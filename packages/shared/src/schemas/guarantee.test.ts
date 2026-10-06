@@ -84,7 +84,7 @@ describe("guaranteeCoverageLine", () => {
         coversLabel: "B1201S King",
         expiresOn: "2041-08-01",
       }),
-    ).toBe("15-year guarantee on B1201S King — one-for-one replacement · valid till 2041-08-01");
+    ).toBe("15-year guarantee on B1201S King · one-for-one replacement · valid till 2041-08-01");
   });
 
   it("says the cover starts on delivery while it is still pending", () => {
@@ -95,7 +95,7 @@ describe("guaranteeCoverageLine", () => {
         coversLabel: null,
         expiresOn: null,
       }),
-    ).toBe("15-year guarantee on the covered item — one-for-one replacement · starts on delivery");
+    ).toBe("15-year guarantee on the covered item · one-for-one replacement · starts on delivery");
   });
 });
 

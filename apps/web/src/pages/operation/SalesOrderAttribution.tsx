@@ -29,12 +29,13 @@
  * so it appears in this file's CODE and never on its SCREEN — the operator reads
  * "who this order belongs to".
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import Button from "@/components/kit/Button";
 import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
 import Textarea from "@/components/kit/Textarea";
+import { useAuth } from "@/lib/auth";
 import { fmtDate } from "@/lib/fmt-date";
 import {
   useApplyAttributionChange,
@@ -60,6 +61,23 @@ function approverWord(approver: AttributionRequest["approver"]): string {
   return approver === "principal" ? "The principal approves this" : "HR or the principal approves this";
 }
 
+/**
+ * GATE 3's deciders, in ONE place.
+ *
+ * The workspace draws the `Change salesperson` door beside the salesperson it
+ * changes, and this file owns the modal behind it — so BOTH need the answer to
+ * "may this person open it". Writing `role === "principal" || role === "hr"` in
+ * two files is this codebase's signature defect: one rule in several places, and
+ * the next role added to none of them. It is written here once and imported.
+ *
+ * A hidden door is courtesy, never security — `sales_order_*_attribution`
+ * (0329) is the control, and it refuses every other role server-side.
+ */
+export function useCanChangeSalesOwnership(): boolean {
+  const role = useAuth((s) => s.role);
+  return role === "principal" || role === "hr";
+}
+
 /** from → to, in names, one line per field that moves. */
 function MoveLine({ label, move }: { label: string; move: { from: string | null; to: string | null } }) {
   return (
@@ -79,6 +97,8 @@ export default function SalesOrderAttribution({
   outletOptions,
   dealerOptions,
   onApplied,
+  inlineTrigger = true,
+  openSignal,
 }: {
   orderId: string;
   current: AttributionCurrent;
@@ -88,11 +108,26 @@ export default function SalesOrderAttribution({
   dealerOptions: Option[];
   /** The order moved — the workspace refetches its revisions and its PDF. */
   onApplied: () => void;
+  /** `false` when the caller draws the door itself — see `openSignal`. This
+   *  component then renders only the request panel and the modal. */
+  inlineTrigger?: boolean;
+  /** A counter the caller bumps to open the form from ITS trigger. Guarded on
+   *  `> 0` so the first render never opens it, and keyed on the counter so a
+   *  cancelled modal can be reopened from the same door
+   *  (`SalesOrderAmendment` uses the identical shape). */
+  openSignal?: number;
 }) {
   const liveQ = useSalesOrderAttribution(orderId);
   const request = liveQ.data?.request ?? null;
+  /* GATE 3 names HR and the principal as the deciders; the owner ruling of
+     2026-08-15 makes them the only ones who may OPEN the change too. A hidden
+     button is courtesy — `sales_order_*_attribution` is still the control. */
+  const canRequest = useCanChangeSalesOwnership();
 
   const [formOpen, setFormOpen] = useState(false);
+  useEffect(() => {
+    if (openSignal && openSignal > 0) setFormOpen(true);
+  }, [openSignal]);
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawReason, setWithdrawReason] = useState("");
   const [salesperson, setSalesperson] = useState<string>("keep");
@@ -132,7 +167,7 @@ export default function SalesOrderAttribution({
   const applyMut = useApplyAttributionChange(orderId, {
     onSuccess: (r) => {
       /* A second Apply is a no-op and says so — it never claims a new revision. */
-      toast.success(r.already_applied ? "Already applied — nothing changed" : `Applied · Rev ${r.revision}`);
+      toast.success(r.already_applied ? "Already applied. Nothing changed" : `Applied · Rev ${r.revision}`);
       void liveQ.refetch();
       onApplied();
     },
@@ -155,7 +190,18 @@ export default function SalesOrderAttribution({
   const keep = (label: string): Option[] => [{ value: "keep", label: `Keep ${label}` }];
 
   return (
-    <div className="mt-3 border-t border-kit-slate-5 pt-3" data-testid="attribution-lane">
+    /* ⭐ NO RULE ACROSS AN EMPTY LANE (YH, 2026-09-01). This div always drew a
+       hairline and 12px of padding, so `Change salesperson` cost a full row of
+       its own under `Sales ownership` — a separator introducing one button.
+       The door moved up beside the Salesperson it changes (the page's own
+       grammar: `Change delivery date` sits under the date it moves). What is
+       left here is the REQUEST panel, which is truth and does deserve a rule,
+       and the modal, which draws nothing until it opens. With neither present
+       this renders an EMPTY div — truly empty, so the SO section body's one
+       12px gap skips it (kit-sizes card, 2026-09-23: an always-present empty
+       button row here cost SO info a phantom 12px). No top margin: the body
+       spaces its groups. */
+    <div className={request ? "border-t border-kit-slate-5 pt-3" : ""} data-testid="attribution-lane">
       {request ? (
         <div
           className="rounded-card border border-kit-slate-5 bg-kit-slate-3 px-3 py-2.5"
@@ -163,7 +209,7 @@ export default function SalesOrderAttribution({
         >
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <span className="text-label font-semibold tracking-wide text-base-700 uppercase">
-              {request.status === "pending" ? "Waiting for approval" : "Approved — not applied yet"}
+              {request.status === "pending" ? "Waiting for approval" : "Approved. Not applied yet"}
             </span>
             <span className="text-meta text-base-500">
               Asked {fmtDate(request.created_at, { time: true })}
@@ -178,7 +224,7 @@ export default function SalesOrderAttribution({
           </div>
 
           {request.reason && (
-            <p className="text-meta text-base-700 mt-2 break-words">Reason — {request.reason}</p>
+            <p className="text-meta text-base-700 mt-2 break-words">Reason: {request.reason}</p>
           )}
           <p className="text-meta text-base-500 mt-1">{approverWord(request.approver)}</p>
 
@@ -266,25 +312,38 @@ export default function SalesOrderAttribution({
               letting the operator assume the approval was the act. */}
           <p className="text-meta text-base-500 mt-2">
             {request.status === "pending"
-              ? "Approving records the decision only — the sales order does not change until it is applied."
+              ? "Approving records the decision only. The sales order does not change until it is applied."
               : "The sales order has not changed yet. Applying writes it and mints a revision."}
           </p>
         </div>
-      ) : (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-meta text-base-500">
-            Sales ownership changes only after approval.
-          </p>
+      ) : canRequest && inlineTrigger ? (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {/* ⭐ READ-ONLY FOR OPERATION — owner ruling 2026-08-15. Who gets paid
+              is not an Operation correction, and a button that always refuses
+              teaches the operator to ignore refusals. The door appears for the
+              roles GATE 3 lets decide it; the REQUEST panel above stays visible
+              to everyone, because a pending change is truth, not an action. */}
+          {/* ⭐ THE DOOR IS JUST ITS VERB NOW — YH, 2026-08-26. It said
+              `Change salesperson — needs approval`, under a line reading "Sales
+              ownership changes only after approval", above a second line
+              reading "This is sent for approval…". THREE statements of one
+              fact, before anybody had pressed anything.
+              The modal this opens already carries that sentence as approved
+              copy, and it is read at the moment it matters — when the operator
+              is filling the form, not while they are scanning past the card.
+              So the two standing lines go and the suffix goes with them; what
+              was a warning becomes a verb. `COPY-STANDARD.md` records the new
+              word and keeps every rejected rename in its `Do NOT use` column. */}
           <Button
             size="sm"
             variant="neutral"
             onClick={() => setFormOpen(true)}
             data-testid="attribution-open"
           >
-            Request ownership change
+            Change salesperson
           </Button>
         </div>
-      )}
+      ) : null}
 
       <Modal
         open={formOpen}

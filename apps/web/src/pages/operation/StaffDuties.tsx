@@ -1,0 +1,201 @@
+import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import ModuleHeader from "./components/ModuleHeader";
+import DutyCatalogue from "./staff-duties/DutyCatalogue";
+import DutyDetail, { DutyHistory } from "./staff-duties/DutyDetail";
+import type { DutyStateFilter } from "./staff-duties/staff-duties-model";
+import Button from "@/components/kit/Button";
+import { useAuth } from "@/lib/auth";
+import { readReturnTo } from "@/lib/return-to";
+import Loading from "@/components/kit/Loading";
+import { appTodayIso } from "@/lib/fmt-date";
+import { useWorkspaceDuties } from "@/lib/queries";
+
+/**
+ * `Settings → Staff & Duties` — the ONE company-wide duty assignment surface
+ * (docs/workspace/MASTER.md §§4.1–4.7; ERP-ARCHITECTURE Global Duty Law).
+ *
+ * It answers three questions and no more: who normally holds each governed
+ * duty, who acts during a dated absence, and what history proves it. It is
+ * not People, leave management, a roster, workload balancing or a manager
+ * dashboard.
+ *
+ * The composition is one CATALOGUE and one SELECTED duty (§4.2), replacing
+ * the document that stacked two forms and a full history under every duty.
+ * Search and `State` are LOCAL — they change which rows a reader sees. The
+ * selected duty lives in the URL, so a Work configuration failure can
+ * deep-link to the duty it needs and the page can be shared.
+ *
+ * Every rule stays in the SQL doors. The page renders the server's
+ * `can_assign` fact and never offers a control the server would refuse: a
+ * reader gets the quiet sentence, not a disabled form.
+ */
+export default function StaffDuties({ settingsNavigation, activitySettings }: { settingsNavigation?: ReactNode; activitySettings?: ReactNode } = {}) {
+  const dutiesQ = useWorkspaceDuties();
+  const personnelManager = useAuth(s => s.role === "principal");
+  const navigate = useNavigate();
+  const location = useLocation();
+  const focusOnReturn = useRef<string | null>(null);
+  const origin = readReturnTo(location.state);
+  const workOrigin = origin?.split("?")[0] === "/operation" && new URLSearchParams(origin.split("?")[1]).get("tab") === "work" ? origin : null;
+  const [params, setParams] = useSearchParams();
+  const [search, setSearch] = useState("");
+  const [stateFilter, setStateFilter] = useState<DutyStateFilter>("all");
+  /* The COMPANY date, read once per render from the governed clock — never a
+     `new Date()` inside a comparison (§4.4). */
+  const today = appTodayIso();
+
+  const duties = useMemo(() => dutiesQ.data?.duties ?? [], [dutiesQ.data]);
+  const requested = params.get("duty");
+  const known = duties.some((d) => d.key === requested);
+  const selectedKey = known ? requested! : (duties[0]?.key ?? "");
+  /* Explicit = the reader chose this duty. Below 1024px that is what opens
+     the detail; from `lg` both panes are always on screen. */
+  const explicit = known;
+
+  /* An unknown duty key is CORRECTED, not obeyed — and it is replaced, so
+     Back never walks the reader through a key that never existed. */
+  useEffect(() => {
+    if (!requested || known || duties.length === 0) return;
+    const next = new URLSearchParams(params);
+    next.set("duty", duties[0]!.key);
+    setParams(next, { replace: true, state: location.state });
+  }, [requested, known, duties, params, setParams, location.state]);
+
+  function select(key: string) {
+    const next = new URLSearchParams(params);
+    next.set("duty", key);
+    setParams(next, { state: location.state });
+  }
+
+  function back() {
+    focusOnReturn.current = selectedKey;
+    const next = new URLSearchParams(params);
+    next.delete("duty");
+    setParams(next, { state: location.state });
+  }
+
+  useEffect(() => {
+    if (explicit || !focusOnReturn.current) return;
+    const key = focusOnReturn.current;
+    const frame = requestAnimationFrame(() => {
+      document.querySelector<HTMLButtonElement>(`[data-testid="duty-catalogue-${key}"]`)?.focus();
+      focusOnReturn.current = null;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [explicit, selectedKey]);
+
+  const selected = duties.find((d) => d.key === selectedKey) ?? null;
+  const canAssign = dutiesQ.data?.can_assign === true;
+  /* The catalogue is CODE-owned (packages/shared/src/workspace-duties-catalogue.ts).
+     A healthy response with zero duties is therefore a CONFIGURATION failure,
+     not an empty list — `No duties yet` would tell the reader that Carres has
+     no duties, which is never true (§4.5). */
+  const broken = !dutiesQ.isLoading && duties.length === 0;
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <ModuleHeader
+        testId="staff-duties-destination-header"
+        word="Staff & Duties"
+        docTitle="Staff & Duties · Settings · Carres"
+        destinationHeader
+        right={personnelManager ? <Button onClick={() => navigate("/hr?tab=people", { state: { returnTo: `${location.pathname}${location.search}` } })}>Manage staff</Button> : undefined}
+      />
+      <div className="flex min-h-0 flex-1 flex-col bg-white" data-testid="staff-duties">
+        {(settingsNavigation || workOrigin) ? <div className="flex flex-wrap items-center gap-3 px-6 pt-3">
+          {settingsNavigation}
+          {workOrigin ? <Button onClick={() => navigate(workOrigin)}>Back to work</Button> : null}
+        </div> : null}
+        {activitySettings}
+        {dutiesQ.isError && duties.length > 0 ? <div role="alert" className="flex flex-wrap items-center gap-3 px-6 pt-3">
+          <p className="text-meta">Staff &amp; Duties could not be opened</p>
+          <Button onClick={() => void dutiesQ.refetch()}>Try again</Button>
+        </div> : null}
+        {dutiesQ.isLoading ? (
+          /* Skeletons keep the page's geometry, so nothing jumps when the read
+             lands — and nothing here claims a duty is unheld while it is still
+             open. */
+          <div className="flex min-h-0 flex-1 flex-col">
+            <p
+              role="status"
+              className="px-6 pt-3 text-meta text-kit-slate-9"
+            >
+              Opening Staff &amp; Duties…
+            </p>
+            <div
+              data-testid="staff-duties-split"
+              className="mt-2 grid min-h-0 flex-1 lg:grid-cols-[minmax(240px,272px)_minmax(0,1fr)] min-[1440px]:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]"
+            >
+              <div
+                data-testid="duty-catalogue-skeleton"
+                className="border-kit-slate-5 px-4 py-3 lg:border-r"
+              >
+                <Loading variant="skeleton" lines={8} label="Opening Staff & Duties…" />
+              </div>
+              <div data-testid="duty-detail-skeleton" className="px-6 py-4">
+                <Loading variant="skeleton" lines={5} label="Opening Staff & Duties…" />
+              </div>
+            </div>
+          </div>
+        ) : broken ? (
+          /* A failure sentence is never the empty sentence — what broke, then
+             the act that fixes it. It never infers that nobody holds a duty. */
+          <div className="flex flex-col items-center gap-3 py-8">
+            <p className="text-body text-kit-slate-12">
+              Staff &amp; Duties could not be opened
+            </p>
+            <button
+              type="button"
+              className="rounded-control border border-kit-slate-5 bg-white px-3 py-1.5 text-meta font-medium text-kit-slate-11 hover:text-kit-slate-12"
+              onClick={() => void dutiesQ.refetch()}
+            >
+              Try again
+            </button>
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <p className="px-6 pt-3 text-meta text-kit-slate-11">
+              Who is assigned to each duty.
+            </p>
+            <div
+              data-testid="staff-duties-split"
+              className="mt-2 grid min-h-0 flex-1 lg:grid-cols-[minmax(240px,272px)_minmax(0,1fr)] min-[1440px]:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]"
+            >
+              <DutyCatalogue
+                duties={duties}
+                selectedKey={selectedKey}
+                onSelect={select}
+                search={search}
+                onSearchChange={setSearch}
+                stateFilter={stateFilter}
+                onStateFilterChange={setStateFilter}
+                today={today}
+                hiddenWhenDetailOpen={explicit}
+              />
+              <div
+                data-testid="duty-detail"
+                className={`min-h-0 overflow-y-auto px-6 py-4 ${
+                  explicit ? "block" : "hidden lg:block"
+                }`}
+              >
+                {selected ? (
+                  <>
+                    <DutyDetail
+                      key={`detail-${selected.key}`}
+                      duty={selected}
+                      canAssign={canAssign}
+                      today={today}
+                      onBack={explicit ? back : undefined}
+                    />
+                    <DutyHistory key={`history-${selected.key}`} duty={selected} />
+                  </>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

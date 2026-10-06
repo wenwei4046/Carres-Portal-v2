@@ -37,11 +37,44 @@ export function maxLeadDaysFor(
   return gated ? Math.max(0, Math.trunc(earliestSellDays)) : 0;
 }
 
-/** Formats `today + n days` as an ISO yyyy-mm-dd string. Used by the wizard
- *  Step 3 date picker's `min` attribute + the validity checks in draft.ts. */
+/**
+ * THE CATEGORIES THAT ARE SOLD ON TOP OF SOMETHING ELSE, NEVER ON THEIR OWN.
+ *
+ * `docs/guarantee/MASTER.md` already says it for one of them — *"a guarantee
+ * only sells attached to the item it covers"*. The owner ruling of 2026-08-15
+ * generalises it to the whole cart: **a Sales Order must contain goods.** A
+ * service with no product on the same order is not a sale, it is a Service
+ * Case, and it belongs to the Service channel.
+ */
+export const ATTACHED_ONLY_CATEGORIES = ["service", "guarantee"] as const;
+
+/**
+ * True when the cart's resolved `product_models.category` values contain at
+ * least one goods line.
+ *
+ * **An unrecognised category counts as GOODS.** Only a line we can POSITIVELY
+ * identify as service or guarantee may be refused, so a legacy, imported or
+ * not-yet-catalogued SKU never blocks a real sale — the same positive-
+ * recognition rule `line-category.ts` applies to accessories.
+ *
+ * An EMPTY cart is not the goods gate's business (the schema's `min(1)` owns
+ * it) and reports `false` here only so a caller cannot read "no lines" as
+ * "goods present".
+ */
+export function cartHasGoods(
+  categories: readonly (string | null | undefined)[],
+): boolean {
+  const attached = ATTACHED_ONLY_CATEGORIES as readonly string[];
+  return categories.some((c) => !c || !attached.includes(c));
+}
+
+/** Today in Kuala Lumpur plus `leadDays`, as yyyy-mm-dd. Used by the wizard
+ *  Step 3 date picker's `min` attribute + the validity checks in draft.ts.
+ *  Malaysia is UTC+8 with no daylight saving, so moving the instant forward
+ *  8 hours makes its UTC date the KL date, whatever the machine's timezone. */
 export function minDeliveryDateISO(leadDays: number, today: Date = new Date()): string {
-  const d = new Date(today);
-  d.setDate(d.getDate() + leadDays);
+  const d = new Date(today.getTime() + 8 * 3_600_000);
+  d.setUTCDate(d.getUTCDate() + leadDays);
   return d.toISOString().slice(0, 10);
 }
 
@@ -106,3 +139,24 @@ export const SIZELESS_CATEGORIES = ["service", "guarantee"] as const;
 export function categoryHasSizeAxis(category: string | undefined | null): boolean {
   return !!category && !(SIZELESS_CATEGORIES as readonly string[]).includes(category);
 }
+
+/**
+ * THE INSTALMENT TERMS CARRES OFFERS.
+ *
+ * ⚠️ NOBODY WROTE DOWN WHY IT IS 6 AND 12 (measured 2026-09-01). There is no
+ * ruling from Jess, Chai or Loo anywhere in this repository. The database
+ * CHECK (`0007`) says `{6, 12}` and its header explains only why the COLUMN
+ * exists — "the wizard already collects these three fields" — so the constraint
+ * copied a hardcoded pair of buttons in `Step3SignaturePayment.tsx` and that is
+ * the whole provenance.
+ *
+ * ⛔ AND THE "6/12" IN THE DOCS IS A DATE. `Jess 2026-07-19 … shipped 6/12`,
+ * `the 6/12 ops overhaul`, `on prod since 6/12` — every one of those is 12 June
+ * or 6 December, not a month count. Anyone grepping for a ruling will find them
+ * and should not believe them.
+ *
+ * So this is the recorded truth and not a decided one. Adding 24 or 36 is a
+ * business ruling plus a migration, not an edit here.
+ */
+export const INSTALMENT_MONTHS = [6, 12] as const;
+export type InstalmentMonths = (typeof INSTALMENT_MONTHS)[number];

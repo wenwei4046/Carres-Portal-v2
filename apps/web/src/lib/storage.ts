@@ -81,7 +81,7 @@ function contentTypeFromFilename(filename: string): string {
   const mime = SAFE_CONTENT_TYPE_BY_EXT[ext];
   if (!mime) {
     throw new Error(
-      `Unsupported attachment extension: .${ext || "(none)"} — only png/jpg/heic/pdf allowed`,
+      `Unsupported attachment extension: .${ext || "(none)"}. Only png/jpg/heic/pdf allowed`,
     );
   }
   return mime;

@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import WarehouseSidebar from "./WarehouseSidebar";
 import WarehouseIncoming from "./WarehouseIncoming";
 import WarehouseMyReceipts from "./WarehouseMyReceipts";
+import WarehouseOutboundDoor from "./WarehouseOutboundDoor";
 
 /**
  * Warehouse portal shell — R6 of the receiving & claim queue (Jess 2026-07-27).
@@ -12,6 +13,8 @@ import WarehouseMyReceipts from "./WarehouseMyReceipts";
  *
  *   Incoming    — POs coming to THIS warehouse + the receiving form
  *   My receiving — what we filed, and what Carres did with it
+ *   Outbound    — Warehouse Card 03: the customer-DO exact-Unit handover door
+ *                 (scan / check / pack / hand over with receiver + proof)
  *
  * What is deliberately absent: prices, stock adjustments, settings, deletes,
  * other warehouses. Not hidden — unreachable. Every read and write behind this
@@ -27,6 +30,7 @@ export default function WarehouseApp() {
           <Route index element={<Navigate to="incoming" replace />} />
           <Route path="incoming" element={<WarehouseIncoming />} />
           <Route path="receipts" element={<WarehouseMyReceipts />} />
+          <Route path="outbound" element={<WarehouseOutboundDoor />} />
           <Route path="*" element={<Navigate to="incoming" replace />} />
         </Routes>
       </main>

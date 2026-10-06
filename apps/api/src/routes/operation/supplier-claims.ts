@@ -2,71 +2,82 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
-  CUSTOMER_RESOLUTION_KEYS,
+  SUPPLIER_CLAIM_DECISION_KEYS,
   HELD_STOCK_STATUS,
   STOCK_HOLD_OUTCOME_KEYS,
   SUPPLIER_CLAIM_LATE,
   SUPPLIER_CLAIM_REQUEST_KEYS,
   SUPPLIER_CLAIM_RESPONSE_KEYS,
+  SUPPLIER_CLAIM_WORK_RULE,
   claimNextMove,
   holdOutcomeNeedsNote,
 } from "@carres/shared";
+import { supplierClaimWorkCompletion } from "../../lib/supplier-claim-work";
+import { readClaimFacts, registerSupplierClaimRecordRoutes } from "./supplier-claim-record";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { chunk } from "../../lib/purchase-demand-read";
 import { adminClient, userClient } from "../../lib/supabase";
+import { resolveActorNames } from "../../lib/actor-names";
+import { purchasingPoDutyMayAct } from "../../lib/purchasing-po-authority";
 import type { AppEnv } from "../../types";
 
 /**
- * /api/operation/supplier-claims — R2 + R3 of the receiving & claim queue
- * (docs/receiving-claim-execution-queue.md, Jess 2026-07-27).
+ * Supplier Claim reads and legacy mutation routes.
+ * Purchasing MASTER §9.5 (2026-09-06) governs the approved Case-linked target.
+ * The register reads every permitted row, actual Catalog descriptions and held
+ * Stock Unit codes. Photos are signed only after an authorised Claim read.
  *
- * A claim is never FILED here: claims are minted inside
- * `operation_receive_po_with_do` (a damaged / wrong-item report) and
- * `supplier_claim_sweep_overdue` (a promise the supplier did not keep), both in
- * migration 0288, and a guard trigger refuses any PO-line issue that has no
- * covering claim. A hand-filed claim would be a receiving problem with no
- * receiving behind it — the exact hole the queue exists to close.
- *
- * What R3 adds is the claim's LIFE: what we asked, what they answered, and the
- * close. Each is its own RPC in 0291 — `supplier_claims` has no write policy at
- * all, so there is no PostgREST door that can edit a claim by hand.
- *
- * R4 adds the GOODS. A damaged or wrong unit is quarantined by the same receive
- * that raised the claim (`on_hold`, migration 0299) and can never be sold,
- * reserved or delivered until somebody says what happened to it. The claim is
- * where that is said, because the claim is the thing that knows the answer.
- *
- * Layer ③ adds the CUSTOMER (0324). `Customer Resolution` answers "what are we
- * doing for the customer?" and is a SECOND decision beside the item's outcome,
- * never a replacement for it — the customer can cancel AND the mattress be
- * destroyed, and a single list would force the operator to record only one of
- * the two. It derives no consequence: consequences are f(Resolution, Execution)
- * and Carres Execution is frozen-but-unbuilt (Loo, 2026-08-05).
- *
- *   GET  /                — the queue (status filter, names, who owes next)
- *   GET  /:id/photos      — signed URLs for that claim's evidence
- *   POST /:id/request     — what WE ask the supplier to do
- *   POST /:id/response    — what the SUPPLIER answered
- *   POST /:id/close       — settle it (refuses unless both sides are on file)
- *   POST /:id/hold-resolve — R4: what happened to the quarantined units
- *   POST /:id/customer-resolution — layer ③: what we are doing for the customer
- *
- * Role: operation + principal, on every route. `supplier_claims` RLS admits
- * every internal role (principal/operation/finance/bd) for SELECT; this
- * endpoint is narrower on purpose — the claim desk is an operations surface,
- * and finance has no move to make on a claim (a claim NEVER produces a credit
- * note; resolutions are goods actions). Widen it when a card asks for it, not
- * before. The RPCs gate independently, so this is defence in depth rather than
- * the only lock.
+ * Legacy request/answer/customer/execution/stock/close RPCs remain here for
+ * compatibility; they are not the approved scoped instruction or completion
+ * contract. The new read-only UI does not expose them as replacement authorities.
+ * Case intake/linking, versioned conversation, shared Work, scoped execution and
+ * Finance-backed closure remain explicit dependencies before operational release.
  */
 const supplierClaimsRouter = new Hono<AppEnv>();
 
 const DEFAULT_LIMIT = 200;
+const CLAIM_READ_CONCURRENCY = 4;
 const SIGNED_URL_TTL_SECONDS = 3600;
 /** A note long enough to record a real agreement, short enough not to become a
  *  document. Prose belongs in the note, never instead of the picked answer. */
 const NOTE_MAX = 500;
 
 type ClaimPhoto = { path: string; at?: string; by?: string | null };
+type ClaimReadError = { code?: string; message?: string; details?: string };
+type ClaimPagedRead<T> = {
+  range: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: T[] | null; error: ClaimReadError | null }>;
+};
+
+async function readEveryClaimRelation<T>(
+  ids: readonly string[],
+  query: (batch: string[]) => ClaimPagedRead<T>,
+): Promise<{ data: T[]; error: ClaimReadError | null }> {
+  const data: T[] = [];
+  const batches = chunk([...new Set(ids)]);
+  for (let index = 0; index < batches.length; index += CLAIM_READ_CONCURRENCY) {
+    const group = await Promise.all(
+      batches.slice(index, index + CLAIM_READ_CONCURRENCY).map(async (batch) => {
+        const rows: T[] = [];
+        for (let from = 0; ; from += DEFAULT_LIMIT) {
+          const result = await query(batch).range(from, from + DEFAULT_LIMIT - 1);
+          if (result.error) return { data: [] as T[], error: result.error };
+          const page = result.data ?? [];
+          rows.push(...page);
+          if (page.length < DEFAULT_LIMIT) break;
+        }
+        return { data: rows, error: null };
+      }),
+    );
+    for (const result of group) {
+      if (result.error) return { data: [], error: result.error };
+      data.push(...result.data);
+    }
+  }
+  return { data, error: null };
+}
 
 function gate(c: { var: { auth: { role: string } } }) {
   const role = c.var.auth.role;
@@ -90,61 +101,120 @@ supplierClaimsRouter.get("/", async (c) => {
   const statusParam = (c.req.query("status") ?? "open").toLowerCase();
   const status =
     statusParam === "closed" || statusParam === "all" ? statusParam : "open";
+  const poId = c.req.query("poId")?.trim() || null;
 
-  let q = sb
-    .from("supplier_claims")
-    .select(
-      "id, claim_no, po_id, po_line_id, supplier_id, sku, product_category, claim_type, qty, status, do_number, photos, note, reported_by, reported_at, requested_action, requested_at, supplier_response, supplier_response_note, responded_at, closed_at, close_note, customer_resolution, customer_resolution_note, customer_resolution_at",
-    )
-    .order("reported_at", { ascending: false })
-    .limit(DEFAULT_LIMIT);
-  if (status !== "all") q = q.eq("status", status);
+  const claims: Array<Record<string, unknown>> = [];
+  for (let from = 0; ; from += DEFAULT_LIMIT) {
+    let q = sb
+      .from("supplier_claims")
+      .select(
+        "id, claim_no, po_id, po_line_id, warehouse_receipt_id, supplier_id, sku, product_category, claim_type, qty, status, do_number, photos, note, reported_by, reported_at, requested_action, requested_at, supplier_response, supplier_response_note, responded_at, closed_at, close_note, customer_resolution, customer_resolution_note, customer_resolution_at, carres_execution, carres_execution_note, carres_execution_at, requested_by, responded_by, supplier_response_reply_id, reply_waiting_days, escalation_extra_days",
+      )
+      .order("reported_at", { ascending: false })
+      .order("id", { ascending: false });
+    if (status !== "all") q = q.eq("status", status);
+    if (poId) q = q.eq("po_id", poId);
 
-  const { data, error } = await q;
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    const { data, error } = await q.range(from, from + DEFAULT_LIMIT - 1);
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    const page = (data ?? []) as Array<Record<string, unknown>>;
+    claims.push(...page);
+    // Search, factual rail counts and export must cover the full permitted set.
+    if (page.length < DEFAULT_LIMIT) break;
   }
-  const claims = (data ?? []) as Array<Record<string, unknown>>;
 
   // Counts for the tab chips come from a separate, unfiltered head-count so the
   // numbers stay right even when the visible page is capped at DEFAULT_LIMIT.
-  const [{ count: openCount }, { count: closedCount }] = await Promise.all([
-    sb
-      .from("supplier_claims")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "open"),
-    sb
-      .from("supplier_claims")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "closed"),
-  ]);
+  let openCount: number;
+  let closedCount: number;
+  {
+    /* ⛔ A COUNT MAY NOT BE DERIVED FROM AN ALREADY-FILTERED PAGE (YH,
+       2026-09-01). The PO branch counted the rows it had just fetched — but
+       those rows are narrowed by `status` when the caller names one, so
+       `?poId=X&status=open` reported ZERO closed claims for a PO that has
+       them. It was invisible while the only caller asked for `all`; wiring
+       the page's `?po=` door makes the stage chips real, and a chip that
+       says 0 is read as "this PO has none", not as "you filtered them out".
+
+       The same two exact head-counts the general branch already runs, with
+       the PO filter applied when there is one. A head count is not narrowed
+       by the page window either, which is the reason they exist. */
+    const scoped = (state: "open" | "closed") => {
+      let q = sb
+        .from("supplier_claims")
+        .select("id", { count: "exact", head: true })
+        .eq("status", state);
+      if (poId) q = q.eq("po_id", poId);
+      return q;
+    };
+    const [openResult, closedResult] = await Promise.all([
+      scoped("open"),
+      scoped("closed"),
+    ]);
+    if (openResult.error || closedResult.error) {
+      const m = mapPgError(openResult.error ?? closedResult.error!);
+      return c.json(m.body, m.status);
+    }
+    openCount = openResult.count ?? 0;
+    closedCount = closedResult.count ?? 0;
+  }
 
   const supplierIds = [
     ...new Set(claims.map((r) => r.supplier_id as string).filter(Boolean)),
   ];
-  const reporterIds = [
-    ...new Set(claims.map((r) => r.reported_by as string).filter(Boolean)),
-  ];
+
+  const grnNumbers = new Map<string, string>();
+  const receiptIds = [...new Set(claims.map((row) => row.warehouse_receipt_id as string).filter(Boolean))];
+  if (receiptIds.length) {
+    const result = await readEveryClaimRelation<Record<string, unknown>>(
+      receiptIds, (ids) => sb.from("warehouse_receipts").select("id, grn_no").in("id", ids),
+    );
+    if (result.error) {
+      const mapped = mapPgError(result.error);
+      return c.json(mapped.body, mapped.status);
+    }
+    for (const row of result.data) if (row.grn_no) grnNumbers.set(String(row.id), String(row.grn_no));
+  }
+
+  const descriptions = new Map<string, string>();
+  const variants = new Map<string, string>();
+  const skuKeys = [...new Set(claims.map((row) => String(row.sku)).filter(Boolean))];
+  if (skuKeys.length) {
+    const result = await readEveryClaimRelation<Record<string, unknown>>(
+      skuKeys, (keys) => sb.from("product_skus").select("sku, variant, product_models(name)").in("sku", keys),
+    );
+    if (result.error) {
+      const mapped = mapPgError(result.error);
+      return c.json(mapped.body, mapped.status);
+    }
+    for (const row of result.data) {
+      const relation = row.product_models;
+      const model = (Array.isArray(relation) ? relation[0] : relation) as { name?: string | null } | null;
+      if (model?.name) descriptions.set(String(row.sku), model.name);
+      if (row.variant) variants.set(String(row.sku), String(row.variant));
+    }
+  }
 
   const supplierNames = new Map<string, string>();
   if (supplierIds.length > 0) {
-    const { data: sup } = await sb
-      .from("suppliers")
-      .select("id, name")
-      .in("id", supplierIds);
-    for (const s of sup ?? [])
+    const result = await readEveryClaimRelation<Record<string, unknown>>(
+      supplierIds,
+      (ids) => sb.from("suppliers").select("id, name").in("id", ids),
+    );
+    if (result.error) {
+      const m = mapPgError(result.error);
+      return c.json(m.body, m.status);
+    }
+    for (const s of result.data)
       supplierNames.set(s.id as string, s.name as string);
   }
-  const reporterNames = new Map<string, string>();
-  if (reporterIds.length > 0) {
-    const { data: users } = await sb
-      .from("app_users")
-      .select("id, name")
-      .in("id", reporterIds);
-    for (const u of users ?? [])
-      reporterNames.set(u.id as string, u.name as string);
-  }
+  const reporterNames = await resolveActorNames(
+    sb,
+    claims.map((r) => r.reported_by as string | null),
+  );
 
   // R3 — does the PO line behind a LATE claim still owe us units?
   //
@@ -167,11 +237,15 @@ supplierClaimsRouter.get("/", async (c) => {
   ];
   const linePending = new Map<string, boolean>();
   if (lateLineIds.length > 0) {
-    const { data: lines } = await sb
-      .from("purchase_order_lines")
-      .select("id, qty, received_qty")
-      .in("id", lateLineIds);
-    for (const l of lines ?? []) {
+    const result = await readEveryClaimRelation<Record<string, unknown>>(
+      lateLineIds,
+      (ids) => sb.from("purchase_order_lines").select("id, qty, received_qty").in("id", ids),
+    );
+    if (result.error) {
+      const m = mapPgError(result.error);
+      return c.json(m.body, m.status);
+    }
+    for (const l of result.data) {
       linePending.set(
         l.id as string,
         Number(l.qty ?? 0) > Number(l.received_qty ?? 0),
@@ -187,22 +261,35 @@ supplierClaimsRouter.get("/", async (c) => {
   // already been resolved). The panel must say what is true of the goods, not
   // what was true of the paperwork.
   const claimIds = claims.map((r) => r.id as string);
-  const heldByClaim = new Map<string, { units: number; reason: string | null }>();
+  const heldByClaim = new Map<string, { units: number; reason: string | null; codes: string[] }>();
   if (claimIds.length > 0) {
-    const { data: held } = await sb
-      .from("ops_stock_items")
-      .select("hold_claim_id, hold_reason")
-      .in("hold_claim_id", claimIds)
-      .eq("status", HELD_STOCK_STATUS);
-    for (const u of held ?? []) {
+    const result = await readEveryClaimRelation<Record<string, unknown>>(
+      claimIds,
+      (ids) => sb
+        .from("ops_stock_items")
+        .select("hold_claim_id, hold_reason, id, unit_code")
+        .in("hold_claim_id", ids)
+        .eq("status", HELD_STOCK_STATUS),
+    );
+    if (result.error) {
+      const m = mapPgError(result.error);
+      return c.json(m.body, m.status);
+    }
+    for (const u of result.data) {
       const key = u.hold_claim_id as string;
       const prev = heldByClaim.get(key);
       heldByClaim.set(key, {
         units: (prev?.units ?? 0) + 1,
         reason: prev?.reason ?? ((u.hold_reason as string | null) ?? null),
+        codes: [...(prev?.codes ?? []), ...(u.unit_code ? [String(u.unit_code)] : [])],
       });
     }
   }
+
+  // §9.5 PO No line two — EVERY Unit this claim names (a released hold keeps
+  // its claim link), read on its own so a failure reads `Units could not be
+  // loaded` on the row instead of failing the register.
+  const facts = await readClaimFacts(sb, claims);
 
   return c.json({
     claims: claims.map((r) => {
@@ -214,6 +301,9 @@ supplierClaimsRouter.get("/", async (c) => {
       return {
         ...r,
         supplier_name,
+        product_description: descriptions.get(String(r.sku)) ?? null,
+        product_variant: variants.get(String(r.sku)) ?? null,
+        grn_no: grnNumbers.get(String(r.warehouse_receipt_id)) ?? null,
         reported_by_name: r.reported_by
           ? (reporterNames.get(r.reported_by as string) ?? null)
           : null,
@@ -222,6 +312,12 @@ supplierClaimsRouter.get("/", async (c) => {
         // R4 — the goods, as they stand right now.
         held_units: held?.units ?? 0,
         hold_reason: held?.reason ?? null,
+        held_unit_codes: held?.codes ?? [],
+        units: facts.units ? (facts.units.get(r.id as string) ?? []) : null,
+        sent: facts.sent ? facts.sent.has(r.id as string) : null,
+        response_reply: r.supplier_response_reply_id
+          ? (facts.replies?.get(r.supplier_response_reply_id as string) ?? null)
+          : null,
         // Computed here so the row, the button and any future digest all read
         // the same sentence — one rule, in the shared module.
         next_move: claimNextMove({
@@ -236,9 +332,9 @@ supplierClaimsRouter.get("/", async (c) => {
       };
     }),
     counts: {
-      open: openCount ?? 0,
-      closed: closedCount ?? 0,
-      all: (openCount ?? 0) + (closedCount ?? 0),
+      open: openCount,
+      closed: closedCount,
+      all: openCount + closedCount,
     },
   });
 });
@@ -284,6 +380,62 @@ supplierClaimsRouter.get("/:id/photos", async (c) => {
   return c.json({ photos });
 });
 
+// ----- GET /:id/inspection -----
+//
+// §9.5 "Row expansion — the per-Unit evidence inspector" (read-only). Every
+// stored file with its kind and — only when it was filed with one (0614) — the
+// Unit it shows; and each held Unit's OWN recorded problem note from receiving
+// (`receiving_unit_results`, outcome `received_with_issue`). The shared
+// `supplierClaimInspectionRows` decides which row each fact belongs to; this
+// route attributes nothing. Read through the caller's JWT first, then signed.
+supplierClaimsRouter.get("/:id/inspection", async (c) => {
+  gate(c);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const id = c.req.param("id");
+  const { data, error } = await sb.from("supplier_claims").select("id, photos").eq("id", id).maybeSingle();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!data) throw new HTTPException(404, { message: "claim not found" });
+
+  const units = await sb.from("ops_stock_items").select("id").eq("hold_claim_id", id);
+  if (units.error) {
+    const m = mapPgError(units.error);
+    return c.json(m.body, m.status);
+  }
+  const unitIds = ((units.data ?? []) as Array<{ id: string }>).map((u) => u.id);
+  const problems = new Map<string, string | null>();
+  if (unitIds.length) {
+    const results = await readEveryClaimRelation<Record<string, unknown>>(unitIds, (ids) =>
+      sb.from("receiving_unit_results").select("stock_item_id, note, outcome, created_at")
+        .in("stock_item_id", ids).eq("outcome", "received_with_issue").order("created_at", { ascending: true }));
+    if (results.error) {
+      const m = mapPgError(results.error);
+      return c.json(m.body, m.status);
+    }
+    // The latest recorded result for the Unit is its problem as it stands.
+    for (const r of results.data) problems.set(String(r.stock_item_id), (r.note as string | null)?.trim() || null);
+  }
+
+  const entries = (Array.isArray(data.photos) ? data.photos : []) as Array<ClaimPhoto & { unit_code?: string | null }>;
+  const admin = adminClient(c.env);
+  const files = await Promise.all(entries.map(async (e) => {
+    const { data: signed } = await admin.storage.from("delivery-orders").createSignedUrl(e.path, SIGNED_URL_TTL_SECONDS);
+    return {
+      path: e.path,
+      at: e.at ?? null,
+      kind: /\.(mp4|mov|m4v|webm)$/i.test(e.path) ? "video" as const : "photo" as const,
+      unit_code: typeof e.unit_code === "string" && e.unit_code ? e.unit_code : null,
+      url: signed?.signedUrl ?? null,
+    };
+  }));
+  return c.json({
+    files,
+    problems: [...problems].map(([stock_item_id, note]) => ({ stock_item_id, note })),
+  });
+});
+
 // ----- R3 · the three moves -------------------------------------------------
 //
 // Each one is a thin door onto an RPC in 0291. The rules — which ask is legal
@@ -299,8 +451,23 @@ const requestSchema = z.object({
   note: noteSchema,
 });
 
+/** §9.5 reply form (owner approval 2026-09-25): answer · Applies to ·
+ *  Supplier's date · Evidence (files and/or the phone answer) · Note. The
+ *  database (0607) is the rule; zod refuses obvious junk before a round-trip. */
 const responseSchema = z.object({
   supplier_response: z.enum(SUPPLIER_CLAIM_RESPONSE_KEYS),
+  scope: z.enum(["claim", "units"]),
+  unit_ids: z.array(z.string().uuid()).max(200).default([]),
+  supplier_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  note: noteSchema,
+  evidence: z.array(z.object({ path: z.string().min(1).max(300), kind: z.enum(["photo", "video", "pdf"]) })).max(12).default([]),
+  spoke_with: z.string().trim().max(120).nullable().optional(),
+  spoken_at: z.string().datetime({ offset: true }).nullable().optional(),
+});
+
+const sendSchema = z.object({
+  channel: z.enum(["whatsapp", "email", "print"]),
+  recipient: z.string().trim().min(1).max(160),
   note: noteSchema,
 });
 
@@ -325,24 +492,53 @@ supplierClaimsRouter.post("/:id/request", async (c) => {
   return c.json(data ?? {});
 });
 
-/** POST /:id/response — what the SUPPLIER answered. Does NOT close the claim:
- *  an answer is a promise, and the goods usually arrive days later. */
-supplierClaimsRouter.post("/:id/response", async (c) => {
+/** POST /:id/response — what the SUPPLIER answered, with its scope, date and
+ *  evidence (0607). Does NOT close the claim: an answer is a promise, and the
+ *  goods usually arrive days later. A reply before any ask is kept as contact
+ *  evidence and becomes the formal reply when the ask is recorded. */
+supplierClaimsRouter.post("/:id/response", supplierClaimWorkCompletion([SUPPLIER_CLAIM_WORK_RULE.obtainReply, SUPPLIER_CLAIM_WORK_RULE.noReplyDecision]), async (c) => {
   gate(c);
   const parsed = await parseJsonBody(c, responseSchema);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
 
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("supplier_claim_record_response", {
+  const d = parsed.data;
+  const { data, error } = await sb.rpc("supplier_claim_record_reply", {
     p_claim_id: c.req.param("id"),
-    p_response: parsed.data.supplier_response,
-    p_note: parsed.data.note ?? null,
+    p_response: d.supplier_response,
+    p_scope: d.scope,
+    p_unit_ids: d.unit_ids,
+    p_supplier_date: d.supplier_date ?? null,
+    p_note: d.note ?? null,
+    p_evidence: d.evidence,
+    p_spoke_with: d.spoke_with || null,
+    p_spoken_at: d.spoken_at ?? null,
   });
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
   return c.json(data ?? {});
+});
+
+/** POST /:id/send — `Claim sent to supplier`: the actual message staff sent,
+ *  confirmed. Opening WhatsApp or copying never reaches this door (§9.5). */
+supplierClaimsRouter.post("/:id/send", supplierClaimWorkCompletion([SUPPLIER_CLAIM_WORK_RULE.issueClaim]), async (c) => {
+  gate(c);
+  const parsed = await parseJsonBody(c, sendSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("supplier_claim_record_send", {
+    p_claim_id: c.req.param("id"),
+    p_channel: parsed.data.channel,
+    p_recipient: parsed.data.recipient,
+    p_note: parsed.data.note ?? null,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ id: data ?? null });
 });
 
 /** POST /:id/close — settle it. The RPC refuses unless BOTH sides are on file
@@ -414,39 +610,74 @@ supplierClaimsRouter.post("/:id/hold-resolve", async (c) => {
   return c.json(data ?? {});
 });
 
-// ----- Layer ③ · what we are doing for the CUSTOMER -------------------------
+// ----- Layer ③ · the customer resolution — RETIRED as a door ----------------
 //
-// Beside the item's outcome, never instead of it. Loo's test (2026-08-05): can
-// both be true at the same time? The customer cancelled AND the mattress is
-// destroyed — so two fields, two doors, and this one touches no stock.
-//
-// Deliberately NOT gated on the supplier's answer: a customer who cancels does
-// not wait for the factory to reply. Re-recordable while the claim is open and
-// refused once closed — the RPC decides both, exactly as with the other moves.
-const customerResolutionSchema = z.object({
-  customer_resolution: z.enum(CUSTOMER_RESOLUTION_KEYS),
+// OWNER RULING (Jess, 2026-09-29): the customer remedy belongs to the related
+// Service Case, and `customer_resolution = repair / replace` is now written
+// ONLY by the one supplier-side decision below (it is the value the Repair
+// Order and supplier-replacement doors read). The 0324 route that wrote it
+// directly is removed and its database door is closed to callers (0609); the
+// stored values stay readable on the claim's rows.
+
+/**
+ * Layer ④ — in what ORDER the goods move (0409).
+ *
+ * The last of Loo's four layers, ruled 2026-08-05 alongside layer ③ and left
+ * frozen until now. It is a SEPARATE axis from the customer's resolution, not a
+ * narrowing of it: `replace` is a promise, and `Replace First` and
+ * `Collect First` are two ways of keeping it that leave Carres holding a
+ * different number of units for as long as the collection takes.
+ *
+ * Deliberately shaped exactly like the customer-resolution route above — same
+ * gate, same optional note, same enum-from-shared. Two layers recorded through
+ * two doors that behave differently is how they start disagreeing about who may
+ * record what.
+ *
+ * **It still derives no consequence.** f(Resolution, Execution) is computable
+ * for the first time, but which stock, finance and demand moves each pair
+ * produces is unruled, and this route is not where that gets guessed.
+ */
+const carresExecutionSchema = z.object({
+  carres_execution: z.enum(SUPPLIER_CLAIM_DECISION_KEYS),
   note: noteSchema,
 });
 
-supplierClaimsRouter.post("/:id/customer-resolution", async (c) => {
+supplierClaimsRouter.post("/:id/carres-execution", async (c) => {
   gate(c);
-  const parsed = await parseJsonBody(c, customerResolutionSchema);
+  const parsed = await parseJsonBody(c, carresExecutionSchema);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
 
   const sb = userClient(c.env, c.var.auth.jwt);
+  /* §9.5/§9.6 OWNER RULING 2026-09-29: `Record what Carres does next` is the
+     ONE supplier-side decision and the Authorised Outcome — PO Duty, its dated
+     cover or an Operations Superuser through the Shared Duty Resolver. The
+     database (0609) asks the same capability again. */
+  const authority = await purchasingPoDutyMayAct(sb, c.var.auth.id);
+  if (authority.error) {
+    const m = mapPgError(authority.error);
+    return c.json(m.body, m.status);
+  }
+  if (!authority.mayAct) {
+    return c.json({ error: "forbidden", code: "not_po_duty", message: "Only PO Duty records what Carres does next" }, 403);
+  }
   const { data, error } = await sb.rpc(
-    "supplier_claim_record_customer_resolution",
+    "supplier_claim_record_carres_execution",
     {
       p_claim_id: c.req.param("id"),
-      p_resolution: parsed.data.customer_resolution,
+      p_execution: parsed.data.carres_execution,
       p_note: parsed.data.note ?? null,
     },
   );
   if (error) {
+    if (error.code === "23514") {
+      return c.json({ error: "refused", code: (error as { details?: string }).details ?? "refused", message: error.message }, 409);
+    }
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
   return c.json(data ?? {});
 });
+
+registerSupplierClaimRecordRoutes(supplierClaimsRouter, gate);
 
 export default supplierClaimsRouter;

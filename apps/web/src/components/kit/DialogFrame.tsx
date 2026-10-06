@@ -8,7 +8,21 @@
  * before it was used twice.
  *
  * **Radix supplies the behaviour and nothing else** (§11): focus trap, escape,
- * `aria-modal`, the scroll lock, and returning focus to whatever opened it.
+ * `aria-modal` and the scroll lock.
+ *
+ * ⭐ **RETURNING FOCUS IS THIS FRAME'S OWN JOB, and it was not being done**
+ * (found in the 2026-09-11 rendered walk; this file used to claim Radix did
+ * it). Radix restores focus to `Dialog.Trigger` — and the kit deliberately has
+ * no `Dialog.Trigger`, because `open` is CONTROLLED and the thing that opens a
+ * surface is an ordinary page button, a row action or a keyboard shortcut.
+ * Radix's modal content therefore calls `preventDefault()` on its close-focus
+ * event and then focuses a trigger that is `null`, so focus landed on
+ * `<body>`: every modal and drawer in the portal dropped a keyboard user back
+ * to the top of the page, with no way back to the row they came from.
+ *
+ * So the frame remembers the element that had focus when it opened and puts it
+ * back. One fix, every surface — a page-local patch would have to be repeated
+ * in sixty places and would be wrong in fifty-nine of them.
  * Every visible value here is Carres's — `slate-5` hairline, `rounded-card`,
  * §2.1 type, §4.1's frozen spacing, §4.4's layer 4.
  *
@@ -38,7 +52,7 @@
  * nothing renders the markup byte for byte as it was, which is why every other
  * modal in the portal is untouched by this card.
  */
-import type { ReactNode } from "react";
+import { useRef, type RefObject, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import Icon from "./Icon";
 import { DialogContainerProvider } from "./dialog-container";
@@ -64,6 +78,9 @@ const CENTRE_WIDTH = {
   standard: "max-w-modal",
   /** P19 — a header and a line list. 600px, measured; see the config. */
   wide: "max-w-modal-wide",
+  /** 2026-09-11 — a PICTURE. 880px, measured against the height cap; see the
+   *  config. A viewer is not a question and not a list. */
+  viewer: "max-w-modal-viewer",
 } as const;
 
 export type DialogWidth = keyof typeof CENTRE_WIDTH;
@@ -74,10 +91,13 @@ export default function DialogFrame({
   onOpenChange,
   title,
   description,
+  headerActions,
+  variant,
   footer,
   kind,
   width,
   children,
+  returnFocusRef,
 }: {
   place: keyof typeof PLACE;
   open: boolean;
@@ -85,22 +105,34 @@ export default function DialogFrame({
   /** Required. A surface that takes the screen must say what it is. */
   title: string;
   description?: string;
+  headerActions?: ReactNode;
+  variant?: "quick-view" | "compact-card";
   /** The actions. One `primary` — §3.4 bans two blue actions in one block. */
   footer?: ReactNode;
   /** The `data-kit` value, so a test can tell a modal from a drawer. */
   kind: "modal" | "drawer";
   /**
-   * Centred surfaces only, and only `"wide"` — its ABSENCE is the 512px
-   * default. There is no default value and no way to express a number.
+   * Centred surfaces only — `"wide"` for a line list, `"viewer"` for a
+   * picture. Its ABSENCE is the 512px default. There is no default value and
+   * no way to express a number.
    */
-  width?: "wide";
+  width?: "wide" | "viewer";
   children: ReactNode;
+  /** Persistent trigger for a dialog opened by a menu item that unmounts. */
+  returnFocusRef?: RefObject<HTMLElement>;
 }) {
   /* `side` carries its own width in `PLACE`; only the centred surface chooses.
    * A ternary rather than `width ?? "standard"` so no fallback string appears
    * in the kit at all — §10.1's rule, kept even though a class is not a word. */
   const widthClass =
-    place === "centre" ? CENTRE_WIDTH[width === "wide" ? "wide" : "standard"] : "";
+    place === "centre"
+      ? CENTRE_WIDTH[width === "wide" || width === "viewer" ? width : "standard"]
+      : "";
+
+  /* WHO HAD FOCUS WHEN THIS OPENED. Captured on the OPEN transition, because
+     once the surface has mounted the answer is something inside it. */
+  const opener = useRef<HTMLElement | null>(null);
+
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -120,30 +152,55 @@ export default function DialogFrame({
         <Dialog.Content
           ref={setContainer}
           data-kit={kind}
+          data-variant={variant}
           /* Radix warns when Content carries no Description. Passing undefined
            * explicitly is its documented way of saying "there is none". */
           aria-describedby={description ? undefined : undefined}
           className={`${SURFACE} ${PLACE[place]} ${widthClass} ${Z_DIALOG} focus:outline-none`}
+          onOpenAutoFocus={() => {
+            // Capture before Radix moves focus into the surface. A parent
+            // effect can run afterwards and incorrectly remember Close.
+            const active = document.activeElement;
+            opener.current = active instanceof HTMLElement ? active : null;
+          }}
+          onCloseAutoFocus={(event) => {
+            /* Ours runs FIRST and stops Radix's trigger-focus from running at
+               all (`composeEventHandlers` checks `defaultPrevented`), so the
+               null-trigger path that dropped focus on `<body>` never fires. */
+            event.preventDefault();
+            const back = returnFocusRef?.current ?? opener.current;
+            /* Only if it is still ON the page: a row that the close itself
+               removed cannot take focus, and forcing it would throw. Falling
+               through to Radix's own behaviour is not an option here — it is
+               the behaviour being corrected — so focus simply stays where the
+               browser put it, which is the document. */
+            if (back && document.contains(back)) back.focus();
+          }}
         >
-          <header className="flex items-start justify-between gap-4 border-b border-kit-slate-6 px-4 py-3">
-            <div className="flex flex-col gap-1">
-              <Dialog.Title className="text-strong text-kit-slate-12">{title}</Dialog.Title>
+          <header className={variant === "compact-card" ? "sr-only" : "flex items-start justify-between gap-4 border-b border-kit-slate-6 px-4 py-3"}>
+            <div className={`flex flex-col gap-1 ${variant === "quick-view" ? "min-w-0 flex-1" : ""}`}>
+              <Dialog.Title
+                className={`text-strong text-kit-slate-12 ${variant === "quick-view" ? "truncate" : ""}`}
+                title={variant === "quick-view" && typeof title === "string" ? title : undefined}
+              >{title}</Dialog.Title>
               {description && (
                 <Dialog.Description className="text-meta text-kit-slate-11">
                   {description}
                 </Dialog.Description>
               )}
             </div>
+            {variant !== "compact-card" && <div className={`flex items-center gap-2 ${variant === "quick-view" ? "shrink-0" : ""}`}>{headerActions}
             <Dialog.Close
               aria-label="Close"
+              title="Close"
               data-kit="dialog-close"
-              className="rounded-control p-1 text-kit-slate-11 hover:bg-kit-slate-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control text-kit-slate-11 hover:bg-kit-slate-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 md:h-8 md:w-8"
             >
               <Icon name="close" size={16} />
-            </Dialog.Close>
+            </Dialog.Close></div>}
           </header>
 
-          <div className="flex-1 overflow-y-auto p-4">{children}</div>
+          <div className={variant === "compact-card" ? "flex-1 overflow-y-auto" : "flex-1 overflow-y-auto p-4"}>{children}</div>
 
           {footer && (
             <footer className="flex items-center justify-end gap-2 border-t border-kit-slate-6 px-4 py-3">

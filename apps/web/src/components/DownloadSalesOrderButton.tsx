@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
 import { renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
+import type { Role } from "@carres/shared/domain";
 
 /**
  * 2026-05-12 (Loo) — Customer-facing Sales Order PDF download button.
@@ -30,19 +31,6 @@ import type { SalesOrderTemplateData } from "@/lib/pdf/types";
  *              for the My-orders drawer footer (2026-07-25, Loo)
  *   - className: optional extra Tailwind classes for layout tweaks
  */
-
-type Role =
-  | "dealer"
-  | "showroom"
-  | "salesperson"
-  | "operation"
-  | "finance"
-  | "partner"
-  | "supplier"
-  | "principal"
-  | "bd"
-  | "hr"
-  | "warehouse";
 
 // Loo 2026-05-12 ~20:00 — operation dropped from the deny list (they
 // surface this on their own drawer when handing over a delivery). Partner

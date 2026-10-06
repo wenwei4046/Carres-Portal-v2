@@ -1,9 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  Adapters,
-  DB,
   PWP_CODES,
-  PWP_RULES,
   SOFA_COMBO_PRICING,
   lineMatchesTargets,
   nameKey,
@@ -13,7 +10,12 @@ import {
 } from "@carres/shared";
 
 import type { RecomputableLine } from "./sofa-recompute";
-import { resolveSkuInfo, type SkuInfo } from "./rule-line-input";
+import {
+  deriveRuleLine,
+  readActivePwpRules,
+  resolveSkuInfo,
+  upper,
+} from "./rule-line-input";
 
 /**
  * Order-path PWP CARRY-FORWARD sweep (2990s Products parity Phase 8d, migration
@@ -97,21 +99,6 @@ export type SweepOutcome = {
   softWarning?: string;
 };
 
-/** A flat trigger line → the matcher's core RuleLineInput (mirrors the reserve
- *  route's `deriveRuleLine`). Triggers are flat real SKUs. */
-function deriveRuleLine(info: SkuInfo | null): RuleLineInput {
-  const category = info?.category ?? "";
-  const isSofa = category.toLowerCase() === "sofa";
-  return {
-    category,
-    modelId: info?.modelId ?? null,
-    sizeCode: !isSofa && info?.variant ? info.variant.toUpperCase() : null,
-    builtCompartments: [],
-  };
-}
-
-const upper = (s: string): string => String(s ?? "").toUpperCase();
-
 /**
  * Sweep the caller's unclaimed RESERVED vouchers for THIS submit: carry forward
  * (active + carry rule + phone) or delete. Runs AFTER `create_order` commits + the
@@ -145,13 +132,13 @@ export async function sweepReservedForSubmit(
 
   // 2. ACTIVE rules (RLS). Needed BOTH for the server-derived trigger match AND
   //    the carry-forward decision (active + carry_forward).
-  const rulesR = await sb.from(PWP_RULES).select("*").eq("active", true);
-  if (rulesR.error) {
-    return { status: "server_error", message: rulesR.error.message, carried: 0, deleted: 0 };
+  //    Same ordered door as the recompute — the two must agree about which rule
+  //    owns a line, or a voucher carries forward against a rule that did not pay.
+  const rulesR = await readActivePwpRules(sb);
+  if (!rulesR.ok) {
+    return { status: "server_error", message: rulesR.message, carried: 0, deleted: 0 };
   }
-  const activeRules: PwpRule[] = ((rulesR.data ?? []) as DB.PwpRuleRow[]).map((r) =>
-    Adapters.pwpRuleFromRow(r),
-  );
+  const activeRules: PwpRule[] = rulesR.rules;
   const activeById = new Map(activeRules.map((r) => [r.id, r] as const));
 
   // 3. SERVER-DERIVE the trigger SKU set: each line in `finalLines` whose (active)

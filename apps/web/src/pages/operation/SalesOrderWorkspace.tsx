@@ -1,87 +1,156 @@
 /**
- * SalesOrderWorkspace — the governed Sales Order detail and safe-correction
- * workspace. Commercial changes leave through Amendment, never this form.
+ * SalesOrderWorkspace — the Sales Order object page. Commercial changes leave
+ * through Amendment, never this form.
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * ⭐ ONE LAYOUT, FOUR STATES, NO FIFTH (the card's own drawing)
+ * ⭐ ONE PAGE, ONE STATE — owner ruling 2026-08-15
  *
  * ```
- * ┌────────────────────── 55% ─────────────────────┬──── 45% ────┐
- * │ CUSTOMER · SOURCE · DATES · DELIVERY ·         │     PDF     │
- * │ ITEMS · MONEY · HISTORY / REVISION             │   PREVIEW   │
- * └────────────────────────────────────────────────┴─────────────┘
- * VIEW    values                      EDIT    the same slots, editable
- * CREATE  the same form, unlocked     OLD REV read-only + historical PDF
+ * ┌───────────────── 50% ─────────────────┬────────────── 50% ──────────────┐
+ * │ CUSTOMER                              │                                 │
+ * │ ORDER INFO                            │      the REAL Sales Order       │
+ * │ AMEND DELIVERY DATE                   │      document — the SAME        │
+ * │ EMERGENCY CONTACT                     │      template Print renders,    │
+ * │ DELIVERY ADDRESS                      │      never a lookalike          │
+ * │ MONEY · SALES OWNERSHIP · GOODS       │                                 │
+ * ├───────────────────────────────────────┤                                 │
+ * │ ⚠ 3 changes            Discard  Save  │  (only when something changed)  │
+ * └───────────────────────────────────────┴─────────────────────────────────┘
  * ```
  *
- * THE PDF IS ONE PIPELINE, LIVE: whatever the left side holds — the saved
- * order, the 300ms-debounced draft, or an old revision's snapshot — becomes
- * ONE SalesOrderTemplateData, ONE renderSalesOrderPdf blob. pdf.js paints
- * those bytes (VIEWER ONLY — never a second renderer) and Print opens the
- * SAME blob. The previous blob URL is revoked on every render.
+ * **The `?edit=1` page is retired.** There was no reading state and no editing
+ * state — there was one document with fields in it, and a mode switch in front
+ * of it that made the operator ask permission to fix a phone number. Fields are
+ * always editable in place; the dark bar appears only when something changed.
  *
- * Every safe correction calls one RPC and mints Rev N+1. Items and the
- * promised delivery date stay read-only here; they are contractual facts.
+ * **THE PREVIEW IS THE DOCUMENT.** Whatever the left side holds — the saved
+ * order, the 300ms-debounced draft, or an old revision's snapshot — becomes ONE
+ * `SalesOrderTemplateData`, ONE `renderSalesOrderPdf` blob. pdf.js paints those
+ * bytes (VIEWER ONLY — never a second renderer) and Print opens the SAME blob.
+ * The previous blob URL is revoked on every render.
+ *
+ * **A PROPOSAL IS NOT A DOCUMENT.** A submitted, not-yet-approved amendment
+ * never enters the paper: the preview always renders the current effective
+ * Revision and the proposal shows as a banner strip above it. A customer must
+ * not be handed a document stating something nobody has agreed to.
+ *
+ * **THE FORM IS THE SALES PORTAL'S FORM.** Every question the portal asks is
+ * here, rendered from the SAME `order_entry_config` contract the POS renders
+ * from (0219) and the same shared choice lists — so the two surfaces cannot
+ * drift into two different forms for one record. Goods, price and
+ * `Requested Delivery Date` are the exception, and they are the whole point: those
+ * are what the customer agreed to, so they leave through the amendment lane.
  */
 // design-standard: not-a-list-page — this is a DOCUMENT workspace. Its
 // tables are the order's own line block: fixed rows, no sort, no selection.
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Pencil, Plus, Printer, Trash2, X } from "lucide-react";
-import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import "./purchase-orders/purchase-order-detail.css";
+import "./sales-order-detail-theme.css";
+import { Plus } from "lucide-react";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import * as pdfjs from "pdfjs-dist";
+import { paintPdfPages } from "@/lib/pdf/paint";
 import { toast } from "sonner";
 import {
-  deliveryReasonLabel,
+  BUILDING_TYPE_OPTIONS,
+  classifySalesOrderChange,
+  INSTALMENT_MONTHS,
+  isLivePayment,
+  SALES_ORDER_EDIT_HEADER_KEYS,
+  salesOrderCommitWord,
+  STAIR_CARRY_ADDON_KEY,
+  SERVER_EXCLUSIVE_ADDON_KEYS,
+  type SalesOrderChangeSide,
+  composeEmergencyContact,
+  CUSTOMER_GENDER_OPTIONS,
+  CUSTOMER_RACE_OPTIONS,
+  fmtMoney,
+  EMERGENCY_RELATIONSHIPS,
+  LIFT_OPTIONS,
   lineClass,
+  MAX_DELIVERY_FLOOR,
+  maxLeadDaysFor,
+  minDeliveryDateISO,
   orderMoney,
-  poReceivingProgress,
-  receivingRecordNo,
+  parseEmergencyContact,
+  resolveFormTab,
   resolveSalesOrderRoute,
-  warehouseReceiptStatusLabel,
-  type SalesOrderRoute as SalesOrderRouteModel,
+  salesOrderNumberWord,
+  salesOrderParamOf,
+  mytDayOf,
+  type CustomField,
+  type OrderEntryTab,
+  type SalesOrderRouteMap as SalesOrderRouteModel,
 } from "@carres/shared";
 import Button from "@/components/kit/Button";
+import Icon from "@/components/kit/Icon";
 import Checkbox from "@/components/kit/Checkbox";
 import DatePicker from "@/components/kit/DatePicker";
+import { getCities, getPostcodes, MY_STATES } from "@/data/malaysia-postcodes";
 import EmptyState from "@/components/kit/EmptyState";
+import FieldFrame from "@/components/kit/FieldFrame";
+import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe";
+import Modal from "@/components/kit/Modal";
+import { addonSizeOptions, disposalUnitSizes } from "../dealer/new-order/draft";
+import { offerableAddons } from "../dealer/pos/AddonsPanel";
 import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
+import PaymentLedger from "./components/SalesOrderPaymentLedger";
+import { SO_HEAD_ROW, SO_TABLE, SO_TH } from "./components/so-document-table";
+import { serviceCodeWord } from "@/lib/service-code";
 import Select from "@/components/kit/Select";
 import Money from "@/components/Money";
 import { apiFetch, ApiError } from "@/lib/api";
-import { cjkClassName } from "@/lib/cjk";
-import { fmtDate } from "@/lib/fmt-date";
+import { composeAddress } from "@/data/malaysia-postcodes";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
+import { floorSurchargeRaw, stairCarryCount } from "@/lib/order-totals";
+import { displayCustomerName } from "@/lib/customer-name";
 import { renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
 import {
-  useCreateSalesOrder,
+  useCatalog,
+  useCustomerTypeProbe,
+  useSalesOrderRegisterSearchCount,
   useOperationDealersRef,
   useOperationOrder,
-  useOrderServiceCases,
+  useWorkspaceDuties,
+  useOrderEntryConfig,
   useOrderCorrectionWork,
+  useOrderServiceCases,
   useOutlets,
+  useSalesOrderAmendment,
   useSalesOrderRevisions,
   useSalesOrderExpansion,
+  useCollectionOwner,
+  useLogisticsCardFacts,
   useSalesOrderRouteFacts,
+  useSalesOrderIdByNumber,
   useSalespersons,
-  useSaveSalesOrderRevision,
+  useDecideSalesOrderAmendment,
+  useOrderPayments,
+  useRecordAmendmentAgreement,
+  useIssuedSalesOrderDocument,
+  storeIssuedSalesOrderDocument,
+  useSubmitSalesOrderChanges,
   type SalesOrderRevisionRow,
   type SalesOrderSnapshot,
-  type AmendmentProposal,
 } from "@/lib/queries";
+import { routeActionOwnersOf } from "./workspace-duty-owner";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CorrectionWorkList from "./CorrectionWorkList";
-import SalesOrderAmendment from "./SalesOrderAmendment";
-import SalesOrderAttribution from "./SalesOrderAttribution";
+import { DraftReview, WaitingRequest } from "./SalesOrderChangePanels";
+import type { RecordedAgreement } from "./customer-agreement";
+import { configWords, diffRows, serviceSizeDraft, resizeService, sizeServiceUnit, NOT_IN_CATALOG, servicesWords, type EditAddon, type EditLine } from "./sales-order-change";
+import { useAuth } from "@/lib/auth";
+import SalesOrderAttribution, { useCanChangeSalesOwnership } from "./SalesOrderAttribution";
 import SalesOrderLedger from "./SalesOrderLedger";
-import SalesOrderRoute from "./SalesOrderRoute";
+import SalesOrderReadFailure from "./SalesOrderReadFailure";
+import SalesOrderRoute, { RouteLoadingFrame, type RouteRetryOwner } from "./SalesOrderRoute";
+import { salesOrderRouteInputOf, type RouteOrderDetail } from "./sales-order-route-input";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { lineName } from "./sales-order-facts";
-import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
-import { missingDeliveryDateGuidance } from "./sales-order-guidance";
-import { copySalesOrderDraft } from "./sales-order-copy";
 
 /* pdf.js worker ships inside the package — nothing fetched from a CDN. */
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -90,7 +159,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 ).toString();
 
 /* ─────────────────────────────────────────────────────────────────────────────
- * The draft — ONE shape for EDIT and CREATE (the same slots, unlocked).
+ * The draft — ONE shape for the OBJECT form and CREATE (the same slots).
  * ──────────────────────────────────────────────────────────────────────────── */
 interface DraftLine {
   key: string;
@@ -98,19 +167,49 @@ interface DraftLine {
   sku: string;
   qty: number;
   unit_price: number;
+  /** The line's CONFIGURATION — sofa fabric, bedframe colour/gap, the cascade
+   *  payload Create-PO reads. Carried so a COPY does not strip it (0374). */
+  attrs?: Record<string, unknown>;
+  /** 0562 — struck through in the whole-page edit; leaves only when the change takes effect. */
+  removed?: boolean;
+  /** 0562 — added in this edit, not yet on the order. */
+  added?: boolean;
+}
+/** 0562 — a service row in the whole-page edit. */
+interface DraftAddon {
+  key: string;
+  id?: string;
+  addon_key: string;
+  qty: number;
+  unit_price: number;
+  attrs?: Record<string, unknown> | null;
+  removed?: boolean;
+  added?: boolean;
 }
 interface Draft {
   customer_name: string;
   customer_phone: string;
   customer_email: string;
+  customer_race: string;
+  customer_gender: string;
+  customer_birthday: string | null;
+  /** The legacy composed address. Kept verbatim when the structured parts are
+   *  empty (an AutoCount import has only this), recomposed from them when they
+   *  are not — the document prints THIS column. */
   customer_address: string;
   customer_address_line1: string;
   customer_address_line2: string;
   customer_address_city: string;
   customer_address_state: string;
   customer_address_postcode: string;
-  customer_emergency: string;
+  customer_address_unknown: boolean;
+  building_type: string;
+  /** THREE validated fields over the one `customer_emergency` column. */
+  emergency_name: string;
+  emergency_phone: string;
+  emergency_relationship: string;
   customer_billing: string;
+  customer_billing_same: boolean;
   dealer_id: string | null;
   outlet_id: string | null;
   salesperson_id: string | null;
@@ -119,7 +218,13 @@ interface Draft {
   proceed_date: string | null;
   delivery_floor: number;
   delivery_has_lift: boolean;
+  delivery_stair_items: number | null;
+  /** 0219 — the operator's own configured fields, keyed by config key. */
+  custom: Record<string, string>;
   lines: DraftLine[];
+  /** 0562 — services and the instalment plan ride the one draft too. */
+  addons: DraftAddon[];
+  installment_months: number | null;
 }
 
 let draftKeySeq = 0;
@@ -129,14 +234,22 @@ const EMPTY_DRAFT: Draft = {
   customer_name: "",
   customer_phone: "",
   customer_email: "",
+  customer_race: "",
+  customer_gender: "",
+  customer_birthday: null,
   customer_address: "",
   customer_address_line1: "",
   customer_address_line2: "",
   customer_address_city: "",
   customer_address_state: "",
   customer_address_postcode: "",
-  customer_emergency: "",
+  customer_address_unknown: false,
+  building_type: "",
+  emergency_name: "",
+  emergency_phone: "",
+  emergency_relationship: "",
   customer_billing: "",
+  customer_billing_same: true,
   dealer_id: null,
   outlet_id: null,
   salesperson_id: null,
@@ -145,80 +258,170 @@ const EMPTY_DRAFT: Draft = {
   proceed_date: null,
   delivery_floor: 1,
   delivery_has_lift: false,
+  delivery_stair_items: null,
+  custom: {},
   lines: [{ key: nextKey(), sku: "", qty: 1, unit_price: 0 }],
+  addons: [],
+  installment_months: null,
+};
+
+/** The one place the three emergency fields become the one stored string. */
+const emergencyString = (d: Draft) =>
+  composeEmergencyContact({
+    name: d.emergency_name,
+    phone: d.emergency_phone,
+    relationship: d.emergency_relationship,
+  });
+
+/**
+ * The address the DOCUMENT prints.
+ *
+ * The structured MY parts are the editable truth; `customer_address` is the one
+ * text column every downstream reader (the SO PDF, the DO, the drawer) already
+ * prints. Composing here is what makes the preview and the paper agree — before
+ * this the parts were editable while the printed string stayed on whatever was
+ * imported. A row with no structured parts keeps its imported string untouched.
+ *
+ * **A CLEAR HAPPENS ONLY WHEN SOMEBODY CLEARS IT.** `Address not given yet`
+ * empties the column when the operator TICKS it; an order that arrived already
+ * ticked and carrying an imported string keeps that string, so a save that only
+ * fixed a phone number cannot wipe an address nobody looked at. Both the
+ * preview and the payload read this one function, so they can never disagree.
+ */
+const addressString = (d: Draft, was: Draft): string => {
+  if (d.customer_address_unknown) return was.customer_address_unknown ? was.customer_address : "";
+  const parts = [d.customer_address_line1, d.customer_address_city, d.customer_address_state]
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return d.customer_address;
+  return composeAddress({
+    line1: d.customer_address_line1,
+    line2: d.customer_address_line2,
+    state: d.customer_address_state,
+    city: d.customer_address_city,
+    postcode: d.customer_address_postcode,
+  });
+};
+
+/** The billing address, under the same rule: ticking `same as delivery` clears
+ *  the column, an order that was ALREADY ticked keeps whatever it stored. */
+const billingString = (d: Draft, was: Draft): string => {
+  if (!d.customer_billing_same) return d.customer_billing;
+  return was.customer_billing_same ? was.customer_billing : "";
 };
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * ONE PDF pipeline — data in, canvases + printable blob out. pdf.js is a
  * viewer only; Print opens the SAME blob the pane shows.
  * ──────────────────────────────────────────────────────────────────────────── */
+/** The width a pane can actually give a page: its box, less its own padding.
+ *  EXPORTED so the padding subtraction — which IS the clipping bug — can be
+ *  asserted without a browser. */
+export function contentWidthOf(node: HTMLElement): number {
+  const cs = getComputedStyle(node);
+  const pad = parseFloat(cs.paddingLeft || "0") + parseFloat(cs.paddingRight || "0");
+  return Math.max(0, Math.round(node.clientWidth - pad));
+}
+
+/** A sales order below this is unreadable; it scrolls in the pane instead. */
+const MIN_PDF_WIDTH = 320;
+/** 0562 — the form pane never gets narrower than the editable Items table
+ *  (# · Item Code · Description · Qty · Unit · Disc · Amount) plus its chrome. */
+const FORM_MIN_WIDTH = 660;
+
 function usePdfCanvases(data: SalesOrderTemplateData | null) {
-  const [url, setUrl] = useState<string | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const paneRef = useRef<HTMLDivElement | null>(null);
-  const urlRef = useRef<string | null>(null);
+  /* The pane unmounts whenever the object opens Revisions / History / Order
+     Route. Coming back, `data` has not changed — so without this the operator
+     returned to an empty sheet of paper. */
+  const [paneEpoch, setPaneEpoch] = useState(0);
+  /* ⭐ THE PAPER IS RE-CUT WHEN THE PANE CHANGES WIDTH (2026-09-11).
+     The canvases were sized ONCE, from `pane.clientWidth` at render time, and
+     the effect depended only on `[data, paneEpoch]`. So every later width
+     change left the old bitmap in place: drag the window narrower, or open a
+     side panel beside the document, and a page rendered for a wider pane hung
+     over its container and was CLIPPED. Nothing redrew it, because nothing was
+     watching. A `ResizeObserver` is what was missing — the width joins the
+     effect's dependencies, so the paper is re-cut exactly when the paper's
+     container changes and at no other time. */
+  const [paneWidth, setPaneWidth] = useState(0);
+  const roRef = useRef<(() => void) | null>(null);
+  const setPane = useCallback((node: HTMLDivElement | null) => {
+    paneRef.current = node;
+    roRef.current?.();
+    roRef.current = null;
+    if (!node) return;
+    setPaneEpoch((n) => n + 1);
+    setPaneWidth(contentWidthOf(node));
+    /* Coalesced on a TIMER, deliberately not `requestAnimationFrame`. A drag
+       fires this dozens of times a second and a PDF render per frame would
+       make the drag itself the slow thing — but rAF does not run in a hidden
+       or background tab, so a width change that happened while the tab was
+       away would never be applied, and the operator would come back to a page
+       cut for the old width. That is the original bug returning through a
+       different door. A timeout fires either way. (Measured: in a hidden tab
+       `requestAnimationFrame` never ran and `ResizeObserver` never delivered —
+       so the redraw must not depend on the frame loop to be CORRECT, only to
+       be smooth.) */
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    /* A renderer without `ResizeObserver` (jsdom, or any non-DOM host) still
+       gets a correctly sized first cut from the measurement above; it simply
+       does not get the re-cut. Degrade, never abort — a missing observer must
+       not take the document down with it. */
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      clearTimeout(timer);
+      timer = setTimeout(() => setPaneWidth(contentWidthOf(node)), 120);
+    });
+    ro.observe(node);
+    roRef.current = () => {
+      clearTimeout(timer);
+      ro.disconnect();
+    };
+  }, []);
+  useEffect(() => () => roRef.current?.(), []);
   useEffect(() => {
     let cancelled = false;
+    let loading: pdfjs.PDFDocumentLoadingTask | undefined;
+    let renderTask: pdfjs.RenderTask | undefined;
     if (!data) {
       paneRef.current?.replaceChildren();
-      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-      urlRef.current = null;
-      setUrl(null);
       return;
     }
     (async () => {
       try {
         const blob = await renderSalesOrderPdf(data);
         if (cancelled) return;
-        const objectUrl = URL.createObjectURL(blob);
-        /* Revoke the PREVIOUS blob URL on each render (the card's own line). */
-        if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-        urlRef.current = objectUrl;
-        setUrl(objectUrl);
         setPdfError(null);
-        const doc = await pdfjs.getDocument({ data: await blob.arrayBuffer() }).promise;
+        const bytes = await blob.arrayBuffer();
+        if (cancelled) return;
+        loading = pdfjs.getDocument({ data: bytes });
+        const doc = await loading.promise;
         if (cancelled) return;
         const pane = paneRef.current;
         if (!pane) return;
         pane.replaceChildren();
-        const paneWidth = Math.max(pane.clientWidth - 48, 320);
-        for (let n = 1; n <= doc.numPages; n++) {
-          const page = await doc.getPage(n);
-          if (cancelled) return;
-          const base = page.getViewport({ scale: 1 });
-          const scale = paneWidth / base.width;
-          const dpr = window.devicePixelRatio || 1;
-          const viewport = page.getViewport({ scale: scale * dpr });
-          const canvas = document.createElement("canvas");
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          canvas.style.width = `${Math.round(viewport.width / dpr)}px`;
-          canvas.style.height = `${Math.round(viewport.height / dpr)}px`;
-          canvas.style.display = "block";
-          canvas.style.margin = "0 auto 16px";
-          canvas.style.boxShadow = "0 1px 4px rgba(0,0,0,0.18)";
-          /* A PDF page is paper — white by definition; this canvas is
-             imperative pdf.js output, not themed React markup. */
-          canvas.style.background = "white";
-          canvas.setAttribute("data-testid", `pdf-page-${n}`);
-          pane.appendChild(canvas);
-          await page.render({ canvasContext: canvas.getContext("2d")!, viewport }).promise;
-        }
+        /* The CONTENT box, not the padding box. `clientWidth` includes the
+           pane's own horizontal padding, so scaling to it drew every page
+           wider than the space it had to sit in — the original clipping, and
+           it was there at every width, not only narrow ones. */
+        const width = Math.max(contentWidthOf(pane), MIN_PDF_WIDTH);
+        await paintPdfPages(doc, pane, width, () => cancelled, (task) => { renderTask = task; });
       } catch (e) {
         if (!cancelled) setPdfError(e instanceof ApiError ? e.message : String(e));
       }
     })();
     return () => {
       cancelled = true;
+      renderTask?.cancel();
+      void loading?.destroy().catch(() => {});
     };
-  }, [data]);
-  useEffect(
-    () => () => {
-      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-    },
-    [],
-  );
-  return { url, pdfError, paneRef };
+  }, [data, paneEpoch, paneWidth]);
+  /* No blob URL is minted here any more. The PANE paints bytes; PRINT owns its
+     own blob, built from the SAVED data — one template, one call path, two
+     purposes that must not share a handle. */
+  return { pdfError, setPane };
 }
 
 /** 300ms debounce for the LIVE draft preview (the card's own number). */
@@ -243,12 +446,17 @@ type Refs = {
 
 function draftTemplateData(
   draft: Draft,
+  baseline: Draft,
   base: SalesOrderTemplateData | null,
   refs: Refs,
+  /** The quoted stair carry, or 0. See the addon note below. */
+  stairFee = 0,
+  addonLabel: (key: string) => string = (key) => key,
+  addonCode: (key: string) => string = (key) => key,
 ): SalesOrderTemplateData {
   const baseBySku = new Map((base?.lines ?? []).map((l) => [l.sku, l]));
   const lines = draft.lines
-    .filter((l) => l.sku.trim().length > 0)
+    .filter((l) => l.sku.trim().length > 0 && !l.removed)
     .map((l) => {
       const known = baseBySku.get(l.sku.trim());
       return {
@@ -261,7 +469,51 @@ function draftTemplateData(
         category: known?.category ?? null,
       };
     });
-  const addons = base?.addons ?? [];
+  /* ⭐ THE DRAFT PAPER CARRIES THE CARRY (YH, 2026-08-28, from the screen).
+     `0393` makes stair carry a real `STAIR_CARRY` addon row, so a SAVED order's
+     document prints it and totals it like any other addon. A DRAFT has no such
+     row yet — it does not exist until the order does — so the preview printed
+     `BALANCE DUE RM 1,490` beside a MONEY card reading `RM 1,540`. One screen,
+     two numbers, which is the whole defect this page keeps being audited for.
+
+     Synthesised as an ADDON rather than folded into the subtotal, because the
+     paper is what the customer signs: a charge they are asked to agree to has
+     to be a line they can read, not a silent difference between two totals.
+     Key and label are the seeded row's own (`0393`), and `Stair carry` is
+     governed at COPY-STANDARD:1519 — two words, no hyphen.
+
+     Only in the draft: once saved, `base.addons` carries the real row and
+     adding this too would print the charge twice. */
+  /* 0562 — services edited in the whole-page draft show on the draft paper;
+     an untouched service list keeps the server's own labelled rows. */
+  const servicesEdited =
+    Boolean(base) &&
+    JSON.stringify(draft.addons.map(({ key: _k, ...a }) => a)) !==
+      JSON.stringify(baseline.addons.map(({ key: _k, ...a }) => a));
+  const addons = servicesEdited
+    ? draft.addons
+        .filter((a) => !a.removed)
+        .map((a) => ({
+          label: addonLabel(a.addon_key),
+          sku: addonCode(a.addon_key),
+          qty: a.qty,
+          unit_price: a.unit_price,
+          line_total: a.qty * a.unit_price,
+          attrs: a.attrs ?? null,
+        }))
+    : base?.addons ??
+    (stairFee > 0
+      ? [
+          {
+            label: "Stair carry",
+            sku: STAIR_CARRY_ADDON_KEY,
+            qty: 1,
+            unit_price: stairFee,
+            line_total: stairFee,
+            attrs: null,
+          },
+        ]
+      : []);
   const subtotal =
     lines.reduce((s, l) => s + l.line_total, 0) + addons.reduce((s, a) => s + a.line_total, 0);
   const paid = base?.paid ?? 0;
@@ -272,18 +524,18 @@ function draftTemplateData(
     /* An unsaved draft has NO number — never invent one (Golden rule). */
     so_number: base?.so_number ?? "DRAFT",
     /* The family template prints `Ordered` from issue_date. */
-    issue_date: base?.issue_date ?? new Date().toISOString().slice(0, 10),
+    issue_date: base?.issue_date ?? appTodayIso(),
     proceed_date: draft.proceed_date,
     order_id: base?.order_id ?? "draft",
     order_code: base?.order_code ?? "DRAFT",
     status_label: base?.status_label ?? "Draft",
     channel: draft.outlet_id ? "showroom" : (base?.channel ?? "dealer"),
     customer: {
-      name: draft.customer_name || "—",
-      address: draft.customer_address || "—",
+      name: draft.customer_name || "",
+      address: addressString(draft, baseline) || "",
       phone: draft.customer_phone || null,
       email: draft.customer_email || null,
-      emergency: draft.customer_emergency || null,
+      emergency: emergencyString(draft) || null,
     },
     dealer: {
       name: refs.dealerName(draft.dealer_id) ?? base?.dealer.name ?? "Carres",
@@ -317,9 +569,23 @@ function draftTemplateData(
 /** An OLD revision's PDF renders FROM THAT SNAPSHOT — printable. The names
  *  the snapshot stored at mint time are what print; the payments ledger is
  *  live money and rides from the base. */
-function snapshotTemplateData(
+/* Exported for `SalesOrderWorkspace.historical-document.test.ts` — the
+   signature rule is a business guarantee about a CUSTOMER DOCUMENT, so it
+   is proved by calling the builder, not by grepping this file. */
+export function snapshotTemplateData(
   snap: SalesOrderSnapshot,
   base: SalesOrderTemplateData | null,
+  /** ⭐ addon key -> the catalog's word for it (YH, 2026-09-01). See the
+   *  `addons` mapping below — without this the printed document showed the
+   *  customer a database key. A FUNCTION, not a map, so the caller decides
+   *  what to do when the catalog has not answered: today it returns the key,
+   *  which is what this printed before, so a slow catalog degrades to the old
+   *  behaviour instead of printing a blank line on a document. */
+  addonLabel: (key: string) => string = (key) => key,
+  /** 0562 — A VERSION PRINTS AS IT WAS ISSUED: only the payments recorded by
+   *  that version's own time, and the customer signature only on the version
+   *  the customer actually signed (orders/MASTER § Old versions and signatures). */
+  asOf?: { date: string },
 ): SalesOrderTemplateData {
   const h = snap.header ?? {};
   const baseBySku = new Map((base?.lines ?? []).map((l) => [l.sku, l]));
@@ -332,8 +598,22 @@ function snapshotTemplateData(
     attrs: (l.attrs as Record<string, unknown> | null) ?? null,
     category: baseBySku.get(l.sku)?.category ?? null,
   }));
+  /* ⭐ THE CUSTOMER'S DOCUMENT NEVER PRINTS A DATABASE KEY (YH, 2026-09-01).
+     This read `String(a.addon_key)`, so an OLD REVISION's PDF — a customer
+     document, printed and sent — carried `dispose_mattress` where the live
+     document carries `Mattress disposal`. The live path never had this bug:
+     `base.addons` arrives labelled from the server. Only the snapshot path,
+     which builds its own rows from the stored revision, spelled the key
+     straight onto paper.
+     ⛔ AND THE SNAPSHOT'S OWN WORD STILL WINS WHERE IT HAS ONE. A revision is
+     a photograph: if the stored row carried a label, that label is what the
+     customer agreed to and it prints, even if the catalog has since renamed
+     the service. The catalog is asked only where the photograph is silent. */
   const addons = (snap.addons ?? []).map((a) => ({
-    label: String(a.addon_key),
+    label:
+      (typeof (a as { label?: unknown }).label === "string"
+        ? ((a as { label?: string }).label ?? "").trim()
+        : "") || addonLabel(String(a.addon_key)),
     qty: Number(a.qty),
     unit_price: Number(a.unit_price),
     line_total: Number(a.qty) * Number(a.unit_price),
@@ -341,19 +621,29 @@ function snapshotTemplateData(
   }));
   const subtotal =
     lines.reduce((s, l) => s + l.line_total, 0) + addons.reduce((s, a) => s + a.line_total, 0);
-  const paid = base?.paid ?? 0;
+  /* ⛔ A RECEIPT NOBODY CAN PLACE IN TIME IS NOT COUNTED IN AN AS-AT VIEW.
+     `order_payments.paid_on` is `date NOT NULL`, so the ledger path always has
+     a day — but the FALLBACK path synthesises ONE row from `placed_at`, and
+     that row carries the whole at-sale amount. With `placed_at` null it has no
+     date at all, and including it would make a Rev 1 document assert the entire
+     deposit had already arrived. Including it is the one choice that misstates,
+     and it misstates in the exact direction this filter exists to prevent. */
+  const payments = asOf
+    ? (base?.payments ?? []).filter((pm) => pm.date && String(pm.date).slice(0, 10) <= asOf.date)
+    : (base?.payments ?? []);
+  const paid = asOf ? payments.reduce((n, pm) => n + Number(pm.amount), 0) : (base?.paid ?? 0);
   const str = (k: string) => (h[k] == null ? null : String(h[k]));
   return {
-    so_number: h["so"] != null ? `SO-${h["so"]}` : (base?.so_number ?? "—"),
+    so_number: h["so"] != null ? `SO-${h["so"]}` : (base?.so_number ?? ""),
     issue_date: (str("placed_at") ?? base?.issue_date ?? "").slice(0, 10),
     proceed_date: str("proceed_date"),
     order_id: base?.order_id ?? "snapshot",
-    order_code: h["so"] != null ? `SO-${h["so"]}` : (base?.order_code ?? "—"),
+    order_code: h["so"] != null ? `SO-${h["so"]}` : (base?.order_code ?? ""),
     status_label: base?.status_label ?? "",
     channel: base?.channel ?? "dealer",
     customer: {
-      name: str("customer_name") ?? "—",
-      address: str("customer_address") ?? "—",
+      name: str("customer_name") ?? "",
+      address: str("customer_address") ?? "",
       phone: str("customer_phone"),
       email: str("customer_email"),
       emergency: str("customer_emergency"),
@@ -374,7 +664,7 @@ function snapshotTemplateData(
     },
     lines,
     addons,
-    payments: base?.payments ?? [],
+    payments,
     vouchers: [],
     subtotal,
     tax_amount: 0,
@@ -382,73 +672,546 @@ function snapshotTemplateData(
     paid,
     balance_due: subtotal - paid,
     currency: base?.currency ?? "MYR",
-    signed: base?.signed ?? false,
-    signature_url: base?.signature_url ?? null,
+    /* ⭐ A SIGNATURE IS NOT REPRODUCED ON A VERSION IT CANNOT BE ATTRIBUTED TO —
+       and that is NOT the same as saying this version is unsigned.
+       APPROVED / LOCKED, owner ruling 2026-09-22 (`docs/orders/MASTER.md`
+       § "Old versions and signatures"): "A signature belongs to the exact
+       version and document the customer signed."
+
+       This read `base?.signed` and `base?.signature_url` — the ORDER's current
+       eSign PNG — so every revision printed the same mark under a different set
+       of goods, prices and dates. A customer could be shown Rev 2 carrying the
+       signature they put on Rev 1. That is the defect.
+
+       ⛔ AND THE OPPOSITE CLAIM IS ALSO UNPROVEN. Which revision a stored
+       signature covers is UNKNOWN: `sales_order_snapshot` records no signing
+       fact and `orders.signature_url` has no capture timestamp (`pod_signed_at`
+       is Delivery's, a different act). So this version is not "unsigned" — the
+       record simply cannot place the signature. The document therefore makes NO
+       claim either way: the mark is not reproduced here, the customer's
+       signature evidence is untouched on the order and still prints on the
+       CURRENT document, and the PAGE states the unknown in words (a customer
+       document gains no new words without the owner).
+
+       FALSIFIER: store the signing fact in the snapshot, or timestamp the
+       capture on `orders`, and a revision can print the signature it really
+       carries. Named as open work in the Orders MASTER. */
+    signed: false,
+    signature_url: null,
+    /* ⭐ AND THE DOCUMENT SAYS BOTH THINGS ITSELF — owner ruling 2026-09-23,
+       wording approved verbatim.
+       The two sentences below were on the PAGE only; a PDF is printed,
+       downloaded and handed to a customer, so a statement that lives on screen
+       is not made at all by the time it matters. `signature_unknown` uses the
+       SAME condition as the `oldrev-signature-unknown` page notice — one fact,
+       one test, so the screen and the paper cannot drift. */
+    rebuilt_notice: "Reconstructed copy. The original issued document is unavailable.",
+    signature_unknown: Boolean(base?.signature_url),
+    /* ⭐ AND ITS MONEY IS THE MONEY DATED ON OR BEFORE THIS VERSION'S DAY. The
+       snapshot stores none, so this reads the SAME payments ledger Payments
+       owns with the SAME arithmetic (sum of the rows) over the rows dated then
+       or earlier. It invents no number, and it never shows a receipt DATED
+       after this version's day — which printing today's `paid` on a Rev 1
+       document did.
+       ⚠️ TWO NAMED LIMITS, stated as they behave rather than as one would wish:
+       · SAME DAY. `paid_on` is a DATE, so a receipt taken in the afternoon
+         counts toward a version minted that morning. `paid_on` is the business
+         fact and `created_at` is merely when someone typed it, so the day is
+         the right grain and the limit is real.
+       · A LATER VOID UNDER-REPORTS. The read filters `voided_at is null`, so a
+         payment voided afterwards disappears from EVERY view, this one
+         included: an old document shows the money still recognised today, not
+         the money recognised then.
+       Both close the same way — a stored historical position, a schema change,
+       named in the Orders MASTER, not a second arithmetic invented here. */
   } as SalesOrderTemplateData;
 }
 
-/* ── Small read-only atoms ─────────────────────────────────────────────────── */
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-card border border-kit-slate-5 bg-white px-4 py-3">
-      <div className="text-label font-semibold tracking-wide text-base-500 uppercase">{title}</div>
-      <div className="mt-2">{children}</div>
-    </div>
-  );
+/** An old revision's snapshot → the same form shape, so a historical view
+ *  shows THAT version's fields rather than today's values behind a pill. */
+function draftFromSnapshot(snap: SalesOrderSnapshot): Draft {
+  const h = snap.header ?? {};
+  const str = (k: string) => (h[k] == null ? "" : String(h[k]));
+  const fields = (h["entry_fields"] ?? {}) as Record<string, unknown>;
+  const custom: Record<string, string> = {};
+  for (const [k, v] of Object.entries(fields)) {
+    if (k === "building_type") continue;
+    custom[k] = v == null ? "" : String(v);
+  }
+  const emergency = parseEmergencyContact(str("customer_emergency"));
+  return {
+    ...EMPTY_DRAFT,
+    customer_name: str("customer_name"),
+    customer_phone: str("customer_phone"),
+    customer_email: str("customer_email"),
+    customer_race: str("customer_race"),
+    customer_gender: str("customer_gender"),
+    customer_birthday: str("customer_birthday").slice(0, 10) || null,
+    customer_address: str("customer_address"),
+    customer_address_line1: str("customer_address_line1"),
+    customer_address_line2: str("customer_address_line2"),
+    customer_address_city: str("customer_address_city"),
+    customer_address_state: str("customer_address_state"),
+    customer_address_postcode: str("customer_address_postcode"),
+    customer_address_unknown: Boolean(h["customer_address_unknown"]),
+    building_type: fields.building_type == null ? "" : String(fields.building_type),
+    emergency_name: emergency.name,
+    emergency_phone: emergency.phone,
+    emergency_relationship: emergency.relationship,
+    customer_billing: str("customer_billing"),
+    customer_billing_same: h["customer_billing_same"] !== false,
+    delivery_date: str("delivery_date") || null,
+    delivery_date_tbd: Boolean(h["delivery_date_tbd"]),
+    proceed_date: str("proceed_date") || null,
+    delivery_floor: Number(h["delivery_floor"] ?? 1),
+    delivery_has_lift: Boolean(h["delivery_has_lift"]),
+    delivery_stair_items:
+      h["delivery_stair_items"] == null ? null : Number(h["delivery_stair_items"]),
+    custom,
+    lines: (snap.lines ?? []).map((l) => ({
+      key: nextKey(),
+      ...(l.id ? { id: String(l.id) } : {}),
+      sku: l.sku,
+      qty: Number(l.qty),
+      unit_price: Number(l.unit_price),
+      ...(l.attrs ? { attrs: l.attrs as Record<string, unknown> } : {}),
+    })),
+    addons: (snap.addons ?? []).map((a) => ({
+      key: nextKey(),
+      addon_key: String(a.addon_key),
+      qty: Number(a.qty),
+      unit_price: Number(a.unit_price),
+      attrs: (a.attrs as Record<string, unknown> | null) ?? null,
+    })),
+    installment_months: h["installment_months"] == null ? null : Number(h["installment_months"]),
+  };
 }
-function Fact({ label, value }: { label: string; value: React.ReactNode }) {
+
+/* ── Small atoms ───────────────────────────────────────────────────────────── */
+
+/** The one card lives in the kit (Workspace §5.10 admission, 2026-09-28). */
+import Block from "@/components/kit/Block";
+export { Block };
+
+/**
+ * A named division INSIDE a card — the merge law's other half (Jess, 2026-08-26).
+ *
+ * Jess asked for fewer, fuller cards: `DELIVERY ADDRESS` joins `CUSTOMER`,
+ * `SALES OWNERSHIP` joins `ORDER INFO`. Merging must not cost the reader the
+ * name of what they are looking at, and it may not cost the WORD either —
+ * `Sales ownership` is locked (COPY-STANDARD:1427 governs its door, and
+ * MASTER.md's block order names the section). So the section keeps its exact
+ * word and loses only its border, its own 24px gap and its second heading rule.
+ *
+ * Deliberately quieter than a card title: HEADINGS HAVE TWO RANKS ONLY
+ * (`docs/orders/MASTER.md` § "Order view") — the card title is `text-strong`
+ * 15px/600 blue, and this in-card label is 13px/600 slate-11. It was drawn at
+ * `text-strong` too, so `Emergency contact` read as a second card title
+ * (measured 15px/600, 2026-09-23). No margins: the section body's one 12px
+ * gap spaces it, and the 1px rule above it marks the group.
+ */
+/** The 1px rule over `Total payable` and `Balance due` in the Payment totals.
+ *  The label cell carries the 24px between the columns as its own padding, so
+ *  the rule runs unbroken under both cells. */
+const TOTAL_RULE = "border-t border-kit-slate-5 pt-1";
+
+function SubHead({ children, note }: { children: React.ReactNode; note?: string }) {
   return (
-    <div className="min-w-0">
-      <div className="text-label text-base-500">{label}</div>
-      <div className="text-body text-base-900 mt-0.5 break-words">{value}</div>
-    </div>
+    <p
+      className="flex flex-wrap items-baseline gap-x-2 text-body font-semibold text-kit-slate-11"
+      data-testid={`subhead-${String(children).replace(/\s+/g, "-").toLowerCase()}`}
+    >
+      {children}
+      {/* The card-level `note` slot, one level down. `creates a Revision ·
+          needs approval` is governed copy that used to ride a Block title; the
+          merge moved the heading, so it moves with it rather than being
+          reworded or dropped. */}
+      {note && <span className="font-normal text-base-500">{note}</span>}
+    </p>
   );
 }
 
-type Mode = "view" | "edit" | "create" | "oldrev";
+/* ⛔ THE DELIVERY PAYMENT APPROVAL DOOR IS REMOVED — owner instruction,
+   2026-09-01, and it changes what the business does rather than how a card
+   looks. Recorded here rather than deleted in silence.
+
+   WHAT IT WAS. `0362` (Jess, 2026-08-19) made "money in full before delivery"
+   the default and allowed ONE exception: a recorded approval, decided by the
+   principal, which opened the Delivery Order as COD — the balance paid by
+   online transfer before unloading. This component was the only surface in the
+   product that could raise or decide one.
+
+   WHAT REMOVING IT MEANS, stated plainly because nobody should have to
+   rediscover it. The rule becomes ABSOLUTE: `ops_delivery_orders_money_gate`
+   (0362) still refuses to mint a Delivery Order while a Sales Order's goods
+   money is outstanding, and there is no longer any way to ask for the
+   exception. An owing order is undeliverable until it is paid. That is the
+   intended effect of this change, not a side effect of it.
+
+   ⛔ THE RECORD, THE RPCs AND THE DATABASE GATE ARE UNTOUCHED.
+   `order_delivery_payment_approvals`, `delivery_payment_approval_request`,
+   `delivery_payment_approval_decide` and the trigger all remain, and so do
+   their API routes. Nothing is dropped and no migration is written, for two
+   reasons: an approval already granted stays honoured by the gate, and
+   restoring the door is a revert of this one commit rather than a rebuild.
+
+   If the exception is wanted again, this is where it goes back. */
+
+/**
+ * A RECORDED ANSWER WEARS THE BOX THE QUESTION WOULD HAVE WORN (YH,
+ * 2026-09-01 — measured on `/operation/orders/so`).
+ *
+ * Every question on this page is a box: `Full name`, `Floor (Max is 3rd
+ * Floor)`, `Lift available?`. An answer that was already recorded, or that this
+ * surface may not move, was a bare label with a line of text under it — so ONE
+ * form carried TWO grammars and the reader learnt which shapes accept typing by
+ * trying them. The frame is constant now; what differs is the CONTROL. A
+ * read-only field has no caret, no focus ring and no hover, so it still reads
+ * as an answer rather than as an invitation, and the page stops looking like
+ * two forms stapled together.
+ *
+ * ⛔ NOT an `<input readOnly>`. Several values here are rendered NODES, not
+ * strings — the amber `No delivery date` chip, and anything wearing `<Money>` —
+ * and an input can hold only a string, so boxing them through one would throw
+ * away the exact fact the chip exists to carry. This borrows the kit's own
+ * `CONTROL_BASE` + resting hairline instead, so there is still ONE control skin
+ * in the app and this shares it rather than copying it. The one deliberate
+ * departure is HEIGHT: `min-h-8` in place of the control's fixed `h-8`, because
+ * an address or a long customer name is an answer that must be readable, and a
+ * fixed-height box would clip it.
+ *
+ * `role="textbox"` + `aria-readonly` is what a screen reader is told, so the
+ * announced grammar matches the drawn one. `aria-label` carries the name
+ * because `<label for>` binds only to real form controls.
+ */
+/**
+ * ⭐ THE SO PAGE FIELD STANDARD — OWNER RULING (Jess, 2026-09-22),
+ * `docs/orders/MASTER.md` § "Order view": **a grey box means "this can be
+ * changed with `Edit`" and nothing else** — *"every grey meaning can edit"*.
+ *
+ * Every fact on the page is a grey box EXCEPT three, which print as PLAIN TEXT
+ * because they are not this page's to change:
+ *   · `SO Doc Date` — the order's birth stamp
+ *   · the payment rows — Payments owns them; the door is `Open this order in
+ *     Payments →`
+ *   · the computed totals — `TOTAL PAYABLE` · `Paid to date` · `Balance due`
+ *
+ * So `Fact` takes `own={false}` for those three. Before this ruling every
+ * read-only value wore the same bordered box, so `SO Doc Date` looked exactly
+ * as changeable as the phone number beside it (reviewer finding 16).
+ */
+/** Contact corrections do not renew an existing delivery promise. */
+export function isContactOnlyCorrection(fields: readonly string[]): boolean {
+  const contactFields = new Set([
+    "customer_name", "customer_phone", "customer_email",
+    "emergency_name", "emergency_phone", "emergency_relationship",
+  ]);
+  return fields.length > 0 && fields.every((field) => contactFields.has(field));
+}
+
+export function Fact({
+  label,
+  value,
+  own = true,
+  framed = own,
+  idPrefix = "so-fact",
+  testId,
+  hint,
+  wide = false,
+  automatic = false,
+}: {
+  label: string;
+  value: React.ReactNode;
+  own?: boolean;
+  framed?: boolean;
+  /** The id/testid family — `so-fact` here, `po-fact` / `mp-fact` on the
+   *  Purchasing pages that share this ONE fact grammar (owner, 2026-09-26). */
+  idPrefix?: string;
+  /** A page that already pins its own test id keeps it. */
+  testId?: string;
+  /** One quiet line under the value (`Provisional. The date is recorded when
+   *  issued.`) through FieldFrame's own hint slot — never a second markup. */
+  hint?: string;
+  /** Spans the whole fact grid row — a free-text reason or requirement. */
+  wide?: boolean;
+  /** A value the SYSTEM fills on a form the person is filling in
+   *  (`Requested By`, `Proceed Date` on a create page). Drawn in a grey
+   *  box so it never reads as a field waiting for input (owner 2026-09-28:
+   *  "yes" to grey automatic fields, the Shopify / SAP read-only look). */
+  automatic?: boolean;
+}) {
+  const id = `${idPrefix}-${label.replace(/\s+/g, "-").toLowerCase()}`;
+  const field = (
+    <FieldFrame id={id} label={label} hint={hint}>
+      <div
+        id={id}
+        role="textbox"
+        aria-readonly
+        aria-label={label}
+        data-kit={framed ? (automatic ? "automatic-field" : "readonly-field") : "plain-fact"}
+        data-editable={own ? "yes" : "no"}
+        data-testid={testId ?? id}
+        className={
+          framed
+            ? `${automatic ? CONTROL_BASE.replace("bg-white", "bg-kit-slate-3") : CONTROL_BASE} ${CONTROL_BORDER.rest} rounded-control min-h-8 min-w-0 break-words px-2 py-1`
+            : "flex min-h-8 min-w-0 items-center break-words px-0 py-1 text-body text-base-900"
+        }
+      >
+        {value}
+      </div>
+    </FieldFrame>
+  );
+  /* The kit owns one field and takes no className; the grid span is the
+     caller's layout, drawn here around it. */
+  return wide ? <div className="col-span-full">{field}</div> : field;
+}
+
+/** The 0219 custom fields of one tab, rendered from the SAME contract the POS
+ *  renders from. An operator who adds a field in Settings gets it on both
+ *  surfaces or on neither. */
+function CustomFields({
+  fields,
+  values,
+  onChange,
+  locked,
+}: {
+  fields: CustomField[];
+  values: Record<string, string>;
+  onChange: (key: string, value: string) => void;
+  /** The page's one lock: a locked field carries no star and no placeholder. */
+  locked: boolean;
+}) {
+  return (
+    <>
+      {fields.map((f) => {
+        const id = `so-custom-${f.key}`;
+        const value = values[f.key] ?? "";
+        /* Locked and absent reads `Not recorded`, the same as every built-in field. */
+        if (locked && !value) return <Fact key={f.key} label={f.label} value="Not recorded" />;
+        if (f.type === "select") {
+          return (
+            <Select
+              key={f.key}
+              id={id}
+              label={f.label}
+              required={!locked && f.required}
+              value={value || undefined}
+              onValueChange={(v) => onChange(f.key, v)}
+              options={f.options.map((o) => ({ value: o, label: o }))}
+            />
+          );
+        }
+        if (f.type === "date") {
+          return (
+            <DatePicker
+              key={f.key}
+              id={id}
+              label={f.label}
+              required={!locked && f.required}
+              value={value || null}
+              onChange={(iso) => onChange(f.key, iso ?? "")}
+            />
+          );
+        }
+        return (
+          <Input
+            key={f.key}
+            id={id}
+            label={f.label}
+            required={!locked && f.required}
+            type={f.type === "number" ? "number" : "text"}
+            value={value}
+            onChange={(e) => onChange(f.key, e.target.value)}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+type Mode = "object" | "oldrev";
 const OBJECT_VIEWS = ["Order", "Revisions", "History", "Order Route"] as const;
 type ObjectView = (typeof OBJECT_VIEWS)[number];
 
+/**
+ * 【DELIVERY】 CARD 19 — THE NUMBER DOOR. `/operation/orders/so/:orderId`
+ * carries either the order's id or the operator's own document word
+ * (`SO-1362`). The object page below reads TEN doors by the id; handing it a
+ * number reached the database as `invalid input syntax for type uuid` and the
+ * page printed an empty Order Route (measured on production 2026-09-13).
+ *
+ * A number is resolved ONCE through the by-number door and the page re-enters
+ * by the id with the same search (`?route=1` survives), so every fan-in read
+ * still happens by the canonical id — one resolver, no second fan-in (Law C).
+ * `new` is no door: the office create door is retired (owner ruling
+ * 2026-09-27) and its route lands on the Register. Anything else is an
+ * absence, never a 500.
+ */
 export default function SalesOrderWorkspace() {
+  const { orderId } = useParams<{ orderId: string }>();
+  const location = useLocation();
+  const ident = salesOrderParamOf(orderId);
+  if (ident.kind === "number") {
+    return <SalesOrderNumberDoor so={ident.so} search={location.search} />;
+  }
+  if (ident.kind === "invalid") {
+    return <SalesOrderAbsence />;
+  }
+  return <SalesOrderWorkspaceBody />;
+}
+
+function SalesOrderNumberDoor({ so, search }: { so: number; search: string }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const resolved = useSalesOrderIdByNumber(so);
+  const id = resolved.data?.id ?? null;
+  useEffect(() => {
+    if (id) navigate(`/operation/orders/so/${id}${search}`, { replace: true, state: location.state });
+  }, [id, navigate, search, location.state]);
+  if (resolved.isError) return <SalesOrderAbsence />;
+  return (
+    <div className="flex h-full items-center justify-center" data-testid="so-number-door">
+      <Loading label={`Opening ${salesOrderNumberWord(so)}`} />
+    </div>
+  );
+}
+
+/** The absence the object page prints for a number or param no order carries
+ *  (COPY-STANDARD: `Sales Order not found.`). */
+function SalesOrderAbsence() {
+  /* The kit's own block and button, through the one translator (owner ruling 2026-09-26). */
+  return (
+    <div className="flex h-full flex-col items-center justify-center" data-testid="so-not-found">
+      <SalesOrderReadFailure error={{ status: 404 }} surface="sales-order" />
+    </div>
+  );
+}
+
+function SalesOrderWorkspaceBody() {
   const { orderId } = useParams<{ orderId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const isNew = location.pathname.endsWith("/so/new");
-  const wantsEdit = params.get("edit") === "1";
-  const showRoute = params.get("route") === "1" && !isNew;
-  const copyFrom = isNew ? params.get("copyFrom") : null;
+  const showRoute = params.get("route") === "1";
   const [viewRev, setViewRev] = useState<number | null>(null);
-  const [amendmentSeed, setAmendmentSeed] = useState<AmendmentProposal | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [problemOpen, setProblemOpen] = useState(false);
+  /* The `Change salesperson` door lives beside the Salesperson it changes; the
+     modal behind it lives in `SalesOrderAttribution`. Bumping this opens it. */
+  const [attributionSignal, setAttributionSignal] = useState(0);
+  const canChangeSalesOwnership = useCanChangeSalesOwnership();
   const [objectView, setObjectView] = useState<ObjectView>(showRoute ? "Order Route" : "Order");
 
-  const detailQ = useOperationOrder(isNew ? copyFrom : (orderId ?? null));
-  const serviceCasesQ = useOrderServiceCases(isNew ? "" : (orderId ?? ""), {
-    enabled: !isNew && Boolean(orderId),
-  });
-  const revisionsQ = useSalesOrderRevisions(isNew ? null : (orderId ?? null));
-  const goodsTruthQ = useSalesOrderExpansion(isNew ? "" : (orderId ?? ""));
+  /* ⛔ `?edit=1` IS RETIRED — owner ruling 2026-08-15. A bookmark, a browser
+     history entry or a stale tab still carries it; it is stripped rather than
+     404'd, because the page it asked for is the page it is already on. */
+  useEffect(() => {
+    if (!params.get("edit")) return;
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("edit");
+        return next;
+      },
+      { replace: true, state: location.state },
+    );
+  }, [params, setParams, location.state]);
+
+  const detailQ = useOperationOrder(orderId ?? null);
+  /* ── THE CREATE DOOR ASKS THE CATALOG (2026-08-21) ───────────────────────
+   * Until now this door took a SKU as free text: a typo produced a line no
+   * stock, PO or readiness engine could recognise, and creation still
+   * succeeded. The POS never had that hole because it only ever offers SKUs
+   * the catalog holds.
+   *
+   * The bundle is the same 5-minute-cached response the POS and both catalog
+   * pages already pull, so an operator who walks POS → Ops pays for it once.
+   *
+   * `admin: true` is deliberate: the office door must be able to write a line
+   * for a SKU that is not on sale at POS (a discontinued model still being
+   * fulfilled, a service line), and the admin bundle is the one that carries
+   * them.
+   *
+   * ⭐ NOW FETCHED IN EVERY MODE (Jess, 2026-08-26). It used to be create-only,
+   * because the document view has no SKU field. The stair-carry working-out
+   * the POS shows needs `floorConfig`, which ships inside this bundle and
+   * nowhere else — and the same change that added it removed three whole
+   * queries from this page (Delivery Orders, Payments, Guarantees), so the
+   * Order tab still makes fewer round trips than it did before. */
+  const catalogQ = useCatalog({ admin: true });
+  /** sku → what the CATALOG says it is. The one lookup both new fields read,
+   *  so the name hint and the price hint can never disagree (Law D). */
+  const catalogBySku = useMemo(() => {
+    const out = new Map<string, CatalogSkuFact>();
+    const bundle = catalogQ.data;
+    if (!bundle) return out;
+    const model = new Map(bundle.models.map((m) => [m.id, m]));
+    for (const sku of bundle.skus) {
+      const m = model.get(sku.modelId);
+      out.set(sku.sku, {
+        price: sku.price,
+        label: [m?.name ?? "", sku.variant].filter(Boolean).join(" · "),
+        category: m?.category ?? null,
+      });
+    }
+    return out;
+  }, [catalogQ.data]);
+  /** addon key -> what the CATALOG calls it. `SalesOrderAddons` reads the same
+   *  bundle for the same purpose, so the Goods table and the Services list
+   *  under it can never print two different names for one row (Law D). */
+  const addonNameByKey = useMemo(
+    () => new Map((catalogQ.data?.addons ?? []).map((a) => [a.key, a.name])),
+    [catalogQ.data],
+  );
+  /** addon key -> the catalogue's Service SKU, for a linked service only (0172). */
+  const addonSkuByKey = useMemo(
+    () => new Map((catalogQ.data?.addons ?? []).flatMap((a) => (a.serviceSku ? [[a.key, a.serviceSku] as const] : []))),
+    [catalogQ.data],
+  );
+  const revisionsQ = useSalesOrderRevisions(orderId ?? null);
+  const goodsTruthQ = useSalesOrderExpansion(orderId ?? "");
+  const amendmentQ = useSalesOrderAmendment(orderId ?? null);
   /* 3.4 · what this sales order's changes have raised for other modules. The
    * workspace SHOWS it and cannot close it — the module that raised the work
    * does not tick it off. */
-  const correctionWorkQ = useOrderCorrectionWork(isNew ? null : (orderId ?? null));
+  const correctionWorkQ = useOrderCorrectionWork(orderId ?? null);
+  /* ⭐ ROUTE FACTS LOAD ONLY WHEN THE ROUTE IS OPEN (owner ruling 2026-09-26).
+     Measured: the fan-in fired on every opened order — eleven requests the
+     Order tab never reads. */
   const routeFactsQ = useSalesOrderRouteFacts(
-    isNew ? null : (orderId ?? null),
+    orderId ?? null,
     showRoute,
     (detailQ.data?.pos ?? []).map((po) => po.id),
   );
+  /* The leg that reaches the customer decides the payment deadline's clock. */
+  const routeCustomerLeg = useMemo(() => {
+    const stops = detailQ.data?.order?.delivery_stops ?? [];
+    return stops.length >= 2 ? Math.max(...stops.map((stop) => Number(stop.leg) || 0)) : 0;
+  }, [detailQ.data]);
+  const routePartnerQ = useLogisticsCardFacts(showRoute ? (orderId ?? null) : null, routeCustomerLeg);
+  /* LINKED PROBLEMS needs the case's own translated status word, and Service
+     owns that translation. The route facts carry only open/closed. */
+  const serviceCasesQ = useOrderServiceCases(orderId ?? "", {
+    enabled: Boolean(orderId),
+  });
   const baseQ = useQuery({
-    queryKey: ["orders", "sales-order-data", orderId ?? "new"],
+    queryKey: ["orders", "sales-order-data", orderId ?? null],
     queryFn: () =>
       apiFetch<SalesOrderTemplateData>(`/api/orders/${orderId}/sales-order-data`),
-    enabled: !isNew && !!orderId,
+    enabled: !!orderId,
   });
 
   const salespersonsQ = useSalespersons();
   const outletsQ = useOutlets();
   const dealersQ = useOperationDealersRef();
+  /* 0219 — the ONE field contract. The POS reads it out of the catalog bundle,
+     the object page reads it here; both call `resolveFormTab`. */
+  const entryConfigQ = useOrderEntryConfig();
+  const formFields = entryConfigQ.data?.entryConfig.formFields ?? null;
+  const tab = useCallback(
+    (t: OrderEntryTab) => resolveFormTab(formFields, t),
+    [formFields],
+  );
 
   const refs: Refs = useMemo(() => {
     const sp = new Map((salespersonsQ.data?.salespersons ?? []).map((s) => [s.id, s.name]));
@@ -462,84 +1225,68 @@ export default function SalesOrderWorkspace() {
     };
   }, [salespersonsQ.data, outletsQ.data, dealersQ.data]);
 
-  /* ── The draft — seeded from the order when EDIT opens, empty for CREATE. ── */
+  const revisions = revisionsQ.data?.revisions ?? [];
+  const currentRev = revisions.length > 0 ? revisions[revisions.length - 1]!.revision : null;
+  const viewedRevision: SalesOrderRevisionRow | null =
+    viewRev != null ? (revisions.find((r) => r.revision === viewRev) ?? null) : null;
+
+  /* ── The draft — seeded from the order. ─────────────────────────────── */
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [baseline, setBaseline] = useState<Draft>(EMPTY_DRAFT);
   const [draftSeed, setDraftSeed] = useState<string>("");
-  const [dirty, setDirty] = useState(false);
   const order = detailQ.data?.order;
   const detailLines = detailQ.data?.lines ?? [];
   useEffect(() => {
-    if (isNew) {
-      if (copyFrom) {
-        const seed = `copy:${copyFrom}`;
-        if (!order || draftSeed === seed) return;
-        const copied = copySalesOrderDraft({
-          order: {
-            id: order.id,
-            so: order.so,
-            customer_name: order.customer_name,
-            customer_phone: order.customer_phone,
-            customer_email: (order as { customer_email?: string | null }).customer_email,
-            customer_address: order.customer_address,
-            customer_address_line1:
-              (order as { customer_address_line1?: string | null }).customer_address_line1,
-            customer_address_line2:
-              (order as { customer_address_line2?: string | null }).customer_address_line2,
-            customer_address_city:
-              (order as { customer_address_city?: string | null }).customer_address_city,
-            customer_address_state:
-              (order as { customer_address_state?: string | null }).customer_address_state,
-            customer_address_postcode:
-              (order as { customer_address_postcode?: string | null }).customer_address_postcode,
-            customer_emergency: order.customer_emergency,
-            customer_billing: order.customer_billing,
-            dealer_id: order.dealer_id,
-            outlet_id: order.outlet_id,
-            salesperson_id: order.salesperson_id,
-            delivery_floor: (order as { delivery_floor?: number }).delivery_floor,
-            delivery_has_lift: (order as { delivery_has_lift?: boolean }).delivery_has_lift,
-          },
-          lines: detailLines.map((line) => ({
-            id: line.id,
-            sku: line.sku,
-            qty: line.qty,
-            unit_price: line.unit_price,
-          })),
-        });
-        setDraft({
-          ...copied,
-          lines: copied.lines.map((line) => ({ ...line, key: nextKey() })),
-        });
-        setDirty(false);
-        setDraftSeed(seed);
-        return;
-      }
-      if (draftSeed !== "new") {
-        setDraft({ ...EMPTY_DRAFT, lines: [{ key: nextKey(), sku: "", qty: 1, unit_price: 0 }] });
-        setDirty(false);
-        setDraftSeed("new");
-      }
+    /* AN OLD REVISION IS A PHOTOGRAPH. The same fields render, filled from
+       THAT snapshot and locked — never the current row's values wearing a
+       "read-only" pill, which is how a historical view starts lying. */
+    if (viewRev != null) {
+      const seed = `${orderId}:rev:${viewRev}`;
+      if (!viewedRevision || draftSeed === seed) return;
+      const next = draftFromSnapshot(viewedRevision.snapshot);
+      setDraft(next);
+      setBaseline(next);
+      setDraftSeed(seed);
       return;
     }
-    const seed = `${orderId}:${wantsEdit}`;
-    if (!wantsEdit || !order || draftSeed === seed) return;
-    setDraft({
+    /* ⛔ A REFETCH MAY NEVER CLOBBER AN OPEN EDIT (ui/MASTER.md §6.4 C3). The
+       seed moves with the server's answer, so a save or an approval reseeds the
+       form from fresh truth — but never while the operator has unsaved words on
+       screen. `dirtyRef` is read, not depended on, so this stays one effect. */
+    const seed = `${orderId}:${detailQ.dataUpdatedAt}`;
+    if (!order || draftSeed === seed) return;
+    if (dirtyRef.current || editingRef.current) return;
+    const bag = order as unknown as Record<string, unknown>;
+    const str = (k: string) => (bag[k] == null ? "" : String(bag[k]));
+    const entryFields =
+      ((order as { entry_data?: { fields?: Record<string, unknown> } | null }).entry_data?.fields ??
+        {}) as Record<string, unknown>;
+    const emergency = parseEmergencyContact(order.customer_emergency);
+    const custom: Record<string, string> = {};
+    for (const [k, v] of Object.entries(entryFields)) {
+      if (k === "building_type") continue;
+      custom[k] = v == null ? "" : String(v);
+    }
+    const next: Draft = {
       customer_name: order.customer_name ?? "",
       customer_phone: order.customer_phone ?? "",
-      customer_email: (order as { customer_email?: string | null }).customer_email ?? "",
+      customer_email: str("customer_email"),
+      customer_race: str("customer_race"),
+      customer_gender: str("customer_gender"),
+      customer_birthday: str("customer_birthday").slice(0, 10) || null,
       customer_address: order.customer_address ?? "",
-      customer_address_line1:
-        (order as { customer_address_line1?: string | null }).customer_address_line1 ?? "",
-      customer_address_line2:
-        (order as { customer_address_line2?: string | null }).customer_address_line2 ?? "",
-      customer_address_city:
-        (order as { customer_address_city?: string | null }).customer_address_city ?? "",
-      customer_address_state:
-        (order as { customer_address_state?: string | null }).customer_address_state ?? "",
-      customer_address_postcode:
-        (order as { customer_address_postcode?: string | null }).customer_address_postcode ?? "",
-      customer_emergency: order.customer_emergency ?? "",
+      customer_address_line1: str("customer_address_line1"),
+      customer_address_line2: str("customer_address_line2"),
+      customer_address_city: str("customer_address_city"),
+      customer_address_state: str("customer_address_state"),
+      customer_address_postcode: str("customer_address_postcode"),
+      customer_address_unknown: Boolean(order.customer_address_unknown),
+      building_type: entryFields.building_type == null ? "" : String(entryFields.building_type),
+      emergency_name: emergency.name,
+      emergency_phone: emergency.phone,
+      emergency_relationship: emergency.relationship,
       customer_billing: order.customer_billing ?? "",
+      customer_billing_same: order.customer_billing_same !== false,
       dealer_id: order.dealer_id ?? null,
       outlet_id: order.outlet_id ?? null,
       salesperson_id: order.salesperson_id ?? null,
@@ -548,25 +1295,103 @@ export default function SalesOrderWorkspace() {
       proceed_date: order.proceed_date ?? null,
       delivery_floor: (order as { delivery_floor?: number }).delivery_floor ?? 1,
       delivery_has_lift: (order as { delivery_has_lift?: boolean }).delivery_has_lift ?? false,
+      delivery_stair_items:
+        (order as { delivery_stair_items?: number | null }).delivery_stair_items ?? null,
+      custom,
       lines: detailLines.map((l) => ({
         key: nextKey(),
         id: l.id,
         sku: l.sku,
         qty: l.qty,
         unit_price: Number(l.unit_price),
+        ...(l.attrs ? { attrs: l.attrs } : {}),
       })),
-    });
-    setDirty(false);
+      addons: (detailQ.data?.addons ?? []).map((a) => ({
+        key: nextKey(),
+        id: a.id,
+        addon_key: a.addon_key,
+        qty: Number(a.qty),
+        unit_price: Number(a.unit_price),
+        attrs: (a.attrs as Record<string, unknown> | null) ?? null,
+      })),
+      installment_months: (order as { installment_months?: number | null }).installment_months ?? null,
+    };
+    setDraft(next);
+    setBaseline(next);
     setDraftSeed(seed);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isNew, wantsEdit, order, orderId, copyFrom, detailLines, draftSeed]);
+  }, [
+    order,
+    orderId,
+    detailLines,
+    draftSeed,
+    detailQ.dataUpdatedAt,
+    viewRev,
+    viewedRevision,
+  ]);
 
-  const mode: Mode = isNew ? "create" : viewRev != null ? "oldrev" : wantsEdit ? "edit" : "view";
+  const mode: Mode = viewRev != null ? "oldrev" : "object";
 
-  const revisions = revisionsQ.data?.revisions ?? [];
-  const currentRev = revisions.length > 0 ? revisions[revisions.length - 1]!.revision : null;
-  const viewedRevision: SalesOrderRevisionRow | null =
-    viewRev != null ? (revisions.find((r) => r.revision === viewRev) ?? null) : null;
+  /* ── WHAT CHANGED — the save bar counts fields, never keystrokes. ─────── */
+  const changedFields = useMemo(() => {
+    if (mode === "oldrev") return [];
+    const keys = Object.keys(baseline) as Array<keyof Draft>;
+    const changed: string[] = [];
+    for (const k of keys) {
+      if (k === "lines") {
+        if (JSON.stringify(draft.lines.map(({ key: _k, ...l }) => l))
+          !== JSON.stringify(baseline.lines.map(({ key: _k, ...l }) => l))) changed.push("lines");
+        continue;
+      }
+      if (k === "custom") {
+        if (JSON.stringify(draft.custom) !== JSON.stringify(baseline.custom)) changed.push("custom");
+        continue;
+      }
+      if (k === "addons") {
+        if (JSON.stringify(draft.addons.map(({ key: _k, ...a }) => a))
+          !== JSON.stringify(baseline.addons.map(({ key: _k, ...a }) => a))) changed.push("addons");
+        continue;
+      }
+      if (draft[k] !== baseline[k]) changed.push(k);
+    }
+    return changed;
+  }, [draft, baseline, mode]);
+  const dirty = changedFields.length > 0;
+  /* Read by the seeding effect without becoming one of its dependencies. */
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  /* ⭐ VIEW FIRST, EDIT ON PURPOSE — owner ruling (Jess, 2026-09-21), built 0562.
+     The Order tab opens READ-ONLY; `Edit` enters the whole-page draft; the
+     draft carries customer, delivery, dates, items, services and the plan. */
+  const [editing, setEditing] = useState(false);
+  const editingRef = useRef(editing);
+  editingRef.current = editing;
+  const [changeReason, setChangeReason] = useState("");
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [changeAskedOn, setChangeAskedOn] = useState<string | null>(null);
+  const [changeAgreement, setChangeAgreement] = useState<RecordedAgreement | null>(null);
+  /** Proposing again over an out-of-date request withdraws it first (server). */
+  const [replaceAmendmentId, setReplaceAmendmentId] = useState<string | null>(null);
+  const role = useAuth((st) => st.role);
+  /** THE LOCKED STATE (owner ruling 2026-09-26): View and a historical version
+   *  are ONE locked presentation; Edit alone draws controls. */
+  const formLocked = (mode === "object" && !editing) || mode === "oldrev";
+  /** Locked and absent prints `Not recorded`, because a `Select` or `Pick a date` placeholder is a question. */
+  const lockedFact = (label: string, present: unknown, control: React.ReactNode) =>
+    formLocked && !present ? <Fact label={label} value="Not recorded" /> : control;
+  /** `Disc (RM)` is zero unless the line really carries a numeric discount (SO-PDF-STANDARD §10). */
+  const discountOf = (row: object) =>
+    typeof (row as { discount?: unknown }).discount === "number" ? (row as { discount: number }).discount : 0;
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+
+  const liveAmendment = amendmentQ.data?.amendment ?? null;
+  /* THE PROPOSAL NEVER ENTERS THE PAPER — it shows as a banner above it. */
+  const pendingDeliveryDate =
+    liveAmendment && !liveAmendment.stale
+      ? ((liveAmendment.proposed_snapshot as { delivery_date?: string | null } | null)
+          ?.delivery_date ?? null)
+      : null;
 
   /* Revision links in Order Route are durable URLs, not local-only buttons. */
   useEffect(() => {
@@ -576,147 +1401,667 @@ export default function SalesOrderWorkspace() {
     if (Number.isInteger(revision) && revision > 0) setViewRev(revision);
   }, [params]);
 
+  /* ⭐ THE STAIR CARRY, SHOWN THE WAY THE POS SHOWS IT (Jess, 2026-08-26).
+   *
+   * The office keyed `Floor`, `Items needing stair carry` and the lift answer
+   * and was told nothing back, while the POS printed the whole working-out —
+   * `3 of 5 items × 2 floors above 2F × RM50 = RM300`. Same three inputs, one
+   * surface explaining them and one not.
+   *
+   * ⛔ THE ARITHMETIC IS IMPORTED, NEVER RE-TYPED (ownership Law D — one
+   * derived fact, ONE arithmetic). `floorSurchargeRaw` is the same function the
+   * POS panel and the order totals call; a second copy here is exactly how the
+   * two surfaces would start disagreeing about money. */
+  const stair = useMemo(() => {
+    const cfg = catalogQ.data?.floorConfig;
+    if (!cfg) return null;
+    const itemsTotal = (detailQ.data?.lines ?? []).reduce((n, l) => n + l.qty, 0);
+    /* ⭐ UNSET MEANS NONE — owner ruling 2026-08-27 (YH). It used to mean
+       EVERY item (0104's column comment), so an order nobody was asked about
+       carried the maximum fee. The same rule now runs in `order-totals.ts` and
+       in the POS panel, so all three agree. */
+    const items = stairCarryCount(itemsTotal, draft.delivery_stair_items);
+    return {
+      itemsTotal,
+      fee: floorSurchargeRaw(draft.delivery_floor, draft.delivery_has_lift, items, cfg),
+    };
+  }, [
+    catalogQ.data?.floorConfig,
+    draft.delivery_stair_items,
+    draft.delivery_floor,
+    draft.delivery_has_lift,
+    detailQ.data?.lines,
+  ]);
+
+  /* ⭐ A SAVED ORDER READS ITS OWN CHARGE, NEVER TODAY'S RATE (YH, 2026-09-01).
+   *
+   * The `stair` memo above prices from `catalogQ.data.floorConfig` — the live
+   * `floor_config` singleton a principal can PATCH — and the sentence below it
+   * was rendered in EVERY mode. So stamping an order at RM 50/floor/item and
+   * later moving the rate to RM 60 made one page print two numbers: the
+   * working-out narrated `× RM 60 = RM 360` while MONEY, the PDF,
+   * `stripe-checkout` and every payment cap stayed at the RM 300 that was
+   * actually charged. The Card's own trap — STAMP THE FEE, DO NOT RE-DERIVE IT
+   * — was closed in the database and left open on screen.
+   *
+   * An old revision was worse again: `stair` reads the CURRENT order's lines
+   * for `itemsTotal` while the floor and the count come from the snapshot, so a
+   * photograph of Rev 3 mixed two revisions and today's rate in one sentence.
+   *
+   * ⭐ SO THE SENTENCE STATES THE STAMPED CHARGE. The fee is the stamped
+   * `STAIR_CARRY` row, the same one MONEY reads, and the counts are the ones
+   * that produced it: the snapshot's for a revision, the order's own otherwise.
+   * (The live-rate multiplication belonged to the office create door, retired
+   * 2026-09-27.)
+   *
+   * ⛔ IT STOPS SHORT OF THE MULTIPLICATION ON A SAVED ORDER, and that is the
+   * point rather than a shortcut. Recovering `× RM rate above NF` from a
+   * stamped fee needs BOTH the rate and `freeUpToFloor`, and only their product
+   * is stored — one equation, two unknowns. Reading either back off today's
+   * config is the very defect this closes, one term smaller. So a saved order
+   * states what it holds: how many items were carried, to which floor, and what
+   * it was charged. `stair-carry-recompute.ts` rules that the breakdown is NOT
+   * re-stated on the addon row ("a second copy of it would be a second
+   * arithmetic for one number"), so there is nowhere honest to read it from.
+   */
+  const stairWorking = useMemo(() => {
+    /* A REVISION IS A PHOTOGRAPH — its own lines and its own addons, never the
+       order's current ones. MONEY already reads it this way; this is the same
+       source, so the two cannot disagree on one page. */
+    const snapshot = mode === "oldrev" ? (viewedRevision?.snapshot ?? null) : null;
+    const lines = snapshot ? (snapshot.lines ?? []) : (detailQ.data?.lines ?? []);
+    const addons = snapshot ? (snapshot.addons ?? []) : (detailQ.data?.addons ?? []);
+    const fee = addons
+      .filter((a) => a.addon_key === STAIR_CARRY_ADDON_KEY)
+      .reduce((sum, a) => sum + Number(a.unit_price ?? 0) * Number(a.qty ?? 0), 0);
+    /* No stamped row means no charge to explain — an order placed before 0393,
+       or one where the addon key was missing and the recompute degraded loudly
+       rather than failing the sale. The zero is not narrated either way. */
+    if (fee <= 0) return null;
+    const itemsTotal = lines.reduce((n, l) => n + Number(l.qty ?? 0), 0);
+    return {
+      items: stairCarryCount(itemsTotal, draft.delivery_stair_items),
+      itemsTotal,
+      floor: draft.delivery_floor,
+      fee,
+    };
+  }, [
+    mode,
+    viewedRevision,
+    detailQ.data,
+    draft.delivery_stair_items,
+    draft.delivery_floor,
+  ]);
+
+  /* 0562 · A SIGNATURE BELONGS TO THE VERSION THE CUSTOMER SIGNED. The Sales
+     Portal captures it at birth, so it is Rev 1's; a later version is unsigned
+     and says so instead of borrowing it (orders/MASTER § Old versions and
+     signatures). */
+  /* 0562 · THE FORM IS NEVER SQUEEZED BY THE DOCUMENT (Jess, 2026-09-23). The
+     approved 50/50 holds whenever each half can carry the Items table; with
+     less room the form keeps its minimum and the document takes the rest down to
+     MIN_PDF_WIDTH; with less than both they stack, form first. Measured on the
+     page's own box inside the Portal shell, never the window. */
+  const splitHostRef = useRef<HTMLDivElement | null>(null);
+  const [split, setSplit] = useState<"half" | "form-first" | "stack">("half");
+  useEffect(() => {
+    const el = splitHostRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const read = () => {
+      const w = el.clientWidth;
+      setSplit(w >= FORM_MIN_WIDTH * 2 ? "half" : w >= FORM_MIN_WIDTH + MIN_PDF_WIDTH ? "form-first" : "stack");
+    };
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+    /* Re-attached when the node the split lives in can have changed. */
+  }, [mode, objectView, showRoute, order?.id]);
   /* ── ONE template-data value per mode; the draft path debounces 300ms. ── */
   const base = baseQ.data ?? null;
   const liveDraftData = useMemo(
-    () => (mode === "edit" || mode === "create" ? draftTemplateData(draft, base, refs) : null),
-    [mode, draft, base, refs],
+    () =>
+      mode === "oldrev"
+        ? null
+        : (draftTemplateData(draft, baseline, base, refs, stair?.fee ?? 0, (key) => addonNameByKey.get(key) ?? key,
+          (key) => serviceCodeWord(key, addonSkuByKey.get(key)))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mode, draft, baseline, base, refs, stair?.fee, addonNameByKey, currentRev],
   );
   const debouncedDraftData = useDebounced(liveDraftData, 300);
+  /* ⭐ 0565 · THE STORED FILE WINS. A version issued after retention exists
+     keeps its own PDF, and that file — not a rebuild of it — is what this page
+     shows and prints. Only a version that never had one falls back to the
+     reconstruction, which is the legacy case the notice is for. */
+  const issuedDoc = useIssuedSalesOrderDocument(
+    mode === "oldrev" ? (orderId ?? null) : null,
+    mode === "oldrev" ? (viewedRevision?.revision ?? null) : null,
+  );
+  const storedDocumentUrl = mode === "oldrev" && issuedDoc.data?.stored ? (issuedDoc.data.url ?? null) : null;
+  const isReconstruction = mode === "oldrev" && issuedDoc.isFetched && !issuedDoc.data?.stored;
+
   const templateData: SalesOrderTemplateData | null = useMemo(() => {
-    if (mode === "oldrev" && viewedRevision) return snapshotTemplateData(viewedRevision.snapshot, base);
-    if (mode === "edit" || mode === "create") return debouncedDraftData;
-    return base;
-  }, [mode, viewedRevision, base, debouncedDraftData]);
-
-  const { url: pdfUrl } = usePdfCanvases(templateData);
-
-  /* ── Writes — ONE page-level Save; every write mints a revision. ── */
-  const saveMut = useSaveSalesOrderRevision(orderId ?? "", {
-    onSuccess: (r) => {
-      toast.success(`Saved · Rev ${r.revision}`);
-      setParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          next.delete("edit");
-          return next;
-        },
-        { replace: true },
+    /* A stored file is shown as itself; nothing is rebuilt for it. */
+    if (mode === "oldrev" && storedDocumentUrl) return null;
+    if (mode === "oldrev" && viewedRevision)
+      return snapshotTemplateData(viewedRevision.snapshot, base, (key) =>
+        addonNameByKey.get(key) ?? key,
+        { date: viewedRevision.created_at.slice(0, 10) },
       );
-      setDraftSeed("");
-      void revisionsQ.refetch();
-      void baseQ.refetch();
-    },
-    onError: (e) => toast.error(e.message),
-  });
-  const createMut = useCreateSalesOrder({
-    onSuccess: (r) => {
-      toast.success(`SO-${r.so} created · Rev 1`);
-      navigate(`/operation/orders/so/${r.id}`, { replace: true });
-    },
-    onError: (e) => toast.error(e.message),
-  });
+    return debouncedDraftData;
+  }, [mode, viewedRevision, base, debouncedDraftData, addonNameByKey]);
 
-  const safeCorrectionPayload = (): Record<string, unknown> => ({
-    customer_name: draft.customer_name.trim(),
-    customer_phone: draft.customer_phone.trim() || null,
-    customer_email: draft.customer_email.trim() || null,
-    customer_address: draft.customer_address.trim() || null,
-    customer_address_line1: draft.customer_address_line1.trim() || null,
-    customer_address_line2: draft.customer_address_line2.trim() || null,
-    customer_address_city: draft.customer_address_city.trim() || null,
-    customer_address_state: draft.customer_address_state.trim() || null,
-    customer_address_postcode: draft.customer_address_postcode.trim() || null,
-    customer_emergency: draft.customer_emergency.trim() || null,
-    customer_billing: draft.customer_billing.trim() || null,
-    proceed_date: draft.proceed_date,
-    delivery_floor: draft.delivery_floor,
-    delivery_has_lift: draft.delivery_has_lift,
-  });
+  const { setPane } = usePdfCanvases(templateData);
 
-  const createHeaderPayload = (): Record<string, unknown> => ({
+  /* ⭐ PRINT IS THE SAVED TRUTH — owner ruling 2026-08-15.
+     Preview-equals-Print is asserted in the SAVED state only. While the form is
+     dirty the pane shows the draft under an `UNSAVED` watermark, but the
+     PRINTED document is what the record actually holds: a customer document
+     built from values nobody has saved is a document the order cannot back up.
+     So the printable blob is rendered from the SAVED data on its own — the same
+     template, the same `renderSalesOrderPdf` call path, a second blob — and the
+     operator is told which one they got. */
+  const printData: SalesOrderTemplateData | null =
+    mode === "oldrev" && viewedRevision ? templateData : base;
+  const printableRef = useRef<{ data: SalesOrderTemplateData | null; url: string | null }>({
+    data: null,
+    url: null,
+  });
+  const openPrint = async () => {
+    /* ⭐ 0565 · A VERSION THAT KEPT ITS DOCUMENT PRINTS THAT DOCUMENT. Not a
+       re-render of it — the actual file the customer was issued. */
+    if (storedDocumentUrl) {
+      window.open(storedDocumentUrl, "_blank");
+      return;
+    }
+    if (!printData) return;
+    if (printableRef.current.data !== printData || !printableRef.current.url) {
+      if (printableRef.current.url) URL.revokeObjectURL(printableRef.current.url);
+      const blob = await renderSalesOrderPdf(printData);
+      printableRef.current = { data: printData, url: URL.createObjectURL(blob) };
+    }
+    const printable = printableRef.current.url;
+    if (!printable) return;
+    if (dirty) toast.message("You have unsaved changes. Printing the saved version");
+    /* A PRINTED REBUILD MUST NOT BE MISTAKEN FOR THE ISSUED DOCUMENT — and
+       this branch is only reached when no file was ever stored for the
+       version, which is the legacy case the notice exists for. */
+    if (isReconstruction) {
+      toast.message("Reconstructed copy. The original issued document is unavailable.");
+    }
+    window.open(printable, "_blank");
+  };
+  useEffect(
+    () => () => {
+      if (printableRef.current.url) URL.revokeObjectURL(printableRef.current.url);
+    },
+    [],
+  );
+
+  /* ── Writes — ONE commit, and the SERVER chooses it (0562). The direct
+     `POST /save` door is gone from this page: `POST /changes` classifies the
+     whole draft and either saves the correction or submits the request. ── */
+
+  const entryFieldsPayloadOf = (d: Draft): Record<string, string | null> => {
+    const out: Record<string, string | null> = {
+      building_type: d.building_type.trim() || null,
+    };
+    for (const [k, v] of Object.entries(d.custom)) out[k] = v.trim() || null;
+    return out;
+  };
+
+  /* ⭐ THE SAME PIPELINE ON BOTH SIDES (0562). The payload normalises — it
+     capitalises and it composes the address from the structured parts — so
+     comparing a normalised DRAFT against the RAW stored row reported every
+     normalisation as an operator change ("7 changes" for one phone edit,
+     measured 2026-09-23). Both sides run through this one function; the server
+     still compares against the stored row, which is what actually gets saved. */
+  const headerPayloadOf = (d: Draft): Record<string, unknown> => ({
+    customer_name: autoCapitalize(d.customer_name.trim()),
+    customer_phone: d.customer_phone.trim() || null,
+    customer_email: d.customer_email.trim() || null,
+    customer_race: d.customer_race.trim() || null,
+    customer_gender: d.customer_gender.trim() || null,
+    customer_birthday: d.customer_birthday || null,
+    customer_address: autoCapitalize(addressString(d, baseline).trim()) || null,
+    customer_address_line1: autoCapitalize(d.customer_address_line1.trim()) || null,
+    customer_address_line2: autoCapitalize(d.customer_address_line2.trim()) || null,
+    customer_address_city: d.customer_address_city.trim() || null,
+    customer_address_state: d.customer_address_state.trim() || null,
+    customer_address_postcode: d.customer_address_postcode.trim() || null,
+    customer_address_unknown: d.customer_address_unknown,
+    customer_emergency: emergencyString(d) || null,
+    customer_billing: billingString(d, baseline).trim() || null,
+    customer_billing_same: d.customer_billing_same,
+    proceed_date: d.proceed_date,
+    delivery_floor: d.delivery_floor,
+    delivery_has_lift: d.delivery_has_lift,
+    delivery_stair_items: d.delivery_stair_items,
+    entry_fields: entryFieldsPayloadOf(d),
+  });
+  const safeCorrectionPayload = (): Record<string, unknown> => headerPayloadOf(draft);
+
+  /* The cart's floor, from the CATALOG's categories — recomputed as lines
+   * change, exactly as the POS wizard does it. */
+  const earliestPromise = useMemo(
+    () =>
+      earliestPromiseISO(
+        draft.lines.map((l) => catalogBySku.get(l.sku.trim())?.category),
+        catalogQ.data?.earliestSellDays,
+      ),
+    [draft.lines, catalogBySku, catalogQ.data?.earliestSellDays],
+  );
+
+  const validateDraft = (): string | null => {
+    if (!draft.customer_name.trim()) return "Customer name is required";
+    // Preserve unrelated legacy delivery facts when correcting contact details.
+    // Any mixed delivery/commercial edit still uses the full checks.
+    if (isContactOnlyCorrection(changedFields)) return null;
+    /* Edit cannot return an order to no date, so a legacy TBD order picks one before it commits (owner ruling 2026-09-26). */
+    if (!draft.delivery_date) return "Delivery date is required. Ask the customer for the date before you save the order.";
+    /* The delivery date is a PROMISE (orders/MASTER — THE THREE DELIVERY
+     * DATES). A date inside the production lead is a promise the factory
+     * cannot keep, and the POS has refused it since 2026-05-22 — this door
+     * now refuses it too, with the same arithmetic rather than a second one. */
+    if (draft.delivery_date && earliestPromise && draft.delivery_date < earliestPromise) {
+      return `Delivery is too soon. The earliest this cart can be promised is ${fmtDate(earliestPromise)}`;
+    }
+    if (draft.proceed_date && draft.delivery_date && draft.proceed_date > draft.delivery_date) {
+      return "The proceed date is after the delivery date";
+    }
+    /* Building type is DELIVERY's fact — stairs, lift access, van parking all
+     * hang off it (Jess, 2026-08-21: it must be filled, delivery needs it).
+     * An unknown address cannot demand one; a known address must say. */
+    if (!draft.customer_address_unknown && !draft.building_type) {
+      return "Fill in the building type first. A condominium can only take a half-day delivery.";
+    }
+    for (const a of draft.addons.filter((row) => !row.removed)) {
+      if (SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addon_key)) continue;
+      const original = baseline.addons.find((row) => row.key === a.key);
+      const changed = a.added || !original || a.qty !== original.qty || JSON.stringify(a.attrs) !== JSON.stringify(original.attrs);
+      const pos = serviceSizeDraft(a, catalogQ.data?.addons.find((x) => x.key === a.addon_key)?.sizeOptions);
+      if (changed && addonSizeOptions(pos).length && disposalUnitSizes(pos).some((size) => !size))
+        return `Size for ${addonNameByKey.get(a.addon_key) ?? a.addon_key}`;
+    }
+    return null;
+  };
+
+
+  /* ══ 0562 · THE WHOLE-PAGE EDIT ════════════════════════════════════════════
+   * The SERVER chooses Save or Submit amendment request (POST /changes runs the
+   * shared `classifySalesOrderChange`); this page runs the SAME function only to
+   * label the one button, so the label and the outcome cannot disagree. */
+  const storedHeader = useMemo((): SalesOrderChangeSide["header"] => {
+    const bagOf = (order ?? {}) as unknown as Record<string, unknown>;
+    const out: SalesOrderChangeSide["header"] = {};
+    for (const k of SALES_ORDER_EDIT_HEADER_KEYS) {
+      out[k] = k === "entry_fields"
+        ? ((order as { entry_data?: { fields?: Record<string, unknown> } | null } | undefined)?.entry_data?.fields ?? {})
+        : bagOf[k];
+    }
+    return out;
+  }, [order]);
+  const draftHeader = (): Record<string, unknown> => ({
     ...safeCorrectionPayload(),
     delivery_date: draft.delivery_date,
     delivery_date_tbd: draft.delivery_date_tbd,
   });
-
-  const draftLinesPayload = () =>
-    draft.lines
-      .filter((l) => l.sku.trim().length > 0)
-      .map((l) => ({
-        ...(l.id ? { id: l.id } : {}),
-        sku: l.sku.trim(),
-        qty: l.qty,
-        unit_price: l.unit_price,
-      }));
-
-  const validateDraft = (needDealer: boolean): string | null => {
-    if (!draft.customer_name.trim()) return "Customer name is required";
-    if (needDealer && !draft.dealer_id) return "A dealer is required";
-    /* orders_salesperson_required (0296): every portal-born order names who
-     * sold it. */
-    if (needDealer && !draft.salesperson_id) return "A salesperson is required";
-    const lines = draftLinesPayload();
-    if (lines.length === 0) return "An order needs at least one item";
-    return null;
-  };
-
-  const onSave = () => {
-    const err = validateDraft(false);
-    if (err) return void toast.error(err);
-    saveMut.mutate({ header: safeCorrectionPayload() });
-  };
-  const onCreate = () => {
-    const err = validateDraft(true);
-    if (err) return void toast.error(err);
-    /* A BIRTH names the parties — only the EDIT door lost them to 0329. */
-    createMut.mutate({
+  const liveLines = (d: Draft) =>
+    d.lines
+      .filter((l) => !l.removed && l.sku.trim())
+      .map((l) => ({ ...(l.id ? { id: l.id } : {}), sku: l.sku.trim(), qty: l.qty, unit_price: l.unit_price, attrs: l.attrs ?? null }));
+  const liveAddons = (d: Draft) =>
+    d.addons
+      .filter((a) => !a.removed)
+      .map((a) => ({ ...(a.id ? { id: a.id } : {}), addon_key: a.addon_key, qty: a.qty, unit_price: a.unit_price, attrs: a.attrs ?? null }));
+  const changeClass = useMemo(() => {
+    if (mode !== "object" || !editing || !order) return null;
+    const current: SalesOrderChangeSide = {
       header: {
-        ...createHeaderPayload(),
-        dealer_id: draft.dealer_id,
-        salesperson_id: draft.salesperson_id,
-        outlet_id: draft.outlet_id,
+        ...(headerPayloadOf(baseline) as SalesOrderChangeSide["header"]),
+        delivery_date: baseline.delivery_date,
+        delivery_date_tbd: baseline.delivery_date_tbd,
       },
-      lines: draftLinesPayload(),
+      lines: liveLines(baseline),
+      addons: liveAddons(baseline),
+      installment_months: baseline.installment_months,
+    };
+    const next: SalesOrderChangeSide = {
+      header: draftHeader() as SalesOrderChangeSide["header"],
+      lines: liveLines(draft),
+      addons: liveAddons(draft),
+      installment_months: draft.installment_months,
+    };
+    return classifySalesOrderChange(current, next, {
+      proceeded: order.status === "proceed_order",
+      proceedRecorded: Boolean(order.proceed_date),
     });
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, editing, order, draft, baseline, storedHeader]);
+  /* The count is what the REVIEW lists — one number, one source, so the header
+     and the Before/After can never disagree (the summary rows are not changes). */
+  const SUMMARY_ROWS = new Set(["Qty", "Services", "Total payable"]);
+  const commitWord = salesOrderCommitWord(changeClass?.action ?? "save");
 
-  const setField = <K extends keyof Draft>(k: K, v: Draft[K]) => {
-    setDirty(true);
-    setDraft((d) => ({ ...d, [k]: v }));
+  /* What the draft starts elsewhere — read from facts this page already holds;
+     never a second arithmetic for money it cannot verify. */
+  const orderPaymentsQ = useOrderPayments(orderId ?? null);
+  const nameOfSku = useCallback((sku: string) => catalogBySku.get(sku)?.label || sku, [catalogBySku]);
+  const nameOfAddon = useCallback((key: string) => addonNameByKey.get(key) ?? key, [addonNameByKey]);
+  /** Delivery owns service input; Items and the document read the same draft. */
+  const serviceOptions = offerableAddons(catalogQ.data?.addons ?? []);
+  const addServiceToDraft = (key: string) => {
+    const hit = serviceOptions.find((x) => x.key === key);
+    if (!hit) return;
+    setDraft((d) => ({ ...d, addons: [...d.addons, { key: nextKey(), addon_key: hit.key, qty: 1, unit_price: Number(hit.price), attrs: null, added: true }] }));
   };
-  const setLine = (key: string, patch: Partial<DraftLine>) => {
-    setDirty(true);
-    setDraft((d) => ({
-      ...d,
-      lines: d.lines.map((l) => (l.key === key ? { ...l, ...patch } : l)),
-    }));
+  const categoryOfSku = useCallback((sku: string) => catalogBySku.get(sku)?.category ?? null, [catalogBySku]);
+  const consequencesFor = (after: { lines: DraftLine[]; addons: DraftAddon[]; header: Record<string, unknown> }) => {
+    const out: string[] = [];
+    const poSkus = new Set((detailQ.data?.pos ?? []).flatMap((po) => po.lines.map((l) => l.sku)));
+    const unitsOf = new Map((goodsTruthQ.data?.lines ?? []).map((l) => [l.lineId, (l.verifiedUnitIds ?? l.unitIds ?? []) as string[]]));
+    for (const l of after.lines) {
+      const was = baseline.lines.find((b) => b.id && b.id === l.id);
+      const changed = l.added || l.removed || !was || was.qty !== l.qty || was.sku !== l.sku ||
+        JSON.stringify(was.attrs ?? null) !== JSON.stringify(l.attrs ?? null);
+      if (!changed) continue;
+      const name = nameOfSku(l.sku);
+      if (l.added) out.push(`${name}: new goods. Purchasing buys them after approval`);
+      else if (poSkus.has(l.sku)) out.push(`${name}: already ordered from the supplier. Purchasing settles it with the supplier`);
+      else out.push(`${name}: no PO yet. Purchasing re-counts what to buy`);
+      const units = l.id ? unitsOf.get(l.id) ?? [] : [];
+      if (units.length) out.push(`${name}: Unit ${units.join(", ")} reserved. Warehouse keeps the Unit until the change is decided`);
+    }
+    if (after.lines.some((l) => l.removed && !protectedLine(l)) && after.lines.some((l) => protectedLine(l) && !l.removed))
+      out.push("Free item: check it is still allowed without the cancelled item");
+    if (after.header["proceed_date"] !== undefined && after.header["proceed_date"] !== (order?.proceed_date ?? null))
+      out.push("Proceed Date: Purchasing's release timing moves");
+    if (after.header["delivery_date"] !== undefined && after.header["delivery_date"] !== (order?.delivery_date ?? null))
+      out.push("Requested Delivery Date: Delivery and Purchasing plan to the new date");
+    const before = baseline.lines.filter((l) => !l.removed).reduce((n, l) => n + l.qty * l.unit_price, 0)
+      + baseline.addons.filter((a) => !a.removed).reduce((n, a) => n + a.qty * a.unit_price, 0);
+    const next = after.lines.filter((l) => !l.removed).reduce((n, l) => n + l.qty * l.unit_price, 0)
+      + after.addons.filter((a) => !a.removed).reduce((n, a) => n + a.qty * a.unit_price, 0);
+    if (Math.round(before * 100) !== Math.round(next * 100)) {
+      const paid = Number(order?.paid ?? 0);
+      const rows = orderPaymentsQ.data?.payments ?? null;
+      /* ⛔ A SUMMARY WITH NO RECORDS BEHIND IT IS NOT A PAID FIGURE (Payments
+         MASTER; owner 2026-09-22): no refund or balance is worked out from it. */
+      const verified = rows != null && (paid === 0 || rows.some((r) => isLivePayment(r)));
+      if (!verified) out.push("Payments: payment data to check first. No refund or balance is worked out");
+      else if (paid > next) out.push(`Payments: ${fmtMoney(paid - next)} paid more than the new total. Payments reviews a refund`);
+      else out.push(`Payments: balance due becomes ${fmtMoney(next - paid)}`);
+    }
+    return out;
   };
+  const HEADER_LABEL: Record<string, string> = {
+    customer_name: "Full name", customer_phone: "Phone", customer_email: "Email", customer_race: "Race",
+    customer_gender: "Gender", customer_birthday: "Birthday", customer_address: "Delivery address",
+    customer_address_line1: "Address line 1", customer_address_line2: "Address line 2", customer_address_city: "City",
+    customer_address_state: "State", customer_address_postcode: "Postcode", customer_address_unknown: "Address not given yet",
+    customer_emergency: "Emergency contact", customer_billing: "Billing address", customer_billing_same: "Billing address same as delivery",
+    entry_fields: "Other details", delivery_floor: "Floor", delivery_has_lift: "Lift available?",
+    delivery_stair_items: "Items needing stair carry", proceed_date: "Proceed Date",
+    delivery_date: "Requested Delivery Date", delivery_date_tbd: "Delivery date to be confirmed",
+  };
+  const factWord = (k: string, v: unknown): string => {
+    if (v == null || v === "") return "";
+    if (k === "proceed_date" || k === "delivery_date" || k === "customer_birthday") return fmtDate(String(v));
+    if (typeof v === "boolean") return v ? "Yes" : "No";
+    if (k === "entry_fields" && typeof v === "object") return Object.values(v as Record<string, unknown>).filter(Boolean).join(" · ");
+    return String(v);
+  };
+  const draftRows = changeClass
+    ? diffRows({
+        header: [
+          ...changeClass.header.map((k) => ({
+            label: HEADER_LABEL[k] ?? k,
+            before: factWord(k, (headerPayloadOf(baseline) as Record<string, unknown>)[k] ?? (k === "delivery_date" ? baseline.delivery_date : k === "delivery_date_tbd" ? baseline.delivery_date_tbd : null)),
+            after: factWord(k, (draftHeader() as Record<string, unknown>)[k]),
+          })),
+          ...(changeClass.installmentChanged
+            ? [{ label: "Instalment months", before: String(baseline.installment_months ?? "None"), after: String(draft.installment_months ?? "None") }]
+            : []),
+        ],
+        before: { lines: baseline.lines as EditLine[], addons: baseline.addons as EditAddon[] },
+        after: { lines: draft.lines as EditLine[], addons: draft.addons as EditAddon[] },
+        nameOfSku,
+        nameOfAddon,
+        categoryOf: categoryOfSku,
+      })
+    : [];
 
-  const confirmDiscard = () => !dirty || window.confirm("Discard unsaved changes?");
-  const enterEdit = () =>
-    setParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.set("edit", "1");
-        return next;
-      },
-      { replace: true },
-    );
+  const changeCount = draftRows.filter((r) => !SUMMARY_ROWS.has(r.what)).length;
+
+  const startEdit = (seed?: Draft, replaceId?: string | null) => {
+    if (seed) setDraft(seed);
+    setReviewOpen(false);
+    setChangeReason("");
+    setChangeAskedOn(null);
+    setChangeAgreement(null);
+    setReplaceAmendmentId(replaceId ?? null);
+    setEditing(true);
+    setObjectView("Order");
+  };
   const cancelEdit = () => {
     if (!confirmDiscard()) return;
-    if (isNew) return navigate("/operation/orders");
-    setParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.delete("edit");
-        return next;
-      },
-      { replace: true },
-    );
-    setDraftSeed("");
-    setDirty(false);
+    setDraft(baseline);
+    setEditing(false);
+    setReplaceAmendmentId(null);
   };
+  /* ⭐ 0565 · AN ISSUED VERSION KEEPS ITS DOCUMENT — owner ruling 2026-09-23:
+     "Newly issued versions after this release: preserve their original issued
+     PDFs as required. A warning does not replace this capability."
+
+     The moment a version is minted, the CURRENT document IS that version, so
+     the sheet stored is the one the order actually issues — rendered from the
+     saved truth that has just been refetched, never from the draft. It is
+     stored once and the database refuses a second file for the same version.
+
+     ⛔ IT NEVER FAILS THE VERSION. The revision is already minted and is
+     business truth; keeping its paper is a separate act. If the render or the
+     upload fails, the version simply has no document and the page draws the
+     reconstruction with its notice — the legacy case, honestly. */
+  const keepIssuedDocument = async (revision: number | null | undefined) => {
+    if (!orderId || !revision) return;
+    try {
+      const fresh = await baseQ.refetch();
+      const base0 = fresh.data ?? null;
+      if (!base0) return;
+      /* ⛔ A NEW VERSION NEVER INHERITS AN OLDER VERSION'S SIGNATURE — owner
+         ruling 2026-09-23. `base` carries the order's stored eSign PNG, which
+         the customer put on whatever version was in front of them THEN. Storing
+         it on the version minted now would file that mark under goods, prices
+         and dates the customer never signed — the same defect the historical
+         view was fixed for, made permanent by being written to a file.
+         Nobody has signed the version being issued here, and which version the
+         stored mark covers is unrecorded, so the sheet says exactly that. */
+      const issued: SalesOrderTemplateData = base0.signature_url
+        ? { ...base0, signed: false, signature_url: null, signature_unknown: true }
+        : base0;
+      const blob = await renderSalesOrderPdf(issued);
+      const out = await storeIssuedSalesOrderDocument(orderId, revision, blob);
+      if (!out.stored) console.error("issued document not kept", { orderId, revision, reason: out.reason });
+      void revisionsQ.refetch();
+    } catch (e) {
+      console.error("issued document not kept", { orderId, revision, reason: e instanceof Error ? e.message : String(e) });
+    }
+  };
+
+  const changesMut = useSubmitSalesOrderChanges(orderId ?? "", {
+    onSuccess: (r) => {
+      if (r.action === "saved") toast.success(`Saved (${r.revision})`);
+      else {
+        toast.success("Sent for approval. The order stays as it is until management approves.");
+        if (changeAgreement && !r.agreementRecorded) toast.error("The customer agreement was not recorded. Record it on the request.");
+      }
+      setDraft(baseline);
+      setEditing(false);
+      setReviewOpen(false);
+      setReplaceAmendmentId(null);
+      void revisionsQ.refetch();
+      void baseQ.refetch();
+      void detailQ.refetch();
+      void amendmentQ.refetch();
+      /* A correction mints a version; that version keeps the sheet it issued. */
+      if (r.action === "saved") void keepIssuedDocument(r.revision);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const onCommit = () => {
+    if (!changeClass || changeClass.action === "none") return;
+    const err = validateDraft();
+    if (err) return void toast.error(err);
+    if (!changeReason.trim()) return void toast.error("Reason for change");
+    changesMut.mutate({
+      header: draftHeader(),
+      lines: liveLines(draft),
+      addons: liveAddons(draft),
+      installment_months: draft.installment_months,
+      reason: changeReason.trim(),
+      customerAskedOn: changeAskedOn,
+      agreement: changeAgreement ?? undefined,
+      replaceAmendmentId,
+    });
+  };
+  const decideMut = useDecideSalesOrderAmendment(orderId ?? "", {
+    onSuccess: (r) => {
+      toast.success(r.status === "applied" ? `Approved and applied (${r.revision})` : "Rejected. The order is unchanged.");
+      void revisionsQ.refetch();
+      void baseQ.refetch();
+      void detailQ.refetch();
+      /* An approved amendment mints a version the same way, and it keeps its
+         document the same way. A rejection mints nothing. */
+      if (r.status === "applied") void keepIssuedDocument(Number(r.revision));
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const agreementMut = useRecordAmendmentAgreement(orderId ?? "", {
+    onSuccess: () => toast.success("Customer agreement recorded"),
+    onError: (e) => toast.error(e.message),
+  });
+
+  /* ── The live request: what it proposes against the version it was sent on. ── */
+  type Proposal = {
+    header?: Record<string, unknown>;
+    lines?: Array<{ id?: string; sku: string; qty: number; unit_price: number; attrs?: Record<string, unknown> | null }>;
+    addons?: Array<{ id?: string; addon_key: string; qty: number; unit_price: number; attrs?: Record<string, unknown> | null }>;
+    delivery_date?: string | null;
+    delivery_date_tbd?: boolean;
+    installment_months?: number | null;
+  };
+  const proposalOf = (a: typeof liveAmendment) => ((a?.proposed_snapshot ?? {}) as Proposal);
+  const withProposal = (baseDraft: Draft, p: Proposal): Draft => {
+    const next: Draft = { ...baseDraft };
+    const h = p.header ?? {};
+    const str = (k: string) => (h[k] == null ? "" : String(h[k]));
+    const simple: Array<[string, keyof Draft]> = [
+      ["customer_name", "customer_name"], ["customer_phone", "customer_phone"], ["customer_email", "customer_email"],
+      ["customer_race", "customer_race"], ["customer_gender", "customer_gender"],
+      ["customer_address", "customer_address"], ["customer_address_line1", "customer_address_line1"],
+      ["customer_address_line2", "customer_address_line2"], ["customer_address_city", "customer_address_city"],
+      ["customer_address_state", "customer_address_state"], ["customer_address_postcode", "customer_address_postcode"],
+      ["customer_billing", "customer_billing"],
+    ];
+    for (const [k, f] of simple) if (k in h) (next as unknown as Record<string, unknown>)[f] = str(k);
+    if ("customer_birthday" in h) next.customer_birthday = str("customer_birthday") || null;
+    if ("customer_address_unknown" in h) next.customer_address_unknown = Boolean(h["customer_address_unknown"]);
+    if ("customer_billing_same" in h) next.customer_billing_same = h["customer_billing_same"] !== false;
+    if ("delivery_floor" in h) next.delivery_floor = Number(h["delivery_floor"] ?? 1);
+    if ("delivery_has_lift" in h) next.delivery_has_lift = Boolean(h["delivery_has_lift"]);
+    if ("delivery_stair_items" in h) next.delivery_stair_items = h["delivery_stair_items"] == null ? null : Number(h["delivery_stair_items"]);
+    if ("proceed_date" in h) next.proceed_date = str("proceed_date") || null;
+    if ("customer_emergency" in h) {
+      const e = parseEmergencyContact(str("customer_emergency"));
+      next.emergency_name = e.name; next.emergency_phone = e.phone; next.emergency_relationship = e.relationship;
+    }
+    if ("entry_fields" in h && h["entry_fields"] && typeof h["entry_fields"] === "object") {
+      const f = h["entry_fields"] as Record<string, unknown>;
+      if ("building_type" in f) next.building_type = f["building_type"] == null ? "" : String(f["building_type"]);
+      const custom = { ...next.custom };
+      for (const [k, v] of Object.entries(f)) if (k !== "building_type") custom[k] = v == null ? "" : String(v);
+      next.custom = custom;
+    }
+    if ("delivery_date" in p) next.delivery_date = p.delivery_date ?? null;
+    if ("delivery_date_tbd" in p) next.delivery_date_tbd = Boolean(p.delivery_date_tbd);
+    if ("installment_months" in p) next.installment_months = p.installment_months ?? null;
+    if (p.lines) {
+      const kept = new Set(p.lines.filter((l) => l.id).map((l) => l.id));
+      next.lines = [
+        ...baseDraft.lines.map((l) => {
+          const hit = p.lines!.find((x) => x.id && x.id === l.id);
+          return hit ? { ...l, sku: hit.sku, qty: hit.qty, unit_price: Number(hit.unit_price), attrs: hit.attrs ?? undefined }
+            : kept.has(l.id) ? l : { ...l, removed: true };
+        }),
+        ...p.lines.filter((l) => !l.id).map((l) => ({ key: nextKey(), sku: l.sku, qty: l.qty, unit_price: Number(l.unit_price), attrs: l.attrs ?? undefined, added: true })),
+      ];
+    }
+    if (p.addons) {
+      /* Pair by row id; a proposal or snapshot without ids falls back to the
+         service key, so an untouched service does not read as cancelled-and-added. */
+      const unmatched = [...p.addons];
+      const take = (a: DraftAddon) => {
+        let i = unmatched.findIndex((x) => x.id && x.id === a.id);
+        if (i < 0 && !a.id) i = unmatched.findIndex((x) => !x.id && x.addon_key === a.addon_key);
+        if (i < 0) i = unmatched.findIndex((x) => x.addon_key === a.addon_key && !x.id);
+        return i < 0 ? undefined : unmatched.splice(i, 1)[0];
+      };
+      const kept = baseDraft.addons.map((a) => {
+        const hit = take(a);
+        return hit ? { ...a, qty: hit.qty, unit_price: Number(hit.unit_price), attrs: hit.attrs ?? a.attrs } : { ...a, removed: true };
+      });
+      next.addons = [
+        ...kept,
+        ...unmatched.map((a) => ({ key: nextKey(), ...(a.id ? { id: a.id } : {}), addon_key: a.addon_key, qty: a.qty, unit_price: Number(a.unit_price), attrs: a.attrs ?? null, added: true })),
+      ];
+    }
+    return next;
+  };
+  const requestView = useMemo(() => {
+    if (!liveAmendment || mode !== "object") return null;
+    const baseRow = revisions.find((r) => r.revision === liveAmendment.base_revision);
+    const before = baseRow ? draftFromSnapshot(baseRow.snapshot) : baseline;
+    /* A snapshot's services carry no row id; pair them with today's rows by key
+       so an unchanged service does not read as changed. */
+    const idsByKey = new Map<string, string[]>();
+    for (const a of detailQ.data?.addons ?? []) idsByKey.set(a.addon_key, [...(idsByKey.get(a.addon_key) ?? []), a.id]);
+    before.addons = before.addons.map((a) => {
+      const ids = idsByKey.get(a.addon_key) ?? [];
+      const id = ids.shift();
+      if (ids.length) idsByKey.set(a.addon_key, ids); else idsByKey.delete(a.addon_key);
+      return id ? { ...a, id } : a;
+    });
+    const p = proposalOf(liveAmendment);
+    const after = withProposal(before, p);
+    const headerKeys = [...Object.keys(p.header ?? {}), ...(["delivery_date", "delivery_date_tbd"] as const).filter((k) => k in p)];
+    const beforeHeader = (baseRow?.snapshot.header ?? {}) as Record<string, unknown>;
+    const rows = diffRows({
+      header: [
+        ...headerKeys.map((k) => ({
+          label: HEADER_LABEL[k] ?? k,
+          before: factWord(k, beforeHeader[k]),
+          after: factWord(k, k in (p.header ?? {}) ? (p.header ?? {})[k] : (p as Record<string, unknown>)[k]),
+        })),
+        ...("installment_months" in p
+          ? [{ label: "Instalment months", before: String(before.installment_months ?? "None"), after: String(p.installment_months ?? "None") }]
+          : []),
+      ],
+      before: { lines: before.lines as EditLine[], addons: before.addons as EditAddon[] },
+      after: { lines: after.lines as EditLine[], addons: after.addons as EditAddon[] },
+      nameOfSku,
+      nameOfAddon,
+      categoryOf: categoryOfSku,
+    });
+    return { rows, consequences: consequencesFor({ lines: after.lines, addons: after.addons, header: { ...(p.header ?? {}), ...("delivery_date" in p ? { delivery_date: p.delivery_date } : {}) } }) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveAmendment, revisions, baseline, mode, detailQ.data, catalogBySku, addonNameByKey, orderPaymentsQ.data, goodsTruthQ.data]);
+
+  const setField = <K extends keyof Draft>(k: K, v: Draft[K]) =>
+    setDraft((d) => ({ ...d, [k]: v }));
+  const setCustom = (key: string, value: string) =>
+    setDraft((d) => ({ ...d, custom: { ...d.custom, [key]: value } }));
+
+  const confirmDiscard = () => !dirty || window.confirm("Discard unsaved changes?");
 
   useEffect(() => {
     if (!dirty) return;
@@ -729,48 +2074,27 @@ export default function SalesOrderWorkspace() {
   }, [dirty]);
 
   const openObjectView = (view: ObjectView) => {
-    if (mode === "edit" && view !== "Order") {
-      if (!confirmDiscard()) return;
-      setParams((prev) => {
+    if (view !== "Order" && !confirmDiscard()) return;
+    if (view !== "Order" && dirty) setDraft(baseline);
+    setObjectView(view);
+    setParams(
+      (prev) => {
         const next = new URLSearchParams(prev);
-        next.delete("edit");
         if (view === "Order Route") next.set("route", "1");
         else next.delete("route");
         return next;
-      }, { replace: true });
-      setDraftSeed("");
-      setDirty(false);
-    }
-    setObjectView(view);
-    if (view === "Order Route") {
-      setParams((prev) => {
-        const next = new URLSearchParams(prev);
-        next.set("route", "1");
-        return next;
-      }, { replace: true });
-      return;
-    }
-    setParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete("route");
-      return next;
-    }, { replace: true });
+      },
+      { replace: true, state: location.state },
+    );
+    if (view === "Order Route") return;
     if (view === "Order") {
       window.setTimeout(() => document.getElementById("sales-order-workspace")?.scrollIntoView(), 0);
     }
   };
 
+
   /* ── The money the left side states (same arithmetic as the register). ── */
-  const editing = mode === "edit" || mode === "create";
   const money = useMemo(() => {
-    if (editing) {
-      const lineSum = draft.lines.reduce(
-        (s, l) => s + (l.sku.trim() ? l.qty * l.unit_price : 0),
-        0,
-      );
-      const addonSum = (base?.addons ?? []).reduce((s, a) => s + a.line_total, 0);
-      return orderMoney({ lineSum, addonSum, paid: base?.paid ?? 0, controlBalance: null });
-    }
     if (mode === "oldrev" && viewedRevision) {
       const lineSum = (viewedRevision.snapshot.lines ?? []).reduce(
         (s, l) => s + Number(l.qty) * Number(l.unit_price),
@@ -780,125 +2104,130 @@ export default function SalesOrderWorkspace() {
         (s, a) => s + Number(a.qty) * Number(a.unit_price),
         0,
       );
-      return orderMoney({ lineSum, addonSum, paid: base?.paid ?? 0, controlBalance: null });
+      return { ...orderMoney({ lineSum, addonSum, paid: base?.paid ?? 0, controlBalance: null }), goods: lineSum, services: addonSum };
     }
+
     const lines = detailQ.data?.lines ?? [];
     const addons = detailQ.data?.addons ?? [];
-    return orderMoney({
-      lineSum: lines.reduce((s, l) => s + Number(l.unit_price ?? 0) * Number(l.qty ?? 0), 0),
-      addonSum: addons.reduce((s, a) => s + Number(a.unit_price ?? 0) * Number(a.qty ?? 0), 0),
-      paid: order?.paid,
-      controlBalance: null,
-    });
-  }, [editing, mode, draft.lines, base, viewedRevision, detailQ.data, order]);
+    /* ⭐ THE BREAKDOWN IS THE SAME TWO SUMS, NAMED. The approved Payment totals
+       show the goods amount and the service amount above `Total payable`
+       (owner approval 2026-09-22). They are the very numbers `orderMoney`
+       already adds — carried out of this memo rather than re-summed anywhere
+       else, so there is still ONE arithmetic (Law D). */
+    const lineSum = lines.reduce((s, l) => s + Number(l.unit_price ?? 0) * Number(l.qty ?? 0), 0);
+    const addonSum = addons.reduce((s, a) => s + Number(a.unit_price ?? 0) * Number(a.qty ?? 0), 0);
+    return {
+      ...orderMoney({ lineSum, addonSum, paid: order?.paid, controlBalance: null }),
+      goods: lineSum,
+      services: addonSum,
+    };
+  }, [mode, base, viewedRevision, detailQ.data, order]);
+
+  /* A line the current commitment no longer carries, but an earlier Revision
+     did, was CANCELLED — and the Route states its outcome instead of letting
+     it vanish. Derived from the revision ledger; nothing is stored. */
+  const cancelledLines = useMemo(() => {
+    const live = new Set((detailQ.data?.lines ?? []).map((line) => line.sku));
+    const gone = new Map<string, { sku: string; label: string | null; qty: number; revision: number }>();
+    for (const revision of revisions) {
+      const present = new Set((revision.snapshot.lines ?? []).map((line) => line.sku));
+      /* The FIRST Revision whose snapshot no longer holds the line is the one
+         that cancelled it — the later ones merely inherit its absence. */
+      for (const [sku, entry] of [...gone]) {
+        if (!present.has(sku) && entry.revision === 0) {
+          gone.set(sku, { ...entry, revision: revision.revision });
+        }
+      }
+      for (const line of revision.snapshot.lines ?? []) {
+        if (live.has(line.sku) || gone.has(line.sku)) continue;
+        gone.set(line.sku, {
+          sku: line.sku,
+          label: line.description?.trim() || line.sku,
+          qty: Number(line.qty),
+          revision: 0,
+        });
+      }
+    }
+    return [...gone.values()].filter((entry) => entry.revision > 0);
+  }, [detailQ.data, revisions]);
 
   const orderRoute: SalesOrderRouteModel | null = useMemo(() => {
     const detail = detailQ.data;
     const facts = routeFactsQ.data;
     if (!orderId || !detail?.order || !facts) return null;
-    return resolveSalesOrderRoute({
-      order: {
-        id: orderId,
-        so: detail.order.so,
-        placedAt: detail.order.placed_at,
-        deliveryDate: detail.order.delivery_date,
-        doNumber: detail.order.do_number,
-        dispatchedAt: detail.order.dispatched_at,
-        deliveredAt: detail.order.delivered_at,
-        invoiceNo: detail.order.invoice_no,
-      },
-      revisions: revisions.map((revision) => revision.revision),
-      lineLabels: Object.fromEntries(detail.lines.map((line) => [line.sku, line.label?.trim() || line.sku])),
-      allocation: facts.allocation,
-      purchaseOrders: detail.pos.map((po) => ({
-        id: po.id,
-        currentFact: poReceivingProgress(po.lines.map((line) => ({
-          qty: line.qty,
-          received_qty: line.received_qty,
-        }))).label,
-        etaDate: po.eta_date,
-        /* A file path proves a file exists but is not its document number. */
-        supplierDoNumber: null,
-        lines: po.lines.map((line) => ({
-          sku: line.sku,
-          qty: Number(line.qty),
-          receivedQty: Number(line.received_qty),
-        })),
-      })),
-      receivingRecords: facts.receiving.map((record) => ({
-        id: record.id,
-        recordNo: receivingRecordNo({
-          id: record.id,
-          goods_received_at: record.goods_received_at ?? undefined,
-          submitted_at: record.submitted_at,
-        }),
-        poId: record.po_id,
-        supplierDoNumber: record.do_number,
-        status: warehouseReceiptStatusLabel(record.status),
-        receivedAt: record.goods_received_at,
-      })),
-      delivery: {
-        booking: facts.brief.appointment
+    const caseStatus = new Map(
+      (serviceCasesQ.data?.items ?? []).map((item) => [item.id, item.statusLabel ?? null]),
+    );
+    /* ONE input builder, shared with the Work page's route stops (Law D). */
+    return resolveSalesOrderRoute(
+      salesOrderRouteInputOf({
+        orderId,
+        detail: detail as RouteOrderDetail,
+        facts,
+        caseStatus,
+        deliverToLines: goodsTruthQ.data?.lines,
+        cancelledLines,
+        money,
+        /* Payment must be complete 3 working days before an outstation
+           delivery, 2 in the Klang Valley — the Work panel's own reading of
+           the partner (Law D). */
+        outstation: routePartnerQ.data?.partner ? !routePartnerQ.data.partner.kvDefault : false,
+        amendmentFailed: amendmentQ.isError,
+        /* `PROPOSED CHANGE` — the same read the Order tab makes. Only a request
+           still waiting for a decision is announced. */
+        amendment:
+          liveAmendment && (liveAmendment.status === "submitted" || liveAmendment.stale)
           ? {
-              date: facts.brief.appointment.dateIso,
-              slot: facts.brief.appointment.slot,
-              partnerName: facts.brief.appointment.carrier.partnerName,
+              status: liveAmendment.stale ? "stale" : "submitted",
+              submittedAt: liveAmendment.submitted_at ? mytDayOf(liveAmendment.submitted_at) : null,
+              submittedBy: liveAmendment.submitted_by_name?.trim() || null,
+              /* WHAT changes — the same rows the Order tab's request shows
+                 (one arithmetic, Law D). The Route prints the first three. */
+              changes: (requestView?.rows ?? []).map((row) => ({
+                what: row.what,
+                before: row.before,
+                after: row.after,
+              })),
             }
           : null,
-        attempts: facts.attempts.map((attempt) => ({
-          id: attempt.id,
-          attemptNo: attempt.attempt_no,
-          result: attempt.result,
-          reason: attempt.reason_key ? deliveryReasonLabel(attempt.reason_key) : attempt.note,
-          doNumber: attempt.do_number,
-          scheduledDate: attempt.scheduled_date,
-          recordedAt: attempt.recorded_at,
-        })),
-      },
-      money: {
-        known: money.known,
-        total: money.total,
-        paid: money.paid,
-        outstanding: money.outstanding,
-      },
-      refunds: facts.refunds.map((refund) => ({
-        id: refund.id,
-        amount: Number(refund.amount),
-        status: refund.status,
-        requestedAt: refund.requested_at,
-      })),
-      loans: facts.loans.map((loan) => ({
-        id: loan.id,
-        label: loan.borrowed_label ?? loan.item_sku ?? loan.category ?? "Loan item",
-        status: loan.status,
-        source: loan.source,
-        loanNoteNo: loan.loan_note_no,
-        loanedAt: loan.loaned_at,
-        returnedAt: loan.returned_at,
-        returnedToSupplierAt: loan.returned_to_supplier_at,
-      })),
-      cases: facts.cases.map((item) => ({
-        id: item.id,
-        caseNo: item.caseNo,
-        closed: item.statusIsClosed,
-        openedAt: item.openedAt,
-      })),
-      claims: facts.claims.map((item) => ({
-        id: item.id,
-        claimNo: item.claim_no,
-        poId: item.po_id,
-        status: item.status,
-        reportedAt: item.reported_at,
-      })),
-      work: (correctionWorkQ.data?.work ?? []).map((item) => ({
-        id: item.id,
-        module: item.module,
-        title: item.consequence,
-        state: item.state,
-        createdAt: item.raised_at,
-      })),
-    });
-  }, [orderId, detailQ.data, routeFactsQ.data, revisions, money, correctionWorkQ.data]);
+      }),
+    );
+  }, [
+    orderId,
+    detailQ.data,
+    routeFactsQ.data,
+    goodsTruthQ.data,
+    serviceCasesQ.data,
+    cancelledLines,
+    money,
+    liveAmendment,
+    amendmentQ.isError,
+    requestView,
+    routePartnerQ.data,
+  ]);
+
+  const retryRouteRead = useCallback(
+    (owner: RouteRetryOwner) => {
+      if (owner === "amendment") void amendmentQ.refetch();
+      else void routeFactsQ.refetch();
+    },
+    [amendmentQ, routeFactsQ],
+  );
+
+  /* The Route hands out the action-engine line; the ROSTER names the person.
+     One duty read, the same one the Team board and the PO chips use. */
+  const dutyQ = useWorkspaceDuties();
+  const orderOwnerQ = useCollectionOwner(orderId ?? null, showRoute);
+  const routeOrderOwner = useMemo(() => {
+    const owner = orderOwnerQ.data?.owner ?? null;
+    const userId = owner?.acting_user_id ?? owner?.normal_user_id ?? null;
+    const name = owner?.acting_user_name ?? owner?.normal_user_name ?? null;
+    return userId && name ? { userId, name, email: "" } : null;
+  }, [orderOwnerQ.data]);
+  const routeOwners = useMemo(
+    () => routeActionOwnersOf(dutyQ.data, routeOrderOwner),
+    [dutyQ.data, routeOrderOwner],
+  );
 
   /* The real parties, with no placeholder — the attribution form supplies its
    * own "Keep …" and "Not recorded" entries, and two placeholders in one list
@@ -911,51 +2240,66 @@ export default function SalesOrderWorkspace() {
     () => (outletsQ.data?.outlets ?? []).map((o) => ({ value: o.id, label: o.name })),
     [outletsQ.data],
   );
-  const spOptions = useMemo(
-    () => [{ value: "none", label: "Not recorded" }, ...realSpOptions],
-    [realSpOptions],
-  );
-  const outletOptions = useMemo(
-    () => [{ value: "none", label: "Not recorded" }, ...realOutletOptions],
-    [realOutletOptions],
-  );
   const dealerOptions = useMemo(
     () => (dealersQ.data?.dealers ?? []).map((d) => ({ value: d.id, label: d.name })),
     [dealersQ.data],
   );
 
+  /* CUSTOMER TYPE (AUTO) — the same probe the Sales Portal runs, on the same
+     400ms debounce, read-only on both surfaces because nobody types it. */
+  const probedPhone = useDebounced(draft.customer_phone.trim(), 400);
+  const typeProbe = useCustomerTypeProbe(probedPhone);
+  const customerTypeWord =
+    probedPhone.length < 8
+      ? "Not known yet"
+      : typeProbe.isLoading
+        ? "Checking…"
+        : typeProbe.data?.existing
+          ? "Existing customer"
+          : "New customer";
+  /* ⭐ `{n}` COUNTS WHAT THE DOOR OPENS (SO BUILD-1c, 2026-10-06 · Law D).
+     The probe above answers New/Existing from an EXACT phone over every
+     status; the door opens the Sales Orders Register, whose population is
+     handed-over, non-cancelled, non-rental orders and whose server search
+     matches the phone by digits. So `n` is the Register's own read for the
+     SAME phone the door carries, counted on the server — never the probe's
+     `matches`. Read only for an existing customer; a failed read, or one that
+     answers no number, shows no count and no door. */
+  const ordersDoorQ = useSalesOrderRegisterSearchCount(probedPhone, customerTypeWord === "Existing customer");
+  const ordersDoorCount =
+    ordersDoorQ.isSuccess && typeof ordersDoorQ.data?.count === "number" ? ordersDoorQ.data.count : 0;
+
+  const liveBlocksCommercial =
+    Boolean(liveAmendment && !liveAmendment.stale) && changeClass?.action === "submit" && !replaceAmendmentId;
+  const canEditOrder = mode === "object" && objectView === "Order" && !showRoute && Boolean(order) && order?.status !== "cancelled";
   const headerRight = (
     <span className="flex items-center gap-2">
-      {mode === "view" && objectView === "Order" && !showRoute && (
-        <Button size="sm" variant="neutral" onClick={enterEdit} data-testid="workspace-edit">
-          <Pencil size={14} /> Edit
-        </Button>
-      )}
-      {/* The governed cancel sits beside the governed edit, exactly as the
-          MASTER's Workspace ruling reads. An order already cancelled has
-          nothing left to cancel, so the door is absent rather than refusing. */}
-      {mode === "view" && objectView === "Order" && !showRoute && order && order.status !== "cancelled" && (
-        <details className="relative">
-          <summary className="btn-ghost cursor-pointer list-none text-meta">More actions</summary>
-          <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-control border border-kit-slate-5 bg-white p-1 shadow-lg">
-            <button type="button" onClick={() => setCancelOpen(true)} data-testid="workspace-cancel-so" className="w-full rounded-control px-2 py-1.5 text-left text-meta text-danger hover:bg-hovertint">Cancel SO</button>
-          </div>
-        </details>
-      )}
-      {(mode === "create" || (mode === "edit" && objectView === "Order")) && (
+      {canEditOrder && editing && (
         <>
-          <Button size="sm" variant="ghost" onClick={cancelEdit} data-testid="workspace-cancel">
-            <X size={14} /> Discard
+          {changeCount > 0 && (
+            <span className="text-body text-base-600" data-testid="change-count">
+              {changeCount} {changeCount === 1 ? "change" : "changes"}
+            </span>
+          )}
+          <Button size="sm" variant="neutral" onClick={cancelEdit} data-testid="workspace-cancel">
+            Cancel
           </Button>
-          <Button
-            size="sm"
-            variant="primary"
-            loading={saveMut.isPending || createMut.isPending}
-            onClick={mode === "create" ? onCreate : onSave}
-            data-testid="workspace-save"
-          >
-            {mode === "create" ? "Create order" : "Save"}
-          </Button>
+          {changeCount > 0 && (
+            <Button
+              size="sm"
+              variant="primary"
+              loading={changesMut.isPending}
+              disabled={liveBlocksCommercial}
+              onClick={() => {
+                const err = validateDraft();
+                if (err) return void toast.error(err);
+                setReviewOpen(true);
+              }}
+              data-testid="workspace-save"
+            >
+              {commitWord}
+            </Button>
+          )}
         </>
       )}
       {mode === "oldrev" && (
@@ -968,48 +2312,1249 @@ export default function SalesOrderWorkspace() {
               const next = new URLSearchParams(prev);
               next.delete("revision");
               return next;
-            }, { replace: true });
+            }, { replace: true, state: location.state });
           }}
           data-testid="workspace-back-to-current"
         >
-          Back to current
+          Return to current
         </Button>
       )}
-      <Button
-        size="sm"
-        variant="ghost"
-        disabled={!pdfUrl}
-        onClick={() => {
-          if (pdfUrl) window.open(pdfUrl, "_blank");
-        }}
-        data-testid="workspace-print"
-      >
-        <Printer size={14} /> Print ▾
-      </Button>
+      {!editing && (
+        <Button
+          size="md"
+          icon="print"
+          variant="ghost"
+          disabled={!printData}
+          onClick={() => void openPrint()}
+          data-testid="workspace-print"
+          aria-label={mode === "oldrev" ? "Print this version" : "Print"}
+        >
+          <span>{mode === "oldrev" ? "Print this version" : "Print ▾"}</span>
+        </Button>
+      )}
+      {canEditOrder && !editing && (
+        <Button size="md" icon="edit" variant="primary" onClick={() => startEdit(baseline)} data-testid="workspace-edit">
+          Edit
+        </Button>
+      )}
+      {canEditOrder && !editing && (
+        <details className="relative">
+          {/* `⋮` LAST, ICON ONLY — owner ruling (Jess, 2026-09-21); its accessible
+              name and tooltip are `More actions`. The retired `Propose a change to
+              the customer` door is gone: the whole-page Edit carries that change. */}
+          <summary className="btn-ghost cursor-pointer list-none px-2 text-body max-md:inline-grid max-md:h-10 max-md:w-10 max-md:place-items-center max-md:px-0" aria-label="More actions" title="More actions"><Icon name="overflow" /></summary>
+          <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-control border border-kit-slate-5 bg-white p-1 shadow-lg">
+            <button
+              type="button"
+              onClick={() => setProblemOpen(true)}
+              data-testid="workspace-report-problem"
+              className="w-full rounded-control px-2 py-1.5 text-left text-meta text-base-700 hover:bg-hovertint"
+            >
+              Report a problem
+            </button>
+            <button type="button" onClick={() => setCancelOpen(true)} data-testid="workspace-cancel-so" className="w-full rounded-control px-2 py-1.5 text-left text-meta text-danger hover:bg-hovertint">Cancel SO</button>
+          </div>
+        </details>
+      )}
     </span>
   );
 
-  const soWord = isNew ? "New Sales Order" : order ? `SO-${order.so}` : "Sales Order";
-  const missingDateAction = order && !order.delivery_date
-    ? missingDeliveryDateGuidance({
-        so: order.so,
-        customer: order.customer_name,
-        salesperson: order.salespersons?.name,
-        phone: order.customer_phone,
-      })
-    : null;
+  const soWord = order ? `SO-${order.so}` : "Sales Order";
+
+  const customerBuiltins = tab("customer").builtins;
+  const emergencyEnabled = tab("emergency").builtins["emergency"]?.enabled !== false;
+
+  /* Is there an address on this order AT ALL? Any one structured part counts,
+     and so does an imported one-string address (AutoCount rows carry the whole
+     thing in `customer_address` with every part null) — otherwise every legacy
+     order would claim to have no address and be offered the tickbox that
+     erases it. */
+  const addressIsBlank =
+    !draft.customer_address_line1.trim() &&
+    !draft.customer_address_line2.trim() &&
+    !draft.customer_address_state &&
+    !draft.customer_address_city &&
+    !draft.customer_address_postcode &&
+    !(order?.customer_address ?? "").trim();
+
+
+  /* ── 0562 · THE ITEMS TABLE WHILE EDITING — the document's own columns
+     (orders/MASTER § ITEMS: # · Item Code · Description · Qty · Unit (RM) ·
+     Disc (RM) · Amount (RM) · TOTAL PAYABLE). A removed row is struck and
+     restorable until commit; nothing leaves the order before the change takes
+     effect. Minimum widths keep every money column readable; the form pane is
+     never narrower than this table (see the split below). */
+  const catalogModel = useMemo(() => {
+    const bundle = catalogQ.data;
+    const bySku = new Map<string, { modelId: string; variant: string; price: number }>();
+    const byModel = new Map<string, { name: string; category: string | null; gaps: string[]; skus: Array<{ sku: string; variant: string; price: number }> }>();
+    if (bundle) {
+      for (const m of bundle.models as Array<{ id: string; name: string; category?: string | null; gaps?: string[] | null; allowedOptions?: { gaps?: string[] } }>) {
+        byModel.set(m.id, { name: m.name, category: m.category ?? null, gaps: m.allowedOptions?.gaps ?? m.gaps ?? [], skus: [] });
+      }
+      for (const k of bundle.skus as Array<{ sku: string; modelId: string; variant: string; price: number }>) {
+        bySku.set(k.sku, { modelId: k.modelId, variant: k.variant, price: Number(k.price) });
+        byModel.get(k.modelId)?.skus.push({ sku: k.sku, variant: k.variant, price: Number(k.price) });
+      }
+    }
+    return { bySku, byModel };
+  }, [catalogQ.data]);
+  const [configOpen, setConfigOpen] = useState<Set<string>>(new Set());
+  const itemsScrollRef = useRef<HTMLDivElement | null>(null);
+  const [itemsOverflow, setItemsOverflow] = useState({ over: false, right: false });
+  useEffect(() => {
+    const el = itemsScrollRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    /* ⛔ SET ONLY WHEN IT CHANGED. A new object every pass, from an effect with
+       no dependency list, is an infinite render loop — measured: the page test
+       run never finished. */
+    const read = () => {
+      const over = el.scrollWidth - el.clientWidth > 1;
+      const right = over && el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+      setItemsOverflow((prev) => (prev.over === over && prev.right === right ? prev : { over, right }));
+    };
+    read();
+    el.addEventListener("scroll", read, { passive: true });
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", read);
+      ro.disconnect();
+    };
+  }, [editing, mode, objectView, draft.lines.length, draft.addons.length]);
+  const [addSku, setAddSku] = useState("");
+  const setDraftLine = (key: string, patch: Partial<DraftLine>) =>
+    setDraft((d) => ({ ...d, lines: d.lines.map((l) => (l.key === key ? { ...l, ...patch } : l)) }));
+  const setDraftAddon = (key: string, patch: Partial<DraftAddon>) =>
+    setDraft((d) => ({ ...d, addons: d.addons.map((a) => (a.key === key ? { ...a, ...patch } : a)) }));
+  const surchargeOf = (attrs: Record<string, unknown> | undefined | null) =>
+    Number((attrs as { specials_total?: number } | null)?.specials_total ?? 0) +
+    Number((attrs as { options_total?: number } | null)?.options_total ?? 0);
+  /** ⭐ A GIFT / PWP / BUNDLE LINE KEEPS ITS PROTECTION (0385; owner-approved
+   *  item contract 2026-09-22): its eligibility and source are not a generic
+   *  qty or price box, and the database refuses an edit to one. It reads in
+   *  the draft; cancelling its PARENT shows the gift consequence instead. */
+  const protectedLine = (l: DraftLine) =>
+    ["free_gift", "free_item", "pwp", "bundle_group", "combo_key"].some((k) => (l.attrs ?? {})[k] !== undefined);
+  const th = `whitespace-nowrap ${SO_TH}`;
+  const editItemsTable = (
+    <div data-testid="edit-items" className="relative">
+      {/* On a screen too narrow for the document's own columns the table scrolls
+          inside its box — never the page — and says so with the DataGrid's
+          grammar: the money columns slide under a fade, and one kit button
+          steps to them. */}
+      <div ref={itemsScrollRef} className="overflow-x-auto" role="region" tabIndex={itemsOverflow.over ? 0 : undefined}
+        aria-label={itemsOverflow.over ? "Items — scroll sideways for more columns" : "Items"}>
+        <table className={SO_TABLE} data-testid="edit-goods">
+          <thead>
+            <tr className={SO_HEAD_ROW}>
+              <th className={`${th} text-left`} style={{ minWidth: 180 }}>Item</th>
+              <th className={`${th} text-center`}>Qty</th>
+              <th className={`${th} text-right`}>Unit (RM)</th>
+              <th className={`${th} text-right`}>Disc (RM)</th>
+              <th className={`${th} text-right`}>Amount (RM)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {draft.lines.filter((l) => l.sku.trim()).map((l, i) => {
+              const known = catalogModel.bySku.get(l.sku);
+              const model = known ? catalogModel.byModel.get(known.modelId) : undefined;
+              const canConfig = !l.removed && model && (model.skus.length > 1 || model.gaps.length > 0);
+              const strike = l.removed ? "line-through text-base-500" : "";
+              const open = configOpen.has(l.key);
+              return [
+                <tr key={l.key} className={`${open ? "" : "border-b border-kit-slate-5"} align-top`} data-testid={`edit-line-${i + 1}`}>
+                  <td className="px-2 py-2">
+                    <div className={`font-medium ${strike}`}>{nameOfSku(l.sku)}</div>
+                    <div className={`break-words text-meta text-base-600 ${strike}`}>{l.sku}</div>
+                    {configWords(l.attrs) && <div className={`text-meta text-base-600 ${strike}`}>{configWords(l.attrs)}</div>}
+                    {!known && <div className="text-meta text-kit-amber-11">{NOT_IN_CATALOG}</div>}
+                    {l.added && <div className="text-meta text-kit-blue-11">New line</div>}
+                    {l.removed && <div className="text-meta text-danger">Cancelled when approved · Restore to keep it</div>}
+                    {protectedLine(l) && <div className="text-meta text-base-600">Free item. It follows the item it came with</div>}
+                    {/* ⭐ ONE COMPOSITION, NOT ONE SET OF DOORS (finding 9). The
+                        seven-column table is now the document in BOTH states,
+                        which is the ruling — but a door that WRITES is an Edit
+                        affordance, and leaving `Configure` / `Remove` live on a
+                        locked order would hand a reader controls the page has
+                        just told them they do not have. Measured in the shell
+                        preview: the row buttons were clickable while the header
+                        still offered `Edit`. */}
+                    <span className={formLocked ? "hidden" : "mt-1 inline-flex flex-wrap gap-x-4 text-meta"}>
+                      {!formLocked && canConfig && !protectedLine(l) && (
+                        <button type="button" className="text-kit-blue-11 hover:underline" aria-expanded={open}
+                          aria-label={`Configure ${nameOfSku(l.sku)}`}
+                          onClick={() => setConfigOpen((st) => { const n = new Set(st); if (n.has(l.key)) n.delete(l.key); else n.add(l.key); return n; })}>
+                          {open ? "Close configuration" : "Configure"}
+                        </button>
+                      )}
+                      {formLocked || protectedLine(l) ? null : l.removed ? (
+                        <button type="button" className="text-kit-blue-11 hover:underline" aria-label={`Restore ${nameOfSku(l.sku)}`}
+                          onClick={() => setDraftLine(l.key, { removed: false })}>Restore</button>
+                      ) : (
+                        <button type="button" className="text-danger hover:underline" aria-label={`Remove ${nameOfSku(l.sku)}`}
+                          onClick={() => (l.added
+                            ? setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))
+                            : setDraftLine(l.key, { removed: true }))}>Remove</button>
+                      )}
+                    </span>
+                  </td>
+                  <td className="px-2 py-2 text-center">
+                    {/* A locked line prints text: no number box exists in View or a historical version. */}
+                    {formLocked || l.removed || protectedLine(l) ? <span className={strike}>{l.qty}</span> : (
+                      <div className="min-w-[56px]">
+                        <Input id={`so-edit-qty-${l.key}`} aria-label={`Qty ${nameOfSku(l.sku)}`} type="number" min={1} value={String(l.qty)}
+                          onChange={(e) => setDraftLine(l.key, { qty: Math.max(1, Number(e.target.value) || 1) })} />
+                      </div>
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-2 text-right">
+                    {formLocked || l.removed || protectedLine(l) ? <span className={`tabular-nums ${strike}`}>{fmtMoney(l.unit_price).replace(/^RM\s*/, "")}</span> : (
+                      <div className="min-w-[80px]">
+                        <Input id={`so-edit-price-${l.key}`} aria-label={`Unit price ${nameOfSku(l.sku)}`} type="number" min={0} step="0.01"
+                          value={String(l.unit_price)}
+                          onChange={(e) => setDraftLine(l.key, { unit_price: Math.max(0, Number(e.target.value) || 0) })} />
+                      </div>
+                    )}
+                  </td>
+                  {/* Zero is the fact, the dash was the banned absent-value glyph. */}
+                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(discountOf(l)).replace(/^RM\s*/, "")}</td>
+                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(l.qty * l.unit_price).replace(/^RM\s*/, "")}</td>
+                </tr>,
+                open && canConfig ? (
+                  <tr key={`${l.key}-config`} className="border-b border-kit-slate-5 bg-kit-slate-2">
+                    <td colSpan={5} className="px-2 py-3">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        {model!.skus.length > 1 && (
+                          <Select id={`so-edit-size-${l.key}`} label="Size" value={l.sku}
+                            onValueChange={(sku) => {
+                              const hit = model!.skus.find((x) => x.sku === sku);
+                              if (!hit) return;
+                              setDraftLine(l.key, { sku, unit_price: hit.price + surchargeOf(l.attrs) });
+                            }}
+                            options={model!.skus.map((x) => ({ value: x.sku, label: x.variant || x.sku }))} />
+                        )}
+                        {model!.gaps.length > 0 && (
+                          <Select id={`so-edit-gap-${l.key}`} label="Mattress gap"
+                            value={String((l.attrs as { gap?: string } | undefined)?.gap ?? "KIV")}
+                            onValueChange={(gap) => setDraftLine(l.key, { attrs: { ...(l.attrs ?? {}), gap } })}
+                            options={[{ value: "KIV", label: "Confirm later" }, ...model!.gaps.map((g) => ({ value: g, label: g }))]} />
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ) : null,
+              ];
+            })}
+            {draft.addons.map((a) => {
+              const strike = a.removed ? "line-through text-base-500" : "";
+              return (
+                <tr key={a.key} className="border-b border-kit-slate-5 align-top" data-testid={`edit-service-${a.addon_key}`}>
+                  <td className="px-2 py-2">
+                    <div className={`font-medium ${strike}`}>{nameOfAddon(a.addon_key)}</div>
+                    <div className={`break-words text-meta text-base-600 ${strike}`}>{serviceCodeWord(a.addon_key, addonSkuByKey.get(a.addon_key))}</div>
+                    {typeof a.attrs?.["size"] === "string" && <div className={`text-meta text-base-600 ${strike}`}>{String(a.attrs["size"])}</div>}
+                    {a.added && <div className="text-meta text-kit-blue-11">New line</div>}
+                  </td>
+                  <td className={`px-2 py-2 text-center ${strike}`}>{a.qty}</td>
+                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(a.unit_price).replace(/^RM\s*/, "")}</td>
+                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(discountOf(a)).replace(/^RM\s*/, "")}</td>
+                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(a.qty * a.unit_price).replace(/^RM\s*/, "")}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr className="font-semibold text-base-900">
+              <td colSpan={4} className="whitespace-nowrap px-2 py-2 text-right">TOTAL PAYABLE</td>
+              <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums" data-testid="edit-total">
+                {fmtMoney(
+                  draft.lines.filter((l) => !l.removed && l.sku.trim()).reduce((n, l) => n + l.qty * l.unit_price, 0) +
+                  draft.addons.filter((a) => !a.removed).reduce((n, a) => n + a.qty * a.unit_price, 0),
+                )}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {itemsOverflow.right && (
+        <div aria-hidden="true" data-testid="items-more-columns" className="pointer-events-none absolute inset-x-0 top-0 h-[2.5rem] bg-gradient-to-l from-kit-slate-6/60 to-transparent" style={{ left: "auto", width: 32 }} />
+      )}
+      {itemsOverflow.over && (
+        <span className="absolute right-1 top-1 z-10">
+          <Button size="sm" variant="neutral" aria-label={itemsOverflow.right ? "Show more Items columns" : "Back to the first Items columns"}
+            data-testid="items-columns-step"
+            onClick={() => {
+              const el = itemsScrollRef.current;
+              if (el) el.scrollBy({ left: (itemsOverflow.right ? 1 : -1) * Math.max(160, el.clientWidth * 0.7), behavior: "smooth" });
+            }}>
+            {itemsOverflow.right ? "›" : "‹"}
+          </Button>
+        </span>
+      )}
+      {/* ⭐ THE DOORS BELONG TO EDIT, THE TABLE BELONGS TO BOTH. The same
+          commercial composition now stands in View (owner ruling 2026-09-21),
+          and a page that reads until `Edit` is pressed cannot offer `Add item`
+          or `Add service` while it is reading. The lock is asked first, so a
+          historical version can never draw the door. */}
+      {!formLocked && editing && (
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <Input id="so-add-item" label="Add item" list="so-sku-catalog" value={addSku}
+              hint={addSku.trim() ? (catalogBySku.get(addSku.trim())?.label ?? NOT_IN_CATALOG) : undefined}
+              onChange={(e) => setAddSku(e.target.value)} />
+            <datalist id="so-sku-catalog">
+              {[...catalogBySku.entries()].map(([sku, info]) => (
+                <option key={sku} value={sku}>{info.label}</option>
+              ))}
+            </datalist>
+          </div>
+          <Button size="sm" variant="neutral" disabled={!catalogBySku.has(addSku.trim())} data-testid="add-item"
+            onClick={() => {
+              const sku = addSku.trim();
+              const hit = catalogBySku.get(sku);
+              if (!hit) return;
+              const key = nextKey();
+              setDraft((d) => ({ ...d, lines: [...d.lines, { key, sku, qty: 1, unit_price: Number(hit.price ?? 0), added: true }] }));
+              setAddSku("");
+            }}>
+            <Plus size={14} /> Add item
+          </Button>
+        </div>
+      </div>
+      )}
+    </div>
+  );
+
+  /* ── THE LEFT PANE ─────────────────────────────────────────────────────── */
+  const form = (
+    /* A `fieldset` because the browser's own disabled-descendants rule is the
+       only lock that cannot be forgotten one control at a time. `contents`
+       keeps it out of the layout. */
+    <fieldset
+      disabled={mode === "oldrev"}
+      className="so-detail-style contents"
+      data-testid="sales-order-workspace"
+      id="sales-order-workspace"
+    >
+    {/* §3 of the token table names 24px "between blocks · card padding" and 12px
+        "standard gap". The left pane stacked eight sections at the standard gap,
+        so neighbouring cards sat as close as two fields inside one card — the
+        second half of why the sections did not separate. */}
+    <div className="flex flex-col gap-6">
+      {mode === "oldrev" && viewedRevision && (
+        <div className="px-1" data-testid="oldrev-notice">
+          <span className="rounded-full bg-base-900 px-2 py-0.5 text-label font-semibold text-white">
+            Viewing ({viewedRevision.revision}) · read-only
+          </span>
+          {/* ⭐ TWO CASES, AND ONLY ONE OF THEM IS A RECONSTRUCTION — owner
+              ruling 2026-09-23: "Legacy PDFs that were never stored: use the
+              approved reconstructed-copy notice. Newly issued versions after
+              this release: preserve their original issued PDFs as required. A
+              warning does not replace this capability."
+
+              So a version issued since `0565` shows THE FILE IT WAS ISSUED AS,
+              and says so. Only a version that never had one is rebuilt, and it
+              carries the approved notice — verbatim, the same sentence the
+              rebuilt sheet itself prints, so screen and paper agree. */}
+          {storedDocumentUrl && (
+            <p className="mt-2 text-meta text-kit-slate-11" data-testid="oldrev-issued-document">
+              The document this version was issued as.
+            </p>
+          )}
+          {isReconstruction && (
+            <p className="mt-2 text-meta text-kit-slate-11" data-testid="oldrev-rebuilt">
+              Reconstructed copy. The original issued document is unavailable.
+            </p>
+          )}
+          {/* A SIGNATURE IS UNKNOWN HERE, NOT ABSENT. The evidence itself is
+              untouched: it stays on the order and still prints on the current
+              document. */}
+          {isReconstruction && base?.signature_url && (
+            <p className="mt-1 text-meta text-kit-slate-11" data-testid="oldrev-signature-unknown">
+              Signature version not recorded.
+            </p>
+          )}
+          {isReconstruction && (base?.payments ?? []).some((pm) => !pm.date) && (
+            <p className="mt-1 text-meta text-kit-slate-11" data-testid="oldrev-undated-payment">
+              One payment has no date, so it is not counted in this version.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* 0562 · the supplier-commitment notice (owner ruling 2026-09-21), in both states. */}
+      {mode === "object" && (detailQ.data?.pos ?? []).length > 0 && (
+        <p className="rounded-card border border-kit-slate-5 bg-white px-4 py-3 text-body text-kit-slate-12" data-testid="supplier-commitment-notice">
+          This SO is already ordered from the supplier. Your change goes for approval first; the order changes only after it is approved.
+        </p>
+      )}
+      {mode === "object" && !editing && liveAmendment && requestView && (
+        <WaitingRequest
+          amendment={liveAmendment}
+          rows={requestView.rows}
+          consequences={requestView.consequences}
+          canDecide={role === "principal"}
+          busy={decideMut.isPending || agreementMut.isPending}
+          onRecordAgreement={(a) => agreementMut.mutate({ amendmentId: liveAmendment.id, ...a })}
+          onDecide={(decision, note) => decideMut.mutate({ amendmentId: liveAmendment.id, decision, note })}
+          onProposeAgain={() => startEdit(withProposal(baseline, proposalOf(liveAmendment)), liveAmendment.id)}
+        />
+      )}
+
+      {/* ⭐ CARD ORDER — OWNER RULING (Jess, 2026-09-21): `SO info` comes FIRST,
+          before `Customer`. The page reads WHEN (which order) · WHO · WHERE ·
+          WHAT · PAYMENT, so the reader meets the order it is, then the person
+          it is for. This overwrites the 2026-08-26 order that put the customer
+          first. */}
+      {/* ② ORDER INFO */}
+      {/* No subtitle (YH, 2026-08-26). The 2026-08-24 teaching line explained
+          what `Proceed date` meant while it was an editable box the office had
+          to reason about. It is a recorded fact now, and a sentence explaining
+          a read-only date is the "reduce descriptions" Jess asked for. */}
+      {/* 0562 · VIEW FIRST: a saved order reads until `Edit` is pressed. */}
+      <fieldset disabled={formLocked} className="contents">
+      <Block title="SO info">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Fact own={false} label="SO Doc Date" value={fmtDate(order?.placed_at ?? null)} />
+          {/* ⭐ THE RULED ORDER IS `SO Doc Date · Proceed Date · Customer
+              Requested Delivery Date` (CARD ORDER AND NAMES, Jess 2026-09-21).
+              It was built with the last two swapped, and the SALES ORDER PDF
+              printed the ruled order — so the page and the paper beside it
+              disagreed, which is the one thing that section forbids: "the left
+              pane and the Sales Order PDF must tally". Proceed Date is also the
+              earlier fact of the two, so it reads first. */}
+          {/* ⭐ PROCEED DATE IS READ-ONLY ONCE THE ORDER EXISTS (Jess,
+              2026-08-26). This OVERWRITES `docs/orders/MASTER.md` §725-728,
+              which gave Operations a direct writer here. The portal asks for
+              the production start as a REQUIRED question at the point of sale
+              (`Proceed date · production start *`), so on an existing order it
+              is a recorded answer, not a field — and an office edit that moved
+              it silently moved when the factory may start. */}
+          {/* ⭐ A DATE THAT WAS NEVER RECORDED IS NOT A DATE THAT IS LOCKED
+              (YH, 2026-08-28). Jess's ruling stands untouched — a proceed date
+              that EXISTS is a recorded answer and stays a `Fact`, because
+              moving it moves when the factory may start. But an order that
+              never carried one is not a locked answer, it is a MISSING one,
+              and locking a blank is how the office door's own orphans became
+              unfixable. So the picker returns for exactly that case.
+
+              THE TEST IS `baseline`, NEVER `draft`. `baseline` is what the
+              database holds; `draft` is what is on screen. Reading `draft`
+              would swap the field back to a `Fact` the instant a date was
+              picked — the operator would watch their own answer lock before
+              they had saved it, with no way to correct a mis-click. Reading
+              the saved value keeps the control open for the whole edit and
+              locks on the next load, which is when the answer is real.
+
+              `sales_order_save_revision` (0391) enforces the same rule: a
+              blank may be filled, a recorded date may not be moved or cleared.
+              This control is the door, not the lock. */}
+          <div data-pos-field="proceedDate">
+            {/* A never-recorded date reads `Not recorded` while locked; Edit opens the picker. */}
+            {mode === "object" && editing ? (
+              <DatePicker id="so-proceed" label="Proceed Date" value={draft.proceed_date}
+                hint={
+                  !baseline.proceed_date
+                    ? "Never recorded. Fill it in once, then it locks"
+                    : undefined
+                }
+                error={
+                  draft.proceed_date && draft.delivery_date && draft.proceed_date > draft.delivery_date
+                    ? "After the delivery date"
+                    : undefined
+                }
+                onChange={(iso) => setField("proceed_date", iso)} />
+            ) : (
+              <span id="so-proceed">
+                <Fact label="Proceed Date" value={fmtDate(draft.proceed_date) || "Not recorded"} />
+              </span>
+            )}
+          </div>
+          {!formLocked && editing ? (
+            <div data-pos-field="deliveryDate">
+              <DatePicker id="so-promised" label="Customer Requested Delivery Date" value={draft.delivery_date}
+                hint={earliestPromise ? `Earliest ${fmtDate(earliestPromise)} (production lead)` : undefined}
+                error={
+                  draft.delivery_date && earliestPromise && draft.delivery_date < earliestPromise
+                    ? `Too soon. Earliest is ${fmtDate(earliestPromise)}`
+                    : undefined
+                }
+                /* A date changes only into another date: picking one in Edit ends a legacy TBD (owner ruling 2026-09-26). */
+                onChange={(iso) =>
+                  setDraft((d) => ({ ...d, delivery_date: iso, delivery_date_tbd: false }))
+                } />
+            </div>
+          ) : (
+            <div data-pos-field="deliveryDate">
+              <Fact label="Customer Requested Delivery Date" value={
+                promisedWord(mode, viewedRevision, order) === "No delivery date" ? (
+                  <span data-attention="warning" className="inline-flex rounded-control bg-kit-amber-3 px-1.5 py-0.5 font-medium text-kit-amber-11">No delivery date</span>
+                ) : promisedWord(mode, viewedRevision, order)
+              } />
+              {/* ⭐ THE DOOR SITS BESIDE THE DATE IT MOVES (YH, 2026-08-27).
+                  The three amend fields were a whole section — first a card,
+                  then a merged subsection — standing open on every order for an
+                  act that happens rarely. They are a MODAL now, opened from the
+                  fact they change, which is where somebody looking at a wrong
+                  date already has their eye.
+                  A LIVE proposal is truth and is NOT hidden behind the modal:
+                  it prints here, under the date it is waiting to move. */}
+              {/* 0562 · the date moves inside the whole-page Edit; a live request
+                  shows once, at the top of the form, never as a second door here. */}
+            </div>
+          )}
+          {/* ⛔ `Customer reference` IS REMOVED FROM THE PAGE — OWNER RULING
+              (Jess, 2026-09-21), `docs/orders/MASTER.md` § "Order view" → CARD
+              ORDER AND NAMES. `orders.source_ref` is untouched and the importer
+              remains its only writer; the SO page simply stops printing it. */}
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <CustomFields fields={tab("target").custom} values={draft.custom} onChange={setCustom} locked={formLocked} />
+        </div>
+        {/* THE ONE DOOR for goods, price and the promised date — opened from
+            `More actions` since 2026-08-26. The component still MOUNTS here
+            because a LIVE proposal is truth and belongs on the card, and
+            because the modal it owns has to exist to be opened at all. The
+            rule + padding therefore appear only when there is a live panel to
+            separate; with nothing pending this renders an empty, invisible
+            div rather than a bordered strip with no content in it. */}
+        {!formLocked && editing && (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Select id="so-instalment" label="Instalment months"
+              value={draft.installment_months == null ? "none" : String(draft.installment_months)}
+              onValueChange={(v) => setField("installment_months", v === "none" ? null : Number(v))}
+              options={[{ value: "none", label: "None" }, ...INSTALMENT_MONTHS.map((m) => ({ value: String(m), label: String(m) }))]} />
+          </div>
+        )}
+        {/* ⭐ DEALER · SALES LOCATION · SALESPERSON LIVE IN `SO info` — OWNER
+            RULING (Jess, 2026-09-21), and the `Sales ownership` heading is
+            RETIRED with the move (COPY-STANDARD § Its section names). They are
+            facts about the ORDER — which showroom opened it and who sold it —
+            not about the person who bought it, and the Register already reads
+            `Sales Location · Salesperson` beside `SO No`. This overwrites the
+            2026-09-11 "who sold it is part of who bought it" placement.
+            `SalesOrderAttribution` keeps its own permission checks and its
+            approve/reject lane exactly as they were. */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div data-pos-field="outlet">
+                <Fact label="Sales Location" value={sourceName(mode, viewedRevision, order, "outlet") || "Not recorded"} />
+              </div>
+              {/* ⭐ THE DOOR SITS BESIDE THE NAME IT MOVES (YH, 2026-09-01).
+                  `Change salesperson` had a rule and a right-aligned row of its
+                  own under this grid — a separator, 12px of padding and a full
+                  row, introducing ONE button. It reads as a section, so the eye
+                  stops at it, and it separated the verb from the fact the verb
+                  acts on.
+                  It is the same shape `Change delivery date` already uses under
+                  `Requested Delivery Date`: a quiet text door under the answer
+                  it changes, which is where somebody looking at the wrong
+                  salesperson already has their eye. `useCanChangeSalesOwnership`
+                  is GATE 3's rule, imported rather than re-typed. */}
+              <div data-pos-field="salesperson">
+                <Fact label="Salesperson" value={sourceName(mode, viewedRevision, order, "salesperson") || "Not recorded"} />
+                {mode !== "oldrev" && orderId && order && canChangeSalesOwnership && (
+                  <button
+                    type="button"
+                    onClick={() => setAttributionSignal((n) => n + 1)}
+                    data-testid="attribution-open"
+                    className="mt-1 text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+                  >
+                    Change salesperson
+                  </button>
+                )}
+              </div>
+            {/* ⭐ AND DEALER READS LAST — the ruled order is `… Sales Location ·
+                Salesperson · Dealer`. It was built Dealer-first, which put the
+                least-used fact in the reader's first cell. */}
+              <Fact label="Dealer" value={sourceName(mode, viewedRevision, order, "dealer") || "Not recorded"} />
+            </div>
+            {/* An OLD revision is a photograph — it carries no lane. */}
+            {mode !== "oldrev" && orderId && order && (
+              <SalesOrderAttribution
+                orderId={orderId}
+                current={{
+                  salesperson_id: order.salesperson_id ?? null,
+                  outlet_id: order.outlet_id ?? null,
+                  dealer_id: order.dealer_id ?? null,
+                }}
+                salespersonOptions={realSpOptions}
+                outletOptions={realOutletOptions}
+                dealerOptions={dealerOptions}
+                inlineTrigger={false}
+                openSignal={attributionSignal}
+                onApplied={() => {
+                  void revisionsQ.refetch();
+                  void baseQ.refetch();
+                  void detailQ.refetch();
+                }}
+              />
+            )}
+
+      </Block>
+      </fieldset>
+
+      {/* ① CUSTOMER — now the whole customer, address included (Jess,
+          2026-08-26). `Delivery address` was its own card between `Emergency
+          contact` and `Money`; a reader looking up "where does this go" had to
+          pass two unrelated sections to find it. It is the same party's fact,
+          so it is the same card, under its own locked name. */}
+      {/* 0562 · VIEW FIRST: a saved order reads until `Edit` is pressed. */}
+      <fieldset disabled={formLocked} className="contents">
+      <Block
+        title="Customer"
+        headerSlot={
+          customerBuiltins["customerType"]?.enabled !== false ? (
+            <span
+              className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-base-700"
+              data-pos-field="customerType"
+              data-testid="customer-type-chip"
+            >
+              {customerTypeWord}
+              {/* ⭐ AN EXISTING CUSTOMER CARRIES HOW MANY ORDERS, AND A DOOR TO
+                  THEM — OWNER RULING (Jess, 2026-09-21). `n` is this phone's
+                  Sales Orders the reader may see, counted by the Register's
+                  own read (`ordersDoorCount` above), and the link opens that
+                  Register searched by the SAME phone — no new customer page
+                  and no new writer (Law C: a door, never a duplicate). Zero,
+                  or no number, prints no `0 orders` and no door. */}
+              {customerTypeWord === "Existing customer" && ordersDoorCount > 0 && (
+                <>
+                  {" · "}
+                  <Link
+                    to={`/operation/orders?search=${encodeURIComponent(probedPhone)}`}
+                    className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+                    data-testid="customer-orders-door"
+                  >
+                    {ordersDoorCount === 1 ? "1 order" : `${ordersDoorCount} orders`} ›
+                  </Link>
+                </>
+              )}
+            </span>
+          ) : undefined
+        }
+      >
+        {/* ⭐ THREE ACROSS (YH, 2026-08-27) — the six identity fields were two
+            per row, which made the card six rows tall for facts that are one
+            line each. At three they land as exactly two rows: who they are,
+            then who they are demographically. */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div data-pos-field="name">
+            {/* A locked field is not a question, so the star belongs to Edit and Create. */}
+            <Input id="so-name" label="Full name" required={!formLocked} value={draft.customer_name}
+              onChange={(e) => setField("customer_name", e.target.value)} />
+          </div>
+          <div data-pos-field="phone">
+            <Input id="so-phone" label="Phone" value={draft.customer_phone}
+              onChange={(e) => setField("customer_phone", e.target.value)} />
+          </div>
+          {customerBuiltins["email"]?.enabled !== false && (
+            <div data-pos-field="email">
+              <Input id="so-email" label="Email" required={!formLocked && customerBuiltins["email"]?.required}
+                value={draft.customer_email}
+                onChange={(e) => setField("customer_email", e.target.value)} />
+            </div>
+          )}
+          {customerBuiltins["race"]?.enabled !== false && (
+            <div data-pos-field="race">
+              {lockedFact("Race", draft.customer_race,
+              <Select id="so-race" label="Race" required={!formLocked && customerBuiltins["race"]?.required}
+                value={draft.customer_race || undefined}
+                onValueChange={(v) => setField("customer_race", v)}
+                options={CUSTOMER_RACE_OPTIONS.map((r) => ({ value: r, label: r }))} />)}
+            </div>
+          )}
+          {customerBuiltins["gender"]?.enabled !== false && (
+            <div data-pos-field="gender">
+              {lockedFact("Gender", draft.customer_gender,
+              <Select id="so-gender" label="Gender" required={!formLocked && customerBuiltins["gender"]?.required}
+                value={draft.customer_gender || undefined}
+                onValueChange={(v) => setField("customer_gender", v)}
+                options={CUSTOMER_GENDER_OPTIONS.map((g) => ({ value: g, label: g }))} />)}
+            </div>
+          )}
+          {customerBuiltins["birthday"]?.enabled !== false && (
+            <div data-pos-field="birthday">
+              {lockedFact("Birthday", draft.customer_birthday,
+              <DatePicker id="so-birthday" label="Birthday" required={!formLocked && customerBuiltins["birthday"]?.required}
+                value={draft.customer_birthday}
+                onChange={(iso) => setField("customer_birthday", iso)} />)}
+            </div>
+          )}
+          <CustomFields fields={tab("customer").custom} values={draft.custom} onChange={setCustom} locked={formLocked} />
+        </div>
+        {/* ⭐ Merged from the retired `Emergency contact` card (YH,
+            2026-08-27). It is the same person's fact, so it is the same
+            card — the customer, everywhere their goods go, and who to ring
+            if nobody answers on the day. It loses its fold with its border:
+            three fields do not need hiding, and a collapsed card cannot
+            show an unsaved change without the force-open machinery that
+            existed only because it was collapsible. */}
+        {emergencyEnabled && (
+          <>
+            <div className="border-t border-kit-slate-5 pt-3">
+              <SubHead>Emergency contact</SubHead>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-pos-field="emergency">
+              <Input id="so-emergency-name" label="Name" value={draft.emergency_name}
+                onChange={(e) => setField("emergency_name", e.target.value)} />
+              <Input id="so-emergency-phone" label="Phone" value={draft.emergency_phone}
+                onChange={(e) => setField("emergency_phone", e.target.value)} />
+              {/* The relationship is a picker with a free-text escape: an
+                  imported or hand-typed word that is not on the list must survive
+                  being looked at, so it stays in the text box. */}
+              <Input id="so-emergency-relationship" label="Relationship"
+                list="so-emergency-relationships"
+                value={draft.emergency_relationship}
+                onChange={(e) => setField("emergency_relationship", e.target.value)} />
+              <datalist id="so-emergency-relationships">
+                {EMERGENCY_RELATIONSHIPS.map((r) => <option key={r} value={r} />)}
+              </datalist>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <CustomFields fields={tab("emergency").custom} values={draft.custom} onChange={setCustom} locked={formLocked} />
+            </div>
+          </>
+        )}
+        {/* ⭐ BILLING BELONGS TO `Customer` — OWNER RULING (Jess, 2026-09-21).
+            `Delivery` answers ONE question — can we deliver it and how is it
+            carried — and who pays is not that question. The in-card label is
+            `Billing` (COPY-STANDARD § Its section names). Every field keeps its
+            id, its POS-parity tag and its codec. */}
+        <div className="border-t border-kit-slate-5 pt-3">
+          <SubHead>Billing</SubHead>
+        </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4" data-pos-field="billing">
+            <div className="sm:col-span-4">
+              <Checkbox id="so-billing-same" label="Billing address same as delivery"
+                checked={draft.customer_billing_same}
+                onCheckedChange={(v) => setField("customer_billing_same", v)} />
+            </div>
+            {!draft.customer_billing_same && (
+              <div className="sm:col-span-4">
+                <Input id="so-billing" label="Billing address" value={draft.customer_billing}
+                  onChange={(e) => setField("customer_billing", e.target.value)} />
+              </div>
+            )}
+            <CustomFields fields={tab("address").custom} values={draft.custom} onChange={setCustom} locked={formLocked} />
+          </div>
+      </Block>
+      </fieldset>
+
+      {/* ⑥ MONEY — read-only forever (ownership Law B). */}
+
+
+      {/* ③ DELIVERY — where the goods go, and what the lorry meets there
+          (approved Sales Order detail organisation, 2026-09-11).
+          The address, the billing relationship and the access conditions were
+          spread across two cards: the address sat inside CUSTOMER and the
+          floor/lift/stair answers sat on ORDER INFO. They are ONE question —
+          "can we deliver this, and what will it cost to carry" — so they are
+          one card. Every field keeps its id, its clamp and its POS-parity
+          tag; nothing here is recomputed and no second fee is derived. The
+          stair charge is the STAMPED `STAIR_CARRY` addon, stated once here as
+          a working line and charged once in GOODS. */}
+      {/* 0562 · VIEW FIRST: a saved order reads until `Edit` is pressed. */}
+      <fieldset disabled={formLocked} className="contents">
+      <Block title="Delivery">
+          {/* Merged from the retired `Delivery address` card (Jess,
+              2026-08-26). Same fields, same ids, same one-address fact — it
+              simply stopped being a separate card two sections away from the
+              customer it belongs to. */}
+          {/* ⭐ ONE GROUP, NO IN-CARD HEADINGS — OWNER RULING (Jess,
+              2026-09-21): the address and the access conditions are one
+              question, so `Delivery address` and `Delivery access` are retired
+              as headings (COPY-STANDARD § Its section names). */}
+          {/* Delivery uses the same two field tracks throughout, including access and services. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" data-pos-field="address">
+            {/* ⭐ THE ESCAPE HATCH ONLY APPEARS WHEN IT IS NEEDED (YH,
+                2026-08-26). `Address not given yet` is the answer to a MISSING
+                address; on an order that already carries one it is a permanent
+                tickbox whose only power is to throw that address away. It shows
+                while the address is blank, and while it is already ticked (so it
+                can be unticked) — and disappears once there is an address to
+                read. The FIELD is untouched: `customer_address_unknown` still
+                round-trips, and the POS still asks the same question. */}
+            {(addressIsBlank || draft.customer_address_unknown) && (
+              <div className="sm:col-span-2">
+                <Checkbox id="so-address-unknown" label="Address not given yet"
+                  checked={draft.customer_address_unknown}
+                  onCheckedChange={(v) => setField("customer_address_unknown", v)} />
+              </div>
+            )}
+            <div>
+              <Input id="so-line1" label="Address line 1" value={draft.customer_address_line1}
+                disabled={draft.customer_address_unknown}
+                onChange={(e) => setField("customer_address_line1", e.target.value)} />
+            </div>
+            <div>
+              <Input id="so-line2" label="Address line 2" value={draft.customer_address_line2}
+                disabled={draft.customer_address_unknown}
+                onChange={(e) => setField("customer_address_line2", e.target.value)} />
+            </div>
+            {/* THE MALAYSIA CASCADE — state picks city picks postcode, the same
+                three questions in the same order the POS asks them.
+                (`@/data/malaysia-postcodes`, one dataset, no second copy.)
+
+                Before this, all three were free text here while the POS could
+                only ever write a listed value — so the office could produce an
+                address the shop floor was incapable of producing, and a postcode
+                that belongs to no city in its own state.
+
+                STRICT, and that is measured rather than assumed: NO importer
+                writes `customer_address_state` — the only writers are this door
+                and the POS create/update path, and AutoCount rows carry null in
+                all three columns (their address arrives as ONE composed string).
+                So a picker cannot orphan legacy data; there is nothing in the
+                column to preserve. An address the list cannot express still has
+                two homes — the free-text lines above, and `Address not given
+                yet` for the genuinely unknown. */}
+            {/* THE LOCKED STATE (owner ruling 2026-09-26): an absent answer reads
+                `Not recorded`, and the hints belong to Edit and Create. */}
+            {lockedFact("State", draft.customer_address_state,
+            <Select id="so-state" label="State"
+              value={draft.customer_address_state || undefined}
+              disabled={draft.customer_address_unknown}
+              onValueChange={(v) =>
+                setDraft((d) => ({ ...d, ...addressCascadePatch("state", v) }))
+              }
+              options={MY_STATES.map((st) => ({ value: st, label: st }))} />)}
+            {lockedFact("City", draft.customer_address_city,
+            <Select id="so-city" label="City"
+              value={draft.customer_address_city || undefined}
+              disabled={draft.customer_address_unknown || !draft.customer_address_state}
+              hint={!formLocked && !draft.customer_address_state ? "Pick a state first" : undefined}
+              onValueChange={(v) =>
+                setDraft((d) => ({ ...d, ...addressCascadePatch("city", v) }))
+              }
+              options={getCities(draft.customer_address_state || null).map((c) => ({ value: c, label: c }))} />)}
+            {lockedFact("Postcode", draft.customer_address_postcode,
+            <Select id="so-postcode" label="Postcode"
+              value={draft.customer_address_postcode || undefined}
+              disabled={draft.customer_address_unknown || !draft.customer_address_city}
+              hint={!formLocked && !draft.customer_address_city ? "Pick a city first" : undefined}
+              onValueChange={(v) => setField("customer_address_postcode", v)}
+              options={getPostcodes(
+                draft.customer_address_state || null,
+                draft.customer_address_city || null,
+              ).map((pc) => ({ value: pc, label: pc }))} />)}
+            {lockedFact("Building type", draft.building_type,
+            <Select id="so-building-type" label="Building type" required={!formLocked}
+              error={
+                !formLocked && !draft.customer_address_unknown && !draft.building_type
+                  ? "Fill in the building type first. A condominium can only take a half-day delivery."
+                  : undefined
+              }
+              value={draft.building_type || undefined}
+              onValueChange={(v) => setField("building_type", v)}
+              options={BUILDING_TYPE_OPTIONS.map((b) => ({ value: b, label: b }))} />)}
+          </div>
+          {/* ⭐ DELIVERY ACCESS SITS WITH THE ADDRESS IT DESCRIBES
+              (approved Sales Order detail composition, 2026-09-10). Floor,
+              lift and stair carry answer "what happens when the lorry
+              reaches THIS address" — they stood on `Order info`, a card away
+              from the address they qualify, so a reader checking a
+              condominium delivery held the address in their head while they
+              went to find the floor. Nothing about the fields changed: the
+              same clamps, the same `stairCarry` POS-parity tag, the same
+              working line, moved whole. */}
+          {/* (same group — no second heading) */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {/* ⭐ THE TAG COVERS THE FIELD IT NAMES (YH, 2026-09-01).
+                  `data-pos-field="stairCarry"` wrapped the FLOOR box alone. The
+                  registry field it stands for is "Delivery access (floor / lift /
+                  stair carry)" — three questions — and the other two sat outside
+                  the tag entirely.
+                  That is not cosmetic. The POS-parity contract test walks
+                  `POS_FORM_BUILTINS` and asserts each key's attribute appears in
+                  this file; it cannot see WHAT the attribute wraps. So the test
+                  reported "stair carry is covered" while checking one box of
+                  three, and deleting `Lift available?` tomorrow would still pass.
+                  THIS IS THE SECOND TIME. `orderAddons` carried the same attribute
+                  on a hidden `<span>` with no control behind it, and the page
+                  passed a completeness test it did not meet while the office rang
+                  the shop to add a disposal service. The lesson was written into
+                  the comment above that door and the same defect was live twelve
+                  lines away.
+                  A NESTED GRID, not a wrapper div: the three fields still sit on
+                  the parent's two tracks (`sm:col-span-2 sm:grid-cols-2`),
+                  so the fields align with the address and read as the one topic
+                  they are. */}
+              <div
+                data-pos-field="stairCarry"
+                className="grid grid-cols-1 gap-3 sm:col-span-2 sm:grid-cols-2"
+              >
+                {/* Carres does not stair-carry above floor 3 (MAX_DELIVERY_FLOOR).
+                    The POS has clamped this since the wizard was written; this door
+                    accepted any number, so an office-keyed order could promise a
+                    carry nobody performs. */}
+                {/* The ceiling rides the LABEL (YH, 2026-08-26) — it was a hint
+                    under the box, which reads as advice rather than as the limit
+                    the input actually enforces. One statement, in the field's own
+                    name, and the separate hint line goes with it. */}
+                {/* Locked prints the number as text: a number box is an Edit control. */}
+                {formLocked ? <Fact label={`Floor (Max is ${MAX_DELIVERY_FLOOR}rd Floor)`} value={String(draft.delivery_floor)} /> :
+                <Input id="so-floor" label={`Floor (Max is ${MAX_DELIVERY_FLOOR}rd Floor)`}
+                  type="number" min={1} max={MAX_DELIVERY_FLOOR}
+                  value={String(draft.delivery_floor)}
+                  onChange={(e) =>
+                    setField(
+                      "delivery_floor",
+                      /* ⭐ THE SAME 1-TO-3 THE POS CLAMPS TO (YH, 2026-09-01 —
+                         "office follow POS"). The floor was 0 here while the POS
+                         stepper starts at 1; the form already shows a missing
+                         floor as 1 (`?? 1`, four places), so the zero was a value
+                         only this box could type and nothing could mean. */
+                      Math.min(MAX_DELIVERY_FLOOR, Math.max(1, Number(e.target.value) || 1)),
+                    )
+                  } />}
+              {/* ⭐ THE CELL ALWAYS CARRIES A NUMBER (YH, 2026-08-27) — "no ask
+                  then put a default value, rather than leaving it blank". The
+                  STORED value stays null until somebody types; this shows the
+                  derived default and never writes one.
+
+                  ⚠️ THE TWO COMMENTS THAT STOOD HERE UNTIL 2026-09-01 DESCRIBED A
+                  FIELD THAT NO LONGER EXISTED. They said an untouched box reads
+                  `All 5 items` and that 0104's NULL means EVERY item, and warned
+                  at length against defaulting to zero. Both were true when typed
+                  on 2026-08-26/27 and were overturned HOURS later by YH's own
+                  ruling that an unset count means NONE — which `stairCarryCount`
+                  has implemented ever since, and which is why the box renders `0`.
+                  A governance record that no longer describes its field is not
+                  harmless: the next reader trusts it, and this one warned them off
+                  the behaviour the code already had. Kept as a correction rather
+                  than deleted, because the ruling it lost to is the point.
+
+                  ⭐ AND THE CEILING IS ENFORCED, NOT JUST STATED (YH, 2026-09-01).
+                  The hint has said `0 to 5` since it was written and the box
+                  accepted 99. The POS cannot produce that number — its stepper
+                  stops at the item count — so an office-keyed order could hold a
+                  count no shop floor could have quoted, while the working line
+                  directly below priced the CLAMPED five. One card, two answers to
+                  "how many items", and the saved one was the wrong one.
+                  `stairCarryCount` is the same clamp the fee already runs and the
+                  same one the server stamps with, imported rather than re-typed —
+                  a second copy of a ceiling is how the two surfaces drifted in the
+                  first place. `max` rides the input too, so the spinner and the
+                  keyboard agree.
+                  ⛔ NO CEILING WITHOUT A COUNT. Until the catalog answers, `stair`
+                  is null and the item total is unknown — so the upper clamp is
+                  simply not applied and the floor at zero still is. A guess at the
+                  ceiling would be worse than no ceiling: it would silently cut a
+                  number the operator typed correctly. Degrade, never abort. */}
+              {/* ⭐ FLOOR → LIFT → ITEMS NEEDING STAIR CARRY — OWNER RULING
+                  (Jess, 2026-09-21). The lift answer is what decides whether
+                  anything is carried at all, so it is asked before the count it
+                  governs; the page previously asked the count first. */}
+              {/* ⭐ THE SAME QUESTION, ASKED THE SAME WAY ON BOTH SIDES (Jess,
+                  2026-08-26). The POS asks `Lift available?` and offers two named
+                  answers — `No lift` / `Has lift` (`pos/StairCarryFields.tsx`).
+                  Operations asked the same fact as a bare tickbox, so an unticked
+                  box meant BOTH "no lift" and "nobody said", and the two surfaces
+                  did not tally. Two named options, the POS's exact words, and a
+                  blank that still reads as a blank. */}
+              <Select id="so-lift" label="Lift available?"
+                value={draft.delivery_has_lift ? "Has lift" : "No lift"}
+                onValueChange={(v) => setField("delivery_has_lift", v === "Has lift")}
+                options={LIFT_OPTIONS.map((o) => ({ value: o, label: o }))} />
+              {formLocked ? <Fact label="Items needing stair carry" value={draft.delivery_stair_items == null ? "Not recorded" : String(draft.delivery_stair_items)} /> :
+              <Input id="so-stair-items" label="Items needing stair carry" type="number" min={0}
+                max={stair?.itemsTotal}
+                hint={stair ? `0 to ${stair.itemsTotal}` : undefined}
+                value={draft.delivery_stair_items == null ? "" : String(draft.delivery_stair_items)}
+                onChange={(e) =>
+                  setField(
+                    "delivery_stair_items",
+                    e.target.value === ""
+                      ? null
+                      : stair
+                        ? stairCarryCount(stair.itemsTotal, Number(e.target.value) || 0)
+                        : Math.max(0, Number(e.target.value) || 0),
+                  )
+                } />}
+          {/* One service editor in Delivery; the Items rows are its charge projection. */}
+          {/* The service editor asks the lock first, so a historical version only reads. */}
+          {(draft.addons.some((a) => !a.removed) || (!formLocked && editing)) && (
+            <div className={`flex min-w-0 flex-col gap-3${!formLocked && editing ? " sm:col-span-2" : ""}`} data-testid="delivery-services" data-pos-field="orderAddons">
+              {!formLocked && editing ? (
+                <FieldFrame id="so-services-editor">
+                  <div id="so-services-editor" role="group" aria-label="Services" className="flex flex-col gap-3">
+                    {draft.addons.map((a) => {
+                      const owned = SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addon_key);
+                      const pos = serviceSizeDraft(a, catalogQ.data?.addons.find((x) => x.key === a.addon_key)?.sizeOptions);
+                      const sizes = disposalUnitSizes(pos);
+                      const options = addonSizeOptions(pos);
+                      return (
+                        <div key={a.key} className="border-b border-kit-slate-5 pb-3" data-testid={`delivery-service-${a.addon_key}`}>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className={`text-body${a.removed ? " line-through text-base-500" : ""}`}>{nameOfAddon(a.addon_key)}{owned ? ` ×${a.qty}` : ""}</span>
+                            {!owned && <Button size="sm" variant="neutral" aria-label={`${a.removed ? "Restore" : "Remove"} ${nameOfAddon(a.addon_key)}`}
+                              onClick={() => a.removed ? setDraftAddon(a.key, { removed: false }) : a.added
+                                ? setDraft((d) => ({ ...d, addons: d.addons.filter((x) => x.key !== a.key) }))
+                                : setDraftAddon(a.key, { removed: true })}>{a.removed ? "Restore" : "Remove"}</Button>}
+                          </div>
+                          {!a.removed && !owned && (
+                            <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                              <Input id={`so-edit-service-qty-${a.key}`} label="Qty" aria-label={`Qty ${nameOfAddon(a.addon_key)}`}
+                                type="number" min={1} step={1} value={String(a.qty)}
+                                onChange={(e) => setDraftAddon(a.key, resizeService(a, Number(e.target.value), pos.sizeOptions))} />
+                              {options.length > 0 && sizes.map((size, i) => (
+                                <Select key={i} id={`so-service-size-${a.key}-${i}`} label={a.qty > 1 ? `Size ${i + 1}` : "Size"}
+                                  value={size} onValueChange={(value) => setDraftAddon(a.key, sizeServiceUnit(a, i, value))}
+                                  options={[...new Set([...options, ...(size ? [size] : [])])].map((value) => ({ value, label: value }))} />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {!draft.addons.length && <span className="text-body">None</span>}
+                  </div>
+                </FieldFrame>
+              ) : <Fact label="Services" own={false} framed value={
+                <div className="flex flex-col gap-1">
+                  {draft.addons.filter((a) => !a.removed).map((a) => (
+                    <div key={a.key}>{servicesWords([a], nameOfAddon)}</div>
+                  ))}
+                </div>
+              } />}
+              {!formLocked && editing && serviceOptions.length > 0 && (
+                <Select id="so-add-delivery-service" label="Add service" value=""
+                  onValueChange={addServiceToDraft}
+                  options={serviceOptions.map((x) => ({ value: x.key, label: `${x.name} · ${fmtMoney(Number(x.price))}` }))} />
+              )}
+            </div>
+          )}
+              </div>
+          </div>
+          {/* The three fields above, added up out loud — the POS's own sentence
+              (`pos/StairCarryFields.tsx`), so the office reads the number the
+              salesperson quoted instead of re-deriving it.
+              ⭐ ONLY WHEN THERE IS A CHARGE (YH, 2026-08-26). It used to narrate
+              the zero too — "No stair carry — floor 1 is within the free 2F" —
+              which is a sentence saying nothing happened, printed on the majority
+              of orders. The fields above already state the floor and the lift; a
+              line that only repeats them back is the noise Jess asked to cut. */}
+          {stairWorking && (
+            <p className="text-meta text-base-500" data-testid="so-stair-working">
+              {stairWorking.items} of {stairWorking.itemsTotal} item
+              {stairWorking.itemsTotal === 1 ? "" : "s"} carried to floor {stairWorking.floor},
+              charged{" "}
+              <span className="font-semibold text-base-900">
+                <Money value={stairWorking.fee} />
+              </span>
+            </p>
+          )}
+
+      </Block>
+      </fieldset>
+
+
+
+
+
+
+
+
+      {/* ⑧ GOODS — the six-column truth §0.1 locks. It is not a form: Unit ID
+          and Deliver To are Stock's and Purchasing's facts, and the document
+          preview beside it never prints them. */}
+      {/* ⭐ 0562 · VIEW FIRST APPLIES HERE TOO. Finding 9 put the document's own
+          table in BOTH states, so the Qty and price boxes now render on a
+          locked order as well — and a grey box on this page means "this can be
+          changed with Edit", never "type here now". The same `fieldset` the
+          other cards use is what keeps that promise; without it the boxes on a
+          locked order accepted keystrokes. */}
+      <fieldset disabled={formLocked} className="contents">
+      <Block title="Items">
+        {/* ⭐ `orderAddons` USED TO BE A HIDDEN SPAN. It carried the
+            `data-pos-field` the POS-parity contract test string-matches, with
+            no control behind it — so the page passed a completeness test it
+            did not meet, and the office still had to ring the shop to add a
+            disposal service. The attribute now rides the real door. */}
+        {/* ⭐ ONE COMMERCIAL TABLE IN BOTH MODES — OWNER RULING (Jess,
+             2026-09-21/22, `docs/orders/MASTER.md` § ITEMS). View used to draw a
+             different table from Edit — Category · Unit ID · SKU · Qty · Item ·
+             Deliver To · Unit price · Line total — so the reader checked the page
+             against the paper column by column and the columns did not match, and
+             pressing `Edit` changed the composition under them.
+             The document's own columns now stand in both: `#` · `Item Code` ·
+             `Description` · `Qty` · `Unit (RM)` · `Disc (RM)` · `Amount (RM)` ·
+             closing `TOTAL PAYABLE`, with no category rows.
+             ⛔ THE CROSS-MODULE FACTS ARE NOT DELETED, THEY ARE WHERE THEY BELONG.
+             Unit ID is Stock's and `Deliver To` is Purchasing's; both are read on
+             `Order Route`, which already draws them from the route facts. This
+             page stops printing a second copy (Law C: a door, never a duplicate). */}
+        {editItemsTable}
+        {/* An OLD revision is a photograph and a draft has no order to write
+            to — the door belongs to the live object only.
+            ⭐ THE ATTRIBUTE STILL RIDES A REAL CONTROL. It was once a hidden
+            `<span>` carrying this exact string with nothing behind it, so the
+            page passed a POS-parity completeness test it did not meet while the
+            office rang the shop to add a disposal service. What is left in
+            `SalesOrderAddons` is the one act the table cannot perform — adding
+            a service that is not there yet — and the attribute rides that. */}
+        {/* The `Add service` door now lives inside the whole-page Edit (0562):
+            a service is part of what was bought, so it moves with the draft
+            through the governed lane instead of a direct write. */}
+      </Block>
+      </fieldset>
+
+      {/* ⭐ THE DOOR RIDES THE TITLE (YH, 2026-09-01). `Open this order in
+          Payments` had a hairline and a row of its own at the foot of the
+          card — a separator introducing one link, on a card whose entire
+          content is three numbers, and it left the fields staring at empty
+          space where the row used to be. The door now sits in the header bar
+          itself, beside the card's own name. The word is locked
+          (COPY-STANDARD:1595) and unchanged. It still writes nothing: it
+          navigates to the desk that owns collection, already scoped to this
+          order, which is the one thing Law C lets a summary add. */}
+      <Block
+        title="Payment"
+        headerSlot={
+          order ? (
+            <button
+              type="button"
+              data-testid="workspace-open-payments"
+              className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+              /* The canonical Register, scoped to this order (payment
+                 MASTER §16; entry-point correction 2026-09-09). */
+              onClick={() => navigate(`/finance/payments?order=${order.so}`)}
+            >
+              Open this order in Payments
+            </button>
+          ) : undefined
+        }
+      >
+        <PaymentLedger orderId={orderId ?? null} saved={{
+          paid: Number(order?.paid ?? 0), method: order?.payment_method,
+          months: order?.installment_months, reference: order?.approval_code,
+          slip: order?.payment_slip_url,
+        }} />
+        {/* ⭐ THE TWO COLLECTION FACTS SIT UNDER THE LEDGER THEY SUM, ON THE
+            RIGHT EDGE ITS AMOUNTS ALREADY USE (approved composition,
+            2026-09-10). `Total` is NOT repeated here — it is stated once,
+            under the Goods table that produces it. What this card answers is
+            the collections question: how much came in, how much is still out.
+            ⭐ AND THEY ARE THE CANONICAL FIGURES, NOT A RE-SUM OF THE ROWS.
+            `money.paid` is `orders.paid` through `orderMoney` — the number
+            every gate reads. Adding the rows up here instead would be a SECOND
+            arithmetic for one fact (Law D), and it would disagree the moment a
+            row is a history mirror (`counted_in_paid: false`) or a storage
+            collection, neither of which is goods money. */}
+        {/* ⭐ THE APPROVED PAYMENT TOTALS — OWNER APPROVAL (Jess, 2026-09-22),
+            `docs/orders/MASTER.md` § "Order view" → PAYMENT: goods amount ·
+            service amount · `Total payable` · `Paid to date` · `Balance due`.
+            This replaces the 2026-09-10 `Paid` / `Outstanding` pair, and the
+            page now repeats `Total payable` because the PDF does.
+
+            ⭐ ONE ARITHMETIC (Law D). Every figure comes from the `money` memo —
+            `orderMoney` plus the two sums it already made — never a re-sum of
+            the printed rows, and never a second total for the same fact. A
+            history mirror (`counted_in_paid: false`) or a storage collection is
+            not goods money and is not added here.
+            ⭐ `Outstanding` REMAINS RED WHILE OWED (owner ruling 2026-08-15);
+            `Total payable` and `Balance due` are the bold lines (kit-sizes card,
+            2026-09-23), and money amounts never borrow the heading size.
+            ⚠️ The `Goods` and `Services` row WORDS are pending COPY review, as
+            the ruling itself records; a combined total is never `Goods total`. */}
+        {/* ⭐ ONE SIZE, TWO WEIGHTS (SO page kit-sizes card, 2026-09-23).
+            Every label and amount is `text-body` 13/18 — measured before this,
+            the amounts carried no size class and rendered at the browser's
+            16px, the labels at 12px and `Balance due` at the 15px heading
+            size. `Total payable` and `Balance due` are the two answers the
+            reader came for, so they alone take weight 600, each under a 1px
+            rule. No KPI treatment: nothing here is larger than a table cell.
+            The full-width bordered two-column summary has one rule per row,
+            matching the ledger insets instead of floating in unused space. */}
+        <div className="w-full">
+          <div className="grid w-full grid-cols-[1fr_auto] overflow-hidden rounded-control border border-kit-slate-5 text-body [&>span]:px-2 [&>span]:py-2 [&>span:nth-child(n+3)]:border-t [&>span:nth-child(n+3)]:border-kit-slate-5"
+            data-testid="payment-totals">
+            <span className="pr-6 text-base-500">Goods</span>
+            <span className="text-right tabular-nums text-base-900" data-testid="money-goods">
+              {money.known ? fmtMoney(money.goods) : "No price yet"}
+            </span>
+            <span className="pr-6 text-base-500">Services</span>
+            <span className="text-right tabular-nums text-base-900" data-testid="money-services">
+              {money.known ? fmtMoney(money.services) : ""}
+            </span>
+            <span className={`${TOTAL_RULE} pr-6 font-semibold text-base-900`}>Total payable</span>
+            <span className={`${TOTAL_RULE} text-right font-semibold tabular-nums text-base-900`} data-testid="money-total-payable">
+              {money.known && money.total != null ? fmtMoney(money.total) : "No price yet"}
+            </span>
+            <span className="pr-6 text-base-500">Paid to date</span>
+            <span className="text-right tabular-nums text-base-900" data-testid="money-paid">
+              {fmtMoney(money.paid)}
+            </span>
+            <span className={`${TOTAL_RULE} pr-6 font-semibold text-base-900`}>Balance due</span>
+            <span
+              className={`${TOTAL_RULE} text-right font-semibold tabular-nums ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
+              data-testid="money-outstanding"
+            >
+              {!money.known ? "No price yet" : money.outstanding > 0 ? fmtMoney(money.outstanding) : "Paid in full"}
+            </span>
+          </div>
+        </div>
+      </Block>
+
+
+
+      {/* ⑨ WHAT THIS CHANGE STARTED ELSEWHERE — 3.4. Shown only when there IS
+          work: a section that says "nothing" on every order is a section the
+          operator learns to skip. */}
+      {mode !== "oldrev" && (correctionWorkQ.data?.work ?? []).length > 0 && (
+        <Block title="What this change started elsewhere">
+          <CorrectionWorkList
+            work={correctionWorkQ.data?.work ?? []}
+            canClose={false}
+            emptyWord=""
+          />
+        </Block>
+      )}
+    </div>
+    </fieldset>
+  );
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col" data-so-theme="trial">
+      {mode === "object" && editing && (
+        <Modal open={reviewOpen} onOpenChange={(open) => { if (!changesMut.isPending) setReviewOpen(open); }}
+          title="Your changes" width="wide"
+          footer={<>
+            <Button variant="neutral" disabled={changesMut.isPending} onClick={() => setReviewOpen(false)}>Cancel</Button>
+            <Button variant="primary" loading={changesMut.isPending}
+              disabled={!changeReason.trim() || liveBlocksCommercial || changeCount === 0}
+              onClick={onCommit} data-testid="workspace-confirm-save">{commitWord}</Button>
+          </>}>
+        <DraftReview
+          rows={draftRows}
+          consequences={consequencesFor({ lines: draft.lines, addons: draft.addons, header: draftHeader() })}
+          commercial={changeClass?.action === "submit"}
+          blocked={liveBlocksCommercial ? "An earlier change is still waiting for management." : null}
+          reason={changeReason}
+          onReason={setChangeReason}
+          askedOn={changeAskedOn}
+          onAskedOn={setChangeAskedOn}
+          agreement={changeAgreement}
+          onAgreement={setChangeAgreement}
+        />
+        </Modal>
+      )}
+
       <SalesOrderTabs
+        backTo={typeof location.state?.salesOrderRegisterReturn === "string" && /^\/operation\/orders(?:\?|$)/.test(location.state.salesOrderRegisterReturn) ? location.state.salesOrderRegisterReturn : undefined}
         identity={soWord}
-        customer={order?.customer_name}
+        /* Capitalize up — owner ruling 2026-08-15. Display only; the
+           `Full name` INPUT below stays on the raw draft value, because a
+           cased edit field would write the casing back to the record. */
+        customer={displayCustomerName(order?.customer_name)}
         onBack={(event) => {
           if (!confirmDiscard()) event.preventDefault();
         }}
-        docTitle={isNew ? "New Sales Order — Carres" : order ? `SO-${order.so} — Carres` : undefined}
+        docTitle={order ? `SO-${order.so} · Carres` : undefined}
         right={headerRight}
-        navigation={!isNew ? (
+        navigation={(
           <nav aria-label="Sales Order views" className="flex h-full items-stretch gap-1">
             {OBJECT_VIEWS.map((view) => {
               const active = objectView === view;
@@ -1026,7 +3571,7 @@ export default function SalesOrderWorkspace() {
               );
             })}
           </nav>
-        ) : null}
+        )}
       />
 
       {order && (
@@ -1059,7 +3604,9 @@ export default function SalesOrderWorkspace() {
           onClose={() => setProblemOpen(false)}
           onSaved={() => {
             setProblemOpen(false);
-            void serviceCasesQ.refetch();
+            /* The case it opened is Service's record; this object shows it on
+               Order Route, which reads it from the route facts. */
+            void routeFactsQ.refetch();
           }}
         />
       )}
@@ -1067,28 +3614,50 @@ export default function SalesOrderWorkspace() {
       {showRoute ? (
         <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 px-4 py-4">
           {routeFactsQ.isLoading || detailQ.isLoading || revisionsQ.isLoading ? (
-            <Loading label="Opening the order route" />
+            <RouteLoadingFrame />
           ) : routeFactsQ.isError || detailQ.isError || revisionsQ.isError ? (
             <div className="rounded-card border border-kit-slate-5 bg-white">
-              <EmptyState
-                title="This order route could not be opened"
-                detail={(routeFactsQ.error as Error | undefined)?.message ?? (detailQ.error as Error | undefined)?.message ?? (revisionsQ.error as Error | undefined)?.message}
-                action={<Button variant="neutral" onClick={() => void routeFactsQ.refetch()}>Try again</Button>}
+              <SalesOrderReadFailure
+                error={detailQ.error ?? revisionsQ.error ?? routeFactsQ.error}
+                surface="order-route"
+                onRetry={() => { void detailQ.refetch(); void revisionsQ.refetch(); void routeFactsQ.refetch(); }}
               />
             </div>
           ) : orderRoute ? (
-            <SalesOrderRoute route={orderRoute} />
+            <SalesOrderRoute route={orderRoute} owners={routeOwners} onRetry={retryRouteRead} />
           ) : (
             <div className="rounded-card border border-kit-slate-5 bg-white">
               <EmptyState title="No route facts were found for this sales order" />
             </div>
           )}
         </div>
-      ) : objectView === "Revisions" || objectView === "History" ? (
+      ) : (objectView === "Revisions" && mode !== "oldrev") || objectView === "History" ? (
         <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 px-4 py-4">
-          <div className="mx-auto max-w-5xl rounded-card border border-kit-slate-5 bg-white p-5">
-            <h2 className="mb-4 text-title font-semibold text-base-900">{objectView}</h2>
+          {/* ⭐ THE SAME SECTION GRAMMAR AS THE ORDER TAB (kit-sizes card,
+              2026-09-23). This card was `p-5` — 20px, off the spacing scale —
+              under a 20px `text-title`, beside an Order tab whose every section
+              is a 15px blue title over a 1px rule. It is now that same `Block`,
+              so padding, title and gap come from one place. */}
+          <div className="mx-auto max-w-5xl">
+          <Block title={objectView}>
+            {/* ⭐ R-7 — A FAILED READ IS NOT AN EMPTY LEDGER. Without these two
+                guards a 403 or a 500 falls straight through to the ledger's
+                governed EMPTY sentences (`No revisions recorded` / `No history
+                recorded`), which tell the reader the order HAS no revisions —
+                a statement the screen cannot know. The Order Route branch above
+                has carried both guards all along; this one never did, so a
+                permission refusal rendered here as a fact about the order. */}
+            {detailQ.isLoading || revisionsQ.isLoading ? (
+              <Loading label={objectView === "History" ? "Opening the history" : "Opening the revisions"} />
+            ) : detailQ.isError || revisionsQ.isError ? (
+              <SalesOrderReadFailure
+                error={detailQ.error ?? revisionsQ.error}
+                surface={objectView === "History" ? "history" : "revisions"}
+                onRetry={() => { void detailQ.refetch(); void revisionsQ.refetch(); }}
+              />
+            ) : (
             <SalesOrderLedger
+              orderReference={order ? `SO-${order.so}` : ""}
               revisions={revisions}
               history={detailQ.data?.history ?? []}
               currentRevision={currentRev}
@@ -1097,430 +3666,145 @@ export default function SalesOrderWorkspace() {
               showViewTabs={false}
               onViewRevision={setViewRev}
               onProposeRevision={(revision) => {
-                const header = revision.snapshot.header ?? {};
-                const currentLineIds = new Map((detailQ.data?.lines ?? []).map((line) => [line.sku, line.id]));
-                setAmendmentSeed({
-                  lines: (revision.snapshot.lines ?? []).map((line) => ({
-                    ...(currentLineIds.get(line.sku) ? { id: currentLineIds.get(line.sku) } : {}),
-                    sku: line.sku,
-                    qty: Number(line.qty),
-                    unit_price: Number(line.unit_price),
-                  })),
-                  delivery_date: header.delivery_date == null ? null : String(header.delivery_date),
-                  delivery_date_tbd: Boolean(header.delivery_date_tbd),
-                  installment_months: header.installment_months == null ? null : Number(header.installment_months),
+                /* PROPOSE THIS VERSION AGAIN — rollback is a new governed change
+                   (orders/MASTER § Detail, edit, amendment): the complete old
+                   version becomes the draft, on top of today's line identity. */
+                const old = draftFromSnapshot(revision.snapshot);
+                const currentIds = new Map((detailQ.data?.lines ?? []).map((line) => [line.sku, line.id]));
+                const addonIds = new Map((detailQ.data?.addons ?? []).map((a) => [a.addon_key, a.id]));
+                const oldSkus = new Set(old.lines.map((l) => l.sku));
+                const oldKeys = new Set(old.addons.map((a) => a.addon_key));
+                startEdit({
+                  ...old,
+                  lines: [
+                    ...old.lines.map((l) => {
+                      const id = currentIds.get(l.sku);
+                      return id ? { ...l, id } : { ...l, id: undefined, added: true };
+                    }),
+                    ...baseline.lines.filter((l) => !oldSkus.has(l.sku)).map((l) => ({ ...l, removed: true })),
+                  ],
+                  addons: [
+                    ...old.addons.map((a) => {
+                      const id = addonIds.get(a.addon_key);
+                      return id ? { ...a, id } : { ...a, added: true };
+                    }),
+                    ...baseline.addons.filter((a) => !oldKeys.has(a.addon_key)).map((a) => ({ ...a, removed: true })),
+                  ],
                 });
-                setObjectView("Order");
               }}
             />
+            )}
+          </Block>
           </div>
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 px-4 py-4">
-          {(!isNew || copyFrom) && detailQ.isLoading && <Loading label={copyFrom ? "Preparing the copied draft" : "Opening the sales order"} />}
-          {(!isNew || copyFrom) && !detailQ.isLoading && detailQ.isError && (
-            <div className="rounded-card border border-kit-slate-5 bg-white">
-              <EmptyState
-                title={copyFrom ? "This Sales Order could not be copied" : "This sales order could not be opened"}
-                detail={(detailQ.error as Error | undefined)?.message}
-                action={
-                  <Button variant="neutral" onClick={() => void detailQ.refetch()}>
-                    Try again
-                  </Button>
-                }
-              />
+        /* ⭐ TWO PANES, 50 / 50 — owner ruling 2026-08-15. Each pane scrolls on
+           its own and the PAGE does not; below 1024px they stack, form first,
+           and the page scrolls normally. */
+        <div ref={splitHostRef} className={`min-h-0 flex-1 bg-kit-slate-3 ${split === "stack" ? "overflow-auto" : "overflow-hidden"}`}>
+          {detailQ.isLoading && (
+            /* Loading holds the two panes' final geometry: the same split the
+               form and the paper will fill, so the page does not jump. */
+            <div
+              data-testid="so-loading"
+              className={split === "stack" ? "flex flex-col" : "grid h-full min-h-0"}
+              style={split === "stack" ? undefined : { gridTemplateColumns: split === "half" ? "minmax(0,1fr) minmax(0,1fr)" : `${FORM_MIN_WIDTH}px minmax(${MIN_PDF_WIDTH}px, 1fr)` }}
+            >
+              <div className="min-w-0 px-4 py-4">
+                <div className="rounded-card border border-kit-slate-5 bg-white p-4">
+                  <Loading variant="skeleton" lines={6} label="Opening the sales order" />
+                </div>
+              </div>
+              <div className={`min-w-0 bg-kit-slate-3 px-4 py-4 ${split === "stack" ? "border-t border-kit-slate-5" : "border-l border-kit-slate-5"}`}>
+                <div className="mx-auto aspect-[210/297] max-w-[700px] rounded-card border border-kit-slate-5 bg-white" />
+              </div>
+            </div>
+          )}
+          {!detailQ.isLoading && detailQ.isError && (
+            <div className="px-4 py-4">
+              <div className="rounded-card border border-kit-slate-5 bg-white">
+                <SalesOrderReadFailure
+                  error={detailQ.error}
+                  surface="sales-order"
+                  onRetry={() => void detailQ.refetch()}
+                />
+              </div>
             </div>
           )}
 
-          {(isNew && !copyFrom || order) && (
-            <div className="mx-auto grid max-w-6xl grid-cols-1 gap-3 xl:grid-cols-2" data-testid="sales-order-workspace">
-              {(mode === "oldrev" || mode === "edit" || (mode === "create" && copyFrom)) && (
-                <div className="px-1 py-1 text-meta text-base-600 xl:col-span-2">
-                  {mode === "oldrev" && viewedRevision ? (
-                    <span className="rounded-pill bg-base-900 px-2 py-0.5 text-label font-semibold text-white">
-                      Viewing Rev {viewedRevision.revision} · read-only
-                    </span>
-                  ) : mode === "edit" ? (
-                    <span>Editing operational details only. Commercial changes require an amendment.</span>
-                  ) : mode === "create" && copyFrom && order ? (
-                    <span className="rounded-pill bg-kit-blue-3 px-2 py-0.5 text-label font-semibold text-kit-blue-11">
-                      Copied from SO-{order.so} · review before creating
-                    </span>
-                  ) : null}
-                </div>
-              )}
-              {!isNew && (order?.source_ref ?? []).length > 0 && (
-                  <div className="px-1 text-meta text-base-500">
-                    Customer reference {(order?.source_ref ?? []).join(" · ")}
-                  </div>
-                )}
-
-              {/* ① CUSTOMER */}
-              <Section title={mode === "edit" ? "Edit operational details" : "Customer"}>
-                {editing ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    {mode === "edit" && <div className="col-span-2 text-label font-semibold text-base-600">Customer contact and address</div>}
-                    <Input id="ws-name" label="Name" required value={draft.customer_name}
-                      onChange={(e) => setField("customer_name", e.target.value)} />
-                    <Input id="ws-phone" label="Phone" value={draft.customer_phone}
-                      onChange={(e) => setField("customer_phone", e.target.value)} />
-                    <Input id="ws-email" label="Email" value={draft.customer_email}
-                      onChange={(e) => setField("customer_email", e.target.value)} />
-                    <Input id="ws-emergency" label="Emergency contact" value={draft.customer_emergency}
-                      onChange={(e) => setField("customer_emergency", e.target.value)} />
-                    <Input id="ws-line1" label="Address line 1" value={draft.customer_address_line1}
-                      onChange={(e) => setField("customer_address_line1", e.target.value)} />
-                    <Input id="ws-line2" label="Address line 2" value={draft.customer_address_line2}
-                      onChange={(e) => setField("customer_address_line2", e.target.value)} />
-                    <Input id="ws-city" label="City" value={draft.customer_address_city}
-                      onChange={(e) => setField("customer_address_city", e.target.value)} />
-                    <Input id="ws-state" label="State" value={draft.customer_address_state}
-                      onChange={(e) => setField("customer_address_state", e.target.value)} />
-                    <Input id="ws-postcode" label="Postcode" value={draft.customer_address_postcode}
-                      onChange={(e) => setField("customer_address_postcode", e.target.value)} />
-                    <div className="col-span-2">
-                      <Fact
-                        label="Address preview"
-                        value={[
-                          draft.customer_address_line1,
-                          draft.customer_address_line2,
-                          draft.customer_address_postcode,
-                          draft.customer_address_city,
-                          draft.customer_address_state,
-                        ].filter(Boolean).join(", ") || "Not given"}
-                      />
-                    </div>
-                    <Input id="ws-billing" label="Billing address" value={draft.customer_billing}
-                      onChange={(e) => setField("customer_billing", e.target.value)} />
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-x-5 gap-y-3">
-                    <Fact label="Name" value={
-                      <span className={cjkClassName(displayHeader(mode, viewedRevision, order, "customer_name"))}>
-                        {displayHeader(mode, viewedRevision, order, "customer_name") || "—"}
-                      </span>
-                    } />
-                    <Fact label="Phone" value={displayHeader(mode, viewedRevision, order, "customer_phone") || "Not given"} />
-                    <Fact label="Email" value={displayHeader(mode, viewedRevision, order, "customer_email") || "Not given"} />
-                    <Fact label="Emergency contact" value={displayHeader(mode, viewedRevision, order, "customer_emergency") || "Not given"} />
-                    <div className="col-span-2">
-                      <Fact label="Address" value={displayHeader(mode, viewedRevision, order, "customer_address") || "Not given"} />
-                    </div>
-                  </div>
-                )}
-              </Section>
-
-              {/* ② SOURCE — a BIRTH names the parties; an EDIT may not move
-                  them. STAGE 3 (0329): salesperson · showroom · dealer decide
-                  who gets paid, so they leave the direct-edit lane and travel
-                  by request (GATES.md Test 3). The save RPC now REFUSES a
-                  header carrying one, so leaving the pickers here would have
-                  been a form that cannot save. */}
-              <Section title={mode === "edit" ? "Order context" : "Sales ownership"}>
-                {mode === "create" ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    <Select id="ws-dealer" label="Dealer"
-                      value={draft.dealer_id ?? ""}
-                      onValueChange={(v) => setField("dealer_id", v || null)}
-                      options={dealerOptions} placeholder="Pick a dealer" />
-                    <Select id="ws-outlet" label="Showroom"
-                      value={draft.outlet_id ?? "none"}
-                      onValueChange={(v) => setField("outlet_id", v === "none" ? null : v)}
-                      options={outletOptions} />
-                    <Select id="ws-salesperson" label="Salesperson"
-                      value={draft.salesperson_id ?? "none"}
-                      onValueChange={(v) => setField("salesperson_id", v === "none" ? null : v)}
-                      options={spOptions} />
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-3 gap-x-5 gap-y-3">
-                      {mode === "edit" && <div className="col-span-3 text-label font-semibold text-base-600">Sales ownership</div>}
-                      <Fact label="Dealer" value={sourceName(mode, viewedRevision, order, "dealer") || "Not recorded"} />
-                      <Fact label="Showroom" value={sourceName(mode, viewedRevision, order, "outlet") || "Not recorded"} />
-                      <Fact label="Salesperson" value={sourceName(mode, viewedRevision, order, "salesperson") || "Not recorded"} />
-                    </div>
-                    {/* An OLD revision is a photograph — it carries no lane. */}
-                    {mode !== "oldrev" && orderId && order && (
-                      <SalesOrderAttribution
-                        orderId={orderId}
-                        current={{
-                          salesperson_id: order.salesperson_id ?? null,
-                          outlet_id: order.outlet_id ?? null,
-                          dealer_id: order.dealer_id ?? null,
-                        }}
-                        salespersonOptions={realSpOptions}
-                        outletOptions={realOutletOptions}
-                        dealerOptions={dealerOptions}
-                        onApplied={() => {
-                          void revisionsQ.refetch();
-                          void baseQ.refetch();
-                          void detailQ.refetch();
-                        }}
-                      />
-                    )}
-                  </>
-                )}
-              </Section>
-
-              {/* ③ DATES */}
-              <Section title="Dates">
-                {mode === "create" ? (
-                  <div className="grid grid-cols-3 gap-3">
-                    <Fact label="Ordered" value={isNew ? "Today" : fmtDate(order?.placed_at ?? null)} />
-                    <div>
-                      <div className="text-label text-base-500 mb-1">Customer Delivery</div>
-                      <DatePicker id="ws-promised" value={draft.delivery_date}
-                        onChange={(iso) => setField("delivery_date", iso)} />
-                      <div className="mt-1.5">
-                        <Checkbox id="ws-tbd" label="Delivery date to be confirmed"
-                          checked={draft.delivery_date_tbd}
-                          onCheckedChange={(v) => setField("delivery_date_tbd", v)} />
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-label text-base-500 mb-1">Proceed date</div>
-                      <DatePicker id="ws-proceed" value={draft.proceed_date}
-                        onChange={(iso) => setField("proceed_date", iso)} />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-3 gap-x-5 gap-y-3">
-                    <Fact label="Ordered" value={fmtDate((displayHeader(mode, viewedRevision, order, "placed_at") || order?.placed_at) ?? null)} />
-                    <Fact label="Customer Delivery" value={
-                      promisedWord(mode, viewedRevision, order) === "No delivery date" ? (
-                        <span data-attention="warning" className="inline-flex rounded-control bg-kit-amber-3 px-1.5 py-0.5 font-medium text-kit-amber-11">No delivery date</span>
-                      ) : promisedWord(mode, viewedRevision, order)
-                    } />
-                    {mode === "edit" ? (
-                      <div>
-                        <div className="text-label text-base-500 mb-1">Proceed date</div>
-                        <DatePicker id="ws-proceed" value={draft.proceed_date}
-                          onChange={(iso) => setField("proceed_date", iso)} />
-                      </div>
-                    ) : (
-                      <Fact label="Proceed date" value={fmtDate(displayHeader(mode, viewedRevision, order, "proceed_date")) || "Not recorded"} />
-                    )}
-                  </div>
-                )}
-              </Section>
-
-              {/* ④ DELIVERY */}
-              <Section title="Delivery">
-                {editing ? (
-                  <div className="grid grid-cols-3 gap-3 items-end">
-                    <Input id="ws-floor" label="Floor" type="number" min={0}
-                      value={String(draft.delivery_floor)}
-                      onChange={(e) => setField("delivery_floor", Math.max(0, Number(e.target.value) || 0))} />
-                    <div className="pb-2">
-                      <Checkbox id="ws-lift" label="Lift available"
-                        checked={draft.delivery_has_lift}
-                        onCheckedChange={(v) => setField("delivery_has_lift", v)} />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-3 gap-x-5 gap-y-3">
-                    <Fact label="Floor" value={String(displayHeader(mode, viewedRevision, order, "delivery_floor") ?? (order as { delivery_floor?: number } | undefined)?.delivery_floor ?? "—")} />
-                    <Fact label="Lift" value={liftWord(mode, viewedRevision, order)} />
-                  </div>
-                )}
-              </Section>
-
-              {/* ⑤ ITEMS */}
-              <div className="xl:col-span-2">
-              <Section title="Goods">
-                {mode === "create" ? (
-                  <div className="flex flex-col gap-2">
-                    {draft.lines.map((l) => (
-                      <div key={l.key} className="grid grid-cols-[1fr_84px_120px_32px] items-end gap-2">
-                        <Input id={`ws-sku-${l.key}`} label="SKU" value={l.sku}
-                          onChange={(e) => setLine(l.key, { sku: e.target.value })} />
-                        <Input id={`ws-qty-${l.key}`} label="Qty" type="number" min={1}
-                          value={String(l.qty)}
-                          onChange={(e) => setLine(l.key, { qty: Math.max(1, Number(e.target.value) || 1) })} />
-                        <Input id={`ws-price-${l.key}`} label="Unit price (RM)" type="number" min={0}
-                          value={String(l.unit_price)}
-                          onChange={(e) => setLine(l.key, { unit_price: Math.max(0, Number(e.target.value) || 0) })} />
-                        <button
-                          type="button"
-                          aria-label="Remove line"
-                          className="mb-1 grid h-8 w-8 place-items-center rounded-control text-base-500 hover:bg-hovertint hover:text-base-900"
-                          onClick={() => setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    ))}
-                    <div>
-                      <Button size="sm" variant="neutral"
-                        onClick={() => setDraft((d) => ({ ...d, lines: [...d.lines, { key: nextKey(), sku: "", qty: 1, unit_price: 0 }] }))}>
-                        <Plus size={14} /> Add item
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <table className="w-full text-body" data-testid="document-goods">
-                    <thead>
-                      <tr className="text-label text-base-500">
-                        <th className="py-1 pr-3 text-left font-medium">Category</th>
-                        <th className="py-1 pr-3 text-left font-medium">Unit ID</th>
-                        <th className="py-1 pr-3 text-left font-medium">SKU</th>
-                        <th className="py-1 pr-3 text-right font-medium">Qty</th>
-                        <th className="py-1 pr-3 text-left font-medium">Item</th>
-                        <th className="py-1 text-left font-medium">Deliver To</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {itemRows(mode, viewedRevision, detailQ.data?.lines ?? []).map((r, i) => {
-                        const liveLine = detailQ.data?.lines?.[i];
-                        const truth = (goodsTruthQ.data?.lines ?? []).find((line) => line.lineId === liveLine?.id);
-                        const destinations = truth?.deliverTo ?? [];
-                        return (
-                        <tr key={i} className="border-t border-kit-slate-5">
-                          <td className="py-1.5 pr-3 text-label font-semibold text-base-600">{liveLine ? categoryWord(liveLine) : "Not recorded"}</td>
-                          <td className="py-1.5 pr-3 font-mono text-meta">{truth?.unitIds.length ? truth.unitIds.join(" · ") : "Not allocated"}</td>
-                          <td className="py-1.5 pr-3 font-mono text-meta">{liveLine?.sku ?? "Not recorded"}</td>
-                          <td className="py-1.5 pr-3 text-right tabular-nums">{r.qty}</td>
-                          <td className={`py-1.5 pr-3 ${cjkClassName(r.name)}`}>
-                            <div>{r.name}</div>
-                            {liveLine && operationalConfig(liveLine).length > 0 && (
-                              <div className="mt-0.5 text-meta text-base-600">{operationalConfig(liveLine).join(" · ")}</div>
-                            )}
-                          </td>
-                          <td className="py-1.5">{destinations.length ? destinations.map((d) => destinations.length > 1 ? `${d.name} ×${d.qty}` : d.name).join(" · ") : goodsTruthQ.isLoading ? "Loading…" : "Not recorded"}</td>
-                        </tr>
-                        );
-                      })}
-                      {(detailQ.data?.addons ?? []).map((a, i) => (
-                        <tr key={`a-${i}`} className="border-t border-kit-slate-5">
-                          <td className="py-1.5 pr-3 text-label font-semibold text-base-600">SERVICE</td>
-                          <td className="py-1.5 pr-3">—</td>
-                          <td className="py-1.5 pr-3 font-mono text-meta">{a.addon_key}</td>
-                          <td className="py-1.5 pr-3 text-right tabular-nums">{a.qty}</td>
-                          <td className="py-1.5 pr-3">{a.addon_key}</td>
-                          <td className="py-1.5">—</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-
-                {/* 3.5 · the amendment lane lives WITH the items, because
-                    items are the contractual thing it proposes to change. It
-                    locks nothing beside it — a phone fix stays free while a
-                    proposal waits (`LOCK THE CONSEQUENCE`). */}
-                {!isNew && mode === "view" && orderId && (
-                  <div className="mt-3 border-t border-kit-slate-5 pt-3">
-                    <SalesOrderAmendment
-                      orderId={orderId}
-                      currentLines={(detailQ.data?.lines ?? []).map((l) => ({
-                        id: l.id,
-                        sku: l.sku,
-                        qty: l.qty,
-                        unit_price: Number(l.unit_price),
-                      }))}
-                      currentDeliveryDate={order?.delivery_date ?? null}
-                      currentDeliveryDateTbd={order?.delivery_date_tbd ?? false}
-                      currentInstallmentMonths={(order as { installment_months?: number | null } | undefined)?.installment_months ?? null}
-                      proposalSeed={amendmentSeed}
-                    />
-                  </div>
-                )}
-              </Section>
+          {order && (
+            <div
+              className={split === "stack" ? "flex flex-col" : "grid h-full min-h-0"}
+              style={split === "stack" ? undefined : { gridTemplateColumns: split === "half" ? "minmax(0,1fr) minmax(0,1fr)" : `${FORM_MIN_WIDTH}px minmax(${MIN_PDF_WIDTH}px, 1fr)` }}
+              data-testid="object-two-panes"
+              data-split={split}
+            >
+              <div className={`flex min-w-0 flex-col ${split === "stack" ? "" : "min-h-0 overflow-hidden"}`}>
+                <div className={`min-h-0 flex-1 px-4 py-4 ${split === "stack" ? "" : "overflow-auto"}`}>{form}</div>
               </div>
 
-              {/* ⑥ MONEY */}
-              <div className="xl:col-span-2"><Section title="Money">
-                <div className="grid grid-cols-3 gap-x-5">
-                  <Fact label="Total" value={money.known && money.total != null ? <Money value={money.total} /> : "No price yet"} />
-                  <Fact label="Paid" value={<Money value={money.paid} />} />
-                  <Fact
-                    label="Balance"
-                    value={
-                      !money.known ? "No price yet" : money.outstanding > 0 ? <Money value={money.outstanding} /> : "Paid in full"
-                    }
-                  />
-                </div>
-              </Section></div>
-
-              {/* ⑦ WHAT THIS CHANGE STARTED ELSEWHERE — 3.4.
-                  Shown only when there IS work: a section that says "nothing"
-                  on every order is a section the operator learns to skip. */}
-              {!isNew && mode !== "oldrev" && (correctionWorkQ.data?.work ?? []).length > 0 && (
-                <Section title="What this change started elsewhere">
-                  <CorrectionWorkList
-                    work={correctionWorkQ.data?.work ?? []}
-                    canClose={false}
-                    emptyWord=""
-                  />
-                </Section>
-              )}
-
-              {!isNew && mode === "view" && order && (
-                <section className="rounded-card border border-kit-slate-5 bg-white p-4 xl:col-span-2" aria-labelledby="sales-order-problems">
-                  {missingDateAction && (
-                    <details open className="mb-4 rounded-control border border-kit-slate-5 bg-kit-amber-3 p-3">
-                      <summary className="cursor-pointer list-none">
-                        <span className="block text-body font-semibold text-kit-amber-11">{missingDateAction.problem}</span>
-                        <span className="block text-meta font-normal text-base-600">{missingDateAction.action}</span>
-                      </summary>
-                      <dl className="mt-3 grid gap-2 border-t border-kit-slate-5 pt-3 sm:grid-cols-2">
-                        {[
-                          ["Why", missingDateAction.why],
-                          ["Who must act", missingDateAction.owner],
-                          ["Who to contact", missingDateAction.contact],
-                          ["What to ask", missingDateAction.ask],
-                          ["What to use", missingDateAction.use],
-                          ["What to record", missingDateAction.record],
-                          ["What happens next", missingDateAction.next],
-                        ].map(([label, value]) => (
-                          <div key={label}>
-                            <dt className="text-label font-semibold text-base-600">{label}</dt>
-                            <dd className="mt-0.5 text-body text-base-900">{value}</dd>
-                          </div>
-                        ))}
-                      </dl>
-                    </details>
-                  )}
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h2 id="sales-order-problems" className="text-body font-semibold text-base-900">Problems</h2>
-                      <p className="mt-0.5 text-meta text-base-600">Report a customer, product, delivery or installation problem.</p>
-                    </div>
-                    <Button variant="neutral" onClick={() => setProblemOpen(true)}>Report a problem</Button>
+              <aside
+                /* ⭐ THE PANE SCROLLS AT EVERY WIDTH, not only at `lg`. It
+                   carried `lg:overflow-auto`, so below the split breakpoint the
+                   pane clipped nothing and a page wider than it — which is
+                   exactly what `MIN_PDF_WIDTH` guarantees on a narrow screen —
+                   pushed the PAGE sideways instead of scrolling inside its own
+                   box. Same rule as the tables: the container scrolls, the page
+                   never does. */
+                className={`min-h-0 min-w-0 overflow-auto bg-kit-slate-3 px-4 py-4 ${split === "stack" ? "border-t border-kit-slate-5" : "border-l border-kit-slate-5"}`}
+                aria-label="Sales Order document"
+              >
+                {/* A PENDING AMENDMENT IS A BANNER, NEVER THE DOCUMENT BODY. */}
+                {liveAmendment && !liveAmendment.stale && (
+                  <div
+                    className="mx-auto mb-3 max-w-[700px] rounded-control border border-kit-slate-5 bg-kit-amber-3 px-3 py-2 text-body font-medium text-kit-amber-11"
+                    data-testid="pending-amendment-banner"
+                  >
+                    ⚠ Amendment pending approval{pendingDeliveryDate ? `: delivery date → ${fmtDate(pendingDeliveryDate)}` : ""}. The document shows the order as it is now.
                   </div>
-                  {(serviceCasesQ.data?.items ?? []).length > 0 && (
-                    <div className="mt-3 divide-y divide-kit-slate-5 border-t border-kit-slate-5">
-                      {(serviceCasesQ.data?.items ?? []).map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => navigate(`/operation/service-cases?case=${encodeURIComponent(item.id)}`)}
-                          className="flex w-full items-center justify-between gap-3 py-2 text-left hover:text-kit-blue-11"
-                        >
-                          <span>
-                            <span className="block text-body font-medium">Service Case {item.caseNo}</span>
-                            <span className="block text-meta text-base-600">{item.statusLabel ?? "Status not recorded"}</span>
-                          </span>
-                          <span className="text-meta text-kit-blue-11">Open case</span>
-                        </button>
-                      ))}
+                )}
+                <div className="relative mx-auto max-w-[700px]">
+                  {/* ⭐ 0565 · THE STORED FILE IS SHOWN AS ITSELF. Not
+                      re-rendered, not re-typeset: the bytes the customer was
+                      issued, in the browser's own viewer. Nothing rebuilt can
+                      appear in this branch, which is the point of it. */}
+                  {storedDocumentUrl ? (
+                    <object
+                      data={storedDocumentUrl}
+                      type="application/pdf"
+                      data-testid="issued-document-pane"
+                      aria-label={`The document (${viewedRevision?.revision ?? ""}) was issued as`}
+                      className="h-[860px] w-full rounded-card border border-kit-slate-5 bg-white"
+                    />
+                  ) : (
+                    <div ref={setPane} data-testid="pdf-pane" />
+                  )}
+                  {/* The watermark is PREVIEW chrome, painted over the paper and
+                      never into it — Print must produce the document, not a
+                      picture of this screen. */}
+                  {dirty && (
+                    <div
+                      aria-hidden="true"
+                      data-testid="unsaved-watermark"
+                      className="pointer-events-none absolute inset-0 grid select-none place-items-center overflow-hidden"
+                    >
+                      <span className="rotate-[-24deg] scale-[2.4] text-page tracking-[0.3em] text-base-900/10">
+                        UNSAVED
+                      </span>
                     </div>
                   )}
-                </section>
-              )}
-
+                </div>
+              </aside>
             </div>
           )}
         </div>
-
       )}
     </div>
   );
 }
 
 /* ── Read-side value pickers: the VIEWED revision's snapshot outranks the
- * current row; VIEW mode reads the row itself. ─────────────────────────────── */
+ * current row; the object reads the row itself. ───────────────────────────── */
 /* A typed interface has no index signature; the pickers read snapshot-vs-row
  * by KEY, so the row is treated as a bag here — reads only, never writes. */
 type Orderish =
@@ -1574,59 +3858,151 @@ function promisedWord(mode: Mode, rev: SalesOrderRevisionRow | null, order: Orde
   return d ? fmtDate(d) : "No delivery date";
 }
 
-function liftWord(mode: Mode, rev: SalesOrderRevisionRow | null, order: Orderish): string {
-  const v =
-    mode === "oldrev" && rev
-      ? rev.snapshot.header?.["delivery_has_lift"]
-      : bag(order)["delivery_has_lift"];
-  if (v == null) return "Not recorded";
-  return v ? "Yes" : "No";
-}
-
-function itemRows(
+/** The goods rows a Sales Order prints, with the money each line carries.
+ *  EXPORTED so the arithmetic can be tested without a DOM: a gift is a line at
+ *  price 0 and an old Revision totals its OWN photograph, and neither is
+ *  observable through the six-column table alone. */
+export function itemRows(
   mode: Mode,
   rev: SalesOrderRevisionRow | null,
   detailLines: Array<{ sku: string; qty: number; unit_price: number; label?: string | null }>,
-): Array<{ name: string; qty: number; total: number }> {
+): Array<{ name: string; qty: number; unitPrice: number; total: number }> {
   if (mode === "oldrev" && rev) {
     return (rev.snapshot.lines ?? []).map((l) => ({
       name: l.description?.trim() || l.sku,
       qty: Number(l.qty),
+      unitPrice: Number(l.unit_price),
       total: Number(l.qty) * Number(l.unit_price),
     }));
   }
   return detailLines.map((l) => ({
     name: lineName(l),
     qty: l.qty,
+    unitPrice: Number(l.unit_price),
     total: Number(l.unit_price) * Number(l.qty),
   }));
 }
 
-function categoryWord(line: { sku: string; attrs?: Record<string, unknown> | null }): string {
-  const fromAttrs = typeof line.attrs?.category === "string" ? line.attrs.category : "";
-  const fromSku = line.sku.includes(":") ? line.sku.split(":", 1)[0] : "";
-  const classified = lineClass(line.sku);
-  const fallback = classified === "acc" ? "Accessory" : classified === "unknown" ? "Other goods" : classified;
-  return (fromAttrs || fromSku || fallback).replace(/[_-]+/g, " ").toUpperCase();
+/**
+ * THE EARLIEST DATE THIS CART MAY BE PROMISED — the same floor the POS applies.
+ *
+ * A made item has a factory behind it, so a delivery date sooner than the
+ * production lead is a promise Carres cannot keep. The POS has refused those
+ * dates since 2026-05-22; the office create door did not, so an order keyed
+ * here could carry a date the same order keyed at POS could not.
+ *
+ * The categories come from the CATALOG (D9) — never from the SKU text — and a
+ * SKU the catalog does not hold contributes NO category, which is honest: we
+ * cannot know its lead, so it must not invent one. `maxLeadDaysFor` then
+ * returns 0 for a cart of nothing but accessories/services/unknowns, and the
+ * floor is simply today.
+ *
+ * Returns the ISO date, or null when nothing gates.
+ */
+export function earliestPromiseISO(
+  categories: readonly (string | null | undefined)[],
+  earliestSellDays: number | undefined,
+  today: Date = new Date(),
+): string | null {
+  if (!earliestSellDays) return null;
+  const lead = maxLeadDaysFor(
+    categories.filter((c): c is string => typeof c === "string" && c.length > 0),
+    earliestSellDays,
+  );
+  return lead > 0 ? minDeliveryDateISO(lead, today) : null;
 }
 
-function operationalConfig(line: { attrs?: Record<string, unknown> | null }): string[] {
-  const attrs = line.attrs ?? {};
-  const facts = lineConfigBits(attrs);
-  const governed: Record<string, string> = {
-    size: "Size",
-    firmness: "Firmness",
-    colour: "Colour",
-    fabric_code: "Fabric code",
-    seat_height: "Seat height",
-    sofa_height: "Sofa height",
-    configuration: "Configuration",
-    sofa_configuration: "Sofa configuration",
-  };
-  for (const [key, label] of Object.entries(governed)) {
-    const value = attrs[key];
-    if (value == null || value === "" || typeof value === "object") continue;
-    facts.push(`${label}: ${String(value)}`);
-  }
-  return facts;
+/**
+ * What an address change does to the fields BELOW it.
+ *
+ * The three parts are a cascade, not three questions: a postcode belongs to a
+ * city and a city belongs to a state. Picking a new state therefore invalidates
+ * both children, and a new city invalidates the postcode — otherwise a draft
+ * can hold `Selangor / Georgetown / 10200`, which no validator downstream would
+ * catch because each field is individually a real value.
+ */
+export function addressCascadePatch(
+  level: "state" | "city",
+  value: string,
+): { customer_address_state?: string; customer_address_city: string; customer_address_postcode: string } {
+  return level === "state"
+    ? { customer_address_state: value, customer_address_city: "", customer_address_postcode: "" }
+    : { customer_address_city: value, customer_address_postcode: "" };
 }
+
+/**
+ * First letter of every word up, the rest left alone (Jess, meeting 1:
+ * "auto capitalized" — customer name and address).
+ *
+ * ONLY the first letter moves. "jalan ketumbar" → "Jalan Ketumbar", but
+ * "SS2", "12-3a" and "McKenzie" keep every character the operator typed —
+ * lowercasing the remainder would mangle exactly the tokens Malaysian
+ * addresses are full of. Applied at the payload, not on keystroke, so typing
+ * is never fought mid-word.
+ */
+export function autoCapitalize(s: string): string {
+  return s.replace(/(^|[\s/(-])([a-z])/g, (_, sep: string, ch: string) => sep + ch.toUpperCase());
+}
+
+/** What the CATALOG says a SKU is, for the create door's two hints. */
+export interface CatalogSkuFact {
+  price: number;
+  label: string;
+  /** `product_models.category` — the CATALOG's answer (D9), and the input the
+   *  lead-time floor is computed from. `null` = the catalog holds no row. */
+  category?: string | null;
+}
+
+/**
+ * The line's CATEGORY WORD — and since 2026-08-21 the CATALOG gets asked.
+ *
+ * D9 (`ERP-ARCHITECTURE.md` §3.1): *"what kind of product is this?"* is the
+ * catalog's answer and nobody else's, and **no screen may re-derive a category
+ * from a SKU string**. This document was doing exactly that: with no `attrs`
+ * and no native prefix — which is every AutoCount-imported line — it fell
+ * straight to a keyword regex over the SKU text. The POS one screen away reads
+ * `product_models.category`, so the same line could print two different words
+ * depending on which surface an operator opened.
+ *
+ * The order of resolution, and why each rung survives:
+ *
+ *   ① `attrs.category`  the DOCUMENT's own snapshot. An order line is a frozen
+ *                       record of what was sold; a category captured at sale
+ *                       time is order truth and outranks anything read live.
+ *   ② `line.category`   THE CATALOG, resolved server-side by `skuCategories`
+ *                       (the one shared reader) and carried on the order-detail
+ *                       payload since PR 867. This rung is the D9 fix.
+ *   ③ the SKU prefix    a NATIVE sku names its own kind before the first colon
+ *                       (`guarantee:`, `service:` …). Kept because it covers
+ *                       words the classifier below has no branch for.
+ *   ④ `lineClass`       the keyword parser, and the ONLY rung that guesses.
+ *                       Kept because 975 live units have no catalog row.
+ *
+ * ⚠️ **Do not "simplify" ④ into `resolvedCategory`.** That helper returns
+ * `CoreCat | "acc"` — it folds `unknown` INTO `acc`, which would print
+ * `ACCESSORY` over goods nothing recognised. That is the D9 lie this function
+ * exists to stop telling. `lineClass` is three-valued on purpose.
+ *
+ * ⛔ THE `unknown` WORD IS `Not in catalog` (COPY-STANDARD:1082), and this
+ * comment used to call `Other goods` "the ruled word". It is the opposite:
+ * :1082 lists `Other goods` in the Do NOT use column for exactly this fact,
+ * *"and above all never folded into `Accessory`"*. The screen already printed
+ * `Not in catalog` as the SKU hint three hundred lines above, so one fact was
+ * wearing two spellings on one card. The three-valued shape is what the
+ * warning above is really protecting; the word it named was wrong.
+ */
+export function categoryWord(line: {
+  sku: string;
+  attrs?: Record<string, unknown> | null;
+  /** The catalog's word. `null` = asked, no catalog row. ABSENT = an older
+   *  Worker that does not send it — both fall through to ③/④. */
+  category?: string | null;
+}): string {
+  const fromAttrs = typeof line.attrs?.category === "string" ? line.attrs.category : "";
+  const fromCatalog = typeof line.category === "string" ? line.category.trim() : "";
+  const fromSku = line.sku.includes(":") ? line.sku.split(":", 1)[0] : "";
+  const classified = lineClass(line.sku);
+  const fallback = classified === "acc" ? "Accessory" : classified === "unknown" ? "Not in catalog" : classified;
+  return (fromAttrs || fromCatalog || fromSku || fallback).replace(/[_-]+/g, " ").toUpperCase();
+}
+

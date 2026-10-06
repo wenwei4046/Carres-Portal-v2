@@ -16,6 +16,7 @@ import {
   modelFabricTierOverrideSchema,
   sizesActiveInput,
   generateSkusInput,
+  skuSupplierOfferUpsertInput,
   floorConfigPatchInput,
   addonCreateInput,
   addonPatchInput,
@@ -34,8 +35,6 @@ import {
   specialAddonCreateInput,
   specialAddonPatchInput,
   SPECIAL_ADDONS,
-  catalogOptionPoolCreateInput,
-  catalogOptionPoolPatchInput,
   catalogOptionPoolNameSchema,
   catalogPoolBatchSaveInput,
   CATALOG_OPTION_POOLS,
@@ -63,10 +62,11 @@ import {
   autoBedSkuDescription,
   skuImportInput,
   hasPricingIntent,
+  purchasingSuppliersOnly,
   type SkuImportRow,
   type SkuImportFailure,
 } from "@carres/shared";
-import { mapPgError, parseJsonBody } from "../lib/route-helpers";
+import { mapPgError, parseJsonBody, fail } from "../lib/route-helpers";
 import { userClient } from "../lib/supabase";
 import { syncCompartmentSku, discontinueCompartmentSku } from "../lib/sofa-compartment-sku";
 import type { AppEnv } from "../types";
@@ -593,10 +593,7 @@ catalogRouter.post("/models", async (c) => {
     })
     .select("*")
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(
     { model: Adapters.productModelFromRow(data as DB.ProductModelRow) },
     201,
@@ -631,10 +628,7 @@ catalogRouter.patch("/models/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "model not found" }, 404);
   }
@@ -655,10 +649,7 @@ catalogRouter.delete("/models/:id", async (c) => {
     .eq("id", id)
     .select("id")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "model not found" }, 404);
   }
@@ -684,10 +675,7 @@ catalogRouter.post("/skus", async (c) => {
     .select("category, model_key, name")
     .eq("id", parsed.data.modelId)
     .maybeSingle();
-  if (modelErr) {
-    const m = mapPgError(modelErr);
-    return c.json(m.body, m.status);
-  }
+  if (modelErr) return fail(c, modelErr);
   if (!modelRow) {
     return c.json({ error: "not_found", code: "not_found", message: "model not found" }, 404);
   }
@@ -734,10 +722,7 @@ catalogRouter.post("/skus", async (c) => {
       .contains("cat_covered", [modelRow.category])
       .limit(1)
       .maybeSingle();
-    if (supErr) {
-      const m = mapPgError(supErr);
-      return c.json(m.body, m.status);
-    }
+    if (supErr) return fail(c, supErr);
     if (!supRow) {
       return c.json(
         {
@@ -763,10 +748,7 @@ catalogRouter.post("/skus", async (c) => {
       .from(CATALOG_OPTION_POOLS)
       .select("value, dimensions")
       .eq("pool", `${modelRow.category}_size`);
-    if (poolErr) {
-      const m = mapPgError(poolErr);
-      return c.json(m.body, m.status);
-    }
+    if (poolErr) return fail(c, poolErr);
     description = autoBedSkuDescription(
       modelRow.category,
       (modelRow.name as string) ?? "",
@@ -787,15 +769,30 @@ catalogRouter.post("/skus", async (c) => {
       // 0186 — principal-only PWP reward price (companion to cost). null = unset.
       pwp_price: parsed.data.pwpPrice ?? null,
       supplier_id: supplierId,
+      // 0375 — the supplier's own item code. '' → null (a blank is not a code).
+      //
+      // ⚠️ SPREAD, NOT A FIXED KEY, and the reason is a deploy-order hazard:
+      // this route ships with the WEB deploy, but 0375 is applied BY HAND. In
+      // the window between them the column does not exist, and PostgREST
+      // refuses an INSERT naming an unknown column — which would have taken
+      // out SKU creation entirely, not just the new field. Omitting the key
+      // when nobody typed a code keeps the old path working untouched; a
+      // typed code still fails loudly, which is the honest half of the trade.
+      // The PATCH door is already conditional for the same reason.
+      ...(parsed.data.supplierCode?.trim()
+        ? { supplier_code: parsed.data.supplierCode.trim() }
+        : {}),
       description,
       pos_active: parsed.data.posActive ?? true,
+      // 0442 — stored only when Catalog said it; never defaulted from the
+      // category here. Absent → NULL → official PO issue refuses by name.
+      ...(parsed.data.stockIdentityMode !== undefined
+        ? { stock_identity_mode: parsed.data.stockIdentityMode }
+        : {}),
     })
     .select("*")
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(
     { sku: Adapters.productSkuFromRow(data as DB.ProductSkuRow) },
     201,
@@ -812,7 +809,13 @@ catalogRouter.patch("/skus/:id", async (c) => {
   const patch: Record<string, unknown> = {};
   // Loo 2026-07-11 — the CODE is a free, directly-renameable field (AutoCount
   // style). DB unique(sku) turns a collision into a clean 409 via mapPgError.
+  // 0558 — a renamed code carries itself: an after-update trigger on
+  // product_skus rewrites the old code in every record that names it (order
+  // lines, PO lines, stock, supplier bills...). Nothing to do here.
   if (parsed.data.sku !== undefined) patch.sku = parsed.data.sku;
+  // 0375 — supplier's own item code; '' clears to null (a blank is not a code).
+  if (parsed.data.supplierCode !== undefined)
+    patch.supplier_code = parsed.data.supplierCode?.trim() || null;
   if (parsed.data.variant !== undefined) patch.variant = parsed.data.variant;
   if (parsed.data.variantKind !== undefined) patch.variant_kind = parsed.data.variantKind;
   if (parsed.data.price !== undefined) patch.price = parsed.data.price;
@@ -830,6 +833,9 @@ catalogRouter.patch("/skus/:id", async (c) => {
   // 0170 — sell-side toggle + editable description.
   if (parsed.data.posActive !== undefined) patch.pos_active = parsed.data.posActive;
   if (parsed.data.description !== undefined) patch.description = parsed.data.description;
+  // 0442 — the stock identity mode is a Catalog fact; the DB ledgers every change.
+  if (parsed.data.stockIdentityMode !== undefined)
+    patch.stock_identity_mode = parsed.data.stockIdentityMode;
   if (Object.keys(patch).length === 0) {
     return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
   }
@@ -846,10 +852,7 @@ catalogRouter.patch("/skus/:id", async (c) => {
       .select("model_id")
       .eq("id", id)
       .maybeSingle();
-    if (skuErr) {
-      const m = mapPgError(skuErr);
-      return c.json(m.body, m.status);
-    }
+    if (skuErr) return fail(c, skuErr);
     if (!skuRow) {
       return c.json({ error: "not_found", code: "not_found", message: "sku not found" }, 404);
     }
@@ -876,10 +879,7 @@ catalogRouter.patch("/skus/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "sku not found" }, 404);
   }
@@ -918,10 +918,7 @@ catalogRouter.delete("/skus/:id", async (c) => {
     .select("id, model_id, compartment_id")
     .eq("id", id)
     .maybeSingle();
-  if (tErr) {
-    const m = mapPgError(tErr);
-    return c.json(m.body, m.status);
-  }
+  if (tErr) return fail(c, tErr);
   if (!target) {
     return c.json({ error: "not_found", code: "not_found", message: "sku not found" }, 404);
   }
@@ -935,10 +932,7 @@ catalogRouter.delete("/skus/:id", async (c) => {
         .delete()
         .eq("model_id", targetModelId)
         .eq("compartment_id", compartmentId);
-      if (offErr) {
-        const m = mapPgError(offErr);
-        return c.json(m.body, m.status);
-      }
+      if (offErr) return fail(c, offErr);
     }
   }
 
@@ -948,10 +942,7 @@ catalogRouter.delete("/skus/:id", async (c) => {
     .eq("id", id)
     .select("id, model_id")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "sku not found" }, 404);
   }
@@ -989,8 +980,13 @@ catalogRouter.delete("/skus/:id", async (c) => {
 //
 // Gating: internalOnly to run at all; principal-only the moment ANY row carries
 // a price/cost (mirrors the 0175 lock — the DB trigger is still the real boundary
-// since we forward the user JWT). Reads are batched; writes are per-row for
-// granular reporting. userClient/RLS only — never service_role.
+// since we forward the user JWT). userClient/RLS only — never service_role.
+//
+// COST: a CONSTANT 4 Cloudflare subrequests — three batched reads and one
+// catalog_import_skus call (migration 0358) — no matter how many rows the file
+// carries. It used to be 3 + one INSERT per new model + one write per row, which
+// crossed the Workers Free-plan cap of 50 at around 45 rows and then reported
+// the overflow as several hundred identical spreadsheet errors.
 catalogRouter.post("/import-skus", async (c) => {
   internalOnly(c);
   const parsed = await parseJsonBody(c, skuImportInput);
@@ -1010,87 +1006,48 @@ catalogRouter.post("/import-skus", async (c) => {
   }
 
   const sb = userClient(c.env, c.var.auth.jwt);
-  const failures: SkuImportFailure[] = [];
   const rowKey = (r: SkuImportRow) => deriveSkuCode(r.modelKey, r.variant);
+  // One slot per submitted row. A row that fails anywhere fills its own slot, so
+  // the failures come back in file order however they were discovered.
+  const failureByRow: (SkuImportFailure | null)[] = rows.map(() => null);
 
-  // ---- (1) Resolve models by (category, model_key); create the missing ones --
-  const modelComposite = (category: string, modelKey: string) => `${category}::${modelKey}`;
-  const wantedModelKeys = Array.from(new Set(rows.map((r) => r.modelKey)));
-  const { data: existingModels, error: modelsErr } = await sb
-    .from("product_models")
-    .select("id, category, model_key")
-    .in("model_key", wantedModelKeys);
-  if (modelsErr) {
-    const m = mapPgError(modelsErr);
-    return c.json(m.body, m.status);
-  }
-  const modelIdByComposite = new Map<string, string>();
-  for (const row of existingModels ?? []) {
-    const mr = row as { id: string; category: string; model_key: string };
-    modelIdByComposite.set(modelComposite(mr.category, mr.model_key), mr.id);
-  }
-
-  // Gather the distinct models we still need to create (name from the first row;
-  // allowed_options.sizes seeded from the row's size variants for Modular parity).
-  const toCreate = new Map<string, { category: string; modelKey: string; name: string; sizes: Set<string> }>();
-  for (const r of rows) {
-    const comp = modelComposite(r.category, r.modelKey);
-    if (modelIdByComposite.has(comp)) continue;
-    let entry = toCreate.get(comp);
-    if (!entry) {
-      entry = { category: r.category, modelKey: r.modelKey, name: r.model, sizes: new Set() };
-      toCreate.set(comp, entry);
-    }
-    if (r.variantKind === "size") entry.sizes.add(r.variant);
-  }
-  let createdModels = 0;
-  for (const [comp, entry] of toCreate) {
-    const allowedOptions = entry.sizes.size > 0 ? { sizes: Array.from(entry.sizes) } : {};
-    const { data: created, error: createErr } = await sb
-      .from("product_models")
-      .insert({
-        category: entry.category,
-        model_key: entry.modelKey,
-        name: entry.name,
-        allowed_options: allowedOptions,
-      })
-      .select("id")
-      .single();
-    if (createErr || !created) {
-      // Every row that needed this model fails (with the same reason).
-      const reason = createErr ? mapPgError(createErr).body.message ?? createErr.message : "model create failed";
-      rows.forEach((r, i) => {
-        if (modelComposite(r.category, r.modelKey) === comp) {
-          failures.push({ row: i + 1, key: rowKey(r), reason: `model "${entry.modelKey}": ${reason}` });
-        }
-      });
-      continue;
-    }
-    modelIdByComposite.set(comp, (created as { id: string }).id);
-    createdModels += 1;
-  }
-
-  // ---- (2) Supplier resolution maps (load all suppliers once) ----------------
+  // ---- (1) Supplier resolution maps (load all suppliers once) ----------------
   // .order(slug) so category auto-resolve (first-wins) is deterministic if two
   // suppliers ever cover the same category.
   const { data: suppliers, error: supErr } = await sb
     .from("suppliers")
-    .select("id, slug, name, cat_covered")
+    .select("id, slug, name, kind, cat_covered")
     .order("slug");
-  if (supErr) {
-    const m = mapPgError(supErr);
-    return c.json(m.body, m.status);
-  }
+  if (supErr) return fail(c, supErr);
   const supBySlug = new Map<string, string>();
   const supByName = new Map<string, string>();
   const supByCategory = new Map<string, string>();
-  for (const row of suppliers ?? []) {
+  // 0477 — a file naming Finance's landlord or advertiser must not put it in a
+  // catalog slot; it resolves like any unknown supplier.
+  for (const row of purchasingSuppliersOnly(suppliers ?? [])) {
     const s = row as { id: string; slug: string | null; name: string | null; cat_covered: string[] | null };
     if (s.slug) supBySlug.set(s.slug.toLowerCase(), s.id);
     if (s.name) supByName.set(s.name.toLowerCase(), s.id);
     for (const cat of s.cat_covered ?? []) {
       if (!supByCategory.has(cat)) supByCategory.set(cat, s.id);
     }
+  }
+
+  // ---- (2) Resolve models by (category, model_key) ---------------------------
+  // Read-only here. CREATING the missing ones is the RPC's job — it is a write,
+  // and it was one subrequest each. This map answers a different question: which
+  // model does a code belong to TODAY, for the collision check below.
+  const modelComposite = (category: string, modelKey: string) => `${category}::${modelKey}`;
+  const wantedModelKeys = Array.from(new Set(rows.map((r) => r.modelKey)));
+  const { data: existingModels, error: modelsErr } = await sb
+    .from("product_models")
+    .select("id, category, model_key")
+    .in("model_key", wantedModelKeys);
+  if (modelsErr) return fail(c, modelsErr);
+  const modelIdByComposite = new Map<string, string>();
+  for (const row of existingModels ?? []) {
+    const mr = row as { id: string; category: string; model_key: string };
+    modelIdByComposite.set(modelComposite(mr.category, mr.model_key), mr.id);
   }
 
   // ---- (3) Preload existing SKUs by derived code -----------------------------
@@ -1100,117 +1057,176 @@ catalogRouter.post("/import-skus", async (c) => {
   const wantedCodes = Array.from(new Set(rows.map(rowKey)));
   const { data: existingSkus, error: skusErr } = await sb
     .from("product_skus")
-    .select("id, sku, model_id")
+    .select("sku, model_id")
     .in("sku", wantedCodes);
-  if (skusErr) {
-    const m = mapPgError(skusErr);
-    return c.json(m.body, m.status);
-  }
-  const skuByCode = new Map<string, { id: string; modelId: string }>();
+  if (skusErr) return fail(c, skusErr);
+  const skuByCode = new Map<string, { modelId: string }>();
   for (const row of existingSkus ?? []) {
-    const sr = row as { id: string; sku: string; model_id: string };
-    skuByCode.set(sr.sku, { id: sr.id, modelId: sr.model_id });
+    const sr = row as { sku: string; model_id: string };
+    skuByCode.set(sr.sku, { modelId: sr.model_id });
   }
 
-  // ---- (4) Per-row upsert (insert new / update existing, blank = preserve) ----
-  const failedRowKeys = new Set(failures.map((f) => f.key));
-  let upserted = 0;
+  // ---- (4) The distinct models the file names --------------------------------
+  // Name comes from the first row that mentions the model; allowed_options.sizes
+  // is seeded from that model's size variants (Modular parity). The RPC creates
+  // only the ones that turn out to be missing.
+  const models = new Map<string, { category: string; model_key: string; name: string; sizes: Set<string> }>();
+  for (const r of rows) {
+    const comp = modelComposite(r.category, r.modelKey);
+    let entry = models.get(comp);
+    if (!entry) {
+      entry = { category: r.category, model_key: r.modelKey, name: r.model, sizes: new Set() };
+      models.set(comp, entry);
+    }
+    if (r.variantKind === "size") entry.sizes.add(r.variant);
+  }
+
+  // ---- (5) Build the batch — every rejection reason is settled here ----------
+  type ImportPayloadRow = Record<string, unknown> & { sku: string };
+  const payloadRows: ImportPayloadRow[] = [];
+  const sourceRowOf: number[] = []; // payload index -> submitted row index
+  // Codes an EARLIER row in this same file will have inserted by the time the
+  // RPC reaches this one. Separate from skuByCode, which is the pre-batch
+  // snapshot the collision check must use.
+  const insertedInBatch = new Set<string>();
+
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     const code = rowKey(r);
-    // Skip rows whose model could not be created above.
-    if (failedRowKeys.has(code) && !modelIdByComposite.has(modelComposite(r.category, r.modelKey))) {
-      continue;
-    }
-    const modelId = modelIdByComposite.get(modelComposite(r.category, r.modelKey));
-    if (!modelId) continue; // already recorded as a failure during model create
+    const comp = modelComposite(r.category, r.modelKey);
 
     // A code that already exists under a DIFFERENT model means a cross-category
     // collision (same {MODEL_KEY}-{variant}, different category). Fail the row
-    // rather than clobber an unrelated SKU.
-    const existing = skuByCode.get(code);
-    if (existing && existing.modelId !== modelId) {
-      failures.push({
+    // rather than clobber an unrelated SKU. An undefined model id means this
+    // file is CREATING that model, so any pre-existing code is by definition
+    // somebody else's.
+    const collidesWith = skuByCode.get(code);
+    const knownModelId = modelIdByComposite.get(comp);
+    if (collidesWith && (knownModelId === undefined || collidesWith.modelId !== knownModelId)) {
+      failureByRow[i] = {
         row: i + 1,
         key: code,
-        reason: `code ${code} already belongs to another model — pick a distinct model_key`,
-      });
+        reason: `code ${code} already belongs to another model. Pick a distinct model_key`,
+      };
       continue;
     }
-    const existingId = existing?.id;
+    const willExist = skuByCode.has(code) || insertedInBatch.has(code);
 
     // Supplier: an explicit column always resolves (and is written on either
     // path). A NEW sku in a supplier-bearing category must resolve one (else the
     // row fails). An UPDATE with no explicit supplier preserves the stored one —
     // so we don't require a covering supplier just to edit a price/description.
     let supplierId: string | null = null;
+    let supplierExplicit = false;
     if (r.supplier) {
       const found = supBySlug.get(r.supplier.toLowerCase()) ?? supByName.get(r.supplier.toLowerCase());
       if (!found) {
-        failures.push({ row: i + 1, key: code, reason: `supplier "${r.supplier}" not found` });
+        failureByRow[i] = { row: i + 1, key: code, reason: `supplier "${r.supplier}" not found` };
         continue;
       }
       supplierId = found;
-    } else if (!existingId && !SUPPLIERLESS_CATEGORIES.has(r.category)) {
+      supplierExplicit = true;
+    } else if (!willExist && !SUPPLIERLESS_CATEGORIES.has(r.category)) {
       const auto = supByCategory.get(r.category);
       if (!auto) {
-        failures.push({ row: i + 1, key: code, reason: `no supplier covers ${r.category}` });
+        failureByRow[i] = { row: i + 1, key: code, reason: `no supplier covers ${r.category}` };
         continue;
       }
       supplierId = auto;
     }
 
-    if (existingId) {
-      // UPDATE — only present fields (blank cells were omitted upstream so they
-      // preserve the stored value). variant_kind is written ONLY when the row
-      // carried one, so a file that omits the column never re-types an existing
-      // preset/part SKU to 'size'. Never touch sku / model_id.
-      const patch: Record<string, unknown> = { variant: r.variant };
-      if (r.variantKind !== undefined) patch.variant_kind = r.variantKind;
-      if (r.price !== undefined) patch.price = r.price;
-      if (r.cost !== undefined) patch.cost = r.cost;
-      if (r.description !== undefined) patch.description = r.description;
-      if (r.posActive !== undefined) patch.pos_active = r.posActive;
-      if (r.supplier) patch.supplier_id = supplierId;
-      const { error } = await sb.from("product_skus").update(patch).eq("id", existingId);
-      if (error) {
-        failures.push({ row: i + 1, key: code, reason: mapPgError(error).body.message ?? error.message });
-      } else {
-        upserted += 1;
-      }
-    } else {
-      // INSERT — omitted price -> 0, omitted cost -> null, omitted pos_active -> true.
-      const { data: inserted, error } = await sb
-        .from("product_skus")
-        .insert({
-          model_id: modelId,
-          sku: code,
-          variant: r.variant,
-          // Omitted variant_kind defaults to 'size' on a fresh insert.
-          variant_kind: r.variantKind ?? "size",
-          price: r.price ?? 0,
-          cost: r.cost ?? null,
-          supplier_id: supplierId,
-          description: r.description ?? null,
-          pos_active: r.posActive ?? true,
-        })
-        .select("id")
-        .single();
-      if (error || !inserted) {
-        failures.push({
-          row: i + 1,
-          key: code,
-          reason: error ? mapPgError(error).body.message ?? error.message : "insert failed",
-        });
-      } else {
-        upserted += 1;
-        // A later duplicate (model_key, variant) in the same batch now updates
-        // this freshly inserted row (last-wins) instead of colliding.
-        skuByCode.set(code, { id: (inserted as { id: string }).id, modelId });
-      }
-    }
+    const p: ImportPayloadRow = {
+      category: r.category,
+      model_key: r.modelKey,
+      sku: code,
+      variant: r.variant,
+      supplier_id: supplierId,
+      supplier_explicit: supplierExplicit,
+    };
+    // An OMITTED key means PRESERVE — on this side and in the RPC. Never send a
+    // null: a blank cell was dropped upstream so a round-trip cannot zero a
+    // price or re-type a preset SKU to 'size'.
+    if (r.variantKind !== undefined) p.variant_kind = r.variantKind;
+    if (r.price !== undefined) p.price = r.price;
+    if (r.cost !== undefined) p.cost = r.cost;
+    if (r.description !== undefined) p.description = r.description;
+    /* 0376 — the supplier's own item code. Same omitted-means-preserve rule:
+       a file with no supplier_code column must not wipe codes keyed in by
+       hand, and only a PRESENT-but-blank cell clears one. */
+    if (r.supplierCode !== undefined) p.supplier_code = r.supplierCode;
+    /* 0186 pwp_price via the import (2026-08-24). Same omitted-means-preserve
+       rule. DEPLOY-ORDER SAFE unlike 0375's column: this is a KEY IN A JSONB
+       PAYLOAD, and catalog_import_skus reads only the keys it knows — until
+       the migration teaching it pwp_price is applied, the key is simply
+       ignored (rows import, prices don't land), never an error. */
+    if (r.pwpPrice !== undefined) p.pwp_price = r.pwpPrice;
+    if (r.posActive !== undefined) p.pos_active = r.posActive;
+
+    payloadRows.push(p);
+    sourceRowOf.push(i);
+    // A later duplicate of this code in the same file is an UPDATE by the time
+    // the RPC reaches it, so it no longer needs a covering supplier — mirroring
+    // the in-order last-wins merge the RPC performs.
+    insertedInBatch.add(code);
   }
 
+  // ---- (6) ONE call: create the models, then upsert every row in order -------
+  // Order is the contract. The RPC walks `rows` as sent, inside one transaction,
+  // so a duplicated code merges last-wins with the earlier row's fields intact.
+  // A concurrent pool would break that and would not reduce the subrequest count
+  // — which is the thing that was actually broken.
+  let upserted = 0;
+  let createdModels = 0;
+  const { data: batch, error: batchErr } = await sb.rpc("catalog_import_skus", {
+    p_payload: {
+      models: Array.from(models.values()).map((m) => ({
+        category: m.category,
+        model_key: m.model_key,
+        name: m.name,
+        sizes: Array.from(m.sizes),
+      })),
+      rows: payloadRows,
+    },
+  });
+
+  const failAllSent = (reason: string) => {
+    sourceRowOf.forEach((src, k) => {
+      failureByRow[src] = { row: src + 1, key: payloadRows[k].sku, reason };
+    });
+  };
+
+  if (batchErr) {
+    // The batch itself failed (role gate, transport). Report every row that
+    // reached it, rather than 500-ing an import that wrote nothing.
+    failAllSent(mapPgError(batchErr).body.message ?? batchErr.message);
+  } else {
+    const res = (batch ?? {}) as {
+      created_models?: number;
+      rows?: { result: string; error?: string | null }[];
+    };
+    createdModels = res.created_models ?? 0;
+    const results = res.rows ?? [];
+    sourceRowOf.forEach((src, k) => {
+      const d = results[k];
+      if (!d) {
+        failureByRow[src] = {
+          row: src + 1,
+          key: payloadRows[k].sku,
+          reason: "no result returned for this row",
+        };
+      } else if (d.result === "error") {
+        failureByRow[src] = {
+          row: src + 1,
+          key: payloadRows[k].sku,
+          reason: d.error ?? "import failed",
+        };
+      } else {
+        upserted += 1;
+      }
+    });
+  }
+
+  const failures = failureByRow.filter((f): f is SkuImportFailure => f !== null);
   return c.json({
     upserted,
     createdModels,
@@ -1238,10 +1254,7 @@ catalogRouter.post("/sofa-fabrics", async (c) => {
     })
     .select("*")
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(
     { fabric: Adapters.sofaFabricFromRow(data as DB.SofaFabricRow) },
     201,
@@ -1272,10 +1285,7 @@ catalogRouter.patch("/sofa-fabrics/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "fabric not found" }, 404);
   }
@@ -1291,10 +1301,7 @@ catalogRouter.delete("/sofa-fabrics/:id", async (c) => {
     .eq("id", id)
     .select("id")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "fabric not found" }, 404);
   }
@@ -1322,7 +1329,7 @@ catalogRouter.patch("/models/:id/sizes-active", async (c) => {
     .select("allowed_options")
     .eq("id", id)
     .maybeSingle();
-  if (mErr) { const m = mapPgError(mErr); return c.json(m.body, m.status); }
+  if (mErr) return fail(c, mErr);
   if (!modelRow) {
     return c.json({ error: "not_found", code: "not_found", message: "model not found" }, 404);
   }
@@ -1335,7 +1342,7 @@ catalogRouter.patch("/models/:id/sizes-active", async (c) => {
     .from("product_models")
     .update({ allowed_options: nextOpts })
     .eq("id", id);
-  if (upErr) { const m = mapPgError(upErr); return c.json(m.body, m.status); }
+  if (upErr) return fail(c, upErr);
 
   // Cascade: all size SKUs off, then turn the in-set ones on. Two idempotent
   // bulk updates (no per-row loop). Never touches discontinued_at.
@@ -1344,7 +1351,7 @@ catalogRouter.patch("/models/:id/sizes-active", async (c) => {
     .update({ pos_active: false })
     .eq("model_id", id)
     .eq("variant_kind", "size");
-  if (offRes.error) { const m = mapPgError(offRes.error); return c.json(m.body, m.status); }
+  if (offRes.error) return fail(c, offRes.error);
   if (parsed.data.sizes.length > 0) {
     const onRes = await sb
       .from("product_skus")
@@ -1352,7 +1359,7 @@ catalogRouter.patch("/models/:id/sizes-active", async (c) => {
       .eq("model_id", id)
       .eq("variant_kind", "size")
       .in("variant", parsed.data.sizes);
-    if (onRes.error) { const m = mapPgError(onRes.error); return c.json(m.body, m.status); }
+    if (onRes.error) return fail(c, onRes.error);
   }
   return c.json({ ok: true, sizes: parsed.data.sizes });
 });
@@ -1372,7 +1379,7 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
     .select("category, model_key, name, allowed_options")
     .eq("id", id)
     .maybeSingle();
-  if (mErr) { const m = mapPgError(mErr); return c.json(m.body, m.status); }
+  if (mErr) return fail(c, mErr);
   if (!modelRow) {
     return c.json({ error: "not_found", code: "not_found", message: "model not found" }, 404);
   }
@@ -1384,26 +1391,46 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
   }
 
   // Supplier resolution (size categories need one; service/accessory don't).
+  // An explicit caller supplierId wins outright - two suppliers can both cover
+  // one category, and without an override a keyer has no way to say a batch is
+  // Hookka's rather than whichever supplier's cat_covered[] happened to sort
+  // first. Absent (the default) keeps today's auto-resolve byte-identical.
   let supplierId: string | null = null;
   if (!SUPPLIERLESS_CATEGORIES.has(modelRow.category)) {
-    const { data: supRow, error: supErr } = await sb
-      .from("suppliers")
-      .select("id")
-      .contains("cat_covered", [modelRow.category])
-      .limit(1)
-      .maybeSingle();
-    if (supErr) { const m = mapPgError(supErr); return c.json(m.body, m.status); }
-    if (!supRow) {
-      return c.json(
-        {
-          error: "rule_violation",
-          code: "no_supplier_for_category",
-          message: `No supplier currently covers ${modelRow.category}. Configure one before generating ${modelRow.category} SKUs.`,
-        },
-        422,
-      );
+    if (parsed.data.supplierId) {
+      const { data: chosen, error: chosenErr } = await sb
+        .from("suppliers")
+        .select("id")
+        .eq("id", parsed.data.supplierId)
+        .maybeSingle();
+      if (chosenErr) return fail(c, chosenErr);
+      if (!chosen) {
+        return c.json(
+          { error: "not_found", code: "not_found", message: "supplierId does not exist" },
+          404,
+        );
+      }
+      supplierId = chosen.id as string;
+    } else {
+      const { data: supRow, error: supErr } = await sb
+        .from("suppliers")
+        .select("id")
+        .contains("cat_covered", [modelRow.category])
+        .limit(1)
+        .maybeSingle();
+      if (supErr) return fail(c, supErr);
+      if (!supRow) {
+        return c.json(
+          {
+            error: "rule_violation",
+            code: "no_supplier_for_category",
+            message: `No supplier currently covers ${modelRow.category}. Configure one before generating ${modelRow.category} SKUs.`,
+          },
+          422,
+        );
+      }
+      supplierId = supRow.id as string;
     }
-    supplierId = supRow.id as string;
   }
 
   // Mattress/bedframe sizes resolve through the canonical table so the SKU
@@ -1424,7 +1451,7 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
       .from(CATALOG_OPTION_POOLS)
       .select("value, dimensions")
       .eq("pool", `${modelRow.category}_size`);
-    if (poolErr) { const m = mapPgError(poolErr); return c.json(m.body, m.status); }
+    if (poolErr) return fail(c, poolErr);
     poolDims = (poolRows ?? []) as { value: string; dimensions: string | null }[];
   }
   const wantCodes = variants.map(codeFor);
@@ -1432,8 +1459,47 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
     .from("product_skus")
     .select("sku")
     .in("sku", wantCodes);
-  if (exErr) { const m = mapPgError(exErr); return c.json(m.body, m.status); }
+  if (exErr) return fail(c, exErr);
   const existing = new Set((existingRows ?? []).map((r) => (r as { sku: string }).sku));
+
+  /* ⭐ The supplier's own code per generated row (2026-08-24): the per-variant
+     override first, then the batch default, then NULL. Read against the RAW
+     variant the caller sent — the canonical size (`K` → `King`) is computed
+     here, so the caller cannot have keyed the map by it. A blank string is
+     NULL, not "", so an untouched box never writes an empty code. */
+  const supplierCodeFor = (v: string): string | null => {
+    /* A BLANK OVERRIDE IS AN ABSENT ONE, not an instruction to clear. The box
+       for a piece starts empty and shows the batch code as its placeholder, so
+       "left alone" and "deliberately emptied" look identical to the operator —
+       reading `""` as a clear would blank the code they had just typed above.
+       `??` alone gets this wrong: an empty string is not nullish, so it would
+       win the coalesce and take the batch default out of play. */
+    const own = (parsed.data.supplierCodes?.[v] ?? "").trim();
+    return own || (parsed.data.supplierCode ?? "").trim() || null;
+  };
+  /* THE DEPLOY-ORDER HAZARD, RESPECTED (`catalog.skus-supplier-code.test.ts`).
+     `supplier_code` (0375) was applied by hand, and PostgREST refuses an INSERT
+     naming a column that does not exist — which would take out SKU GENERATION
+     entirely rather than just the new field. So the key is named only when a
+     code was actually typed, and then on EVERY row of the batch, because a
+     bulk insert whose objects disagree about their keys is its own hazard. */
+  const anySupplierCode = variants.some((v) => supplierCodeFor(v) !== null);
+
+  /* ⭐ PER-VARIANT PRICE AND PWP (2026-08-25) — the quotation case: a bedframe
+     is priced per size, so ONE batch price wrote the wrong number on every row.
+     A variant's own entry wins; absent falls back to the batch price, then 0
+     (UNPRICED). An explicit per-variant 0 is a deliberate "unpriced at this
+     size" and is kept — `??` passes 0 through, which is exactly right.
+     pwp_price obeys the 0186 server law: a value <= 0 means NOT SET and is
+     stored as NULL, never as a zero that half-reads as a price. The key rides
+     every row of the batch or none (rows of one bulk insert must agree about
+     their columns). */
+  const priceFor = (v: string): number => parsed.data.prices?.[v] ?? parsed.data.price ?? 0;
+  const pwpFor = (v: string): number | null => {
+    const p = parsed.data.pwpPrices?.[v];
+    return typeof p === "number" && p > 0 ? p : null;
+  };
+  const anyPwp = variants.some((v) => pwpFor(v) !== null);
 
   const toInsert = variants
     .filter((v) => !existing.has(codeFor(v)))
@@ -1442,10 +1508,16 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
       sku: codeFor(v),
       variant: resolve(v).name,
       variant_kind: "size" as const,
-      price: parsed.data.price ?? 0,
+      price: priceFor(v),
+      ...(anyPwp ? { pwp_price: pwpFor(v) } : {}),
       cost: null,
       supplier_id: supplierId,
+      ...(anySupplierCode ? { supplier_code: supplierCodeFor(v) } : {}),
       pos_active: true,
+      // 0442 — every generated SKU is born with the mode the keyer stated.
+      ...(parsed.data.stockIdentityMode
+        ? { stock_identity_mode: parsed.data.stockIdentityMode }
+        : {}),
       description: autoBedSkuDescription(
         modelRow.category,
         (modelRow.name as string) ?? "",
@@ -1460,7 +1532,7 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
       .from("product_skus")
       .insert(toInsert)
       .select("id");
-    if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+    if (error) return fail(c, error);
     generated = (data ?? []).length;
 
     // Loo 2026-07-21 — generating a size onto an EXISTING model must also join
@@ -1479,11 +1551,121 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
           .from("product_models")
           .update({ allowed_options: nextOpts })
           .eq("id", id);
-        if (aoErr) { const m = mapPgError(aoErr); return c.json(m.body, m.status); }
+        if (aoErr) return fail(c, aoErr);
       }
     }
   }
   return c.json({ ok: true, generated, skipped: variants.length - generated });
+});
+
+// ----- 0388 — dual-sourcing, the recording half ------------------------------
+//
+// A SKU's `supplier_id` slot stays THE routing truth for POs. These routes
+// only record what each supplier QUOTED for the piece — their own code, their
+// prices — so the second Hookka's paper stops being thrown away. Nothing that
+// reads the slot changes.
+
+/* `*` rather than a column list (0389): the strip must keep working in the
+   window between this code deploying and the hand-applied column existing —
+   a named missing column makes PostgREST refuse the whole select. */
+const OFFER_SELECT = "*, suppliers(name)";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function offerFromRow(r: any) {
+  return {
+    supplierId: r.supplier_id as string,
+    supplierName: (r.suppliers?.name as string | undefined) ?? null,
+    supplierCode: (r.supplier_code as string | null) ?? null,
+    price: (r.price as number | null) ?? null,
+    pwpPrice: (r.pwp_price as number | null) ?? null,
+    pricesBySize: (r.prices_by_size as Record<string, number> | null | undefined) ?? null,
+    updatedAt: r.updated_at as string,
+  };
+}
+
+catalogRouter.get("/skus/:id/supplier-offers", async (c) => {
+  internalOnly(c);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("sku_supplier_offers")
+    .select(OFFER_SELECT)
+    .eq("sku_id", c.req.param("id"));
+  if (error) return fail(c, error);
+  const offers = (data ?? []).map(offerFromRow)
+    .sort((a, b) => (a.supplierName ?? "").localeCompare(b.supplierName ?? ""));
+  return c.json({ offers });
+});
+
+/* The WHOLE offer list in one read — the Supplier Items view joins it against
+   the catalog bundle client-side, exactly as it joins the slot. Without this,
+   an offer was visible only inside its own SKU's strip: Cody quoted by Hookka
+   Industries did not appear under Industries in Supplier Items, which reads
+   as "we never recorded it" — the precise impression 0388 exists to end. */
+catalogRouter.get("/supplier-offers", async (c) => {
+  internalOnly(c);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("sku_supplier_offers")
+    .select("sku_id, supplier_id, supplier_code");
+  if (error) return fail(c, error);
+  return c.json({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    offers: (data ?? []).map((r: any) => ({
+      skuId: r.sku_id as string,
+      supplierId: r.supplier_id as string,
+      supplierCode: (r.supplier_code as string | null) ?? null,
+    })),
+  });
+});
+
+catalogRouter.put("/skus/:id/supplier-offers", async (c) => {
+  /* Offers carry PRICES, and price-bearing catalog writes have been principal
+     locked since 0175/0186 — the same person who may set a SKU's price may
+     record what a supplier quoted for it. RLS enforces the same boundary. */
+  principalOnly(c, "Only the principal (Master Admin) can record supplier offers");
+  const parsed = await parseJsonBody(c, skuSupplierOfferUpsertInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("sku_supplier_offers")
+    .upsert(
+      {
+        sku_id: c.req.param("id"),
+        supplier_id: parsed.data.supplierId,
+        supplier_code: parsed.data.supplierCode?.trim() || null,
+        price: parsed.data.price ?? null,
+        pwp_price: parsed.data.pwpPrice ?? null,
+        /* Named ONLY when the caller sent it — an upsert naming a not-yet-
+           applied column would take out offer saving entirely (0375 lesson),
+           and ABSENT also means "leave the stored map alone". */
+        ...(parsed.data.pricesBySize !== undefined
+          ? { prices_by_size: parsed.data.pricesBySize }
+          : {}),
+        updated_at: new Date().toISOString(),
+        updated_by: c.var.auth.id,
+      },
+      { onConflict: "sku_id,supplier_id" },
+    )
+    .select(OFFER_SELECT)
+    .maybeSingle();
+  if (error) return fail(c, error);
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "upsert returned no row" }, 404);
+  }
+  return c.json({ offer: offerFromRow(data) });
+});
+
+catalogRouter.delete("/skus/:id/supplier-offers/:supplierId", async (c) => {
+  principalOnly(c, "Only the principal (Master Admin) can remove supplier offers");
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb
+    .from("sku_supplier_offers")
+    .delete()
+    .eq("sku_id", c.req.param("id"))
+    .eq("supplier_id", c.req.param("supplierId"));
+  if (error) return fail(c, error);
+  // Idempotent: removing an offer that is not there is not an error.
+  return c.json({ ok: true });
 });
 
 // ----- Model photo (signed-upload pattern, mirrors storage/dos + partner/pod) -----
@@ -1541,7 +1723,7 @@ catalogRouter.patch("/models/:id/photo", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "model not found" }, 404);
   }
@@ -1558,7 +1740,7 @@ catalogRouter.delete("/models/:id/photo", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "model not found" }, 404);
   }
@@ -1586,7 +1768,7 @@ catalogRouter.patch("/floor-config", async (c) => {
     .eq("id", 1)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "floor_config row missing" }, 404);
   }
@@ -1648,7 +1830,7 @@ catalogRouter.post("/addons", async (c) => {
     })
     .select("*")
     .single();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (parsed.data.serviceSku) {
     await ensureServiceSkuRow(sb, {
       sku: parsed.data.serviceSku,
@@ -1684,7 +1866,7 @@ catalogRouter.patch("/addons/:key", async (c) => {
     Object.keys(patch).length > 0
       ? await sb.from("addons").update(patch).eq("key", key).select("*").maybeSingle()
       : await sb.from("addons").select("*").eq("key", key).maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "addon not found" }, 404);
   }
@@ -1728,7 +1910,7 @@ catalogRouter.delete("/addons/:key", async (c) => {
     .eq("key", key)
     .select("key")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "addon not found" }, 404);
   }
@@ -1763,7 +1945,7 @@ catalogRouter.post("/special-addons", async (c) => {
     })
     .select("*")
     .single();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   return c.json({ specialAddon: Adapters.specialAddonFromRow(data as DB.SpecialAddonRow) }, 201);
 });
 
@@ -1795,7 +1977,7 @@ catalogRouter.patch("/special-addons/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "special add-on not found" }, 404);
   }
@@ -1814,7 +1996,7 @@ catalogRouter.delete("/special-addons/:id", async (c) => {
     .eq("id", id)
     .select("id")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "special add-on not found" }, 404);
   }
@@ -1850,7 +2032,7 @@ catalogRouter.patch("/fabric-tier-config", async (c) => {
     .eq("id", 1)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "not_found", code: "not_found", message: "fabric_tier_addon_config row missing" },
@@ -1887,7 +2069,7 @@ catalogRouter.put("/model-fabric-tier-override/:modelId", async (c) => {
     )
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "not_found", code: "not_found", message: "upsert returned no row" },
@@ -1937,7 +2119,7 @@ catalogRouter.post("/sofa-compartments", async (c) => {
     })
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "rpc_failed", code: "rpc_failed", message: "compartment insert returned no row" }, 500);
   }
@@ -1976,7 +2158,7 @@ catalogRouter.patch("/sofa-compartments/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "compartment not found" }, 404);
   }
@@ -1995,7 +2177,7 @@ catalogRouter.delete("/sofa-compartments/:id", async (c) => {
     .eq("id", id)
     .select("id")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "compartment not found" }, 404);
   }
@@ -2054,7 +2236,7 @@ catalogRouter.patch("/sofa-compartments/:id/photo", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "compartment not found" }, 404);
   }
@@ -2072,7 +2254,7 @@ catalogRouter.delete("/sofa-compartments/:id/photo", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "compartment not found" }, 404);
   }
@@ -2097,6 +2279,9 @@ catalogRouter.put("/models/:modelId/compartments/:compartmentId", async (c) => {
     modelId,
     compartmentId,
     priceOverride: parsed.data.priceOverride ?? null,
+    supplierId: parsed.data.supplierId,
+    supplierCode: parsed.data.supplierCode,
+    stockIdentityMode: parsed.data.stockIdentityMode,
   });
   if (!synced.ok) return c.json(synced.body, synced.status);
 
@@ -2115,7 +2300,7 @@ catalogRouter.put("/models/:modelId/compartments/:compartmentId", async (c) => {
     )
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "upsert returned no row" }, 404);
   }
@@ -2135,7 +2320,7 @@ catalogRouter.delete("/models/:modelId/compartments/:compartmentId", async (c) =
     .delete()
     .eq("model_id", modelId)
     .eq("compartment_id", compartmentId);
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
 
   // Phase 5 — soft-discontinue the compartment's sku (pos_active=false +
   // discontinued_at). NEVER delete it: historical order_lines may FK the sku. A
@@ -2194,7 +2379,7 @@ catalogRouter.post("/sofa-combos", async (c) => {
     .insert(insert)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "rpc_failed", code: "rpc_failed", message: "sofa combo insert returned no row" }, 500);
   }
@@ -2238,7 +2423,7 @@ catalogRouter.patch("/sofa-combos/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "sofa combo not found" }, 404);
   }
@@ -2263,7 +2448,7 @@ catalogRouter.delete("/sofa-combos/:id", async (c) => {
     .eq("id", id)
     .select("id")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "sofa combo not found" }, 404);
   }
@@ -2297,97 +2482,6 @@ function optionPoolDuplicate(value?: string, pool?: string) {
         : "that value already exists in this pool",
   } as const;
 }
-
-// POST /option-pools — create a pool entry (principal-only).
-catalogRouter.post("/option-pools", async (c) => {
-  principalOnly(c, OPTION_POOL_MSG);
-  const parsed = await parseJsonBody(c, catalogOptionPoolCreateInput);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from(CATALOG_OPTION_POOLS)
-    .insert({
-      pool: parsed.data.pool,
-      value: parsed.data.value,
-      label: parsed.data.label ?? null,
-      dimensions: parsed.data.dimensions ?? null,
-      surcharge: parsed.data.surcharge ?? null,
-      active: parsed.data.active ?? true,
-      sort_order: parsed.data.sortOrder ?? 0,
-      updated_at: new Date().toISOString(),
-      updated_by: c.var.auth.id,
-    })
-    .select("*")
-    .maybeSingle();
-  if (error) {
-    if (error.code === "23505") {
-      return c.json(optionPoolDuplicate(parsed.data.value, parsed.data.pool), 409);
-    }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  if (!data) {
-    return c.json({ error: "rpc_failed", code: "rpc_failed", message: "option pool insert returned no row" }, 500);
-  }
-  return c.json({ optionPool: Adapters.catalogOptionPoolFromRow(data as DB.CatalogOptionPoolRow) }, 201);
-});
-
-// PATCH /option-pools/:id — update a pool entry (principal-only); empty → 422.
-// `pool` is intentionally NOT patchable (the schema omits it) — moving an entry
-// between pools would skew the UNIQUE(pool,value) intent; delete + recreate.
-catalogRouter.patch("/option-pools/:id", async (c) => {
-  principalOnly(c, OPTION_POOL_MSG);
-  const id = c.req.param("id");
-  const parsed = await parseJsonBody(c, catalogOptionPoolPatchInput);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const patch: Record<string, unknown> = {};
-  if (parsed.data.value !== undefined) patch.value = parsed.data.value;
-  if (parsed.data.label !== undefined) patch.label = parsed.data.label;
-  if (parsed.data.dimensions !== undefined) patch.dimensions = parsed.data.dimensions;
-  if (parsed.data.surcharge !== undefined) patch.surcharge = parsed.data.surcharge;
-  if (parsed.data.active !== undefined) patch.active = parsed.data.active;
-  if (parsed.data.sortOrder !== undefined) patch.sort_order = parsed.data.sortOrder;
-  if (Object.keys(patch).length === 0) {
-    return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
-  }
-  patch.updated_at = new Date().toISOString();
-  patch.updated_by = c.var.auth.id;
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from(CATALOG_OPTION_POOLS)
-    .update(patch)
-    .eq("id", id)
-    .select("*")
-    .maybeSingle();
-  if (error) {
-    // A value-rename can also collide with an existing (pool,value).
-    if (error.code === "23505") {
-      return c.json(optionPoolDuplicate(parsed.data.value), 409);
-    }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  if (!data) {
-    return c.json({ error: "not_found", code: "not_found", message: "option pool not found" }, 404);
-  }
-  return c.json({ optionPool: Adapters.catalogOptionPoolFromRow(data as DB.CatalogOptionPoolRow) });
-});
-
-// DELETE /option-pools/:id — HARD delete (principal-only). Nothing FKs to this
-// table (curated reference list, no order-side consumer), so deletion is safe.
-// The soft-hide path is `active=false` via PATCH. Idempotent: a missing id is a
-// no-op that still returns ok (mirrors the un-offer route).
-catalogRouter.delete("/option-pools/:id", async (c) => {
-  principalOnly(c, OPTION_POOL_MSG);
-  const id = c.req.param("id");
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { error } = await sb.from(CATALOG_OPTION_POOLS).delete().eq("id", id);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  return c.json({ ok: true });
-});
 
 // PUT /option-pools/:pool — 0201 batch save (principal-only). REPLACE semantics:
 // the body's `entries` become the pool's full new contents (array order =
@@ -2427,8 +2521,7 @@ catalogRouter.put("/option-pools/:pool", async (c) => {
     if (error.code === "23505") {
       return c.json(optionPoolDuplicate(undefined, poolParam.data), 409);
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ ok: true, result: data ?? null });
 });
@@ -2452,10 +2545,7 @@ catalogRouter.get("/config-history", async (c) => {
     .order("effective_from", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(50);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({
     history: (data ?? []).map((r) =>
       Adapters.catalogConfigHistoryFromRow(r as DB.CatalogConfigHistoryRow),
@@ -2500,8 +2590,7 @@ catalogRouter.put("/fabrics", async (c) => {
   });
   if (error) {
     if (error.code === "23505") return c.json(fabricDuplicate(), 409);
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ ok: true, result: data ?? null });
 });
@@ -2510,7 +2599,7 @@ function fabricDuplicate() {
   return {
     error: "conflict",
     code: "duplicate_fabric_code",
-    message: "Duplicate fabric codes — each fabric code must be unique.",
+    message: "Duplicate fabric codes. Each fabric code must be unique.",
   } as const;
 }
 
@@ -2535,8 +2624,7 @@ catalogRouter.patch("/fabrics/:id/cost", async (c) => {
         404,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ ok: true, result: data ?? null });
 });
@@ -2553,10 +2641,7 @@ catalogRouter.get("/fabrics/history", async (c) => {
     .order("effective_from", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(50);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({
     history: (data ?? []).map((r) =>
       Adapters.catalogFabricsHistoryFromRow(r as DB.CatalogConfigHistoryRow),
@@ -2607,7 +2692,7 @@ catalogRouter.patch("/delivery-fee-config", async (c) => {
     .eq("id", 1)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "not_found", code: "not_found", message: "delivery_fee_config row missing" },
@@ -2638,7 +2723,7 @@ catalogRouter.post("/special-delivery-fee-rules", async (c) => {
     })
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "rpc_failed", code: "rpc_failed", message: "special delivery fee rule insert returned no row" },
@@ -2677,7 +2762,7 @@ catalogRouter.patch("/special-delivery-fee-rules/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "not_found", code: "not_found", message: "special delivery fee rule not found" },
@@ -2696,10 +2781,7 @@ catalogRouter.delete("/special-delivery-fee-rules/:id", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error } = await sb.from(SPECIAL_DELIVERY_FEE_RULES).delete().eq("id", id);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ ok: true });
 });
 
@@ -2738,7 +2820,7 @@ catalogRouter.put("/model-free-gifts/:modelId", async (c) => {
       .from(MODEL_DEFAULT_FREE_GIFTS)
       .delete()
       .eq("model_id", modelId);
-    if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+    if (error) return fail(c, error);
     return c.json({ modelDefaultFreeGifts: { modelId, gifts: [] } });
   }
 
@@ -2757,7 +2839,7 @@ catalogRouter.put("/model-free-gifts/:modelId", async (c) => {
     )
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "not_found", code: "not_found", message: "upsert returned no row" },
@@ -2781,7 +2863,7 @@ catalogRouter.delete("/model-free-gifts/:modelId", async (c) => {
     .from(MODEL_DEFAULT_FREE_GIFTS)
     .delete()
     .eq("model_id", modelId);
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   return c.json({ ok: true });
 });
 
@@ -2806,7 +2888,7 @@ catalogRouter.post("/free-item-campaigns", async (c) => {
     })
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "rpc_failed", code: "rpc_failed", message: "free item campaign insert returned no row" },
@@ -2842,7 +2924,7 @@ catalogRouter.patch("/free-item-campaigns/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "not_found", code: "not_found", message: "free item campaign not found" },
@@ -2859,7 +2941,7 @@ catalogRouter.delete("/free-item-campaigns/:id", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error } = await sb.from(FREE_ITEM_CAMPAIGNS).delete().eq("id", id);
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   return c.json({ ok: true });
 });
 
@@ -2910,7 +2992,7 @@ catalogRouter.post("/pwp-rules", async (c) => {
     })
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "rpc_failed", code: "rpc_failed", message: "pwp rule insert returned no row" },
@@ -2953,7 +3035,7 @@ catalogRouter.patch("/pwp-rules/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "not_found", code: "not_found", message: "pwp rule not found" },
@@ -2970,7 +3052,7 @@ catalogRouter.delete("/pwp-rules/:id", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error } = await sb.from(PWP_RULES).delete().eq("id", id);
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   return c.json({ ok: true });
 });
 
@@ -3010,7 +3092,7 @@ catalogRouter.post("/bundles", async (c) => {
     })
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "rpc_failed", code: "rpc_failed", message: "bundle insert returned no row" },
@@ -3049,7 +3131,7 @@ catalogRouter.patch("/bundles/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       { error: "not_found", code: "not_found", message: "bundle not found" },
@@ -3066,7 +3148,7 @@ catalogRouter.delete("/bundles/:id", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error } = await sb.from(PRODUCT_BUNDLES).delete().eq("id", id);
-  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (error) return fail(c, error);
   return c.json({ ok: true });
 });
 

@@ -5,6 +5,7 @@ import { ApiError, apiFetch } from "@/lib/api";
 import { qk, usePartnerMarkPickupCollected } from "@/lib/queries";
 import PartnerReceiveAtWhModal from "./components/PartnerReceiveAtWhModal";
 import PickupBatchDialog from "./components/PickupBatchDialog";
+import { lineSummary } from "./PartnerDashboard";
 
 /**
  * Partner · Factory pickups — supplier → warehouse pipeline.
@@ -200,23 +201,6 @@ function stagesOf(p: PickupRow): Stage[] {
   if (scheduled) out.push("scheduled");
   if (inTransit) out.push("in_transit");
   return out;
-}
-
-function lineSummary(lines: PickupLine[]): { head: string; rest: number; totalQty: number } {
-  const totalQty = lines.reduce((s, l) => s + (l.qty ?? 0), 0);
-  const head = lines[0];
-  if (!head) return { head: "—", rest: 0, totalQty };
-  const a = head.attrs as { color?: string; gap?: string; fabric_name?: string } | null;
-  let label = head.sku;
-  if (a?.color || a?.gap) {
-    const bits: string[] = [];
-    if (a.color) bits.push(a.color);
-    if (a.gap) bits.push(`gap ${a.gap}`);
-    label = `${head.sku} · ${bits.join(" · ")}`;
-  } else if (a?.fabric_name) {
-    label = `${head.sku} · ${a.fabric_name}`;
-  }
-  return { head: label, rest: lines.length - 1, totalQty };
 }
 
 export default function PartnerFactoryPickupsPage() {
@@ -503,7 +487,7 @@ export default function PartnerFactoryPickupsPage() {
                                 <span className="font-mono font-semibold">
                                   SO-{t.orders?.so ?? "?"}
                                 </span>{" "}
-                                · {t.orders?.customer_name ?? "—"}
+                                · {t.orders?.customer_name ?? ""}
                               </span>
                             </label>
                           ))}
@@ -791,7 +775,7 @@ function PipelineColumn({
       </div>
       <div className="p-2.5 min-h-[220px] flex flex-col gap-2">
         {items.length === 0 ? (
-          <div className="text-center text-base-400 text-label py-6">—</div>
+          null
         ) : (
           items.map((p) => (
             <PipelineCard
@@ -831,10 +815,10 @@ function PipelineCard({
         {summary}
       </div>
       <div className="font-body text-label text-base-600 leading-[1.5]">
-        🏭 {po.suppliers?.name ?? "—"}
+        🏭 {po.suppliers?.name ?? ""}
       </div>
       <div className="font-body text-label text-base-600 leading-[1.5]">
-        🏢 → {po.warehouses?.name ?? "—"}
+        🏢 → {po.warehouses?.name ?? ""}
       </div>
       {!hideCalendarLine && (
         <div className="font-mono text-label text-base-500 mt-1">
@@ -912,7 +896,7 @@ function DeliveredRow({
       <div>
         <div className="font-body text-meta">{summary}</div>
         <div className="font-body text-label text-base-500 mt-0.5">
-          {po.suppliers?.name ?? "—"} → {po.warehouses?.name ?? "—"} · ×{totalQty}
+          {po.suppliers?.name ?? ""} → {po.warehouses?.name ?? ""} · ×{totalQty}
         </div>
       </div>
       <span className="font-mono text-label text-success uppercase tracking-[0.1em] font-semibold">
@@ -1051,7 +1035,7 @@ function PickupDrawer({
                 <ThreadGroup
                   title="Producing"
                   count={producingThreads.length}
-                  hint="Supplier still making — not ready to collect"
+                  hint="Supplier still making. Not ready to collect"
                   testId={`drawer-producing-threads-${po.id}`}
                 >
                   {producingThreads.map((t) => (
@@ -1091,7 +1075,7 @@ function PickupDrawer({
                           <span className="font-mono font-semibold">
                             SO-{t.orders?.so ?? "?"}
                           </span>{" "}
-                          · {t.orders?.customer_name ?? "—"}
+                          · {t.orders?.customer_name ?? ""}
                         </span>
                         {t.orders?.delivery_date && (
                           <span className="font-mono text-label text-base-500 shrink-0">
@@ -1271,7 +1255,7 @@ function ThreadRow({
         <span className="font-mono font-semibold">
           SO-{thread.orders?.so ?? "?"}
         </span>{" "}
-        · {thread.orders?.customer_name ?? "—"}
+        · {thread.orders?.customer_name ?? ""}
       </span>
       {doNumber && (
         <span

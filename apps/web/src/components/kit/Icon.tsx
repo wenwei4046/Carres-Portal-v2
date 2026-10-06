@@ -26,24 +26,33 @@ import {
   Bed,
   BedDouble,
   CalendarDays,
+  CalendarOff,
   Check,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   ChevronUp,
   CircleHelp,
   ClipboardList,
   Clock,
   Copy,
+  Command,
   Download,
   ExternalLink,
   Factory,
   Flag,
   History,
+  LayoutGrid,
   Lightbulb,
   Lock,
   MessageCircle,
+  Mail,
   MoreVertical,
   Package,
+  PanelLeftOpen,
+  PanelLeftClose,
+  RectangleHorizontal,
+  Layers2,
   Paperclip,
   Pencil,
   Phone,
@@ -57,6 +66,7 @@ import {
   SlidersHorizontal,
   Sofa,
   Trash2,
+  Table2,
   Truck,
   User,
   Users,
@@ -78,6 +88,7 @@ const GLYPH = {
   delete: Trash2,
   confirm: Check,
   search: Search,
+  jump: Command,
   filter: SlidersHorizontal,
   refresh: RefreshCw,
   copy: Copy,
@@ -88,14 +99,18 @@ const GLYPH = {
   overflow: MoreVertical,
   flag: Flag,
   message: MessageCircle,
+  mail: Mail,
   call: Phone,
   attach: Paperclip,
   settings: Settings,
+  panelToggle: PanelLeftOpen,
   help: CircleHelp,
   lock: Lock,
   history: History,
   // NAVIGATION
   back: ArrowLeft,
+  /** The previous period of a calendar control — its week or month. */
+  previous: ChevronLeft,
   forward: ChevronRight,
   expand: ChevronDown,
   /** A column's Excel filter caret (Jess, 2026-08-01: GitHub/Excel's quiet
@@ -118,6 +133,13 @@ const GLYPH = {
   warehouse: Warehouse,
   order: ClipboardList,
   date: CalendarDays,
+  /** Work that has no lawful working date (Work left rail, 2026-09-24). */
+  noDate: CalendarOff,
+  /** The ERP modules as one group — the Work rail's `Module` heading. */
+  modules: LayoutGrid,
+  /** Register presentation choices — owner-approved icon plus visible word. */
+  table: Table2,
+  cards: LayoutGrid,
   note: Lightbulb,
   activity: ScrollText,
   // The three made-to-order categories (Loo, 2026-07-31 — the To Order rail's
@@ -125,6 +147,8 @@ const GLYPH = {
   mattress: BedDouble,
   bedframe: Bed,
   sofa: Sofa,
+  pillow: RectangleHorizontal,
+  protector: Layers2,
 } as const;
 
 /** Every meaning the portal has. Not a Lucide name — a business meaning. */
@@ -137,14 +161,17 @@ export default function Icon({
   name,
   size = 16,
   title,
+  panelOpen = false,
 }: {
   name: IconName;
+  /** The two states of the same panel-toggle meaning. */
+  panelOpen?: boolean;
   /** 14 in a row / in a pill · 16 default · 18 page-level. */
   size?: IconSize;
   /** Give an icon a title ONLY when it carries meaning no nearby word does. */
   title?: string;
 }) {
-  const Glyph = GLYPH[name];
+  const Glyph = name === "panelToggle" && panelOpen ? PanelLeftClose : GLYPH[name];
   return (
     <Glyph
       size={size}

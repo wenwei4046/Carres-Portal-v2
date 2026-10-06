@@ -4,7 +4,6 @@ import {
   Adapters,
   DB,
   PWP_CODES,
-  PWP_RULES,
   SOFA_COMBO_PRICING,
   lineMatchesTargets,
   pwpReserveInputSchema,
@@ -15,7 +14,12 @@ import {
   type RuleTarget,
 } from "@carres/shared";
 import { userClient } from "../lib/supabase";
-import { resolveSkuInfo, type SkuInfo } from "../lib/rule-line-input";
+import {
+  deriveRuleLine,
+  readActivePwpRules,
+  resolveSkuInfo,
+  upper,
+} from "../lib/rule-line-input";
 import type { AppEnv } from "../types";
 
 /**
@@ -38,8 +42,6 @@ import type { AppEnv } from "../types";
  *                                      RESERVED codes (RESERVED only — never USED).
  *   GET    /mine                     — the caller's RESERVED set + a self-heal
  *                                      (owner-scoped orphan reaper) sweep.
- *   POST   /reap                     — the caller-scoped orphan reaper (also the
- *                                      target of the daily cron, owner-scoped here).
  *
  * All DB access via `userClient(c.env, auth.jwt)` (RLS) + the SECURITY DEFINER
  * RPCs — NEVER service_role. DORMANT: 0 active `pwp_rules` → reserve matches no
@@ -64,21 +66,6 @@ function genCode(): string {
   for (let i = 0; i < 4; i++) letters += LETTERS[buf[4 + i]! % 26];
   return `PWP-${digits}${letters}`;
 }
-
-/* ─── trigger-line → RuleLineInput (mirrors pwp-recompute's deriveRuleLine) ──── */
-
-function deriveRuleLine(info: SkuInfo | null): RuleLineInput {
-  const category = info?.category ?? "";
-  const isSofa = category.toLowerCase() === "sofa";
-  return {
-    category,
-    modelId: info?.modelId ?? null,
-    sizeCode: !isSofa && info?.variant ? info.variant.toUpperCase() : null,
-    builtCompartments: [],
-  };
-}
-
-const upper = (s: string): string => String(s ?? "").toUpperCase();
 
 /* ─── POST /reserve — reconcile ONE trigger line's RESERVED set ─────────────── */
 
@@ -112,10 +99,11 @@ pwpCodesRouter.post("/reserve", async (c) => {
     builtCompartments: (builtCompartments ?? []).map((m) => m.trim()).filter(Boolean),
   };
 
-  // 2. ACTIVE pwp_rules (RLS). The adapter parses RuleTargets.
-  const rulesR = await sb.from(PWP_RULES).select("*").eq("active", true);
-  if (rulesR.error) throw new HTTPException(500, { message: rulesR.error.message });
-  const rules: PwpRule[] = ((rulesR.data ?? []) as DB.PwpRuleRow[]).map((r) => Adapters.pwpRuleFromRow(r));
+  // 2. ACTIVE pwp_rules (RLS), through the ordered door — minting must match the
+  //    rule the recompute will later bind, or the voucher names the wrong rule.
+  const rulesR = await readActivePwpRules(sb);
+  if (!rulesR.ok) throw new HTTPException(500, { message: rulesR.message });
+  const rules: PwpRule[] = rulesR.rules;
 
   // 3. Select rules whose TRIGGER scope matches this line: category match AND the
   //    RuleTarget matcher covers it. (combo-scope triggers are not minted from a
@@ -355,23 +343,6 @@ pwpCodesRouter.get("/mine", async (c) => {
   if (error) throw new HTTPException(500, { message: error.message });
   const codes = ((data ?? []) as DB.PwpCodeRow[]).map((r) => Adapters.pwpCodeFromRow(r));
   return c.json(pwpCodesResponseSchema.parse({ codes }));
-});
-
-/* ─── POST /reap — the caller-scoped orphan reaper (also the cron target) ───── */
-
-pwpCodesRouter.post("/reap", async (c) => {
-  const auth = c.var.auth;
-  const sb = userClient(c.env, auth.jwt);
-  // Self-scoped — a salesperson reclaims only their OWN orphans. The RPC forces the
-  // owner to auth.uid() (no p_owner arg) + a 15-min grace floor (review BLOCKER
-  // fix). The all-owners (incl. nulled-owner) backstop is the cron-only
-  // pwp_reap_orphans_all() (NOT granted to authenticated), wired to a daily cron
-  // when the backstop goes live (CF pwp-orphan-reaper-cron-unwired).
-  const { data, error } = await sb.rpc("pwp_reap_orphans", {
-    p_grace_minutes: 15,
-  });
-  if (error) throw new HTTPException(500, { message: error.message });
-  return c.json({ reaped: typeof data === "number" ? data : 0 });
 });
 
 export default pwpCodesRouter;

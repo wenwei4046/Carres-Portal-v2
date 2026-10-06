@@ -1,0 +1,2807 @@
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
+import { poDeliveryDateOf, purchasingRefusal } from "@carres/shared";
+import { todayIsoMYT } from "../../lib/delivery-order-issue";
+import app from "../../index";
+import { _setJwksForTesting } from "../../middleware/auth";
+
+vi.mock("../../lib/supabase", () => ({
+  userClient: vi.fn(),
+}));
+vi.mock("../../lib/duties", () => ({
+  myDuties: vi.fn().mockResolvedValue([]),
+  dutyHolders: vi.fn().mockResolvedValue({}),
+}));
+vi.mock("../../lib/purchase-demand-read", () => ({
+  readFreeStock: vi.fn(),
+}));
+vi.mock("../../lib/purchasing-settings", () => ({
+  // The frozen ETA arithmetic is the SHARED function; the loader is mocked to
+  // a minimal settings shape whose arithmetic degrades to `today` — this test
+  // is about the PAYLOAD (purpose + demand link), not the calendar.
+  loadPurchasingSettings: vi.fn().mockResolvedValue({
+    orderByBufferDays: 7,
+    earliestSellDays: 21,
+    logisticsCallWorkingDays: 1,
+    poDays: [1, 3, 5],
+    suppliers: [],
+    productionDays: [{ supplierId: "bbbbbbbb-0000-0000-0000-000000000001", category: "sofa", workingDays: 14 }],
+    lastChanges: [],
+  }),
+}));
+
+import { stockMatchKey } from "@carres/shared";
+import { readFreeStock } from "../../lib/purchase-demand-read";
+import { userClient } from "../../lib/supabase";
+
+/**
+ * MANUAL PURCHASE — POST /issue (card §6, slice 3).
+ *
+ * The card's own test lines, at the API boundary:
+ *   · "Issued POs carry their reason; the reason survives a round trip" —
+ *     the governed payload names the request's purpose per document and the
+ *     demand per line.
+ *   · "Approved requests are issuable the same day; no PO-day gate" — the
+ *     route never reads PO days (the mocked loader would throw if the route
+ *     tried to batch by them; the payload goes straight to the authority).
+ *   · "`Issue as one PO?` is declinable" — together:false yields one
+ *     document per request even for one supplier.
+ */
+
+const SUPABASE_URL = "https://test.supabase.co";
+const env = {
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY: "test-anon",
+  SUPABASE_SERVICE_ROLE_KEY: "test-service",
+  SUPABASE_JWT_SECRET: "unused",
+};
+
+async function makeJwt(role: string) {
+  return signTestJwt("11111111-1111-1111-1111-000000000999", { email: `${role}@carres.com`, app_metadata: { role } });
+}
+
+afterEach(() => vi.useRealTimers());
+
+beforeEach(() => {
+  useTestJwks();
+  vi.mocked(userClient).mockReset();
+});
+
+afterAll(() => _setJwksForTesting(null));
+
+const REQ_A = "aaaaaaaa-0000-0000-0000-00000000000a";
+const REQ_B = "aaaaaaaa-0000-0000-0000-00000000000b";
+const SUP = "bbbbbbbb-0000-0000-0000-000000000001";
+const DEST = "cccccccc-0000-0000-0000-000000000001";
+
+const REQUESTS = [
+  {
+    id: REQ_A, req_no: "REQ-0001", purpose: "display", destination_id: DEST,
+    approval_required: true, approved_at: "2026-08-19T03:00:00Z" as string | null, refused_at: null,
+  },
+  {
+    /* R1 (2026-09-16): a stored `approval_required = false` is history, not
+       an exemption — this request is issuable because it WAS approved. */
+    id: REQ_B, req_no: null, purpose: "display", destination_id: DEST,
+    approval_required: false, approved_at: "2026-08-19T03:05:00Z", refused_at: null,
+  },
+];
+
+const LINES = [
+  { id: "dddddddd-0000-0000-0000-000000000001", request_id: REQ_A, sku: "5539-2NA",
+    supplier_id: SUP, qty: 3, approved_qty: 2, issued_qty: 0, cancelled_at: null },
+  { id: "dddddddd-0000-0000-0000-000000000002", request_id: REQ_B, sku: "5539-CNR",
+    supplier_id: SUP, qty: 1, approved_qty: null, issued_qty: 0, cancelled_at: null },
+];
+
+/** A chainable query stub: every builder method returns itself; awaiting it
+ *  resolves to the canned result for its table. */
+function tableStub(result: unknown, opts?: { filterInBy?: string }) {
+  const q: Record<string, unknown> = {};
+  /* A configured Catalog row (it has `product_models`) always carries its
+     Stock identity (0442); a fixture that wants `Not set` writes `null`. */
+  let rows = Array.isArray(result)
+    ? (result as Record<string, unknown>[]).map((r) =>
+        r && typeof r === "object" && "sku" in r && "product_models" in r
+          ? { stock_identity_mode: "unit", ...r }
+          : r,
+      )
+    : result;
+  const chain = () => q;
+  for (const m of ["select", "eq", "order", "limit", "not", "gt", "is", "maybeSingle"]) {
+    q[m] = vi.fn(chain);
+  }
+  // `.in()` honours the id filter when asked to — the route compares the
+  // returned count against what it asked for.
+  q.in = vi.fn((col: string, vals: string[]) => {
+    if (opts?.filterInBy && col === opts.filterInBy && Array.isArray(rows)) {
+      rows = (rows as Array<Record<string, unknown>>).filter((r) =>
+        vals.includes(r[opts.filterInBy!] as string),
+      );
+    }
+    return q;
+  });
+  (q as { then: unknown }).then = (resolve: (v: unknown) => void) =>
+    resolve({ data: rows, error: null });
+  return q;
+}
+
+function makeSb(rpc: ReturnType<typeof vi.fn>, mayIssue = true) {
+  return {
+    from: vi.fn((table: string) => {
+      switch (table) {
+        case "purchase_requests":
+          return tableStub(REQUESTS, { filterInBy: "id" });
+        case "purchase_demands":
+          return tableStub(LINES, { filterInBy: "request_id" });
+        case "product_skus":
+          return tableStub(SKUS);
+        case "suppliers":
+          return tableStub([{ id: SUP, kind: "own_logistics" }]);
+        case "warehouses":
+          return tableStub([{ id: "eeeeeeee-0000-0000-0000-000000000001", name: "Carres Klang", kind: "own" }]);
+        default:
+          return tableStub([]);
+      }
+    }),
+    rpc: vi.fn((fn: string, args: unknown) => {
+      if (fn === "purchasing_actor_may_issue") {
+        return Promise.resolve({ data: mayIssue, error: null });
+      }
+      return rpc(fn, args);
+    }),
+  } as unknown as ReturnType<typeof userClient>;
+}
+
+/** Catalog's own rows. `cost` is a fixture a test may empty: a SKU with no
+ *  recorded price is ISSUED, carrying no commercial claim (owner instruction
+ *  2026-09-23). */
+const SKUS: Array<{
+  sku: string;
+  supplier_id: string;
+  cost: number | null;
+  product_models: { category: string };
+}> = [
+  { sku: "5539-2NA", supplier_id: SUP, cost: 850, product_models: { category: "sofa" } },
+  { sku: "5539-CNR", supplier_id: SUP, cost: 400, product_models: { category: "sofa" } },
+];
+
+/** ⭐ THE PRICES THE OPERATOR REVIEWED (0380). Every issue declares them now;
+ *  there is no "let the server read Catalog" path left. */
+const REVIEWED = { "5539-2NA": 850, "5539-CNR": 400 };
+
+async function issue(
+  body: unknown,
+  rpc: ReturnType<typeof vi.fn>,
+  options: { mayIssue?: boolean; role?: "operation" | "principal" } = {},
+) {
+  vi.mocked(userClient).mockReturnValue(makeSb(rpc, options.mayIssue ?? true));
+  const jwt = await makeJwt(options.role ?? "operation");
+  return app.fetch(
+    new Request("https://api.test/api/operation/purchasing/requests/issue", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+    env as never,
+    { waitUntil() {}, passThroughException() {} } as never,
+  );
+}
+
+describe("POST /purchasing/requests/issue — the reason rides to the authority", () => {
+  it("refuses an ordinary non-duty operation user before the creation RPC", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
+    const res = await issue(
+      { requestIds: [REQ_A], together: false, expectedCosts: REVIEWED },
+      rpc,
+      { mayIssue: false },
+    );
+
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { code: string }).code).toBe("not_po_duty");
+    expect(rpc).not.toHaveBeenCalledWith("purchasing_issue_pos_batch", expect.anything());
+  });
+
+  it("accepts Jess through the same governed capability", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
+    const res = await issue(
+      { requestIds: [REQ_A], together: false, expectedCosts: REVIEWED },
+      rpc,
+      { role: "principal", mayIssue: true },
+    );
+
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_issue_pos_batch", expect.anything());
+  });
+
+  it("together: one document per supplier×category wall, carrying purpose and demand links", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
+    const res = await issue({ requestIds: [REQ_A, REQ_B], together: true, expectedCosts: REVIEWED }, rpc);
+    expect(res.status).toBe(200);
+
+    expect(rpc).toHaveBeenCalledWith("purchasing_issue_pos_batch", expect.anything());
+    const pos = rpc.mock.calls[0][1].p_pos as Array<Record<string, unknown>>;
+    expect(pos).toHaveLength(1);
+    // The REASON survives the round trip (card §6).
+    expect(pos[0].purpose).toBe("display");
+    // No so_refs — this document was not born from a customer order.
+    expect(pos[0].so_refs).toBeNull();
+    const lines = pos[0].lines as Array<Record<string, unknown>>;
+    // The approver's cut (2 of 3), never the original ask; each line names
+    // its demand.
+    expect(lines).toEqual([
+      expect.objectContaining({ sku: "5539-2NA", qty: 2, demand_id: LINES[0].id }),
+      expect.objectContaining({ sku: "5539-CNR", qty: 1, demand_id: LINES[1].id }),
+    ]);
+  });
+
+  it("declined: one document per request — the offer is an offer, not a gate", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001", "PO-9002"] }, error: null });
+    const res = await issue({ requestIds: [REQ_A, REQ_B], together: false, expectedCosts: REVIEWED }, rpc);
+    expect(res.status).toBe(200);
+    const pos = rpc.mock.calls[0][1].p_pos as Array<Record<string, unknown>>;
+    expect(pos).toHaveLength(2);
+  });
+
+  it("⭐ A LINE WITH NO RECORDED PRICE IS ISSUED, CARRYING NO COMMERCIAL CLAIM", async () => {
+    /**
+     * ⛔ THE GATE THIS REPLACES (owner instruction 2026-09-23). A SKU whose
+     * Catalog price was not set refused the whole issue with `cost_required`,
+     * so goods that were needed — and a purchase the approver had already
+     * decided to make — could not be ordered until somebody typed a number.
+     * Price and financial approval are NOT placement gates.
+     *
+     * The line goes out stating the ABSENCE: no cost, no cost source, no
+     * treatment. `normal` would claim a number nobody recorded.
+     */
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
+    const priced = SKUS[0]!.cost;
+    SKUS[0]!.cost = null;
+    try {
+      const res = await issue(
+        { requestIds: [REQ_A, REQ_B], together: true, expectedCosts: REVIEWED },
+        rpc,
+      );
+      expect(res.status).toBe(200);
+      const pos = rpc.mock.calls[0][1].p_pos as Array<Record<string, unknown>>;
+      const lines = pos[0].lines as Array<Record<string, unknown>>;
+      const unpriced = lines.find((l) => l.sku === "5539-2NA")!;
+      expect(unpriced.cost).toBeNull();
+      expect(unpriced.cost_source).toBeNull();
+      expect(unpriced.commercial_treatment).toBeNull();
+      expect(unpriced.expected_catalog_cost).toBeNull();
+      /* And the SKU that IS priced keeps every existing rule. */
+      const stillPriced = lines.find((l) => l.sku === "5539-CNR")!;
+      expect(stillPriced.cost).toBe(400);
+      expect(stillPriced.commercial_treatment).toBe("normal");
+    } finally {
+      SKUS[0]!.cost = priced;
+    }
+  });
+
+  it("missing production number names the blocker before issuing", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
+      ...CARD06_SETTINGS,
+      productionDays: [],
+    } as Awaited<ReturnType<typeof loadPurchasingSettings>>);
+    const res = await issue(
+      { requestIds: [REQ_A, REQ_B], together: true, expectedCosts: REVIEWED },
+      rpc,
+    );
+    expect(res.status).toBe(422);
+    expect(JSON.stringify(await res.json())).toContain("production_days_required");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("answers with the issued documents in the shape the shared review reads", async () => {
+    /* `Review Purchase Orders` is ONE surface for both buying lanes, and the
+       evidence step after an issue reads `pos` — so this door answers with the
+       same array the SO Batch door answers with. Issue is still not send. */
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
+    const res = await issue(
+      { requestIds: [REQ_A, REQ_B], together: true, expectedCosts: REVIEWED },
+      rpc,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      poIds: string[];
+      pos: Array<Record<string, unknown>>;
+    };
+    expect(body.poIds).toEqual(["PO-9001"]);
+    expect(body.pos).toHaveLength(1);
+    expect(body.pos[0]).toEqual(
+      expect.objectContaining({ id: "PO-9001", supplierId: SUP }),
+    );
+  });
+
+  it("an undecided approval-required request is refused before anything is built", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue(
+      makeSb(rpc),
+    );
+    // REQ_A undecided this time.
+    REQUESTS[0].approved_at = null;
+    try {
+      const res = await issue({ requestIds: [REQ_A], together: false, expectedCosts: REVIEWED }, rpc);
+      expect(res.status).toBe(409);
+      expect(rpc).not.toHaveBeenCalled();
+    } finally {
+      REQUESTS[0].approved_at = "2026-08-19T03:00:00Z";
+    }
+  });
+});
+
+/**
+ * ⭐ THE SAME COMMERCIAL AND ACTOR LAW ON THE MANUAL LANE
+ * (closure §1 · §2; 0379 · 0380).
+ *
+ * This lane called the creation authority with NO duty check at all, and it
+ * re-read the Catalog price itself and sent it back as `cost_source: catalog` —
+ * so the database compared its own live value against itself.
+ */
+describe("closure §2 · Catalog is the manual lane's normal price authority", () => {
+  it("sends the reviewed cost beside the server's own read", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
+    const res = await issue(
+      { requestIds: [REQ_A, REQ_B], together: true, expectedCosts: REVIEWED },
+      rpc,
+    );
+    expect(res.status).toBe(200);
+    const pos = rpc.mock.calls[0][1].p_pos as Array<Record<string, unknown>>;
+    const lines = pos[0].lines as Array<Record<string, unknown>>;
+    for (const l of lines) {
+      /* The stored number is the server's; the declaration is what makes the
+         comparison possible. Here they agree, which is the ordinary case. */
+      expect(l.expected_catalog_cost).toBe(l.cost);
+    }
+  });
+
+  it("does not require a browser price declaration", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
+    const res = await issue(
+      { requestIds: [REQ_A, REQ_B], together: true, expectedCosts: { "5539-2NA": 850 } },
+      rpc,
+    );
+    expect(res.status).toBe(200);
+    const pos = rpc.mock.calls[0][1].p_pos as Array<Record<string, unknown>>;
+    expect((pos[0].lines as Array<Record<string, unknown>>)[1].cost).toBe(400);
+  });
+
+  it("ignores a stale browser price and uses Catalog", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-9001"] }, error: null });
+    const res = await issue(
+      {
+        requestIds: [REQ_A, REQ_B],
+        together: true,
+        /* Catalog says 400 now; the operator looked at 380. */
+        expectedCosts: { "5539-2NA": 850, "5539-CNR": 380 },
+      },
+      rpc,
+    );
+    expect(res.status).toBe(200);
+    const pos = rpc.mock.calls[0][1].p_pos as Array<Record<string, unknown>>;
+    expect((pos[0].lines as Array<Record<string, unknown>>)[1].cost).toBe(400);
+  });
+
+  it("turns the database's duty refusal into the approved two lines", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { message: "only Current PO Duty…", details: "not_po_duty", code: "42501" },
+    });
+    const res = await issue(
+      { requestIds: [REQ_A, REQ_B], together: true, expectedCosts: REVIEWED },
+      rpc,
+    );
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code?: string; message?: string; action?: string };
+    expect(body.code).toBe("not_po_duty");
+    expect(body.message).toBe("Only Operation staff may issue a purchase order.");
+    expect(body.action?.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * ⭐ CARD 03 — the register read carries the rail's facts, and the doors
+ * speak the approved purpose vocabulary (owner ruling 2026-08-28).
+ */
+describe("Card 03 · GET /purchasing/requests — the CATALOG's category rides each line", () => {
+  const REG_LINES = [
+    { id: "dddddddd-0000-0000-0000-000000000001", request_id: REQ_A, sku: "5539-2NA",
+      supplier_id: SUP, qty: 3, approved_qty: 2, issued_qty: 0, remaining_qty: 2,
+      required_by: null, remark: null, po_id: null, cancelled_at: null, cancel_reason: null },
+    // A SKU whose TEXT screams mattress but whose Catalog category is absent:
+    // the line says `category: null` — never a SKU-text inference.
+    { id: "dddddddd-0000-0000-0000-000000000009", request_id: REQ_B, sku: "MATTRESS-TEXT-9",
+      supplier_id: SUP, qty: 1, approved_qty: null, issued_qty: 0, remaining_qty: 1,
+      required_by: null, remark: null, po_id: null, cancelled_at: null, cancel_reason: null },
+  ];
+
+  function makeRegisterSb() {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub(REQUESTS);
+          case "purchase_demands":
+            return tableStub(REG_LINES, { filterInBy: "request_id" });
+          case "product_skus":
+            return tableStub([
+              { sku: "5539-2NA", product_models: { category: "sofa" } },
+              { sku: "MATTRESS-TEXT-9", product_models: null },
+            ]);
+          case "suppliers":
+            return tableStub([
+              { id: SUP, name: "Hooka", kind: "own_logistics" },
+              { id: "cccccccc-0000-0000-0000-000000000009", name: "Bayview Properties", kind: "other_creditor" },
+            ]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn(),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  it("stamps the Catalog category on each line — null when Catalog has none", async () => {
+    vi.mocked(userClient).mockReturnValue(makeRegisterSb());
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      lines: Array<{ sku: string; category: string | null }>;
+    };
+    const bySku = new Map(body.lines.map((l) => [l.sku, l.category]));
+    expect(bySku.get("5539-2NA")).toBe("sofa");
+    expect(bySku.get("MATTRESS-TEXT-9")).toBeNull();
+  });
+
+  /* 0477 — Finance's landlord shares the suppliers table; the Register's
+     supplier list is Purchasing's and never carries it. */
+  it("leaves Finance's other creditors out of the supplier list", async () => {
+    vi.mocked(userClient).mockReturnValue(makeRegisterSb());
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { suppliers: Array<{ name: string; kind: string }> };
+    expect(body.suppliers.map((s) => s.name)).toEqual(["Hooka"]);
+  });
+});
+
+describe("Card 03 · the doors speak the approved purpose vocabulary", () => {
+  async function createHeader(
+    purpose: string,
+    extra: Record<string, unknown> = {},
+    rpc = vi.fn().mockResolvedValue({
+      data: { id: REQ_A, req_no: null, approval_required: true },
+      error: null,
+    }),
+  ) {
+    vi.mocked(userClient).mockReturnValue(makeSb(rpc));
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        /* Card 06 — a new request always carries its Delivery Date. */
+        body: JSON.stringify({
+          purpose,
+          destinationId: DEST,
+          requiredBy: "2026-09-15",
+          ...extra,
+        }),
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    return { res, rpc };
+  }
+
+  /** Card 04 — each exceptional purpose ships its own structured For fact. */
+  const FOR_FACT: Record<string, Record<string, unknown>> = {
+    ready_stock: {},
+    showroom_display: {},
+    service_case: { serviceCaseId: "cccccccc-0000-0000-0000-000000000001" },
+    internal_staff_purchase: { staffUserId: "dddddddd-0000-0000-0000-000000000001" },
+    subsidiary_purchase: { subsidiaryName: "Carres Living Sdn Bhd" },
+    other_purchase: { why: "spare parts for the van" },
+  };
+
+  it("admits every approved purpose — six of them — and hands it to the governed door", async () => {
+    for (const purpose of [
+      "ready_stock",
+      "showroom_display",
+      "service_case",
+      "internal_staff_purchase",
+      "subsidiary_purchase",
+      "other_purchase",
+    ]) {
+      const { res, rpc } = await createHeader(purpose, FOR_FACT[purpose]);
+      expect(res.status).toBe(200);
+      expect(rpc).toHaveBeenCalledWith(
+        "purchasing_create_request",
+        expect.objectContaining({ p_purpose: purpose }),
+      );
+    }
+  });
+
+  it("Card 04 · only Other Purchase requires `What is this for?`", async () => {
+    // Routine purposes send with NO why at all…
+    const ok = await createHeader("ready_stock", {});
+    expect(ok.res.status).toBe(200);
+    expect(ok.rpc).toHaveBeenCalledWith(
+      "purchasing_create_request",
+      expect.objectContaining({ p_purpose: "ready_stock", p_why: null }),
+    );
+    // …and Other Purchase without its answer is refused before the RPC.
+    const bad = await createHeader("other_purchase", {});
+    expect(bad.res.status).toBe(400);
+    expect(bad.rpc).not.toHaveBeenCalled();
+  });
+
+  it("Card 04 · each exceptional purpose must name its structured For object", async () => {
+    for (const purpose of [
+      "service_case",
+      "internal_staff_purchase",
+      "subsidiary_purchase",
+    ]) {
+      const { res, rpc } = await createHeader(purpose, {});
+      expect(res.status).toBe(400);
+      expect(rpc).not.toHaveBeenCalled();
+    }
+  });
+
+  it("refuses a retired value before the RPC — history is readable, not creatable", async () => {
+    for (const retired of ["display", "warranty", "office", "spare_parts"]) {
+      const { res, rpc } = await createHeader(retired);
+      expect(res.status).toBe(400);
+      expect(rpc).not.toHaveBeenCalled();
+    }
+  });
+
+  it("refuses an invented value — Management folds under Internal Staff Purchase", async () => {
+    const { res, rpc } = await createHeader("management_purchase");
+    expect(res.status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("Card 06 · a new request without its Delivery Date is refused before the RPC", async () => {
+    const { res, rpc } = await createHeader("ready_stock", { requiredBy: undefined });
+    expect(res.status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * ⭐ CARD 03 §3 — THE REGISTER NAMES THE REAL APPROVAL OWNER (2026-08-28).
+ *
+ * The rail says `Need approval`; the payload names who actually decides: the
+ * resolved `ops_manager` duty holder(s), the governed legacy list as the
+ * empty-seat fallback — and a robot or shared-password account never prints
+ * while a named person also holds the gate.
+ */
+import { dutyHolders } from "../../lib/duties";
+
+describe("Card 03 §3 · GET /purchasing/requests — the approval owner's name", () => {
+  const U_JESS = "11111111-1111-1111-1111-00000000000a";
+  const U_SHARED = "11111111-1111-1111-1111-00000000000b";
+
+  function makeApproverSb() {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub(REQUESTS);
+          case "purchase_demands":
+            return tableStub([], { filterInBy: "request_id" });
+          case "app_users":
+            return tableStub([
+              { id: U_JESS, name: "Jess", email: "jess@carres.com" },
+              { id: U_SHARED, name: "Operation", email: "operation@carres.com" },
+            ]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn(async (fn: string) => {
+        if (fn === "workspace_resolve_duty") {
+          return { data: { duty_key: "purchasing_approver", actor_user_id: resolved }, error: null };
+        }
+        if (fn === "actor_display_names") {
+          return { data: [{ id: U_JESS, name: "Jess" }], error: null };
+        }
+        return { data: null, error: null };
+      }),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  let resolved: string | null = null;
+  async function readRegister() {
+    vi.mocked(userClient).mockReturnValue(makeApproverSb());
+    const jwt = await makeJwt("operation");
+    return app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  it("names today's resolved Purchasing Approver through the governed name read", async () => {
+    resolved = U_JESS;
+    const res = await readRegister();
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { approvers: Array<{ id: string; name: string | null }> };
+    expect(body.approvers).toEqual([{ id: U_JESS, name: "Jess" }]);
+  });
+
+  it("0533 · names NOBODY while the duty is unheld — no ops_manager rung, no email list", async () => {
+    // jess@carres.com sits in the users read AND holds the ops_manager
+    // position duty: neither may name an approver any more.
+    resolved = null;
+    vi.mocked(dutyHolders).mockResolvedValueOnce({ [U_JESS]: ["ops_manager"] });
+    const res = await readRegister();
+    const body = (await res.json()) as { approvers: Array<{ id: string; name: string | null }> };
+    expect(body.approvers).toEqual([]);
+  });
+});
+
+/**
+ * PURCHASING CARD 04 — the permanent Register's read: real PO lineage, the
+ * Catalog's item words, and PO duty resolved by the one actor authority.
+ */
+describe("Card 04 · GET /purchasing/requests — lineage, item words, PO duty", () => {
+  const ME = "11111111-1111-1111-1111-000000000999"; // makeJwt's subject
+  /* ⭐ The PO's id IS its number (`purchase_orders.id` is the `PO-…` text;
+     no `po_no` column exists on the live schema — Card 05's authority read). */
+  const PO_1 = "PO-20260829-1111";
+  const PO_2 = "PO-20260829-2222";
+  const LINE_1 = "dddddddd-0000-0000-0000-000000000001";
+  const REG_LINES = [
+    { id: LINE_1, request_id: REQ_A, sku: "5539-2NA",
+      supplier_id: SUP, destination_id: DEST, qty: 3, approved_qty: 2, issued_qty: 2,
+      remaining_qty: 0, required_by: null, remark: null, po_id: PO_1,
+      cancelled_at: null, cancel_reason: null },
+  ];
+
+  function makeSbCard04(options: { actorUserId?: string; mayIssue?: boolean } = {}) {
+    const actorUserId = options.actorUserId ?? ME;
+    const mayIssue = options.mayIssue ?? true;
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub(REQUESTS);
+          case "purchase_demands":
+            return tableStub(REG_LINES, { filterInBy: "request_id" });
+          case "product_skus":
+            return tableStub([
+              { sku: "5539-2NA", variant: "Queen", variant_kind: "size",
+                product_models: { category: "sofa", name: "Sonic" } },
+            ]);
+          case "purchase_order_lines":
+            // The 0361 lineage: this demand was issued onto TWO documents;
+            // the demand's own po_id remembers only the last.
+            return tableStub([
+              { po_id: PO_1, sku: "5539-2NA", qty: 1, received_qty: 0, demand_id: LINE_1 },
+              { po_id: PO_2, sku: "5539-2NA", qty: 1, received_qty: 0, demand_id: LINE_1 },
+            ]);
+          case "purchase_orders":
+            return tableStub([{ id: PO_1 }, { id: PO_2 }]);
+          case "suppliers":
+            return tableStub([{ id: SUP, name: "Hooka", kind: "own_logistics" }]);
+          case "app_users":
+            return tableStub([
+              { id: ME, name: "Shasha", email: "shasha@carres.com" },
+            ]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn((fn: string) => {
+        if (fn === "purchasing_actor_may_issue") {
+          return Promise.resolve({ data: mayIssue, error: null });
+        }
+        return Promise.resolve({
+          data: { normal_user_id: actorUserId, acting_user_id: null, actor_user_id: actorUserId },
+          error: null,
+        });
+      }),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  it("PO No comes ONLY from real lineage — both documents, actual numbers, no UUID", async () => {
+    vi.mocked(userClient).mockReturnValue(makeSbCard04());
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      lines: Array<{ sku: string; po_ids: string[]; item_label: string }>;
+      pos: Array<{ id: string; po_no: string }>;
+      currentPoDuty: { userId: string; name: string } | null;
+      mayIssue: boolean;
+      poDutyUnavailable: boolean;
+    };
+    const line = body.lines.find((l) => l.sku === "5539-2NA")!;
+    expect(new Set(line.po_ids)).toEqual(new Set([PO_1, PO_2]));
+    expect(new Set(body.pos.map((p) => p.po_no))).toEqual(
+      new Set(["PO-20260829-1111", "PO-20260829-2222"]),
+    );
+    // The Catalog's human words ride the line (`railItemLabel`: Sonic Q).
+    expect(line.item_label).toBe("Sonic Q");
+    // PO duty resolved by the one actor authority; this login IS the actor.
+    expect(body.poDutyUnavailable).toBe(false);
+    expect(body.currentPoDuty).toEqual({ userId: ME, name: "Shasha" });
+    expect(body.mayIssue).toBe(true);
+  });
+
+  it("offers Issue PO to the governed Operations Superuser while another person holds PO duty", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      makeSbCard04({
+        actorUserId: "11111111-1111-1111-1111-000000000888",
+        mayIssue: true,
+      }),
+    );
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { mayIssue: boolean }).mayIssue).toBe(true);
+  });
+
+  it("does not offer Issue PO to an ordinary non-duty user", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      makeSbCard04({
+        actorUserId: "11111111-1111-1111-1111-000000000888",
+        mayIssue: false,
+      }),
+    );
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { mayIssue: boolean }).mayIssue).toBe(false);
+  });
+});
+
+/**
+ * ⭐ THE RENDER GATE AND THE SQL GATE ARE ONE GATE (2026-08-29).
+ *
+ * `purchasing_decide_request`'s SQL gate (`purchasing_settings_gate`) passes
+ * the `principal` role or a real `ops_manager` POSITION duty — no legacy
+ * email pass. `canApprove` used to answer through `isOpsManager`, whose
+ * legacy fallback admits the shared operation@ login — so the shared login
+ * was offered Approve/Refuse the door then refused with a raw `forbidden`
+ * (measured on production, MPR-20260829-2779). Both defects are pinned here.
+ */
+import { myDuties } from "../../lib/duties";
+
+describe("the decision gate — render asks what the door asks", () => {
+  const U_JESS = "11111111-1111-1111-1111-00000000000a";
+  const U_SHARED = "11111111-1111-1111-1111-00000000000b";
+
+  function makeGateSb(rpc: ReturnType<typeof vi.fn>) {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub(REQUESTS);
+          case "purchase_demands":
+            return tableStub([], { filterInBy: "request_id" });
+          case "app_users":
+            return tableStub([
+              { id: U_JESS, name: "Jess", email: "jess@carres.com" },
+              { id: U_SHARED, name: "Operation", email: "operation@carres.com" },
+            ]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc,
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function readRegister(role: string) {
+    vi.mocked(userClient).mockReturnValue(makeGateSb(vi.fn()));
+    const jwt = await makeJwt(role);
+    return app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  it("the shared operation@ login is NOT offered the decision — the door would refuse it", async () => {
+    // makeJwt("operation") is operation@carres.com: the legacy list's first
+    // entry. Without the ops_manager position duty, canApprove must say no.
+    const res = await readRegister("operation");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { canApprove: boolean };
+    expect(body.canApprove).toBe(false);
+  });
+
+  it("0533 · the ops_manager position no longer decides — only the resolved Purchasing Approver", async () => {
+    vi.mocked(myDuties).mockResolvedValueOnce(["ops_manager"]);
+    const res = await readRegister("operation");
+    const body = (await res.json()) as { canApprove: boolean };
+    expect(body.canApprove).toBe(false);
+  });
+
+  it("0533 · the principal ROLE alone does not decide — the shared owner login executes no duty", async () => {
+    const res = await readRegister("principal");
+    const body = (await res.json()) as { canApprove: boolean };
+    expect(body.canApprove).toBe(false);
+  });
+
+  it("today's resolved Purchasing Approver IS offered the decision", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      makeGateSb(
+        vi.fn(async (fn: string) =>
+          fn === "workspace_resolve_duty"
+            ? { data: { actor_user_id: "11111111-1111-1111-1111-000000000999" }, error: null }
+            : { data: null, error: null },
+        ),
+      ),
+    );
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    const body = (await res.json()) as { canApprove: boolean };
+    expect(body.canApprove).toBe(true);
+  });
+
+  it("the door's 42501 leaves as the approved two lines, naming the real approver", async () => {
+    const rpc = vi.fn(async (fn: string) => {
+      if (fn === "workspace_resolve_duty") return { data: { actor_user_id: U_JESS }, error: null };
+      if (fn === "actor_display_names") return { data: [{ id: U_JESS, name: "Jess" }], error: null };
+      return { data: null, error: { code: "42501", message: "forbidden", details: "not_purchase_approver" } };
+    });
+    vi.mocked(userClient).mockReturnValue(makeGateSb(rpc));
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(
+        `https://api.test/api/operation/purchasing/requests/${REQ_A}/decide`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ decision: "approve" }),
+        },
+      ),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as {
+      code: string;
+      message: string;
+      action: string;
+    };
+    expect(body.code).toBe("not_purchase_approver");
+    // Never the raw word: the fact, then the act, naming who decides.
+    expect(body.message).toBe("Only the approver may decide this purchase.");
+    expect(body.action).toBe("Ask Jess to approve or refuse it.");
+  });
+
+  /** Card 05 §5 — every 0360 refusal leaves in the approved two lines. */
+  async function decideWith(error: Record<string, unknown>) {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error });
+    vi.mocked(userClient).mockReturnValue(makeGateSb(rpc));
+    const jwt = await makeJwt("operation");
+    return app.fetch(
+      new Request(
+        `https://api.test/api/operation/purchasing/requests/${REQ_A}/decide`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ decision: "approve" }),
+        },
+      ),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  it("a second decision is refused atomically — in the governed words", async () => {
+    const res = await decideWith({
+      code: "22023",
+      message: "request is already decided",
+      details: "already_decided",
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code: string; message: string; action: string };
+    expect(body.code).toBe("already_decided");
+    expect(body.message).toBe("This purchase was already decided.");
+    expect(body.action).toBe("Reload the Manual Purchase Request to see the decision.");
+  });
+
+  it("a refusal without its reason leaves as the governed two lines", async () => {
+    const res = await decideWith({
+      code: "22023",
+      message: "a refusal needs a reason",
+      details: "reason_required",
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string; message: string; action: string };
+    expect(body.code).toBe("reason_required");
+    expect(body.message).toBe("The decision reason is missing.");
+    expect(body.action).toBe("Type why this purchase is not going ahead.");
+  });
+
+  it("an out-of-range cut leaves as the governed two lines", async () => {
+    const res = await decideWith({
+      code: "22023",
+      message: "cut for 5539-2NA must be between 0 and 3",
+      details: "invalid_cut_qty",
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("invalid_cut_qty");
+    expect(body.message).toBe("The approved quantity is not valid.");
+  });
+
+  it("an unmapped door error is the honest decision fallback — never raw SQL text", async () => {
+    const res = await decideWith({ code: "XX000", message: "deadlock detected" });
+    expect(res.status).toBe(500);
+    const body = (await res.json()) as { code: string; message: string; action: string };
+    expect(body.code).toBe("decision_not_recorded");
+    expect(body.message).toBe("The decision was not recorded.");
+    expect(JSON.stringify(body)).not.toContain("deadlock");
+  });
+
+  it("0533 · the requester deciding their own purchase leaves as its own governed two lines", async () => {
+    const res = await decideWith({ code: "42501", message: "you cannot decide a purchase you raised", details: "own_request" });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string; message: string; action: string };
+    expect(body.code).toBe("own_request");
+    expect(body.message).toBe("You cannot decide a purchase you raised.");
+    expect(body.action).toBe("Withdraw it if the goods are no longer needed.");
+  });
+
+  it("42501 with NO resolvable approver names the configuration hole", async () => {
+    // Nobody holds the duty, though jess@carres.com is among the users and
+    // holds the ops_manager position: the refusal says nobody holds it —
+    // no email list and no position rung may invent a name (0533).
+    const rpc = vi.fn(async (fn: string) =>
+      fn === "workspace_resolve_duty"
+        ? { data: { actor_user_id: null, source: "not_assigned" }, error: null }
+        : { data: null, error: { code: "42501", message: "Nobody holds Purchasing Approver.", details: "no_purchase_approver" } },
+    );
+    vi.mocked(userClient).mockReturnValue({
+      from: vi.fn((table: string) =>
+        table === "app_users"
+          ? tableStub([{ id: U_JESS, name: "Jess", email: "jess@carres.com" }])
+          : tableStub([]),
+      ),
+      rpc,
+    } as unknown as ReturnType<typeof userClient>);
+    vi.mocked(dutyHolders).mockResolvedValueOnce({ [U_JESS]: ["ops_manager"] });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(
+        `https://api.test/api/operation/purchasing/requests/${REQ_A}/decide`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ decision: "approve" }),
+        },
+      ),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string; message: string; action: string };
+    expect(body.code).toBe("no_purchase_approver");
+    expect(body.message).toBe("Nobody holds Purchasing Approver.");
+    expect(body.action).toBe("Set the holder in Workspace → Staff & Duties.");
+  });
+});
+
+/**
+ * CARD 05 · GET /detail/:id — the Object Detail's facts: exact PO lineage
+ * with its date words, stored-fact History, and the individual-only
+ * `Requested By`. No migration: every fact below is a column that already
+ * exists.
+ */
+describe("Card 05 · GET /purchasing/requests/detail/:id", () => {
+  const U_SHARED = "11111111-1111-1111-1111-00000000000b";
+  const U_JESS = "11111111-1111-1111-1111-00000000000a";
+  const PO_D = "PO-20260829-3333";
+  const LINE_D = "dddddddd-0000-0000-0000-0000000000d1";
+  const REQ_D = {
+    id: REQ_A,
+    req_no: "MPR-20260829-2779",
+    purpose: "ready_stock",
+    destination_id: DEST,
+    required_by: "2026-09-12",
+    why: null,
+    approval_required: true,
+    approved_at: "2026-08-29T02:42:00Z",
+    approved_by: U_JESS,
+    refused_at: null,
+    refused_by: null,
+    refuse_reason: null,
+    for_service_case_id: null,
+    for_staff_user_id: null,
+    for_subsidiary_name: null,
+    // The shared login raised it — an individual CANNOT be recovered.
+    created_by: U_SHARED,
+    created_at: "2026-08-29T01:00:00Z",
+  };
+
+  let detailActor: string | null = null;
+  let detailCreatedBy: string = U_SHARED;
+  function makeDetailSb() {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub({ ...REQ_D, created_by: detailCreatedBy });
+          case "purchase_demands":
+            return tableStub([
+              { id: LINE_D, sku: "5539-2NA", supplier_id: SUP, destination_id: DEST,
+                qty: 2, approved_qty: 1, issued_qty: 1, remaining_qty: 0,
+                required_by: null, remark: null, po_id: PO_D,
+                cancelled_at: null, cancel_reason: null },
+            ]);
+          case "product_skus":
+            return tableStub([
+              { sku: "5539-2NA", variant: null, variant_kind: null, cost: 850,
+                product_models: { category: "sofa", name: "Ohana 2 Seater" } },
+            ]);
+          case "purchase_order_lines":
+            return tableStub([
+              { po_id: PO_D, sku: "5539-2NA", qty: 1, received_qty: 0, demand_id: LINE_D },
+            ]);
+          case "purchase_orders":
+            return tableStub([
+              { id: PO_D, placed_at: "2026-08-29T03:05:00Z", official_delivery_date: "2026-09-01", eta_date: "2026-09-08", version: 1 },
+            ]);
+          case "po_supplier_promises":
+            // The supplier moved the date: the ledger holds the date we HELD.
+            return tableStub([
+              { po_id: PO_D, previous_date: "2026-09-01", new_date: "2026-09-08",
+                kind: "tomorrow_delivery", answer: "delayed", po_version: 1, channel: "whatsapp",
+                recipient: "Factory", evidence: "reply.png", reported_by: "Factory staff",
+                reported_at: "2026-09-02T01:00:00Z", recorded_by: U_JESS,
+                recorded_at: "2026-09-02T02:00:00Z" },
+            ]);
+          case "purchasing_destinations":
+            return tableStub([{ id: DEST, name: "Carres Klang" }]);
+          case "suppliers":
+            return tableStub([{ id: SUP, name: "Ohana", kind: "own_logistics" }]);
+          case "app_users":
+            return tableStub([
+              { id: U_JESS, name: "Jess", email: "jess@carres.com", role: "principal" },
+              { id: U_SHARED, name: "Operation", email: "operation@carres.com", role: "operation" },
+            ]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      /* D2 — names resolve through the shared actor door (0390), exactly as
+         production does; every other RPC answers nothing. */
+      rpc: vi.fn(async (name: string) =>
+        name === "workspace_resolve_duty"
+          ? { data: { actor_user_id: detailActor }, error: null }
+          : name === "actor_display_names"
+          ? {
+              data: [
+                { id: U_JESS, name: "Jess" },
+                { id: U_SHARED, name: "Operation" },
+              ],
+              error: null,
+            }
+          : { data: null, error: null },
+      ),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function readDetail(role = "operation") {
+    vi.mocked(userClient).mockReturnValue(makeDetailSb());
+    const jwt = await makeJwt(role);
+    return app.fetch(
+      new Request(
+        `https://api.test/api/operation/purchasing/requests/detail/${REQ_A}`,
+        { headers: { Authorization: `Bearer ${jwt}` } },
+      ),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  it("PO facts come from the exact linked document — issue time, original date, changed date", async () => {
+    const res = await readDetail();
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      pos: Array<{
+        id: string; po_no: string; placed_at: string | null;
+        po_delivery_date: string | null; supplier_delivery_date: string | null;
+        ordered_qty: number;
+      }>;
+    };
+    expect(body.pos).toEqual([
+      {
+        id: PO_D,
+        po_no: PO_D, // the PO's id IS its number — no po_no column exists
+        placed_at: "2026-08-29T03:05:00Z",
+        // D5 — no confirmed-sent mark on the current version: `Sending not confirmed`.
+        marked_sent_at: null,
+        // The ORIGINAL supplier-facing date is the one the ledger says we
+        // held before the supplier moved it; the moved date is the change.
+        po_delivery_date: "2026-09-01",
+        supplier_delivery_date: "2026-09-08",
+        ordered_qty: 1,
+      },
+    ]);
+  });
+
+  it("History holds only stored facts — created, approved, exact PO issue", async () => {
+    const res = await readDetail();
+    const body = (await res.json()) as {
+      history: Array<Record<string, unknown>>;
+      requested_by_name: string | null;
+    };
+    const kinds = body.history.map((h) => h.kind);
+    expect(kinds).toEqual(["created", "approved", "po_issued"]);
+    const created = body.history[0];
+    // The shared login is a permission, not a person — no actor is invented.
+    expect(created.actor).toBeNull();
+    expect(body.requested_by_name).toBeNull();
+    const approved = body.history[1];
+    expect(approved.actor).toBe("Jess");
+    expect(approved.actor_role).toBe("principal");
+    expect(approved.requested_units).toBe(2);
+    expect(approved.approved_units).toBe(1);
+    const issued = body.history[2];
+    expect(issued.po_no).toBe(PO_D);
+    expect(issued.units).toBe(1);
+    expect(issued.occurred_at).toBe("2026-08-29T03:05:00Z");
+  });
+
+  it("money is absent for a non-approver — the key does not exist", async () => {
+    const res = await readDetail("operation");
+    const body = (await res.json()) as {
+      canApprove: boolean;
+      lines: Array<Record<string, unknown>>;
+    };
+    expect(body.canApprove).toBe(false);
+    expect("unit_cost" in body.lines[0]).toBe(false);
+  });
+
+  it("the approver's money rides the line; lineage and item words ride every line", async () => {
+    detailActor = "11111111-1111-1111-1111-000000000999"; // makeJwt's subject
+    const res = await readDetail("principal");
+    const body = (await res.json()) as {
+      canApprove: boolean;
+      lines: Array<{ unit_cost?: number | null; item_label?: string; po_ids?: string[]; destination_id?: string }>;
+    };
+    expect(body.canApprove).toBe(true);
+    expect(body.lines[0].unit_cost).toBe(850);
+    expect(body.lines[0].item_label).toBe("Ohana 2 Seater");
+    expect(body.lines[0].po_ids).toEqual([PO_D]);
+    expect(body.lines[0].destination_id).toBe(DEST);
+    detailActor = null;
+  });
+
+  it("0533 · the resolved approver is NOT offered the decision on a purchase they raised", async () => {
+    detailActor = "11111111-1111-1111-1111-000000000999";
+    detailCreatedBy = "11111111-1111-1111-1111-000000000999";
+    const res = await readDetail("principal");
+    const body = (await res.json()) as { canApprove: boolean };
+    expect(body.canApprove).toBe(false);
+    detailActor = null;
+    detailCreatedBy = U_SHARED;
+  });
+});
+
+/**
+ * PURCHASING CARD 06 — the server date projection, the create form's plan
+ * read, and the Delivery-Date document partition. The arithmetic itself is
+ * the shared planners' (tested in packages/shared); these tests pin the
+ * WIRING: the route calls the one arithmetic, stamps every line, and never
+ * invents a date.
+ */
+import { loadPurchasingSettings } from "../../lib/purchasing-settings";
+import { expectedArrivalOf, orderByFromDeliveryDate } from "@carres/shared";
+
+const CARD06_SETTINGS = {
+  orderByBufferDays: 7,
+  earliestSellDays: 21,
+  logisticsCallWorkingDays: 1,
+  poDays: [1, 3, 5],
+  manualPurchaseMinDeliveryDays: 0,
+  suppliers: [
+    { id: SUP, name: "Hooka", categories: ["sofa"], offDays: [0] },
+  ],
+  productionDays: [{ supplierId: SUP, category: "sofa", workingDays: 5 }],
+  destinations: [],
+  lastChanges: [],
+} as Awaited<ReturnType<typeof loadPurchasingSettings>>;
+
+describe("Card 06 · GET /purchasing/requests — the server date projection", () => {
+  const LINE_1 = "dddddddd-0000-0000-0000-0000000000c1";
+  const DATED_REQUESTS = [
+    {
+      id: REQ_A, req_no: "MPR-20260830-0001", purpose: "ready_stock",
+      destination_id: DEST, required_by: "2026-10-16",
+      approval_required: true, approved_at: "2026-08-30T03:00:00Z", refused_at: null,
+      created_at: "2026-08-30T01:00:00Z",
+    },
+  ];
+  function makeDatedSb(sends: Array<Record<string, unknown>> = []) {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub(DATED_REQUESTS);
+          case "purchase_demands":
+            return tableStub(
+              [
+                // The line's own required_by is null — the header's Delivery
+                // Date is its fallback (Card 06 §3.2).
+                { id: LINE_1, request_id: REQ_A, sku: "5539-2NA", supplier_id: SUP,
+                  destination_id: DEST, qty: 2, approved_qty: 2, issued_qty: 1,
+                  remaining_qty: 1, required_by: null, remark: null, po_id: "PO-20260830-0001",
+                  cancelled_at: null, cancel_reason: null },
+              ],
+              { filterInBy: "request_id" },
+            );
+          case "product_skus":
+            return tableStub([
+              { sku: "5539-2NA", variant: null, variant_kind: null,
+                product_models: { category: "sofa", name: "Sonic" } },
+            ]);
+          case "purchase_order_lines":
+            return tableStub([
+              { po_id: "PO-20260830-0001", sku: "5539-2NA", qty: 1, received_qty: 0,
+                demand_id: LINE_1 },
+            ]);
+          case "purchase_orders":
+            return tableStub([{ id: "PO-20260830-0001", version: 2 }]);
+          case "po_sends":
+            return tableStub(sends);
+          case "suppliers":
+            return tableStub([{ id: SUP, name: "Hooka", kind: "own_logistics" }]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn().mockResolvedValue({ data: {}, error: null }),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function readRegister() {
+    const jwt = await makeJwt("operation");
+    return app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  it("stamps delivery_date (header fallback) and order_by via the ONE inverse planner", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce(CARD06_SETTINGS);
+    vi.mocked(userClient).mockReturnValue(makeDatedSb());
+    const res = await readRegister();
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      lines: Array<{
+        delivery_date: string | null; order_by: string | null;
+        production_days_missing: boolean;
+      }>;
+      todayIso: string;
+      planUnavailable: boolean;
+    };
+    expect(body.planUnavailable).toBe(false);
+    expect(body.todayIso).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(body.lines[0].delivery_date).toBe("2026-10-16");
+    // The wiring calls the same shared arithmetic — agreement, not a copy.
+    expect(body.lines[0].order_by).toBe(
+      orderByFromDeliveryDate(CARD06_SETTINGS, {
+        supplierId: SUP,
+        category: "sofa",
+        deliveryDateIso: "2026-10-16",
+      }),
+    );
+    // Fri 16 Oct − 5 Hooka working days (Mon to Sat) = Sat 10 Oct: production
+    // only, no transit leg (owner ruling 2026-09-29).
+    expect(body.lines[0].order_by).toBe("2026-10-10");
+    expect(body.lines[0].production_days_missing).toBe(false);
+    expect(body.lines[0]).not.toHaveProperty("transit_days_missing");
+  });
+
+  it("missing Settings produce NO guessed date — the exact gap is named instead", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
+      ...CARD06_SETTINGS,
+      suppliers: [
+        { id: SUP, name: "Hooka", categories: ["sofa"], offDays: [0] },
+      ],
+      productionDays: [],
+    } as Awaited<ReturnType<typeof loadPurchasingSettings>>);
+    vi.mocked(userClient).mockReturnValue(makeDatedSb());
+    const body = (await (await readRegister()).json()) as {
+      lines: Array<{
+        order_by: string | null;
+        production_days_missing: boolean;
+      }>;
+    };
+    expect(body.lines[0].order_by).toBeNull();
+    expect(body.lines[0].production_days_missing).toBe(true);
+    // The transit gap no longer exists (owner ruling 2026-09-29).
+    expect(body.lines[0]).not.toHaveProperty("transit_days_missing");
+  });
+
+  it("a numbered PO is not `sent` — only the CURRENT version's confirmed-sent evidence", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce(CARD06_SETTINGS);
+    // Version 1 was confirmed sent, but the document is at Version 2 now:
+    // the older evidence completes nothing.
+    vi.mocked(userClient).mockReturnValue(
+      makeDatedSb([{ po_id: "PO-20260830-0001", po_version: 1, kind: "confirmed_sent" }]),
+    );
+    let body = (await (await readRegister()).json()) as {
+      pos: Array<{ id: string; sent: boolean }>;
+    };
+    expect(body.pos[0].sent).toBe(false);
+
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce(CARD06_SETTINGS);
+    vi.mocked(userClient).mockReturnValue(
+      makeDatedSb([{ po_id: "PO-20260830-0001", po_version: 2, kind: "confirmed_sent" }]),
+    );
+    body = (await (await readRegister()).json()) as {
+      pos: Array<{ id: string; sent: boolean }>;
+    };
+    expect(body.pos[0].sent).toBe(true);
+  });
+});
+
+describe("Card 06 · POST /purchasing/requests/plan — the create form's date plan", () => {
+  async function plan(skus: string[]) {
+    const jwt = await makeJwt("operation");
+    return app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests/plan", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ skus }),
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  function makePlanSb() {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "product_skus":
+            return tableStub([
+              { sku: "5539-2NA", supplier_id: SUP, product_models: { category: "sofa" } },
+              { sku: "NO-CATALOG", supplier_id: null, product_models: null },
+            ]);
+          case "suppliers":
+            return tableStub([{ id: SUP, name: "Hooka" }]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn(),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  it("no SKUs still answers the Proceed Date preview — the server's own date", async () => {
+    vi.mocked(userClient).mockReturnValue(makePlanSb());
+    const res = await plan([]);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { proceedDate: string; deliveryDateDefault: null };
+    expect(body.proceedDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(body.deliveryDateDefault).toBeNull();
+  });
+
+  it("complete Settings propose the arrival from the ONE forward planner", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce(CARD06_SETTINGS);
+    vi.mocked(userClient).mockReturnValue(makePlanSb());
+    const res = await plan(["5539-2NA"]);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      proceedDate: string;
+      lines: Array<{
+        sku: string; supplierName: string | null; category: string | null;
+        productionDays: number | null; arrival: string | null;
+      }>;
+      deliveryDateDefault: string | null;
+    };
+    expect(body.lines[0]).toMatchObject({
+      sku: "5539-2NA",
+      supplierName: "Hooka",
+      category: "sofa",
+      productionDays: 5,
+    });
+    expect(body.lines[0]).not.toHaveProperty("transitDays");
+    // Agreement with the shared arithmetic from the same Proceed Date.
+    expect(body.lines[0].arrival).toBe(
+      expectedArrivalOf(CARD06_SETTINGS, {
+        supplierId: SUP,
+        category: "sofa",
+        fromIso: body.proceedDate,
+      }),
+    );
+    expect(body.deliveryDateDefault).toBe(body.lines[0].arrival);
+  });
+
+  it("an incomplete line proposes NOTHING — no default, nulls named, never a guess", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce(CARD06_SETTINGS);
+    vi.mocked(userClient).mockReturnValue(makePlanSb());
+    const res = await plan(["5539-2NA", "NO-CATALOG"]);
+    const body = (await res.json()) as {
+      lines: Array<{ sku: string; arrival: string | null }>;
+      deliveryDateDefault: string | null;
+    };
+    expect(body.lines.find((l) => l.sku === "NO-CATALOG")?.arrival).toBeNull();
+    // One incomplete line means the form cannot be defaulted truthfully.
+    expect(body.deliveryDateDefault).toBeNull();
+  });
+});
+
+describe("Card 06 · POST /issue — Delivery Date joins the document partition", () => {
+  const DATED_REQS = [
+    {
+      id: REQ_A, req_no: "MPR-1", purpose: "ready_stock", destination_id: DEST,
+      required_by: "2026-10-10",
+      approval_required: true, approved_at: "2026-08-30T03:00:00Z", refused_at: null,
+    },
+    {
+      id: REQ_B, req_no: "MPR-2", purpose: "ready_stock", destination_id: DEST,
+      required_by: "2026-10-20",
+      approval_required: false, approved_at: "2026-08-19T03:05:00Z", refused_at: null,
+    },
+  ];
+  const DATED_LINES = [
+    { id: "dddddddd-0000-0000-0000-0000000000a1", request_id: REQ_A, sku: "5539-2NA",
+      supplier_id: SUP, destination_id: DEST, qty: 1, approved_qty: null, issued_qty: 0,
+      required_by: null, cancelled_at: null },
+    { id: "dddddddd-0000-0000-0000-0000000000a2", request_id: REQ_B, sku: "5539-CNR",
+      supplier_id: SUP, destination_id: DEST, qty: 1, approved_qty: null, issued_qty: 0,
+      required_by: null, cancelled_at: null },
+  ];
+  function makeDatedIssueSb(rpc: ReturnType<typeof vi.fn>) {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub(DATED_REQS, { filterInBy: "id" });
+          case "purchase_demands":
+            return tableStub(DATED_LINES, { filterInBy: "request_id" });
+          case "product_skus":
+            return tableStub([
+              { sku: "5539-2NA", supplier_id: SUP, cost: 850, product_models: { category: "sofa" } },
+              { sku: "5539-CNR", supplier_id: SUP, cost: 400, product_models: { category: "sofa" } },
+            ]);
+          case "suppliers":
+            return tableStub([{ id: SUP, kind: "own_logistics" }]);
+          case "warehouses":
+            return tableStub([
+              { id: "eeeeeeee-0000-0000-0000-000000000001", name: "Carres Klang", kind: "own" },
+            ]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn((fn: string, args: unknown) => {
+        if (fn === "purchasing_actor_may_issue") {
+          return Promise.resolve({ data: true, error: null });
+        }
+        return rpc(fn, args);
+      }),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  it("two Delivery Dates still create two POs — and neither prints the requested date", async () => {
+    // A real October clock can legitimately calculate one of the fixture dates.
+    // Fix the PO date so this tests date ownership rather than calendar coincidence.
+    vi.useFakeTimers({ now: new Date("2026-09-22T04:00:00Z"), toFake: ["Date"] });
+    /**
+     * ⭐ THE OWNER CORRECTION OF 2026-09-22, IN ONE TEST.
+     *
+     * The MPR's `Delivery Date` still SPLITS the documents — two approved
+     * dates are two supplier commitments, so the five-fact partition keeps
+     * them apart. What changed is what reaches the supplier's paper: the PO's
+     * own delivery date is now `PO Date + n Settings working days`, with no
+     * transit added, so a request raised for a showroom two months out stops
+     * printing that far date as if the factory had agreed it.
+     */
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: ["PO-1", "PO-2"] }, error: null });
+    vi.mocked(userClient).mockReturnValue(makeDatedIssueSb(rpc));
+    /* The Settings the date now comes from: Hooka, sofa, 5 working days. */
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce(CARD06_SETTINGS);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests/issue", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requestIds: [REQ_A, REQ_B],
+          together: true,
+          expectedCosts: REVIEWED,
+        }),
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(200);
+    const pos = rpc.mock.calls[0][1].p_pos as Array<Record<string, unknown>>;
+    // Same supplier × category × destination × purpose — two approved
+    // Delivery Dates are two supplier commitments (Card 06 §7, unchanged).
+    expect(pos).toHaveLength(2);
+    // ⛔ THE REQUESTED DATES NO LONGER REACH THE DOCUMENT.
+    expect(pos.map((p) => p.eta_date)).not.toContain("2026-10-10");
+    expect(pos.map((p) => p.eta_date)).not.toContain("2026-10-20");
+    // Every document carries the ONE Settings arithmetic, from today's PO
+    // Date — the same function the paper's `PO {n}-Day` label counts back.
+    const expected = poDeliveryDateOf(CARD06_SETTINGS, {
+      supplierId: SUP,
+      category: "sofa",
+      poDateIso: todayIsoMYT(),
+    });
+    expect(expected).not.toBeNull();
+    expect(new Set(pos.map((p) => p.eta_date))).toEqual(new Set([expected]));
+    expect((await res.json() as { documents: number }).documents).toBe(2);
+  });
+});
+
+/**
+ * EVERY REFUSAL ON THIS DOOR ARRIVES WITH WORDS (YH, 2026-09-01).
+ *
+ * Four throw sites on `POST /issue` were bare `c.json({ error, code })` while
+ * their neighbours ten lines away already used `refuse()`. A bare body carries
+ * no `message` and no `action`, so the browser fell through to the honest
+ * fallback — "The Portal refused this purchase order. Tell IT the message on
+ * screen." — for the TWO COMMONEST outcomes of this door. Nothing was broken
+ * and nothing was said.
+ *
+ * These tests assert the CONTRACT, not the spelling: every refusal carries a
+ * message and an action, and neither is the fallback. `purchasing-refusals.ts`
+ * owns the words and its own suite pins their shape, so a ruled reword changes
+ * one file and passes here untouched.
+ */
+describe("POST /purchasing/requests/issue — a refusal says what is wrong and what to do", () => {
+  const FALLBACK = purchasingRefusal("__not_a_code__");
+
+  type Over = {
+    requests?: unknown[];
+    lines?: unknown[];
+    skus?: unknown[];
+    suppliers?: unknown[];
+    collections?: unknown[];
+  };
+
+  function sbWith(over: Over, rpc: ReturnType<typeof vi.fn>) {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub(over.requests ?? REQUESTS, { filterInBy: "id" });
+          case "purchase_demands":
+            return tableStub(over.lines ?? LINES, { filterInBy: "request_id" });
+          case "product_skus":
+            return tableStub(
+              over.skus ?? [
+                { sku: "5539-2NA", supplier_id: SUP, cost: 850, product_models: { category: "sofa" } },
+                { sku: "5539-CNR", supplier_id: SUP, cost: 400, product_models: { category: "sofa" } },
+              ],
+            );
+          case "suppliers":
+            return tableStub(over.suppliers ?? [{ id: SUP, kind: "own_logistics", name: "Ohana" }]);
+          case "purchasing_supplier_settings":
+            return tableStub(over.collections ?? []);
+          case "warehouses":
+            return tableStub([
+              { id: "eeeeeeee-0000-0000-0000-000000000001", name: "Carres Klang", kind: "own" },
+            ]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn((fn: string, args: unknown) => {
+        if (fn === "purchasing_actor_may_issue") return Promise.resolve({ data: true, error: null });
+        return rpc(fn, args);
+      }),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function issueAgainst(over: Over, body: unknown) {
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: [] }, error: null });
+    vi.mocked(userClient).mockReturnValue(sbWith(over, rpc));
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests/issue", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    return { res, rpc, body: (await res.json()) as Record<string, string> };
+  }
+
+  /** The whole contract in one place: a code, words, and NOT the fallback. */
+  function expectSpoken(payload: Record<string, string>, code: string) {
+    expect(payload.code, "the code still travels").toBe(code);
+    expect(payload.message, `${code} has a fact`).toBeTruthy();
+    expect(payload.action, `${code} has an act`).toBeTruthy();
+    expect(payload.message, `${code} is not the fallback`).not.toBe(FALLBACK.wrong);
+    expect(payload.action, `${code} is not the fallback`).not.toBe(FALLBACK.todo);
+  }
+
+  /* ⭐ THE DELIVER TO GATE (owner, 2026-09-03). A supplier Carres collects
+     from has one place its goods land, held in Purchasing Settings. A request
+     that names another Deliver To is refused BEFORE any PO exists, and the
+     refusal names the supplier and the governed place — the sentence the
+     owner met on MPR-20260903-3381. This pre-flight had no test until now. */
+  it("refuses a collected supplier's request that names another Deliver To, before creating anything", async () => {
+    const OHANA = "cccccccc-0000-0000-0000-000000000002";
+    const { res, rpc, body } = await issueAgainst(
+      {
+        suppliers: [{ id: SUP, kind: "factory_pickup", name: "Ohana" }],
+        collections: [
+          {
+            supplier_id: SUP,
+            fixed_destination_id: OHANA,
+            collected_by_partner_id: "ffffffff-0000-0000-0000-000000000001",
+          },
+        ],
+      },
+      { requestIds: [REQ_A], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(422);
+    expectSpoken(body, "supplier_collection_destination_mismatch");
+    expect(body.message).toContain("Ohana must be collected to");
+    expect(body.supplier, "the supplier travels as a fact").toBe("Ohana");
+    expect(rpc, "no PO was created").not.toHaveBeenCalled();
+  });
+
+  it("names a Manual Purchase that is no longer on the list", async () => {
+    const { res, rpc, body } = await issueAgainst(
+      { requests: [REQUESTS[0]] },
+      { requestIds: [REQ_A, REQ_B], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(404);
+    expectSpoken(body, "unknown_request");
+    expect(rpc, "nothing was created").not.toHaveBeenCalled();
+  });
+
+  /* ⭐ ONE CODE CANNOT SAY TWO THINGS. `not_ready_to_order` used to cover BOTH
+     "nobody has approved this yet" and "somebody refused this" — opposite
+     facts with opposite next acts. The route separates them; these two tests
+     are what stop them being folded back together. */
+  it("separates a Manual Purchase nobody has approved yet", async () => {
+    const { res, rpc, body } = await issueAgainst(
+      {
+        requests: [
+          { ...REQUESTS[0], approved_at: null, refused_at: null, approval_required: true },
+        ],
+      },
+      { requestIds: [REQ_A], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(409);
+    expectSpoken(body, "not_ready_to_order");
+    expect(body.requestId, "the row is named so the operator can find it").toBe(REQ_A);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("separates a Manual Purchase somebody refused", async () => {
+    const { res, body } = await issueAgainst(
+      { requests: [{ ...REQUESTS[0], refused_at: "2026-08-30T02:00:00Z" }] },
+      { requestIds: [REQ_A], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(409);
+    expectSpoken(body, "request_refused");
+    /* The two are genuinely different sentences, not one word reused. */
+    expect(body.message).not.toBe(purchasingRefusal("not_ready_to_order").wrong);
+  });
+
+  it("names an issue with nothing left to buy on it", async () => {
+    const { res, body } = await issueAgainst(
+      { lines: [{ ...LINES[0], approved_qty: 2, issued_qty: 2 }] },
+      { requestIds: [REQ_A], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(409);
+    expectSpoken(body, "nothing_to_issue");
+  });
+
+  it("names the SKU whose supplier the catalog does not hold", async () => {
+    const { res, body } = await issueAgainst(
+      {
+        lines: [LINES[0]],
+        skus: [{ sku: "5539-2NA", supplier_id: null, cost: 850, product_models: { category: "sofa" } }],
+      },
+      { requestIds: [REQ_A], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(422);
+    expectSpoken(body, "unresolved_supplier");
+    /* The sentence names the SKU rather than saying "an item". */
+    expect(body.message).toContain("5539-2NA");
+  });
+
+  /* 0477 — a catalog slot pointed at Finance's landlord is not a supplier
+     Purchasing may buy from: the same refusal as an empty slot, and no PO. */
+  it("refuses a SKU whose catalog supplier is Finance's other creditor", async () => {
+    const { res, rpc, body } = await issueAgainst(
+      {
+        lines: [LINES[0]],
+        suppliers: [{ id: SUP, kind: "other_creditor", name: "Bayview Properties" }],
+      },
+      { requestIds: [REQ_A], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(422);
+    expectSpoken(body, "unresolved_supplier");
+    expect(body.message).toContain("5539-2NA");
+    expect(rpc, "no PO was created").not.toHaveBeenCalledWith(
+      "purchasing_issue_pos_batch",
+      expect.anything(),
+    );
+  });
+
+  /* ⭐ THE DELIVER TO DOOR (0421). MPR-20260903-3381 was told "Set Deliver To
+     to Ohana, then issue again" and had no way to. PUT /:id/deliver-to is
+     that way: it runs the same collection pre-flight as /issue, then asks the
+     RPC, and every refusal leaves with its two lines. */
+  describe("PUT /purchasing/requests/:id/deliver-to", () => {
+    const OHANA = "cccccccc-0000-0000-0000-000000000002";
+
+    async function moveAgainst(over: Over, rpc: ReturnType<typeof vi.fn>, destinationId = OHANA) {
+      vi.mocked(userClient).mockReturnValue(sbWith(over, rpc));
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request(`https://api.test/api/operation/purchasing/requests/${REQ_A}/deliver-to`, {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ destinationId }),
+        }),
+        env as never,
+        { waitUntil() {}, passThroughException() {} } as never,
+      );
+      return { res, rpc, body: (await res.json()) as Record<string, unknown> };
+    }
+
+    it("asks the RPC to move the request, with the request and the place", async () => {
+      const rpc = vi.fn().mockResolvedValue({
+        data: { id: REQ_A, req_no: "REQ-0001", destination_id: OHANA, moved: true },
+        error: null,
+      });
+      const { res, body } = await moveAgainst({}, rpc);
+      expect(res.status).toBe(200);
+      expect(rpc).toHaveBeenCalledWith("purchasing_move_request_destination", {
+        p_id: REQ_A,
+        p_destination_id: OHANA,
+      });
+      expect(body.ok).toBe(true);
+      expect(body.moved).toBe(true);
+    });
+
+    it("a request already on a PO is refused in the governed words", async () => {
+      const rpc = vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: "22023", message: "request is already ordered", details: "request_ordered" },
+      });
+      const { res, body } = await moveAgainst({}, rpc);
+      expect(res.status).toBe(422);
+      expectSpoken(body as Record<string, string>, "request_ordered");
+      expect(body.message).toBe("This request is already ordered. Deliver To cannot move.");
+      expect(body.action).toBe("Revise the purchase order instead.");
+    });
+
+    it("a request with nothing going ahead is refused in the governed words", async () => {
+      const rpc = vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: "22023", message: "request is not going ahead", details: "request_closed" },
+      });
+      const { res, body } = await moveAgainst({}, rpc);
+      expect(res.status).toBe(422);
+      expectSpoken(body as Record<string, string>, "request_closed");
+    });
+
+    it("a collected supplier's request cannot move away from its governed place — refused before the RPC", async () => {
+      const rpc = vi.fn();
+      const KLANG = "cccccccc-0000-0000-0000-000000000009";
+      const { res, body } = await moveAgainst(
+        {
+          suppliers: [{ id: SUP, kind: "factory_pickup", name: "Ohana" }],
+          collections: [
+            {
+              supplier_id: SUP,
+              fixed_destination_id: OHANA,
+              collected_by_partner_id: "ffffffff-0000-0000-0000-000000000001",
+            },
+          ],
+        },
+        rpc,
+        KLANG,
+      );
+      expect(res.status).toBe(422);
+      expectSpoken(body as Record<string, string>, "supplier_collection_destination_mismatch");
+      expect(body.message).toContain("Ohana must be collected to");
+      expect(rpc).not.toHaveBeenCalled();
+    });
+
+    it("a move TO the governed place passes the pre-flight", async () => {
+      const rpc = vi.fn().mockResolvedValue({
+        data: { id: REQ_A, moved: true },
+        error: null,
+      });
+      const { res } = await moveAgainst(
+        {
+          suppliers: [{ id: SUP, kind: "factory_pickup", name: "Ohana" }],
+          collections: [
+            {
+              supplier_id: SUP,
+              fixed_destination_id: OHANA,
+              collected_by_partner_id: "ffffffff-0000-0000-0000-000000000001",
+            },
+          ],
+        },
+        rpc,
+        OHANA,
+      );
+      expect(res.status).toBe(200);
+      expect(rpc).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+/**
+ * A MANUAL PURCHASE ARRIVES WHOLE, OR NOT AT ALL (0410, YH 2026-09-01).
+ *
+ * The create form used to POST the header, read back its id, then POST one
+ * line per line in a loop — six transactions for one act. A failure on line 3
+ * left a committed header holding two of five lines, on no screen and behind
+ * no door, and the Register listed it as a real request.
+ *
+ * These tests pin the ROUTE's half of the fix: lines that arrive with the
+ * header go to the one transactional door, and — because `0410` is applied by
+ * hand — a build that reaches production before the migration does must still
+ * be able to create a Manual Purchase.
+ */
+describe("POST /purchasing/requests — the whole request, or none of it", () => {
+  const HEADER = {
+    purpose: "ready_stock",
+    destinationId: DEST,
+    requiredBy: "2026-09-15",
+  };
+
+  async function post(body: unknown, rpc: ReturnType<typeof vi.fn>) {
+    vi.mocked(userClient).mockReturnValue(makeSb(rpc));
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    return { res, rpc };
+  }
+
+  it("sends header and lines to the ONE transactional door", async () => {
+    const rpc = vi
+      .fn()
+      .mockResolvedValue({ data: { id: REQ_A, req_no: "MPR-1", approval_required: true }, error: null });
+    const { res } = await post(
+      { ...HEADER, lines: [{ sku: "5539-2NA", qty: 2 }, { sku: "5539-CNR", qty: 1 }] },
+      rpc,
+    );
+    expect(res.status).toBe(200);
+    const [fn, args] = rpc.mock.calls[0] as [string, Record<string, unknown>];
+    expect(fn).toBe("purchasing_create_request_with_lines");
+    expect(args.p_lines).toEqual([
+      { sku: "5539-2NA", qty: 2, required_by: null, remark: null, attrs: null },
+      { sku: "5539-CNR", qty: 1, required_by: null, remark: null, attrs: null },
+    ]);
+    /* ONE call. The per-line loop is what this replaces. */
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("⭐ 0549 · THE RECORDED INTENT RIDES THE CREATE, BY NAME", async () => {
+    /* ⛔ THE BUG THIS PINS. 0546 built the binding column, the guards, the
+       arithmetic, the atomic save and the issue ceiling — every one of them
+       reads `fulfilment_intent` — and NOTHING wrote it. The create route sent
+       seven names, PostgREST resolved to the pre-intent overload, the column
+       stored NULL, and every goods line read `This purchase did not record
+       whether stock can answer it`. The name is the fix; asserting the VALUE
+       alone would pass on a call that still lost it. */
+    const rpc = vi
+      .fn()
+      .mockResolvedValue({ data: { id: REQ_A, req_no: "MPR-1", approval_required: true }, error: null });
+    const { res } = await post(
+      { ...HEADER, fulfilmentIntent: "concrete_need", lines: [{ sku: "5539-2NA", qty: 1 }] },
+      rpc,
+    );
+    expect(res.status).toBe(200);
+    const [, args] = rpc.mock.calls[0] as [string, Record<string, unknown>];
+    expect(args).toHaveProperty("p_fulfilment_intent", "concrete_need");
+  });
+
+  it("⛔ 0549 · AN UNANSWERED CREATE SENDS NULL — never a guessed answer", async () => {
+    /* A caller that records no intent gets the honest absence. The screen is
+       what refuses an unanswered form; the wire never invents one, so a
+       pre-0549 row and a skipped question read the same and both say so. */
+    const rpc = vi
+      .fn()
+      .mockResolvedValue({ data: { id: REQ_A, req_no: "MPR-1", approval_required: true }, error: null });
+    const { res } = await post({ ...HEADER, lines: [{ sku: "5539-2NA", qty: 1 }] }, rpc);
+    expect(res.status).toBe(200);
+    const [, args] = rpc.mock.calls[0] as [string, Record<string, unknown>];
+    expect(args).toHaveProperty("p_fulfilment_intent", null);
+  });
+
+  it("⛔ 0549 · AND A THIRD INTENT NEVER REACHES THE DOOR", async () => {
+    const rpc = vi.fn();
+    const { res } = await post(
+      { ...HEADER, fulfilmentIntent: "maybe", lines: [{ sku: "5539-2NA", qty: 1 }] },
+      rpc,
+    );
+    expect(res.status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a request with no lines before it reaches the database", async () => {
+    /* An empty Manual Purchase is the orphan `0410` exists to delete. The
+       route refuses it on the schema, so no transaction is even opened; the
+       function refuses it again in SQL, because a screen is not a rule. */
+    const rpc = vi.fn();
+    const { res } = await post({ ...HEADER, lines: [] }, rpc);
+    expect(res.status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("returns a real refusal from the transactional door untouched", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "22023", message: "unknown sku NOPE", details: "unknown_sku" },
+    });
+    const { res } = await post({ ...HEADER, lines: [{ sku: "NOPE", qty: 1 }] }, rpc);
+    expect(res.status).toBe(422);
+    /* It must NOT be mistaken for a missing migration and silently retried on
+       the old door — that is how a refusal would become a half-written row. */
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  /* ⛔ MERGED IS NOT APPLIED — AND DEGRADING IS NOT DROPPING.
+     ⭐ RE-PINNED THE SAME DAY IT WAS WRITTEN (YH, 2026-09-01). The original
+     assertion here was that a missing `0410` falls back to the header-only
+     door and returns 200, on the reasoning that a create form which 404s for a
+     day is worse than one that degrades. The reasoning was right and what it
+     pinned was wrong: the header-only door cannot write lines, the browser is
+     the only caller and always sends them, so that 200 meant an EMPTY request
+     and a form that ticked every line as created. An approver could approve a
+     purchase with no items and it would read `Ready to order` for ever.
+     A 404 is found in one second. An empty approved purchase is found weeks
+     later by somebody wondering why nothing arrived. The test now pins the
+     refusal, and pins that NOTHING was written behind it. */
+  for (const code of ["PGRST202", "42883"]) {
+    it(`refuses in words when the create migration is not applied yet, and writes nothing (${code})`, async () => {
+      const rpc = vi.fn().mockResolvedValue({ data: null, error: { code, message: "not found" } });
+      const { res } = await post({ ...HEADER, lines: [{ sku: "5539-2NA", qty: 1 }] }, rpc);
+      expect(res.status).toBe(503);
+      const body = (await res.json()) as Record<string, string>;
+      expect(body.code).toBe("migration_not_applied");
+      /* It says what happened and who fixes it — never a bare code. */
+      expect(body.message).toBeTruthy();
+      /* The refusal names the migration THIS build needs (0562 since Card 13),
+         not the one two cards ago — an operator forwarding it to IT must be
+         able to act on the sentence. */
+      expect(body.action).toContain("0562");
+      /* ⛔ AND IT DOES NOT QUIETLY TRY THE HEADER-ONLY DOOR. One call, one
+         refusal; a second call here would be the dropped-lines bug again. */
+      expect(rpc).toHaveBeenCalledTimes(1);
+      expect(rpc.mock.calls[0][0]).toBe("purchasing_create_request_with_lines");
+    });
+  }
+
+  it("still accepts a header with no lines at all, for a caller that sends none", async () => {
+    const rpc = vi
+      .fn()
+      .mockResolvedValue({ data: { id: REQ_A, req_no: "MPR-1", approval_required: true }, error: null });
+    const { res } = await post(HEADER, rpc);
+    expect(res.status).toBe(200);
+    expect(rpc.mock.calls[0][0]).toBe("purchasing_create_request");
+  });
+});
+
+/**
+ * 0422 — THE EARLIEST DELIVERY DATE A MANUAL PURCHASE MAY ASK FOR
+ * (YH, 2026-09-04; owner ruling: a number, not a switch).
+ *
+ * Purchasing Settings holds `manual_purchase_min_delivery_days` (calendar
+ * days). The floor is the Proceed Date — today, Malaysia — plus that number.
+ * When the number is above 0 and the asked-for date is earlier, the create
+ * door refuses BEFORE the create RPC. 0, or settings unavailable: the door
+ * behaves exactly as before. The lead-time plan is not consulted.
+ */
+describe("POST /purchasing/requests — the earliest Delivery Date a Manual Purchase may ask for (0422)", () => {
+  const HEADER = { purpose: "ready_stock", destinationId: DEST };
+  const LINES = [{ sku: "5539-2NA", qty: 1 }];
+
+  function sbWith(rpc: ReturnType<typeof vi.fn>) {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "product_skus":
+            return tableStub([
+              { sku: "5539-2NA", supplier_id: SUP, product_models: { category: "sofa" } },
+            ]);
+          case "suppliers":
+            return tableStub([{ id: SUP, name: "Hooka" }]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn((fn: string, args: unknown) => rpc(fn, args)),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function create(body: unknown, rpc: ReturnType<typeof vi.fn>) {
+    vi.mocked(userClient).mockReturnValue(sbWith(rpc));
+    const jwt = await makeJwt("operation");
+    return app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  const created = () =>
+    vi.fn().mockResolvedValue({
+      data: { id: REQ_A, req_no: "MPR-1", approval_required: true },
+      error: null,
+    });
+
+  /** Today in Malaysia + n calendar days — the floor, computed here by hand
+   *  so the route's arithmetic is pinned by value, not trusted. */
+  const mytPlus = (n: number) =>
+    new Date(Date.now() + 8 * 3_600_000 + n * 86_400_000).toISOString().slice(0, 10);
+
+  it("3 days + a Delivery Date before Proceed Date + 3 → 422, and the RPC is never called", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
+      ...CARD06_SETTINGS,
+      manualPurchaseMinDeliveryDays: 3,
+    });
+    const rpc = created();
+    const tooEarly = mytPlus(2);
+    const res = await create({ ...HEADER, requiredBy: tooEarly, lines: LINES }, rpc);
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as Record<string, string>;
+    expect(body.code).toBe("delivery_date_before_earliest");
+    expect(body.date).toBe(tooEarly);
+    expect(body.earliest).toBe(mytPlus(3));
+    expect(body.message).toContain(tooEarly);
+    expect(body.action).toContain(mytPlus(3));
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("3 days + a Delivery Date exactly on Proceed Date + 3 → the RPC is called", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
+      ...CARD06_SETTINGS,
+      manualPurchaseMinDeliveryDays: 3,
+    });
+    const rpc = created();
+    const res = await create({ ...HEADER, requiredBy: mytPlus(3), lines: LINES }, rpc);
+    expect(res.status).toBe(200);
+    expect(rpc.mock.calls[0][0]).toBe("purchasing_create_request_with_lines");
+  });
+
+  it("0 days → an early Delivery Date still reaches the RPC (today's behaviour)", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
+      ...CARD06_SETTINGS,
+      manualPurchaseMinDeliveryDays: 0,
+    });
+    const rpc = created();
+    const res = await create({ ...HEADER, requiredBy: "2020-01-01", lines: LINES }, rpc);
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("the settings cannot be loaded → no number, no floor, no refusal", async () => {
+    vi.mocked(loadPurchasingSettings).mockRejectedValueOnce(new Error("purchasing_settings: down"));
+    const rpc = created();
+    const res = await create({ ...HEADER, requiredBy: "2020-01-01", lines: LINES }, rpc);
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* ════════════════════════════════════════════════════════════════════════
+ * MANUAL PURCHASE · READY STOCK ALLOCATION (owner ruling 2026-09-18)
+ *
+ * GET  /:id/stock-allocation  what is on the shelf for each line, what the
+ *                             line already holds, and whether it may choose
+ * POST /:id/stock-allocation  the one save — the COMPLETE desired set
+ *
+ * ⭐ THESE TESTS REPLACE THE READ-ONLY `ready-stock` SUITE, WHICH ASSERTED A
+ * RULE THE OWNER HAS SINCE OVERWRITTEN. It proved the section could never
+ * write. It can now — for a CONCRETE NEED on an APPROVED request, and for
+ * nothing else. What the old suite protected that still stands (the ask is
+ * never netted, a counted row shows and is not a Unit, a dead line asks for
+ * nothing) is protected here, in the new shape.
+ * ════════════════════════════════════════════════════════════════════════ */
+describe("GET /purchasing/requests/:id/stock-allocation", () => {
+  const REQ = "aaaaaaaa-0000-0000-0000-0000000000aa";
+  const LINE = "bbbbbbbb-0000-0000-0000-0000000000b1";
+  const UNIT = "ffffffff-0000-0000-0000-000000000001";
+  const BULK = "ffffffff-0000-0000-0000-000000000002";
+  const HELD = "ffffffff-0000-0000-0000-000000000003";
+
+  type ReqRow = Record<string, unknown>;
+  const approvedRequest = (over: ReqRow = {}): ReqRow => ({
+    id: REQ,
+    req_no: "MPR-20260918-4103",
+    fulfilment_intent: "concrete_need",
+    approved_at: "2026-09-18T02:00:00Z",
+    refused_at: null,
+    withdrawn_at: null,
+    sent_back_at: null,
+    ...over,
+  });
+
+  function allocSb(
+    request: ReqRow | null,
+    lines: Array<Record<string, unknown>>,
+    held: Array<Record<string, unknown>> = [],
+    rpc: ReturnType<typeof vi.fn> = vi.fn(),
+  ) {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub(request);
+          case "purchase_demands":
+            return tableStub(lines);
+          case "stock_unit_register_v":
+            return tableStub(held);
+          case "product_skus":
+            return tableStub([
+              {
+                sku: "5539-2NA",
+                variant: null,
+                variant_kind: null,
+                product_models: { name: "Ohana 2 Seater" },
+              },
+            ]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc,
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function read(
+    request: ReqRow | null,
+    lines: Array<Record<string, unknown>>,
+    held: Array<Record<string, unknown>> = [],
+  ) {
+    vi.mocked(userClient).mockReturnValue(allocSb(request, lines, held));
+    const jwt = await makeJwt("operation");
+    return app.fetch(
+      new Request(
+        `https://api.test/api/operation/purchasing/requests/${REQ}/stock-allocation`,
+        { headers: { Authorization: `Bearer ${jwt}` } },
+      ),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  type Body = {
+    reference: string | null;
+    intent: string | null;
+    approved: boolean;
+    lines: Array<{
+      demandId: string;
+      item: string;
+      requestedQty: number;
+      availableQty: number;
+      reservedQty: number;
+      remainingQty: number;
+      stockBlock: string | null;
+      units: Array<Record<string, unknown>>;
+    }>;
+  };
+
+  beforeEach(() => {
+    vi.mocked(readFreeStock).mockResolvedValue({
+      stockWarehouse: null,
+      freeStock: {},
+      stockQtyById: new Map(),
+      freeUnitsByKey: new Map([
+        [
+          stockMatchKey("5539-2NA"),
+          [
+            {
+              id: UNIT,
+              unitCode: "U1-000-014",
+              sku: "5539-2NA",
+              qty: 1,
+              condition: "exhibition",
+              siteName: "Carres Klang",
+              holderName: null,
+              ownership: "carres_owned",
+              supplier: "Ohana",
+              identityScope: "unit",
+              dateIn: "2026-08-01T09:30:00Z",
+              poNo: "PO-20260801-1121",
+            },
+            {
+              id: BULK,
+              unitCode: "QTY-5539-2NA",
+              sku: "5539-2NA",
+              qty: 12,
+              condition: null,
+              siteName: "Carres Klang",
+              holderName: null,
+              ownership: "carres_owned",
+              supplier: null,
+              identityScope: "quantity",
+              dateIn: null,
+              poNo: null,
+            },
+          ],
+        ],
+      ]),
+    });
+  });
+
+  it("prints the ask, the shelf and the remainder as THREE numbers and nets none of them into the ask", async () => {
+    const res = await read(approvedRequest(), [
+      {
+        id: LINE,
+        sku: "5539-2NA",
+        qty: 4,
+        approved_qty: null,
+        issued_qty: 0,
+        cancelled_at: null,
+      },
+    ]);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Body;
+    const [line] = body.lines;
+    expect(line.item).toBe("Ohana 2 Seater");
+    /* ⛔ THE ORIGINAL ASK SURVIVES. 4 asked, 13 on the shelf, 4 still to buy
+       because nothing has been SAVED yet — seeing stock is not taking it. */
+    expect(line.requestedQty).toBe(4);
+    expect(line.availableQty).toBe(13);
+    expect(line.reservedQty).toBe(0);
+    expect(line.remainingQty).toBe(4);
+    expect(line.stockBlock).toBeNull();
+  });
+
+  it("a counted row SHOWS and cannot be ticked (0453 · 0368)", async () => {
+    const res = await read(approvedRequest(), [
+      { id: LINE, sku: "5539-2NA", qty: 4, approved_qty: null, issued_qty: 0, cancelled_at: null },
+    ]);
+    const body = (await res.json()) as Body;
+    const units = body.lines[0]!.units;
+    /* Hiding the 12 would make a full shelf read as an empty one. */
+    expect(units.map((u) => u.itemId)).toEqual([UNIT, BULK]);
+    expect(units[1]!.blocked).toBe("counted_stock");
+    /* A counted key is not a Unit ID and never pretends to be one. */
+    expect(units[1]!.identityScope).toBe("quantity");
+  });
+
+  it("the picker's six facts come from the STOCK record, and the receipt date is a DATE", async () => {
+    const res = await read(approvedRequest(), [
+      { id: LINE, sku: "5539-2NA", qty: 1, approved_qty: null, issued_qty: 0, cancelled_at: null },
+    ]);
+    const unit = ((await res.json()) as Body).lines[0]!.units[0]!;
+    /* Date only on this picker; the stored timestamp is not rewritten. */
+    expect(unit.goodsReceivedDate).toBe("2026-08-01");
+    expect(unit.stockLocation).toBe("Carres Klang");
+    expect(unit.supplier).toBe("Ohana");
+    /* The Unit's OWN source document — never the Manual Purchase reading it. */
+    expect(unit.sourceRef).toBe("PO-20260801-1121");
+    expect(unit.unitCode).toBe("U1-000-014");
+    expect(unit.condition).toBe("exhibition");
+  });
+
+  it("a Unit already saved against this line is reserved, is listed first, and reduces the remainder", async () => {
+    const res = await read(
+      approvedRequest(),
+      [
+        {
+          id: LINE,
+          sku: "5539-2NA",
+          qty: 2,
+          approved_qty: null,
+          issued_qty: 0,
+          cancelled_at: null,
+        },
+      ],
+      [
+        {
+          id: HELD,
+          unit_code: "U1-000-099",
+          sku: "5539-2NA",
+          qty: 1,
+          date_in: "2026-07-02",
+          condition: "new",
+          site_name: "Carres Klang",
+          supplier: "Ohana",
+          po_no: null,
+          ownership: "carres_owned",
+          identity_scope: "unit",
+          reserved_ref: "MPR-20260918-4103",
+          reserved_purchase_demand_id: LINE,
+        },
+      ],
+    );
+    const line = ((await res.json()) as Body).lines[0]!;
+    expect(line.reservedQty).toBe(1);
+    /* SAVED UNITS COME FIRST and are never hidden — the journey that takes a
+       choice back has to stay reachable. */
+    expect(line.units[0]!.itemId).toBe(HELD);
+    expect(line.units[0]!.reservedForThisLine).toBe(true);
+    /* 2 asked − 0 issued − 1 saved = 1 still to buy. */
+    expect(line.remainingQty).toBe(1);
+  });
+
+  it("an unapproved request may not choose stock, and says so instead of hiding the shelf", async () => {
+    const res = await read(approvedRequest({ approved_at: null }), [
+      { id: LINE, sku: "5539-2NA", qty: 1, approved_qty: null, issued_qty: 0, cancelled_at: null },
+    ]);
+    const body = (await res.json()) as Body;
+    expect(body.approved).toBe(false);
+    expect(body.lines[0]!.stockBlock).toBe("not_approved");
+    /* The goods still SHOW: the operator can see what is there while they
+       wait, they simply cannot commit it. */
+    expect(body.lines[0]!.units.length).toBeGreaterThan(0);
+  });
+
+  it("ADDITIONAL REPLENISHMENT is read-only, and existing stock never reduces its ask", async () => {
+    const res = await read(approvedRequest({ fulfilment_intent: "additional_stock" }), [
+      { id: LINE, sku: "5539-2NA", qty: 4, approved_qty: null, issued_qty: 0, cancelled_at: null },
+    ]);
+    const line = ((await res.json()) as Body).lines[0]!;
+    expect(line.stockBlock).toBe("additional_stock");
+    /* 13 free on the shelf and the ask is still 4 to buy. */
+    expect(line.availableQty).toBe(13);
+    expect(line.remainingQty).toBe(4);
+  });
+
+  it("AN UNRECORDED INTENT IS ITS OWN STATE — never guessed into either answer", async () => {
+    const res = await read(approvedRequest({ fulfilment_intent: null }), [
+      { id: LINE, sku: "5539-2NA", qty: 4, approved_qty: null, issued_qty: 0, cancelled_at: null },
+    ]);
+    const body = (await res.json()) as Body;
+    expect(body.intent).toBeNull();
+    expect(body.lines[0]!.stockBlock).toBe("intent_not_recorded");
+  });
+
+  it("a request minted before the number came back cannot save stock against nothing", async () => {
+    const res = await read(approvedRequest({ req_no: null }), [
+      { id: LINE, sku: "5539-2NA", qty: 1, approved_qty: null, issued_qty: 0, cancelled_at: null },
+    ]);
+    const body = (await res.json()) as Body;
+    expect(body.reference).toBeNull();
+    expect(body.lines[0]!.stockBlock).toBe("request_has_no_number");
+  });
+
+  it("the approver's cut REPLACES the ask, and an issued quantity has already left it", async () => {
+    const res = await read(approvedRequest(), [
+      { id: LINE, sku: "5539-2NA", qty: 5, approved_qty: 3, issued_qty: 1, cancelled_at: null },
+    ]);
+    const line = ((await res.json()) as Body).lines[0]!;
+    /* The ORIGINAL ask still prints; the remainder is 3 − 1 = 2. */
+    expect(line.requestedQty).toBe(5);
+    expect(line.remainingQty).toBe(2);
+  });
+
+  it("a line nobody is going ahead with asks for nothing and cannot be chosen against", async () => {
+    const res = await read(approvedRequest(), [
+      {
+        id: LINE,
+        sku: "5539-2NA",
+        qty: 4,
+        approved_qty: null,
+        issued_qty: 0,
+        cancelled_at: "2026-09-01T00:00:00Z",
+      },
+    ]);
+    const line = ((await res.json()) as Body).lines[0]!;
+    expect(line.remainingQty).toBe(0);
+    expect(line.stockBlock).toBe("line_not_going_ahead");
+  });
+
+  it("READING WRITES NOTHING — no RPC runs", async () => {
+    const sb = allocSb(approvedRequest(), [
+      { id: LINE, sku: "5539-2NA", qty: 1, approved_qty: null, issued_qty: 0, cancelled_at: null },
+    ]);
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(
+        `https://api.test/api/operation/purchasing/requests/${REQ}/stock-allocation`,
+        { headers: { Authorization: `Bearer ${jwt}` } },
+      ),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(200);
+    expect((sb as unknown as { rpc: ReturnType<typeof vi.fn> }).rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses an id that is not a request id before it reads anything", async () => {
+    vi.mocked(userClient).mockReturnValue(allocSb(approvedRequest(), []));
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(
+        "https://api.test/api/operation/purchasing/requests/not-a-uuid/stock-allocation",
+        { headers: { Authorization: `Bearer ${jwt}` } },
+      ),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(400);
+  });
+});
+
+/* ════════════════════════════════════════════════════════════════════════
+ * THE DEPLOY WINDOW — code on `main` before 0546 is applied
+ *
+ * ⭐ `main` deploys the code; the migration lands through its own governed
+ * path. Between them the allocation column does not exist, and the Register
+ * must keep working — but it must NOT start guessing.
+ * ════════════════════════════════════════════════════════════════════════ */
+describe("the Register before 0546 is applied", () => {
+  const LINES = [
+    {
+      id: "dddddddd-0000-0000-0000-0000000000a1",
+      request_id: REQUESTS[0]!.id,
+      sku: "5539-2NA",
+      supplier_id: SUP,
+      qty: 3,
+      approved_qty: null,
+      issued_qty: 0,
+      remaining_qty: 3,
+      required_by: null,
+      remark: null,
+      po_id: null,
+      cancelled_at: null,
+      cancel_reason: null,
+    },
+  ];
+
+  /** The whole register read, with the saved-stock read failing its own way. */
+  function registerSb(stockError: { code?: string; message: string }) {
+    const base = {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub(REQUESTS);
+          case "purchase_demands":
+            return tableStub(LINES, { filterInBy: "request_id" });
+          case "ops_stock_items":
+            /* `.select().in().in()` — the shape the saved-stock read uses. */
+            return {
+              select: () => ({
+                in: () => ({ in: () => Promise.resolve({ data: null, error: stockError }) }),
+              }),
+            };
+          case "suppliers":
+            return tableStub([{ id: SUP, name: "Hooka", kind: "own_logistics" }]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn(),
+    };
+    return base as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function register(stockError: { code?: string; message: string }) {
+    vi.mocked(userClient).mockReturnValue(registerSb(stockError));
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(200);
+    return (await res.json()) as {
+      linesUnavailable?: boolean;
+      lines: Array<{ stock_reserved_qty?: number }>;
+    };
+  }
+
+  it("⭐ a MISSING COLUMN is not unknown — nothing can be allocated where there is nowhere to store it", async () => {
+    const body = await register({
+      code: "42703",
+      message: "column ops_stock_items.reserved_purchase_demand_id does not exist",
+    });
+    /* Unknown here would be a portal-wide P1: every remainder unreadable, so
+       every Manual Purchase row would read `Remaining quantity not checked`
+       and NOTHING could be ticked until the migration landed. Zero is the TRUE
+       answer before the column exists, not a guess — which is the only reason
+       this one code is tolerated. */
+    expect(body.linesUnavailable).toBeFalsy();
+    expect(body.lines.length).toBeGreaterThan(0);
+    for (const l of body.lines) expect(l.stock_reserved_qty).toBe(0);
+  });
+
+  it("⛔ EVERY OTHER FAILURE STAYS UNKNOWN and still refuses the tick", async () => {
+    const body = await register({ code: "57014", message: "canceling statement due to timeout" });
+    expect(body.linesUnavailable).toBe(true);
+  });
+});
+
+describe("POST /purchasing/requests/:id/stock-allocation — the one save", () => {
+  const REQ = "aaaaaaaa-0000-0000-0000-0000000000aa";
+  const OTHER_REQ = "aaaaaaaa-0000-0000-0000-0000000000bb";
+  const LINE = "bbbbbbbb-0000-0000-0000-0000000000b1";
+  const UNIT = "ffffffff-0000-0000-0000-000000000001";
+
+  function saveSb(line: Record<string, unknown> | null, rpc: ReturnType<typeof vi.fn>) {
+    return {
+      from: vi.fn((table: string) =>
+        table === "purchase_demands" ? tableStub(line) : tableStub([]),
+      ),
+      rpc,
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function save(
+    line: Record<string, unknown> | null,
+    rpc: ReturnType<typeof vi.fn>,
+    body: Record<string, unknown>,
+  ) {
+    vi.mocked(userClient).mockReturnValue(saveSb(line, rpc));
+    const jwt = await makeJwt("operation");
+    return app.fetch(
+      new Request(
+        `https://api.test/api/operation/purchasing/requests/${REQ}/stock-allocation`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      ),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  it("sends the COMPLETE desired set to the ONE allocation door — never an SO reservation route", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { demandId: LINE, reserved: 1, added: 1, removed: 0, remainingQty: 0 },
+      error: null,
+    });
+    const res = await save({ id: LINE, request_id: REQ }, rpc, {
+      demandId: LINE,
+      itemIds: [UNIT],
+      expectedItemIds: [],
+    });
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_allocate_ready_units", {
+      p_demand_id: LINE,
+      p_item_ids: [UNIT],
+      p_expected_item_ids: [],
+    });
+    /* ⛔ AN MPR ID NEVER REACHES THE SALES-ORDER DOOR. */
+    expect(rpc.mock.calls.map((c) => c[0])).not.toContain("so_batch_reserve_ready_units");
+  });
+
+  it("AN EMPTY SET IS A REAL SAVE — removing every Unit needs no second door", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { demandId: LINE, reserved: 0, added: 0, removed: 2, remainingQty: 2 },
+      error: null,
+    });
+    const res = await save({ id: LINE, request_id: REQ }, rpc, {
+      demandId: LINE,
+      itemIds: [],
+    });
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_allocate_ready_units", {
+      p_demand_id: LINE,
+      p_item_ids: [],
+      p_expected_item_ids: null,
+    });
+  });
+
+  it("refuses a line that belongs to a DIFFERENT Manual Purchase", async () => {
+    const rpc = vi.fn();
+    const res = await save({ id: LINE, request_id: OTHER_REQ }, rpc, {
+      demandId: LINE,
+      itemIds: [UNIT],
+    });
+    expect(res.status).toBe(404);
+    /* The route owns the relationship between its own two identities: without
+       this, naming somebody else's line would bind Units to it. */
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("passes the door's own refusal code and the Unit that stopped it", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: {
+        code: "40001",
+        message: "unit_no_longer_free",
+        details: `someone else took that Unit · unit_id=${UNIT}`,
+      },
+    });
+    const res = await save({ id: LINE, request_id: REQ }, rpc, {
+      demandId: LINE,
+      itemIds: [UNIT],
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code?: string; itemId?: string };
+    expect(body.code).toBe("unit_no_longer_free");
+    expect(body.itemId).toBe(UNIT);
+  });
+
+  it("names the intent refusal rather than a generic one", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "22023", message: "request_not_a_concrete_need", details: "" },
+    });
+    const res = await save({ id: LINE, request_id: REQ }, rpc, {
+      demandId: LINE,
+      itemIds: [UNIT],
+    });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code?: string }).code).toBe("request_not_a_concrete_need");
+  });
+});
+
+/* ════════════════════════════════════════════════════════════════════════
+ * THE PURCHASING APPROVER RESOLVES THROUGH THE SHARED DUTY RESOLVER (0474)
+ *
+ * ⭐ The screen and the door must ask the SAME system. Staff & Duties writes
+ * `workspace_duty_assignments` and `workspace_resolve_duty` reads it;
+ * `org_position_duties` is the HR POSITION duty table and a different one.
+ * Reading the wrong table is what made an assignment made on the Staff &
+ * Duties screen invisible to Manual Purchase — measured on production
+ * 2026-09-11: 13 `po_duty` and 13 `grn_duty` assignments there, and zero
+ * `purchasing_approver`.
+ * ════════════════════════════════════════════════════════════════════════ */
+describe("GET /purchasing/requests — who the Register names as approver", () => {
+  const JESS = "11111111-1111-1111-1111-00000000ce55";
+  const YJ = "11111111-1111-1111-1111-00000000cd7a";
+
+  function registerSb(resolved: string | null, opsManagerHolders: string[]) {
+    vi.mocked(dutyHolders).mockResolvedValue(
+      Object.fromEntries(opsManagerHolders.map((id) => [id, ["ops_manager"]])),
+    );
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub([]);
+          case "app_users":
+            return tableStub([
+              { id: JESS, name: "Jess", email: "jess@carres.com" },
+              { id: YJ, name: "Yu Jun", email: "yujun@carres.com" },
+            ]);
+          case "purchasing_destinations":
+          case "suppliers":
+          case "service_cases":
+            return tableStub([]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn((fn: string) => {
+        if (fn === "workspace_resolve_duty") {
+          return Promise.resolve({
+            data: {
+              duty_key: "purchasing_approver",
+              actor_user_id: resolved,
+              normal_user_id: resolved,
+              source: resolved ? "assignment" : "not_assigned",
+            },
+            error: null,
+          });
+        }
+        return Promise.resolve({ data: null, error: null });
+      }),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function register(resolved: string | null, opsManagerHolders: string[]) {
+    vi.mocked(userClient).mockReturnValue(registerSb(resolved, opsManagerHolders));
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    return (await res.json()) as { approvers: Array<{ id: string; name: string | null }> };
+  }
+
+  it("names TODAY'S RESOLVED holder — not whoever holds the ops_manager POSITION", async () => {
+    /* Yu Jun holds the Workspace duty; Jess holds the legacy position duty.
+       The approved target is the Workspace duty, so Yu Jun is the answer and
+       the legacy rung is over the moment somebody is assigned. */
+    const body = await register(YJ, [JESS]);
+    expect(body.approvers.map((a) => a.id)).toEqual([YJ]);
+  });
+
+  it("0533 · names nobody while the duty resolves to nobody — the ops_manager rung is gone", async () => {
+    const body = await register(null, [JESS]);
+    expect(body.approvers).toEqual([]);
+  });
+
+  it("a resolver that cannot answer fails soft to NOBODY, never wider", async () => {
+    vi.mocked(dutyHolders).mockResolvedValue({ [JESS]: ["ops_manager"] });
+    vi.mocked(userClient).mockReturnValue({
+      from: vi.fn((table: string) =>
+        table === "app_users"
+          ? tableStub([{ id: JESS, name: "Jess", email: "jess@carres.com" }])
+          : tableStub([]),
+      ),
+      rpc: vi.fn(() =>
+        Promise.resolve({ data: null, error: { message: "resolver down" } }),
+      ),
+    } as unknown as ReturnType<typeof userClient>);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { approvers: Array<{ id: string }>; canApprove: boolean };
+    expect(body.approvers).toEqual([]);
+    /* A failed read must never widen the gate. */
+    expect(body.canApprove).toBe(false);
+  });
+});

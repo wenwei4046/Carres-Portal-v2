@@ -100,11 +100,11 @@ describe("the live state — one case, closed, filed before the questions", () =
     renderPanel();
 
     const avg = await screen.findByTestId("numbers-avg-days");
-    expect(avg.textContent).toContain("—");
+    expect(avg.textContent).not.toMatch(/[—–]/);
     expect(avg.textContent).toContain("closed before the portal recorded");
 
     const onTime = screen.getByTestId("numbers-on-time");
-    expect(onTime.textContent).toContain("—");
+    expect(onTime.textContent).not.toMatch(/[—–]/);
     expect(onTime.textContent).not.toContain("%");
   });
 
@@ -148,7 +148,7 @@ describe("the rankings — the card's one glance", () => {
     onTime: { measured: 2, unmeasured: 0, onTime: 1, late: 1, pct: 50, withheldReason: null },
     byResponsibility: { supplier: 2, carres: 1, customer: 0 },
     delayReasonsRecorded: 3,
-    headline: "4 cases reported. Damaged is the most common problem — 3 of 4. Ohana carries the most: 3.",
+    headline: "4 cases reported. Damaged is the most common problem: 3 of 4. Ohana carries the most: 3.",
   });
 
   it("shows the leading problem with its per-category split", async () => {

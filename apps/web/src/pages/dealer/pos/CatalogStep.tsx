@@ -1,5 +1,19 @@
-import { Search, Sofa } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import {
+  Bed,
+  BedDouble,
+  Lamp,
+  LayoutGrid,
+  Lock,
+  Package,
+  Repeat,
+  RotateCcw,
+  Search,
+  ShieldCheck,
+  Sofa,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type {
   CatalogResponse,
@@ -40,6 +54,7 @@ import CartDrawer from "./CartDrawer";
 import AddonsPanel, { offerableAddons } from "./AddonsPanel";
 import FloatingCartButton from "./FloatingCartButton";
 import GuaranteePickerModal from "./GuaranteePickerModal";
+import Drawer from "@/components/kit/Drawer";
 
 /** The families that render as cards on the wall. Narrower than
  *  `ProductCategory` (which also carries `service`, whose models back the
@@ -59,6 +74,28 @@ const CARD_ORDER: CardCategory[] = [
   "guarantee",
 ];
 
+const MOBILE_CHIP_KEYS = new Set<RailKey>([
+  "all",
+  "mattress",
+  "bedframe",
+  "sofa",
+  "accessory",
+]);
+
+/** Drawer-only presentation map. Entry labels, counts, visibility and locks
+ * continue to come exclusively from `railEntries`. */
+const MOBILE_CATEGORY_ICON: Record<RailKey, LucideIcon> = {
+  all: LayoutGrid,
+  mattress: BedDouble,
+  bedframe: Bed,
+  sofa: Sofa,
+  accessory: Lamp,
+  guarantee: ShieldCheck,
+  rental: Repeat,
+  bundles: Package,
+  addons: Lamp,
+};
+
 /**
  * Step 01 — POS catalog. 2990s-parity layout: sectioned left sidebar
  * (categories / quick / principal-only MAINTAIN / pricing footer), searchable
@@ -77,6 +114,8 @@ export default function CatalogStep({
   onProceed,
   cartOpen,
   onCartOpenChange,
+  categoryOpen = false,
+  onCategoryOpenChange = () => {},
   pwpReservedCodes,
   pwpClaimGroup,
   customerPhone,
@@ -91,6 +130,9 @@ export default function CatalogStep({
   onProceed: () => void;
   cartOpen: boolean;
   onCartOpenChange: (open: boolean) => void;
+  /** Phone top-bar category drawer, controlled by DealerPos. */
+  categoryOpen?: boolean;
+  onCategoryOpenChange?: (open: boolean) => void;
   /** Loo 2026-07-26 — the topbar's `POS · {store}` label; presence turns on
    *  the configure pages' brand strip (logo = back to catalog). */
   topbarContext?: string;
@@ -121,6 +163,8 @@ export default function CatalogStep({
   const activeAddons = useMemo(() => offerableAddons(catalog.addons), [catalog.addons]);
 
   const [activeRail, setActiveRail] = useState<RailKey>("all");
+  const activeChipRef = useRef<HTMLButtonElement | null>(null);
+  const previousActiveRailRef = useRef<RailKey>(activeRail);
   const [rawSearch, setRawSearch] = useState("");
   const search = useDebouncedValue(rawSearch.trim().toLowerCase(), 180);
   const [configureModelId, setConfigureModelId] = useState<string | null>(null);
@@ -130,6 +174,9 @@ export default function CatalogStep({
   // configurator prefilled; on save the line is REPLACED in place.
   const [editingLine, setEditingLine] = useState<DraftLine | null>(null);
   const [pulse, setPulse] = useState(false);
+  const pulseTimer = useRef<number | undefined>(undefined);
+  // A pulse still pending when the page unmounts must not fire afterwards.
+  useEffect(() => () => window.clearTimeout(pulseTimer.current), []);
 
   const lockedCats = useMemo(
     () => lockedCategoriesFor(draft.lines, index.skuToCategory),
@@ -187,6 +234,24 @@ export default function CatalogStep({
     }
     if (lockedCats.has(activeRail)) setActiveRail("all");
   }, [activeRail, lockedCats, rentalRailLocked, outrightRailsLocked]);
+
+  useEffect(() => {
+    if (previousActiveRailRef.current === activeRail) return;
+    previousActiveRailRef.current = activeRail;
+    if (
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function" ||
+      !window.matchMedia("(max-width: 767px)").matches
+    ) {
+      return;
+    }
+
+    activeChipRef.current?.scrollIntoView({
+      behavior: "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+  }, [activeRail]);
 
   const countByCat = useMemo(() => {
     const m = new Map<ProductCategory, number>();
@@ -405,6 +470,21 @@ export default function CatalogStep({
     setActiveRail("all");
   }
 
+  function selectCategoryFromDrawer(key: RailKey) {
+    setActiveRail(key);
+    onCategoryOpenChange(false);
+  }
+
+  function selectBestsellersFromDrawer() {
+    setActiveRail("mattress");
+    onCategoryOpenChange(false);
+  }
+
+  function resetFiltersFromDrawer() {
+    resetFilters();
+    onCategoryOpenChange(false);
+  }
+
   /**
    * The no-mixing law (Loo 2026-07-26, LOCKED): a cart is either all rental or
    * all outright. Enforced HERE, at the single funnel every add passes through
@@ -421,8 +501,13 @@ export default function CatalogStep({
     // The one-shot FAB pulse (class applied by FloatingCartButton when
     // pulse=true; cleared after 220ms) is the ONLY add feedback — no toast,
     // per Loo 2026-07-14: no notification pop-ups on cart mutations.
+    pulseCart();
+  }
+
+  function pulseCart() {
+    window.clearTimeout(pulseTimer.current);
     setPulse(true);
-    window.setTimeout(() => setPulse(false), 220);
+    pulseTimer.current = window.setTimeout(() => setPulse(false), 220);
   }
 
   /** 0239 — add a bundle: explode it into one line per component (Σ-exact
@@ -433,7 +518,7 @@ export default function CatalogStep({
   function addBundle(bundle: ProductBundleDto) {
     const r = explodeBundle(bundle.components, bundle.price, (sku) => skuPrice.get(sku) ?? null);
     if (!r.ok) {
-      toast.error("This bundle isn't available right now — an item in it is off sale.");
+      toast.error("This bundle isn't available right now. An item in it is off sale.");
       return;
     }
     const group = newLocalId();
@@ -456,8 +541,7 @@ export default function CatalogStep({
       };
     });
     onChange({ ...draft, lines: [...draft.lines, ...newLines] });
-    setPulse(true);
-    window.setTimeout(() => setPulse(false), 220);
+    pulseCart();
   }
 
   /** 0241 — a bundle card tap routes: anything with a choice or spec axes
@@ -479,14 +563,13 @@ export default function CatalogStep({
   function completeBundle(bundle: ProductBundleDto, picks: BundleSlotPick[]) {
     const assembled = assembleBundleLines(bundle, picks, newLocalId());
     if (!assembled) {
-      toast.error("This bundle isn't available right now — an item in it is off sale.");
+      toast.error("This bundle isn't available right now. An item in it is off sale.");
       return;
     }
     const newLines: DraftLine[] = assembled.map((l) => ({ ...l, localId: newLocalId() }));
     onChange({ ...draft, lines: [...draft.lines, ...newLines] });
     setConfiguringBundle(null);
-    setPulse(true);
-    window.setTimeout(() => setPulse(false), 220);
+    pulseCart();
   }
 
   /** Cart-line EDIT save — swap the edited line IN PLACE (same localId, so the
@@ -511,7 +594,7 @@ export default function CatalogStep({
     const hasClaim = Boolean(nextAttrs?.pwp || nextAttrs?.free_item);
     if (hadClaim && !hasClaim) {
       toast.info(
-        "The voucher / free claim on this item was reset — re-apply it from the cart if it still applies.",
+        "The voucher / free claim on this item was reset. Re-apply it from the cart if it still applies.",
       );
     }
   }
@@ -530,7 +613,7 @@ export default function CatalogStep({
       if (s && term) {
         setGuaranteePick({ term, sku: s });
       } else {
-        toast.error("This guarantee isn't set up yet — ask the principal to add its terms.");
+        toast.error("This guarantee isn't set up yet. Ask the principal to add its terms.");
       }
       return;
     }
@@ -596,6 +679,32 @@ export default function CatalogStep({
           </span>
         </div>
 
+        <nav
+          className="pos-mobile-category-chips hidden"
+          aria-label="Popular product categories"
+          data-testid="pos-mobile-category-chips"
+        >
+          {railEntries
+            .filter((entry) => MOBILE_CHIP_KEYS.has(entry.key))
+            .map((entry) => (
+              <button
+                key={entry.key}
+                ref={entry.key === activeRail ? activeChipRef : null}
+                type="button"
+                className={`pos-mobile-category-chip${entry.key === activeRail ? " is-active" : ""}`}
+                disabled={entry.locked}
+                aria-pressed={entry.key === activeRail}
+                onClick={() => setActiveRail(entry.key)}
+                data-testid={`pos-mobile-chip-${entry.key}`}
+              >
+                <span className="pos-mobile-category-chip__inner">
+                  <span>{entry.label}</span>
+                  <span className="pos-mobile-category-chip__count">{entry.count}</span>
+                </span>
+              </button>
+            ))}
+        </nav>
+
         <div className="cat-grid-wrap">
           {/* Sofa-exclusivity notice — functional mutex feedback. */}
           {activeRail !== "addons" && (cartHasSofa || cartHasMainNonSofa) && (
@@ -617,8 +726,8 @@ export default function CatalogStep({
               <Sofa size={16} strokeWidth={1.75} style={{ flexShrink: 0 }} />
               <span>
                 {cartHasSofa
-                  ? "Sofa order — sofas don't share an order with mattresses or bed frames. Check out or clear the cart to switch categories."
-                  : "This order has a mattress or bed frame. Sofas are placed separately — check out or clear the cart to start a sofa order."}
+                  ? "Sofa order. Sofas don't share an order with mattresses or bed frames. Check out or clear the cart to switch categories."
+                  : "This order has a mattress or bed frame. Sofas are placed separately. Check out or clear the cart to start a sofa order."}
               </span>
             </div>
           )}
@@ -662,7 +771,7 @@ export default function CatalogStep({
                         lockedReason={
                           missing
                             ? "An item in this bundle is off sale right now"
-                            : "Locked — this order already has a conflicting product family"
+                            : "Locked. This order already has a conflicting product family"
                         }
                         inCart={draft.lines.some(
                           (l) =>
@@ -717,6 +826,56 @@ export default function CatalogStep({
           )}
         </div>
       </main>
+
+      <Drawer open={categoryOpen} onOpenChange={onCategoryOpenChange} title="Categories">
+        <nav className="pos-proto pos-category-drawer" aria-label="All product categories">
+          <div className="pos-category-drawer__list">
+            {railEntries.map((entry) => {
+              const Icon = MOBILE_CATEGORY_ICON[entry.key];
+              return (
+                <button
+                  key={entry.key}
+                  type="button"
+                  className={`pos-category-drawer__item${entry.key === activeRail ? " is-active" : ""}`}
+                  disabled={entry.locked}
+                  aria-pressed={entry.key === activeRail}
+                  onClick={() => selectCategoryFromDrawer(entry.key)}
+                  data-testid={`pos-category-drawer-${entry.key}`}
+                >
+                  {entry.locked ? (
+                    <Lock size={16} strokeWidth={1.75} aria-hidden="true" />
+                  ) : (
+                    <Icon size={16} strokeWidth={1.75} aria-hidden="true" />
+                  )}
+                  <span>{entry.label}</span>
+                  <span className="pos-category-drawer__count">{entry.count}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="pos-category-drawer__quick" aria-label="Category shortcuts">
+            <button
+              type="button"
+              className="pos-category-drawer__item"
+              onClick={selectBestsellersFromDrawer}
+              data-testid="pos-category-drawer-bestsellers"
+            >
+              <Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />
+              <span>Bestsellers</span>
+            </button>
+            <button
+              type="button"
+              className="pos-category-drawer__item"
+              onClick={resetFiltersFromDrawer}
+              data-testid="pos-category-drawer-reset"
+            >
+              <RotateCcw size={16} strokeWidth={1.75} aria-hidden="true" />
+              <span>Reset filters</span>
+            </button>
+          </div>
+        </nav>
+      </Drawer>
 
       <FloatingCartButton
         itemCount={itemCount}
@@ -873,9 +1032,6 @@ export default function CatalogStep({
             fabrics={index.fabricsByModel.get(activeModel.id) ?? []}
             fabricTierConfig={catalog.fabricTierConfig}
             modelFabricTierOverrides={catalog.modelFabricTierOverrides}
-            sofaCompartments={catalog.sofaCompartments}
-            modelSofaCompartments={catalog.modelSofaCompartments}
-            sofaCombos={catalog.sofaCombos}
             specialAddons={catalog.specialAddons}
             onAdd={addLine}
             onClose={closeConfigure}

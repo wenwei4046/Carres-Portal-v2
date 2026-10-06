@@ -17,7 +17,7 @@ import {
   type CaseSlaEvent,
 } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 
 /**
  * S4 — the deadline. **No case silently passes day 14.**
@@ -51,7 +51,7 @@ export default function CaseDeadline({
   const holidayOpts = useMemo(() => ({ holidays: myHolidaySet() }), []);
 
   const clock = caseSlaClock(
-    { openedAt, todayIso: todayLocal(), events, closed, customerName },
+    { openedAt, todayIso: appTodayIso(), events, closed, customerName },
     holidayOpts,
   );
   const action = caseSlaAction(clock, customerName);
@@ -104,7 +104,7 @@ export default function CaseDeadline({
           {extension && (
             <li className="rounded border border-base-200 bg-white px-2.5 py-1.5">
               <span className="block text-body text-base-800">
-                Deadline moved once — {fmtDate(clock.baseDueIso ?? "")} to{" "}
+                Deadline moved once: {fmtDate(clock.baseDueIso ?? "")} to{" "}
                 {fmtDate(extension.until ?? "")}
               </span>
               <span className="text-meta block text-base-500">
@@ -202,7 +202,7 @@ function RecordDeadlineForm({
   onDone: () => void;
 }) {
   const qc = useQueryClient();
-  const [on, setOn] = useState(todayLocal());
+  const [on, setOn] = useState(appTodayIso());
   const [reason, setReason] = useState<CaseDelayReason | "">("");
   const [note, setNote] = useState("");
   const [until, setUntil] = useState("");
@@ -281,7 +281,7 @@ function RecordDeadlineForm({
           className="mt-1 block w-full rounded border border-base-300 bg-white px-2 py-1 text-body"
         >
           {/* No default — a silent default records a reason nobody chose. */}
-          <option value="">— pick one —</option>
+          <option value=""></option>
           {CASE_DELAY_REASONS.map((r) => (
             <option key={r} value={r}>
               {CASE_DELAY_REASON_LABEL[r]}
@@ -304,7 +304,7 @@ function RecordDeadlineForm({
 
       {kind === "extension" && movedUntil && movedUntil !== until && (
         <p className="text-meta text-base-600">
-          {fmtDate(until)} is not a working day — the deadline lands on {fmtDate(movedUntil)}.
+          {fmtDate(until)} is not a working day. The deadline lands on {fmtDate(movedUntil)}.
         </p>
       )}
 
@@ -317,10 +317,4 @@ function RecordDeadlineForm({
       )}
     </div>
   );
-}
-
-/** Today in the operator's own timezone. `toISOString()` is UTC, which is
- *  yesterday in Malaysia until 8 AM — the wrong day to count a deadline from. */
-function todayLocal(): string {
-  return new Date().toLocaleDateString("en-CA");
 }

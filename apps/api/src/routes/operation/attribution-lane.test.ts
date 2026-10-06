@@ -16,15 +16,8 @@
  *   · HR reaches the approver lane, and reaches ONLY it. GATE 3 gives HR the
  *     right to approve a salesperson move; HR must not gain SUBMIT or APPLY.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -37,17 +30,9 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("u1")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("u1", { email: `${role}@x`, app_metadata: { role } });
 }
 
 type RpcCall = { name: string; args: Record<string, unknown> };
@@ -66,16 +51,8 @@ function makeSb(result: { data: unknown; error: unknown }, calls: RpcCall[]) {
   };
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 afterAll(() => _setJwksForTesting(null));
@@ -251,6 +228,41 @@ describe("STAGE 3 · 3.5 — the amendment spine, and the wall past it", () => {
     });
     expect(res.status).toBe(201);
     expect(calls.map((c) => c.name)).toEqual(["sales_order_submit_amendment"]);
+  });
+
+  /* 0354 — `AMEND DELIVERY DATE` names the day the CUSTOMER asked, which is
+     not `submitted_at`: a change phoned in on Monday and typed on Thursday is
+     a Monday request. It reaches the RPC as its own argument, never folded
+     into the reason sentence. */
+  it("SUBMIT carries the day the customer asked, as its own argument", async () => {
+    const { res, calls } = await call(`/${ORDER_ID}/amendment`, "operation", {
+      proposed: { delivery_date: "2026-09-24", delivery_date_tbd: false },
+      reason: "Customer moving house",
+      customerAskedOn: "2026-08-11",
+    });
+    expect(res.status).toBe(201);
+    expect(calls[0]!.args).toMatchObject({
+      p_reason: "Customer moving house",
+      p_customer_asked_on: "2026-08-11",
+    });
+  });
+
+  it("SUBMIT passes a null asked-on when nobody typed one", async () => {
+    const { calls } = await call(`/${ORDER_ID}/amendment`, "operation", {
+      proposed: { lines: [{ sku: "B1201S-K", qty: 3, unit_price: 2499 }] },
+      reason: "Customer wants one more",
+    });
+    expect(calls[0]!.args).toMatchObject({ p_customer_asked_on: null });
+  });
+
+  it("refuses a malformed asked-on before the database", async () => {
+    const { res, calls } = await call(`/${ORDER_ID}/amendment`, "operation", {
+      proposed: { delivery_date: "2026-09-24" },
+      reason: "Customer moving house",
+      customerAskedOn: "11 Aug 2026",
+    });
+    expect(res.status).toBe(422);
+    expect(calls).toHaveLength(0);
   });
 
   it("refuses a proposal carrying a CLASS B field — corrections are not amendments", async () => {

@@ -40,7 +40,9 @@ describe("buildSkuExportCsv", () => {
     const csv = buildSkuExportCsv([{ sku: sku(), model: model() }]);
     const lines = csv.split("\n");
     expect(lines[0]).toBe(SKU_EXPORT_COLUMNS.join(","));
-    expect(lines[1]).toBe("Booqit,booqit,sofa,1S,size,1899,900,1 seater,yes,BOOQIT-1S");
+    // 2026-08-24: pwp_price + supplier_code joined the round-trip — both blank
+    // on this fixture, so two empty cells between cost and description.
+    expect(lines[1]).toBe("Booqit,booqit,sofa,1S,size,1899,900,,,1 seater,yes,BOOQIT-1S");
   });
 
   it("blanks price 0 and cost null (treated as not-set, clean round-trip)", () => {
@@ -52,7 +54,9 @@ describe("buildSkuExportCsv", () => {
 
   it("marks pos_active=false as no", () => {
     const csv = buildSkuExportCsv([{ sku: sku({ posActive: false }), model: model() }]);
-    expect(csv.split("\n")[1].split(",")[8]).toBe("no");
+    // Index 10 since 2026-08-24: pwp_price + supplier_code sit between cost
+    // and description in the round-trip column set.
+    expect(csv.split("\n")[1].split(",")[10]).toBe("no");
   });
 
   it("quotes a description with a comma (RFC4180)", () => {

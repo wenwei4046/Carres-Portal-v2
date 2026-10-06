@@ -1,8 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import CaseFollowUps from "./CaseFollowUps";
+import { fmtDateShort } from "@/lib/fmt-date";
 
 /**
  * S3 in the case view: the chain the case is running, what has been recorded
@@ -42,13 +43,13 @@ describe("CaseFollowUps", () => {
   it("lists the whole chain the customer's answer set off, with the factory named", () => {
     render(wrap(<CaseFollowUps caseId="c1" answers={REPAIR} progress={[]} />));
 
-    expect(screen.getByText("Call Ohana — confirm the repair date")).toBeInTheDocument();
+    expect(screen.getByText("Call Ohana to confirm the repair date")).toBeInTheDocument();
     expect(screen.getByText("Collect the item from Ryan Chong")).toBeInTheDocument();
     expect(screen.getByText("Send the item to Ohana")).toBeInTheDocument();
     expect(screen.getByText("Check in the item from Ohana")).toBeInTheDocument();
     expect(screen.getByText("Deliver the item back to Ryan Chong")).toBeInTheDocument();
     expect(
-      screen.getByText("Call Ryan Chong — confirm the problem is solved"),
+      screen.getByText("Call Ryan Chong to confirm the problem is solved"),
     ).toBeInTheDocument();
     expect(screen.getByText("0 of 6 done")).toBeInTheDocument();
   });
@@ -59,7 +60,9 @@ describe("CaseFollowUps", () => {
     );
 
     expect(screen.getByText("Collected")).toBeInTheDocument();
-    expect(screen.getByText(/20 Jul 26.*recorded by operation/)).toBeInTheDocument();
+    expect(
+      screen.getByText(new RegExp(`${fmtDateShort("2026-07-20")}.*recorded by operation`)),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Collect the item from Ryan Chong")).not.toBeInTheDocument();
     expect(screen.getByText("1 of 6 done")).toBeInTheDocument();
   });
@@ -140,7 +143,31 @@ describe("CaseFollowUps", () => {
       ),
     );
 
-    expect(screen.getByText("Call Walk-in — confirm the problem is solved")).toBeInTheDocument();
+    expect(screen.getByText("Call Walk-in to confirm the problem is solved")).toBeInTheDocument();
     expect(screen.getByText("0 of 1 done")).toBeInTheDocument();
+  });
+
+  describe("the date a step is recorded on, in a browser that is not on Malaysian time", () => {
+    const savedTz = process.env.TZ;
+    beforeAll(() => {
+      process.env.TZ = "UTC";
+    });
+    afterAll(() => {
+      if (savedTz === undefined) delete process.env.TZ;
+      else process.env.TZ = savedTz;
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("defaults to the Kuala Lumpur day, not the browser's", () => {
+      // 23:30 UTC on 14 Aug is already 07:30 on 15 Aug in Kuala Lumpur.
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-08-14T23:30:00Z"));
+      render(wrap(<CaseFollowUps caseId="c1" answers={REPAIR} progress={[]} />));
+
+      fireEvent.click(screen.getAllByRole("button", { name: "Record" })[0]);
+      expect(screen.getByLabelText(/Date/)).toHaveValue("2026-08-15");
+    });
   });
 });

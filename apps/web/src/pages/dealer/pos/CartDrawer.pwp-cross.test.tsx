@@ -276,3 +276,120 @@ describe("CartDrawer — PWP cross-order voucher (P8d)", () => {
     expect(screen.queryByTestId("pwp-cross-suggest-R1-PWP-EEEE5555")).not.toBeInTheDocument();
   });
 });
+
+/**
+ * ⭐ THE REWARD-ONLY CART (2026-08-24) — the journey carry-forward exists for.
+ *
+ * The customer bought a mattress in June and comes back in August for the
+ * bedframe ALONE. Every test above puts a trigger in the cart, which is the one
+ * case a saved voucher is not needed: the same-cart offer already covers it.
+ *
+ * Two gates hid the surface from a reward-only cart, and BOTH had to go:
+ *   1. `PwpRow` returned null when `coveringPwpForLine` was empty — no trigger,
+ *      no row, so not even the box to type a voucher number into.
+ *   2. `ruleForVoucher` required the voucher's rule to be in that same-cart
+ *      covering set, so a typed code was refused with "doesn't apply to this
+ *      product" when it did apply.
+ */
+describe("CartDrawer — cross-order voucher on a REWARD-ONLY cart", () => {
+  /** A cart with the BEDFRAME reward and NO mattress trigger. */
+  function rewardOnlyCart(): WizardDraft {
+    return {
+      ...emptyDraft(),
+      lines: [
+        { localId: "R1", sku: "BED-A", qty: 1, attrs: null, unitPrice: 800, label: "Bed X · Queen" },
+      ],
+    };
+  }
+
+  function renderRewardOnly(over: Partial<React.ComponentProps<typeof CartDrawer>> = {}) {
+    return render(
+      <CartDrawer
+        draft={rewardOnlyCart()}
+        onChange={noop}
+        onProceed={noop}
+        onClose={noop}
+        catalog={catalog({ pwpRules: [pwpRule] })}
+        pwpReservedCodes={noReserved}
+        pwpClaimGroup="cg-1"
+        customerPhone="0123456789"
+        pwpAvailableVouchers={[voucher({ code: "PWP-AAAA1111" })]}
+        onApplyVoucherCode={vi.fn()}
+        {...over}
+      />,
+    );
+  }
+
+  it("⭐ offers the saved voucher with NO trigger in the cart", () => {
+    renderRewardOnly();
+    expect(screen.getByTestId("pwp-cross-suggest-R1-PWP-AAAA1111")).toBeInTheDocument();
+  });
+
+  it("⭐ binding it forces the price and stamps crossOrder", () => {
+    const onChange = vi.fn();
+    renderRewardOnly({ onChange });
+    fireEvent.click(screen.getByTestId("pwp-cross-suggest-R1-PWP-AAAA1111"));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0] as WizardDraft;
+    const marked = next.lines[0]!;
+    expect(marked.unitPrice).toBe(300);
+    const marker = (marked.attrs as Record<string, unknown>).pwp as Record<string, unknown>;
+    expect(marker.crossOrder).toBe(true);
+    expect(marker.code).toBe("PWP-AAAA1111");
+  });
+
+  it("the manual code box is reachable without a trigger", () => {
+    // Discovery is phone-based; a customer whose phone is not on file still has
+    // the printed code on their old SO, so the box must exist regardless.
+    renderRewardOnly({ pwpAvailableVouchers: [] });
+    expect(screen.getByTestId("pwp-cross-input-R1")).toBeInTheDocument();
+  });
+
+  it("the SAME-CART chips do NOT appear — there is no trigger to grant from", () => {
+    // The two surfaces stay separate. Showing a same-cart chip here would offer
+    // a claim the server refuses, which is the honest-pricing rule inverted.
+    renderRewardOnly();
+    expect(screen.queryByTestId("pwp-toggle-R1-rule-pwp")).not.toBeInTheDocument();
+  });
+
+  it("NEGATIVE CONTROL: a voucher whose FROZEN scope misses this line is not offered", () => {
+    // The snapshot says mattress; the line is a bedframe. Judged by the voucher's
+    // own snapshot, never by today's rule.
+    renderRewardOnly({
+      pwpAvailableVouchers: [voucher({ code: "PWP-BBBB2222", rewardCategory: "mattress" })],
+    });
+    expect(screen.queryByTestId("pwp-cross-suggest-R1-PWP-BBBB2222")).not.toBeInTheDocument();
+  });
+
+  it("NEGATIVE CONTROL: a line no rule could ever reward shows nothing at all", () => {
+    // `rewardCapableRules` is the visibility gate — a product that is never a
+    // reward keeps a normal cart exactly as quiet as it is today.
+    render(
+      <CartDrawer
+        draft={{
+          ...emptyDraft(),
+          lines: [
+            { localId: "R1", sku: "MATT-A", qty: 1, attrs: null, unitPrice: 1200, label: "Matt X · Queen" },
+          ],
+        }}
+        onChange={noop}
+        onProceed={noop}
+        onClose={noop}
+        catalog={catalog({ pwpRules: [pwpRule] })}
+        pwpReservedCodes={noReserved}
+        pwpClaimGroup="cg-1"
+        customerPhone="0123456789"
+        pwpAvailableVouchers={[voucher({ code: "PWP-AAAA1111" })]}
+        onApplyVoucherCode={vi.fn()}
+      />,
+    );
+    // MATT-A is a TRIGGER product, never a reward under this rule.
+    expect(screen.queryByTestId("pwp-cross-input-R1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pwp-cross-need-phone-R1")).not.toBeInTheDocument();
+  });
+
+  it("DORMANT: no active rules → no voucher surface on a reward-only cart", () => {
+    renderRewardOnly({ catalog: catalog({ pwpRules: [] }) });
+    expect(screen.queryByTestId("pwp-cross-input-R1")).not.toBeInTheDocument();
+  });
+});

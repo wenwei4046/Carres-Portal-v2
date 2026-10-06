@@ -55,6 +55,11 @@ export interface StorageHoldInput {
   importedSof?: number | string | null;
   /** The order's line SKUs — they decide which rate applies (MS/BF · sofa). */
   skus: readonly string[];
+  /** `product_models.category` per SKU, from the one shared catalog reader
+   *  (`sku-categories.ts`). THE CATALOG OWNS WHICH RATE APPLIES
+   *  (ERP-ARCHITECTURE §6.1, CARD-2026-08-28); absent, the SKU-string parser
+   *  answers as it did before, and it is wrong for every real SKU. */
+  categories?: ReadonlyMap<string, string> | null;
   /** Today, as an ISO date. Handed in so this stays pure. */
   asOf: string;
   /** `ops_order_control.storage_collected_at` — the fee is in. */
@@ -90,6 +95,7 @@ export function storageHold({
   importedMsbf,
   importedSof,
   skus,
+  categories,
   asOf,
   collectedAt,
   waiverStatus,
@@ -102,6 +108,7 @@ export function storageHold({
     storageFrom,
     override: hasOverride ? n(override) : null,
     skus,
+    categories,
     asOf,
   });
   const imported = n(importedMsbf) + n(importedSof);

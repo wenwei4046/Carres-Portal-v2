@@ -8,6 +8,7 @@
 export {
   lineClass,
   lineCategory,
+  resolvedCategory,
   lineSize,
   stockMatchKey,
   accShort,

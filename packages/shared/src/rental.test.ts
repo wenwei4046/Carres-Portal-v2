@@ -4,6 +4,7 @@ import {
   RENTAL_LATE_INTEREST_PCT_PER_MONTH,
   rentalDueDates,
   rentalLateInterest,
+  rentalMonthView,
   rentalScheduleSum,
   agreementTokens,
   blocksFromText,
@@ -881,5 +882,30 @@ describe("agreementTemplateInputSchema (0267)", () => {
     expect(
       agreementTemplatePatchSchema.safeParse({ body: [{ kind: "p", text: "sneaky" }] }).success,
     ).toBe(false);
+  });
+});
+
+describe("rentalMonthView (0538)", () => {
+  const row = (status: string, dueDate: string, amountDue: number, paidAmount: number | null = null) => ({
+    billingId: `${status}-${dueDate}`, agreementId: "a", agreementNo: "RA-1", seq: 1, dueDate,
+    amountDue, status, paidAmount, customerName: "Ali", customerPhone: null,
+    orderId: null, orderSo: null, salespersonName: null,
+  });
+
+  it("totals due, collected and unpaid, leaves waived out, and counts days late", () => {
+    const v = rentalMonthView(
+      [
+        row("paid", "2026-09-07", 199.9, 199.9),
+        row("due", "2026-09-07", 199.9),
+        row("overdue", "2026-09-07", 100.1),
+        row("due", "2026-09-30", 50),
+        row("waived", "2026-09-07", 999),
+      ],
+      "2026-09-18",
+    );
+    expect(v.due).toBe(549.9);
+    expect(v.collected).toBe(199.9);
+    expect(v.outstanding).toBe(350);
+    expect(v.unpaid.map((r) => r.daysLate)).toEqual([11, 11, 0]);
   });
 });

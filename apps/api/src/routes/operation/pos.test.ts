@@ -1,4 +1,7 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
@@ -8,6 +11,10 @@ vi.mock("../../lib/supabase", () => ({
   userClient: vi.fn(),
 }));
 
+vi.mock("../../lib/po-email-attempts", () => ({ preparePoEmailAttempt: vi.fn(), recordPoEmailOutcome: vi.fn(), readPoEmailAttempts: vi.fn() }));
+import { preparePoEmailAttempt, recordPoEmailOutcome, readPoEmailAttempts } from "../../lib/po-email-attempts";
+vi.mock("../../lib/supplier-email", () => ({ sendSupplierPoEmail: vi.fn() }));
+import { sendSupplierPoEmail } from "../../lib/supplier-email";
 import { userClient } from "../../lib/supabase";
 
 const SUPABASE_URL = "https://test.supabase.co";
@@ -51,6 +58,30 @@ beforeEach(() => {
 
 afterAll(() => _setJwksForTesting(null));
 
+describe("GET /api/operation/pos/:id/issue-context", () => {
+  it.each(["open", "cancelled", "missing"])("reads the saved PO and handles %s", async (status) => {
+    const from = vi.fn((table: string) => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn(async () => ({ error: null, data: table === "purchase_orders"
+        ? status === "missing" ? null : { id: "PO-existing", supplier_id: "supplier", destination_id: "destination", status }
+        : table === "suppliers"
+          ? { name: "Hooka", whatsapp_group_url: "https://chat.whatsapp.com/saved", contact_email: "supplier@example.com", contact: "123" }
+          : { name: "Carres Klang" } })),
+    }));
+    vi.mocked(userClient).mockReturnValue({ from } as never);
+    const res = await app.fetch(new Request("http://localhost/api/operation/pos/PO-existing/issue-context", {
+      headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+    }), env);
+    expect(res.status).toBe(status === "missing" ? 404 : status === "cancelled" ? 422 : 200);
+    if (status === "open") expect(await res.json()).toMatchObject({
+      id: "PO-existing", supplierName: "Hooka", destination: "Carres Klang",
+      whatsappGroupUrl: "https://chat.whatsapp.com/saved", contactEmail: "supplier@example.com",
+    });
+    else expect(from).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("GET /api/operation/pos", () => {
   const PO_ROW = {
     id: "PO-2030",
@@ -81,27 +112,61 @@ describe("GET /api/operation/pos", () => {
     promises: Record<string, unknown>[] = [],
     orderRows: Record<string, unknown>[] = [],
     skuRows: Record<string, unknown>[] = [],
+    lineage: {
+      poLineSources?: Record<string, unknown>[];
+      demands?: Record<string, unknown>[];
+      requests?: Record<string, unknown>[];
+      sends?: Record<string, unknown>[];
+      grns?: Record<string, unknown>[];
+      referencedDestinations?: Record<string, unknown>[];
+      onPoLineRange?: (phase: "start" | "end") => void;
+    } = {},
   ) {
     const eq = vi.fn().mockReturnThis();
     const order = vi.fn().mockReturnThis();
-    const limit = vi.fn().mockResolvedValue({ data: rows, error: null });
-    const select = vi.fn(() => ({ eq, order, limit }));
+    const range = vi.fn((from: number, to: number) => Promise.resolve({
+      data: rows.slice(from, to + 1),
+      error: null,
+    }));
+    const select = vi.fn(() => ({ eq, order, range }));
 
-    const promiseOrder = vi.fn().mockResolvedValue({ data: promises, error: null });
-    const promiseIn = vi.fn(() => ({ order: promiseOrder }));
+    // Every Register enrichment now owns both protections: a small `.in(…)`
+    // batch and complete range pages. This chain mimics that PostgREST shape.
+    const paged = (
+      data: Record<string, unknown>[],
+      onRange?: (phase: "start" | "end") => void,
+    ) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const builder: any = {};
+      builder.order = vi.fn(() => builder);
+      builder.not = vi.fn(() => builder);
+      builder.range = vi.fn(async (from: number, to: number) => {
+        onRange?.("start");
+        if (onRange) await new Promise((resolve) => setTimeout(resolve, 0));
+        const result = { data: data.slice(from, to + 1), error: null };
+        onRange?.("end");
+        return result;
+      });
+      return builder;
+    };
+
+    const promiseIn = vi.fn(() => paged(promises));
     const promiseSelect = vi.fn(() => ({ in: promiseIn }));
 
-    const ordersIn = vi.fn().mockResolvedValue({ data: orderRows, error: null });
+    const ordersIn = vi.fn(() => paged(orderRows));
     const ordersSelect = vi.fn(() => ({ in: ordersIn }));
 
-    const skusIn = vi.fn().mockResolvedValue({ data: skuRows, error: null });
+    const skusIn = vi.fn(() => {
+      const result = Promise.resolve({ data: skuRows, error: null });
+      return { ...paged(skuRows), then: result.then.bind(result) };
+    });
     const skusSelect = vi.fn(() => ({ in: skusIn }));
 
     // 0311's destination registry rides the list so the per-line picker has
     // its options without a second call.
     // 0312: the sends read + the settings singleton (message template).
-    const sendsOrder = vi.fn().mockResolvedValue({ data: [], error: null });
-    const sendsIn = vi.fn(() => ({ order: sendsOrder }));
+    const sendsPaged = paged(lineage.sends ?? []);
+    const sendsIn = vi.fn(() => sendsPaged);
     const sendsSelect = vi.fn(() => ({ in: sendsIn }));
 
     const tmplSingle = vi.fn().mockResolvedValue({ data: null, error: null });
@@ -111,32 +176,122 @@ describe("GET /api/operation/pos", () => {
     const destOrder2 = vi.fn().mockResolvedValue({ data: [], error: null });
     const destOrder1 = vi.fn(() => ({ order: destOrder2 }));
     const destEq = vi.fn(() => ({ order: destOrder1 }));
-    const destSelect = vi.fn(() => ({ eq: destEq }));
+    const destinationHistoryIn = vi.fn(() => paged(lineage.referencedDestinations ?? []));
+    const destSelect = vi.fn(() => ({ eq: destEq, in: destinationHistoryIn }));
 
     // The Excel-row derivation reads the covered SOs' own lines (Jess,
     // 2026-08-02): one grid row per SO × SKU, carrying the salesperson's
     // remark. Empty here — the rows fall back to one per PO line.
-    const solIn = vi.fn().mockResolvedValue({ data: [], error: null });
+    const solIn = vi.fn(() => paged([]));
     const solSelect = vi.fn(() => ({ in: solIn }));
+
+    const lineRows = rows.flatMap((po) => po.purchase_order_lines.map((line) => ({
+      ...line,
+      po_id: po.id,
+    })));
+    const poLinesIn = vi.fn(() => paged(lineRows, lineage.onPoLineRange));
+    const poLinesSelect = vi.fn(() => ({ in: poLinesIn }));
+
+    const lineageIn = vi.fn(() => paged(lineage.poLineSources ?? []));
+    const lineageSelect = vi.fn(() => ({ in: lineageIn }));
+    const demandIn = vi.fn(() => paged(lineage.demands ?? []));
+    const demandSelect = vi.fn(() => ({ in: demandIn }));
+    const requestIn = vi.fn(() => paged(lineage.requests ?? []));
+    const grnPaged = paged(lineage.grns ?? []);
+    const grnIn = vi.fn(() => grnPaged);
+    const grnSelect = vi.fn(() => ({ in: grnIn }));
+    const requestSelect = vi.fn(() => ({ in: requestIn }));
 
     vi.mocked(userClient).mockReturnValue({
       from: vi.fn((table: string) => {
         if (table === "po_supplier_promises") return { select: promiseSelect };
+        // 0585 · the day-before check's evidence rides the register read.
+        if (table === "po_arrival_confirmations") return { select: vi.fn(() => ({ in: vi.fn(() => paged([])) })) };
         if (table === "orders") return { select: ordersSelect };
         if (table === "product_skus") return { select: skusSelect };
         if (table === "order_lines") return { select: solSelect };
+        if (table === "purchase_order_lines") return { select: poLinesSelect };
+        if (table === "po_line_sources") return { select: lineageSelect };
+        if (table === "purchase_demands") return { select: demandSelect };
+        if (table === "purchase_requests") return { select: requestSelect };
         if (table === "purchasing_destinations") return { select: destSelect };
         if (table === "po_sends") return { select: sendsSelect };
+        if (table === "warehouse_receipts") return { select: grnSelect };
         if (table === "purchasing_settings") return { select: tmplSelect };
         return { select };
       }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
-    return { eq, order, limit, promiseIn, promiseSelect, ordersIn, skusIn };
+    return { eq, order, range, promiseIn, promiseSelect, ordersIn, skusIn, sendsRange: sendsPaged.range, grnSelect, grnNot: grnPaged.not };
   }
 
+  it("carries each PO's numbered GRNs with their real arrival date and good-unit count, and each SO source's order id (§9.3)", async () => {
+    const { grnSelect, grnNot } = mockPosList([PO_ROW], [], [], [], {
+      poLineSources: [{ id: "s1", po_id: "PO-2030", po_line_id: "line-a", order_id: "order-4001", order_line_id: "ol-1", so: 4001, qty: 2 }],
+      grns: [
+        {
+          id: "receipt-1", po_id: "PO-2030", grn_no: "GRN-20260910-1001",
+          /* The goods arrived on the 9th and the record was filed on the 10th.
+             The register prints the ARRIVAL, which is why the two differ here. */
+          goods_received_at: "2026-09-09", created_at: "2026-09-10T02:00:00Z",
+          lines: [
+            { id: "line-a", sku: "MAT-K", received_now: 2, damaged_qty: 1, wrong_item_qty: 0, wrong_item_claim_type: null },
+          ],
+        },
+        {
+          id: "receipt-2", po_id: "PO-2030", grn_no: "GRN-20260912-1002",
+          goods_received_at: "2026-09-12", created_at: "2026-09-12T02:00:00Z",
+          lines: [{ id: "line-a", sku: "MAT-K", received_now: 3, damaged_qty: 0, wrong_item_qty: 0, wrong_item_claim_type: null }],
+        },
+      ],
+    });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { pos: Array<{ grns: unknown; sources: unknown }> };
+    expect(body.pos[0]?.grns).toEqual([
+      /* Damaged units are not received — the one shared arithmetic, not a
+         second one invented for this listing. */
+      { id: "receipt-1", grn_no: "GRN-20260910-1001", goods_received_at: "2026-09-09", received_qty: 2 },
+      { id: "receipt-2", grn_no: "GRN-20260912-1002", goods_received_at: "2026-09-12", received_qty: 3 },
+    ]);
+    expect(body.pos[0]?.sources).toEqual([{ kind: "sales_order", reference: "SO-4001", order_id: "order-4001" }]);
+    expect(grnSelect).toHaveBeenCalledWith("id, po_id, grn_no, goods_received_at, lines, created_at");
+    // A draft receipt has no number and is not a GRN.
+    expect(grnNot).toHaveBeenCalledWith("grn_no", "is", null);
+  });
+
+  it("a Manual Purchase request with no stored number keeps the governed label, and never an invented one", async () => {
+    const row = {
+      ...PO_ROW,
+      so: null,
+      so_refs: null,
+      purchase_order_lines: [{ ...PO_ROW.purchase_order_lines[0], demand_id: "demand-1" }],
+    };
+    mockPosList([row as unknown as typeof PO_ROW], [], [], [], {
+      demands: [{ id: "demand-1", request_id: "request-1", purpose: "showroom" }],
+      /* A pre-numbering request. `MPR` is READ, so there is nothing to print
+         and the listing says so with the governed word — it does not mint one,
+         and it does not fall back to the UUID. */
+      requests: [{ id: "request-1", created_at: "2026-08-28T02:00:00Z", req_no: null }],
+    });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { pos: Array<{ sources: Array<{ reference: string; req_no: string | null }> }> };
+    expect(body.pos[0]?.sources).toEqual([
+      expect.objectContaining({ kind: "manual_purchase", reference: "Manual Purchase Request", req_no: null }),
+    ]);
+  });
+
   it("returns POs for operation with default 'all' status", async () => {
-    const { order, limit } = mockPosList([PO_ROW]);
+    const { order, range } = mockPosList([PO_ROW]);
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/operation/pos", {
@@ -149,7 +304,199 @@ describe("GET /api/operation/pos", () => {
     expect(body.pos).toHaveLength(1);
     expect(body.pos[0]?.id).toBe("PO-2030");
     expect(order).toHaveBeenCalledWith("placed_at", { ascending: false });
-    expect(limit).toHaveBeenCalledWith(200);
+    expect(range).toHaveBeenCalledWith(0, 999);
+  });
+
+  it("pages the complete PO register beyond the first PostgREST response", async () => {
+    const rows = Array.from({ length: 1_001 }, (_, index) => ({
+      ...PO_ROW,
+      id: `PO-${String(index + 1).padStart(5, "0")}`,
+      purchase_order_lines: [],
+    }));
+    const { range } = mockPosList(rows);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { pos: Array<{ id: string }> };
+    expect(body.pos).toHaveLength(1_001);
+    expect(range).toHaveBeenNthCalledWith(1, 0, 999);
+    expect(range).toHaveBeenNthCalledWith(2, 1000, 1999);
+  });
+
+  it("pages every send so current-version evidence cannot disappear at row 1001", async () => {
+    const sends = Array.from({ length: 1_001 }, (_, index) => ({
+      id: `00000000-0000-0000-0000-${String(index).padStart(12, "0")}`,
+      po_id: "PO-2030",
+      channel: "whatsapp",
+      note: null,
+      sent_at: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(),
+      kind: index === 1_000 ? "confirmed_sent" : "external_open",
+      recipient: index === 1_000 ? "Hooka Purchasing Group" : null,
+      po_version: index === 1_000 ? 1 : null,
+      sent_by: null,
+      duty_user_id: null,
+      acting_user_id: null,
+      po_revisions: null,
+    }));
+    const { sendsRange } = mockPosList([PO_ROW], [], [], [], { sends });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { pos: Array<{ sends: Array<{ kind: string }> }> };
+    expect(body.pos[0]?.sends).toHaveLength(1_001);
+    expect(body.pos[0]?.sends.some((send) => send.kind === "confirmed_sent")).toBe(true);
+    expect(sendsRange).toHaveBeenNthCalledWith(1, 0, 999);
+    expect(sendsRange).toHaveBeenNthCalledWith(2, 1000, 1999);
+  });
+
+  it("uses bounded parallel batches for a large register enrichment", async () => {
+    let active = 0;
+    let maximum = 0;
+    const rows = Array.from({ length: 81 }, (_, index) => ({
+      ...PO_ROW,
+      id: `PO-${String(index + 1).padStart(5, "0")}`,
+    }));
+    mockPosList(rows, [], [], [], {
+      onPoLineRange: (phase) => {
+        active += phase === "start" ? 1 : -1;
+        maximum = Math.max(maximum, active);
+      },
+    });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(maximum).toBeGreaterThan(1);
+    expect(maximum).toBeLessThanOrEqual(4);
+  });
+
+  it("returns governed SO and Manual Purchase lineage instead of guessing from display fields", async () => {
+    const row = {
+      ...PO_ROW,
+      so: null,
+      so_refs: null,
+      purchase_order_lines: [
+        { ...PO_ROW.purchase_order_lines[0], demand_id: "demand-1" },
+      ],
+    };
+    mockPosList([row as unknown as typeof PO_ROW], [], [], [], {
+      poLineSources: [
+        {
+          po_id: "PO-2030",
+          po_line_id: "line-a",
+          order_id: "order-1",
+          order_line_id: "order-line-1",
+          so: 4001,
+          qty: 1,
+        },
+      ],
+      demands: [{ id: "demand-1", request_id: "request-1", purpose: "showroom" }],
+      requests: [{ id: "request-1", created_at: "2026-08-28T02:00:00Z", req_no: "MPR-20260828-0533" }],
+    });
+
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      pos: Array<{
+        sources: Array<{ kind: string; reference: string }>;
+        purchase_order_lines: Array<{
+          sources: Array<{ so: number; qty: number }>;
+          governed_sources: Array<{ kind: string; reference: string; qty: number | null }>;
+        }>;
+      }>;
+    };
+    /* ⭐ MPR IS THE VISIBLE IDENTITY AGAIN (owner ruling 2026-09-18, which
+       overwrites Card 08 §3.5's retirement): the request's own stored number
+       is the reference. Identity is still the request UUID plus the business
+       facts, and the number is READ, never minted here. */
+    expect(body.pos[0]?.sources).toEqual([
+      { kind: "sales_order", reference: "SO-4001", order_id: "order-1" },
+      {
+        kind: "manual_purchase",
+        reference: "MPR-20260828-0533",
+        req_no: "MPR-20260828-0533",
+        request_id: "request-1",
+        purpose: "showroom",
+        proceed_date: "2026-08-28",
+      },
+    ]);
+    expect(body.pos[0]?.purchase_order_lines[0]?.sources).toEqual([
+      expect.objectContaining({ so: 4001, qty: 1 }),
+    ]);
+    expect(body.pos[0]?.purchase_order_lines[0]).toEqual(expect.objectContaining({
+      governed_sources: [
+        { kind: "sales_order", reference: "SO-4001", qty: 1 },
+        {
+          kind: "manual_purchase",
+          reference: "MPR-20260828-0533",
+          req_no: "MPR-20260828-0533",
+          qty: 1,
+          request_id: "request-1",
+          purpose: "showroom",
+          proceed_date: "2026-08-28",
+        },
+      ],
+    }));
+    expect(
+      body.pos[0]?.purchase_order_lines[0]?.governed_sources.reduce(
+        (sum, source) => sum + (source.qty ?? 0),
+        0,
+      ),
+    ).toBe(2);
+  });
+
+  it("returns a closed destination name when a historical PO still references it", async () => {
+    const row = {
+      ...PO_ROW,
+      destination_id: "destination-closed",
+      purchase_order_lines: [{
+        ...PO_ROW.purchase_order_lines[0],
+        destination_id: "destination-closed",
+      }],
+    };
+    mockPosList([row as unknown as typeof PO_ROW], [], [], [], {
+      referencedDestinations: [{
+        id: "destination-closed",
+        name: "Old Partner Warehouse",
+        is_default: false,
+      }],
+    });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      referencedDestinations: Array<{ id: string; name: string }>;
+    };
+    expect(body.referencedDestinations).toContainEqual({
+      id: "destination-closed",
+      name: "Old Partner Warehouse",
+      is_default: false,
+    });
   });
 
   // ── P3 (0306) · what the supplier last told us, and what it was ABOUT ──────
@@ -226,7 +573,7 @@ describe("GET /api/operation/pos", () => {
         { so: 4001, delivery_date: "2026-09-20", customer_name: "Ah Hock" },
         { so: 4002, delivery_date: "2026-09-05", customer_name: "Mei Ling" },
       ],
-      [{ sku: "MAT-K-001", variant: "King", product_models: { name: "Cody" } }],
+      [{ sku: "MAT-K-001", variant: "King", product_models: { name: "Cody", category: "Bedframe" } }],
     );
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
@@ -241,7 +588,7 @@ describe("GET /api/operation/pos", () => {
         customer_delivery: string | null;
         eta_revised: boolean;
         orders: { so: number; customer_name: string }[];
-        purchase_order_lines: { id: string; model_name: string | null; size: string | null }[];
+        purchase_order_lines: { id: string; model_name: string | null; size: string | null; category: string | null }[];
       }[];
     };
     expect(ordersIn).toHaveBeenCalledWith("so", expect.arrayContaining([4001, 4002]));
@@ -257,6 +604,8 @@ describe("GET /api/operation/pos", () => {
     const lineA = po.purchase_order_lines.find((l) => l.id === "line-a");
     const lineB = po.purchase_order_lines.find((l) => l.id === "line-b");
     expect(lineA?.model_name).toBe("Cody");
+    expect(lineA?.category).toBe("Bedframe");
+    expect(lineB?.category).toBeNull();
     expect(lineA?.size).toBe("King");
     // A SKU the catalog does not know stays honest: null, never an invention.
     expect(lineB?.model_name).toBeNull();
@@ -301,6 +650,22 @@ describe("GET /api/operation/pos", () => {
       env,
     );
     expect(eq).toHaveBeenCalledWith("supplier_id", supId);
+  });
+
+  it("0584 · narrows to one PO for the Work completion probe, and refuses a blank one", async () => {
+    const { eq } = mockPosList([PO_ROW]);
+    const jwt = await makeJwt("operation");
+    const ok = await app.fetch(
+      new Request("http://t/api/operation/pos?status=all&poId=PO2609-4827", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(ok.status).toBe(200);
+    expect(eq).toHaveBeenCalledWith("id", "PO2609-4827");
+    const bad = await app.fetch(
+      new Request("http://t/api/operation/pos?poId=%20", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(bad.status).toBe(422);
   });
 
   it("returns 422 for invalid status", async () => {
@@ -453,6 +818,70 @@ describe("GET /api/operation/pos/:id/source-orders", () => {
     );
     expect(res.status).toBe(403);
     expect(from).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/operation/pos/:id/audit", () => {
+  it("returns complete revisions and history with real staff names", async () => {
+    const tables: Record<string, Record<string, unknown>[]> = {
+      po_revisions: [
+        {
+          id: "rev-1",
+          rev_no: 1,
+          reason: "Deliver To changed",
+          created_by: "user-1",
+          created_at: "2026-08-28T09:00:00Z",
+          snapshot: { version: 1 },
+        },
+      ],
+      po_history: [
+        {
+          id: "hist-1",
+          text: "Purchase order revised to Version 2",
+          by_role: "operation",
+          by_user_id: "user-1",
+          occurred_at: "2026-08-28T09:00:00Z",
+        },
+      ],
+      /* ⭐ RE-PINNED 2026-09-01. The route read `app_users` directly, under
+         the caller's own JWT — so `0235`'s peers policy left every PRINCIPAL
+         actor unnamed on a purchase order's own audit, including one acting
+         under `0403`'s operations-superuser authority. It goes through
+         `resolveActorNames` now, the same arithmetic the Sales Order records
+         and the Activity rail use, so the mock answers the door instead of the
+         table. The assertion is unchanged: a real staff name reaches the
+         screen. */
+      salespersons: [],
+    };
+    vi.mocked(userClient).mockReturnValue({
+      from: vi.fn((table: string) => {
+        const chain: Record<string, ReturnType<typeof vi.fn>> = {};
+        chain.select = vi.fn(() => chain);
+        chain.eq = vi.fn(() => chain);
+        chain.in = vi.fn().mockResolvedValue({ data: tables[table] ?? [], error: null });
+        chain.order = vi.fn().mockResolvedValue({ data: tables[table] ?? [], error: null });
+        return chain;
+      }),
+      rpc: vi.fn(async (fn: string) =>
+        fn === "actor_display_names"
+          ? { data: [{ id: "user-1", name: "Yee Jean" }], error: null }
+          : { data: null, error: null },
+      ),
+    } as never);
+
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos/PO-2030/audit", {
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      revisions: Array<{ actor_name: string | null }>;
+      history: Array<{ actor_name: string | null }>;
+    };
+    expect(body.revisions[0]?.actor_name).toBe("Yee Jean");
+    expect(body.history[0]?.actor_name).toBe("Yee Jean");
   });
 });
 
@@ -610,6 +1039,61 @@ describe("the Office has exactly ONE receiving door", () => {
     expect(
       rpc.mock.calls.some((c: unknown[]) => c[0] === "operation_receive_po_with_do"),
     ).toBe(false);
+  });
+});
+
+describe("POST /api/operation/pos/:id/office-receive — the arrival time (0601)", () => {
+  const OFFICE_LINE = "33333333-3333-4333-8333-333333333333";
+  function mocks(rpc: ReturnType<typeof vi.fn>) {
+    const from = vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }),
+      }),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from } as any);
+  }
+  const send = async (body: Record<string, unknown>) =>
+    app.fetch(
+      new Request("http://t/api/operation/pos/PO-2050/office-receive", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ doNumber: "DO-1234", doFilePath: "x/y.pdf", lines: [{ id: OFFICE_LINE, receivedNow: 1 }], ...body }),
+      }),
+      env,
+    );
+
+  it("passes the Goods Received Date time point to the RPC", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { receipt_id: "r1" }, error: null });
+    mocks(rpc);
+    const res = await send({ goodsReceivedTime: "2026-09-28T09:15:00+08:00" });
+    expect(res.status).toBe(200);
+    expect(rpc.mock.calls[0][0]).toBe("office_receive_post");
+    expect(rpc.mock.calls[0][1]).toMatchObject({ p_goods_received_time: "2026-09-28T09:15:00+08:00" });
+  });
+
+  it("refuses a time that is not an ISO time point before the database", async () => {
+    const rpc = vi.fn();
+    mocks(rpc);
+    const res = await send({ goodsReceivedTime: "28/09/2026 9am" });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("on a database without 0601 it still posts, with the KL date and no invented clock", async () => {
+    const rpc = vi
+      .fn()
+      .mockResolvedValueOnce({ data: null, error: { code: "PGRST202", message: "Could not find the function public.office_receive_post" } })
+      .mockResolvedValueOnce({ data: { receipt_id: "r1" }, error: null });
+    mocks(rpc);
+    const res = await send({ goodsReceivedTime: "2026-09-27T17:30:00Z" });
+    expect(res.status).toBe(200);
+    const retry = rpc.mock.calls[1][1] as Record<string, unknown>;
+    expect(retry).not.toHaveProperty("p_goods_received_time");
+    expect(retry.p_goods_received_at).toBe("2026-09-28");
   });
 });
 
@@ -1123,7 +1607,7 @@ describe("POST /api/operation/pos/:id/reassign-warehouse", () => {
 //     prior IN-list filter to a single-value .eq()).
 //   - purchase_orders (v2-style coverage filter on legacy fallback): only
 //     open POs gate orders. Received/cancelled don't count.
-//   - order_lines + stock_balances: same as before.
+//   - order_lines + stock_sku_availability (0366): same as before.
 describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
   function mockShortageQueries(opts: {
     // v3-S4.6: thread rows. Each row tagged with operation_stage + po_id so
@@ -1140,7 +1624,15 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     // and assert the route narrows the input set BEFORE this fetch. Lines
     // without order_id always pass through (preserves existing tests).
     orderLines?: { sku: string; qty: number; order_id?: string }[];
-    stockBalances?: { sku: string; qty: number; reserved: number }[];
+    stockBalances?: {
+      sku: string;
+      qty: number;
+      reserved: number;
+      /** 0366 — exact Units a Sales Order can BIND. Defaults to qty − reserved. */
+      available?: number;
+      /** 0368 — available + bulk pieces on the floor; what replenishment asks. */
+      sellable?: number;
+    }[];
     pos?: { status: string; so: number | null; so_refs: number[] | null }[];
   }) {
     const fromImpl = vi.fn((table: string) => {
@@ -1218,9 +1710,22 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
             );
           });
           break;
-        case "stock_balances":
+        case "stock_sku_availability":
+          // 0366 — the shortage feed reads the unit register's ONE availability
+          // authority, not `stock_balances`. Fixtures still describe a site as
+          // {qty, reserved} because that is what the scenarios are about; the
+          // view's `available` is derived here exactly as the register derives
+          // it, so a test that wants a controlled unit sets `available` itself.
           // No filter on this query — the .select() chain itself awaits.
-          chain.select = vi.fn(() => promise(opts.stockBalances ?? []));
+          chain.select = vi.fn(() =>
+            promise(
+              (opts.stockBalances ?? []).map((b) => ({
+                sku: b.sku,
+                // 0368 — this feed decides what to BUY, so it reads `sellable`.
+                sellable: b.sellable ?? b.available ?? b.qty - b.reserved,
+              })),
+            ),
+          );
           break;
         case "purchase_orders":
           // v3-S2.1: route calls `.eq("status", "open")` to grab POs that
@@ -2077,10 +2582,9 @@ describe("POST /api/operation/pos/:id/ready-date", () => {
       p_po_id: PO_ID,
       p_new_date: "2026-09-10",
       p_reason: null,
-      // Slice 1 (0325): the computed `ready + transit` arrival rides along;
-      // null here because the mock supplies no transit number — P1: no
-      // number, no guessed arrival, and the RPC then keeps the old date.
-      p_new_eta: null,
+      // Slice 1 (0325): the computed arrival rides along. With the supplier
+      // transit leg removed (owner ruling 2026-09-29) it IS the ready date.
+      p_new_eta: "2026-09-10",
     });
     // The RPC's signature is (text, date, text, date): a missing or extra key
     // is PGRST202 in production and a green test without this assertion.
@@ -2223,5 +2727,627 @@ describe("POST /api/operation/pos/:id/ready-date", () => {
     );
     const passedJwt = vi.mocked(userClient).mock.calls[0]?.[1];
     expect(passedJwt).toBe(jwt);
+  });
+});
+
+
+/**
+ * CONFIRMED OUTBOUND EVIDENCE (0377; CARD-2026-08-22-purchasing-02 §7.4).
+ *
+ * The whole point of this block: an app that OPENED is not a PDF that ARRIVED.
+ */
+describe("POST /api/operation/pos/:id/confirm-sent", () => {
+  const PO_ID = "PO-2041";
+
+  function mockRpc(result: unknown = { po_id: PO_ID, po_version: 2 }, error: unknown = null) {
+    const rpc = vi.fn().mockResolvedValue({ data: result, error });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    return rpc;
+  }
+
+  async function post(body: unknown, role = "operation") {
+    const jwt = await makeJwt(role);
+    return app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/confirm-sent`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+  }
+
+  it("records channel, recipient, version and note through the governed RPC", async () => {
+    const rpc = mockRpc();
+    const res = await post({
+      channel: "whatsapp",
+      recipient: "Hooka Purchasing Group",
+      poVersion: 2,
+      note: "Sent with the Unit list",
+    });
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_confirm_po_sent", {
+      p_po_id: PO_ID,
+      p_expected_version: 2,
+      p_channel: "whatsapp",
+      p_recipient: "Hooka Purchasing Group",
+      p_note: "Sent with the Unit list",
+    });
+  });
+
+  /**
+   * ⭐ 0378 — the caller DECLARES the version it rendered.
+   *
+   * 0377 had SQL read the newest version instead, reasoning that a caller able
+   * to name one could lie. That was backwards: send Version 1, let another
+   * session revise to Version 2, confirm — and Carres recorded Version 2 as
+   * shared while the supplier held Version 1. Declaring is not trusting; SQL
+   * locks, compares, refuses, and still stores only its own read.
+   */
+  it("a confirmation with NO version is refused", async () => {
+    const rpc = mockRpc();
+    const res = await post({ channel: "email", recipient: "buy@hooka.my" });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("a version that is not a positive whole number is refused", async () => {
+    const rpc = mockRpc();
+    for (const bad of [0, -1, 1.5, "2", null]) {
+      const res = await post({ channel: "email", recipient: "buy@hooka.my", poVersion: bad });
+      expect(res.status, JSON.stringify(bad)).toBe(422);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("the declared version reaches SQL as the EXPECTED version, not as the stored one", async () => {
+    const rpc = mockRpc();
+    await post({ channel: "email", recipient: "buy@hooka.my", poVersion: 1 });
+    const args = rpc.mock.calls[0]![1] as Record<string, unknown>;
+    expect(args.p_expected_version).toBe(1);
+    // There is no argument that could SET the stored version.
+    expect(Object.keys(args)).not.toContain("p_version");
+    expect(Object.keys(args)).not.toContain("p_po_version");
+  });
+
+  it("viewing Version 1 while the database holds Version 2 is refused, in two lines", async () => {
+    mockRpc(null, {
+      code: "P0001",
+      message: "stale_po_version: saw 1, current is 2",
+      details: "stale_po_version",
+    });
+    const res = await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 1 });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code?: string; message?: string; action?: string };
+    expect(body.code).toBe("stale_po_version");
+    // The approved fact/fix pair (`docs/purchasing/MASTER.md` §8.3).
+    expect(body.message).toBe("Purchase order changed");
+    expect(body.action).toBe("Open the latest PDF and send it again.");
+  });
+
+  it("a stale confirmation writes NOTHING — the refusal is the whole outcome", async () => {
+    const rpc = mockRpc(null, {
+      code: "P0001",
+      message: "stale_po_version",
+      details: "stale_po_version",
+    });
+    await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 1 });
+    // One call, and it raised. No second call could have written a row.
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc.mock.calls[0]![0]).toBe("purchasing_confirm_po_sent");
+  });
+
+  it("declaring the version that IS current records it", async () => {
+    const rpc = mockRpc({ po_id: PO_ID, po_version: 2 });
+    const res = await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 2 });
+    expect(res.status).toBe(200);
+    expect((rpc.mock.calls[0]![1] as Record<string, unknown>).p_expected_version).toBe(2);
+    const body = (await res.json()) as { result?: { po_version?: number } };
+    expect(body.result?.po_version).toBe(2);
+  });
+
+  it("refuses a blank recipient — `sent` must say to whom", async () => {
+    const rpc = mockRpc();
+    for (const recipient of ["", "   "]) {
+      const res = await post({ channel: "whatsapp", recipient, poVersion: 1 });
+      expect(res.status, JSON.stringify(recipient)).toBe(422);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a channel nobody governs", async () => {
+    const rpc = mockRpc();
+    const res = await post({ channel: "carrier pigeon", recipient: "Hooka", poVersion: 1 });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses an unknown field rather than silently dropping it", async () => {
+    const rpc = mockRpc();
+    const res = await post({
+      channel: "whatsapp", recipient: "Hooka", poVersion: 1, sentAt: "2026-08-24",
+    });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("a caller who does not hold PO duty is refused by SQL, not by the screen", async () => {
+    mockRpc(null, { code: "P0001", message: "not_po_duty", details: "not_po_duty" });
+    const res = await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 1 });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBeLessThan(500);
+  });
+
+  it("a dealer never reaches the door", async () => {
+    const rpc = mockRpc();
+    const res = await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 1 }, "dealer");
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("opening an app records an OPEN, and completes nothing", () => {
+  it("`/sends` still exists and still takes only channel and note", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: {}, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos/PO-2041/sends", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ channel: "whatsapp" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_record_send", {
+      p_po_id: "PO-2041",
+      p_channel: "whatsapp",
+      p_note: null,
+    });
+    // It carries NO recipient — an open cannot name who received anything.
+    const args = rpc.mock.calls[0]![1] as Record<string, unknown>;
+    expect(args).not.toHaveProperty("p_recipient");
+  });
+
+  it("the two doors are DIFFERENT functions — an open can never mint evidence", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(join(here, "pos.ts"), "utf8");
+    expect(src).toContain("purchasing_record_send");
+    expect(src).toContain("purchasing_confirm_po_sent");
+    // The open door does not touch the evidence function, and vice versa.
+    const openBlock = src.slice(src.indexOf('post("/:id/sends"'), src.indexOf('post("/:id/confirm-sent"'));
+    expect(openBlock).not.toContain("purchasing_confirm_po_sent");
+  });
+});
+
+
+describe("POST day-before arrival confirmation (0585)", () => {
+  const DEST = "11111111-0000-4000-8000-00000000d001";
+  const confirmation = {
+    poVersion: 2, forDate: "2026-10-20", destinationId: DEST, kind: "supplier_confirmation",
+    evidence: ["PO-TEST/confirm.png"], channel: "whatsapp", recipient: "Factory group",
+    reportedBy: "Factory staff", reportedAt: "2026-10-19T01:00:00Z",
+  };
+  const supplierDo = { poVersion: 2, forDate: "2026-10-20", destinationId: DEST, kind: "supplier_do", supplierDoNo: "NF-DO-8812", evidence: ["PO-TEST/do.jpg"] };
+  async function post(body: unknown, role = "operation") {
+    return app.fetch(new Request("https://api.test/api/operation/pos/PO-TEST/arrival-confirmation", {
+      method: "POST", headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }), env as never, { waitUntil() {}, passThroughException() {} } as never);
+  }
+  it("records an evidenced confirmation or a Supplier DO through the one caller-authenticated RPC", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { confirmation_id: "cf" }, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    expect((await post(confirmation)).status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_record_arrival_confirmation", { p_po_id: "PO-TEST", p: confirmation });
+    expect((await post(supplierDo)).status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_record_arrival_confirmation", { p_po_id: "PO-TEST", p: supplierDo });
+  });
+  it("refuses an incomplete body before any database call", async () => {
+    for (const body of [
+      { ...confirmation, evidence: [] },
+      { ...confirmation, channel: undefined },
+      { ...confirmation, destinationId: "not-a-uuid" },
+      { ...supplierDo, supplierDoNo: undefined },
+      { ...confirmation, kind: "promise" },
+    ]) {
+      expect((await post(body)).status).toBe(422);
+    }
+    expect(userClient).not.toHaveBeenCalled();
+  });
+  it("names the database's refusal: wrong date or wrong Warehouse", async () => {
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn().mockResolvedValue({ data: null, error: { code: "22023", details: "arrival_date_mismatch", message: "The supplier must confirm the expected arrival date." } }) } as any);
+    const response = await post(confirmation);
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ code: "arrival_date_mismatch" });
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn().mockResolvedValue({ data: null, error: { code: "22023", details: "wrong_warehouse", message: "x" } }) } as any);
+    expect(await (await post(confirmation)).json()).toMatchObject({ code: "wrong_warehouse" });
+  });
+  it("rejects a dealer", async () => {
+    expect((await post(confirmation, "dealer")).status).toBe(403);
+  });
+});
+
+describe("POST supplier answer per goods line (0587)", () => {
+  /* Purchasing §5.7 (owner 2026-09-25): the answer is recorded PER LINE —
+     `confirmed` · `new_date` · `split` batches — with an optional Supplier DO
+     and photo/video/PDF evidence; the server classifies every date. */
+  const LINE = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const input = {
+    poVersion: 2, channel: "whatsapp", recipient: "Factory group", reportedBy: "Factory staff",
+    reportedAt: "2026-09-01T01:00:00Z", evidence: ["PO-TEST/reply.png"],
+    lines: [
+      { poLineId: LINE, answer: "split", batches: [{ qty: 3, date: "2026-09-10" }, { qty: 1, date: "2026-09-17", reason: "Partial quantity ready" }] },
+    ],
+  };
+  async function post(body: unknown, role = "operation") {
+    return app.fetch(new Request("https://api.test/api/operation/pos/PO-TEST/tomorrow-delivery", {
+      method: "POST", headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }), env as never, { waitUntil() {}, passThroughException() {} } as never);
+  }
+  it("submits the exact version, the lines and the evidence through the ONE per-line RPC", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { answer_group: "g", answers: 2 }, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    expect((await post(input)).status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_record_supplier_answers", { p_po_id: "PO-TEST", p: input });
+  });
+  it("a Supplier DO alone, every line unchanged, is a valid answer", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: {}, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const body = { ...input, evidence: [], supplierDo: { number: "DO-2251", file: "PO-TEST/do.pdf" },
+      lines: [{ poLineId: LINE, answer: "no_change" }] };
+    expect((await post(body)).status).toBe(200);
+  });
+  it("rejects an incomplete answer before any database call", async () => {
+    for (const key of ["poVersion", "channel", "recipient", "reportedBy", "reportedAt", "evidence", "lines"]) {
+      const body = { ...input } as Record<string, unknown>; delete body[key];
+      expect((await post(body)).status).toBe(422);
+    }
+    /* no evidence and no DO · a new date without the date · a split with no
+       batches · every line `no_change` with no DO · Other without a note */
+    expect((await post({ ...input, evidence: [] })).status).toBe(422);
+    expect((await post({ ...input, lines: [{ poLineId: LINE, answer: "new_date" }] })).status).toBe(422);
+    expect((await post({ ...input, lines: [{ poLineId: LINE, answer: "split", batches: [] }] })).status).toBe(422);
+    expect((await post({ ...input, lines: [{ poLineId: LINE, answer: "no_change" }] })).status).toBe(422);
+    expect((await post({ ...input, lines: [{ poLineId: LINE, answer: "new_date", date: "2026-09-20", reason: "Other" }] })).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+  it("surfaces the door's named refusals — a stale version, a split that does not add up", async () => {
+    for (const detail of ["stale_po_version", "batch_total_mismatch", "line_all_received"]) {
+      vi.mocked(userClient).mockReturnValue({ rpc: vi.fn().mockResolvedValue({ data: null, error: { code: "22023", details: detail, message: detail } }) } as any);
+      const response = await post(input);
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ code: detail });
+    }
+  });
+  it("rejects a dealer", async () => {
+    expect((await post(input, "dealer")).status).toBe(403);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/operation/pos/for-order/:orderId — the Work Supplier card's facts (§5.10)", () => {
+  const ORDER = "11111111-2222-4333-8444-555555555555";
+  function chainFor(rows: Record<string, unknown[]>, calls: Array<[string, string, unknown[]]>) {
+    return vi.fn((table: string) => {
+      const chain: Record<string, unknown> = {};
+      for (const m of ["select", "eq", "in", "is", "order"]) {
+        chain[m] = vi.fn((...args: unknown[]) => {
+          calls.push([table, m, args]);
+          return chain;
+        });
+      }
+      chain.then = (resolve: (v: unknown) => unknown) => resolve({ data: rows[table] ?? [], error: null });
+      return chain;
+    });
+  }
+
+  it("reads only the ARRIVAL answer (`tomorrow_delivery`) and returns Purchasing's facts per PO", async () => {
+    const calls: Array<[string, string, unknown[]]> = [];
+    const from = chainFor(
+      {
+        order_supplier_threads: [{ po_id: "PO-A" }],
+        po_line_sources: [],
+        purchase_orders: [{ id: "PO-A", status: "open", placed_at: "2026-10-01T02:00:00Z", official_delivery_date: "2026-10-20", eta_date: "2026-10-21", do_number: null, do_uploaded_at: null, destination_id: "d1", suppliers: { name: "Sleepwell" } }],
+        purchase_order_lines: [{ po_id: "PO-A", destination_id: null, sku: "M1", qty: 1, received_qty: 0 }],
+        purchasing_destinations: [{ id: "d1", name: "Carres Klang Warehouse" }],
+        po_supplier_promises: [{ po_id: "PO-A", kind: "tomorrow_delivery", answer: "delayed", new_date: "2026-10-30", about_date: "2026-10-21", previous_date: "2026-10-21", reason: "Production Delay", evidence: "wa.jpg", recorded_at: "2026-10-10T01:00:00Z" }],
+        warehouse_receipts: [],
+      },
+      calls,
+    );
+    vi.mocked(userClient).mockReturnValue({ from } as never);
+    const res = await app.fetch(new Request(`http://localhost/api/operation/pos/for-order/${ORDER}`, {
+      headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+    }), env);
+    expect(res.status).toBe(200);
+    expect(calls).toContainEqual(["po_supplier_promises", "eq", ["kind", "tomorrow_delivery"]]);
+    const body = (await res.json()) as { purchaseOrders: Array<Record<string, unknown>> };
+    expect(body.purchaseOrders[0]).toMatchObject({ poNo: "PO-A", supplier: "Sleepwell", originalIso: "2026-10-20", effectiveIso: "2026-10-30", etaIso: "2026-10-21" });
+  });
+
+  it("refuses a caller outside Operation/Principal", async () => {
+    const res = await app.fetch(new Request(`http://localhost/api/operation/pos/for-order/${ORDER}`, {
+      headers: { Authorization: `Bearer ${await makeJwt("finance")}` },
+    }), env);
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("POST /api/operation/pos/:id/change-deliver-to (0610 · Purchasing §5.4)", () => {
+  const LINE = "570cc230-d0f3-45ef-a525-f3f061bf7d85";
+  const AL = "818b420c-27f9-4707-a516-b91a6e03f343";
+  const post = async (body: unknown) =>
+    app.fetch(
+      new Request("http://t/api/operation/pos/PO-20260903-4316/change-deliver-to", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+
+  it("calls the ONE door with the chosen Units and returns its version", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { version: 2, to_line: "new-line", unit_codes: ["U1-000-026", "U1-000-027"] }, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await post({ lineId: LINE, qty: 2, destinationId: AL, reason: "Customer in Sungai Buloh", unitCodes: ["U1-000-026", "U1-000-027"] });
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_change_po_deliver_to", {
+      p_po_id: "PO-20260903-4316",
+      p_line_id: LINE,
+      p_qty: 2,
+      p_destination_id: AL,
+      p_reason: "Customer in Sungai Buloh",
+      p_unit_codes: ["U1-000-026", "U1-000-027"],
+    });
+    assertRpcCallShape(rpc, "purchasing_change_po_deliver_to",
+      ["p_po_id", "p_line_id", "p_qty", "p_destination_id", "p_reason", "p_unit_codes"]);
+    expect(await res.json()).toMatchObject({ ok: true, result: { version: 2 } });
+  });
+
+  it("lets the server pick the Units when none are named", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { version: 2 }, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    await post({ lineId: LINE, qty: 1, destinationId: AL, reason: "Nearer the customer" });
+    expect(rpc.mock.calls[0]?.[1]).toMatchObject({ p_unit_codes: null });
+  });
+
+  it("refuses an empty reason before any database call", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await post({ lineId: LINE, qty: 1, destinationId: AL, reason: "   " });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "same_destination", "all_received", "qty_out_of_range", "unit_chosen_twice",
+    "unit_not_on_line", "unit_count_mismatch", "deliver_to_line_exists", "deliver_to_closed",
+  ])("passes the door's own refusal %s through by code", async (code) => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "P0001", message: "refused", details: code } });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await post({ lineId: LINE, qty: 1, destinationId: AL, reason: "x" });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ code });
+  });
+
+  it("retires 0311's split route: it no longer exists", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/lines/${LINE}/split`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ moveQty: 1, destinationId: AL }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/operation/pos/issued-today", () => {
+  it("reads only issued SO demand on the Malaysia day, with saved supplier channels", async () => {
+    const filters: Array<[string, string, unknown]> = [];
+    const from = vi.fn((table: string) => {
+      const chain = {
+        select: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(), in: vi.fn().mockReturnThis(),
+        eq: vi.fn((key, value) => { filters.push(["eq", key, value]); return chain; }),
+        neq: vi.fn((key, value) => { filters.push(["neq", key, value]); return chain; }),
+        gte: vi.fn((key, value) => { filters.push(["gte", key, value]); return chain; }),
+        lt: vi.fn((key, value) => { filters.push(["lt", key, value]); return chain; }),
+        range: vi.fn(async () => ({ error: null, data: table === "purchase_orders"
+          ? [{ id: "PO-today", supplier_id: "s1", destination_id: "d1", version: 2 }]
+          : table === "suppliers" ? [{ id: "s1", name: "Hooka", contact_email: "supplier@example.invalid", po_send_channel: "email" }]
+            : [{ id: "d1", name: "Carres Klang" }] })),
+      };
+      return chain;
+    });
+    vi.mocked(userClient).mockReturnValue({ from } as never);
+    const response = await app.fetch(new Request("http://localhost/api/operation/pos/issued-today", {
+      headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+    }), env);
+    expect(response.status).toBe(200);
+    const body = await response.json() as { today: string; pos: unknown[] };
+    expect(body.pos).toEqual([expect.objectContaining({ id: "PO-today", supplierId: "s1", version: 2, contactEmail: "supplier@example.invalid" })]);
+    expect(filters).toContainEqual(["eq", "purpose", "customer_sales"]);
+    expect(filters).toContainEqual(["neq", "status", "cancelled"]);
+    const start = filters.find(([op]) => op === "gte")![2] as string;
+    const end = filters.find(([op]) => op === "lt")![2] as string;
+    expect(start).toBe(new Date(`${body.today}T00:00:00+08:00`).toISOString());
+    expect(new Date(end).getTime() - new Date(start).getTime()).toBe(86_400_000);
+  });
+});
+
+describe("GET /api/operation/pos/issued-round", () => {
+  it("uses the existing Work round projection and refuses an invalid key", async () => {
+    const work = await import("./work");
+    const facts = vi.spyOn(work, "poWindowSendFacts").mockResolvedValue({ poIds: ["PO-existing", "PO-new"], demandLeft: 0, allSent: false });
+    try {
+      const headers = { Authorization: `Bearer ${await makeJwt("operation")}` };
+      const refused = await app.fetch(new Request("http://localhost/api/operation/pos/issued-round?window=invalid", { headers }), env);
+      expect(refused.status).toBe(422);
+      expect(facts).not.toHaveBeenCalled();
+      const response = await app.fetch(new Request("http://localhost/api/operation/pos/issued-round?window=2026-10-05T10%3A15", { headers }), env);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ poIds: ["PO-existing", "PO-new"] });
+      expect(facts.mock.calls[0][1]).toBe("2026-10-05T10:15");
+    } finally { facts.mockRestore(); }
+  });
+});
+
+
+describe("supplier email dispatch", () => {
+  const supplierId = "11111111-1111-4111-8111-111111111111";
+  const attemptId = "22222222-2222-4222-8222-222222222222";
+  const enabledEnv = { ...env, PO_EMAIL_ENABLED: "true", RESEND_API_KEY: "test-mail-key", PO_EMAIL_FROM: "purchasing@carres.example" };
+  const content = btoa("%PDF-1.4" + "x".repeat(1200));
+  const body = { supplierId, attemptId, recipient: "supplier@example.com", subject: "Purchase Orders", message: "Please arrange delivery.",
+    documents: ["PO-001", "PO-002"].map(id => ({ id, version: 1, filename: `${id}-V1.pdf`, content })) };
+  let work: typeof import("./work");
+  beforeAll(async () => { work = await import("./work"); });
+  beforeEach(() => {
+    vi.mocked(preparePoEmailAttempt).mockReset().mockResolvedValue({ data: { created: true, status: "prepared" }, error: null } as never);
+    vi.mocked(recordPoEmailOutcome).mockReset().mockResolvedValue({ data: null, error: null } as never);
+    vi.mocked(sendSupplierPoEmail).mockReset().mockResolvedValue({ status: "dispatched", providerId: "email-provider-1" });
+    vi.spyOn(work, "poWindowKeysServing").mockResolvedValue([]);
+    vi.spyOn(work, "manualPurchaseRequestsServing").mockResolvedValue([]);
+  });
+  afterEach(() => { vi.restoreAllMocks(); });
+  function database(options: { permission?: boolean; poChanges?: Record<string, unknown>; recipient?: string; history?: Record<string, unknown>[]; refusedRecord?: string } = {}) {
+    const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => name === "purchasing_actor_may_issue"
+      ? { data: options.permission ?? true, error: null }
+      : { data: { po_id: args.p_po_id, po_version: 1 }, error: args.p_po_id === options.refusedRecord ? { code: "P0001", message: "stale_po_version", details: "stale_po_version" } : null });
+    const from = vi.fn((table: string) => {
+      const data = table === "purchase_orders" ? body.documents.map(document => ({ id: document.id, supplier_id: supplierId, version: 1, status: "open", ...options.poChanges }))
+        : table === "suppliers" ? { contact_email: options.recipient ?? body.recipient } : options.history ?? [];
+      const chain = { select: vi.fn().mockReturnThis(), in: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn(async () => ({ data, error: null })),
+        then: (resolve: (result: unknown) => void) => Promise.resolve({ data, error: null }).then(resolve) };
+      return chain;
+    });
+    vi.mocked(userClient).mockReturnValue({ rpc, from } as never);
+    return { rpc, from };
+  }
+  async function post(input: unknown = body, configured = true, role = "operation") {
+    return app.fetch(new Request("http://localhost/api/operation/pos/supplier-email", {
+      method: "POST", headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" }, body: JSON.stringify(input),
+    }), configured ? enabledEnv : env);
+  }
+  it("stays unavailable without explicit verified mail configuration", async () => {
+    database();
+    expect((await post(body, false)).status).toBe(503);
+    expect(userClient).not.toHaveBeenCalled();
+    expect(sendSupplierPoEmail).not.toHaveBeenCalled();
+  });
+  it("refuses dealer and non-authorised staff before document reads or mail dispatch", async () => {
+    const db = database({ permission: false });
+    expect((await post(body, true, "dealer")).status).toBe(403);
+    expect((await post()).status).toBe(403);
+    expect(db.from).not.toHaveBeenCalled();
+    expect(sendSupplierPoEmail).not.toHaveBeenCalled();
+  });
+  it.each([
+    { name: "changed version", changes: { version: 2 }, status: 409 },
+    { name: "other supplier", changes: { supplier_id: "other" }, status: 422 },
+    { name: "cancelled PO", changes: { status: "cancelled" }, status: 422 },
+  ])("refuses $name before external dispatch", async ({ changes, status }) => {
+    database({ poChanges: changes });
+    expect((await post()).status).toBe(status);
+    expect(sendSupplierPoEmail).not.toHaveBeenCalled();
+  });
+  it("refuses a changed saved recipient and duplicate selection", async () => {
+    database({ recipient: "new@example.com" });
+    expect((await post()).status).toBe(409);
+    expect((await post({ ...body, documents: [body.documents[0], body.documents[0]] })).status).toBe(422);
+    expect(sendSupplierPoEmail).not.toHaveBeenCalled();
+  });
+  it("an already-sent PO cannot borrow another PO's prior attempt", async () => {
+    database({ history: [
+      { po_id: "PO-001", po_version: 1, note: `Email dispatch email-1; po-email/${attemptId}` },
+      { po_id: "PO-002", po_version: 1, note: "Earlier email" },
+    ] });
+    expect((await post()).status).toBe(409);
+    expect(sendSupplierPoEmail).not.toHaveBeenCalled();
+  });
+  it("passes the exact independent attachments and records each current-version dispatch through the existing writer", async () => {
+    const db = database();
+    const response = await post();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ status: "dispatched", providerId: "email-provider-1", documents: [
+      { id: "PO-001", version: 1, recorded: true }, { id: "PO-002", version: 1, recorded: true },
+    ] });
+    expect(sendSupplierPoEmail).toHaveBeenCalledWith(expect.anything(), {
+      recipient: body.recipient, subject: body.subject, message: "Please arrange delivery.\n\nPO-001 · V1\nPO-002 · V1",
+      attachments: body.documents.map(({ filename, content }) => ({ filename, content })), attemptKey: `po-email/${attemptId}`,
+    });
+    expect(db.rpc.mock.calls.filter(call => call[0] === "purchasing_confirm_po_sent").map(call => call[1])).toEqual(body.documents.map(document => ({
+      p_po_id: document.id, p_expected_version: 1, p_channel: "email", p_recipient: body.recipient,
+      p_note: `Email dispatch email-provider-1; po-email/${attemptId}`,
+    })));
+  });
+  it("does not expose server attempt evidence for a PO hidden by user visibility", async () => {
+    database();
+    // Override the RLS-visible PO read independently of the server ledger.
+    vi.mocked(userClient).mockReturnValue({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }) } as never);
+    vi.mocked(readPoEmailAttempts).mockReset();
+    const response = await app.fetch(new Request("http://localhost/api/operation/pos/PO-hidden/email-attempts", { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } }), enabledEnv);
+    expect(response.status).toBe(404);
+    expect(readPoEmailAttempts).not.toHaveBeenCalled();
+  });
+  it("returns a definite server failure for recovery without claiming a sent document", async () => {
+    vi.mocked(userClient).mockReturnValue({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: "PO-001" }, error: null }) }) }) }) } as never);
+    vi.mocked(readPoEmailAttempts).mockResolvedValue({ data: [{ po_id: "PO-001", po_version: 1,
+      po_email_attempts: { id: attemptId, outcome: "failed", provider_id: null, recipient: body.recipient } }], error: null } as never);
+    const response = await app.fetch(new Request("http://localhost/api/operation/pos/PO-001/email-attempts", { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } }), enabledEnv);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ attempts: [{ id: attemptId, status: "failed", recipient: body.recipient, documents: [{ id: "PO-001", version: 1 }] }] });
+  });
+  it("never dispatches when the durable reservation fails", async () => {
+    database();
+    vi.mocked(preparePoEmailAttempt).mockResolvedValue({ data: null, error: { message: "unavailable" } } as never);
+    expect((await post()).status).toBe(502);
+    expect(sendSupplierPoEmail).not.toHaveBeenCalled();
+  });
+  it("recovers a persisted provider success without sending another email", async () => {
+    database();
+    vi.mocked(preparePoEmailAttempt).mockResolvedValue({ data: { created: false, status: "dispatched", providerId: "saved-provider" }, error: null } as never);
+    const response = await post();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ providerId: "saved-provider" });
+    expect(sendSupplierPoEmail).not.toHaveBeenCalled();
+  });
+  it("an uncertain attempt blocks a second provider call", async () => {
+    database();
+    vi.mocked(preparePoEmailAttempt).mockResolvedValue({ data: { created: false, status: "unknown" }, error: null } as never);
+    expect((await post()).status).toBe(502);
+    expect(sendSupplierPoEmail).not.toHaveBeenCalled();
+  });
+  it("does not confirm sent when persisting the provider outcome fails", async () => {
+    const db = database();
+    vi.mocked(recordPoEmailOutcome).mockResolvedValue({ data: null, error: { message: "unavailable" } } as never);
+    expect((await post()).status).toBe(502);
+    expect(sendSupplierPoEmail).toHaveBeenCalledOnce();
+    expect(db.rpc.mock.calls.filter(call => call[0] === "purchasing_confirm_po_sent")).toHaveLength(0);
+  });
+  it("a failed evidence write preserves known dispatch and the other PO's successful record", async () => {
+    database({ refusedRecord: "PO-002" });
+    const response = await post();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ status: "dispatched", documents: [
+      { id: "PO-001", recorded: true }, { id: "PO-002", recorded: false },
+    ] });
+    expect(sendSupplierPoEmail).toHaveBeenCalledOnce();
+  });
+  it.each(["failed", "unknown"] as const)("%s dispatch records no sent evidence", async status => {
+    const db = database();
+    vi.mocked(sendSupplierPoEmail).mockResolvedValue({ status });
+    const response = await post();
+    expect(response.status).toBe(502);
+    expect(await response.json()).toMatchObject({ status, code: `email_${status}` });
+    expect(db.rpc.mock.calls.filter(call => call[0] === "purchasing_confirm_po_sent")).toHaveLength(0);
   });
 });

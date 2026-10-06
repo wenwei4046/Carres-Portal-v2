@@ -4,7 +4,7 @@ import {
   lpAcceptOrderInput,
   lpRejectOrderInput,
 } from "@carres/shared";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -59,10 +59,7 @@ partnerOrdersRouter.get("/incoming", async (c) => {
     .is("partner_rejected_at", null)
     .order("request_for_delivery_at", { ascending: true });
 
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ orders: data ?? [] });
 });
 
@@ -82,10 +79,7 @@ partnerOrdersRouter.post("/:id/accept", async (c) => {
   const { data, error } = await sb.rpc("lp_accept_order", {
     p_order_id: c.req.param("id"),
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -103,10 +97,7 @@ partnerOrdersRouter.post("/:id/reject", async (c) => {
     p_order_id: c.req.param("id"),
     p_reason:   parsed.data.reason,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 

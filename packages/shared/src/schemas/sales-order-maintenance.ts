@@ -60,7 +60,7 @@ export const SO_GRID_COLUMNS: SoGridColumnDef[] = [
   // --- Order -------------------------------------------------------------
   { key: "so", label: "Doc No.", group: "Order", type: "text", source: "order", defaultVisible: true, defaultWidth: 110 },
   { key: "source_ref", label: "Ref.", group: "Order", type: "text", source: "order", defaultVisible: true, defaultWidth: 120 },
-  { key: "placed_at", label: "Order Date", group: "Order", type: "date", source: "order", defaultVisible: true, defaultWidth: 110 },
+  { key: "placed_at", label: "SO Date", group: "Order", type: "date", source: "order", defaultVisible: true, defaultWidth: 110 },
   { key: "status", label: "Status", group: "Order", type: "option", source: "order", defaultVisible: true, defaultWidth: 110, option: true },
   { key: "channel", label: "Channel", group: "Order", type: "option", source: "order", defaultVisible: false, defaultWidth: 100, option: true },
   { key: "source_system", label: "Source", group: "Order", type: "option", source: "order", defaultVisible: false, defaultWidth: 100, option: true },

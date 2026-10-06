@@ -70,16 +70,3 @@ export function CodeChip({ children }: { children: React.ReactNode }) {
     </span>
   );
 }
-
-/**
- * Sell-side ON/OFF status pill. Reflects `product_skus.pos_active` (NOT
- * discontinued_at — that's the cost/PO side). ON = visible to dealers;
- * OFF = hidden from the sales portal.
- */
-export function SkuStatusPill({ posActive }: { posActive: boolean }) {
-  return posActive ? (
-    <span className="pill pill-confirmed">ON</span>
-  ) : (
-    <span className="pill pill-neutral">OFF</span>
-  );
-}

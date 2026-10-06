@@ -1,15 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  Adapters,
-  DB,
   PWP_CODES,
-  PWP_RULES,
   SOFA_COMBO_PRICING,
   lineMatchesTargets,
   type PwpRule,
   type RuleLineInput,
 } from "@carres/shared";
-import { resolveSkuInfo, type SkuInfo } from "./rule-line-input";
+import {
+  deriveRuleLine,
+  readActivePwpRules,
+  resolveSkuInfo,
+  upper,
+} from "./rule-line-input";
 
 /**
  * 0256 — line-EDIT promo parity helpers (Loo 2026-07-25: "edited/added items
@@ -103,21 +105,6 @@ export type PromoEntitlementOutcome =
   | { status: "blocked"; message: string }
   | { status: "server_error"; message: string };
 
-const upper = (s: string): string => String(s ?? "").toUpperCase();
-
-/** A flat line → the matcher's RuleLineInput (mirrors the sweep's
- *  deriveRuleLine — triggers are flat real SKUs). */
-function deriveRuleLine(info: SkuInfo | null): RuleLineInput {
-  const category = info?.category ?? "";
-  const isSofa = category.toLowerCase() === "sofa";
-  return {
-    category,
-    modelId: info?.modelId ?? null,
-    sizeCode: !isSofa && info?.variant ? info.variant.toUpperCase() : null,
-    builtCompartments: [],
-  };
-}
-
 /** Guard: would the post-edit cart still back everything this order's promos
  *  already handed out? Dormant orders (no reward lines, no sourced vouchers)
  *  cost one indexed pwp_codes read. */
@@ -147,12 +134,11 @@ export async function checkPromoEntitlementAfterEdit(
   }
   if (consumedByRule.size === 0) return { status: "ok" };
 
-  // ACTIVE rules only — a deactivated rule's artifacts are settled/dead.
-  const rulesR = await sb.from(PWP_RULES).select("*").eq("active", true);
-  if (rulesR.error) return { status: "server_error", message: rulesR.error.message };
-  const activeRules: PwpRule[] = ((rulesR.data ?? []) as DB.PwpRuleRow[]).map((r) =>
-    Adapters.pwpRuleFromRow(r),
-  );
+  // ACTIVE rules only — a deactivated rule's artifacts are settled/dead. Ordered
+  // door, so the amendment path resolves a cart the same way Confirm did.
+  const rulesR = await readActivePwpRules(sb);
+  if (!rulesR.ok) return { status: "server_error", message: rulesR.message };
+  const activeRules: PwpRule[] = rulesR.rules;
   const activeById = new Map(activeRules.map((r) => [r.id, r] as const));
   const checked = activeRules.filter((r) => consumedByRule.has(r.id));
   if (checked.length === 0) return { status: "ok" };
@@ -243,7 +229,7 @@ export async function checkPromoEntitlementAfterEdit(
       return {
         status: "blocked",
         message:
-          "This item backs a promo or printed voucher on this order — the new " +
+          "This item backs a promo or printed voucher on this order. The new " +
           "configuration would no longer qualify for it. Cancel the promo with HQ " +
           "first, or keep a configuration that still qualifies.",
       };

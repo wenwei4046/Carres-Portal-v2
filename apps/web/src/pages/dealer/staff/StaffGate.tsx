@@ -258,7 +258,7 @@ function ForgotPinModal({
         {reauth.isError && (
           <div className="staff-gate__err">
             {reauth.error instanceof ApiError && reauth.error.status === 401
-              ? "Wrong password — try again."
+              ? "Wrong password. Try again."
               : reauth.error?.message ?? "Could not verify"}
           </div>
         )}

@@ -1,0 +1,71 @@
+/* Local PO/SO detail styling trial. `.mp-create-style` joins the SAME rule
+   rather than copying it: the Manual Purchase create workspace reuses the
+   Sales Order composition (owner 2026-09-22), and one section band belongs to
+   one stylesheet — a second copy is how two greys start drifting apart.
+ Explicit object scopes keep other shared
+   blocks, alert banners, action controls and PDF templates intact. */
+:is(.po-detail-style, .so-detail-style, .mp-create-style) {
+  font-family: Inter, "SF Pro Text", Roboto, system-ui, sans-serif;
+}
+
+.po-detail-style h1 > .font-mono,
+.po-detail-style [data-block] .font-mono {
+  font-family: inherit;
+}
+
+/* A note or a chip beside the blue title now sits on white, so it takes the
+   page's ordinary muted grey rather than the pale shade the band needed. */
+.so-detail-style [data-block] > div:first-child :is(span, p) {
+  color: #667085;
+}
+
+.so-detail-style [data-testid="subhead-delivery-address"],
+.so-detail-style [data-testid="subhead-emergency-contact"] {
+  color: #334155;
+}
+
+/* ⭐ THE BAND IS GONE EVERYWHERE — owner instruction (Jess, 2026-09-26):
+   "follow sales order ui kit … every page of purchasing". The shared `Block`
+   draws the card title 15px/600 sentence case in `kit-blue-11` on a WHITE card
+   over a 1px rule; this stylesheet no longer paints a grey band over it for
+   Purchase Orders or the Manual Purchase create workspace. ⛔ LESSON KEPT: it
+   was a rule here, not the markup, that decided the old look. Nothing here may
+   style `[data-block] > div:first-child` again. */
+.po-detail-style :is(label, .text-base-400, .text-base-500, .text-base-600, .text-kit-slate-11),
+.po-detail-style [data-block] > div:first-child :is(span, p) {
+  color: #667085;
+}
+
+/* ⭐ DARKER FIELD LABELS (Jess, 2026-09-10 density pass) — scoped tighter than
+   the muted-text rule above so it wins without affecting hints, captions or
+   other `.text-base-*` shades. */
+.po-detail-style label[for] {
+  color: #475569;
+}
+
+.po-detail-style :is(.text-base-700, .text-base-900, .text-kit-slate-12) {
+  color: #1f2937;
+}
+
+.po-detail-style :is([data-kit="input"], [data-kit="textarea"], [data-kit="select"], [data-kit="date-picker"], [data-kit="readonly-field"]) {
+  background-color: #ffffff;
+  color: #1f2937;
+}
+
+/* Retain error borders and the existing blue focus treatment. */
+.po-detail-style :is([data-kit="input"], [data-kit="textarea"], [data-kit="select"], [data-kit="date-picker"], [data-kit="readonly-field"]).border-kit-slate-5:not(:focus):not(:focus-visible) {
+  border-color: #cbd5e1;
+}
+
+/* ONE KIT LAW (owner 2026-09-27): the PO page's tables are the kit's own —
+   the DocumentTable recipe draws plain label heads over a kit-slate-5
+   hairline. The page-scoped raw-hex band and line colours that overrode it
+   were removed 2026-09-29. */
+
+.po-detail-style tbody tr:is([aria-selected="true"], [data-state="selected"]) {
+  background-color: #eaf4ff;
+}
+
+.po-detail-style :is([data-kit="input"], [data-kit="select"], [data-kit="date-picker"]) {
+  height: 1.75rem;
+}

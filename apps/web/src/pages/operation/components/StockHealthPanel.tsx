@@ -277,7 +277,7 @@ function PlanAccuracy({ months }: { months: OpsMonthAccuracy[] }) {
             {m.reported ? (
               m.movedPct == null ? (
                 <div className="text-base-500 mt-0.5">
-                  Every line was cut to zero — nothing was ordered.
+                  Every line was cut to zero. Nothing was ordered.
                 </div>
               ) : (
                 <div className="text-base-700 mt-0.5">
@@ -285,7 +285,7 @@ function PlanAccuracy({ months }: { months: OpsMonthAccuracy[] }) {
                     {m.movedPct}%
                   </span>{" "}
                   of what was ordered sold that month
-                  {m.movedPct > 100 ? " — we ordered too little" : ""}
+                  {m.movedPct > 100 ? ". We ordered too little" : ""}
                 </div>
               )
             ) : (

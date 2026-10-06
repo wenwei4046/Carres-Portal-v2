@@ -1,8 +1,13 @@
 import {
+  cartHasGoods,
+  composeEmergencyContact,
+  EMERGENCY_RELATIONSHIP_OTHER,
+  minDeliveryDateISO,
   ORDER_ENTRY_TABS,
   resolveFormTab,
   resolvePaymentMethods,
   STRIPE_METHOD_KEY,
+  type CatalogResponse,
   type FormFieldsConfig,
   type PaymentMethodConfig,
 } from "@carres/shared";
@@ -201,9 +206,13 @@ export interface WizardDraft {
   delivery: {
     date: string;
     // Phase 11.1 (Loo) — salesperson-entered planned production-start
-    // ("Proceed") date. Paired with `date` via the same `dateTbd` toggle
-    // (both-or-neither). Must be on/before `date`. Empty string = not picked.
+    // ("Proceed") date. Paired with `date` (both-or-neither) and must be
+    // on/before it. Empty string = not picked.
     proceedDate: string;
+    /** ⛔ RETIRED 2026-08-15 (Jess) — nothing sets this to `true` any more.
+     *  The field stays in the shape so `CreateOrderInput` keeps its wire
+     *  contract and old sessionStorage drafts still parse; `loadDraft`
+     *  normalises it to `false` on restore. */
     dateTbd: boolean;
     floor: number;
     hasLift: boolean;
@@ -211,12 +220,9 @@ export interface WizardDraft {
     // null = "auto = all items" (legacy behavior). Lets dealer charge for
     // partial coverage when only some of the lines go above the free floor.
     stairItems: number | null;
-    // 2026-05-10 (Loo) — "As Fast As Possible" pill on Step1. When clicked,
-    // sets date = today + 20 days and flips this flag. After successful
-    // order create, the wizard auto-fires the Proceed mutation so the order
-    // skips the manual Place→Proceed click. If Proceed conditions aren't
-    // met (e.g. insufficient deposit), we surface the error and the order
-    // stays in 'place' for the dealer to top up + manually proceed.
+    /** ⛔ RETIRED — saved-draft compatibility only. Final submit now asks the
+     *  database to complete the canonical handoff automatically whenever the
+     *  governed facts are ready; no browser-side second Proceed action. */
     asap?: boolean;
   };
   /** Step 2: products picked + addons toggled. Empty array = no products yet. */
@@ -335,12 +341,22 @@ export function loadDraft(storageKey: string = DRAFT_STORAGE_KEY): WizardDraft |
       addressState: parsed.customer.addressState ?? empty.customer.addressState,
       addressCity: parsed.customer.addressCity ?? empty.customer.addressCity,
       addressPostcode: parsed.customer.addressPostcode ?? empty.customer.addressPostcode,
+      /* The "Fill in address later" tick is retired (2026-09-13): a saved
+         draft that carried it comes back asking for the address. */
+      addressUnknown: false,
     };
     // Only backfill the new stairItems field for old drafts; don't merge in
     // empty.delivery (that would inject defaults like asap=false the original
     // draft never had, breaking save/load round-trip equality).
     const delivery = {
       ...parsed.delivery,
+      // ⛔ 2026-08-15 (Jess) — "Confirm later" is retired. A draft saved from
+      // the old wizard may still carry `dateTbd: true`; restoring it as-is
+      // would put the salesperson in front of a disabled picker with no way
+      // to clear it, and the create door would refuse the submit. Normalise
+      // on restore: the date fields keep whatever was typed, the retired flag
+      // does not survive.
+      dateTbd: false,
       // Phase 11.1 — backfill proceedDate for drafts saved before this field
       // existed, so old in-flight drafts restore cleanly.
       proceedDate:
@@ -403,7 +419,8 @@ export function clearDraft(storageKey: string = DRAFT_STORAGE_KEY): void {
  *   - Phone matches /^[0-9-+\s]{8,}/  (8+ chars, only digits/dash/plus/space)
  *   - Emergency name ≥ 2 chars + phone matches same
  *   - Emergency relationship picked AND ("Others" only valid with relOther ≥ 2)
- *   - Either addressUnknown OR address ≥ 5 chars
+ *   - The delivery address, state, city, postcode and building type (the
+ *     `addressUnknown` escape is retired — owner ruling 2026-09-13)
  *   - Either billingSame OR the billing MY cascade complete (Line 1 ≥ 5 chars
  *     + state + city + postcode — same rule as delivery)
  *   - Either delivery.dateTbd OR delivery.date is set
@@ -438,40 +455,48 @@ export function step1FirstIssue(
   // always apply.
   const cust = resolveFormTab(formCfg ?? null, "customer").builtins;
   const emg = resolveFormTab(formCfg ?? null, "emergency").builtins["emergency"];
-  if (!d.outletId)        return "Sale info — pick an Outlet";
-  if (!d.salespersonId)   return "Sale info — pick a Salesperson";
-  if (c.name.trim().length < 2)   return "Customer — full name (≥2 chars)";
-  if (!PHONE_RE.test(c.phone))    return "Customer — phone (≥8 digits)";
+  if (!d.outletId)        return "Sale info: pick an Outlet";
+  if (!d.salespersonId)   return "Sale info: pick a Salesperson";
+  if (c.name.trim().length < 2)   return "Customer: full name (≥2 chars)";
+  if (!PHONE_RE.test(c.phone))    return "Customer: phone (≥8 digits)";
   // 0200 — POS-parity demographics (2990s: POS-required, server-lenient).
   // Required per config; a NON-required but filled email still needs a valid shape.
-  if (cust["email"]?.required && !EMAIL_RE.test(c.email.trim())) return "Customer — email";
+  if (cust["email"]?.required && !EMAIL_RE.test(c.email.trim())) return "Customer: email";
   if (cust["email"]?.enabled && !cust["email"]?.required && c.email.trim() && !EMAIL_RE.test(c.email.trim())) {
-    return "Customer — email (invalid format)";
+    return "Customer: email (invalid format)";
   }
-  if (cust["race"]?.required && !c.race)         return "Customer — race";
-  if (cust["gender"]?.required && !c.gender)     return "Customer — gender";
-  if (cust["birthday"]?.required && !c.birthday) return "Customer — birthday";
+  if (cust["race"]?.required && !c.race)         return "Customer: race";
+  if (cust["gender"]?.required && !c.gender)     return "Customer: gender";
+  if (cust["birthday"]?.required && !c.birthday) return "Customer: birthday";
   if (emg?.required) {
-    if (c.emergencyName.trim().length < 2)   return "Emergency Contact — name";
-    if (!PHONE_RE.test(c.emergencyPhone))    return "Emergency Contact — phone";
-    if (!c.emergencyRelationship)            return "Emergency Contact — relationship";
+    if (c.emergencyName.trim().length < 2)   return "Emergency Contact: name";
+    if (!PHONE_RE.test(c.emergencyPhone))    return "Emergency Contact: phone";
+    if (!c.emergencyRelationship)            return "Emergency Contact: relationship";
     if (c.emergencyRelationship === "__OTHER__" && c.emergencyRelationshipOther.trim().length < 2) {
-      return "Emergency Contact — describe the 'Other' relationship";
+      return "Emergency Contact: describe the 'Other' relationship";
     }
   }
-  if (!c.addressUnknown) {
-    if (c.addressLine1.trim().length < 5)   return "Address — Line 1 (≥5 chars), or tick 'Unknown'";
-    if (!c.addressState)                    return "Address — State, or tick 'Unknown'";
-    if (!c.addressCity)                     return "Address — City, or tick 'Unknown'";
-    if (!c.addressPostcode)                 return "Address — Postcode, or tick 'Unknown'";
-  }
+  /* ⛔ THE REQUIRED SALES FACTS FOR A DELIVERY (owner ruling 2026-09-13,
+   * Delivery Card 18): the "Fill in address later" escape is RETIRED. A valid
+   * new order carries its delivery address, state, building type, floor,
+   * lift and requested date — an address nobody has yet is a Sales conversation
+   * still open, not an order Operation can plan. `createOrderInputSchema`
+   * refuses the same facts at the door with the governed words. */
+  if (c.addressLine1.trim().length < 5)   return "Address: Line 1 (≥5 chars)";
+  if (!c.addressState)                    return "Address: State";
+  if (!c.addressCity)                     return "Address: City";
+  if (!c.addressPostcode)                 return "Address: Postcode";
+  /* 2026-08-21 (Jess) — building type is DELIVERY's fact: stairs, lift
+   * access and van parking all hang off it, and Operations was chasing the
+   * shop for it after the sale. */
+  if (!c.buildingType)                    return "Address: Building type";
   // 2026-07-19 (Loo) — billing keys in with the SAME MY cascade as delivery,
   // so the gate mirrors the delivery rules field-for-field.
   if (!c.billingSame) {
-    if (c.billingLine1.trim().length < 5) return "Billing — Line 1 (≥5 chars), or tick 'Same as delivery'";
-    if (!c.billingState)                  return "Billing — State, or tick 'Same as delivery'";
-    if (!c.billingCity)                   return "Billing — City, or tick 'Same as delivery'";
-    if (!c.billingPostcode)               return "Billing — Postcode, or tick 'Same as delivery'";
+    if (c.billingLine1.trim().length < 5) return "Billing: Line 1 (≥5 chars), or tick 'Same as delivery'";
+    if (!c.billingState)                  return "Billing: State, or tick 'Same as delivery'";
+    if (!c.billingCity)                   return "Billing: City, or tick 'Same as delivery'";
+    if (!c.billingPostcode)               return "Billing: Postcode, or tick 'Same as delivery'";
   }
   // 0219 — operator-defined REQUIRED custom fields (all 4 tabs share the
   // d.customer.custom bag; target-tab customs gate here too so the shell's
@@ -479,7 +504,7 @@ export function step1FirstIssue(
   for (const tab of ORDER_ENTRY_TABS) {
     for (const f of resolveFormTab(formCfg ?? null, tab).custom) {
       if (f.required && !(c.custom?.[f.key] ?? "").trim()) {
-        return `${f.label} — required`;
+        return `${f.label}: required`;
       }
     }
   }
@@ -502,6 +527,38 @@ export function step2Valid(d: WizardDraft): boolean {
   return true;
 }
 
+/**
+ * ⛔ A SALES ORDER MUST CONTAIN GOODS — owner ruling 2026-08-15.
+ *
+ * `docs/guarantee/MASTER.md` already gates one category this way (*"a
+ * guarantee only sells attached to the item it covers"*); the ruling
+ * generalises it to the whole cart. A service with no product on the same
+ * order is not a sale — it is a Service Case, and it belongs to the Service
+ * channel.
+ *
+ * **Positive recognition only** (the same rule `line-category.ts` applies to
+ * accessories): a SKU the catalog cannot resolve counts as GOODS, so a
+ * not-yet-catalogued line never blocks a real sale. With no catalog in hand
+ * the gate is silent — the create door re-runs it against the catalog and is
+ * the authority.
+ *
+ * Returns the reason, or `null` when the cart is sellable.
+ */
+export function cartGoodsIssue(
+  d: WizardDraft,
+  catalog?: CatalogResponse | null,
+): string | null {
+  if (!catalog || d.lines.length === 0) return null;
+  const categoryBySku = new Map<string, string>();
+  const modelById = new Map(catalog.models.map((m) => [m.id, m]));
+  for (const s of catalog.skus) {
+    const category = modelById.get(s.modelId)?.category;
+    if (category) categoryBySku.set(s.sku, category);
+  }
+  if (cartHasGoods(d.lines.map((l) => categoryBySku.get(l.sku)))) return null;
+  return "This order has no product. Add the product this service belongs to";
+}
+
 /** Returns the first failing sized addon's display label, or null when
  *  every sized-addon unit has a size. Used by the wizard footer to surface a
  *  specific reason rather than a generic "Continue" disabled state. */
@@ -512,8 +569,8 @@ export function step2FirstDisposalIssue(d: WizardDraft): string | null {
     const missing = sizes.filter((s) => !s).length;
     if (missing > 0) {
       return a.qty > 1
-        ? `${a.name} — pick a size for each of the ${a.qty} items`
-        : `${a.name} — pick a size`;
+        ? `${a.name}: pick a size for each of the ${a.qty} items`
+        : `${a.name}: pick a size`;
     }
   }
   return null;
@@ -525,8 +582,9 @@ export function step2FirstDisposalIssue(d: WizardDraft): string | null {
  * from the cart's categories — see shared `maxLeadDaysFor`) so this module
  * stays catalog-agnostic.
  *
- *   - TBD is accepted (order parks in Place until a real date is entered)
- *   - Otherwise the picked date must be on/after today + minLeadDays
+ * ⛔ 2026-08-15 (Jess) — **the date is mandatory.** "Confirm later" is retired:
+ * if the date is not confirmed with the customer, Operation must not receive
+ * the order. The picked date must still be on/after today + minLeadDays.
  */
 export function step3DateValid(d: WizardDraft, minLeadDays: number, today: Date = new Date()): boolean {
   return step3DateFirstIssue(d, minLeadDays, today) === null;
@@ -537,30 +595,28 @@ export function step3DateFirstIssue(
   minLeadDays: number,
   today: Date = new Date(),
 ): string | null {
-  if (d.delivery.dateTbd) return null;
-  if (!d.delivery.date) return "Delivery — pick a date, or tick 'Confirm later'";
+  if (!d.delivery.date) {
+    return "Delivery date: ask the customer for the date, then pick it";
+  }
   if (minLeadDays > 0) {
-    const min = new Date(today);
-    min.setDate(min.getDate() + minLeadDays);
-    const picked = new Date(d.delivery.date);
-    if (picked < new Date(min.toISOString().slice(0, 10))) {
-      return `Delivery — earliest date is ${min.toISOString().slice(0, 10)} (${minLeadDays}-day lead time)`;
+    const min = minDeliveryDateISO(minLeadDays, today);
+    if (d.delivery.date < min) {
+      return `Delivery: earliest date is ${min} (${minLeadDays}-day lead time)`;
     }
   }
   // Phase 11.1 (Loo) — the salesperson must ALSO commit a proceed
   // (production-start) date whenever a delivery date is set. It can't be in the
   // past and can't be after the delivery date (you don't start building after
-  // you've promised delivery). TBD orders skip this (handled by the early
-  // return above) — both dates get filled in later via the confirm-date flow.
+  // you've promised delivery).
   if (!d.delivery.proceedDate) {
-    return "Proceed date — pick when production should start, or tick 'Confirm later'";
+    return "Proceed date: pick the day production should start";
   }
-  const todayIso = today.toISOString().slice(0, 10);
+  const todayIso = minDeliveryDateISO(0, today);
   if (d.delivery.proceedDate < todayIso) {
-    return `Proceed date — can't be in the past (earliest ${todayIso})`;
+    return `Proceed date: can't be in the past (earliest ${todayIso})`;
   }
   if (d.delivery.proceedDate > d.delivery.date) {
-    return "Proceed date — must be on or before the delivery date";
+    return "Proceed date: must be on or before the delivery date";
   }
   return null;
 }
@@ -658,8 +714,15 @@ export function dataUrlToBlob(dataUrl: string): Blob {
  */
 export function composeEmergency(c: WizardDraft["customer"]): string {
   const rel =
-    c.emergencyRelationship === "__OTHER__"
+    c.emergencyRelationship === EMERGENCY_RELATIONSHIP_OTHER
       ? c.emergencyRelationshipOther.trim()
       : c.emergencyRelationship;
-  return [c.emergencyName.trim(), c.emergencyPhone.trim(), rel].filter(Boolean).join(" · ");
+  /* The codec lives in `@carres/shared` since 2026-08-15 — the Sales Order
+     object page edits the same column as three fields and must write it the
+     same way (ownership Law D). */
+  return composeEmergencyContact({
+    name: c.emergencyName,
+    phone: c.emergencyPhone,
+    relationship: rel,
+  });
 }

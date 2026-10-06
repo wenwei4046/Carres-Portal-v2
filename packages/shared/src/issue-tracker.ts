@@ -1,23 +1,16 @@
 import { z } from "zod";
+import { operationWorkItemSchema, operationWorkStableId, type OperationWorkItem } from "./operation-work";
+import type { WorkspaceDutyResolution } from "./workspace-duty";
 
 export const issueObjectKinds = ["item", "delivery", "document", "payment", "customer_information", "staff_work", "other"] as const;
 export const issueObservedProblems = ["wrong_item", "damaged", "missing", "wrong_quantity", "late", "no_reply", "wrong_information", "work_not_done", "not_sure"] as const;
-export const issueEvidenceKinds = ["photo", "video", "workspace_communication", "delivery_document", "other_document"] as const;
-
-export function decideProblemHome(input: { customerResolutionRequired: boolean; internalFailureObserved: boolean }) {
-  if (input.customerResolutionRequired) {
-    return { home: "service_case" as const, linkedIssueRequired: input.internalFailureObserved };
-  }
-  return input.internalFailureObserved
-    ? { home: "issue_tracker" as const, linkedIssueRequired: false }
-    : { home: "owning_module" as const, linkedIssueRequired: false };
-}
+export const issueEvidenceKinds = ["photo", "video", "whatsapp_reply", "delivery_document", "other_document"] as const;
 
 export const issueIntakeSchema = z.object({
   problemObject: z.enum(issueObjectKinds), observedProblem: z.enum(issueObservedProblems),
   foundByKind: z.enum(["me", "customer", "warehouse", "supplier", "logistics", "system", "other"]),
   foundByName: z.string().min(1), observedOn: z.string().date(),
-  linkedObjects: z.array(z.object({ kind: z.enum(["sales_order", "purchase_order", "receiving", "supplier_claim", "unit", "delivery", "payment", "service_case", "guarantee", "rental", "issue", "workspace_communication"]), id: z.string().min(1), label: z.string().min(1) })).min(1),
+  linkedObjects: z.array(z.object({ kind: z.enum(["sales_order", "purchase_order", "receiving", "supplier_claim", "unit", "delivery", "payment", "service_case", "guarantee", "rental", "issue"]), id: z.string().min(1), label: z.string().min(1) })).min(1),
   affectedObject: z.string().min(1), impact: z.string().min(1),
   evidence: z.array(z.object({ kind: z.enum(issueEvidenceKinds), count: z.number().int().positive() })).min(1),
   optionalDetail: z.string().max(300).optional(),
@@ -31,23 +24,113 @@ export function buildIssueEnglish(raw: IssueIntake): string {
   const input = issueIntakeSchema.parse(raw); const link = input.linkedObjects[0]!.label;
   const where = input.foundByKind === "warehouse" ? "Warehouse checked" : `${input.foundByName} checked`;
   const proof = input.evidence.map((e) => `${e.count} ${e.kind === "photo" ? (e.count === 1 ? "photo" : "photos") : e.kind.replaceAll("_", " ")}`).join(" and ");
-  return `${input.affectedObject} ${problemText[input.observedProblem]} when ${where} ${link} on ${englishDate(input.observedOn)}. ${proof} were added by ${input.foundByName}. ${input.impact}.`;
+  // One photo WAS added; three photos WERE (production walk 2026-09-26).
+  const verb = input.evidence.reduce((n, e) => n + e.count, 0) === 1 ? "was" : "were";
+  return `${input.affectedObject} ${problemText[input.observedProblem]} when ${where} ${link} on ${englishDate(input.observedOn)}. ${proof} ${verb} added by ${input.foundByName}. ${input.impact}.`;
 }
 
-export const issueWorkSchema = z.object({ owner: z.string().min(1), object: z.string().min(1), recipient: z.string().min(1), action: z.string().min(4).refine((v) => !/^(call|ask|check|choose|upload|add|send|save|follow up|review|handle|resolve)$/i.test(v.trim()), "Action must name what to do"), requiredResult: z.string().min(3), dueOn: z.string().date() });
-export function buildIssueWorkTitle(raw: z.input<typeof issueWorkSchema>) { const w = issueWorkSchema.parse(raw); return `${w.owner} · ${w.action} for ${w.object} · Contact ${w.recipient} · Need: ${w.requiredResult} · By ${englishDate(w.dueOn)}`; }
+/** 0589 — a Unit problem reported from Warehouse routes its check to GRN Duty
+ *  (Stock MASTER §6), so the Duty rule joins the two Issue Tracker rules. */
+export const issueActionOwnerRules = ["issue_triage_duty", "issue_review_approver", "grn_duty"] as const;
+export type IssueActionOwnerRule = (typeof issueActionOwnerRules)[number];
+
+const governedActionSchema = z.string().trim().min(4).refine(
+  (value) => !/^[^·]+\s·\s/.test(value),
+  "Owner identity belongs in structured metadata, not the action sentence",
+);
+
+export const issueActionInputSchema = z.object({
+  trigger: z.string().trim().min(3),
+  ownerRule: z.enum(issueActionOwnerRules),
+  action: governedActionSchema,
+  recipient: z.string().trim().min(1),
+  requiredResult: z.string().trim().min(3),
+  dueOn: z.string().date(),
+}).strict();
+
+export const issueActionResultInputSchema = z.object({
+  resultCode: z.enum(["accepted", "rejected", "proof_added", "correction_confirmed", "repair_confirmed", "replacement_confirmed", "answer_recorded"]),
+  result: z.string().trim().min(3),
+  nextAction: issueActionInputSchema.optional(),
+}).strict();
+
+export type IssueActionSource = {
+  id: string; issueId: string; issueNo: string; trigger: string;
+  ownerRule: IssueActionOwnerRule; action: string; recipient: string;
+  requiredResult: string; dueOn: string; materiality: "routine" | "significant" | "critical";
+};
+
+export function projectIssueActionWork(input: {
+  actions: readonly IssueActionSource[];
+  dutyResolutions: Partial<Record<IssueActionOwnerRule, WorkspaceDutyResolution>>;
+  today: string;
+  observedAt: string;
+}): OperationWorkItem[] {
+  return input.actions.map((source) => {
+    const duty = input.dutyResolutions[source.ownerRule] ?? null;
+    return operationWorkItemSchema.parse({
+      contractVersion: 2,
+      id: operationWorkStableId("issue_tracker", source.id, "current_action"),
+      module: "issue_tracker",
+      ruleKey: "current_action",
+      ruleVersion: 1,
+      object: { kind: "issue", id: source.issueId, label: source.issueNo },
+      problem: source.trigger,
+      action: source.action,
+      recipient: source.recipient,
+      requiredResult: source.requiredResult,
+      completionPredicate: "Current Issue action has a governed result",
+      completionStatement: "The current Issue action has a recorded result",
+      owner: {
+        rule: source.ownerRule,
+        dutyKey: source.ownerRule,
+        normal: duty?.normalOwner ?? null,
+        activeCover: duty?.activeCover ?? null,
+        coverEvidence: null,
+        acting: duty?.actingPerson ?? null,
+        state: duty?.state ?? "not_assigned",
+      },
+      timing: {
+        businessDueOn: source.dueOn,
+        actionOn: source.dueOn,
+        placement: source.dueOn < input.today ? "missed" : "on_day",
+        missedAge: { state: "not_calculable", workingDays: null, basis: null },
+        eligibility: duty?.state === "not_assigned" || !duty ? "unknown" : "eligible",
+        noDateReason: null,
+        calendar: {
+          module: { key: "issue_action", source: "issue_actions.due_on", state: "ready" },
+          actor: {
+            key: duty?.actingPerson?.userId ? `person:${duty.actingPerson.userId}` : `duty:${source.ownerRule}`,
+            source: "people",
+            state: "not_configured",
+          },
+          holidayName: null,
+        },
+      },
+      communication: null,
+      blocker: null,
+      nextConsequence: null,
+      interaction: {
+        mode: "open_module",
+        fallbackDestination: `/operation/issues?issue=${encodeURIComponent(source.issueId)}`,
+      },
+      destination: `/operation/issues?issue=${encodeURIComponent(source.issueId)}`,
+      observedAt: input.observedAt,
+      sourceVersion: input.observedAt,
+      tone: source.materiality === "critical" ? "danger" : source.materiality === "significant" ? "warning" : "info",
+      locked: false,
+      broken: duty === null || duty.state === "not_assigned",
+    });
+  });
+}
 
 export const createIssueInputSchema = z.object({
+  /** 0526 — one request records at most one Issue; a retry answers with the first. */
+  requestId: z.string().uuid(),
   intake: issueIntakeSchema,
-  scope: z.enum(["internal_only", "customer_impact_linked"]),
   sourceModule: z.string().min(1),
   materiality: z.enum(["routine", "significant", "critical"]).default("routine"),
-  work: issueWorkSchema,
-  actionOwnerId: z.string().uuid().optional(),
-}).superRefine((input, context) => {
-  if (input.scope === "customer_impact_linked" && !input.intake.linkedObjects.some((link) => link.kind === "service_case")) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ["intake", "linkedObjects"], message: "Link the Service Case before recording the internal Issue" });
-  }
+  currentAction: issueActionInputSchema,
 });
 export const addFaultOwnerInputSchema = z.object({
   ownerKind: z.enum(["related_party", "internal_staff", "internal_team", "other"]), relatedPartyId: z.string().uuid().optional(), staffId: z.string().uuid().optional(), ownerName: z.string().min(1),

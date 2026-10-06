@@ -11,7 +11,6 @@ import {
   itemsBlock,
   rmAmount,
   salutationOf,
-  titleCaseName,
   waEncode,
 } from "./wa-templates";
 
@@ -27,7 +26,7 @@ describe("wa-templates (two-tone locked copy, 2026-07-13)", () => {
     expect(itemsBlock(multi)).toBe(
       "2× Lumi FirmCare-L1201F-K\n3× Essential Memory Pillow(L)",
     );
-    expect(itemsBlock([])).toBe("—");
+    expect(itemsBlock([])).toBe("");
   });
 
   it("rmAmount — thousands-separated, no prefix", () => {
@@ -36,13 +35,26 @@ describe("wa-templates (two-tone locked copy, 2026-07-13)", () => {
     expect(rmAmount(1234567.4)).toBe("1,234,567");
   });
 
-  it("salutation — preferred field wins; else Title-Case name; NEVER auto Mr/Ms", () => {
+  it("salutation — preferred field wins; else the ONE name rule; NEVER auto Mr/Ms", () => {
     expect(salutationOf("Ms Lee", "LEE WEI YANG")).toBe("Ms Lee");
-    expect(salutationOf("", "LEE WEI YANG")).toBe("Lee Wei Yang");
     expect(salutationOf(null, null)).toBe("there");
-    expect(titleCaseName("LEE WEI YANG")).toBe("Lee Wei Yang");
     // no auto-inferred title anywhere
     expect(salutationOf(null, "LEE WEI YANG")).not.toMatch(/\b(Mr|Ms|Mrs)\b/);
+  });
+
+  /* ⭐ CAPITALIZE UP ONLY reaches the greeting too — owner ruling 2026-08-15. */
+  it("greets with the capitalize-up rule, and never rewrites initials", () => {
+    // The defect the ruling names: the old `titleCaseName` lowercased the tail,
+    // so a message to KJ NG was addressed to `Kj` — to nobody.
+    expect(salutationOf("", "KJ NG")).toBe("KJ NG");
+    expect(salutationOf(null, "kj ng")).toBe("Kj Ng");
+    expect(salutationOf("", "LEE WEI YANG")).toBe("LEE WEI YANG");
+    expect(salutationOf(null, "lee wei yang")).toBe("Lee Wei Yang");
+  });
+
+  it("has no second name-casing entry point left", async () => {
+    const mod = await import("./wa-templates");
+    expect("titleCaseName" in mod).toBe(false);
   });
 
   it("customer Reminder — exact locked copy, multi-line, no delivery date", () => {
@@ -72,7 +84,7 @@ describe("wa-templates (two-tone locked copy, 2026-07-13)", () => {
       lines: multi,
     });
     expect(t).toContain(
-      "Following up on your order — the balance below is still outstanding.",
+      "Following up on your order.\nThe balance below is still outstanding.",
     );
     expect(t).toContain("REF: CR0902\nOutstanding: RM 1,749");
     expect(t).toContain(
@@ -98,7 +110,7 @@ describe("wa-templates (two-tone locked copy, 2026-07-13)", () => {
       when: "tomorrow",
     });
     expect(t).toContain(
-      "Final reminder — your delivery is arranged for tomorrow and the balance below is still outstanding.",
+      "Final reminder.\nYour delivery is arranged for tomorrow and the balance below is still outstanding.",
     );
     expect(t).toContain("REF: CR0902\nOutstanding: RM 1,749");
     expect(t).toContain(
@@ -139,7 +151,7 @@ describe("wa-templates (two-tone locked copy, 2026-07-13)", () => {
     expect(r).toContain("Friendly reminder");
     expect(r).not.toContain("overdue");
     expect(c).toContain("the deadline has passed");
-    expect(c).toContain("Deadline: 6 Jul 26 — overdue");
+    expect(c).toContain("Deadline: 6 Jul 26 (overdue)");
   });
 
   it("supplier Reminder + Chase — PO-led, never SO", () => {
@@ -189,8 +201,8 @@ describe("wa-templates (two-tone locked copy, 2026-07-13)", () => {
     for (const t of [r, c]) {
       expect(t).toContain("Hi NETS 👋");
       // Each delivery is its own block — REF-led, never the SO.
-      expect(t).toContain("_CR0902_ — Lee Wei Yang (Puchong)");
-      expect(t).toContain("_TCF0544_ — Tan (Johor)");
+      expect(t).toContain("_CR0902_ · Lee Wei Yang (Puchong)");
+      expect(t).toContain("_TCF0544_ · Tan (Johor)");
       expect(t).toContain("1× L1201F-K");
       expect(t).toContain("2× SOF-3RA");
       expect(t).toContain("2 deliveries.");
@@ -198,7 +210,7 @@ describe("wa-templates (two-tone locked copy, 2026-07-13)", () => {
     }
     // The overdue delivery is tagged only on that block.
     expect(r).toContain("by 6 Jul 26\n");
-    expect(c).toContain("by 2 Jul 26 — overdue");
+    expect(c).toContain("by 2 Jul 26 (overdue)");
     expect(r).toContain("please confirm the delivery date");
     expect(c).toContain("following up");
   });

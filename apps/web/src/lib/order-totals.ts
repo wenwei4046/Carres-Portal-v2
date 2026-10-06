@@ -33,32 +33,25 @@ export function totalItems(order: Order): number {
   return (order.lines ?? []).reduce((s, l) => s + l.qty, 0);
 }
 
-/**
- * Raw stair-carry calculation — exported so the wizard's Step 2 (which holds
- * a pre-Order draft, not an Order) can call the same formula without
- * constructing a fake Order. Single source of truth: change this function and
- * both the wizard preview and the order-detail page update together.
- */
-export function floorSurchargeRaw(
-  floor: number,
-  hasLift: boolean,
-  totalQty: number,
-  cfg: FloorConfigDto,
-): number {
-  if (hasLift) return 0;
-  if (floor <= cfg.freeUpToFloor) return 0;
-  const flights = floor - cfg.freeUpToFloor;
-  return flights * cfg.perFloorPerItem * totalQty;
-}
+/* ⭐ THE STAIR ARITHMETIC MOVED TO `@carres/shared` (2026-08-29).
+
+   It was defined here, and `apps/web` is a place the Worker cannot import
+   from — so the fee the customer signed for was computed in the browser on
+   every render and never written down. The server now stamps it onto the
+   order as an `order_addons` row, which it can only do if it can run the
+   same function.
+
+   Re-exported rather than re-imported at each call site: every existing
+   caller keeps its import, and there is still ONE implementation.
+
+   Imported AND re-exported: this file still uses both itself, and a bare
+   `export ... from` would not bind them locally. */
+import { floorSurchargeRaw, stairCarryCount } from "@carres/shared";
+export { floorSurchargeRaw, stairCarryCount };
 
 export function floorSurcharge(order: Order, cfg: FloorConfigDto): number {
-  // delivery.stairItems is the dealer-picked count of items that need stair
-  // carry. Null = legacy / dealer didn't override → fall back to all items
-  // (current behavior pre-0104). Clamped ≥ 0 for safety.
-  const count =
-    order.delivery.stairItems == null
-      ? totalItems(order)
-      : Math.max(0, order.delivery.stairItems);
+  const itemsTotal = (order.lines ?? []).reduce((n, l) => n + l.qty, 0);
+  const count = stairCarryCount(itemsTotal, order.delivery.stairItems);
   return floorSurchargeRaw(order.delivery.floor, order.delivery.hasLift, count, cfg);
 }
 
@@ -170,10 +163,10 @@ export function draftTotals(draft: DraftTotalsInput, catalog: CatalogResponse): 
   const lineSub = draft.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
   const addonSub = draft.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0);
   const itemsTotal = draft.lines.reduce((s, l) => s + l.qty, 0);
-  const stairItems =
-    draft.delivery.stairItems == null
-      ? itemsTotal
-      : Math.max(0, Math.min(itemsTotal, draft.delivery.stairItems));
+  /* Unset = NONE (owner ruling 2026-08-27) — the same rule `floorSurcharge`
+     applies to a saved order, so the wizard preview and the order detail
+     cannot quote two different stair fees. */
+  const stairItems = stairCarryCount(itemsTotal, draft.delivery.stairItems);
   const stair = floorSurchargeRaw(
     draft.delivery.floor,
     draft.delivery.hasLift,

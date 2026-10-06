@@ -17,6 +17,7 @@ import {
 import { SectionCard } from "@/components/SectionPanel";
 import { useHrPeople } from "@/lib/queries";
 import HrPersonDrawer from "./HrPersonDrawer";
+import { personInitials } from "@/lib/staff-avatar";
 
 /**
  * People (HR-P4, migration 0269) — one row per human who has a CRnnn code.
@@ -79,7 +80,7 @@ function PersonRow({
     >
       <span className="flex min-w-0 items-center gap-2.5">
         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-base-100 text-label font-semibold text-base-600">
-          {p.name.slice(0, 2).toUpperCase()}
+          {personInitials(p.name, "")}
         </span>
         <span className="min-w-0">
           <span className="block truncate text-body font-semibold leading-tight text-base-900">
@@ -92,7 +93,7 @@ function PersonRow({
       </span>
 
       <span className="font-mono text-meta font-semibold text-base-600">
-        {p.staffCode ?? "—"}
+        {p.staffCode ?? ""}
       </span>
 
       <span className="min-w-0">
@@ -249,7 +250,7 @@ export default function HrPeopleTab() {
           <Info size={14} className="shrink-0 text-base-400" />
           <span className="text-meta text-base-400">
             Showing all {people.length}. Store logins, supplier and partner accounts are not
-            people — they have no CR code, so they never appear here.
+            people. They have no CR code, so they never appear here.
           </span>
         </div>
       </SectionCard>

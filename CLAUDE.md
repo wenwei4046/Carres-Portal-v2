@@ -22,6 +22,23 @@ number, the party and the date already worked out, and one obvious button.
 
 ---
 
+**Mandatory UI cold-start:** before any listing/UI proposal or build, read `docs/ui/MASTER.md`
+**§0 Current kit index first** (one current source per thing on screen; anything not listed is not a
+pattern to copy), then §0.1–§0.3 (page anatomy, shared module page flow, every-new-chat procedure),
+§6.0 and the section for the part being built, the canonical token/component/pattern files, the owning
+module listing section and COPY entries. Module cards use the kit `CompactModuleCard` (§4.3), never a
+copy of its reference HTML. Reuse the kit and complete the §2.2 full-page checks before delivery.
+Approved goods/Ready Stock flows: Purchasing §9.1 SO Batch and §9.2 Manual Purchase (Jess
+2026-09-18, both BUILT 2026-09-18 — the authenticated production walk is owed for both, and
+Manual Purchase's migrations 0545–0547 + 0549 are APPLIED 2026-09-20 and only the authenticated walk
+is owed); preserve their distinct approval and allocation rules.
+Manual Purchase INHERITS the four §6.8 engine capabilities and §6.10's group-local header engine;
+neither page grows a second set and no page writes a local copy of either.
+GRN document review: Purchasing §9.4 owns the approved/not-built composition and quantity
+example; COPY distinguishes accepted Received Qty from Physical arrived Qty.
+Use the current main versions; open PRs and mockups are not a second authority. Resolve older PR
+text against these rules before merging. Never ask Jess to repeat already recorded UI decisions.
+
 ## 2 · Design philosophy
 
 **Law order: Business Rules → Information Architecture → Design System → Implementation.**
@@ -33,6 +50,21 @@ On a conflict, Business wins.
   `docs/01-design-tokens.md` and are not design opinions. **Composition is yours.**
 - **A component that does not exist: STOP and ask for it to join the kit.** Never draw one
   inline "just this once".
+- **THE ONE KIT LAW — owner ruling 2026-09-27 (Jess: "every page must follow · delete the old UI
+  kit, update the new · chats don't read and create new").** There is ONE UI kit:
+  `docs/01-design-tokens.md` · `docs/02-components.md` · `docs/03-page-patterns.md` ·
+  `docs/ui/MASTER.md` §6.0. Every page, every module, every chat follows it; a page that differs
+  is a defect, never a "page style". Before ANY UI proposal, mock or build, read §6.0 and the
+  tokens — a chat that has not read them may not draw. Never create a new component, colour, type
+  size, word, rail, table or guide document; when a kit gap is real, admit the thing to the kit
+  (with its `/ui` example) and every page gets it. When an old rule is found, DELETE it and update
+  the kit in the same change — never leave two versions. The old kit files are gone
+  (`UI-KIT-NEW-CHAT`, `archive/UI-KIT-*`, the `carres-design` skill, the old `ui-reference/` mocks);
+  do not recreate them. `docs/ui-reference/` now holds only the confirmed compact-card reference that
+  the kit component is proven against, and `components/retired-components.test.ts` blocks new use of
+  the retired `Btn`, `Field` and `PageHeader`. Portal-wide standards ruled the same day: **no dash anywhere on a screen** ·
+  **card titles are black bold `text-strong`, never blue** · **column separators by column
+  count** · **rail = icon + title only; every group closed until clicked, its chosen value on the header; two views are a tab bar (owner ruling 2026-09-28; SO representative pilot owner correction 2026-10-01 stacks the two views and opens Delivery first, see Orders MASTER)** · **header filter icons on hover only**.
 - **Content decides column width**, never the table width. **Expand has exactly one job.**
   **An inline second line is the only exception.**
 - **Copy the POWER of the tools the team already uses, never their ASSUMPTIONS.** AutoCount's
@@ -41,6 +73,11 @@ On a conflict, Business wins.
 - **A feature is wired only if it makes the operator finish faster today.** "The kit has it" is
   not an answer. Three fewer clicks, five fewer documents opened, one fewer exception missed.
 - **A word that is not in `docs/COPY-STANDARD.md` may not appear on screen.** Stop and ask.
+- **Any listing — read first:** [UI MASTER §6.0 Listing Template](docs/ui/MASTER.md) (one page), then the
+  module MASTER's column order. The Sales Orders Register is the reference page.
+- **Purchasing UI cold start:** read [the shared Purchasing UI dictionary](docs/COPY-STANDARD.md#purchasing-ui-dictionary)
+  and the exact column order in `docs/purchasing/MASTER.md` §9.1–§9.4 before changing those lists.
+  Use the same fact names across pages; do not revive labels from old chats or improvise column order.
 
 ---
 
@@ -54,6 +91,42 @@ evidence beats older documentation.
 `CLAUDE.md` + `docs/<module>/MASTER.md`. BUILD starts with those two files; Plan/Design reads the
 governing chain required by the §4 start protocol. This does not license indiscriminate document
 loading. Old queues and checkpoints live in `docs/archive/` — **no chat reads them as authority.**
+
+### ERP AUTHORITY MAP — canonical handoff, 2026-08-14
+
+This table is the cold-start directory, not a second copy of module law. `APPROVED` or `LOCKED`
+does not claim the target is built. `BUILD` means approved law plus committed implementation that
+still requires delivery/production proof. A proposal never becomes authority through this table.
+
+| Module / responsibility | Canonical current authority | State | Resume execution at |
+|---|---|---|---|
+| Catalog | No module MASTER yet; boundary in `docs/ERP-ARCHITECTURE.md` | **PROPOSAL / authority gap** | PLAN a complete Catalog Blueprint; do not infer rules from other modules |
+| Sales Orders / Customer Order | `docs/orders/MASTER.md` | **LOCKED business law · consolidated Blueprint 2026-10-01 PLAN COMPLETE; implementation partial** | §0.0 approved handoff scopes and acceptance boundaries; #1834 scoped amendment implementation is for review, not deployment proof; preserve verified register/object truth |
+| Purchasing / Purchase Orders | `docs/purchasing/MASTER.md` | **APPROVED / LOCKED** | Its measured current blocks and Approved Evolution; do not revive old queues |
+| PO windows + supplier delay/day-before evidence | `docs/purchasing/MASTER.md` §§5.6.1, 5.7; Workspace §6.2; Orders charter; Stock §2; Delivery §1; COPY | **DEPLOYED — PO window Work card + storage; migrations 0584/0585 APPLIED 2026-09-25; per-line `Record supplier answer` + day-before check per batch DEPLOYED 2026-09-26 with 0587 APPLIED (Purchasing §5.7 production record); owner walk owed; Settings screen for window times BUILT 2026-09-28 (supplier earlier cut-off still has no screen)** | Batch demand into editable 11:30 and optional 16:00 standard windows on the days ticked in the `PO Days` setting (Jess 2026-09-25; she sets it to every Office working day); supplier earlier cut-off wins. Default PO date is not confirmation. Supplier answers are recorded per PO goods line in one `Record supplier answer` form (Confirmed / New date / Split delivery; photo, video, PDF evidence; eight governed delay reasons — Jess 2026-09-25); one-working-day-before asks for Supplier DO or exact-date confirmation per batch. Workspace §5.10/§6.1 mirror this; Purchasing owns the write doors. Preserve module boundaries. |
+| Chase answer link (all modules) + outstation release | `docs/ERP-ARCHITECTURE.md` §§6.4–6.5; Delivery §14.1; Payment "Collection timing" | **OWNER-APPROVED 2026-09-24 / NOT BUILT** | Every remind/chase to an outside party links to its scoped Portal answer surface; answers write the owning module's record; NETS first, each party's login rollout needs owner authorisation. Outstation: customer WhatsApp confirmation with proof before the first leg leaves Klang; payment complete 3 working days before Confirmed Delivery. |
+| Manual Purchase create / returned-request edit | `docs/purchasing/MASTER.md` §9.2; COPY; UI MASTER split rule | **BUILT (Cards 13/13-B); authenticated saved-request and issue lifecycle still owed** | Sales Order composition; `Request Details → Delivery → Items`, 50/50 internal MPR preview. §9.2 also owns MPR → PO review reuse and five-fact grouping. Owner selected A: retain request approval, no financial placement gate; PO date follows Settings, not the MPR requested date. |
+| Purchase Returns | `docs/purchasing/MASTER.md` §9.6 + `docs/COPY-STANDARD.md` | **Register BUILT + DEPLOYED 2026-09-19 (`7e9e7c37`), 0548 APPLIED; creation door (Record what Carres does next · Issue Purchase Return · send · pickup Work) BUILT ON BRANCH 2026-09-29, 0609 NOT APPLIED** | Deliver the creation-door PR; its named dependencies (Supplier Master return address editor, Stock Outbound `Return to supplier` handover, Supplier Received Date) are listed in §9.6. Preserve PR Doc Date / PR No, Category before PO No + Unit ID, the Supplier Claims-style supplier rail, `Sending not confirmed`, and no Finance |
+| Repair Orders — business scope and register UI | `docs/purchasing/MASTER.md` §9.7; Stock §12.8; Workspace §6; COPY; UI §6.7–6.8 | **APPROVED TARGET / NOT BUILT — UI confirmed 2026-09-20** | Direct inventory or Claim-linked RO; Warehouse/Showroom/Dealer including Display; actual Units and ownership facts required. Supplier Claim optional. Owner ruling B (2026-09-19): missing non-Carres owner consent permits Issue with an outstanding consent follow-up in existing Work. Owner ruling 2026-09-19: optional price in create/detail; no financial placement/Issue gate; any required approval is Jess-only. **Owner correction 2026-09-20:** no backdated RO Doc Date; automatic 14 working days from Supplier receipt of the RO document, separate Supplier return reply; show all Unit IDs directly. See §9.7 for calendar/admission gaps. **Register UI confirmed 2026-09-20:** the 17-column order, the per-Unit expansion with `Problem` and `Evidence` separate, and a five-group rail with NO quotation/approval facet. Read §9.7 before resuming; the page is still `Coming soon` and two structural conflicts (0490 mints `RO No` on the return leg; no shared Issue engine) are named there and must be resolved before build. |
+| Purchasing confirmed UI handoff — all six reviewed pages | `docs/purchasing/MASTER.md` §9.1–9.6; COPY and UI MASTER | **Confirmed decisions recorded on main; build status remains per page** | SO Batch #1459 merged; Manual design #1457 merged, build #1464 merged (`55ee52e7`) with migrations **0546 + 0547 APPLIED 2026-09-20** (§9.2 records the governed application evidence); PO #1462 merged, its listing BUILT and DEPLOYED 2026-09-18 (`6de125c1`) with the authenticated walk still owed; Receiving #1461 merged, its listing BUILT and DEPLOYED 2026-09-19 (#1467, `896a7b12`); a rendered walk 2026-09-19 found and fixed a 🔴 pinning defect (missing `min-w-0`), leaving only the real-data walk owed; Supplier Claims specification synced from #1463; Returns #1465 merged. Read current sections; do not restart design or revive older PR text. |
+| Receiving | `docs/purchasing/MASTER.md` §§7.3, 9.4 | **APPROVED / LOCKED** | Receipt facts and source-linked supplier claim reporting; no Service Case prerequisite |
+| Supplier Claims | `docs/purchasing/MASTER.md` §9.5 | **APPROVED / LOCKED** | Purchasing-owned stock claims from Stock/PO/receipt evidence; customer Service Cases are separate |
+| Stock / Warehouse | `docs/stock/MASTER.md` | **LOCKED** | Measured Stock implementation and explicit approved gaps in that MASTER |
+| Delivery | `docs/delivery/MASTER.md` | **APPROVED / LOCKED** | §2.1 assignment timing (2026-09-29) and §6 actual-date/time precision (2026-09-30) are APPROVED TARGET / NOT BUILT: assignment opens early with a configurable cut-off; actual delivery date required, exact time optional and never guessed. Preserve the approved operating model; implementation may lag |
+| Payment / Money In | `docs/payment/MASTER.md` | **APPROVED / LOCKED** | Its approved-target/not-built convergence work; Payment remains customer money only |
+| Showroom / Dealer — page and request journey | `docs/purchasing/MASTER.md` §9.8; `docs/stock/MASTER.md` §3; `docs/service/MASTER.md` §1.1 | **APPROVED TARGET / NOT BUILT — owner 2026-10-02** | Current location goods from owning Warehouse/asset facts; orders/requests and actual movement history; normal new-purchase rules with optional outgoing goods; existing-item service; meaningful external facts, internal Work ownership. PJ database has 36 IDs, not a physical-audit claim. Receiver-applied labels; counted goods have no Unit ID. No approved 5/7/3 service timetable or blanket Dealer14day guarantee. |
+| Service Cases | `docs/service/MASTER.md` | **APPROVED / LOCKED** | Implement the approved 2026-08-14 Case/playbook rulings; no new business interview |
+| Guarantee / Service Package | `docs/guarantee/MASTER.md` | **APPROVED / LOCKED** | Preserve shipped entitlement baseline; implement the dated policy/playbook rulings |
+| Rental / Subscription | `docs/rental/MASTER.md`; cross-module pointer `docs/ERP-ARCHITECTURE.md` §6.3 | **Existing Rental law LOCKED; scoped new owner targets APPROVED / NOT BUILT; remaining design PROPOSAL / NOT LAW** | Read §4 and §§5.6, 5.8–5.9 for advance supply, Diglant holding, NETS Klang Valley, regional logistics evidence and service lifecycle. All connected Portal tasks must preserve these boundaries; do not infer full-blueprint or build approval. |
+| People / HR | `docs/hr/MASTER.md` | **LOCKED** | Measured current implementation and explicit gaps in that MASTER |
+| Issue Tracker | `docs/issue-tracker/MASTER.md` | **BUILD — business law APPROVED / LOCKED** | Verify/deliver the committed Issue Tracker implementation; do not re-plan the operating model |
+| Work right panel — Logistics party card + external logistics link | `docs/workspace/MASTER.md` §§5.5, 5.9; Delivery §5.5; ERP-ARCHITECTURE §6.4; COPY "The Work Logistics card" | **OWNER-APPROVED 2026-09-24 / BUILT (0581)** | Requested / Scheduled / Delivered · time optional · three fixed checks · Logistics not assigned · no-portal partners answer through one company-level link (Copy/Revoke while active, Create otherwise). Open architecture items are Workspace §5.9's gap list — `Collected from supplier`, partner-Site receiving, the legacy leg-0 booking slot, DO download through the link. |
+| Work right panel — complete mission composition | `docs/workspace/MASTER.md` §5.10; COPY "The complete Work right panel words"; §5.9 for deployed Logistics | **OWNER-APPROVED 2026-09-25 / NOT BUILT except Logistics** | Preserve left/middle/density and §5.9 Logistics. Build compact summary → one-line concurrent Order Route → Logistics → Customer → multi-supplier Supplier → audit disclosure; 72px collapsed party cards; 743×704 acceptance. **Customer boundary:** Logistics normally contacts/agrees the date; Carres acts only for known delay, partner-reported date change/refusal or wrong phone (plus the separate governed outstation-release exception). Do not revive a routine Carres customer-scheduling workflow. |
+| Workspace — Staff & Duties + Work + Dashboard | `docs/workspace/MASTER.md` | **APPROVED / LOCKED architecture; staged delivery** | Staff & Duties final Blueprint §§3–4 owner-approved 2026-09-29 / PARTIALLY DELIVERED: global Settings; Duty + current name + plain dates; `Next`, collapsed `History`, manager `⋯`, `Manage staff` to People. Automatic monthly rota, next-month newcomer allocation, all active Operation staff may execute ordinary work, recorded-leave cover, bounded manual exceptions; People-owned one-confirmation departure and restricted former-profile lookup. BUILD/DELIVERY authorised by Jess; Settings relocation production verified (#1791), two-period activity checks, current-person UI and assignment movements deployed (#1798). Read Workspace §4.4 for measured evidence and remaining target work. Other Work/Dashboard scope remains separately governed. |
+| Shared ERP UI | `docs/ui/MASTER.md` | **PRODUCTION-VERIFIED / LOCKED** | Apply the governed templates/tokens and the latest locked owner/action presentation law |
+
+`docs/issue-tracker/MASTER.md` is the one current Issue Tracker path. The former
+`docs/issues/MASTER.md` survives only in Git history and is not a second authority.
 
 ### Law 2 · Build first. Freeze after validation. Then overwrite the MASTER
 ```
@@ -72,6 +145,13 @@ the evidence is strong enough AND its boundary is explicit: a Principle must be 
 Every Principle names the Findings it rests on; if one is overwritten it returns to review in
 the same change. **Principles guide research; they never replace research.** No Principle is
 permanent — it holds only until better evidence replaces it.
+
+**Owner confirmation handoff:** when the owner confirms a presented design, automatically
+synchronise the approved delta into the owning MASTER, applicable COPY/UI rules and authority
+index before reporting completion. Preserve unrelated edits. Distinguish UI approval from built
+or production-verified status, and report local vs committed/pushed/merged state accurately.
+A local edit does not notify other sessions; their shared authority is the synchronised repository.
+Do not require the owner to repeat “update the repo” after confirmation.
 
 ### Law 3 · Override Law — a MASTER is never permanent, and it holds ONE truth
 **A better architecture always wins.** When one is approved, **overwrite** the MASTER.
@@ -175,7 +255,7 @@ engineering mechanics. Clarify only when acting would risk crossing a business o
      authoritative sources conflict.
    A missing implementation is not an owner decision. A planner preference is not an owner
    decision. Example: if Blueprint/Money authority already permits planning/booking in parallel and
-   makes T−1 with RM0 the hard Delivery release gate, Delivery records it as **`RESOLVED FROM
+   makes T−2 with RM0 the hard Delivery release gate, Delivery records it as **`RESOLVED FROM
    AUTHORITY`**; it may not ask Jess whether an outstanding balance should block release.
 3. **WHOLE-DOMAIN AUDIT FIRST — AUDIT IS INPUT, NOT FINAL PLAN.** Complete the target domain
    capability and lifecycle pass, including
@@ -411,10 +491,10 @@ found*. **The failure has a name: dressing an engineering decision as a business
 *"Option A or B?"* about a file, a freeze, a scope or a merge is *"please do my job"*, and it is
 worse than silence because it looks like diligence.
 
-**A card is handed over TAB FIRST** — `【TAB】 — 【id】 · 【one line】`, and the paste block says
-which tab it owns and which it may not touch. The queue letters are the build line, not the
-screen, and they do not match: `R9` · `R11` · `R12` are all **Claims** and touch no Receiving
-file, while Receiving is the closed page.
+**A card is handed over MODULE FIRST** — `【MODULE】 — CARD 【sequence】 · 【clear capability name】`.
+The card file repeats the module and sequence in its metadata and H1; a date or opaque ID never
+replaces the human build order. The paste block says which module/surface it owns and which it may
+not touch. Queue letters remain technical build lines, not screen or module names.
 
 **Engineer-Owned Delivery.** After approval, engineering owns delivery until production is
 verified: implementation · testing · self-review · fixing what it finds · merge · deploy ·
@@ -430,7 +510,10 @@ production data must be modified irreversibly · long-term architecture must cha
 **BUILD/DELIVERY DEFAULT AUTONOMY.** A BUILD takeover of an approved `READY FOR CARD` scope owns the
 full vertical slice: inspect current `origin/main` and authority → implement → run targeted tests
 during development → pass the authoritative release gate → push/PR/merge → deploy → authenticated
-production verification → close the owning MASTER. If the mission says continuous build, continue
+production verification → close the owning MASTER. Before calling a module complete, proactively offer
+how to complete its Settings — every setting it needs to run, its Settings door, current value or
+default, which are still empty, and who sets it (owner ruling 2026-10-05); never wait for the owner to ask.
+If the mission says continuous build, continue
 to the next approved READY scope without asking *“what next?”* or saying *“waiting for your next
 instruction.”* Never ask Jess to choose subagent-driven vs inline execution, technical-layer order,
 test batching, branch/worktree strategy, migration numbering, PR sequence, CI strategy, deployment
@@ -510,19 +593,26 @@ CONFIGURATION — suppliers, SKUs, production days, rates — not transactions.
 > **When the architecture and a module MASTER disagree, the ARCHITECTURE wins** — a MASTER
 > describes one module, and every boundary defect found so far lived *between* two of them.
 
+> **GLOBAL OWNER LAW — OWNER-APPROVED 2026-09-03; OVERWRITTEN 2026-09-17.** Every ERP action and
+> approval names an Owner Rule. That rule resolves either a stable object owner such as the Sales
+> Order PIC, or a governed Duty through Staff & Duties; today's Buddy cover may act without
+> replacing the normal owner, and actual actor evidence is retained. A module may never hard-code a
+> person's name, keep a second assignment list, or turn owner identity into action-sentence text.
+
 ## 8.1 · Modules
 
 | Module | What it owns | MASTER |
 |---|---|---|
 | **Orders** | the customer's order end to end — the list, the drawer, the action engine, delay planning, the money gate | [`docs/orders/MASTER.md`](docs/orders/MASTER.md) |
 | **Purchasing** | buy what customers ordered and what the shelf needs | [`docs/purchasing/MASTER.md`](docs/purchasing/MASTER.md) |
-| **Delivery** | the delivery WORKSPACE — a view of Orders' delivery track | [`docs/delivery/MASTER.md`](docs/delivery/MASTER.md) |
-| **Stock** | on hand · in & out · ready stock · the reorder engine | [`docs/stock/MASTER.md`](docs/stock/MASTER.md) |
+| **Delivery** | the delivery WORKSPACE — it owns the arrangement, the Delivery Order document, handover and proof; Sales owns the promise | [`docs/delivery/MASTER.md`](docs/delivery/MASTER.md) |
+| **Stock** | exact Unit · Where · Who has it · availability · physical history and month-end truth | [`docs/stock/MASTER.md`](docs/stock/MASTER.md) |
 | **Payment** | the collections desk | [`docs/payment/MASTER.md`](docs/payment/MASTER.md) |
 | **Service** | customer complaints after delivery | [`docs/service/MASTER.md`](docs/service/MASTER.md) |
 | **UI** | the design system, the kit, the portal shell and its right rail | [`docs/ui/MASTER.md`](docs/ui/MASTER.md) |
 | **HR** | people, commission, targets, cost | [`docs/hr/MASTER.md`](docs/hr/MASTER.md) |
 | **Rental** | rent-to-own agreements, billing and buyout | [`docs/rental/MASTER.md`](docs/rental/MASTER.md) |
+| **Workspace** | Staff & Duties, duty holders, cover and shared approval routing | [`docs/workspace/MASTER.md`](docs/workspace/MASTER.md) |
 
 **A module gets a folder only when it is a real operator surface with measured reality.**
 Never create an empty master for symmetry.
@@ -535,6 +625,7 @@ Never create an empty master for symmetry.
 | [`docs/COPY-STANDARD.md`](docs/COPY-STANDARD.md) | every visible word — the dictionary, the seven verbs, the banned words |
 | [`docs/ACTION-FLOW-STANDARD.md`](docs/ACTION-FLOW-STANDARD.md) | how actions are computed, appear, close, and which shows first |
 | [`docs/01-design-tokens.md`](docs/01-design-tokens.md) · [`02-components.md`](docs/02-components.md) · [`03-page-patterns.md`](docs/03-page-patterns.md) | the design system — token values and components |
+| [`docs/pdf/DOCUMENT-KIT.md`](docs/pdf/DOCUMENT-KIT.md) | **every printed document** — the shared shape, the owner's review rulings, which documents exist and where each one's rules live. Read it BEFORE designing any PDF |
 | [`docs/ENGINEERING.md`](docs/ENGINEERING.md) | the stack, the repo, RLS performance, deployment, testing, current production state |
 
 **Open one only when you need a specific answer from it. Do not read them to start work.**
@@ -560,6 +651,13 @@ Never create an empty master for symmetry.
   nothing was read** — Law 4 already requires the challenge; this rule says it is not optional
   and it is not on request.
 - **She agrees, then you build.** A settled decision is not reopened unless she reopens it.
+- **⭐ TOP-TO-TOE IS AUTOMATIC, AND SHE NEVER POINTS TWICE — owner ruling 2026-09-27 (Jess).** Before a
+  surface reaches her: walk ALL of it against the ONE KIT and the dictionary AND against two or three
+  NAMED international products (Shopify · Stripe · Linear · SAP Fiori · NN/g; AutoCount / 2990 for the
+  team's habits), then bring EVERY deviation with its fix and a PNG of the whole page in ONE message.
+  Never fix the one thing she pointed at and wait for the next; never make her ask "is this
+  international?" or "which brand do we copy?" — say it first. Every UI segment starts by invoking the
+  installed UI/UX design skill and says so.
 - **Count before you propose UI.** Measure fill rates with SQL; empty fields do not reach the
   screen.
 - Anything she must paste elsewhere is written in **English**.

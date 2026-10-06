@@ -27,14 +27,35 @@ import { BANNED, itSaysNoBannedWord, visibleStrings } from "./banned-words";
 const PAGES = join(dirname(fileURLToPath(import.meta.url)), "..", "pages");
 
 describe("no banned word reaches the screen (C12 · portal-wide)", () => {
-  describe("the collections desk", () => {
-    itSaysNoBannedWord(join(PAGES, "operation", "OperationPayments.tsx"), {
-      // Measured on the file: 219 strings. The floor is a non-vacuity guard,
-      // not a target — it is set below the real count so an unrelated edit does
-      // not trip it, and far above zero so a matcher that stopped matching
-      // cannot make every assertion below vacuously true.
-      minStrings: 150,
-      expectString: "Waiting stock",
+  /* THE COLLECTIONS DESK IS THE REGISTER PAIR NOW (2026-09-09). The scan
+     followed the CLICK, not the filename: `OperationPayments.tsx` was the page
+     the everyday `Payments` row opened, and on 2026-09-09 that row started
+     opening `/finance/payments` instead. The desk was deleted in the same
+     change, so its guard moves here rather than disappearing — a retired
+     surface must never take a live word-scan with it.
+
+     The floors are non-vacuity guards, not targets: measured 107 and 169
+     visible strings, set below the real count so an unrelated edit does not
+     trip them and far above zero so a matcher that stopped matching cannot
+     make every assertion below vacuously true. */
+  describe("Payment Records — the money listing", () => {
+    itSaysNoBannedWord(join(PAGES, "finance", "PaymentRecords.tsx"), {
+      minStrings: 70,
+      expectString: "Back to Payment Records",
+    });
+  });
+
+  describe("the collection desk — the Payment Monitor", () => {
+    itSaysNoBannedWord(join(PAGES, "finance", "PaymentMonitor.tsx"), {
+      minStrings: 40,
+      expectString: "Show payment details",
+    });
+  });
+
+  describe("the collection workspace behind the Monitor row", () => {
+    itSaysNoBannedWord(join(PAGES, "finance", "PaymentCollectionWorkspace.tsx"), {
+      minStrings: 40,
+      expectString: "Do not ask the customer to pay yet.",
     });
   });
 
@@ -45,11 +66,27 @@ describe("no banned word reaches the screen (C12 · portal-wide)", () => {
     );
   });
 
-  describe("To Order", () => {
-    itSaysNoBannedWord(join(PAGES, "operation", "OperationToOrder.tsx"), {
-      minStrings: 80,
-      expectString: "Open Purchase Order",
-    });
+  /**
+   * SO BATCH PURCHASE (CARD-2026-08-22-purchasing-02). `OperationToOrder.tsx`
+   * is a thin orchestrator now — it owns data and mode and spells almost no
+   * words — so the scan follows the WORDS to the two files that hold them. A
+   * floor left on the orchestrator would pass vacuously forever.
+   */
+  describe("SO Batch Purchase", () => {
+    itSaysNoBannedWord(
+      join(PAGES, "operation", "so-batch", "SoBatchRegister.tsx"),
+      /* Card 02-B — `Not counted yet` left with the retired Stock column; the
+         coverage absence is the string the file is now known to contain. */
+      { minStrings: 40, expectString: "Not ordered yet" },
+    );
+    itSaysNoBannedWord(
+      join(PAGES, "operation", "so-batch", "SoBatchIssueWorkspace.tsx"),
+      { minStrings: 20, expectString: "Goods must arrive" },
+    );
+    itSaysNoBannedWord(
+      join(PAGES, "operation", "components", "PoIssueEvidence.tsx"),
+      { minStrings: 20, expectString: "PO sent to supplier" },
+    );
   });
 
   /**
@@ -63,7 +100,7 @@ describe("no banned word reaches the screen (C12 · portal-wide)", () => {
   describe("the claim panel", () => {
     itSaysNoBannedWord(
       join(PAGES, "operation", "components", "SupplierClaimPanel.tsx"),
-      { minStrings: 40, expectString: "Customer Resolution" },
+      { minStrings: 40, expectString: "Record supplier reply" },
     );
   });
 });
@@ -125,7 +162,7 @@ describe("the scanner reads what a human reads", () => {
   });
 
   it("carries the whole banned list, so a rule cannot be quietly dropped", () => {
-    expect(BANNED.length).toBe(12);
+    expect(BANNED.length).toBe(14);
     expect(BANNED.map(([re]) => re.source)).toContain("\\bchase[ds]?\\b");
   });
 });

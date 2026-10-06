@@ -1,12 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../test/jwt";
 import app from "../index";
 import { _setJwksForTesting } from "../middleware/auth";
 
@@ -37,17 +30,8 @@ const env = {
   PUBLIC_WEB_URL: "https://web.test",
 };
 
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
-
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("u1")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("u1", { email: `${role}@x`, app_metadata: { role } });
 }
 
 interface TableCfg {
@@ -72,6 +56,8 @@ function makeSb(byTable: Record<string, TableCfg>, rpc?: { data: unknown; error:
         return builder;
       }),
       eq: vi.fn(() => builder),
+      order: vi.fn(() => builder),
+      limit: vi.fn(() => builder),
       single: vi.fn(() => Promise.resolve(cfg.single ?? { data: null, error: null })),
       maybeSingle: vi.fn(() => Promise.resolve(cfg.maybeSingle ?? { data: null, error: null })),
       then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
@@ -106,17 +92,8 @@ function makeStripe(overrides: Record<string, unknown> = {}) {
   } as any;
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
   vi.mocked(adminClient).mockReset();
   vi.mocked(stripeClient).mockReset();
@@ -212,6 +189,42 @@ describe("POST /:id/stripe/checkout", () => {
     expect(body.maxAmount).toBe(1600);
   });
 
+  it("the cap is the SO across kinds: a live storage paper raises it, a voided one does not", async () => {
+    // total 2100 · paid 500 · storage issued 150+8 tax; the draft REPLACEMENT
+    // and the voided paper ask nothing (§2 exactly — no draft-debt rule)
+    // → cap 2100 + 158 − 500 = 1758.
+    const orderWithStorage = { ...ORDER, invoices: [
+      { kind: "storage", status: "issued", amount: 150, tax_amount: 8, voided_at: null, replaces_invoice_id: null },
+      { kind: "additional_storage", status: "draft", amount: 100, tax_amount: 0, voided_at: null, replaces_invoice_id: "old-1" },
+      { kind: "additional_storage", status: "voided", amount: 40, tax_amount: 0, voided_at: "2026-09-01", replaces_invoice_id: null },
+      { kind: "sales", status: "issued", amount: 2100, tax_amount: 0, voided_at: null, replaces_invoice_id: null },
+      { kind: "storage", status: "draft", amount: 999, tax_amount: 0, voided_at: null, replaces_invoice_id: null },
+    ] };
+    vi.mocked(userClient).mockReturnValue(
+      makeSb({ orders: { maybeSingle: { data: orderWithStorage, error: null } } }) as never);
+    vi.mocked(adminClient).mockReturnValue(
+      makeSb({ stripe_checkout_sessions: { single: { data: SESSION_ROW, error: null } } }) as never);
+    vi.mocked(stripeClient).mockReturnValue(makeStripe());
+    // 1758 exactly is allowed…
+    let res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 1758 }),
+      }), env);
+    expect(res.status).toBe(201);
+    // …one ringgit above the combined obligation is refused with the cap named.
+    res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 1759 }),
+      }), env);
+    expect(res.status).toBe(422);
+    const body = await res.json() as { code: string; maxAmount: number };
+    expect(body.code).toBe("amount_exceeds_outstanding");
+    expect(body.maxAmount).toBe(1758);
+  });
   it("201 mints a session (sen amount, dashboard-controlled methods) and tracks it", async () => {
     const user = makeSb({ orders: { maybeSingle: { data: ORDER, error: null } } });
     const admin = makeSb({
@@ -270,6 +283,34 @@ describe("POST /:id/stripe/checkout", () => {
 });
 
 // =====================================================================
+// GET /api/orders/:id/stripe/checkout — the order's recent links
+describe("GET /:id/stripe/checkout", () => {
+  it("lists the order's sessions newest first, RLS-gated on the order read", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      makeSb({ orders: { maybeSingle: { data: ORDER, error: null } } }) as never);
+    vi.mocked(adminClient).mockReturnValue(
+      makeSb({ stripe_checkout_sessions: { list: { data: [SESSION_ROW], error: null } } }) as never);
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+      }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { sessions: Array<{ sessionId: string; status: string }> };
+    expect(body.sessions).toHaveLength(1);
+    expect(body.sessions[0]).toMatchObject({ sessionId: "cs_test_abc", status: "open", amount: 1600 });
+  });
+  it("404 when RLS hides the order", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      makeSb({ orders: { maybeSingle: { data: null, error: null } } }) as never);
+    vi.mocked(adminClient).mockReturnValue(makeSb({}) as never);
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+      }), env);
+    expect(res.status).toBe(404);
+  });
+});
+
 // GET /api/orders/:id/stripe/checkout/:sid — poll + live reconcile
 // =====================================================================
 describe("GET /:id/stripe/checkout/:sid", () => {
@@ -690,6 +731,60 @@ describe("POST /stripe/webhook", () => {
       );
       expect((await res).status).toBe(200);
       expect(admin.calls.rpc).toHaveLength(1);
+    });
+  });
+
+  /**
+   * The subscription's FIRST invoice carries the one-time signup month, which
+   * the checkout-session branch already recorded as month 1. Recording the
+   * invoice as well marked month 2 paid with the same money (and, since 0473,
+   * posted it to the ledger twice).
+   */
+  describe("invoice.paid — the signup invoice is not a second month", () => {
+    const AG3 = "aaaaaaaa-0000-0000-0000-000000000003";
+    const signupInvoice = {
+      id: "in_signup_1",
+      number: "CARRES-0011",
+      billing_reason: "subscription_create",
+      amount_due: 5900,
+      amount_paid: 5900,
+      created: 1_800_000_000,
+      status_transitions: { paid_at: 1_800_000_100 },
+      subscription: "sub_signup",
+    };
+
+    function run(object: unknown) {
+      const admin = makeSb(
+        { rental_agreements: { maybeSingle: { data: { id: AG3, monthly_fee: 59 }, error: null } } },
+        { data: { seq: 2 }, error: null },
+      );
+      vi.mocked(adminClient).mockReturnValue(admin as never);
+      const stripe = makeStripe();
+      stripe.webhooks.constructEventAsync.mockResolvedValue({ id: "evt_signup", type: "invoice.paid", data: { object } });
+      vi.mocked(stripeClient).mockReturnValue(stripe);
+      return { admin, res: app.fetch(hook({}, "good"), env) };
+    }
+
+    it("records nothing when the signup invoice collected only the first month (trial case)", async () => {
+      const { admin, res } = run(signupInvoice);
+      const r = await res;
+      expect(r.status).toBe(200);
+      expect(await r.json()).toEqual({ received: true, ignored: "signup_month_recorded_by_session" });
+      expect(admin.calls.rpc).toHaveLength(0);
+    });
+
+    it("records only the amount beyond the first month when Stripe also billed a period (no trial)", async () => {
+      const { admin, res } = run({ ...signupInvoice, amount_due: 11800, amount_paid: 11800 });
+      expect((await res).status).toBe(200);
+      expect(admin.calls.rpc).toHaveLength(1);
+      expect((admin.calls.rpc[0].args as Record<string, unknown>).p_amount).toBe(59);
+    });
+
+    it("a regular monthly invoice still records its full amount", async () => {
+      const { admin, res } = run({ ...signupInvoice, billing_reason: "subscription_cycle" });
+      expect((await res).status).toBe(200);
+      expect(admin.calls.rpc).toHaveLength(1);
+      expect((admin.calls.rpc[0].args as Record<string, unknown>).p_amount).toBe(59);
     });
   });
 });

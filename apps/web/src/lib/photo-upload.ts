@@ -1,5 +1,7 @@
 import {
+  DELIVERY_VIDEO_MAX_BYTES,
   PRODUCT_MODEL_PHOTOS_BUCKET,
+  isDeliveryVideoMime,
   type OpsOrderControl,
   type ProductModelDto,
   type SofaCompartmentDto,
@@ -96,33 +98,54 @@ export async function uploadCompartmentPhoto(
 }
 
 /**
- * T6 delivery photo upload (migration 0280) — same signed-upload flow against
- * the operation order-control routes. The server refuses unless the order is
- * delivered (a delivery photo proves a delivery that happened); the photo
- * lands in the private proof-of-delivery bucket under `order/{order_id}/` and
- * the attach route appends it to `ops_order_control.delivery_photos` + writes
- * the activity line. Returns the refreshed control overlay.
+ * T6 driver submission upload (migration 0280; videos + document binding by the
+ * owner ruling 2026-09-11) — the same signed-upload flow against the operation
+ * order-control routes. The server refuses unless the goods reached the
+ * customer; the file lands in the private proof-of-delivery bucket under
+ * `order/{order_id}/` and the attach route appends it to
+ * `ops_order_control.delivery_photos` + writes the activity line.
+ *
+ * `doNumber` names the trip the file came back from. The SERVER verifies the
+ * number is one of this order's own documents, so this argument can ask but
+ * never assert. Omitted = the submission names no trip, which is the only
+ * honest answer when the caller does not know one.
+ *
+ * A PHOTO is re-encoded to a <=2 MB JPEG. A VIDEO is uploaded as it is —
+ * shrinking it would need a transcoder the browser does not have, so the size
+ * ceiling is enforced here BEFORE any bytes move.
  */
-export async function uploadDeliveryPhoto(
+export async function uploadDeliveryProof(
   orderId: string,
   file: Blob,
+  opts?: { doNumber?: string | null },
 ): Promise<OpsOrderControl> {
-  const { blob } = await shrinkImage(file);
+  const isVideo = isDeliveryVideoMime(file.type);
+  if (isVideo && file.size > DELIVERY_VIDEO_MAX_BYTES) {
+    throw new Error(
+      `Video too large (${Math.round(file.size / 1024 / 1024)} MB). Max ${Math.round(
+        DELIVERY_VIDEO_MAX_BYTES / 1024 / 1024,
+      )} MB.`,
+    );
+  }
+  const blob = isVideo ? file : (await shrinkImage(file)).blob;
+  const mimeType = isVideo ? file.type : "image/jpeg";
 
   const sign = await apiFetch<SignUploadResponse>(
     `/api/operation/orders/${orderId}/delivery-photo/sign-upload`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mimeType: "image/jpeg", sizeBytes: blob.size }),
+      body: JSON.stringify({ mimeType, sizeBytes: blob.size }),
     },
   );
 
   const { error } = await supabase.storage
     .from("proof-of-delivery")
-    .uploadToSignedUrl(sign.path, sign.token, blob, { contentType: "image/jpeg" });
+    .uploadToSignedUrl(sign.path, sign.token, blob, { contentType: mimeType });
   if (error) {
-    throw new Error(`Photo upload failed: ${error.message}`);
+    throw new Error(
+      `${isVideo ? "Video" : "Photo"} upload failed: ${error.message}`,
+    );
   }
 
   const res = await apiFetch<{ control: OpsOrderControl }>(
@@ -130,7 +153,11 @@ export async function uploadDeliveryPhoto(
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: sign.path }),
+      body: JSON.stringify({
+        path: sign.path,
+        kind: isVideo ? "video" : "photo",
+        ...(opts?.doNumber ? { doNumber: opts.doNumber } : {}),
+      }),
     },
   );
   return res.control;

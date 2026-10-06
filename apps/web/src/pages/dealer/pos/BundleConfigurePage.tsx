@@ -202,9 +202,6 @@ export default function BundleConfigurePage({
         fabrics={index.fabricsByModel.get(model.id) ?? []}
         fabricTierConfig={catalog.fabricTierConfig}
         modelFabricTierOverrides={catalog.modelFabricTierOverrides}
-        sofaCompartments={catalog.sofaCompartments}
-        modelSofaCompartments={[]}
-        sofaCombos={catalog.sofaCombos}
         specialAddons={catalog.specialAddons}
       />
     );
@@ -240,7 +237,7 @@ export default function BundleConfigurePage({
           </button>
         </div>
         <p style={{ fontSize: 12, color: "var(--fg-muted)", marginBottom: 20 }}>
-          Pick every item like a cart — two of the same product can carry different specs; identical
+          Pick every item like a cart. Two of the same product can carry different specs; identical
           ones merge into one line at the end.
         </p>
 
@@ -347,7 +344,7 @@ export default function BundleConfigurePage({
               >
                 <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>
                   Item {units[activeUnit]!.si + 1}
-                  {units[activeUnit]!.slot.qty > 1 ? ` · #${units[activeUnit]!.u + 1}` : ""} — which
+                  {units[activeUnit]!.slot.qty > 1 ? ` · #${units[activeUnit]!.u + 1}` : ""}: which
                   product?
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>

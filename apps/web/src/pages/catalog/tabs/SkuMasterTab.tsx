@@ -3,19 +3,22 @@ import { toast } from "sonner";
 import type {
   CatalogResponse,
   ProductCategory,
-  ProductModelDto,
   ProductSkuDto,
 } from "@carres/shared";
 import { activeSofaSizes, categoryHasSizeAxis, PRODUCT_CATEGORIES } from "@carres/shared";
 import { ApiError } from "@/lib/api";
+import { appTodayIso } from "@/lib/fmt-date";
 import { useAuth } from "@/lib/auth";
-import { useDeleteCatalogSku, usePatchCatalogModel, usePatchCatalogSku } from "@/lib/queries";
+import { useDeleteCatalogSku, useOperationSuppliers, usePatchCatalogModel, usePatchCatalogSku } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CategoryChip, CATEGORY_LABEL, CATEGORY_LABEL_SHORT, CodeChip } from "../components/atoms";
+import { SupplierOffersModal } from "../components/SupplierOffers";
 import { skuMargin } from "../margin";
 import NewSkuModal from "./NewSkuModal";
 import ImportSkusDialog from "./ImportSkusDialog";
 import { buildSkuExportCsv, downloadCsv } from "@/lib/sku-csv";
+import { fmtRm } from "../format";
+import { useSkuFilter, type FlatRow } from "./use-sku-filter";
 
 /**
  * SKU Master — flat product table for the Master Admin. Columns: Product code ·
@@ -49,27 +52,35 @@ const VISIBLE_CAP = 300;
 // (PWP = the 0186 per-SKU PWP reward price, 2990s "PWP Price" column. The sofa
 // per-size grid variant deliberately has NO pwp column — a sofa's PWP price
 // lives on the matched COMBO (pwp_prices_by_height), never on component SKUs.)
-const GRID_COLS = "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 110px 100px 110px 90px 90px";
-// Same tracks minus the 100px SIZE one — used when the active filter is a
-// category with no size axis (Service / Guarantee), where every SIZE cell would
-// either repeat the CODE column or print an invoice sentence (Loo 2026-07-26).
-const GRID_COLS_NO_SIZE = "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 110px 110px 90px 90px";
-
-type CatFilter = ProductCategory | "all";
-
-interface FlatRow {
-  sku: ProductSkuDto;
-  model: ProductModelDto | undefined;
-  category: ProductCategory | undefined;
-  productName: string;
-}
-
-function fmtPrice(n: number): string {
-  return `RM ${n.toLocaleString("en-MY", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
+// ⛔ SUPPLIER LEFT THIS GRID — 2026-09-01 (YH, after Loo), and it is a
+// correction of the 2026-08-26 ruling that put it here. That ruling asked for
+// "supplier too, show supplier code too if possible so if supplier code entered
+// wrong can check from there as well", and the reason still stands — what
+// changed is that a COLUMN cannot serve it any more.
+//
+// Migration 0388 (2026-08-26, the same day) made a SKU remember EVERY supplier
+// that has quoted it. A cell can print one. So from the day the offers table
+// shipped, this column under-reported every dual-sourced SKU by construction:
+// it showed the slot and silently hid the alternates.
+//
+// The pair moved WHOLE into `SupplierOffersModal`, opened from the code chip —
+// one item code, one product name, click it for who supplies it and at what
+// cost. Nothing was dropped; a list simply does not fit a cell.
+//
+// The placement was never the problem: this grid renders one row per SKU, which
+// is right. HOUZS ERP paid for the same lesson from the other side —
+// `docs/modules/mrp.md`: "a Model or a Sales Order does not have suppliers,
+// each VARIANT does."
+//
+// COST still did not come with it — Loo dropped that column on 2026-07-06 and
+// nothing has reopened it.
+const GRID_COLS =
+  "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 100px 90px 100px 100px 80px";
+// Same tracks minus the SIZE one — used when the active filter is a category
+// with no size axis (Service / Guarantee), where every SIZE cell would either
+// repeat the CODE column or print an invoice sentence (Loo 2026-07-26).
+const GRID_COLS_NO_SIZE =
+  "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 100px 100px 100px 80px";
 
 export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) {
   // Phase 2 (0175): only the principal ("Master Admin") may set/change SKU
@@ -78,9 +89,22 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
   // gated. Every other catalog edit (pos_active, description, name, delete,
   // + New SKU as UNPRICED) stays available.
   const isPrincipal = useAuth((s) => s.role) === "principal";
-  const [category, setCategory] = useState<CatFilter>("all");
-  const [modelFilter, setModelFilter] = useState<string>("all");
-  const [search, setSearch] = useState("");
+  const {
+    category,
+    pickCategory,
+    modelFilter,
+    setModelFilter,
+    search,
+    setSearch,
+    supplierFilter,
+    setSupplierFilter,
+    categoryModels,
+    filtered,
+  } = useSkuFilter(catalog);
+  /* The SKU whose supplier door is open. One modal for the whole grid, not one
+     per row - a mounted-per-row modal would fetch offers for every visible SKU. */
+  const [offersFor, setOffersFor] = useState<ProductSkuDto | null>(null);
+  const suppliersQ = useOperationSuppliers();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [newOpen, setNewOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -90,34 +114,6 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
 
   const del = useDeleteCatalogSku();
 
-  const modelById = useMemo(() => {
-    const m = new Map<string, ProductModelDto>();
-    for (const model of catalog.models) m.set(model.id, model);
-    return m;
-  }, [catalog.models]);
-
-  const allRows = useMemo<FlatRow[]>(() => {
-    return catalog.skus.map((sku) => {
-      const model = modelById.get(sku.modelId);
-      return {
-        sku,
-        model,
-        category: model?.category,
-        productName: model?.name ?? "—",
-      };
-    });
-  }, [catalog.skus, modelById]);
-
-  // Models for the model pill row — scoped to the active category so the row
-  // isn't a flat 1000-model list; hidden entirely while category is "all".
-  const categoryModels = useMemo(
-    () =>
-      catalog.models
-        .filter((m) => category === "all" || m.category === category)
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [catalog.models, category],
-  );
-
   // 0204 (Loo 2026-07-06) — the sofa-size axis (Special Add-ons → SOFA →
   // Sizes pool, the SAME `activeSofaSizes` the builder's Customize canvas
   // offers). With the Sofa category filtered, the grid swaps the single Price
@@ -126,6 +122,19 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
   // to the canonical SOFA_HEIGHTS when the pool is empty, so the sofa grid
   // variant only needs the pools field to be present.
   const sofaSizes = useMemo(() => activeSofaSizes(catalog.optionPools), [catalog.optionPools]);
+  /* 🟡 A CONTRADICTION LEFT STANDING, DELIBERATELY (2026-08-25).
+     The comment above says this variant "only needs the pools field to be
+     present", and `activeSofaSizes` returns the canonical SOFA_HEIGHTS when the
+     pool has no active rows — a fallback this gate can never reach, because it
+     also demands an active row. So on a database whose `sofa_size` pool is
+     empty, a sofa shows ONE price column and nothing says where the seat
+     heights went.
+     I changed this to `category === "sofa"` and reverted it: the empty-pool
+     behaviour is PINNED by "Sofa filter WITHOUT a pool keeps the normal grid",
+     and a pinned behaviour with no recorded reason is still somebody's
+     decision. The operator fix is to activate the sofa_size pool, which is
+     configuration the sizes deserve anyway. Raised for an owner ruling rather
+     than settled by whoever edited this file last. */
   const sofaSizeMode =
     category === "sofa" &&
     (catalog.optionPools ?? []).some((p) => p.pool === "sofa_size" && p.active);
@@ -138,30 +147,6 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
     : sizelessMode
       ? GRID_COLS_NO_SIZE
       : GRID_COLS;
-
-  // Switching category invalidates a model pick from the previous category —
-  // reset synchronously in the same handler so there's no stale-filter frame.
-  function pickCategory(next: CatFilter) {
-    setCategory(next);
-    setModelFilter("all");
-  }
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return allRows
-      .filter((r) => (category === "all" ? true : r.category === category))
-      .filter((r) => (modelFilter === "all" ? true : r.sku.modelId === modelFilter))
-      .filter((r) => {
-        if (!q) return true;
-        return (
-          r.sku.sku.toLowerCase().includes(q) ||
-          (r.sku.description ?? "").toLowerCase().includes(q) ||
-          r.productName.toLowerCase().includes(q) ||
-          r.sku.variant.toLowerCase().includes(q)
-        );
-      })
-      .sort((a, b) => a.sku.sku.localeCompare(b.sku.sku));
-  }, [allRows, category, modelFilter, search]);
 
   const visible = filtered.slice(0, VISIBLE_CAP);
   const overflow = filtered.length - visible.length;
@@ -225,7 +210,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
     }
     const csv = buildSkuExportCsv(filtered.map((r) => ({ sku: r.sku, model: r.model })));
     const tag = category === "all" ? "" : `${category}-`;
-    downloadCsv(`carres-skus-${tag}${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    downloadCsv(`carres-skus-${tag}${appTodayIso()}.csv`, csv);
     toast.success(`Exported ${filtered.length} SKU${filtered.length === 1 ? "" : "s"}`);
   }
 
@@ -246,6 +231,23 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           ))}
         </div>
         <div className="flex items-center gap-2">
+          <select
+            value={supplierFilter}
+            onChange={(e) => setSupplierFilter(e.target.value)}
+            aria-label="Filter by supplier"
+            data-testid="sku-supplier-filter"
+            className={`${INPUT_CLS} w-44`}
+          >
+            <option value="all">All suppliers</option>
+            {/* "No supplier" is a real bucket, not an error state: service and
+                accessory SKUs legitimately carry none (0171). */}
+            <option value="none">No supplier</option>
+            {(suppliersQ.data?.suppliers ?? []).map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
           <input
             type="search"
             value={search}
@@ -279,7 +281,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
             type="button"
             onClick={() => setEditAll((v) => !v)}
             className={`${editAll ? "btn-primary" : "btn-secondary"} text-meta`}
-            title="Edit every visible SKU inline — changes commit on blur"
+            title="Edit every visible SKU inline. Changes commit on blur"
             data-testid="sku-edit-all"
           >
             {editAll ? "Done" : "Edit"}
@@ -340,13 +342,13 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
         {overflow > 0 && (
           <span className="text-base-400">
             {" "}
-            · showing first {VISIBLE_CAP} — refine the search or category to see the rest
+            · showing first {VISIBLE_CAP}. Refine the search or category to see the rest
           </span>
         )}
         {sofaSizeMode && (
           <span className="text-base-400" data-testid="sofa-size-mode-hint">
             {" "}
-            · per-size prices (RM) — a blank cell inherits the base price shown in grey
+            · per-size prices (RM): a blank cell inherits the base price shown in grey
             (base price: row Edit); sizes follow Special Add-ons → Sizes
           </span>
         )}
@@ -408,6 +410,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
             sofaSizes={sofaSizeMode ? sofaSizes : null}
             gridCols={gridCols}
             showSize={!sizelessMode}
+            onOpenSuppliers={() => setOffersFor(r.sku)}
           />
         ))}
       </div>
@@ -420,6 +423,20 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           optionPools={catalog.optionPools ?? []}
           sofaCombos={catalog.sofaCombos ?? []}
           onClose={() => setNewOpen(false)}
+        />
+      )}
+
+      {/* WHO SUPPLIES THIS SKU. One modal for the whole grid - the slot the next
+          PO goes to, and every supplier who has quoted it (0388). This is where
+          the `Supplier` column went on 2026-09-01: a cell can print one
+          supplier, and a SKU can have several. */}
+      {offersFor && (
+        <SupplierOffersModal
+          sku={offersFor}
+          suppliers={suppliersQ.data?.suppliers ?? []}
+          category={catalog.models.find((m) => m.id === offersFor.modelId)?.category ?? null}
+          heights={sofaSizes}
+          onClose={() => setOffersFor(null)}
         />
       )}
       {importOpen && <ImportSkusDialog onClose={() => setImportOpen(false)} />}
@@ -436,6 +453,7 @@ const SkuRowView = memo(function SkuRowView({
   sofaSizes,
   gridCols,
   showSize,
+  onOpenSuppliers,
 }: {
   row: FlatRow;
   /** 0175 — true only for the principal; price/PWP cells stay read-only otherwise. */
@@ -453,6 +471,12 @@ const SkuRowView = memo(function SkuRowView({
   /** false when the whole SIZE column is dropped (Service / Guarantee filter);
    *  the row must then omit its SIZE cell or every later cell shifts a track. */
   showSize: boolean;
+  /** Resolved through the roster by supplier_id; null = the SKU names no
+   *  supplier (legitimate for service/accessory, 0171). */
+  /** The roster, for the inline picker. The IDENTITY written is always
+   *  supplier_id; the name is only ever what the picker displays. */
+  /** Opens the one door that now holds supplier truth for this SKU. */
+  onOpenSuppliers: () => void;
 }) {
   const { sku, model, category, productName } = row;
   const priceEdit = inlineEdit && canEditPrices;
@@ -531,6 +555,26 @@ const SkuRowView = memo(function SkuRowView({
     );
   }
 
+  /* 0442 — the Catalog-owned stock identity mode. Every change is ledgered
+     server-side; official PO issue refuses a SKU with none. */
+  function commitIdentityMode(next: string) {
+    const value = next === "exact_unit" || next === "quantity" ? next : null;
+    if (value === (sku.stockIdentityMode ?? null)) return;
+    patch.mutate(
+      { id: sku.id, patch: { stockIdentityMode: value } },
+      {
+        onSuccess: () =>
+          toast.success(`${sku.sku} · stock identity ${value === "quantity" ? "Quantity" : value === "exact_unit" ? "Unit ID" : "not set"}`),
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
+  const identityModeWord =
+    sku.stockIdentityMode === "exact_unit" ? "Unit ID"
+    : sku.stockIdentityMode === "quantity" ? "Quantity"
+    : "Not set";
+
   /** Inline CODE cell: the WHOLE code is one free-text input (Loo 2026-07-11 —
    *  not a locked prefix + suffix; codes are AutoCount-style free strings). */
   const codeCell = inlineEdit ? (
@@ -541,12 +585,23 @@ const SkuRowView = memo(function SkuRowView({
         if (e.key === "Enter") (e.target as HTMLInputElement).blur();
       }}
       aria-label={`${sku.sku} code`}
-      title="Edit the full SKU code — new orders/POs use the new code; history keeps the old string"
+      title="Edit the full SKU code. New orders/POs use the new code; history keeps the old string"
       className={`${INPUT_CLS} t-num text-meta w-full min-w-0`}
     />
   ) : (
     <div>
-      <CodeChip>{sku.sku}</CodeChip>
+      {/* THE DOOR. "one item code one product name, click on it, then a modal
+          that shows the 2 different suppliers and their cost" (YH, 2026-09-01).
+          The chip, not a new column - a column is what could not hold the list. */}
+      <button
+        type="button"
+        onClick={onOpenSuppliers}
+        aria-label={`Who supplies ${sku.sku}`}
+        data-testid={`sku-suppliers-door-${sku.sku}`}
+        className="text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 focus-visible:ring-offset-1 rounded-[3px]"
+      >
+        <CodeChip>{sku.sku}</CodeChip>
+      </button>
     </div>
   );
 
@@ -554,7 +609,7 @@ const SkuRowView = memo(function SkuRowView({
   const descriptionCell = inlineEdit ? (
     <input
       defaultValue={sku.description ?? ""}
-      placeholder="—"
+      placeholder=""
       onBlur={(e) => commitDescription(e.target.value)}
       onKeyDown={(e) => {
         if (e.key === "Enter") (e.target as HTMLInputElement).blur();
@@ -564,9 +619,15 @@ const SkuRowView = memo(function SkuRowView({
     />
   ) : (
     <div className="text-body text-base-700 truncate" title={sku.description ?? ""}>
-      {sku.description || <span className="text-base-400">—</span>}
+      {sku.description || null}
     </div>
   );
+
+  /* 2026-08-26 (YH) — the same two supplier facts the Operations catalog
+     writes, editable here too: neither is money, so neither is 0175-locked and
+     the API leaves both ungated. The point of showing them on this door is
+     checking a keyed-in supplier code against the quotation without switching
+     pages — and a typo you can see is a typo you should be able to fix. */
 
   function commitPrice(raw: string) {
     const trimmed = raw.trim();
@@ -592,8 +653,12 @@ const SkuRowView = memo(function SkuRowView({
   function commitPwpPrice(raw: string) {
     const trimmed = raw.trim();
     const val = trimmed === "" ? null : Number(trimmed);
-    if (val !== null && (!Number.isFinite(val) || val < 0)) {
-      toast.error("Enter a non-negative number (blank = not set)");
+    // 0 is NOT a price here — it is the same fact as blank. A 'pwp' reward is a
+    // discount (the server rejects <= 0) and a FREE reward is a 'promo' rule,
+    // which never reads this column at all. Accepting 0 stored a value that no
+    // rule could ever spend and that the till previewed as "RM 0.00".
+    if (val !== null && (!Number.isFinite(val) || val <= 0)) {
+      toast.error("Enter a price above 0, or leave it blank. A free reward is a 'promo' rule, not a PWP price of 0.");
       return;
     }
     if (val === (sku.pwpPrice ?? null)) return;
@@ -651,7 +716,7 @@ const SkuRowView = memo(function SkuRowView({
             ) : sku.price === 0 ? (
               <span className="text-meta text-base-400 italic">price not set</span>
             ) : (
-              <span className="t-num text-meta text-base-800">{fmtPrice(sku.price)}</span>
+              <span className="t-num text-meta text-base-800">{fmtRm(sku.price)}</span>
             )}
           </div>
         )}
@@ -681,26 +746,52 @@ const SkuRowView = memo(function SkuRowView({
       <div className="text-body text-base-800 truncate" title={productName}>
         {productName}
       </div>
-      {inlineEdit && model ? (
-        <select
-          defaultValue={model.category}
-          onChange={(e) => commitCategory(e.target.value)}
-          aria-label={`${sku.sku} category`}
-          title="Category lives on the product — changing it moves ALL of this product's SKUs"
-          className={`${INPUT_CLS} text-meta`}
-          data-testid={`sku-category-select-${sku.sku}`}
-        >
-          {PRODUCT_CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {CATEGORY_LABEL[c]}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <div className="text-meta text-base-600">
-          {category ? CATEGORY_LABEL[category] : "—"}
-        </div>
-      )}
+      {/* Category, with the SKU's stock identity mode beneath it (0442): the
+          two answer "what is this thing" and "how does Stock count it" and
+          share one cell so the grid tracks stay as the header draws them. */}
+      <div className="min-w-0">
+        {inlineEdit && model ? (
+          <select
+            defaultValue={model.category}
+            onChange={(e) => commitCategory(e.target.value)}
+            aria-label={`${sku.sku} category`}
+            title="Category lives on the product. Changing it moves ALL of this product's SKUs"
+            className={`${INPUT_CLS} text-meta`}
+            data-testid={`sku-category-select-${sku.sku}`}
+          >
+            {PRODUCT_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {CATEGORY_LABEL[c]}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="text-meta text-base-600">
+            {category ? CATEGORY_LABEL[category] : ""}
+          </div>
+        )}
+        {inlineEdit ? (
+          <select
+            defaultValue={sku.stockIdentityMode ?? ""}
+            onChange={(e) => commitIdentityMode(e.target.value)}
+            aria-label={`${sku.sku} stock identity`}
+            title="How Stock identifies this SKU. Unit ID: one permanent ID per piece, born with the official PO. Quantity: counted, no Unit ID"
+            className={`${INPUT_CLS} text-meta mt-1`}
+            data-testid={`sku-identity-select-${sku.sku}`}
+          >
+            <option value="">Not set</option>
+            <option value="exact_unit">Unit ID</option>
+            <option value="quantity">Quantity</option>
+          </select>
+        ) : (
+          <div
+            className={`text-meta ${sku.stockIdentityMode ? "text-base-500" : "text-kit-red-11"}`}
+            data-testid={`sku-identity-${sku.sku}`}
+          >
+            {identityModeWord}
+          </div>
+        )}
+      </div>
       {showSize &&
         (inlineEdit && !sizeless ? (
           <input
@@ -713,13 +804,13 @@ const SkuRowView = memo(function SkuRowView({
             aria-label={`${sku.sku} size`}
             title={
               noVariantAxis
-                ? "Optional — accessories/services carry no size"
-                : "The SIZE label — editing it never changes the code"
+                ? "Optional. Accessories/services carry no size"
+                : "The SIZE label. Editing it never changes the code"
             }
             className={`${INPUT_CLS} text-body text-meta w-full min-w-0`}
           />
         ) : (
-          <div className="text-body text-base-700">{sizeless ? "—" : sku.variant || "—"}</div>
+          <div className="text-body text-base-700">{sizeless ? "" : sku.variant || ""}</div>
         ))}
 
       {/* Price */}
@@ -740,7 +831,7 @@ const SkuRowView = memo(function SkuRowView({
         ) : sku.price === 0 ? (
           <span className="text-meta text-base-400 italic">price not set</span>
         ) : (
-          <span className="t-num text-meta text-base-800">{fmtPrice(sku.price)}</span>
+          <span className="t-num text-meta text-base-800">{fmtRm(sku.price)}</span>
         )}
       </div>
 
@@ -749,10 +840,10 @@ const SkuRowView = memo(function SkuRowView({
         {priceEdit ? (
           <input
             type="number"
-            min={0}
+            min={0.01}
             step="0.01"
-            defaultValue={sku.pwpPrice ?? ""}
-            placeholder="—"
+            defaultValue={sku.pwpPrice ? String(sku.pwpPrice) : ""}
+            placeholder=""
             onBlur={(e) => commitPwpPrice(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
@@ -760,25 +851,29 @@ const SkuRowView = memo(function SkuRowView({
             aria-label={`${sku.sku} PWP price`}
             className={`${INPUT_CLS} text-right t-num text-meta`}
           />
-        ) : sku.pwpPrice == null ? (
-          <span className="text-meta text-base-400 italic" title="No PWP price — this SKU cannot be a PWP reward">
-            —
+        ) : sku.pwpPrice == null || sku.pwpPrice <= 0 ? (
+          // A stored 0 reads as "not set" for the same reason the Price column
+          // one cell over renders 0 as "price not set" — it is data that predates
+          // the input guard, and showing it as "RM 0.00" claims an offer the
+          // server will refuse.
+          <span className="text-meta text-base-400 italic" title="No PWP price. This SKU cannot be a PWP reward">
+            not set
           </span>
         ) : (
-          <span className="t-num text-meta text-base-800">{fmtPrice(sku.pwpPrice)}</span>
+          <span className="t-num text-meta text-base-800">{fmtRm(sku.pwpPrice)}</span>
         )}
       </div>
 
       {/* Margin */}
       <div className="text-right" data-testid={`sku-margin-${sku.sku}`}>
         {margin === null ? (
-          <span className="text-meta text-base-400 italic" title={`${marginLabel} · cost not set`}>—</span>
+          null
         ) : (
           <span
             className={`t-num text-meta ${margin.amount < 0 ? "text-[#C44D2B]" : "text-base-700"}`}
             title={marginLabel}
           >
-            {fmtPrice(margin.amount)}
+            {fmtRm(margin.amount)}
             <span className="text-base-400 text-label ml-0.5">
               {(margin.pct * 100).toFixed(1)}%
             </span>
@@ -866,7 +961,7 @@ function CompartmentSizeCells({
                 min={0}
                 step="0.01"
                 value={draft[s] ?? ""}
-                placeholder={sku.price > 0 ? String(sku.price) : "—"}
+                placeholder={sku.price > 0 ? String(sku.price) : ""}
                 onChange={(e) => setDraft((d) => ({ ...d, [s]: e.target.value }))}
                 onBlur={commit}
                 onKeyDown={(e) => {
@@ -876,16 +971,16 @@ function CompartmentSizeCells({
                 className={`${INPUT_CLS} text-right t-num text-meta`}
               />
             ) : typeof explicit === "number" ? (
-              <span className="t-num text-meta text-base-800">{fmtPrice(explicit)}</span>
+              <span className="t-num text-meta text-base-800">{fmtRm(explicit)}</span>
             ) : sku.price > 0 ? (
               <span
                 className="text-meta text-base-400"
-                title={`Inherits the base price ${fmtPrice(sku.price)} — set a price for ${s} to override`}
+                title={`Inherits the base price ${fmtRm(sku.price)}. Set a price for ${s} to override`}
               >
-                ({fmtPrice(sku.price)})
+                ({fmtRm(sku.price)})
               </span>
             ) : (
-              <span className="text-meta text-base-400 italic">—</span>
+              null
             )}
           </div>
         );

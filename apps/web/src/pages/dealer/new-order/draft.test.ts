@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { CatalogResponse } from "@carres/shared";
 import {
   DRAFT_STORAGE_KEY,
   type WizardDraft,
+  cartGoodsIssue,
   clearDraft,
   composeDisposalSizeSummary,
   composeEmergency,
@@ -15,8 +17,7 @@ import {
   step2Valid,
   step3DateFirstIssue,
   step3DateValid,
-  step3Valid,
-} from "./draft";
+  step3Valid, step1FirstIssue } from "./draft";
 
 afterEach(() => {
   sessionStorage.clear();
@@ -39,7 +40,9 @@ function validDraft(): WizardDraft {
       addressCity: "Bangsar",
       addressPostcode: "59000",
       addressUnknown: false,
-      buildingType: "",
+      /* Required since 2026-08-21 — a "fully filled valid draft" has to carry
+         one now, the same as a state or a postcode. */
+      buildingType: "Condo",
       billing: "",
       billingSame: true,
       billingLine1: "",
@@ -242,14 +245,15 @@ describe("step1Valid — Continue gate", () => {
     expect(step1Valid(d)).toBe(false);
   });
 
-  it("addressUnknown = true bypasses every address rule", () => {
+  it("addressUnknown no longer bypasses the address rules (owner ruling 2026-09-13)", () => {
     const d = validDraft();
     d.customer.addressLine1 = "";
     d.customer.addressState = "";
     d.customer.addressCity = "";
     d.customer.addressPostcode = "";
     d.customer.addressUnknown = true;
-    expect(step1Valid(d)).toBe(true);
+    expect(step1Valid(d)).toBe(false);
+    expect(step1FirstIssue(d)).toBe("Address: Line 1 (≥5 chars)");
   });
 
   it("rejects when billing empty and not billingSame", () => {
@@ -494,19 +498,24 @@ describe("step3DateValid — delivery date gate (2026-05-22, Loo)", () => {
     return d.toISOString().slice(0, 10);
   }
 
-  it("accepts dateTbd regardless of lead time", () => {
+  /* ⛔ OWNER RULING 2026-08-15 (Jess) — the Requested Delivery Date date is a
+     PROMISE, and "Confirm later" is retired. A dateless draft is refused
+     whatever the retired flag says, so the operator can never be sent to a
+     customer who has already answered. */
+  it("refuses a dateless draft even when the retired dateTbd flag is set", () => {
     const d = validDraft();
     d.delivery.date = "";
     d.delivery.dateTbd = true;
-    expect(step3DateValid(d, 21, TODAY)).toBe(true);
+    expect(step3DateValid(d, 21, TODAY)).toBe(false);
+    expect(step3DateFirstIssue(d, 21, TODAY)).toContain("ask the customer for the date");
   });
 
-  it("rejects when date empty and not TBD", () => {
+  it("rejects when the date is empty", () => {
     const d = validDraft();
     d.delivery.date = "";
     d.delivery.dateTbd = false;
     expect(step3DateValid(d, 14, TODAY)).toBe(false);
-    expect(step3DateFirstIssue(d, 14, TODAY)).toContain("pick a date");
+    expect(step3DateFirstIssue(d, 14, TODAY)).toContain("ask the customer for the date");
   });
 
   it("rejects mattress date < today + 14", () => {
@@ -566,6 +575,21 @@ describe("step3DateValid — delivery date gate (2026-05-22, Loo)", () => {
     expect(step3DateValid(d, 14, TODAY)).toBe(false);
     expect(step3DateFirstIssue(d, 14, TODAY)).toContain("past");
   });
+
+  // 17 Sep 2026 — the gate counted from the UTC day. Before 08:00 in KL that is
+  // still yesterday, so a 3-day lead said 19 Sep and a proceed date of 16 Sep
+  // passed as "today".
+  it("counts from today in Kuala Lumpur, not the UTC day", () => {
+    const klMorning = new Date("2026-09-16T23:00:00Z"); // 07:00 Thu 17 Sep in KL
+    const d = validDraft();
+    d.delivery.date = "2026-09-19";
+    d.delivery.proceedDate = "2026-09-17";
+    expect(step3DateFirstIssue(d, 3, klMorning)).toContain("earliest date is 2026-09-20");
+    d.delivery.date = "2026-09-20";
+    expect(step3DateValid(d, 3, klMorning)).toBe(true);
+    d.delivery.proceedDate = "2026-09-16";
+    expect(step3DateFirstIssue(d, 3, klMorning)).toContain("can't be in the past (earliest 2026-09-17)");
+  });
 });
 
 describe("step3Valid — Submit gate", () => {
@@ -617,6 +641,9 @@ describe("step3Valid — Submit gate", () => {
     d.payment.approvalCode = "AB";
     expect(step3Valid(d)).toBe(false);
     d.payment.approvalCode = "ABC123";
+    // KL Gateway 2026-09-18: a card sale also names its bank.
+    expect(step3Valid(d)).toBe(false);
+    d.payment.followUps = { bank: "Maybank" };
     expect(step3Valid(d)).toBe(true);
   });
 
@@ -680,6 +707,69 @@ describe("dataUrlToBlob", () => {
   });
 });
 
+/**
+ * ⛔ A SALES ORDER MUST CONTAIN GOODS — owner ruling 2026-08-15.
+ *
+ * The Guarantee attachment law generalised to the whole cart. The gate is
+ * POSITIVE-recognition only, which is the half a test has to pin: an
+ * unresolvable SKU must stay sellable, or a not-yet-catalogued line silently
+ * blocks a real sale.
+ */
+describe("cartGoodsIssue — a service never sells alone", () => {
+  function catalogOf(pairs: Array<[sku: string, category: string]>): CatalogResponse {
+    const models = pairs.map(([, category], i) => ({ id: `m${i}`, category }));
+    return {
+      models,
+      skus: pairs.map(([sku], i) => ({ sku, modelId: `m${i}` })),
+    } as unknown as CatalogResponse;
+  }
+  const line = (sku: string) => ({ localId: sku, sku, qty: 1, attrs: null, unitPrice: 100, label: sku });
+
+  it("passes a cart that carries a product", () => {
+    const d = validDraft();
+    d.lines = [line("MS-Q"), line("SVC-DISPOSE-MATTRESS")];
+    expect(
+      cartGoodsIssue(d, catalogOf([["MS-Q", "mattress"], ["SVC-DISPOSE-MATTRESS", "service"]])),
+    ).toBeNull();
+  });
+
+  it("refuses a cart of nothing but service lines", () => {
+    const d = validDraft();
+    d.lines = [line("SVC-DISPOSE-MATTRESS")];
+    expect(
+      cartGoodsIssue(d, catalogOf([["SVC-DISPOSE-MATTRESS", "service"]])),
+    ).toContain("Add the product this service belongs to");
+  });
+
+  it("refuses a guarantee sold on its own — the attachment law, generalised", () => {
+    const d = validDraft();
+    d.lines = [line("GRT-MATTRESS-15Y")];
+    expect(cartGoodsIssue(d, catalogOf([["GRT-MATTRESS-15Y", "guarantee"]]))).not.toBeNull();
+  });
+
+  it("treats a SKU the catalog cannot resolve as GOODS — nothing is refused by elimination", () => {
+    const d = validDraft();
+    d.lines = [line("SOME-LEGACY-CODE")];
+    expect(cartGoodsIssue(d, catalogOf([["SVC-DISPOSE-MATTRESS", "service"]]))).toBeNull();
+  });
+
+  it("says nothing without a catalog — the create door is the authority", () => {
+    const d = validDraft();
+    d.lines = [line("SVC-DISPOSE-MATTRESS")];
+    expect(cartGoodsIssue(d, null)).toBeNull();
+  });
+});
+
+describe("loadDraft — the retired 'Confirm later' flag does not survive a restore", () => {
+  it("normalises a pre-2026-08-15 draft's dateTbd to false", () => {
+    const d = validDraft();
+    d.delivery.dateTbd = true;
+    d.delivery.date = "";
+    saveDraft(d);
+    expect(loadDraft()?.delivery.dateTbd).toBe(false);
+  });
+});
+
 describe("composeEmergency", () => {
   it("joins name · phone · relationship", () => {
     const c = validDraft().customer;
@@ -693,9 +783,21 @@ describe("composeEmergency", () => {
     expect(composeEmergency(c)).toBe("Tan Junior · 012-9988776 · Cousin");
   });
 
-  it("omits empty parts cleanly", () => {
+  /* ⭐ RE-PINNED (YH, 2026-09-01 — audit F-4). This asserted
+     `"Tan Junior · Spouse"` for a contact with no phone, and that string is
+     the DEFECT: `parseEmergencyContact` reads by position, so it comes back as
+     name `Tan Junior`, phone `Spouse`. The relationship had become the phone
+     number, silently, on the next reload.
+     A middle empty keeps its slot now so nothing shifts left. A TRAILING empty
+     is still dropped — there is nothing after it to move. */
+  it("keeps a middle empty part's slot, and still drops a trailing one", () => {
     const c = validDraft().customer;
     c.emergencyPhone = "";
-    expect(composeEmergency(c)).toBe("Tan Junior · Spouse");
+    expect(composeEmergency(c)).toBe("Tan Junior ·  · Spouse");
+
+    const d = validDraft().customer;
+    d.emergencyRelationship = "";
+    d.emergencyRelationshipOther = "";
+    expect(composeEmergency(d)).toBe("Tan Junior · 012-9988776");
   });
 });

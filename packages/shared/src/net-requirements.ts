@@ -149,8 +149,9 @@ export interface BundleRequirement {
   /**
    * **Stock Ready** — `deadline − arrivalBufferDays` (delivery-side working
    * days): the day the goods must be in for the delivery to be arranged in
-   * time. It is what `raiseBy` is measured back FROM, so the two can never
-   * disagree, and it is the ONE source To Order reads (Loo, 2026-07-30 — the
+   * time. `raiseBy` is measured back from it through the production leg, so
+   * the two can never disagree, and it is the ONE
+   * source To Order reads (Loo, 2026-07-30 — the
    * naming freeze: Stock Ready is Carres' own requirement, never a supplier's
    * promise, which is `purchase_orders.expected_ready_date`).
    *
@@ -158,9 +159,12 @@ export interface BundleRequirement {
    * was thrown away, which is why nothing downstream could show it.
    */
   arriveBy: IsoDate | null;
-  /** arriveBy − maxLead (working days). `null` when deadline is TBD. */
+  /**
+   * arriveBy − production (on the factory's own week). `null` when
+   * the deadline is TBD. A planned date, never an unlock date.
+   */
   raiseBy: IsoDate | null;
-  /** One-trip ready date if the PO is cut today = today + maxLead. */
+  /** One-trip ARRIVAL if the PO is cut today = today + production. */
   promiseIfOrderedToday: IsoDate;
   /** Sum of member `toOrder` — 0 means fully covered. */
   toOrder: number;
@@ -356,10 +360,17 @@ export function computeNetRequirements(
     const maxLeadDays = members.reduce((mx, m) => Math.max(mx, m.leadDays), 0);
     // Arrival buffer: stock must land `arrivalBufferDays` working days BEFORE the
     // deadline (Carres/delivery-side week = wdOpts), leaving time to arrange
-    // delivery. Then each member backs off its OWN lead using its OWN supplier
-    // work week (m.offDays); the bundle is ordered by the EARLIEST member
+    // delivery. Then each member walks its production leg backwards on its own
+    // factory week (Law 2A), and the bundle is ordered by the EARLIEST member
     // raise-by (a bed-set spanning Nice Future 5-day + Ohana 6-day gates on the
     // earlier leg — both must be ready by arriveBy).
+    //
+    //   arriveBy  = deadline − Safety days              OFFICE week (wdOpts)
+    //   raiseBy   = arriveBy − production days          FACTORY week (memberWd)
+    //
+    // The supplier transit leg was removed by owner ruling (Jess, 2026-09-29):
+    // goods arrival is production days only, exactly `expectedArrivalOf`.
+    // Safety days are still subtracted EXACTLY ONCE, here at `arriveBy`.
     const buffer = options.arrivalBufferDays ?? 0;
     const arriveBy =
       deadline == null ? null : subtractWorkingDays(deadline, buffer, wdOpts);

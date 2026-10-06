@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { signTestJwt, useTestJwks } from "../test/jwt";
 import app from "../index";
 import { _setJwksForTesting } from "../middleware/auth";
 
@@ -11,7 +11,6 @@ vi.mock("../lib/supabase", () => ({
 import { userClient } from "../lib/supabase";
 
 const SUPABASE_URL = "https://test.supabase.co";
-const KID = "test-kid-hr";
 
 const env = {
   SUPABASE_URL,
@@ -28,28 +27,15 @@ const SP_MAYSON = "00000000-0000-0000-0000-00000000ff02";
 const MODEL_A = "00000000-0000-0000-0000-00000000ab01";
 const ORDER_1 = "00000000-0000-0000-0000-00000000e001";
 
-let signKey: KeyLike;
-let publicJwk: JWK;
-
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey as KeyLike;
-  publicJwk = { ...(await exportJWK(kp.publicKey)), kid: KID, alg: "ES256", use: "sig" };
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
-});
+beforeAll(() => useTestJwks());
 afterEach(() => vi.mocked(userClient).mockReset());
 afterAll(() => _setJwksForTesting(null));
 
 async function makeJwt(role: string) {
-  return new SignJWT({
+  return signTestJwt("11111111-1111-1111-1111-000000000777", {
     email: "hr@carres.com",
     app_metadata: { role },
-  })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000777")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  });
 }
 
 function req(path: string, init?: RequestInit) {

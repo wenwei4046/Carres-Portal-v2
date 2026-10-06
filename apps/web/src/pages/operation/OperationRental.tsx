@@ -143,10 +143,9 @@ export default function OperationRental() {
       </div>
 
       {/* Stat tiles */}
-      <div className="grid grid-cols-3 gap-3 mb-7 max-w-[680px]">
+      <div className="grid grid-cols-2 gap-3 mb-7 max-w-[452px]">
         <StatTile label="Active agreements" value={String(activeAgreements)} />
         <StatTile label="Units in rental" value={String(unitsInRental)} />
-        <StatTile label="Visits due" value="—" />
       </div>
 
       {/* AGREEMENTS */}
@@ -178,7 +177,7 @@ export default function OperationRental() {
                     colSpan={7}
                     className="p-12 text-center text-meta text-base-500"
                   >
-                    No rental agreements yet — the POS rental lane ships next.
+                    No rental agreements yet. The POS rental lane ships next.
                   </td>
                 </tr>
               )}
@@ -195,7 +194,7 @@ export default function OperationRental() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-base-800">
-                        {a.customerName ?? <span className="text-base-400">—</span>}
+                        {a.customerName ?? null}
                       </div>
                       {a.customerPhone && (
                         <div className="text-meta font-mono text-base-500 mt-0.5">
@@ -245,7 +244,7 @@ export default function OperationRental() {
                           ) : null}
                         </>
                       ) : (
-                        <span className="text-base-300">—</span>
+                        null
                       )}
                     </td>
                   </tr>
@@ -291,7 +290,7 @@ export default function OperationRental() {
                     colSpan={6}
                     className="p-12 text-center text-meta text-base-500"
                   >
-                    No rental units yet — units are registered here when the
+                    No rental units yet. Units are registered here when the
                     first agreement deploys.
                   </td>
                 </tr>
@@ -323,7 +322,7 @@ export default function OperationRental() {
                       {fmtDate(u.warrantyUntil)}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap font-mono text-base-700">
-                      {linkedNo ?? <span className="text-base-400">—</span>}
+                      {linkedNo ?? null}
                     </td>
                   </tr>
                 );

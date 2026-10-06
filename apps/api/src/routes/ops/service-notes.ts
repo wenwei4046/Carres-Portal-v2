@@ -6,7 +6,9 @@ import {
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { userClient } from "../../lib/supabase";
+import { todayIsoMYT } from "../../lib/today";
 import type { AppEnv } from "../../types";
+import { parseBody } from "../../lib/route-helpers";
 
 /**
  * Service Notes (SN) — migration 0140.
@@ -71,7 +73,7 @@ snRouter.post("/", requireOperationOrPrincipal, async (c) => {
       order_id:         parsed.orderId         ?? null,
       category:         parsed.category        ?? null,
       type:             parsed.type            ?? null,
-      request_date:     parsed.requestDate     ?? new Date().toISOString().slice(0, 10),
+      request_date:     parsed.requestDate     ?? todayIsoMYT(),
       deadline:         parsed.deadline        ?? null,
       what_happened:    parsed.whatHappened    ?? null,
       section_a:        parsed.sectionA        ?? null,
@@ -290,20 +292,6 @@ function shapeItem(r: RawItem) {
     qty:    r.qty,
     remark: r.remark,
   };
-}
-
-async function parseBody<S extends import("zod").ZodTypeAny>(
-  c: import("hono").Context<AppEnv>,
-  schema: S,
-): Promise<import("zod").infer<S>> {
-  let body: unknown;
-  try { body = await c.req.json(); }
-  catch { throw new HTTPException(400, { message: "Body must be valid JSON" }); }
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) {
-    throw new HTTPException(400, { message: "Invalid input: " + parsed.error.issues[0]?.message });
-  }
-  return parsed.data;
 }
 
 export default snRouter;

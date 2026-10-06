@@ -1,0 +1,1595 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
+import app from "../../index";
+import { _setJwksForTesting } from "../../middleware/auth";
+
+vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
+import { userClient } from "../../lib/supabase";
+
+const env = {
+  SUPABASE_URL: "https://t.x",
+  SUPABASE_ANON_KEY: "a",
+  SUPABASE_SERVICE_ROLE_KEY: "s",
+  SUPABASE_JWT_SECRET: "",
+};
+
+async function makeJwt(role: string) {
+  return signTestJwt("11111111-1111-1111-1111-000000000001", { email: `${role}@x`, app_metadata: { role } });
+}
+
+beforeEach(() => {
+  useTestJwks();
+  vi.mocked(userClient).mockReset();
+});
+
+afterAll(() => _setJwksForTesting(null));
+
+// ── a recording stand-in for the supabase client ────────────────────────────
+// Every `from()` / `rpc()` starts a call; every chained method is recorded on
+// it; awaiting the chain asks `answer` for the result, so a test sees the
+// whole query that was built before it answers.
+
+type Op = [string, ...unknown[]];
+type Call = { kind: "from" | "rpc"; name: string; args?: unknown; ops: Op[] };
+type Result = { data: unknown; error: { code?: string; message?: string; details?: string } | null; count?: number | null };
+
+function fakeClient(answer: (call: Call) => Result) {
+  const calls: Call[] = [];
+  const chain = (call: Call): unknown => {
+    const proxy: object = new Proxy({}, {
+      get(_t, prop: string) {
+        if (prop === "then") {
+          return (resolve: (r: Result) => unknown, reject: (e: unknown) => unknown) => {
+            try {
+              return Promise.resolve(answer(call)).then(resolve, reject);
+            } catch (e) {
+              return reject(e);
+            }
+          };
+        }
+        return (...args: unknown[]) => {
+          call.ops.push([prop, ...args]);
+          return proxy;
+        };
+      },
+    });
+    return proxy;
+  };
+  const sb = {
+    from: vi.fn((name: string) => {
+      const call: Call = { kind: "from", name, ops: [] };
+      calls.push(call);
+      return chain(call);
+    }),
+    rpc: vi.fn((name: string, args?: unknown) => {
+      const call: Call = { kind: "rpc", name, args, ops: [] };
+      calls.push(call);
+      return chain(call);
+    }),
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  vi.mocked(userClient).mockReturnValue(sb as any);
+  return { sb, calls };
+}
+
+const ops = (call: Call | undefined, method: string) => (call?.ops ?? []).filter((o) => o[0] === method);
+
+async function get(path: string, role = "finance") {
+  const jwt = await makeJwt(role);
+  return app.fetch(
+    new Request(`http://t/api/finance/ledger${path}`, { headers: { Authorization: `Bearer ${jwt}` } }),
+    env,
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyJson = Record<string, any>;
+const json = async (res: Response) => (await res.json()) as AnyJson;
+
+const ok = (data: unknown, count?: number | null): Result => ({ data, error: null, count });
+const fail = (code: string, message = "database said something internal"): Result => ({
+  data: null,
+  error: { code, message },
+});
+/** A refusal the way a raise ... using detail = '…' reaches PostgREST. */
+const refuse = (code: string, details: string, message: string): Result => ({
+  data: null,
+  error: { code, message, details },
+});
+
+const ENTRY = {
+  id: "aaaaaaaa-0000-4000-8000-000000000001",
+  entry_no: "JE-202609-0003",
+  entry_date: "2026-09-02",
+  source_type: "SALES_INVOICE",
+  source_doc_no: "INV-TEST-1",
+  narration: "Invoice to a test customer",
+  total_debit: "150.00",
+  total_credit: "150.00",
+  reversed: true,
+  reverses: null,
+  reversed_by: "aaaaaaaa-0000-4000-8000-000000000002",
+  created_at: "2026-09-02T03:00:00Z",
+  created_by: "11111111-1111-1111-1111-000000000001",
+};
+
+/** The entry ENTRY.reversed_by points at, as the linked-number read returns it. */
+const LINKED = { id: "aaaaaaaa-0000-4000-8000-000000000002", entry_no: "JE-202609-0004" };
+
+/** The linked-number read is the `gl_entries` read filtered `in("id", …)`. */
+const isLinkedRead = (call: Call) => call.name === "gl_entries" && ops(call, "in").some((o) => o[1] === "id");
+
+// ── the guard ────────────────────────────────────────────────────────────────
+
+describe("finance ledger — who may read", () => {
+  const paths = [
+    "/entries",
+    "/entries/JE-202609-0003",
+    "/accounts",
+    "/trial-balance",
+    "/health",
+    "/self-check",
+    "/account-ledger?account=1210&from=2026-09-01&to=2026-09-30",
+    "/profit-and-loss?from=2026-09-01&to=2026-09-30",
+    "/balance-sheet",
+    "/daily-bank",
+    "/cash-flow?from=2026-09-01&to=2026-09-30",
+    "/general-ledger?from=2026-09-01&to=2026-09-30",
+    "/stock-value?monthEnd=2026-09-30",
+    "/collection?from=2026-09-01&to=2026-09-30",
+    "/forecast?month=2026-10",
+  ];
+
+  it.each(["dealer", "operation", "supplier"])("refuses %s on every route before any database call", async (role) => {
+    for (const p of paths) {
+      const res = await get(p, role);
+      expect(res.status, `${role} ${p}`).toBe(403);
+    }
+    expect(userClient).not.toHaveBeenCalled();
+  });
+
+  it("admits the principal", async () => {
+    const { sb } = fakeClient(() => ok([], 0));
+    const res = await get("/entries", "principal");
+    expect(res.status).toBe(200);
+    expect(sb.from).toHaveBeenCalledWith("gl_entries");
+  });
+});
+
+// ── the Journal ──────────────────────────────────────────────────────────────
+
+describe("GET /entries", () => {
+  it("reads posted entries newest first, with both reversal numbers", async () => {
+    const { calls } = fakeClient((call) => (isLinkedRead(call) ? ok([LINKED]) : ok([ENTRY], 1)));
+    const res = await get("/entries");
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.total).toBe(1);
+    expect(body.rows[0]).toMatchObject({
+      entry_no: "JE-202609-0003",
+      total_debit: 150,
+      reversed: true,
+      reversed_by_entry_no: "JE-202609-0004",
+      reverses_entry_no: null,
+    });
+    const c = calls[0]!;
+    expect(c.name).toBe("gl_entries");
+    const select = ops(c, "select")[0]!;
+    expect(String(select[1])).not.toContain("!inner");
+    expect(select[2]).toEqual({ count: "exact" });
+    expect(ops(c, "eq")).toContainEqual(["eq", "posted", true]);
+    expect(ops(c, "order").map((o) => o[1])).toEqual(["entry_date", "created_at", "id"]);
+    expect(ops(c, "range")).toEqual([["range", 0, 499]]);
+    // The number comes from a second, plain read of the entry it points at.
+    const linked = calls[1]!;
+    expect(isLinkedRead(linked)).toBe(true);
+    expect(ops(linked, "select")).toEqual([["select", "id,entry_no"]]);
+    expect(ops(linked, "in")).toEqual([["in", "id", [LINKED.id]]]);
+    expect(calls).toHaveLength(2);
+  });
+
+  // PostgREST refuses to embed a table in itself through a foreign-key hint,
+  // and production answered every Journal read 500 while this select carried
+  // one. A recording fake accepts any string, so the select is pinned instead.
+  it("never embeds gl_entries in itself", async () => {
+    const { calls } = fakeClient((call) =>
+      isLinkedRead(call) ? ok([LINKED]) : ops(call, "maybeSingle").length ? ok(ENTRY) : ok([ENTRY], 1));
+    await get("/entries");
+    await get("/entries?account=1210");
+    await get("/entries/JE-202609-0003");
+    const selects = calls.flatMap((call) => ops(call, "select").map((o) => String(o[1])));
+    expect(selects.length).toBeGreaterThan(3);
+    for (const s of selects) expect(s).not.toMatch(/gl_entries[!(]/);
+  });
+
+  it("asks for no linked numbers when no entry on the page links", async () => {
+    const { calls } = fakeClient(() => ok([{ ...ENTRY, reversed: false, reversed_by: null }], 1));
+    const res = await get("/entries");
+    expect(res.status).toBe(200);
+    expect((await json(res)).rows[0]).toMatchObject({ reverses_entry_no: null, reversed_by_entry_no: null });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("reads the linked numbers of a full page in slices of 100", async () => {
+    const id = (n: number) => `bbbbbbbb-0000-4000-8000-${String(n).padStart(12, "0")}`;
+    const page = Array.from({ length: 250 }, (_, n) => ({ ...ENTRY, id: `row-${n}`, reversed_by: id(n) }));
+    const { calls } = fakeClient((call) => {
+      if (!isLinkedRead(call)) return ok(page, 250);
+      const asked = ops(call, "in")[0]![2] as string[];
+      return ok(asked.map((i) => ({ id: i, entry_no: `JE-${i.slice(-4)}` })));
+    });
+    const res = await get("/entries?limit=1000");
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.rows[249].reversed_by_entry_no).toBe("JE-0249");
+    expect(calls.filter(isLinkedRead).map((call) => (ops(call, "in")[0]![2] as string[]).length)).toEqual([100, 100, 50]);
+  });
+
+  it("answers an unreadable linked number with an error, never a reversal without its link", async () => {
+    fakeClient((call) => (isLinkedRead(call) ? fail("XX000") : ok([ENTRY], 1)));
+    const res = await get("/entries");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("The journal could not be loaded. Try again.");
+  });
+
+  it("narrows by account through an inner join, and by date, source and search", async () => {
+    const { calls } = fakeClient(() => ok([], 0));
+    const res = await get(
+      "/entries?account=1210&from=2026-09-01&to=2026-09-30&source=SALES_INVOICE&q=INV-7&offset=500&limit=100",
+    );
+    expect(res.status).toBe(200);
+    const c = calls[0]!;
+    expect(String(ops(c, "select")[0]![1])).toContain("gl_entry_lines!inner(account_code)");
+    expect(ops(c, "eq")).toContainEqual(["eq", "gl_entry_lines.account_code", "1210"]);
+    expect(ops(c, "eq")).toContainEqual(["eq", "source_type", "SALES_INVOICE"]);
+    expect(ops(c, "gte")).toEqual([["gte", "entry_date", "2026-09-01"]]);
+    expect(ops(c, "lte")).toEqual([["lte", "entry_date", "2026-09-30"]]);
+    expect(ops(c, "or")).toEqual([["or", "entry_no.ilike.*INV-7*,source_doc_no.ilike.*INV-7*"]]);
+    expect(ops(c, "range")).toEqual([["range", 500, 599]]);
+  });
+
+  // The filter is an inner join on the gl_line_departments view in the SAME
+  // query as the dates. The old version read every entry id the department
+  // ever had, then spelt them into the URL and refused past 200, so a showroom
+  // with 201 entries broke the Journal even for one day.
+  it("narrows by department through an inner join on gl_line_departments, in one query", async () => {
+    const { calls } = fakeClient(() => ok([], 0));
+    const res = await get("/entries?departmentType=SHOWROOM&departmentId=11111111-1111-4111-8111-111111111111");
+    expect(res.status).toBe(200);
+    expect(calls.map((x) => x.name)).toEqual(["gl_entries"]);
+    const c = calls[0]!;
+    expect(String(ops(c, "select")[0]![1])).toContain("gl_line_departments!inner(department_type,department_id)");
+    expect(ops(c, "eq")).toContainEqual(["eq", "gl_line_departments.department_type", "SHOWROOM"]);
+    expect(ops(c, "eq")).toContainEqual(["eq", "gl_line_departments.department_id", "11111111-1111-4111-8111-111111111111"]);
+    expect(ops(c, "in")).toEqual([]);
+    // The computed relationship over the same view is a SQL function with a
+    // SET clause, so Postgres cannot inline it. That shape never returned.
+    expect(String(ops(c, "select")[0]![1])).not.toContain("gl_entry_departments");
+  });
+
+  it("lists 250 entries of one department for one day, with no id list", async () => {
+    const page = Array.from({ length: 250 }, (_, n) => ({ ...ENTRY, id: `e-${n}`, reverses: null, reversed_by: null }));
+    const { calls } = fakeClient(() => ok(page, 250));
+    const res = await get("/entries?departmentType=SHOWROOM&from=2026-09-10&to=2026-09-10&limit=1000");
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.total).toBe(250);
+    expect(body.rows).toHaveLength(250);
+    expect(calls).toHaveLength(1);
+    const c = calls[0]!;
+    expect(ops(c, "in")).toEqual([]);
+    expect(ops(c, "eq")).toContainEqual(["eq", "gl_line_departments.department_type", "SHOWROOM"]);
+    // The dates narrow the same query the department does.
+    expect(ops(c, "gte")).toEqual([["gte", "entry_date", "2026-09-10"]]);
+    expect(ops(c, "lte")).toEqual([["lte", "entry_date", "2026-09-10"]]);
+  });
+
+  it("keeps the department and the account filters together", async () => {
+    const { calls } = fakeClient(() => ok([], 0));
+    await get("/entries?departmentType=OFFICE&account=1210&from=2026-09-01");
+    const c = calls[0]!;
+    const select = String(ops(c, "select")[0]![1]);
+    expect(select).toContain("gl_entry_lines!inner(account_code)");
+    expect(select).toContain("gl_line_departments!inner(department_type,department_id)");
+    expect(ops(c, "eq")).toContainEqual(["eq", "gl_line_departments.department_type", "OFFICE"]);
+    expect(ops(c, "eq").some((o) => o[1] === "gl_line_departments.department_id")).toBe(false);
+    expect(ops(c, "gte")).toEqual([["gte", "entry_date", "2026-09-01"]]);
+  });
+
+  // The Journal with ?dept= answered 500 on live: the view's customer payment
+  // match cast every receipt number to uuid once the planner used the payment
+  // id index ("invalid input syntax for type uuid"). The cast must sit behind a
+  // CASE, the only order Postgres promises to keep.
+  it("the newest gl_line_departments casts source_doc_no to uuid only behind a CASE", () => {
+    const dir = path.resolve(__dirname, "../../../../../supabase/migrations");
+    const newest = fs.readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()
+      .map((f) => fs.readFileSync(path.join(dir, f), "utf8"))
+      .filter((sql) => sql.includes("create or replace view public.gl_line_departments"))
+      .at(-1)!;
+    const view = newest.slice(newest.indexOf("create or replace view public.gl_line_departments")).split(";")[0]!;
+    expect(view).toContain("source_doc_no::uuid");
+    expect(view).not.toMatch(/(?<!then )e\.source_doc_no::uuid/);
+  });
+
+  it("answers a department with no entries as empty, never as an error", async () => {
+    fakeClient(() => ok([], 0));
+    const res = await get("/entries?departmentType=OFFICE");
+    expect(res.status).toBe(200);
+    expect((await json(res)).total).toBe(0);
+  });
+
+  it.each([
+    ["?from=2026-09-30&to=2026-09-01", "backwards dates"],
+    ["?q=a,b", "a comma in the search"],
+    ["?q=a*", "a wildcard in the search"],
+    ["?account=12%2010", "a space in an account"],
+    ["?limit=5000", "a page too large"],
+    ["?colour=red", "an unknown filter"],
+  ])("refuses %s (%s) with 422 before any database call", async (qs) => {
+    const res = await get(`/entries${qs}`);
+    expect(res.status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+
+  it("answers an unreadable Journal with an error, never an empty list", async () => {
+    fakeClient(() => fail("XX000"));
+    const res = await get("/entries");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("The journal could not be loaded. Try again.");
+  });
+
+  it("answers a missing count with an error", async () => {
+    fakeClient(() => ok([ENTRY], null));
+    expect((await get("/entries")).status).toBe(500);
+  });
+});
+
+describe("GET /entries/:ref", () => {
+  function entryAnswer(overrides: Partial<Record<"head" | "linked" | "related" | "lines", Result>> = {}) {
+    return (call: Call): Result => {
+      if (call.name === "gl_entries" && ops(call, "maybeSingle").length) return overrides.head ?? ok(ENTRY);
+      if (isLinkedRead(call)) return overrides.linked ?? ok([LINKED]);
+      if (call.name === "gl_entries") {
+        return overrides.related ?? ok([
+          {
+            id: "aaaaaaaa-0000-4000-8000-000000000002",
+            entry_no: "JE-202609-0004",
+            entry_date: "2026-09-03",
+            source_type: "SALES_INVOICE_REVERSAL",
+            reversed: false,
+          },
+        ]);
+      }
+      if (call.name === "gl_entry_lines") {
+        return overrides.lines ?? ok([
+          {
+            line_no: 1, account_code: "1210", debit: "150.00", credit: "0", party_type: "CUSTOMER",
+            party_id: "cccccccc-0000-4000-8000-000000000001", memo: null, gl_accounts: { name: "Trade debtors" },
+          },
+          {
+            line_no: 2, account_code: "4100", debit: "0", credit: "150.00", party_type: null,
+            party_id: null, memo: "Sales", gl_accounts: { name: "Sales" },
+          },
+        ]);
+      }
+      if (call.name === "customers") return ok([{ id: "cccccccc-0000-4000-8000-000000000001", name: "Test Customer One" }]);
+      return ok([]);
+    };
+  }
+
+  it("finds an entry by its number, with lines, party names and related entries", async () => {
+    const { calls } = fakeClient(entryAnswer());
+    const res = await get("/entries/je-202609-0003");
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    const head = calls.find((c) => c.name === "gl_entries" && ops(c, "maybeSingle").length)!;
+    expect(ops(head, "eq")).toContainEqual(["eq", "entry_no", "JE-202609-0003"]);
+    expect(body.entry.reversed_by_entry_no).toBe("JE-202609-0004");
+    expect(body.lines).toHaveLength(2);
+    expect(body.lines[0]).toMatchObject({
+      account_code: "1210", account_name: "Trade debtors", debit: 150, credit: 0, party_name: "Test Customer One",
+    });
+    expect(body.lines[1]).toMatchObject({ party_name: null, memo: "Sales" });
+    expect(body.related).toEqual([
+      expect.objectContaining({ entry_no: "JE-202609-0004", source_type: "SALES_INVOICE_REVERSAL" }),
+    ]);
+    // Finance reads only its own app_users row, so a name lookup would lie
+    // about everybody else; the entry does not ask.
+    expect(body).not.toHaveProperty("posted_by_name");
+    expect(calls.some((c) => c.name === "app_users")).toBe(false);
+    const linked = calls.find(isLinkedRead)!;
+    expect(ops(linked, "in")).toEqual([["in", "id", [LINKED.id]]]);
+    const related = calls.find((c) => c.name === "gl_entries" && ops(c, "eq").some((o) => o[1] === "source_doc_no"))!;
+    expect(ops(related, "in")).toEqual([["in", "source_type", ["SALES_INVOICE", "SALES_INVOICE_REVERSAL"]]]);
+    expect(ops(related, "neq")).toEqual([["neq", "id", ENTRY.id]]);
+    // No supplier on the lines, so suppliers are never asked.
+    expect(calls.some((c) => c.name === "suppliers")).toBe(false);
+  });
+
+  it("finds an entry by its id", async () => {
+    const { calls } = fakeClient(entryAnswer());
+    expect((await get(`/entries/${ENTRY.id}`)).status).toBe(200);
+    expect(ops(calls[0], "eq")).toContainEqual(["eq", "id", ENTRY.id]);
+  });
+
+  it("says 404 when no entry has that number", async () => {
+    fakeClient(entryAnswer({ head: ok(null) }));
+    expect((await get("/entries/JE-209901-0001")).status).toBe(404);
+  });
+
+  it("refuses a malformed reference", async () => {
+    expect((await get("/entries/JE%2A1")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+
+  it("fails when the lines cannot be read, rather than showing an entry with none", async () => {
+    fakeClient(entryAnswer({ lines: fail("XX000") }));
+    expect((await get("/entries/JE-202609-0003")).status).toBe(500);
+  });
+
+  it("fails when the linked number cannot be read, rather than showing a reversal without it", async () => {
+    fakeClient(entryAnswer({ linked: fail("XX000") }));
+    expect((await get("/entries/JE-202609-0003")).status).toBe(500);
+  });
+});
+
+// ── the chart and the trial balance ─────────────────────────────────────────
+
+const CHART = [
+  { code: "1000", name: "Assets", kind: "ASSET", parent_code: null, is_control: false, control_for: null, is_active: true },
+  { code: "1210", name: "Trade debtors", kind: "ASSET", parent_code: "1000", is_control: true, control_for: "CUSTOMER", is_active: true },
+  { code: "4100", name: "Sales", kind: "INCOME", parent_code: null, is_control: false, control_for: null, is_active: true },
+];
+
+function chartAnswer(tb: Result) {
+  return (call: Call): Result => {
+    if (call.name === "gl_trial_balance") return tb;
+    if (call.name === "gl_accounts") return ok(CHART);
+    if (call.name === "gl_config") return ok({ go_live_on: "2026-09-01" });
+    return ok([]);
+  };
+}
+
+// 0580: the stored flag. 2300 has nothing under it and is still a heading.
+const FLAGGED_CHART = [
+  { ...CHART[0], is_heading: true },
+  { ...CHART[1], is_heading: false },
+  { code: "2300", name: "Taxes", kind: "LIABILITY", parent_code: null, is_control: false, control_for: null, is_active: true, is_heading: true },
+  { ...CHART[2], is_heading: false },
+];
+
+describe("GET /accounts", () => {
+  it("reads the chart with star, so it still loads before 0580's column is there", async () => {
+    const { calls } = fakeClient(chartAnswer(ok([])));
+    await get("/accounts");
+    const read = calls.find((c) => c.name === "gl_accounts")!;
+    expect(ops(read, "select")).toEqual([["select", "*"]]);
+  });
+
+  it("before 0580, works headers out from parents; and gives the ledger start", async () => {
+    fakeClient(chartAnswer(ok([])));
+    const res = await get("/accounts");
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.go_live_on).toBe("2026-09-01");
+    expect(body.accounts.map((a: AnyJson) => [a.code, a.is_header])).toEqual([["1000", true], ["1210", false], ["4100", false]]);
+  });
+
+  it("reads a heading from the stored flag, so an empty heading is still one (0580)", async () => {
+    const answer = chartAnswer(ok([]));
+    fakeClient((call) => (call.name === "gl_accounts" ? ok(FLAGGED_CHART) : answer(call)));
+    const body = await json(await get("/accounts"));
+    expect(body.accounts.map((a: AnyJson) => [a.code, a.is_header])).toEqual([
+      ["1000", true], ["1210", false], ["2300", true], ["4100", false],
+    ]);
+  });
+
+  it("names the headings no account moves into or out of (0570 gl_rule_headings)", async () => {
+    const answer = chartAnswer(ok([]));
+    const { sb } = fakeClient((call) => (call.name === "gl_rule_headings" ? ok(["2200", "1300"]) : answer(call)));
+    const body = await json(await get("/accounts"));
+    expect(sb.rpc).toHaveBeenCalledWith("gl_rule_headings");
+    expect(body.rule_headings).toEqual(["2200", "1300"]);
+  });
+
+  it("still serves the chart when that list cannot be read; the move door refuses on its own", async () => {
+    const answer = chartAnswer(ok([]));
+    fakeClient((call) => (call.name === "gl_rule_headings" ? fail("42883") : answer(call)));
+    const res = await get("/accounts");
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.accounts).toHaveLength(3);
+    expect(body.rule_headings).toEqual([]);
+  });
+
+  it("names which account does each job and which accounts hold money (0570), so no screen writes a number", async () => {
+    const answer = chartAnswer(ok([]));
+    const { sb } = fakeClient((call) =>
+      call.name === "gl_account_roles_read" ? ok({ BANK_AND_PAYMENT_CHARGES: "902-0000", SUPPLIER_ADVANCE: "340-A001" })
+      : call.name === "gl_money_accounts" ? ok([{ account_code: "320-0000" }, { account_code: "310-A001" }])
+      : answer(call));
+    const body = await json(await get("/accounts"));
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_roles_read");
+    expect(body.roles).toEqual({ BANK_AND_PAYMENT_CHARGES: "902-0000", SUPPLIER_ADVANCE: "340-A001" });
+    expect(body.money_accounts).toEqual(["320-0000", "310-A001"]);
+  });
+
+  it("still serves the chart when the roles or the money accounts cannot be read", async () => {
+    const answer = chartAnswer(ok([]));
+    fakeClient((call) =>
+      call.name === "gl_account_roles_read" || call.name === "gl_money_accounts" ? fail("42501") : answer(call));
+    const res = await get("/accounts");
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.accounts).toHaveLength(3);
+    expect(body.roles).toEqual({});
+    expect(body.money_accounts).toEqual([]);
+  });
+});
+
+describe("PATCH /accounts/:code", () => {
+  const patch = async (path: string, body: unknown, role = "finance") =>
+    app.fetch(new Request(`http://t/api/finance/ledger${path}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+
+  it("renames through gl_account_update with the name trimmed and the number left alone", async () => {
+    const { sb } = fakeClient(() => ok("2130"));
+    const res = await patch("/accounts/2130", { name: " Accruals " });
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ code: "2130" });
+    // p_new_code null is what the function reads as "keep this number".
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_update", { p_code: "2130", p_name: "Accruals", p_new_code: null });
+  });
+
+  it("renumbers, keeping the name, and answers with the number the account now carries", async () => {
+    const { sb } = fakeClient(() => ok("2140"));
+    const res = await patch("/accounts/2130", { name: "Accruals", code: "2140" });
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ code: "2140" });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_update", { p_code: "2130", p_name: "Accruals", p_new_code: "2140" });
+  });
+
+  it("changes the name and the number in one call, and takes the dashed shape", async () => {
+    const { sb } = fakeClient(() => ok("100-0001"));
+    const res = await patch("/accounts/2130", { name: " Accrued expenses ", code: " 100-0001 " });
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ code: "100-0001" });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_update", {
+      p_code: "2130", p_name: "Accrued expenses", p_new_code: "100-0001",
+    });
+  });
+
+  it("takes AutoCount's letter form, and sends a lower-case letter in capitals", async () => {
+    const { sb } = fakeClient(() => ok("900-A001"));
+    const res = await patch("/accounts/6900", { name: "Advertisement", code: " 900-a001 " });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_update", { p_code: "6900", p_name: "Advertisement", p_new_code: "900-A001" });
+    expect((await patch("/accounts/900-A001", { name: "Advertisement" })).status).toBe(200);
+  });
+
+  it.each(["900-AA01", "90-A001", "900-A0011", "900-ı001", "900-İ001", "٩٠٠-A001", "９０００"])(
+    "refuses %s before the database",
+    async (code) => {
+      const { sb } = fakeClient(() => ok("x"));
+      const res = await patch("/accounts/6900", { name: "X", code });
+      expect(res.status).toBe(422);
+      expect((await json(res)).message).toBe(
+        "A number is four digits, like 1210, or AutoCount's form, like 100-0001 or 900-A001.",
+      );
+      expect(sb.rpc).not.toHaveBeenCalled();
+    },
+  );
+
+  it("reaches an account that already carries the dashed shape in its own path", async () => {
+    const { sb } = fakeClient(() => ok("100-0001"));
+    expect((await patch("/accounts/100-0001", { name: "Accruals" })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_update", { p_code: "100-0001", p_name: "Accruals", p_new_code: null });
+  });
+
+  it("refuses operation, a bad path code and a blank name before the database", async () => {
+    expect((await patch("/accounts/2130", { name: "X" }, "operation")).status).toBe(403);
+    fakeClient(() => ok("x"));
+    expect((await patch("/accounts/abc", { name: "X" })).status).toBe(404);
+    expect((await patch("/accounts/2130", { name: "  " })).status).toBe(422);
+    // A number of the wrong shape never reaches the database.
+    const shape = await patch("/accounts/2130", { name: "X", code: "99" });
+    expect(shape.status).toBe(422);
+    expect((await json(shape)).message).toBe(
+      "A number is four digits, like 1210, or AutoCount's form, like 100-0001 or 900-A001.",
+    );
+    // A field the door does not take is still refused.
+    expect((await patch("/accounts/2130", { name: "X", kind: "ASSET" })).status).toBe(422);
+  });
+
+  // 0550's four refusals, each one reaching the user as its own sentence under
+  // its own tag rather than as raw database text.
+  it.each([
+    ["code_shape", "22023", 422, "A number is four digits, like 1210, or AutoCount's form, like 100-0001 or 900-A001."],
+    ["code_exists", "22023", 422, "An account numbered 2140 is already in the chart."],
+    ["name_exists", "22023", 422, "An account named Accruals is already in the chart."],
+    ["not_finance", "42501", 403, "Only Finance changes the chart of accounts."],
+  ])("answers %s with %s as %i and the function's own sentence", async (details, sqlstate, status, message) => {
+    fakeClient(() => refuse(sqlstate, details as string, message as string));
+    const res = await patch("/accounts/2130", { name: "Accruals", code: "2140" });
+    expect(res.status).toBe(status);
+    const body = await json(res);
+    expect(body.code).toBe(details);
+    expect(body.message).toBe(message);
+  });
+
+  it("keeps a break a break: no tag, no sentence of the database's", async () => {
+    fakeClient(() => fail("XX000", "deadlock detected"));
+    const res = await patch("/accounts/2130", { name: "Accruals" });
+    expect(res.status).toBe(500);
+    expect((await json(res)).code).toBe("rpc_failed");
+  });
+});
+
+describe("POST /accounts (0577)", () => {
+  const post = async (body: unknown, role = "finance") =>
+    app.fetch(new Request("http://t/api/finance/ledger/accounts", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+
+  it("adds an account under a heading, the number in capitals", async () => {
+    const { sb } = fakeClient(() => ok("900-A001"));
+    const res = await post({ parentCode: "6000", code: "900-a001", name: " Freight " });
+    expect(res.status).toBe(201);
+    expect(await json(res)).toEqual({ code: "900-A001" });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_add", {
+      p_parent_code: "6000", p_code: "900-A001", p_name: "Freight", p_first_code: null, p_first_name: null, p_is_heading: false, p_kind: null,
+    });
+  });
+
+  it("adds a heading with its first account", async () => {
+    const { sb } = fakeClient(() => ok("1400"));
+    const res = await post({ parentCode: "1000", code: "1400", name: "Deposits paid", first: { code: "1410", name: "Rental deposits" } });
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_add", {
+      p_parent_code: "1000", p_code: "1400", p_name: "Deposits paid", p_first_code: "1410", p_first_name: "Rental deposits",
+      p_is_heading: false, p_kind: null,
+    });
+  });
+
+  it("adds a heading on its own, with no first account (0608)", async () => {
+    const { sb } = fakeClient(() => ok("8000"));
+    const res = await post({ parentCode: "6000", code: "8000", name: "testhead", isHeading: true });
+    expect(res.status).toBe(201);
+    expect(await json(res)).toEqual({ code: "8000" });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_add", {
+      p_parent_code: "6000", p_code: "8000", p_name: "testhead", p_first_code: null, p_first_name: null, p_is_heading: true, p_kind: null,
+    });
+  });
+
+  it("adds a heading at the top of the chart with its kind (0608)", async () => {
+    const { sb } = fakeClient(() => ok("8000"));
+    const res = await post({ parentCode: null, code: "8000", name: "Other income", isHeading: true, kind: "INCOME" });
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_add", {
+      p_parent_code: null, p_code: "8000", p_name: "Other income", p_first_code: null, p_first_name: null, p_is_heading: true, p_kind: "INCOME",
+    });
+  });
+
+  it("forwards the refusal of an account at the top that is not a heading", async () => {
+    fakeClient(() => refuse("22023", "add_top_account", "Only a heading goes at the top of the chart. Pick the heading this account goes under."));
+    const res = await post({ parentCode: null, code: "8000", name: "Other income" });
+    expect(res.status).toBe(422);
+    expect((await json(res)).code).toBe("add_top_account");
+  });
+
+  it("refuses a kind the chart does not have before the database", async () => {
+    const { sb } = fakeClient(() => ok("x"));
+    expect((await post({ parentCode: null, code: "8000", name: "Other income", isHeading: true, kind: "OTHER" })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses an isHeading that is not true or false", async () => {
+    const { sb } = fakeClient(() => ok("x"));
+    expect((await post({ parentCode: "6000", code: "8000", name: "testhead", isHeading: "yes" })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses operation, a bad number and a blank name before the database", async () => {
+    expect((await post({ parentCode: "6000", code: "6998", name: "Freight" }, "operation")).status).toBe(403);
+    const { sb } = fakeClient(() => ok("x"));
+    expect((await post({ parentCode: "6000", code: "12", name: "Freight" })).status).toBe(422);
+    expect((await post({ parentCode: "6000", code: "6998", name: " " })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("forwards the database's refusal and its tag", async () => {
+    fakeClient(() => refuse("22023", "code_exists", "An account numbered 6500 is already in the chart."));
+    const res = await post({ parentCode: "6000", code: "6500", name: "Freight" });
+    expect(res.status).toBe(422);
+    const body = await json(res);
+    expect(body.code).toBe("code_exists");
+    expect(body.message).toBe("An account numbered 6500 is already in the chart.");
+  });
+});
+
+describe("POST /accounts/move and /accounts/reorder", () => {
+  const post = async (path: string, body: unknown, role = "finance") =>
+    app.fetch(new Request(`http://t/api/finance/ledger${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+
+  const MOVE = {
+    code: "5200",
+    toParentCode: "6000",
+    from: { was: ["5100", "5200"], now: ["5100"] },
+    to: { was: ["6100", "6500"], now: ["6100", "6500", "5200"] },
+  };
+
+  it("forwards both headings' before and after orders to gl_account_move untouched", async () => {
+    const { sb } = fakeClient(() => ok("5200"));
+    const res = await post("/accounts/move", MOVE);
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ code: "5200" });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_move", {
+      p_code: "5200",
+      p_to_parent: "6000",
+      p_from_was: ["5100", "5200"],
+      p_from_now: ["5100"],
+      p_to_was: ["6100", "6500"],
+      p_to_now: ["6100", "6500", "5200"],
+    });
+  });
+
+  it("forwards the last account leaving its heading, and a move into an empty heading (0580)", async () => {
+    const { sb } = fakeClient(() => ok("2310"));
+    const out = await post("/accounts/move", {
+      code: "2310", toParentCode: "2100",
+      from: { was: ["2310"], now: [] },
+      to: { was: ["2110", "2120"], now: ["2110", "2120", "2310"] },
+    });
+    expect(out.status).toBe(200);
+    expect(sb.rpc).toHaveBeenLastCalledWith("gl_account_move", {
+      p_code: "2310", p_to_parent: "2100",
+      p_from_was: ["2310"], p_from_now: [],
+      p_to_was: ["2110", "2120"], p_to_now: ["2110", "2120", "2310"],
+    });
+    const back = await post("/accounts/move", {
+      code: "2310", toParentCode: "2300",
+      from: { was: ["2110", "2120", "2310"], now: ["2110", "2120"] },
+      to: { was: [], now: ["2310"] },
+    });
+    expect(back.status).toBe(200);
+    expect(sb.rpc).toHaveBeenLastCalledWith("gl_account_move", {
+      p_code: "2310", p_to_parent: "2300",
+      p_from_was: ["2110", "2120", "2310"], p_from_now: ["2110", "2120"],
+      p_to_was: [], p_to_now: ["2310"],
+    });
+  });
+
+  it("refuses operation, a missing before-order and an extra field before the database", async () => {
+    expect((await post("/accounts/move", MOVE, "operation")).status).toBe(403);
+    const { sb } = fakeClient(() => ok("x"));
+    // The heading it leaves always held the account, so its before-order is never empty.
+    expect((await post("/accounts/move", { ...MOVE, from: { was: [], now: ["5100"] } })).status).toBe(422);
+    // An empty heading's before-order is [], but it is still sent.
+    expect((await post("/accounts/move", { ...MOVE, to: { now: ["5200"] } })).status).toBe(422);
+    expect((await post("/accounts/move", { ...MOVE, name: "Freight" })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["order_stale", "40001", 409, "The chart changed while you were dragging. Open it again and redo the move."],
+    ["move_onto_account", "22023", 422, "6500 Bank and payment charges is not a heading. Move the account under a heading."],
+    ["move_other_kind", "22023", 422, "An account moves only under a heading of the same kind."],
+    ["move_into_itself", "22023", 422, "1200 Receivables is inside 1100 Cash and bank. A heading cannot go under a heading inside it."],
+    ["move_rule_heading", "22023", 422, "2200 Customer money held decides how money may be recorded, not only where an account prints. No account moves into or out of it."],
+    ["move_into_money_heading", "22023", 422, "1250 Loans and advances given is not a bank or cash account. Only bank and cash accounts go under 1100 Cash and bank."],
+  ])("answers %s with %s as %i and the function's own sentence", async (details, sqlstate, status, message) => {
+    fakeClient(() => refuse(sqlstate, details as string, message as string));
+    const res = await post("/accounts/move", MOVE);
+    expect(res.status).toBe(status);
+    const body = await json(res);
+    expect(body.code).toBe(details);
+    expect(body.message).toBe(message);
+  });
+
+  it("reorders an account that carries the dashed number shape", async () => {
+    const { sb } = fakeClient(() => ok(2));
+    const res = await post("/accounts/reorder", { parentCode: "600-0000", was: ["610-0001", "610-0002"], now: ["610-0002", "610-0001"] });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_accounts_reorder", {
+      p_parent_code: "600-0000", p_was: ["610-0001", "610-0002"], p_now: ["610-0002", "610-0001"],
+    });
+  });
+});
+
+describe("GET /trial-balance", () => {
+  const tbRow = (o: AnyJson) => ({ report_status: "OK", go_live_on: "2026-09-01", as_of: "2026-09-10", ...o });
+
+  it("asks for the day given, drops header accounts, and reports the difference", async () => {
+    const { sb } = fakeClient(chartAnswer(ok([
+      tbRow({ ordinal: 1, row_kind: "ACCOUNT", account_code: "1000", account_name: "Assets", kind: "ASSET", total_debit: 0, total_credit: 0, natural_balance: 0 }),
+      tbRow({ ordinal: 2, row_kind: "ACCOUNT", account_code: "1210", account_name: "Trade debtors", kind: "ASSET", is_control: true, is_active: true, total_debit: "150.00", total_credit: "40.00", natural_balance: "110.00" }),
+      tbRow({ ordinal: 3, row_kind: "ACCOUNT", account_code: "4100", account_name: "Sales", kind: "INCOME", is_active: true, total_debit: "0", total_credit: "110.00", natural_balance: "110.00" }),
+      tbRow({ ordinal: 4, row_kind: "TOTAL", total_debit: "150.00", total_credit: "150.00", balances: true }),
+    ])));
+    const res = await get("/trial-balance?asOf=2026-09-10");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_trial_balance", { p_as_of: "2026-09-10", p_department_type: null, p_department_id: null });
+    const body = await json(res);
+    expect(body.status).toBe("ok");
+    expect(body.accounts.map((a: AnyJson) => a.account_code)).toEqual(["1210", "4100"]);
+    expect(body).toMatchObject({ total_debit: 150, total_credit: 150, difference: 0, balances: true });
+  });
+
+  // A chart three headings deep, with made-up codes. Finance dragged Bank
+  // (CA-B) above Cash in hand (CA-A), so the chart's order is not the codes'
+  // order. Stock holds nothing that moved.
+  const DEEP = [
+    { code: "AS", name: "Assets", kind: "ASSET", parent_code: null, sort_order: 0 },
+    { code: "CA", name: "Current assets", kind: "ASSET", parent_code: "AS", sort_order: 0 },
+    { code: "CA-B", name: "Bank", kind: "ASSET", parent_code: "CA", sort_order: -1 },
+    { code: "CA-B1", name: "Maybank", kind: "ASSET", parent_code: "CA-B", sort_order: 0 },
+    { code: "CA-B2", name: "Public Bank", kind: "ASSET", parent_code: "CA-B", sort_order: 0 },
+    { code: "CA-A", name: "Cash in hand", kind: "ASSET", parent_code: "CA", sort_order: 0 },
+    { code: "ST", name: "Stock", kind: "ASSET", parent_code: "AS", sort_order: 0 },
+    { code: "ST-F", name: "Finished goods", kind: "ASSET", parent_code: "ST", sort_order: 0 },
+    { code: "IN", name: "Income", kind: "INCOME", parent_code: null, sort_order: 0 },
+    { code: "IN-S", name: "Sales", kind: "INCOME", parent_code: "IN", sort_order: 0 },
+  ].map((a) => ({ is_control: false, control_for: null, is_active: true, ...a }));
+  const deepAnswer = (moved: Record<string, [number, number]>) => (call: Call): Result => {
+    // readChart asks for sort_order, then code, across the whole chart.
+    if (call.name === "gl_accounts") return ok([...DEEP].sort((a, b) => a.sort_order - b.sort_order || a.code.localeCompare(b.code)));
+    if (call.name === "gl_config") return ok({ go_live_on: "2026-09-01" });
+    if (call.name !== "gl_trial_balance") return ok([]);
+    const accounts = [...DEEP].sort((a, b) => a.code.localeCompare(b.code)).map((a, i) => {
+      const [dr, cr] = moved[a.code] ?? [0, 0];
+      return tbRow({ ordinal: i + 1, row_kind: "ACCOUNT", account_code: a.code, account_name: a.name, kind: a.kind,
+        is_control: false, is_active: true, total_debit: dr.toFixed(2), total_credit: cr.toFixed(2), natural_balance: "0" });
+    });
+    const dr = Object.values(moved).reduce((t, [d]) => t + d, 0);
+    const cr = Object.values(moved).reduce((t, [, c]) => t + c, 0);
+    return ok([...accounts, tbRow({ ordinal: accounts.length + 1, row_kind: "TOTAL", total_debit: dr, total_credit: cr, balances: dr === cr })]);
+  };
+
+  it("gives every heading its own debit and credit subtotal at every depth, and each row its place in the chart", async () => {
+    // Maybank sits 500 on the debit side, Public Bank is overdrawn 30, Cash in hand holds 20; sales take the 490.
+    fakeClient(deepAnswer({ "CA-B1": [700, 200], "CA-B2": [10, 40], "CA-A": [20, 0], "IN-S": [0, 490] }));
+    const body = await json(await get("/trial-balance?asOf=2026-09-10"));
+    expect(body.headings.map((h: AnyJson) => [h.code, h.depth, h.parent_code, h.chart_position, h.debit, h.credit])).toEqual([
+      ["AS", 1, null, 1, 520, 30],
+      ["CA", 2, "AS", 2, 520, 30],
+      ["CA-B", 3, "CA", 3, 500, 30],
+      ["ST", 2, "AS", 7, 0, 0],
+      ["IN", 1, null, 9, 0, 490],
+    ]);
+    // The accounts keep the ledger's own order, as before headings; each
+    // carries its heading and its place in the chart, counted with the
+    // headings' places, so Bank (3) sorts above Cash in hand (6).
+    expect(body.accounts.map((a: AnyJson) => [a.account_code, a.header_code, a.chart_position])).toEqual([
+      ["CA-A", "CA", 6], ["CA-B1", "CA-B", 4], ["CA-B2", "CA-B", 5], ["IN-S", "IN", 10], ["ST-F", "ST", 8],
+    ]);
+    // The totals are the ledger's own, never the subtotals added in again, and they balance.
+    expect(body).toMatchObject({ total_debit: 730, total_credit: 730, difference: 0, balances: true });
+  });
+
+  it("keeps the department filter, and the subtotals are that department's", async () => {
+    const { sb } = fakeClient(deepAnswer({ "CA-A": [20, 0], "IN-S": [0, 20] }));
+    const body = await json(await get("/trial-balance?asOf=2026-09-10&departmentType=SHOWROOM"));
+    expect(sb.rpc).toHaveBeenCalledWith("gl_trial_balance", { p_as_of: "2026-09-10", p_department_type: "SHOWROOM", p_department_id: null });
+    expect(body.headings.find((h: AnyJson) => h.code === "AS")).toMatchObject({ debit: 20, credit: 0 });
+    expect(body.headings.find((h: AnyJson) => h.code === "CA-B")).toMatchObject({ debit: 0, credit: 0 });
+  });
+
+  it("refuses a trial balance with an account the chart does not hold, never prints it short", async () => {
+    const answer = deepAnswer({});
+    fakeClient((call) => {
+      if (call.name !== "gl_trial_balance") return answer(call);
+      return ok([
+        tbRow({ ordinal: 1, row_kind: "ACCOUNT", account_code: "XX", account_name: "Stray", kind: "ASSET", total_debit: "5.00", total_credit: "0" }),
+        tbRow({ ordinal: 2, row_kind: "TOTAL", total_debit: "5.00", total_credit: "0", balances: false }),
+      ]);
+    });
+    expect((await get("/trial-balance?asOf=2026-09-10")).status).toBe(500);
+  });
+
+  it("drops an empty heading too, by the stored flag (0580)", async () => {
+    const answer = chartAnswer(ok([
+      tbRow({ ordinal: 1, row_kind: "ACCOUNT", account_code: "2300", account_name: "Taxes", kind: "LIABILITY", total_debit: 0, total_credit: 0, natural_balance: 0 }),
+      tbRow({ ordinal: 2, row_kind: "ACCOUNT", account_code: "4100", account_name: "Sales", kind: "INCOME", total_debit: 0, total_credit: 0, natural_balance: 0 }),
+      tbRow({ ordinal: 3, row_kind: "TOTAL", total_debit: 0, total_credit: 0, balances: true }),
+    ]));
+    fakeClient((call) => (call.name === "gl_accounts" ? ok(FLAGGED_CHART) : answer(call)));
+    const body = await json(await get("/trial-balance?asOf=2026-09-10"));
+    expect(body.accounts.map((a: AnyJson) => a.account_code)).toEqual(["4100"]);
+  });
+
+  it("defaults to today in Malaysia", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-10T17:30:00Z")); // 01:30 on the 11th in Malaysia
+    try {
+      const { sb } = fakeClient(chartAnswer(ok([tbRow({ row_kind: "TOTAL", total_debit: 0, total_credit: 0, balances: true })])));
+      await get("/trial-balance");
+      expect(sb.rpc).toHaveBeenCalledWith("gl_trial_balance", { p_as_of: "2026-09-11", p_department_type: null, p_department_id: null });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("says the day is before the ledger started instead of showing zeros", async () => {
+    fakeClient(chartAnswer(ok([tbRow({ report_status: "BEFORE_GO_LIVE", as_of: "2026-08-01", row_kind: "NOTICE" })])));
+    const body = await json(await get("/trial-balance?asOf=2026-08-01"));
+    expect(body).toMatchObject({ status: "before_go_live", accounts: [], difference: null });
+  });
+
+  it("maps a ledger with no start date to 409", async () => {
+    fakeClient(chartAnswer(fail("55000")));
+    const res = await get("/trial-balance");
+    expect(res.status).toBe(409);
+    expect((await json(res)).code).toBe("ledger_not_started");
+  });
+
+  it("fails closed on an empty answer", async () => {
+    fakeClient(chartAnswer(ok([])));
+    expect((await get("/trial-balance")).status).toBe(500);
+  });
+
+  it("refuses a date that is not a date", async () => {
+    expect((await get("/trial-balance?asOf=10/09/2026")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /account-ledger", () => {
+  it("reads the account in pages and returns every row", async () => {
+    const page1 = Array.from({ length: 1000 }, (_, i) => ({
+      report_status: "OK", go_live_on: "2026-09-01", account_code: "1210", account_name: "Trade debtors",
+      kind: "ASSET", ordinal: i + 1, row_kind: "LINE", debit: "1.00", credit: "0", running_balance: String(i + 1),
+    }));
+    const page2 = [{ report_status: "OK", go_live_on: "2026-09-01", ordinal: 1001, row_kind: "CLOSING", running_balance: "1000.00" }];
+    const { calls } = fakeClient((call) => (ops(call, "range")[0]![1] === 0 ? ok(page1) : ok(page2)));
+    const res = await get("/account-ledger?account=1210&from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.rows).toHaveLength(1001);
+    expect(calls).toHaveLength(2);
+    expect(calls[0]!.args).toEqual({ p_account_code: "1210", p_from: "2026-09-01", p_to: "2026-09-30", p_department_type: null, p_department_id: null });
+    expect(ops(calls[1], "range")).toEqual([["range", 1000, 1999]]);
+  });
+
+  it("hands a credit account's running balance through as the database counted it", async () => {
+    // gl_account_ledger counts a LIABILITY as credit less debit, from the
+    // opening balance (everything before `from`). The route keeps that sign
+    // and the kind, which is how the Journal knows the side.
+    const row = { report_status: "OK", go_live_on: "2026-09-10", account_code: "2110", account_name: "Trade payables", kind: "LIABILITY" };
+    fakeClient(() => ok([
+      { ...row, ordinal: 1, row_kind: "OPENING", running_balance: "1000.00" },
+      { ...row, ordinal: 2, row_kind: "LINE", entry_no: "JE-T-0002", debit: "300.00", credit: "0.00", running_balance: "700.00" },
+      { ...row, ordinal: 3, row_kind: "LINE", entry_no: "JE-T-0003", debit: "0.00", credit: "50.00", running_balance: "750.00" },
+      { ...row, ordinal: 4, row_kind: "CLOSING", debit: "300.00", credit: "50.00", running_balance: "750.00" },
+    ]));
+    const body = await json(await get("/account-ledger?account=2110&from=2026-09-12&to=2026-09-30"));
+    expect(body.kind).toBe("LIABILITY");
+    expect(body.rows.map((r: { row_kind: string; running_balance: number }) => [r.row_kind, r.running_balance]))
+      .toEqual([["OPENING", 1000], ["LINE", 700], ["LINE", 750], ["CLOSING", 750]]);
+  });
+
+  it("needs an account and both dates", async () => {
+    expect((await get("/account-ledger?account=1210&from=2026-09-01")).status).toBe(422);
+  });
+});
+
+describe("GET /health", () => {
+  it("returns the rows without the database wording", async () => {
+    fakeClient(() => ok([{
+      ordinal: 1, check_key: "go_live_on", check_label: "Go-live", status: "OK",
+      detail: "select ... from gl_config", date_value: "2026-09-01", count_value: null, amount_value: null,
+    }]));
+    const body = await json(await get("/health"));
+    expect(body.rows[0]).toMatchObject({ check_key: "go_live_on", date_value: "2026-09-01" });
+    expect(body.rows[0]).not.toHaveProperty("detail");
+  });
+
+  it("treats no rows as a failure, not a healthy ledger", async () => {
+    fakeClient(() => ok([]));
+    expect((await get("/health")).status).toBe(500);
+  });
+});
+
+// ── the self-check ───────────────────────────────────────────────────────────
+
+const SUP_A = "5a5a5a5a-0000-4000-8000-000000000001";
+const SUP_B = "5a5a5a5a-0000-4000-8000-000000000002";
+const CUST = "cccccccc-0000-4000-8000-000000000001";
+
+const controlRows = [
+  { account_code: "1210", account_name: "Trade debtors", kind: "ASSET", control_for: "CUSTOMER", is_active: true, row_kind: "ACCOUNT", total_debit: "105", total_credit: "40", natural_balance: "65", line_count: 3 },
+  { account_code: "1210", row_kind: "PARTY", party_type: "CUSTOMER", party_id: CUST, party_name: "Test Customer One", party_matches: true, total_debit: "100", total_credit: "40", natural_balance: "60", line_count: 2 },
+  { account_code: "1210", row_kind: "PARTY", party_type: "SUPPLIER", party_id: SUP_A, party_name: "Test Supplier A", party_matches: false, total_debit: "5", total_credit: "0", natural_balance: "5", line_count: 1, entry_nos: ["JE-202609-0009"] },
+  { account_code: "1240", account_name: "Other debtors", kind: "ASSET", control_for: "CUSTOMER", is_active: true, row_kind: "ACCOUNT", total_debit: "0", total_credit: "0", natural_balance: "0", line_count: 0 },
+  { account_code: "2110", account_name: "Trade creditors", kind: "LIABILITY", control_for: "SUPPLIER", is_active: true, row_kind: "ACCOUNT", total_debit: "0", total_credit: "35", natural_balance: "35", line_count: 2 },
+  { account_code: "2110", row_kind: "NO_PARTY", total_debit: "0", total_credit: "5", natural_balance: "5", line_count: 1, entry_nos: ["JE-202609-0009"] },
+  { account_code: "2110", row_kind: "PARTY", party_type: "SUPPLIER", party_id: SUP_A, party_name: "Test Supplier A", party_matches: true, total_debit: "0", total_credit: "30", natural_balance: "30", line_count: 1 },
+];
+
+function selfCheckAnswer(overrides: Partial<Record<string, Result>> = {}) {
+  return (call: Call): Result => {
+    const hit = overrides[call.name];
+    if (hit) return hit;
+    switch (call.name) {
+      case "gl_trial_balance_check":
+        return ok([{
+          checked_at: "2026-09-10T00:00:00Z", go_live_on: "2026-09-01", entry_count: 4, line_count: 8,
+          total_debit: "140", total_credit: "140", difference: "0", header_mismatch_count: 0, balanced: true,
+        }]);
+      case "gl_ledger_health":
+        return ok([{ ordinal: 1, check_key: "go_live_on", check_label: "Go-live", status: "OK", date_value: "2026-09-01" }]);
+      case "gl_control_party_balances":
+        return ok(controlRows);
+      case "gl_receivables_reconcile":
+        return ok([{
+          ar_account_code: "1210", go_live_on: "2026-09-01", comparable: true, ledger_ar_balance: "60",
+          operational_ar_balance: "60", difference: "0", unposted_invoice_count: 0, unposted_invoice_amount: "0",
+          missing_first: "internal text",
+        }]);
+      case "ap_outstanding":
+        return ok([
+          { supplier_id: SUP_A, supplier_name: "Test Supplier A", balance_owing: "30" },
+          { supplier_id: SUP_B, supplier_name: "Test Supplier B", balance_owing: "12.50" },
+        ]);
+      default:
+        return ok([]);
+    }
+  };
+}
+
+describe("GET /self-check", () => {
+  it("checks the books, every control account, receivables, payables and health", async () => {
+    const { calls } = fakeClient(selfCheckAnswer());
+    const res = await get("/self-check");
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.go_live_on).toBe("2026-09-01");
+    expect(body.books).toMatchObject({ ok: true, balanced: true, difference: 0 });
+
+    // Every control account from the chart shows — a new one with no code change.
+    expect(body.controls.ok).toBe(true);
+    expect(body.controls.accounts.map((a: AnyJson) => a.account_code)).toEqual(["1210", "1240", "2110"]);
+    const ar = body.controls.accounts[0];
+    expect(ar.findings).toEqual([
+      expect.objectContaining({ kind: "wrong_party", party_type: "SUPPLIER", entry_nos: ["JE-202609-0009"] }),
+    ]);
+    expect(ar.open_party_count).toBe(2);
+    const ap = body.controls.accounts[2];
+    expect(ap.findings).toEqual([expect.objectContaining({ kind: "no_party", total_credit: 5, entry_nos: ["JE-202609-0009"] })]);
+
+    expect(body.receivables).toMatchObject({ ok: true, comparable: true, difference: 0 });
+    expect(body.receivables).not.toHaveProperty("missing_first");
+
+    // Payables: the ledger has A at 30 and nothing for B; the bills say A 30, B 12.50.
+    expect(body.payables).toMatchObject({
+      ok: true, account_codes: ["2110"], ledger_total: 30, bills_total: 42.5, difference: -12.5, supplier_difference_count: 1,
+    });
+    expect(body.payables.suppliers).toEqual([
+      { supplier_id: SUP_B, supplier_name: "Test Supplier B", ledger_owing: 0, bills_owing: 12.5, difference: -12.5 },
+    ]);
+
+    const control = calls.find((c) => c.name === "gl_control_party_balances")!;
+    expect(ops(control, "order").map((o) => o[1])).toEqual(["account_code", "row_kind", "party_type", "party_id"]);
+    expect(ops(control, "range")).toEqual([["range", 0, 999]]);
+
+    // No rental month is waiting for its entry: the healthy answer.
+    expect(body.rentals).toEqual({ ok: true, months: [], month_count: 0, amount: 0 });
+  });
+
+  it("compares net_owing, so a supplier with an unused advance is not named (0484)", async () => {
+    // B was paid a 1,500 advance (Dr 2110) and billed 1,000 (Cr 2110): the
+    // ledger says -500. Bills alone say 1,000 owed; less the advance, -500.
+    fakeClient(selfCheckAnswer({
+      gl_control_party_balances: ok([
+        ...controlRows,
+        { account_code: "2110", row_kind: "PARTY", party_type: "SUPPLIER", party_id: SUP_B, party_name: "Test Supplier B", party_matches: true, total_debit: "1500", total_credit: "1000", natural_balance: "-500", line_count: 2 },
+      ]),
+      ap_outstanding: ok([
+        { supplier_id: SUP_A, supplier_name: "Test Supplier A", balance_owing: "30", advance_open: "0", net_owing: "30" },
+        { supplier_id: SUP_B, supplier_name: "Test Supplier B", balance_owing: "1000", advance_open: "1500", net_owing: "-500" },
+      ]),
+    }));
+    const body = await json(await get("/self-check"));
+    expect(body.payables).toMatchObject({
+      ok: true, ledger_total: -470, bills_total: -470, difference: 0, supplier_difference_count: 0,
+    });
+    expect(body.payables.suppliers).toEqual([]);
+  });
+
+  it("names every rental month collected with no ledger entry", async () => {
+    fakeClient(selfCheckAnswer({
+      gl_rental_payments_unposted: ok([
+        { billing_id: "b1", agreement_id: "a1", agreement_no: "RA-9001", seq: 3, paid_on: "2026-09-10",
+          paid_amount: "120.50", method: "card", reference: null, stripe_invoice_id: null, doc_no: "RA-9001-M03" },
+        { billing_id: "b2", agreement_id: "a1", agreement_no: "RA-9001", seq: 4, paid_on: "2026-09-11",
+          paid_amount: "120.50", method: "card", reference: null, stripe_invoice_id: null, doc_no: "RA-9001-M04" },
+      ]),
+    }));
+    const body = await json(await get("/self-check"));
+    expect(body.rentals).toMatchObject({ ok: true, month_count: 2, amount: 241 });
+    expect(body.rentals.months[0]).toEqual({
+      agreement_no: "RA-9001", seq: 3, paid_on: "2026-09-10", paid_amount: 120.5, doc_no: "RA-9001-M03",
+    });
+  });
+
+  it("says plainly when this server has no rental read yet", async () => {
+    fakeClient(selfCheckAnswer({ gl_rental_payments_unposted: fail("PGRST202") }));
+    const body = await json(await get("/self-check"));
+    expect(body.rentals).toEqual({ ok: false, message: "Rental months are not checked on this server yet." });
+    expect(body.books.ok).toBe(true);
+  });
+
+  it("marks one unreadable section as not checked, and never as zero", async () => {
+    fakeClient(selfCheckAnswer({ gl_receivables_reconcile: fail("XX000") }));
+    const res = await get("/self-check");
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.receivables).toEqual({ ok: false, message: "Customer receivables could not be checked. Try again." });
+    expect(body.books.ok).toBe(true);
+  });
+
+  it("cannot check payables when the control accounts were not read", async () => {
+    fakeClient(selfCheckAnswer({ gl_control_party_balances: fail("XX000") }));
+    const body = await json(await get("/self-check"));
+    expect(body.controls.ok).toBe(false);
+    expect(body.payables.ok).toBe(false);
+  });
+
+  it("refuses the whole page when the ledger refuses the reader", async () => {
+    fakeClient(selfCheckAnswer({ gl_ledger_health: fail("42501") }));
+    expect((await get("/self-check")).status).toBe(403);
+  });
+
+  it("refuses the whole page when the rental read refuses the reader", async () => {
+    fakeClient(selfCheckAnswer({ gl_rental_payments_unposted: fail("42501") }));
+    expect((await get("/self-check")).status).toBe(403);
+  });
+});
+
+describe("statements, passed through", () => {
+  it("profit and loss asks for the period", async () => {
+    const { sb } = fakeClient(() => ok([{ report_status: "OK", row_kind: "TOTAL", amount: 0 }]));
+    expect((await get("/profit-and-loss?from=2026-09-01&to=2026-09-30")).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_profit_and_loss", { p_from: "2026-09-01", p_to: "2026-09-30", p_department_type: null, p_department_id: null });
+  });
+
+  it("balance sheet asks for the day", async () => {
+    const { sb } = fakeClient(() => ok([{ report_status: "OK", row_kind: "TOTAL" }]));
+    expect((await get("/balance-sheet?asOf=2026-09-30")).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_balance_sheet", { p_as_of: "2026-09-30", p_department_type: null, p_department_id: null });
+  });
+
+  it("balance sheet asks for one department (0540)", async () => {
+    const { sb } = fakeClient(() => ok([{ report_status: "OK", row_kind: "TOTAL" }]));
+    const id = "11111111-1111-4111-8111-111111111111";
+    expect((await get(`/balance-sheet?asOf=2026-09-30&departmentType=DEALER&departmentId=${id}`)).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_balance_sheet", { p_as_of: "2026-09-30", p_department_type: "DEALER", p_department_id: id });
+  });
+
+  it("refuses a department id without its type", async () => {
+    fakeClient(() => ok([]));
+    expect((await get("/balance-sheet?departmentId=11111111-1111-4111-8111-111111111111")).status).toBe(422);
+  });
+
+  it("balance sheet rows reach the page whole, with whatever columns the database returns (0506, 0507)", async () => {
+    const rows = [
+      { report_status: "OK", row_kind: "ACCOUNT", account_code: "1230", amount: 100, reclassified: 100, reclassified_for: "SUPPLIER" },
+      { report_status: "OK", row_kind: "ACCOUNT", account_code: "2210", amount: 50, reclassified: 50 },
+    ];
+    fakeClient(() => ok(rows));
+    expect(await json(await get("/balance-sheet?asOf=2026-09-30"))).toEqual({ rows });
+  });
+});
+
+describe("GET and PUT /books-closed (0622)", () => {
+  const put = async (body: unknown, role = "principal") =>
+    app.fetch(new Request("http://t/api/finance/ledger/books-closed", {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+
+  it("reads the closed day from gl_config, for finance", async () => {
+    const { calls } = fakeClient(() => ok({ books_closed_through: "2026-08-31" }));
+    const res = await get("/books-closed");
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ closedThrough: "2026-08-31" });
+    expect(calls[0]).toMatchObject({ kind: "from", name: "gl_config" });
+  });
+
+  it("reads null as no month closed", async () => {
+    fakeClient(() => ok({ books_closed_through: null }));
+    expect(await json(await get("/books-closed"))).toEqual({ closedThrough: null });
+  });
+
+  it("is not for operation", async () => {
+    fakeClient(() => ok({ books_closed_through: null }));
+    expect((await get("/books-closed", "operation")).status).toBe(403);
+  });
+
+  it("sets the day as the principal, through gl_set_books_closed_through", async () => {
+    const { sb } = fakeClient(() => ok("2026-08-31"));
+    const res = await put({ closedThrough: "2026-08-31" });
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ closedThrough: "2026-08-31" });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_set_books_closed_through", { p_date: "2026-08-31" });
+  });
+
+  it("clears it with null", async () => {
+    const { sb } = fakeClient(() => ok(null));
+    expect((await put({ closedThrough: null })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_set_books_closed_through", { p_date: null });
+  });
+
+  it("refuses finance before the database is asked", async () => {
+    const { sb } = fakeClient(() => ok(null));
+    const res = await put({ closedThrough: "2026-08-31" }, "finance");
+    expect(res.status).toBe(403);
+    expect(await json(res)).toMatchObject({ code: "forbidden", message: "Only the principal may close or reopen a month." });
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a day that does not exist", async () => {
+    const { sb } = fakeClient(() => ok(null));
+    expect((await put({ closedThrough: "2026-02-31" })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("keeps the database's sentence and tag for a day that has not ended", async () => {
+    fakeClient(() => refuse("22023", "books_closed_not_ended", "Choose a day that has ended. 30 Sep 2026 has not ended yet."));
+    const res = await put({ closedThrough: "2026-09-30" });
+    expect(res.status).toBe(422);
+    expect(await json(res)).toMatchObject({ code: "books_closed_not_ended", message: "Choose a day that has ended. 30 Sep 2026 has not ended yet." });
+  });
+});
+
+// ── Daily Bank (0637, Chew 2026-10-03) ──────────────────────────────────────
+
+describe("GET /daily-bank (0637)", () => {
+  const DAY = {
+    day: "2026-10-02",
+    go_live_on: "2026-09-01",
+    accounts: [
+      {
+        account_code: "1110", name: "Cash in hand", money_kind: "CASH", is_active: true,
+        brought_forward: "500.00", received: "120.00", paid: "0.00", pending: "0.00",
+        pending_vouchers: [],
+        lines: [{ entry_no: "JE-202610-0001", source_type: "PAYMENT_RECEIVED", source_doc_no: "OR-1", description: "Deposit", party_name: "Tan Ah Kow", received: "120.00", paid: "0.00" }],
+      },
+      {
+        account_code: "1122", name: "Maybank", money_kind: "BANK", is_active: true,
+        brought_forward: "10000.00", received: "0.00", paid: "0.00", pending: "800.00",
+        pending_vouchers: [{ voucher_id: "bbbbbbbb-0000-4000-8000-000000000001", voucher_no: "PV-0007", payee_name: "Lumen Sofa Works", voucher_date: "2026-10-01", amount: "800.00" }],
+        lines: [] as AnyJson[],
+      },
+    ],
+  };
+
+  it("asks for the day it is given and passes the answer through whole", async () => {
+    const { sb } = fakeClient(() => ok(DAY));
+    const res = await get("/daily-bank?day=2026-10-02");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_daily_bank", { p_day: "2026-10-02" });
+    expect(await json(res)).toEqual(DAY);
+  });
+
+  it("admits the principal", async () => {
+    fakeClient(() => ok(DAY));
+    expect((await get("/daily-bank?day=2026-10-02", "principal")).status).toBe(200);
+  });
+
+  it("defaults to today in Malaysia", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-02T17:30:00Z")); // 01:30 on the 3rd in Malaysia
+    try {
+      const { sb } = fakeClient(() => ok(DAY));
+      await get("/daily-bank");
+      expect(sb.rpc).toHaveBeenCalledWith("fin_daily_bank", { p_day: "2026-10-03" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("refuses a day that is not a date, and a question it does not know, before any database call", async () => {
+    expect((await get("/daily-bank?day=02/10/2026")).status).toBe(422);
+    expect((await get("/daily-bank?day=2026-10-02&account=1122")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+
+  it("a day the calendar does not have is a date problem, not a crash", async () => {
+    fakeClient(() => fail("22008"));
+    const res = await get("/daily-bank?day=2026-02-30");
+    expect(res.status).toBe(422);
+    expect((await json(res)).message).toBe("Daily Bank needs a valid date.");
+  });
+
+  it("the database's own refusal stays a refusal", async () => {
+    fakeClient(() => refuse("42501", "not_internal", "Daily Bank is internal."));
+    expect((await get("/daily-bank?day=2026-10-02")).status).toBe(403);
+  });
+
+  it("a figure it cannot read refuses the whole day instead of printing part of it", async () => {
+    const broken = structuredClone(DAY);
+    broken.accounts[1]!.pending_vouchers[0]!.amount = "eight hundred";
+    fakeClient(() => ok(broken));
+    const res = await get("/daily-bank?day=2026-10-02");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("Daily Bank could not be loaded. Try again.");
+  });
+
+  it("a line with an unreadable figure refuses too", async () => {
+    const broken = structuredClone(DAY);
+    broken.accounts[0]!.lines[0]!.received = "";
+    fakeClient(() => ok(broken));
+    expect((await get("/daily-bank?day=2026-10-02")).status).toBe(500);
+  });
+
+  it("fails closed on an empty or shapeless answer", async () => {
+    fakeClient(() => ok(null));
+    expect((await get("/daily-bank?day=2026-10-02")).status).toBe(500);
+    fakeClient(() => ok({ day: "2026-10-02" }));
+    expect((await get("/daily-bank?day=2026-10-02")).status).toBe(500);
+  });
+
+  it("a database failure is a plain sentence, not the database's text", async () => {
+    fakeClient(() => fail("XX000", "relation gl_money_accounts is broken"));
+    const res = await get("/daily-bank?day=2026-10-02");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("Daily Bank could not be loaded. Try again.");
+  });
+});
+
+// ── Cash Flow (0638, Chew 2026-10-03) ───────────────────────────────────────
+
+describe("GET /cash-flow (0638)", () => {
+  const FLOW = {
+    from: "2026-09-01",
+    to: "2026-09-30",
+    go_live_on: "2026-09-01",
+    accounts: [
+      { account_code: "1121", name: "Public Bank", money_kind: "BANK", is_active: true, opening: "10000.00", receipts: "6300.00", payments: "1200.00" },
+    ],
+    rows: [
+      { side: "IN", account_code: "1210", name: "Trade receivables", kind: "ASSET", money_kind: null, amount: 6300 },
+      { side: "OUT", account_code: "2110", name: "Trade payables", kind: "LIABILITY", money_kind: null, amount: 1200 },
+    ],
+    card: { taken: 0, waiting: 0 },
+  };
+
+  it("asks for the period and passes the answer through whole", async () => {
+    const { sb } = fakeClient(() => ok(FLOW));
+    const res = await get("/cash-flow?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_cash_flow", { p_from: "2026-09-01", p_to: "2026-09-30" });
+    expect(await json(res)).toEqual(FLOW);
+  });
+
+  it("refuses a missing or backwards period before any database call", async () => {
+    expect((await get("/cash-flow?from=2026-09-01")).status).toBe(422);
+    expect((await get("/cash-flow?from=2026-09-30&to=2026-09-01")).status).toBe(422);
+    expect((await get("/cash-flow?from=01/09/2026&to=2026-09-30")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+
+  it("rows that do not add up to the accounts' money in and out refuse the whole report", async () => {
+    const broken = structuredClone(FLOW);
+    broken.rows[0]!.amount = 6299.99;
+    fakeClient(() => ok(broken));
+    const res = await get("/cash-flow?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("Cash Flow could not be loaded. Try again.");
+  });
+
+  it("fails closed on a shapeless answer, and says a database failure in plain words", async () => {
+    fakeClient(() => ok({ from: "2026-09-01" }));
+    expect((await get("/cash-flow?from=2026-09-01&to=2026-09-30")).status).toBe(500);
+    fakeClient(() => fail("XX000", "relation gl_entries is broken"));
+    const res = await get("/cash-flow?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("Cash Flow could not be loaded. Try again.");
+  });
+
+  it("the database's own refusal stays a refusal", async () => {
+    fakeClient(() => refuse("42501", "not_internal", "Cash Flow is internal."));
+    expect((await get("/cash-flow?from=2026-09-01&to=2026-09-30", "principal")).status).toBe(403);
+  });
+});
+
+// ── General Ledger (0639, Chew 2026-10-03) ──────────────────────────────────
+
+describe("GET /general-ledger (0639)", () => {
+  const glRow = (over: AnyJson) => ({
+    row_kind: "LINE", account_code: "1121", account_name: "Public Bank", kind: "ASSET",
+    entry_date: "2026-09-02", entry_no: "JE-202609-0001", source_type: "CUSTOMER_PAYMENT", source_doc_no: "OR-1",
+    narration: "Payment", memo: null, debit: 0, credit: 0, running_balance: 0, ...over,
+  });
+  const LEDGER = {
+    status: "OK", go_live_on: "2026-09-01", from: "2026-09-01", to: "2026-09-30",
+    accounts: [{
+      account_code: "1121",
+      rows: [
+        glRow({ row_kind: "OPENING", entry_date: null, entry_no: null, source_type: null, source_doc_no: null, debit: null, credit: null, running_balance: 0 }),
+        glRow({ debit: 250.5, running_balance: 250.5 }),
+        glRow({ row_kind: "CLOSING", entry_date: null, entry_no: null, source_type: null, source_doc_no: null, debit: null, credit: null, running_balance: 250.5 }),
+      ],
+    }],
+  };
+
+  it("asks for the period, every account, and passes the answer through whole", async () => {
+    const { sb } = fakeClient(() => ok(LEDGER));
+    const res = await get("/general-ledger?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_general_ledger", {
+      p_from: "2026-09-01", p_to: "2026-09-30", p_accounts: null, p_department_type: null, p_department_id: null,
+    });
+    expect(await json(res)).toEqual(LEDGER);
+  });
+
+  it("asks for the accounts named, and for one department", async () => {
+    const { sb } = fakeClient(() => ok(LEDGER));
+    const id = "11111111-1111-4111-8111-111111111111";
+    await get(`/general-ledger?from=2026-09-01&to=2026-09-30&accounts=1121,2110&departmentType=DEALER&departmentId=${id}`);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_general_ledger", {
+      p_from: "2026-09-01", p_to: "2026-09-30", p_accounts: ["1121", "2110"], p_department_type: "DEALER", p_department_id: id,
+    });
+  });
+
+  it("refuses a backwards period or an account that is not a code, before any database call", async () => {
+    expect((await get("/general-ledger?from=2026-09-30&to=2026-09-01")).status).toBe(422);
+    expect((await get("/general-ledger?from=2026-09-01&to=2026-09-30&accounts=1121;x")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+
+  it("a block whose balance does not follow its lines refuses the whole report", async () => {
+    const broken = structuredClone(LEDGER);
+    broken.accounts[0]!.rows[1]!.running_balance = 250.49;
+    fakeClient(() => ok(broken));
+    const res = await get("/general-ledger?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("The General Ledger could not be loaded. Try again.");
+  });
+
+  it("a ledger with no start date is 409, before go-live passes through", async () => {
+    fakeClient(() => fail("55000"));
+    expect((await get("/general-ledger?from=2026-09-01&to=2026-09-30")).status).toBe(409);
+    fakeClient(() => ok({ ...LEDGER, status: "BEFORE_GO_LIVE", accounts: [] }));
+    expect(await json(await get("/general-ledger?from=2026-08-01&to=2026-08-31"))).toMatchObject({ status: "BEFORE_GO_LIVE" });
+  });
+});
+
+describe("GET /stock-value (0643)", () => {
+  const VALUE = {
+    month_end: "2026-09-30", cut_at: "2026-09-30T16:00:00Z", today: "2026-10-03", provisional: true,
+    units: [
+      { id: "u1", unit_code: "U1-000-001", sku: "SOFA-3S", qty: 1, scope: "unit", status: "free", bucket: "warehouse",
+        site_name: "Carres Klang", holder_name: null, po_no: "PO-1", unit_cost: "520.00", value: "520.00" },
+      { id: "u2", unit_code: "U1-000-002", sku: "SOFA-3S", qty: 1, scope: "unit", status: "free", bucket: "showroom",
+        site_name: "PJ Showroom", holder_name: null, po_no: null, unit_cost: null, value: null },
+    ],
+    left_out: { consignment_units: 1, consignment_qty: 1 },
+  };
+
+  it("asks for the month end and passes the answer through whole", async () => {
+    const { sb } = fakeClient(() => ok(VALUE));
+    const res = await get("/stock-value?monthEnd=2026-09-30");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_stock_value", { p_month_end: "2026-09-30" });
+    expect(await json(res)).toEqual(VALUE);
+  });
+
+  it("refuses a missing day before any database call, and a value that is not quantity times cost", async () => {
+    expect((await get("/stock-value")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+    const broken = structuredClone(VALUE);
+    broken.units[0]!.value = "521.00";
+    fakeClient(() => ok(broken));
+    const res = await get("/stock-value?monthEnd=2026-09-30");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("The stock value could not be loaded. Try again.");
+  });
+});
+
+describe("GET /collection (0644)", () => {
+  const ORDERS = {
+    from: "2026-09-01", to: "2026-09-30",
+    orders: [{ id: "o1", so: 1401, placed_on: "2026-09-05", status: "proceed_order", customer_name: "LIM KUAN YANG",
+      salesperson_id: "s1", salesperson_name: "Aina", channel: "showroom", dealer_name: "PJ Showroom",
+      order_value: "2000.00", deposit: "1000.00", balance_paid: "0.00", invoice_no: null, billed: null, issued_at: null, delivered: false }],
+  };
+
+  it("asks for the period and passes the answer through whole", async () => {
+    const { sb } = fakeClient(() => ok(ORDERS));
+    const res = await get("/collection?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_collection", { p_from: "2026-09-01", p_to: "2026-09-30" });
+    expect(await json(res)).toEqual(ORDERS);
+  });
+
+  it("refuses a backwards period before any database call, and a figure it cannot read", async () => {
+    expect((await get("/collection?from=2026-09-30&to=2026-09-01")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+    fakeClient(() => ok({ ...ORDERS, orders: [{ ...ORDERS.orders[0], deposit: "lots" }] }));
+    const res = await get("/collection?from=2026-09-01&to=2026-09-30");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("The Collection report could not be loaded. Try again.");
+  });
+});
+
+describe("GET and PUT /forecast (0646)", () => {
+  const ACCOUNTS = [
+    { code: "4100", name: "Furniture sales", kind: "INCOME", active: true, block: "income" },
+    { code: "5100", name: "Cost of goods sold", kind: "EXPENSE", active: true, block: "cost" },
+    { code: "6200", name: "Rent and utilities", kind: "EXPENSE", active: true, block: "expense" },
+  ];
+  const PLAN = {
+    month: "2026-10", accounts: ACCOUNTS,
+    lines: { "4100": { amount: 100000 }, "5100": { share: 5500 } },
+    updated_at: "2026-10-03T08:15:00.123456+00:00", updated_by_name: "Chew",
+    previous: { month: "2026-09", lines: { "6200": { amount: 8000 } } },
+    planned_months: ["2026-09", "2026-10"],
+  };
+  const put = async (month: string, body: unknown, role = "finance") =>
+    app.fetch(new Request(`http://t/api/finance/ledger/forecast/${month}`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+
+  it("asks for the month and passes the plan through whole", async () => {
+    const { sb } = fakeClient(() => ok(PLAN));
+    const res = await get("/forecast?month=2026-10");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_forecast_read", { p_month: "2026-10" });
+    expect(await json(res)).toEqual(PLAN);
+  });
+
+  it("refuses a month that is not one before any database call, and a plan it cannot read", async () => {
+    expect((await get("/forecast?month=2026-13")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+    fakeClient(() => ok({ ...PLAN, lines: { "4100": { share: 100 } } }));
+    const res = await get("/forecast?month=2026-10");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("The forecast could not be loaded. Try again.");
+    fakeClient(() => ok({ ...PLAN, month: "2026-09" }));
+    expect((await get("/forecast?month=2026-10")).status).toBe(500);
+  });
+
+  it("saves the whole month with the time the page read, and answers the new time", async () => {
+    const { sb } = fakeClient(() => ok("2026-10-03T09:00:00.5+00:00"));
+    const res = await put("2026-10", { lines: { "4100": { amount: 0.1 + 0.2 }, "5100": { share: 5500 } }, was: PLAN.updated_at });
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ month: "2026-10", saved_at: "2026-10-03T09:00:00.5+00:00" });
+    expect(sb.rpc).toHaveBeenCalledWith("fin_forecast_save", {
+      p_month: "2026-10", p_lines: { "4100": { amount: 0.3 }, "5100": { share: 5500 } }, p_was: PLAN.updated_at,
+    });
+  });
+
+  it("refuses a broken cell before the database, and passes the database's own refusals through", async () => {
+    const { sb } = fakeClient(() => ok(null));
+    expect((await put("2026-10", { lines: { "6200": { amount: 1.234 } }, was: null })).status).toBe(422);
+    expect((await put("2026-1", { lines: {}, was: null })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+    expect((await put("2026-10", { lines: {}, was: null }, "operation")).status).toBe(403);
+
+    fakeClient(() => ({ data: null, error: { code: "40001", details: "forecast_changed", message: "Someone else saved this month after you opened it. Open it again to see their plan." } }));
+    const stale = await put("2026-10", { lines: {}, was: null });
+    expect(stale.status).toBe(409);
+    expect(await json(stale)).toMatchObject({ code: "forecast_changed" });
+    fakeClient(() => ({ data: null, error: { code: "P0001", details: "income_needs_amount", message: "4100 Furniture sales: an income account is planned as an amount." } }));
+    const income = await put("2026-10", { lines: { "4100": { share: 1 } }, was: null });
+    expect(income.status).toBe(422);
+    expect(await json(income)).toMatchObject({ code: "income_needs_amount", message: "4100 Furniture sales: an income account is planned as an amount." });
+    fakeClient(() => fail("XX000"));
+    expect((await json(await put("2026-10", { lines: {}, was: null }))).message).toBe("The forecast could not be saved. Try again.");
+  });
+});

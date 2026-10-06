@@ -59,12 +59,18 @@ export type DoTemplateData = {
   /** Proof-of-delivery already captured digitally (orders.pod_*): the
    *  customer box prints the signature image when present. */
   pod?: { signature_url?: string | null; signed_at?: string | null };
+  /** 0362 (owner ruling 2026-08-19) — printed when the document was issued
+   *  under an APPROVED Delivery Payment Approval and money is still owed:
+   *  `COLLECT RM {amount} BY ONLINE TRANSFER BEFORE UNLOADING — NO CASH.`
+   *  The ONE ruled exception to "a delivery doc never talks money". */
+  cod_instruction?: string | null;
 };
 
 export type ReceiptTemplateData = {
   receipt_no: string;
   issue_date: string; // paid_on (yyyy-mm-dd)
-  order_code: string; // SO-123
+  /** SO-123. Null for a receipt that belongs to no order (an other receipt, RV). */
+  order_code: string | null;
   customer: { name: string };
   amount: number;
   method: string; // cash / bank / card / cheque / online / other
@@ -72,6 +78,50 @@ export type ReceiptTemplateData = {
   reference: string | null;
   note: string | null;
   currency: string;
+  /** §4 — the invoice number(s) this payment settles (live allocations). */
+  invoice_nos?: string[];
+  /** §4: "Voided Payment keeps a visible VOIDED receipt." The receipt is not
+   *  withdrawn when a payment is voided — it is reprinted saying so. */
+  voided?: boolean;
+  void_reason?: string | null;
+  /** Right-hand signature caption; defaults to "Customer signature". */
+  payer_sign_label?: string;
+};
+
+/** Other debtor invoice (ARI, migration 0478) — e.g. office rent billed to a
+ *  sister company. Only an issued or cancelled invoice prints: a draft has no
+ *  number yet. */
+export type OtherDebtorInvoiceTemplateData = {
+  invoice_no: string;
+  issue_date: string;
+  due_date: string | null;
+  reference: string | null;
+  narration: string | null;
+  party: { name: string; address: string | null; phone: string | null; registration_no: string | null };
+  lines: Array<{ description: string; amount: number }>;
+  total: number;
+  currency: string;
+  cancelled: boolean;
+  cancel_reason: string | null;
+  issued_by: string | null;
+};
+
+/** Payment voucher (PV, 0477/0529) — printed for Finance's file, signed by
+ *  the three people who prepared, checked and approved it. */
+export type PaymentVoucherTemplateData = {
+  voucher_no: string;
+  voucher_date: string;
+  payee: string;
+  supplier: string | null;
+  pay_from: string;
+  pay_method: string;
+  reference: string | null;
+  narration: string | null;
+  lines: Array<{ description: string; amount: number }>;
+  total: number;
+  cancelled: boolean;
+  cancel_reason: string | null;
+  signatures: Array<{ label: string; name: string | null; at: string | null }>;
 };
 
 /** Storage delivery-EXTENSION agreement (migration 0196; the two Delivery-
@@ -124,6 +174,9 @@ export type InvoiceTemplateData = {
   tax_amount: number;
   total: number;
   currency: string;
+  /** Goods money (deposit + payments) received before this invoice was
+   *  issued. Above 0, the totals card adds that line and the balance due. */
+  received_before?: number;
   /** Audit name for the footer's left cell (owner 2026-08-09) — who at
    *  Carres issued this invoice. Falls back to the invoice number. */
   issued_by?: string | null;
@@ -144,30 +197,136 @@ export type InvoiceTemplateData = {
 };
 
 export type PoTemplateData = {
+  /** Local review only; no PO number, version or unit identities exist yet. */
+  draft?: boolean;
   // Money-free payload of `purchasing_po_document` (migration 0307) — the
   // supplier-facing PO carries no RM figure (docs/pdf/PO-PDF-STANDARD.md §2).
   po_number: string;
   po_id: string;
+  /**
+   * 0378 — which version of this document the factory is being handed. It
+   * PRINTS, including Version 1: a supplier holding two papers with one number
+   * and no version cannot tell which one to build from, and "an unrevised PO is
+   * just the PO" is a rule for the internal panel, not for paper that leaves
+   * the building. The confirmation hands this same number back, so what Carres
+   * records is by construction what the operator rendered.
+   */
+  version: number;
   issue_date: string;
   supplier: { name: string; address: string | null; contact: string | null };
   destination: { name: string; address: string };
   delivery_instructions: string | null;
   eta_date: string | null;
-  /** PO-level sales-order refs (route-added beside the RPC payload). */
+  /** The `{n}` of `PO {n}-Day Delivery Date` — supplier working days from the
+   *  PO Date to `eta_date`, from the shared engine (`poDeliveryWorkingDays`).
+   *  Absent on a kept version / draft → the plain `PO Delivery Date` label. */
+  delivery_working_days?: number | null;
+  /** `Delivery Method` — collection supplier → `we_collect`. Absent → no row. */
+  delivery_method?: "we_collect" | "supplier_delivers" | null;
+  /** PO-level sales-order refs, from the document authority (0383). */
   so_refs?: number[] | null;
-  /** Audit name for the footer; null until the portal records an issuer. */
+  /**
+   * Who at Carres issued this purchase order — `audit_log`'s own actor, read by
+   * `purchasing_po_document` (0383). It was hard-coded `null` in the route
+   * until then, so the footer named nobody.
+   */
   issued_by?: string | null;
   lines: Array<{
     sku: string;
     description: string;
     qty: number;
     unit: string;
+    /** Effective governed destination for this goods line. Older document
+     * payloads may omit it, in which case the PO-level destination applies. */
+    destination?: { name: string; address: string } | null;
     attrs?: Record<string, unknown> | null;
-    /** ops_stock_items.unit_code (0153) — minted at PO-open; the Item ID
-     *  column the old law RESERVED is now fed by this. */
+    /** 0442 — the line's snapshotted stock identity mode. A `quantity` line
+     *  legitimately prints `—` in the UNIT ID column. */
+    identity_mode?: "exact_unit" | "quantity" | null;
+    /** ops_stock_items.unit_code — born at official PO issue under the locked
+     *  `U1-000-001` identity (0381/0443), bound to THIS line; the UNIT ID
+     *  column is fed by this. */
     unit_codes?: string[] | null;
+    /**
+     * ⭐ WHICH CUSTOMER ORDER EACH UNIT ON THIS LINE IS FOR (`po_line_sources`,
+     * 0382).
+     *
+     * A bulk purchase order aggregates one SKU across three customers, so the
+     * `SO NO` column had nothing to print and printed blank — a supplier
+     * delivering ten mattresses could not tell Carres whose they were, and
+     * neither could Carres. One entry per source order, summing to `qty`.
+     */
+    sources?: Array<{ so: number | null; qty: number }> | null;
   }>;
   terms: string | null;
+};
+
+/**
+ * GOODS RECEIVED NOTE — the formal receiving document (owner correction
+ * 2026-09-06). Money-free like the PO and the DO: a receiving document talks
+ * quantity and identity, never price. The five quantity words are the
+ * governed set (`purchasing/MASTER.md` §5.8); `Deliver To` is where the PO
+ * instructed the supplier to deliver, `Goods arrived at` is where the goods
+ * physically arrived, `Goods received on` is the physical arrival date —
+ * three different facts, all printed.
+ */
+export type GrnTemplateData = {
+  grn_no: string;
+  /** ISO — the date THIS document was created, i.e. when the numbered GRN was
+   *  posted (`warehouse_receipts.posted_at`). Every Carres document prints its
+   *  own `{DOC} Doc Date` (owner 2026-09-23, DOCUMENT-KIT.md §4), and it is NOT
+   *  `goods_received_on`: goods can arrive on Friday and be counted into a
+   *  numbered GRN on Monday. Null while the receipt is not yet posted. */
+  grn_doc_date: string | null;
+  /** `Valid` | `Cancelled` — the document status words. */
+  status_label: string;
+  /** The linked source document — a PO, or a CO when consignment. */
+  source: { po_number: string; is_consignment: boolean };
+  supplier: { name: string };
+  supplier_do_no: string;
+  deliver_to: string;
+  goods_arrived_at: string;
+  /** ISO date — the physical arrival date, in Kuala Lumpur. */
+  goods_received_on: string | null;
+  /** 0601 — the physical arrival clock, `HH:MM` in Kuala Lumpur. Null on an
+   *  older record: the paper prints `Time not recorded`, never a guess. */
+  goods_received_time?: string | null;
+  /** 0601 — `Received by {company or staff name}` (owner ruling 2026-09-28):
+   *  the operating company at a partner-run Site, the saving Carres staff
+   *  member at a Carres site. `Not recorded` on an older GRN. */
+  received_by?: string | null;
+  lines: Array<{
+    sku: string;
+    /** Human words first (catalog variant); the caller falls back to the SKU. */
+    description: string;
+    /** The governed category word from the one shared ladder. */
+    category: string;
+    order_qty: number;
+    received_qty: number;
+    damaged_qty: number;
+    wrong_item_qty: number;
+    pending_delivery_qty: number;
+    unit_results?: Array<{ unit_code: string; outcome_label: string }>;
+  }>;
+  /** Exact-Unit outcomes, when governed Units exist — the scan record is
+   *  part of the paper. */
+  unit_results?: Array<{ unit_code: string; outcome_label: string }>;
+  /** Extra goods — recorded separately, never Inventory, never pending. */
+  extra_lines?: Array<{ sku: string; qty: number; note?: string | null }>;
+  /** Evidence references — counts, not URLs (paper carries no dead links). */
+  evidence?: { photos: number; videos: number; do_file: boolean } | null;
+  /** The duty-evidence trio — normal holder · dated cover · actual actor. */
+  duty: {
+    holder_name: string | null;
+    cover_name: string | null;
+    actor_name: string | null;
+    authority_label: string | null;
+    posted_on: string | null;
+  };
+  /** Append-only amendment marking — printed on the paper itself. */
+  amendments?: Array<{ date: string; reason: string | null; by: string | null }>;
+  /** Cancellation marking — the record survives, plainly marked. */
+  cancelled?: { date: string | null; reason: string | null; by: string | null } | null;
 };
 
 export type SalesOrderTemplateData = {
@@ -291,9 +450,39 @@ export type SalesOrderTemplateData = {
    *  a figure arrives. */
   expected_deposit?: number | null;
 
+  /** Footer audit cell — the `audit_log` actor who CREATED the order, the
+   *  same source the PO reads (0383). NOT the salesperson: that row answers
+   *  "who does the customer call". Absent → the footer prints `Not recorded`. */
+  issued_by?: string | null;
+
   signed: boolean;
   /** 2026-05-22 (Loo) — signed URL to the customer's eSign PNG captured at
    *  checkout. The template renders this inline as the customer signature.
    *  Null when the order has no signature on file. */
   signature_url?: string | null;
+
+  /* ─── A REBUILT SHEET SAYS SO, ON THE PAPER — owner ruling 2026-09-23 ───
+   *
+   * Both fields are OPTIONAL and both default to the behaviour that shipped
+   * before them, so the CURRENT document's bytes do not move. Only the
+   * historical-version path sets either one.
+   *
+   * The page already carried these two statements; a PDF is a separate
+   * artefact that is printed, downloaded and handed to a customer, so a
+   * statement that lives only on screen is not made at all by the time it
+   * matters. The owner approved the exact wording. */
+
+  /** Printed verbatim when this sheet was REBUILT from a version's saved facts
+   *  rather than being the file issued at the time. The owner-approved
+   *  sentence is `Reconstructed copy — original issued document unavailable.`
+   *  Absent/null on the current document and on every stored original. */
+  rebuilt_notice?: string | null;
+
+  /** The order HAS a customer signature, but nothing records which version it
+   *  was given on, so it may not be reproduced here — and this version may not
+   *  be called unsigned either (owner ruling 2026-09-23: unknown is not
+   *  unsigned). The signing box prints the owner-approved
+   *  `Signature version not recorded.` INSTEAD of standing empty, because an
+   *  empty box is what an unsigned document prints. */
+  signature_unknown?: boolean;
 };

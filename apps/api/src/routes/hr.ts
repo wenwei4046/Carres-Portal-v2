@@ -15,6 +15,7 @@ import {
 import { requireHr } from "../lib/auth-guards";
 import { loadCommissionMonth } from "../lib/commission-month";
 import { userClient } from "../lib/supabase";
+import { todayIsoMYT } from "../lib/today";
 import type { AppEnv } from "../types";
 
 /**
@@ -81,7 +82,7 @@ hrRouter.post("/config/bd-rate", requireHr, async (c) => {
     {
       user_id: userId,
       pct,
-      effective_from: effectiveFrom ?? new Date().toISOString().slice(0, 10),
+      effective_from: effectiveFrom ?? todayIsoMYT(),
       updated_by: c.var.auth.id,
     },
     { onConflict: "user_id,effective_from" },
@@ -194,7 +195,7 @@ hrRouter.post("/config/staff-rate", requireHr, async (c) => {
     {
       salesperson_id: salespersonId,
       pct,
-      effective_from: effectiveFrom ?? new Date().toISOString().slice(0, 10),
+      effective_from: effectiveFrom ?? todayIsoMYT(),
       updated_by: c.var.auth.id,
     },
     { onConflict: "salesperson_id,effective_from" },

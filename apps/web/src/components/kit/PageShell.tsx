@@ -180,7 +180,7 @@ export default function PageShell(props: PageShellProps) {
                   type="button"
                   onClick={c.onClear}
                   data-kit="page-chip"
-                  className="inline-flex items-center gap-1 rounded-pill border border-kit-slate-5 bg-white py-0.5 pl-2 pr-1 text-label text-kit-slate-11 hover:border-kit-slate-6"
+                  className="inline-flex items-center gap-1 rounded-full border border-kit-slate-5 bg-white py-0.5 pl-2 pr-1 text-label text-kit-slate-11 hover:border-kit-slate-6"
                 >
                   {c.label}
                   <Icon name="close" size={14} />

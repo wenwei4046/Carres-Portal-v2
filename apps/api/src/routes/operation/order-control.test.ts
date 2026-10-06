@@ -1,12 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -19,17 +12,9 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("u1")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("u1", { email: `${role}@x`, app_metadata: { role } });
 }
 
 /** Chainable supabase query-builder mock — both the GET (select→eq→maybeSingle)
@@ -46,17 +31,8 @@ function makeSb(result: { data: unknown; error: unknown }) {
   return { from: vi.fn(() => builder), builder };
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -292,7 +268,13 @@ describe("PUT /api/operation/orders/:id/control", () => {
    removal takes working tests with it. */
 /** Per-table mock: routes each `.from(table)` to its own result, is thenable so
  *  `await select().eq()` resolves, and captures insert/upsert rows. */
-function tableSb(tables: Record<string, { data?: unknown; error?: unknown }>) {
+function tableSb(
+  tables: Record<string, { data?: unknown; error?: unknown }>,
+  // 0366 — governed doors return through `rpc`, so a test that exercises one
+  // says what the door answered. Absent, every door answers `null`, which is
+  // what "nothing was bound / nothing matched" looks like on the wire.
+  rpcResults: Record<string, { data?: unknown; error?: unknown }> = {},
+) {
   const captured: {
     inserts: { table: string; rows: unknown }[];
     upserts: { table: string; rows: unknown }[];
@@ -329,7 +311,8 @@ function tableSb(tables: Record<string, { data?: unknown; error?: unknown }>) {
   const rpcCalls: { name: string; args: Record<string, unknown> }[] = [];
   const rpc = vi.fn((name: string, args: Record<string, unknown>) => {
     rpcCalls.push({ name, args });
-    return Promise.resolve({ data: null, error: null });
+    const r = rpcResults[name] ?? {};
+    return Promise.resolve({ data: r.data ?? null, error: r.error ?? null });
   });
   return { from, rpc, captured, rpcCalls };
 }
@@ -379,7 +362,7 @@ describe("POST /api/operation/orders/:id/loan-sofa", () => {
     expect(res.status).toBe(422);
   });
 
-  it("200 — claims the free unit (LOAN marker) + records the loan", async () => {
+  it("200 — claims the free unit through the binding door + records the loan", async () => {
     const sb = tableSb({
       orders: { data: { id: ORDER_ID, so: 1146 } },
       ops_stock_items: { data: { id: ITEM, sku: "Sofa L 3-Seater", condition: "exhibition" } },
@@ -395,7 +378,7 @@ describe("POST /api/operation/orders/:id/loan-sofa", () => {
           notes: null,
         },
       },
-    });
+    }, { ops_stock_bind_units: { data: [ITEM] } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
     const jwt = await makeJwt("operation");
@@ -411,16 +394,23 @@ describe("POST /api/operation/orders/:id/loan-sofa", () => {
     const body = (await res.json()) as { loan: { status: string; item_sku: string } };
     expect(body.loan.status).toBe("on_loan");
     expect(body.loan.item_sku).toBe("Sofa L 3-Seater");
-    // The unit was claimed with a LOAN reserved_ref marker.
-    const claim = sb.captured.updates.find((u) => u.table === "ops_stock_items");
-    expect((claim!.patch as Record<string, unknown>).reserved_ref).toBe("LOAN SO-1146");
+    // 0366 — the unit was bound through THE governed door, with the LOAN
+    // marker as its reference. A raw `.update()` on the register would be
+    // refused by RLS in production, so this is not a style assertion.
+    const bind = sb.rpcCalls.find((r) => r.name === "ops_stock_bind_units");
+    expect(bind).toBeDefined();
+    expect(bind!.args.p_item_ids).toEqual([ITEM]);
+    expect(bind!.args.p_ref).toBe("LOAN SO-1146");
+    expect(sb.captured.updates.find((u) => u.table === "ops_stock_items")).toBeUndefined();
   });
 
   it("409 when the sofa is no longer free", async () => {
+    // 0366 — the door binds only free, uncontrolled, single units and returns
+    // an empty array when someone else got there first.
     const sb = tableSb({
       orders: { data: { id: ORDER_ID, so: 1146 } },
-      ops_stock_items: { data: null }, // the conditional update matched nothing
-    });
+      ops_stock_items: { data: null },
+    }, { ops_stock_bind_units: { data: [] } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
     const jwt = await makeJwt("operation");
@@ -501,3 +491,96 @@ describe("POST /api/operation/orders/:id/loan-return", () => {
     expect(res.status).toBe(409);
   });
 });
+
+describe("POST /:id/delivery-attempt — a Journey leg records its own result (0491)", () => {
+  const ORDER = "00000000-0000-0000-0000-00000000020a";
+  it("passes the leg to the governed door, and admits an intermediate leg's arrival", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { attempt: { leg: 1 } }, error: null });
+    vi.mocked(userClient).mockReturnValue({ ...makeSb({ data: null, error: null }), rpc } as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER}/delivery-attempt`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ result: "delivered", leg: 1, note: "Reached JB" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("delivery_attempt_record", expect.objectContaining({ p_order_id: ORDER, p_result: "delivered", p_leg: 1, p_reason_key: null, p_where_goods: null }));
+  });
+
+  it("a whole-order `delivered` is refused before any call — the delivery door owns it", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue({ ...makeSb({ data: null, error: null }), rpc } as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER}/delivery-attempt`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ result: "delivered" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("the loan offer record (0492, Delivery MASTER §14.2)", () => {
+  const ORDER = "00000000-0000-0000-0000-00000000020a";
+  it("records the offer through the one Orders door", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { event: "offered" }, error: null });
+    vi.mocked(userClient).mockReturnValue({ ...makeSb({ data: null, error: null }), rpc } as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER}/loan-offers`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ event: "offered", label: "Display sofa · HK55-3S", reason: "Supplier date misses the customer commitment" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("sales_order_loan_offer_record", {
+      p_order_id: ORDER, p_event: "offered", p_item_id: null, p_label: "Display sofa · HK55-3S", p_reason: "Supplier date misses the customer commitment",
+    });
+  });
+
+  it("a decline without its reason is refused before any call", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue({ ...makeSb({ data: null, error: null }), rpc } as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER}/loan-offers`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ event: "declined" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("reads the history newest first with the offered Unit's ID", async () => {
+    const sb = makeSb({ data: null, error: null });
+    const order = vi.fn().mockResolvedValue({
+      data: [
+        { id: "o2", seq: 2, order_id: ORDER, event: "accepted", item_id: "u1", label: "Display sofa", reason: null, recorded_by: null, recorded_at: "2026-09-13T01:00:00Z", ops_stock_items: { unit_code: "U1-000-082", identity_scope: "unit" } },
+      ],
+      error: null,
+    });
+    sb.builder.order = order;
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER}/loan-offers`, { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { offers: Array<{ event: string; unit_id: string | null }> };
+    expect(body.offers[0]).toMatchObject({ event: "accepted", unit_id: "U1-000-082" });
+  });
+});
+

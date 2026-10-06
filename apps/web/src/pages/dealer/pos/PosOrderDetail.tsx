@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import {
   PROCEED_BLOCKER_LABEL,
+  SERVER_EXCLUSIVE_ADDON_KEYS,
   isProceedBlockerCode,
   maxLeadDaysFor,
   minDeliveryDateISO,
@@ -35,7 +36,7 @@ import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { addonSubtotal, floorSurcharge, lineSubtotal } from "@/lib/order-totals";
+import { addonSubtotal, lineSubtotal } from "@/lib/order-totals";
 import {
   useAddOrderLines,
   useCancelOrderChangeRequest,
@@ -91,7 +92,13 @@ interface Props {
 }
 
 /** 0184 — delivery trip-fee addons appended by the Hono recompute (same
- *  labels DealerOrderDetail uses). */
+ *  labels DealerOrderDetail uses).
+ *
+ *  ⚠️ LABELS ONLY. This map is not the list of server-computed fees and must
+ *  never be used as one — `SERVER_EXCLUSIVE_ADDON_KEYS` is. It was used as the
+ *  pencil's gate until 2026-09-01, which is how `STAIR_CARRY` kept an edit door
+ *  the office screen had already closed. A stair-carry row needs no label here
+ *  because the catalog carries its name (`Stair carry`, seeded by 0393). */
 const DELIVERY_ADDON_LABELS: Record<string, string> = {
   DELIVERY: "Delivery fee",
   DELIVERY_CROSS: "Cross-category delivery",
@@ -135,8 +142,8 @@ function errCode(e: unknown): string | null {
 function saveErrorCopy(e: unknown): string {
   const code = errCode(e);
   if (code === "proceed_locked_fields")
-    return "Dates are locked after Proceed — move the order back to Order placed to edit them.";
-  if (code === "wrong_status") return "Order can no longer be edited — refresh and retry.";
+    return "Dates are locked after Proceed. Move the order back to Order placed to edit them.";
+  if (code === "wrong_status") return "Order can no longer be edited. Refresh and retry.";
   if (code === "no_changes") return "No fields changed.";
   return e instanceof Error ? e.message : "Request failed.";
 }
@@ -155,19 +162,19 @@ function addErrorCopy(e: unknown): string {
   if (code === "wrong_status")
     return "Products can only be added while the order is in Order placed.";
   if (code === "unknown_or_inactive_sku")
-    return "This product is no longer available — refresh and retry.";
+    return "This product is no longer available. Refresh and retry.";
   if (code === "pwp_voucher_add_not_supported")
-    return "Voucher codes can't be redeemed on an added line — place a new order to use the voucher.";
+    return "Voucher codes can't be redeemed on an added line. Place a new order to use the voucher.";
   if (code === "pending_exists")
-    return "A product change is already pending on this order — cancel it first.";
+    return "A product change is already pending on this order. Cancel it first.";
   if (code === "use_direct_add")
-    return "This order can still take products directly — use Add product instead.";
+    return "This order can still take products directly. Use Add product instead.";
   if (code && code.startsWith("pwp_"))
-    return "This promo price isn't eligible on this order — reconfigure and retry.";
+    return "This promo price isn't eligible on this order. Reconfigure and retry.";
   if (code === "sofa_price_drift")
-    return "The sofa price changed since this screen loaded — rebuild and retry.";
+    return "The sofa price changed since this screen loaded. Rebuild and retry.";
   if (code === "special_price_drift" || code === "options_price_drift")
-    return "Prices changed since this screen loaded — reopen the product and reconfigure.";
+    return "Prices changed since this screen loaded. Reopen the product and reconfigure.";
   return e instanceof Error ? e.message : "Could not add the product.";
 }
 
@@ -178,37 +185,37 @@ function replaceErrorCopy(e: unknown): string {
   if (code === "downsell_blocked")
     return e instanceof Error && e.message
       ? e.message
-      : "The new configuration is below the original price — edits can only upgrade the order.";
+      : "The new configuration is below the original price. Edits can only upgrade the order.";
   if (code === "wrong_status")
     return "Products can only be edited while the order is in Order placed.";
   if (code === "line_not_editable") return "Free, promo and bundle items can't be edited.";
   if (code === "promo_entitlement_broken")
     return (
-      "This item backs a promo or printed voucher on this order — the new configuration " +
+      "This item backs a promo or printed voucher on this order. The new configuration " +
       "would no longer qualify for it. Cancel the promo with HQ first."
     );
   if (code === "line_not_found")
-    return "The item is no longer on this order — refresh and retry.";
+    return "The item is no longer on this order. Refresh and retry.";
   if (code === "partial_sofa_group")
-    return "This sofa must be edited as a whole build — refresh and retry.";
+    return "This sofa must be edited as a whole build. Refresh and retry.";
   if (code === "mixed_category_lines")
     return "Sofa can't mix with mattress / bed frame in one order.";
   if (code === "unknown_or_inactive_sku")
-    return "This product is no longer available — refresh and retry.";
+    return "This product is no longer available. Refresh and retry.";
   if (code === "sofa_price_drift")
-    return "The sofa price changed since this screen loaded — rebuild and retry.";
+    return "The sofa price changed since this screen loaded. Rebuild and retry.";
   if (code === "special_price_drift" || code === "options_price_drift")
-    return "Prices changed since this screen loaded — reopen the product and reconfigure.";
+    return "Prices changed since this screen loaded. Reopen the product and reconfigure.";
   return e instanceof Error ? e.message : "Could not update the product.";
 }
 
 function unproceedErrorCopy(e: unknown): string {
   const code = errCode(e);
   if (code === "wrong_stage")
-    return "HQ operation has already started on this order — it can't be moved back.";
+    return "HQ operation has already started on this order. It can't be moved back.";
   if (code === "proceed_date_passed")
-    return "The proceed date has passed — this order can't be moved back.";
-  if (code === "wrong_status") return "Order is no longer in Proceed — refresh and retry.";
+    return "The proceed date has passed. This order can't be moved back.";
+  if (code === "wrong_status") return "Order is no longer in Proceed. Refresh and retry.";
   return e instanceof Error ? e.message : "Request failed.";
 }
 
@@ -557,7 +564,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
     if (newTotal < target.oldTotal) {
       setAddErr(
         `The new configuration totals RM ${rm(newTotal)}, below the original ` +
-          `RM ${rm(target.oldTotal)} — edits can only upgrade the order.`,
+          `RM ${rm(target.oldTotal)}. Edits can only upgrade the order.`,
       );
       return;
     }
@@ -689,11 +696,25 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
     };
   }, [onClose, nestedSurfaceOpen]);
 
-  // ── totals (order-totals — line + addon + stair carry) ───────────────────
+  /* ── totals (order-totals — lines + addons) ───────────────────────────────
+     ⛔ THE STAIR FEE IS ALREADY IN `addonSub`, AND ADDING IT AGAIN CHARGED IT
+     TWICE (YH, 2026-09-02 — live money on the collection screen).
+     `addonSubtotal` sums EVERY `order.addons` row, and `0393` stamps the
+     `STAIR_CARRY` row at birth while `0394` re-stamps it whenever an input
+     moves. A saved order therefore always carries the fee as a row. This screen
+     then added `floorSurcharge(order, catalog.floorConfig)` — a LIVE
+     recomputation — on top of it.
+     WHAT THAT COST. `total` drives `outstanding`, and `outstanding` prefills
+     the record-payment amount. So the POS asked the customer for the stair
+     carry twice, and printed it twice in the items list — once as its own addon
+     row and once as a `Stair carry` line beneath.
+     The office screen already carries this exact rule and says so
+     (`SalesOrderWorkspace.tsx`: "adding it here too would count it twice").
+     That branch computes the fee live because CREATE has no persisted row to
+     read; this screen only ever shows a SAVED order, so it never needed one. */
   const lineSub = order ? lineSubtotal(order) : 0;
   const addonSub = order ? addonSubtotal(order) : 0;
-  const stair = order && catalog ? floorSurcharge(order, catalog.floorConfig) : 0;
-  const total = lineSub + addonSub + stair;
+  const total = lineSub + addonSub;
   const paid = order?.paid ?? 0;
   const outstanding = Math.max(0, total - paid);
 
@@ -959,7 +980,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
       <div className="os-detail-overlay" onClick={onClose} data-testid="pos-od-overlay">
         <aside className="os-detail" onClick={(e) => e.stopPropagation()}>
           <div className="os-detail__body">
-            <p>{orderQ.isError ? "Couldn't load this order — close and retry." : "Loading…"}</p>
+            <p>{orderQ.isError ? "Couldn't load this order. Close and retry." : "Loading…"}</p>
           </div>
         </aside>
       </div>
@@ -1012,7 +1033,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
             <div className="os-detail__title">SO-{order.so}</div>
             <div className="os-detail__sub">
               {order.customer.name || "Walk-in"} · placed {daysAgo(order.placedAt)} by{" "}
-              {staffName ?? "—"}
+              {staffName ?? ""}
             </div>
           </div>
           <button className="icon-btn" onClick={onClose} aria-label="Close" data-testid="pos-od-close">
@@ -1141,11 +1162,19 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                     ? ((a.attrs as { size: string }).size)
                     : null;
                 // 0258 — service add-ons get the pencil too (Loo: "service
-                // sku need to be editable as well"); DELIVERY* rows are
-                // server-computed and stay locked.
+                // sku need to be editable as well"); a SERVER-COMPUTED fee
+                // stays locked, because its price is worked out per order and
+                // nobody picked it.
+                //
+                // 0406 — ask the one exported list, never a local copy. The
+                // gate here read `DELIVERY_ADDON_LABELS`, a LABEL map holding
+                // the three 0184 delivery keys, so when `STAIR_CARRY` became
+                // the fourth computed fee this pencil kept offering it. The
+                // office screen closed the same door on the same day; this one
+                // was a different copy of the list and nobody edited it.
                 const editable =
                   (scope.editablePlaced || (scope.editableProceed && !pendingChange)) &&
-                  !DELIVERY_ADDON_LABELS[a.addonKey] &&
+                  !SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addonKey) &&
                   !!a.id;
                 return (
                   <div
@@ -1193,15 +1222,6 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 <span>
                   <sup>RM</sup>
                   {rm(addonSub)}
-                </span>
-              </div>
-            )}
-            {stair > 0 && (
-              <div className="os-items__total">
-                <span>Stair carry</span>
-                <span>
-                  <sup>RM</sup>
-                  {rm(stair)}
                 </span>
               </div>
             )}
@@ -1393,7 +1413,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
             </fieldset>
             {legacyFallback && !addressDirty && (
               <p className="t-tiny" style={{ color: "var(--fg-muted)", marginTop: 8 }}>
-                Saved as free text — pick State / City / Postcode to upgrade it to the
+                Saved as free text. Pick State / City / Postcode to upgrade it to the
                 structured format.
               </p>
             )}
@@ -1484,7 +1504,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                       data-testid="pos-od-collect-online"
                     >
                       <QrCode size={16} />
-                      Collect online — QR / link
+                      Collect online: QR / link
                     </button>
                   </div>
                   <div className="os-stripe__divider">or record a manual payment</div>
@@ -1878,7 +1898,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 </div>
               </div>
               <p className="t-tiny text-base-500 mb-3">
-                Quantity can only stay or increase — reductions go through HQ.
+                Quantity can only stay or increase. Reductions go through HQ.
               </p>
               {addonEditing.sizeOptions.length > 0 && (
                 <div className="flex flex-col gap-1.5 mb-3">

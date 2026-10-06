@@ -18,6 +18,7 @@
  * **Its own words are none.** `placeholder` and every option label come from the
  * caller, which gets them from COPY-STANDARD. This file spells nothing.
  */
+import type { ReactNode } from "react";
 import * as RadixSelect from "@radix-ui/react-select";
 import FieldFrame from "./FieldFrame";
 import Icon, { type IconName } from "./Icon";
@@ -43,10 +44,11 @@ export default function Select({
   onValueChange,
   placeholder = "Select",
   options,
+  toolbar = false,
 }: {
   id: string;
   label?: string;
-  hint?: string;
+  hint?: ReactNode;
   /** Present = the field is refused. The message replaces the hint. */
   error?: string;
   required?: boolean;
@@ -56,10 +58,19 @@ export default function Select({
   onValueChange: (value: string) => void;
   placeholder?: string;
   options: readonly SelectOption[];
+  /** A workspace toolbar control — 36px, 40px below 768px. */
+  toolbar?: boolean;
 }) {
   /* D0.5b.1 — null outside a dialog, which is Radix's own "use <body>", so the
    * ordinary case does not move. */
   const dialogContainer = useDialogContainer();
+  /* A value the list no longer offers (a retired choice, a legacy import) is
+   * still the record's value: it prints as itself, disabled, instead of an
+   * empty box that reads as "nothing recorded". */
+  const shown: readonly SelectOption[] =
+    value && !options.some((o) => o.value === value)
+      ? [...options, { value, label: value, disabled: true }]
+      : options;
   return (
     <FieldFrame id={id} label={label} hint={hint} error={error} required={required}>
       <RadixSelect.Root value={value} onValueChange={onValueChange} disabled={disabled}>
@@ -68,7 +79,7 @@ export default function Select({
           data-kit="select"
           aria-invalid={error ? true : undefined}
           aria-describedby={error || hint ? `${id}-msg` : undefined}
-          className={`${controlClass(Boolean(error), "single")} inline-flex items-center justify-between gap-2 text-left data-[placeholder]:text-kit-slate-9`}
+          className={`${controlClass(Boolean(error), toolbar ? "toolbar" : "single")} inline-flex items-center justify-between gap-2 text-left data-[placeholder]:text-kit-slate-9`}
         >
           <RadixSelect.Value placeholder={placeholder} />
           <RadixSelect.Icon className="text-kit-slate-9">
@@ -87,7 +98,7 @@ export default function Select({
             className={`${FLOATING_SURFACE} min-w-[var(--radix-select-trigger-width)] p-1`}
           >
             <RadixSelect.Viewport className="flex flex-col gap-0.5">
-              {options.map((o) => (
+              {shown.map((o) => (
                 <RadixSelect.Item
                   key={o.value}
                   value={o.value}

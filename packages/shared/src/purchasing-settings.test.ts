@@ -1,15 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { addWorkingDays } from "./working-days";
-import {
+import { poDeliveryDateOf,
+  arrivalFromReadyDate,
+  poDeliveryWorkingDays,
   PURCHASING_NUMBER_KEYS,
   expectedArrivalOf,
+  orderByFromDeliveryDate,
   isPurchasingCategory,
   isPurchasingNumberKey,
   lastChangeFor,
   parsePgIntArray,
   productionWorkingDaysFor,
   purchasingSetNumberInput,
+  purchasingCreateDestinationInput,
   purchasingSetProductionDaysInput,
+  purchasingUpdateDestinationInput,
   purchasingSetWorkWeekInput,
   purchasingUrgentWindowDays,
   settingValueLabel,
@@ -29,16 +33,35 @@ const SETTINGS: PurchasingSettings = {
   orderByBufferDays: 7,
   earliestSellDays: 21,
   logisticsCallWorkingDays: 1,
+  manualPurchaseMinDeliveryDays: 0,
   poDays: [1, 3, 5],
   suppliers: [
-    { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], transitDays: 1 },
-    { id: OHANA, name: "Ohana", categories: ["bedframe", "sofa"], offDays: [0], transitDays: 1 },
-    { id: NOBODY, name: "No SKUs", categories: [], offDays: null, transitDays: null },
+    { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6] },
+    { id: OHANA, name: "Ohana", categories: ["bedframe", "sofa"], offDays: [0] },
+    { id: NOBODY, name: "No SKUs", categories: [], offDays: null },
   ],
   productionDays: [
     { supplierId: NICE, category: "mattress", workingDays: 7 },
     { supplierId: OHANA, category: "bedframe", workingDays: 7 },
     { supplierId: OHANA, category: "sofa", workingDays: 14 },
+  ],
+  destinations: [
+    {
+      id: "44444444-0000-0000-0000-000000000004",
+      name: "Carres Klang",
+      address: "Lot 12, Klang",
+      isDefault: true,
+      active: true,
+      warehouseLinked: true,
+    },
+    {
+      id: "55555555-0000-0000-0000-000000000005",
+      name: "Ohana",
+      address: null,
+      isDefault: false,
+      active: true,
+      warehouseLinked: false,
+    },
   ],
   lastChanges: [
     {
@@ -91,7 +114,7 @@ describe("workWeekOffDaysFor — keyed by SUPPLIER, not by category", () => {
   });
 
   it("an unset week falls back to the portal's own working-day definition", () => {
-    // Sunday off, Mon–Sat — never a purchasing constant. A supplier with no
+    // Sunday off, Mon to Sat — never a purchasing constant. A supplier with no
     // week also has no production time, so it is already out of the plan.
     expect(workWeekOffDaysFor(SETTINGS, NOBODY)).toEqual([0]);
     expect(workWeekOffDaysFor(SETTINGS, null)).toEqual([0]);
@@ -152,8 +175,8 @@ describe("lastChangeFor — the line under each row", () => {
 
 describe("workWeekLabel", () => {
   it("states the days the factory WORKS", () => {
-    expect(workWeekLabel([0, 6])).toBe("Mon–Fri");
-    expect(workWeekLabel([0])).toBe("Mon–Sat");
+    expect(workWeekLabel([0, 6])).toBe("Mon to Fri");
+    expect(workWeekLabel([0])).toBe("Mon to Sat");
   });
   it("a non-contiguous week is listed, not faked into a range", () => {
     expect(workWeekLabel([0, 3])).toBe("Mon Tue Thu Fri Sat");
@@ -161,11 +184,50 @@ describe("workWeekLabel", () => {
 });
 
 describe("the wire refuses what the database would refuse", () => {
-  it("only the three single numbers are settable by key", () => {
+  it("accepts a future Deliver To and trims its name and address", () => {
+    expect(
+      purchasingCreateDestinationInput.parse({
+        name: "  Ohana  ",
+        address: "  Sungai Buloh  ",
+      }),
+    ).toEqual({ name: "Ohana", address: "Sungai Buloh" });
+  });
+
+  it("refuses a blank Deliver To name", () => {
+    expect(
+      purchasingCreateDestinationInput.safeParse({ name: "   ", address: null }).success,
+    ).toBe(false);
+  });
+
+  it("a destination edit carries the full governed state", () => {
+    expect(
+      purchasingUpdateDestinationInput.safeParse({
+        name: "Ohana",
+        address: null,
+        active: true,
+        isDefault: false,
+      }).success,
+    ).toBe(true);
+    expect(
+      purchasingUpdateDestinationInput.safeParse({
+        name: "Ohana",
+        address: null,
+        active: false,
+        isDefault: true,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("only the seven single numbers are settable by key (0603 Repair return target · 0606 claim reply timing)", () => {
+    /* The SAME closed list as `purchasing_set_number` in SQL (0603). */
     expect(PURCHASING_NUMBER_KEYS).toEqual([
       "order_by_buffer_days",
       "earliest_sell_days",
       "logistics_call_working_days",
+      "manual_purchase_min_delivery_days",
+      "repair_return_working_days",
+      "claim_reply_waiting_days",
+      "claim_escalation_extra_days",
     ]);
     expect(isPurchasingNumberKey("production_days")).toBe(false);
     expect(purchasingSetNumberInput.safeParse({ key: "po_days", value: 3 }).success).toBe(false);
@@ -203,8 +265,8 @@ describe("the wire refuses what the database would refuse", () => {
 
 /**
  * `expectedArrivalOf` — ONE arithmetic for the expected arrival (Loo,
- * 2026-08-05, §4 Approved Evolution). It replaced two copies that disagreed:
- * the issue path added the transit leg, the register did not.
+ * 2026-08-05, §4 Approved Evolution). Since the owner removed the supplier
+ * transit leg (Jess, 2026-09-29) it is production working days only.
  *
  * Holidays are injected EMPTY here on purpose. The 2026 Selangor list is data
  * that will be corrected, and a test that moves when a gazette date is fixed
@@ -212,11 +274,71 @@ describe("the wire refuses what the database would refuse", () => {
  */
 const NO_HOLIDAYS: ReadonlySet<string> = new Set();
 
+/**
+ * ⭐ `poDeliveryDateOf` — THE PO's OWN DELIVERY DATE (owner ruling Jess,
+ * 2026-09-22). `PO Date + n Settings working days`, and `n` is exactly the
+ * recorded production number.
+ */
+describe("poDeliveryDateOf — the Settings date the supplier's paper prints", () => {
+  it("counts the recorded production days on the FACTORY's week", () => {
+    // Ohana works Saturday (offDays [0]) on a 7-day bedframe lead: Mon 3 Aug
+    // + 7 working days is Tue 11 Aug.
+    expect(
+      poDeliveryDateOf(SETTINGS, {
+        supplierId: OHANA,
+        category: "bedframe",
+        poDateIso: "2026-08-03",
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBe("2026-08-11");
+  });
+
+  it("the label's `n` counts back to the same number it was computed from", () => {
+    /* The paper prints `PO {n}-Day Delivery Date`, and `n` is counted from the
+       two dates by `poDeliveryWorkingDays`. Computing the date from Settings
+       and counting it back must agree, or the label and the date would be two
+       arithmetics again (Law D). */
+    const date = poDeliveryDateOf(SETTINGS, {
+      supplierId: NICE,
+      category: "mattress",
+      poDateIso: "2026-08-03",
+      holidays: NO_HOLIDAYS,
+    });
+    expect(date).not.toBeNull();
+    expect(
+      poDeliveryWorkingDays(SETTINGS, {
+        supplierId: NICE,
+        poDateIso: "2026-08-03",
+        deliveryDateIso: date,
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBe(productionWorkingDaysFor(SETTINGS, NICE, "mattress"));
+  });
+
+  it("NULL IS A REAL ANSWER — no production number, no date", () => {
+    expect(
+      poDeliveryDateOf(SETTINGS, {
+        supplierId: OHANA,
+        category: "mattress",
+        poDateIso: "2026-08-03",
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBeNull();
+    expect(
+      poDeliveryDateOf(SETTINGS, {
+        supplierId: OHANA,
+        category: "bedframe",
+        poDateIso: null,
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBeNull();
+  });
+});
+
 describe("expectedArrivalOf — the ONE expected-arrival arithmetic", () => {
-  it("production on the FACTORY's week, then transit on the OFFICE week", () => {
+  it("production working days on the FACTORY's week, and no transit leg (owner 2026-09-29)", () => {
     // Ohana works Saturday (offDays [0]). Mon 3 Aug + 7 working days lands on
-    // Tue 11 Aug because Sat 8 counts and Sun 9 does not; + 1 transit day on
-    // the office week is Wed 12 Aug.
+    // Tue 11 Aug because Sat 8 counts and Sun 9 does not. Arrival is that day.
     expect(
       expectedArrivalOf(SETTINGS, {
         supplierId: OHANA,
@@ -224,13 +346,13 @@ describe("expectedArrivalOf — the ONE expected-arrival arithmetic", () => {
         fromIso: "2026-08-03",
         holidays: NO_HOLIDAYS,
       }),
-    ).toBe("2026-08-12");
+    ).toBe("2026-08-11");
   });
 
   it("a factory that does NOT work Saturday lands a day later on the same lead", () => {
-    // Nice Future is Mon–Fri (offDays [0,6]) on the same 7-day mattress lead:
-    // ready Wed 12 Aug, arriving Thu 13 Aug. Same number, different week — the
-    // reason production may never be counted on a portal-wide calendar.
+    // Nice Future is Mon to Fri (offDays [0,6]) on the same 7-day mattress lead:
+    // arriving Wed 12 Aug. Same number, different week — the reason production
+    // may never be counted on a portal-wide calendar.
     expect(
       expectedArrivalOf(SETTINGS, {
         supplierId: NICE,
@@ -238,34 +360,59 @@ describe("expectedArrivalOf — the ONE expected-arrival arithmetic", () => {
         fromIso: "2026-08-03",
         holidays: NO_HOLIDAYS,
       }),
-    ).toBe("2026-08-13");
+    ).toBe("2026-08-12");
   });
 
-  /**
-   * THE DEFECT THIS FUNCTION EXISTS FOR. The register computed
-   * `placed_at + production` and stopped, so it printed the day the factory
-   * FINISHES as the day the goods REACH us. Both live suppliers carry
-   * `transitDays = 1`, and on the 16 dateless POs that missing day moved three
-   * rows: one silent that should read `same day`, and two amber `same day` that
-   * are truly `1d late`.
-   */
-  it("THE TRANSIT LEG IS NOT OPTIONAL — production alone is the day the factory finishes", () => {
-    const production = addWorkingDays("2026-08-03", 7, { offDays: [0], holidays: NO_HOLIDAYS });
-    expect(production).toBe("2026-08-11");
+  it("is EXACTLY `poDeliveryDateOf` for the same inputs — one arithmetic, two names", () => {
+    const cases: Array<{ supplierId: string; category: string; from: string }> = [
+      { supplierId: OHANA, category: "bedframe", from: "2026-08-03" },
+      { supplierId: OHANA, category: "sofa", from: "2026-07-30" },
+      { supplierId: NICE, category: "mattress", from: "2026-08-03" },
+      { supplierId: NICE, category: "mattress", from: "2026-09-25" },
+      { supplierId: OHANA, category: "mattress", from: "2026-08-03" }, // null both
+    ];
+    for (const holidays of [NO_HOLIDAYS, new Set(["2026-08-05", "2026-10-01"])]) {
+      for (const c of cases) {
+        expect(
+          expectedArrivalOf(SETTINGS, {
+            supplierId: c.supplierId,
+            category: c.category,
+            fromIso: c.from,
+            holidays,
+          }),
+        ).toBe(
+          poDeliveryDateOf(SETTINGS, {
+            supplierId: c.supplierId,
+            category: c.category,
+            poDateIso: c.from,
+            holidays,
+          }),
+        );
+      }
+    }
+  });
+
+  it("a supplier row with no transit field at all still gets an arrival", () => {
+    // The row shape has no transit number any more. A supplier that has a
+    // production number and nothing else is fully planned.
+    const bare: Pick<PurchasingSettings, "productionDays" | "suppliers"> = {
+      suppliers: [{ id: NOBODY, name: "Bare", categories: ["sofa"], offDays: null }],
+      productionDays: [{ supplierId: NOBODY, category: "sofa", workingDays: 3 }],
+    };
+    // Default week (Sunday off): Mon 3 Aug + 3 = Thu 6 Aug.
     expect(
-      expectedArrivalOf(SETTINGS, {
-        supplierId: OHANA,
-        category: "bedframe",
+      expectedArrivalOf(bare, {
+        supplierId: NOBODY,
+        category: "sofa",
         fromIso: "2026-08-03",
         holidays: NO_HOLIDAYS,
       }),
-    ).not.toBe(production);
+    ).toBe("2026-08-06");
   });
 
-  it("transit skips the WEEKEND even for a factory that works Saturday", () => {
-    // Ohana bedframe from Thu 30 Jul is ready Fri 7 Aug. Moving the goods is
-    // arranged by US (Law 2A's office week), so the arrival is Mon 10 Aug —
-    // never Sat 8, which counting transit on Ohana's own week would give.
+  it("counts only the factory's own week — a Saturday-working factory can land on a Saturday", () => {
+    // Ohana bedframe from Thu 30 Jul: Fri 31, Sat 1, Mon 3 … Fri 7 Aug. With no
+    // transit leg the arrival is the day the factory finishes.
     expect(
       expectedArrivalOf(SETTINGS, {
         supplierId: OHANA,
@@ -273,10 +420,19 @@ describe("expectedArrivalOf — the ONE expected-arrival arithmetic", () => {
         fromIso: "2026-07-30",
         holidays: NO_HOLIDAYS,
       }),
-    ).toBe("2026-08-10");
+    ).toBe("2026-08-07");
+    // Ohana bedframe from Fri 31 Jul: Sat 1, Mon 3 … Sat 8 Aug.
+    expect(
+      expectedArrivalOf(SETTINGS, {
+        supplierId: OHANA,
+        category: "bedframe",
+        fromIso: "2026-07-31",
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBe("2026-08-08");
   });
 
-  it("NULL IS A REAL ANSWER — no production number, no transit number, no start", () => {
+  it("NULL IS A REAL ANSWER — no production number, no start", () => {
     // P1's law: a missing number never becomes a 7, and never becomes a date.
     expect(
       expectedArrivalOf(SETTINGS, {
@@ -288,7 +444,7 @@ describe("expectedArrivalOf — the ONE expected-arrival arithmetic", () => {
     ).toBeNull();
     expect(
       expectedArrivalOf(SETTINGS, {
-        supplierId: NOBODY, // transitDays null
+        supplierId: NOBODY, // no production number for any category
         category: "sofa",
         fromIso: "2026-08-03",
         holidays: NO_HOLIDAYS,
@@ -312,7 +468,112 @@ describe("expectedArrivalOf — the ONE expected-arrival arithmetic", () => {
         fromIso: "2026-08-03T09:15:00.000Z",
         holidays: NO_HOLIDAYS,
       }),
+    ).toBe("2026-08-11");
+  });
+});
+
+describe("arrivalFromReadyDate — the ready date IS the arrival (owner 2026-09-29)", () => {
+  it("returns the ready date itself, sliced to a day", () => {
+    expect(
+      arrivalFromReadyDate(SETTINGS, { supplierId: OHANA, readyDateIso: "2026-08-12" }),
     ).toBe("2026-08-12");
+    expect(
+      arrivalFromReadyDate(SETTINGS, {
+        supplierId: NOBODY,
+        readyDateIso: "2026-08-14T03:00:00.000Z",
+      }),
+    ).toBe("2026-08-14");
+  });
+
+  it("a missing or malformed ready date is still no arrival", () => {
+    expect(arrivalFromReadyDate(SETTINGS, { supplierId: OHANA, readyDateIso: null })).toBeNull();
+    expect(arrivalFromReadyDate(SETTINGS, { supplierId: OHANA, readyDateIso: "2026-08" })).toBeNull();
+  });
+});
+
+/**
+ * `orderByFromDeliveryDate` — the ONE inverse of `expectedArrivalOf`
+ * (Purchasing Card 06). Delivery Date − production on the FACTORY's own week
+ * = Order By; null is a real answer. No transit leg (owner 2026-09-29).
+ */
+describe("orderByFromDeliveryDate — the ONE Order By arithmetic (Card 06)", () => {
+  it("walks the production leg backwards on the factory's OWN week — Ohana works Saturday", () => {
+    // 30 Sep 2026 (Wed) − 14 Ohana working days (Mon to Sat) = Mon 14 Sep.
+    expect(
+      orderByFromDeliveryDate(SETTINGS, {
+        supplierId: OHANA,
+        category: "sofa",
+        deliveryDateIso: "2026-09-30",
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBe("2026-09-14");
+    // Nice Future does not work Saturday: the same delivery date and a
+    // 7-day production lands Mon 21 Sep.
+    expect(
+      orderByFromDeliveryDate(SETTINGS, {
+        supplierId: NICE,
+        category: "mattress",
+        deliveryDateIso: "2026-09-30",
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBe("2026-09-21");
+  });
+
+  it("is the exact inverse of the forward planner on its own answer", () => {
+    const orderBy = orderByFromDeliveryDate(SETTINGS, {
+      supplierId: OHANA,
+      category: "sofa",
+      deliveryDateIso: "2026-09-30",
+      holidays: NO_HOLIDAYS,
+    });
+    expect(
+      expectedArrivalOf(SETTINGS, {
+        supplierId: OHANA,
+        category: "sofa",
+        fromIso: orderBy,
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBe("2026-09-30");
+  });
+
+  it("skips an injected public holiday on the production leg", () => {
+    // 30 Sep − 7 Nice Future days with Tue 29 Sep a holiday: 28, 25, 24, 23,
+    // 22, 21, 18 → Fri 18 Sep.
+    expect(
+      orderByFromDeliveryDate(SETTINGS, {
+        supplierId: NICE,
+        category: "mattress",
+        deliveryDateIso: "2026-09-30",
+        holidays: new Set(["2026-09-29"]),
+      }),
+    ).toBe("2026-09-18");
+  });
+
+  it("NULL is a real answer — no production or no date means no Order By", () => {
+    expect(
+      orderByFromDeliveryDate(SETTINGS, {
+        supplierId: NOBODY,
+        category: "sofa",
+        deliveryDateIso: "2026-09-30",
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBeNull();
+    expect(
+      orderByFromDeliveryDate(SETTINGS, {
+        supplierId: OHANA,
+        category: "mattress", // no Ohana × mattress number exists
+        deliveryDateIso: "2026-09-30",
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBeNull();
+    expect(
+      orderByFromDeliveryDate(SETTINGS, {
+        supplierId: OHANA,
+        category: "sofa",
+        deliveryDateIso: null,
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBeNull();
   });
 });
 
@@ -330,16 +591,16 @@ describe("expectedArrivalOf — the ONE expected-arrival arithmetic", () => {
 describe("P20.4 · an audited setting value reads as business, never as SQL", () => {
   it("the two rows production actually holds stop printing `{0}`", () => {
     // `{0}` = off Sunday only → the factory works Monday to Saturday.
-    expect(settingValueLabel("supplier_work_week", "{0}")).toBe("Mon–Sat");
+    expect(settingValueLabel("supplier_work_week", "{0}")).toBe("Mon to Sat");
     // `{0,6}` = off Sunday and Saturday → Monday to Friday.
-    expect(settingValueLabel("supplier_work_week", "{0,6}")).toBe("Mon–Fri");
+    expect(settingValueLabel("supplier_work_week", "{0,6}")).toBe("Mon to Fri");
   });
 
   it("`po_days` had the identical defect waiting, and reads the same way", () => {
     // Stored the other way round from a work week — these are the days the
     // office SENDS — and it must still read as days.
     expect(settingValueLabel("po_days", "{1,3,5}")).toBe("Mon Wed Fri");
-    expect(settingValueLabel("po_days", "{1,2,3,4,5}")).toBe("Mon–Fri");
+    expect(settingValueLabel("po_days", "{1,2,3,4,5}")).toBe("Mon to Fri");
   });
 
   it("every other key stores one number and prints as itself", () => {
@@ -354,8 +615,8 @@ describe("P20.4 · an audited setting value reads as business, never as SQL", ()
     }
     // `{}` is a recorded EMPTY array, which is a different fact from nothing
     // recorded — it reads as the glyph, not as a blank.
-    expect(settingValueLabel("supplier_work_week", "{}")).toBe("Mon–Sat");
-    expect(settingValueLabel("po_days", "{}")).toBe("—");
+    expect(settingValueLabel("supplier_work_week", "{}")).toBe("Mon to Sat");
+    expect(settingValueLabel("po_days", "{}")).toBe("");
   });
 
   it("the parser survives what a text column can hold", () => {
@@ -373,7 +634,65 @@ describe("P20.4 · an audited setting value reads as business, never as SQL", ()
   it("`workWeekLabel` and `weekdayListLabel` are the same labeller", () => {
     expect(workWeekLabel([0, 6])).toBe(weekdayListLabel([1, 2, 3, 4, 5]));
     expect(workWeekLabel([0])).toBe(weekdayListLabel([1, 2, 3, 4, 5, 6]));
-    // Two working days do not collapse into a range — `Mon Tue`, never `Mon–Tue`.
+    // Two working days do not collapse into a range — `Mon Tue`, never `Mon to Tue`.
     expect(weekdayListLabel([1, 2])).toBe("Mon Tue");
+  });
+});
+
+describe("poDeliveryWorkingDays — the n of `PO {n}-Day Delivery Date` (owner 2026-09-22)", () => {
+  const settings = {
+    suppliers: [
+      { id: "nf", name: "Nice Future", categories: [], offDays: [0, 6] },
+      { id: "ohana", name: "Ohana", categories: [], offDays: [0] },
+    ],
+  } as unknown as Pick<import("./purchasing-settings").PurchasingSettings, "suppliers">;
+
+  it("Mon 21 Sep 2026 → Fri 9 Oct 2026 on a Mon to Fri supplier is 14 — the owner's example", () => {
+    expect(poDeliveryWorkingDays(settings, { supplierId: "nf", poDateIso: "2026-09-21", deliveryDateIso: "2026-10-09", holidays: new Set() })).toBe(14);
+  });
+
+  it("counts on THIS supplier's week — a Saturday-working factory gets more days in the same span", () => {
+    expect(poDeliveryWorkingDays(settings, { supplierId: "ohana", poDateIso: "2026-09-21", deliveryDateIso: "2026-10-09", holidays: new Set() })).toBe(16); // + Sat 26 Sep, Sat 3 Oct
+  });
+
+  it("skips a public holiday", () => {
+    expect(poDeliveryWorkingDays(settings, { supplierId: "nf", poDateIso: "2026-09-21", deliveryDateIso: "2026-10-09", holidays: new Set(["2026-10-01"]) })).toBe(13);
+  });
+
+  it("no date, or a date not after the PO Date, is no number — never a guess", () => {
+    expect(poDeliveryWorkingDays(settings, { supplierId: "nf", poDateIso: "2026-09-21", deliveryDateIso: null })).toBeNull();
+    expect(poDeliveryWorkingDays(settings, { supplierId: "nf", poDateIso: null, deliveryDateIso: "2026-10-09" })).toBeNull();
+    expect(poDeliveryWorkingDays(settings, { supplierId: "nf", poDateIso: "2026-10-09", deliveryDateIso: "2026-10-09" })).toBeNull();
+  });
+});
+
+describe("PO windows in Settings (0585, MASTER §5.6.1)", () => {
+  it("reads the recorded change in clock words, never the database's spelling or a dash", async () => {
+    const { poWindowsHistoryLabel, settingValueLabel } = await import("./purchasing-settings");
+    expect(poWindowsHistoryLabel("11:30:00 · 16:00:00 · on")).toBe("11:30 AM and 4:00 PM");
+    expect(poWindowsHistoryLabel("11:30:00 · 16:00:00 · off")).toBe("11:30 AM, second window off");
+    expect(poWindowsHistoryLabel("09:00:00 · - · off")).toBe("9:00 AM, second window off");
+    expect(poWindowsHistoryLabel("12:15:00 · 00:30:00 · on")).toBe("12:15 PM and 12:30 AM");
+    expect(settingValueLabel("po_windows", "11:30:00 · 16:00:00 · on")).not.toContain("-");
+  });
+
+  it("accepts two ordered times and refuses a missing or earlier second window", async () => {
+    const { purchasingSetPoWindowsInput } = await import("./purchasing-settings");
+    expect(purchasingSetPoWindowsInput.safeParse({ first: "11:30", second: "16:00", secondEnabled: true }).success).toBe(true);
+    expect(purchasingSetPoWindowsInput.safeParse({ first: "11:30", second: null, secondEnabled: false }).success).toBe(true);
+    expect(purchasingSetPoWindowsInput.safeParse({ first: "11:30", second: null, secondEnabled: true }).success).toBe(false);
+    expect(purchasingSetPoWindowsInput.safeParse({ first: "16:00", second: "11:30", secondEnabled: true }).success).toBe(false);
+    expect(purchasingSetPoWindowsInput.safeParse({ first: "25:00", second: null, secondEnabled: false }).success).toBe(false);
+  });
+});
+
+describe("a supplier's Last PO time (0585)", () => {
+  it("reads the recorded time in clock words and checks the input", async () => {
+    const { settingValueLabel, purchasingSetSupplierPoCutoffInput } = await import("./purchasing-settings");
+    expect(settingValueLabel("supplier_po_cutoff", "10:00:00")).toBe("10:00 AM");
+    const id = "11111111-0000-0000-0000-000000000001";
+    expect(purchasingSetSupplierPoCutoffInput.safeParse({ supplierId: id, cutoff: "10:00" }).success).toBe(true);
+    expect(purchasingSetSupplierPoCutoffInput.safeParse({ supplierId: id, cutoff: null }).success).toBe(true);
+    expect(purchasingSetSupplierPoCutoffInput.safeParse({ supplierId: id, cutoff: "10am" }).success).toBe(false);
   });
 });

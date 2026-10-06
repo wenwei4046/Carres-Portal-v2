@@ -29,6 +29,7 @@ vi.mock("@/lib/api", async () => {
   return { ...actual, apiFetch: vi.fn() };
 });
 import { apiFetch } from "@/lib/api";
+import { fmtDate } from "@/lib/fmt-date";
 
 const ASOF = "2026-07-27";
 
@@ -164,7 +165,9 @@ describe("OperationSuppliers · the scorecard", () => {
       screen.getByText("1 PO has not reached its promised date."),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/5 POs on file since Wed, 1 Jul 26 · 3 scored\./),
+      screen.getByText(
+        new RegExp(`5 POs on file since ${fmtDate("2026-07-01")} · 3 scored\\.`),
+      ),
     ).toBeInTheDocument();
   });
 

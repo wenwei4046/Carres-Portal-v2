@@ -1,221 +1,256 @@
-/**
- * OperationWork — SO V2 CARD 10 · My Work / Team Work.
- *
- * The page is assembly, so the tests pin what assembly can get wrong:
- *
- *  1. **Two filters, ONE set** — the same rows, scoped by owner; My Work is
- *     empty-with-a-sentence when the signed-in account is not in the pool.
- *  2. **The starting view is the §2.2 law** — a manager lands on Team Work,
- *     a non-manager on My Work; both can switch (a default, never a wall).
- *  3. **WHO + ACTION + actual working day** — the row prints the party-named
- *     line the Orders list prints, grouped under weekday+date headers.
- *  4. **The page writes nothing** — a row is a door to the order workspace.
- */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import type {
-  operationOrderListRow,
-  operationOrdersListResponse,
-  operationStockResponse,
-  DeliveryPartnersListResponse,
-} from "@/lib/queries";
-import type { OpsStaffListResponse } from "@carres/shared";
+import type { OperationWorkItem, OperationWorkResponse } from "@carres/shared";
 
-let listState: {
-  data: operationOrdersListResponse | undefined;
+const SH = "00000000-0000-4000-8000-0000000000aa";
+const YJ = "00000000-0000-4000-8000-0000000000bb";
+let workState: {
+  data: OperationWorkResponse | undefined;
   isLoading: boolean;
-  refetch: ReturnType<typeof vi.fn>;
+  isError: boolean;
 };
-let partnersState: { data: DeliveryPartnersListResponse | undefined };
-let stockState: { data: operationStockResponse | undefined };
-let staffState: { data: OpsStaffListResponse | undefined; isLoading: boolean };
-let settingsState: { data: undefined };
-let authState: { role: string; email: string | null };
+let authState = { role: "operation", email: "shasha@carres.test" };
+const refetch = vi.fn();
 
+/* The Mission and Communication read their orders through their own queries;
+   their behaviour is held by work/work-stops.test.ts and the kit tests. */
+vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () => <span data-testid="top-bar-icons" /> }));
+vi.mock("./work/WorkMission", () => ({
+  default: ({ orderId, acts }: { orderId: string; acts: Array<{ title: string; button: string }> }) => (
+    <div data-testid="work-mission-stub" data-order={orderId}>{acts.map((a) => <p key={a.title}>{`${a.title} · ${a.button}`}</p>)}</div>
+  ),
+}));
+vi.mock("./work/WorkCommunication", () => ({ default: () => <div data-testid="work-comm-stub" /> }));
+vi.mock("./work/LogisticsCard", () => ({ useLogisticsModel: () => ({ model: null }) }));
+vi.mock("./work/PoWindowPanel", () => ({ default: () => <div data-testid="po-window-panel-stub" />, usePoWindow: () => ({ window: null, loading: false, failed: false }) }));
+let indexState: import("./work/work-orders").WorkOrderIndex = { poOrders: new Map(), orderBySo: new Map(), soByOrder: new Map(), windows: [] };
+vi.mock("./work/use-work-data", () => ({ useWorkOrderIndex: () => ({ index: indexState, loading: false }) }));
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return {
     ...actual,
-    useOperationOrders: () => listState,
-    useDeliveryPartners: () => partnersState,
-    useOperationStock: () => stockState,
-    useOperationStaff: () => staffState,
-    usePurchasingSettings: () => settingsState,
+    useOperationWork: () => ({ ...workState, refetch }),
+    useOperationStaff: () => ({
+      data: {
+        staff: [
+          { user_id: SH, name: "Shasha", email: "shasha@carres.test", pooled: true, available: true, note: null, last_seen_at: null, duties: [] },
+          { user_id: YJ, name: "Yu Jun", email: "yujun@carres.test", pooled: true, available: true, note: null, last_seen_at: null, duties: [] },
+        ],
+        myDuties: [],
+      },
+      isLoading: false,
+    }),
   };
 });
-
 vi.mock("@/lib/auth", () => ({
-  useAuth: (sel: (s: { role: string; user: { email: string | null } }) => unknown) =>
-    sel({ role: authState.role, user: { email: authState.email } }),
+  useAuth: (select: (state: { role: string; user: { id: string; email: string } }) => unknown) =>
+    select({
+      role: authState.role,
+      // The one identity is the signed-in account id (HF-3); these fixtures
+      // sign in by email, so the account id follows the email.
+      user: { id: authState.email.startsWith("yujun") ? YJ : SH, email: authState.email },
+    }),
 }));
-
-const navigateSpy = vi.fn();
+const navigate = vi.fn();
 vi.mock("react-router-dom", async () => {
-  const actual =
-    await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
-  return { ...actual, useNavigate: () => navigateSpy };
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  return { ...actual, useNavigate: () => navigate };
 });
 
 import OperationWork from "./OperationWork";
 
-const TODAY = "2026-07-27"; // a Monday
-
-const OP_UID = "00000000-0000-0000-0000-0000000000aa";
-const OTHER_UID = "00000000-0000-0000-0000-0000000000bb";
-
-function makeRow(
-  partial: Partial<operationOrderListRow> & { id: string; so: number },
-): operationOrderListRow {
+function timing(actionOn: string | null, workingDaysLate = 0): OperationWorkItem["timing"] {
   return {
-    status: "proceed_order",
-    operation_stage: "ready_to_dispatch",
-    warehouse_id: null,
-    customer_name: "Kong Chai Yin",
-    customer_phone: null,
-    customer_address: null,
-    placed_at: "2026-07-01T00:00:00Z",
-    delivery_date: "2026-08-05",
-    delivery_date_tbd: false,
-    source_system: null,
-    source_ref: null,
-    ops_assigned_logistic: null,
-    order_lines: [],
-    delivery_partner_id: null,
-    request_for_delivery_at: null,
-    partner_accepted_at: null,
-    partner_rejected_at: null,
-    partner_rejected_reason: null,
-    delivery_partners: null,
-    do_number: null,
-    dispatched_at: null,
-    delivered_at: null,
-    outlet_id: null,
-    dealer_id: "d-1",
-    dealers: { name: "Carres KL" },
-    order_supplier_threads: [],
-    order_annotations: [],
-    ops_order_control: [{ assigned_staff: OP_UID } as never],
-    ...partial,
+    businessDueOn: actionOn,
+    actionOn,
+    placement: actionOn === null ? "no_working_date" : workingDaysLate > 0 ? "missed" : "on_day",
+    missedAge: {
+      state: "counted",
+      workingDays: workingDaysLate,
+      basis: { calendarKey: "module+person", from: actionOn ?? "2026-09-07", to: "2026-09-07" },
+    },
+    eligibility: "eligible",
+    noDateReason: actionOn === null ? "The owning rule has no working date" : null,
+    calendar: {
+      module: { key: "orders", source: "orders", state: "ready" },
+      actor: { key: "person:shasha", source: "people", state: "ready" },
+      holidayName: null,
+    },
   };
 }
 
-const STAFF: OpsStaffListResponse = {
-  staff: [
-    {
-      user_id: OP_UID,
-      email: "sha@carres.co",
-      name: "Shasha",
-      pooled: true,
-      available: true,
-      note: null,
-      last_seen_at: null,
-      duties: [],
+function item(overrides: Partial<OperationWorkItem> = {}): OperationWorkItem {
+  return {
+    contractVersion: 2,
+    id: "orders:order-1:ask_delivery_date",
+    module: "orders",
+    ruleKey: "ask_delivery_date",
+    ruleVersion: 1,
+    object: { kind: "sales_order", id: "order-1", label: "SO-1318" },
+    problem: "No delivery date",
+    action: "Ask customer for a delivery date",
+    recipient: "Tan Qu Qu",
+    requiredResult: "Customer Delivery exists",
+    completionPredicate: "orders.delivery_date exists",
+    completionStatement: "Customer Delivery exists",
+    owner: {
+      rule: "salesperson",
+      dutyKey: null,
+      normal: { userId: SH, name: "Shasha" },
+      activeCover: null,
+      coverEvidence: null,
+      acting: { userId: SH, name: "Shasha" },
+      state: "primary",
     },
-    {
-      user_id: OTHER_UID,
-      email: "yj@carres.co",
-      name: "Yu Jun",
-      pooled: true,
-      available: true,
-      note: null,
-      last_seen_at: null,
-      duties: [],
-    },
-  ],
-  myDuties: [],
-};
+    timing: timing("2026-09-07"),
+    communication: null,
+    blocker: null,
+    nextConsequence: null,
+    interaction: { mode: "open_module", fallbackDestination: "/operation/orders/so/order-1" },
+    destination: "/operation/orders/so/order-1",
+    observedAt: "2026-09-07T01:00:00.000Z",
+    sourceVersion: "2026-09-07T01:00:00.000Z",
+    tone: "warning",
+    locked: false,
+    broken: false,
+    ...overrides,
+  };
+}
 
-function wrap(node: React.ReactNode) {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/operation?tab=work"]}>{node}</MemoryRouter>
-    </QueryClientProvider>,
+function show(url = "/operation?tab=work") {
+  const view = render(
+    <MemoryRouter initialEntries={[url]}>
+      <OperationWork />
+    </MemoryRouter>,
   );
+  return view;
 }
 
 beforeEach(() => {
-  navigateSpy.mockReset();
-  listState = { data: { orders: [] }, isLoading: false, refetch: vi.fn() };
-  partnersState = { data: { partners: [] } };
-  stockState = { data: undefined };
-  staffState = { data: STAFF, isLoading: false };
-  settingsState = { data: undefined };
-  authState = { role: "operation", email: "sha@carres.co" };
-  vi.useFakeTimers();
-  vi.setSystemTime(new Date(`${TODAY}T09:00:00`));
-});
-afterEach(() => {
-  vi.useRealTimers();
-});
-
-describe("OperationWork — two filters over the one open work set", () => {
-  it("a non-manager lands on My Work and sees only their own items, grouped by weekday+date", () => {
-    listState.data = {
-      orders: [
-        makeRow({ id: "a", so: 1201 }), // PIC = Shasha (me)
-        makeRow({
-          id: "b",
-          so: 1202,
-          ops_order_control: [{ assigned_staff: OTHER_UID } as never],
-        }),
+  navigate.mockReset();
+  refetch.mockReset();
+  authState = { role: "operation", email: "shasha@carres.test" };
+  workState = {
+    data: {
+      contractVersion: 2,
+      complete: true,
+      items: [item()],
+      staff: [
+        { userId: SH, name: "Shasha", email: "shasha@carres.test" },
+        { userId: YJ, name: "Yu Jun", email: "yujun@carres.test" },
       ],
+      generatedOn: "2026-09-07",
+      closureReceipt: null,
+      sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((key) => ({
+        key,
+        state: "healthy" as const,
+        observedAt: "2026-09-07T01:00:00.000Z",
+        lastSuccessfulAt: "2026-09-07T01:00:00.000Z",
+        errorLabel: null,
+      })),
+    },
+    isLoading: false,
+    isError: false,
+  };
+});
+
+describe("Workspace Work page — §5.10", () => {
+  it("opens everyone, a manager included, on My Task", () => {
+    authState = { role: "principal", email: "shasha@carres.test" };
+    show();
+    expect(screen.getByTestId("work-view-mine")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("work-view-mine")).toHaveTextContent("My Task");
+    expect(screen.getByTestId("work-view-team")).toHaveTextContent("Team Work");
+  });
+
+  it("draws the rail: search, the month, Attention and Module, then one row per order with its task count", () => {
+    show();
+    const rail = screen.getByTestId("work-rail");
+    expect(within(rail).getByPlaceholderText("Search work…")).toBeInTheDocument();
+    expect(within(rail).getByTestId("work-rail-month")).toBeInTheDocument();
+    expect(rail).toHaveTextContent("Attention");
+    expect(rail).toHaveTextContent("Module");
+    expect(screen.getByTestId("work-rail-module-all")).toHaveTextContent("All modules1");
+    const row = screen.getByTestId("work-order-row-SO-1318");
+    expect(row).toHaveTextContent(/^SO-13181$/);
+    expect(row).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("work-mission-stub")).toHaveAttribute("data-order", "order-1");
+    // ONE blue in the rail (Jess 2026-09-28: "confusing like select 2"): the chosen
+    // order row only; the chosen filter `All modules` is the grey chip.
+    expect([...rail.querySelectorAll('[class*="bg-kit-blue"]')]).toEqual([row, ...row.querySelectorAll('[class*="bg-kit-blue"]')]);
+    expect(screen.getByTestId("work-rail-module-all").className).toContain("bg-kit-slate-3");
+  });
+
+  it("shows only my occurrences in My Task and everyone's in Team Work", () => {
+    workState.data!.items = [
+      item(),
+      item({ id: "orders:order-2:ask_delivery_date", object: { kind: "sales_order", id: "order-2", label: "SO-1319" }, owner: { ...item().owner, normal: { userId: YJ, name: "Yu Jun" }, acting: { userId: YJ, name: "Yu Jun" } } }),
+    ];
+    const first = show();
+    expect(screen.getAllByTestId(/^work-order-row-/)).toHaveLength(1);
+    first.unmount();
+    show("/operation?tab=work&scope=team");
+    expect(screen.getAllByTestId(/^work-order-row-/)).toHaveLength(2);
+  });
+
+  it("counts a PO window ONCE on its order and puts one Send act per unsent PO sourced from it alone", () => {
+    indexState = {
+      poOrders: new Map([["PO260903-4316", ["order-1"]], ["PO260903-7907", ["order-1"]]]),
+      orderBySo: new Map([[1318, "order-1"]]),
+      soByOrder: new Map([["order-1", 1318]]),
+      windows: [{
+        key: "2026-09-03T11:30", date: "2026-09-03", time: "11:30", timeWord: "11:30 AM", dueAt: "2026-09-03T11:30:00+08:00",
+        demand: { items: 0, orders: 0, rowIds: [], suppliers: [] },
+        pos: [
+          { poId: "PO260903-4316", documentNo: "PO260903-4316", supplierId: null, supplierName: "Ohana", sent: false, channel: null, act: null, orderIds: ["order-1"] },
+          { poId: "PO260903-7907", documentNo: "PO260903-7907", supplierId: null, supplierName: "Nice Future", sent: false, channel: null, act: null, orderIds: ["order-1"] },
+        ],
+        unsent: 2,
+        card: { objectLabel: "11:30 AM PO window", problem: "", action: "", recipient: null, requiredResult: "" },
+      }],
     };
-    wrap(<OperationWork />);
-    // My Work default: only SO-1201's items.
-    expect(screen.getByTestId("work-row-SO-1201-assign_logistics")).toBeInTheDocument();
-    expect(screen.queryByTestId("work-row-SO-1202-assign_logistics")).toBeNull();
-    // Grouped under a weekday+date header — never a bare Today.
-    // 2026-08-05 (Wed) − 3 working days on the Mon–Sat week = Sat 1 Aug.
-    expect(screen.getByTestId("work-day-2026-08-01")).toHaveTextContent("Sat 1 Aug");
+    workState.data!.items = [
+      item(),
+      item({ id: "purchasing:w:po_window", module: "purchasing", ruleKey: "purchasing.po_window", object: { kind: "po_window", id: "2026-09-03T11:30", label: "11:30 AM PO window" } }),
+    ];
+    show();
+    expect(screen.getByTestId("work-order-row-SO-1318")).toHaveTextContent(/^SO-13182$/);
+    const mission = screen.getByTestId("work-mission-stub");
+    expect(mission).toHaveTextContent("Send PO260903-4316 to Ohana · PO sent to supplier");
+    expect(mission).toHaveTextContent("Send PO260903-7907 to Nice Future · PO sent to supplier");
+    indexState = { poOrders: new Map(), orderBySo: new Map(), soByOrder: new Map(), windows: [] };
   });
 
-  it("Team Work shows everyone and the owner chip scopes — one set, filtered", () => {
-    listState.data = {
-      orders: [
-        makeRow({ id: "a", so: 1201 }),
-        makeRow({
-          id: "b",
-          so: 1202,
-          ops_order_control: [{ assigned_staff: OTHER_UID } as never],
-        }),
-      ],
-    };
-    wrap(<OperationWork />);
-    fireEvent.click(screen.getByTestId("work-view-team"));
-    expect(screen.getByTestId("work-row-SO-1201-assign_logistics")).toBeInTheDocument();
-    expect(screen.getByTestId("work-row-SO-1202-assign_logistics")).toBeInTheDocument();
-    // Scope to Yu Jun only.
-    fireEvent.click(screen.getByTestId(`work-owner-${OTHER_UID}`));
-    expect(screen.queryByTestId("work-row-SO-1201-assign_logistics")).toBeNull();
-    expect(screen.getByTestId("work-row-SO-1202-assign_logistics")).toBeInTheDocument();
-    // The row names its owner in Team view.
-    expect(screen.getByTestId("work-row-SO-1202-assign_logistics")).toHaveTextContent("Yu Jun");
+  it("reads search, the day and the module from the URL", () => {
+    show("/operation?tab=work&q=nothing-matches");
+    expect(screen.queryAllByTestId(/^work-order-row-/)).toHaveLength(0);
+    expect(screen.getByTestId("work-empty")).toBeInTheDocument();
   });
 
-  it("a manager lands on Team Work — the §2.2 starting view, not a wall", () => {
-    authState = { role: "principal", email: "boss@carres.co" };
-    listState.data = { orders: [makeRow({ id: "a", so: 1201 })] };
-    wrap(<OperationWork />);
-    expect(screen.getByTestId("work-row-SO-1201-assign_logistics")).toBeInTheDocument();
-    // And can switch to My Work (empty — not in the staff pool → the sentence).
-    fireEvent.click(screen.getByTestId("work-view-mine"));
-    expect(screen.getByTestId("work-empty")).toHaveTextContent("not in the staff list");
+  it("shows a server failure as an error rather than a clear desk", () => {
+    workState = { data: undefined, isLoading: false, isError: true };
+    show();
+    expect(screen.getByText("Work could not be loaded. Try again.")).toBeInTheDocument();
+    expect(screen.queryByText("Nothing assigned to you")).toBeNull();
   });
 
-  it("a row is a DOOR — clicking opens the order workspace, the page writes nothing", () => {
-    listState.data = { orders: [makeRow({ id: "a", so: 1201 })] };
-    wrap(<OperationWork />);
-    fireEvent.click(screen.getByTestId("work-row-SO-1201-assign_logistics"));
-    expect(navigateSpy).toHaveBeenCalledWith("/operation/orders/so/a");
+  it("shows a stable loading shell", () => {
+    workState = { data: undefined, isLoading: true, isError: false };
+    show();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading…");
   });
 
-  it("no open work → the quiet clear sentence, never an invented item", () => {
-    authState = { role: "principal", email: "boss@carres.co" };
-    listState.data = { orders: [] };
-    wrap(<OperationWork />);
-    expect(screen.getByTestId("work-empty")).toHaveTextContent("every track is clear");
+  it("offers Team Work when My Task is empty and the team has work", () => {
+    workState.data!.items = [item({ owner: { ...item().owner, normal: { userId: YJ, name: "Yu Jun" }, acting: { userId: YJ, name: "Yu Jun" } } })];
+    show();
+    expect(screen.getByTestId("work-empty")).toHaveTextContent("Nothing assigned to you");
+    fireEvent.click(screen.getByTestId("work-empty-team-door"));
+    expect(screen.getByTestId("work-view-team")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("prints no dash anywhere on the page", () => {
+    const { container } = show();
+    expect(container.textContent ?? "").not.toMatch(/[—–]/);
   });
 });

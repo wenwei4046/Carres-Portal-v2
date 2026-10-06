@@ -101,6 +101,8 @@ export const EXECUTION_FIELDS: ReadonlyMap<string, string> = new Map([
   ["orders.placed_at", "birth stamp"],
   ["orders.created_at", "bookkeeping"],
   ["orders.updated_at", "bookkeeping"],
+  ["orders.proceeded_at", "Sales → Operations handoff stamp (0396)"],
+  ["orders.sales_final_submitted_at", "Sales Portal final-submit / exact recovery stamp (0396)"],
   ["orders.entry_data", "POS wizard capture"],
   ["orders.source_system", "import provenance"],
   ["orders.source_ref", "import provenance"],

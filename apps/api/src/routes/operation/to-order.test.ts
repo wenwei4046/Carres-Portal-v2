@@ -1,21 +1,17 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
+import { documentPartitionKey } from "@carres/shared";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
+import { todayIsoMYT } from "../../lib/today";
 
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
 import { addWorkingDays, myHolidaySet } from "@carres/shared";
 import { userClient } from "../../lib/supabase";
+import { loadToOrder } from "../../lib/purchase-demand-read";
 
 /**
  * `Issue Purchase Order` is the ONE act that creates a formal purchase order,
@@ -33,23 +29,16 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("u1")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("u1", { email: `${role}@x`, app_metadata: { role } });
 }
 
 const OHANA = "11111111-1111-1111-1111-111111111111";
 const KLANG = "2f181917-f4e1-42b2-9e25-d7ee6785424a";
 const AL = "818b420c-27f9-4707-a516-b91a6e03f343";
 const WAREHOUSE = "00000000-0000-0000-0000-000000000c03";
+const CLOSED_YARD = "9c9c9c9c-0000-4000-8000-00000000000c";
 
 function sofaLine(id: string, sku: string, orderId: string, buildKey: string | null) {
   return {
@@ -80,7 +69,7 @@ const TABLES = (): Tbl => ({
     error: null,
   },
   purchasing_supplier_settings: {
-    data: [{ supplier_id: OHANA, off_days: [0], transit_days: 1 }],
+    data: [{ supplier_id: OHANA, off_days: [0] }],
     error: null,
   },
   purchasing_setting_changes: { data: [], error: null },
@@ -96,10 +85,18 @@ const TABLES = (): Tbl => ({
         delivery_date: "2026-08-22", delivery_date_tbd: false,
         placed_at: "2026-07-01", created_at: "2026-07-01",
       },
+      /* Proceeded since Card 02-C: a `place` order no longer enters the
+         engine at all, and this fixture order is ordinary live demand. */
       {
-        id: "o2", so: 1204, customer_name: "ella", status: "place",
+        id: "o2", so: 1204, customer_name: "ella", status: "proceed_order",
         delivery_date: "2026-08-11", delivery_date_tbd: false,
         placed_at: "2026-07-01", created_at: "2026-07-01",
+      },
+      /* ⭐ Card 02-C — the `place` order the boundary keeps out. */
+      {
+        id: "o9", so: 1290, customer_name: "NOT YET PROCEEDED", status: "place",
+        delivery_date: "2026-08-11", delivery_date_tbd: false,
+        placed_at: "2026-06-01", created_at: "2026-06-01",
       },
     ],
     error: null,
@@ -111,6 +108,7 @@ const TABLES = (): Tbl => ({
       sofaLine("p3", "5539-2A(RHF)", "o1", "bk-a"),
       sofaLine("p4", "5539-1A(LHF)", "o1", "bk-b"),
       sofaLine("e1", "5539-1A(LHF)", "o2", "bk-e"),
+      sofaLine("e9", "5539-1A(LHF)", "o9", "bk-z"),
       // An accessory on a live order — it must never reach To Order.
       {
         id: "x1", order_id: "o2", sku: "MEMORY-FOAM-PILLOW", qty: 4, attrs: null,
@@ -137,19 +135,23 @@ const TABLES = (): Tbl => ({
   purchase_order_lines: { data: [], error: null },
   purchasing_destinations: {
     data: [
-      { id: KLANG, name: "Carres Klang", is_default: true },
-      { id: AL, name: "AL Sungai Buloh", is_default: false },
+      { id: KLANG, name: "Carres Klang", is_default: true, active: true },
+      { id: AL, name: "AL Sungai Buloh", is_default: false, active: true },
     ],
     error: null,
   },
   warehouses: { data: [{ id: WAREHOUSE, name: "Carres Klang", kind: "own" }], error: null },
+  /* `u1` is the JWT subject every test signs with, so the caller HOLDS PO duty
+     unless a test deliberately hands it to somebody else. */
+  ops_po_duty: { data: [{ user_id: "u1" }], error: null },
+  app_users: { data: [{ id: "u1", name: "On Duty", email: "od@carres.com" }], error: null },
   purchase_orders: { data: null, error: null },
 });
 
 /** Records what every table saw, plus every rpc + update call. */
 function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
   const CHAIN = [
-    "select", "in", "or", "eq", "neq", "gt", "gte", "ilike", "not", "is", "order", "limit",
+    "select", "in", "or", "eq", "neq", "gt", "gte", "ilike", "not", "is", "order", "limit", "range",
   ];
   const updates: { table: string; patch: unknown; id: unknown }[] = [];
   /**
@@ -243,6 +245,15 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
     tables.product_skus?.data ??
     []) as { sku: string }[];
 
+  /* A configured Catalog row carries its Stock identity (0442), and a
+     configured Deliver To its address; a fixture that wants either missing
+     writes it as `null`. */
+  const withIdentity = (t: { data: unknown; error: unknown }) => ({
+    ...t,
+    data: Array.isArray(t.data)
+      ? (t.data as Record<string, unknown>[]).map((r) => ({ stock_identity_mode: "unit", ...r }))
+      : t.data,
+  });
   const from = vi.fn((table: string) => {
     tableCalls[table] = (tableCalls[table] ?? 0) + 1;
     if (table === "product_skus") {
@@ -259,13 +270,15 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
         Promise.resolve(
           existenceRead
             ? { data: fullCatalog.map((r) => ({ sku: r.sku })), error: null }
-            : (tables.product_skus ?? { data: [], error: null }),
+            : withIdentity(tables.product_skus ?? { data: [], error: null }),
         ).then(res, rej);
       return b;
     }
     if (table === "purchasing_destinations") {
       return destBuilder(
-        (tables.purchasing_destinations.data as { id: string; name: string }[]) ?? [],
+        ((tables.purchasing_destinations.data as { id: string; name: string }[]) ?? []).map(
+          (r) => ({ address: "1 Test Road", ...r }),
+        ),
       );
     }
     return builder(table, tables[table] ?? { data: [], error: null });
@@ -273,6 +286,42 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
 
   const rpc = vi.fn(async (fn: string, args: Record<string, unknown>) => {
     rpcCalls.push({ fn, args });
+    if (fn === "purchasing_actor_may_issue") {
+      if (tables.__mayIssue) return tables.__mayIssue;
+      const duty = tables.ops_po_duty?.data as { user_id?: string }[] | null;
+      const cover = tables.ops_po_duty_cover?.data as { acting_user_id?: string }[] | null;
+      const actor = cover?.[0]?.acting_user_id ?? duty?.[0]?.user_id ?? null;
+      return { data: actor === "u1", error: null };
+    }
+    /* 0379 · THE ONE ACTOR RESOLVER, answered from the same two tables the SQL
+       reads, so a test still says who holds the duty by setting `ops_po_duty`
+       and says who covers by setting `ops_po_duty_cover`. */
+    if (fn === "purchasing_po_actor") {
+      const dutyData = tables.ops_po_duty?.data as
+        | { user_id?: string }[]
+        | { user_id?: string }
+        | null;
+      const normal =
+        (Array.isArray(dutyData) ? dutyData[0]?.user_id : dutyData?.user_id) ?? null;
+      const coverData = tables.ops_po_duty_cover?.data as
+        | { acting_user_id?: string }[]
+        | null;
+      const acting = (Array.isArray(coverData) ? coverData[0]?.acting_user_id : null) ?? null;
+      return {
+        data: {
+          normal_user_id: normal,
+          acting_user_id: acting,
+          actor_user_id: acting ?? normal,
+          is_cover: acting != null,
+          month: "2026-08",
+        },
+        error: null,
+      };
+    }
+    /* 0600 · the `Use this PO` offer — none unless a test names one. */
+    if (fn === "purchasing_po_free_units") {
+      return (tables.__poFree as { data: unknown; error: unknown } | undefined) ?? { data: [], error: null };
+    }
     if (fn === "purchasing_issue_pos_batch") {
       const pos = (args.p_pos as unknown[]) ?? [];
       const ids = pos.map(() => `PO-${(poSeq += 1)}`);
@@ -285,159 +334,32 @@ function makeSb(tables: Record<string, { data: unknown; error: unknown }>) {
   return { from, rpc, updates, inserts, rpcCalls, tableCalls, filters };
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
 afterAll(() => _setJwksForTesting(null));
 
-const READ = "http://t/api/operation/purchase/to-order";
-const ISSUE = "http://t/api/operation/purchase/to-order/issue";
-
-async function get(query = "") {
-  const jwt = await makeJwt("operation");
-  return app.fetch(new Request(`${READ}${query}`, { headers: { Authorization: `Bearer ${jwt}` } }), env);
+/** The To Order projection — the recomputation the batch door and the
+ *  Purchase Demands register both read. */
+async function project(sb: ReturnType<typeof makeSb>) {
+  const res = await loadToOrder(sb as never);
+  if (!res.ok) throw new Error(`loadToOrder refused: ${JSON.stringify(res.body)}`);
+  return res.data;
 }
 
-/** The arrangement the browser would post untouched: one doc per sofa order. */
-async function defaultPlan(sb: ReturnType<typeof makeSb>) {
-  vi.mocked(userClient).mockReturnValue(sb as never);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const body = (await (await get()).json()) as any;
-  const p = body.proposals[0];
-  const perOrder = new Map<string, string[]>();
-  for (const r of p.rows) {
-    perOrder.set(
-      r.orderId,
-      r.builds.map((b: { key: string }) => b.key),
-    );
-  }
-  return [...perOrder.values()].map((buildKeys, i) => ({
-    key: `d${i + 1}`,
-    include: true,
-    buildKeys,
-  }));
-}
-
-async function post(body: unknown) {
-  const jwt = await makeJwt("operation");
-  return app.fetch(
-    new Request(ISSUE, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }),
-    env,
-  );
-}
-
-describe("GET /api/operation/purchase/to-order", () => {
-  it("401 without Authorization", async () => {
-    const res = await app.fetch(new Request(READ), env);
-    expect(res.status).toBe(401);
-  });
-
+describe("the To Order projection", () => {
   it("projects the live demand into one Ohana · Sofa proposal", async () => {
     const sb = makeSb(TABLES());
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const res = await get();
-    expect(res.status).toBe(200);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
+    const body = (await project(sb)) as any;
 
     expect(body.proposals).toHaveLength(1);
     expect(body.proposals[0].label).toBe("Ohana · Sofa");
     // PETER's one order = one row, holding TWO builds; ella's is the other.
     expect(body.proposals[0].rows).toHaveLength(2);
     expect(body.proposals[0].poCount).toBe(2);
-    expect(body.destinations.map((d: { name: string }) => d.name)).toEqual([
-      "Carres Klang",
-      "AL Sungai Buloh",
-    ]);
-  });
-
-  it("scopes only after the full server recomputation and returns an explanatory summary", async () => {
-    const t = TABLES();
-    const todayIsoStr = new Date().toISOString().slice(0, 10);
-    t.purchase_orders = {
-      data: [
-        {
-          id: "PO-1900",
-          supplier_id: OHANA,
-          placed_at: "2025-01-01T09:00:00Z",
-          so_refs: [1207],
-        },
-      ],
-      error: null,
-    };
-    t.purchase_order_lines = {
-      data: [{ po_id: "PO-1900", sku: "5539-1B(LHF)", qty: 1, received_qty: 1 }],
-      error: null,
-    };
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const res = await get("?so=1207");
-    expect(res.status).toBe(200);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-
-    expect(body.proposals.flatMap((p: any) => p.rows).every((r: any) => r.so === 1207)).toBe(true);
-    expect(body.unresolved).toEqual([]);
-    expect(body.ordered).toEqual([
-      expect.objectContaining({ poId: "PO-1900", so: 1207 }),
-    ]);
-    expect(body.scope).toMatchObject({
-      so: 1207,
-      orderFound: true,
-      alreadyIssued: 1,
-    });
-    expect(todayIsoStr).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-  });
-
-  it("returns only the three demand-local blocker kinds; pickup remains document-level", async () => {
-    const t = TABLES();
-    (t.product_skus.data as { sku: string; supplier_id: string | null; cost: number | null }[])
-      .find((row) => row.sku === "5539-CNR")!.supplier_id = null;
-    (t.product_skus.data as { sku: string; cost: number | null }[])
-      .find((row) => row.sku === "5539-1A(LHF)")!.cost = null;
-    const undated = (t.orders.data as { id: string; delivery_date: string | null; delivery_date_tbd: boolean }[])
-      .find((order) => order.id === "o2")!;
-    undated.delivery_date = null;
-    undated.delivery_date_tbd = true;
-    (t.suppliers.data as { kind: string }[])[0].kind = "factory_pickup";
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-
-    const body = (await (await get()).json()) as {
-      blockedDemand: { code: string; sku: string; so: number | null }[];
-    };
-    expect(new Set(body.blockedDemand.map((blocker) => blocker.code))).toEqual(
-      new Set(["blocked_delivery_date", "unresolved_supplier", "cost_required"]),
-    );
-    expect(body.blockedDemand).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: "unresolved_supplier", sku: "5539-CNR", so: 1207 }),
-        expect.objectContaining({ code: "blocked_delivery_date", sku: "5539-1A(LHF)", so: 1204 }),
-        expect.objectContaining({ code: "cost_required", sku: "5539-1A(LHF)", so: 1204 }),
-      ]),
-    );
-    expect(body.blockedDemand.some((blocker) => blocker.code.includes("partner"))).toBe(false);
-  });
-
-  it("rejects an invalid Sales Order scope without running the engine", async () => {
-    const res = await get("?so=not-a-number");
-    expect(res.status).toBe(400);
-    expect(userClient).not.toHaveBeenCalled();
   });
 
   /**
@@ -461,7 +383,7 @@ describe("GET /api/operation/purchase/to-order", () => {
     const sb = makeSb(t);
     vi.mocked(userClient).mockReturnValue(sb as never);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     const ella = body.proposals[0].rows.find((r: { orderId: string }) => r.orderId === "o2");
     expect(ella.qty).toBe(1); // 2 asked for, 1 already bought
     expect(ella.coveredByOpenPo).toBe(1); // …and this is why
@@ -478,7 +400,7 @@ describe("GET /api/operation/purchase/to-order", () => {
     const sb = makeSb(t);
     vi.mocked(userClient).mockReturnValue(sb as never);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     const ella = body.proposals[0].rows.find((r: { orderId: string }) => r.orderId === "o2");
     expect(ella.qty).toBe(2);
     expect(ella.coveredByOpenPo).toBe(0);
@@ -489,7 +411,7 @@ describe("GET /api/operation/purchase/to-order", () => {
     const sb = makeSb(TABLES());
     vi.mocked(userClient).mockReturnValue(sb as never);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     const skus = body.proposals
       .flatMap((p: { rows: { builds: { lines: { sku: string }[] }[] }[] }) => p.rows)
       .flatMap((r: { builds: { lines: { sku: string }[] }[] }) => r.builds)
@@ -498,457 +420,17 @@ describe("GET /api/operation/purchase/to-order", () => {
     expect(skus).not.toContain("MEMORY-FOAM-PILLOW");
   });
 
-  it("reads back what was already ordered — recent POs, one row per customer order", async () => {
-    const t = TABLES();
-    const todayIsoStr = new Date().toISOString().slice(0, 10);
-    t.purchase_orders = {
-      data: [
-        { id: "PO-2001", supplier_id: OHANA, placed_at: `${todayIsoStr}T09:00:00Z`, so_refs: [1207] },
-      ],
-      error: null,
-    };
-    // received in full so the SUPPLY read subtracts nothing and the demand
-    // half of the fixture stays byte-identical.
-    t.purchase_order_lines = {
-      data: [{ po_id: "PO-2001", sku: "5539-1B(LHF)", qty: 1, received_qty: 1 }],
-      error: null,
-    };
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-
-    expect(body.ordered).toHaveLength(1);
-    expect(body.ordered[0]).toMatchObject({
-      poId: "PO-2001",
-      placedAt: todayIsoStr,
-      category: "sofa",
-      so: 1207,
-      orderId: "o1",
-      delivery: "2026-08-22",
-      model: "Booqit",
-      qty: 1,
-    });
-  });
-
-  it("a manual PO with no SO still gets a row — ordered work must be answerable", async () => {
-    const t = TABLES();
-    const todayIsoStr = new Date().toISOString().slice(0, 10);
-    t.purchase_orders = {
-      data: [
-        { id: "PO-2002", supplier_id: OHANA, placed_at: `${todayIsoStr}T09:00:00Z`, so_refs: [] },
-      ],
-      error: null,
-    };
-    t.purchase_order_lines = {
-      data: [{ po_id: "PO-2002", sku: "5539-1A(LHF)", qty: 2, received_qty: 2 }],
-      error: null,
-    };
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-    expect(body.ordered).toHaveLength(1);
-    expect(body.ordered[0]).toMatchObject({ poId: "PO-2002", so: null, orderId: null, qty: 2 });
-  });
-
   it("each demand row carries its ORDER's own orderBy for the Work Queue — never rendered", async () => {
     const sb = makeSb(TABLES());
     vi.mocked(userClient).mockReturnValue(sb as never);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     for (const r of body.proposals[0].rows) {
       expect(r.orderBy === null || /^\d{4}-\d{2}-\d{2}$/.test(r.orderBy)).toBe(true);
     }
   });
 });
 
-describe("POST …/to-order/issue", () => {
-  it("creates one purchase order per customer order and returns the real numbers", async () => {
-    const sb = makeSb(TABLES());
-    vi.mocked(userClient).mockReturnValue(sb as never);
-
-    const plan = await defaultPlan(sb);
-    const res = await post({ supplierId: OHANA, category: "sofa", destinationId: KLANG, purchaseOrders: plan });
-    expect(res.status).toBe(200);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-
-    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
-    expect(body.pos).toHaveLength(2);
-    expect(body.pos.map((p: { id: string }) => p.id)).toEqual(["PO-2031", "PO-2032"]);
-    expect(body.pos.map((p: { customer: string }) => p.customer).sort()).toEqual([
-      "PETER",
-      "ella",
-    ]);
-    expect(body.supplier).toBe("Ohana");
-  });
-
-  it("puts every module of a customer's sofas on that customer's document", async () => {
-    const sb = makeSb(TABLES());
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    await post({ supplierId: OHANA, category: "sofa", destinationId: KLANG, purchaseOrders: await defaultPlan(sb) });
-
-    const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
-    const pos = batch.args.p_pos as { so_refs: number[]; lines: { sku: string; qty: number }[] }[];
-    const peter = pos.find((po) => po.so_refs.includes(1207))!;
-    const lines = peter.lines;
-    expect(lines.map((l) => l.sku).sort()).toEqual([
-      "5539-1A(LHF)",
-      "5539-1B(LHF)",
-      "5539-2A(RHF)",
-      "5539-CNR",
-    ]);
-    expect(peter.so_refs).toEqual([1207]);
-  });
-
-  it("writes the chosen destination onto EVERY purchase order it created", async () => {
-    const sb = makeSb(TABLES());
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    await post({ supplierId: OHANA, category: "sofa", destinationId: AL, purchaseOrders: await defaultPlan(sb) });
-
-    // Destination AND expected arrival ride every document into the same RPC
-    // transaction that creates it. No post-create partial state exists.
-    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args.p_pos as {
-      destination_id: string;
-      eta_date: string;
-    }[];
-    expect(pos).toHaveLength(2);
-    expect(pos.every((po) => po.destination_id === AL)).toBe(true);
-    expect(pos.every((po) => /^\d{4}-\d{2}-\d{2}$/.test(po.eta_date))).toBe(true);
-    expect(sb.updates.filter((u) => u.table === "purchase_orders")).toHaveLength(0);
-  });
-
-  it("blocks only the affected document when catalog cost is unknown", async () => {
-    const t = TABLES();
-    (t.product_skus.data as { sku: string; cost: number | null }[]).find(
-      (row) => row.sku === "5539-CNR",
-    )!.cost = null;
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const plan = await defaultPlan(sb);
-    const res = await post({
-      supplierId: OHANA,
-      category: "sofa",
-      destinationId: KLANG,
-      purchaseOrders: plan,
-    });
-    expect(res.status).toBe(422);
-    expect(await res.json()).toMatchObject({ code: "cost_required", sku: "5539-CNR" });
-    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
-  });
-
-  it("records an explicit Free of Charge decision; unknown cost never becomes RM0", async () => {
-    const t = TABLES();
-    (t.product_skus.data as { sku: string; cost: number | null }[]).find(
-      (row) => row.sku === "5539-CNR",
-    )!.cost = null;
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const plan = await defaultPlan(sb);
-    const res = await post({
-      supplierId: OHANA,
-      category: "sofa",
-      destinationId: KLANG,
-      purchaseOrders: plan.map((doc) =>
-        doc.buildKeys.length > 1
-          ? {
-              ...doc,
-              lineDecisions: [
-                { sku: "5539-CNR", treatment: "free_of_charge", reason: "Warranty replacement" },
-              ],
-            }
-          : doc,
-      ),
-    });
-    expect(res.status).toBe(200);
-
-    const lines = (
-      sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args.p_pos as {
-        lines: {
-          sku: string;
-          cost: number;
-          cost_source: string;
-          commercial_treatment: string;
-          commercial_reason: string | null;
-        }[];
-      }[]
-    ).flatMap((po) => po.lines);
-    expect(lines.find((l) => l.sku === "5539-CNR")).toMatchObject({
-      cost: 0,
-      cost_source: "hand_entered",
-      commercial_treatment: "free_of_charge",
-      commercial_reason: "Warranty replacement",
-    });
-    expect(lines.find((l) => l.sku === "5539-1A(LHF)")!.commercial_treatment).toBe("normal");
-  });
-
-  it("records a hand-entered transaction cost without changing Catalog", async () => {
-    const t = TABLES();
-    (t.product_skus.data as { sku: string; cost: number | null }[]).find(
-      (row) => row.sku === "5539-CNR",
-    )!.cost = null;
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const plan = await defaultPlan(sb);
-    const res = await post({
-      supplierId: OHANA,
-      category: "sofa",
-      destinationId: KLANG,
-      purchaseOrders: plan.map((doc) =>
-        doc.buildKeys.length > 1
-          ? {
-              ...doc,
-              lineDecisions: [
-                {
-                  sku: "5539-CNR",
-                  treatment: "normal",
-                  unitCost: 880,
-                  costSource: "hand_entered",
-                },
-              ],
-            }
-          : doc,
-      ),
-    });
-    expect(res.status).toBe(200);
-    const lines = (
-      sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args.p_pos as {
-        lines: { sku: string; cost: number; cost_source: string }[];
-      }[]
-    ).flatMap((po) => po.lines);
-    expect(lines.find((line) => line.sku === "5539-CNR")).toMatchObject({
-      cost: 880,
-      cost_source: "hand_entered",
-    });
-    expect(sb.updates.filter((update) => update.table === "product_skus")).toHaveLength(0);
-  });
-
-  it("rejects a stale catalog-seeded cost before the creation RPC", async () => {
-    const sb = makeSb(TABLES());
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const plan = await defaultPlan(sb);
-    const target = plan.find((doc) => doc.buildKeys.length > 1)!;
-    const res = await post({
-      supplierId: OHANA,
-      category: "sofa",
-      destinationId: KLANG,
-      purchaseOrders: [
-        {
-          ...target,
-          lineDecisions: [
-            {
-              sku: "5539-CNR",
-              treatment: "normal",
-              unitCost: 999,
-              costSource: "catalog",
-            },
-          ],
-        },
-      ],
-    });
-    expect(res.status).toBe(409);
-    expect(await res.json()).toMatchObject({ code: "stale_catalog_cost", sku: "5539-CNR" });
-    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
-  });
-
-  it("rejects Free of Charge without an explicit reason at the request boundary", async () => {
-    const sb = makeSb(TABLES());
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const plan = await defaultPlan(sb);
-    const res = await post({
-      supplierId: OHANA,
-      category: "sofa",
-      destinationId: KLANG,
-      purchaseOrders: [
-        {
-          ...plan[0],
-          lineDecisions: [
-            { sku: "5539-CNR", treatment: "free_of_charge", reason: "" },
-          ],
-        },
-      ],
-    });
-    expect(res.status).toBe(400);
-    expect(await res.json()).toMatchObject({ code: "invalid_param" });
-    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
-  });
-
-  it("an unrelated valid document remains issuable when another document needs cost", async () => {
-    const t = TABLES();
-    (t.product_skus.data as { sku: string; cost: number | null }[]).find(
-      (row) => row.sku === "5539-CNR",
-    )!.cost = null;
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const plan = await defaultPlan(sb);
-    const unaffected = plan.find((doc) => doc.buildKeys.length === 1)!;
-    const res = await post({
-      supplierId: OHANA,
-      category: "sofa",
-      destinationId: KLANG,
-      purchaseOrders: [unaffected],
-    });
-    expect(res.status).toBe(200);
-    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
-      .p_pos as unknown[];
-    expect(pos).toHaveLength(1);
-  });
-
-  it("factory pickup requires one valid procurement partner on every Issue document", async () => {
-    const t = TABLES();
-    (t.suppliers.data as { kind: string }[])[0].kind = "factory_pickup";
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const plan = await defaultPlan(sb);
-    const blocked = await post({
-      supplierId: OHANA,
-      category: "sofa",
-      destinationId: KLANG,
-      purchaseOrders: plan,
-    });
-    expect(blocked.status).toBe(422);
-    expect(await blocked.json()).toMatchObject({ code: "pickup_partner_required" });
-    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
-
-    const partnerId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
-    const issued = await post({
-      supplierId: OHANA,
-      category: "sofa",
-      destinationId: KLANG,
-      purchaseOrders: plan.map((doc) => ({ ...doc, procurementPartnerId: partnerId })),
-    });
-    expect(issued.status).toBe(200);
-    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
-      .p_pos as { procurement_partner_id: string }[];
-    expect(pos.every((po) => po.procurement_partner_id === partnerId)).toBe(true);
-  });
-
-  it("own-logistics documents cannot smuggle a procurement partner", async () => {
-    const sb = makeSb(TABLES());
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const plan = await defaultPlan(sb);
-    const res = await post({
-      supplierId: OHANA,
-      category: "sofa",
-      destinationId: KLANG,
-      purchaseOrders: plan.map((doc) => ({
-        ...doc,
-        procurementPartnerId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-      })),
-    });
-    expect(res.status).toBe(422);
-    expect(await res.json()).toMatchObject({ code: "pickup_partner_not_allowed" });
-  });
-
-  it("an undated Customer Order is visible but crafted Issue is blocked server-side", async () => {
-    const t = TABLES();
-    const ella = (t.orders.data as { id: string; delivery_date_tbd: boolean; delivery_date: string | null }[])
-      .find((order) => order.id === "o2")!;
-    ella.delivery_date_tbd = true;
-    ella.delivery_date = null;
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const plan = await defaultPlan(sb);
-    const undated = plan.find((doc) => doc.buildKeys.length === 1)!;
-    const res = await post({
-      supplierId: OHANA,
-      category: "sofa",
-      destinationId: KLANG,
-      purchaseOrders: [undated],
-    });
-    expect(res.status).toBe(422);
-    expect(await res.json()).toMatchObject({ code: "blocked_delivery_date" });
-    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
-  });
-
-  it("unresolved supplier demand does not globally block an unrelated valid document", async () => {
-    const t = TABLES();
-    (t.product_skus.data as { sku: string; supplier_id: string | null }[]).find(
-      (row) => row.sku === "5539-CNR",
-    )!.supplier_id = null;
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const plan = await defaultPlan(sb);
-    const unaffected = plan.find((doc) => doc.buildKeys.length === 1)!;
-    const res = await post({
-      supplierId: OHANA,
-      category: "sofa",
-      destinationId: KLANG,
-      purchaseOrders: [unaffected],
-    });
-    expect(res.status).toBe(200);
-    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
-  });
-
-  it("refuses a pair with no production days, and writes nothing", async () => {
-    const t = TABLES();
-    t.purchasing_production_days = { data: [], error: null };
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-
-    const res = await post({ supplierId: OHANA, category: "sofa", destinationId: KLANG, purchaseOrders: [{ key: "d1", include: true, buildKeys: ["x"] }] });
-    // With no number the pair cannot be planned at all, so there is nothing to
-    // issue — the block is upstream of the button, not a softer refusal.
-    expect(res.status).toBe(409);
-    expect(sb.rpcCalls).toHaveLength(0);
-    expect(sb.updates).toHaveLength(0);
-  });
-
-  it("refuses an unknown destination and writes nothing", async () => {
-    const sb = makeSb(TABLES());
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const plan = await defaultPlan(sb);
-    const res = await post({
-      supplierId: OHANA,
-      category: "sofa",
-      destinationId: "99999999-9999-9999-9999-999999999999",
-      purchaseOrders: plan,
-    });
-    expect(res.status).toBe(422);
-    expect(sb.rpcCalls).toHaveLength(0);
-  });
-
-  it("refuses a supplier that has nothing to issue", async () => {
-    const sb = makeSb(TABLES());
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const res = await post({
-      supplierId: "33333333-3333-3333-3333-333333333333",
-      category: "sofa",
-      destinationId: KLANG,
-      purchaseOrders: [{ key: "d1", include: true, buildKeys: ["x"] }],
-    });
-    expect(res.status).toBe(409);
-    expect(sb.rpcCalls).toHaveLength(0);
-  });
-
-  it("400s on a malformed body", async () => {
-    const sb = makeSb(TABLES());
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const res = await post({ supplierId: "not-a-uuid", category: "sofa", destinationId: KLANG, purchaseOrders: [] });
-    expect(res.status).toBe(400);
-  });
-
-  it("401 without Authorization", async () => {
-    const res = await app.fetch(
-      new Request(ISSUE, { method: "POST", body: "{}" }),
-      env,
-    );
-    expect(res.status).toBe(401);
-  });
-});
-
-/**
- * 2026-07-30 — the regression that must never be possible again.
- *
- * Seven customer requirements across five customer orders reached no purchase
- * order, and the documents that WERE issued looked complete. The cause was a
- * catalog read coming back short and the loop skipping what it could not
- * resolve, in silence.
- *
- * These pin the two halves of the fix: a requirement the catalog cannot answer
- * for is NAMED, and it stops every issue rather than quietly shrinking one.
- */
 describe("a requirement the catalog cannot answer for", () => {
   it("says NOTHING about a line that was never a catalog product", async () => {
     // `Transport Fees`, `Leg 4"`, an AutoCount free-text description — an
@@ -974,7 +456,7 @@ describe("a requirement the catalog cannot answer for", () => {
     vi.mocked(userClient).mockReturnValue(sb as never);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     expect(body.unresolved).toEqual([]);
   });
 
@@ -991,9 +473,10 @@ describe("a requirement the catalog cannot answer for", () => {
       error: null,
     };
     const sb = makeSb(t);
-    const plan = await defaultPlan(sb);
-    const res = await post({
-      supplierId: OHANA, category: "sofa", destinationId: KLANG, purchaseOrders: plan,
+    const demands = await readyDemands(sb);
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
     });
     expect(res.status).toBe(200);
   });
@@ -1016,8 +499,6 @@ describe("a requirement the catalog cannot answer for", () => {
     );
     const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     expect(code).not.toMatch(/\.in\(\s*["']sku["']/);
-    // order_id is a uuid — safe, and the one list that still earns its place.
-    expect(code).toMatch(/\.in\(\s*["']order_id["']/);
   });
 
   it("names a procurable SKU nobody has mapped to a supplier", async () => {
@@ -1032,7 +513,7 @@ describe("a requirement the catalog cannot answer for", () => {
     vi.mocked(userClient).mockReturnValue(sb as never);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     expect(body.unresolved.map((u: { sku: string }) => u.sku)).toEqual(["5539-CNR"]);
   });
 
@@ -1040,7 +521,7 @@ describe("a requirement the catalog cannot answer for", () => {
     const sb = makeSb(TABLES());
     vi.mocked(userClient).mockReturnValue(sb as never);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     expect(body.unresolved).toEqual([]);
   });
 
@@ -1048,7 +529,7 @@ describe("a requirement the catalog cannot answer for", () => {
     const sb = makeSb(TABLES());
     vi.mocked(userClient).mockReturnValue(sb as never);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     expect(body.unresolved).toEqual([]);
     const skus = body.proposals
       .flatMap((p: { rows: { builds: { lines: { sku: string }[] }[] }[] }) => p.rows)
@@ -1058,65 +539,11 @@ describe("a requirement the catalog cannot answer for", () => {
     expect(skus).not.toContain("MEMORY-FOAM-PILLOW");
   });
 
-  it("reads back what was already ordered — recent POs, one row per customer order", async () => {
-    const t = TABLES();
-    const todayIsoStr = new Date().toISOString().slice(0, 10);
-    t.purchase_orders = {
-      data: [
-        { id: "PO-2001", supplier_id: OHANA, placed_at: `${todayIsoStr}T09:00:00Z`, so_refs: [1207] },
-      ],
-      error: null,
-    };
-    // received in full so the SUPPLY read subtracts nothing and the demand
-    // half of the fixture stays byte-identical.
-    t.purchase_order_lines = {
-      data: [{ po_id: "PO-2001", sku: "5539-1B(LHF)", qty: 1, received_qty: 1 }],
-      error: null,
-    };
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-
-    expect(body.ordered).toHaveLength(1);
-    expect(body.ordered[0]).toMatchObject({
-      poId: "PO-2001",
-      placedAt: todayIsoStr,
-      category: "sofa",
-      so: 1207,
-      orderId: "o1",
-      delivery: "2026-08-22",
-      model: "Booqit",
-      qty: 1,
-    });
-  });
-
-  it("a manual PO with no SO still gets a row — ordered work must be answerable", async () => {
-    const t = TABLES();
-    const todayIsoStr = new Date().toISOString().slice(0, 10);
-    t.purchase_orders = {
-      data: [
-        { id: "PO-2002", supplier_id: OHANA, placed_at: `${todayIsoStr}T09:00:00Z`, so_refs: [] },
-      ],
-      error: null,
-    };
-    t.purchase_order_lines = {
-      data: [{ po_id: "PO-2002", sku: "5539-1A(LHF)", qty: 2, received_qty: 2 }],
-      error: null,
-    };
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-    expect(body.ordered).toHaveLength(1);
-    expect(body.ordered[0]).toMatchObject({ poId: "PO-2002", so: null, orderId: null, qty: 2 });
-  });
-
   it("each demand row carries its ORDER's own orderBy for the Work Queue — never rendered", async () => {
     const sb = makeSb(TABLES());
     vi.mocked(userClient).mockReturnValue(sb as never);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     for (const r of body.proposals[0].rows) {
       expect(r.orderBy === null || /^\d{4}-\d{2}-\d{2}$/.test(r.orderBy)).toBe(true);
     }
@@ -1152,7 +579,7 @@ describe("the reads are chunked", () => {
     vi.mocked(userClient).mockReturnValue(sb as never);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
+    const body = (await project(sb)) as any;
     // 78 + 95 distinct SKUs cannot ride one `.in()`; the catalog is asked more
     // than once, and nothing is lost.
     expect(sb.tableCalls.product_skus).toBeGreaterThan(1);
@@ -1168,136 +595,13 @@ describe("the reads are chunked", () => {
  * so a browser left open since this morning cannot order goods that have since
  * been bought, and a hand-written request cannot invent a line.
  */
-describe("POST …/issue — server validation", () => {
-  async function planFor(sb: ReturnType<typeof makeSb>) {
-    return defaultPlan(sb);
-  }
-  const issue = (over: Record<string, unknown>) =>
-    post({ supplierId: OHANA, category: "sofa", destinationId: KLANG, ...over });
-
-  it("refuses a build that is not waiting to be ordered, and writes nothing", async () => {
-    const sb = makeSb(TABLES());
-    await planFor(sb);
-    const res = await issue({
-      purchaseOrders: [{ key: "d1", include: true, buildKeys: ["not-a-real-build"] }],
-    });
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(((await res.json()) as any).code).toBe("unknown_build");
-    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
-    expect(sb.updates).toHaveLength(0);
-  });
-
-  it("refuses the same item on two purchase orders", async () => {
-    const sb = makeSb(TABLES());
-    const plan = await planFor(sb);
-    const k = plan[0].buildKeys[0];
-    const res = await issue({
-      purchaseOrders: [
-        { key: "d1", include: true, buildKeys: [k] },
-        { key: "d2", include: true, buildKeys: [k] },
-      ],
-    });
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(((await res.json()) as any).code).toBe("duplicate_build");
-    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
-  });
-
-  it("refuses an empty purchase order", async () => {
-    const sb = makeSb(TABLES());
-    await planFor(sb);
-    const res = await issue({ purchaseOrders: [{ key: "d1", include: true, buildKeys: [] }] });
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(((await res.json()) as any).code).toBe("empty_document");
-  });
-
-  it("refuses a merged SOFA purchase order", async () => {
-    const sb = makeSb(TABLES());
-    const plan = await planFor(sb);
-    // PETER's and ella's builds on ONE document — fabric, size and
-    // configuration make that dangerous, so it never reaches the database.
-    const res = await issue({
-      purchaseOrders: [
-        { key: "d1", include: true, buildKeys: [...plan[0].buildKeys, ...plan[1].buildKeys] },
-      ],
-    });
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(((await res.json()) as any).code).toBe("sofa_merge");
-    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
-  });
-
-  it("refuses when nothing is selected to issue", async () => {
-    const sb = makeSb(TABLES());
-    const plan = await planFor(sb);
-    const res = await issue({
-      purchaseOrders: plan.map((d) => ({ ...d, include: false })),
-    });
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(((await res.json()) as any).code).toBe("no_documents");
-  });
-
-  it("issues ONLY what is included", async () => {
-    const sb = makeSb(TABLES());
-    const plan = await planFor(sb);
-    const res = await issue({
-      purchaseOrders: [plan[0], { ...plan[1], include: false }],
-    });
-    expect(res.status).toBe(200);
-    const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
-    expect((batch.args.p_pos as unknown[]).length).toBe(1);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(((await res.json()) as any).pos).toHaveLength(1);
-  });
-
-  it("creates every document in ONE transaction, not one call each", async () => {
-    const sb = makeSb(TABLES());
-    const plan = await planFor(sb);
-    await issue({ purchaseOrders: plan });
-    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
-    expect(sb.rpcCalls.filter((c) => c.fn === "operation_create_po")).toHaveLength(0);
-  });
-
-  it("never lets the client send a quantity, a SKU or a price", async () => {
-    const sb = makeSb(TABLES());
-    const plan = await planFor(sb);
-    await issue({
-      purchaseOrders: plan.map((d) => ({
-        ...d,
-        // A hand-written request trying to smuggle its own lines in.
-        lines: [{ sku: "MADE-UP", qty: 999, cost: 1 }],
-      })),
-    });
-    const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
-    const skus = (batch.args.p_pos as { lines: { sku: string }[] }[]).flatMap((po) =>
-      po.lines.map((l) => l.sku),
-    );
-    expect(skus).not.toContain("MADE-UP");
-    expect(skus.every((s) => s.startsWith("5539-"))).toBe(true);
-  });
-});
-
-
-/**
- * THE PO'S BIRTH CERTIFICATE (Loo, 2026-08-03).
- *
- * A purchase order must be born carrying what the rest of the module reads.
- * Measured the same day: `purchasing_record_tomorrow_delivery` (0306, shipped)
- * refuses to open when `eta_date` is NULL, and nothing had ever written one on
- * a PO raised here — a built, deployed supplier call that could never fire.
- */
 describe("a purchase order is born with its expected arrival", () => {
-  it("stamps eta_date = today + production (factory week) + transit (office week)", async () => {
+  it("stamps eta_date = PO Date + n Settings working days", async () => {
     const sb = makeSb(TABLES());
     vi.mocked(userClient).mockReturnValue(sb as never);
-    await post({
-      supplierId: OHANA,
-      category: "sofa",
-      destinationId: KLANG,
-      purchaseOrders: await defaultPlan(sb),
+    await postBatch({
+      selections: allTo(await readyDemands(sb), KLANG),
+      documentDecisions: pricedAll(await readyDemands(sb), KLANG),
     });
 
     const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args.p_pos as {
@@ -1308,32 +612,26 @@ describe("a purchase order is born with its expected arrival", () => {
     expect(pos.every((po) => po.destination_id === KLANG)).toBe(true);
     expect(pos.every((po) => /^\d{4}-\d{2}-\d{2}$/.test(po.eta_date))).toBe(true);
 
-    // 14 production days on Ohana's week (Sunday off) + 1 transit day on the
-    // OFFICE week — arranging the movement is our work, not the factory's.
+    // ⭐ OWNER CORRECTION 2026-09-22, converged across both buying doors on
+    // 2026-09-23: the PO's own delivery date is the SETTINGS date — 14
+    // production days on Ohana's week (Sunday off). The supplier transit leg
+    // was removed by owner ruling 2026-09-29, so this is also the arrival.
     //
-    // THE HOLIDAY SET IS PART OF THE ARITHMETIC, not a detail. `expectedArrivalOf`
-    // defaults to `myHolidaySet()`, so a naive recomputation here is only equal on
-    // the days no Malaysian public holiday falls inside the window — which is why
-    // this line passed for a week and then failed on 2026-08-10, when Maulidur
-    // Rasul (2026-08-25, my-holidays.ts:41) landed in the 14-day production leg.
-    // The route was right and the expectation was short by exactly that day.
+    // THE HOLIDAY SET IS PART OF THE ARITHMETIC, not a detail: a naive
+    // recomputation is only equal on the days no Malaysian public holiday
+    // falls inside the window, which is why this expectation computes it the
+    // same way the route does.
     const holidays = myHolidaySet();
-    const expected = addWorkingDays(
-      addWorkingDays(new Date().toISOString().slice(0, 10), 14, { offDays: [0], holidays }),
-      1,
-      { offDays: [0, 6], holidays },
-    );
-    expect(pos.every((po) => po.eta_date === expected)).toBe(true);
+    const settingsDate = addWorkingDays(todayIsoMYT(), 14, { offDays: [0], holidays });
+    expect(pos.every((po) => po.eta_date === settingsDate)).toBe(true);
   });
 
   it("NEVER writes expected_ready_date — that column is the factory's promise", async () => {
     const sb = makeSb(TABLES());
     vi.mocked(userClient).mockReturnValue(sb as never);
-    await post({
-      supplierId: OHANA,
-      category: "sofa",
-      destinationId: KLANG,
-      purchaseOrders: await defaultPlan(sb),
+    await postBatch({
+      selections: allTo(await readyDemands(sb), KLANG),
+      documentDecisions: pricedAll(await readyDemands(sb), KLANG),
     });
     // R5 grades a factory by `expected_ready_date`. Seeding it with OUR
     // estimate would score a supplier on a number it never gave, and nothing
@@ -1343,48 +641,24 @@ describe("a purchase order is born with its expected arrival", () => {
     }
   });
 
-  it("raises the purchase order ANYWAY when transit days are not set, with no invented date", async () => {
-    const t = TABLES();
-    t.purchasing_supplier_settings = {
-      data: [{ supplier_id: OHANA, off_days: [0] }], // no transit_days
-      error: null,
-    };
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const res = await post({
-      supplierId: OHANA,
-      category: "sofa",
-      destinationId: KLANG,
-      purchaseOrders: await defaultPlan(sb),
-    });
+  /* ⛔ A MISSING PRODUCTION NUMBER IS NOT TESTABLE HERE, WHICH IS WORTH
+     SAYING: a demand with no production number never becomes ready to order in
+     this lane, so the missing-production case cannot reach this door at all
+     (the route answers 400 before it). Manual Purchase's own door does admit
+     it, and its suite pins the null date there. */
 
-    // The goods matter more than the estimate: the PO is still raised.
-    expect(res.status).toBe(200);
-    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args.p_pos as {
-      eta_date: string | null;
-    }[];
-    // A guessed arrival would be read downstream as a measurement (P1's law).
-    expect(pos.every((po) => po.eta_date === null)).toBe(true);
-  });
-
-  it("records who raised it — po_history, the table that has existed since 0001", async () => {
+  it("leaves issue audit to the atomic database boundary", async () => {
     const sb = makeSb(TABLES());
     vi.mocked(userClient).mockReturnValue(sb as never);
-    await post({
-      supplierId: OHANA,
-      category: "sofa",
-      destinationId: KLANG,
-      purchaseOrders: await defaultPlan(sb),
+    await postBatch({
+      selections: allTo(await readyDemands(sb), KLANG),
+      documentDecisions: pricedAll(await readyDemands(sb), KLANG),
     });
 
-    // Measured 2026-08-01: `purchasing_issue_pos_batch` writes no audit row of
-    // any kind, so a purchase order could not say who raised it or when.
+    // Migration 0403 stamps actual actor + duty/cover inside the same database
+    // transaction. A browser-side best-effort insert would be a second answer.
     const hist = sb.inserts.filter((i) => i.table === "po_history");
-    expect(hist).toHaveLength(1);
-    const rows = hist[0].rows as { po_id: string; text: string }[];
-    expect(rows).toHaveLength(2); // one per document the batch made
-    expect(rows[0].po_id).toBe("PO-2031");
-    expect(rows[0].text).toContain("expected arrival");
+    expect(hist).toHaveLength(0);
   });
 });
 
@@ -1398,7 +672,7 @@ describe("a purchase order is born with its expected arrival", () => {
  * 500 the whole workspace.
  */
 describe("purchase_demands absent — fail closed, not down", () => {
-  it("still answers 200 with the customer-order plan when the table is missing", async () => {
+  it("still returns the customer-order plan when the table is missing", async () => {
     const t = TABLES();
     // What PostgREST answers for a table that is not there.
     t.purchase_demands = {
@@ -1408,10 +682,8 @@ describe("purchase_demands absent — fail closed, not down", () => {
     const sb = makeSb(t);
     vi.mocked(userClient).mockReturnValue(sb as never);
 
-    const res = await get();
-    expect(res.status).toBe(200);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
+    const body = (await project(sb)) as any;
     // The customer work is all there — the day's purchasing is unaffected.
     expect(body.proposals.length).toBeGreaterThan(0);
     expect(body.proposals[0].rows.length).toBeGreaterThan(0);
@@ -1426,716 +698,25 @@ describe("purchase_demands absent — fail closed, not down", () => {
     const sb = makeSb(t);
     vi.mocked(userClient).mockReturnValue(sb as never);
 
-    const res = await post({
-      supplierId: OHANA,
-      category: "sofa",
-      destinationId: KLANG,
-      purchaseOrders: await defaultPlan(sb),
+    const res = await postBatch({
+      selections: allTo(await readyDemands(sb), KLANG),
+      documentDecisions: pricedAll(await readyDemands(sb), KLANG),
     });
     expect(res.status).toBe(200);
   });
 });
 
-/**
- * A DEMAND SURVIVES BEING PART SATISFIED (Loo, 2026-08-04 · migration 0320).
- *
- * 0319 froze "one row = one issue" and Loo ruled the business needs the other
- * thing: a demand's quantity FALLS when ready stock is taken (card P10), so the
- * row has to keep its remainder instead of disappearing or re-appearing whole.
- */
-const DEMAND_ID = "9ce4bbb1-0000-4000-8000-00000000d001";
-
-/**
- * A MATTRESS, deliberately — the live demand is `SONIC-S`, and mattress is the
- * grain where a quantity is a quantity. Sofa counted BUILDS whatever the row
- * was, so a sofa fixture here would have measured that rule rather than the
- * remainder. It measured it and REPORTED it, which is card P11; the sofa case
- * has its own fixture below now that a lone line carries its own quantity.
- */
-function withDemand(issued: number, qty = 5) {
-  const t = TABLES();
-  t.purchasing_production_days = {
-    data: [
-      { supplier_id: OHANA, category: "sofa", working_days: 14 },
-      { supplier_id: OHANA, category: "mattress", working_days: 10 },
-    ],
-    error: null,
-  };
-  t.product_skus = {
-    data: [
-      ...(t.product_skus.data as unknown[]),
-      {
-        sku: "SONIC-S",
-        supplier_id: OHANA,
-        cost: 300,
-        variant: "Single",
-        variant_kind: "size",
-        product_models: { category: "mattress", name: "Sonic" },
-      },
-    ],
-    error: null,
-  };
-  t.purchase_demands = {
-    data: [
-      {
-        id: DEMAND_ID,
-        purpose: "ready_stock",
-        sku: "SONIC-S",
-        supplier_id: OHANA,
-        destination_id: KLANG,
-        qty,
-        issued_qty: issued,
-        // GENERATED in the database. The fixture states it the way the wire
-        // carries it rather than recomputing it, because a test that does the
-        // subtraction itself would still pass if the column were dropped.
-        remaining_qty: qty - issued,
-        required_by: null,
-        remark: null,
-      },
-    ],
-    error: null,
-  };
-  return t;
-}
-
-/** The one demand row, wherever it landed among the proposals. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function demandRow(body: any) {
-  for (const p of body.proposals ?? []) {
-    for (const r of p.rows ?? []) if (r.orderId === `demand:${DEMAND_ID}`) return r;
-  }
-  return null;
-}
-
-describe("a partly satisfied demand keeps its remainder", () => {
-  it("shows what is LEFT to buy, not what was originally asked for", async () => {
-    const sb = makeSb(withDemand(2)); // 5 asked for, 2 already dealt with
-    vi.mocked(userClient).mockReturnValue(sb as never);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-    const row = demandRow(body);
-    expect(row).not.toBeNull();
-
-    // 3, never 5. Buying 5 again is the double order this column exists to stop.
-    const units = row.builds.reduce((n: number, b: { qty: number }) => n + b.qty, 0);
-    expect(units).toBe(3);
-  });
-
-  it("an untouched demand is unchanged — the whole quantity is still to buy", async () => {
-    const sb = makeSb(withDemand(0));
-    vi.mocked(userClient).mockReturnValue(sb as never);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-    const units = demandRow(body).builds.reduce(
-      (n: number, b: { qty: number }) => n + b.qty,
-      0,
-    );
-    expect(units).toBe(5);
-  });
-
-  it("asks what is LEFT, never whether a purchase order exists", async () => {
-    const sb = makeSb(withDemand(2));
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    await get();
-
-    const onDemands = sb.filters.filter((f) => f.table === "purchase_demands");
-    // The question that keeps a partly satisfied row alive.
-    expect(onDemands).toContainEqual({
-      table: "purchase_demands",
-      method: "gt",
-      col: "remaining_qty",
-      val: 0,
-    });
-    // The question that would have buried it. `po_id is null` reads a demand
-    // that was partly ordered as finished.
-    expect(
-      onDemands.some((f) => f.method === "is" && f.col === "po_id"),
-    ).toBe(false);
-  });
-
-  it("issuing records the quantity it took, through the door — never a PATCH", async () => {
-    const sb = makeSb(withDemand(2));
-    vi.mocked(userClient).mockReturnValue(sb as never);
-
-    // The demand's OWN proposal — it is a mattress, and the sofa work is a
-    // separate document with a separate supplier×category key.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const prop = body.proposals.find((p: any) =>
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (p.rows ?? []).some((r: any) => r.orderId === `demand:${DEMAND_ID}`),
-    );
-    expect(prop).toBeTruthy();
-
-    const res = await post({
-      supplierId: prop.supplierId,
-      category: prop.category,
-      destinationId: KLANG,
-      purchaseOrders: [
-        {
-          key: "d1",
-          include: true,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          buildKeys: prop.rows.flatMap((r: any) => r.builds.map((b: any) => b.key)),
-        },
-      ],
-    });
-    expect(res.status).toBe(200);
-
-    const calls = sb.rpcCalls.filter((r) => r.fn === "purchasing_demand_record_issue");
-    expect(calls).toHaveLength(1);
-    // The REMAINDER it actually ordered, and the purchase order that took it.
-    expect(calls[0].args.p_id).toBe(DEMAND_ID);
-    expect(calls[0].args.p_qty).toBe(3);
-    expect(String(calls[0].args.p_po_id)).toMatch(/^PO-/);
-
-    // 0316's rule on this table: the quantity may not move by a client write.
-    expect(sb.updates.some((u) => u.table === "purchase_demands")).toBe(false);
-  });
-
-  /**
-   * The same demand, on the SOFA grain (card P11). A typed demand is one sku
-   * and one number and has no modules at all, so the build-collapse must not
-   * reach it: the proposal, the purchase order and the number credited back to
-   * the demand all have to be the quantity that was typed.
-   */
-  function withSofaDemand(qty = 5) {
-    const t = withDemand(0, qty);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (t.purchase_demands.data as any[])[0].sku = "5539-1A(LHF)"; // a real sofa sku
-    return t;
-  }
-
-  it("a typed SOFA demand of 5 is proposed, ordered and recorded as 5", async () => {
-    const sb = makeSb(withSofaDemand(5));
-    vi.mocked(userClient).mockReturnValue(sb as never);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-    const row = demandRow(body);
-    expect(row).not.toBeNull();
-    expect(row.qty).toBe(5);
-    expect(row.builds).toHaveLength(1);
-    expect(row.builds[0].qty).toBe(5);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const prop = body.proposals.find((p: any) =>
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (p.rows ?? []).some((r: any) => r.orderId === `demand:${DEMAND_ID}`),
-    );
-    const res = await post({
-      supplierId: prop.supplierId,
-      category: prop.category,
-      destinationId: KLANG,
-      purchaseOrders: [
-        {
-          key: "d1",
-          include: true,
-          buildKeys: row.builds.map((b: { key: string }) => b.key),
-        },
-      ],
-    });
-    expect(res.status).toBe(200);
-
-    // The purchase order and the credit are the SAME number. They are computed
-    // from two different places — the line, and the build — so a disagreement
-    // orders 5 and records 1, and the other 4 come back to be bought again.
-    const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
-    const pos = batch.args.p_pos as { lines: { sku: string; qty: number }[] }[];
-    expect(pos).toHaveLength(1);
-    expect(pos[0].lines.map((l) => l.qty)).toEqual([5]);
-
-    const calls = sb.rpcCalls.filter((r) => r.fn === "purchasing_demand_record_issue");
-    expect(calls).toHaveLength(1);
-    expect(calls[0].args.p_qty).toBe(5);
-  });
-
-  it("a customer order is not a demand — it records nothing on this table", async () => {
-    const sb = makeSb(TABLES()); // no typed demand at all
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    await post({
-      supplierId: OHANA,
-      category: "sofa",
-      destinationId: KLANG,
-      purchaseOrders: await defaultPlan(sb),
-    });
-    expect(sb.rpcCalls.some((r) => r.fn === "purchasing_demand_record_issue")).toBe(false);
-  });
-});
-
-// ── P10 · ready stock is SUGGESTED; the human decides whether to take it ─────
-//
-// Jess's 2026-07-21 ruling stands untouched: `consumeFreeStock` is OFF and
-// nothing auto-eats labelled stock. The defect is that the number was computed
-// and shown to nobody.
-
-const TAKE = "http://t/api/operation/purchase/to-order/take-stock";
-
-async function take(body: unknown) {
-  const jwt = await makeJwt("operation");
-  return app.fetch(
-    new Request(TAKE, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }),
-    env,
-  );
-}
-
-/**
- * Free register records + the pool-usage ledger, on top of whatever base the
- * caller passes. The stock SKUs are written the warehouse's way (`Sonic
- * Single`, not `SONIC-S`) on purpose — that drift is the whole reason
- * `stockMatchKey` exists, and a fixture using the catalog spelling would test
- * a join that does not happen in production.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function withStock(base: any, items: unknown[], usage: unknown[] = []) {
-  base.ops_stock_items = { data: items, error: null };
-  base.ops_stock_pool_usage = { data: usage, error: null };
-  return base;
-}
-
-const READY_REF = "Ready Stock · Carres Klang";
-
-const unit = (id: string, sku: string, qty = 1, dateIn = "2026-01-01") => ({
-  id,
-  sku,
-  qty,
-  date_in: dateIn,
-  created_at: `${dateIn}T00:00:00Z`,
-});
-
-describe("P10 · the offer", () => {
-  it("makes no offer at all when the warehouse holds nothing — the page is untouched", async () => {
-    const sb = makeSb(withStock(withDemand(0), []));
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-    const row = demandRow(body);
-    expect(row.freeStock).toBe(0);
-    expect(row.builds[0].freeStockItemIds).toEqual([]);
-    expect(row.qty).toBe(5);
-  });
-
-  it("offers what is free, matched across the two SKU vocabularies, and SUBTRACTS NOTHING", async () => {
-    const sb = makeSb(
-      withStock(withDemand(0), [unit("i1", "Sonic Single"), unit("i2", "Sonic Single")]),
-    );
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-    const row = demandRow(body);
-    expect(row.freeStock).toBe(2);
-    expect(row.builds[0].freeStockItemIds).toEqual(["i1", "i2"]);
-    // THE RULING (Jess, 2026-07-21): the row still asks for all 5.
-    expect(row.qty).toBe(5);
-    expect(body.stockWarehouse).toBe("Carres Klang");
-  });
-
-  it("names the warehouse from the record, never a word typed into the page", async () => {
-    const t = withStock(withDemand(0), [unit("i1", "Sonic Single")]);
-    t.warehouses = { data: [{ id: WAREHOUSE, name: "Carres Semenyih", kind: "own" }], error: null };
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-    expect(body.stockWarehouse).toBe("Carres Semenyih");
-  });
-
-  it("counts the REGISTER, not stock_balances — the two are different tables", async () => {
-    // `ops_stock_pool_draw` moves the register. A count read from the rollup
-    // would not fall when a unit is taken, so the same units would be offered
-    // again tomorrow.
-    const sb = makeSb(withStock(withDemand(0), [unit("i1", "Sonic Single")]));
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    await get();
-    expect(sb.tableCalls.ops_stock_items ?? 0).toBeGreaterThan(0);
-    expect(sb.tableCalls.stock_balances ?? 0).toBe(0);
-  });
-
-  it("asks only for FREE, sound units at the one warehouse", async () => {
-    const sb = makeSb(withStock(withDemand(0), [unit("i1", "Sonic Single")]));
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    await get();
-    const f = sb.filters.filter((x) => x.table === "ops_stock_items");
-    expect(f).toContainEqual({ table: "ops_stock_items", method: "eq", col: "status", val: "free" });
-    expect(f).toContainEqual({
-      table: "ops_stock_items", method: "eq", col: "needs_repair", val: false,
-    });
-    expect(f).toContainEqual({
-      table: "ops_stock_items", method: "eq", col: "warehouse_id", val: WAREHOUSE,
-    });
-    // Ready Stock's OWN definition of ready, mirrored not re-decided. R4
-    // releases a quarantined unit back to `free`, so without this the page
-    // would offer a DAMAGED unit to a customer's order the day one is
-    // released. (`/api/ops/stock/ready`'s header comment says `new` +
-    // `exhibition`; its CODE is this list, and the code is the rule.)
-    expect(f).toContainEqual({
-      table: "ops_stock_items",
-      method: "in",
-      col: "condition",
-      val: ["new", "exhibition", "old", "refurbished"],
-    });
-  });
-
-  it("stays up when the register is unreachable — the feature goes, the workspace does not", async () => {
-    const t = withDemand(0);
-    t.ops_stock_items = {
-      data: null,
-      error: { code: "42P01", message: "relation ops_stock_items does not exist" },
-    };
-    const sb = makeSb(t);
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const res = await get();
-    expect(res.status).toBe(200);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(demandRow(body).freeStock).toBe(0);
-    expect(demandRow(body).qty).toBe(5);
-  });
-});
-
-describe("P10 · what was already taken", () => {
-  it("reads the LEDGER, so a delivered unit does not make the requirement come back", async () => {
-    // A reservation-based reading would lose the fact the day the goods go out
-    // (`reserved` becomes `sold`) and put a satisfied requirement back on the
-    // page.
-    const sb = makeSb(
-      withStock(withDemand(2), [], [{ ref: READY_REF, sku: "Sonic Single", qty: 2 }]),
-    );
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-    const row = demandRow(body);
-    // The remainder comes from the database's own generated column, and the
-    // ledger only says WHY it is smaller.
-    expect(row.qty).toBe(3);
-    expect(row.takenFromStock).toBe(2);
-  });
-
-  it("nets a customer requirement whichever door committed the unit", async () => {
-    // A unit reserved to SO-1204 through the order drawer is a unit we do not
-    // have to buy. This page's own button and that one are the same act.
-    const sb = makeSb(
-      withStock(TABLES(), [], [{ ref: "SO-1204", sku: "5539-1A(LHF)", qty: 1 }]),
-    );
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-    // ella's order was ONE module line of 1. Taken from stock, it has nothing
-    // left to buy and leaves the workspace entirely.
-    const rows = body.proposals.flatMap((p: { rows: unknown[] }) => p.rows);
-    expect(rows.some((r: { so: number }) => r.so === 1204)).toBe(false);
-    expect(rows.some((r: { so: number }) => r.so === 1207)).toBe(true);
-  });
-
-  it("a draw under someone else's reference never touches this row", async () => {
-    const sb = makeSb(
-      withStock(TABLES(), [], [{ ref: "SO-9999", sku: "5539-1A(LHF)", qty: 1 }]),
-    );
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-    const rows = body.proposals.flatMap((p: { rows: unknown[] }) => p.rows);
-    expect(rows.some((r: { so: number }) => r.so === 1204)).toBe(true);
-  });
-
-  it("a demand is never read as having taken more than it ISSUED", async () => {
-    // A second demand to the same destination shares the reference. The
-    // ceiling is the row's own counter, so a stranger's draw cannot make a
-    // requirement disappear.
-    const sb = makeSb(
-      withStock(withDemand(0), [], [{ ref: READY_REF, sku: "Sonic Single", qty: 4 }]),
-    );
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-    expect(demandRow(body).takenFromStock).toBe(0);
-    expect(demandRow(body).qty).toBe(5);
-  });
-});
-
-describe("P10 · the take", () => {
-  /** The demand row's build key, read off the server's own projection. */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async function demandBuild(sb: any) {
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-    const row = demandRow(body);
-    return { orderId: row.orderId, buildKey: row.builds[0].key };
-  }
-
-  it("goes through K4's door, one call per record, with the reason and the reference", async () => {
-    const sb = makeSb(
-      withStock(withDemand(0), [unit("i1", "Sonic Single"), unit("i2", "Sonic Single")]),
-    );
-    const target = await demandBuild(sb);
-    const res = await take(target);
-    expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ taken: 2, reference: READY_REF });
-
-    const draws = sb.rpcCalls.filter((r) => r.fn === "ops_stock_pool_draw");
-    expect(draws.map((d) => d.args.p_item_id)).toEqual(["i1", "i2"]);
-    for (const d of draws) {
-      expect(d.args.p_ref).toBe(READY_REF);
-      /**
-       * P13② (0322) — K4's SIXTH reason, ruled by Loo on 2026-08-04.
-       *
-       * P10 wrote `other` + a note, because the locked five had no row for
-       * *"we had it on the shelf, so we did not raise a purchase order"* and
-       * inventing one would have been a ruling on a locked vocabulary. The
-       * ruling was made, so the ledger now says it in its own word — and a
-       * monthly split whose biggest slice reads `Other` stops being the only
-       * answer K5 can give to 为什么一直缺货.
-       */
-      expect(d.args.p_reason).toBe("used_instead_of_ordering");
-      expect(d.args.p_reason).not.toBe("other");
-      // The note keeps only what the reason cannot say: WHICH build.
-      expect(String(d.args.p_note)).toContain("To Order");
-      expect(String(d.args.p_note)).not.toContain("purchase order");
-    }
-  });
-
-  it("never writes ops_stock_items itself — a fourth door is a second truth", async () => {
-    const sb = makeSb(withStock(withDemand(0), [unit("i1", "Sonic Single")]));
-    const target = await demandBuild(sb);
-    await take(target);
-    expect(sb.updates.some((u) => u.table === "ops_stock_items")).toBe(false);
-  });
-
-  it("reduces a typed demand through its own door, by what was actually drawn", async () => {
-    const sb = makeSb(
-      withStock(withDemand(0), [unit("i1", "Sonic Single"), unit("i2", "Sonic Single")]),
-    );
-    const target = await demandBuild(sb);
-    await take(target);
-    const calls = sb.rpcCalls.filter((r) => r.fn === "purchasing_demand_record_issue");
-    expect(calls).toHaveLength(1);
-    expect(calls[0].args.p_qty).toBe(2);
-    // Nothing was ordered, so nothing may claim a purchase order.
-    expect(calls[0].args.p_po_id).toBeNull();
-    expect(sb.updates.some((u) => u.table === "purchase_demands")).toBe(false);
-  });
-
-  it("a CUSTOMER row records no demand — the ledger row IS the record", async () => {
-    // TWO units, because ella's earlier deadline is served first — the engine's
-    // own allocation order, and the reason one unit could never reach PETER.
-    const sb = makeSb(
-      withStock(TABLES(), [unit("i1", "5539-1A(LHF)"), unit("i2", "5539-1A(LHF)")]),
-    );
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await (await get()).json()) as any;
-    // `bk-b` is PETER's lone module line — one line, so it IS offerable.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const row = body.proposals[0].rows.find((r: any) => r.so === 1207);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const build = row.builds.find((b: any) => b.freeStock > 0);
-    expect(build).toBeTruthy();
-
-    const res = await take({ orderId: row.orderId, buildKey: build.key });
-    expect(res.status).toBe(200);
-    const draws = sb.rpcCalls.filter((r) => r.fn === "ops_stock_pool_draw");
-    expect(draws).toHaveLength(1);
-    expect(draws[0].args.p_ref).toBe("SO-1207");
-    // The SECOND record — ella's row was offered the first, and the take draws
-    // exactly what the row was shown.
-    expect(draws[0].args.p_item_id).toBe("i2");
-    expect(sb.rpcCalls.some((r) => r.fn === "purchasing_demand_record_issue")).toBe(false);
-  });
-
-  it("taking twice cannot over-draw", async () => {
-    const sb = makeSb(withStock(withDemand(0), [unit("i1", "Sonic Single")]));
-    const target = await demandBuild(sb);
-    await take(target);
-
-    // The unit is no longer free. The door answers null — the whole point of
-    // its `where status = free` guard — so the second press takes nothing and,
-    // critically, records nothing against the demand.
-    const before = sb.rpcCalls.filter((r) => r.fn === "purchasing_demand_record_issue").length;
-    sb.rpc.mockImplementation(
-      // The real RPC returns a union; this stand-in only ever answers the
-      // draw's "nothing was free" null, so the shape is widened at the seam.
-      (async (fn: string, args: Record<string, unknown>) => {
-        sb.rpcCalls.push({ fn, args });
-        return { data: null, error: null };
-      }) as never,
-    );
-    const res = await take(target);
-    expect(res.status).toBe(409);
-    expect(await res.json()).toMatchObject({ code: "no_free_stock" });
-    expect(sb.rpcCalls.filter((r) => r.fn === "purchasing_demand_record_issue")).toHaveLength(
-      before,
-    );
-  });
-
-  it("refuses a build the recomputation does not know about", async () => {
-    const sb = makeSb(withStock(withDemand(0), [unit("i1", "Sonic Single")]));
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const res = await take({ orderId: `demand:${DEMAND_ID}`, buildKey: "not-a-build" });
-    expect(res.status).toBe(409);
-    expect(await res.json()).toMatchObject({ code: "unknown_build" });
-  });
-
-  it("refuses a row the warehouse holds nothing for", async () => {
-    const sb = makeSb(withStock(withDemand(0), []));
-    const target = await demandBuild(sb);
-    const res = await take(target);
-    expect(res.status).toBe(409);
-    expect(await res.json()).toMatchObject({ code: "no_free_stock" });
-    expect(sb.rpcCalls.some((r) => r.fn === "ops_stock_pool_draw")).toBe(false);
-  });
-
-  it("carries no quantity on the wire — the system suggests, the human accepts", async () => {
-    const sb = makeSb(withStock(withDemand(0), [unit("i1", "Sonic Single")]));
-    const target = await demandBuild(sb);
-    // A browser naming its own number is ignored by the CONTRACT, not by a
-    // check somewhere in the body.
-    const res = await take({ ...target, qty: 99 });
-    expect(res.status).toBe(200);
-    const calls = sb.rpcCalls.filter((r) => r.fn === "purchasing_demand_record_issue");
-    expect(calls[0].args.p_qty).toBe(1);
-  });
-
-  it("is refused to anyone who is not operation", async () => {
-    const sb = makeSb(withStock(withDemand(0), [unit("i1", "Sonic Single")]));
-    vi.mocked(userClient).mockReturnValue(sb as never);
-    const jwt = await makeJwt("dealer");
-    const res = await app.fetch(
-      new Request(TAKE, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: "x", buildKey: "y" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(403);
-  });
-});
-
-/**
- * ── P12 · the cancel door (Loo, 2026-08-04) ─────────────────────────────────
- *
- * `POST /demand/:id/cancel`. It ships in the same card as its button, because
- * C1 deleted a live route whose only caller had gone — *a route with no caller
- * is a bypass one curl away* — and a button with no door is the same fault
- * pointing the other way.
- *
- * These tests are about the DOOR, not the rule: the rule (a part-ordered demand
- * may cancel its remainder, a fully issued one may not, a reason is mandatory)
- * lives in 0321 and was proved against production in a rolled-back transaction.
- * What the route owes is that it reaches that rule with exactly what it was
- * given, sends no quantity, and hands the server's own refusal back by name.
- */
-describe("POST /api/operation/purchase/to-order/demand/:id/cancel", () => {
-  const CANCEL_ID = "6299ed4e-3c91-43c5-b41b-1e8fe9677c7d";
-
-  async function cancel(
-    id: string,
-    body: unknown,
-    role = "operation",
-    rpcResult: { data: unknown; error: unknown } = {
-      data: { id: CANCEL_ID, cancelled: 2, issued: 3 },
-      error: null,
-    },
-  ) {
-    const calls: { fn: string; args: Record<string, unknown> }[] = [];
-    vi.mocked(userClient).mockReturnValue({
-      from: vi.fn(),
-      rpc: vi.fn(async (fn: string, args: Record<string, unknown>) => {
-        calls.push({ fn, args });
-        return rpcResult;
-      }),
-    } as never);
-    const jwt = await makeJwt(role);
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/purchase/to-order/demand/${id}/cancel`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
-      env,
-    );
-    return { res, calls };
-  }
-
-  it("reaches purchasing_cancel_demand with the id and the reason — and NO quantity", async () => {
-    const { res, calls } = await cancel(CANCEL_ID, { reason: "do not want the other 2" });
-    expect(res.status).toBe(200);
-    expect(calls).toHaveLength(1);
-    expect(calls[0].fn).toBe("purchasing_cancel_demand");
-    expect(calls[0].args.p_id).toBe(CANCEL_ID);
-    expect(calls[0].args.p_reason).toBe("do not want the other 2");
-    /**
-     * THE CARD'S OWN "nobody types a quantity", as a test rather than a
-     * sentence. A cancel takes the whole remainder, and `remaining_qty` is
-     * GENERATED — a quantity on this wire would be a number that can disagree
-     * with the one the database computed.
-     */
-    expect(Object.keys(calls[0].args).sort()).toEqual(["p_id", "p_reason"]);
-  });
-
-  it("answers with what was cancelled and what stays ordered", async () => {
-    const { res } = await cancel(CANCEL_ID, { reason: "changed our mind" });
-    expect(await res.json()).toEqual({ id: CANCEL_ID, cancelled: 2, issued: 3 });
-  });
-
-  it("refuses a blank reason before it reaches the database", async () => {
-    const { res, calls } = await cancel(CANCEL_ID, { reason: "   " });
-    expect(res.status).toBe(400);
-    // The RPC would refuse it too (`reason_required`), and the table's CHECK
-    // behind that. Three refusals, and the cheapest one runs first.
-    expect(calls).toHaveLength(0);
-  });
-
-  it("refuses a missing reason", async () => {
-    const { res, calls } = await cancel(CANCEL_ID, {});
-    expect(res.status).toBe(400);
-    expect(calls).toHaveLength(0);
-  });
-
-  it("refuses an id that is not a demand id", async () => {
-    const { res, calls } = await cancel("PO-2040", { reason: "x" });
-    expect(res.status).toBe(400);
-    expect(calls).toHaveLength(0);
-  });
-
-  it("hands back `already_cancelled` by name", async () => {
-    const { res } = await cancel(CANCEL_ID, { reason: "x" }, "operation", {
-      data: null,
-      error: { code: "P0001", details: "already_cancelled", message: "already cancelled" },
-    });
-    expect(res.status).toBe(422);
-    expect(((await res.json()) as any).code).toBe("already_cancelled");
-  });
-
-  it("hands back `nothing_to_cancel` by name", async () => {
-    const { res } = await cancel(CANCEL_ID, { reason: "x" }, "operation", {
-      data: null,
-      error: {
-        code: "P0001",
-        details: "nothing_to_cancel",
-        message: "demand has nothing left to cancel",
-      },
-    });
-    expect(res.status).toBe(422);
-    // The two refusals must not read alike: one means it already happened, the
-    // other that there is nothing left to do it to.
-    expect(((await res.json()) as any).code).toBe("nothing_to_cancel");
-  });
-
-  it("is not open to a supplier login", async () => {
-    const { res, calls } = await cancel(CANCEL_ID, { reason: "x" }, "supplier");
-    expect(res.status).toBe(403);
-    expect(calls).toHaveLength(0);
-  });
-});
+/* THE TYPED-DEMAND-IN-GRID CONTRACTS RETIRED WITH THE GRID SPLIT
+ * (CARD-2026-08-18-manual-purchase §1, executed 2026-08-19):
+ *   · the 0320 remainder contract now surfaces on the Manual Purchase
+ *     register and detail (`OperationManualPurchase.test.tsx`), and the
+ *     record-issue call moved INSIDE `purchasing_issue_pos_batch` (0361,
+ *     `manual-purchase.test.ts`) — atomic, not after-the-fact.
+ *   · P10's offer/take on TYPED rows lost its rendering surface with the
+ *     rows themselves; the requester now sees WHAT WE ALREADY HAVE before
+ *     submitting and the approver cuts to zero with a reason. The pool-
+ *     draw doors (0322) are untouched; the customer-row free-stock
+ *     subtraction in the grid is untouched and still covered above. */
 
 /**
  * P12 — CANCEL IS NOT DELETE, asserted rather than promised (Loo, 2026-08-04,
@@ -2168,106 +749,6 @@ describe("no delete path exists for a purchase demand", () => {
   it("no route path in the file spells a delete or a purge", () => {
     expect(src).not.toMatch(/["'`][^"'`]*\/(delete|purge|remove)\b/i);
   });
-
-  it("the only demand doors are create, cancel and the issue record", () => {
-    const rpcs = [...src.matchAll(/rpc\(\s*"(purchasing_[a-z_]*demand[a-z_]*)"/g)].map(
-      (m) => m[1],
-    );
-    expect([...new Set(rpcs)].sort()).toEqual([
-      "purchasing_cancel_demand",
-      "purchasing_create_demand",
-      "purchasing_demand_record_issue",
-    ]);
-  });
-});
-
-/**
- * P15 — THE SOURCE, AND THE PICKER'S OWN READ (Loo, 2026-08-04).
- *
- * `purpose` was a hardcoded `"ready_stock"` on this route because the RPC
- * refused everything else by name (Jess, 2026-08-03 — *"V1 buys READY STOCK
- * only"*). 0319 wrote that refusal so that *"the day one is approved this gate
- * is the only thing that changes"*; Loo approved the four the CHECK holds and
- * 0323 changed that one gate. The route now forwards what the operator chose.
- */
-describe("POST …/to-order/demand — the Source rides the wire (P15)", () => {
-  const DEST = "2f181917-f4e1-42b2-9e25-d7ee6785424a";
-
-  async function create(body: unknown, role = "operation") {
-    const calls: { fn: string; args: Record<string, unknown> }[] = [];
-    vi.mocked(userClient).mockReturnValue({
-      from: vi.fn(),
-      rpc: vi.fn(async (fn: string, args: Record<string, unknown>) => {
-        calls.push({ fn, args });
-        return { data: { id: "d1", supplier_id: "s1" }, error: null };
-      }),
-    } as never);
-    const jwt = await makeJwt(role);
-    const res = await app.fetch(
-      new Request("http://t/api/operation/purchase/to-order/demand", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
-      env,
-    );
-    return { res, calls };
-  }
-
-  const base = { sku: "SONIC-S", qty: 2, destinationId: DEST };
-
-  it("forwards each of the four purposes the store can record", async () => {
-    for (const p of ["ready_stock", "display", "warranty", "office"]) {
-      const { res, calls } = await create({ ...base, purpose: p });
-      expect(res.status).toBe(200);
-      expect(calls[0].fn).toBe("purchasing_create_demand");
-      expect(calls[0].args.p_purpose).toBe(p);
-    }
-  });
-
-  it("refuses a purpose the database has no value for, before it reaches the RPC", async () => {
-    // `Spare Parts` and `Other…` are ruled WORDS with no CHECK value. The
-    // dialog does not offer them; this proves the wire does not either, so the
-    // three lists (CHECK · function gate · shared constant) cannot drift into
-    // a fourth that only the api believes.
-    for (const p of ["spare_parts", "other", "", "READY_STOCK"]) {
-      const { res, calls } = await create({ ...base, purpose: p });
-      expect(res.status).toBe(400);
-      expect(calls).toHaveLength(0);
-    }
-  });
-
-  it("a browser on the pre-P15 bundle still works, and means ready stock", async () => {
-    // No `purpose` key at all — the only thing that browser could have meant,
-    // and the RPC's own default.
-    const { res, calls } = await create(base);
-    expect(res.status).toBe(200);
-    expect(calls[0].args.p_purpose).toBe("ready_stock");
-  });
-
-  it("NO SUPPLIER may be smuggled through the body", async () => {
-    /**
-     * Jess's 2026-08-03 ruling as a test: a product has ONE factory and the
-     * server derives it from the SKU. P15 shows the supplier in the dialog —
-     * that is the derivation read back, never a second answer. The RPC has no
-     * supplier parameter, so a body carrying one must reach nothing.
-     */
-    const { res, calls } = await create({
-      ...base,
-      purpose: "display",
-      supplierId: "11111111-1111-1111-1111-111111111111",
-      supplier: "Somebody Else",
-    });
-    expect(res.status).toBe(200);
-    expect(Object.keys(calls[0].args).sort()).toEqual([
-      "p_destination_id",
-      "p_purpose",
-      "p_qty",
-      "p_remark",
-      "p_required_by",
-      "p_sku",
-    ]);
-  });
 });
 
 describe("GET …/to-order/demand/pick-items — the picker's own read (P15)", () => {
@@ -2285,6 +766,29 @@ describe("GET …/to-order/demand/pick-items — the picker's own read (P15)", (
       // on its way → neither
       { id: "u5", sku: "SONIC-S", qty: 9, status: "incoming", condition: "new", needs_repair: false },
     ];
+    /* P10's offer now reads the AUTHORITATIVE register view (0366 · 0371 ·
+       0453) rather than re-deciding availability over the base table. The
+       fixture derives it from the SAME rows through `unit_availability`'s own
+       rule, so the mock cannot answer something the database would not. */
+    const registerView = stock.map((r) => ({
+      ...r,
+      unit_code: `U1-000-00${String(r.id).slice(1)}`,
+      warehouse_id: WH,
+      site_name: "Carres Klang",
+      holder_name: null,
+      ownership: "carres_owned",
+      supplier: null,
+      identity_scope: "unit",
+      date_in: null,
+      availability:
+        r.status === "free" && !r.needs_repair && r.condition !== "damaged"
+          ? "available"
+          : r.status === "reserved"
+            ? "reserved"
+            : r.status === "incoming"
+              ? "incoming"
+              : "not_available",
+    }));
     return {
       from: vi.fn((table: string) => {
         const rows =
@@ -2307,13 +811,18 @@ describe("GET …/to-order/demand/pick-items — the picker's own read (P15)", (
                   ? [{ id: WH, name: "Carres Klang", kind: "own" }]
                   : table === "ops_stock_items"
                     ? stock
-                    : [];
+                    : table === "stock_unit_register_v"
+                      ? registerView
+                      : [];
         const q: Record<string, unknown> = {};
         const chain = () => q;
         // Every narrowing the route applies, honoured so the shaped rows are
         // what the route would really have seen.
         q.select = vi.fn(chain);
         q.eq = vi.fn((col: string, val: unknown) => {
+          if (table === "stock_unit_register_v" && col === "availability") {
+            (q as { _rows: unknown[] })._rows = registerView.filter((r) => r.availability === val);
+          }
           if (table === "ops_stock_items" && col === "status") {
             (q as { _rows: unknown[] })._rows = stock.filter((r) => r.status === val);
           }
@@ -2336,9 +845,10 @@ describe("GET …/to-order/demand/pick-items — the picker's own read (P15)", (
         q.order = vi.fn(chain);
         q.then = (resolve: (v: unknown) => unknown) =>
           resolve({
-            data: table === "ops_stock_items"
-              ? ((q as { _rows?: unknown[] })._rows ?? stock)
-              : rows,
+            data:
+              table === "ops_stock_items" || table === "stock_unit_register_v"
+                ? ((q as { _rows?: unknown[] })._rows ?? rows)
+                : rows,
             error: null,
           });
         return q;
@@ -2404,7 +914,13 @@ describe("GET …/to-order/demand/pick-items — the picker's own read (P15)", (
     const c = client();
     const realFrom = c.from;
     c.from = vi.fn((table: string) => {
-      if (table === "ops_stock_items") throw new Error("register down");
+      /* THE REGISTER IS BOTH ITS TABLE AND ITS AUTHORITATIVE VIEW. P10's
+         offer reads `stock_unit_register_v` (0366 · 0371 · 0453) and the
+         On Hand / Reserved counts read the base table, so "unreachable"
+         means neither answers — otherwise this test would prove nothing. */
+      if (table === "ops_stock_items" || table === "stock_unit_register_v") {
+        throw new Error("register down");
+      }
       return (realFrom as (t: string) => unknown)(table);
     }) as never;
     const { res, body } = await pick(c);
@@ -2436,10 +952,8 @@ describe("P18 · the proceed date rides the To Order wire", () => {
     return (async () => {
       const sb = makeSb(t);
       vi.mocked(userClient).mockReturnValue(sb as never);
-      const res = await get();
-      expect(res.status).toBe(200);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const body = (await res.json()) as any;
+      const body = (await project(sb)) as any;
       const rows = body.proposals[0].rows as { so: number; proceedDate: string | null }[];
       const bySo = new Map(rows.map((r) => [r.so, r.proceedDate]));
       expect(bySo.get(1207)).toBe("2026-07-21");
@@ -2449,21 +963,1600 @@ describe("P18 · the proceed date rides the To Order wire", () => {
   });
 
   it("the order reads NAME the column — the mock cannot prove this, PostgREST needs it", () => {
-    const src = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), "to-order.ts"),
-      "utf8",
-    )
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    const here = dirname(fileURLToPath(import.meta.url));
+    const strip = (path: string) =>
+      readFileSync(path, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    // CARD-2026-08-20 — the demand read moved to `lib/purchase-demand-read.ts`
+    // (Purchase Demands reads the same recomputation), so the guard follows it
+    // rather than shrinking: the whole point is that NO orders read anywhere in
+    // this engine may drop the column.
+    const src =
+      strip(join(here, "to-order.ts")) +
+      "\n" +
+      strip(join(here, "..", "..", "lib", "purchase-demand-read.ts"));
 
-    // Every `.from("orders").select(...)` in this file must ask for it. There
-    // are TWO: the demand read, and the ordered/receipt read-back — and the
-    // second is not optional, because an order whose every line is bought has no
-    // demand rows left, so its group is receipts alone.
+    // Every `.from("orders").select(...)` in the engine must ask for it. The
+    // ordered read-back and the scoped SO lens left with `GET /`, so the demand
+    // read is the one that remains.
     const selects = [
       ...src.matchAll(/\.from\(\s*"orders"\s*\)\s*\n?\s*\.select\(\s*([\s\S]*?)\)\s*\n?\s*\./g),
     ].map((m) => m[1]!);
-    expect(selects).toHaveLength(3);
+    expect(selects).toHaveLength(1);
     for (const s of selects) expect(s).toContain("proceed_date");
+  });
+});
+
+
+/**
+ * THE WHOLE-BATCH ISSUE (CARD-2026-08-22-purchasing-02 §7.3).
+ *
+ * One request, every purchase order, one transaction. The server groups by
+ * supplier × Deliver To ITSELF — the browser's grouping is a hint it never
+ * reads — recomputes all demand and coverage first, and creates everything or
+ * nothing.
+ */
+const ISSUE_BATCH = "http://t/api/operation/purchase/to-order/issue-batch";
+
+async function postBatch(body: unknown, role = "operation") {
+  const jwt = await makeJwt(role);
+  return app.fetch(
+    new Request(ISSUE_BATCH, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+    env,
+  );
+}
+
+/** Every buyable demand id the projection would show, with its build quantity. */
+async function readyDemands(sb: ReturnType<typeof makeSb>) {
+  vi.mocked(userClient).mockReturnValue(sb as never);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const body = (await project(sb)) as any;
+  const out: { demandId: string; qty: number; orderId: string; skus: string[] }[] = [];
+  for (const p of body.proposals) {
+    for (const r of p.rows) {
+      for (const b of r.builds) {
+        out.push({
+          demandId: `build::${r.orderId}::${b.key}`,
+          qty: b.qty,
+          orderId: r.orderId,
+          /* The SKUs this build puts on a document — so a test can price
+             exactly what each side of a split actually carries. */
+          skus: String(b.codes ?? "").split(" · ").filter(Boolean),
+        });
+      }
+    }
+  }
+  return out;
+}
+
+
+/**
+ * ⭐ A DECISION NAMES ITS DOCUMENT (Card closure §4).
+ *
+ * The fixture is Ohana × sofa, and a sofa is ONE PO PER CUSTOMER ORDER — so
+ * `o1` and `o2` are two documents and a decision must say which. This builds
+ * the set the browser would send: the priced document, plus an entry for every
+ * other document so the coverage is complete (partial coverage is refused,
+ * because it means the operator never saw the split the server made).
+ */
+function sofaDocKey(orderId: string, destinationId = KLANG) {
+  return documentPartitionKey({
+    supplierId: OHANA,
+    destinationId,
+    category: "sofa",
+    orderId,
+  });
+}
+/**
+ * ⭐ EVERY LINE IS PRICED, ALWAYS (0380; closure §3).
+ *
+ * There is no "send nothing and let the server read Catalog" path any more:
+ * that was the check that compared the live value against itself. The browser
+ * declares the price it REVIEWED for every SKU, and so does every test.
+ */
+const CATALOG_COST: Record<string, number> = {
+  "5539-1B(LHF)": 100,
+  "5539-CNR": 100,
+  "5539-2A(RHF)": 100,
+  "5539-1A(LHF)": 120,
+};
+/** Which SKUs each customer order's sofa document carries. */
+const SKUS_BY_ORDER: Record<string, string[]> = {
+  o1: ["5539-1B(LHF)", "5539-CNR", "5539-2A(RHF)", "5539-1A(LHF)"],
+  o2: ["5539-1A(LHF)"],
+};
+type WireDecision = { sku: string } & Record<string, unknown>;
+const catalogLines = (orderId: string): WireDecision[] =>
+  (SKUS_BY_ORDER[orderId] ?? []).map((sku) => ({
+    sku,
+    treatment: "normal",
+    unitCost: CATALOG_COST[sku]!,
+    costSource: "catalog",
+    expectedCatalogCost: CATALOG_COST[sku]!,
+  }));
+
+function decisionsForAll(
+  demands: { orderId: string }[],
+  destinationId: string,
+  priced: {
+    orderId: string;
+    lineDecisions: unknown[];
+    procurementPartnerId?: string | null;
+  } | null = null,
+) {
+  const orders = [...new Set(demands.map((d) => d.orderId))];
+  return orders.map((orderId) => {
+    /* A test that prices ONE sku replaces that one and leaves the rest at the
+       catalog price it reviewed — the same thing the operator does. */
+    const byS = new Map<string, WireDecision>(catalogLines(orderId).map((l) => [l.sku, l]));
+    if (priced && priced.orderId === orderId) {
+      for (const l of priced.lineDecisions as WireDecision[]) byS.set(l.sku, l);
+    }
+    return {
+      documentKey: sofaDocKey(orderId, destinationId),
+      supplierId: OHANA,
+      destinationId,
+      procurementPartnerId:
+        priced?.procurementPartnerId !== undefined ? priced.procurementPartnerId : null,
+      lineDecisions: [...byS.values()],
+    };
+  });
+}
+
+/** The catalog decision for an explicit SKU list — used where a split makes
+ *  each document carry a different part of the set. */
+const catalogLinesFor = (skus: readonly string[]): WireDecision[] =>
+  skus.map((sku) => ({
+    sku,
+    treatment: "normal",
+    unitCost: CATALOG_COST[sku]!,
+    costSource: "catalog",
+    expectedCatalogCost: CATALOG_COST[sku]!,
+  }));
+
+const pricedDoc = (
+  orderId: string,
+  destinationId: string,
+  skus: readonly string[],
+) => ({
+  documentKey: sofaDocKey(orderId, destinationId),
+  supplierId: OHANA,
+  destinationId,
+  procurementPartnerId: null,
+  lineDecisions: catalogLinesFor(skus),
+});
+
+/**
+ * PRICE WHAT EACH DOCUMENT ACTUALLY CARRIES, derived from the arrangement.
+ *
+ * The browser can do exactly this because the partition key is shared: it knows
+ * where the server's cuts fall, so it can price each document rather than
+ * guessing at the whole supplier surface.
+ */
+const priceSplit = (
+  selections: readonly {
+    demandId: string;
+    allocations: readonly { destinationId: string; qty: number }[];
+  }[],
+  demands: readonly { demandId: string; orderId: string; skus: string[] }[],
+) => {
+  const byId = new Map(demands.map((d) => [d.demandId, d]));
+  const docs = new Map<string, { orderId: string; destinationId: string; skus: Set<string> }>();
+  for (const sel of selections) {
+    const d = byId.get(sel.demandId);
+    if (!d) continue;
+    for (const a of sel.allocations) {
+      const key = sofaDocKey(d.orderId, a.destinationId);
+      let hit = docs.get(key);
+      if (!hit) {
+        hit = { orderId: d.orderId, destinationId: a.destinationId, skus: new Set() };
+        docs.set(key, hit);
+      }
+      for (const sku of d.skus) hit.skus.add(sku);
+    }
+  }
+  return [...docs.values()].map((v) => pricedDoc(v.orderId, v.destinationId, [...v.skus]));
+};
+
+/** Everything at the catalog price, for the ordinary happy path. */
+const pricedAll = (demands: { orderId: string }[], destinationId: string) =>
+  decisionsForAll(demands, destinationId);
+
+const allTo = (
+  demands: { demandId: string; qty: number }[],
+  destinationId: string,
+) => demands.map((d) => ({ demandId: d.demandId, allocations: [{ destinationId, qty: d.qty }] }));
+
+describe("POST …/to-order/issue-batch — one door, one transaction", () => {
+  it("401 without Authorization", async () => {
+    const res = await app.fetch(new Request(ISSUE_BATCH, { method: "POST" }), env);
+    expect(res.status).toBe(401);
+  });
+
+  it("creates every purchase order through the ONE governed RPC", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
+    expect(res.status).toBe(200);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
+  });
+
+  it("an authenticated ordinary caller sees the locked-source refusal after a stale read", async()=>{
+    const sb=makeSb(TABLES());
+    const demands=await readyDemands(sb);
+    const original=sb.rpc.getMockImplementation()!;
+    sb.rpc.mockImplementation(async (fn,args)=>fn === "purchasing_issue_pos_batch"
+      ? {data:null,error:{code:"P0001",message:"Source requirement changed",details:"unknown_demand"}} as never
+      : original(fn,args));
+    const res=await postBatch({selections:allTo(demands,KLANG)});
+    expect(res.status).toBe(422);
+    const body=await res.json() as Record<string,unknown>;
+    expect(body).toMatchObject({code:"unknown_demand"});
+    expect(JSON.stringify(body)).toContain("Go back to buying and tick the lines again.");
+    expect(body).not.toHaveProperty("pos");
+  });
+
+  it("derives Catalog cost and the fixed collection partner from governed data", async () => {
+    const tables = TABLES();
+    (tables.suppliers.data as Record<string, unknown>[])[0]!.kind = "factory_pickup";
+    tables.purchasing_supplier_settings = {
+      data: [{
+        supplier_id: OHANA,
+        off_days: [0],
+        fixed_destination_id: KLANG,
+        collected_by_partner_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      }],
+      error: null,
+    };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+
+    const res = await postBatch({ selections: allTo(demands, KLANG) });
+
+    expect(res.status).toBe(200);
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as Array<{ procurement_partner_id: string; lines: Array<Record<string, unknown>> }>;
+    expect(pos.every((po) => po.procurement_partner_id === "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")).toBe(true);
+    expect(pos.flatMap((po) => po.lines).every((line) => line.cost_source === "catalog")).toBe(true);
+  });
+
+  it("the server groups by supplier × Deliver To — the client's grouping is a hint", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    // Everything to ONE destination.
+    await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
+    const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
+    const pos = batch.args.p_pos as { destination_id: string; supplier_id: string }[];
+    expect(new Set(pos.map((p) => p.destination_id))).toEqual(new Set([KLANG]));
+    expect(new Set(pos.map((p) => p.supplier_id))).toEqual(new Set([OHANA]));
+  });
+
+  it("one supplier split across two destinations becomes TWO documents", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    const first = demands[0]!;
+    const rest = demands.slice(1);
+    const selections = [
+      { demandId: first.demandId, allocations: [{ destinationId: AL, qty: first.qty }] },
+      ...allTo(rest, KLANG),
+    ];
+    /* Each document is priced for the part of the set IT carries — the
+       partition is shared, so the browser knows where the cut fell. */
+    const res = await postBatch({
+      selections,
+      documentDecisions: priceSplit(selections, demands),
+    });
+    expect(res.status).toBe(200);
+    const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
+    const pos = batch.args.p_pos as { destination_id: string }[];
+    expect(new Set(pos.map((p) => p.destination_id))).toEqual(new Set([KLANG, AL]));
+  });
+
+  it("splitting ONE line across two destinations creates two documents from it", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    const multi = demands.find((d) => d.qty >= 2);
+    if (!multi) return; // the sofa fixture is one unit per build; covered elsewhere
+    const res = await postBatch({
+      selections: [
+        {
+          demandId: multi.demandId,
+          allocations: [
+            { destinationId: KLANG, qty: multi.qty - 1 },
+            { destinationId: AL, qty: 1 },
+          ],
+        },
+      ],
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("every line keeps its source Sales Order on the document", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
+    const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
+    const pos = batch.args.p_pos as { so_refs: number[] }[];
+    const refs = pos.flatMap((p) => p.so_refs).sort();
+    expect(refs).toEqual([1204, 1207]);
+    expect(pos.every((p) => p.so_refs.length > 0)).toBe(true);
+  });
+});
+
+describe("the batch issue refuses before it creates anything", () => {
+  async function expectNoPos(body: unknown, status: number, code?: string) {
+    const sb = makeSb(TABLES());
+    await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch(body);
+    expect(res.status).toBe(status);
+    if (code) expect(((await res.json()) as { code?: string }).code).toBe(code);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+    return sb;
+  }
+
+  it("a demand the recomputation has never heard of", async () => {
+    await expectNoPos(
+      {
+        selections: [
+          { demandId: "build::ghost::nope", allocations: [{ destinationId: KLANG, qty: 1 }] },
+        ],
+        documentDecisions: [],
+      },
+      409,
+      "unknown_demand",
+    );
+  });
+
+  it("a fully covered receipt is refused BY NAME — re-issuing it is how six POs bought one unit", async () => {
+    /* 0430 — T6 keeps a fully covered build visible (a receipt stating what
+       the covering PO bought), and nothing here refused it: production minted
+       six open purchase orders for the SAME 1-unit order line of SO-1340 over
+       two days. The receipt's demandId is still in the index; the door must
+       answer `already_on_po`, never create another document. */
+    const t = TABLES();
+    t.purchase_order_lines = {
+      data: [{ po_id: "PO-2051", sku: "5539-1A(LHF)", qty: 5, received_qty: 0 }],
+      error: null,
+    };
+    const sb = makeSb(t);
+    const demands = await readyDemands(sb);
+    const receipt = demands.find((d) => d.orderId === "o2");
+    expect(receipt).toBeDefined();
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: [
+        { demandId: receipt!.demandId, allocations: [{ destinationId: KLANG, qty: receipt!.qty }] },
+      ],
+      documentDecisions: [],
+    });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code?: string }).code).toBe("already_on_po");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  /* ⭐ Owner ruling 2026-09-28 (Purchasing §9.1): "the operator may ignore
+     [the Use this PO offer] and tick the row to issue a new PO instead; the
+     second line never blocks buying". 0430 still refuses exact lineage. */
+  function poolCovered(lineage: boolean) {
+    const t = TABLES() as Record<string, { data: unknown; error: unknown }>;
+    t.purchase_order_lines = {
+      data: [{ id: "pol-2051", po_id: "PO-2051", sku: "5539-1A(LHF)", qty: 5, received_qty: 0, purchase_orders: { status: "open" } }],
+      error: null,
+    };
+    t.__poFree = {
+      data: [{ po_id: "PO-2051", po_line_id: "pol-2051", sku: "5539-1A(LHF)", free_units: 5 }],
+      error: null,
+    };
+    if (lineage) {
+      t.po_line_sources = {
+        data: [{ order_line_id: "e1", qty: 1, purchase_orders: { status: "open" } }],
+        error: null,
+      };
+    }
+    return t;
+  }
+  async function issueO2(t: Record<string, { data: unknown; error: unknown }>) {
+    const sb = makeSb(t as never);
+    const demands = await readyDemands(sb);
+    const receipt = demands.find((d) => d.orderId === "o2")!;
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: [{ demandId: receipt.demandId, allocations: [{ destinationId: KLANG, qty: receipt.qty }] }],
+      documentDecisions: pricedAll([receipt], KLANG),
+    });
+    return { res, sb };
+  }
+
+  it("a line covered ONLY by the anonymous pool, with a Use this PO offer, is bought instead", async () => {
+    const { res, sb } = await issueO2(poolCovered(false));
+    expect(res.status).toBe(200);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
+  });
+
+  it("a line covered by EXACT lineage from this Sales Order line is still refused (0430)", async () => {
+    const { res, sb } = await issueO2(poolCovered(true));
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code?: string }).code).toBe("already_on_po");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("a pool-covered line with NO free goods on any PO is still refused", async () => {
+    const t = poolCovered(false);
+    t.__poFree = { data: [], error: null };
+    const { res } = await issueO2(t);
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code?: string }).code).toBe("already_on_po");
+  });
+
+  it("an allocation total that does not equal the server's own remainder", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const first = demands[0]!;
+    const res = await postBatch({
+      selections: [
+        { demandId: first.demandId, allocations: [{ destinationId: KLANG, qty: first.qty + 5 }] },
+      ],
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code?: string }).code).toBe("allocation_mismatch");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("a destination that is switched off", async () => {
+    const tables = TABLES();
+    tables.purchasing_destinations = {
+      data: [
+        { id: KLANG, name: "Carres Klang", is_default: true, active: true },
+        { id: CLOSED_YARD, name: "Old Yard", is_default: false, active: false },
+      ],
+      error: null,
+    };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const first = demands[0]!;
+    const res = await postBatch({
+      selections: [
+        { demandId: first.demandId, allocations: [{ destinationId: CLOSED_YARD, qty: first.qty }] },
+      ],
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code?: string }).code).toBe("inactive_destination");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("⭐ a Deliver To with no address is refused BEFORE the PO exists", async () => {
+    const tables = TABLES();
+    tables.purchasing_destinations = {
+      data: [
+        { id: KLANG, name: "Carres Klang", is_default: true, active: true, address: null },
+      ],
+      error: null,
+    };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const first = demands[0]!;
+    const res = await postBatch({
+      selections: [
+        { demandId: first.demandId, allocations: [{ destinationId: KLANG, qty: first.qty }] },
+      ],
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; message?: string };
+    expect(body.code).toBe("destination_address_missing");
+    expect(body.message).toContain("Carres Klang has no address on file.");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("⭐ a SKU whose Stock identity is Not set is refused by name before the PO exists", async () => {
+    const tables = TABLES();
+    tables.product_skus = {
+      data: (tables.product_skus.data as Record<string, unknown>[]).map((r) => ({
+        ...r,
+        stock_identity_mode: null,
+      })),
+      error: null,
+    };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const first = demands[0]!;
+    const res = await postBatch({
+      selections: [
+        { demandId: first.demandId, allocations: [{ destinationId: KLANG, qty: first.qty }] },
+      ],
+      documentDecisions: [],
+    });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code?: string }).code).toBe("catalog_identity_mode_missing");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("a destination nobody has heard of", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: [
+        {
+          demandId: demands[0]!.demandId,
+          allocations: [
+            { destinationId: "7c7c7c7c-0000-4000-8000-00000000000e", qty: demands[0]!.qty },
+          ],
+        },
+      ],
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(422);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("a customer order with no delivery date", async () => {
+    const tables = TABLES();
+    (tables.orders.data as Record<string, unknown>[])[0]!.delivery_date = null;
+    (tables.orders.data as Record<string, unknown>[])[0]!.delivery_date_tbd = true;
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const o1 = demands.filter((d) => d.orderId === "o1");
+    if (o1.length === 0) return;
+    const res = await postBatch({ selections: allTo(o1, KLANG), documentDecisions: pricedAll(demands, KLANG) });
+    expect(res.status).toBe(422);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("an empty selection is refused by the schema, not by the database", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await postBatch({ selections: [], documentDecisions: [] });
+    expect(res.status).toBe(400);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("the same demand named twice", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const first = demands[0]!;
+    const one = { demandId: first.demandId, allocations: [{ destinationId: KLANG, qty: first.qty }] };
+    const res = await postBatch({ selections: [one, one], documentDecisions: [] });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code?: string }).code).toBe("duplicate_demand");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+});
+
+describe("only Current PO Duty may issue", () => {
+  it("the duty holder issues", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
+    expect(res.status).toBe(200);
+  });
+
+  it("an Operations login who is NOT on duty is refused, and creates nothing", async () => {
+    const tables = TABLES();
+    tables.ops_po_duty = { data: [{ user_id: "somebody-else" }], error: null };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { code?: string }).code).toBe("not_po_duty");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("nobody on duty means nobody issues", async () => {
+    const tables = TABLES();
+    tables.ops_po_duty = { data: [], error: null };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
+    expect(res.status).toBe(403);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("a dealer never reaches the door at all", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await postBatch({ selections: [], documentDecisions: [] }, "dealer");
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("the commercial laws still hold on the batch door", () => {
+  it("a catalog cost that moved since the operator looked stops that document", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: null, lineDecisions: [
+            {
+              sku: "5539-1B(LHF)",
+              treatment: "normal",
+              unitCost: 999999,
+              costSource: "catalog",
+              /* ⭐ WHAT THE OPERATOR REVIEWED. Catalog says 100 now, so the
+                 price moved between the review and Issue PO — and 0380 refuses
+                 it instead of adopting it silently. */
+              expectedCatalogCost: 999999,
+            },
+          ] }),
+    });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code?: string }).code).toBe("supplier_price_changed");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("a priced line that is no longer on the document stops the batch", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: null, lineDecisions: [
+            { sku: "GONE-SKU", treatment: "normal", unitCost: 10, costSource: "catalog" },
+          ] }),
+    });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code?: string }).code).toBe("stale_cost_decision");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("Free of Charge still carries its reason into the document", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: null, lineDecisions: [
+            { sku: "5539-CNR", treatment: "free_of_charge", reason: "Supplier replacement" },
+          ] }),
+    }, "principal");
+    expect(res.status).toBe(200);
+    const batch = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!;
+    const pos = batch.args.p_pos as { lines: Record<string, unknown>[] }[];
+    const foc = pos.flatMap((p) => p.lines).find((l) => l.sku === "5539-CNR")!;
+    expect(foc.commercial_treatment).toBe("free_of_charge");
+    expect(foc.commercial_reason).toBe("Supplier replacement");
+    expect(foc.cost).toBe(0);
+  });
+});
+
+
+/**
+ * ⭐ THE GUARDS THAT CAME OFF THE RETIRED `/issue` DOOR
+ * (CARD-2026-08-22-purchasing-02 §9 Task 7).
+ *
+ * `POST …/to-order/issue` is deleted. These are its laws, re-asked of the ONE
+ * remaining issuance authority, because a law whose only test died with its
+ * route is a law nobody is checking any more.
+ *
+ * Two of them CHANGED MEANING on the way across, and that is the Card's own
+ * ruling rather than a regression:
+ *
+ *   · the old door issued ONE supplier × category at a time, so "an unrelated
+ *     document stays issuable when another needs cost" was true. The batch door
+ *     is ATOMIC (§12 — "one failed group leaves some newly created POs
+ *     behind" is a failure condition), so the same input now creates NOTHING.
+ *   · the old door let the client name which builds shared a document, so a
+ *     "merged sofa" had to be refused. The batch door groups by itself, so the
+ *     assertion becomes: the server never merges two customer orders' sofas.
+ */
+describe("the retired door's laws, re-asked of the batch door", () => {
+  async function ready(tables = TABLES()) {
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    return { sb, demands };
+  }
+  const batchArgs = (sb: ReturnType<typeof makeSb>) =>
+    sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args.p_pos as Record<
+      string,
+      unknown
+    >[];
+
+  it("puts every module of a customer's sofas on that customer's document", async () => {
+    const { sb, demands } = await ready();
+    await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
+    const pos = batchArgs(sb) as unknown as {
+      so_refs: number[];
+      lines: { sku: string }[];
+    }[];
+    const peter = pos.find((po) => po.so_refs.includes(1207))!;
+    expect(peter.lines.map((l) => l.sku).sort()).toEqual([
+      "5539-1A(LHF)",
+      "5539-1B(LHF)",
+      "5539-2A(RHF)",
+      "5539-CNR",
+    ]);
+    expect(peter.so_refs).toEqual([1207]);
+  });
+
+  it("the server never merges two customers' sofas onto one document", async () => {
+    const { sb, demands } = await ready();
+    await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
+    const pos = batchArgs(sb) as unknown as { so_refs: number[] }[];
+    // A sofa is one PO per customer order (locked 2026-07-27).
+    for (const po of pos) expect(po.so_refs).toHaveLength(1);
+    expect(pos.length).toBeGreaterThan(1);
+  });
+
+  it("writes the chosen destination onto EVERY purchase order it created", async () => {
+    const { sb, demands } = await ready();
+    await postBatch({ selections: allTo(demands, AL), documentDecisions: pricedAll(demands, AL) });
+    for (const po of batchArgs(sb)) expect(po.destination_id).toBe(AL);
+  });
+
+  /**
+   * ⭐ OWNER INSTRUCTION 2026-09-23 — PRICE IS NOT A PLACEMENT GATE ON THIS
+   * LANE EITHER (the gap MASTER §9.2 named after Manual Purchase shipped 0573).
+   *
+   * These three tests keep the two cases apart, because they cost a supplier
+   * different things:
+   *   · NOBODY DECLARED and Catalog has nothing → the order goes out carrying
+   *     the ABSENCE (no cost, no source, no treatment).
+   *   · A DECLARED catalog price that Catalog no longer has → still refused:
+   *     the operator reviewed a figure that is gone, which is not an unknown.
+   *   · A non-positive price carries no commercial claim. Filling it with
+   *     RM0 would put a number nobody agreed on a supplier's paper.
+   */
+  it("⭐ an UNPRICED SKU nobody declared is ISSUED, carrying the absence — never RM0", async () => {
+    const tables = TABLES();
+    (tables.product_skus.data as Record<string, unknown>[]).forEach((r) => {
+      if (r.sku === "5539-CNR") r.cost = null;
+    });
+    const { sb, demands } = await ready(tables);
+    const res = await postBatch({ selections: allTo(demands, KLANG) });
+    expect(res.status).toBe(200);
+    const lines = (batchArgs(sb) as unknown as { lines: Record<string, unknown>[] }[])
+      .flatMap((po) => po.lines);
+    const unpriced = lines.find((l) => l.sku === "5539-CNR")!;
+    expect(unpriced.cost).toBeNull();
+    expect(unpriced.cost_source).toBeNull();
+    expect(unpriced.commercial_treatment).toBeNull();
+    expect(unpriced.expected_catalog_cost).toBeNull();
+    /* Its neighbours on the same document keep every commercial fact they had. */
+    const priced = lines.find((l) => l.sku !== "5539-CNR" && l.cost != null)!;
+    expect(priced.cost_source).toBe("catalog");
+    expect(priced.commercial_treatment).toBe("normal");
+  });
+
+  it("⛔ a DECLARED catalog price that Catalog no longer has is still refused", async () => {
+    const tables = TABLES();
+    (tables.product_skus.data as Record<string, unknown>[]).forEach((r) => {
+      if (r.sku === "5539-CNR") r.cost = null;
+    });
+    const { sb, demands } = await ready(tables);
+    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; sku?: string };
+    expect(body.code).toBe("cost_required");
+    expect(body.sku).toBe("5539-CNR");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it.each([0, -1])("a Catalog price issue (%s) permits issue without approving a price", async (cost) => {
+    const tables = TABLES();
+    (tables.product_skus.data as Record<string, unknown>[]).forEach((r) => {
+      if (r.sku === "5539-CNR") r.cost = cost;
+    });
+    const { sb, demands } = await ready(tables);
+    const res = await postBatch({ selections: allTo(demands, KLANG) });
+    expect(res.status).toBe(200);
+    const lines = (batchArgs(sb) as unknown as { lines: Record<string, unknown>[] }[]).flatMap((po) => po.lines);
+    expect(lines.find((l) => l.sku === "5539-CNR")).toMatchObject({
+      cost: null, cost_source: null, commercial_treatment: null, expected_catalog_cost: null,
+    });
+    expect((tables.product_skus.data as Record<string, unknown>[]).find((r) => r.sku === "5539-CNR")?.cost).toBe(cost);
+  });
+
+  it("the whole batch stops — a priced document is not quietly issued alone", async () => {
+    /* The old door issued the healthy supplier and blocked the other. The batch
+       door cannot: all or none is the point of one request (§7.3). */
+    const tables = TABLES();
+    (tables.product_skus.data as Record<string, unknown>[]).forEach((r) => {
+      if (r.sku === "5539-CNR") r.cost = null;
+    });
+    const { sb, demands } = await ready(tables);
+    await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("a hand-entered transaction cost rides the document and never touches Catalog", async () => {
+    const { sb, demands } = await ready();
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: null, lineDecisions: [
+            { sku: "5539-CNR", treatment: "normal", unitCost: 1234, costSource: "hand_entered" },
+          ] }),
+    }, "principal");
+    expect(res.status).toBe(200);
+    const line = (batchArgs(sb) as unknown as { lines: Record<string, unknown>[] }[])
+      .flatMap((p) => p.lines)
+      .find((l) => l.sku === "5539-CNR")!;
+    expect(line.cost).toBe(1234);
+    expect(line.cost_source).toBe("hand_entered");
+    // Catalog is untouched — a PO price is not a price list edit.
+    expect(sb.rpcCalls.map((c) => c.fn)).not.toContain("catalog_set_cost");
+  });
+
+  it("Free of Charge without a reason is refused at the request boundary", async () => {
+    const { sb, demands } = await ready();
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: null, lineDecisions: [{ sku: "5539-CNR", treatment: "free_of_charge", reason: "   " }] }),
+    });
+    expect(res.status).toBe(400);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  /* ⭐ THE DATABASE'S REFUSAL KEEPS ITS NAMES (YH, 2026-09-03).
+     The route reads the collection rule as the OPERATOR while the guard is
+     `security definer`, so the rule can be invisible to the code that has to
+     explain it — and this refusal reached the screen as "The supplier must be
+     collected to its configured destination", naming neither party, beside
+     whichever document happened to be showing. 0418 sends the names in `hint`;
+     this pins that they reach the operator instead of the fallback. */
+  it("names the supplier and the destination the database refused over", async () => {
+    const { sb, demands } = await ready();
+    /* Only the batch call is replaced — the PO-duty read and every other RPC
+       keep their real answers, or the route refuses for the wrong reason. */
+    const passThrough = sb.rpc.getMockImplementation()!;
+    sb.rpc.mockImplementation(async (fn: string, args: Record<string, unknown>) => {
+      if (fn !== "purchasing_issue_pos_batch") return passThrough(fn, args);
+      return {
+        data: null,
+        error: {
+          code: "P0001",
+          message: "The PO destination must match Purchasing Settings.",
+          details: "supplier_collection_destination_mismatch",
+          hint: JSON.stringify({ supplier: "Ohana", destination: "Carres Klang" }),
+        },
+      };
+    });
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { message?: string; action?: string };
+    expect(body.message).toBe("Ohana must be collected to Carres Klang.");
+    expect(body.action).toBe("Set Deliver To to Carres Klang, then issue again.");
+  });
+
+  it("a browser collector cannot replace a missing governed collection rule", async () => {
+    const tables = TABLES();
+    (tables.suppliers.data as Record<string, unknown>[])[0]!.kind = "factory_pickup";
+    const { sb, demands } = await ready(tables);
+    const res = await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code?: string }).code).toBe("pickup_partner_required");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+
+    const { sb: sb2, demands: d2 } = await ready(tables);
+    const ok = await postBatch({
+      selections: allTo(d2, KLANG),
+      documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", lineDecisions: [] }),
+    });
+    expect(ok.status).toBe(422);
+    expect(sb2.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("a partner nobody governs is refused even on a pickup document", async () => {
+    const tables = TABLES();
+    (tables.suppliers.data as Record<string, unknown>[])[0]!.kind = "factory_pickup";
+    const { sb, demands } = await ready(tables);
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: "5d5d5d5d-0000-4000-8000-00000000000d", lineDecisions: [] }),
+    });
+    expect(res.status).toBe(422);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("an obsolete browser collector is ignored for own logistics", async () => {
+    const { sb, demands } = await ready();
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", lineDecisions: [] }),
+    });
+    expect(res.status).toBe(200);
+    expect(batchArgs(sb).every((po) => po.procurement_partner_id == null)).toBe(true);
+  });
+
+  it("⭐ the client may never send a quantity, a SKU or a price for a LINE", async () => {
+    const { sb, demands } = await ready();
+    const first = demands[0]!;
+    const res = await postBatch({
+      selections: [
+        {
+          demandId: first.demandId,
+          allocations: [{ destinationId: KLANG, qty: first.qty }],
+          // Anything beyond demandId + allocations is refused outright.
+          lines: [{ sku: "5539-CNR", qty: 99, cost: 1 }],
+        },
+      ],
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(400);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("the quantities that reach the RPC are the SERVER's, never the request's", async () => {
+    const { sb, demands } = await ready();
+    await postBatch({ selections: allTo(demands, KLANG), documentDecisions: pricedAll(demands, KLANG) });
+    const lines = (batchArgs(sb) as unknown as { lines: { qty: number }[] }[]).flatMap(
+      (p) => p.lines,
+    );
+    // Every fixture line is one unit; nothing the browser said could change it.
+    for (const l of lines) expect(l.qty).toBe(1);
+  });
+
+  it("a build that is not waiting to be ordered is unknown to the batch", async () => {
+    const { sb } = await ready();
+    const res = await postBatch({
+      selections: [
+        { demandId: "build::o1::already-ordered", allocations: [{ destinationId: KLANG, qty: 1 }] },
+      ],
+      documentDecisions: [],
+    });
+    expect(res.status).toBe(409);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("400s on a malformed body", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(ISSUE_BATCH, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: "{not json",
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("there is exactly ONE issuance door left", () => {
+  it("the retired per-supplier `/issue` route is GONE from the source", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(join(here, "to-order.ts"), "utf8");
+    expect(src).toContain('post("/issue-batch"');
+    expect(src).not.toContain('post("/issue"');
+    // ...and its own schema went with it. `validateIssuePlan` STAYS: it is the
+    // shared merged-sofa / duplicate-build guard, and the batch door still asks it.
+    expect(src).not.toContain("const issueBody");
+    expect(src).toContain("validateIssuePlan");
+  });
+
+  it("the retired route 404s", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/purchase/to-order/issue", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  /**
+   * ⭐ ONE AUTHORITY, GOVERNED CALLERS — and the difference matters.
+   *
+   * `purchasing_issue_pos_batch` is the only thing that may create a Purchase
+   * Order. It is NOT reached from only one place: Manual Purchase is a second
+   * governed journey onto the same authority
+   * (`routes/operation/manual-purchase.ts`), and always was. What this Card
+   * removed is the DUPLICATE SO-buying door, not Manual Purchase's.
+   *
+   * So the assertion is scoped honestly: SO Batch Purchase reaches the
+   * authority from exactly one place in its own route.
+   */
+  it("SO Batch Purchase reaches the creation authority from exactly one place", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(join(here, "to-order.ts"), "utf8");
+    expect(src.match(/rpc\(\s*"purchasing_issue_pos_batch"/g) ?? []).toHaveLength(1);
+  });
+
+  it("Manual Purchase is the OTHER governed journey onto the same authority", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const manual = readFileSync(join(here, "manual-purchase.ts"), "utf8");
+    // It is not a bypass and this Card did not touch it — it is the second
+    // approved way in, and a claim of "one caller" would have been false.
+    expect(manual).toContain("purchasing_issue_pos_batch");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CARD 02 CLOSURE — the five authorities, at the door that uses them
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * ONE ACTOR AUTHORITY (closure §1; 0379).
+ *
+ * The route used to read `ops_po_duty` for itself. It now asks the ONE resolver
+ * `purchasing_po_actor`, which knows dated buddy cover — and the creation RPC
+ * asks it again, so a direct call cannot walk past it either.
+ */
+describe("closure §1 · one governed PO actor authority", () => {
+  it("asks the ONE governed issue capability, never the duty table, for who may act", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    sb.tableCalls.length = 0;
+    await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(sb.rpcCalls.some((c) => c.fn === "purchasing_actor_may_issue")).toBe(true);
+    expect(sb.tableCalls).not.toContain("ops_po_duty");
+  });
+
+  it("accepts the governed operation@ Operations Superuser while Yu Jun remains duty owner", async () => {
+    const tables = TABLES();
+    tables.ops_po_duty = { data: [{ user_id: "u-yu-jun" }], error: null };
+    tables.app_users = {
+      data: [{ id: "u-yu-jun", name: "Yu Jun", email: "yujun@carres.com" }],
+      error: null,
+    };
+    tables.__mayIssue = { data: true, error: null };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+
+    expect(res.status).toBe(200);
+    expect(sb.rpcCalls.some((c) => c.fn === "purchasing_actor_may_issue")).toBe(true);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
+  });
+
+  it("accepts Jess through the same governed Operations Superuser capability", async () => {
+    const tables = TABLES();
+    tables.ops_po_duty = { data: [{ user_id: "u-yu-jun" }], error: null };
+    tables.__mayIssue = { data: true, error: null };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+
+    const res = await postBatch(
+      {
+        selections: allTo(demands, KLANG),
+        documentDecisions: pricedAll(demands, KLANG),
+      },
+      "principal",
+    );
+
+    expect(res.status).toBe(200);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
+  });
+
+  it("lets the authorised cover issue while the holder is away", async () => {
+    const tables = TABLES();
+    /* The month's holder is somebody else; today's dated cover is the caller. */
+    tables.ops_po_duty = { data: [{ user_id: "u9" }], error: null };
+    tables.ops_po_duty_cover = {
+      data: [{ normal_user_id: "u9", acting_user_id: "u1" }],
+      error: null,
+    };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(200);
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(1);
+  });
+
+  it("refuses an Operations login who is neither the holder nor the cover", async () => {
+    const tables = TABLES();
+    tables.ops_po_duty = { data: [{ user_id: "u9" }], error: null };
+    tables.app_users = {
+      data: [{ id: "u9", name: "Li Ching", email: "lc@carres.com" }],
+      error: null,
+    };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code?: string; message?: string; action?: string };
+    expect(body.code).toBe("not_po_duty");
+    /* ⭐ THE TWO LINES (closure §9): the fact, then the act, naming the person. */
+    expect(body.message).toBe("Only Operation staff may issue a purchase order.");
+    expect(body.action).toBe("Ask Li Ching to issue this purchase order.");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("says so plainly when the month has no PO duty holder at all", async () => {
+    const tables = TABLES();
+    tables.ops_po_duty = { data: [], error: null };
+    const sb = makeSb(tables);
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code?: string; action?: string };
+    expect(body.code).toBe("no_po_duty_holder");
+    expect(body.action).toBe("Ask management to set this month's PO duty holder.");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  it("turns the DATABASE's own duty refusal into the same two lines", async () => {
+    /* The route's check is for words; the RPC's is the authority. When SQL
+       refuses, the operator must still read a sentence and not a stack. */
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    const realRpc = sb.rpc.getMockImplementation()!;
+    sb.rpc.mockImplementation(async (fn: string, args: Record<string, unknown>) => {
+      if (fn === "purchasing_issue_pos_batch") {
+        return {
+          data: null,
+          error: { message: "only Current PO Duty…", details: "not_po_duty", code: "42501" },
+        } as never;
+      }
+      return realRpc(fn, args);
+    });
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code?: string; message?: string; action?: string };
+    expect(body.code).toBe("not_po_duty");
+    expect(body.message).toBe("Only Operation staff may issue a purchase order.");
+    expect(body.action?.length).toBeGreaterThan(0);
+  });
+
+  it("turns a commercial-approval refusal from SQL into the same two lines", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    const realRpc = sb.rpc.getMockImplementation()!;
+    sb.rpc.mockImplementation(async (fn: string, args: Record<string, unknown>) => {
+      if (fn === "purchasing_issue_pos_batch") {
+        return {
+          data: null,
+          error: {
+            message: "this price has no commercial approval",
+            details: "commercial_approval_required",
+            code: "P0001",
+          },
+        } as never;
+      }
+      return realRpc(fn, args);
+    });
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; action?: string };
+    expect(body.code).toBe("commercial_approval_required");
+    expect(body.action).toMatch(/Ask a manager to approve/);
+  });
+});
+
+/**
+ * COMMERCIAL AUTHORITY (closure §2; 0380).
+ *
+ * The defect was silent: the API re-read Catalog, sent the value back as
+ * `cost_source: catalog`, and the RPC compared the live value with itself. Every
+ * line now declares the price the OPERATOR REVIEWED, and there is no fallback
+ * for a line nobody checked.
+ */
+describe("closure §2 · commercial authority", () => {
+  it("sends the reviewed catalog cost to the RPC, so SQL has something to compare", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(200);
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as { lines: Record<string, unknown>[] }[];
+    const lines = pos.flatMap((p) => p.lines);
+    expect(lines.length).toBeGreaterThan(0);
+    for (const l of lines) {
+      expect(l.cost_source).toBe("catalog");
+      /* ⭐ THE DECLARATION. Without it 0380 refuses the line outright. */
+      expect(l.expected_catalog_cost).toBe(l.cost);
+      expect(l.expected_catalog_cost).not.toBeNull();
+    }
+  });
+
+  it("fills an undeclared normal line from governed Catalog", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    /* One document arrives with an EMPTY decision list — exactly what the old
+       "send nothing and let the server read Catalog" path produced. */
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: [
+        { ...pricedDoc("o1", KLANG, []), lineDecisions: [] },
+        pricedDoc("o2", KLANG, ["5539-1A(LHF)"]),
+      ],
+    });
+    expect(res.status).toBe(200);
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as Array<{ lines: Array<Record<string, unknown>> }>;
+    const lines = pos.flatMap((po) => po.lines);
+    expect(lines.every((line) => line.cost_source === "catalog")).toBe(true);
+  });
+
+  it("sends a hand-entered price as an EXCEPTION, with no catalog expectation", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: decisionsForAll(demands, KLANG, {
+        orderId: "o1",
+        procurementPartnerId: null,
+        lineDecisions: [
+          {
+            sku: "5539-CNR",
+            treatment: "normal",
+            unitCost: 250,
+            costSource: "hand_entered",
+            expectedCatalogCost: 100,
+          },
+        ],
+      }),
+    }, "principal");
+    expect(res.status).toBe(200);
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as { lines: Record<string, unknown>[] }[];
+    const hand = pos.flatMap((p) => p.lines).find((l) => l.sku === "5539-CNR")!;
+    expect(hand.cost).toBe(250);
+    expect(hand.cost_source).toBe("hand_entered");
+    /* ⭐ AN EXCEPTION'S AUTHORITY IS AN APPROVAL RECORD, not a catalog price.
+       0380 goes to `po_cost_approvals`; there is nothing here to compare. */
+    expect(hand.expected_catalog_cost).toBeNull();
+  });
+
+  it("sends Free of Charge as an exception too — reason kept, expectation absent", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: decisionsForAll(demands, KLANG, {
+        orderId: "o1",
+        procurementPartnerId: null,
+        lineDecisions: [
+          { sku: "5539-CNR", treatment: "free_of_charge", reason: "Replacement for a claim" },
+        ],
+      }),
+    }, "principal");
+    expect(res.status).toBe(200);
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as { lines: Record<string, unknown>[] }[];
+    const foc = pos.flatMap((p) => p.lines).find((l) => l.sku === "5539-CNR")!;
+    expect(foc).toMatchObject({
+      cost: 0,
+      cost_source: "hand_entered",
+      commercial_treatment: "free_of_charge",
+      commercial_reason: "Replacement for a claim",
+      expected_catalog_cost: null,
+    });
+  });
+
+  it("stores the SERVER's price, not the number the browser declared", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as { lines: Record<string, unknown>[] }[];
+    const cnr = pos.flatMap((p) => p.lines).find((l) => l.sku === "5539-CNR")!;
+    /* The fixture's catalog cost. The declaration only made the comparison
+       possible; the stored number is the server's own read. */
+    expect(cnr.cost).toBe(100);
+  });
+});
+
+/**
+ * SOURCE LINEAGE (closure §4; 0382).
+ *
+ * `so_refs` sat on the DOCUMENT, so a bulk purchase order printed a blank
+ * `SO NO`. Every line now carries which customer order each unit is for.
+ */
+describe("closure §4 · source lineage on every line", () => {
+  it("gives every line its customer order, SO number and order line", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(200);
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as { lines: { sku: string; qty: number; sources: Record<string, unknown>[] }[] }[];
+    const lines = pos.flatMap((p) => p.lines);
+    expect(lines.length).toBeGreaterThan(0);
+    for (const l of lines) {
+      expect(Array.isArray(l.sources)).toBe(true);
+      expect(l.sources.length).toBeGreaterThan(0);
+      /* THE PARTS ADD UP TO THE LINE — the rule 0382 refuses in SQL. */
+      expect(l.sources.reduce((s, x) => s + Number(x.qty), 0)).toBe(l.qty);
+      for (const src of l.sources) {
+        expect(typeof src.order_id).toBe("string");
+        expect(typeof src.order_line_id).toBe("string");
+        expect(src.so === null || typeof src.so === "number").toBe(true);
+      }
+    }
+  });
+
+  it("names the real order line, so SQL can validate the lineage it is given", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as { lines: { sku: string; sources: { order_id: string; order_line_id: string; so: number | null }[] }[] }[];
+    const cnr = pos.flatMap((p) => p.lines).find((l) => l.sku === "5539-CNR")!;
+    /* `p2` is the fixture's own order line for 5539-CNR on order o1 (SO-1207). */
+    expect(cnr.sources).toEqual([{ order_id: "o1", so: 1207, order_line_id: "p2", qty: 1 }]);
+  });
+
+  it("keeps the document's so_refs derived from the same lineage", async () => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as { so_refs: number[]; lines: { sources: { so: number | null }[] }[] }[];
+    for (const po of pos) {
+      const fromLines = new Set(
+        po.lines.flatMap((l) => l.sources.map((s) => s.so)).filter((v) => v != null),
+      );
+      expect(new Set(po.so_refs)).toEqual(fromLines);
+    }
+  });
+});
+
+/**
+ * ⭐ THE SPLIT THAT USED TO DOUBLE THE ORDER (closure §3 · §4).
+ *
+ * Measured 2026-08-24: the endpoint grouped allocations into documents and then
+ * asked `planFromDocuments` for each group's lines — a function that answers
+ * *what does this BUILD contain*. A demand of 3 split 2 + 1 across two
+ * destinations therefore produced two purchase orders of THREE: six units
+ * bought for a three-unit demand.
+ *
+ * The sofa fixture cannot show it (a sofa build is one unit and one place), so
+ * this fixture buys mattresses, which consolidate across customer orders.
+ */
+function MATTRESS_TABLES(): Tbl {
+  const t = TABLES();
+  t.purchasing_production_days = {
+    data: [{ supplier_id: OHANA, category: "mattress", working_days: 7 }],
+    error: null,
+  };
+  t.orders = {
+    data: [
+      {
+        id: "m1", so: 1400, customer_name: "MEI", status: "proceed_order",
+        delivery_date: "2026-09-30", delivery_date_tbd: false,
+        placed_at: "2026-07-01", created_at: "2026-07-01",
+      },
+    ],
+    error: null,
+  };
+  t.order_lines = {
+    data: [
+      {
+        id: "ml1", order_id: "m1", sku: "MAT-KING", qty: 3, attrs: null,
+        excluded_from_plan: false, exclude_from_plan_until: null,
+      },
+    ],
+    error: null,
+  };
+  t.product_skus = {
+    data: [
+      {
+        sku: "MAT-KING", supplier_id: OHANA, cost: 800, variant: "King",
+        product_models: { category: "mattress", name: "Dreamland" },
+      },
+    ],
+    error: null,
+  };
+  return t;
+}
+
+const matDocKey = (destinationId: string) =>
+  documentPartitionKey({
+    supplierId: OHANA,
+    destinationId,
+    category: "mattress",
+    /* A mattress consolidates across customer orders, so the order is not part
+       of its key — `documentPartitionKey` drops it. */
+    orderId: "m1",
+  });
+
+const matDoc = (destinationId: string) => ({
+  documentKey: matDocKey(destinationId),
+  supplierId: OHANA,
+  destinationId,
+  procurementPartnerId: null,
+  lineDecisions: [
+    {
+      sku: "MAT-KING",
+      treatment: "normal",
+      unitCost: 800,
+      costSource: "catalog",
+      expectedCatalogCost: 800,
+    },
+  ],
+});
+
+describe("closure §3 · a Deliver To split buys the demand ONCE", () => {
+  it("splits 3 into 2 + 1 and buys three units, not six", async () => {
+    const sb = makeSb(MATTRESS_TABLES());
+    const demands = await readyDemands(sb);
+    const only = demands.find((d) => d.qty === 3);
+    expect(only, "the mattress fixture must offer one build of 3").toBeTruthy();
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: [
+        {
+          demandId: only!.demandId,
+          allocations: [
+            { destinationId: KLANG, qty: 2 },
+            { destinationId: AL, qty: 1 },
+          ],
+        },
+      ],
+      documentDecisions: [matDoc(KLANG), matDoc(AL)],
+    });
+    expect(res.status).toBe(200);
+    const pos = sb.rpcCalls.find((c) => c.fn === "purchasing_issue_pos_batch")!.args
+      .p_pos as {
+      destination_id: string;
+      lines: { sku: string; qty: number; sources: { qty: number }[] }[];
+    }[];
+    expect(pos).toHaveLength(2);
+    const byDest = new Map(pos.map((p) => [p.destination_id, p]));
+    expect(byDest.get(KLANG)!.lines[0]!.qty).toBe(2);
+    expect(byDest.get(AL)!.lines[0]!.qty).toBe(1);
+    /* ⭐ THE WHOLE POINT: three units bought for a three-unit demand. */
+    const bought = pos.flatMap((p) => p.lines).reduce((s, l) => s + l.qty, 0);
+    expect(bought).toBe(3);
+    /* And the lineage was cut with it, not copied. */
+    for (const p of pos) {
+      for (const l of p.lines) {
+        expect(l.sources.reduce((s, x) => s + x.qty, 0)).toBe(l.qty);
+      }
+    }
+  });
+
+  it("still refuses a split that does not add back to the server's own Buy", async () => {
+    const sb = makeSb(MATTRESS_TABLES());
+    const demands = await readyDemands(sb);
+    const only = demands.find((d) => d.qty === 3)!;
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: [
+        {
+          demandId: only.demandId,
+          allocations: [
+            { destinationId: KLANG, qty: 2 },
+            { destinationId: AL, qty: 3 },
+          ],
+        },
+      ],
+      documentDecisions: [matDoc(KLANG), matDoc(AL)],
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string; message?: string };
+    expect(body.code).toBe("allocation_mismatch");
+    expect(body.message).toBe("You arranged 5 units and must buy 3.");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+});
+
+/**
+ * ⭐ CARD 02-C — THE PROCEEDED-ORDER BOUNDARY AT THE WRITE DOORS
+ * (RESOLVED FROM AUTHORITY, 2026-08-27).
+ *
+ * Both doors recompute through the ONE boundary read at POST time — a demand
+ * id naming a `place` order resolves to nothing and is refused BY NAME, with
+ * nothing created and nothing reserved. There is no second status check to
+ * drift from the read: the recomputation IS the recheck.
+ */
+describe("Card 02-C · a `place` order is refused at every door", () => {
+  it("never reaches the projection — no proposal row, no blocker row", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await project(sb)) as any;
+    for (const proposal of body.proposals) {
+      for (const row of proposal.rows) {
+        expect(row.orderId, `SO-${row.so}`).not.toBe("o9");
+        expect(row.so).not.toBe(1290);
+      }
+    }
+    for (const blocked of [...body.blocked, ...body.unresolved]) {
+      expect(blocked.so).not.toBe(1290);
+    }
+  });
+
+  it("direct PO issuance is refused with ZERO purchase orders created", async () => {
+    const sb = makeSb(TABLES());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await postBatch({
+      selections: [
+        { demandId: "build::o9::bk-z", allocations: [{ destinationId: KLANG, qty: 1 }] },
+      ],
+      documentDecisions: [],
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe("unknown_demand");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+});
+
+
+describe("Operation cannot edit commercial terms through legacy issue inputs", () => {
+  it.each([
+    { sku: "5539-CNR", treatment: "normal", unitCost: 1234, costSource: "hand_entered" },
+    { sku: "5539-CNR", treatment: "free_of_charge", reason: "Supplier replacement" },
+  ])("refuses $treatment before a PO or approval is consumed", async (line) => {
+    const sb = makeSb(TABLES());
+    const demands = await readyDemands(sb);
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({ selections: allTo(demands, KLANG),
+      documentDecisions: decisionsForAll(demands, KLANG, { orderId: "o1", procurementPartnerId: null, lineDecisions: [line] }),
+    });
+    expect(res.status).toBe(403);
+    expect(sb.rpcCalls.some(call => call.fn === "purchasing_issue_pos_batch")).toBe(false);
   });
 });

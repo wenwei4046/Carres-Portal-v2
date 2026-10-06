@@ -67,3 +67,20 @@ Customer panel (+ the inline-form primary Save, spec §4).
 Active + hover = BLUE (selection colour): `.railtab-active` = `#DBEAFE` fill +
 `#1E40AF` text; hover = `#DBEAFE` at 50%. Red dot = the tab's track needs
 action; count chip (white bg, amber ink) where a number says more.
+
+## 5. Delivery Order DOCUMENT statuses (blueprint card, owner ruling 2026-08-16)
+
+The DO register/object status is a **capsule pill** (StatusPill), derived by
+the ONE arithmetic `deliveryOrderStatusOf` (`packages/shared`) — never stored,
+never hand-keyed:
+
+| Status | Tone | Derived from |
+|---|---|---|
+| Created | neutral (grey) — owner column ruling 2026-08-18 | document exists, no delivery run recorded |
+| Out for delivery | info (blue) | the §4 chain's `Received by Logistics` fact (0363) with no result recorded yet — never derived from the calendar, and any recorded result outranks it |
+| Delivered | success (green) | latest `delivery_attempts` result for this number = delivered |
+| Delivery exception | warning (amber) | latest result = partial/failed · carries its ONE T4 reason on the quieter second line |
+| Cancelled | neutral (grey) | `voided_at` stamp (`order_cancelled` / `rescheduled`) |
+
+A failed document keeps its exception forever — a rebooked trip is a NEW
+document, so no cross-document input can rewrite it.

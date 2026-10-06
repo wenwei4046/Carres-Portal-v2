@@ -90,6 +90,12 @@ export interface SofaBuildAddPayload {
   priceBasis: "combo" | "a_la_carte";
 }
 
+export interface SofaBuildAddControl {
+  handleAdd: () => void;
+  canAdd: boolean;
+  blocker: string | null;
+}
+
 
 interface DragState {
   /** The primary cell id under the pointer. */
@@ -134,6 +140,7 @@ export default function SofaBuildCanvas({
   remarkPriceDisabled,
   onAddBuild,
   onLiveTotal,
+  onAddControlChange,
   onCreateCombo,
   onCreateQuickPick,
   onClose,
@@ -193,6 +200,9 @@ export default function SofaBuildCanvas({
    *  reprices (cells / size / fabric / leg), `null` while the canvas is empty.
    *  Lets a host page mirror the canvas price in its own chrome. */
   onLiveTotal?: (total: number | null) => void;
+  /** Exposes the existing add action and its gate to embedding chrome without
+   *  changing or replacing the builder footer. */
+  onAddControlChange?: (control: SofaBuildAddControl | null) => void;
   /** Principal-only: capture the CURRENT arrangement as a sofa combo. When
    *  provided, a "Create combo" button appears beside Add to cart (enabled once
    *  the build is a valid connected sofa). Absent → no button (dealer flow). */
@@ -718,6 +728,16 @@ export default function SofaBuildCanvas({
     });
   };
 
+  const handleAddRef = useRef(handleAdd);
+  handleAddRef.current = handleAdd;
+  const handleHostAdd = useCallback(() => handleAddRef.current(), []);
+
+  useEffect(() => {
+    if (!onAddControlChange) return;
+    onAddControlChange({ handleAdd: handleHostAdd, canAdd, blocker });
+    return () => onAddControlChange(null);
+  }, [onAddControlChange, handleHostAdd, canAdd, blocker]);
+
   const comboSavings =
     priceResult.basis === "combo" &&
     priceResult.comboSubsetSum != null &&
@@ -921,7 +941,7 @@ export default function SofaBuildCanvas({
                         className="sof-cv__btn"
                         style={{ width: "auto", padding: "0 10px", gap: 5 }}
                         aria-label="Edit modules"
-                        title="Unlock — select / move / rotate the modules individually"
+                        title="Unlock: select / move / rotate the modules individually"
                         data-testid="sofa-group-edit"
                       >
                         <Ungroup size={13} />
@@ -1256,7 +1276,7 @@ export default function SofaBuildCanvas({
               disabled={!canAdd}
               className="btn btn--secondary btn--lg"
               data-testid="sofa-build-create-quickpick"
-              title="Save this arrangement as a Quick Pick preset — no price (principal)"
+              title="Save this arrangement as a Quick Pick preset, no price (principal)"
             >
               Create quick pick
             </button>

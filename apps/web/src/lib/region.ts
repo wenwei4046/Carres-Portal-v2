@@ -106,15 +106,43 @@ const PREFIX2_TO_STATE: Record<string, string> = {
 };
 
 /**
- * Best-effort state detection from a free-text address. Returns a canonical
- * MY state name, the sentinel "Singapore", or null when nothing is recognised.
+ * ⭐ HOW a state was read out of a written address — because the three ways are
+ * not equally trustworthy, and a surface that warns about missing information
+ * has to know which one it is holding (Delivery MASTER §8.3, 2026-09-14).
+ *
+ * ```
+ * named        the state's own name or a known alias is WRITTEN in the address
+ *              (`…, 43300 PUCHONG,SELANGOR, Puchong, Selangor`)
+ * postcode     an exact 5-digit postcode the national dataset knows
+ * approximate  only the first TWO digits of an unknown postcode matched the
+ *              coarse range table — a guess, and this file has always said so
+ * ```
+ *
+ * `named` and `postcode` are the address SAYING where it goes. `approximate`
+ * is arithmetic over a range, so a reader that must not invent a fact stops
+ * there and keeps its warning.
  */
-export function detectState(address: string | null | undefined): string | null {
+export type StateBasis = "named" | "postcode" | "approximate";
+
+export interface DetectedState {
+  /** A canonical MY state name, or the sentinel "Singapore". */
+  state: string;
+  basis: StateBasis;
+}
+
+/**
+ * Best-effort state detection from a free-text address, WITH the evidence it
+ * rests on. `detectState` is this answer with the evidence dropped, so every
+ * existing caller keeps its exact behaviour.
+ */
+export function classifyState(address: string | null | undefined): DetectedState | null {
   if (!address) return null;
   const lower = address.toLowerCase();
 
   // Singapore is not a MY state — treat as its own region.
-  if (/\bsingapore\b/.test(lower) || /\bs'?pore\b/.test(lower)) return "Singapore";
+  if (/\bsingapore\b/.test(lower) || /\bs'?pore\b/.test(lower)) {
+    return { state: "Singapore", basis: "named" };
+  }
 
   // Keyword match on canonical state names + aliases. Prefer the match closest
   // to the END of the string (the state sits last in a composed address; this
@@ -135,13 +163,26 @@ export function detectState(address: string | null | undefined): string | null {
       bestState = canonical;
     }
   }
-  if (bestState !== null) return bestState;
+  if (bestState !== null) return { state: bestState, basis: "named" };
 
   // Postcode fallback: exact 5-digit, then coarse 2-digit prefix.
   const pc = lower.match(/\b(\d{5})\b/)?.[1];
-  if (pc) return POSTCODE_TO_STATE.get(pc) ?? PREFIX2_TO_STATE[pc.slice(0, 2)] ?? null;
+  if (pc) {
+    const exact = POSTCODE_TO_STATE.get(pc);
+    if (exact) return { state: exact, basis: "postcode" };
+    const coarse = PREFIX2_TO_STATE[pc.slice(0, 2)];
+    if (coarse) return { state: coarse, basis: "approximate" };
+  }
 
   return null;
+}
+
+/**
+ * Best-effort state detection from a free-text address. Returns a canonical
+ * MY state name, the sentinel "Singapore", or null when nothing is recognised.
+ */
+export function detectState(address: string | null | undefined): string | null {
+  return classifyState(address)?.state ?? null;
 }
 
 /** Map a detected state (or "Singapore") to a region bucket. */
@@ -212,4 +253,52 @@ export function suggestCarrier(
   if (!region) return null;
   const { primary, alt } = REGION_CARRIER[region];
   return { partner: primary, alt, region };
+}
+
+/**
+ * The OFFICIAL post town this text names, in the dataset's own spelling, or
+ * null when the text is not a post town of that state.
+ *
+ * The pickers speak official post towns only (`malaysia-postcodes.ts`), so a
+ * town that survives this check is one Pos Malaysia prints — never a
+ * neighbourhood, a condominium or a street that happened to sit before the
+ * state in a comma list. That is what makes reading a town OUT of a written
+ * address a reading rather than a guess.
+ */
+export function postTownOf(state: string | null | undefined, text: string | null | undefined): string | null {
+  if (!state || !text) return null;
+  const cities = MY_ADDRESS[state];
+  if (!cities) return null;
+  const wanted = text.trim().toLowerCase();
+  if (!wanted) return null;
+  for (const city of Object.keys(cities)) {
+    if (city.toLowerCase() === wanted) return city;
+  }
+  return null;
+}
+
+/**
+ * The post town an EXACT 5-digit postcode belongs to — the curated dataset
+ * only, never a range guess. Null when the dataset does not know the code.
+ *
+ * `state` is a REQUIRED agreement, not a filter: a record can carry a postcode
+ * from one state and name another (SO-1225 writes `43500` — Semenyih, Selangor
+ * — and ends `Sentul, Kuala Lumpur`), and pairing the two would print a town
+ * that is not in the state standing beside it. A disagreement resolves to
+ * nothing, and the label falls back to the state alone.
+ */
+export function postTownForPostcode(
+  postcode: string | null | undefined,
+  state: string | null | undefined,
+): string | null {
+  const pc = postcode?.trim().match(/^(\d{5})$/)?.[1];
+  if (!pc) return null;
+  const city = POSTCODE_TO_CITY.get(pc);
+  if (!city) return null;
+  return state && postTownOf(state, city) ? city : null;
+}
+
+/** The first exact 5-digit postcode written anywhere in an address. */
+export function postcodeIn(address: string | null | undefined): string | null {
+  return address?.match(/\b(\d{5})\b/)?.[1] ?? null;
 }

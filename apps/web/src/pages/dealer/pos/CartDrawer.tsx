@@ -4,6 +4,7 @@ import { ArrowRight, BookmarkPlus, X, Trash2, Minus, Pencil, Plus, Gift, Ticket,
 import type { CatalogResponse, PwpCodeDto, PwpDiscoverDto, PwpRuleDto } from "@carres/shared";
 import { rm } from "@/lib/format-currency";
 import {
+  cartGoodsIssue,
   step2Valid,
   step2FirstDisposalIssue,
   type DraftLine,
@@ -30,6 +31,8 @@ import {
 import {
   coveringPwpForLine,
   isLinePwp,
+  rewardCapableRules,
+  voucherOfferForLine,
   linePwpCode,
   linePwpCrossOrder,
   linePwpRuleId,
@@ -123,7 +126,7 @@ export default function CartDrawer({
     const group = target ? lineBundleGroup(target) : null;
     if (group !== null) {
       onChange({ ...draft, lines: draft.lines.filter((l) => lineBundleGroup(l) !== group) });
-      toast.info(`Bundle removed — "${lineBundleLabel(target!) ?? "bundle"}" items go together.`);
+      toast.info(`Bundle removed: "${lineBundleLabel(target!) ?? "bundle"}" items go together.`);
       return;
     }
     onChange({ ...draft, lines: draft.lines.filter((l) => l.localId !== localId) });
@@ -146,7 +149,7 @@ export default function CartDrawer({
         if (camp && freed > camp.maxFreeQty) {
           lines = lines.map((l) => (l.localId === localId ? unmarkLineFree(l) : l));
           toast.warning(
-            `"${camp.name}" allows ${camp.maxFreeQty} free per order — the line is back to its real price.`,
+            `"${camp.name}" allows ${camp.maxFreeQty} free per order. The line is back to its real price.`,
           );
         }
       }
@@ -200,7 +203,7 @@ export default function CartDrawer({
       customer: { ...draft.customer, name: quoteName.trim(), phone: quotePhone.trim() },
     });
     setQuoteFormOpen(false);
-    toast.success(`Quote saved — "${q.label}". Cart cleared.`);
+    toast.success(`Quote saved: "${q.label}". Cart cleared.`);
     onClose();
   }
 
@@ -234,8 +237,12 @@ export default function CartDrawer({
   const addonSub = cartAddonSubtotal(draft.addons);
   const total = lineSub + addonSub;
   const items = cartItemCount(draft.lines);
-  const ready = step2Valid(draft);
-  const blockReason = step2FirstDisposalIssue(draft);
+  /* ⛔ A SALES ORDER MUST CONTAIN GOODS (owner ruling 2026-08-15) — a cart of
+     nothing but service/guarantee lines cannot leave this drawer. The create
+     door re-runs the same rule against the catalog and is the authority. */
+  const goodsIssue = cartGoodsIssue(draft, catalog);
+  const ready = step2Valid(draft) && goodsIssue === null;
+  const blockReason = goodsIssue ?? step2FirstDisposalIssue(draft);
   const empty = draft.lines.length === 0 && draft.addons.length === 0;
 
   return (
@@ -280,7 +287,7 @@ export default function CartDrawer({
         <div className="cart__body">
           {empty ? (
             <p className="t-small text-base-500 text-center py-12">
-              Your cart is empty — pick a product to get started.
+              Your cart is empty. Pick a product to get started.
             </p>
           ) : (
             <div className="flex flex-col">
@@ -328,7 +335,7 @@ export default function CartDrawer({
                           type="button"
                           onClick={() => bumpLineQty(l.localId, -1)}
                           disabled={l.qty <= 1 || inBundle}
-                          title={inBundle ? "Bundle items are fixed — remove the bundle to change it" : undefined}
+                          title={inBundle ? "Bundle items are fixed. Remove the bundle to change it" : undefined}
                           aria-label="Decrease quantity"
                           className="disabled:opacity-30 disabled:cursor-not-allowed"
                         >
@@ -339,7 +346,7 @@ export default function CartDrawer({
                           type="button"
                           onClick={() => bumpLineQty(l.localId, 1)}
                           disabled={inBundle}
-                          title={inBundle ? "Bundle items are fixed — remove the bundle to change it" : undefined}
+                          title={inBundle ? "Bundle items are fixed. Remove the bundle to change it" : undefined}
                           aria-label="Increase quantity"
                           className="disabled:opacity-30 disabled:cursor-not-allowed"
                         >
@@ -700,18 +707,40 @@ function MakeFreeRow({
     );
   const offerable = covering.filter((c) => freedQty(c.id) + line.qty <= c.maxFreeQty);
   if (offerable.length === 0) {
-    // Covered, but the order's free allowance is already spent elsewhere —
-    // say so instead of silently dropping the affordance.
-    return covering.some((c) => freedQty(c.id) > 0) ? (
+    // ⭐ THIS BRANCH USED TO SAY NOTHING IN THE COMMONEST CASE, AND THAT WAS THE
+    // REPORTED GWP FRICTION. The old gate spoke only when some OTHER line had
+    // already taken free units (`covering.some(c => freedQty(c.id) > 0)`). But
+    // `max_free_qty` defaults to 1 (0185_free_gifts.sql) and `mergeLine` folds a
+    // second tap of the same product into ONE qty-2 line — so the very first
+    // campaign a principal creates lands on qty 2 / cap 1 / nothing freed yet.
+    // freedQty is 0, the gate is false, and the chip simply disappeared. The
+    // comment above already said "say so instead of silently dropping the
+    // affordance"; the gate on the next line was what stopped it.
+    //
+    // TWO REASONS, TWO FIXES, so they are two different sentences — an error
+    // that does not name its fix is the anti-pattern COPY-STANDARD rule 6 exists
+    // to stop. The allowance is a PER-ORDER total across every claiming line
+    // (free-gift-resolve enforces it that way), not a per-line cap.
+    const spent = covering.find((c) => freedQty(c.id) > 0);
+    // Nothing freed yet → it is THIS line's own qty that overshoots. Report the
+    // most generous campaign, the one closest to being usable.
+    const tightest = covering.reduce((a, b) => (b.maxFreeQty > a.maxFreeQty ? b : a));
+    const message = spent
+      ? `${freedQty(spent.id)} of ${spent.maxFreeQty} free used on another line. Undo it there first.`
+      : // The workaround is real but unguessable: a freed line carries
+        // attrs.free_item, so `sameLine` will not merge a later re-add back into
+        // it — the extra units land as their own paid line.
+        `Only ${tightest.maxFreeQty} free per order. Set this line to ${tightest.maxFreeQty}, then add more.`;
+    return (
       <div className="mt-2">
         <span
           className="t-tiny text-base-400"
           data-testid={`free-limit-reached-${line.localId}`}
         >
-          Free limit reached for this order
+          {message}
         </span>
       </div>
-    ) : null;
+    );
   }
 
   return (
@@ -804,7 +833,22 @@ function PwpRow({
   }
 
   const covering = coveringPwpForLine(line, lines, catalog);
-  if (covering.length === 0) return null;
+  // ⭐ AN EMPTY `covering` MUST NOT HIDE THE SAVED-VOUCHER SURFACE.
+  //
+  // `coveringPwpForLine` answers "is this line grantable right now, from a
+  // trigger already in THIS cart" — the right gate for the same-cart chips
+  // below, and the wrong one for a carried-forward voucher, which exists to be
+  // spent on a LATER order that need not contain the trigger at all. Gating the
+  // whole row on it meant a cart holding only the reward could not even show the
+  // box to type a saved voucher number into, so the entire P8d layer was
+  // reachable only by carts that did not need it.
+  //
+  // The honest test for showing the voucher surface is "could this product ever
+  // be a reward" — the rules' REWARD scope, with no trigger and no allowance in
+  // it. Empty means no voucher could ever apply here, so a normal cart stays
+  // exactly as quiet as it is today.
+  const rewardCapable = rewardCapableRules(line, catalog);
+  if (covering.length === 0 && rewardCapable.length === 0) return null;
 
   // 0187 — P8c is Auto-Fill ONLY: a covering rule is offerable only when a
   // RESERVED code minted under it is free to bind (not already on another reward
@@ -820,9 +864,11 @@ function PwpRow({
     return hit?.code ?? null;
   }
 
-  const coveringIds = new Set(covering.map((r) => r.id));
   return (
     <div className="flex flex-col gap-1.5 mt-2">
+      {/* The same-cart chips exist only when a trigger in THIS cart grants the
+          line. A reward-only cart skips straight to the voucher row below. */}
+      {covering.length > 0 && (
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="t-tiny text-base-400">Use PWP:</span>
         {covering.map((rule) => {
@@ -855,6 +901,7 @@ function PwpRow({
           );
         })}
       </div>
+      )}
 
       {/* 0188 — the CROSS-ORDER (carry-forward) voucher affordance. Phone-gated:
           a cross-order voucher is bound to the customer's phone; the server
@@ -864,8 +911,6 @@ function PwpRow({
       {hasVoucherLayer && claimGroup && (
         <PwpCrossOrderRow
           line={line}
-          covering={coveringIds}
-          coveringRules={covering}
           catalog={catalog}
           onSet={onSet}
           claimGroup={claimGroup}
@@ -896,8 +941,6 @@ function PwpRow({
  */
 function PwpCrossOrderRow({
   line,
-  covering,
-  coveringRules,
   catalog,
   onSet,
   claimGroup,
@@ -907,8 +950,6 @@ function PwpCrossOrderRow({
   onApplyVoucherCode,
 }: {
   line: DraftLine;
-  covering: Set<string>;
-  coveringRules: PwpRuleDto[];
   catalog: CatalogResponse;
   onSet: (localId: string, next: DraftLine) => void;
   claimGroup: string;
@@ -936,23 +977,38 @@ function PwpCrossOrderRow({
     );
   }
 
-  /** The rule (covering this line) backing voucher `v`, with the previewed price. */
-  function ruleForVoucher(v: PwpDiscoverDto): { rule: PwpRuleDto; price: number } | null {
-    if (!v.ruleId || !covering.has(v.ruleId)) return null;
-    const rule = coveringRules.find((r) => r.id === v.ruleId);
+  /**
+   * The rule backing voucher `v`, with the previewed price — or null.
+   *
+   * ⭐ THIS USED TO REQUIRE `covering.has(v.ruleId)`, i.e. the voucher's rule had
+   * to be granting this line FROM A TRIGGER IN THIS CART. That is the second
+   * gate that made carry-forward unreachable: even with the row rendered, every
+   * saved voucher was filtered out of the suggestions and a typed code was
+   * rejected with "This voucher doesn't apply to this product" — when it did.
+   *
+   * A voucher is judged by the reward scope FROZEN on it at mint, which is what
+   * `voucherOfferForLine` checks, and it is the SAME function the server runs.
+   */
+  function offerForVoucher(v: PwpDiscoverDto): { rule: PwpRuleDto; price: number } | null {
+    if (!v.ruleId) return null;
+    // The server still requires the claimed rule to be ACTIVE (pwp_unknown_rule),
+    // so a voucher we cannot back with a live rule is not offerable here either —
+    // better a hidden offer than one that 409s at Confirm.
+    const rule = (catalog.pwpRules ?? []).find((r) => r.id === v.ruleId && r.active);
     if (!rule) return null;
-    return { rule, price: pwpRewardPrice(line, catalog, rule) ?? 0 };
+    const offer = voucherOfferForLine(v, line, catalog);
+    return offer ? { rule, price: offer.price } : null;
   }
 
   // Auto-suggest: identity-matched (phone AND name — the 2990s name+phone
   // binding, 0204) AVAILABLE vouchers whose rule covers this line + not already
   // bound to another reward line in this cart.
   const suggestions = availableVouchers.filter(
-    (v) => v.phoneMatches && v.nameMatches && !consumedCodes.has(v.code) && ruleForVoucher(v) !== null,
+    (v) => v.phoneMatches && v.nameMatches && !consumedCodes.has(v.code) && offerForVoucher(v) !== null,
   );
 
   function bind(v: PwpDiscoverDto) {
-    const hit = ruleForVoucher(v);
+    const hit = offerForVoucher(v);
     if (!hit) return;
     onSet(line.localId, markLinePwpWithAvailableCode(line, hit.rule, hit.price, v.code, claimGroup));
   }
@@ -976,14 +1032,14 @@ function PwpCrossOrderRow({
         setManualError("This voucher belongs to a different customer.");
         return;
       }
-      if (ruleForVoucher(v) === null) {
+      if (offerForVoucher(v) === null) {
         setManualError("This voucher doesn't apply to this product.");
         return;
       }
       bind(v);
       setManualCode("");
     } catch {
-      setManualError("Couldn't check that voucher — please retry.");
+      setManualError("Couldn't check that voucher. Please retry.");
     } finally {
       setManualBusy(false);
     }
@@ -995,7 +1051,7 @@ function PwpCrossOrderRow({
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="t-tiny text-base-400">Saved:</span>
           {suggestions.map((v) => {
-            const hit = ruleForVoucher(v)!;
+            const hit = offerForVoucher(v)!;
             const tag = hit.rule.type === "promo" ? "FREE" : rm(hit.price);
             return (
               <button

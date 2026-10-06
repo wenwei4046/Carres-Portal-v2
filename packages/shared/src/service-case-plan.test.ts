@@ -68,9 +68,9 @@ describe("caseFollowUpPlan — what the customer asked for decides what happens"
       caseFollowUpPlan({ ...PARTIES, customerWants: w }).find((s) => s.key === "supplier_date")
         ?.label;
 
-    expect(ask(["replace", "repair"])).toBe("Call Ohana — confirm the replacement date");
-    expect(ask(["missing_parts", "repair"])).toBe("Call Ohana — confirm the parts date");
-    expect(ask(["repair"])).toBe("Call Ohana — confirm the repair date");
+    expect(ask(["replace", "repair"])).toBe("Call Ohana to confirm the replacement date");
+    expect(ask(["missing_parts", "repair"])).toBe("Call Ohana to confirm the parts date");
+    expect(ask(["repair"])).toBe("Call Ohana to confirm the repair date");
   });
 
   it("always ends with the customer, whatever was asked for — including nothing", () => {
@@ -93,7 +93,7 @@ describe("caseFollowUpPlan — what the customer asked for decides what happens"
   it("uses the role word only where no name is stored", () => {
     const plan = caseFollowUpPlan({ customerWants: ["repair"] });
     expect(plan.find((s) => s.key === "supplier_date")?.label).toBe(
-      "Call the supplier — confirm the repair date",
+      "Call the supplier to confirm the repair date",
     );
     expect(plan.find((s) => s.key === "collect")?.label).toBe(
       "Collect the item from the customer",
@@ -132,7 +132,7 @@ describe("the close gate — the card's acceptance", () => {
     const open = caseOpenSteps(plan, [recorded("supplier_date")]);
     const msg = caseCloseBlockerMessage(open);
     expect(msg).toContain("Collect the item from Ryan Chong");
-    expect(msg).toContain("Call Ryan Chong — confirm the problem is solved");
+    expect(msg).toContain("Call Ryan Chong to confirm the problem is solved");
     expect(msg).not.toContain("confirm the replacement date");
   });
 

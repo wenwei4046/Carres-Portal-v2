@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { createStripeCheckoutInputSchema } from "@carres/shared";
-import { mapPgError, parseJsonBody } from "../lib/route-helpers";
+import { parseJsonBody, fail } from "../lib/route-helpers";
 import { describePaymentMethod, receiptUrlOf, stripeClient, stripeConfigured } from "../lib/stripe";
 import { adminClient, userClient } from "../lib/supabase";
 import type { AppEnv } from "../types";
@@ -73,7 +73,7 @@ function shape(row: SessionRow) {
 function requireConfigured(c: { env: AppEnv["Bindings"] }) {
   if (!stripeConfigured(c.env)) {
     throw new HTTPException(503, {
-      message: "Stripe is not set up yet — ask the principal to add the Stripe keys.",
+      message: "Stripe is not set up yet. Ask the principal to add the Stripe keys.",
     });
   }
 }
@@ -93,7 +93,7 @@ async function fetchOrderScoped(c: Context<AppEnv>, id: string) {
   const { data, error } = await sb
     .from("orders")
     .select(
-      "id, so, dealer_id, status, paid, customer_name, customer_email, order_lines(unit_price, qty), order_addons(unit_price, qty)",
+      "id, so, dealer_id, status, paid, customer_name, customer_email, order_lines(unit_price, qty), order_addons(unit_price, qty), invoices(kind, status, amount, tax_amount, voided_at, replaces_invoice_id)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -109,15 +109,45 @@ async function fetchOrderScoped(c: Context<AppEnv>, id: string) {
     customer_email: string | null;
     order_lines: Array<{ unit_price: number | string; qty: number }>;
     order_addons: Array<{ unit_price: number | string; qty: number }>;
+    invoices?: Array<{
+      kind: string; status: string; amount: number | string;
+      tax_amount: number | string; voided_at: string | null;
+      replaces_invoice_id: string | null;
+    }>;
   };
 }
 
-/** The RPC's balance base: lines + addons (stair carry is a client-side
- *  display extra — mirroring top_up_order keeps every cap consistent). */
+/**
+ * The RPC's balance base: lines + addons — mirroring `top_up_order` keeps
+ * every cap consistent.
+ *
+ * ⛔ THE OLD NOTE CALLED stair carry "a client-side display extra". That is
+ * RETIRED (owner ruling YH, 2026-08-28): it is money the customer owes, and
+ * while it was excluded this function returned 422 `amount_exceeds_outstanding`
+ * BEFORE Stripe was ever called — the customer could not pay the balance they
+ * had signed for.
+ *
+ * The arithmetic below is UNCHANGED and deliberately so. 0393 makes the fee an
+ * `order_addons` row, so `addons` now carries it and the cap rises with it. The
+ * cap itself is the surviving invariant: a payment may never exceed what is
+ * owed. This ruling changed what IS owed, never whether the cap holds.
+ */
 function orderTotal(order: { order_lines: Array<{ unit_price: number | string; qty: number }>; order_addons: Array<{ unit_price: number | string; qty: number }> }): number {
   const lines = (order.order_lines ?? []).reduce((s, l) => s + Number(l.unit_price) * l.qty, 0);
   const addons = (order.order_addons ?? []).reduce((s, a) => s + Number(a.unit_price) * a.qty, 0);
   return lines + addons;
+}
+
+/** The SO's live storage obligations (0438 papers) — the same rule the shared
+ *  `soRemaining` prints: ISSUED storage-kind invoices with their tax, §2
+ *  exactly (a draft asks nothing yet, a voided one is dead). A storage fee is
+ *  money the customer owes (payment/MASTER.md §2), so the link cap includes
+ *  it; the invariant is unchanged — a payment may never exceed what is owed,
+ *  and `paid` is subtracted ONCE from the combined obligation. */
+function storageObligations(order: { invoices?: Array<{ kind: string; status: string; amount: number | string; tax_amount: number | string; voided_at: string | null; replaces_invoice_id: string | null }> }): number {
+  return (order.invoices ?? [])
+    .filter((i) => i.kind !== "sales" && i.status === "issued" && !i.voided_at)
+    .reduce((s, i) => s + Number(i.amount) + Number(i.tax_amount), 0);
 }
 
 // POST /:id/stripe/checkout — mint one Checkout link for RM<amount>.
@@ -135,7 +165,7 @@ stripeCheckoutRouter.post("/:id/stripe/checkout", async (c) => {
   const order = await fetchOrderScoped(c, idCheck.data);
   if (order.status === "delivered" || order.status === "cancelled") {
     return c.json(
-      { error: "stripe_checkout_blocked", code: "wrong_status", message: "Order is closed — no balance to collect." },
+      { error: "stripe_checkout_blocked", code: "wrong_status", message: "Order is closed. No balance to collect." },
       422,
     );
   }
@@ -147,7 +177,7 @@ stripeCheckoutRouter.post("/:id/stripe/checkout", async (c) => {
       422,
     );
   }
-  const outstanding = Math.max(0, total - Number(order.paid));
+  const outstanding = Math.max(0, total + storageObligations(order) - Number(order.paid));
   if (outstanding <= 0) {
     return c.json(
       { error: "stripe_checkout_blocked", code: "already_paid", message: "Order is already fully paid." },
@@ -221,11 +251,34 @@ stripeCheckoutRouter.post("/:id/stripe/checkout", async (c) => {
   if (insErr) {
     // Money safety: a link we can't track must not stay payable.
     await stripe.checkout.sessions.expire(session.id).catch(() => {});
-    const m = mapPgError(insErr);
-    return c.json(m.body, m.status);
+    return fail(c, insErr);
   }
 
   return c.json({ session: shape(row as SessionRow) }, 201);
+});
+
+// GET /:id/stripe/checkout — the order's recent links, newest first (payment
+// MASTER §16 Online link: the Invoice object shows the standing link instead
+// of blindly minting a twin). Read-only; status changes belong to the
+// per-session poll and the webhook.
+stripeCheckoutRouter.get("/:id/stripe/checkout", async (c) => {
+  requireConfigured(c);
+  requireOrderRole(c.var.auth.role);
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  // Visibility gate first — RLS decides whether the caller may see the order.
+  await fetchOrderScoped(c, idCheck.data);
+
+  const admin = adminClient(c.env);
+  const { data, error } = await admin
+    .from("stripe_checkout_sessions")
+    .select(SESSION_COLS)
+    .eq("order_id", idCheck.data)
+    .order("created_at", { ascending: false })
+    .limit(5);
+  if (error) return fail(c, error);
+  return c.json({ sessions: ((data ?? []) as SessionRow[]).map(shape) });
 });
 
 // GET /:id/stripe/checkout/:sid — status poll + live reconcile while open.
@@ -251,10 +304,7 @@ stripeCheckoutRouter.get("/:id/stripe/checkout/:sid", async (c) => {
     .eq("session_id", sidCheck.data)
     .eq("order_id", idCheck.data)
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!row) throw new HTTPException(404, { message: "Checkout session not found" });
 
   let current = row as SessionRow;

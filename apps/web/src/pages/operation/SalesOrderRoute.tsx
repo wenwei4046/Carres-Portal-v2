@@ -1,78 +1,1046 @@
-import { AlertTriangle, ArrowRight, ArrowUpRight, Check, CircleDot } from "lucide-react";
-import { Link } from "react-router-dom";
-import type { SalesOrderRoute as Route, SalesOrderRouteFact } from "@carres/shared";
+/**
+ * ORDER ROUTE — ONE NODE MAP.
+ *
+ * ⭐ OWNER RULING 2026-08-16 (`docs/cards/CARD-2026-08-16-order-route-node-map.md`).
+ * The three stacked section cards are gone. This is one connected, pannable,
+ * zoomable canvas: white node cards joined by connector lines, three routes
+ * leaving the Sales Order at once, converging on the Delivery Order gate.
+ *
+ * The canvas is READ-ONLY. Every node is a door into the module that owns the
+ * fact; nothing here writes, and there is no Release or Approve control in any
+ * state — the SYSTEM issues the delivery order.
+ *
+ * Geometry (positions, sizes, elbows) is computed in `@carres/shared` so the
+ * connectors can be asserted without a DOM. The box heights below MUST match
+ * that module's constants, or a connector would stop short of its node.
+ *
+ * The reading model is copied from org-chart / parcel-tracking / GitHub-checks
+ * PATTERNS only; every colour, size, spacing and component here is the Carres
+ * UI Kit.
+ */
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, Check, ChevronDown, ChevronRight, Circle, CircleDot, Maximize2, Minus, Plus } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { ROUTE_NODE_W, ROUTE_TEXT_BUDGET, routeLateElbow, wrapRouteText } from "@carres/shared";
+import type {
+  NodeMark,
+  RouteEdge,
+  RouteNode,
+  SalesOrderRouteMap as RouteMap,
+  StationOwnerKey,
+} from "@carres/shared";
+import Loading from "@/components/kit/Loading";
+import { fmtDate } from "@/lib/fmt-date";
+import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 
-const stateStyle = {
-  complete: "bg-kit-green-3 text-kit-green-11",
-  clear: "bg-kit-green-3 text-kit-green-11",
-  current: "bg-kit-blue-3 text-kit-blue-11",
-  attention: "bg-kit-amber-3 text-kit-amber-11",
-} as const;
-
-function StateIcon({ fact }: { fact: SalesOrderRouteFact }) {
-  const Icon = fact.state === "attention" ? AlertTriangle : fact.state === "current" ? CircleDot : Check;
-  return <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-pill ${stateStyle[fact.state]}`}><Icon size={12} aria-hidden="true" /></span>;
+/** The resolved people behind the action lines. The Route never derives duty;
+ *  it is handed the holders the Work Engine roster already names (card §7). */
+export interface RouteActionOwners {
+  purchasing: RoutePerson | null;
+  receiving: RoutePerson | null;
+  stock?: RoutePerson | null;
+  delivery?: RoutePerson | null;
+  sales?: RoutePerson | null;
+  payment?: RoutePerson | null;
 }
 
-function FactStep({ fact, currentLabel = false }: { fact: SalesOrderRouteFact; currentLabel?: boolean }) {
-  const body = (
-    <>
-      <StateIcon fact={fact} />
-      <span className="min-w-0">
-        <span className="block text-body font-medium text-kit-slate-12">{fact.title}</span>
-        {fact.detail && <span className="block text-meta text-kit-slate-9">{fact.detail}</span>}
-        {currentLabel && <span className="mt-1 inline-block text-label font-semibold tracking-wide text-kit-blue-11">CURRENT</span>}
-      </span>
-    </>
+export interface RoutePerson {
+  userId: string;
+  name: string | null;
+  email: string;
+}
+
+/* ONE date spelling. Facts carry ISO with their meaning attached
+   (`Issued: 2026-08-13`); the year rule lives in `fmtDate`. */
+const spellDates = (s: string) =>
+  s.replace(
+    /\b(\d{4}-\d{2}-\d{2})(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)?/g,
+    (_value, day: string) => fmtDate(day),
   );
-  return fact.href ? (
-    <Link to={fact.href} aria-label={`${fact.title} · Open in ${fact.owner}`} className="flex min-w-[190px] items-start gap-2 rounded-control px-2 py-2 hover:bg-hovertint">{body}<ArrowUpRight size={12} className="ml-auto mt-1 shrink-0 text-kit-blue-11" /></Link>
-  ) : <div className="flex min-w-[190px] items-start gap-2 px-2 py-2">{body}</div>;
+
+/* ── the box, to the pixel the shared geometry assumed ──────────────────── */
+const BOX_PAD_Y = 11;
+const TITLE_H = 20;
+const LINE_H = 18;
+const REQ_H = 16;
+const ACTION_H = 22;
+const CONTEXT_H = 18;
+const DOOR_H = 18;
+
+const MIN_SCALE = 0.4;
+const MAX_SCALE = 1.6;
+const STEP = 0.15;
+/** ⭐ OWNER RULING 2026-08-17: the load fit never shrinks below this — a text
+ *  scaled past it is an unreadable stripe, not a map. A wider map opens
+ *  centred on the Sales Order and pans; the ⛶ control still offers the true
+ *  whole-map fit as an explicit act. */
+const FIT_FLOOR = 0.7;
+
+const MAP_PAD = 28;
+const MAP_COLUMN_GAP = 32;
+const MAP_GROUP_GAP = 72;
+const MAP_ROW_GAP = 30;
+const MAP_BAND_HEIGHT = 22;
+const MAP_BAND_GAP = 28;
+const MAP_BAND_DROP = 18;
+const MAP_GATE_GAP = 56;
+
+function routeElbow(from: RouteNode, to: RouteNode) {
+  const x1 = from.x + from.w / 2;
+  const y1 = from.y + from.h;
+  const x2 = to.x + to.w / 2;
+  const y2 = to.y;
+  if (x1 === x2) return [{ x: x1, y: y1 }, { x: x2, y: y2 }];
+  const midY = y1 + (y2 - y1) / 2;
+  return [
+    { x: x1, y: y1 },
+    { x: x1, y: midY },
+    { x: x2, y: midY },
+    { x: x2, y: y2 },
+  ];
 }
 
-function isCurrentPosition(facts: SalesOrderRouteFact[], fact: SalesOrderRouteFact, index: number) {
-  const hasExplicitCurrent = facts.some((candidate) => candidate.state === "current");
-  return hasExplicitCurrent ? fact.state === "current" : index === facts.length - 1;
+function goodsGroups(route: RouteMap) {
+  const outgoing = new Map<string, string[]>();
+  for (const edge of route.edges) {
+    const list = outgoing.get(edge.from) ?? [];
+    list.push(edge.to);
+    outgoing.set(edge.from, list);
+  }
+  const byId = new Map(route.nodes.map((node) => [node.id, node]));
+  return route.nodes
+    .filter((node) => node.kind === "goods-line")
+    .map((plate) => {
+      const ids = new Set<string>([plate.id]);
+      const queue = [plate.id];
+      while (queue.length > 0) {
+        const from = queue.shift()!;
+        for (const id of outgoing.get(from) ?? []) {
+          const next = byId.get(id);
+          if (!next || next.branch !== "goods" || ids.has(id)) continue;
+          ids.add(id);
+          queue.push(id);
+        }
+      }
+      return { plate, ids };
+    });
 }
 
-export default function SalesOrderRoute({ route }: { route: Route }) {
-  const goods = route.lanes.find((lane) => lane.key === "goods");
-  const obligations = route.lanes
-    .filter((lane) => lane.key !== "goods")
-    .map((lane) => ({ ...lane, groups: lane.groups.map((group) => ({ ...group, facts: group.facts.filter((fact) => fact.state === "attention" || fact.state === "current") })).filter((group) => group.facts.length > 0) }))
-    .filter((lane) => lane.groups.length > 0);
-  const so = route.documents.find((document) => document.kind === "Sales Order");
+export function defaultExpandedGoods(route: RouteMap): string | null {
+  const groups = goodsGroups(route);
+  const current = route.nodes.find((node) => node.branch === "goods" && node.current);
+  return groups.find((group) => current && group.ids.has(current.id))?.plate.id ?? groups[0]?.plate.id ?? null;
+}
+
+/**
+ * The resolver keeps the complete truth graph. This presentation fold gives a
+ * long order a readable shape: goods lines stack down the page; the line with
+ * today's work opens; the rest stay as one-line disclosure plates. Delivery
+ * and Money remain parallel, and every visible branch still converges on the
+ * one Delivery Order gate.
+ */
+export function compactOrderRoute(route: RouteMap, expandedPlateId: string | null): RouteMap {
+  const source = new Map(route.nodes.map((node) => [node.id, node]));
+  const placed = new Map<string, RouteNode>();
+  const groups = goodsGroups(route);
+  const goodsSourceIds = new Set(groups.flatMap((group) => [...group.ids]));
+  const cancelled = route.nodes.filter((node) => node.branch === "goods" && !goodsSourceIds.has(node.id));
+
+  const groupBounds = groups.map((group) => {
+    const nodes = [...group.ids].map((id) => source.get(id)!).filter(Boolean);
+    return {
+      ...group,
+      nodes,
+      minX: Math.min(...nodes.map((node) => node.x)),
+      minY: Math.min(...nodes.map((node) => node.y)),
+      width: Math.max(...nodes.map((node) => node.x + node.w)) - Math.min(...nodes.map((node) => node.x)),
+      height: Math.max(...nodes.map((node) => node.y + node.h)) - Math.min(...nodes.map((node) => node.y)),
+    };
+  });
+  const expanded = groupBounds.find((group) => group.plate.id === expandedPlateId) ?? groupBounds[0] ?? null;
+  const goodsWidth = Math.max(ROUTE_NODE_W, expanded?.width ?? ROUTE_NODE_W);
+  /* ⭐ ONE DELIVERY SCOPE IS ONE LANE (owner ruling 2026-09-26). With lanes,
+     every lane carries its own gate and tail, so the resolver's own geometry
+     for the DELIVERY group is kept whole and only moved into place. */
+  const laneNodes = route.nodes.some((node) => node.kind === "delivery-lane")
+    ? route.nodes.filter((node) => node.branch === "delivery" || node.branch === "gate")
+    : [];
+  const laned = laneNodes.length > 0;
+  const laneMinX = laned ? Math.min(...laneNodes.map((node) => node.x)) : 0;
+  const laneMinY = laned ? Math.min(...laneNodes.map((node) => node.y)) : 0;
+  const deliveryWidth = laned
+    ? Math.max(...laneNodes.map((node) => node.x + node.w)) - laneMinX
+    : ROUTE_NODE_W;
+  const moneyWidth = ROUTE_NODE_W;
+  const loanNodes = route.nodes.filter((node) => node.branch === "loan");
+  const loanWidth = loanNodes.length > 0
+    ? loanNodes.length * ROUTE_NODE_W + (loanNodes.length - 1) * MAP_COLUMN_GAP
+    : 0;
+  const totalWidth =
+    goodsWidth + MAP_GROUP_GAP + deliveryWidth + MAP_GROUP_GAP + moneyWidth +
+    (loanWidth > 0 ? MAP_GROUP_GAP + loanWidth : 0);
+  const centreX = MAP_PAD + totalWidth / 2;
+  const originSource = route.nodes.find((node) => node.kind === "sales-order")!;
+  const origin = { ...originSource, x: centreX - originSource.w / 2, y: MAP_PAD };
+  placed.set(origin.id, origin);
+  const bandY = origin.y + origin.h + MAP_BAND_GAP;
+  const rowTop = bandY + MAP_BAND_HEIGHT + MAP_BAND_DROP;
+
+  let goodsY = rowTop;
+  /* The goods lines stack in ONE column, so a line hangs from the node
+     directly above it. A line drawn from the Sales Order to a stacked plate
+     turns half way down and runs behind whatever stands there (measured
+     2026-09-28: behind SUPPLIER). */
+  const hangsFrom = new Map<string, string>();
+  let above: string | null = null;
+  for (const group of groupBounds) {
+    if (above) hangsFrom.set(group.plate.id, above);
+    const opened = group.plate.id === expanded?.plate.id;
+    above = opened
+      ? [...group.nodes].sort((a, b) => b.y + b.h - (a.y + a.h))[0]!.id
+      : group.plate.id;
+    /* A collapsed line hides its chain; a failed read inside it must not hide
+       with it. */
+    if (!opened && group.nodes.some((node) => node.mark === "unreadable")) {
+      const failed = group.nodes.find((node) => node.mark === "unreadable")!;
+      group.plate = {
+        ...group.plate,
+        mark: "unreadable",
+        spoken: [...group.plate.spoken, ...failed.spoken],
+      };
+    }
+    if (group.plate.id === expanded?.plate.id) {
+      for (const node of group.nodes) {
+        placed.set(node.id, {
+          ...node,
+          x: MAP_PAD + node.x - group.minX,
+          y: goodsY + node.y - group.minY,
+        });
+      }
+      goodsY += group.height + MAP_ROW_GAP;
+    } else {
+      placed.set(group.plate.id, { ...group.plate, x: MAP_PAD, y: goodsY, w: ROUTE_NODE_W });
+      goodsY += group.plate.h + 18;
+    }
+  }
+  for (const node of cancelled) {
+    placed.set(node.id, { ...node, x: MAP_PAD, y: goodsY });
+    goodsY += node.h + 18;
+  }
+
+  const deliveryX = MAP_PAD + goodsWidth + MAP_GROUP_GAP;
+  const moneyX = deliveryX + deliveryWidth + MAP_GROUP_GAP;
+  const loanX = moneyX + moneyWidth + MAP_GROUP_GAP;
+  const placeChain = (branch: RouteNode["branch"], x: number) => {
+    const chain = route.nodes.filter((node) => node.branch === branch);
+    if (chain.length === 0) return rowTop;
+    const minY = Math.min(...chain.map((node) => node.y));
+    let bottom = rowTop;
+    chain.forEach((node, index) => {
+      const next = { ...node, x: x + index * (branch === "loan" ? ROUTE_NODE_W + MAP_COLUMN_GAP : 0), y: rowTop + node.y - minY };
+      placed.set(node.id, next);
+      bottom = Math.max(bottom, next.y + next.h);
+    });
+    return bottom;
+  };
+  let deliveryBottom = rowTop;
+  if (laned) {
+    for (const node of laneNodes) {
+      const next = { ...node, x: deliveryX + node.x - laneMinX, y: rowTop + node.y - laneMinY };
+      placed.set(node.id, next);
+      deliveryBottom = Math.max(deliveryBottom, next.y + next.h);
+    }
+  } else {
+    deliveryBottom = placeChain("delivery", deliveryX);
+  }
+  const moneyBottom = placeChain("money", moneyX);
+  const loanBottom = placeChain("loan", loanX);
+  const deepest = Math.max(goodsY - MAP_ROW_GAP, deliveryBottom, moneyBottom, loanBottom);
+
+  const gateSource = route.nodes.find((node) => node.kind === "delivery-order")!;
+  /* With lanes the gates already stand in their lanes; a collapsed goods
+     line points at the first lane's gate. */
+  const gate = laned
+    ? placed.get(gateSource.id)!
+    : { ...gateSource, x: centreX - gateSource.w / 2, y: deepest + MAP_GATE_GAP };
+  placed.set(gate.id, gate);
+  let tailY = laned ? deepest + MAP_ROW_GAP : gate.y + gate.h + MAP_ROW_GAP;
+  for (const node of route.nodes.filter((item) => item.branch === "tail")) {
+    const next = { ...node, x: centreX - node.w / 2, y: tailY };
+    placed.set(node.id, next);
+    tailY += node.h + MAP_ROW_GAP;
+  }
+
+  const visible = new Set(placed.keys());
+  const edges: RouteEdge[] = route.edges
+    .filter((edge) => visible.has(edge.from) && visible.has(edge.to))
+    .map((edge) =>
+      edge.from === originSource.id && hangsFrom.has(edge.to)
+        ? { ...edge, id: `${hangsFrom.get(edge.to)}→${edge.to}`, from: hangsFrom.get(edge.to)!, style: "solid" as const }
+        : edge,
+    )
+    .map((edge) => {
+      const from = placed.get(edge.from)!;
+      const to = placed.get(edge.to)!;
+      return { ...edge, points: edge.late ? routeLateElbow(from, to) : routeElbow(from, to), labelAt: null };
+    });
+  for (const group of groupBounds) {
+    if (group.plate.id === expanded?.plate.id) continue;
+    edges.push({
+      id: `${group.plate.id}→delivery-order:collapsed`,
+      from: group.plate.id,
+      to: gate.id,
+      style: "dashed",
+      labelLines: [],
+      points: laned
+        ? routeLateElbow(placed.get(group.plate.id)!, gate)
+        : routeElbow(placed.get(group.plate.id)!, gate),
+      labelAt: null,
+    });
+  }
+
+  const bands = [
+    { id: "goods" as const, label: "GOODS", x: MAP_PAD, y: bandY, w: goodsWidth, h: MAP_BAND_HEIGHT },
+    { id: "delivery" as const, label: "DELIVERY", x: deliveryX, y: bandY, w: deliveryWidth, h: MAP_BAND_HEIGHT },
+    { id: "money" as const, label: "PAYMENT", x: moneyX, y: bandY, w: ROUTE_NODE_W, h: MAP_BAND_HEIGHT },
+    ...(loanNodes.length > 0
+      ? [{ id: "loan" as const, label: "LOAN", x: loanX, y: bandY, w: loanWidth, h: MAP_BAND_HEIGHT }]
+      : []),
+  ];
+  return {
+    ...route,
+    nodes: [...placed.values()],
+    edges,
+    bands,
+    width: MAP_PAD * 2 + totalWidth,
+    height: tailY - MAP_ROW_GAP + MAP_PAD,
+  };
+}
+
+/** State is never colour-only (card §12): every mark carries a glyph too. */
+const MARK_GLYPH: Record<NodeMark, typeof Check> = {
+  complete: Check,
+  current: CircleDot,
+  waiting: Circle,
+  blocked: AlertTriangle,
+  future: Circle,
+  /* Amber like `blocked`: it IS an exception, just not a business one. */
+  unreadable: AlertTriangle,
+};
+
+const MARK_BADGE: Record<NodeMark, string> = {
+  complete: "bg-kit-green-3 text-kit-green-11",
+  current: "bg-kit-blue-3 text-kit-blue-11",
+  waiting: "bg-kit-slate-3 text-kit-slate-9",
+  blocked: "bg-kit-amber-3 text-kit-amber-11",
+  future: "bg-kit-slate-3 text-kit-slate-9",
+  unreadable: "bg-kit-amber-3 text-kit-amber-11",
+};
+
+/**
+ * The BOX stays on the neutral ramp and the MARK BADGE carries the state
+ * colour — the same division the shipped station list uses. Only the steps
+ * `tailwind.config.ts` publishes exist; a step it does not publish renders
+ * nothing at all (`kit-palette.test.ts`), so no ramp is invented here.
+ */
+const MARK_BOX: Record<NodeMark, string> = {
+  complete: "border-kit-slate-5 bg-white",
+  current: "border-kit-blue-9 bg-white shadow-sm",
+  waiting: "border-kit-slate-5 bg-white",
+  blocked: "border-kit-slate-5 bg-kit-amber-3",
+  future: "border-dashed border-kit-slate-5 bg-white",
+  unreadable: "border-kit-slate-5 bg-kit-amber-3",
+};
+
+/** The owners whose failed read the operator can ask for again. */
+export type RouteRetryOwner = "delivery" | "payments" | "purchasing" | "amendment";
+const retryOwnerOf = (href: string): RouteRetryOwner | null => {
+  const match = /^#retry-(delivery|payments|purchasing|amendment)$/.exec(href);
+  return match ? (match[1] as RouteRetryOwner) : null;
+};
+
+function ownerOf(owners: RouteActionOwners, key: StationOwnerKey): RoutePerson | null {
+  switch (key) {
+    case "receiving":
+      return owners.receiving ?? null;
+    case "stock":
+      return owners.stock ?? null;
+    case "delivery":
+      return owners.delivery ?? null;
+    case "sales":
+      return owners.sales ?? null;
+    case "payment":
+      return owners.payment ?? null;
+    default:
+      return owners.purchasing ?? null;
+  }
+}
+
+/** Initials only on the node; Team Work shows the full names, and the action
+ *  sentence never repeats the person (card §7). */
+function OwnerChip({ person }: { person: RoutePerson }) {
+  const colors = avatarColor(person.userId);
+  const label = personLabel(person.name, person.email);
+  return (
+    <span
+      className="inline-grid h-5 w-5 shrink-0 place-items-center rounded-full text-label font-semibold"
+      style={{ background: colors.bg, color: colors.fg }}
+      title={label}
+      aria-hidden="true"
+    >
+      {personInitials(person.name, person.email)}
+    </span>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * One node.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+function Node({
+  node,
+  owners,
+  onReveal,
+  goodsExpanded,
+  onToggleGoods,
+  onRetry,
+}: {
+  node: RouteNode;
+  owners: RouteActionOwners;
+  onRetry?: (owner: RouteRetryOwner) => void;
+  /** Slice 4 — the page pans the transformed surface so a focused node is
+   *  visible; the browser cannot do it for a CSS-transformed canvas. */
+  onReveal?: (node: RouteNode) => void;
+  goodsExpanded?: boolean;
+  onToggleGoods?: (id: string) => void;
+}) {
+  const navigate = useNavigate();
+  const Glyph = MARK_GLYPH[node.mark];
+
+  /* The goods line's caption plate — a small grey header naming the line so
+     no product name ever sits on a connector (owner ruling 2026-08-17). Not
+     a station: no glyph, no state word, no action, no door. */
+  if (node.kind === "goods-line") {
+    return (
+      <button
+        type="button"
+        data-testid={`route-node-${node.id}`}
+        data-kind={node.kind}
+        data-mark={node.mark}
+        aria-label={[node.title, ...node.spoken].join(" — ")}
+        aria-expanded={goodsExpanded}
+        title={node.mark === "unreadable" ? node.spoken[node.spoken.length - 2] : undefined}
+        onClick={() => onToggleGoods?.(node.id)}
+        className={`absolute overflow-hidden rounded-card border border-kit-slate-5 px-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 ${
+          node.mark === "unreadable" ? "bg-kit-amber-3" : "bg-kit-slate-3 hover:bg-white"
+        }`}
+        style={{
+          left: node.x,
+          top: node.y,
+          width: node.w,
+          height: node.h,
+          paddingTop: BOX_PAD_Y,
+          paddingBottom: BOX_PAD_Y,
+        }}
+      >
+        <div
+          className="flex items-center gap-1 truncate text-label font-semibold text-base-900"
+          style={{ height: TITLE_H, lineHeight: `${TITLE_H}px` }}
+        >
+          {goodsExpanded ? <ChevronDown size={12} aria-hidden="true" /> : <ChevronRight size={12} aria-hidden="true" />}
+          <span className="truncate">{node.title}</span>
+          {/* State is never colour alone: the failed read carries its glyph. */}
+          {node.mark === "unreadable" && (
+            <AlertTriangle size={12} className="ml-auto shrink-0 text-kit-amber-11" aria-hidden="true" />
+          )}
+        </div>
+        {node.lines.map((line, i) => (
+          <div
+            key={`${node.id}-line-${i}`}
+            className="truncate text-label text-base-600"
+            style={{ height: LINE_H, lineHeight: `${LINE_H}px` }}
+          >
+            {spellDates(line)}
+          </div>
+        ))}
+      </button>
+    );
+  }
+  /* A delivery lane's plate — the same grey header grammar, and not a station:
+     no glyph, no state word, no action, no door, nothing to press. */
+  if (node.kind === "delivery-lane") {
+    return (
+      <div
+        data-testid={`route-node-${node.id}`}
+        data-kind={node.kind}
+        data-mark={node.mark}
+        role="group"
+        tabIndex={0}
+        aria-label={node.spoken.join(" — ")}
+        onFocus={() => onReveal?.(node)}
+        className="absolute overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3 px-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+        style={{
+          left: node.x,
+          top: node.y,
+          width: node.w,
+          height: node.h,
+          paddingTop: BOX_PAD_Y,
+          paddingBottom: BOX_PAD_Y,
+        }}
+      >
+        <div
+          className="text-label font-semibold text-base-900"
+          style={{ height: TITLE_H, lineHeight: `${TITLE_H}px` }}
+        >
+          {node.title}{" "}
+        </div>
+        {node.lines.map((line, i) => (
+          <div
+            key={`${node.id}-line-${i}`}
+            className="whitespace-nowrap text-label text-base-600"
+            style={{ height: LINE_H, lineHeight: `${LINE_H}px` }}
+          >
+            {line}{" "}
+          </div>
+        ))}
+      </div>
+    );
+  }
+  const person = node.action ? ownerOf(owners, node.action.ownerKey) : null;
+  const actionContext = node.action?.context.detail ?? null;
+
+  const spoken = [
+    node.title,
+    /* A row break is for the eye; the sentence is spoken whole. */
+    ...node.spoken.map(spellDates),
+    ...node.requirements.map((r) => `${r.met ? "met" : "not met"}: ${spellDates(r.text)}`),
+    /* `Unassigned` is in COPY-STANDARD's Do NOT use column for this surface,
+       and it was not an edge case: the page supplies only two of the six owner
+       keys, so most nodes printed it. With no owner the action speaks alone. */
+    node.action
+      ? person
+        ? `${personLabel(person.name, person.email)}: ${node.action.label}`
+        : node.action.label
+      : null,
+    actionContext ? spellDates(actionContext) : null,
+  ]
+    .filter(Boolean)
+    .join(" — ");
+
+  /* `Try again →` is not a place: it asks the page to read that owner again. */
+  const retryOwner = node.door ? retryOwnerOf(node.door.href) : null;
+  const go = () => {
+    if (!node.door) return;
+    if (retryOwner) onRetry?.(retryOwner);
+    else navigate(node.door.href);
+  };
 
   return (
-    <div className="mx-auto flex max-w-[1280px] flex-col gap-5" data-testid="sales-order-route">
-      <div className="border-b border-kit-slate-6 pb-3">
-        <h1 className="text-page text-kit-slate-12">Order Route</h1>
-        <p className="mt-1 text-body text-kit-slate-11">Each item has its own route. Open a fact in the team that owns it.</p>
+    <div
+      data-testid={`route-node-${node.id}`}
+      data-kind={node.kind}
+      data-mark={node.mark}
+      data-current={node.current ? "true" : "false"}
+      role={node.door && !retryOwner ? "link" : "group"}
+      tabIndex={0}
+      aria-label={spoken}
+      aria-current={node.current ? "step" : undefined}
+      onFocus={() => onReveal?.(node)}
+      onKeyDown={(e) => {
+        if (node.door && e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          go();
+        }
+      }}
+      className={`absolute overflow-hidden rounded-card border ${MARK_BOX[node.mark]} focus:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9`}
+      style={{
+        left: node.x,
+        top: node.y,
+        width: node.w,
+        height: node.h,
+        /* The CURRENT border is 2px. It takes its extra pixel from the padding,
+           never from the rows: measured 2026-09-27, the last row of every
+           CURRENT node sat 2px under the box's edge. */
+        paddingTop: BOX_PAD_Y - (node.mark === "current" ? 1 : 0),
+        paddingBottom: BOX_PAD_Y - (node.mark === "current" ? 1 : 0),
+        paddingLeft: node.mark === "current" ? 11 : 12,
+        paddingRight: node.mark === "current" ? 11 : 12,
+        borderWidth: node.mark === "current" ? 2 : 1,
+      }}
+    >
+      <div className="flex items-center gap-1.5" style={{ height: TITLE_H }}>
+        <span
+          className={`grid h-5 w-5 shrink-0 place-items-center rounded-full ${MARK_BADGE[node.mark]}`}
+          aria-hidden="true"
+        >
+          <Glyph size={14} />
+        </span>
+        {/* The station's name is never cut to make room for `Current`
+            (measured 2026-09-28: `DELIVERY PHO…`). The word gives up its
+            letter spacing first. */}
+        <span
+          className={`whitespace-nowrap text-label font-semibold uppercase text-base-600 ${node.current ? "" : "tracking-wide"}`}
+        >
+          {node.title}
+        </span>
+        {node.current && (
+          <span className="ml-auto shrink-0 text-label font-semibold uppercase text-kit-blue-11">
+            Current
+          </span>
+        )}
       </div>
 
-      <section className="rounded-card border border-kit-slate-5 bg-white" data-testid="goods-routes">
-        <div className="border-b border-kit-slate-5 px-4 py-3"><h2 className="text-strong text-kit-slate-12">Goods routes</h2></div>
-        <div className="divide-y divide-kit-slate-5">
-          {goods?.groups.map((group) => (
-            <article key={group.id} className="px-4 py-4">
-              <h3 className="mb-3 text-body font-semibold text-kit-slate-12">{group.title}</h3>
-              <div className="flex flex-wrap items-stretch gap-1">
-                {so && <Link to={so.href} className="flex min-w-[145px] items-center gap-2 rounded-control px-2 py-2 text-body font-medium text-kit-blue-11 hover:bg-hovertint">{so.number}</Link>}
-                {group.facts.map((fact, index) => <div key={fact.id} className="flex items-center"><ArrowRight size={14} className="mx-1 shrink-0 text-kit-slate-9" /><FactStep fact={fact} currentLabel={isCurrentPosition(group.facts, fact, index)} /></div>)}
-              </div>
-            </article>
+      {node.lines.map((line, i) => (
+        <div
+          key={`${node.id}-line-${i}`}
+          data-testid={`route-fact-${node.id}-${i}`}
+          className={`truncate text-body ${node.action ? "font-semibold" : ""} ${
+            node.mark === "future" ? "text-kit-slate-9" : "text-base-900"
+          }`}
+          style={{ height: LINE_H, lineHeight: `${LINE_H}px` }}
+        >
+          {spellDates(line)}{" "}
+        </div>
+      ))}
+
+      {/* One requirement, as many rows as the shared wrap gives it — the
+          geometry counted the same rows, so nothing is cut (measured 2026-09-27). */}
+      {node.requirements.map((req) => {
+        const rows = wrapRouteText(req.text, ROUTE_TEXT_BUDGET.requirement);
+        return (
+          <div
+            key={req.id}
+            data-testid={`route-requirement-${req.id}`}
+            data-met={req.met ? "true" : "false"}
+            className="flex items-start gap-1 text-label"
+            style={{ height: REQ_H * rows.length, lineHeight: `${REQ_H}px` }}
+          >
+            <span
+              className={`w-3 shrink-0 ${req.met ? "text-kit-green-11" : "text-kit-slate-9"}`}
+              aria-hidden="true"
+            >
+              {req.met ? "✓" : "·"}
+            </span>
+            <span className={`min-w-0 ${req.met ? "text-base-600" : "text-base-900"}`}>
+              {rows.map((row, i) => (
+                <span key={i} className="block whitespace-nowrap">
+                  {spellDates(row)}{" "}
+                </span>
+              ))}
+            </span>
+          </div>
+        );
+      })}
+
+      {node.action && (
+        /* The 13 / 11 two-line grammar: the FACT above, the INSTRUCTION here,
+           with the owner as a chip rather than a name inside the sentence. */
+        <div
+          className="flex items-start gap-1.5 text-label"
+          data-testid={`route-action-${node.id}`}
+        >
+          {person && (
+            <span className="grid shrink-0 place-items-center" style={{ height: ACTION_H }}>
+              <OwnerChip person={person} />
+            </span>
+          )}
+          {/* A long instruction wraps under the chip; it never ends in "…". */}
+          <span className="text-label text-base-600">
+            {wrapRouteText(node.action.label, ROUTE_TEXT_BUDGET.action).map((row, i) => (
+              <span
+                key={i}
+                className="block whitespace-nowrap"
+                style={{ height: i === 0 ? ACTION_H : CONTEXT_H, lineHeight: `${i === 0 ? ACTION_H : CONTEXT_H}px` }}
+              >
+                {row}{" "}
+              </span>
+            ))}
+          </span>
+        </div>
+      )}
+
+      {node.action && actionContext && (
+        <div
+          data-testid={`route-context-${node.id}`}
+          className="text-label text-base-600"
+          style={{ lineHeight: `${CONTEXT_H}px` }}
+        >
+          {wrapRouteText(actionContext, ROUTE_TEXT_BUDGET.context).map((row, i) => (
+            <span key={i} className="block whitespace-nowrap" style={{ height: CONTEXT_H }}>
+              {spellDates(row)}{" "}
+            </span>
           ))}
         </div>
-      </section>
+      )}
 
-      <section className="rounded-card border border-kit-slate-5 bg-white">
-        <div className="border-b border-kit-slate-5 px-4 py-3"><h2 className="text-strong text-kit-slate-12">Still owed</h2></div>
-        {obligations.length > 0 ? (
-          <div className="divide-y divide-kit-slate-5">
-            {obligations.map((lane) => <div key={lane.key} className="grid gap-2 px-4 py-3 md:grid-cols-[150px_1fr]"><div className="text-body font-medium text-kit-slate-11">{lane.title}</div><div className="grid gap-1 md:grid-cols-2">{lane.groups.flatMap((group) => group.facts).map((fact) => <FactStep key={fact.id} fact={fact} />)}</div></div>)}
-          </div>
-        ) : <div className="px-4 py-4 text-body text-kit-slate-9">Nothing is still owed.</div>}
-      </section>
+      {node.door && retryOwner && (
+        <div style={{ height: DOOR_H, lineHeight: `${DOOR_H}px` }}>
+          <button
+            type="button"
+            onClick={go}
+            className="truncate text-label font-medium text-kit-blue-11 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+          >
+            {node.door.label}
+          </button>
+        </div>
+      )}
+
+      {node.door && !retryOwner && (
+        <div style={{ height: DOOR_H, lineHeight: `${DOOR_H}px` }}>
+          <Link
+            to={node.door.href}
+            tabIndex={-1}
+            className="truncate text-label font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+          >
+            {node.door.label}
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * The connectors. One polyline per edge, plus its small grey label.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+function Edges({ map }: { map: RouteMap }) {
+  return (
+    <svg
+      className="pointer-events-none absolute left-0 top-0"
+      width={map.width}
+      height={map.height}
+      aria-hidden="true"
+      data-testid="route-edges"
+    >
+      {map.edges.map((edge: RouteEdge) => (
+        <g key={edge.id} data-testid={`route-edge-${edge.from}--${edge.to}`} data-style={edge.style}>
+          <polyline
+            points={edge.points.map((p) => `${p.x},${p.y}`).join(" ")}
+            fill="none"
+            className={edge.style === "dashed" ? "stroke-kit-slate-6" : "stroke-kit-slate-9"}
+            strokeWidth={1.5}
+            strokeDasharray={edge.style === "dashed" ? "4 4" : undefined}
+          />
+          {edge.labelAt &&
+            edge.labelLines.map((line, i) => (
+              <text
+                key={`${edge.id}-label-${i}`}
+                x={edge.labelAt!.x}
+                y={edge.labelAt!.y - (edge.labelLines.length - 1 - i) * 12}
+                textAnchor="middle"
+                className="fill-kit-slate-9 text-label"
+              >
+                {line}
+              </text>
+            ))}
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * The page — a pan/zoom surface that FITS the whole map on load.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+export default function SalesOrderRoute({
+  route,
+  owners = { purchasing: null, receiving: null },
+  loading = false,
+  onRetry,
+}: {
+  route: RouteMap;
+  owners?: RouteActionOwners;
+  loading?: boolean;
+  /** A node's or the banner's `Try again →` — the page reads that owner again. */
+  onRetry?: (owner: RouteRetryOwner) => void;
+}) {
+  const frame = useRef<HTMLDivElement | null>(null);
+  const initialExpanded = useMemo(() => defaultExpandedGoods(route), [route]);
+  const [expandedGoods, setExpandedGoods] = useState<string | null>(initialExpanded);
+  useEffect(() => setExpandedGoods(initialExpanded), [initialExpanded]);
+  const map = useMemo(() => compactOrderRoute(route, expandedGoods), [route, expandedGoods]);
+  const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 });
+  const drag = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
+
+  /** The load fit shows the whole map while it stays readable and never drops
+   *  below FIT_FLOOR — past the floor the map opens centred on the Sales
+   *  Order and the operator pans (owner ruling 2026-08-17). ⛶ remains the
+   *  explicit whole-map fit. */
+  const fit = useCallback(
+    (whole = false) => {
+      const box = frame.current?.getBoundingClientRect();
+      if (!box || box.width === 0 || map.width === 0) return;
+      const wFit = box.width / map.width;
+      const raw = Math.min(1, wFit, box.height / map.height);
+      if (whole || raw >= FIT_FLOOR) {
+        const scale = Math.max(MIN_SCALE, raw);
+        setView({
+          scale,
+          tx: Math.max(0, (box.width - map.width * scale) / 2),
+          ty: Math.max(0, (box.height - map.height * scale) / 2),
+        });
+        return;
+      }
+      /* Readability beats completeness: fit the WIDTH when it (almost) clears
+         the floor — the fan stays whole and the operator pans down to the
+         gate — and only a genuinely wider map opens at the floor, centred on
+         the Sales Order, panning sideways. */
+      if (wFit >= FIT_FLOOR * 0.95) {
+        const scale = Math.min(1, wFit);
+        setView({ scale, tx: Math.max(0, (box.width - map.width * scale) / 2), ty: 0 });
+        return;
+      }
+      const scale = FIT_FLOOR;
+      const so = map.nodes.find((n) => n.kind === "sales-order");
+      const cx = so ? so.x + so.w / 2 : map.width / 2;
+      setView({
+        scale,
+        tx: Math.min(0, Math.max(box.width - map.width * scale, box.width / 2 - cx * scale)),
+        ty: 0,
+      });
+    },
+    [map],
+  );
+
+  useLayoutEffect(() => {
+    fit();
+  }, [fit]);
+
+  useEffect(() => {
+    const onResize = () => fit();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [fit]);
+
+  const zoom = (dir: 1 | -1) =>
+    setView((v) => ({
+      ...v,
+      scale: Math.min(MAX_SCALE, Math.max(MIN_SCALE, v.scale + dir * STEP)),
+    }));
+
+  /** ⭐ Slice 4 — keyboard reachability on a transformed surface. The canvas
+   *  is positioned by CSS transform, so the browser CANNOT scroll a focused
+   *  node into view by itself: a keyboard user tabbing along the route would
+   *  walk off the visible frame and keep going, blind. When focus lands on a
+   *  node outside the frame, pan the view just enough to show it — never
+   *  re-zoom, never re-centre, so a mouse user's hand-placed view is
+   *  disturbed by the minimum a keyboard needs. */
+  const revealNode = useCallback(
+    (node: { x: number; y: number; w: number; h: number }) => {
+      const box = frame.current?.getBoundingClientRect();
+      if (!box || box.width === 0 || box.height === 0) return;
+      setView((v) => {
+        const M = 16; // breathing margin, so a revealed node is not flush on the edge
+        const left = node.x * v.scale + v.tx;
+        const top = node.y * v.scale + v.ty;
+        const right = left + node.w * v.scale;
+        const bottom = top + node.h * v.scale;
+        let { tx, ty } = v;
+        if (left < M) tx += M - left;
+        else if (right > box.width - M) tx -= right - (box.width - M);
+        if (top < M) ty += M - top;
+        else if (bottom > box.height - M) ty -= bottom - (box.height - M);
+        return tx === v.tx && ty === v.ty ? v : { ...v, tx, ty };
+      });
+    },
+    [],
+  );
+
+  if (loading) return <RouteLoadingFrame />;
+
+  return (
+    <div className="flex flex-col gap-3" data-testid="sales-order-route">
+      {/* ⭐ `PROPOSED CHANGE` — owner ruling 2026-09-25. ABOVE the canvas, never
+          inside it: the map keeps meaning what is true now. The same amber
+          `warning` band every Register draws; nothing is rendered while no
+          request waits. */}
+      {route.proposedChange && (
+        <div
+          role="alert"
+          data-testid="route-proposed-change"
+          data-kind={route.proposedChange.kind}
+          className="flex min-h-10 flex-wrap items-center gap-x-2 gap-y-0.5 rounded-card border border-kit-amber-6 bg-kit-amber-3 px-3 py-1.5 text-meta text-kit-amber-11"
+        >
+          <AlertTriangle size={14} className="shrink-0" aria-hidden="true" />
+          <span>{spellDates(route.proposedChange.fact)}</span>
+          {retryOwnerOf(route.proposedChange.door.href) ? (
+            <button
+              type="button"
+              onClick={() => onRetry?.("amendment")}
+              className="font-medium text-kit-blue-11 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+            >
+              {route.proposedChange.door.label}
+            </button>
+          ) : (
+            <Link
+              to={route.proposedChange.door.href}
+              className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+            >
+              {route.proposedChange.door.label}
+            </Link>
+          )}
+          {route.proposedChange.changes.map((row, i) => (
+            <span key={i} className="basis-full font-semibold">{spellDates(row)}</span>
+          ))}
+          {route.proposedChange.more > 0 && (
+            <span className="basis-full">and {route.proposedChange.more} more</span>
+          )}
+          {route.proposedChange.rule && <span className="basis-full">{route.proposedChange.rule}</span>}
+        </div>
+      )}
+      {/* A linked exception is NOT a node: a node is a stage every Sales Order
+          passes through, and Service is not one. It stays a conditional strip
+          beside the map, rendered only when one is open. */}
+      {route.linkedProblems.length > 0 && (
+        <section
+          className="rounded-card border border-kit-slate-5 bg-kit-amber-3 px-4 py-3"
+          data-testid="linked-problems"
+        >
+          <h2 className="text-label font-semibold uppercase tracking-wide text-kit-amber-11">
+            Linked problems
+          </h2>
+          <ul className="mt-1 flex flex-col gap-1">
+            {route.linkedProblems.map((problem) => (
+              <li key={problem.id} className="flex items-center gap-2 text-body text-base-900">
+                <span>{problem.title}</span>
+                <Link
+                  to={problem.door.href}
+                  className="text-label font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+                >
+                  {problem.door.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+        <div className="flex shrink-0 items-center justify-end" data-testid="route-controls">
+        <div className="flex overflow-hidden rounded-control border border-kit-slate-5 bg-white">
+          <button
+            type="button"
+            onClick={() => zoom(-1)}
+            data-testid="route-zoom-out"
+            aria-label="Zoom out"
+            className="grid h-7 w-7 place-items-center text-base-600 hover:bg-kit-slate-3"
+          >
+            <Minus size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => zoom(1)}
+            data-testid="route-zoom-in"
+            aria-label="Zoom in"
+            className="grid h-7 w-7 place-items-center border-l border-kit-slate-5 text-base-600 hover:bg-kit-slate-3"
+          >
+            <Plus size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => fit(true)}
+            data-testid="route-fit"
+            aria-label="Fit the whole route"
+            className="grid h-7 w-7 place-items-center border-l border-kit-slate-5 text-base-600 hover:bg-kit-slate-3"
+          >
+            <Maximize2 size={14} aria-hidden="true" />
+          </button>
+        </div>
+        </div>
+
+      <div
+        data-testid="route-canvas"
+        className="relative flex h-[calc(100vh-260px)] min-h-[420px] flex-col overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3"
+      >
+      {/* Controls sit outside the viewport so they never cover a route node. */}
+      <div
+        ref={frame}
+        data-testid="route-viewport"
+        tabIndex={0}
+        aria-label="Order Route"
+        className="relative min-h-0 flex-1 overflow-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+        onPointerDown={(e) => {
+          if ((e.target as HTMLElement).closest("[data-testid^='route-node-']")) return;
+          drag.current = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty };
+          e.currentTarget.setPointerCapture(e.pointerId);
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current;
+          if (!d) return;
+          setView((v) => ({ ...v, tx: d.tx + (e.clientX - d.x), ty: d.ty + (e.clientY - d.y) }));
+        }}
+        onPointerUp={() => {
+          drag.current = null;
+        }}
+        onPointerCancel={() => {
+          drag.current = null;
+        }}
+      >
+        <div data-testid="route-scroll-extent" aria-hidden="true" style={{
+          width: Math.max(0, view.tx) + map.width * view.scale,
+          height: Math.max(0, view.ty) + map.height * view.scale,
+          pointerEvents: "none",
+        }} />
+        <div
+          data-testid="route-surface"
+          className="absolute left-0 top-0 origin-top-left motion-safe:transition-transform motion-safe:duration-150"
+          style={{
+            width: map.width,
+            height: map.height,
+            transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})`,
+          }}
+        >
+          {/* The route names live on these bands — GOODS · DELIVERY · PAYMENT —
+              never on the connectors (owner ruling 2026-08-17). */}
+          {map.bands.map((band) => (
+            <div
+              key={band.id}
+              data-testid={`route-band-${band.id}`}
+              className="absolute truncate border-b border-kit-slate-5 text-label font-semibold uppercase tracking-wide text-base-600"
+              style={{
+                left: band.x,
+                top: band.y,
+                width: band.w,
+                height: band.h,
+                lineHeight: `${band.h - 2}px`,
+              }}
+            >
+              {band.label}
+            </div>
+          ))}
+          <Edges map={map} />
+          {map.nodes.map((node) => (
+            <Node
+              key={node.id}
+              node={node}
+              owners={owners}
+              onReveal={revealNode}
+              onRetry={onRetry}
+              goodsExpanded={node.kind === "goods-line" ? node.id === expandedGoods : undefined}
+              onToggleGoods={(id) => setExpandedGoods((current) => current === id ? current : id)}
+            />
+          ))}
+        </div>
+      </div>
+
+
+      </div>
+    </div>
+  );
+}
+
+/** Loading holds the canvas's final geometry (Orders MASTER § A READ FAILURE
+ *  HAS THREE FACES): the same framed box the map will fill, so nothing jumps. */
+export function RouteLoadingFrame() {
+  return (
+    <div
+      data-testid="route-loading"
+      className="relative flex h-[calc(100vh-260px)] min-h-[420px] items-start overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3 p-6"
+    >
+      <div className="w-[208px] rounded-card border border-kit-slate-5 bg-white p-3">
+        <Loading variant="skeleton" lines={3} label="Opening the order route" />
+      </div>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from "react";
+import { ORDER_TERMS, ORDER_TERMS_HEADING } from "@/lib/order-terms";
 import {
   resolvePaymentMethods,
   STRIPE_METHOD_KEY,
@@ -7,6 +8,7 @@ import {
 } from "@carres/shared";
 import { draftTotals } from "@/lib/order-totals";
 import { newWizardSessionId } from "@/lib/storage";
+import { composeAddress } from "@/data/malaysia-postcodes";
 import { previewDefaultGifts } from "../pos/free-line";
 import { cartModeOf } from "../pos/rental-cart";
 import {
@@ -155,13 +157,27 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
       hasSlip &&
       (!selectedMethod.approvalCodeRequired || hasApproval) &&
       !missingFollowUp;
+  const deliveryAddress = composeAddress({
+    line1: draft.customer.addressLine1,
+    line2: draft.customer.addressLine2,
+    state: draft.customer.addressState,
+    city: draft.customer.addressCity,
+    postcode: draft.customer.addressPostcode,
+  });
   // Stripe submits the order with paid 0 (money moves only when the customer
   // completes Checkout), so it can never auto-qualify for Proceed at submit.
   const willProceed =
     !isStripe &&
+    total > 0 &&
     paidPct >= 50 &&
+    draft.customer.name.trim().length > 0 &&
+    draft.customer.phone.trim().length > 0 &&
     !draft.customer.addressUnknown &&
+    deliveryAddress.trim().length > 0 &&
+    draft.delivery.date.trim().length > 0 &&
     !draft.delivery.dateTbd &&
+    !!draft.signature?.startsWith("data:image/") &&
+    draft.termsAccepted &&
     paymentMethodOk;
 
   function paymentBlockerLabel(): string | null {
@@ -181,7 +197,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
       <Section title="Customer">
         <div className="rounded border border-base-200 bg-white p-4">
           <div className="font-display text-lg font-semibold leading-tight">
-            {draft.customer.name || <em className="text-base-400">—</em>}
+            {draft.customer.name || null}
           </div>
           <div className="font-mono text-xs text-base-500 mt-0.5">
             {draft.customer.phone}
@@ -280,10 +296,17 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
           {deliveryPreview && deliveryPreview.base > 0 && (
             <div className="flex justify-between px-3.5 py-2.5 border-t border-base-100 text-base-600">
               <span className="text-[13px]">
+                {/* ONE NAME FOR THE CHARGE (YH, 2026-08-28). This line used to
+                    rename itself — `Cross-category follow-up delivery` ·
+                    `Special delivery fee` · `Delivery fee` — so the same charge
+                    wore a different word depending on config the salesperson
+                    cannot see. Every row now opens with `Delivery fee` and puts
+                    the REASON after a separator, the way stair carry already
+                    qualifies itself with `(with lift)`. */}
                 + {deliveryPreview.isFollowup
-                  ? "Cross-category follow-up delivery"
+                  ? "Delivery fee · follow-up order"
                   : deliveryPreview.isSpecial
-                    ? "Special delivery fee"
+                    ? "Delivery fee · special rate"
                     : "Delivery fee"}
               </span>
               <span className="font-mono text-[13px]">RM {deliveryPreview.base.toLocaleString()}</span>
@@ -291,13 +314,13 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
           )}
           {deliveryPreview && deliveryPreview.crossCategory > 0 && (
             <div className="flex justify-between px-3.5 py-2.5 border-t border-base-100 text-base-600">
-              <span className="text-[13px]">+ Cross-category delivery</span>
+              <span className="text-[13px]">+ Delivery fee · extra category</span>
               <span className="font-mono text-[13px]">RM {deliveryPreview.crossCategory.toLocaleString()}</span>
             </div>
           )}
           {deliveryPreview && deliveryPreview.additional > 0 && (
             <div className="flex justify-between px-3.5 py-2.5 border-t border-base-100 text-base-600">
-              <span className="text-[13px]">+ Additional delivery fee</span>
+              <span className="text-[13px]">+ Delivery fee · added by store</span>
               <span className="font-mono text-[13px]">RM {deliveryPreview.additional.toLocaleString()}</span>
             </div>
           )}
@@ -318,9 +341,34 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
       </Section>
 
       {/* ---------- Delivery fee (0184) ---------- */}
-      <Section title="Delivery fee" hint="Server-priced — these two are operator inputs">
+      {/* ⛔ THE TWO OPERATOR DELIVERY-FEE INPUTS ARE WITHHELD (YH, 2026-08-29).
+
+          `Add to the delivery fee` and `Earlier order this delivery follows`
+          are the only two delivery-fee values a salesperson can type. What
+          either one MEANS commercially has never been settled — the base rate
+          and the charged-category set are Mr Loo's to rule and he has not been
+          asked yet, and the whole subsystem is dormant (both configured rates
+          seed to RM 0), so neither field can change a price today anyway.
+
+          A box that cannot change anything still teaches a shop that it can.
+          So they are withheld rather than shown-and-ignored.
+
+          ⭐ DO NOT RESTORE THIS WITHOUT THE RULING. Put it back only when YH
+          says Mr Loo has answered: what a base trip fee is for, who sets the
+          rate, and which categories are charged. Restoring it early hands the
+          shop two inputs whose meaning nobody can explain to a customer.
+
+          Nothing else is touched: the server still computes and stamps the fee,
+          the summary above still itemises whatever it computed, and the draft
+          simply carries the defaults (`additionalDeliveryFee` 0,
+          `crossCategorySourceSo` null) that an untouched form always carried.
+
+          The block below is preserved verbatim so restoring it is a delete of
+          two lines, not a rebuild. */}
+      {false && (
+      <Section title="Delivery fee" hint="Head office sets the rate. You can add to it here">
         <div className="rounded border border-base-200 bg-white p-4 flex flex-col gap-3.5">
-          <FieldLabel label="Additional delivery fee (optional)">
+          <FieldLabel label="Add to the delivery fee (optional)">
             <div className="flex items-center gap-2.5">
               <span className="font-mono text-[13px] text-base-500">RM</span>
               <input
@@ -341,11 +389,11 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
               />
             </div>
             <div className="text-[11px] text-base-500 mt-1.5">
-              A free-form fee agreed at handover (e.g. remote area). Added on top of the
-              base trip fee.
+              A fee you agreed with the customer, for example a remote area.
+              It is added on top of the delivery fee above.
             </div>
           </FieldLabel>
-          <FieldLabel label="Previous SO — cross-category link (optional)">
+          <FieldLabel label="Earlier order this delivery follows (optional)">
             <input
               type="text"
               value={draft.crossCategorySourceSo ?? ""}
@@ -356,16 +404,17 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
               data-testid="step3-cross-category-so"
             />
             <div className="text-[11px] text-base-500 mt-1.5">
-              If this order delivers as a follow-up to the customer's earlier SO (the base
-              fee was already paid there), enter that SO so only the reduced cross-category
-              rate applies. The server validates it before booking.
+              If this delivery follows an earlier order from the same customer, enter that
+              SO number. The delivery fee was already charged there, so this order is
+              charged the lower rate. We check the number before the order is booked.
             </div>
           </FieldLabel>
         </div>
       </Section>
+      )}
 
       {/* ---------- Payment received ---------- */}
-      <Section title="Payment received" hint="50% required to move to Proceed Order">
+      <Section title="Payment received" hint="50% required before Operations receives the order">
         <div className="grid grid-cols-3 gap-2 mb-3">
           {(
             [
@@ -423,7 +472,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
         {draft.paid > 0 && isStripe && (
           <div className="mt-2.5 px-3 py-2.5 rounded text-xs leading-relaxed text-base-800 border border-success bg-success-soft">
             ✓ After you complete the order, a <strong>QR / payment link</strong> for RM{" "}
-            {draft.paid.toLocaleString()} opens — the customer pays there and the payment
+            {draft.paid.toLocaleString()} opens. The customer pays there and the payment
             records itself.{" "}
             {/* A RENTAL leaves Place when FINANCE APPROVES it, not when money
                 lands (0275 replaced the deposit gate with the credit-approval
@@ -431,11 +480,13 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
                 watching the wrong thing — nobody would think to chase finance. */}
             {cartModeOf(draft.lines) === "rental" ? (
               <>
-                The order sits in <strong>Place</strong> until finance approves the rental.
+                Finance approval is still needed. Operations receives this order automatically
+                after finance approves the rental.
               </>
             ) : (
               <>
-                The order sits in <strong>Place</strong> until the payment lands.
+                Payment is not received yet. Operations receives this order automatically after
+                the payment is recorded.
               </>
             )}
           </div>
@@ -450,21 +501,35 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
           >
             {willProceed ? (
               <>
-                ✓ Payment ≥ 50% and all info complete — this order will be eligible for{" "}
-                <strong>Proceed</strong> immediately after submit.
+                ✓ This order is complete.
+                <br />
+                <span className="text-[11px]">
+                  Operations receives this order automatically when you submit.
+                </span>
               </>
             ) : (
               <>
-                ⚠ Order will sit in <strong>Place</strong> until{" "}
-                {[
-                  paidPct < 50 && `payment reaches 50% (now ${paidPct}%)`,
-                  paymentBlockerLabel(),
-                  draft.customer.addressUnknown && "delivery address is provided",
-                  draft.delivery.dateTbd && "delivery date is confirmed",
-                ]
-                  .filter(Boolean)
-                  .join(", ")}
-                .
+                ⚠ This order is not ready.
+                <br />
+                <span className="text-[11px]">
+                  Operations receives it when{" "}
+                  {[
+                    total <= 0 && "the order has goods and a price",
+                    paidPct < 50 && `payment reaches 50% (now ${paidPct}%)`,
+                    paymentBlockerLabel(),
+                    !draft.customer.name.trim() && "customer name is entered",
+                    !draft.customer.phone.trim() && "customer phone is entered",
+                    (draft.customer.addressUnknown || !deliveryAddress.trim()) &&
+                      "delivery address is entered",
+                    (draft.delivery.dateTbd || !draft.delivery.date.trim()) &&
+                      "Requested Delivery Date is entered",
+                    !draft.signature?.startsWith("data:image/") && "customer signs",
+                    !draft.termsAccepted && "terms are accepted",
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
+                  .
+                </span>
               </>
             )}
           </div>
@@ -516,7 +581,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
             </div>
             The customer pays by FPX / card on Stripe&rsquo;s secure page (QR at the counter, or
             a WhatsApp link). The payment records itself with a <strong>payment code</strong> and
-            an official <strong>Stripe receipt</strong> attached for finance — nothing to key in
+            an official <strong>Stripe receipt</strong> attached for finance. Nothing to key in
             or photograph.
           </div>
         )}
@@ -565,7 +630,7 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
                   className="w-full px-3 py-2.5 border-[1.5px] border-base-200 rounded-xl text-sm bg-white outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-colors"
                   data-testid={`pay-followup-${fu.key}`}
                 >
-                  <option value="">— select {fu.label.toLowerCase()} —</option>
+                  <option value="">{fu.label}</option>
                   {fu.options.map((o) => (
                     <option key={o} value={o}>
                       {o}
@@ -623,35 +688,12 @@ export default function Step3SignaturePayment({ draft, onChange, catalog, onStri
           PDF they sign. Any future edit must touch both files together. */}
       <Section title="Terms & conditions">
         <div className="rounded border border-base-200 bg-white p-3.5 text-[11px] leading-relaxed text-base-700 max-h-[140px] overflow-auto">
-          <p className="text-base-900 font-semibold mb-1.5">Carres Group Sdn Bhd · Order Terms</p>
-          <p>
-            {/* THE OWNER-CORRECTED WORDING (2026-08-09), law in
-                docs/pdf/SO-PDF-STANDARD.md §T&C. Card 3.0-FIX applied it to the
-                PDF and MISSED THIS SCREEN, so the customer was signing "becomes
-                a binding tax invoice" while receiving "the sales invoice is a
-                separate document". The comment above this Section predicted
-                exactly that — "any future edit must touch both files together" —
-                and prose cannot enforce it, so sales-order-terms.test.tsx now
-                does. */}
-            1. This sales order records your purchase agreement with Carres. The sales invoice is a
-            separate document issued upon delivery.
-          </p>
-          <p>
-            2. Balance due is payable in full on or before delivery. Cash, bank transfer, DuitNow
-            QR, and cheque accepted.
-          </p>
-          <p>
-            3. Delivery date is best-effort and may shift ±3 working days subject to operation
-            confirmation.
-          </p>
-          <p>
-            4. Stair-carry surcharges (if any) are billed on this sales order and are not invoiced
-            separately on the DO.
-          </p>
-          <p>
-            5. Once the delivery date has been confirmed, any subsequent request to change or
-            extend the date will incur a rescheduling surcharge.
-          </p>
+          <p className="text-base-900 font-semibold mb-1.5">{ORDER_TERMS_HEADING}</p>
+          {ORDER_TERMS.map((t, i) => (
+            <p key={i}>
+              {i + 1}. {t}
+            </p>
+          ))}
         </div>
         <label
           className={`mt-2.5 flex items-start gap-2.5 px-3.5 py-3 border rounded cursor-pointer ${
@@ -712,7 +754,7 @@ function KV({ label, value }: { label: string; value: React.ReactNode }) {
         {label}
       </div>
       <div className="text-[13px] text-base-800">
-        {value || <em className="text-base-400">—</em>}
+        {value || null}
       </div>
     </div>
   );

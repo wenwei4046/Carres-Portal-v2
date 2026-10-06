@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type {
+  StockIdentityMode,
   CatalogOptionPoolDto,
   ProductCategory,
   ProductModelDto,
@@ -13,6 +14,8 @@ import {
   PRODUCT_CATEGORIES,
   autoBedSkuDescription,
   canonicalSize,
+  supplierSlug,
+  supplierCreateInput,
   guaranteeVisitsTotal,
   type GuaranteeKind,
 } from "@carres/shared";
@@ -20,6 +23,8 @@ import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
   useCreateCatalogModel,
+  useCreateSupplier,
+  useOperationSuppliers,
   useCreateCatalogSku,
   useCreateGuaranteeProduct,
   useGenerateSkus,
@@ -78,6 +83,13 @@ function deriveModelKey(name: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+/** 0442 — the form's DEFAULT for the stock identity mode, from the one fact
+ *  it already knows. It is a suggestion the keyer confirms and the server
+ *  stores explicitly; nothing derives the mode at runtime. */
+function defaultIdentityModeFor(category: ProductCategory | undefined): StockIdentityMode {
+  return category === "accessory" ? "quantity" : "exact_unit";
+}
+
 function variantKindFor(category: ProductCategory, model?: ProductModelDto): VariantKind {
   if (category === "sofa") return model?.sofaMode === "custom" ? "part" : "preset";
   if (category === "mattress" || category === "bedframe") return "size";
@@ -111,7 +123,20 @@ export default function NewSkuModal({
   // non-principal may still create a SKU — it's just UNPRICED (price 0 / cost
   // null) and the principal prices it later. Hide the price/cost fields and
   // force the unpriced payload for them.
-  const isPrincipal = useAuth((s) => s.role) === "principal";
+  const role = useAuth((s) => s.role);
+  const isPrincipal = role === "principal";
+  /* ⭐ COST IS OPERATION'S LANE TOO (0226), and this modal was narrower than
+   * the server it posts to. `gateSkuCreatePriceCost` says so in as many words —
+   * *"a non-principal MAY create an UNPRICED sku; operation may additionally
+   * seed the buying cost"* — but the form offered the cost box to the principal
+   * alone and hard-sent `null` otherwise.
+   *
+   * Nobody noticed while `+ New SKU` lived only on the admin door. Jess's
+   * 2026-08-26 alignment ruling put that button on the Operations catalog, and
+   * the whole reason that catalog exists is recording what we pay: an operation
+   * user could create the SKU and then had to go back to the grid to key the
+   * one number they opened the form for. */
+  const canSetCost = isPrincipal || role === "operation";
   const createModel = useCreateCatalogModel();
   const createSku = useCreateCatalogSku();
   const createGuarantee = useCreateGuaranteeProduct();
@@ -124,8 +149,83 @@ export default function NewSkuModal({
   const [price, setPrice] = useState("");
   const [cost, setCost] = useState(""); // blank -> null (cost is optional on creation)
   const [description, setDescription] = useState("");
+  /* 0375 — the SUPPLIER'S own item code (their quotation's code for this
+   * piece). Free text, optional; ours is the SKU code above. */
+  const [supplierCode, setSupplierCode] = useState("");
+  /* ⭐ ONE CODE FOR THE BATCH, ANY PIECE OVERRIDDEN (2026-08-24).
+   *
+   * A supplier's quotation names the SUPPLIER's code, never Carres' SKU — it is
+   * the only string a keyer can match a factory's paperwork against. The bulk
+   * flows generate many SKUs at once and a quotation usually lists a different
+   * code per size or per compartment, so one shared box would write the same
+   * wrong code onto every row.
+   *
+   * `supplierCode` above is the batch default; this map overrides one piece.
+   * Keyed by what the SUBMIT sends — the canonical size NAME for the size flow
+   * (`King`, which is what `variants` carries) and the compartmentId for the
+   * compartment flow (which is what that loop iterates). Keying by anything the
+   * server cannot recognise would silently drop the override. */
+  const [supplierCodes, setSupplierCodes] = useState<Record<string, string>>({});
+  /* ⭐ A QUOTATION PRICES EACH SIZE DIFFERENTLY (2026-08-25). Hookka's Cody
+   * bedframe is K 550 · Q 425 · S 395 · SS 407.50 — the one batch price box
+   * cannot say that, so 66 bedframe SKUs were generating wrong-or-zero and
+   * being re-keyed by hand in SKU Master. One box per ticked size, price and
+   * PWP, keyed by the canonical size NAME the submit sends (same contract as
+   * `supplierCodes`). Empty box = the batch price; PWP has NO batch default
+   * because the measured quotation's Price 1 never repeats across sizes. */
+  const [sizePrices, setSizePrices] = useState<Record<string, string>>({});
+  const [sizePwp, setSizePwp] = useState<Record<string, string>>({});
+  /* 2026-08-24 - WHO supplies this piece. Empty = Auto: the route resolves
+   * the supplier from `suppliers.cat_covered[]` exactly as it always has,
+   * so an untouched form is byte-identical to before this picker existed.
+   * Picking one writes supplier_id explicitly - the identity is the FK;
+   * the NAME is only ever derived from it (Law A/D), never typed here. */
+  const [supplierId, setSupplierId] = useState("");
+  const suppliersQ = useOperationSuppliers();
+  /* ⭐ Adding a supplier without leaving the SKU (2026-08-24). Principal-only,
+   * because `suppliers_principal_write` (0002) has always been the boundary —
+   * the panel simply does not render for anyone who would be refused. */
+  const createSupplier = useCreateSupplier();
+  const [newSupplierOpen, setNewSupplierOpen] = useState(false);
+  const [newSupplierName, setNewSupplierName] = useState("");
+  const [newSupplierKind, setNewSupplierKind] =
+    useState<"own_logistics" | "factory_pickup">("factory_pickup");
+  const [newSupplierCats, setNewSupplierCats] = useState<Array<"mattress" | "bedframe" | "sofa">>([]);
+  const [newSupplierDays, setNewSupplierDays] = useState<Record<string, string>>({});
+  const [newSupplierOffDays, setNewSupplierOffDays] = useState<number[]>([0]);
+  const supplierSetup = supplierCreateInput.safeParse({
+    name: newSupplierName, kind: newSupplierKind, catCovered: newSupplierCats,
+    productionDays: newSupplierCats.map(category => ({ category, workingDays: Number(newSupplierDays[category]) })),
+    offDays: newSupplierOffDays,
+  });
+  /* ⭐ A DUPLICATE IS CAUGHT BEFORE THE ROUND-TRIP, AND IS NOT A DEAD END
+   * (2026-08-25). The server refuses a second supplier with the same derived
+   * slug, correctly — but a red toast saying "already a supplier, pick it from
+   * the list" leaves the keyer holding a form they must now dismantle by hand,
+   * and it arrives only after a request. The roster is ALREADY loaded, and the
+   * slug is derived by the SAME shared function the server derives it with
+   * (`supplierSlug`), so the same answer is available while they type. Matching
+   * on the slug, not the name, is what makes `HoOKkA` and `hookka` collide here
+   * exactly as they collide in the database. */
+  const typedSupplierSlug = supplierSlug(newSupplierName);
+  /* ⭐ MATCH ON THE STORED SLUG, NOT THE NAME'S (2026-08-25). A supplier can be
+     RENAMED while its slug stays — `Ohana` still carries `hookka` from 0032.
+     Deriving from the name said "no match" for "Hookka" here while the server
+     refused it on the stored column: the exact dead end this check exists to
+     prevent, reproduced in production while keying the Hookka quotation. The
+     name-derived slug remains only as the fallback for a roster row an older
+     Worker served without the column. */
+  const existingSupplierMatch = typedSupplierSlug
+    ? ((suppliersQ.data?.suppliers ?? []).find(
+        (s) => (s.slug ?? supplierSlug(s.name)) === typedSupplierSlug,
+      ) ?? null)
+    : null;
   // new-product fields
   const [category, setCategory] = useState<ProductCategory>("mattress");
+  /* 0442 — Catalog states how Stock identifies the new SKU: `exact_unit`
+     (one permanent Unit ID per piece, born with the official PO) or
+     `quantity` (counted goods, no Unit IDs). Saved EXPLICITLY with the SKU. */
+  const [identityMode, setIdentityMode] = useState<StockIdentityMode>("exact_unit");
   const [name, setName] = useState("");
   // existing-model field
   const [modelId, setModelId] = useState("");
@@ -147,11 +247,296 @@ export default function NewSkuModal({
       ),
     [models],
   );
+  // ⭐ TWO MODELS CAN SHARE A NAME (2026-08-24) — the schema's real identity is
+  // `(category, model_key)`, not name. Two suppliers each pitching a "Booqit"
+  // land as two separate models the moment either one's model_key differs
+  // (the import's own escape hatch; the auto-derived key alone WOULD collide).
+  // The "Add to existing model" list read `{Category} {Name}` only, so two
+  // same-named rows were LITERALLY IDENTICAL TEXT — a keyer had no way to tell
+  // Hookka's Booqit from anyone else's, and could add a SKU to the wrong one.
+  // Disambiguate ONLY where a real collision exists in this category, using a
+  // fact already loaded (model_key) rather than inventing a supplier concept
+  // a model doesn't have — supplier lives on the SKU, not here.
+  const duplicateNameKeys = useMemo(() => {
+    const seen = new Map<string, number>();
+    for (const m of models) {
+      const k = `${m.category} ${m.name.trim().toLowerCase()}`;
+      seen.set(k, (seen.get(k) ?? 0) + 1);
+    }
+    return new Set([...seen].filter(([, n]) => n > 1).map(([k]) => k));
+  }, [models]);
+  // ⭐ ONE PICKER, THREE FLOWS (2026-08-24). The classic single-SKU flow always
+  // had this control; the bulk paths (sizeFlow, compFlow) did not, so a batch
+  // of mattress sizes or sofa compartments always guessed its supplier via the
+  // route's category-cover fallback with no way to override it. Same state
+  // (`supplierId`), same control, rendered wherever a flow needs it — the value
+  // means the same thing everywhere: empty = Auto (today's resolve), a pick =
+  // an explicit override sent to whichever endpoint this flow calls.
+  /* 0442 — the Catalog fact official PO issue reads. Absent, the PO refuses
+     the SKU by name, so the form always sends one. */
+  const stockIdentityField = (
+    <label className="block">
+      <span className="label block mb-1">Stock identity</span>
+      <select
+        value={identityMode}
+        onChange={(e) => setIdentityMode(e.target.value as StockIdentityMode)}
+        data-testid="new-sku-stock-identity"
+        className={INPUT_CLS}
+      >
+        <option value="exact_unit">Unit ID: one permanent ID per piece</option>
+        <option value="quantity">Quantity: counted, no Unit ID</option>
+      </select>
+    </label>
+  );
+
+  const supplierPickerField = (
+    <div className="block">
+      <label className="block">
+        <span className="label block mb-1">Supplier</span>
+        <select
+          value={supplierId}
+          onChange={(e) => setSupplierId(e.target.value)}
+          data-testid="new-sku-supplier"
+          className={INPUT_CLS}
+        >
+          {/* Auto keeps the route's category-based resolution - the behaviour
+              every SKU before this picker was created under. */}
+          <option value="">Auto (by category)</option>
+          {(suppliersQ.data?.suppliers ?? []).map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {/* ⭐ MEETING A NEW SUPPLIER MID-CATALOG (2026-08-24).
+          Until today the portal had NO supplier-creation door anywhere, so a
+          keyer who reached a factory nobody had entered yet had to stop, open
+          the SQL editor (or ask someone who could) and come back. The record
+          still belongs to Purchasing; this is a door onto it, and the point of
+          putting it HERE is that the half-written SKU survives. */}
+      {isPrincipal && !newSupplierOpen && (
+        <button
+          type="button"
+          onClick={() => {
+            setNewSupplierOpen(true);
+            /* ⭐ A FRESH PANEL IS A FRESH SUPPLIER (2026-08-25). Cancelling used
+               to leave the last name in the box, so reopening it later to add a
+               DIFFERENT factory submitted the old one and the server refused a
+               duplicate the keyer could not see they had asked for. */
+            setNewSupplierName("");
+            /* Pre-tick the category being keyed: it is the answer nine times
+               out of ten, and it is the one fact this modal already knows. */
+            setNewSupplierCats(effectiveCategory === "mattress" || effectiveCategory === "bedframe" || effectiveCategory === "sofa" ? [effectiveCategory] : []);
+            setNewSupplierDays({});
+            setNewSupplierOffDays([0]);
+          }}
+          className="mt-1.5 text-meta font-medium text-kit-blue-9 underline underline-offset-2"
+          data-testid="new-sku-supplier-add-open"
+        >
+          Add Supplier
+        </button>
+      )}
+      {isPrincipal && newSupplierOpen && (
+        <div
+          className="mt-2 flex flex-col gap-2 rounded-card border border-base-200 bg-base-50 p-2.5"
+          data-testid="new-sku-supplier-add"
+        >
+          <label className="block">
+            <span className="label block mb-1">Supplier Name</span>
+            <input
+              value={newSupplierName}
+              onChange={(e) => setNewSupplierName(e.target.value)}
+              placeholder="e.g. Hookka"
+              data-testid="new-sku-supplier-add-name"
+              className={INPUT_CLS}
+            />
+          </label>
+          <label className="block">
+            <span className="label block mb-1">Delivery Method</span>
+            <select
+              value={newSupplierKind}
+              onChange={(e) =>
+                setNewSupplierKind(e.target.value as "own_logistics" | "factory_pickup")
+              }
+              data-testid="new-sku-supplier-add-kind"
+              className={INPUT_CLS}
+            >
+              <option value="own_logistics">Supplier delivers</option>
+              <option value="factory_pickup">We collect</option>
+            </select>
+          </label>
+          <div className="block">
+            <span className="label block mb-1">Product Categories</span>
+            <div className="flex flex-wrap gap-1.5">
+              {(["mattress", "bedframe", "sofa"] as const).map((cat) => {
+                const on = newSupplierCats.includes(cat);
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() =>
+                      setNewSupplierCats((prev) =>
+                        prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
+                      )
+                    }
+                    className={`rounded-[4px] border px-2 py-1 text-meta font-semibold transition-colors ${
+                      on
+                        ? "border-base-900 bg-base-900 text-white"
+                        : "border-base-200 bg-white text-base-500 hover:border-base-400"
+                    }`}
+                    data-testid={`new-sku-supplier-add-cat-${cat}`}
+                  >
+                    {CATEGORY_LABEL[cat]}
+                  </button>
+                );
+              })}
+            </div>
+
+          </div>
+          {newSupplierCats.map(cat => (
+            <label className="block" key={cat}>
+              <span className="label block mb-1">{CATEGORY_LABEL[cat]} · Production Days</span>
+              <input type="number" min={1} max={180} step={1} required
+                value={newSupplierDays[cat] ?? ""}
+                onChange={e => setNewSupplierDays(prev => ({ ...prev, [cat]: e.target.value }))}
+                data-testid={`new-sku-supplier-add-days-${cat}`} className={INPUT_CLS} />
+              <span className="text-meta text-base-500">working days</span>
+            </label>
+          ))}
+          <fieldset>
+            <legend className="label block mb-1">Supplier work week</legend>
+            <div className="flex flex-wrap gap-2">
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label, day) => (
+                <label key={day} className="text-meta">
+                  <input type="checkbox" checked={!newSupplierOffDays.includes(day)}
+                    onChange={() => setNewSupplierOffDays(prev => prev.includes(day)
+                      ? prev.filter(value => value !== day) : [...prev, day])} /> {label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          {existingSupplierMatch && (
+            <div
+              className="flex flex-wrap items-center gap-2 text-meta text-base-700"
+              data-testid="new-sku-supplier-add-duplicate"
+            >
+              <span>{existingSupplierMatch.name} is already a supplier.</span>
+              <button
+                type="button"
+                onClick={() => {
+                  /* One click finishes what they meant: select it and close.
+                     Refusing without doing the obvious next thing is what made
+                     the server's message a dead end. */
+                  setSupplierId(existingSupplierMatch.id);
+                  setNewSupplierOpen(false);
+                  setNewSupplierName("");
+                }}
+                className="font-medium text-kit-blue-9 underline underline-offset-2"
+                data-testid="new-sku-supplier-add-use-existing"
+              >
+                Use {existingSupplierMatch.name}
+              </button>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={
+                !supplierSetup.success ||
+                createSupplier.isPending ||
+                existingSupplierMatch !== null
+              }
+              onClick={async () => {
+                try {
+                  if (!supplierSetup.success) return;
+                  const { supplier } = await createSupplier.mutateAsync(supplierSetup.data);
+                  /* Select it immediately — the keyer asked for this supplier
+                     because they are keying its SKU right now. */
+                  setSupplierId(supplier.id);
+                  setNewSupplierOpen(false);
+                  setNewSupplierName("");
+                  toast.success(`${supplier.name} added and selected for this SKU`);
+                } catch (e) {
+                  toast.error(e instanceof ApiError ? e.message : "Could not add the supplier");
+                }
+              }}
+              className="btn-primary text-meta"
+              data-testid="new-sku-supplier-add-save"
+            >
+              {createSupplier.isPending ? "Adding…" : "Add Supplier"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setNewSupplierOpen(false);
+                setNewSupplierName("");
+              }}
+              className="btn-ghost text-meta"
+              data-testid="new-sku-supplier-add-cancel"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  /* The batch-default code plus one box per piece being generated. Rendered by
+     both bulk flows; the classic single-SKU flow keeps its own plain field
+     below, because there is no batch to default and no second piece to
+     override — a "same as above" placeholder would be describing nothing. */
+  const supplierCodeBatchField = (pieces: { key: string; label: string }[]) => (
+    <div className="block" data-testid="new-sku-supplier-code-batch">
+      <label className="block">
+        <span className="label block mb-1">Supplier item code (optional)</span>
+        <input
+          value={supplierCode}
+          onChange={(e) => setSupplierCode(e.target.value)}
+          placeholder="One code for the whole batch. Override any piece below"
+          data-testid="new-sku-supplier-code"
+          className={INPUT_CLS}
+        />
+      </label>
+      {pieces.length > 0 && (
+        <div className="mt-2 flex flex-col gap-1.5" data-testid="new-sku-supplier-code-pieces">
+          {pieces.map((p) => (
+            <label key={p.key} className="flex items-center gap-2">
+              <span className="w-24 shrink-0 truncate font-mono text-meta text-base-500">
+                {p.label}
+              </span>
+              <input
+                value={supplierCodes[p.key] ?? ""}
+                onChange={(e) =>
+                  setSupplierCodes((prev) => ({ ...prev, [p.key]: e.target.value }))
+                }
+                /* The placeholder SHOWS the inherited value, so an empty box is
+                   never mistaken for an empty code. */
+                placeholder={supplierCode.trim() || "same as above"}
+                data-testid={`new-sku-supplier-code-piece-${p.key}`}
+                className={INPUT_CLS}
+              />
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const modelOptionLabel = (m: ProductModelDto): string => {
+    const dupe = duplicateNameKeys.has(`${m.category} ${m.name.trim().toLowerCase()}`);
+    return `${CATEGORY_LABEL[m.category]} ${m.name}${dupe ? ` (${m.modelKey})` : ""}`;
+  };
   const existingModel = sortedModels.find((m) => m.id === modelId);
   // The category the option chips key off — the picked category (new) or the
   // picked model's (existing): "Add to existing model" surfaces the SAME chips
   // as "New product" (Loo 2026-07-21).
   const effectiveCategory = mode === "new" ? category : existingModel?.category;
+  useEffect(() => {
+    setIdentityMode(defaultIdentityModeFor(effectiveCategory));
+  }, [effectiveCategory]);
 
   // The picked model's LIVE SKUs (discontinued excluded — a soft-retired
   // compartment sku re-offers cleanly, so its chip stays offerable).
@@ -334,8 +719,9 @@ export default function NewSkuModal({
       ? chipTargetOk && selectedSizes.size > 0 && (!isPrincipal || priceOk)
       : // No-variant-axis categories (accessory / service) need no size/variant.
         (noVariantAxis || variant.trim().length > 0) &&
-        // Price/cost only gate validity when the principal can actually set them.
-        (!isPrincipal || (priceOk && costOk)) &&
+        // Each money field gates validity only for the role that can set it.
+        (!isPrincipal || priceOk) &&
+        (!canSetCost || costOk) &&
         (mode === "new" ? name.trim().length >= 2 && modelKey.length >= 2 : !!existingModel);
 
   const pending =
@@ -369,7 +755,7 @@ export default function NewSkuModal({
           price: priceNum,
           description: description.trim() || null,
         });
-        toast.success(`${res.sku} created — covers ${res.covers}`);
+        toast.success(`${res.sku} created. Covers ${res.covers}`);
         onClose();
       } catch (e) {
         toast.error(e instanceof ApiError ? e.message : "Could not create the guarantee");
@@ -396,16 +782,30 @@ export default function NewSkuModal({
           setCreatedModelId(sofaModelId); // lock identity; a retry only re-offers
         }
         const ids = compPool.filter((c) => selectedComps.has(c.id)).map((c) => c.id);
+        /* The compartment lane sends ONE code per request, so the batch default
+           is resolved here rather than on the server — each PUT carries the
+           single code that compartment should end up with. */
+        const batch = supplierCode.trim();
+        const codes: Record<string, string> = {};
+        for (const compartmentId of ids) {
+          const code = (supplierCodes[compartmentId] ?? "").trim() || batch;
+          if (code) codes[compartmentId] = code;
+        }
         const { failed } = await offerCompartments.mutateAsync({
           modelId: sofaModelId,
           compartmentIds: ids,
+          supplierId: supplierId || undefined,
+          /* Omitted when nobody typed a code, so a batch with no codes sends
+             the byte-identical payload it sent before this field existed. */
+          ...(Object.keys(codes).length > 0 ? { supplierCodes: codes } : {}),
+          stockIdentityMode: identityMode,
         });
         if (failed.length > 0) {
           // Keep the modal open with ONLY the failed compartments selected —
           // clicking create again retries just those (the offer is idempotent).
           setSelectedComps(new Set(failed.map((f) => f.compartmentId)));
           toast.error(
-            `${ids.length - failed.length} of ${ids.length} compartment SKUs created — ${failed.length} failed: ${failed[0].message}`,
+            `${ids.length - failed.length} of ${ids.length} compartment SKUs created. ${failed.length} failed: ${failed[0].message}`,
           );
           return;
         }
@@ -445,7 +845,47 @@ export default function NewSkuModal({
         const r = await generateSkus.mutateAsync({
           modelId: sizeModelId,
           // Non-principal generates UNPRICED (price omitted → server defaults 0).
-          input: { variants: sizes, price: isPrincipal && priceNum > 0 ? priceNum : undefined },
+          input: {
+            variants: sizes,
+            price: isPrincipal && priceNum > 0 ? priceNum : undefined,
+            supplierId: supplierId || undefined,
+            /* The server resolves per-variant → batch → NULL, so both ride the
+               one request. Only the sizes actually being generated are sent —
+               a code typed against a size then unticked must not travel. */
+            supplierCode: supplierCode.trim() || undefined,
+            stockIdentityMode: identityMode,
+            ...(() => {
+              const own = sizes.reduce<Record<string, string>>((acc, v) => {
+                const code = (supplierCodes[v] ?? "").trim();
+                if (code) acc[v] = code;
+                return acc;
+              }, {});
+              /* Same rule as the compartment lane: an empty map is not sent, so
+                 a batch with no per-piece codes is byte-identical to before. */
+              return Object.keys(own).length > 0 ? { supplierCodes: own } : {};
+            })(),
+            /* Per-size price / PWP ride the same request, principal only (the
+               boxes never render otherwise) and only for the sizes actually
+               being generated — a number typed against a size then unticked
+               must not travel. A box that fails to parse is treated as empty
+               rather than sent as NaN for the server to refuse. */
+            ...(() => {
+              const priceMap: Record<string, number> = {};
+              const pwpMap: Record<string, number> = {};
+              for (const v of sizes) {
+                const pTxt = (sizePrices[v] ?? "").trim();
+                const p = Number(pTxt);
+                if (pTxt !== "" && Number.isFinite(p) && p >= 0) priceMap[v] = p;
+                const wTxt = (sizePwp[v] ?? "").trim();
+                const w = Number(wTxt);
+                if (wTxt !== "" && Number.isFinite(w) && w > 0) pwpMap[v] = w;
+              }
+              return {
+                ...(isPrincipal && Object.keys(priceMap).length > 0 ? { prices: priceMap } : {}),
+                ...(isPrincipal && Object.keys(pwpMap).length > 0 ? { pwpPrices: pwpMap } : {}),
+              };
+            })(),
+          },
         });
         toast.success(
           mode === "existing"
@@ -479,8 +919,13 @@ export default function NewSkuModal({
         // 0175 — non-principal creates an UNPRICED SKU (price 0 / cost null);
         // the principal prices it later. Principal can seed price/cost here.
         price: isPrincipal ? priceNum : 0,
-        cost: isPrincipal ? costNum : null,
+        /* Sent for whoever the SERVER allows, not for the principal alone —
+           `gateSkuCreatePriceCost` admits operation here (0226). */
+        cost: canSetCost ? costNum : null,
         description: description.trim() || null,
+        supplierId: supplierId || null,
+        supplierCode: supplierCode.trim() || null,
+        stockIdentityMode: identityMode,
       });
       toast.success(`Added ${codePreview || variant.trim()}`);
       onClose();
@@ -520,7 +965,7 @@ export default function NewSkuModal({
           >
             <div className="text-body font-semibold text-amber-800">Model created</div>
             <div className="text-meta text-amber-700 mt-0.5">
-              The model exists — click create again to retry the remaining SKUs only.
+              The model exists. Click create again to retry the remaining SKUs only.
             </div>
           </div>
         )}
@@ -700,7 +1145,7 @@ export default function NewSkuModal({
               <option value="">Select a model...</option>
               {sortedModels.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {CATEGORY_LABEL[m.category]} {m.name}
+                  {modelOptionLabel(m)}
                 </option>
               ))}
             </select>
@@ -737,12 +1182,12 @@ export default function NewSkuModal({
             </div>
             {compPool.length === 0 ? (
               <div className="text-meta text-base-500">
-                No compartments in the pool yet — add them in Maintenance → Sofa
+                No compartments in the pool yet. Add them in Maintenance → Sofa
                 Compartments, or use the size field below for a flat sofa SKU.
               </div>
             ) : compChoices.length === 0 ? (
               <div className="text-meta text-base-500" data-testid="new-sku-comps-none-left">
-                This model already offers every pool compartment — nothing left to add.
+                This model already offers every pool compartment. Nothing left to add.
               </div>
             ) : (
               <>
@@ -778,7 +1223,7 @@ export default function NewSkuModal({
                 <div className="text-meta text-base-500 mt-1.5">
                   {selectedComps.size > 0 ? (
                     <>
-                      Every sofa is a combination of compartments — auto-generates{" "}
+                      Every sofa is a combination of compartments. Auto-generates{" "}
                       <span className="text-base-700 font-medium">{selectedComps.size}</span>{" "}
                       SKU{selectedComps.size === 1 ? "" : "s"}, e.g.{" "}
                       <span className="font-mono text-base-700">
@@ -790,15 +1235,22 @@ export default function NewSkuModal({
                         : "Untick what this model doesn't offer; prices are set per SKU in SKU Master."}
                     </>
                   ) : mode === "existing" ? (
-                    <>Tick the compartments to add — each mints its real SKU.</>
+                    <>Tick the compartments to add. Each mints its real SKU.</>
                   ) : (
-                    <>None selected — creates a single flat sofa SKU from the size field below.</>
+                    <>None selected. Creates a single flat sofa SKU from the size field below.</>
                   )}
                 </div>
               </>
             )}
           </div>
         )}
+        {compFlow && supplierPickerField}
+        {compFlow &&
+          supplierCodeBatchField(
+            compPool
+              .filter((c) => selectedComps.has(c.id))
+              .map((c) => ({ key: c.id, label: c.code })),
+          )}
         {sizeSection && (
           <div className="block" data-testid="new-sku-sizes">
             <div className="flex items-center justify-between mb-1">
@@ -826,7 +1278,7 @@ export default function NewSkuModal({
             </div>
             {sizeChoices.length === 0 ? (
               <div className="text-meta text-base-500" data-testid="new-sku-sizes-none-left">
-                This model already has a SKU for every pool size — nothing left to add.
+                This model already has a SKU for every pool size. Nothing left to add.
               </div>
             ) : (
               <>
@@ -876,13 +1328,13 @@ export default function NewSkuModal({
                       )}
                       .{" "}
                       {mode === "existing"
-                        ? "Only sizes this model doesn't have yet are shown — the list follows Special Add-ons → Sizes."
-                        : "Untick the sizes this product doesn't come in — the list follows Special Add-ons → Sizes."}
+                        ? "Only sizes this model doesn't have yet are shown. The list follows Special Add-ons → Sizes."
+                        : "Untick the sizes this product doesn't come in. The list follows Special Add-ons → Sizes."}
                     </>
                   ) : mode === "existing" ? (
-                    <>Tick the sizes to add — one SKU per size.</>
+                    <>Tick the sizes to add. One SKU per size.</>
                   ) : (
-                    <>None selected — creates a single SKU from the size field below.</>
+                    <>None selected. Creates a single SKU from the size field below.</>
                   )}
                 </div>
               </>
@@ -913,10 +1365,69 @@ export default function NewSkuModal({
             >
               <div className="text-body text-base-600">Price</div>
               <div className="text-meta text-base-400 mt-0.5">
-                Generated SKUs are created unpriced — the principal (Master Admin) prices them.
+                Generated SKUs are created unpriced. The principal (Master Admin) prices them.
               </div>
             </div>
           ))}
+        {sizeFlow && isPrincipal && selectedSizes.size > 0 && (
+          <div className="block" data-testid="new-sku-size-prices">
+            <span className="label block mb-1">Price per size (overrides the price above)</span>
+            <div className="flex flex-col gap-1.5">
+              {sizePool
+                .filter((po) => selectedSizes.has(po.value))
+                .map((po) => {
+                  const nm = canonicalSize(po.value).name;
+                  return (
+                    <div key={nm} className="flex items-center gap-2">
+                      <span className="w-24 shrink-0 truncate text-meta text-base-500">{nm}</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={sizePrices[nm] ?? ""}
+                        onChange={(e) =>
+                          setSizePrices((prev) => ({ ...prev, [nm]: e.target.value }))
+                        }
+                        /* The placeholder SHOWS the inherited batch price, so an
+                           empty box never reads as a free bedframe. */
+                        placeholder={price.trim() || "0.00"}
+                        data-testid={`new-sku-size-price-${nm}`}
+                        className={INPUT_CLS}
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={sizePwp[nm] ?? ""}
+                        onChange={(e) => setSizePwp((prev) => ({ ...prev, [nm]: e.target.value }))}
+                        placeholder="PWP"
+                        title="PWP price at this size (blank = no PWP)"
+                        data-testid={`new-sku-size-pwp-${nm}`}
+                        className={INPUT_CLS}
+                      />
+                    </div>
+                  );
+                })}
+            </div>
+            <div className="mt-1 text-meta text-base-500">
+              Left box is the price, right box the PWP price. Blank price = the batch price above;
+              blank PWP = no PWP at that size.
+            </div>
+          </div>
+        )}
+        {sizeFlow && supplierPickerField}
+        {sizeFlow &&
+          supplierCodeBatchField(
+            /* Keyed by the CANONICAL NAME, because that is what the submit puts
+               in `variants` — keying by the raw pool value would hand the server
+               a map it cannot match and the override would vanish silently. */
+            sizePool
+              .filter((p) => selectedSizes.has(p.value))
+              .map((p) => ({
+                key: canonicalSize(p.value).name,
+                label: canonicalSize(p.value).name,
+              })),
+          )}
 
         {/* Classic single-SKU fields — hidden on the compartment path (codes,
             descriptions + prices all derive per compartment there) AND on the
@@ -957,45 +1468,49 @@ export default function NewSkuModal({
               </label>
             )}
 
-            {isPrincipal ? (
-              <>
-                <label className="block">
-                  <span className="label block mb-1">Price (RM, optional)</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    placeholder="0.00"
-                    data-testid="new-sku-price"
-                    className={INPUT_CLS}
-                  />
-                </label>
+            {isPrincipal && (
+              <label className="block">
+                <span className="label block mb-1">Price (RM, optional)</span>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="0.00"
+                  data-testid="new-sku-price"
+                  className={INPUT_CLS}
+                />
+              </label>
+            )}
 
-                <label className="block">
-                  <span className="label block mb-1">Cost (RM, optional)</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={cost}
-                    onChange={(e) => setCost(e.target.value)}
-                    placeholder="not set"
-                    data-testid="new-sku-cost"
-                    className={INPUT_CLS}
-                  />
-                </label>
-              </>
-            ) : (
+            {/* Offered to whoever the SERVER admits — operation included (0226). */}
+            {canSetCost && (
+              <label className="block">
+                <span className="label block mb-1">Cost (RM, optional)</span>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={cost}
+                  onChange={(e) => setCost(e.target.value)}
+                  placeholder="not set"
+                  data-testid="new-sku-cost"
+                  className={INPUT_CLS}
+                />
+              </label>
+            )}
+
+            {!isPrincipal && (
               <div
                 className="rounded-[4px] border border-base-200 bg-base-50 px-3 py-2"
                 data-testid="new-sku-price-lock-hint"
               >
-                <div className="text-body text-base-600">Price &amp; cost</div>
+                <div className="text-body text-base-600">Selling price</div>
                 <div className="text-meta text-base-400 mt-0.5">
-                  Set by the principal (Master Admin). This SKU is created unpriced —
-                  the principal will price it.
+                  Set by the principal (Master Admin). This SKU is created unpriced.
+                  The principal will price it
+                  {canSetCost ? ". The cost above is yours to record." : "."}
                 </div>
               </div>
             )}
@@ -1016,6 +1531,20 @@ export default function NewSkuModal({
                 </div>
               )}
             </label>
+
+            {supplierPickerField}
+            {stockIdentityField}
+
+            <label className="block">
+              <span className="label block mb-1">Supplier item code (optional)</span>
+              <input
+                value={supplierCode}
+                onChange={(e) => setSupplierCode(e.target.value)}
+                placeholder="The supplier's own code for this piece (e.g. off the Hookka quotation)"
+                data-testid="new-sku-supplier-code"
+                className={INPUT_CLS}
+              />
+            </label>
           </>
         )}
       </div>
@@ -1023,17 +1552,26 @@ export default function NewSkuModal({
       <ModalActions
         onCancel={onClose}
         onPrimary={submit}
+        /* ⭐ THE BUTTON NAMES THE CATEGORY (YH keying incident, 2026-08-26).
+            The modal opens defaulted to Mattress, and a whole Regal-A bedframe
+            family was generated as mattresses because nothing at the moment of
+            commitment said which category was about to be written. The last
+            thing the keyer reads before clicking now carries the word —
+            `Create Bedframe model + 5 SKUs` — using the same governed
+            CATEGORY_LABEL every other surface prints. Existing-model adds keep
+            their short labels: the model (and so its category) was explicitly
+            picked two fields up. */
         primary={
           compFlow
             ? mode === "existing"
               ? `Add ${selectedComps.size} SKU${selectedComps.size === 1 ? "" : "s"}`
-              : `Create model + ${selectedComps.size} SKU${selectedComps.size === 1 ? "" : "s"}`
+              : `Create ${CATEGORY_LABEL[category]} model + ${selectedComps.size} SKU${selectedComps.size === 1 ? "" : "s"}`
             : sizeFlow
               ? mode === "existing"
                 ? `Add ${selectedSizes.size} SKU${selectedSizes.size === 1 ? "" : "s"}`
-                : `Create model + ${selectedSizes.size} SKU${selectedSizes.size === 1 ? "" : "s"}`
+                : `Create ${CATEGORY_LABEL[category]} model + ${selectedSizes.size} SKU${selectedSizes.size === 1 ? "" : "s"}`
               : mode === "new"
-                ? "Create product + SKU"
+                ? `Create ${CATEGORY_LABEL[category]} product + SKU`
                 : "Add SKU"
         }
         primaryDisabled={!valid}

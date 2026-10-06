@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { userClient } from "../../lib/supabase";
+import { actorKindOf, actorRoleWord, resolveActorIdentities, resolveActorNames } from "../../lib/actor-names";
 import type { AppEnv } from "../../types";
 
 /**
@@ -44,10 +45,7 @@ annotationsRouter.post("/:id/annotations", requireOperationOrPrincipal, async (c
     p_content: parsed.data.content,
     p_tag: parsed.data.tag ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data, 201);
 });
 
@@ -58,11 +56,28 @@ annotationsRouter.get("/:id/timeline", requireOperationOrPrincipal, async (c) =>
   const { data, error } = await sb.rpc("operation_get_timeline", {
     p_order_id: orderId,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  return c.json(data ?? []);
+  if (error) return fail(c, error);
+  const rows = (data ?? []) as Array<{ id: string; kind: string; detail?: unknown }>;
+  if (!rows.length) return c.json([]);
+  // The merged RPC drops actor ids. Recover only these order-scoped records,
+  // then use the same identity classification as Order History and Revisions.
+  const [activities, notes] = await Promise.all([
+    rows.some(row => row.kind === "activity") ? sb.from("ops_activity_log").select("id, actor_id").eq("order_id", orderId).in("id", rows.filter(row => row.kind === "activity").map(row => row.id)) : Promise.resolve({ data: [], error: null }),
+    rows.some(row => row.kind === "annotation") ? sb.from("order_annotations").select("id, created_by").eq("order_id", orderId).in("id", rows.filter(row => row.kind === "annotation").map(row => row.id)) : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (activities.error) return fail(c, activities.error);
+  if (notes.error) return fail(c, notes.error);
+  const ids = new Map<string, string | null>();
+  for (const row of activities.data ?? []) ids.set(row.id, row.actor_id);
+  for (const row of notes.data ?? []) ids.set(row.id, row.created_by);
+  const identities = await resolveActorIdentities(sb, [...ids.values()]);
+  return c.json(rows.map(row => {
+    const actorId = ids.get(row.id);
+    const identity = actorId ? identities.get(actorId) : null;
+    const actor_kind = actorKindOf(actorId, identity, row.detail);
+    return { ...row, actor_kind, actor_role: actorRoleWord(identity),
+      actor_name: actor_kind === "human" ? identity?.name : actor_kind === "system" ? "System" : "Staff identity not recorded" };
+  }));
 });
 
 export default annotationsRouter;
@@ -88,28 +103,17 @@ escalationsRouter.get("/", requireOperationOrPrincipal, async (c) => {
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   // created_by FK points to auth.users (not public.app_users) so PostgREST
-  // can't traverse it. Fetch names from app_users manually in one round-trip.
+  // can't traverse it. Names come from the one actor lookup.
   const rows = data ?? [];
-  const authorIds = [...new Set(rows.map((r) => r.created_by).filter(Boolean))];
-  const nameMap: Record<string, string> = {};
-  if (authorIds.length) {
-    const { data: users } = await sb
-      .from("app_users")
-      .select("id, name")
-      .in("id", authorIds);
-    (users ?? []).forEach((u) => { nameMap[u.id] = u.name; });
-  }
+  const names = await resolveActorNames(sb, rows.map((r) => r.created_by));
 
   return c.json(
     rows.map((r) => ({
       ...r,
-      app_users: r.created_by ? { name: nameMap[r.created_by] ?? null } : null,
+      app_users: r.created_by ? { name: names.get(r.created_by) ?? null } : null,
     })),
   );
 });

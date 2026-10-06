@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, Menu, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import type {
   CatalogFabricDto,
@@ -52,7 +52,7 @@ import {
   pwpRewardPrice,
 } from "./pwp-line";
 import { sellingFabricsFor } from "../sofa-build/selling-fabrics";
-import SofaBuildCanvas from "../sofa-build/SofaBuildCanvas";
+import SofaBuildCanvas, { type SofaBuildAddControl } from "../sofa-build/SofaBuildCanvas";
 import CreateSofaComboModal from "../sofa-build/CreateSofaComboModal";
 import { useSeriesFabric, FABRIC_KIV } from "../sofa-build/use-series-fabric";
 import { buildToDraftLine } from "../sofa-build/sofa-build-draft";
@@ -82,6 +82,25 @@ interface QuickPick {
 type SeedCell = { moduleCode: string; x: number; y: number; rot: Rot };
 
 const SEED_ROTS: Rot[] = [0, 90, 180, 270];
+const SOFA_WIZARD_STEPS = ["Cart", "Customer", "Confirmed"] as const;
+
+function usePhoneSofaChrome(): boolean {
+  const query = "(max-width: 767px)";
+  const [matches, setMatches] = useState(
+    () => typeof window !== "undefined" && !!window.matchMedia && window.matchMedia(query).matches,
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const media = window.matchMedia(query);
+    const update = () => setMatches(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  return matches;
+}
 
 /** One flush left→right run (tops aligned) at default depth. */
 function seedStraight(codes: string[], depth: string): SeedCell[] {
@@ -421,6 +440,12 @@ export default function SofaConfigurePage({
   // Customize LIVE total — mirrored up from the canvas engine (onLiveTotal) so
   // the header price follows every module placed/removed; null = empty canvas.
   const [custTotal, setCustTotal] = useState<number | null>(null);
+  const [custAddControl, setCustAddControl] = useState<SofaBuildAddControl | null>(null);
+  const handleCustAddControlChange = useCallback(
+    (control: SofaBuildAddControl | null) => setCustAddControl(control),
+    [],
+  );
+  const phoneChrome = usePhoneSofaChrome();
   const picks: QuickPick[] = useMemo(
     () =>
       sofaCombos
@@ -586,7 +611,7 @@ export default function SofaConfigurePage({
   const cardHeight = offeredHeights[0] ?? "24";
   const cardPriceLabel = (codes: string[]) => {
     const t = pricePick(codes, "PRICE_1", cardHeight, null).total;
-    return t > 0 ? `From RM ${t.toLocaleString("en-MY")}` : "—";
+    return t > 0 ? `From RM ${t.toLocaleString("en-MY")}` : "";
   };
 
   // Hero pane previews the SELECTED (else first) pick — CLICK only, no
@@ -739,7 +764,7 @@ export default function SofaConfigurePage({
     }
     if (!(customerPhone ?? "").trim()) {
       setPwpErr(
-        "Enter the customer's phone (step 02) first to redeem a saved voucher — or apply it from the cart.",
+        "Enter the customer's phone (step 02) first to redeem a saved voucher, or apply it from the cart.",
       );
       return;
     }
@@ -769,7 +794,7 @@ export default function SofaConfigurePage({
       }
       setPwpApplied({ ruleId: v.ruleId, code: v.code, crossOrder: true });
     } catch {
-      setPwpErr("Couldn't check that voucher — please retry.");
+      setPwpErr("Couldn't check that voucher. Please retry.");
     } finally {
       setPwpBusy(false);
     }
@@ -801,7 +826,7 @@ export default function SofaConfigurePage({
     const rule = covering.find((r) => r.id === pwpApplied.ruleId);
     const price = rule ? pwpRewardPrice(line, catalog, rule) : null;
     if (!rule || price == null) {
-      toast.error("The PWP code doesn't cover this sofa — added at the normal price.");
+      toast.error("The PWP code doesn't cover this sofa. Added at the normal price.");
       return line;
     }
     if (pwpApplied.code && pwpClaimGroup) {
@@ -851,22 +876,265 @@ export default function SofaConfigurePage({
     onClose();
   }
 
+  const responsivePrelude = (
+    <div className="sof-responsive-prelude">
+      <h2 className="sof-responsive-prelude__model">{model.name}</h2>
+
+      <div className="sof-flow__modeTabs sof-responsive-prelude__modes">
+        <button
+          type="button"
+          className={`sof-flow__modeTab ${mode === "quick" ? "is-on" : ""}`}
+          disabled={picks.length === 0}
+          aria-pressed={mode === "quick"}
+          onClick={() => setMode("quick")}
+          data-testid="sofa-mode-quick"
+        >
+          Quick pick
+        </button>
+        <button
+          type="button"
+          className={`sof-flow__modeTab ${mode === "custom" ? "is-on" : ""}`}
+          aria-pressed={mode === "custom"}
+          onClick={() => setMode("custom")}
+          data-testid="sofa-mode-custom"
+        >
+          Customize
+        </button>
+      </div>
+
+      <div className="sof-responsive-prelude__sizes">
+        {mode === "quick" && heroHeights.length > 0 && (
+          <span
+            className="sof-flow__modeTabs"
+            role="group"
+            aria-label="Seat height"
+            data-testid="sofa-qp-heights"
+          >
+            {heroHeights.map((h) => (
+              <button
+                key={h}
+                type="button"
+                className={`sof-flow__modeTab ${effHeight === h ? "is-on" : ""}`}
+                aria-pressed={effHeight === h}
+                onClick={() => setQpHeight(h)}
+                data-testid={`sofa-qp-height-${h}`}
+              >
+                {h}&Prime;
+              </button>
+            ))}
+          </span>
+        )}
+        {mode === "custom" && sofaSizes.length > 0 && (
+          <span
+            className="sof-flow__modeTabs"
+            role="group"
+            aria-label="Seat size"
+            data-testid="sofa-cust-sizes"
+          >
+            {sofaSizes.map((h) => (
+              <button
+                key={h}
+                type="button"
+                className={`sof-flow__modeTab ${custSize === h ? "is-on" : ""}`}
+                aria-pressed={custSize === h}
+                onClick={() => setCustSize(h)}
+                data-testid={`sofa-cust-size-${h}`}
+              >
+                {/^\d+$/.test(h) ? <>{h}&Prime;</> : h}
+              </button>
+            ))}
+          </span>
+        )}
+      </div>
+
+      {catalog && pwpRulesActive && (
+        <div className="sof-flow__pwp sof-responsive-prelude__pwp" data-testid="sofa-pwp">
+          {pwpApplied ? (
+            <span className="sof-responsive-prelude__pwp-applied t-small">
+              <span className="pill pill-confirmed" data-testid="sofa-pwp-applied">
+                {pwpApplied.code ? `PWP ${pwpApplied.code}` : "PWP price"} ✓
+                {qpPwpTotal != null ? ` · RM ${qpPwpTotal.toLocaleString("en-MY")}` : ""}
+              </span>
+              {pwpCovering && !qpAppliedRule && (
+                <span className="t-small text-warning" data-testid="sofa-pwp-uncovered">
+                  doesn't cover this layout, adds at normal price
+                </span>
+              )}
+              <button
+                type="button"
+                className="t-small text-base-500 underline hover:text-base-800"
+                onClick={() => {
+                  setPwpApplied(null);
+                  setPwpInput("");
+                  setPwpErr(null);
+                }}
+                data-testid="sofa-pwp-remove"
+              >
+                remove
+              </button>
+            </span>
+          ) : (
+            <>
+              <input
+                type="text"
+                value={pwpInput}
+                onChange={(e) => {
+                  setPwpInput(e.target.value);
+                  if (pwpErr) setPwpErr(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void applyManualCode();
+                }}
+                placeholder="Insert PWP code"
+                aria-label="Insert PWP code"
+                className="rounded-[6px] border border-base-300 bg-white px-2 py-1.5 t-small uppercase"
+                data-testid="sofa-pwp-input"
+              />
+              {autoFill && (
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={applyAutoFill}
+                  data-testid="sofa-pwp-autofill"
+                >
+                  Auto Fill
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn--secondary"
+                disabled={pwpBusy || !pwpInput.trim()}
+                onClick={() => void applyManualCode()}
+                data-testid="sofa-pwp-apply"
+              >
+                {pwpBusy ? "Checking…" : "Apply"}
+              </button>
+              {pwpErr && (
+                <span className="t-small text-danger" data-testid="sofa-pwp-error">
+                  {pwpErr}
+                </span>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   return createPortal(
     <div
-      className="pos-proto cfg-root"
+      className="pos-proto cfg-root cfg-root--sofa"
       style={{ position: "fixed", inset: 0, zIndex: 50 }}
       role="dialog"
       aria-modal="true"
       aria-label={`Configure ${model.name}`}
       data-testid="sofa-configure-page"
     >
+      {phoneChrome && (
+        <div className="sof-responsive-wizardbar">
+          <div className="pos-mobile-topbar__main">
+            <button
+              type="button"
+              className="pos-mobile-topbar__icon"
+              aria-label="Categories unavailable while configuring"
+              disabled
+            >
+              <Menu size={18} strokeWidth={1.75} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="pos-wordmark pos-mobile-topbar__wordmark"
+              onClick={onClose}
+              aria-label="Back to catalog"
+            >
+              CARRES
+            </button>
+            <span className="pos-topbar__crumb pos-mobile-topbar__context">POS · NEW SALE</span>
+            <button
+              type="button"
+              className="pos-mobile-topbar__avatar"
+              aria-label="Staff profile unavailable while configuring"
+              disabled
+            >
+              <span className="pos-staff-chip__avatar" aria-hidden="true">PR</span>
+            </button>
+          </div>
+          <nav className="pos-mobile-topbar__steps" aria-label="Order steps">
+            {SOFA_WIZARD_STEPS.map((label, index) => (
+              <button
+                key={label}
+                type="button"
+                className={`pos-mobile-topbar__step ${index === 0 ? "is-active" : ""}`}
+                aria-current={index === 0 ? "step" : undefined}
+                disabled={index !== 0}
+              >
+                <span className="pos-mobile-topbar__step-pill">
+                  <span className="pos-mobile-topbar__step-number">{index + 1}</span>
+                  {label}
+                </span>
+              </button>
+            ))}
+          </nav>
+        </div>
+      )}
+
+      {phoneChrome && (
+        <div className="cfg-header cfg-header--icon sof-responsive-actionbar">
+          <div className="cfg-header__live">
+            <div className="cfg-header__total" tabIndex={0}>
+              <div className="cfg-header__totalLabel">Live total</div>
+              <div className="cfg-header__totalNum">
+                {(mode === "quick" ? qpDisplayTotal : custTotal) !== null ? (
+                  <>
+                    <sup>RM</sup>
+                    {(mode === "quick" ? qpDisplayTotal : custTotal)?.toLocaleString("en-MY")}
+                  </>
+                ) : (
+                  ""
+                )}
+              </div>
+            </div>
+            <span className="sof-responsive-actionbar__actions">
+              <button type="button" className="btn btn--secondary" onClick={onClose}>
+                <X size={14} strokeWidth={2} /> Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn--primary"
+                disabled={
+                  mode === "quick"
+                    ? qpTotal === null || !heroPick || (qpDisplayTotal !== null && qpDisplayTotal < 0)
+                    : !custAddControl?.canAdd
+                }
+                title={
+                  mode === "quick"
+                    ? qpDisplayTotal !== null && qpDisplayTotal < 0
+                      ? "The remark adjustment puts the sofa below RM 0. Reduce the discount"
+                      : undefined
+                    : custAddControl?.blocker ?? undefined
+                }
+                onClick={() => {
+                  if (mode === "quick") {
+                    if (heroPick) addQuickPick(heroPick);
+                  } else {
+                    custAddControl?.handleAdd();
+                  }
+                }}
+              >
+                <Plus size={14} strokeWidth={2} /> {editLine ? "Update item" : "Add to Cart"}
+              </button>
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Header — the design's cfg-header with the sofa-flow crumb: back ·
           eyebrow/model · mode tabs (rail pill pair) · live total. NOTE (Loo
           2026-07-26, two attempts): this row has ZERO slack — the brand strip
           (inline PR-301, compact PR-305) overlapped the PWP bar / mode tabs
           both times, so the sofa page keeps the ORIGINAL arrow-only header;
           the bed/mattress page carries the wizardbar strip instead. */}
-      <div className="cfg-header cfg-header--icon">
+      {!phoneChrome && <div className="cfg-header cfg-header--icon">
         <button
           className="cfg-header__back"
           type="button"
@@ -967,7 +1235,7 @@ export default function SofaConfigurePage({
                 </span>
                 {pwpCovering && !qpAppliedRule && (
                   <span className="t-small text-warning" data-testid="sofa-pwp-uncovered">
-                    doesn't cover this layout — adds at normal price
+                    doesn't cover this layout, adds at normal price
                   </span>
                 )}
                 <button
@@ -1041,7 +1309,7 @@ export default function SofaConfigurePage({
               {mode === "quick"
                 ? heroPick
                   ? "Quick pick"
-                  : "Pick a layout — it lands on the canvas assembled"
+                  : "Pick a layout. It lands on the canvas assembled"
                 : "Drag modules · rotate · we price the connected sofa live"}
             </div>
           </div>
@@ -1055,7 +1323,7 @@ export default function SofaConfigurePage({
                     {qpDisplayTotal.toLocaleString("en-MY")}
                   </>
                 ) : (
-                  "—"
+                  ""
                 )}
               </div>
               <div className="cfg-header__totalNote">
@@ -1074,7 +1342,7 @@ export default function SofaConfigurePage({
                     {custTotal.toLocaleString("en-MY")}
                   </>
                 ) : (
-                  "—"
+                  ""
                 )}
               </div>
               <div className="cfg-header__totalNote">component total · combo when matched</div>
@@ -1098,7 +1366,7 @@ export default function SofaConfigurePage({
                 disabled={!heroPick || (qpDisplayTotal !== null && qpDisplayTotal < 0)}
                 title={
                   qpDisplayTotal !== null && qpDisplayTotal < 0
-                    ? "The remark adjustment puts the sofa below RM 0 — reduce the discount"
+                    ? "The remark adjustment puts the sofa below RM 0. Reduce the discount"
                     : undefined
                 }
                 onClick={() => heroPick && addQuickPick(heroPick)}
@@ -1109,11 +1377,12 @@ export default function SofaConfigurePage({
             )}
           </span>
         </div>
-      </div>
+      </div>}
 
       {/* Body */}
       {mode === "quick" ? (
         <div className="cfg-body" style={{ minHeight: 0, overflow: "hidden" }}>
+          {phoneChrome && responsivePrelude}
           <div className="sof-qp" style={{ height: "100%" }}>
             {/* Rail — this model's ready-made layouts */}
             <div className="sof-qp__rail">
@@ -1458,6 +1727,7 @@ export default function SofaConfigurePage({
         </div>
       ) : (
         <div className="cfg-body" style={{ position: "relative", minHeight: 0 }}>
+          {phoneChrome && responsivePrelude}
           <SofaBuildCanvas
             key={seedKey}
             embedded
@@ -1485,6 +1755,7 @@ export default function SofaConfigurePage({
             onRemarkPriceChange={setQpRemarkPrice}
             remarkPriceDisabled={pwpApplied != null}
             onLiveTotal={setCustTotal}
+            onAddControlChange={handleCustAddControlChange}
             onAddBuild={(payload) => {
               // A PWP-priced sofa takes NO manual adjustment — the reward
               // price is forced server-side (mirrors addQuickPick).

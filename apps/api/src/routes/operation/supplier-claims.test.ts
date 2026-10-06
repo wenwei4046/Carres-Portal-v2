@@ -9,15 +9,8 @@
  * it), it defaults to the OPEN queue, and it signs photo URLs only after the
  * row has already been read through the caller's own JWT.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -33,17 +26,9 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000001")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("11111111-1111-1111-1111-000000000001", { email: `${role}@x`, app_metadata: { role } });
 }
 
 const CLAIM = {
@@ -73,6 +58,10 @@ function listBuilder(rows: unknown[], eqCalls: Array<[string, unknown]>): any {
     select: vi.fn(() => b),
     order: vi.fn(() => b),
     limit: vi.fn(() => b),
+    range: vi.fn((from: number, to: number) => Promise.resolve({
+      data: rows.slice(from, to + 1),
+      error: null,
+    })),
     in: vi.fn(() => b),
     eq: vi.fn((col: string, val: unknown) => {
       eqCalls.push([col, val]);
@@ -85,17 +74,17 @@ function listBuilder(rows: unknown[], eqCalls: Array<[string, unknown]>): any {
   return b;
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
+/** The actor lookup's staff door (`actor_display_names`) — it names u1. */
+function namesDoor() {
+  return vi.fn(async (name: string) =>
+    name === "actor_display_names"
+      ? { data: [{ id: "u1", name: "Shasha" }], error: null }
+      : { data: null, error: null },
+  );
+}
 
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
   vi.mocked(adminClient).mockReset();
 });
@@ -106,17 +95,22 @@ describe("GET /api/operation/supplier-claims", () => {
   it("defaults to the OPEN queue — a worklist does not open on closed rows", async () => {
     const eqCalls: Array<[string, unknown]> = [];
     const sb = {
+      rpc: namesDoor(),
       from: vi.fn((t: string) => {
+        if (t === "product_skus") {
+          const builder = listBuilder([{ sku: "MS01-K", variant: "King", product_models: { name: "Mattress Classic" } }], eqCalls);
+          builder.select = vi.fn((columns: string) => { expect(columns).toBe("sku, variant, product_models(name)"); return builder; });
+          return builder;
+        }
         if (t === "supplier_claims") return listBuilder([CLAIM], eqCalls);
         if (t === "suppliers")
           return listBuilder([{ id: "s1", name: "Ohana" }], eqCalls);
-        if (t === "app_users")
-          return listBuilder([{ id: "u1", name: "Shasha" }], eqCalls);
+        if (t === "salespersons") return listBuilder([], eqCalls);
         // R4 — the two units this claim quarantined.
         if (t === "ops_stock_items")
           return listBuilder(
             [
-              { hold_claim_id: "c1", hold_reason: "damaged" },
+              { hold_claim_id: "c1", hold_reason: "damaged", unit_code: "U-1001" },
               { hold_claim_id: "c1", hold_reason: "damaged" },
             ],
             eqCalls,
@@ -143,11 +137,50 @@ describe("GET /api/operation/supplier-claims", () => {
     expect(body.claims[0].supplier_name).toBe("Ohana");
     expect(body.claims[0].reported_by_name).toBe("Shasha");
     expect(body.claims[0].photo_count).toBe(1);
+    expect(body.claims[0].product_description).toBe("Mattress Classic");
+    expect(body.claims[0].product_variant).toBe("King");
+    expect(body.claims[0].held_unit_codes).toEqual(["U-1001"]);
     // R4 — the goods, read from the register rather than copied from qty.
     expect(body.claims[0].held_units).toBe(2);
     expect(body.claims[0].hold_reason).toBe("damaged");
+    // §9.5 PO No line two reads EVERY Unit the claim names; a send read that
+    // could not run is unknown (null), never "not sent".
+    expect(body.claims[0].units.map((u: { unit_code: string | null }) => u.unit_code)).toEqual(["U-1001", null]);
+    expect(body.claims[0].sent).toBeNull();
     // NEVER the admin client for a read the caller's own RLS can do.
     expect(adminClient).not.toHaveBeenCalled();
+  });
+
+  it("prints Units could not be loaded for ONE row's failed Unit read, not a failed register", async () => {
+    const eqCalls: Array<[string, unknown]> = [];
+    let stockReads = 0;
+    const sb = {
+      rpc: namesDoor(),
+      from: vi.fn((t: string) => {
+        if (t === "supplier_claims") return listBuilder([{ ...CLAIM, supplier_response_reply_id: "r1" }], eqCalls);
+        if (t === "suppliers") return listBuilder([{ id: "s1", name: "Ohana" }], eqCalls);
+        if (t === "document_sends") return listBuilder([{ document_id: "c1" }], eqCalls);
+        if (t === "supplier_claim_replies") return listBuilder([{ id: "r1", scope: "claim", unit_ids: [], supplier_date: "2026-10-05" }], eqCalls);
+        if (t === "ops_stock_items") {
+          stockReads += 1;
+          const b = listBuilder([], eqCalls);
+          // The held-count read succeeds; the all-Units read fails.
+          if (stockReads > 1) b.range = vi.fn().mockResolvedValue({ data: null, error: { message: "boom" } });
+          return b;
+        }
+        return listBuilder([], eqCalls);
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request("http://t/api/operation/supplier-claims?status=all", { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const row = ((await res.json()) as any).claims[0];
+    expect(row.units).toBeNull();
+    expect(row.sent).toBe(true);
+    expect(row.response_reply).toEqual({ scope: "claim", unit_ids: [], supplier_date: "2026-10-05" });
   });
 
   it("`all` asks for no status at all", async () => {
@@ -167,6 +200,113 @@ describe("GET /api/operation/supplier-claims", () => {
     expect(res.status).toBe(200);
     // Only the two head-count queries filter on status; the list itself does not.
     expect(eqCalls.filter(([c]) => c === "status")).toHaveLength(2);
+  });
+
+  it("can limit the return and claim connection to one governed PO", async () => {
+    const eqCalls: Array<[string, unknown]> = [];
+    const sb = { from: vi.fn(() => listBuilder([], eqCalls)) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/supplier-claims?status=all&poId=PO-2030", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(eqCalls).toContainEqual(["po_id", "PO-2030"]);
+  });
+
+  it("counts a PO's stages from head counts, not from the page it just filtered", async () => {
+    /* ⛔ A COUNT MAY NOT BE DERIVED FROM AN ALREADY-FILTERED PAGE. The PO
+       branch counted the rows it had fetched, and those rows are narrowed by
+       `status` — so `?poId=X&status=open` reported ZERO closed claims for a PO
+       that has them. Invisible while the only caller asked for `all`; the
+       moment the page's `?po=` door is wired, the stage chips are read as
+       "this PO has none". */
+    const eqCalls: Array<[string, unknown]> = [];
+    const openRows = [{ ...CLAIM, po_id: "PO-2030", supplier_id: null, reported_by: null }];
+    const sb = {
+      from: vi.fn((table: string) =>
+        listBuilder(table === "supplier_claims" ? openRows : [], eqCalls),
+      ),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/supplier-claims?status=open&poId=PO-2030", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // The PO scopes the LIST and BOTH head counts — three reads, one filter.
+    expect(eqCalls.filter(([col, val]) => col === "po_id" && val === "PO-2030")).toHaveLength(3);
+    // And the closed count comes from its own read rather than from the open
+    // page, which by construction contains no closed row to find.
+    const body = (await res.json()) as { counts: { open: number; closed: number } };
+    expect(body.counts.closed).not.toBe(0);
+  });
+
+  it.each(["&poId=PO-2030", ""])("returns all claims beyond 200 for scope %s", async (scope) => {
+    const eqCalls: Array<[string, unknown]> = [];
+    const claims = Array.from({ length: 205 }, (_, index) => ({
+      ...CLAIM,
+      id: `claim-${index}`,
+      claim_no: `SC-${String(index).padStart(4, "0")}`,
+      po_id: "PO-2030",
+      supplier_id: null,
+      reported_by: null,
+    }));
+    const sb = {
+      from: vi.fn((table: string) => listBuilder(
+        table === "supplier_claims" ? claims : [],
+        eqCalls,
+      )),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/supplier-claims?status=all${scope}`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { claims: unknown[] };
+    expect(body.claims).toHaveLength(205);
+  });
+
+  it("reports a held-unit connection error instead of calling it zero", async () => {
+    const eqCalls: Array<[string, unknown]> = [];
+    const held = listBuilder([], eqCalls);
+    held.range = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "XX000", message: "held-unit read failed", details: "" },
+    });
+    const sb = {
+      rpc: namesDoor(),
+      from: vi.fn((table: string) => {
+        if (table === "supplier_claims") return listBuilder([CLAIM], eqCalls);
+        if (table === "suppliers") return listBuilder([{ id: "s1", name: "Ohana" }], eqCalls);
+        if (table === "ops_stock_items") return held;
+        return listBuilder([], eqCalls);
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/supplier-claims", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual(expect.objectContaining({ error: expect.any(String) }));
   });
 
   it("an unknown status word falls back to open rather than leaking everything", async () => {
@@ -212,13 +352,14 @@ describe("GET /api/operation/supplier-claims", () => {
       requested_at: "2026-07-27T00:00:00Z",
     };
     const sb = {
+      rpc: namesDoor(),
       from: vi.fn((t: string) => {
         tables.push(t);
+        if (t === "product_skus") return listBuilder([], eqCalls);
         if (t === "supplier_claims") return listBuilder([CLAIM, LATE], eqCalls);
         if (t === "suppliers")
           return listBuilder([{ id: "s1", name: "Ohana" }], eqCalls);
-        if (t === "app_users")
-          return listBuilder([{ id: "u1", name: "Shasha" }], eqCalls);
+        if (t === "salespersons") return listBuilder([], eqCalls);
         // The line still owes 1 unit → the supplier still owes the move.
         if (t === "purchase_order_lines")
           return listBuilder([{ id: "l2", qty: 3, received_qty: 2 }], eqCalls);
@@ -243,7 +384,7 @@ describe("GET /api/operation/supplier-claims", () => {
     expect(damaged.next_move).toEqual({
       key: "ask",
       owner: "carres",
-      label: "Call Ohana — agree the fix",
+      label: "Call Ohana to agree the fix",
     });
     expect(late.next_move.owner).toBe("supplier");
     expect(late.line_pending).toBe(true);
@@ -264,7 +405,9 @@ describe("GET /api/operation/supplier-claims", () => {
       requested_at: "2026-07-27T00:00:00Z",
     };
     const sb = {
+      rpc: namesDoor(),
       from: vi.fn((t: string) => {
+        if (t === "product_skus") return listBuilder([], eqCalls);
         if (t === "supplier_claims") return listBuilder([LATE], eqCalls);
         // po_line_id is ON DELETE SET NULL — the line can simply not be there.
         if (t === "purchase_order_lines") return listBuilder([], eqCalls);
@@ -462,63 +605,105 @@ describe("POST /:id/request — what WE ask", () => {
   });
 });
 
-describe("POST /:id/response — what the SUPPLIER answered", () => {
-  it("passes the answer and its note through", async () => {
-    const sb = rpcClient({ data: { claim_no: "SC-1001", supplier_response: "reject" } });
+const REPLY = {
+  supplier_response: "repair",
+  scope: "claim",
+  supplier_date: "2026-10-05",
+  evidence: [{ path: "supplier_claim_reply/c1/a.jpg", kind: "photo" }],
+};
+
+describe("POST /:id/response — what the SUPPLIER answered, with scope, date and evidence (0607)", () => {
+  it("passes the answer, its scope, the supplier's date and the evidence to the ONE reply door", async () => {
+    const sb = rpcClient({ data: { claim_no: "SC-1001", supplier_response: "repair", formal: true } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
-    const res = await post("c1/response", {
-      supplier_response: "reject",
-      note: "Out of warranty",
-    });
+    const res = await post("c1/response", REPLY);
     expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("supplier_claim_record_response", {
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_claim_record_reply", {
       p_claim_id: "c1",
-      p_response: "reject",
-      p_note: "Out of warranty",
+      p_response: "repair",
+      p_scope: "claim",
+      p_unit_ids: [],
+      p_supplier_date: "2026-10-05",
+      p_note: null,
+      p_evidence: [{ path: "supplier_claim_reply/c1/a.jpg", kind: "photo" }],
+      p_spoke_with: null,
+      p_spoken_at: null,
     });
+    // The scope-less legacy door is never reached again.
+    expect(sb.rpc).not.toHaveBeenCalledWith("supplier_claim_record_response", expect.anything());
   });
 
-  it("does not narrow the supplier's answer to what we asked", async () => {
+  it("carries exact Units and a phone answer (who spoke, when)", async () => {
     const sb = rpcClient({ data: {} });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
-    for (const answer of [
-      "replacement",
-      "deliver_remaining",
-      "repair",
-      "return_and_replace",
-      "other_agreement",
-    ]) {
-      const res = await post("c1/response", { supplier_response: answer, note: "ok" });
-      expect(res.status).toBe(200);
-    }
-  });
-
-  it("lets the DATABASE be the one that demands a note for a refusal", async () => {
-    // The route does not second-guess it: one rule, one place. A missing note
-    // comes back as the RPC's own detail code.
-    const sb = rpcClient({
-      error: {
-        code: "P0001",
-        details: "response_note_required",
-        message: "a reject answer must say what was agreed or why",
-      },
+    const unit = "0b8a3b5e-7a0c-4d3e-9d44-5d6c1a2b3c4d";
+    const res = await post("c1/response", {
+      supplier_response: "other_agreement", scope: "units", unit_ids: [unit], note: "New cushion only",
+      evidence: [], spoke_with: "Mr Tan", spoken_at: "2026-09-29T10:00:00+08:00",
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-    const res = await post("c1/response", { supplier_response: "reject" });
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(((await res.json()) as any).code).toBe("response_note_required");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_claim_record_reply", expect.objectContaining({
+      p_scope: "units", p_unit_ids: [unit], p_spoke_with: "Mr Tan", p_spoken_at: "2026-09-29T10:00:00+08:00", p_note: "New cushion only",
+    }));
   });
 
-  it("refuses an invented answer word", async () => {
+  it("refuses a reply without a scope before any round-trip", async () => {
     const sb = rpcClient({});
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
-    const res = await post("c1/response", { supplier_response: "maybe_later" });
+    const res = await post("c1/response", { supplier_response: "repair", evidence: REPLY.evidence });
     expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("lets the DATABASE demand the evidence and the note — its detail comes back as the code", async () => {
+    for (const detail of ["evidence_required", "response_note_required", "unit_not_on_claim"]) {
+      const sb = rpcClient({ error: { code: "22023", details: detail, message: detail } });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue(sb as any);
+      const res = await post("c1/response", REPLY);
+      expect(res.status).toBe(422);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(((await res.json()) as any).code).toBe(detail);
+    }
+  });
+
+  it("refuses an invented answer word and an evidence kind the form never offers", async () => {
+    const sb = rpcClient({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    expect((await post("c1/response", { ...REPLY, supplier_response: "maybe_later" })).status).toBe(422);
+    expect((await post("c1/response", { ...REPLY, evidence: [{ path: "x", kind: "zip" }] })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a supplier and a dealer", async () => {
+    for (const role of ["supplier", "dealer"]) {
+      expect((await post("c1/response", REPLY, role)).status).toBe(403);
+    }
+  });
+});
+
+describe("POST /:id/send — Claim sent to supplier (document_sends, 0607)", () => {
+  it("records the channel and recipient through the send door", async () => {
+    const sb = rpcClient({ data: "send-1" });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/send", { channel: "whatsapp", recipient: "Hooka Mr Tan" });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_claim_record_send", {
+      p_claim_id: "c1", p_channel: "whatsapp", p_recipient: "Hooka Mr Tan", p_note: null,
+    });
+  });
+
+  it("refuses a send with no recipient or an invented channel", async () => {
+    const sb = rpcClient({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    expect((await post("c1/send", { channel: "whatsapp", recipient: "  " })).status).toBe(422);
+    expect((await post("c1/send", { channel: "fax", recipient: "Hooka" })).status).toBe(422);
     expect(sb.rpc).not.toHaveBeenCalled();
   });
 });
@@ -698,118 +883,14 @@ describe("POST /:id/hold-resolve — the goods", () => {
 // these pin: the right RPC with the right arguments, an invented option refused
 // before a round-trip, the role gate, and the RPC's refusal surfaced intact.
 
-describe("POST /:id/customer-resolution — the customer", () => {
-  it("records the resolution through the RPC", async () => {
-    const sb = rpcClient({
-      data: { claim_no: "SC-1001", customer_resolution: "replace" },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-    const res = await post("c1/customer-resolution", {
-      customer_resolution: "replace",
-    });
-    expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith(
-      "supplier_claim_record_customer_resolution",
-      { p_claim_id: "c1", p_resolution: "replace", p_note: null },
-    );
-    // A user-JWT write. There is no service-role bypass on this desk.
-    expect(adminClient).not.toHaveBeenCalled();
-  });
-
-  it("carries the note when there is one", async () => {
-    const sb = rpcClient({ data: { customer_resolution: "no_replacement_required" } });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-    const res = await post("c1/customer-resolution", {
-      customer_resolution: "no_replacement_required",
-      note: "Customer cancelled the order on 5 Aug",
-    });
-    expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith(
-      "supplier_claim_record_customer_resolution",
-      {
-        p_claim_id: "c1",
-        p_resolution: "no_replacement_required",
-        p_note: "Customer cancelled the order on 5 Aug",
-      },
-    );
-  });
-
-  it("accepts all four of Loo's resolutions and nothing else", async () => {
-    for (const r of ["replace", "repair", "accept_as_is", "no_replacement_required"]) {
-      const sb = rpcClient({ data: { customer_resolution: r } });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.mocked(userClient).mockReturnValue(sb as any);
-      const res = await post("c1/customer-resolution", { customer_resolution: r });
-      expect(res.status, r).toBe(200);
-    }
-  });
-
-  it("refuses an ITEM outcome as a customer resolution, without touching the database", async () => {
-    // `Return to Supplier` and `Write Off` answer what happened to the ITEM.
-    // Accepting one here would be the two decisions collapsing back into one.
-    for (const wrong of ["returned", "return_to_supplier", "written_off", "write_off"]) {
-      const sb = rpcClient({});
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.mocked(userClient).mockReturnValue(sb as any);
-      const res = await post("c1/customer-resolution", { customer_resolution: wrong });
-      expect(res.status, wrong).toBe(422);
-      expect(sb.rpc).not.toHaveBeenCalled();
-    }
-  });
-
-  it("refuses a SUPPLIER answer, and `refund`, the same way", async () => {
-    // The supplier's words are not our decision, and `Refund` has no frozen
-    // business meaning — nobody may guess it.
-    for (const wrong of ["reject", "replacement", "return_and_replace", "refund"]) {
-      const sb = rpcClient({});
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.mocked(userClient).mockReturnValue(sb as any);
-      const res = await post("c1/customer-resolution", { customer_resolution: wrong });
-      expect(res.status, wrong).toBe(422);
-      expect(sb.rpc).not.toHaveBeenCalled();
-    }
-  });
-
-  it("surfaces the RPC's refusal on a closed claim", async () => {
-    const sb = rpcClient({
-      error: {
-        code: "P0001",
-        details: "claim_closed",
-        message: "claim SC-1014 is already closed",
-      },
-    });
+describe("POST /:id/customer-resolution — retired (owner ruling 2026-09-29)", () => {
+  it("is gone: the ONE decision door writes the Authorised Outcome", async () => {
+    const sb = rpcClient({});
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
     const res = await post("c1/customer-resolution", { customer_resolution: "repair" });
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(((await res.json()) as any).code).toBe("claim_closed");
-  });
-
-  it("refuses a supplier, a partner and a dealer", async () => {
-    for (const role of ["supplier", "partner", "dealer"]) {
-      const res = await post(
-        "c1/customer-resolution",
-        { customer_resolution: "replace" },
-        role,
-      );
-      expect(res.status).toBe(403);
-    }
-    expect(userClient).not.toHaveBeenCalled();
-  });
-
-  it("moves no stock — the item's outcome keeps its own door", async () => {
-    const sb = rpcClient({ data: { customer_resolution: "accept_as_is" } });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-    await post("c1/customer-resolution", { customer_resolution: "accept_as_is" });
-    expect(sb.rpc).toHaveBeenCalledTimes(1);
-    expect(sb.rpc).not.toHaveBeenCalledWith(
-      "ops_stock_resolve_hold",
-      expect.anything(),
-    );
+    expect(res.status).toBe(404);
+    expect(sb.rpc).not.toHaveBeenCalled();
   });
 });
 
@@ -828,6 +909,10 @@ describe("GET / carries the customer resolution", () => {
         }),
         order: vi.fn(() => b),
         limit: vi.fn(() => b),
+        range: vi.fn((from: number, to: number) => Promise.resolve({
+          data: rows.slice(from, to + 1),
+          error: null,
+        })),
         in: vi.fn(() => b),
         eq: vi.fn(() => b),
         maybeSingle: vi.fn().mockResolvedValue({ data: rows[0] ?? null, error: null }),
@@ -843,6 +928,7 @@ describe("GET / carries the customer resolution", () => {
       customer_resolution_at: "2026-08-05T09:00:00Z",
     };
     const sb = {
+      rpc: namesDoor(),
       from: vi.fn((t: string) => (t === "supplier_claims" ? builder([resolved]) : builder([]))),
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -863,5 +949,235 @@ describe("GET / carries the customer resolution", () => {
     const body = (await res.json()) as any;
     expect(body.claims[0].customer_resolution).toBe("no_replacement_required");
     expect(body.claims[0].customer_resolution_note).toBe("Customer cancelled");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Layer ④ · Carres Execution (Loo, 2026-08-05 · migration 0409)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// The business rules — the vocabulary, the stamp, the refusal on a closed
+// claim, that re-recording is allowed while it is open — all live in the RPC,
+// because `supplier_claims` is writable from nowhere else. What the ROUTER owes
+// is what these pin: the right RPC with the right arguments, an invented option
+// refused before a round-trip, the role gate, and the RPC's refusal intact.
+
+/** 0609: the route first asks the one PO issue capability (PO Duty, dated
+ *  cover or Operations Superuser); this caller holds it. */
+function executionClient(result: { data?: unknown; error?: unknown }) {
+  const rpc = vi.fn(async (name: string) =>
+    name === "purchasing_po_duty_may_act"
+      ? { data: true, error: null }
+      : { data: result.data ?? null, error: result.error ?? null });
+  return { rpc };
+}
+
+describe("POST /:id/carres-execution — `Record what Carres does next` (owner ruling 2026-09-29)", () => {
+  it("records the decision through the ONE door, as the caller", async () => {
+    const sb = executionClient({ data: { claim_no: "SC-1001", decision: "repair" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/carres-execution", { carres_execution: "repair", note: "Hooka repairs both" });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("purchasing_po_duty_may_act", { p_user: expect.any(String) });
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_claim_record_carres_execution", { p_claim_id: "c1", p_execution: "repair", p_note: "Hooka repairs both" });
+    expect(sb.rpc).not.toHaveBeenCalledWith("purchasing_actor_may_issue", expect.anything());
+    expect(adminClient).not.toHaveBeenCalled();
+  });
+
+  it("accepts exactly the three supplier-side decisions", async () => {
+    for (const e of ["return_to_supplier", "repair", "replacement"]) {
+      const sb = executionClient({ data: { decision: e } });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue(sb as any);
+      const res = await post("c1/carres-execution", { carres_execution: e });
+      expect(res.status, e).toBe(200);
+    }
+  });
+
+  it("refuses the four customer movements and every other word, without touching the database", async () => {
+    for (const wrong of ["collect_defective_item", "replace_first", "collect_first", "exchange_on_collection", "replace", "accept_as_is", "no_replacement_required", "returned", "written_off", "reject"]) {
+      const sb = rpcClient({});
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue(sb as any);
+      const res = await post("c1/carres-execution", { carres_execution: wrong });
+      expect(res.status, wrong).toBe(422);
+      expect(sb.rpc).not.toHaveBeenCalled();
+    }
+  });
+
+  it("refuses a caller the Shared Duty Resolver does not name", async () => {
+    const rpc = vi.fn(async (name: string) => (name === "purchasing_po_duty_may_act" ? { data: false, error: null } : { data: {}, error: null }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const res = await post("c1/carres-execution", { carres_execution: "return_to_supplier" });
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { code: string }).code).toBe("not_po_duty");
+    expect(rpc).not.toHaveBeenCalledWith("supplier_claim_record_carres_execution", expect.anything());
+  });
+
+  it("surfaces a locked decision in the door's own words", async () => {
+    const sb = executionClient({ error: { code: "23514", details: "repair_order_issued", message: "RO260928-4827 is already issued" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/carres-execution", { carres_execution: "replacement" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "repair_order_issued", message: "RO260928-4827 is already issued" });
+  });
+
+  it("refuses a supplier, a partner and a dealer", async () => {
+    for (const role of ["supplier", "partner", "dealer"]) {
+      const res = await post("c1/carres-execution", { carres_execution: "repair" }, role);
+      expect(res.status).toBe(403);
+    }
+    expect(userClient).not.toHaveBeenCalled();
+  });
+
+  it("moves no stock — the capability and the one door, nothing else", async () => {
+    const sb = executionClient({ data: { decision: "return_to_supplier" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    await post("c1/carres-execution", { carres_execution: "return_to_supplier" });
+    expect(sb.rpc).toHaveBeenCalledTimes(2);
+    expect(sb.rpc).not.toHaveBeenCalledWith("ops_stock_resolve_hold", expect.anything());
+  });
+});
+
+describe("GET / carries the Carres execution", () => {
+  it("selects the three layer-④ columns and returns them on the row", async () => {
+    // The queue is the ONLY read the panel has, so a column left out of the
+    // select is a decision the operator can record and then never see again —
+    // exactly the hazard the layer-③ test above pins, and the reason this one
+    // exists rather than trusting that the select was extended.
+    const selects: string[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const builder = (rows: unknown[]): any => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const b: any = {
+        select: vi.fn((cols: string) => {
+          selects.push(cols);
+          return b;
+        }),
+        order: vi.fn(() => b),
+        limit: vi.fn(() => b),
+        range: vi.fn((from: number, to: number) => Promise.resolve({
+          data: rows.slice(from, to + 1),
+          error: null,
+        })),
+        in: vi.fn(() => b),
+        eq: vi.fn(() => b),
+        maybeSingle: vi.fn().mockResolvedValue({ data: rows[0] ?? null, error: null }),
+        then: (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+          Promise.resolve({ data: rows, error: null, count: rows.length }).then(res, rej),
+      };
+      return b;
+    };
+    const executed = {
+      ...CLAIM,
+      customer_resolution: "replace",
+      carres_execution: "collect_first",
+      carres_execution_note: "Van picks up before the new one ships",
+      carres_execution_at: "2026-09-01T09:00:00Z",
+    };
+    const sb = {
+      rpc: namesDoor(),
+      from: vi.fn((t: string) => (t === "supplier_claims" ? builder([executed]) : builder([]))),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/supplier-claims", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(selects[0]).toContain("carres_execution");
+    expect(selects[0]).toContain("carres_execution_note");
+    expect(selects[0]).toContain("carres_execution_at");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.claims[0].carres_execution).toBe("collect_first");
+    expect(body.claims[0].carres_execution_note).toBe(
+      "Van picks up before the new one ships",
+    );
+    // Both layers survive the same read — one is not shadowing the other.
+    expect(body.claims[0].customer_resolution).toBe("replace");
+  });
+});
+
+describe("GET /:id/record — the claim record's Supplier facts (§9.5)", () => {
+  it("returns every reply with its scope, date and signed evidence; sends; and refuses Plan Repair without an Authorised Outcome", async () => {
+    const eqCalls: Array<[string, unknown]> = [];
+    const replies = [
+      { id: "r1", response: "replacement", scope: "claim", unit_ids: [], supplier_date: "2026-10-05", note: null, evidence: [{ path: "supplier_claim_reply/c1/a.jpg", kind: "photo" }], spoke_with: null, spoken_at: null, recorded_by: "u1", recorded_at: "2026-09-29T02:00:00Z", formal_at: "2026-09-29T02:00:00Z" },
+    ];
+    const sb = {
+      rpc: namesDoor(),
+      from: vi.fn((t: string) => {
+        if (t === "supplier_claims") return listBuilder([{ id: "c1", claim_no: "SC-1001", requested_by: "u1", requested_at: "2026-09-28T02:00:00Z", responded_by: "u1", supplier_response_reply_id: "r1" }], eqCalls);
+        if (t === "supplier_claim_replies") return listBuilder(replies, eqCalls);
+        if (t === "document_sends") return listBuilder([{ id: "s1", version: 1, recipient: "Hooka Mr Tan", channel: "whatsapp", note: null, sent_by: "u1", sent_at: "2026-09-28T03:00:00Z" }], eqCalls);
+        if (t === "ops_stock_items") return listBuilder([{ id: "u-1", unit_code: "U1-000-075", identity_scope: "unit", qty: 1, status: "on_hold" }], eqCalls);
+        return listBuilder([], eqCalls);
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const createSignedUrl = vi.fn().mockResolvedValue({ data: { signedUrl: "https://signed/a.jpg" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(adminClient).mockReturnValue({ storage: { from: vi.fn(() => ({ createSignedUrl })) } } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request("http://t/api/operation/supplier-claims/c1/record", { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.replies[0]).toMatchObject({ response: "replacement", scope: "claim", supplier_date: "2026-10-05", current: true, recorded_by_name: "Shasha", evidence: [{ kind: "photo", url: "https://signed/a.jpg" }] });
+    expect(body.sends[0]).toMatchObject({ channel: "whatsapp", recipient: "Hooka Mr Tan", sent_by_name: "Shasha" });
+    expect(body.units).toHaveLength(1);
+    expect(body.plan_repair).toEqual({ allowed: false, missing: "Authorised Outcome" });
+    expect(createSignedUrl).toHaveBeenCalledWith("supplier_claim_reply/c1/a.jpg", 3600);
+  });
+});
+
+describe("GET /:id/inspection — the per-Unit evidence inspector's facts (§9.5 Row expansion)", () => {
+  it("returns every file with its kind and its Unit when it was filed with one, and each Unit's own recorded problem", async () => {
+    const eqCalls: Array<[string, unknown]> = [];
+    const sb = {
+      rpc: namesDoor(),
+      from: vi.fn((t: string) => {
+        if (t === "supplier_claims") return listBuilder([{ id: "c1", warehouse_receipt_id: "g1", photos: [{ path: "PO-1/a.jpg", at: "2026-09-04T02:00:00Z", by: "u1", unit_code: "U1-000-001" }, { path: "PO-1/b.mp4", at: "2026-09-04T02:00:00Z", by: "u1" }] }], eqCalls);
+        if (t === "ops_stock_items") return listBuilder([{ id: "u-1" }], eqCalls);
+        if (t === "receiving_unit_results") return listBuilder([{ stock_item_id: "u-1", note: "Scratch on left arm", outcome: "received_with_issue", created_at: "2026-09-04T02:00:00Z" }], eqCalls);
+        return listBuilder([], eqCalls);
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const createSignedUrl = vi.fn(async (path: string) => ({ data: { signedUrl: `https://signed/${path}` } }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(adminClient).mockReturnValue({ storage: { from: vi.fn(() => ({ createSignedUrl })) } } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request("http://t/api/operation/supplier-claims/c1/inspection", { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.files).toEqual([
+      { path: "PO-1/a.jpg", at: "2026-09-04T02:00:00Z", kind: "photo", unit_code: "U1-000-001", url: "https://signed/PO-1/a.jpg" },
+      { path: "PO-1/b.mp4", at: "2026-09-04T02:00:00Z", kind: "video", unit_code: null, url: "https://signed/PO-1/b.mp4" },
+    ]);
+    expect(body.problems).toEqual([{ stock_item_id: "u-1", note: "Scratch on left arm" }]);
+  });
+
+  it("answers 404 for a claim the caller cannot read, and refuses a dealer", async () => {
+    const sb = { rpc: namesDoor(), from: vi.fn(() => listBuilder([], [])) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await app.fetch(new Request("http://t/api/operation/supplier-claims/c9/inspection", { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } }), env);
+    expect(res.status).toBe(404);
+    const dealer = await app.fetch(new Request("http://t/api/operation/supplier-claims/c9/inspection", { headers: { Authorization: `Bearer ${await makeJwt("dealer")}` } }), env);
+    expect(dealer.status).toBe(403);
   });
 });

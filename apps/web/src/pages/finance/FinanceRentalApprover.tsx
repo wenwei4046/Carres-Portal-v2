@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useRentalApprovals, useDecideRentalAgreement, type RentalApproval } from "@/lib/queries";
 import { rm } from "@/lib/format-currency";
+import { fmtDate } from "@/lib/fmt-date";
+import { FinanceKpi } from "@/components/FinanceKpi";
 import { supabase } from "@/lib/supabase";
 
 /** The private evidence bucket 0267 created. No delete policy — a signed
@@ -31,7 +33,7 @@ function SignatureLink({ path }: { path: string }) {
         .from(SIGNATURE_BUCKET)
         .createSignedUrl(key, 3600);
       if (error || !data?.signedUrl) {
-        toast.error(`Couldn't open the signature — ${error?.message ?? "no URL"}`);
+        toast.error(`Couldn't open the signature: ${error?.message ?? "no URL"}`);
         return;
       }
       window.open(data.signedUrl, "_blank", "noopener");
@@ -102,14 +104,14 @@ export default function FinanceRentalApprover() {
       </header>
 
       <div className="grid grid-cols-3 gap-3.5 mb-6">
-        <Kpi label="Waiting on you" value={String(totals.count)} hint="Applications undecided" />
-        <Kpi
+        <FinanceKpi label="Waiting on you" value={String(totals.count)} hint="Applications undecided" />
+        <FinanceKpi
           label="Credit at stake"
           value={rm(totals.credit)}
           hint="Total over the full terms"
           accent
         />
-        <Kpi label="Monthly if all approved" value={rm(totals.monthly)} hint="Combined monthly fee" />
+        <FinanceKpi label="Monthly if all approved" value={rm(totals.monthly)} hint="Combined monthly fee" />
       </div>
 
       {approvalsQ.isLoading ? (
@@ -142,7 +144,7 @@ export default function FinanceRentalApprover() {
       <div className="mt-3.5 px-4 py-3 bg-muted/30 rounded-md text-label text-muted-foreground">
         <b>Approve</b> puts the contract live: the monthly schedule is written, the unit is
         allocated, and the store can collect the first month by card.{" "}
-        <b>Reject</b> fails the application and leaves no money behind — the reason you type is
+        <b>Reject</b> fails the application and leaves no money behind. The reason you type is
         recorded against it.
       </div>
     </div>
@@ -153,12 +155,19 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
   const decide = useDecideRentalAgreement();
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
+  // 0538 — which check Finance ran and its reference, kept with the decision.
+  const [creditCheck, setCreditCheck] = useState("");
+  const [creditReference, setCreditReference] = useState("");
 
   const busy = decide.isPending;
 
   const run = (approve: boolean, note?: string) => {
     decide.mutate(
-      { id: r.id, approve, note },
+      {
+        id: r.id, approve, note,
+        creditCheck: creditCheck.trim() || undefined,
+        creditReference: creditReference.trim() || undefined,
+      },
       {
         onSuccess: () => {
           toast.success(
@@ -190,7 +199,7 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
             {r.signedAt ? (
               <span
                 className="px-2 py-0.5 rounded-full text-label font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
-                title={`Signed ${new Date(r.signedAt).toLocaleString()}`}
+                title={`Signed ${fmtDate(r.signedAt, { time: true })}`}
               >
                 Signed by {r.signedName ?? "customer"}
                 {r.templateVersion != null ? ` · T&C v${r.templateVersion}` : ""}
@@ -198,7 +207,7 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
             ) : (
               <span
                 className="px-2 py-0.5 rounded-full text-label font-semibold bg-amber-50 text-amber-800 border border-amber-200"
-                title="This application predates signature capture — no signature is on file, and approval is now refused without one."
+                title="This application predates signature capture. No signature is on file, and approval is now refused without one."
               >
                 Not signed yet
               </span>
@@ -208,7 +217,7 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
           <div className="text-meta text-muted-foreground mt-1">
             {r.customer.name}
             {r.customer.phone ? ` · ${r.customer.phone}` : ""}
-            {r.dealer ? ` · ${r.dealer.name}` : " · HQ direct"}
+            {r.dealer ? <> · <span className="uppercase">{r.dealer.name}</span></> : " · HQ direct"}
             {r.salesperson ? ` · ${r.salesperson.name}` : ""}
           </div>
         </div>
@@ -224,21 +233,49 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
 
       <div className="grid gap-x-6 gap-y-2 px-4 py-3.5 sm:grid-cols-2 lg:grid-cols-3">
         <Field label="Product" value={r.sku} mono />
-        <Field label="Starts" value={r.startDate} />
-        <Field label="Applied" value={new Date(r.createdAt).toLocaleDateString()} />
-        <Field label="Email" value={r.customer.email ?? "—"} />
-        <Field label="Address" value={r.customer.address ?? "—"} />
-        <Field label="Due once at signing" value={r.oneOffTotal > 0 ? rm(r.oneOffTotal) : "—"} />
+        <Field label="Starts" value={fmtDate(r.startDate)} />
+        <Field label="Applied" value={fmtDate(r.createdAt)} />
+        <Field label="Email" value={r.customer.email ?? ""} />
+        <Field label="Address" value={r.customer.address ?? ""} />
+        <Field label="Due once at signing" value={r.oneOffTotal > 0 ? rm(r.oneOffTotal) : ""} />
         {r.orderSo ? <Field label="Sales order" value={`SO-${r.orderSo}`} mono /> : null}
         {r.notes ? <Field label="Note from the store" value={r.notes} /> : null}
       </div>
 
       {/* The CBM check is planned, not built (Loo 2026-07-26) — the page says
-          that plainly instead of showing a button that does nothing. */}
+          that plainly instead of showing a button that does nothing. 0538: the
+          check Finance ran by hand is typed here and kept with the decision. */}
       <div className="px-4 pb-2 text-label text-muted-foreground">
         {r.creditReference
           ? `Credit bureau: ${r.creditReference}`
-          : "Credit bureau (CBM) check is not wired yet — assess this one by hand."}
+          : "Credit bureau (CBM) check is not wired yet. Assess this one by hand."}
+      </div>
+      <div className="grid gap-3 px-4 pb-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="block text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">
+            Credit check used
+          </span>
+          <input
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-body"
+            value={creditCheck}
+            placeholder="e.g. CTOS"
+            maxLength={100}
+            onChange={(e) => setCreditCheck(e.target.value)}
+            data-testid="approver-credit-check"
+          />
+        </label>
+        <label className="block">
+          <span className="block text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">
+            Check reference
+          </span>
+          <input
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-body"
+            value={creditReference}
+            maxLength={200}
+            onChange={(e) => setCreditReference(e.target.value)}
+            data-testid="approver-credit-reference"
+          />
+        </label>
       </div>
 
       {rejecting ? (
@@ -316,32 +353,6 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
       <div className={`text-body text-foreground break-words ${mono ? "font-mono" : ""}`}>
         {value}
       </div>
-    </div>
-  );
-}
-
-function Kpi({
-  label,
-  value,
-  hint,
-  accent,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  accent?: boolean;
-}) {
-  return (
-    <div
-      className={`bg-card rounded-md border p-4 ${accent ? "border-primary/40" : "border-border"}`}
-    >
-      <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground">
-        {label}
-      </div>
-      <div className="font-mono text-page font-semibold text-foreground tabular-nums mt-1">
-        {value}
-      </div>
-      <div className="text-label text-muted-foreground mt-0.5">{hint}</div>
     </div>
   );
 }

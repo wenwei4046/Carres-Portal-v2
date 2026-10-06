@@ -3,7 +3,7 @@
  * convert from snake_case DB rows to these.
  */
 
-import type { CostSource, OperationStage } from "./db-types";
+import type { CostSource, OperationStage, Role } from "./db-types";
 import type { FabricTier } from "./fabric-tier";
 import type { DefaultFreeGift } from "./free-gift";
 import type { FreeItemCampaign } from "./free-item-campaign";
@@ -28,10 +28,7 @@ export type { FreeItemCampaign };
 // partner: the third-party warehouse files its own receiving instead of
 // reporting it by WhatsApp. Like them it is scoped by an entity id
 // (`app_users.warehouse_id`) and reaches nothing except its own RPCs.
-export type Role =
-  | "principal" | "dealer" | "salesperson" | "showroom"
-  | "operation" | "supplier" | "partner" | "finance" | "bd" | "hr"
-  | "warehouse";
+export type { Role };
 
 export interface Dealer {
   id: string;
@@ -88,6 +85,9 @@ export interface ProductModel {
   allowedOptions?: Record<string, string[] | undefined>;
 }
 
+/** 0442 — the Catalog-owned stock identity mode of a SKU. */
+export type StockIdentityMode = "exact_unit" | "quantity";
+
 export interface ProductSku {
   id: string;
   modelId: string;
@@ -104,6 +104,13 @@ export interface ProductSku {
   // instead of parsing a `category:model:variant` prefix from the SKU string
   // (the proto-era convention that's no longer how SKUs are formatted).
   supplierId: string | null;
+  /** 0375 — the SUPPLIER'S own item code (their quotation's code). */
+  supplierCode?: string | null;
+  /** 0442 — how Stock identifies this SKU. `exact_unit` = every piece is one
+   *  permanent Carres Unit ID born at official PO issue; `quantity` = counted
+   *  interchangeable goods, never given Unit IDs; null = Catalog has not said
+   *  (official PO issue refuses the SKU by name). Stored, never derived. */
+  stockIdentityMode?: StockIdentityMode | null;
   discontinuedAt?: string | null;
   // 0170 — sell-side ON/OFF (Modular toggle, DISTINCT from discontinuedAt) +
   // editable sell-side description.

@@ -29,6 +29,7 @@
 import type {
   CatalogResponse,
   FabricTier,
+  PwpDiscoverDto,
   PwpRuleDto,
   PwpRuleEngine,
   PwpLineInput,
@@ -41,6 +42,7 @@ import {
   matchSofaCombo,
   pwpSwappedCombos,
   resolvePwp,
+  voucherCoversLine,
 } from "@carres/shared";
 import type { DraftLine } from "../new-order/draft";
 import { toFreeGiftLineInput } from "./free-line";
@@ -176,7 +178,17 @@ export function pwpRewardPrice(
   if (rule.type === "promo") return 0;
   const skuRow = catalog.skus.find((s) => s.sku === line.sku) ?? null;
   const p = skuRow?.pwpPrice;
-  return typeof p === "number" ? p : null;
+  // ⭐ A STORED 0 IS "NOT SET", NEVER "FREE" — and this line is the client half
+  // of a rule the server already states: `p == null || p <= 0` is rejected at
+  // Confirm (`pwp-recompute.ts`, "2990s parity: pwp_price = 0 means not set for
+  // a 'pwp' rule"). Only a 'promo' rule redeems free, and it returns above
+  // without ever reading pwpPrice — so 0 has no meaning here at all.
+  //
+  // Reading it as a price previewed "RM 0.00" on the chip, let the dealer build
+  // the entire order on it, and lost the lot to a 409 at Confirm naming SKU
+  // Master, a screen a dealer cannot open. Honest-pricing means this function
+  // and the server answer identically or the chip must not appear.
+  return typeof p === "number" && p > 0 ? p : null;
 }
 
 /** Reconstruct the pure `SofaBuild` a build line carries (null = not a build /
@@ -479,4 +491,72 @@ export function markLinePwpWithAvailableCode(
       pwp: { ruleId: rule.id, code, claimGroup, crossOrder: true },
     },
   };
+}
+
+/**
+ * ⭐ COULD THIS LINE EVER BE A REWARD? — the cross-order visibility test.
+ *
+ * `coveringPwpForLine` answers a different, narrower question: is this line
+ * grantable RIGHT NOW, from a trigger already in THIS cart. That is the correct
+ * gate for the same-cart "Use PWP" chips, and it was also — wrongly — the gate on
+ * the whole voucher surface, so a cart holding only the reward could not even
+ * show the box to type a saved voucher number into.
+ *
+ * A carried-forward voucher is redeemed on a LATER order that need not contain
+ * the trigger. The honest question for showing that affordance is therefore
+ * "could this product be a reward at all", which is the rules' REWARD scope with
+ * no trigger and no allowance in it.
+ *
+ * Returns the ACTIVE rules whose reward scope covers the line. Empty = this
+ * product is never a reward, so no voucher could ever apply and the surface
+ * stays hidden — which keeps a normal cart exactly as quiet as it is today.
+ */
+export function rewardCapableRules(
+  line: DraftLine,
+  catalog: CatalogResponse,
+): PwpRuleDto[] {
+  const rules = activePwpRules(catalog);
+  if (rules.length === 0) return [];
+  const li = toFreeGiftLineInput(line, catalog);
+  const combos = comboModulesMap(catalog);
+  return rules.filter((r) =>
+    voucherCoversLine(
+      { rewardCategory: r.rewardCategory, rewardTargets: r.rewardTargets },
+      li,
+      combos,
+    ),
+  );
+}
+
+/**
+ * ⭐ CAN THIS SAVED VOUCHER BE SPENT ON THIS LINE, AND AT WHAT PRICE?
+ *
+ * Judged against the voucher's OWN FROZEN SNAPSHOT (`rewardCategory` /
+ * `rewardTargets` / `type`, stamped at mint), never against today's rule and
+ * never against this cart's allowance — the P8d design's rule that a later rule
+ * edit must not invalidate an outstanding voucher, and the same test the server
+ * applies in `pwp-recompute`. Same function, both sides: honest-pricing.
+ *
+ * `null` = not offerable, for one of three reasons the dealer never has to
+ * distinguish: the snapshot's scope does not cover this line · it is a 'pwp'
+ * voucher and the reward SKU has no usable price (the >0 law) · the line is a
+ * sofa BUILD, whose price comes from the combo map and which is out of scope for
+ * cross-order redemption (the server would refuse it).
+ */
+export function voucherOfferForLine(
+  voucher: PwpDiscoverDto,
+  line: DraftLine,
+  catalog: CatalogResponse,
+): { price: number } | null {
+  // A build's price is the combo map's, not a per-SKU figure — deliberately not
+  // offered cross-order rather than previewing a number the server will not use.
+  if ((line.attrs as Record<string, unknown> | null)?.sofa_build) return null;
+  if (!voucherCoversLine(voucher, toFreeGiftLineInput(line, catalog), comboModulesMap(catalog))) {
+    return null;
+  }
+  if (voucher.type === "promo") return { price: 0 };
+  const skuRow = catalog.skus.find((s) => s.sku === line.sku) ?? null;
+  const p = skuRow?.pwpPrice;
+  // The same >0 law as the same-cart offer gate and the server.
+  return typeof p === "number" && p > 0 ? { price: p } : null;
 }

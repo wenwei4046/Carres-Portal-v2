@@ -18,15 +18,8 @@
  *     the engine's "unknown never reads as good" gate has nothing to catch.
  *  4. It states the window it looked at.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -42,17 +35,9 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000001")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("11111111-1111-1111-1111-000000000001", { email: `${role}@x`, app_metadata: { role } });
 }
 
 /** Chainable thenable, recording the columns each table was asked for. */
@@ -87,11 +72,16 @@ const SUPPLIER = {
   slug: "ohana",
 };
 
-function mount(pos: unknown[], lines: unknown[], claims: unknown[]) {
+function mount(
+  pos: unknown[],
+  lines: unknown[],
+  claims: unknown[],
+  suppliers: unknown[] = [SUPPLIER],
+) {
   const selects: string[] = [];
   const sb = {
     from: vi.fn((t: string) => {
-      if (t === "suppliers") return builder([SUPPLIER], selects);
+      if (t === "suppliers") return builder(suppliers, selects);
       if (t === "purchase_orders") return builder(pos, selects);
       if (t === "purchase_order_lines") return builder(lines, selects);
       if (t === "supplier_claims") return builder(claims, selects);
@@ -136,17 +126,8 @@ function threeClean(receivedAt: string) {
   return { pos, lines };
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -254,6 +235,17 @@ describe("GET /api/operation/suppliers-overview — the R5 scorecard", () => {
     const lineSelect = selects.find((s) => s.includes("received_qty"));
     expect(lineSelect).toContain("damaged_qty");
     expect(lineSelect).toContain("wrong_item_qty");
+  });
+
+  /* 0477 — a landlord added by Finance is not a factory this roster oversees. */
+  it("leaves out Finance's other creditors", async () => {
+    mount([], [], [], [
+      SUPPLIER,
+      { ...SUPPLIER, id: "s9", name: "Bayview Properties", kind: "other_creditor", cat_covered: [], slug: "bayview-properties" },
+    ]);
+    const { res, body } = await get();
+    expect(res.status).toBe(200);
+    expect(body.suppliers.map((s: { name: string }) => s.name)).toEqual(["Ohana"]);
   });
 
   it("refuses a role that is not operation or principal", async () => {

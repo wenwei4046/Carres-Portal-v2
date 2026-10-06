@@ -34,6 +34,8 @@ import {
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+import { parseBody } from "../../lib/route-helpers";
+import { todayIsoMYT } from "../../lib/delivery-order-issue";
 
 /**
  * Service Cases (SC) — migration 0210. The case / 病历 parent layer above
@@ -483,7 +485,7 @@ scRouter.post("/", requireOperationOrPrincipal, async (c) => {
       carres_action:    parsed.carresAction    ?? null,
       what_affected:    parsed.whatAffected    ?? null,
       incurred_charges: parsed.incurredCharges ?? null,
-      opened_at:        parsed.openedAt        ?? new Date().toISOString().slice(0, 10),
+      opened_at:        parsed.openedAt        ?? todayIsoMYT(),
       created_by:       c.var.auth.id,
 
       // S1 (0285) — the guided intake's answers. `priority` is NOT here and
@@ -871,13 +873,6 @@ scRouter.post("/:id/sla", requireOperationOrPrincipal, async (c) => {
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Today in MYT. The Worker's clock is UTC; between 16:00 and midnight UTC that
- *  is already tomorrow in Klang, and a deadline must not turn late a day early
- *  (or a day late) because of it. */
-function todayIsoMYT(): string {
-  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
-}
-
 /** Rows come back snake_case from the database; the clock reads camelCase. */
 function shapeSlaEvents(raw: unknown): CaseSlaEvent[] {
   if (!Array.isArray(raw)) return [];
@@ -1041,20 +1036,6 @@ function embeddedSo(o: RawCase["orders"]): number | null {
   if (!o) return null;
   const row = Array.isArray(o) ? o[0] : o;
   return row?.so ?? null;
-}
-
-async function parseBody<S extends import("zod").ZodTypeAny>(
-  c: import("hono").Context<AppEnv>,
-  schema: S,
-): Promise<import("zod").infer<S>> {
-  let body: unknown;
-  try { body = await c.req.json(); }
-  catch { throw new HTTPException(400, { message: "Body must be valid JSON" }); }
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) {
-    throw new HTTPException(400, { message: "Invalid input: " + parsed.error.issues[0]?.message });
-  }
-  return parsed.data;
 }
 
 export default scRouter;

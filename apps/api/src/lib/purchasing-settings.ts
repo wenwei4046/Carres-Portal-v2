@@ -1,11 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  isOtherCreditor,
   isPurchasingCategory,
   type PurchasingCategory,
   type PurchasingProductionDays,
   type PurchasingSettingChange,
   type PurchasingSettings,
   type PurchasingSupplierRow,
+  type PoWindowSettings,
 } from "@carres/shared";
 
 /**
@@ -28,6 +30,9 @@ interface SettingsRow {
   earliest_sell_days: number;
   logistics_call_working_days: number;
   po_days: number[];
+  /** 0423 — CALENDAR days after the Proceed Date; 0 means no floor. Read
+   *  on its own; absent until the migration is applied. */
+  manual_purchase_min_delivery_days?: number | null;
 }
 
 /**
@@ -39,6 +44,7 @@ export async function loadPurchasingNumbers(sb: SupabaseClient): Promise<{
   earliestSellDays: number;
   logisticsCallWorkingDays: number;
   poDays: number[];
+  manualPurchaseMinDeliveryDays: number;
 }> {
   const { data, error } = await sb
     .from("purchasing_settings")
@@ -61,7 +67,34 @@ export async function loadPurchasingNumbers(sb: SupabaseClient): Promise<{
     if (Array.isArray(v)) continue;
     if (!Number.isFinite(v)) throw new Error(`purchasing_settings.${k} is not a number`);
   }
-  return numbers;
+  return { ...numbers, manualPurchaseMinDeliveryDays: await loadManualPurchaseMinDays(sb) };
+}
+
+/**
+ * The Manual Purchase floor, read on its own so that it cannot take the
+ * rest of Purchasing down.
+ *
+ * The column arrives with migration 0423. The code that reads it deployed
+ * first (4 Sep 2026), and because it sat in the same SELECT as the four
+ * numbers above, the SO Batch buying list, the orders routes and the POS
+ * gate all failed with "column does not exist" until the SQL was pasted.
+ * A Manual Purchase-only number must never decide whether a customer order
+ * can be planned. A missing column, or a missing value, reads as 0: no
+ * floor, which is the pre-0423 behaviour.
+ */
+async function loadManualPurchaseMinDays(sb: SupabaseClient): Promise<number> {
+  const { data, error } = await sb
+    .from("purchasing_settings")
+    .select("manual_purchase_min_delivery_days")
+    .eq("id", 1)
+    .maybeSingle();
+  if (error) {
+    console.warn("purchasing_settings.manual_purchase_min_delivery_days unreadable; using 0", error.message);
+    return 0;
+  }
+  const v = (data as Partial<SettingsRow> | null)?.manual_purchase_min_delivery_days;
+  const n = v == null ? 0 : Number(v);
+  return Number.isFinite(n) ? n : 0;
 }
 
 /**
@@ -76,22 +109,38 @@ export async function loadPurchasingSettings(
   sb: SupabaseClient,
 ): Promise<LoadedPurchasingSettings> {
   const numbers = await loadPurchasingNumbers(sb);
+  // An unavailable optional matcher setting must not invent a priority or
+  // prevent ordinary purchasing. The matcher itself refuses a missing value.
+  let readyStockPriority: "customer_delivery" | "proceed_date" | null = null;
+  try {
+    const result = await sb.from("purchasing_settings").select("ready_stock_priority").eq("id", 1).maybeSingle();
+    const value = result.data?.ready_stock_priority;
+    if (!result.error && (value === "customer_delivery" || value === "proceed_date")) readyStockPriority = value;
+  } catch { /* The unavailable value is exposed as null. */ }
 
-  const [skusR, suppliersR, prodR, weekR, changesR] = await Promise.all([
+  const [skusR, suppliersR, prodR, weekR, changesR, destinationsR, partnersR] = await Promise.all([
     sb
       .from("product_skus")
       .select("supplier_id, product_models!inner(category)")
       .not("supplier_id", "is", null),
-    sb.from("suppliers").select("id, name"),
+    sb.from("suppliers").select("id, name, kind, cat_covered, terms_days, address, return_address, whatsapp_group_url, po_send_channel, contact_email"),
     sb.from("purchasing_production_days").select("supplier_id, category, working_days"),
-    sb.from("purchasing_supplier_settings").select("supplier_id, off_days, transit_days"),
+    sb
+      .from("purchasing_supplier_settings")
+      .select("supplier_id, off_days, fixed_destination_id, collected_by_partner_id"),
     sb
       .from("purchasing_setting_changes")
       .select("setting_key, supplier_id, category, old_value, new_value, changed_at, changed_by")
       .order("changed_at", { ascending: false })
       .limit(400),
+    sb
+      .from("purchasing_destinations")
+      .select("id, name, address, is_default, active, warehouse_id, warehouses(address)")
+      .order("sort_order")
+      .order("name"),
+    sb.from("delivery_partners").select("id, name").order("name"),
   ]);
-  for (const r of [skusR, suppliersR, prodR, weekR, changesR]) {
+  for (const r of [skusR, suppliersR, prodR, weekR, changesR, destinationsR, partnersR]) {
     if (r.error) throw new Error(`purchasing settings: ${r.error.message}`);
   }
 
@@ -111,33 +160,67 @@ export async function loadPurchasingSettings(
     }
   }
 
-  const transitBySupplier = new Map<string, number>();
+  // Setup categories remain maintainable before any SKU has been linked.
+  for (const supplier of (suppliersR.data ?? []) as Array<Record<string, unknown>>) {
+    for (const category of (supplier.cat_covered ?? []) as string[]) {
+      if (!isPurchasingCategory(category)) continue;
+      const categories = catsBySupplier.get(supplier.id as string) ?? new Set<PurchasingCategory>();
+      categories.add(category);
+      catsBySupplier.set(supplier.id as string, categories);
+    }
+  }
+
   const offDaysBySupplier = new Map<string, number[]>();
+  const collectionBySupplier = new Map<
+    string,
+    { destinationId: string | null; partnerId: string | null }
+  >();
   for (const row of (weekR.data ?? []) as Array<Record<string, unknown>>) {
     offDaysBySupplier.set(
       row.supplier_id as string,
       ((row.off_days as number[] | null) ?? []).map(Number),
     );
-    // The eighth number. NULL stays null rather than becoming a 0 or a 1 —
-    // "nobody has set it" and "it takes no time" are different facts, and only
-    // the first one may withhold an arrival date.
-    if (row.transit_days != null) {
-      transitBySupplier.set(row.supplier_id as string, Number(row.transit_days));
-    }
+    collectionBySupplier.set(row.supplier_id as string, {
+      destinationId: (row.fixed_destination_id as string | null) ?? null,
+      partnerId: (row.collected_by_partner_id as string | null) ?? null,
+    });
   }
 
   const nameById = new Map<string, string>();
+  const termsById = new Map<string, number | null>();
+  const addressById = new Map<string, { address: string | null; returnAddress: string | null; whatsappGroupUrl: string | null; contactEmail: string | null; poSendChannel: string | null }>();
+  const factoryPickupSupplierIds: string[] = [];
+  /* 0477 — Finance's other creditors (a landlord, an advertiser) share the
+     table. They make nothing, so they never get a Settings row, even if a
+     catalog slot was pointed at one by mistake. */
+  const otherCreditorIds = new Set<string>();
   for (const row of (suppliersR.data ?? []) as Array<Record<string, unknown>>) {
     nameById.set(row.id as string, (row.name as string | null) ?? "");
+    termsById.set(row.id as string, (row.terms_days as number | null) ?? null);
+    addressById.set(row.id as string, {
+      address: (row.address as string | null) ?? null,
+      returnAddress: (row.return_address as string | null) ?? null,
+      whatsappGroupUrl: (row.whatsapp_group_url as string | null) ?? null,
+      contactEmail: (row.contact_email as string | null) ?? null,
+      poSendChannel: (row.po_send_channel as string | null) ?? null,
+    });
+    if (row.kind === "factory_pickup") factoryPickupSupplierIds.push(row.id as string);
+    if (isOtherCreditor(row)) otherCreditorIds.add(row.id as string);
   }
 
   const suppliers: PurchasingSupplierRow[] = [...catsBySupplier.entries()]
+    .filter(([id]) => !otherCreditorIds.has(id))
     .map(([id, cats]) => ({
       id,
       name: nameById.get(id) ?? "",
       categories: [...cats].sort(),
       offDays: offDaysBySupplier.get(id) ?? null,
-      transitDays: transitBySupplier.get(id) ?? null,
+      termsDays: termsById.get(id) ?? null,
+      address: addressById.get(id)?.address ?? null,
+      returnAddress: addressById.get(id)?.returnAddress ?? null,
+      whatsappGroupUrl: addressById.get(id)?.whatsappGroupUrl ?? null,
+      contactEmail: addressById.get(id)?.contactEmail ?? null,
+      poSendChannel: addressById.get(id)?.poSendChannel ?? null,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -151,6 +234,42 @@ export async function loadPurchasingSettings(
       workingDays: Number(row.working_days),
     });
   }
+
+  const destinations = ((destinationsR.data ?? []) as Array<Record<string, unknown>>).map(
+    (row) => {
+      const warehouse = row.warehouses as
+        | { address?: string | null }
+        | { address?: string | null }[]
+        | null;
+      const warehouseAddress = Array.isArray(warehouse)
+        ? warehouse[0]?.address
+        : warehouse?.address;
+      return {
+        id: row.id as string,
+        name: (row.name as string | null) ?? "",
+        address:
+          row.warehouse_id != null
+            ? (warehouseAddress ?? null)
+            : ((row.address as string | null) ?? null),
+        isDefault: row.is_default === true,
+        active: row.active !== false,
+        warehouseLinked: row.warehouse_id != null,
+      };
+    },
+  );
+
+  const supplierCollections = factoryPickupSupplierIds
+    .map((supplierId) => ({
+      supplierId,
+      supplierName: nameById.get(supplierId) ?? "",
+      destinationId: collectionBySupplier.get(supplierId)?.destinationId ?? null,
+      partnerId: collectionBySupplier.get(supplierId)?.partnerId ?? null,
+    }))
+    .sort((a, b) => a.supplierName.localeCompare(b.supplierName));
+  const deliveryPartners = ((partnersR.data ?? []) as Array<Record<string, unknown>>).map((row) => ({
+    id: row.id as string,
+    name: (row.name as string | null) ?? "",
+  }));
 
   // The screen shows ONE line per setting — the most recent change. Rows come
   // back newest-first, so the first hit per key wins.
@@ -188,5 +307,63 @@ export async function loadPurchasingSettings(
     }
   }
 
-  return { ...numbers, suppliers, productionDays, lastChanges };
+  return {
+    ...numbers,
+    readyStockPriority,
+    suppliers,
+    productionDays,
+    destinations,
+    supplierCollections,
+    deliveryPartners,
+    lastChanges,
+  };
+}
+
+/**
+ * ⭐ THE DAILY PO WINDOWS (Purchasing MASTER §5.6.1; storage 0585).
+ *
+ * The first window, the optional second, whether the second is on, and each
+ * supplier's governed earlier cut-off. `PO Days` (0303) decides WHICH days a
+ * window opens (owner correction 2026-09-25) and rides here so every reader
+ * builds the one calendar through `poWindowCalendarOf`.
+ *
+ * Like the loader above there is NO fallback object: an unreadable setting is
+ * an error the caller reports, never an invented 11:30.
+ */
+export interface LoadedPoWindows {
+  settings: PoWindowSettings;
+  poDays: number[];
+  cutoffBySupplier: Map<string, string>;
+}
+
+export async function loadPoWindows(sb: SupabaseClient): Promise<LoadedPoWindows> {
+  const [settings, cutoffs] = await Promise.all([
+    sb
+      .from("purchasing_settings")
+      .select("po_days, po_window_first, po_window_second, po_window_second_enabled")
+      .eq("id", 1)
+      .single(),
+    sb.from("purchasing_supplier_settings").select("supplier_id, po_cutoff").not("po_cutoff", "is", null),
+  ]);
+  if (settings.error) throw new Error(`purchasing_settings po windows: ${settings.error.message}`);
+  if (cutoffs.error) throw new Error(`purchasing_supplier_settings po_cutoff: ${cutoffs.error.message}`);
+  const row = settings.data as {
+    po_days: number[] | null;
+    po_window_first: string;
+    po_window_second: string | null;
+    po_window_second_enabled: boolean;
+  };
+  const cutoffBySupplier = new Map<string, string>();
+  for (const r of (cutoffs.data ?? []) as Array<{ supplier_id: string; po_cutoff: string | null }>) {
+    if (r.po_cutoff) cutoffBySupplier.set(r.supplier_id, r.po_cutoff.slice(0, 5));
+  }
+  return {
+    settings: {
+      first: row.po_window_first.slice(0, 5),
+      second: row.po_window_second ? row.po_window_second.slice(0, 5) : null,
+      secondEnabled: row.po_window_second_enabled === true,
+    },
+    poDays: (row.po_days ?? []).map(Number),
+    cutoffBySupplier,
+  };
 }

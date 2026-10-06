@@ -81,7 +81,7 @@ export default function PODrawerThreadList({ poId }: { poId: string }) {
                     Customer ETA
                   </span>
                   <span className="font-mono font-semibold">
-                    {t.customer_delivery_date ?? "—"}
+                    {t.customer_delivery_date ?? ""}
                   </span>
                 </div>
                 {(t.sku_lines ?? []).length > 0 && (

@@ -241,20 +241,38 @@ async function recordRentalInvoice(c: Context<AppEnv>, invoice: Stripe.Invoice) 
   const admin = adminClient(c.env);
   const { data: ag } = await admin
     .from("rental_agreements")
-    .select("id")
+    .select("id, monthly_fee")
     .eq("stripe_subscription_id", subId)
     .maybeSingle();
-  const agreementId = (ag as { id: string } | null)?.id ?? null;
+  const agRow = ag as { id: string; monthly_fee: number | string | null } | null;
+  const agreementId = agRow?.id ?? null;
   // A subscription we do not own (the CARRESS account still carries the old
   // carressglobal system's objects) — acknowledge, never retry.
   if (!agreementId) return c.json({ received: true, ignored: "unknown_subscription" });
 
+  // Stripe reports sen; the ledger keeps ringgit. `amount_paid` is what was
+  // ACTUALLY collected, which is the only figure worth recording.
+  let paidSen = invoice.amount_paid ?? 0;
+  // The subscription's FIRST invoice carries the signup month: Checkout puts
+  // the one-time "first month" line (rental.ts) on it. recordRentalSession has
+  // already recorded that money as month 1, keyed on the session id, so
+  // recording this invoice too would mark month 2 paid with the same ringgit —
+  // and, since 0473, post it to the ledger twice. Only what the invoice
+  // collected BEYOND the signup month is a new instalment: nothing when the
+  // trial covers the gap to the first 7th (the normal case), one month's fee
+  // when the trial fallback in rental.ts was skipped.
+  if (invoice.billing_reason === "subscription_create") {
+    const signupSen = Math.round(Number(agRow?.monthly_fee ?? 0) * 100);
+    paidSen -= signupSen;
+    if (paidSen <= 0) {
+      return c.json({ received: true, ignored: "signup_month_recorded_by_session" });
+    }
+  }
+
   const { data, error } = await admin.rpc("rental_record_payment", {
     p_agreement_id: agreementId,
     p_stripe_invoice_id: invoice.id,
-    // Stripe reports sen; the ledger keeps ringgit. `amount_paid` is what was
-    // ACTUALLY collected, which is the only figure worth recording.
-    p_amount: (invoice.amount_paid ?? 0) / 100,
+    p_amount: paidSen / 100,
     p_paid_at: new Date((invoice.status_transitions?.paid_at ?? invoice.created) * 1000).toISOString(),
     p_method: "stripe",
     p_reference: invoice.number ?? invoice.id,

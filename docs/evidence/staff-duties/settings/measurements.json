@@ -1,0 +1,43 @@
+{
+  "evidence": "Local intercepted synthetic fixtures in the actual application shell; not production or database permission proof.",
+  "scope": "CARD 02 navigation only; existing duty page retained",
+  "date": "2026-09-29T07:42:08.476Z",
+  "viewports": [
+    {
+      "width": 1440,
+      "scrollWidth": 1440,
+      "headerCount": 1
+    },
+    {
+      "width": 1180,
+      "scrollWidth": 1180,
+      "headerCount": 1
+    },
+    {
+      "width": 820,
+      "scrollWidth": 820,
+      "headerCount": 1
+    },
+    {
+      "width": 743,
+      "scrollWidth": 743,
+      "headerCount": 1
+    },
+    {
+      "width": 390,
+      "scrollWidth": 390,
+      "headerCount": 1
+    }
+  ],
+  "checks": [
+    "Settings navigation opens and closes",
+    "canonical exact duty URL",
+    "single destination header",
+    "narrow Back restores catalogue focus",
+    "reader has no assign action",
+    "loading and initial failure",
+    "no horizontal document overflow",
+    "no page errors"
+  ],
+  "errors": []
+}

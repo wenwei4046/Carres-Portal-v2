@@ -109,8 +109,15 @@ export default function ThankYou({
             ) : (
               <strong>on a date we'll confirm with the customer</strong>
             )}
-            . The order sits in <strong>Place</strong> until it's proceeded; operation takes it
-            from there.
+            .{" "}
+            {order.status === "proceed_order" ? (
+              <strong>Operations has received this order.</strong>
+            ) : (
+              <>
+                This order is waiting for payment or approval. Operations receives it
+                automatically when complete.
+              </>
+            )}
           </p>
           {collected > 0 && (
             <div className="confirm__paidbar" data-testid="thankyou-stripe-collected">

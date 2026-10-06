@@ -17,6 +17,7 @@ import {
   type OrderEventType,
 } from "@carres/shared";
 import type { AnnotationTag } from "@/lib/queries";
+import { fmtDate } from "@/lib/fmt-date";
 
 // Shared between the per-order timeline (AnnotationTimeline) and the global
 // Activity feed (GlobalActivity), so every activity row reads the same.
@@ -59,20 +60,92 @@ const FIELD_LABEL: Record<string, string> = {
   status: "Status",
   balance: "Balance",
   payment_status: "Payment status",
-  logistic_eta: "Logistic ETA",
-  stock_eta: "Stock ETA",
+  logistic_eta: "Logistics' date",
+  stock_eta: "Expected arrival",
   balance_due_date: "Balance due date",
   called_customer: "Called customer",
   delivery_time_slot: "Delivery time slot",
+  confirmed_date: "Confirmed date",
+  confirmed_time_slot: "Confirmed time",
+  confirmed_partner: "Logistics",
   customer_request: "Customer request",
   carres_remark: "Carres remark",
   warehouse_remark: "Warehouse remark",
   storage_waiver_status: "Storage waiver",
 };
 
-function fmtVal(v: unknown): string {
-  if (v === null || v === undefined || v === "") return "—";
+/**
+ * NO INTERNAL ENUM ON SCREEN (owner ruling 2026-08-15).
+ *
+ * `orders.status` is stored as `place | proceed_order | delivered | cancelled`
+ * and this panel printed those four raw — a line reading
+ * `Status changed — place → proceed_order` is the database talking, not the
+ * portal. The four operator words are the dictionary's own (COPY-STANDARD:
+ * `Placed` = ordered, no date agreed yet; `Proceed` = the customer confirmed
+ * the date and it is ready for a PO).
+ *
+ * This is the same state-vocabulary law `PLAN_STATUS_LABEL` and
+ * `EMERGENCY_STATUS_LABEL` already enforce elsewhere: no DB word reaches the
+ * screen. An unknown value is passed through rather than guessed at — a wrong
+ * translation is worse than an untranslated one, and an unknown here means the
+ * enum grew and this map is what must be updated.
+ */
+const ORDER_STATUS_LABEL: Record<string, string> = {
+  place: "Placed",
+  proceed_order: "Proceed",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+};
+
+/** Fields whose value is a business DATE — printed the one ruled way, never
+ *  as the stored `2026-08-28`. */
+const DATE_FIELDS = new Set([
+  "confirmed_date",
+  "delivery_date",
+  "logistic_eta",
+  "stock_eta",
+  "balance_due_date",
+]);
+
+/** Fields whose value is MONEY — printed `RM 1,250.00`, never the stored
+ *  `1250.00` (COPY-STANDARD: a money figure always carries its currency and
+ *  its two decimals). */
+const MONEY_FIELDS = new Set(["balance"]);
+
+/**
+ * One changed value, in operator words.
+ *
+ * `null` = the value was absent. The caller composes the governed absence
+ * phrase from the FIELD's own name, because a bare `—` on the left of an
+ * arrow is a dash pretending to be a value — the reader cannot tell an empty
+ * field from a value that failed to load.
+ */
+function fmtVal(field: string | undefined, v: unknown): string | null {
+  if (v === null || v === undefined || v === "") return null;
+  if (field === "status") {
+    const raw = String(v);
+    return ORDER_STATUS_LABEL[raw] ?? raw;
+  }
+  if (field && DATE_FIELDS.has(field)) return fmtDate(String(v));
+  if (field && MONEY_FIELDS.has(field)) {
+    const n = Number(v);
+    return Number.isFinite(n) ? fmtMoney(n) : String(v);
+  }
+  if (typeof v === "boolean") return v ? "Yes" : "No";
   return String(v);
+}
+
+/**
+ * `No delivery date → Sat, 15 Aug 26` — the governed way to say a value did
+ * not exist before (owner ruling 2026-08-15). The field's own ruled label
+ * supplies the noun, so the phrase names WHICH fact was missing: `No status`
+ * and `No payment status` are two different events and this panel renders
+ * both, so one shared word for them would be ambiguous on its own screen.
+ */
+function changeBody(field: string | undefined, fieldWord: string, from: unknown, to: unknown): string {
+  const before = fmtVal(field, from) ?? `No ${fieldWord.toLowerCase()}`;
+  const after = fmtVal(field, to) ?? `No ${fieldWord.toLowerCase()}`;
+  return `${before} → ${after}`;
 }
 
 /** The minimal shape both a per-order entry and a global row satisfy. */
@@ -130,8 +203,8 @@ export function describeActivity(row: ActivityLike): {
     if ((type === "payment.received" || type === "payment.voided") && d?.amount != null) {
       const amount = Number(d.amount);
       // The METHOD is deliberately absent: the portal spells it two ways today
-      // (`online` prints as "Online" on the SO document and "e-wallet" in the
-      // drawer), and a timeline is not the place to pick a winner. The ledger
+      // (`online` prints as "Online" on the SO document and "Online payment" on
+      // screen), and a timeline is not the place to pick a winner. The ledger
       // row beside it states the method; reported for the copy owner.
       const bits = [
         Number.isFinite(amount) ? fmtMoney(amount) : null,
@@ -154,12 +227,21 @@ export function describeActivity(row: ActivityLike): {
       return {
         category: meta.category,
         title: `${field} changed`,
-        body: `${fmtVal(d.from)} → ${fmtVal(d.to)}`,
+        body: changeBody(d.field, field, d.from, d.to),
       };
     }
     return { category: meta.category, title: meta.defaultTitle, body: null };
   }
-  return { category: "system", title: action.replace(/_/g, " ") || "Activity", body: null };
+  // An action with no declared event type is a DEFECT — some writer stamped a
+  // type the taxonomy never declared. This used to print the raw key with its
+  // underscores swapped for spaces (`stock_flag_repair` → `stock flag repair`),
+  // which put the database's own vocabulary on the operator's screen to
+  // describe an event the portal cannot name. The row keeps its order, its
+  // person and its time; the undeclared key is engineering's problem, not a
+  // word an operator should have to read. (Every action live in production
+  // today resolves above — measured 2026-08-15: six distinct actions, all
+  // declared or mapped.)
+  return { category: "system", title: "Activity", body: null };
 }
 
 export function IconChip({ category, size = 28 }: { category: OrderEventCategory; size?: number }) {

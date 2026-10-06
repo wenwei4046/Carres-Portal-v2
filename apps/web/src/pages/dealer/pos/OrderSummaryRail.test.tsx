@@ -88,7 +88,10 @@ describe("OrderSummaryRail — totals include stair carry + delivery fee (Loo 20
     const draft: WizardDraft = {
       ...draftWith({}), // 1 × MATT-A @ 1200
       addons: [{ key: "dispose-mattress", qty: 2, unitPrice: 80, name: "Dispose old mattress", attrs: { size: "Queen" } }],
-      delivery: { ...emptyDraft().delivery, floor: 3 }, // stair = (3−1) × 50 × 1 = 100
+      /* `stairItems` is STATED — unset means NONE since the 2026-08-27 ruling,
+         so leaving it null would make the stair leg 0 and stop this test
+         checking that the total includes it. stair = (3−1) × 50 × 1 = 100 */
+      delivery: { ...emptyDraft().delivery, floor: 3, stairItems: 1 },
     };
     render(
       <OrderSummaryRail

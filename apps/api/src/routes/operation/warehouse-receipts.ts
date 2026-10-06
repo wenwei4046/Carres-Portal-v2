@@ -1,14 +1,34 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import {
+  arrivalReceivingInput,
+  documentDisplayNumber,
+  type RegisterColumnQuery,
+  buildGrnRegisterView,
+  catalogCategoryWordOf,
+  poSupplierDeliveryDateOf,
+  receiptCategoryWords,
+  receivingAmendInput,
+  receivingDisplayNo,
+  receivingVoidInput,
   warehouseReceiptOpensClaims,
   warehouseReceiptSummary,
+  warehouseReceiptTotals,
+  receivingExtraQty,
   warehouseReceiptReturnInput,
+  type GrnRegisterFactRow,
+  type GrnReceivedWith,
+  type ReceivingExtraLine,
+  type PoDatePromise,
   type WarehouseReceiptLine,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { mapPgError, parseJsonBody, readAllPages } from "../../lib/route-helpers";
+import { isMissingRelationError } from "../../lib/optional-relation";
+import { skuCategories } from "../../lib/sku-categories";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+import { repairOrderReturnWorkCompletion } from "../../lib/repair-order-work";
 
 /**
  * /api/operation/warehouse-receipts — the ops half of R6.
@@ -34,7 +54,57 @@ import type { AppEnv } from "../../types";
  */
 const warehouseReceiptsRouter = new Hono<AppEnv>();
 
+// Source receipts remain a Receiving operation, under the same GRN Duty gate.
+warehouseReceiptsRouter.post(
+  "/arrival/:sourceId",
+  requireOperation,
+  // A repair-return receipt is the fact that ends the RO's return follow-up
+  // (Purchasing §9.7 · §10); every other arrival source observes nothing.
+  repairOrderReturnWorkCompletion(),
+  async (c) => {
+    const id = z.string().uuid().safeParse(c.req.param("sourceId"));
+    if (!id.success) return c.json({ message: "Invalid source" }, 422);
+    const p = await parseJsonBody(c, arrivalReceivingInput);
+    if (!p.ok) return c.json(p.body, p.status);
+    const r = await userClient(c.env, c.var.auth.jwt).rpc(
+      "receiving_arrival_post",
+      { p_source_id: id.data, p_input: p.data },
+    );
+    if (r.error) {
+      const m = mapPgError(r.error);
+      return c.json(m.body, m.status);
+    }
+    return c.json(r.data, 201);
+  },
+);
+
+warehouseReceiptsRouter.post(
+  "/arrival-receipts/:id/void",
+  requireOperation,
+  async (c) => {
+    const id = z.string().uuid().safeParse(c.req.param("id"));
+    if (!id.success) return c.json({ message: "Invalid Receiving" }, 422);
+    const p = await parseJsonBody(
+      c,
+      z.object({ reason: z.string().trim().min(1).max(2000) }).strict(),
+    );
+    if (!p.ok) return c.json(p.body, p.status);
+    const r = await userClient(c.env, c.var.auth.jwt).rpc(
+      "receiving_arrival_void",
+      { p_receipt_id: id.data, p_reason: p.data.reason },
+    );
+    if (r.error) {
+      const m = mapPgError(r.error);
+      return c.json(m.body, m.status);
+    }
+    return c.json(r.data);
+  },
+);
+
 const DEFAULT_LIMIT = 200;
+/** The Register may ask for more (`?limit=`) — it virtualises its rows, so a
+ *  large GRN history stays scrollable without a second fetch. Hard-capped. */
+const MAX_LIMIT = 1000;
 /** Long enough to open the paper, short enough that a copied link dies. */
 const SIGNED_URL_TTL_SECONDS = 3600;
 
@@ -57,8 +127,678 @@ type ReceiptRow = Record<string, unknown>;
  * its warehouse id so the record of who counted survives a PO being relocated,
  * but a human reading the queue needs the name as it stands today.
  */
+/** Chunked `.in(…)` read — bounded URLs, no PostgREST response ceiling. */
+async function readByIds<T>(
+  ids: readonly string[],
+  query: (batch: string[]) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<T[]> {
+  const out: T[] = [];
+  const unique = [...new Set(ids)];
+  for (let i = 0; i < unique.length; i += 100) {
+    const { data, error } = await query(unique.slice(i, i + 100));
+    if (error) throw error;
+    out.push(...(data ?? []));
+  }
+  return out;
+}
+
+/** The full record select — one string, so the paged mode and the legacy
+ *  list cannot quietly read two different rows. */
+const RECEIPT_FIELDS =
+  "po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, submitted_by, submitted_at, posted_by, posted_at, reviewed_by, reviewed_at, return_reason, grn_no, actual_site_id, arrival_evidence, extra_lines, posted_duty_holder, posted_duty_cover, posted_authority, void_at, void_by, void_reason";
+/** 0601 — the arrival time point, the receiver and the amendment version. */
+const RECEIPT_FIELDS_0601 =
+  "goods_received_time, received_by_kind, received_by_name, revision";
+const RECEIPT_SELECT_0601 = `id, arrival_source_id, ${RECEIPT_FIELDS}, ${RECEIPT_FIELDS_0601}`;
+const RECEIPT_SELECT = `id, arrival_source_id, ${RECEIPT_FIELDS}`;
+/** `arrival_source_id` lands with the arrival-source tables, still an
+ *  unnumbered draft (docs/stock/MASTER.md §13.9). Until they exist every
+ *  receipt is PO-backed — which is what production holds — so the register
+ *  reads the same rows without that one column instead of refusing to open. */
+const RECEIPT_SELECT_WITHOUT_ARRIVAL = `id, ${RECEIPT_FIELDS}`;
+
+/** Run a receipts read with the full select; retry once without the optional
+ *  column when the deployed schema does not carry it. Any other error is the
+ *  caller's to handle unchanged. */
+async function readReceipts<T>(run: (select: string) => Promise<T>): Promise<T> {
+  // 0601's columns first; a schema that does not carry them yet (the Worker
+  // deploys on merge, the migration is applied through its governed path)
+  // still opens every record, reading `Time not recorded` and no receiver.
+  for (const select of [RECEIPT_SELECT_0601, RECEIPT_SELECT]) {
+    try {
+      return await run(select);
+    } catch (error) {
+      if (!isMissingRelationError(error)) throw error;
+    }
+  }
+  return run(RECEIPT_SELECT_WITHOUT_ARRIVAL);
+}
+
+/**
+ * The business day an instant falls on, in `Asia/Kuala_Lumpur` — the ONE
+ * calendar the rail's `GRN date` ladder and the Warehouse working week share.
+ * A missing stamp stays missing: a GRN with no recorded creation instant is
+ * never given today's date so that it can appear under a heading.
+ */
+function businessDay(at: string | null | undefined): string | null {
+  if (!at) return null;
+  const d = new Date(at);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur",
+  }).format(d);
+}
+
+const GRN_PAGE_DEFAULT = 50;
+const GRN_PAGE_MAX = 200;
+/** The scan's own page size — a Worker-side read, never sent to the browser. */
+const GRN_SCAN_PAGE = 1000;
+const GRN_COLUMN_KEYS = new Set(["grnDate", "grn", "source", "po", "supplier", "deliverTo", "actualSite", "supplierConfirmedDeliveryDate", "receivedAt", "doNo", "items", "receivedQty", "damagedQty", "wrongQty", "extraQty"]);
+const grnColumnKey = z.string().refine(key => GRN_COLUMN_KEYS.has(key));
+const grnColumnQuery = z.object({
+  filters: z.record(grnColumnKey, z.array(z.string().max(2000)).max(5000)),
+  dateFilters: z.record(grnColumnKey, z.enum(["today", "tomorrow", "thisWeek", "thisMonth", "lastMonth", "overdue"])),
+  numberFilters: z.record(grnColumnKey, z.object({ min: z.number().finite().optional(), max: z.number().finite().optional() }).strict()),
+  dateRangeFilters: z.record(grnColumnKey, z.object({ from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).strict()),
+  sort: z.object({ key: grnColumnKey, dir: z.enum(["asc", "desc"]) }).strict().nullable(),
+}).strict();
+
+
 warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
+
+  /* ── `?scope=grn` — THE PAGED GRN REGISTER (owner correction 2026-09-06:
+     server-side pagination; `Showing 1–50 of 10,000` and every rail count
+     speak for the WHOLE filtered result set, never a loaded sample). The
+     Worker scans light rows, resolves the shared facts (category ladder,
+     the governed `Supplier Delivery Date`), asks the ONE pure arithmetic
+     (`buildGrnRegisterView`) for facets and the slice, then reads the full
+     record for just that page. Everything else keeps the legacy shape. ── */
+  if (c.req.query("scope") === "grn") {
+    const differences = c.req.query("view") === "differences";
+    const exportAll = c.req.query("export") === "1";
+    const limit = Math.min(
+      Math.max(1, Math.floor(Number(c.req.query("limit")) || GRN_PAGE_DEFAULT)),
+      GRN_PAGE_MAX,
+    );
+    const offset = Math.max(0, Math.floor(Number(c.req.query("offset")) || 0));
+    /* The rail's six groups (§9.4, owner ruling 2026-09-17). `from`/`to` is
+       the ONE shape a day, a week, a month and `Choose dates…` all arrive in,
+       so the server never learns four date vocabularies. */
+    const receivedWithRaw = c.req.query("receivedWith") ?? null;
+    const receivedWith: GrnReceivedWith | null =
+      receivedWithRaw === "damaged" ||
+      receivedWithRaw === "wrong_item" ||
+      receivedWithRaw === "extra"
+        ? receivedWithRaw
+        : null;
+    const isoDay = (v: string | undefined) =>
+      v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+    let columns: RegisterColumnQuery | null = null;
+    if (c.req.query("columns")) {
+      try {
+        const parsed = grnColumnQuery.safeParse(JSON.parse(c.req.query("columns")!));
+        if (!parsed.success) return c.json({ message: "Invalid register filters" }, 422);
+        columns = parsed.data;
+      } catch { return c.json({ message: "Invalid register filters" }, 422); }
+    }
+    const sel = {
+      columns,
+      category: c.req.query("category") ?? null,
+      supplier: c.req.query("supplier") ?? null,
+      site: c.req.query("site") ?? null,
+      receivedWith,
+      from: isoDay(c.req.query("from")),
+      to: isoDay(c.req.query("to")),
+      cancelled: c.req.query("cancelled") === "1" ? true : null,
+      q: c.req.query("q") ?? null,
+    };
+
+    // The scan: every GRN record (the Register boundary — `posted`/`voided`
+    // only), light columns, in the register's own order (the BUSINESS date,
+    // submitted stamp breaking ties).
+    type ScanRow = {
+      id: string;
+      arrival_source_id?: string | null;
+      po_id: string;
+      warehouse_id: string | null;
+      actual_site_id: string | null;
+      goods_received_at: string | null;
+      submitted_at: string | null;
+      /* `GRN date` is the GRN's CREATION stamp — the posting — and is never
+         inferred from the physical arrival date (§9.4). */
+      posted_at: string | null;
+      status: string | null;
+      grn_no: string | null;
+      do_number: string | null;
+      lines: WarehouseReceiptLine[] | null;
+      extra_lines: unknown;
+    };
+    const scan: ScanRow[] = [];
+    for (let from = 0; ; from += GRN_SCAN_PAGE) {
+      const { data, error } = await sb
+        .from("warehouse_receipts")
+        .select(
+          "id, po_id, arrival_source_id, warehouse_id, actual_site_id, goods_received_at, submitted_at, posted_at, status, grn_no, do_number, lines, extra_lines",
+        )
+        .in("status", differences ? ["draft", "submitted", "returned", "posted"] : ["posted", "voided"])
+        .order("goods_received_at", { ascending: false })
+        .order("submitted_at", { ascending: false })
+        .range(from, from + GRN_SCAN_PAGE - 1);
+      if (error) {
+        const m = mapPgError(error);
+        return c.json(m.body, m.status);
+      }
+      scan.push(...((data ?? []) as ScanRow[]));
+      if ((data ?? []).length < GRN_SCAN_PAGE) break;
+    }
+
+    if (differences) {
+      const notReceived = new Set<string>();
+      for (let start = 0; start < scan.length; start += 100) {
+        const ids = scan.slice(start, start + 100).map(row => row.id);
+        const results = await readAllPages<{ id: string; receipt_id: string }>((from, to) => sb
+          .from("receiving_unit_results").select("id, receipt_id")
+          .in("receipt_id", ids).eq("outcome", "not_received").order("id").range(from, to));
+        if (!("rows" in results)) return c.json({ message: "Receiving could not be opened" }, 500);
+        for (const result of results.rows) notReceived.add(result.receipt_id);
+      }
+      const included = scan.filter(row => {
+        if (["draft", "submitted", "returned"].includes(row.status ?? "")) return true;
+        if (row.status !== "posted") return false;
+        const totals = warehouseReceiptTotals(row.lines ?? []);
+        return totals.damaged > 0 || totals.wrongItem > 0 || notReceived.has(row.id)
+          || receivingExtraQty((Array.isArray(row.extra_lines) ? row.extra_lines : []) as ReceivingExtraLine[]) > 0;
+      });
+      scan.splice(0, scan.length, ...included);
+    }
+
+    const scanPoIds = [...new Set(scan.map((r) => r.po_id).filter(Boolean))];
+    const scanWhIds = [
+      ...new Set(
+        scan
+          .flatMap((r) => [r.warehouse_id, r.actual_site_id])
+          .filter((v): v is string => typeof v === "string" && v.length > 0),
+      ),
+    ];
+
+    let poRows: Array<Record<string, unknown>> = [];
+    let promiseRows: Array<Record<string, unknown>> = [];
+    let whRows: Array<{ id: string; name: string }> = [];
+    try {
+      [poRows, promiseRows, whRows] = await Promise.all([
+        readByIds<Record<string, unknown>>(scanPoIds, (ids) =>
+          sb
+            .from("purchase_orders")
+            .select("id, version, supplier_id, suppliers(name)")
+            .in("id", ids),
+        ),
+        // Only the fields the ONE reply arithmetic reads
+        // (`poSupplierDeliveryDateOf` — an evidenced answer about the exact
+        // PO version). Receiving re-derives nothing.
+        readByIds<Record<string, unknown>>(scanPoIds, (ids) =>
+          sb
+            .from("po_supplier_promises")
+            .select(
+              "po_id, kind, answer, about_date, new_date, po_version, channel, recipient, evidence, reported_by, reported_at, recorded_by, recorded_at",
+            )
+            .in("po_id", ids)
+            .order("recorded_at", { ascending: false }),
+        ),
+        readByIds<{ id: string; name: string }>(scanWhIds, (ids) =>
+          sb.from("warehouses").select("id, name").in("id", ids),
+        ),
+      ]);
+    } catch (error) {
+      const m = mapPgError(error as never);
+      return c.json(m.body, m.status);
+    }
+
+    const supplierByPo = new Map<string, string | null>();
+    const versionByPo = new Map<string, number>();
+    for (const p of poRows) {
+      const sup = p.suppliers as { name?: string } | null;
+      supplierByPo.set(p.id as string, sup?.name ?? null);
+      versionByPo.set(p.id as string, (p.version as number | null) ?? 1);
+    }
+    const promisesByPo = new Map<string, PoDatePromise[]>();
+    for (const row of promiseRows) {
+      const pid = row.po_id as string;
+      const hist = promisesByPo.get(pid) ?? [];
+      hist.push(row as unknown as PoDatePromise);
+      promisesByPo.set(pid, hist);
+    }
+    const supplierDateByPo = new Map<string, string | null>();
+    for (const pid of scanPoIds) {
+      supplierDateByPo.set(
+        pid,
+        poSupplierDeliveryDateOf(promisesByPo.get(pid), versionByPo.get(pid) ?? 1),
+      );
+    }
+    const whNames = new Map(whRows.map((w) => [w.id, w.name]));
+
+    const scanCatalog = await skuCategories(
+      sb,
+      scan.flatMap((r) => (r.lines ?? []).map((l) => l.sku)),
+    );
+
+    // The Product cell speaks the GRN PAPER's word — `product_skus.variant`,
+    // else the SKU — resolved for the complete authorised filter population.
+    const scanSkus = [
+      ...new Set(
+        scan.flatMap((r) => [
+          ...((Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[]).map(
+            (l) => l.sku,
+          ),
+          // Extra goods are their own rows in the expansion and need the same
+          // item word and category as an ordered line.
+          ...((Array.isArray(r.extra_lines) ? r.extra_lines : []) as Array<{
+            sku?: string;
+          }>)
+            .map((x) => x.sku)
+            .filter((v): v is string => typeof v === "string" && v.length > 0),
+        ]),
+      ),
+    ];
+    const productWordBySku = new Map<string, string>();
+    if (scanSkus.length > 0) {
+      const skuRows = await readByIds<{ sku: string; variant: string | null }>(scanSkus, ids =>
+        sb.from("product_skus").select("sku, variant").in("sku", ids));
+      for (const s of (skuRows ?? []) as Array<{ sku: string; variant: string | null }>)
+        if (s.variant) productWordBySku.set(s.sku, s.variant);
+    }
+
+    // Source references are filterable facts, so resolve them across the full
+    // authorised scan. Unit results and signed evidence remain page-only.
+    const scanLineIds = [
+      ...new Set(
+        scan.flatMap((r) =>
+          ((Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[]).map(
+            (l) => l.id,
+          ),
+        ),
+      ),
+    ].filter((id) => typeof id === "string" && id.length > 0);
+
+    /** `po_line_id` → the governed reference numbers of that line's sources. */
+    const refsByLine = new Map<string, string[]>();
+    if (scanLineIds.length > 0) {
+      const poLines = await readByIds<{
+        id: string;
+        demand_id: string | null;
+      }>(scanLineIds, (ids) =>
+        sb
+          .from("purchase_order_lines")
+          .select("id, demand_id")
+          .in("id", ids),
+      );
+      const sources = await readByIds<{ po_line_id: string; so: number | null }>(
+        scanLineIds,
+        (ids) =>
+          sb
+            .from("po_line_sources")
+            .select("po_line_id, so")
+            .in("po_line_id", ids),
+      );
+      for (const src of sources) {
+        if (src.so == null) continue;
+        const list = refsByLine.get(src.po_line_id) ?? [];
+        const reference = `SO-${Number(src.so)}`;
+        if (!list.includes(reference)) list.push(reference);
+        refsByLine.set(src.po_line_id, list);
+      }
+      // The Manual Purchase Request number (owner ruling 2026-09-18) — the
+      // request's own `MPR-YYYYMMDD-RRRR`, reached through the line's demand.
+      const demandIds = [
+        ...new Set(
+          poLines
+            .map((l) => l.demand_id)
+            .filter((v): v is string => typeof v === "string" && v.length > 0),
+        ),
+      ];
+      const requestByDemand = new Map<string, string>();
+      if (demandIds.length > 0) {
+        const demands = await readByIds<{ id: string; request_id: string | null }>(
+          demandIds,
+          (ids) =>
+            sb.from("purchase_demands").select("id, request_id").in("id", ids),
+        );
+        const requestIds = [
+          ...new Set(
+            demands
+              .map((d) => d.request_id)
+              .filter((v): v is string => typeof v === "string" && v.length > 0),
+          ),
+        ];
+        const reqNoById = new Map<string, string>();
+        if (requestIds.length > 0) {
+          const requests = await readByIds<{ id: string; req_no: string | null }>(
+            requestIds,
+            (ids) =>
+              sb.from("purchase_requests").select("id, req_no").in("id", ids),
+          );
+          for (const r of requests)
+            if (r.req_no) reqNoById.set(r.id, r.req_no);
+        }
+        for (const d of demands)
+          if (d.request_id && reqNoById.has(d.request_id))
+            requestByDemand.set(d.id, reqNoById.get(d.request_id)!);
+      }
+      for (const line of poLines) {
+        const mpr = line.demand_id ? requestByDemand.get(line.demand_id) : null;
+        if (!mpr) continue;
+        const list = refsByLine.get(line.id) ?? [];
+        if (!list.includes(mpr)) list.push(mpr);
+        refsByLine.set(line.id, list);
+      }
+    }
+
+    /* A receipt that came through an arrival source (0490) has NO purchase
+       order at all — the check constraint allows exactly one of the two — so
+       its own document number IS the reference: `RO-…` for a repair return,
+       the claim, case or delivery paper for the others. */
+    const arrivalIds = [
+      ...new Set(
+        scan
+          .map((r) => r.arrival_source_id as string | null | undefined)
+          .filter((v): v is string => typeof v === "string" && v.length > 0),
+      ),
+    ];
+    const arrivalNoById = new Map<string, string>();
+    if (arrivalIds.length > 0) {
+      try {
+        const arrivals = await readByIds<{ id: string; source_no: string | null }>(
+          arrivalIds,
+          (ids) =>
+            sb.from("arrival_sources").select("id, source_no").in("id", ids),
+        );
+        for (const a of arrivals)
+          if (a.source_no) arrivalNoById.set(a.id, a.source_no);
+      } catch (error) {
+        // A failed source read cannot become a false empty source-filter answer.
+        const mapped = mapPgError(error as never);
+        return c.json(mapped.body, mapped.status);
+      }
+    }
+
+    const factRows: GrnRegisterFactRow[] = scan.map((r) => {
+      const supplierName = supplierByPo.get(r.po_id) ?? null;
+      const totals = warehouseReceiptTotals(r.lines ?? []);
+      const number = receivingDisplayNo({ id: r.id, status: r.status, grn_no: r.grn_no, goods_received_at: r.goods_received_at ?? undefined, submitted_at: r.submitted_at ?? undefined });
+      const source = [...new Set([
+        ...(r.arrival_source_id && arrivalNoById.has(r.arrival_source_id) ? [arrivalNoById.get(r.arrival_source_id)!] : []),
+        ...(r.lines ?? []).flatMap(line => refsByLine.get(line.id) ?? []),
+      ])].map(ref => documentDisplayNumber(ref)).join(" · ");
+      const labels = [...new Set((r.lines ?? []).map(line => productWordBySku.get(line.sku) ?? line.sku))];
+      const actualSite = (r.actual_site_id ? whNames.get(r.actual_site_id) : null) ?? (r.warehouse_id ? whNames.get(r.warehouse_id) : null) ?? "";
+      const extra = receivingExtraQty((Array.isArray(r.extra_lines) ? r.extra_lines : []) as ReceivingExtraLine[]);
+      return {
+        columnFacts: {
+          grnDate: { text: businessDay(r.posted_at) ?? "", date: businessDay(r.posted_at) },
+          grn: { text: number }, source: { text: source }, po: { text: documentDisplayNumber(r.po_id ?? "") },
+          supplier: { text: supplierName ?? "" }, deliverTo: { text: r.warehouse_id ? whNames.get(r.warehouse_id) ?? "" : "" },
+          actualSite: { text: actualSite }, supplierConfirmedDeliveryDate: { text: supplierDateByPo.get(r.po_id) ?? "Not confirmed", date: supplierDateByPo.get(r.po_id) ?? null },
+          receivedAt: { text: r.goods_received_at ?? "", date: r.goods_received_at }, doNo: { text: r.do_number ?? "" },
+          items: { text: labels.join(" · ") }, receivedQty: { text: String(totals.received), number: totals.received },
+          damagedQty: { text: String(totals.damaged), number: totals.damaged }, wrongQty: { text: String(totals.wrongItem), number: totals.wrongItem },
+          extraQty: { text: String(extra), number: extra },
+        },
+        id: r.id,
+        categories: receiptCategoryWords(r.lines, scanCatalog),
+        supplierName,
+        siteName:
+          (r.actual_site_id ? whNames.get(r.actual_site_id) : null) ??
+          (r.warehouse_id ? whNames.get(r.warehouse_id) : null) ??
+          null,
+        grnDateIso: businessDay(r.posted_at),
+        // `Received with` reads the receipt's OWN stored quantities through the
+        // shared totals — the register never re-counts a jsonb line itself.
+        damaged: totals.damaged > 0,
+        wrongItem: totals.wrongItem > 0,
+        extra:
+          receivingExtraQty(
+            (Array.isArray(r.extra_lines)
+              ? r.extra_lines
+              : []) as ReceivingExtraLine[],
+          ) > 0,
+        cancelled: r.status === "voided",
+        // The Search box's own promise: GRN, PO, supplier or DO number.
+        searchText: [
+          r.grn_no ?? "",
+          receivingDisplayNo({
+            id: r.id,
+            status: r.status,
+            grn_no: r.grn_no,
+            goods_received_at: r.goods_received_at ?? undefined,
+            submitted_at: r.submitted_at ?? undefined,
+          }),
+          r.po_id,
+          documentDisplayNumber(r.po_id ?? ""),
+          r.do_number ?? "",
+          supplierName ?? "",
+        ].join(" "),
+      };
+    });
+
+    const view = buildGrnRegisterView(factRows, sel, exportAll ? 0 : offset, exportAll ? Math.max(1, factRows.length) : limit);
+    // Dropdown choices cover the complete authorised population narrowed by the
+    // existing rail/search. Current column choices remain available to clear.
+    const choiceIds = new Set(buildGrnRegisterView(factRows, { ...sel, columns: null }, 0, Math.max(1, factRows.length)).pageIds);
+    const columnValues = Object.fromEntries([...GRN_COLUMN_KEYS].map(key => [key,
+      [...new Set(factRows.filter(row => choiceIds.has(row.id)).map(row => row.columnFacts?.[key]?.text ?? ""))].sort((a, b) => a.localeCompare(b, "en", { numeric: true })),
+    ]));
+
+    // The page itself — full records for exactly these ids, in the scan's
+    // order (a `.in(…)` read has no order of its own).
+    let pageRows: ReceiptRow[] = [];
+    try {
+      pageRows = await readReceipts((select) =>
+        readByIds<ReceiptRow>(view.pageIds, (ids) =>
+          sb.from("warehouse_receipts").select(select).in("id", ids) as unknown as
+            PromiseLike<{ data: ReceiptRow[] | null; error: unknown }>,
+        ),
+      );
+    } catch (error) {
+      const m = mapPgError(error as never);
+      return c.json(m.body, m.status);
+    }
+    const byId = new Map(pageRows.map((r) => [r.id as string, r]));
+    const ordered = view.pageIds
+      .map((id) => byId.get(id))
+      .filter((r): r is ReceiptRow => r != null);
+
+    const pageUserIds = [
+      ...new Set(
+        ordered
+          .flatMap((r) => [
+            r.submitted_by,
+            r.reviewed_by,
+            r.posted_by,
+            r.posted_duty_holder,
+            r.posted_duty_cover,
+            r.void_by,
+          ])
+          .filter((v): v is string => typeof v === "string" && v.length > 0),
+      ),
+    ];
+    const userNames = new Map<string, string>();
+    if (!exportAll && pageUserIds.length > 0) {
+      const { data: users } = await sb
+        .from("app_users")
+        .select("id, name")
+        .in("id", pageUserIds);
+      for (const u of users ?? [])
+        userNames.set(u.id as string, u.name as string);
+    }
+
+    /** `receipt id` → `po_line_id` → the Unit IDs THIS receiving answered. */
+    const unitsByReceiptLine = new Map<string, Map<string, string[]>>();
+    /* A FAILED read is not an empty answer. When the Units could not be read
+       the register says so on the cell instead of printing `Counted stock`
+       over goods that are individually tracked (COPY-STANDARD). */
+    let unitReadFailed = false;
+    if (!exportAll && view.pageIds.length > 0) {
+      try {
+        const results = await readByIds<{
+          receipt_id: string;
+          stock_item_id: string;
+          unit_code: string;
+        }>(view.pageIds, (ids) =>
+          sb
+            .from("receiving_unit_results")
+            .select("receipt_id, stock_item_id, unit_code")
+            .in("receipt_id", ids)
+            .order("unit_code"),
+        );
+        const itemIds = [...new Set(results.map((u) => u.stock_item_id))];
+        const lineByItem = new Map<string, string>();
+        if (itemIds.length > 0) {
+          const items = await readByIds<{
+            id: string;
+            po_line_id: string | null;
+            identity_scope: string | null;
+          }>(itemIds, (ids) =>
+            sb
+              .from("ops_stock_items")
+              .select("id, po_line_id, identity_scope")
+              .in("id", ids),
+          );
+          for (const item of items) {
+            // A quantity line's register row carries a TECHNICAL key and is
+            // never shown as a Unit ID (§9.4, 0453). Only exact-unit identity
+            // reaches the screen.
+            if (item.po_line_id && item.identity_scope !== "quantity")
+              lineByItem.set(item.id, item.po_line_id);
+          }
+        }
+        for (const u of results) {
+          const lineId = lineByItem.get(u.stock_item_id);
+          if (!lineId) continue;
+          const byLine =
+            unitsByReceiptLine.get(u.receipt_id) ?? new Map<string, string[]>();
+          const codes = byLine.get(lineId) ?? [];
+          if (!codes.includes(u.unit_code)) codes.push(u.unit_code);
+          byLine.set(lineId, codes);
+          unitsByReceiptLine.set(u.receipt_id, byLine);
+        }
+      } catch (e) {
+        console.error("reading receiving unit results failed (non-fatal):", e);
+        unitReadFailed = true;
+      }
+    }
+
+    /* The expansion's `Category` and `Items` come from the SAME two reads the
+       official GRN object uses — the catalog ladder and the GRN paper's own
+       item word — so the register and the document can never disagree. */
+    const lineInfo: Record<string, { description: string | null; category: string }> =
+      {};
+    const pageSkus = new Set(ordered.flatMap(r => [
+      ...(Array.isArray(r.lines) ? r.lines as WarehouseReceiptLine[] : []).map(line => line.sku),
+      ...(Array.isArray(r.extra_lines) ? r.extra_lines as ReceivingExtraLine[] : []).map(line => line.sku),
+    ]));
+    for (const sku of pageSkus) {
+      lineInfo[sku] = {
+        description: productWordBySku.get(sku) ?? null,
+        // 0601 · the Catalog's category, or `Not recorded` — never a guess.
+        category: catalogCategoryWordOf(sku, scanCatalog.get(sku) ?? null),
+      };
+    }
+
+    // Signed DOs — page rows only, best-effort exactly as the legacy list.
+    const doPaths = ordered
+      .map((r) => r.do_file_path as string | null)
+      .filter((p): p is string => typeof p === "string" && p.length > 0);
+    const doUrls = new Map<string, string>();
+    if (!exportAll && doPaths.length > 0) {
+      try {
+        const admin = adminClient(c.env);
+        const { data: signed } = await admin.storage
+          .from("delivery-orders")
+          .createSignedUrls(doPaths, SIGNED_URL_TTL_SECONDS);
+        for (const s of signed ?? [])
+          if (s.path && s.signedUrl) doUrls.set(s.path, s.signedUrl);
+      } catch (e) {
+        console.error("signing receipt DO urls failed (non-fatal):", e);
+      }
+    }
+
+    const { count: waiting } = await sb
+      .from("warehouse_receipts")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "submitted");
+
+    return c.json({
+      receipts: ordered.map((r) => {
+        const lines = (Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[];
+        return {
+          ...r,
+          categories: receiptCategoryWords(lines, scanCatalog),
+          warehouse_name: whNames.get(r.warehouse_id as string) ?? null,
+          supplier_name: supplierByPo.get(r.po_id as string) ?? null,
+          supplier_delivery_date: supplierDateByPo.get(r.po_id as string) ?? null,
+          product_labels: [
+            ...new Set(lines.map((l) => productWordBySku.get(l.sku) ?? l.sku)),
+          ],
+          /* `GRN Date` is CREATION; `Goods Received Date` is physical receipt.
+             Neither is ever inferred from the other (§9.4). */
+          grn_date: (r.posted_at as string | null) ?? null,
+          /* The receipt's ACTUAL linked documents. An arrival-source receipt
+             carries its own number and no purchase order; a PO receipt carries
+             its lines' SO and MPR numbers. Nothing stands in for a missing
+             one. */
+          source_refs: [
+            ...new Set([
+              ...(typeof r.arrival_source_id === "string"
+                ? [arrivalNoById.get(r.arrival_source_id)].filter(
+                    (v): v is string => typeof v === "string",
+                  )
+                : []),
+              ...lines.flatMap((l) => refsByLine.get(l.id) ?? []),
+            ]),
+          ],
+          unit_ids_by_line: exportAll || unitReadFailed
+            ? null
+            : Object.fromEntries(
+                unitsByReceiptLine.get(r.id as string) ??
+                  new Map<string, string[]>(),
+              ),
+          submitted_by_name: r.submitted_by
+            ? (userNames.get(r.submitted_by as string) ?? null)
+            : null,
+          reviewed_by_name: r.reviewed_by
+            ? (userNames.get(r.reviewed_by as string) ?? null)
+            : null,
+          posted_by_name: r.posted_by
+            ? (userNames.get(r.posted_by as string) ?? null)
+            : null,
+          actual_site_name: r.actual_site_id
+            ? (whNames.get(r.actual_site_id as string) ?? null)
+            : null,
+          posted_duty_holder_name: r.posted_duty_holder
+            ? (userNames.get(r.posted_duty_holder as string) ?? null)
+            : null,
+          posted_duty_cover_name: r.posted_duty_cover
+            ? (userNames.get(r.posted_duty_cover as string) ?? null)
+            : null,
+          void_by_name: r.void_by
+            ? (userNames.get(r.void_by as string) ?? null)
+            : null,
+          do_file_url: r.do_file_path
+            ? (doUrls.get(r.do_file_path as string) ?? null)
+            : null,
+          summary: warehouseReceiptSummary(lines),
+          opens_claims: warehouseReceiptOpensClaims(lines),
+        };
+      }),
+      page: { offset: exportAll ? 0 : offset, limit: exportAll ? view.total : limit, total: view.total },
+      facets: view.facets,
+      column_values: columnValues,
+      /* The expansion's item words and governed categories, resolved once for
+         the page — the same two facts the official GRN document prints. */
+      line_info: lineInfo,
+      counts: { waiting: waiting ?? 0 },
+    });
+  }
 
   const raw = (c.req.query("status") ?? "submitted").toLowerCase();
   const status = (
@@ -67,26 +807,41 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
     ? raw
     : "submitted";
 
-  let q = sb
-    .from("warehouse_receipts")
-    .select(
-      // C2 widened this: `submitted_from` · `goods_received_at` · `posted_*`
-      // are what the Goods Received register reads, and they are 0314/0315
-      // columns this select predates. `reviewed_*` stays until the
-      // reader-rename slice drops it (0314's own discipline).
-      "id, po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, submitted_by, submitted_at, posted_by, posted_at, reviewed_by, reviewed_at, return_reason",
-    )
-    // The register is a HISTORY, so it sorts by the BUSINESS date — when the
-    // goods physically arrived — not by when somebody keyed them in. The
-    // submitted stamp only breaks ties.
-    .order("goods_received_at", { ascending: false })
-    .order("submitted_at", { ascending: false })
-    .limit(DEFAULT_LIMIT);
-  if (status !== "all") q = q.eq("status", status);
+  // C2 widened this select: `submitted_from` · `goods_received_at` ·
+  // `posted_*` are what the Goods Received register reads, and they are
+  // 0314/0315 columns it predates. `reviewed_*` stays until the reader-rename
+  // slice drops it (0314's own discipline). 0426 widened it again: grn_no ·
+  // actual_site_id · arrival_evidence · extra_lines · the posted
+  // duty-evidence trio · void_* are what the Register and the GRN record read.
+  const listRead = async (select: string) => {
+    let q = sb
+      .from("warehouse_receipts")
+      .select(select)
+      // The register is a HISTORY, so it sorts by the BUSINESS date — when
+      // the goods physically arrived — not by when somebody keyed them in.
+      // The submitted stamp only breaks ties.
+      .order("goods_received_at", { ascending: false })
+      .order("submitted_at", { ascending: false })
+      .limit(
+        Math.min(
+          Math.max(1, Math.floor(Number(c.req.query("limit")) || DEFAULT_LIMIT)),
+          MAX_LIMIT,
+        ),
+      );
+    if (status !== "all") q = q.eq("status", status);
+    const res = (await q) as unknown as {
+      data: unknown[] | null;
+      error: unknown;
+    };
+    if (res.error) throw res.error;
+    return res.data;
+  };
 
-  const { data, error } = await q;
-  if (error) {
-    const m = mapPgError(error);
+  let data: unknown[] | null = null;
+  try {
+    data = await readReceipts(listRead);
+  } catch (err) {
+    const m = mapPgError(err as never);
     return c.json(m.body, m.status);
   }
   const rows = (data ?? []) as ReceiptRow[];
@@ -99,13 +854,26 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
     .eq("status", "submitted");
 
   const warehouseIds = [
-    ...new Set(rows.map((r) => r.warehouse_id as string).filter(Boolean)),
+    ...new Set(
+      rows
+        .flatMap((r) => [r.warehouse_id, r.actual_site_id])
+        .filter((v): v is string => typeof v === "string" && v.length > 0),
+    ),
   ];
-  const poIds = [...new Set(rows.map((r) => r.po_id as string).filter(Boolean))];
+  const poIds = [
+    ...new Set(rows.map((r) => r.po_id as string).filter(Boolean)),
+  ];
   const userIds = [
     ...new Set(
       rows
-        .flatMap((r) => [r.submitted_by, r.reviewed_by, r.posted_by])
+        .flatMap((r) => [
+          r.submitted_by,
+          r.reviewed_by,
+          r.posted_by,
+          r.posted_duty_holder,
+          r.posted_duty_cover,
+          r.void_by,
+        ])
         .filter((v): v is string => typeof v === "string" && v.length > 0),
     ),
   ];
@@ -134,17 +902,53 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
     }
   }
 
+  const arrivalIds = [
+    ...new Set(
+      rows
+        .map((r) => r.arrival_source_id)
+        .filter((v): v is string => typeof v === "string"),
+    ),
+  ];
+  const arrivalNames = new Map<
+    string,
+    { source_no: string; party_name: string | null }
+  >();
+  if (arrivalIds.length) {
+    const { data: sources, error: sourceError } = await sb
+      .from("arrival_sources")
+      .select("id,source_no,stock_operating_parties(name)")
+      .in("id", arrivalIds);
+    if (sourceError) {
+      const m = mapPgError(sourceError);
+      return c.json(m.body, m.status);
+    }
+    for (const source of sources ?? [])
+      arrivalNames.set(source.id, {
+        source_no: source.source_no,
+        party_name:
+          (source.stock_operating_parties as unknown as { name: string } | null)
+            ?.name ?? null,
+      });
+  }
+
   /**
    * The signed DO — a short-lived URL per row, batch-signed exactly the way
    * `supplier-claims` signs its claim photos. The signed DO IS the record's
    * evidence, so a register that cannot open it is a filing cabinet with the
    * paper removed. Signed only for the rows this page returns.
    */
-  const doPaths = rows
-    .map((r) => r.do_file_path as string | null)
-    .filter((p): p is string => typeof p === "string" && p.length > 0);
+
   const doUrls = new Map<string, string>();
-  if (doPaths.length > 0) {
+  for (const bucket of ["delivery-orders", "arrival-proofs"]) {
+    const doPaths = rows
+      .filter(
+        (r) =>
+          (r.arrival_source_id ? "arrival-proofs" : "delivery-orders") ===
+          bucket,
+      )
+      .map((r) => r.do_file_path)
+      .filter((p): p is string => typeof p === "string" && p.length > 0);
+    if (!doPaths.length) continue;
     // Best-effort, and deliberately so: the register's job is to LIST the
     // records. If storage refuses to sign, the row still appears and its
     // record reads `Not on file` — a queue that 500s because one attachment
@@ -152,7 +956,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
     try {
       const admin = adminClient(c.env);
       const { data: signed } = await admin.storage
-        .from("delivery-orders")
+        .from(bucket)
         .createSignedUrls(doPaths, SIGNED_URL_TTL_SECONDS);
       for (const s of signed ?? [])
         if (s.path && s.signedUrl) doUrls.set(s.path, s.signedUrl);
@@ -171,11 +975,32 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       userNames.set(u.id as string, u.name as string);
   }
 
+  // The rail's CATEGORY facet (owner correction 2026-09-06): the catalog's
+  // answer through the ONE shared reader, folded by the ONE shared ladder —
+  // Receiving never derives its own category from SKU text.
+  const allSkus = rows.flatMap((r) =>
+    ((Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[]).map(
+      (l) => l.sku,
+    ),
+  );
+  const catalogCategories = await skuCategories(sb, allSkus);
+
   return c.json({
     receipts: rows.map((r) => {
-      const lines = (Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[];
+      const lines = (
+        Array.isArray(r.lines) ? r.lines : []
+      ) as WarehouseReceiptLine[];
       return {
         ...r,
+        source_no:
+          arrivalNames.get(r.arrival_source_id as string)?.source_no ??
+          r.po_id ??
+          null,
+        source_party_name:
+          arrivalNames.get(r.arrival_source_id as string)?.party_name ??
+          supplierByPo.get(r.po_id as string) ??
+          null,
+        categories: receiptCategoryWords(lines, catalogCategories),
         warehouse_name: warehouseNames.get(r.warehouse_id as string) ?? null,
         supplier_name: supplierByPo.get(r.po_id as string) ?? null,
         submitted_by_name: r.submitted_by
@@ -186,6 +1011,18 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
           : null,
         posted_by_name: r.posted_by
           ? (userNames.get(r.posted_by as string) ?? null)
+          : null,
+        actual_site_name: r.actual_site_id
+          ? (warehouseNames.get(r.actual_site_id as string) ?? null)
+          : null,
+        posted_duty_holder_name: r.posted_duty_holder
+          ? (userNames.get(r.posted_duty_holder as string) ?? null)
+          : null,
+        posted_duty_cover_name: r.posted_duty_cover
+          ? (userNames.get(r.posted_duty_cover as string) ?? null)
+          : null,
+        void_by_name: r.void_by
+          ? (userNames.get(r.void_by as string) ?? null)
           : null,
         do_file_url: r.do_file_path
           ? (doUrls.get(r.do_file_path as string) ?? null)
@@ -211,9 +1048,435 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
  * BACK, with a reason, to the only people who can look at the goods again.
  */
 warehouseReceiptsRouter.post("/:id/check-in", requireOperation, async (c) => {
+  // The optional body carries only the Actual Site — everything counted was
+  // decided by the person who held the pallet. Absent body = original flow.
+  // Validated as a UUID here, so a malformed value is the caller's 422 and
+  // never Postgres's 22P02 dressed as a 500.
+  let actualSiteId: string | null = null;
+  try {
+    const body = (await c.req.json()) as { actualSiteId?: unknown };
+    if (typeof body?.actualSiteId === "string") {
+      const parsed = z.string().uuid().safeParse(body.actualSiteId);
+      if (!parsed.success) {
+        return c.json(
+          {
+            error: "invalid_input",
+            code: "invalid_param",
+            message: "actualSiteId must be a warehouse id",
+            field: "actualSiteId",
+          },
+          422,
+        );
+      }
+      actualSiteId = parsed.data;
+    }
+  } catch {
+    /* no body — fine */
+  }
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("warehouse_receipt_check_in", {
     p_receipt_id: c.req.param("id"),
+    p_actual_site_id: actualSiteId,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data ?? {});
+});
+
+/**
+ * GET /duty — who may save a Receiving today (0425 `receiving_actor_context`).
+ *
+ * The page consumes the RESOLVED owner; it never reads a rota or computes an
+ * offset (ERP-ARCHITECTURE Law F.1). Names ride along so the chip can speak.
+ */
+warehouseReceiptsRouter.get("/duty", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("receiving_actor_context");
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  const ctx = (data ?? {}) as Record<string, unknown>;
+  const ids = [ctx.normal_user_id, ctx.acting_user_id].filter(
+    (v): v is string => typeof v === "string" && v.length > 0,
+  );
+  const names = new Map<string, string>();
+  if (ids.length > 0) {
+    const { data: users } = await sb
+      .from("app_users")
+      .select("id, name")
+      .in("id", ids);
+    for (const u of users ?? []) names.set(u.id as string, u.name as string);
+  }
+  return c.json({
+    ...ctx,
+    normal_user_name: ctx.normal_user_id
+      ? (names.get(ctx.normal_user_id as string) ?? null)
+      : null,
+    acting_user_name: ctx.acting_user_id
+      ? (names.get(ctx.acting_user_id as string) ?? null)
+      : null,
+  });
+});
+
+/**
+ * GET /receiver?site= — who the GRN will name as `Received by` if the
+ * signed-in person saves at this Site (0601 `receiving_receiver_preview`, the
+ * SAME rule the posting trigger stamps). The form draws it as a grey automatic
+ * fact. A database without 0601 answers no receiver, and the form draws none.
+ */
+warehouseReceiptsRouter.get("/receiver", requireOperation, async (c) => {
+  const site = z.string().uuid().safeParse(c.req.query("site"));
+  if (!site.success) {
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: "site must be a warehouse id", field: "site" },
+      422,
+    );
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("receiving_receiver_preview", { p_site_id: site.data });
+  if (error) {
+    if ((error as { code?: string }).code === "PGRST202") return c.json({ receiver: null });
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  const r = (data ?? null) as { kind?: "company" | "staff"; name?: string | null } | null;
+  return c.json({
+    receiver: r?.kind ? { kind: r.kind, name: r.name ?? null } : null,
+  });
+});
+
+/**
+ * GET /:id — one Receiving Session / GRN record: the row, its per-Unit
+ * results and its append-only events, names resolved.
+ */
+warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const id = c.req.param("id");
+  let row: Record<string, unknown> | null = null;
+  let error: unknown = null;
+  try {
+    row = await readReceipts(async (select) => {
+      const res = (await sb
+        .from("warehouse_receipts")
+        .select(select)
+        .eq("id", id)
+        .maybeSingle()) as unknown as {
+        data: Record<string, unknown> | null;
+        error: unknown;
+      };
+      if (res.error) throw res.error;
+      return res.data;
+    });
+  } catch (e) {
+    error = e;
+  }
+  if (error) {
+    const m = mapPgError(error as never);
+    return c.json(m.body, m.status);
+  }
+  if (!row) return c.json({ error: "receipt not found" }, 404);
+  const r = row as ReceiptRow;
+
+  // Related documents are read through this actor's RLS scope and exact source IDs.
+  // A failed relationship read is unavailable, never a false empty result.
+  const relatedRead = (async () => {
+    const all = async <T>(page: Parameters<typeof readAllPages>[0]): Promise<T[]> => {
+      const result = await readAllPages<T>(page);
+      if ("rows" in result) return result.rows;
+      throw new Error("Related records could not be read completely");
+    };
+    try {
+      const claims = await all<{ id: string; claim_no: string | null }>((from, to) => sb
+        .from("supplier_claims").select("id, claim_no")
+        .eq("warehouse_receipt_id", id).order("id").range(from, to));
+      const returns = await all<{ id: string; pr_no: string }>((from, to) => sb
+        .from("purchase_returns").select("id, pr_no")
+        .eq("warehouse_receipt_id", id).order("id").range(from, to));
+      for (let offset = 0; offset < claims.length; offset += 100) {
+        returns.push(...await all<{ id: string; pr_no: string }>((from, to) => sb
+          .from("purchase_returns").select("id, pr_no")
+          .in("supplier_claim_id", claims.slice(offset, offset + 100).map(claim => claim.id))
+          .order("id").range(from, to)));
+      }
+      return { claims, returns: [...new Map(returns.map(record => [record.id, record])).values()] };
+    } catch { return null; }
+  })();
+
+  const [unitsRead, eventsRead, poRead] = await Promise.all([
+    sb
+      .from("receiving_unit_results")
+      .select("stock_item_id, unit_code, outcome, issue_kind, note")
+      .eq("receipt_id", id)
+      .order("unit_code"),
+    sb
+      .from("receiving_events")
+      .select("id, receipt_id, event, actor_id, event_at, payload")
+      .eq("receipt_id", id)
+      .order("event_at", { ascending: false }),
+    sb
+      .from("purchase_orders")
+      .select(
+        "id, supplier_id, warehouse_id, destination_id, is_consignment, suppliers(name), purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty)",
+      )
+      .eq("id", r.po_id as string)
+      .maybeSingle(),
+  ]);
+
+  // A missing read must never produce a seemingly complete formal receipt.
+  const readError = unitsRead.error ?? eventsRead.error ?? poRead.error;
+  if (readError) {
+    const m = mapPgError(readError);
+    return c.json(m.body, m.status);
+  }
+  const { data: units } = unitsRead;
+  const { data: evs } = eventsRead;
+  const { data: po } = poRead;
+  const itemIds = [...new Set((units ?? []).map((u) => u.stock_item_id as string))];
+  let items: Array<{ id: string; po_line_id: string | null; identity_scope: string | null }> = [];
+  try {
+    items = await readByIds(itemIds, (ids) =>
+      sb.from("ops_stock_items").select("id, po_line_id, identity_scope").in("id", ids),
+    );
+  } catch (e) {
+    const m = mapPgError(e as never);
+    return c.json(m.body, m.status);
+  }
+  const itemById = new Map(items.map((item) => [item.id, item]));
+  const receiptLineIds = new Set(
+    (Array.isArray(r.lines) ? r.lines : []).map((line: WarehouseReceiptLine) => line.id),
+  );
+  const unitResults = (units ?? []).flatMap((unit) => {
+    const item = itemById.get(unit.stock_item_id);
+    // Quantity-managed stock has a technical key, not an operator Unit ID.
+    if (item?.identity_scope === "quantity") return [];
+    return [{
+      ...unit,
+      po_line_id: item?.po_line_id && receiptLineIds.has(item.po_line_id)
+        ? item.po_line_id : null,
+    }];
+  });
+
+  const userIds = [
+    ...new Set(
+      [
+        r.submitted_by,
+        r.posted_by,
+        r.reviewed_by,
+        r.posted_duty_holder,
+        r.posted_duty_cover,
+        r.void_by,
+        ...((evs ?? []) as Array<Record<string, unknown>>).map(
+          (e) => e.actor_id,
+        ),
+      ].filter((v): v is string => typeof v === "string" && v.length > 0),
+    ),
+  ];
+  const userNames = new Map<string, string>();
+  if (userIds.length > 0) {
+    const { data: users } = await sb
+      .from("app_users")
+      .select("id, name")
+      .in("id", userIds);
+    for (const u of users ?? [])
+      userNames.set(u.id as string, u.name as string);
+  }
+  const whIds = [r.warehouse_id, r.actual_site_id].filter(
+    (v): v is string => typeof v === "string" && v.length > 0,
+  );
+  const whNames = new Map<string, string>();
+  if (whIds.length > 0) {
+    const { data: whs } = await sb
+      .from("warehouses")
+      .select("id, name")
+      .in("id", whIds);
+    for (const w of whs ?? []) whNames.set(w.id as string, w.name as string);
+  }
+  // The formal GRN document's product facts: the human description (the same
+  // `product_skus.variant` lookup the DO print path uses) and the governed
+  // category word through the ONE shared ladder — never a SKU-text rule of
+  // Receiving's own.
+  const receiptLines = (
+    Array.isArray(r.lines) ? r.lines : []
+  ) as WarehouseReceiptLine[];
+  const extraLines = (
+    Array.isArray(r.extra_lines) ? r.extra_lines : []
+  ) as Array<{
+    sku: string;
+  }>;
+  const docSkus = [
+    ...new Set([
+      ...receiptLines.map((l) => l.sku),
+      ...extraLines.map((x) => x.sku),
+    ]),
+  ];
+  const lineInfo: Record<
+    string,
+    { description: string | null; category: string }
+  > = {};
+  if (docSkus.length > 0) {
+    const catalog = await skuCategories(sb, docSkus);
+    const descriptions = new Map<string, string>();
+    const { data: skuRows } = await sb
+      .from("product_skus")
+      .select("sku, variant")
+      .in("sku", docSkus);
+    for (const row2 of (skuRows ?? []) as Array<{
+      sku: string;
+      variant: string | null;
+    }>) {
+      if (row2.variant) descriptions.set(row2.sku, row2.variant);
+    }
+    for (const sku of docSkus) {
+      lineInfo[sku] = {
+        description: descriptions.get(sku) ?? null,
+        // 0601 · the Catalog's category, or `Not recorded` — never a guess
+        // (owner ruling 2026-09-28: the SMOKE item printed `Other goods`).
+        category: catalogCategoryWordOf(sku, catalog.get(sku) ?? null),
+      };
+    }
+  }
+
+  let doUrl: string | null = null;
+  if (typeof r.do_file_path === "string" && r.do_file_path.length > 0) {
+    try {
+      const admin = adminClient(c.env);
+      const { data: signed } = await admin.storage
+        .from(r.arrival_source_id ? "arrival-proofs" : "delivery-orders")
+        .createSignedUrl(r.do_file_path, SIGNED_URL_TTL_SECONDS);
+      doUrl = signed?.signedUrl ?? null;
+    } catch (e) {
+      console.error("signing receipt DO url failed (non-fatal):", e);
+    }
+  }
+  /* Arrival evidence was stored (0426) but never viewable — sign every file
+     so the record can be RE-SEEN, not only counted (unified card §9). */
+  let arrivalEvidence: Array<{ path: string; kind: string; url: string | null }> =
+    [];
+  if (Array.isArray(r.arrival_evidence) && r.arrival_evidence.length > 0) {
+    const files = (r.arrival_evidence as Array<{ path?: string; kind?: string }>)
+      .filter((f) => typeof f?.path === "string" && f.path.length > 0)
+      .map((f) => ({ path: f.path as string, kind: f.kind === "video" ? "video" : "photo" }));
+    try {
+      const admin = adminClient(c.env);
+      const { data: signedFiles } = await admin.storage
+        .from(r.arrival_source_id ? "arrival-proofs" : "delivery-orders")
+        .createSignedUrls(files.map((f) => f.path), SIGNED_URL_TTL_SECONDS);
+      arrivalEvidence = files.map((f, i) => ({
+        ...f,
+        url: signedFiles?.[i]?.signedUrl ?? null,
+      }));
+    } catch (e) {
+      console.error("signing arrival evidence failed (non-fatal):", e);
+      arrivalEvidence = files.map((f) => ({ ...f, url: null }));
+    }
+  }
+  const name = (v: unknown) =>
+    typeof v === "string" && v.length > 0 ? (userNames.get(v) ?? null) : null;
+  const sup = (po as Record<string, unknown> | null)?.suppliers as {
+    name?: string;
+  } | null;
+  return c.json({
+    receipt: {
+      ...r,
+      supplier_name: sup?.name ?? null,
+      warehouse_name:
+        typeof r.warehouse_id === "string"
+          ? (whNames.get(r.warehouse_id) ?? null)
+          : null,
+      actual_site_name:
+        typeof r.actual_site_id === "string"
+          ? (whNames.get(r.actual_site_id) ?? null)
+          : null,
+      submitted_by_name: name(r.submitted_by),
+      posted_by_name: name(r.posted_by),
+      posted_duty_holder_name: name(r.posted_duty_holder),
+      posted_duty_cover_name: name(r.posted_duty_cover),
+      void_by_name: name(r.void_by),
+      do_file_url: doUrl,
+      arrival_evidence_files: arrivalEvidence,
+      unit_results: unitResults,
+    },
+    related_records: await relatedRead,
+    line_info: lineInfo,
+    po: po ?? null,
+    events: ((evs ?? []) as Array<Record<string, unknown>>).map((e) => ({
+      ...e,
+      actor_name: name(e.actor_id),
+    })),
+  });
+});
+
+/**
+ * POST /:id/amend — `Amend Receiving` (0426). Reason required; before/after
+ * and the safe recalculation live in the RPC; a blocked correction comes back
+ * as the RPC's named refusal.
+ */
+warehouseReceiptsRouter.post("/:id/amend", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, receivingAmendInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const d = parsed.data;
+  // 0601 · the version this correction starts from — first save wins.
+  const changes: Record<string, unknown> = {
+    based_on_revision: d.basedOnRevision,
+  };
+  if (d.goodsReceivedTime !== undefined)
+    changes.goods_received_time = d.goodsReceivedTime;
+  if (d.goodsReceivedAt !== undefined)
+    changes.goods_received_at = d.goodsReceivedAt;
+  if (d.doNumber !== undefined) changes.do_number = d.doNumber;
+  if (d.actualSiteId !== undefined) changes.actual_site_id = d.actualSiteId;
+  if (d.doFilePath !== undefined) changes.do_file_path = d.doFilePath;
+  if (d.arrivalEvidenceAdd !== undefined)
+    changes.arrival_evidence_add = d.arrivalEvidenceAdd;
+  if (d.lines !== undefined)
+    changes.lines = d.lines.map((l) => ({
+      id: l.id,
+      received_now: l.receivedNow,
+    }));
+  // 0601 · the person names each exact Unit; the system never picks one.
+  if (d.units !== undefined)
+    changes.units = d.units.map((u) => ({
+      stock_item_id: u.stockItemId,
+      outcome: u.outcome,
+    }));
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("receiving_amend", {
+    p_receipt_id: c.req.param("id"),
+    p_reason: d.reason,
+    p_changes: changes,
+    p_save_key: d.saveKey ?? null,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    // 0601 · every locked Unit comes back by name with its own reason, so
+    // the form can mark each one (the RPC carries them in its HINT).
+    const hint = (error as { hint?: string | null }).hint;
+    if ((error as { details?: string }).details === "units_locked" && hint) {
+      try {
+        const units = JSON.parse(hint) as unknown;
+        if (Array.isArray(units))
+          return c.json({ ...m.body, units }, m.status);
+      } catch {
+        /* an unreadable hint still returns the named sentence */
+      }
+    }
+    return c.json(m.body, m.status);
+  }
+  return c.json(data ?? {});
+});
+
+/** POST /:id/void — `Void Receiving` (0426): only for a GRN that should never
+ *  have existed. Downstream blockers refuse by name; nothing partially voids. */
+warehouseReceiptsRouter.post("/:id/void", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, receivingVoidInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("receiving_void", {
+    p_receipt_id: c.req.param("id"),
+    p_reason: parsed.data.reason,
   });
   if (error) {
     const m = mapPgError(error);

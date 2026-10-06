@@ -1,26 +1,79 @@
 export const SHARED_VERSION = "0.0.0" as const;
 
 export * from "./issue-tracker";
+export * from "./unit-problem";
+export * from "./supplier-return-pickup";
+export * from "./repair-order";
+export * from "./repair-order-work";
+export * from "./supplier-claim-record";
+export * from "./purchase-return-record";
+
+/* Stair carry — moved out of `apps/web` 2026-08-29 so the SERVER can stamp
+   the fee onto the order. The Worker cannot import from the web app, which
+   is why the fee the customer signed for was written down nowhere. */
+export {
+  floorSurchargeRaw,
+  stairCarryCount,
+  stairCarryFee,
+  STAIR_CARRY_ADDON_KEY,
+  SERVER_EXCLUSIVE_ADDON_KEYS,
+} from "./stair-carry";
 
 export {
   resolveSalesOrderRoute,
+  NODE_W as ROUTE_NODE_W,
+  ROUTE_TEXT_BUDGET,
+  lateElbow as routeLateElbow,
+  wrapRouteText,
+  type RouteDeliveryScope,
+  type RouteProposedChange,
+  type RouteUnreadable,
+  type GateRequirement,
+  type GateRequirementId,
+  type LinkedProblem,
+  type NodeAction,
+  type NodeMark,
+  type RouteBranchKey,
   type RouteDeliveryAttempt,
+  type RouteDeliveryPhoto,
+  type RouteDoor,
+  type RouteEdge,
+  type RouteLinkedCase,
+  type RouteLinkedClaim,
   type RouteLoan,
+  type RouteNode,
+  type RouteNodeKind,
+  type RoutePoint,
   type RoutePurchaseOrder,
-  type SalesOrderRoute,
-  type SalesOrderRouteDocument,
-  type SalesOrderRouteFact,
-  type SalesOrderRouteFactState,
-  type SalesOrderRouteGroup,
+  type RouteReceivingRecord,
   type SalesOrderRouteInput,
-  type SalesOrderRouteLane,
-  type SalesOrderRouteLaneKey,
+  type SalesOrderRouteMap,
+  type StationOwnerKey,
 } from "./sales-order-route";
+export {
+  MONTHLY_DEMAND_CATEGORIES,
+  monthlyDemandOf,
+  monthlyDemandCategoryOf,
+  monthlyDemandWindowOf,
+  type MonthlyDemandCategory,
+  type MonthlyDemandFilters,
+  type MonthlyDemandOrder,
+  type MonthlyDemandRow,
+  type MonthlyDemandView,
+} from "./monthly-demand";
+export { readFailureWords, type ReadFailureSurface, type ReadFailureWords } from "./read-failure";
+export { routeGoodsLinesOf, type RouteGoodsFacts, type RouteGoodsLine, type RouteGoodsSource } from "./sales-order-route-goods";
+export { routeDeliveryScopesOf, type RouteScopeFacts } from "./sales-order-route-scopes";
 
 export {
+  INSTALMENT_MONTHS,
   MAX_DELIVERY_FLOOR,
+  type InstalmentMonths,
   EARLIEST_SELL_GATED_CATEGORIES,
   maxLeadDaysFor,
+  // Owner ruling 2026-08-15 — a Sales Order must contain goods.
+  ATTACHED_ONLY_CATEGORIES,
+  cartHasGoods,
   minDeliveryDateISO,
   // 0169-0173 — Product & Maintenance rebuild.
   PRODUCT_CATEGORIES,
@@ -43,11 +96,13 @@ export {
   WEEKDAYS,
   SUNDAY,
   expectedArrivalOf,
+  poDeliveryDateOf,
+  poDeliveryWorkingDays,
   arrivalFromReadyDate,
+  orderByFromDeliveryDate,
   isPurchasingCategory,
   isPurchasingNumberKey,
   productionWorkingDaysFor,
-  transitDaysFor,
   workWeekOffDaysFor,
   purchasingUrgentWindowDays,
   unratedPairs,
@@ -58,20 +113,43 @@ export {
   settingValueLabel,
   purchasingCategorySchema,
   purchasingSettingsResponseSchema,
+  purchasingCreateDestinationInput,
+  purchasingUpdateDestinationInput,
+  purchasingSetSupplierCollectionInput,
   purchasingSetNumberInput,
   purchasingSetPoDaysInput,
+  purchasingSetReadyStockPriorityInput,
+  purchasingSetPoWindowsInput,
+  purchasingSetSupplierPoCutoffInput,
+  clockWordOf,
+  poWindowsHistoryLabel,
   purchasingSetProductionDaysInput,
+  purchasingSetSupplierTermsDaysInput,
+  purchasingSetSupplierAddressInput,
+  purchasingSetSupplierChannelInput,
+  SUPPLIER_ADDRESS_MAX,
   purchasingSetWorkWeekInput,
   type PurchasingCategory,
   type PurchasingNumberKey,
   type PurchasingProductionDays,
   type PurchasingSupplierRow,
   type PurchasingSettingChange,
+  type PurchasingDestinationSetting,
+  type PurchasingSupplierCollectionSetting,
+  type PurchasingDeliveryPartnerSetting,
   type PurchasingSettings,
   type PurchasingSettingsResponse,
+  type PurchasingCreateDestinationInput,
+  type PurchasingUpdateDestinationInput,
+  type PurchasingSetSupplierCollectionInput,
   type PurchasingSetNumberInput,
   type PurchasingSetPoDaysInput,
+  type PurchasingSetPoWindowsInput,
+  type PurchasingSetSupplierPoCutoffInput,
   type PurchasingSetProductionDaysInput,
+  type PurchasingSetSupplierTermsDaysInput,
+  type PurchasingSetSupplierAddressInput,
+  type PurchasingSetSupplierChannelInput,
   type PurchasingSetWorkWeekInput,
 } from "./purchasing-settings";
 
@@ -149,6 +227,7 @@ export {
   type UpdateOrderInput,
   type CancelOrderInput,
   type SetOpsAssignedLogisticInput,
+  installmentMonthsField,
 } from "./schemas/orders";
 
 export {
@@ -355,6 +434,22 @@ export {
   pwpDiscoverResponseSchema,
   type PwpDiscoverDto,
   type PwpDiscoverResponse,
+  // 2026-08-24 — the FIRST supplier-creation door the portal has ever had.
+  // Purchasing still owns the record; this is the shared contract for it.
+  supplierCreateInput,
+  supplierSlug,
+  type SupplierCreateInput,
+  // 0477 — an other creditor (landlord, advertiser) is Finance's row in
+  // `suppliers`; every Purchasing, Catalog and Operation list drops it.
+  OTHER_CREDITOR_KIND,
+  isOtherCreditor,
+  purchasingSuppliersOnly,
+  // 0388 — dual-sourcing's recording half: a SKU remembers every supplier
+  // that quoted it; the supplier_id slot stays the routing truth.
+  skuSupplierOfferSchema,
+  skuSupplierOfferUpsertInput,
+  type SkuSupplierOfferDto,
+  type SkuSupplierOfferUpsertInput,
 } from "./schemas/catalog";
 
 // 0219 — Order Entry config (payment methods + form fields).
@@ -437,18 +532,25 @@ export {
   // Q5 (0318) — the supplier's promised READY date, the third answer body.
   recordReadyDateInput,
   recordSendInput,
+  confirmPoSentInput,
+  supplierPoEmailInput,
+  // PO Revisions (0364) — a sent PO keeps its number and mints a version.
+  revisePoInput,
   setMessageTemplateInput,
-  setLineDestinationInput,
   setLineOpsRemarkInput,
-  splitLineDestinationInput,
+  changePoDeliverToInput,
   recordBalanceDateInput,
   attachDoInput,
   receivePoWithDoInput,
   // Slice B (0315) — the Office Receiving Workspace's one write door.
   officeReceiveInput,
-  adjustStockInput,
+  // 0426 — Amend / Void doors for a posted GRN.
+  receivingAmendInput,
+  receivingVoidInput,
+  // 0425 — Workspace → Staff & Duties.
+  workspaceAssignDutyInput,
+  workspaceCoverDutyInput,
   abandonOrderInput,
-  warehousePickInput,
   recheckStockInput,
   assignPickupPartnerInput,
   reassignPoWarehouseInput,
@@ -460,7 +562,6 @@ export {
   reselectPartnerInput,
   lpAcceptOrderInput,
   lpRejectOrderInput,
-  transferReadyInputSchema,
   reservedDrilldownQuery,
   reservedDrilldownResponse,
   awaitingStockShortageResponse,
@@ -480,9 +581,7 @@ export {
   type AttachDoInput,
   type ReceivePoWithDoInput,
   type OfficeReceiveInput,
-  type AdjustStockInput,
   type AbandonOrderInput,
-  type WarehousePickInput,
   type RecheckStockInput,
   type AssignPickupPartnerInput,
   type ReassignPoWarehouseInput,
@@ -493,7 +592,6 @@ export {
   type ReselectPartnerInput,
   type LpAcceptOrderInput,
   type LpRejectOrderInput,
-  type TransferReadyInput,
   type ReservedDrilldownQuery,
   type ReservedDrilldownResponse,
   type AwaitingStockShortageResponse,
@@ -521,8 +619,6 @@ export {
   bankStatementsListQuery,
   reconciliationCreateInput,
   cashflowSeriesQuery,
-  monthlyPlQuery,
-  topSkusQuery,
   refundApplyInput,
   type PaymentMethod,
   type FinanceTopupApproveInput,
@@ -540,9 +636,17 @@ export {
   type BankStatementsListQuery,
   type ReconciliationCreateInput,
   type CashflowSeriesQuery,
-  type MonthlyPlQuery,
-  type TopSkusQuery,
   type RefundApplyInput,
+} from "./schemas/finance";
+
+// The read-only Finance Ledger (Journal · Trial Balance · Self-check).
+export {
+  ledgerAccountCode, ledgerSourceType, ledgerEntriesQuery, ledgerEntryRef,
+  ledgerAsOfQuery, ledgerPeriodQuery, ledgerAccountLedgerQuery, ledgerAccountUpdateInput, ledgerAccountReorderInput,
+  ledgerAccountCodeShape, LEDGER_ACCOUNT_CODE_MESSAGE, ledgerAccountCodeInput, ledgerAccountMoveInput, ledgerAccountAddInput,
+  ledgerBooksClosedInput, type LedgerBooksClosed,
+  type LedgerAccountReorderInput, type LedgerAccountMoveInput, type LedgerAccountAddInput,
+  type LedgerEntriesQuery, type LedgerAsOfQuery, type LedgerPeriodQuery, type LedgerAccountLedgerQuery,
 } from "./schemas/finance";
 
 export {
@@ -595,7 +699,9 @@ export {
   opsStockRefurbishInputSchema,
   opsStockRefurbishCompleteInputSchema,
   opsStockUpdateConditionInputSchema,
-  opsStockCreateInputSchema,
+  opsStockSetSiteInputSchema,
+  opsStockSetHolderInputSchema,
+  opsStockSetOwnershipInputSchema,
   opsStockItemSchema,
   opsStockListResponseSchema,
   opsReorderPointInputSchema,
@@ -641,7 +747,9 @@ export {
   type OpsStockRefurbishInput,
   type OpsStockRefurbishCompleteInput,
   type OpsStockUpdateConditionInput,
-  type OpsStockCreateInput,
+  type OpsStockSetSiteInput,
+  type OpsStockSetHolderInput,
+  type OpsStockSetOwnershipInput,
   type OpsStockItem,
   type OpsStockListResponse,
 } from "./schemas/ops-stock";
@@ -799,6 +907,8 @@ export {
   opsStaffListResponseSchema,
   updateOpsStaffSettingInput,
   distributeOrders,
+  planOpsAssignment,
+  type OpsAssignmentCandidate,
   seenTodayMYT,
   countsAsInToday,
   OPS_DAY_CUTOFF_HOUR_MYT,
@@ -818,6 +928,11 @@ export {
   deliveryPhotoSchema,
   DELIVERY_PHOTO_MIMES,
   DELIVERY_PHOTO_MAX_BYTES,
+  DELIVERY_VIDEO_MIMES,
+  DELIVERY_VIDEO_MAX_BYTES,
+  DELIVERY_PROOF_MIMES,
+  DELIVERY_PROOF_EXTENSION,
+  isDeliveryVideoMime,
   signDeliveryPhotoUploadInput,
   attachDeliveryPhotoInput,
   deliveryPhotoListResponseSchema,
@@ -878,6 +993,8 @@ export {
   orderActionDone,
   orderActionForQueue,
   orderActionLine,
+  orderActionLines,
+  type OrderActionLines,
   orderActionQueue,
   purchasingActionButton,
   purchasingActionDone,
@@ -926,14 +1043,28 @@ export {
   poArrivalGapOf,
   poCurrentActionOf,
   poDateHistoryOf,
+  poSupplierReplyOf,
+  poSupplierDeliveryDateOf,
+  poLevelSupplierAnswerOf,
+  poLineSupplierAnswersOf,
+  poSupplierAnswerSummaryOf,
+  poReplyDateOf,
+  poRecordedReplyOf,
+  poDocumentNumberOf,
   poOverdueDays,
+  poReviseSaveGapOf,
   poRiskRungOf,
+  poUnsharedVersionNoticeOf,
+  poVersionLabelOf,
   poWorkStateOf,
   type PoArrivalGap,
   type PoCurrentAction,
   type PoDateHistory,
   type PoDateHistoryEntry,
   type PoDatePromise,
+  type PoSupplierAnswerBatch,
+  type PoLineSupplierAnswer,
+  type PoSupplierAnswerSummary,
   type PoRiskRow,
   type PoRiskRung,
   type PoWorkspacePo,
@@ -1051,6 +1182,14 @@ export {
   customerResolutionMeaning,
   isCustomerResolution,
   type CustomerResolution,
+  // Layer ④ · in what ORDER the goods move (Loo, 2026-08-05 · 0409)
+  CARRES_EXECUTIONS,
+  CARRES_EXECUTION_KEYS,
+  CARRES_EXECUTION_MEANING,
+  carresExecutionLabel,
+  carresExecutionMeaning,
+  isCarresExecution,
+  type CarresExecution,
 } from "./supplier-claim";
 
 // R6 · The warehouse files its own receiving — a queued call to R1's engine
@@ -1077,13 +1216,132 @@ export {
   type WarehouseIncomingLine,
   type WarehouseIncomingPo,
   type WarehouseIncomingResponse,
+  // 0426 · the 2026-09-04 owner instruction — stored GRN, Actual Site, unit
+  // outcomes, extra goods, the save-blocker law and the Work feed.
+  receivingDisplayNo,
+  receivingSummaryOf,
+  receivingExtraQty,
+  pendingDeliveryAfterSave,
+  receivingSaveBlocker,
+  receivingWorkItems,
+  RECEIVING_UNIT_OUTCOME_LABEL,
+  RECEIVING_AUTHORITY_LABEL,
+  receivedByWords,
+  RECEIVING_WORK_WORDS,
+  // 2026-09-06 owner correction — the Register is the GRN record; the rail
+  // speaks exactly five governed category rows through the shared ladder.
+  RECEIVING_CATEGORY_ROWS,
+  receiptCategoryWords,
+  type ReceivingCategoryRow,
+  type ReceivingUnitOutcome,
+  type ReceivingUnitResult,
+  type ReceivingArrivalEvidence,
+  type ReceivingExtraLine,
+  type ReceivingSummary,
+  type ReceivingWorkSource,
 } from "./warehouse-receipt";
+// 2026-09-06 owner correction (Receiving page) — server-side GRN Register
+// pagination/facets and the rail Calendar's expected-arrival markers, one
+// arithmetic for the Worker and the page's tests alike.
+export {
+  buildGrnRegisterView,
+  expectedArrivalCounts,
+  grnDateMonths,
+  grnDateWeeks,
+  grnMonthEnd,
+  grnWeekStart,
+  GRN_RECEIVED_WITH_ROWS,
+  type GrnDateDay,
+  type GrnDateMonth,
+  type GrnDateWeek,
+  type GrnReceivedWith,
+  type GrnRegisterFactRow,
+  type GrnRegisterSelection,
+  type GrnRegisterView,
+} from "./receiving-register";
 export {
   warehouseSubmitReceiptInput,
   warehouseReceiptReturnInput,
   type WarehouseSubmitReceiptInput,
   type WarehouseReceiptReturnInput,
 } from "./schemas/warehouse";
+
+// 0366 · WAREHOUSE UNIT AUTHORITY — the ONE availability arithmetic, and the
+// lifecycle outcome that `ended` must never erase. The SQL half lives in
+// migration 0366 (`public.unit_availability`, `public.unit_lifecycle_outcome`).
+export {
+  UNIT_AVAILABILITY,
+  UNIT_AVAILABILITY_LABEL,
+  UNIT_LIFECYCLE_OUTCOMES,
+  UNIT_LIFECYCLE_OUTCOME_LABEL,
+  UNIT_OWNERSHIPS,
+  UNIT_OWNERSHIP_LABEL,
+  unitAvailability,
+  isUnitAvailable,
+  isUnitBindable,
+  unitLifecycleOutcome,
+  type UnitAvailability,
+  type UnitLifecycleOutcome,
+  type UnitOwnership,
+  type SkuAvailability,
+} from "./unit-availability";
+
+// CARD-2026-09-07-purchasing-10 · THE ONE UNIT IDENTITY. Every surface asks
+// THIS file what a row's Unit ID is, so a counted row can never print its
+// technical key as an identity (0442 · 0443 · 0453).
+export {
+  unitIdOf,
+  isExactUnit,
+  displayUnitId,
+  normaliseUnitIdQuery,
+  matchesUnitId,
+  looksLikeUnitId,
+  canonicalUnitIdFrom,
+  UNIT_ID_PATTERN,
+  QUANTITY_KEY_PATTERN,
+  LEGACY_UNIT_ID_PATTERN,
+  NO_UNIT_ID,
+  type IdentityScope,
+  type UnitIdentityRow,
+} from "./unit-identity";
+
+// CARD-2026-08-20-stock-register · THE STOCK REGISTER — the one current listing
+// of controlled Units. Pure: it READS 0366's availability and never re-derives
+// it. The `Changed` scopes read the append-only physical lineage (0373's
+// `stock_unit_register_v`), never `updated_at`.
+export {
+  ATTENTION_REASONS,
+  ATTENTION_REASON_LABEL,
+  CHANGED_SCOPES,
+  CHANGED_SCOPE_LABEL,
+  EMPTY_RAIL_SELECTION,
+  NO_CATALOG_KEY,
+  NO_CATALOG_LABEL,
+  applyRailSelection,
+  availabilityLabel,
+  categoryKeyOf,
+  changedWithin,
+  hasAttention,
+  isCurrentUnit,
+  isRailFiltered,
+  matchesRegisterQuery,
+  registerSummaryLine,
+  summariseRegister,
+  type AttentionReason,
+  type ChangedScope,
+  type StockRailSelection,
+  type StockRegisterTotals,
+  type StockRegisterUnit,
+} from "./stock-register";
+export {
+  INVENTORY_STATUS_RAIL,
+  STOCK_CONDITION_WORDS,
+  inventoryStatusOf,
+  isHeldUnit,
+  stillToArriveLine,
+  stockConditionOf,
+  type InventoryStatus,
+  type InventoryWordsInput, goodsReceivedAbsence } from "./inventory-words";
 
 // R4 · Problem stock is quarantined — on hold · returned · written off
 export {
@@ -1142,25 +1400,44 @@ export {
   type PartnerWarningKey,
 } from "./partner-delivery-rules";
 export {
+  latestWarehouseReadyDate,
+  partnerJourneyCalendar,
+  type JourneyChain,
+  type JourneyChainInput,
+  type JourneyRegionRule,
+  type PartnerJourneyCalendar,
+} from "./partner-journey";
+export {
   partnerDeliveryRulesSchema,
   setPartnerDeliveryRulesInput,
+  journeyRegionRuleSchema,
+  setPartnerJourneyCalendarInput,
   partnerBookingWarningSchema,
   partnerBookingCheckResponseSchema,
   type PartnerDeliveryRulesWire,
   type SetPartnerDeliveryRulesInput,
+  type SetPartnerJourneyCalendarInput,
   type PartnerBookingWarningWire,
   type PartnerBookingCheckResponse,
 } from "./schemas/delivery-partner-rules";
 
 // T10 · Delivery calendar — the ONE rule that decides which day an order's
-// truck sits on (the D1 booking, never the promised date), the Today /
-// Tomorrow / This week ranges, and the carrier's load on a day (T9 rules).
+// truck sits on (the D1 booking, never the promised date), the three day
+// ranges, and the carrier's load on a day (T9 rules). The ranges carry DAYS
+// and no word: `dayWord` was deleted by the no-relative-dates ruling (owner,
+// 2026-08-15) and a caller prints the actual weekday + date through `fmtDate`.
 export {
   bookingDayOf,
+  scheduledDeliveryOf,
+  customerLegDeliveryOf,
+  assignedLogisticsIdOf,
+  type CustomerLegArrangementRead,
+  type CustomerLegDocumentRead,
+  type ScheduledDelivery,
+  type ScheduledDeliveryRead,
   carrierDayLoads,
   carrierDayNote,
   daysInRange,
-  dayWord,
   deliveryRange,
   DELIVERY_RANGE_KEYS,
   inRange,
@@ -1185,27 +1462,14 @@ export {
 } from "./delivery-board";
 
 export {
-  monthKeyMYT,
   isPoDayMYT,
   poUrgentBypass,
-  opsPoDutySchema,
-  opsPoDutyResponseSchema,
-  opsPoDutyRosterEntrySchema,
   nextPoDayMYT,
-  type OpsPoDutyRosterEntry,
-  updateOpsPoDutyInput,
-  pickNextDutyHolder,
-  canRaisePo,
-  isPoDutyEditor,
-  type OpsPoDuty,
-  type OpsPoDutyResponse,
-  type UpdateOpsPoDutyInput,
 } from "./schemas/ops-po-duty";
 
 // HR-P2 (0260) — permissions that follow the position, not the person.
-// `isOpsManager` / `isPoDutyEditor` are re-exported above from their original
-// modules so no existing importer had to change; everything genuinely new to
-// duty keys is exported here.
+// Duty keys and their authorization helpers are exported from their one
+// shared authority.
 export {
   DUTY_KEYS,
   isDutyKey,
@@ -1214,7 +1478,6 @@ export {
   isOpsManagerRow,
   isStockPlanner,
   LEGACY_OPS_MANAGER_EMAILS,
-  LEGACY_PO_DUTY_EDITOR_EMAILS,
   type DutyKey,
   type DutyHolderMap,
   type DutyGrant,
@@ -1414,9 +1677,19 @@ export * from "./order-activity";
 export {
   PAYMENT_METHODS,
   PAYMENT_KINDS,
+  // 0476 — a payment method is a key; the registry lives in Settings → Payment.
+  PAYMENT_METHOD_KEY_RE,
+  paymentMethodKeySchema,
+  paymentMethodSaveInput,
+  type PaymentMethodKey,
+  type PaymentMethodRegistryRow,
+  type PaymentMoneyAccount,
+  type PaymentMethodSaveInput,
   recordPaymentInputSchema,
+  requiredPaymentReference,
   collectStorageInput,
   summarizePayments,
+  receivedBeforeInvoice,
   // CARD 4 closing slice (0347) — the ONE "is this a valid payment?" predicate.
   // A voided row stays in the history and counts toward nothing.
   isLivePayment,
@@ -1451,6 +1724,8 @@ export {
 // types live in the schemas/catalog export block; the adapters are reached via
 // Adapters.* like fabricTierConfigFromRow.
 export type { SofaCompartment, ModelSofaCompartment } from "./domain";
+/** 0442 — the Catalog-owned stock identity mode of a SKU. */
+export type { StockIdentityMode } from "./domain";
 
 // 0179 — sofa engine Phase 2: sofa combo domain type + the row→domain adapter +
 // the canonical seat-height axis. `sofaComboFromRow` is also reachable via
@@ -1580,6 +1855,10 @@ export type { ModelDefaultFreeGifts } from "./domain";
 // (`pwpRuleFromRow`) is surfaced top-level here too (mirrors sofaComboFromRow).
 export {
   resolvePwp,
+  // The CROSS-ORDER counterpart: a saved voucher is redeemed on a later order
+  // that need not contain the trigger, so `resolvePwp` cannot judge it. Shared
+  // for the same honest-pricing reason - POS and server must agree.
+  voucherCoversLine,
   parsePwpTargets,
   type PwpRule as PwpRuleEngine,
   type PwpLineInput,
@@ -1665,6 +1944,9 @@ export { deriveSkuCode, normalizeSkuKey } from "./sku-code";
 export {
   lineClass,
   lineCategory,
+  // D9's Sales Order half (2026-08-20) — the catalog's category, parser as the
+  // named fallback. Prefer this over `lineCategory` in every new call site.
+  resolvedCategory,
   lineSize,
   stockMatchKey,
   accShort,
@@ -1672,6 +1954,13 @@ export {
   lineKind,
   lineSortRank,
   defaultLineLocation,
+  // The governed category-word ladder (2026-09-06) — extracted from the SO
+  // register footer so Receiving and Sales Orders speak one rule.
+  GOODS_CATEGORY_WORDS,
+  goodsCategoryWordOf,
+  catalogCategoryWordOf,
+  CATALOG_CATEGORY_NOT_RECORDED,
+  type GoodsCategoryWord,
   type CoreCat,
   type LineClass,
   type ItemKind,
@@ -1679,6 +1968,7 @@ export {
 export {
   lineReadiness,
   readinessCounts,
+  unitsShortWords,
   type LineReadiness,
   type LineReadinessInput,
 } from "./line-readiness";
@@ -1842,9 +2132,104 @@ export {
 // own goods + money answers so the two surfaces cannot disagree.
 export {
   deliveryOrderIssueGate,
+  deliveryMoneyHolds,
   type DeliveryOrderIssueInput,
   type DeliveryOrderIssueResult,
 } from "./delivery-order";
+// The DO DOCUMENT status — ONE arithmetic over the void stamp (0356) + the
+// attempt history (0344); nothing stored (blueprint card 2026-08-16).
+export {
+  deliveryOrderStatusOf,
+  DELIVERY_ORDER_STATUS_LABEL,
+  type DeliveryOrderStatus,
+  type DeliveryOrderStatusKind,
+  type DeliveryOrderStatusInput,
+  type DeliveryOrderAttemptFact,
+  type DeliveryHandoverKind,
+} from "./delivery-order-status";
+// DELIVERY WORK's own status ladder — the OPERATION's progress, deliberately a
+// different vocabulary from the document's (owner correction 2026-08-24).
+// ONE status function and ONE label function print every surface (Delivery
+// MASTER §8.4, owner ruling 2026-09-25).
+export {
+  deliveryWorkStatusOf,
+  deliveryJourneyProgressOf,
+  deliveryWorkStatusLabelOf,
+  askForResultLine,
+  deliveryResultRecorded,
+  deliveryFailed,
+  deliveryGoodsMoved,
+  DELIVERY_WORK_STATUS_KINDS,
+  DELIVERY_WORK_STATUS_TONE,
+  LOGISTICS_ROLE_WORD,
+  TRANSFER_STOP_ROLE_WORD,
+  type DeliveryStatusWords,
+  type DeliveryWorkStatus,
+  type DeliveryWorkStatusKind,
+  type DeliveryWorkStatusInput,
+  type DeliveryWorkStatusTone,
+  type DeliveryStatusSpell,
+} from "./delivery-work-status";
+// 【DELIVERY】 CARD 19 — what a Sales Order URL param names: the id, the
+// operator's document word (`SO-1362`), or nothing. ONE resolver for the
+// object page and the by-number door.
+export {
+  salesOrderParamOf,
+  salesOrderNumberWord,
+  type SalesOrderParam,
+} from "./sales-order-identity";
+// THE DELIVERY ARRANGEMENT (0379) — Delivery's own record of how a scope
+// travels, keyed by (order_id, leg). Overwrites the "Delivery Work writes
+// nothing" claim; Sales keeps the commercial promise, Delivery the arrangement.
+export {
+  deliveryScopeLegSchema,
+  deliveryScopeRefSchema,
+  assignLogisticsInputSchema,
+  saveDeliveryArrangementInputSchema,
+  isLogisticsChange,
+  changeLogisticsReasonLabel,
+  CHANGE_LOGISTICS_REASONS,
+  CHANGE_LOGISTICS_REASON_KEYS,
+  DEFAULT_KV_LOGISTICS,
+  CANNOT_DELIVER_REASONS,
+  CANNOT_DELIVER_REASON_KEYS,
+  partnerSaveArrangementInput,
+  partnerCannotDeliverInput,
+  type CannotDeliverReasonKey,
+  type PartnerSaveArrangementInput,
+  type PartnerCannotDeliverInput,
+  type PartnerDeliveryCard,
+  type DeliveryScopeRef,
+  type AssignLogisticsInput,
+  type SaveDeliveryArrangementInput,
+  type DeliveryArrangementRow,
+  type DeliveryArrangementEventRow,
+  type ChangeLogisticsReasonKey,
+  operationCannotDeliverInput,
+  type OperationCannotDeliverInput,
+  type DeliveryCannotDeliverRow,
+  cannotDeliverReasonLabel,
+} from "./schemas/delivery-arrangement";
+// The §4 handover chain door inputs (0363) — one schema for Worker and web.
+export {
+  DELIVERY_HANDOVER_KINDS,
+  HANDOVER_EVIDENCE_MAX_FILES,
+  HANDOVER_EVIDENCE_MIMES,
+  HANDOVER_EVIDENCE_VIDEO_MAX_BYTES,
+  HANDOVER_EVIDENCE_VIDEO_MIMES,
+  handoverEvidenceFileSchema,
+  handoverGoodsLineSchema,
+  recordHandoverInput,
+  recordOutboundPrepInput,
+  signHandoverProofUploadInput,
+  WAREHOUSE_PREP_FACTS,
+  type HandoverEvidenceFile,
+  type HandoverGoodsLine,
+  type RecordHandoverInput,
+  type RecordOutboundPrepInput,
+  type SignHandoverProofUploadInput,
+  type WarehousePrepFact,
+} from "./schemas/delivery-handover";
 export {
   isWorkingDay,
   addWorkingDays,
@@ -1854,6 +2239,50 @@ export {
   type IsoDate,
   type WorkingDayOptions,
 } from "./working-days";
+export {
+  deliveryCustodyProjection,
+  deliveryOperationsReadyBy,
+  deliveryWarehouseScheduleEvents,
+  type DeliveryWarehouseScheduleEvent,
+  type DeliveryWarehouseScheduleEventKind,
+  type DeliveryWarehouseScheduleInput,
+} from "./delivery-warehouse-schedule";
+export {
+  buildOutboundRegisterView,
+  filterOutboundCards,
+  outboundExceptionLines,
+  outboundStatusWordOf,
+  outboundViewMatches,
+  WAREHOUSE_DASHBOARD_DATE_COUNT,
+  WAREHOUSE_OFF_DAYS,
+  warehouseEmptyDaySentence,
+  warehouseOperatingDates,
+  warehouseOutboundCards,
+  warehouseRangeShift,
+  warehouseUnitPendingReason,
+  type OutboundProduct,
+  type OutboundRegisterFacets,
+  type WarehouseOutboundCard,
+} from "./warehouse-outbound";
+export {
+  driverCollectedLine,
+  WAREHOUSE_MONITOR_EVENT_LABEL,
+  WAREHOUSE_MONITOR_GROUP_LABEL,
+  warehouseAssignedDriverLine,
+  warehouseLoadedLine,
+  warehouseMonitorArrivalEvents,
+  warehouseMonitorDayEvents,
+  warehouseMonitorEmptyDaySentence,
+  warehouseMonitorGroupOf,
+  warehouseMonitorPickupEvents,
+  warehouseMonitorTimeSentence,
+  warehouseRecordLoadedSentence,
+  warehouseUnitNotCollectedSentence,
+  type WarehouseExpectedArrival,
+  type WarehouseMonitorEvent,
+  type WarehouseMonitorEventKind,
+  type WarehouseMonitorGroup,
+} from "./warehouse-monitor";
 export {
   MY_HOLIDAYS_2026,
   MY_HOLIDAYS_2027_EARLY,
@@ -1880,7 +2309,10 @@ export {
   DEMAND_PURPOSES,
   DEMAND_PURPOSE_DEFAULT,
   DEMAND_PURPOSE_VALUES,
+  RETIRED_DEMAND_PURPOSE_LABELS,
+  demandPurposeLabelOf,
   isDemandPurpose,
+  poPurposeLabelOf,
   type DemandPurpose,
   type DemandPickItem,
   buildToOrder,
@@ -1943,7 +2375,244 @@ export {
   type ToOrderRow,
   type ToOrderSortKey,
   type ToOrderSupplier,
+  GOODS_ABSENCE_WORDS,
 } from "./to-order";
+export {
+  MANUAL_PURCHASE_WORDS,
+  MANUAL_PURCHASE_STATUS_WORDS,
+  MANUAL_PURCHASE_APPROVAL_WORDS,
+  MANUAL_PURCHASE_RAIL,
+  MANUAL_PURCHASE_RAIL_CLEAR,
+  MANUAL_PURCHASE_HISTORY_WORDS,
+  manualPurchaseHistoryRecord,
+  manualPurchaseApproverLine,
+  manualPurchaseApprovalOf,
+  manualPurchaseStatusOf,
+  manualPurchaseGroupOf,
+  manualPurchaseOrderByCell,
+  compareManualPurchaseRows,
+  manualPurchaseOrderByOf,
+  manualPurchaseOrderByLine,
+  manualPurchaseLeadDayFacts,
+  manualPurchaseTimingOf,
+  manualPurchaseRailFacts,
+  manualPurchaseRailModel,
+  manualPurchaseWorkItems,
+  manualPurchaseWorkContext,
+  manualPurchaseObjectHeading,
+  manualPurchaseSourceSummary,
+  manualPurchaseSourceLine,
+  manualPurchaseLineRemainingOf,
+  manualPurchasePoSummary,
+  manualPurchaseItemsSummary,
+  manualPurchaseSupplierSummary,
+  manualPurchaseDeliverToSummary,
+  manualPurchaseForOf,
+  manualPurchaseSelectable,
+  manualPurchaseNotSelectableReason,
+  manualPurchaseIssueDocuments,
+  manualPurchaseIssueGroupCount,
+  manualPurchaseIssueSentence,
+  stillNeededOf,
+  type ManualPurchaseApprovalKind,
+  type ManualPurchaseStatus,
+  type ManualPurchaseStatusInput,
+  type ManualPurchaseStatusKind,
+  type ManualPurchaseGroup,
+  type ManualPurchaseDecisionFacts,
+  type ManualPurchaseTimingState,
+  type ManualPurchaseSetupKey,
+  type ManualPurchaseWorkInput,
+  type ManualPurchaseRailFilter,
+  type ManualPurchaseRailFacts,
+  type ManualPurchaseRailModel,
+  type ManualPurchaseHistoryKind,
+  type ManualPurchaseHistoryEvent,
+} from "./manual-purchase";
+export {
+  PURCHASE_DEMAND_WORDS,
+  PURCHASE_DEMAND_STATES,
+  PURCHASE_DEMAND_TIMING_STATES,
+  PURCHASE_DEMAND_OWNER_DUTY,
+  isPurchaseDemandState,
+  isPurchaseDemandTimingState,
+  purchaseDemandStateWords,
+  purchaseDemandRailWords,
+  purchaseDemandBlockerOf,
+  catalogCostBlocksIssue,
+  purchaseDemandTimingOf,
+  purchaseDemandSafetyDaysLeft,
+  purchaseDemandQuantities,
+  purchaseDemandHelpLine,
+  purchaseDemandCoverageLine,
+  groupPurchaseDemands,
+  filterPurchaseDemands,
+  purchaseDemandStateCounts,
+  purchaseDemandFooter,
+  purchaseDemandStateSchema,
+  purchaseDemandRowSchema,
+  purchaseDemandsResponseSchema,
+  soBatchAction,
+  soBatchPurchaseActionSchema,
+  type PurchaseDemandState,
+  type PurchaseDemandTimingState,
+  type PurchaseDemandBlockerState,
+  type PurchaseDemandBlockerInput,
+  type PurchaseDemandTimingInput,
+  type PurchaseDemandRow,
+  type PurchaseDemandItemGroup,
+  type PurchaseDemandVariantGroup,
+  type PurchaseDemandsResponse,
+  type SoBatchPurchaseAction,
+} from "./purchase-demands";
+export {
+  SO_BATCH_PURCHASE_WORDS,
+  SO_BATCH_RAIL,
+  SO_BATCH_RAIL_CLEAR,
+  soBatchOrderSupplierNames,
+  soBatchOrderLineOutstandingQty,
+  soBatchPoDocumentState,
+  soBatchToBuyState,
+  type SoBatchToBuyState,
+  soBatchRailFacts,
+  soBatchRailModel,
+  type SoBatchProductCategory,
+  type SoBatchRailFilter,
+  type SoBatchRailFacts,
+  type SoBatchRailModel,
+  SO_BATCH_ORDER_STATUS_WORDS,
+  soBatchOrderStatusOf,
+  soBatchOrderRowSchema,
+  soBatchCellSummary,
+  soBatchOrderSelection,
+  soBatchOrderPlanning,
+  soBatchPurchaseStatus,
+  soBatchOrderUnselectableReason,
+  soBatchOrderStatusWhy,
+  soBatchLeafStatusWhy,
+  soBatchLineReservedWhy,
+  soBatchPoOfferSentence,
+  soBatchPoReservedSentences,
+  SO_BATCH_STATUS_DOOR,
+  type SoBatchStatusDoor,
+  type SoBatchStatusWhy,
+  soBatchOrderSafetyDays,
+  soBatchOrderStatusWord,
+  type SoBatchSafetyDaysCell,
+  soBatchOrderByAbsenceWord,
+  type SoBatchOrderByAbsence,
+  soBatchOrderRemainingQty,
+  compareSoBatchPlanning,
+  type SoBatchRegisterGroup,
+  soBatchPurchaseResponseSchema,
+  type SoBatchOrderStatus,
+  type SoBatchOrderPoFact,
+  type SoBatchOrderLineFact,
+  type SoBatchOrderRow,
+  type SoBatchCellSummary,
+  type SoBatchPurchaseResponse,
+  isSelectableForBuying,
+  isSelectableForOrder,
+  defaultAllocations,
+  setDestination,
+  splitAllocation,
+  validateAllocations,
+  documentPartitionKey,
+  composeDocumentLines,
+  groupSelectionsIntoDocuments,
+  soBatchSelectionSummary,
+  destinationAllocationSchema,
+  soBatchSelectionSchema,
+  purchasingDestinationSchema,
+  type PurchasingDestination,
+  type DestinationAllocation,
+  type SoBatchSelection,
+  type SoBatchDocument,
+  type SoBatchDocumentLine,
+  type PoDocumentAllocation,
+  type PoDocumentLine,
+  type PoDocumentLines,
+  type PoLineSource,
+  type SoBatchSelectionSummary,
+  type AllocationCheck,
+} from "./so-batch-purchase";
+export {
+  READY_STOCK_BLOCKED_WORDS,
+  READY_STOCK_CONDITION_ABSENT,
+  READY_STOCK_CONDITION_WORDS,
+  READY_STOCK_REFUSAL_WORDS,
+  readyStockConditionWord,
+  readyStockIdentityScopeSchema,
+  readyStockLineSchema,
+  readyStockOwnershipSchema,
+  readyStockPickSchema,
+  readyStockRefusalWord,
+  readyStockReserveInputSchema,
+  readyStockReserveResultSchema,
+  readyStockSaveInputSchema,
+  readyStockUsePoInputSchema,
+  readyStockUsePoResultSchema,
+  readyStockSaveResultSchema,
+  readyStockResponseSchema,
+  readyStockUnitSchema,
+  type ReadyStockLine,
+  type ReadyStockPick,
+  type ReadyStockReserveInput,
+  type ReadyStockReserveResult,
+  type ReadyStockSaveInput,
+  type ReadyStockUsePoInput,
+  type ReadyStockUsePoResult,
+  type ReadyStockSaveResult,
+  type ReadyStockResponse,
+  type ReadyStockUnit,
+} from "./so-batch-ready-stock";
+/* ── MANUAL PURCHASE · READY STOCK ALLOCATION (owner ruling 2026-09-18) ─────
+   Its own module, because it is a CAPABILITY the SO Batch contract explicitly
+   said Manual Purchase did not have. Folding it into that file would leave the
+   two rulings arguing inside one set of comments. */
+export {
+  MANUAL_PURCHASE_NEED_STATUS_WORDS,
+  MANUAL_PURCHASE_STOCK_BLOCK_WORDS,
+  MANUAL_PURCHASE_STOCK_REFUSAL_ACTS,
+  MANUAL_PURCHASE_STOCK_REFUSAL_WORDS,
+  MANUAL_PURCHASE_STOCK_UNIT_BLOCKED_WORDS,
+  manualPurchaseIntentSchema,
+  manualPurchaseLineStockRemaining,
+  manualPurchaseNeedStatusOf,
+  manualPurchaseStockBlockOf,
+  manualPurchaseStockBlockSchema,
+  manualPurchaseStockBlockWord,
+  manualPurchaseStockCounts,
+  manualPurchaseStockLineSchema,
+  manualPurchaseStockRefusal,
+  manualPurchaseStockResponseSchema,
+  manualPurchaseStockSaveInputSchema,
+  manualPurchaseStockSaveResultSchema,
+  manualPurchaseStockUnitSchema,
+  type ManualPurchaseIntent,
+  type ManualPurchaseNeedStatus,
+  type ManualPurchaseStockBlock,
+  type ManualPurchaseStockLine,
+  type ManualPurchaseStockResponse,
+  type ManualPurchaseStockSaveInput,
+  type ManualPurchaseStockSaveResult,
+  type ManualPurchaseStockUnit,
+} from "./manual-purchase-stock";
+export {
+  PO_SAFETY_DAYS_NONE,
+  poSafetyDaysOf,
+  poSafetyDaysWord,
+  tightestPoSafetyDays,
+  type PoSafetyDays,
+} from "./purchasing-safety-days";
+export {
+  PURCHASING_REFUSAL_CODES,
+  purchasingRefusal,
+  purchasingRefusalLine,
+  type PurchasingRefusal,
+  type PurchasingRefusalCode,
+  type PurchasingRefusalFacts,
+} from "./purchasing-refusals";
 export {
   IMPORT_ACCESSORY_KINDS,
   IMPORT_LEAD_DAYS_DEFAULT,
@@ -2376,6 +3045,23 @@ export * from "./store-kind";
 // scheme: PREFIX-DDMMYY-NNNN, tail derived per-order (never a counter).
 export { docNumber, docTail, amendmentSuffix, type DocNumberInput } from "./doc-number";
 
+// `Jump to…` — the ONE global navigate-only command surface (ui/MASTER,
+// APPROVED / LOCKED 2026-08-11). The PURE half: how a typed query is read, and
+// the shape of a document result. Shared so the Worker's lookup and the
+// browser's surface cannot disagree about the locked result contract.
+export {
+  JUMP_DOC_TYPES,
+  JUMP_DOC_LABEL,
+  parseJumpQuery,
+  numericPrefixRanges,
+  grnDateFromQuery,
+  rankJumpDocuments,
+  type JumpDocType,
+  type JumpDocumentResult,
+  type JumpSearchResponse,
+  type ParsedJumpQuery,
+} from "./jump-to";
+
 // Rental + Service Plan base (0247-0249) — customers, service packages, rental
 // plans, agreements/billings, the rented-asset registry + the service
 // entitlement/visit engine. The PURE plan math (visit cadence + contract value
@@ -2392,6 +3078,10 @@ export {
   // The SQL mirror `rental_late_interest()` asserts the same worked examples.
   rentalLateInterest,
   RENTAL_LATE_INTEREST_PCT_PER_MONTH,
+  // 0538 — Finance's month across all agreements.
+  rentalMonthView,
+  type RentalMonthBilling,
+  type RentalMonthView,
   // 0264 — the offer layer: service SKU codes + the pick → money resolver
   // (shared by the P&M previews, the POS lanes and the signing recompute).
   serviceSkuCode,
@@ -2522,7 +3212,12 @@ export {
 } from "./schemas/hr";
 export * from "./schemas/hr-team";
 export * from "./sales-order-classification";
+export * from "./sales-order-change";
 export * from "./sales-order-commitment";
+// ONE FIELD CONTRACT — the choices the Sales Portal offers and the emergency
+// contact's three-fields-⇄-one-column codec, shared with the object page so the
+// two surfaces cannot drift (owner ruling 2026-08-15).
+export * from "./sales-order-form";
 // CARD 2 — unit/stock allocation truth: the one arithmetic for "which real
 // Units are reserved/sold to this SO, and what is still unallocated".
 export * from "./sales-order-allocation";
@@ -2533,6 +3228,24 @@ export * from "./booking-brief";
 // CARD 4 — the collection clock: T−3 · T−2 · T−1 (final deadline) on working
 // days before the delivery, one arithmetic for every surface that presses.
 export * from "./collection-clock";
+// DELIVERY MONITOR (2026-09-11) — when the goods reach us, as a delivery
+// surface must read it: the recorded purchase-order dates, the latest supplier
+// reply, the exact per-line shortage, and ONE arrival state over them. It
+// computes no arrival date — `expectedArrivalOf` already did, once.
+export * from "./delivery-arrival";
+
+/**
+ * The Finance exception — the ONE money blocker (owner ruling 2026-08-16,
+ * `docs/orders/MASTER.md` §8). Slice 1 of the money-gate correction: the
+ * blocker exists before Slice 3 removes the balance from the gate, so the
+ * delivery order is never briefly ungated.
+ */
+export * from "./finance-exception";
+/* THE DELIVERY PAYMENT APPROVAL (owner ruling 2026-08-19, 0362) — the
+ * black-and-white door that opens the money gate: money in full before
+ * delivery is the only default; the exception is a recorded APPROVED
+ * approval, which authorises COD on the owner's exact terms. */
+export * from "./delivery-payment-approval";
 // CARD 5 — delivery attempts: every vehicle run leaves a record; a failure is
 // ONE exception (Reason Library + where the goods are), units move with reality.
 export * from "./schemas/delivery-attempt";
@@ -2542,3 +3255,119 @@ export * from "./sales-order-completion";
 // CARD 9 — the unified work engine: the five-part rule registry (Trigger ·
 // Owner · Action · Due · Completion fact) + WHO/ACTION/working-day composition.
 export * from "./work-engine";
+// Workspace foundation — company-wide owner-Duty assignments, cover resolution,
+// and immutable actor evidence. Capability/permission duties remain separate.
+export * from "./workspace-duty";
+export * from "./workspace-duties-catalogue";
+export * from "./delivery-contact";
+export * from "./delivery-settings";
+export * from "./delivery-proof";
+export * from "./schemas/loan-offer";
+// Workspace Work — the one server/client wire contract. Owning modules keep
+// trigger and completion truth; this only carries their open-action projection.
+export * from "./operation-work";
+export * from "./work-lifecycle";
+export * from "./po-windows";
+export * from "./po-window-work";
+export * from "./sales-order-work-source";
+export * from "./storage-obligation";
+export * from "./payment-collection-outcome";
+export * from "./payment-monitor";
+export * from "./payment-collection-owner";
+export * from "./payment-duplicate";
+// Purchase Orders — one evidence-derived Register state and Work vocabulary.
+export * from "./purchase-order-register";
+
+export { recordArrivalConfirmationInput, recordSupplierAnswersInput, recordSupplierReplyInput } from "./schemas/operation";
+export type { RecordSupplierAnswersInput } from "./schemas/operation";
+
+export {
+  purchaseOrderReplyWorkItems,
+  purchaseOrderArrivalCheckWorkItems,
+} from "./purchase-order-register";
+
+export * from "./warehouse-inbound";
+
+export * from "./arrival-source";
+
+export * from "./warehouse-settings";
+
+export * from "./warehouse-schedule";
+
+export { stockSiteVisits, type StockMovementEvidence, type StockSiteVisit } from "./stock-site-visits";
+
+// ⭐ PURCHASE RETURNS — the owner-confirmed register vocabulary (§9.6,
+// 2026-09-18). Presentation truth only: labels, the confirmed column order and
+// FACTUAL predicates. Custody stays with Stock; issuing a return moves nothing.
+export {
+  PURCHASE_RETURN_PREFIX,
+  PURCHASE_RETURN_NOT_ISSUED,
+  PURCHASE_RETURN_ABSENT,
+  PURCHASE_RETURN_COLUMN_ORDER,
+  PURCHASE_RETURN_COLUMN_LABEL,
+  PURCHASE_RETURN_UNIT_COLUMN_ORDER,
+  PURCHASE_RETURN_UNIT_COLUMN_LABEL,
+  PURCHASE_RETURN_SUPERSEDED_LABELS,
+  PURCHASE_RETURN_EVIDENCE_PURPOSES,
+  PURCHASE_RETURN_UNIT_QTY,
+  PURCHASE_RETURN_RAIL_SECTIONS,
+  PURCHASE_RETURN_CONDITIONS,
+  PURCHASE_RETURN_CONDITION_SECTION,
+  PURCHASE_RETURN_CONDITION_ORDER,
+  purchaseReturnNo,
+  purchaseReturnEvidenceLabel,
+  purchaseReturnPhotoAction,
+  purchaseReturnVideoAction,
+  purchaseReturnQty,
+  purchaseReturnCollectedQty,
+  purchaseReturnCollectedBy,
+  purchaseReturnActualPickupDate,
+  purchaseReturnSupplierReceivedDate,
+  purchaseReturnPickupLocation,
+  purchaseReturnReturnTo,
+  purchaseReturnCategory,
+  purchaseReturnPoNo,
+  purchaseReturnUnitCell,
+  purchaseReturnItems,
+  purchaseReturnItemSpec,
+  purchaseReturnConditions,
+  purchaseReturnPickupProofMissing,
+  purchaseReturnMatches,
+  purchaseReturnSupplierCounts,
+  purchaseReturnConditionCounts,
+  type PurchaseReturnColumnKey,
+  type PurchaseReturnUnitColumnKey,
+  type PurchaseReturnEvidencePurpose,
+  type PurchaseReturnEvidenceCount,
+  type PurchaseReturnUnitRow,
+  type PurchaseReturnListRow,
+  type PurchaseReturnRailSection,
+  type PurchaseReturnCondition,
+} from "./purchase-return";
+
+export * from "./department";
+export * from "./logistics-card";
+export * from "./customer-card";
+export * from "./supplier-card";
+export * from "./mission-route";
+
+export * from "./sales-order-register-filters";
+
+export {
+  workspaceActivitySettingsSchema,
+  workspaceActivitySettingsInput,
+  workspaceActivitySettingsResponseSchema,
+  type WorkspaceActivitySettingsResponse,
+  INITIAL_WORKSPACE_ACTIVITY_SETTINGS,
+  workspaceActivityWindow,
+  type WorkspaceActivitySettings,
+} from "./workspace-activity";
+
+export { evaluateWorkspaceActivityCheck, type WorkspaceActivityEvidence, type WorkspaceActivityCheck } from "./workspace-activity-check";
+
+export { decideWorkspaceReassignment, type WorkspaceCheckpointIdentity, type WorkspaceReassignmentDecision } from "./workspace-reassignment";
+
+export { documentDisplayNumber } from "./document-display";
+
+export { dateMatchesPreset, matchesRegisterColumnFilters } from "./register-column-query";
+export type { DatePreset, RegisterColumnQuery, RegisterColumnFact } from "./register-column-query";

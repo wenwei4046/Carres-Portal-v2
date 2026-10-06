@@ -64,7 +64,7 @@ export const PO_WORK_STATE_LABEL: Record<PoWorkState, string> = {
  */
 export const PO_STATE_ACTION_WORD = {
   // `Goods Arrival`, never `Goods Arriving At` (Jess, 2026-08-03): `At` adds
-  // no information, and the column beside it is `Customer Delivery` — the two
+  // no information, and the column beside it is `Requested Delivery Date` — the two
   // dates are the same kind of fact and now read as a pair. It is also the
   // word `ORDERS-WORKING-FLOW.md` already uses (`Waiting Goods Arrival`), so
   // Purchasing stops speaking its own dialect.
@@ -101,12 +101,18 @@ export const PO_STATE_ACTION_SHORT = {
  * ledger can be counted ("这年 Production Delay 几次?"); the real story goes
  * in the free-text Remarks beside it, never inside the category.
  */
+/** The eight governed supplier delay reasons (owner ruling 2026-09-24,
+ *  Purchasing MASTER §5.7; `purchasing_supplier_delay_reasons()` in 0585).
+ *  `Other` alone requires a short note. Rows recorded before keep their
+ *  earlier words. */
 export const PO_DELAY_REASONS = [
-  "Production Delay",
-  "Material Shortage",
-  "Transport Delay",
-  "Waiting Customer Confirmation",
-  "Factory Closed",
+  "Production delay",
+  "Material unavailable",
+  "Capacity / scheduling delay",
+  "Quality issue / remake",
+  "Transport delay",
+  "Supplier closed / holiday",
+  "Partial quantity ready",
   "Other",
 ] as const;
 
@@ -114,7 +120,7 @@ export const PO_DELAY_REASONS = [
  * How the goods' arrival stands against what we promised the CUSTOMER
  * (Jess, 2026-08-03).
  *
- * The register put `Customer Delivery` and `Goods Arrival` side by side and
+ * The register put `Requested Delivery Date` and `Goods Arrival` side by side and
  * left the subtraction to the operator's head. Measured on the live 19 POs:
  * EIGHT were already landing after the customer's date, two on the very day,
  * and the page said nothing — and most of those arrival dates are still our
@@ -376,6 +382,22 @@ export function poCurrentActionOf(
  * is our guess, not their promise).
  */
 export interface PoDatePromise {
+  id?: string | null;
+  /** 0587 · a line-level answer names its PO goods line and batch quantity;
+   *  the rows of one recorded answer share `answer_group`. */
+  po_line_id?: string | null;
+  about_qty?: number | null;
+  answer_group?: string | null;
+  po_version?: number | null;
+  channel?: string | null;
+  recipient?: string | null;
+  evidence?: string | null;
+  reported_by?: string | null;
+  reported_at?: string | null;
+  recorded_by?: string | null;
+  recorded_by_name?: string | null;
+  duty_name?: string | null;
+  acting_name?: string | null;
   kind: string;
   answer: string;
   about_date: string | null;
@@ -384,6 +406,173 @@ export interface PoDatePromise {
   reason: string | null;
   remarks?: string | null;
   recorded_at: string;
+}
+
+/** The one date a reply names, whatever its era's vocabulary. The legacy
+ *  `shipping` rows kept the date in `about_date`; everything since 0430
+ *  (`confirmed` · `earlier` · `delayed` · `reported`) writes `new_date`. */
+export function poReplyDateOf(row: PoDatePromise): string | null {
+  if (row.kind !== "tomorrow_delivery") return null;
+  return row.answer === "shipping" ? row.about_date : (row.new_date ?? null);
+}
+
+/** Only an evidenced answer about this exact document version is a reply. */
+export function poSupplierReplyOf(promises: readonly PoDatePromise[] | null | undefined, version: number) {
+  return [...(promises ?? [])].filter(row =>
+    row.kind === "tomorrow_delivery" && row.po_version === version &&
+    row.channel?.trim() && row.recipient?.trim() && row.evidence?.trim() &&
+    row.reported_by?.trim() && row.reported_at && row.recorded_by && row.recorded_at &&
+    poReplyDateOf(row)
+  ).sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0] ?? null;
+}
+
+/**
+ * The latest reply RECORDED against this exact version, evidence or not.
+ *
+ * 0430 — a pre-evidence reply (recorded before 0428's evidence law) is a real
+ * business fact somebody wrote down; hiding it printed "the supplier has said
+ * nothing" over a recorded answer. It never QUALIFIES as the governed supplier
+ * date — `poSupplierReplyOf` stays the only authority for that — but a surface
+ * must be able to say "a reply was recorded without evidence" instead of
+ * claiming a proven absence.
+ */
+export function poRecordedReplyOf(promises: readonly PoDatePromise[] | null | undefined, version: number) {
+  return [...(promises ?? [])].filter(row =>
+    row.kind === "tomorrow_delivery" && row.po_version === version && poReplyDateOf(row)
+  ).sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0] ?? null;
+}
+
+export function poSupplierDeliveryDateOf(promises: readonly PoDatePromise[] | null | undefined, version: number): string | null {
+  const reply = poSupplierReplyOf(promises, version);
+  return reply ? poReplyDateOf(reply) : null;
+}
+
+/**
+ * ⭐ THE SUPPLIER'S ANSWER, PER GOODS LINE — Purchasing §5.7 (owner 2026-09-25).
+ *
+ * One line's newest evidenced answer on the current version, as its batches:
+ * one batch (`Confirmed` / `New date`) or several (`Split delivery`, each with
+ * its own quantity and date). A PO-level answer recorded before 0587 (or by
+ * the retired one-date form) still answers every line that has no answer of
+ * its own — it is a fact somebody wrote down, never dropped to tidy a screen.
+ * ONE reader, so the PO page, the Register expansion, the Register parent and
+ * the Work Supplier card cannot disagree (Law D).
+ */
+export interface PoSupplierAnswerBatch {
+  qty: number | null;
+  date: string;
+  /** confirmed · earlier · delayed · reported — the SERVER's classification. */
+  answer: string;
+  reason: string | null;
+  remarks: string | null;
+}
+
+export interface PoLineSupplierAnswer {
+  poLineId: string | null;
+  batches: PoSupplierAnswerBatch[];
+  recordedAt: string;
+  answerGroup: string | null;
+  previousDate: string | null;
+  recordedByName: string | null;
+  evidence: string | null;
+}
+
+const evidenced = (row: PoDatePromise, version: number) =>
+  row.kind === "tomorrow_delivery" && row.po_version === version &&
+  !!row.channel?.trim() && !!row.recipient?.trim() && !!row.evidence?.trim() &&
+  !!row.reported_by?.trim() && !!row.reported_at && !!row.recorded_by && !!row.recorded_at &&
+  !!poReplyDateOf(row);
+
+const batchOf = (row: PoDatePromise): PoSupplierAnswerBatch => ({
+  qty: row.about_qty ?? null,
+  date: poReplyDateOf(row)!,
+  answer: row.answer,
+  reason: row.reason ?? null,
+  remarks: row.remarks ?? null,
+});
+
+/** The newest PO-level (line-less) evidenced answer, or null. */
+export function poLevelSupplierAnswerOf(
+  promises: readonly PoDatePromise[] | null | undefined,
+  version: number,
+): PoLineSupplierAnswer | null {
+  const row = [...(promises ?? [])]
+    .filter((r) => evidenced(r, version) && !r.po_line_id)
+    .sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0];
+  return row
+    ? { poLineId: null, batches: [batchOf(row)], recordedAt: row.recorded_at, answerGroup: row.answer_group ?? null,
+        previousDate: row.previous_date ?? null, recordedByName: row.recorded_by_name ?? null, evidence: row.evidence ?? null }
+    : null;
+}
+
+/**
+ * The newest evidenced answer for EACH goods line: the line's own newest
+ * answer group (all of its batches, in date order), else the PO-level one.
+ * A line with no answer at all is absent from the map.
+ */
+export function poLineSupplierAnswersOf(
+  promises: readonly PoDatePromise[] | null | undefined,
+  version: number,
+  lineIds: readonly string[],
+): Map<string, PoLineSupplierAnswer> {
+  const rows = [...(promises ?? [])].filter((r) => evidenced(r, version) && !!r.po_line_id);
+  const poLevel = poLevelSupplierAnswerOf(promises, version);
+  const out = new Map<string, PoLineSupplierAnswer>();
+  for (const lineId of lineIds) {
+    const own = rows.filter((r) => r.po_line_id === lineId).sort((a, b) => b.recorded_at.localeCompare(a.recorded_at));
+    const newest = own[0];
+    if (newest) {
+      const group = own.filter((r) =>
+        newest.answer_group ? r.answer_group === newest.answer_group : r.recorded_at === newest.recorded_at);
+      const batches = group.map(batchOf).sort((a, b) => a.date.localeCompare(b.date));
+      out.set(lineId, {
+        poLineId: lineId, batches, recordedAt: newest.recorded_at, answerGroup: newest.answer_group ?? null,
+        previousDate: newest.previous_date ?? null, recordedByName: newest.recorded_by_name ?? null, evidence: newest.evidence ?? null,
+      });
+    } else if (poLevel) {
+      out.set(lineId, { ...poLevel, poLineId: lineId });
+    }
+  }
+  return out;
+}
+
+/**
+ * What the Register PARENT prints for `Supplier Confirmed Delivery Date`
+ * (Purchasing §9.3, Blueprint segment 2): ONE date when every answered
+ * line/batch names the same day; `{n} dates` when they differ; null when no
+ * line has an answer. `changed` counts lines whose newest date is not the
+ * original PO Delivery Date; `changedFrom` is that original when exactly one
+ * line moved (the second line prints `Supplier changed from {date}`).
+ */
+export interface PoSupplierAnswerSummary {
+  date: string | null;
+  distinctDates: string[];
+  answeredLines: number;
+  changed: number;
+  changedFrom: string | null;
+}
+
+export function poSupplierAnswerSummaryOf(
+  promises: readonly PoDatePromise[] | null | undefined,
+  version: number,
+  lineIds: readonly string[],
+  originalDate: string | null | undefined,
+): PoSupplierAnswerSummary {
+  const answers = poLineSupplierAnswersOf(promises, version, lineIds);
+  const dates = new Set<string>();
+  let changed = 0;
+  for (const answer of answers.values()) {
+    for (const b of answer.batches) dates.add(b.date);
+    if (answer.batches.some((b) => originalDate != null && b.date !== originalDate)) changed += 1;
+  }
+  const distinctDates = [...dates].sort();
+  return {
+    date: distinctDates.length === 1 ? distinctDates[0] : null,
+    distinctDates,
+    answeredLines: answers.size,
+    changed,
+    changedFrom: changed === 1 && originalDate ? originalDate : null,
+  };
 }
 
 export interface PoDateHistoryEntry {
@@ -402,8 +591,7 @@ export interface PoDateHistory {
   /**
    * `Supplier Ready Date` — when the factory says it has FINISHED making it
    * (Q5). Its own list, never merged into `entries`: the two are different
-   * FACTS (§12.2's date dictionary), every supplier here carries transit days,
-   * and one numbered run mixing them would count `2nd` across two questions
+   * FACTS (§12.2's date dictionary), and one numbered run mixing them would count `2nd` across two questions
    * and measure a slip between a ready date and an arrival date.
    *
    * Before Q5 this ledger kind was FILTERED OUT, so the first ready date an
@@ -436,14 +624,10 @@ function dateEntriesOf(
   const entries: PoDateHistoryEntry[] = [];
   for (const r of rows) {
     // A ready date IS the answer, so it always names its new date. On the
-    // arrival kind a delay names the NEW date and a confirmation names the
-    // date it was about.
-    const date =
-      kind === "ready_date"
-        ? r.new_date
-        : r.answer === "delayed"
-          ? r.new_date
-          : r.about_date;
+    // arrival kind the one reply-date rule (`poReplyDateOf`) reads both the
+    // legacy vocabulary and 0430's `confirmed` · `earlier` · `delayed` ·
+    // `reported`.
+    const date = kind === "ready_date" ? r.new_date : poReplyDateOf(r);
     if (!date) continue;
     // A repeated confirmation of the SAME date is not a new date — it is the
     // same promise restated, so it never earns an ordinal.
@@ -501,4 +685,94 @@ export function ordinalLabel(n: number): string {
     default:
       return `${n}th`;
   }
+}
+
+/* ── PO REVISIONS — a sent PO keeps its number and mints a version ──────────
+ *
+ * Jess, 2026-08-18 (purchasing/MASTER.md §4 FROZEN RULES): cancel-and-reissue
+ * puts TWO numbers for ONE job in the factory's hands, and a factory reads two
+ * numbers as two jobs. A change KEEPS the number and mints `PO-2041 ·
+ * Version 2`; the floor is `received_qty` per line; adding items is a NEW PO
+ * and stopping is the whole PO (Cancel).
+ *
+ * These words live HERE (Law 7): the panel title, the disabled Save's gap
+ * names, and the unshared-version sentence are one spelling for every screen
+ * that ever prints them. COPY-STANDARD's PURCHASING block registers each.
+ */
+
+/**
+ * THE DOCUMENT NUMBER A SUPPLIER READS, VERSION AND ALL.
+ *
+ * Owner ruling 2026-09-23 (`docs/purchasing/MASTER.md` §6.1): a new purchase
+ * order is `PO260924-4827` and its version is a marker with NO space —
+ * `PO260924-4827(1)` on the original, `(2)` after one revision.
+ *
+ * ⭐ THE SPELLING FOLLOWS THE NUMBER, NEVER THE PRINT DATE. Every pre-cutover
+ * PO keeps the form its supplier already holds (`PO-20260904-4665 V2`, and the
+ * older `PO-2054 V1`), because §6.1's permanence rule and PO-PDF-STANDARD's
+ * frozen-document rule both say a paper reprints as it was received — and the
+ * kept payload of a sent version carries that same old number, so a reprint
+ * lands on the old spelling by construction rather than by a stored flag.
+ *
+ * One version is printed too, never suppressed: a factory holding two papers
+ * with one number cannot tell which to build from (0378).
+ */
+const NEW_FORM_DOCUMENT_NO = /^[A-Z]{2,4}\d{6}-\d{4}$/;
+
+export function poDocumentNumberOf(
+  poNumber: string,
+  version?: number | null,
+): string {
+  const n = version != null && version > 0 ? version : 1;
+  return NEW_FORM_DOCUMENT_NO.test(poNumber)
+    ? `${poNumber}(${n})`
+    : `${poNumber} V${n}`;
+}
+
+/** `Version 2` for the panel title's ` · Version 2` — and NOTHING for
+ *  Version 1: an unrevised PO is just the PO, and printing `Version 1`
+ *  everywhere would teach operators the word means nothing. */
+export function poVersionLabelOf(
+  version: number | null | undefined,
+): string | null {
+  return version != null && version > 1 ? `Version ${version}` : null;
+}
+
+/** What a revise Save is missing, top-to-bottom — the Receiving button law:
+ *  a disabled button NAMES its gap, and the first gap wins. The floor outranks
+ *  everything (it is the ruling's own red line), then the empty change set,
+ *  then the missing reason. Returns null when Save may run. */
+export function poReviseSaveGapOf(input: {
+  belowFloorSku: string | null;
+  nothingChanged: boolean;
+  reasonEmpty: boolean;
+}): string | null {
+  if (input.belowFloorSku != null) return "Save: below received";
+  if (input.nothingChanged) return "Save: nothing changed";
+  if (input.reasonEmpty) return "Save: say why";
+  return null;
+}
+
+/** `PO-2041 Version 2 has not reached Ohana` — COPY-STANDARD's governed
+ *  sentence, DERIVED and never stored: the current version was minted after
+ *  the last observed hand-over (or nothing was ever handed over). Version 1
+ *  never raises it — before the first revise, the share story is the existing
+ *  `Issue` ladder's, not this sentence's. */
+export function poUnsharedVersionNoticeOf(
+  po: {
+    id: string;
+    version?: number | null;
+    revised_at?: string | null;
+    sends?: readonly { sent_at: string }[] | null;
+  },
+  supplierName: string,
+): string | null {
+  const version = po.version ?? 1;
+  if (version <= 1 || !po.revised_at) return null;
+  const lastSend = (po.sends ?? []).reduce<string | null>(
+    (max, s) => (max == null || s.sent_at > max ? s.sent_at : max),
+    null,
+  );
+  if (lastSend != null && lastSend > po.revised_at) return null;
+  return `${po.id} Version ${version} has not reached ${supplierName}`;
 }

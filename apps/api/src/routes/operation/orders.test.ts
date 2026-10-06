@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 import { assertRpcCallShape } from "../../test-utils/assert-rpc";
@@ -9,9 +9,20 @@ vi.mock("../../lib/supabase", () => ({
 }));
 
 import { userClient } from "../../lib/supabase";
+vi.mock("../../lib/sales-order-document-search", () => ({ findSalesOrderDocuments: vi.fn(async () => ({ orderIds: [] as string[], soNumbers: [] as number[] })) }));
+import { findSalesOrderDocuments } from "../../lib/sales-order-document-search";
+
+
+// The Work Completed writer (0584) observes this door from a middleware and is
+// proven in lib/sales-order-work-completion*.test.ts; here it passes through,
+// so these tests keep asserting only what the door itself writes.
+vi.mock("../../lib/sales-order-work-completion", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/sales-order-work-completion")>()),
+  salesOrderWorkCompletion: () => async (_c: unknown, next: () => Promise<void>) => { await next(); },
+}));
+
 
 const SUPABASE_URL = "https://test.supabase.co";
-const KID = "test-kid-1";
 
 const env = {
   SUPABASE_URL,
@@ -20,33 +31,17 @@ const env = {
   SUPABASE_JWT_SECRET: "unused",
 };
 
-let signKey: KeyLike;
-let publicJwk: JWK;
-
 async function makeJwt(role: string) {
-  return new SignJWT({
+  return signTestJwt("11111111-1111-1111-1111-000000000999", {
     email: `${role}@carres.com`,
     app_metadata: { role },
-  })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000999")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  });
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
+  vi.mocked(findSalesOrderDocuments).mockResolvedValue({ orderIds: [], soNumbers: [] });
 });
 
 afterAll(() => _setJwksForTesting(null));
@@ -79,13 +74,37 @@ describe("GET /api/operation/orders", () => {
     const is = vi.fn().mockReturnThis();
     const order = vi.fn().mockReturnThis();
     const limit = vi.fn().mockResolvedValue({ data: rows, error: null });
-    const select = vi.fn(() => ({ in: inFn, eq, ilike, or, not, is, order, limit }));
+    const select = vi.fn((_fields?: string) => ({ in: inFn, eq, ilike, or, not, is, order, limit }));
     vi.mocked(userClient).mockReturnValue({
       from: vi.fn(() => ({ select })),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
-    return { eq, inFn, ilike, or, not, is, order, limit };
+    return { select, eq, inFn, ilike, or, not, is, order, limit };
   }
+
+  it("reads invoice, receipt allocation and amendment lineage from their source ledgers", async () => {
+    const { select, eq } = mockOrdersList([ORDER_ROW]);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request("http://t/api/operation/orders", { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(200);
+    const fields = String(select.mock.calls[0]?.[0]);
+    expect(fields).toContain("original_request:sales_order_revisions(revision,snapshot)");
+    expect(eq).toHaveBeenCalledWith("original_request.revision", 1);
+    expect(fields).toContain("invoice_documents:invoices(id,invoice_no)");
+    expect(fields).toContain("receipt_documents:order_payments(id,receipt_no)");
+    expect(fields).toContain("allocated_receipts:payment_allocations(order_payments(id,receipt_no))");
+    expect(fields).toContain("amendment_documents:sales_order_amendments(id)");
+  });
+
+  it("searches linked identities before the register cap, retaining normal order scope", async () => {
+    const { or } = mockOrdersList([ORDER_ROW]);
+    vi.mocked(findSalesOrderDocuments).mockResolvedValue({ orderIds: [ORDER_ROW.id], soNumbers: [4001, 4002] });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request("http://t/api/operation/orders?stage=proceeded&search=RC-123", { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(200);
+    expect(or.mock.calls.some(([value]) => value.includes(`id.in.(${ORDER_ROW.id})`) && value.includes("so.in.(4001,4002)"))).toBe(true);
+    expect(findSalesOrderDocuments).toHaveBeenCalledWith(expect.anything(), "RC-123");
+  });
 
   it("returns orders for operation with default 'all' stage and 'all' channel", async () => {
     const { inFn, order, limit } = mockOrdersList([ORDER_ROW]);
@@ -106,6 +125,304 @@ describe("GET /api/operation/orders", () => {
     expect(order).toHaveBeenCalledWith("placed_at", { ascending: false });
     // STAGE 1 FIX 1 — the 200-row trap removed; the agreed cap is 500.
     expect(limit).toHaveBeenCalledWith(500);
+  });
+
+  /* ⭐ `{n} of {m}` needs the SERVER's count of the permitted scope — not the
+     500-row page, not the search answer. */
+  describe("salesOrderTotal — the Register's authoritative total", () => {
+    /* Which table each recorded call was made on — kept beside the calls so
+       the recorded shape the older assertions compare stays unchanged. */
+    let tableOfCall = new WeakMap<object, string>();
+    function mockWithCount(opts: { rows: unknown[]; count: number | null; countError?: unknown }) {
+      const calls: Array<{ head: boolean; method: string; args: unknown[] }> = [];
+      tableOfCall = new WeakMap();
+      const record = (table: string, call: { head: boolean; method: string; args: unknown[] }) => {
+        tableOfCall.set(call, table);
+        calls.push(call);
+      };
+      const from = vi.fn((table: string) => {
+        let head = false;
+        const chain: Record<string, unknown> = {};
+        chain.select = vi.fn((_cols: string, o?: { count?: string; head?: boolean }) => {
+          head = Boolean(o?.head);
+          record(table, { head, method: "select", args: [_cols, o] });
+          return chain;
+        });
+        for (const m of ["in", "eq", "neq", "ilike", "or", "not", "is", "order", "limit", "range"])
+          chain[m] = vi.fn((...args: unknown[]) => { record(table, { head, method: m, args }); return chain; });
+        chain.then = (resolve: (v: unknown) => unknown) =>
+          resolve(head ? { count: opts.count, error: opts.countError ?? null, data: null } : { data: opts.rows, error: null });
+        return chain;
+      });
+      vi.mocked(userClient).mockReturnValue({ from } as never);
+      return calls;
+    }
+    const get = async (qs = "") => {
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(new Request(`http://t/api/operation/orders${qs}`, { headers: { Authorization: `Bearer ${jwt}` } }), env);
+      expect(res.status).toBe(200);
+      return (await res.json()) as { orders: unknown[]; salesOrderTotal: number | null };
+    };
+
+    it("answers a search with the UNSEARCHED total, counted head-only and without rentals", async () => {
+      const calls = mockWithCount({ rows: [ORDER_ROW], count: 612 });
+      const body = await get("?search=Tan");
+      expect(body.orders).toHaveLength(1);
+      expect(body.salesOrderTotal).toBe(612);
+      const countCalls = calls.filter((c) => c.head);
+      expect(countCalls.find((c) => c.method === "select")?.args[1]).toEqual({ count: "exact", head: true });
+      expect(countCalls).toContainEqual({ head: true, method: "in", args: ["status", ["place", "proceed_order", "delivered"]] });
+      expect(countCalls).toContainEqual({ head: true, method: "or", args: ["source_system.is.null,source_system.neq.rental"] });
+      /* The search narrows the rows, never the total. */
+      expect(countCalls.some((c) => c.method === "or" && String(c.args[0]).includes("customer_name"))).toBe(false);
+    });
+
+    it("reports a total larger than the 500-row page it returns", async () => {
+      mockWithCount({ rows: Array.from({ length: 500 }, (_, i) => ({ ...ORDER_ROW, id: `o-${i}`, so: 5000 + i })), count: 612 });
+      const body = await get();
+      expect(body.orders).toHaveLength(500);
+      expect(body.salesOrderTotal).toBe(612);
+    });
+
+    it("narrows the total by the same stage and channel as the list", async () => {
+      const calls = mockWithCount({ rows: [], count: 3 });
+      await get("?stage=placed&channel=showrooms");
+      const countCalls = calls.filter((c) => c.head);
+      expect(countCalls).toContainEqual({ head: true, method: "eq", args: ["status", "place"] });
+      expect(countCalls).toContainEqual({ head: true, method: "not", args: ["outlet_id", "is", null] });
+    });
+
+    /* ⭐ THE SALES ORDERS REGISTER POPULATION — ONE POPULATION, ONE PREDICATE
+       (owner ruling 2026-09-26, Orders MASTER §0.1 REGISTER CLOSE-OUT item 4).
+       Every non-cancelled handed-over order, rentals excluded ON THE SERVER,
+       and the rows and the total are narrowed by the SAME calls. */
+    const populationCalls = (calls: Array<{ head: boolean; method: string; args: unknown[] }>, head: boolean) =>
+      calls
+        .filter((c) => c.head === head && tableOfCall.get(c) === "orders")
+        .filter((c) =>
+          (["in", "eq", "neq", "not"].includes(c.method) && c.args[0] === "status") ||
+          (c.method === "or" && String(c.args[0]).includes("source_system")))
+        .map((c) => ({ method: c.method, args: c.args }));
+
+    it("stage=proceeded reads the rows AND the total through one predicate, and serves proceeded_at", async () => {
+      const calls = mockWithCount({ rows: [ORDER_ROW], count: 29 });
+      const body = await get("?stage=proceeded");
+      expect(body.salesOrderTotal).toBe(29);
+      const expected = [
+        { method: "not", args: ["status", "in", "(place,cancelled)"] },
+        { method: "or", args: ["source_system.is.null,source_system.neq.rental"] },
+      ];
+      expect(populationCalls(calls, false)).toEqual(expected);
+      expect(populationCalls(calls, true)).toEqual(expected);
+      const listSelect = calls.find((c) => !c.head && c.method === "select");
+      expect(String(listSelect?.args[0])).toContain("proceeded_at");
+      /* Never the planned production-start field in its place. */
+      expect(calls.some((c) => c.method === "eq" && c.args[0] === "operation_stage")).toBe(false);
+    });
+
+    it("stage=proceeded keeps one predicate when a search narrows the rows", async () => {
+      const calls = mockWithCount({ rows: [ORDER_ROW], count: 29 });
+      await get("?stage=proceeded&search=Tan");
+      expect(populationCalls(calls, false)).toEqual(populationCalls(calls, true));
+      expect(populationCalls(calls, false)).toHaveLength(2);
+    });
+
+    /* The list is shared (Delivery, Work, Payments, the dashboard, the old
+       Orders control). Off the Register's path nothing they receive changes:
+       Placed rows and rentals still ride the list. */
+    it("leaves every other caller's list as it was — no Register predicate without stage=proceeded", async () => {
+      const calls = mockWithCount({ rows: [ORDER_ROW], count: 40 });
+      await get();
+      expect(populationCalls(calls, false)).toEqual([
+        { method: "in", args: ["status", ["place", "proceed_order", "delivered"]] },
+      ]);
+    });
+
+    it("says UNKNOWN (null), never a guess, when the count cannot be read", async () => {
+      mockWithCount({ rows: [ORDER_ROW], count: null, countError: { message: "timeout" } });
+      const body = await get();
+      expect(body.orders).toHaveLength(1);
+      expect(body.salesOrderTotal).toBeNull();
+    });
+  });
+
+  /* ⭐ FIND AN ORDER BY PHONE (Orders MASTER §0 Charter). The Sales Order
+     page's `Existing customer · {n} orders ›` opens this list searched by the
+     phone; before this read the server matched no phone, so the answer
+     replaced the rows with nothing. */
+  describe("phone search — the digits find the order however they were written", () => {
+    type Call = { table: string; cols: string; head: boolean; method: string; args: unknown[] };
+    const PHONE_COLS = "id, customer_phone";
+    function mockPhoneRead(opts: { phones?: Array<{ id: string; customer_phone: string | null }>; phoneError?: unknown }) {
+      const calls: Call[] = [];
+      const from = vi.fn((table: string) => {
+        let cols = "";
+        let head = false;
+        const chain: Record<string, unknown> = {};
+        chain.select = vi.fn((c: string, o?: { head?: boolean }) => {
+          cols = c;
+          head = Boolean(o?.head);
+          calls.push({ table, cols, head, method: "select", args: [c, o] });
+          return chain;
+        });
+        for (const m of ["in", "eq", "neq", "ilike", "or", "not", "is", "order", "limit", "range"])
+          chain[m] = vi.fn((...args: unknown[]) => { calls.push({ table, cols, head, method: m, args }); return chain; });
+        chain.then = (resolve: (v: unknown) => unknown) =>
+          resolve(
+            head
+              ? { count: 1, error: null, data: null }
+              : cols === PHONE_COLS
+                ? opts.phoneError
+                  ? { data: null, error: opts.phoneError }
+                  : { data: opts.phones ?? [], error: null }
+                : { data: [ORDER_ROW], error: null },
+          );
+        return chain;
+      });
+      vi.mocked(userClient).mockReturnValue({ from } as never);
+      return calls;
+    }
+    const search = async (term: string, stage = "proceeded") => {
+      const jwt = await makeJwt("operation");
+      return app.fetch(
+        new Request(`http://t/api/operation/orders?stage=${stage}&search=${encodeURIComponent(term)}`, { headers: { Authorization: `Bearer ${jwt}` } }),
+        env,
+      );
+    };
+    const listOr = (calls: Call[]) =>
+      calls.filter((c) => c.table === "orders" && !c.head && c.cols !== PHONE_COLS && c.method === "or").map((c) => String(c.args[0]));
+    const searchClause = (calls: Call[]) => listOr(calls).find((v) => v.includes("customer_name")) ?? "";
+
+    it.each([
+      ["019-83372393", "019-83372393"],
+      ["01983372393", "019-83372393"],
+      ["019 8337 2393", "019-83372393"],
+      ["(019) 8337-2393", "019-83372393"],
+      ["+60198337 2393", "019-83372393"],
+      ["+60 19-8337 2393", "019-83372393"],
+      ["0123456789", "+60123456789"],
+      ["012-345 6789", "+60 12-345 6789"],
+      ["+60123456789", "0123456789"],
+      ["0123456789", "123456789"],
+    ])("typed %s finds the order stored as %s", async (typed, stored) => {
+      const calls = mockPhoneRead({
+        phones: [
+          { id: "hit-order", customer_phone: stored },
+          { id: "other-order", customer_phone: "011-1111 2222" },
+        ],
+      });
+      const res = await search(typed);
+      expect(res.status).toBe(200);
+      const clause = searchClause(calls);
+      expect(clause).toContain("id.in.(hit-order)");
+      expect(clause).not.toContain("other-order");
+    });
+
+    it("reads the phones of the list's OWN population, through the caller's RLS client", async () => {
+      const calls = mockPhoneRead({ phones: [] });
+      await search("019-8337 2393");
+      const phoneCalls = calls.filter((c) => c.cols === PHONE_COLS).map((c) => ({ method: c.method, args: c.args }));
+      expect(phoneCalls).toContainEqual({ method: "not", args: ["status", "in", "(place,cancelled)"] });
+      expect(phoneCalls).toContainEqual({ method: "or", args: ["source_system.is.null,source_system.neq.rental"] });
+      expect(phoneCalls).toContainEqual({ method: "ilike", args: ["customer_phone", "%1%9%8%3%3%7%2%3%9%3%"] });
+      expect(phoneCalls).toContainEqual({ method: "range", args: [0, 999] });
+      /* No phone matched: no id clause, and the rest of the search is unchanged. */
+      expect(searchClause(calls)).not.toContain("id.in.");
+    });
+
+    it("leaves a NAME search exactly as it was — no phone read", async () => {
+      const calls = mockPhoneRead({ phones: [{ id: "hit-order", customer_phone: "0123456789" }] });
+      const res = await search("Tan");
+      expect(res.status).toBe(200);
+      expect(calls.some((c) => c.cols === PHONE_COLS)).toBe(false);
+      expect(searchClause(calls)).toBe("customer_name.ilike.%Tan%,source_ref.cs.{TAN},invoice_no.ilike.%TAN%,do_number.ilike.%TAN%");
+    });
+
+    it("leaves an SO-number search as it was — four digits are not a phone", async () => {
+      const calls = mockPhoneRead({ phones: [{ id: "hit-order", customer_phone: "0123454001" }] });
+      await search("4001");
+      expect(calls.some((c) => c.cols === PHONE_COLS)).toBe(false);
+      expect(searchClause(calls)).toContain("so.eq.4001");
+    });
+
+    it("fails the search when the phones cannot be read — never a silent `no order`", async () => {
+      const calls = mockPhoneRead({ phoneError: { code: "42501", message: "permission denied for table orders" } });
+      const res = await search("019-8337 2393");
+      expect(res.status).toBe(403);
+      /* The list itself was never answered with a phone-less search. */
+      expect(listOr(calls).some((v) => v.includes("customer_name"))).toBe(false);
+    });
+
+    it("keeps a bracketed phone from breaking the or() grammar", async () => {
+      const calls = mockPhoneRead({ phones: [{ id: "hit-order", customer_phone: "03-1234 5678" }] });
+      const res = await search("(03) 1234 5678");
+      expect(res.status).toBe(200);
+      const clause = searchClause(calls);
+      expect(clause.startsWith('customer_name.ilike."%(03) 1234 5678%",')).toBe(true);
+      expect(clause).toContain("id.in.(hit-order)");
+    });
+  });
+
+  it.each(["4001", "SO-4001", "so-4001", "SO 4001"])("finds the order number entered as %s", async (search) => {
+    const { or } = mockOrdersList([]);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders?search=${encodeURIComponent(search)}`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    expect(or).toHaveBeenCalledWith(expect.stringContaining("so.eq.4001"));
+  });
+
+  it.each(["4001 Smith", "CR4001", "SO-4001-extra", "9007199254740992"])("does not turn %s into an unrelated order number", async (search) => {
+    const { or } = mockOrdersList([]);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders?search=${encodeURIComponent(search)}`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    expect(or).toHaveBeenCalledWith(expect.not.stringContaining("so.eq."));
+  });
+
+  it("carries exact product-line bindings through both reserved and sold stock reads", async () => {
+    const stockSelects: string[] = [];
+    const from = vi.fn((table: string) => {
+      let status: unknown;
+      const chain: Record<string, unknown> = {};
+      for (const method of ["in", "ilike", "or", "not", "is", "order", "limit", "range"])
+        chain[method] = vi.fn(() => chain);
+      chain.select = vi.fn((columns: string) => {
+        if (table === "ops_stock_items") stockSelects.push(columns);
+        return chain;
+      });
+      chain.eq = vi.fn((column: string, value: unknown) => {
+        if (column === "status") status = value;
+        return chain;
+      });
+      chain.then = (resolve: (value: unknown) => unknown) => resolve({ error: null, data:
+        table === "orders" ? [ORDER_ROW] : table === "ops_stock_items" ?
+          status === "reserved" ? [
+            { sku: "same", qty: 1, reserved_ref: "SO-4001", reserved_order_line_id: "line-a" },
+            { sku: "same", qty: 1, reserved_ref: "SO-4001", reserved_order_line_id: null },
+          ] : status === "sold" ? [
+            { sku: "same", qty: 2, sold_order_id: ORDER_ROW.id, reserved_order_line_id: "line-b" },
+          ] : [] : [],
+      });
+      return chain;
+    });
+    vi.mocked(userClient).mockReturnValue({ from } as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request("http://t/api/operation/orders", {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { orders: { allocated_units: unknown[] }[] };
+    expect(body.orders[0]?.allocated_units).toEqual([
+      { sku: "same", qty: 1, status: "reserved", orderLineId: "line-a" },
+      { sku: "same", qty: 1, status: "reserved", orderLineId: null },
+      { sku: "same", qty: 2, status: "sold", orderLineId: "line-b" },
+    ]);
+    expect(stockSelects).toHaveLength(2);
+    expect(stockSelects.every(columns => columns.split(", ").includes("reserved_order_line_id"))).toBe(true);
   });
 
   // ── D1 · the list carries the SKUs a real purchase order covers ───────────
@@ -206,13 +523,15 @@ describe("GET /api/operation/orders", () => {
       expect(body.orders[1]?.po_numbers).toEqual([]);
     });
 
-    it("a PO with no lines contributes nothing", async () => {
+    it("a PO with no lines retains its document number without claiming goods coverage", async () => {
       mockWithPos(
         [{ ...ORDER_ROW, so: 1206 }],
         [{ id: "PO-EMPTY", so: null, so_refs: [1206] }],
         [],
       );
-      expect((await get()).orders[0]?.po_skus).toEqual([]);
+      const body = await get();
+      expect(body.orders[0]?.po_skus).toEqual([]);
+      expect(body.orders[0]?.po_numbers).toEqual(["PO-EMPTY"]);
     });
 
     it("ONE batched query for the whole page — never one per order", async () => {
@@ -232,6 +551,100 @@ describe("GET /api/operation/orders", () => {
       );
       expect(poCalls).toHaveLength(1);
       expect(lineCalls).toHaveLength(1);
+    });
+  });
+
+  /**
+   * THE LIST CARRIES THE CATALOG'S CATEGORY (2026-08-24).
+   *
+   * Jess: "Other goods 44 - the number doesn't tally." The register footer
+   * classified a line from its SKU TEXT alone while the SO detail read the
+   * catalog first, so one product counted two ways on two screens. The list
+   * now stamps `category` the SAME way the detail route has since PR 885,
+   * through `skuCategories` - the ONE category reader (Law D).
+   */
+  describe("category on list lines", () => {
+    function mockWithCatalog(
+      orders: Record<string, unknown>[],
+      productSkus: Record<string, unknown>[],
+    ) {
+      const from = vi.fn((table: string) => {
+        if (table === "product_skus") {
+          // ONE fixture serves BOTH readers of this table -
+          // `resolveSkuLabels` (name) and `skuCategories` (category).
+          const inFn = vi.fn().mockResolvedValue({ data: productSkus, error: null });
+          return { select: vi.fn(() => ({ in: inFn })) };
+        }
+        if (table === "purchase_orders") {
+          const or = vi.fn().mockResolvedValue({ data: [], error: null });
+          return { select: vi.fn(() => ({ or })) };
+        }
+        if (table === "purchase_order_lines") {
+          const inFn = vi.fn().mockResolvedValue({ data: [], error: null });
+          return { select: vi.fn(() => ({ in: inFn })) };
+        }
+        const chain: Record<string, unknown> = {};
+        for (const k of ["in", "eq", "ilike", "or", "not", "is", "order"])
+          chain[k] = vi.fn(() => chain);
+        chain.limit = vi.fn().mockResolvedValue({ data: orders, error: null });
+        return { select: vi.fn(() => chain) };
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue({ from } as any);
+      return from;
+    }
+
+    async function lines() {
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request("http://t/api/operation/orders", {
+          headers: { Authorization: `Bearer ${jwt}` },
+        }),
+        env,
+      );
+      const body = (await res.json()) as {
+        orders: { order_lines: { sku: string; category: string | null }[] }[];
+      };
+      return body.orders[0]?.order_lines ?? [];
+    }
+
+    it("stamps the catalog category onto a line the SKU parser cannot read", async () => {
+      mockWithCatalog(
+        [{ ...ORDER_ROW, order_lines: [{ sku: "1013Jager/Fab3-King", qty: 1 }] }],
+        [
+          {
+            sku: "1013Jager/Fab3-King",
+            variant: "King",
+            product_models: { name: "Jager", category: "mattress" },
+          },
+        ],
+      );
+      expect((await lines())[0]?.category).toBe("mattress");
+    });
+
+    it("a SKU the catalog does not hold reads null - never a guessed category", async () => {
+      mockWithCatalog(
+        [{ ...ORDER_ROW, order_lines: [{ sku: "NOT-IN-CATALOG", qty: 1 }] }],
+        [],
+      );
+      expect((await lines())[0]?.category).toBeNull();
+    });
+
+    it("ONE batched product_skus read for the whole page, never one per order", async () => {
+      // `skuCategories` and `resolveSkuLabels` each read this table once
+      // for the page. Two reads total is the documented price of keeping
+      // ONE category owner; what must never happen is a read PER ORDER.
+      const from = mockWithCatalog(
+        [
+          { ...ORDER_ROW, id: "a", so: 1206, order_lines: [{ sku: "S-1", qty: 1 }] },
+          { ...ORDER_ROW, id: "b", so: 1213, order_lines: [{ sku: "S-2", qty: 1 }] },
+          { ...ORDER_ROW, id: "c", so: 1216, order_lines: [{ sku: "S-3", qty: 1 }] },
+        ],
+        [],
+      );
+      await lines();
+      const skuCalls = from.mock.calls.filter((c) => c[0] === "product_skus");
+      expect(skuCalls.length).toBeLessThanOrEqual(2);
     });
   });
 
@@ -296,6 +709,23 @@ describe("GET /api/operation/orders", () => {
       env,
     );
     expect(eq).toHaveBeenCalledWith("operation_stage", "ready_to_dispatch");
+  });
+
+  it("0584 · narrows to one order for the Work completion probe, and refuses a malformed id", async () => {
+    const { eq } = mockOrdersList([ORDER_ROW]);
+    const jwt = await makeJwt("operation");
+    const id = "11111111-0000-4000-8000-000000000001";
+    const ok = await app.fetch(
+      new Request(`http://t/api/operation/orders?orderId=${id}`, { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(ok.status).toBe(200);
+    expect(eq).toHaveBeenCalledWith("id", id);
+    const bad = await app.fetch(
+      new Request("http://t/api/operation/orders?orderId=not-an-id", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(bad.status).toBe(422);
   });
 
   it("filters by channel=dealers excludes showroom orders (outlet_id IS NULL)", async () => {
@@ -378,6 +808,18 @@ describe("GET /api/operation/orders/:id", () => {
     poLines?: any[];
     warehouse?: any;
     stockBalances?: any[];
+    /** Rows `product_skus` answers with. ONE fixture serves BOTH readers the
+     *  route makes of that table — `resolveSkuLabels` (name) and
+     *  `skuCategories` (category) — which is the point: they read one join. */
+    productSkus?: any[];
+    freeUnits?: any[];
+    /** The two name sources the History actor is resolved from. They are
+     *  SEPARATE fixtures on purpose: the staff door (`actor_display_names`,
+     *  0390) returns only internal-staff accounts, so a test that fed one
+     *  list to both would prove nothing about the case that actually breaks
+     *  — a salesperson whose name only `salespersons` can answer. */
+    appUsers?: any[];
+    salespersons?: any[];
   }) {
     const fromImpl = vi.fn((table: string) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -405,6 +847,9 @@ describe("GET /api/operation/orders/:id", () => {
         case 'order_history':
           chain.order = vi.fn(() => promise(opts.history ?? []));
           break;
+        case 'salespersons':
+          chain.in = vi.fn(() => promise(opts.salespersons ?? []));
+          break;
         case 'purchase_orders':
           chain.or = vi.fn(() => promise(opts.pos ?? []));
           break;
@@ -414,15 +859,53 @@ describe("GET /api/operation/orders/:id", () => {
         case 'warehouses':
           chain.maybeSingle = vi.fn(() => promise(opts.warehouse ?? null));
           break;
-        case 'stock_balances':
-          chain.in = vi.fn(() => promise(opts.stockBalances ?? []));
+        // 0366 — the order drawer reads the unit register's one availability
+        // authority. Fixtures still describe a site as {qty, reserved}; the
+        // view's `on_hand`/`available` are derived here as the register does.
+        case 'stock_sku_availability':
+          chain.in = vi.fn(() =>
+            promise(
+              (opts.stockBalances ?? []).map((b: {
+                sku: string;
+                warehouse_id: string;
+                qty: number;
+                reserved: number;
+                available?: number;
+              }) => ({
+                sku: b.sku,
+                warehouse_id: b.warehouse_id,
+                on_hand: b.qty,
+                reserved: b.reserved,
+                available: b.available ?? b.qty - b.reserved,
+              })),
+            ),
+          );
+          break;
+        // These two are awaited at the END of a chain whose length varies
+        // (`ops_stock_items` appends `.eq(warehouse)` only when the order has
+        // one), so the chain itself is the thenable rather than any one method.
+        case 'product_skus':
+          chain.then = (res: (v: unknown) => unknown) =>
+            res({ data: opts.productSkus ?? [], error: null });
+          break;
+        case 'ops_stock_items':
+          chain.then = (res: (v: unknown) => unknown) =>
+            res({ data: opts.freeUnits ?? [], error: null });
           break;
       }
       return chain;
     });
+    /* The staff half of the actor lookup goes through the 0390 definer door,
+       not a table read — the fixture keeps its old name because it plays the
+       same part: what the internal-staff source answers. */
+    const rpcImpl = vi.fn((fn: string) =>
+      fn === "actor_display_names"
+        ? Promise.resolve({ data: opts.appUsers ?? [], error: null })
+        : Promise.resolve({ data: null, error: { message: `unexpected rpc ${fn}` } }),
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ from: fromImpl } as any);
-    return fromImpl;
+    vi.mocked(userClient).mockReturnValue({ from: fromImpl, rpc: rpcImpl } as any);
+    return Object.assign(fromImpl, { rpc: rpcImpl });
   }
 
   it("returns 404 when order does not exist", async () => {
@@ -435,6 +918,22 @@ describe("GET /api/operation/orders/:id", () => {
       env,
     );
     expect(res.status).toBe(404);
+  });
+
+  it("carries saved POS payment facts without creating or inferring a transaction", async () => {
+    const capture = { payment_method: "installment", installment_months: 12,
+      approval_code: "BANK-REF", payment_slip_url: "orders-attachments/dealer/proof.pdf" };
+    const from = mockDetailQueries({ order: { id: ORDER_ID, so: 1319, paid: 1250, ...capture } });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/${ORDER_ID}`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    expect((await res.json() as { order: unknown }).order).toMatchObject(capture);
+    const orderCall = from.mock.calls.findIndex(([table]) => table === "orders");
+    const projection = from.mock.results[orderCall].value.select.mock.calls[0][0].split(", ");
+    for (const field of Object.keys(capture)) expect(projection).toContain(field);
+    expect(from.mock.calls.map(([table]) => table)).not.toContain("order_payments");
   });
 
   it("returns aggregated detail for an in_production order", async () => {
@@ -479,6 +978,13 @@ describe("GET /api/operation/orders/:id", () => {
     expect(body.total).toBe(2 * 1500 + 1 * 800 + 4 * 50);
     expect(body.warehouse.name).toBe("KL HQ");
     expect(body.stockBalances).toHaveLength(2);
+    // 0366 — the drawer carries the register's `available` beside the on-hand
+    // count, so nothing downstream has to compute qty − reserved.
+    expect(body.stockBalances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ sku: "BED-K-002", qty: 5, reserved: 0, available: 5 }),
+      ]),
+    );
     expect(body.pos).toHaveLength(1);
     expect(body.pos[0].lines).toHaveLength(1);
     expect(body.history).toHaveLength(1);
@@ -497,6 +1003,254 @@ describe("GET /api/operation/orders/:id", () => {
     );
     expect(res.status).toBe(403);
     expect(from).not.toHaveBeenCalled();
+  });
+
+  /**
+   * D9's SALES ORDER HALF — the drawer's loan flow stops guessing.
+   *
+   * `56239a3c` made /inventory read the CATALOG. This endpoint feeds the OTHER
+   * screen that answers "what kind of product is this?", and it was not
+   * answering cosmetically: `LoanPanel` FILTERS the free-unit list with the
+   * result, so a real sofa whose model name was missing from a hardcoded
+   * keyword list was never offered as a loaner.
+   *
+   * `5539-1A(LHF)` is not invented. It is one of thirteen production SKUs read
+   * off live orders on 2026-08-08 — a sofa module `lineClass` returns
+   * `unknown` for. It is the whole reason this test exists.
+   */
+  it("carries the CATALOG's category on BOTH the lines and the free units", async () => {
+    mockDetailQueries({
+      order: {
+        id: ORDER_ID, so: 4002, status: "proceed_order", operation_stage: "in_production",
+        warehouse_id: "00000000-0000-0000-0000-000000000w01",
+        customer_name: "Tan Ah Kow", customer_phone: "+60123456789", customer_address: "...",
+        delivery_date: null, placed_at: "2026-08-20T10:00:00Z",
+        do_number: null, do_note: null, dispatched_at: null, delivered_at: null,
+        delivery_partner_id: null, dealer_id: "00000000-0000-0000-0000-000000000d01",
+        dealers: { name: "BedHouse KL" }, outlet_id: null, outlets: null,
+      },
+      lines: [
+        // The keyword list reads this as `unknown` → `acc`. The catalog knows.
+        { sku: "5539-1A(LHF)", qty: 1, unit_price: 1200 },
+        // Held by no catalog row — an AutoCount free-text import.
+        { sku: "LEGACY-FREE-TEXT-9", qty: 1, unit_price: 300 },
+      ],
+      productSkus: [
+        { sku: "5539-1A(LHF)", variant: "Charcoal", product_models: { name: "Hookka", category: "sofa" } },
+        { sku: "SOFA-UNIT-77", variant: null, product_models: { name: "Hookka", category: "sofa" } },
+      ],
+      freeUnits: [
+        // A free unit whose SKU no keyword list matches either.
+        { id: "u1", unit_code: "U-0001", sku: "SOFA-UNIT-77", warehouse_id: "00000000-0000-0000-0000-000000000w01", condition: "new", po_no: null, source_ref: null, date_in: "2026-08-01", qty: 1 },
+      ],
+      warehouse: { id: "00000000-0000-0000-0000-000000000w01", name: "KL HQ", address: "..." },
+    });
+
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+
+    // The line the parser gets wrong, answered by the catalog.
+    expect(body.lines[0].sku).toBe("5539-1A(LHF)");
+    expect(body.lines[0].category).toBe("sofa");
+
+    // The free unit the loan filter compares against it — same answer, same
+    // reader. Before this, one side guessed and the unit vanished.
+    expect(body.freeUnits[0].sku).toBe("SOFA-UNIT-77");
+    expect(body.freeUnits[0].category).toBe("sofa");
+
+    // ⭐ null is NOT absent, and the difference is load-bearing. This endpoint
+    // ASKED, so a SKU the catalog does not hold comes back with the key present
+    // and null. An ABSENT key means a Worker that never asked, and the browser
+    // reads those two differently (`resolvedCategory`).
+    expect("category" in body.lines[1]).toBe(true);
+    expect(body.lines[1].category).toBeNull();
+
+    // The label reader still works off the same rows — one join, two consumers.
+    expect(body.lines[0].label).toBe("Hookka · Charcoal");
+  });
+
+  /**
+   * ⭐ HISTORY NAMES ITS ACTOR — TWO SOURCES, BECAUSE ONE CANNOT SEE EVERYONE
+   * (2026-08-24).
+   *
+   * `by_role` said "Salesperson" and never which salesperson. The fix reads the
+   * name from TWO sources, and the split is an RLS fact, not a preference:
+   *
+   *   0390  `actor_display_names` — the definer door that names INTERNAL
+   *         staff (principal · operation · finance · bd · hr · warehouse),
+   *         because 0235's peers policy shows an operation JWT only
+   *         operation-role rows and a principal actor was rendering as an
+   *         audit defect on the very order that recorded her.
+   *   0002  `salespersons_scoped_read` lets any internal role read
+   *         `salespersons`, and that table carries `user_id`.
+   *
+   * The commonest actor on a sales order is a salesperson — exactly the one
+   * the staff door deliberately does NOT answer for. A test that fed one list
+   * to both sources would pass while the real page stated an audit defect on
+   * nearly every row — the defect moved rather than fixed. These cases hold
+   * both halves down.
+   */
+  describe("History names its actor", () => {
+    const SELLER = "00000000-0000-0000-0000-0000000000s1";
+    const STAFF = "00000000-0000-0000-0000-0000000000f1";
+    const BASE_ORDER = {
+      id: ORDER_ID, so: 4003, status: "proceed_order", operation_stage: "in_production",
+      warehouse_id: null,
+      customer_name: "Tan Ah Kow", customer_phone: "+60123456789", customer_address: "...",
+      delivery_date: null, placed_at: "2026-08-22T10:00:00Z",
+      do_number: null, do_note: null, dispatched_at: null, delivered_at: null,
+      delivery_partner_id: null, dealer_id: "00000000-0000-0000-0000-000000000d01",
+      dealers: { name: "BedHouse KL" }, outlet_id: null, outlets: null,
+    };
+
+    async function detail() {
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request(`http://t/api/operation/orders/${ORDER_ID}`, {
+          headers: { Authorization: `Bearer ${jwt}` },
+        }),
+        env,
+      );
+      expect(res.status).toBe(200);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (await res.json()) as any;
+    }
+
+    it("⭐ names a salesperson the staff door does not answer for", async () => {
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [{ text: "Amendment proposed", by_role: "salesperson", by_user_id: SELLER, occurred_at: "2026-08-22T11:00:00Z" }],
+        // Exactly what production returns for a dealer-role id: the 0390
+        // door names internal staff only — not an error, just no row.
+        appUsers: [],
+        salespersons: [{ user_id: SELLER, name: "Kimmy Lee" }],
+      });
+      const body = await detail();
+      expect(body.history[0].actor).toBe("Kimmy Lee");
+      expect(body.history[0].by_role).toBe("salesperson");
+      expect(body.history[0].actor_kind).toBe("human");
+    });
+
+    it("names internal staff through the 0390 staff door", async () => {
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [{ text: "Warehouse set", by_role: "operation", by_user_id: STAFF, occurred_at: "2026-08-22T11:00:00Z" }],
+        appUsers: [{ id: STAFF, name: "Wen Wei" }],
+        salespersons: [],
+      });
+      expect((await detail()).history[0].actor).toBe("Wen Wei");
+    });
+
+    it("⭐ names a principal actor for an operation reader — the SO-1329 walk defect", async () => {
+      /* The production walk found `Staff identity not recorded · Principal` on an
+         order whose actor WAS recorded — the reader's JWT simply could not
+         see a principal-role row. The 0390 door answers for every internal
+         staff role, so the record now names her. */
+      const PRINCIPAL = "11111111-1111-1111-1111-000000000001";
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [{ text: "Order created · 0% deposit · online", by_role: "principal", by_user_id: PRINCIPAL, occurred_at: "2026-08-27T04:30:36Z" }],
+        appUsers: [{ id: PRINCIPAL, name: "Jess" }],
+        salespersons: [],
+      });
+      const body = await detail();
+      expect(body.history[0].actor).toBe("Jess");
+      expect(body.history[0].actor_kind).toBe("human");
+    });
+
+    it("prefers the account when the same person answers from both tables", async () => {
+      /* `app_users` IS the account; the `salespersons` row is the sales-side
+         profile of the same human. One person may not print two names. */
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [{ text: "Order placed", by_role: "salesperson", by_user_id: SELLER, occurred_at: "2026-08-22T11:00:00Z" }],
+        appUsers: [{ id: SELLER, name: "Kimmy Lee" }],
+        salespersons: [{ user_id: SELLER, name: "Kimmy (showroom)" }],
+      });
+      expect((await detail()).history[0].actor).toBe("Kimmy Lee");
+    });
+
+    it("fails OPEN — an unresolvable id keeps the event and names nobody", async () => {
+      /* A cron, a database trigger, a deleted account, an RLS miss. The event
+         is the record; losing it to protect a name would be the worse bug. */
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [
+          { text: "Stock reserved", by_role: "system", by_user_id: "00000000-0000-0000-0000-0000000000c1", occurred_at: "2026-08-22T11:00:00Z" },
+          { text: "Order placed", by_role: "dealer", by_user_id: null, occurred_at: "2026-08-22T10:00:00Z" },
+        ],
+        appUsers: [],
+        salespersons: [],
+      });
+      const body = await detail();
+      expect(body.history).toHaveLength(2);
+      expect(body.history[0].actor).toBeNull();
+      expect(body.history[1].actor).toBeNull();
+      expect(body.history[0].text).toBe("Stock reserved");
+      /* Both are audit-data defects the UI must state — a recorded id the
+         reader cannot resolve, and a row that never recorded one. Neither is
+         a person, and neither is promoted to System. */
+      expect(body.history[0].actor_kind).toBe("missing");
+      expect(body.history[1].actor_kind).toBe("missing");
+    });
+
+    it("⭐ says System only when the event's own facts prove automation", async () => {
+      /* The Card's contract: `actor_kind` is derived server-side from
+         authoritative facts, and a missing person id does NOT by itself prove
+         the portal acted. The structured marker an automated writer stamps
+         (`metadata.actor = "system"`) is the proof; a bare null id is an
+         audit-data defect, not automation. */
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [
+          { text: "Delivery order voided", by_role: null, by_user_id: null, occurred_at: "2026-08-22T11:00:00Z", metadata: { actor: "system" } },
+          { text: "Order placed", by_role: "dealer", by_user_id: null, occurred_at: "2026-08-22T10:00:00Z", metadata: null },
+        ],
+      });
+      const body = await detail();
+      expect(body.history[0].actor_kind).toBe("system");
+      expect(body.history[1].actor_kind).toBe("missing");
+    });
+
+    it("asks neither table when no event carries an actor id", async () => {
+      /* Cloudflare caps subrequests per invocation (50 Free / 1000 Paid) and
+         this route is already one of the heaviest reads in the portal. Two name
+         lookups are worth it when there is a name to look up, and are pure cost
+         when there is not. */
+      const fromImpl = mockDetailQueries({
+        order: BASE_ORDER,
+        history: [{ text: "Order placed", by_role: "dealer", by_user_id: null, occurred_at: "2026-08-22T10:00:00Z" }],
+      });
+      const body = await detail();
+      expect(body.history[0].actor).toBeNull();
+      const tables = fromImpl.mock.calls.map((c) => c[0]);
+      expect(tables).not.toContain("salespersons");
+      expect(fromImpl.rpc).not.toHaveBeenCalled();
+    });
+
+    it("looks each id up ONCE, however many events that person wrote", async () => {
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [
+          { text: "Amendment proposed", by_role: "salesperson", by_user_id: SELLER, occurred_at: "2026-08-22T12:00:00Z" },
+          { text: "Amendment withdrawn", by_role: "salesperson", by_user_id: SELLER, occurred_at: "2026-08-22T11:00:00Z" },
+          { text: "Order placed", by_role: "salesperson", by_user_id: SELLER, occurred_at: "2026-08-22T10:00:00Z" },
+        ],
+        appUsers: [],
+        salespersons: [{ user_id: SELLER, name: "Kimmy Lee" }],
+      });
+      const body = await detail();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(body.history.map((h: any) => h.actor)).toEqual(["Kimmy Lee", "Kimmy Lee", "Kimmy Lee"]);
+    });
   });
 });
 
@@ -653,6 +1407,34 @@ describe("POST /api/operation/orders/:id/attach-do", () => {
       "p_signature_url",
       "p_signed_by",
     ]);
+  });
+
+  it("an order with no document gets its number DRAWN by the one allocator (0575), never invented", async () => {
+    const rpc = vi.fn((fn: string) =>
+      Promise.resolve(
+        fn === "delivery_document_number_draw"
+          ? { data: "DO2609-0042", error: null }
+          : { data: { id: ORDER_ID }, error: null },
+      ),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const { doNumber: _omitted, ...withoutNumber } = VALID;
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/attach-do`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(withoutNumber),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("delivery_document_number_draw", { p_order_id: ORDER_ID });
+    expect(rpc).toHaveBeenCalledWith(
+      "operation_attach_do_and_deliver",
+      expect.objectContaining({ p_do_number: "DO2609-0042" }),
+    );
   });
 
   it("rejects when signed is false", async () => {
@@ -851,80 +1633,25 @@ describe("POST /api/operation/orders/:id/abandon", () => {
   });
 });
 
-describe("POST /api/operation/orders/:id/warehouse", () => {
-  const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
-  const WAREHOUSE_ID = "00000000-0000-0000-0000-000000000c02";
-
-  it("returns 200 on success", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: { id: ORDER_ID, warehouse_id: WAREHOUSE_ID, operation_stage: "ready_to_dispatch" }, error: null });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/warehouse`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ warehouseId: WAREHOUSE_ID }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("operation_warehouse_pick", {
-      p_order_id: ORDER_ID,
-      p_warehouse_id: WAREHOUSE_ID,
-    });
-    assertRpcCallShape(rpc, "operation_warehouse_pick", ["p_order_id", "p_warehouse_id"]);
-  });
-
-  it("returns 422 when warehouseId is not uuid", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/warehouse`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ warehouseId: "not-a-uuid" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-  });
-
-  it("maps P0001 has_open_pos → 422 with code", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "P0001", message: "PO already issued", details: "has_open_pos" } });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/warehouse`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ warehouseId: WAREHOUSE_ID }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.code).toBe("has_open_pos");
-  });
-
-  it("returns 403 for non-operation (no rpc call)", async () => {
-    const rpc = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+describe("retired POST /api/operation/orders/:id/warehouse", () => {
+  it.each([{}, { warehouseId: "00000000-0000-0000-0000-000000000c02" }, { warehouseId: "not-a-uuid" }])(
+    "refuses stale requests before opening a database client: %j", async (body) => {
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(new Request("http://t/api/operation/orders/00000000-0000-0000-0000-000000000a01/warehouse", {
+        method: "POST", headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" }, body: JSON.stringify(body),
+      }), env);
+      expect(res.status).toBe(410);
+      expect(await res.json()).toMatchObject({ code: "warehouse_pick_retired" });
+      expect(userClient).not.toHaveBeenCalled();
+    },
+  );
+  it("preserves the Operation permission boundary", async () => {
     const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/warehouse`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ warehouseId: WAREHOUSE_ID }),
-      }),
-      env,
-    );
+    const res = await app.fetch(new Request("http://t/api/operation/orders/00000000-0000-0000-0000-000000000a01/warehouse", {
+      method: "POST", headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" }, body: "{}",
+    }), env);
     expect(res.status).toBe(403);
-    expect(rpc).not.toHaveBeenCalled();
+    expect(userClient).not.toHaveBeenCalled();
   });
 });
 
@@ -1293,124 +2020,25 @@ describe("POST /api/operation/orders/:id/reselect-partner (migration 0147 — it
   });
 });
 
-describe("POST /api/operation/orders/:id/transfer-ready", () => {
-  const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
-  const WAREHOUSE_ID = "00000000-0000-0000-0000-000000000c02";
-
-  it("returns 200 on happy path with warehouseId", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: { id: ORDER_ID, warehouse_id: WAREHOUSE_ID, operation_stage: "ready_to_dispatch", shortages: 0 },
-      error: null,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/transfer-ready`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ warehouseId: WAREHOUSE_ID }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("operation_warehouse_pick", {
-      p_order_id: ORDER_ID,
-      p_warehouse_id: WAREHOUSE_ID,
-    });
-    assertRpcCallShape(rpc, "operation_warehouse_pick", ["p_order_id", "p_warehouse_id"]);
-  });
-
-  it("returns 422 from zod when warehouseId is missing (empty body)", async () => {
-    // Pipeline v2 reviewer fix: transfer-ready REQUIRES warehouseId. The
-    // underlying RPC `operation_warehouse_pick` raises 22023 `warehouse_required`
-    // on NULL, so zod must reject empty bodies up-front rather than letting
-    // the request reach Postgres. (confirm-proceed has a different RPC that
-    // accepts NULL — do not conflate.)
-    const rpc = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/transfer-ready`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.code).toBe("invalid_param");
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  it("returns 422 with code='wrong_stage' when not in confirmed/in_production", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: null,
-      error: { code: "22023", message: "order not in confirmed/in_production state", details: "wrong_stage" },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/transfer-ready`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ warehouseId: WAREHOUSE_ID }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.code).toBe("wrong_stage");
-  });
-
-  it("returns 422 with code='insufficient_stock_for_reserve' + hint passthrough", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: null,
-      error: {
-        code: "P0001",
-        message: "cannot reserve",
-        details: "insufficient_stock_for_reserve",
-        hint: "sku=BED-K-002 warehouse_id=00000000-0000-0000-0000-000000000c02",
-      },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/transfer-ready`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ warehouseId: WAREHOUSE_ID }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.code).toBe("insufficient_stock_for_reserve");
-    expect(body.hint).toBe("sku=BED-K-002 warehouse_id=00000000-0000-0000-0000-000000000c02");
-  });
-
-  it("returns 403 for non-operation role (no rpc call)", async () => {
-    const rpc = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+describe("retired POST /api/operation/orders/:id/transfer-ready", () => {
+  it.each([{}, { warehouseId: "00000000-0000-0000-0000-000000000c02" }, { warehouseId: "not-a-uuid" }])(
+    "refuses stale requests before opening a database client: %j", async (body) => {
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(new Request("http://t/api/operation/orders/00000000-0000-0000-0000-000000000a01/transfer-ready", {
+        method: "POST", headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" }, body: JSON.stringify(body),
+      }), env);
+      expect(res.status).toBe(410);
+      expect(await res.json()).toMatchObject({ code: "warehouse_pick_retired" });
+      expect(userClient).not.toHaveBeenCalled();
+    },
+  );
+  it("preserves the Operation permission boundary", async () => {
     const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/transfer-ready`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      }),
-      env,
-    );
+    const res = await app.fetch(new Request("http://t/api/operation/orders/00000000-0000-0000-0000-000000000a01/transfer-ready", {
+      method: "POST", headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" }, body: "{}",
+    }), env);
     expect(res.status).toBe(403);
-    expect(rpc).not.toHaveBeenCalled();
+    expect(userClient).not.toHaveBeenCalled();
   });
 });
 
@@ -1881,6 +2509,64 @@ describe("POST /api/operation/orders/:id/save", () => {
     ]);
   });
 
+  /* 0354 — the object page's form IS the Sales Portal's form (owner ruling
+     2026-08-15), so the door must accept every question the portal asks. A
+     `.strict()` schema that had never heard of `customer_race` turned a field
+     the operator could SEE into a field they could never fix. */
+  it("accepts the rest of what the Sales Portal asks", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { revision: 3, changed: [] }, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from: vi.fn() } as any);
+    const jwt = await makeJwt("operation");
+    const header = {
+      customer_race: "Chinese",
+      customer_gender: "Female",
+      customer_birthday: "1990-04-02",
+      customer_address_unknown: false,
+      customer_billing_same: true,
+      delivery_stair_items: 2,
+      entry_fields: { building_type: "Condo", referral: null },
+    };
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/save`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ header }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("sales_order_save_revision", {
+      p_order_id: ORDER_ID,
+      p_header: header,
+      p_lines: null,
+      p_change: null,
+    });
+  });
+
+  it("still refuses attribution at the API boundary", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    for (const header of [
+      { salesperson_id: "00000000-0000-0000-0000-0000000000a1" },
+      { outlet_id: "00000000-0000-0000-0000-0000000000a2" },
+      { dealer_id: "00000000-0000-0000-0000-0000000000a3" },
+    ]) {
+      const res = await app.fetch(
+        new Request(`http://t/api/operation/orders/${ORDER_ID}/save`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ header }),
+        }),
+        env,
+      );
+      expect(res.status).toBe(422);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it("refuses contractual items at the API boundary", async () => {
     const rpc = vi.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1962,6 +2648,82 @@ describe("POST /api/operation/orders/:id/save", () => {
 
 describe("Sales Order amendment decision lane", () => {
   const AMENDMENT_ID = "00000000-0000-0000-0000-000000000a01";
+
+  /* ⭐ `PROPOSED CHANGE` (owner ruling 2026-09-25) names WHO submitted the
+     request. `sales_order_amendment_live` returns no sender, so the door reads
+     the request's own `submitted_by` and names it through the ONE resolver. */
+  describe("GET /:id/amendment names the sender", () => {
+    const ORDER = "00000000-0000-0000-0000-0000000000c1";
+    const SENDER = "00000000-0000-0000-0000-0000000000f1";
+    const live = { id: AMENDMENT_ID, status: "submitted", stale: false, submitted_at: "2026-09-24T03:00:00Z" };
+
+    function client(opts: { sender?: string | null; senderError?: boolean; names?: Array<{ id: string; name: string | null }> }) {
+      const rpc = vi.fn((fn: string) =>
+        fn === "sales_order_amendment_live"
+          ? Promise.resolve({ data: { amendment: live }, error: null })
+          : fn === "actor_display_names"
+            ? Promise.resolve({ data: opts.names ?? [], error: null })
+            : Promise.resolve({ data: null, error: null }),
+      );
+      const from = vi.fn((table: string) => {
+        if (table === "sales_order_amendments") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: () =>
+                  Promise.resolve(
+                    opts.senderError
+                      ? { data: null, error: { message: "boom" } }
+                      : { data: { submitted_by: opts.sender ?? null }, error: null },
+                  ),
+              }),
+            }),
+          };
+        }
+        return { select: () => ({ in: () => Promise.resolve({ data: [], error: null }) }) };
+      });
+      return { rpc, from };
+    }
+
+    async function read(c: ReturnType<typeof client>) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue(c as any);
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request(`http://t/api/operation/orders/${ORDER}/amendment`, {
+          headers: { Authorization: `Bearer ${jwt}` },
+        }),
+        env,
+      );
+      expect(res.status).toBe(200);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (await res.json()) as any;
+    }
+
+    it("adds the sender's real name to the live request", async () => {
+      const body = await read(client({ sender: SENDER, names: [{ id: SENDER, name: "Mei Ling" }] }));
+      expect(body.amendment).toEqual({ ...live, submitted_by_name: "Mei Ling" });
+    });
+
+    it("never invents a person: an unresolved sender stays unnamed and the request still reads", async () => {
+      expect((await read(client({ sender: SENDER, names: [] }))).amendment.submitted_by_name).toBeNull();
+      expect((await read(client({ senderError: true }))).amendment).toEqual({ ...live, submitted_by_name: null });
+    });
+
+    it("returns no amendment untouched", async () => {
+      const rpc = vi.fn().mockResolvedValue({ data: { amendment: null }, error: null });
+      const from = vi.fn();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue({ rpc, from } as any);
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request(`http://t/api/operation/orders/${ORDER}/amendment`, { headers: { Authorization: `Bearer ${jwt}` } }),
+        env,
+      );
+      expect(await res.json()).toEqual({ amendment: null });
+      expect(from).not.toHaveBeenCalled();
+    });
+  });
 
   it("returns the owner impact preview without writing another module", async () => {
     const impact = {
@@ -2076,48 +2838,42 @@ describe("Sales Order amendment decision lane", () => {
   });
 });
 
-describe("POST /api/operation/orders (create)", () => {
-  it("calls sales_order_create; a missing dealer is refused before the database", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: { id: "00000000-0000-0000-0000-000000000b02", so: 1400, revision: 1 },
-      error: null,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const good = await app.fetch(
-      new Request("http://t/api/operation/orders", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          header: {
-            customer_name: "Walk-in",
-            dealer_id: "00000000-0000-0000-0000-0000000000d1",
-            // orders_salesperson_required (0296) — the door demands it too.
-            salesperson_id: "00000000-0000-0000-0000-0000000000a1",
-          },
-          lines: [{ sku: "B1201S-K", qty: 1, unit_price: 2499 }],
+describe("retired POST /api/operation/orders (the office create door)", () => {
+  /* ⭐ OWNER RULING 2026-09-27 (Jess): a customer order is born in the Sales
+     Portal and nowhere else; Operation receives it and never creates it. */
+  it.each([{}, { header: { customer_name: "Walk-in" }, lines: [{ sku: "X", qty: 1, unit_price: 1 }] }])(
+    "refuses a stale client before opening a database client: %j",
+    async (body) => {
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request("http://t/api/operation/orders", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
         }),
-      }),
-      env,
-    );
-    expect(good.status).toBe(201);
-    assertRpcCallShape(rpc, "sales_order_create", ["p_header", "p_lines"]);
+        env,
+      );
+      expect(res.status).toBe(410);
+      expect(await res.json()).toEqual({
+        error: "This action is no longer available. A Sales Order is created in the Sales Portal.",
+        code: "office_create_retired",
+      });
+      expect(userClient).not.toHaveBeenCalled();
+    },
+  );
 
-    rpc.mockClear();
-    const bad = await app.fetch(
+  it("preserves the Operation permission boundary", async () => {
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
       new Request("http://t/api/operation/orders", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          header: { customer_name: "Walk-in" },
-          lines: [{ sku: "B1201S-K", qty: 1, unit_price: 2499 }],
-        }),
+        body: "{}",
       }),
       env,
     );
-    expect(bad.status).toBe(422);
-    expect(rpc).not.toHaveBeenCalled();
+    expect(res.status).toBe(403);
+    expect(userClient).not.toHaveBeenCalled();
   });
 });
 
@@ -2172,30 +2928,274 @@ describe("GET /api/operation/orders/:id/commitment", () => {
 });
 
 describe("GET /api/operation/orders/:id/expansion", () => {
+  it("uses an explicit reserved line before the PO source and never spreads it across same-SKU lines", async () => {
+    const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
+    const from = vi.fn((table: string) => ({ select: (columns: string) => {
+      let data: unknown = [];
+      if (table === "orders") data = { so: 1340 };
+      if (table === "order_lines") data = [{ id: "l1", sku: "SAME", qty: 1 }, { id: "l2", sku: "SAME", qty: 1 }];
+      if (table === "po_line_sources") data = [{ po_line_id: "p1", po_id: "po1", order_id: ORDER_ID, order_line_id: "l1", qty: 1 }];
+      if (table === "ops_stock_items" && columns.includes("warehouse_id")) {
+        expect(columns).toContain("reserved_order_line_id");
+        data = [{ unit_code: "EXACT", sku: "SAME", po_line_id: "p1", reserved_order_line_id: "l2" },
+          { unit_code: "UNKNOWN", sku: "SAME", po_line_id: "p1", reserved_order_line_id: "other-order-line" }];
+      }
+      const chain: Record<string, unknown> = {};
+      for (const method of ["eq", "in", "or"]) chain[method] = () => chain;
+      chain.maybeSingle = () => Promise.resolve({ data, error: null });
+      chain.then = (resolve: (value: unknown) => unknown) => resolve({ data, error: null });
+      return chain;
+    } }));
+    vi.mocked(userClient).mockReturnValue({ from } as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/${ORDER_ID}/expansion`, { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { lines: Array<{ unitIds: string[]; verifiedUnitIds: string[]; unverifiedUnitIds: string[] }> };
+    expect(body.lines[0].verifiedUnitIds).toEqual([]);
+    expect(body.lines[1].verifiedUnitIds).toEqual(["EXACT"]);
+    expect(body.lines[0].unverifiedUnitIds).toEqual(["UNKNOWN"]);
+  });
+
+  it.each([false, true])("never launders excess or unverified IDs into an ordinary Qty 1 row (verified=%s)", async (verified) => {
+    const orderId = "00000000-0000-0000-0000-000000000a01";
+    const ids = Array.from({ length: 14 }, (_, i) => `U1-${i}`);
+    const from = vi.fn((table: string) => ({ select: (columns: string) => {
+      let data: unknown = [];
+      if (table === "orders") data = { so: 1340 };
+      if (table === "order_lines") data = [{ id: "l1", sku: "H1401F-K", qty: 1 }, { id: "l2", sku: "H1401F-K", qty: 1 }];
+      if (table === "purchasing_destinations") data = [{ id: "default", name: "Carres Klang", is_default: true }];
+      if (table === "po_line_sources" && verified) data = [{ po_line_id: "p1", po_id: "po1", order_id: orderId, order_line_id: "l1", qty: 1 }];
+      if (table === "ops_stock_items" && columns.includes("warehouse_id")) data = ids.map((unit_code) => ({ unit_code, sku: "H1401F-K", po_line_id: verified ? "p1" : null, reserved_order_line_id: verified ? "l1" : null }));
+      const chain: Record<string, unknown> = {};
+      for (const method of ["eq", "in", "or"]) chain[method] = () => chain;
+      chain.maybeSingle = () => Promise.resolve({ data, error: null });
+      chain.then = (resolve: (value: unknown) => unknown) => resolve({ data, error: null });
+      return chain;
+    } }));
+    vi.mocked(userClient).mockReturnValue({ from } as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/${orderId}/expansion`, { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { lines: Array<{ unitIds: string[]; verifiedUnitIds: string[]; unverifiedUnitIds: string[]; unitQuantityMismatch: boolean; deliverTo: unknown[] }> };
+    expect(body.lines[0].verifiedUnitIds).toHaveLength(verified ? 14 : 0);
+    expect(body.lines[0].unverifiedUnitIds).toHaveLength(verified ? 0 : 14);
+    expect(body.lines[0].unitQuantityMismatch).toBe(verified);
+    expect(body.lines[1].verifiedUnitIds).toEqual([]);
+    // No PO destination exists: a current default is never a historical fact.
+    expect(body.lines.every((line) => line.deliverTo.length === 0)).toBe(true);
+  });
+
+  it.each([[false, false], [true, false], [false, true]])("reads incoming IDs only from complete exclusive sources (shared=%s, truncated=%s)", async (shared, truncated) => {
+    const orderId = "00000000-0000-0000-0000-000000000a01";
+    const source = { po_line_id: "pol-1", order_id: orderId, order_line_id: "line-1" };
+    const secondSource = { ...source, po_line_id: "pol-2" };
+    const from = vi.fn((table: string) => ({
+      select: vi.fn((columns: string) => {
+        let data: unknown = [];
+        if (table === "orders") data = { so: 1340 };
+        if (table === "order_lines") data = [
+          { id: "line-1", sku: "H1401F-K", qty: 1 },
+          { id: "line-2", sku: "H1401F-K", qty: 1 },
+        ];
+        if (table === "po_line_sources") data = columns.includes("order_id") && shared
+          ? [source, secondSource, ...[source, secondSource].map((s) => ({ ...s, order_id: "other-order", order_line_id: "other-line" }))] : [source, secondSource];
+        if (table === "ops_stock_items" && !columns.includes("sku")) data = [
+          { unit_code: "U1-000-071", po_line_id: "pol-2" },
+          { unit_code: "U1-000-070", po_line_id: "pol-1" },
+        ];
+        if (table === "purchase_order_lines") data = [{ id: "pol-1", po_id: "PO-1" }, { id: "pol-2", po_id: "PO-2" }];
+        const chain: Record<string, unknown> = {};
+        for (const method of ["eq", "in", "or"]) chain[method] = vi.fn(() => chain);
+        chain.maybeSingle = vi.fn().mockResolvedValue({ data, error: null });
+        chain.then = (resolve: (value: unknown) => unknown) => resolve({ data, error: null,
+          count: Array.isArray(data) ? data.length + (table === "po_line_sources" && columns.includes("order_id") && truncated ? 1 : 0) : null,
+        });
+        return chain;
+      }),
+    }));
+    vi.mocked(userClient).mockReturnValue({ from } as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/${orderId}/expansion`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      lines: Array<{ unitIds: string[] }>;
+      place: unknown[];
+      unitCoverage: Record<string, string>;
+      unitLines: Record<string, string | null>;
+    };
+    expect(body.lines[0].unitIds).toEqual(shared || truncated ? [] : ["U1-000-070", "U1-000-071"]);
+    expect(body.unitCoverage).toEqual(shared || truncated ? {} : { "U1-000-070": "PO-1", "U1-000-071": "PO-2" });
+    expect(body.lines[1].unitIds).toEqual([]);
+    /**
+     * ⭐ THE INVARIANT A READER IS ALLOWED TO STAND ON (owner correction
+     * 2026-09-11): an incoming Unit DECLARES the item line it answers, it does
+     * not leave the map and let a reader infer one from its own absence.
+     *
+     * The evidence is the same one `exclusive` above establishes — every
+     * `po_line_sources` row on that purchase-order line names THIS order and
+     * THIS item line — but it is now WRITTEN DOWN, so `unitLines` can carry
+     * the whole rule: what is in it is evidenced, and what is not, is not.
+     * Without this, a gap in the data proved a fact about the goods.
+     */
+    expect(body.unitLines).toEqual(
+      shared || truncated ? {} : { "U1-000-070": "line-1", "U1-000-071": "line-1" },
+    );
+    // Incoming goods are not reported as physical allocated stock for Delivery.
+    expect(body.place).toEqual([]);
+  });
+
+  /**
+   * A purchase-order line SHARED with another Sales Order evidences nothing
+   * about which SO's Unit is which, so it names no line at all — and the map
+   * stays empty rather than pointing somewhere convenient. The `shared=true`
+   * case above proves exactly that, and this states why it matters: a reader
+   * that finds nothing in `unitLines` must read `unresolved`, never `exact`.
+   */
+  it("names no item line for a Unit on a SHARED purchase-order line", async () => {
+    const orderId = "00000000-0000-0000-0000-000000000a01";
+    const mine = { po_line_id: "pol-1", order_id: orderId, order_line_id: "line-1" };
+    const theirs = { po_line_id: "pol-1", order_id: "other-order", order_line_id: "other-line" };
+    const from = vi.fn((table: string) => ({
+      select: vi.fn((columns: string) => {
+        let data: unknown = [];
+        if (table === "orders") data = { so: 1340 };
+        if (table === "order_lines") data = [{ id: "line-1", sku: "H1401F-K", qty: 1 }];
+        if (table === "po_line_sources") data = columns.includes("order_id") ? [mine, theirs] : [mine];
+        if (table === "ops_stock_items" && !columns.includes("sku")) {
+          data = [{ unit_code: "U1-000-070", po_line_id: "pol-1" }];
+        }
+        if (table === "purchase_order_lines") data = [{ id: "pol-1", po_id: "PO-1" }];
+        const chain: Record<string, unknown> = {};
+        for (const method of ["eq", "in", "or"]) chain[method] = vi.fn(() => chain);
+        chain.maybeSingle = vi.fn().mockResolvedValue({ data, error: null });
+        chain.then = (resolve: (value: unknown) => unknown) => resolve({ data, error: null });
+        return chain;
+      }),
+    }));
+    vi.mocked(userClient).mockReturnValue({ from } as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/${orderId}/expansion`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { unitLines: Record<string, string | null>; lines: Array<{ unitIds: string[] }> };
+    expect(body.unitLines).toEqual({});
+    expect(body.lines[0].unitIds).toEqual([]);
+  });
+
   it("projects Stock Unit IDs and Purchasing line destinations without a Sales Order destination field", async () => {
     const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
     const rows: Record<string, unknown> = {
       orders: { so: 1303 },
       order_lines: [{ id: "line-1", sku: "B1201S-K", qty: 11 }],
       order_supplier_threads: [{ order_line_id: "line-1", po_id: "PO-2032" }],
+      po_line_sources: [
+        { po_id: "PO-2032", po_line_id: "pol-1", order_id: ORDER_ID, order_line_id: "line-1", qty: 10 },
+        { po_id: "PO-2032", po_line_id: "pol-2", order_id: ORDER_ID, order_line_id: "line-1", qty: 1 },
+      ],
       purchasing_destinations: [
         { id: "klang", name: "Carres Klang", is_default: true },
         { id: "al", name: "AL Sungai Buloh", is_default: false },
       ],
       purchase_orders: [{ id: "PO-2032", destination_id: "klang" }],
       purchase_order_lines: [
-        { po_id: "PO-2032", sku: "B1201S-K", qty: 10, destination_id: null },
-        { po_id: "PO-2032", sku: "B1201S-K", qty: 1, destination_id: "al" },
+        { id: "pol-1", po_id: "PO-2032", sku: "B1201S-K", qty: 10, destination_id: null },
+        { id: "pol-2", po_id: "PO-2032", sku: "B1201S-K", qty: 1, destination_id: "al" },
       ],
       ops_stock_items: [
-        { unit_code: "id-001", sku: "B1201S-K" },
-        { unit_code: "id-002", sku: "B1201S-K" },
+        { unit_code: "id-001", po_line_id: "pol-1", sku: "B1201S-K", warehouse_id: "wh-klang", holder_party_id: null },
+        { unit_code: "id-002", po_line_id: "pol-1", sku: "B1201S-K", warehouse_id: "wh-klang", holder_party_id: "party-nets" },
       ],
+      /* DELIVERY CARD 02 — Where and Who has it come from Stock's own two
+         lookup tables, never from a name copied onto the Unit. */
+      warehouses: [{ id: "wh-klang", name: "Carres Klang Warehouse" }],
+      stock_operating_parties: [{ id: "party-nets", name: "NETS Warehouse" }],
     };
     const from = vi.fn((table: string) => {
       const data = rows[table];
       const chain: Record<string, unknown> = {};
       for (const method of ["eq", "in", "or"]) chain[method] = vi.fn(() => chain);
+      chain.maybeSingle = vi.fn().mockResolvedValue({ data, error: null });
+      chain.then = (resolve: (value: unknown) => unknown) => resolve({ data, error: null });
+      return { select: vi.fn((columns: string) => table === "ops_stock_items" && !columns.includes("warehouse_id")
+        ? { in: () => ({ eq: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) }) } : chain) };
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/${ORDER_ID}/expansion`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      defaultDeliverTo: "Carres Klang",
+      unitCoverage: { "id-001": "PO-2032", "id-002": "PO-2032" },
+      /* 0471 — the stored binding, carried verbatim. Neither Unit here has
+         one, and `null` is the honest answer for that: the Unit is on this
+         Sales Order and WHICH item line it answers was never recorded. */
+      unitLines: { "id-001": null, "id-002": null },
+      /* 0453 — a counted row has no identity, so the scope rides the wire and
+         no reader has to guess a `QTY-` key from its shape. */
+      unitScopes: { "id-001": "unit", "id-002": "unit" },
+      /* WHERE each Unit is and WHO has it — the SAME Units the lines already
+         name, resolved to Stock's own names. Delivery Work reads this block;
+         the Sales Orders register ignores it. */
+      place: [
+        { unitCode: "id-001", siteName: "Carres Klang Warehouse", holderName: null },
+        { unitCode: "id-002", siteName: "Carres Klang Warehouse", holderName: "NETS Warehouse" },
+      ],
+      lines: [{
+        lineId: "line-1",
+        sku: "B1201S-K",
+        unitIds: ["id-001", "id-002"],
+        verifiedUnitIds: [],
+        unverifiedUnitIds: ["id-001", "id-002"],
+        unitQuantityMismatch: false,
+        deliverTo: [
+          { name: "Carres Klang", qty: 10 },
+          { name: "AL Sungai Buloh", qty: 1 },
+        ],
+      }],
+    });
+  });
+});
+
+/**
+ * ⭐ THE STORED BINDING, NOT A SKU MATCH — 0471 applied to this read
+ * 2026-09-11.
+ *
+ * This fan-in grouped every reserved/sold Unit of the order by NORMALIZED SKU,
+ * so a Sales Order with two item lines of one SKU — SO-1251, SO-1207 and
+ * SO-1246 carry exactly that today — printed the SAME Unit IDs under BOTH
+ * lines. `ops_stock_items.reserved_order_line_id` has answered that question
+ * since 0471 and the read simply did not ask it: a row position was answering
+ * something the database already knew.
+ */
+describe("GET /api/operation/orders/:id/expansion — the Unit's own item line", () => {
+  const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
+
+  const call = async (units: Array<Record<string, unknown>>) => {
+    const rows: Record<string, unknown> = {
+      orders: { so: 1251 },
+      order_lines: [
+        { id: "line-1", sku: "JAGER-SS", qty: 1 },
+        { id: "line-2", sku: "JAGER-SS", qty: 1 },
+      ],
+      order_supplier_threads: [],
+      purchasing_destinations: [{ id: "klang", name: "Carres Klang", is_default: true }],
+      purchase_orders: [],
+      purchase_order_lines: [],
+      po_line_sources: [],
+      ops_stock_items: units,
+      warehouses: [],
+      stock_operating_parties: [],
+    };
+    const from = vi.fn((table: string) => {
+      const data = rows[table];
+      const chain: Record<string, unknown> = {};
+      for (const method of ["eq", "in", "or", "not"]) chain[method] = vi.fn(() => chain);
       chain.maybeSingle = vi.fn().mockResolvedValue({ data, error: null });
       chain.then = (resolve: (value: unknown) => unknown) => resolve({ data, error: null });
       return { select: vi.fn(() => chain) };
@@ -2207,32 +3207,73 @@ describe("GET /api/operation/orders/:id/expansion", () => {
       headers: { Authorization: `Bearer ${jwt}` },
     }), env);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
-      defaultDeliverTo: "Carres Klang",
-      lines: [{
-        lineId: "line-1",
-        sku: "B1201S-K",
-        unitIds: ["id-001", "id-002"],
-        deliverTo: [
-          { name: "Carres Klang", qty: 10 },
-          { name: "AL Sungai Buloh", qty: 1 },
-        ],
-      }],
+    return (await res.json()) as {
+      lines: Array<{ lineId: string; unitIds: string[] }>;
+      unitLines: Record<string, string | null>;
+    };
+  };
+
+  it("puts a bound Unit under its OWN line and nowhere else", async () => {
+    const body = await call([
+      { unit_code: "U1-000-001", sku: "JAGER-SS", reserved_order_line_id: "line-1" },
+      { unit_code: "U1-000-002", sku: "JAGER-SS", reserved_order_line_id: "line-2" },
+    ]);
+    expect(body.lines[0]!.unitIds).toEqual(["U1-000-001"]);
+    expect(body.lines[1]!.unitIds).toEqual(["U1-000-002"]);
+    expect(body.unitLines).toEqual({
+      "U1-000-001": "line-1",
+      "U1-000-002": "line-2",
     });
+  });
+
+  /* A pre-0471 reservation carries no binding. It is NOT dropped — evidence is
+     never thrown away to tidy a read — it keeps the SKU reading it always had,
+     and `unitLines` reports `null` so a screen can say the association was
+     never recorded instead of printing an inference as a fact. */
+  it("keeps the SKU reading for an unbound Unit, and reports that it is unbound", async () => {
+    const body = await call([
+      { unit_code: "U1-000-003", sku: "JAGER-SS", reserved_order_line_id: null },
+    ]);
+    expect(body.lines[0]!.unitIds).toEqual(["U1-000-003"]);
+    expect(body.lines[1]!.unitIds).toEqual(["U1-000-003"]);
+    expect(body.unitLines).toEqual({ "U1-000-003": null });
   });
 });
 
+/**
+ * ⭐ A REVISION NAMES ITS RECORDER (CARD 2026-08-27). `created_by` has been
+ * stored since 0327; the read now resolves it to a real display name through
+ * the SAME two-source resolver History uses (Law D — one arithmetic), and
+ * classifies the recorder truthfully. `created_by` still rides the wire as
+ * the audit identity, and the immutable snapshot is never touched.
+ */
 describe("GET /api/operation/orders/:id/revisions", () => {
-  it("reads the immutable store oldest-first", async () => {
-    const order = vi.fn().mockResolvedValue({
-      data: [{ revision: 1, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-09", created_by: null }],
-      error: null,
-    });
+  const SELLER = "00000000-0000-0000-0000-0000000000s1";
+  const STAFF = "00000000-0000-0000-0000-0000000000f1";
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function mockRevisionQueries(opts: { revisions: any[]; appUsers?: any[]; salespersons?: any[] }) {
+    const order = vi.fn().mockResolvedValue({ data: opts.revisions, error: null });
     const eq = vi.fn(() => ({ order }));
-    const select = vi.fn(() => ({ eq }));
-    const from = vi.fn(() => ({ select }));
+    const revisionSelect = vi.fn(() => ({ eq }));
+    const salespersonsIn = vi.fn(() => Promise.resolve({ data: opts.salespersons ?? [], error: null }));
+    const from = vi.fn((table: string) => {
+      if (table === "sales_order_revisions") return { select: revisionSelect };
+      if (table === "salespersons") return { select: vi.fn(() => ({ in: salespersonsIn })) };
+      throw new Error(`unexpected table ${table}`);
+    });
+    /* The staff half goes through the 0390 definer door. */
+    const rpc = vi.fn((fn: string) =>
+      fn === "actor_display_names"
+        ? Promise.resolve({ data: opts.appUsers ?? [], error: null })
+        : Promise.resolve({ data: null, error: { message: `unexpected rpc ${fn}` } }),
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ from } as any);
+    vi.mocked(userClient).mockReturnValue({ from, rpc } as any);
+    return { from, order, rpc, salespersonsIn };
+  }
+
+  async function revisions() {
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/operation/orders/00000000-0000-0000-0000-000000000b01/revisions", {
@@ -2241,11 +3282,88 @@ describe("GET /api/operation/orders/:id/revisions", () => {
       env,
     );
     expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (await res.json()) as any;
+  }
+
+  it("reads the immutable store oldest-first and keeps the audit identity", async () => {
+    const { from, order } = mockRevisionQueries({
+      revisions: [
+        { revision: 1, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-09", created_by: STAFF, change_type: null, note: null },
+        { revision: 2, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-10", created_by: STAFF, change_type: "staff_correction", note: null },
+      ],
+      appUsers: [{ id: STAFF, name: "Wen Wei" }],
+    });
+    const body = await revisions();
     expect(from).toHaveBeenCalledWith("sales_order_revisions");
     expect(order).toHaveBeenCalledWith("revision", { ascending: true });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.revisions).toHaveLength(1);
+    expect(body.revisions.map((r: { revision: number }) => r.revision)).toEqual([1, 2]);
+    /* `created_by` remains the audit identity; the name is presentation,
+       added beside it, never a replacement. The snapshot is untouched. */
+    expect(body.revisions[0].created_by).toBe(STAFF);
+    expect(body.revisions[0].snapshot).toEqual({ header: {}, lines: [], addons: [] });
+  });
+
+  it("names internal staff through the 0390 staff door", async () => {
+    mockRevisionQueries({
+      revisions: [{ revision: 1, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-09", created_by: STAFF, change_type: null, note: null }],
+      appUsers: [{ id: STAFF, name: "Wen Wei" }],
+    });
+    const body = await revisions();
+    expect(body.revisions[0].created_by_name).toBe("Wen Wei");
+    expect(body.revisions[0].actor_kind).toBe("human");
+  });
+
+  it("⭐ names a salesperson the staff door does not answer for", async () => {
+    /* The same split History carries: the 0390 door names internal staff
+       only; `salespersons.user_id` (0002) answers the sales-side half. */
+    mockRevisionQueries({
+      revisions: [{ revision: 1, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-09", created_by: SELLER, change_type: null, note: null }],
+      appUsers: [],
+      salespersons: [{ user_id: SELLER, name: "Kimmy Lee" }],
+    });
+    const body = await revisions();
+    expect(body.revisions[0].created_by_name).toBe("Kimmy Lee");
+    expect(body.revisions[0].actor_kind).toBe("human");
+  });
+
+  it("classifies an unrecorded or unresolvable recorder as missing, never a guess", async () => {
+    mockRevisionQueries({
+      revisions: [
+        { revision: 1, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-09", created_by: null, change_type: null, note: null },
+        { revision: 2, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-10", created_by: "00000000-0000-0000-0000-0000000000c1", change_type: "customer_change", note: null },
+      ],
+      appUsers: [],
+      salespersons: [],
+    });
+    const body = await revisions();
+    expect(body.revisions[0].created_by_name).toBeNull();
+    expect(body.revisions[0].actor_kind).toBe("missing");
+    expect(body.revisions[1].created_by_name).toBeNull();
+    expect(body.revisions[1].actor_kind).toBe("missing");
+  });
+
+  it("looks each distinct id up ONCE, however many revisions it authored", async () => {
+    const { rpc, salespersonsIn } = mockRevisionQueries({
+      revisions: [
+        { revision: 1, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-09", created_by: SELLER, change_type: null, note: null },
+        { revision: 2, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-10", created_by: SELLER, change_type: "customer_change", note: null },
+        { revision: 3, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-11", created_by: STAFF, change_type: "staff_correction", note: null },
+      ],
+      appUsers: [{ id: STAFF, name: "Wen Wei" }],
+      salespersons: [{ user_id: SELLER, name: "Kimmy Lee" }],
+    });
+    const body = await revisions();
+    /* Two doors since 0592 — the name and the person marker — and each is
+       asked ONCE, for the distinct ids. */
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(rpc).toHaveBeenCalledWith("actor_display_names", { p_ids: [SELLER, STAFF] });
+    expect(rpc).toHaveBeenCalledWith("actor_identities", { p_ids: [SELLER, STAFF] });
+    expect(salespersonsIn).toHaveBeenCalledTimes(1);
+    expect(salespersonsIn).toHaveBeenCalledWith("user_id", [SELLER, STAFF]);
+    expect(body.revisions.map((r: { created_by_name: string | null }) => r.created_by_name)).toEqual([
+      "Kimmy Lee", "Kimmy Lee", "Wen Wei",
+    ]);
   });
 });
 

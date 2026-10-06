@@ -19,6 +19,7 @@ import {
   soCountLabel,
   sortToOrderRows,
   toOrderBuilds,
+  validateIssuePlan,
   unitsHeadline,
   poScheduleDays,
   snapToPoDay,
@@ -36,6 +37,8 @@ import {
   DEMAND_PURPOSES,
   DEMAND_PURPOSE_DEFAULT,
   DEMAND_PURPOSE_VALUES,
+  RETIRED_DEMAND_PURPOSE_LABELS,
+  demandPurposeLabelOf,
   isDemandPurpose,
   type ToOrderLine,
   type ToOrderRow,
@@ -515,8 +518,8 @@ describe("Build name + quantity", () => {
   it("earns the ordinal back when a sibling would read identically", () => {
     const [p] = run([mattress(), mattress({ lineId: "x2" })]);
     expect(p.rows[0].builds.map((b) => b.title)).toEqual([
-      "Mattress 1 — B1201S King",
-      "Mattress 2 — B1201S King",
+      "Mattress 1: B1201S King",
+      "Mattress 2: B1201S King",
     ]);
   });
 
@@ -670,6 +673,23 @@ describe("T3 · On PO", () => {
     expect(r.qty).toBe(1); // what is still to buy — the engine already netted it
     expect(r.coveredByOpenPo).toBe(2); // …and this is why it is 1 and not 3
     expect(r.builds[0].coveredByOpenPo).toBe(2);
+  });
+
+  it("a FULLY covered build may be issued — the plan no longer refuses it", () => {
+    /* YH, 2026-09-03: a line with a supplier, a cost and a price is buyable,
+       and the buyer judges the coverage. `validateIssuePlan` used to answer
+       `already_on_po` here, which turned the tick the register now offers into
+       a trap — and the refusal never said WHICH line, because the coverage it
+       objected to comes from a per-SKU pool with no customer attribution and
+       may belong to another customer entirely. */
+    const proposal = run([MAT()], { supply: { openPoBySku: { "H1401S-K": 3 } } })[0];
+    const [build] = toOrderBuilds(proposal);
+    expect(proposal.rows[0].builds[0].fullyOnPo).toBe(true);
+    expect(
+      validateIssuePlan(proposal, [
+        { key: "d1", include: true, buildKeys: [build.buildKey] },
+      ]),
+    ).toMatchObject({ ok: true, count: 1 });
   });
 
   it("names the purchase orders behind the number", () => {
@@ -1211,25 +1231,64 @@ describe("P13 · the take path speaks the drawer's word", () => {
  * word the server refuses BY NAME.
  */
 describe("P15 · the Source a typed demand may carry", () => {
-  it("holds exactly the four the database can store", () => {
+  it("holds exactly the approved six, in the approved order (Cards 03/04)", () => {
+    // The owner-approved vocabulary; the 0399/0401 doors admit exactly these.
     expect(DEMAND_PURPOSES.map((p) => p.value)).toEqual([
       "ready_stock",
-      "display",
-      "warranty",
-      "office",
+      "showroom_display",
+      "service_case",
+      "internal_staff_purchase",
+      "subsidiary_purchase",
+      "other_purchase",
+    ]);
+    expect(DEMAND_PURPOSES.map((p) => p.label)).toEqual([
+      "Ready Stock",
+      "Showroom Display",
+      "Service Case",
+      "Internal Staff Purchase",
+      "Subsidiary Purchase",
+      "Other Purchase",
     ]);
   });
 
-  it("offers no word the store has no value for", () => {
-    // `Spare Parts` and `Other…` are RULED WORDS and they are deliberately not
-    // offerable — neither has ever had a CHECK value, and inventing one would
-    // be a screen ruling on a business question nobody has asked.
+  it("offers no word the doors refuse — retired values included", () => {
+    // `Other…` is a RULED WORD and deliberately not offerable — it has never
+    // had a CHECK value, and inventing one would be a screen ruling on a
+    // business question nobody has asked ("other" than what, recorded where?).
     const labels = DEMAND_PURPOSES.map((p) => p.label);
-    expect(labels).not.toContain(TO_ORDER_WORDS.reasonSpareParts);
     expect(labels).not.toContain(TO_ORDER_WORDS.reasonOther);
-    // ...and the words themselves survive, because a later card may need them.
-    expect(TO_ORDER_WORDS.reasonSpareParts).toBe("Spare Parts");
+    // The retired four are HISTORY's words, never offered again (Card 03):
+    // an office-supplies buy was never a staff purchase.
+    for (const retired of ["Display", "Warranty", "Office", "Spare Parts"]) {
+      expect(labels).not.toContain(retired);
+    }
+    for (const retired of ["display", "warranty", "office", "spare_parts"]) {
+      expect(isDemandPurpose(retired)).toBe(false);
+    }
+    // Management folds under Internal Staff Purchase — no word of its own.
+    expect(labels).not.toContain("Management Purchase");
+    // ...and the unoffered word survives, because a later card may need it.
     expect(TO_ORDER_WORDS.reasonOther).toBe("Other…");
+  });
+
+  it("history keeps its own truthful words — retired, never relabelled", () => {
+    // A pre-ruling row prints the word it was actually asked as; the label
+    // arithmetic answers for approved and retired values alike (Law D).
+    expect(RETIRED_DEMAND_PURPOSE_LABELS).toEqual({
+      display: "Display",
+      warranty: "Warranty",
+      office: "Office",
+      spare_parts: "Spare Parts",
+    });
+    expect(demandPurposeLabelOf("ready_stock")).toBe("Ready Stock");
+    expect(demandPurposeLabelOf("subsidiary_purchase")).toBe("Subsidiary Purchase");
+    expect(demandPurposeLabelOf("office")).toBe("Office");
+    expect(demandPurposeLabelOf("warranty")).toBe("Warranty");
+    // No false mapping in either direction:
+    expect(demandPurposeLabelOf("office")).not.toBe("Internal Staff Purchase");
+    expect(demandPurposeLabelOf("warranty")).not.toBe("Service Case");
+    expect(demandPurposeLabelOf("nonsense")).toBeNull();
+    expect(demandPurposeLabelOf(null)).toBeNull();
   });
 
   it("every label comes from the words module — none is spelt twice", () => {
@@ -1244,9 +1303,9 @@ describe("P15 · the Source a typed demand may carry", () => {
     expect(isDemandPurpose(DEMAND_PURPOSE_DEFAULT)).toBe(true);
   });
 
-  it("the guard admits the four and refuses everything else", () => {
+  it("the guard admits the five and refuses everything else", () => {
     for (const v of DEMAND_PURPOSE_VALUES) expect(isDemandPurpose(v)).toBe(true);
-    for (const v of ["spare_parts", "other", "", "READY_STOCK", null, 7, undefined]) {
+    for (const v of ["other", "", "READY_STOCK", null, 7, undefined]) {
       expect(isDemandPurpose(v)).toBe(false);
     }
   });

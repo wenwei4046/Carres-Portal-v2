@@ -4,7 +4,6 @@ import {
   carrierDayLoads,
   carrierDayNote,
   daysInRange,
-  dayWord,
   deliveryRange,
   inRange,
   shiftDays,
@@ -66,10 +65,10 @@ describe("bookingDayOf — the ONE booking read (T10)", () => {
   });
 });
 
-describe("deliveryRange — Today / Tomorrow / This week", () => {
+describe("deliveryRange — the three day ranges", () => {
   it("today is one day", () => {
     expect(deliveryRange("today", MON)).toMatchObject({
-      label: "Today",
+      key: "today",
       fromIso: MON,
       toIso: MON,
     });
@@ -104,7 +103,7 @@ describe("deliveryRange — Today / Tomorrow / This week", () => {
   });
 });
 
-describe("daysInRange / inRange / shiftDays / dayWord", () => {
+describe("daysInRange / inRange / shiftDays", () => {
   it("lists both ends inclusive", () => {
     expect(daysInRange(MON, "2026-07-29")).toEqual(["2026-07-27", "2026-07-28", "2026-07-29"]);
     expect(daysInRange(MON, MON)).toEqual([MON]);
@@ -132,10 +131,15 @@ describe("daysInRange / inRange / shiftDays / dayWord", () => {
     expect(shiftDays("2027-01-01", -1)).toBe("2026-12-31");
   });
 
-  it("only today and tomorrow get a word — every other day prints its date", () => {
-    expect(dayWord(MON, MON)).toBe("Today");
-    expect(dayWord("2026-07-28", MON)).toBe("Tomorrow");
-    expect(dayWord("2026-07-29", MON)).toBeNull();
+  // NO RELATIVE DATE WORDS (owner ruling 2026-08-15). `dayWord` returned
+  // `Today` / `Tomorrow` and was deleted with the ruling; a range now carries
+  // DAYS and no word, so there is nothing here that can print one. Asserting
+  // the absence is the enforcement — a `label` that quietly comes back is the
+  // failure this test exists to stop.
+  it("a range carries days and no word", () => {
+    const r = deliveryRange("today", MON);
+    expect(r).toEqual({ key: "today", fromIso: MON, toIso: MON });
+    expect("label" in r).toBe(false);
   });
 });
 
@@ -182,7 +186,7 @@ describe("carrierDayLoads — who is carrying what on the day", () => {
 
   it("names the no-carrier group instead of hiding it — the day is not emptier than it is", () => {
     const loads = carrierDayLoads([booking({ partnerId: null, partnerName: null })], MON);
-    expect(loads[0]).toMatchObject({ partnerId: null, partnerName: "No logistics picked", confirmed: 1 });
+    expect(loads[0]).toMatchObject({ partnerId: null, partnerName: "Logistics not assigned", confirmed: 1 });
   });
 
   it("busiest carrier first", () => {
@@ -215,7 +219,7 @@ describe("carrierDayLoads — who is carrying what on the day", () => {
     const [load] = carrierDayLoads([booking(), booking()], MON, rules);
     expect(load!.atLimit).toBe(true);
     expect(carrierDayNote(load!)).toBe(
-      "NETS is at its limit of 2 deliveries a day — call them before promising more",
+      "NETS is at its limit of 2 deliveries a day. Call them before promising more",
     );
   });
 
@@ -225,7 +229,7 @@ describe("carrierDayLoads — who is carrying what on the day", () => {
     const [load] = carrierDayLoads([booking({ date: SAT })], SAT, rules);
     expect(load!.runs).toBe(false);
     expect(carrierDayNote(load!)).toBe(
-      "NETS is not running on this day — call them or move these",
+      "NETS is not running on this day. Call them or move these",
     );
   });
 

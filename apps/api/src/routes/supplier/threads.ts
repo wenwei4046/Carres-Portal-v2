@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { requireSupplier } from "../../lib/auth-guards";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -35,10 +35,7 @@ supplierThreadsRouter.post("/:threadId/ready", requireSupplier, async (c) => {
   const { data, error } = await sb.rpc("supplier_mark_thread_ready", {
     p_thread_id: threadId,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 
@@ -54,10 +51,7 @@ supplierThreadsRouter.delete("/:threadId/ready", requireSupplier, async (c) => {
   const { data, error } = await sb.rpc("supplier_unmark_thread_ready", {
     p_thread_id: threadId,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 

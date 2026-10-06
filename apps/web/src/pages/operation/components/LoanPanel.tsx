@@ -14,17 +14,25 @@ import {
 import Segmented from "@/components/Segmented";
 import Btn from "@/components/Btn";
 import { toast } from "sonner";
-import { docNumber, type SofaLoanDto } from "@carres/shared";
+import {
+  docNumber,
+  loanOfferEventLabel,
+  loanOfferStateOf,
+  READY_STOCK_CONDITION_WORDS,
+  type SofaLoanDto,
+} from "@carres/shared";
 import {
   useBorrowLoan,
+  useLoanOffers,
+  useRecordLoanOffer,
   useUpdateLoan,
   useReturnLoan,
   useReturnLoanSupplier,
   type SupplierRow,
 } from "@/lib/queries";
-import { lineCategory } from "@/lib/line-category";
-import { fmtDateShort } from "@/lib/fmt-date";
-import type { ReserveFreeUnit } from "./ReserveStockDialog";
+import { lineCategory, resolvedCategory } from "@/lib/line-category";
+import { appTodayIso, fmtDateShort } from "@/lib/fmt-date";
+import type { ReserveFreeUnit } from "./StockPickerGrid";
 
 /**
  * LoanPanel — "ON MISSION" card language (Jess 2026-07-19, approved from her
@@ -47,15 +55,6 @@ import type { ReserveFreeUnit } from "./ReserveStockDialog";
  *    "checked it can enter" confirm gates the lend.
  * migration 0217 (no schema change here).
  */
-
-/** Same labels as the rev20 stock picker — one vocabulary across the drawer. */
-const CONDITION_LABEL: Record<string, string> = {
-  new: "New",
-  exhibition: "Display",
-  old: "Fair (used)",
-  refurbished: "Refurbished",
-  damaged: "Damaged",
-};
 
 /** Lend order — display/used stock first, sellable NEW last (protect stock). */
 const COND_RANK: Record<string, number> = {
@@ -109,14 +108,14 @@ function addDays(iso: string | null, n: number): string | null {
 /** Whole-day diff from today (MYT-agnostic; date-only). */
 function daysFromToday(iso: string): number {
   const d = new Date(`${iso.slice(0, 10)}T00:00:00`).getTime();
-  const t = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00`).getTime();
+  const t = new Date(`${appTodayIso()}T00:00:00`).getTime();
   return Math.round((d - t) / 86_400_000);
 }
 
 /** "day N since lent" for the at-customer row. */
 function dayN(loan: SofaLoanDto): number | null {
   if (!loan.loaned_at) return null;
-  const end = (loan.returned_at ?? new Date().toISOString()).slice(0, 10);
+  const end = loan.returned_at ? loan.returned_at.slice(0, 10) : appTodayIso();
   const a = new Date(`${end}T00:00:00`).getTime();
   const b = new Date(`${loan.loaned_at.slice(0, 10)}T00:00:00`).getTime();
   return Math.max(0, Math.round((a - b) / 86_400_000));
@@ -261,7 +260,7 @@ function LoanCard({
         {!isSupplier && loan.item_condition && (
           <Row k="Condition">
             <span className={`${TAG} ${condTone(loan.item_condition)}`}>
-              {CONDITION_LABEL[loan.item_condition] ?? loan.item_condition}
+              {READY_STOCK_CONDITION_WORDS[loan.item_condition] ?? loan.item_condition}
             </span>
           </Row>
         )}
@@ -416,7 +415,7 @@ function LoanCard({
                 value={returnRef}
                 autoFocus
                 onChange={(e) => setReturnRef(e.target.value)}
-                placeholder="Returned with… (e.g. Laveo DO-2207) — optional"
+                placeholder="Returned with… (optional, e.g. Laveo DO-2207)"
                 aria-label="Returned with which supplier delivery"
                 className="w-full border border-base-300 rounded-[6px] bg-white px-2 py-1 text-meta focus:border-primary focus:outline-none"
               />
@@ -494,7 +493,7 @@ function LoanCard({
                       type="button"
                       onClick={() => onSetReturnDue(null)}
                       disabled={busy}
-                      title="Clear the override — back to auto"
+                      title="Clear the override. Back to auto"
                       className="text-label text-base-400 border-b border-dashed border-base-300"
                     >
                       clear
@@ -549,7 +548,7 @@ function WarehousePick({
           key,
           sku: u.sku,
           condition: u.condition,
-          cat: lineCategory(u.sku),
+          cat: resolvedCategory(u.sku, u.category),
           count: 0,
           firstId: u.id,
           poNo: u.poNo,
@@ -597,7 +596,7 @@ function WarehousePick({
             </div>
             <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
               <span className={`${TAG} ${condTone(g.condition)}`}>
-                {CONDITION_LABEL[g.condition] ?? g.condition}
+                {READY_STOCK_CONDITION_WORDS[g.condition] ?? g.condition}
                 {g.condition === "new" ? " · sellable" : ""}
               </span>
               <span className="text-label text-base-500">{g.count} free</span>
@@ -650,7 +649,7 @@ function WarehousePick({
           {safe.length > 0 && (
             <div className="flex items-start gap-1.5 bg-warning-soft/60 border border-warning/30 rounded-[8px] px-2.5 py-1.5 mb-2 text-label text-warning">
               <AlertTriangle size={13} className="shrink-0 mt-0.5" />
-              This is sellable new stock — lend a display unit above when you have one.
+              This is sellable new stock. Lend a display unit above when you have one.
             </div>
           )}
           {sellable.map((g) => (
@@ -663,6 +662,139 @@ function WarehousePick({
 }
 
 /* ── panel ───────────────────────────────────────────────────────────────── */
+
+/**
+ * THE LOAN OFFER (0492, Delivery MASTER §14.2, Card 15). Carres Operation
+ * offers the loan and records the customer's answer HERE, on the Sales Order,
+ * beside the loan itself; Logistics never makes the commercial offer. The
+ * record is append-only — the latest one is the current state, the list is
+ * the history Order Route reads.
+ */
+function LoanOfferBlock({ orderId, field }: { orderId: string; field: string }) {
+  const offersQ = useLoanOffers(orderId);
+  const record = useRecordLoanOffer(orderId, {
+    onSuccess: () => {
+      toast.success("Loan offer recorded");
+      setMode(null);
+      setLabel("");
+      setReason("");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const [mode, setMode] = useState<"offer" | "decline" | null>(null);
+  const [label, setLabel] = useState("");
+  const [reason, setReason] = useState("");
+  const offers = offersQ.data?.offers ?? [];
+  const { state } = loanOfferStateOf(offers);
+  const latest = offers[0] ?? null;
+  const stateWord =
+    state === "none"
+      ? "No loan offered"
+      : `${loanOfferEventLabel(state)}${latest?.label ? ` · ${latest.label}` : ""}`;
+  return (
+    <section className="rounded-[6px] border border-base-200 bg-white p-2.5" data-testid="loan-offer-block">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-label font-semibold uppercase tracking-wide text-base-500">Loan offer</div>
+          <div className="text-body text-base-900" data-testid="loan-offer-state">
+            {offersQ.isLoading ? "Loading…" : stateWord}
+          </div>
+          {state === "declined" && latest?.reason ? (
+            <div className="text-label text-base-600">{latest.reason}</div>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {state === "offered" ? (
+            <>
+              <Btn
+                size="sm"
+                onClick={() => record.mutate({ event: "accepted" })}
+                disabled={record.isPending}
+                data-testid="loan-offer-accept"
+              >
+                Customer accepted
+              </Btn>
+              <Btn size="sm" onClick={() => setMode("decline")} disabled={record.isPending} data-testid="loan-offer-decline">
+                Customer declined
+              </Btn>
+            </>
+          ) : (
+            <Btn size="sm" onClick={() => setMode("offer")} disabled={record.isPending} data-testid="loan-offer-open">
+              Offer a loan
+            </Btn>
+          )}
+        </div>
+      </div>
+      {mode === "offer" ? (
+        <form
+          className="mt-2 grid gap-1.5"
+          data-testid="loan-offer-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!label.trim()) return;
+            record.mutate({ event: "offered", label: label.trim(), reason: reason.trim() || null });
+          }}
+        >
+          <input
+            aria-label="What is offered"
+            placeholder="What is offered · e.g. Display sofa HK55-3S"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            className={field}
+          />
+          <input
+            aria-label="Why it is offered"
+            placeholder="Why · e.g. supplier date misses the customer commitment"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            className={field}
+          />
+          <div className="flex items-center gap-1.5">
+            <Btn size="sm" type="submit" disabled={!label.trim() || record.isPending} data-testid="loan-offer-save">
+              Record the offer
+            </Btn>
+            <Btn size="sm" onClick={() => setMode(null)}>Cancel</Btn>
+          </div>
+        </form>
+      ) : mode === "decline" ? (
+        <form
+          className="mt-2 grid gap-1.5"
+          data-testid="loan-decline-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!reason.trim()) return;
+            record.mutate({ event: "declined", reason: reason.trim() });
+          }}
+        >
+          <input
+            aria-label="Why the customer declined"
+            placeholder="Why the customer declined"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            className={field}
+          />
+          <div className="flex items-center gap-1.5">
+            <Btn size="sm" type="submit" disabled={!reason.trim() || record.isPending} data-testid="loan-decline-save">
+              Record the answer
+            </Btn>
+            <Btn size="sm" onClick={() => setMode(null)}>Cancel</Btn>
+          </div>
+        </form>
+      ) : null}
+      {offers.length > 1 ? (
+        <ul className="mt-2 space-y-0.5" data-testid="loan-offer-history">
+          {offers.slice(1).map((o) => (
+            <li key={o.id} className="text-label text-base-500">
+              {loanOfferEventLabel(o.event)}
+              {o.label ? ` · ${o.label}` : ""}
+              {o.reason ? ` · ${o.reason}` : ""} · {fmtDateShort(o.recorded_at)}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
 
 export default function LoanPanel({
   orderId,
@@ -712,7 +844,13 @@ export default function LoanPanel({
   const visible = [...active, ...owed.filter((l) => l.status === "returned")];
 
   const catSet = new Set(orderCategories);
-  const lendable = freeUnits.filter((u) => catSet.has(lineCategory(u.sku)));
+  // D9, 2026-08-20 — the CATALOG decides what this unit is, not a keyword list
+  // compiled into `packages/shared`. This line FILTERS warehouse stock: before
+  // the change, a real sofa whose model name was absent from `lineClass`'s
+  // regex resolved to "acc", which the drawer deliberately excludes from
+  // `orderCategories`, and the unit simply was not offered. Every product keyed
+  // into the catalog from 2026-08-19 onward is in that missing set.
+  const lendable = freeUnits.filter((u) => catSet.has(resolvedCategory(u.sku, u.category)));
 
   // §7.9 lend flow — closed by default; "+ Lend" opens the two-source choice.
   const [lending, setLending] = useState(false);
@@ -749,25 +887,25 @@ export default function LoanPanel({
         // LN-DDMMYY-NNNN — tail derived from the ORDER id so every doc of this
         // order shares it, never a counter (volume stays private), reprint-stable.
         ln_no: docNumber({ prefix: "LN", date: issueDate, seed: orderId, digits: 4 }),
-        order_code: orderCode || "—",
+        order_code: orderCode || "",
         order_ref: orderRef,
         issue_date: issueDate,
         customer: { name: customerName, phone: customerPhone },
         item:
           (isSup ? loan.borrowed_label ?? loan.borrowed_sku : loan.item_sku) ??
-          "—",
+          "",
         condition: isSup
           ? "Borrowed piece"
-          : (CONDITION_LABEL[loan.item_condition ?? ""] ??
+          : (READY_STOCK_CONDITION_WORDS[loan.item_condition ?? ""] ??
             loan.item_condition ??
-            "—"),
+            ""),
         source: isSup
           ? `Borrowed · ${loan.supplier_name ?? "supplier"}`
           : "Warehouse · Klang",
       });
       window.open(URL.createObjectURL(blob), "_blank");
     } catch (e) {
-      toast.error(`Couldn't open loan note — ${(e as Error).message}`);
+      toast.error(`Couldn't open loan note: ${(e as Error).message}`);
     }
   }
 
@@ -788,7 +926,7 @@ export default function LoanPanel({
       },
       {
         onSuccess: () => {
-          toast.success("Borrowed — loaner out, owe the supplier a piece");
+          toast.success("Borrowed. Loaner out, owe the supplier a piece");
           resetLend();
         },
         onError: (e) => toast.error(e.message),
@@ -801,6 +939,7 @@ export default function LoanPanel({
 
   return (
     <div className="p-3 space-y-2.5">
+      <LoanOfferBlock orderId={orderId} field={field} />
       {visible.map((loan) => (
         <LoanCard
           key={loan.id}
@@ -839,7 +978,7 @@ export default function LoanPanel({
             returnLoan.mutate(
               { loanId: loan.id },
               {
-                onSuccess: () => toast.success("Collected — swap done"),
+                onSuccess: () => toast.success("Collected. Swap done"),
                 onError: (e) => toast.error(e.message),
               },
             )
@@ -848,7 +987,7 @@ export default function LoanPanel({
             returnSupplier.mutate(
               { loanId: loan.id, returnRef },
               {
-                onSuccess: () => toast.success("Returned to supplier — obligation closed"),
+                onSuccess: () => toast.success("Returned to supplier. Obligation closed"),
                 onError: (e) => toast.error(e.message),
               },
             )
@@ -885,7 +1024,7 @@ export default function LoanPanel({
           {source === "supplier" && (
             <div className="space-y-2">
               <div className="text-label text-base-500 px-0.5">
-                Borrow whatever the supplier currently has — describe the piece.
+                Borrow whatever the supplier currently has. Describe the piece.
               </div>
               <select
                 value={supplierId}

@@ -13,6 +13,7 @@ import { fieldCls } from "@/components/Field";
 import { SectionCard } from "@/components/SectionPanel";
 import { rm } from "@/lib/format-currency";
 import { useHrComp, useHrDeleteStaffComp, useHrSetStaffComp } from "@/lib/queries";
+import { StatTile } from "./HrOverviewTab";
 
 /**
  * People cost (HR-P7, migration 0278) — what the team costs, per month.
@@ -40,32 +41,6 @@ const PILL: Record<string, string> = {
   waiting: "pill pill-warning",
   neutral: "pill pill-neutral",
 };
-
-function Tile({
-  label,
-  value,
-  sub,
-  muted,
-}: {
-  label: string;
-  value: string;
-  sub: string;
-  muted?: boolean;
-}) {
-  return (
-    <div className="flex-1 min-w-[170px] rounded-lg border border-base-200 bg-card px-4 py-3">
-      <div className="text-label uppercase tracking-[0.05em] text-base-500">{label}</div>
-      <div
-        className={`t-num text-page leading-8 font-semibold ${
-          muted ? "text-base-400" : "text-base-900"
-        }`}
-      >
-        {value}
-      </div>
-      <div className="text-meta text-base-500">{sub}</div>
-    </div>
-  );
-}
 
 interface EditState {
   employeeId: string;
@@ -184,10 +159,10 @@ function CompDialog({ edit, onClose }: { edit: EditState; onClose: () => void })
           <div className="col-span-2 rounded-lg bg-base-50 border border-base-200 px-3 py-2">
             <div className="text-label uppercase tracking-[0.05em] text-base-500">Loaded monthly cost</div>
             <div className="t-num text-strong font-semibold" data-testid="comp-loaded-preview">
-              {preview === null ? "—" : rm(preview)}
+              {preview === null ? "" : rm(preview)}
             </div>
             <div className="text-meta text-base-500">
-              (base + allowance) × (1 + burden). Burden is an estimate you type —
+              (base + allowance) × (1 + burden). Burden is an estimate you type.
               Carres never computes EPF, SOCSO, EIS or PCB.
             </div>
           </div>
@@ -256,7 +231,7 @@ function CompositionBar({ cost }: { cost: PeopleCost }) {
       </div>
       <div className="text-meta text-base-500">
         {rm(cost.breakdown.base)} base + {rm(cost.breakdown.allowance)} allowance +{" "}
-        {rm(cost.breakdown.burden)} employer burden — typed in, never computed
+        {rm(cost.breakdown.burden)} employer burden (typed in, never computed)
       </div>
     </>
   );
@@ -291,21 +266,21 @@ export default function HrPeopleCostTab({
     <div className="flex flex-col gap-4">
       {/* Four tiles, none of which needs revenue to mean something. */}
       <div className="flex gap-3 flex-wrap">
-        <Tile
+        <StatTile
           label="Monthly cost"
           value={rm(cost.fixedCost)}
           sub={`loaded · ${cost.recorded} of ${cost.headcount} recorded`}
           muted={cost.fixedCost === 0}
         />
         {/* Its own tile on purpose — never folded into the figure above. */}
-        <Tile
+        <StatTile
           label="Commission"
           value={rm(cost.commissionCost)}
           sub={cost.commissionCost === 0 ? "no rates set up yet" : "this month, variable"}
           muted={cost.commissionCost === 0}
         />
-        <Tile label="Headcount" value={String(cost.headcount)} sub="people on file" />
-        <Tile
+        <StatTile label="Headcount" value={String(cost.headcount)} sub="people on file" />
+        <StatTile
           label="Average per person"
           value={rm(cost.avgFixedPerPerson)}
           sub="fixed only, excludes commission"
@@ -355,7 +330,7 @@ export default function HrPeopleCostTab({
                   </td>
                   <td className="px-2.5 h-11 text-body text-right t-num">
                     {g.revenue === null ? (
-                      <span className="text-base-400">—</span>
+                      null
                     ) : (
                       rm(g.revenue)
                     )}
@@ -381,7 +356,7 @@ export default function HrPeopleCostTab({
             is reported as overhead.
           </p>
           <p className="text-meta text-base-500 border-t border-base-200 pt-1.5">
-            People with no department land in <b>Management</b> — the Chairman and COO are
+            People with no department land in <b>Management</b>. The Chairman and COO are
             department-less by design (they top the org chart). Give anyone else a
             position on the Team tab and they move into their own row.
           </p>
@@ -414,7 +389,7 @@ export default function HrPeopleCostTab({
                     s.costPctOfRevenue === null ? "text-base-400" : ""
                   }`}
                 >
-                  {s.costPctOfRevenue === null ? "—" : `${s.costPctOfRevenue}%`}
+                  {s.costPctOfRevenue === null ? "" : `${s.costPctOfRevenue}%`}
                 </div>
               </div>
             </div>
@@ -426,8 +401,8 @@ export default function HrPeopleCostTab({
                   {cost.coverage.partial ? (
                     <>
                       <b>
-                        Sales on file cover {cost.coverage.firstOrderDate}–
-                        {cost.coverage.lastOrderDate} — {cost.coverage.daysWithOrders} of{" "}
+                        Sales on file cover {cost.coverage.firstOrderDate} to{" "}
+                        {cost.coverage.lastOrderDate}, {cost.coverage.daysWithOrders} of{" "}
                         {cost.coverage.daysInMonth} days.
                       </b>{" "}
                     </>
@@ -436,14 +411,14 @@ export default function HrPeopleCostTab({
                   )}
                   A full month of salary against part of a month of sales would read as a
                   wildly wrong ratio, so the percentage stays hidden until the month is
-                  complete. It appears on its own — nothing to switch on.
+                  complete. It appears on its own. Nothing to switch on.
                 </div>
               </div>
             )}
 
             <p className="text-meta text-base-500">
               Revenue here is the same attributed figure the Performance tab and the
-              Overview tile use — one computation, so the three screens cannot quote three
+              Overview tile use. One computation, so the three screens cannot quote three
               numbers.
             </p>
           </div>
@@ -486,7 +461,7 @@ export default function HrPeopleCostTab({
                     )}
                   </td>
                   <td className="px-2.5 h-11 text-body text-base-500">
-                    {r.positionName ?? (r.storeName ? r.storeName : "—")}
+                    {r.positionName ?? (r.storeName ? r.storeName : "")}
                   </td>
                   {r.compId === null ? (
                     <td
@@ -538,14 +513,14 @@ export default function HrPeopleCostTab({
         </div>
         <div className="px-3 py-2 flex flex-col gap-1.5">
           <p className="text-meta text-base-500">
-            A salary is <b>never edited in place</b> — a raise is a new row from the date it
+            A salary is <b>never edited in place</b>. A raise is a new row from the date it
             starts, so last month's cost stays what it actually was. Same rule as
             commission rates and targets.
           </p>
           <p className="text-meta text-base-500 border-t border-base-200 pt-1.5">
             <b>Carres never computes EPF, SOCSO, EIS or PCB.</b> Burden is one percentage a
             human types as an estimate so the cost figure is not misleadingly low. No
-            payslip, no bank file, no e-filing — that stays with the payroll provider.
+            payslip, no bank file, no e-filing. That stays with the payroll provider.
           </p>
         </div>
       </SectionCard>

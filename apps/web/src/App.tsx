@@ -2,11 +2,14 @@ import { Suspense, lazy, useEffect, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { useAuth } from "@/lib/auth";
+import { useWorkActivity } from "@/lib/use-work-activity";
 import { RequireRole } from "@/lib/require-role";
+import { loginState } from "@/lib/return-to";
 import { roleAllowedOnPortal } from "@/lib/portal";
 import WrongPortal from "@/components/WrongPortal";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Login from "@/pages/Login";
+import UpdatePassword from "@/pages/UpdatePassword";
 import Me from "@/pages/Me";
 import DealerApp from "@/pages/dealer/DealerApp";
 import PrincipalApp from "@/pages/principal/PrincipalApp";
@@ -25,8 +28,11 @@ import { PayCancelled, PaySuccess } from "@/pages/pay/PayResult";
  * reference, not a portal page, so it must not ride the main bundle that every
  * operator downloads (CF `phase-10-bundle-size-regression`). */
 const UiShowcase = lazy(() => import("@/pages/dev/UiShowcase"));
+/* 0581 — the external logistics link: public, lazy, its own chunk. */
+const DeliveryLinkPage = lazy(() => import("@/pages/public/DeliveryLinkPage"));
 
 function HomeRedirect() {
+  const location = useLocation();
   const session = useAuth((s) => s.session);
   const role = useAuth((s) => s.role);
   const hydrated = useAuth((s) => s.hydrated);
@@ -37,7 +43,8 @@ function HomeRedirect() {
       </div>
     );
   }
-  if (!session) return <Navigate to="/login" replace />;
+  // Both guards remember the same thing the same way — see lib/return-to.ts.
+  if (!session) return <Navigate to="/login" state={loginState(location)} replace />;
   // POS/ERP domain split (2026-07-18): wrong-domain roles get the signpost
   // before any role-home navigation. pages.dev/localhost stay ungated.
   if (role && !roleAllowedOnPortal(role)) return <WrongPortal role={role} />;
@@ -68,12 +75,14 @@ function RequireAuth({ children }: { children: ReactNode }) {
     );
   }
   if (!session) {
-    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+    // Path + query + hash, so a document-number deep link survives the login.
+    return <Navigate to="/login" state={loginState(location)} replace />;
   }
   return <>{children}</>;
 }
 
 export default function App() {
+  useWorkActivity();
   const hydrate = useAuth((s) => s.hydrate);
   const location = useLocation();
   useEffect(() => {
@@ -89,6 +98,12 @@ export default function App() {
       <ErrorBoundary key={location.pathname} area="Carres Portal" variant="route">
       <Routes>
         <Route path="/login" element={<Login />} />
+        {/* Step 02 of recovery — the destination the reset email has always
+            named. NOT behind RequireAuth: an expired link leaves no session,
+            and the guard would bounce that person to /login with no word about
+            why, which is the silent dead end this route exists to end. The page
+            checks the session itself and says which case it is. */}
+        <Route path="/update-password" element={<UpdatePassword />} />
         <Route path="/me" element={<RequireAuth><Me /></RequireAuth>} />
         <Route
           path="/dealer/*"
@@ -138,7 +153,11 @@ export default function App() {
           path="/finance/*"
           element={
             <RequireAuth>
-              <RequireRole roles={["finance", "principal"]}>
+              {/* Payment MASTER §12 — the Responsible Delivery Operation
+                  (role: operation) do daily collection, so the Payments and
+                  Invoices destinations must open for them. FinanceApp itself
+                  bounces operation off the finance-only pages. */}
+              <RequireRole roles={["finance", "principal", "operation"]}>
                 <FinanceApp />
               </RequireRole>
             </RequireAuth>
@@ -219,6 +238,16 @@ export default function App() {
           element={
             <Suspense fallback={<div className="p-8 text-body text-kit-slate-11">Loading…</div>}>
               <UiShowcase />
+            </Suspense>
+          }
+        />
+        {/* 0581 — a logistics company with no portal login answers here.
+            NOT behind RequireAuth: the link's token is the whole boundary. */}
+        <Route
+          path="/delivery-link/:token"
+          element={
+            <Suspense fallback={<div className="p-4 text-body text-kit-slate-11">Loading…</div>}>
+              <DeliveryLinkPage />
             </Suspense>
           }
         />

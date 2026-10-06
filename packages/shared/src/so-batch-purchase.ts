@@ -1,0 +1,1926 @@
+import { z } from "zod";
+import { isOnePoPerOrder } from "./to-order";
+import { purchasingRefusalLine } from "./purchasing-refusals";
+import type { ProductCategory } from "./db-types";
+import type { IsoDate } from "./working-days";
+import type { PurchaseOrderRegisterFacts } from "./purchase-order-register";
+import {
+  PURCHASE_DEMAND_TIMING_STATES,
+  isPurchaseDemandTimingState,
+  purchaseDemandRowSchema,
+  type PurchaseDemandRow,
+  type PurchaseDemandState,
+  type PurchaseDemandTimingState,
+} from "./purchase-demands";
+
+/**
+ * SO BATCH PURCHASE — the arrangement a buyer makes BEFORE a purchase order
+ * exists (CARD-2026-08-22-purchasing-02; `docs/purchasing/MASTER.md` §§5.1,
+ * 5.4, 9.1).
+ *
+ * ── WHAT THIS FILE IS ALLOWED TO KNOW ───────────────────────────────────────
+ *
+ * Exactly one thing: **where the goods the server says we must buy should be
+ * sent.** It may check that an arrangement adds back to the server's own `Buy`,
+ * and it may compose the `supplier × Deliver To` key the server will recompute
+ * for itself. It may not net a quantity, resolve a supplier, price a line,
+ * choose an arrival date or decide coverage — those are the engine's, and a
+ * second implementation of any of them would be a second truth (Law D).
+ *
+ * `toBuy` arrives here as a NUMBER THIS FILE CANNOT EXPLAIN. That is the point:
+ * every function below treats it as given, so there is nowhere for browser
+ * arithmetic to grow.
+ *
+ * ── AND THE ARRANGEMENT IS NOT A STORED FACT ────────────────────────────────
+ *
+ * It lives in the operator's session until `Issue PO`. A refresh returns to the
+ * server default, because *where this buy should go* only becomes truth when
+ * the purchase order carries it. Persisting it would create a second demand
+ * field that nothing recomputes.
+ */
+
+// ─── The words ───────────────────────────────────────────────────────────────
+
+/**
+ * Every word this destination spells that its own Register owns
+ * (`docs/COPY-STANDARD.md` — the SO Batch Purchase / purchase-demand block).
+ *
+ * The six STATE words are not repeated here: they live in `purchase-demands.ts`
+ * because the states are the demand's, not the page's, and respelling them is
+ * exactly how two surfaces start disagreeing.
+ */
+export const SO_BATCH_PURCHASE_WORDS = {
+  destination: "SO Batch Purchase",
+  search: "Search Sales Order, customer, SKU or supplier…",
+  empty: "No proceeded Sales Orders.",
+  /** What the footer's bare numbers count — the Register's own row grain. */
+  footerUnit: "Sales Orders",
+
+  /**
+   * Column heads, in the approved reading order (owner correction 2026-09-11;
+   * `docs/purchasing/MASTER.md` §9.1). One row per proceeded Sales Order, read
+   * the way the work is read: which order, whose, when it arrived, when the
+   * customer wants it, where it goes, who supplies it, where the goods land,
+   * and finally the documents.
+   *
+   * `Status` is RETIRED as a column. blank · `Partial` · `Ordered` was a
+   * generic word for an arithmetic the row already showed under `PO No` and in
+   * the expansion, and an operator could act on none of the three. The
+   * ELIGIBILITY it was derived from is untouched — `soBatchOrderStatusOf` still
+   * decides which rows may be ticked — it simply stopped being a column. The
+   * other retired heads (`Source SO` · `Required For` · `SKU / configuration` ·
+   * `Required` · `Stock` · `Open PO` · `Buy` · `Goods Must Arrive` · `Work`)
+   * never return either; their FACTS survive off-screen.
+   */
+  colProceedDate: "Proceed Date",
+  colPoNo: "PO No",
+  colSoNo: "SO No",
+  /** Owner rulings R1/R2, 2026-09-16 — the engine's date to issue by. It is an
+   *  ENGINE/DETAIL fact again (Jess 2026-09-18): the parent column is
+   *  `PO Safety Days`, and `Order By` is not a goods-table column either. */
+  colOrderBy: "Order By",
+  /**
+   * ⭐ THE PARENT PLANNING COLUMN — owner ruling 2026-09-18, the shared
+   * Purchasing dictionary's `PO Safety Days`.
+   *
+   * The working-day margin that would REMAIN if the outstanding demand were
+   * ordered today, after supplier production, against the
+   * applicable required date. It is NOT the Order By date, NOT always 14 and
+   * NOT days since creation: the one server planning engine counts it
+   * (`purchaseDemandSafetyDaysLeft`, the same expression the timing states are
+   * classified from — Law D), the browser only prints it.
+   *
+   * The parent shows the TIGHTEST outstanding line. Nothing left to buy prints
+   * nothing. Unknown setup or unverified coverage NEVER prints `0`; it prints
+   * the same governed absence word this page already uses for an unstatable
+   * plan (`Not planned` · `Coverage not checked` · `Already on a PO`).
+   */
+  colPoSafetyDays: "PO Safety Days",
+  /**
+   * A margin that has already been spent: ordering today lands the goods after
+   * the customer's date. It is the page's own governed timing word, not a
+   * negative number — `−2` in a days column reads as a defect rather than as
+   * the one sentence that says what is wrong.
+   */
+  safetyDaysOverrun: "Not enough production days",
+  /** The Order By of remaining demand that cannot be stated yet (blocked or unverified). */
+  notPlanned: "Not planned",
+  /** The two governed table group headings — never stored statuses or rail rows. */
+  groupToBuy: "To buy",
+  groupNoPurchaseNeeded: "No purchase needed",
+  noMatch: "No Sales Orders match these filters",
+  footerUnitOne: "Sales Order",
+  issueNeedsPoDuty: "Only Operation staff can issue this PO",
+  colCustomer: "Customer",
+  /**
+   * ⭐ THE SHARED PURCHASING DICTIONARY'S OWN HEADS — owner ruling 2026-09-18
+   * (`docs/COPY-STANDARD.md` — Purchasing UI dictionary).
+   *
+   * `Delivery Location` and `Requested Delivery Date` said WHOSE date and
+   * WHOSE address only by where they happened to sit. On four pages that read
+   * the same facts — SO Batch, Manual Purchase, Purchase Orders, Receiving —
+   * the customer's date sits beside a supplier's, and a warehouse destination
+   * sits beside a customer address. The customer's facts now say so in their
+   * own heads, and `Deliver To` becomes `Supplier Deliver To` for the
+   * destination INSTRUCTED TO THE SUPPLIER.
+   */
+  colDeliveryLocation: "Customer Delivery Location",
+  colRequestedDelivery: "Customer’s original requested delivery",
+  colSupplier: "Supplier",
+  /** The goods summary: `{first item} + {n} more`, every item in expansion. */
+  colItems: "Items",
+  deliverTo: "Supplier Deliver To",
+  /**
+   * The ORIGINAL supplier-facing date stamped at the document's birth (§5.7).
+   * `PO Delivery Date` is retired for this fact on all four reviewed pages.
+   */
+  colPoDeliveryDate: "PO Default Delivery Date",
+
+  /**
+   * ⭐ STATUS IS THE NEW-PO NEED, NOT A PROGRESS BADGE — owner ruling
+   * 2026-09-18.
+   *
+   * `Partial` / `Ordered` described a generic progress the row already showed
+   * under `PO No`, and an operator could act on neither. What a buying page
+   * has to answer is one question: does this still need a purchase order?
+   *
+   * It is derived from the SAME remaining-demand reading that decides the two
+   * governed groups (`soBatchOrderPlanning().group`) — there is no second
+   * arithmetic and no stored status. And it is a NEED, never a permission:
+   * unknown coverage and every other blocker still refuse the tick and state
+   * their own reason, whatever this word says.
+   */
+  statusNeedPo: "Need PO",
+  statusNoPoNeeded: "No PO needed",
+  /**
+   * ⭐ THE TWO-LINE STATUS RULE — owner ruling 2026-09-28 (§9.1). When a row
+   * cannot be ticked, line two says why and, where a door exists, the next
+   * step. The reason words are the demand's own state words; only the doors
+   * are spelt here.
+   */
+  statusFixInCatalog: "Fix in Catalog",
+  statusOpenSettings: "Open Settings",
+  /** RESERVE GOODS ALREADY ON A PO (owner ruling 2026-09-28) — the door. */
+  statusUseThisPo: "Use this PO",
+
+  /**
+   * The deterministic compact summaries a parent cell prints when one Sales
+   * Order genuinely carries more than one value — the exact mapping lives in
+   * the expansion, never in the cell.
+   */
+  multiple: "Multiple",
+
+  /**
+   * A purchase order exists, but the original date it was issued with is not
+   * on file — the 0428 recovery recorded an unevidenced original as unknown
+   * rather than back-filling it from a planning date (§5.7). 21 of 62 live
+   * purchase orders are in this state.
+   *
+   * It is the SAME word the Purchase Orders register already prints for the
+   * same fact, so the two columns cannot describe one PO differently. A cell
+   * left BLANK keeps its own separate meaning: nothing has been ordered.
+   */
+  poDeliveryDateUnknown: "Not recorded",
+
+  /**
+   * ⭐ THE READ-ONLY SECTION'S OWN HEADING (owner correction 2026-09-11).
+   *
+   * `Purchase order details` — the section under the expanded row that holds
+   * every document covering the Sales Order, each with its own Unit, quantity,
+   * destination, supplier and original date. Deliberately NOT `Covered by`
+   * (retired: one heading for three questions) and NOT `ON PO` (that is the
+   * goods table's QUANTITY column, and a heading that repeats a column name
+   * makes the number and the section read as the same thing).
+   */
+  poDetails: "Purchase order details",
+
+  /**
+   * ⭐ WHAT `To buy` MEANS WHEN IT IS NOT A REMAINDER (owner correction
+   * 2026-09-11).
+   *
+   * The engine prints the covering document's quantity under `To buy` on a
+   * build every unit of which is already on an OPEN purchase order, because
+   * the row stays buyable: that pool has no customer attribution, so the
+   * covering document routinely belongs to another customer and refusing here
+   * would block a FIRST purchase for this one (YH, 2026-09-03). But the same
+   * figure then means two opposite things, and the operator is the one who has
+   * to tell them apart. This sentence is what tells them.
+   *
+   * It states a fact, never an instruction: buying again may be exactly right.
+   *
+   * ⛔ NOT `Open PO …`. That spelling is a RETIRED column head
+   * (`COPY-STANDARD.md` — `PO` is already the dictionary's word for the
+   * document), and the suite greps the whole dictionary for it.
+   *
+   * ⭐ AND IT STATES THE CONSEQUENCE, NOT ONLY THE STATE (owner correction
+   * 2026-09-11). The existing coverage is half the answer; what happens if the
+   * operator acts is the other half, and it was missing.
+   *
+   * TRACED THROUGH THE ONE DOOR, on current `main`: `POST /issue-batch`
+   * refuses any selection whose engine build is `fullyOnPo` with
+   * **`already_on_po` (422)**, naming the covering purchase order, and creates
+   * nothing (0430 — production had minted six open purchase orders against one
+   * 1-unit line of SO-1340 because nothing downstream of the receipt refused
+   * it). So the consequence is not "it buys again": **it is refused**, and the
+   * row now says the same thing the door would.
+   *
+   * THE WORDS ARE THE DOOR'S OWN. `purchasingRefusal("already_on_po")` reads
+   * `An open purchase order (…) already covers this line.` / `Nothing to buy
+   * here. Check the covering purchase order instead.` These two lines are that
+   * refusal at cell width, so an operator meets one sentence, not two.
+   *
+   * TWO SHORT LINES, not one long one. The governed sentence wraps to three
+   * lines under a one-digit figure and takes the item row to 91px — a stack of
+   * documents deciding a row's height again, spelt out in words. The lines are
+   * written at the width they are read at; the full refusal rides as the cell's
+   * title.
+   */
+  toBuyAlreadyOnPo: ["Already on a PO", "Nothing to buy here"] as readonly string[],
+
+  /**
+   * ⭐ UNKNOWN IS NOT YES (owner correction 2026-09-11). The engine's
+   * `fullyOnPo` decides whether this line may be bought at all, and a payload
+   * without it leaves the page unable to say. It prints neither a purchasing
+   * quantity nor a tick, because both would describe an eligibility nobody
+   * verified — and the issue door's own refusal is preserved underneath.
+   */
+  toBuyNotChecked: ["Coverage not checked"] as readonly string[],
+  toBuyNotCheckedWhy:
+    "Whether an open Purchase Order already covers this line could not be checked, so it is not offered for buying. Reopen the page to check again.",
+  /**
+   * The door's own refusal, carried as the qualifying cell's own title. It
+   * never contradicts the two visible lines; it says the same thing with room
+   * to be exact, in the words the API would have answered with.
+   */
+  toBuyAlreadyOnPoWhy:
+    "An open purchase order already covers this line. Nothing to buy here. Check the covering purchase order instead. Issue PO refuses it.",
+
+  /* THE ROW INSPECTOR HAS NO WORDS OF ITS OWN (owner correction 2026-08-24).
+     It draws `GoodsMiniTable`, the child table Sales Orders and Delivery draw,
+     and that component owns its own headings. The eight labels that used to
+     live here — REQUIRED · FROM STOCK · ON OPEN PO · BUY · Source ·
+     Required for · Goods must arrive · Deliver to — are DELETED rather than
+     kept beside the new truth: seven of the eight were re-printing a column
+     the row already carried. */
+
+  /** The destination editor. */
+  split: "Split",
+  splitTotal: "Total",
+
+  /**
+   * ── READY STOCK ON THE ITEM ROW — owner ruling 2026-09-18 ─────────────────
+   *
+   * The cell states two counts and nothing else: what is FREE for this goods,
+   * and what is already SAVED against THIS item line. Two numbers because they
+   * answer two questions, and folding them into one made a line with a saved
+   * reservation and an empty shelf read as a line with nothing at all.
+   *
+   * ⛔ `0` IS AN ANSWER, NOT A PLACEHOLDER. It prints only for a SUCCESSFUL
+   * read that found no free stock AND no saved reservation, and that row gets
+   * no disclosure because there is nothing under it. Loading, failed and
+   * unverified reads print their own words — never a zero.
+   */
+  readyStockAvailable: (n: number) => `${n} available`,
+  readyStockReserved: (n: number) => `${n} reserved`,
+  readyStockNone: "0",
+  readyStockLoading: "Loading…",
+  readyStockFailed: "Could not be read",
+  readyStockRetry: "Try again",
+  readyStockOpen: "Show Ready Stock",
+  readyStockClose: "Hide Ready Stock",
+  readyStockEmpty: "No stock on the shelf matches this item line.",
+
+  /**
+   * ── THE ONE SAVED SET, AND THE FOUR CONTROLS THAT EDIT IT ────────────────
+   *
+   * Ticking is a DRAFT and writes nothing. `Choose Ready Unit` saves the first
+   * reservation — on its own, with no purchase order involved, which is what
+   * an all-stock Sales Order needs. After that the same set is reopened by
+   * `Change selection`, and the replacement is committed by `Save changes` or
+   * abandoned by `Cancel`.
+   *
+   * ⛔ THERE IS NO PER-UNIT UNDO. A release is part of the replacement and is
+   * validated with it, so one act is one transaction — a row of little Undo
+   * buttons would be N acts, each its own race.
+   */
+  readyStockChoose: "Choose Ready Unit",
+  readyStockChange: "Change selection",
+  readyStockSave: "Save changes",
+  readyStockCancel: "Cancel",
+  readyStockChosen: (n: number) => `${n} chosen`,
+  readyStockNoneChosen: "No Unit chosen",
+  /**
+   * A purchase cannot be issued on top of a stock decision nobody committed:
+   * the quantity the purchase would be raised against is exactly what the
+   * pending edit is changing.
+   */
+  readyStockPendingBlocksIssue:
+    "Save or cancel the Ready Stock changes before issuing a PO.",
+
+  /** The stock picker's own six heads (Purchasing MASTER §9.1). */
+  stockColReceived: "Goods Received Date",
+  stockColLocation: "Stock Location",
+  stockColSupplier: "Supplier",
+  /** ONE cell, two lines: the document reference, then the Unit ID under it. */
+  stockColReference: "PO No / Ref No",
+  stockColCondition: "Condition",
+  stockUnitIdLabel: "Unit ID",
+  /** An absent fact is a stated fact — never a blank and never an invention. */
+  stockNotRecorded: "Not recorded",
+
+  /** The issue journey. */
+  issuePo: "Issue PO",
+  reviewTitle: "Review Purchase Orders",
+  backToBuying: "Back to buying",
+  previewNotSendable: "This is a preview. Issue PO creates the number.",
+} as const;
+
+// ─── The rail ────────────────────────────────────────────────────────────────
+
+/**
+ * THE RAIL CONTRACT — latest Owner ruling 2026-08-30;
+ * `docs/COPY-STANDARD.md` — the rail; `docs/purchasing/MASTER.md` §9.1).
+ *
+ * Purchasing fact sections, in their governed order. Work remains in the
+ * central owner-resolved `My Work` / `Team Work` surfaces; the local rail must
+ * not copy Sales, Catalog or Purchasing actions into a second work lens.
+ * `ORDER TIMING` holds the five timing rows, every one of them orderable. `PRODUCT` holds the three Catalog categories —
+ * the CATALOG's answer, never SKU-text inference. `SUPPLIER` holds the actual
+ * supplier names the Register itself projects, alphabetical and never
+ * hardcoded. `REGION` groups the order's recorded Delivery State using the
+ * established operator vocabulary. `SETUP TO FIX` holds the one
+ * Purchasing-owned setup blocker and renders ONLY while an affected Sales
+ * Order exists — an exception section with nothing in it is noise wearing a
+ * heading.
+ *
+ * The rail is NAVIGATION, not batch selection: one filter per section,
+ * sections combine, and no rail row ever grows a checkbox — the page's only
+ * checkboxes are the Register's `Issue PO` selection.
+ */
+/**
+ * ⭐ `TO ORDER / All not ordered` IS RETIRED — owner correction 2026-09-11.
+ *
+ * It was the one rail row that named no FACT about a Sales Order. It named the
+ * page's own DEFAULT, and the default is what the operator already sees when
+ * nothing is selected — so the first row on the rail was the least useful
+ * narrowing on it, sitting above `ORDER TIMING`, the section that actually
+ * answers *what to buy today*. The arithmetic behind it is untouched and still
+ * governs the tick and the Ready Stock door
+ * (`soBatchOrderLineOutstandingQty`); what goes is the row.
+ */
+export const SO_BATCH_RAIL = {
+  timing: { heading: "Order timing", states: PURCHASE_DEMAND_TIMING_STATES },
+  product: {
+    heading: "Product",
+    all: "All products",
+    /** The approved filters, in the approved order — Catalog categories. */
+    categories: [
+      { category: "mattress", word: "Mattress" },
+      { category: "bedframe", word: "Bedframe" },
+      { category: "sofa", word: "Sofa" },
+    ],
+  },
+  supplier: { heading: "Supplier", all: "All suppliers" },
+  region: { heading: "Region", all: "All regions" },
+  setup: {
+    heading: "Setup to fix",
+    states: ["no_production_days"] as readonly PurchaseDemandState[],
+  },
+} as const;
+
+/** The three Catalog categories the `PRODUCT` section may filter by. */
+export type SoBatchProductCategory =
+  (typeof SO_BATCH_RAIL.product.categories)[number]["category"];
+
+// ─── The rail filter — one selection per section, sections combine ───────────
+
+/**
+ * WHAT THE OPERATOR HAS PICKED (Card 02-C §8). One slot per section; `null`
+ * (or `false`) is that section's `All`. Different sections combine with AND;
+ * clearing every slot restores the complete permanent Register, Ordered
+ * records included.
+ */
+export interface SoBatchRailFilter {
+  /** One `ORDER TIMING` row, or none. A second click clears it. */
+  timing: PurchaseDemandTimingState | null;
+  /** One `PRODUCT` category; `null` is `All products`. */
+  product: SoBatchProductCategory | null;
+  /** One supplier name; `null` is `All suppliers`. */
+  supplier: string | null;
+  /** One delivery-region label; `null` is `All regions`. */
+  region: string | null;
+  /** The one `SETUP TO FIX` row. */
+  setup: boolean;
+}
+
+export const SO_BATCH_RAIL_CLEAR: SoBatchRailFilter = {
+  timing: null,
+  product: null,
+  supplier: null,
+  region: null,
+  setup: false,
+};
+
+const SO_BATCH_KLANG_VALLEY = "Klang Valley";
+const SO_BATCH_OTHER_REGION = "Others";
+const SO_BATCH_KLANG_VALLEY_STATES = new Set(["kuala lumpur", "selangor", "putrajaya"]);
+
+/**
+ * The Register already receives the server's parsed Delivery State. Region is
+ * a presentation grouping over that fact: Klang Valley is grouped, every
+ * outstation state keeps its own name, and an absent state stays findable as
+ * `Others`. No address text or postcode is guessed in the browser.
+ */
+function soBatchRegionName(state: string | null): string {
+  const recorded = state?.trim();
+  if (!recorded) return SO_BATCH_OTHER_REGION;
+  return SO_BATCH_KLANG_VALLEY_STATES.has(recorded.toLowerCase())
+    ? SO_BATCH_KLANG_VALLEY
+    : recorded;
+}
+
+/**
+ * THE ONE SUPPLIER PROJECTION (Card 02-C §7). The `Supplier` column and the
+ * `SUPPLIER` rail section both ask THIS function — the resolved
+ * outstanding-demand suppliers plus the issued PO lineage suppliers — so the
+ * rail can never learn a supplier the column does not print, and there is no
+ * second browser-only supplier calculation.
+ */
+export function soBatchOrderSupplierNames(o: SoBatchOrderRow): (string | null)[] {
+  return [...o.outstandingSuppliers, ...o.pos.map((p) => p.supplierName)];
+}
+
+/**
+ * Units on one Sales Order line that still have no committed coverage.
+ *
+ * This is the one `All not ordered` arithmetic: customer quantity less the
+ * Ready Stock ledger draw and less exact, non-cancelled PO lineage. A generic
+ * open-PO SKU pool may suppress today's issue leaf, but it cannot claim that a
+ * particular Sales Order was ordered when no `po_line_sources` row says so.
+ */
+export function soBatchOrderLineOutstandingQty(
+  line: Pick<SoBatchOrderLineFact, "qty" | "stockTaken" | "pos" | "poReserved">,
+): number {
+  /* 0600 — Unit IDs reserved on a PO by `Use this PO` cover the line exactly
+     like Ready Stock (the SQL twin is `so_line_remaining_requirement`). */
+  const onPoReserved = (line.poReserved ?? []).reduce((sum, r) => sum + Math.max(0, r.qty), 0);
+  const required = Math.max(0, line.qty - line.stockTaken - onPoReserved);
+  const linked = line.pos.reduce((sum, po) => sum + Math.max(0, po.qty), 0);
+  return Math.max(0, required - linked);
+}
+
+/**
+ * One Sales Order's rail-relevant facts, derived once from the server's own
+ * rows — the leaf states the engine computed, the Catalog categories on the
+ * order's lines (never SKU-text inference), and the Register's own supplier
+ * projection. This file combines and counts them; it derives nothing new.
+ */
+export interface SoBatchRailFacts {
+  orderId: string;
+  /** Selectable timing states and unresolved setup states under this order. */
+  states: ReadonlySet<PurchaseDemandState>;
+  /** The CATALOG's categories on the order's lines. */
+  categories: ReadonlySet<ProductCategory>;
+  /** `soBatchOrderSupplierNames`, deduplicated. */
+  suppliers: ReadonlySet<string>;
+  /** Region derived only from the order's recorded Delivery State. */
+  region: string;
+}
+
+export function soBatchRailFacts(
+  orders: readonly SoBatchOrderRow[],
+  leafs: readonly PurchaseDemandRow[],
+): SoBatchRailFacts[] {
+  const statesByOrder = new Map<string, Set<PurchaseDemandState>>();
+  const statusByOrder = new Map(orders.map((o) => [o.orderId, o.status]));
+  for (const r of leafs) {
+    const status = statusByOrder.get(r.orderId);
+    if (status == null || status === "ordered") continue;
+    if (isPurchaseDemandTimingState(r.state) && !isSelectableForOrder(r, status)) continue;
+    let s = statesByOrder.get(r.orderId);
+    if (!s) {
+      s = new Set();
+      statesByOrder.set(r.orderId, s);
+    }
+    s.add(r.state);
+  }
+  return orders.map((o) => ({
+    orderId: o.orderId,
+    states: statesByOrder.get(o.orderId) ?? new Set(),
+    categories: new Set(
+      o.lines
+        .map((l) => l.category)
+        .filter((c): c is ProductCategory => c != null),
+    ),
+    suppliers: new Set(
+      soBatchOrderSupplierNames(o).filter((s): s is string => s != null && s !== ""),
+    ),
+    region: soBatchRegionName(o.deliveryState),
+  }));
+}
+
+type SoBatchRailSection =
+  | "timing"
+  | "product"
+  | "supplier"
+  | "region"
+  | "setup";
+
+/** Does this order pass every selected section — except, optionally, one? */
+function railMatches(
+  f: SoBatchRailFacts,
+  filter: SoBatchRailFilter,
+  except?: SoBatchRailSection,
+): boolean {
+  if (except !== "timing" && filter.timing != null && !f.states.has(filter.timing)) {
+    return false;
+  }
+  if (except !== "product" && filter.product != null && !f.categories.has(filter.product)) {
+    return false;
+  }
+  if (except !== "supplier" && filter.supplier != null && !f.suppliers.has(filter.supplier)) {
+    return false;
+  }
+  if (except !== "region" && filter.region != null && f.region !== filter.region) return false;
+  if (except !== "setup" && filter.setup && !f.states.has("no_production_days")) return false;
+  return true;
+}
+
+/**
+ * WHAT THE RAIL PRINTS (Card 02-C §§7–8). Every count is UNIQUE Sales Orders —
+ * never SKU quantities, demand lines, POs or notifications — and every
+ * section's counts are computed under the OTHER sections' selections, so the
+ * printed number predicts exactly the rows a click would show. The fixed rows
+ * print their live count, zero included; a supplier row exists only while it
+ * matches, except the selected supplier, which stays visible with `0`.
+ */
+export interface SoBatchRailModel {
+  /** Orders passing every selected filter — what the Register shows. */
+  visibleOrderIds: ReadonlySet<string>;
+  timingCounts: Record<PurchaseDemandTimingState, number>;
+  productCounts: Record<SoBatchProductCategory, number>;
+  /** Actual names, alphabetical. Never hardcoded, never a placeholder. */
+  suppliers: Array<{ name: string; count: number }>;
+  /** Delivery regions, Klang Valley first and missing state last. */
+  regions: Array<{ name: string; count: number }>;
+  setupCount: number;
+  /** Whether `SETUP TO FIX` renders at all: any affected Sales Order exists. */
+  setupExists: boolean;
+}
+
+export function soBatchRailModel(
+  facts: readonly SoBatchRailFacts[],
+  filter: SoBatchRailFilter,
+): SoBatchRailModel {
+  const count = (section: SoBatchRailSection, has: (f: SoBatchRailFacts) => boolean) =>
+    facts.filter((f) => railMatches(f, filter, section) && has(f)).length;
+
+  const timingCounts = {} as Record<PurchaseDemandTimingState, number>;
+  for (const s of PURCHASE_DEMAND_TIMING_STATES) {
+    timingCounts[s] = count("timing", (f) => f.states.has(s));
+  }
+  const productCounts = {} as Record<SoBatchProductCategory, number>;
+  for (const c of SO_BATCH_RAIL.product.categories) {
+    productCounts[c.category] = count("product", (f) => f.categories.has(c.category));
+  }
+
+  const supplierCounts = new Map<string, number>();
+  for (const f of facts) {
+    if (!railMatches(f, filter, "supplier")) continue;
+    for (const name of f.suppliers) {
+      supplierCounts.set(name, (supplierCounts.get(name) ?? 0) + 1);
+    }
+  }
+  /* The selected supplier stays visible with 0 while another section
+     temporarily removes its matches — a filter the operator cannot see is a
+     narrowing they cannot clear. */
+  if (filter.supplier != null && !supplierCounts.has(filter.supplier)) {
+    supplierCounts.set(filter.supplier, 0);
+  }
+
+  const regionCounts = new Map<string, number>();
+  for (const f of facts) {
+    if (!railMatches(f, filter, "region")) continue;
+    regionCounts.set(f.region, (regionCounts.get(f.region) ?? 0) + 1);
+  }
+  if (filter.region != null && !regionCounts.has(filter.region)) {
+    regionCounts.set(filter.region, 0);
+  }
+  const regionOrder = (name: string) => {
+    if (name === SO_BATCH_KLANG_VALLEY) return -1;
+    if (name === SO_BATCH_OTHER_REGION) return 1;
+    return 0;
+  };
+
+  return {
+    visibleOrderIds: new Set(
+      facts.filter((f) => railMatches(f, filter)).map((f) => f.orderId),
+    ),
+    timingCounts,
+    productCounts,
+    suppliers: [...supplierCounts]
+      .map(([name, n]) => ({ name, count: n }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    regions: [...regionCounts]
+      .map(([name, n]) => ({ name, count: n }))
+      .sort((a, b) => regionOrder(a.name) - regionOrder(b.name) || a.name.localeCompare(b.name)),
+    setupCount: count("setup", (f) => f.states.has("no_production_days")),
+    setupExists: facts.some((f) => f.states.has("no_production_days")),
+  };
+}
+
+// ─── The Register row — one proceeded Sales Order (Card 02-B) ────────────────
+
+/**
+ * THE PERMANENT PURCHASING REGISTER (Card 02-B, owner ruling 2026-08-27;
+ * `docs/purchasing/MASTER.md` §9.1).
+ *
+ * The right Register shows ONE ROW PER PROCEEDED PHYSICAL-GOODS SALES ORDER,
+ * and the row never leaves when a purchase order is issued — the page is both
+ * the buying surface and the permanent purchasing audit register. The leaf
+ * demand rows (`PurchaseDemandRow`) remain the ONLY selection and issue
+ * contract; the order row is presentation and aggregation over them plus the
+ * authoritative PO lineage.
+ *
+ * ── STATUS IS DERIVED, NEVER STORED ─────────────────────────────────────────
+ *
+ * Three visible values — blank · `Partial` · `Ordered` — derived from exactly
+ * two server quantities:
+ *
+ *   buyingRequiredQty   units that genuinely require purchasing
+ *                       (demanded minus Ready-Stock coverage)
+ *   sentCoveredQty      units of that requirement covered by a NON-CANCELLED
+ *                       purchase order whose CURRENT PDF version has
+ *                       confirmed-sent evidence (`po_sends.kind =
+ *                       'confirmed_sent'` at `COALESCE(version, 1)`)
+ *
+ * `external_open` never counts. Supplier silence changes nothing. A numbered
+ * but unsent PO leaves Status blank while appearing under `PO No`. A new
+ * revision without its own confirmed send invalidates older-version
+ * completeness. A Sales Order covered entirely by Ready Stock has nothing that
+ * requires purchasing, so it is blank — visible, and unselectable.
+ */
+export type SoBatchOrderStatus = "blank" | "partial" | "ordered";
+
+/** The visible Status words. Blank is BLANK — never `No buying needed`. */
+export const SO_BATCH_ORDER_STATUS_WORDS: Record<SoBatchOrderStatus, string> = {
+  blank: "",
+  partial: "Partial",
+  ordered: "Ordered",
+};
+
+export function soBatchOrderStatusOf(f: {
+  buyingRequiredQty: number;
+  sentCoveredQty: number;
+}): SoBatchOrderStatus {
+  if (f.buyingRequiredQty <= 0) return "blank";
+  if (f.sentCoveredQty <= 0) return "blank";
+  if (f.sentCoveredQty >= f.buyingRequiredQty) return "ordered";
+  return "partial";
+}
+
+/**
+ * ⭐ THE DOCUMENT'S OWN STATE, IN THE ONE PURCHASING VOCABULARY — 2026-09-11.
+ *
+ * `SoBatchOrderPoFact.status` is a RAW DATABASE VALUE (`open` / `received`)
+ * and may never reach a screen: `COPY-STANDARD.md` rules that **`Open` is
+ * never a Purchase Order status**. This narrows the two facts this register
+ * actually carries onto the SAME union the Purchase Orders register prints,
+ * in the same precedence, so one document can never be described two ways.
+ *
+ * It is a NARROWED view, not a second implementation:
+ * `purchaseOrderRegisterFacts` decides the operation status (`Issued`,
+ * `In Production`, `Receiving`) from lines, sends and supplier dates this read does not carry,
+ * and this register does not claim any of those three — it answers only the
+ * question its own screen asks: *has this document been sent, and are its
+ * goods already in?* A cancelled purchase order never reaches this register at
+ * all, so `Cancelled` is unreachable here by construction.
+ *
+ * WHY THE REGISTER NEEDS IT AT ALL. `On PO` is the HISTORICAL document
+ * quantity — every non-cancelled `po_line_sources` row, received documents
+ * included, never netted by `received_qty`. `To buy` is the ENGINE's
+ * effective remainder, drawn from a pool of OPEN purchase-order lines net of
+ * what has already arrived. Without the document's state on screen, a reader
+ * cannot tell a line whose fourteen documents have all been received from one
+ * whose fourteen are still outstanding — and those are opposite situations.
+ */
+export function soBatchPoDocumentState(
+  po: Pick<SoBatchOrderPoFact, "status" | "sentCurrentVersion">,
+): PurchaseOrderRegisterFacts["documentState"] {
+  if (po.status === "received") return "Completed";
+  return po.sentCurrentVersion ? "Waiting for goods from supplier" : "Sending not confirmed";
+}
+
+/** One linked purchase order, through `po_line_sources` lineage ONLY. */
+export interface SoBatchOrderPoFact {
+  /** The PO number — `purchase_orders.id`. */
+  poId: string;
+  /** Cancelled POs never reach this list at all. */
+  status: "open" | "received";
+  supplierId: string | null;
+  supplierName: string | null;
+  /** The destination the ISSUED document actually carries. */
+  destinationId: string | null;
+  /**
+   * `purchase_orders.official_delivery_date` — the ORIGINAL supplier-facing
+   * date, stamped at birth and never changed (0428/0430, MASTER §5.7).
+   *
+   * It is deliberately NOT `eta_date`: that is the LIVE planning arrival and
+   * the ready-date door recomputes it, so a register drawing it would show a
+   * "PO Delivery Date" that silently MOVED after the supplier was sent the
+   * paper. `null` is a real answer — a PO whose original the 0428 recovery
+   * could not evidence is recorded as unknown, and is printed as an absence
+   * rather than back-filled from today's planning date.
+   */
+  officialDeliveryDate: IsoDate | null;
+  /** TRUE = the current PDF version has confirmed-sent evidence. */
+  sentCurrentVersion: boolean;
+  /** The current PDF version — `PO250925-4827(2)`. Optional on the wire. */
+  version?: number;
+  /**
+   * The PO window THIS order's demand for this PO's supplier fell into — the
+   * same stamp as the demand rows (Purchasing §5.6.1). A PO serving several
+   * orders carries one stamp per order row; Work counts it in the earliest.
+   */
+  poWindow?: string | null;
+}
+
+/**
+ * One procurable customer line of the order, with its Ready-Stock coverage and
+ * its exact PO lineage — the expansion's mapping truth. Quantities are SKU
+ * units throughout, the same unit `po_line_sources.qty` speaks.
+ */
+export interface SoBatchOrderLineFact {
+  orderLineId: string;
+  sku: string;
+  /** What the customer ordered on this line. */
+  qty: number;
+  /** Units already covered by Ready Stock (the pool ledger's own number). */
+  stockTaken: number;
+  item: string;
+  variant: string | null;
+  category: ProductCategory | null;
+  /**
+    * Exact lineage: which purchase-order LINES cover this item line, how many
+    * units each, and where that LINE sends them.
+    *
+    * ⭐ KEYED BY THE DOCUMENT LINE, not the document (owner correction
+    * 2026-09-11). One purchase order may carry a SKU to two destinations
+    * through two lines and source both to the same customer item line; merging
+    * them by `po_id` left only the parent document's `Deliver To` to print,
+    * which is a different fact from the line's own recorded one.
+    *
+    * `destinationId` is the LINE's, falling back to the document's ONLY when
+    * the line has none — the same rule the Sales Order expansion door uses,
+    * and the only case in which a parent summary may stand for a line.
+    * `poLineId` is optional so an older Worker's payload still parses.
+    */
+  pos: Array<{ poId: string; poLineId?: string | null; qty: number; destinationId?: string | null }>;
+  /**
+   * ⭐ RESERVE GOODS ALREADY ON A PO (owner ruling 2026-09-28, §9.1). Unit IDs
+   * still `incoming` on an open PO that `Use this PO` bound to THIS item line,
+   * per PO. They cover the line exactly like Ready Stock (0600
+   * `so_line_remaining_requirement`). Optional so an older Worker parses.
+   */
+  poReserved?: Array<{ poId: string; qty: number }>;
+  /**
+   * The open PO whose incoming Unit IDs no order holds for these goods
+   * (0600 `purchasing_po_free_units`) — the `Use this PO` offer. `null` or
+   * absent: none.
+   */
+  poOffer?: { poId: string; qty: number } | null;
+  /** TRUE when the free PO balance could not be read: never a number. */
+  poOfferUnread?: boolean;
+}
+
+/** One right-Register row: one proceeded physical-goods Sales Order. */
+export interface SoBatchOrderRow {
+  orderId: string;
+  so: number | null;
+  customer: string | null;
+  status: SoBatchOrderStatus;
+  /** `orders.proceeded_at` — the actual Sales → Operations handoff. */
+  proceededAt: string | null;
+  /** `orders.delivery_date` — the customer's current request. */
+  requestedDeliveryDate: IsoDate | null;
+  /** Preserved revision 1 request; display/filter/export only. */
+  originalRequestedDeliveryDate?: IsoDate | null;
+  /** The customer's delivery locality, formatted by the shared web rule. */
+  deliveryCity: string | null;
+  deliveryState: string | null;
+  /** Non-cancelled lineage POs, sorted by PO number. */
+  pos: SoBatchOrderPoFact[];
+  lines: SoBatchOrderLineFact[];
+  /** Suppliers resolved for the OUTSTANDING demand — the pre-issue answer. */
+  outstandingSuppliers: string[];
+}
+
+export const soBatchOrderRowSchema = z.object({
+  orderId: z.string(),
+  so: z.number().nullable(),
+  customer: z.string().nullable(),
+  status: z.enum(["blank", "partial", "ordered"]),
+  proceededAt: z.string().nullable(),
+  requestedDeliveryDate: z.string().nullable(),
+  originalRequestedDeliveryDate: z.string().nullable().optional(),
+  deliveryCity: z.string().nullable(),
+  deliveryState: z.string().nullable(),
+  pos: z.array(
+    z.object({
+      poId: z.string(),
+      status: z.enum(["open", "received"]),
+      supplierId: z.string().nullable(),
+      supplierName: z.string().nullable(),
+      destinationId: z.string().nullable(),
+      officialDeliveryDate: z.string().nullable(),
+      sentCurrentVersion: z.boolean(),
+      version: z.number().int().positive().optional(),
+      poWindow: z.string().nullable().optional(),
+    }),
+  ),
+  lines: z.array(
+    z.object({
+      orderLineId: z.string(),
+      sku: z.string(),
+      qty: z.number(),
+      stockTaken: z.number(),
+      item: z.string(),
+      variant: z.string().nullable(),
+      category: z
+        .enum(["mattress", "bedframe", "sofa", "accessory", "service", "guarantee"])
+        .nullable(),
+      pos: z.array(
+        z.object({
+          poId: z.string(),
+          poLineId: z.string().nullable().optional(),
+          qty: z.number(),
+          destinationId: z.string().nullable().optional(),
+        }),
+      ),
+      poReserved: z.array(z.object({ poId: z.string(), qty: z.number() })).optional(),
+      poOffer: z.object({ poId: z.string(), qty: z.number() }).nullable().optional(),
+      poOfferUnread: z.boolean().optional(),
+    }),
+  ),
+  outstandingSuppliers: z.array(z.string()),
+});
+
+/**
+ * A parent cell's deterministic answer over a set of values. `none` prints the
+ * grid's own `—`; `one` prints the value; `many` prints a compact summary —
+ * `2 POs`, `2 suppliers`, `Multiple` — and the exact mapping lives in the
+ * expansion. Values are deduplicated and sorted so two refreshes cannot
+ * summarise one Sales Order two ways.
+ */
+export type SoBatchCellSummary =
+  | { kind: "none" }
+  | { kind: "one"; value: string }
+  | { kind: "many"; count: number; values: string[] };
+
+export function soBatchCellSummary(values: readonly (string | null)[]): SoBatchCellSummary {
+  const distinct = [...new Set(values.filter((v): v is string => v != null && v !== ""))].sort(
+    (a, b) => a.localeCompare(b),
+  );
+  if (distinct.length === 0) return { kind: "none" };
+  if (distinct.length === 1) return { kind: "one", value: distinct[0]! };
+  return { kind: "many", count: distinct.length, values: distinct };
+}
+
+/**
+ * THE PARENT SELECTION LAW (Card 02-B §6). The parent checkbox represents ALL
+ * eligible uncovered child demand under its Sales Order:
+ *
+ *   no eligible child   → unselectable (Ordered, or fully Ready-Stock covered)
+ *   all selected        → checked
+ *   some selected       → indeterminate
+ *
+ * `eligible` is `isSelectableForBuying` over the SAME leaf rows the issue
+ * journey consumes — there is no second eligibility rule.
+ */
+export function soBatchOrderSelection(f: {
+  eligibleIds: readonly string[];
+  selectedIds: ReadonlySet<string>;
+}): { selectable: boolean; checked: boolean; indeterminate: boolean } {
+  const selectable = f.eligibleIds.length > 0;
+  const on = f.eligibleIds.filter((id) => f.selectedIds.has(id)).length;
+  return {
+    selectable,
+    checked: selectable && on === f.eligibleIds.length,
+    indeterminate: on > 0 && on < f.eligibleIds.length,
+  };
+}
+
+// ─── The wire: the SO Batch Purchase read ────────────────────────────────────
+
+/**
+ * THE SO BATCH PURCHASE READ (Card 02 §7.1; Card 02-B §8).
+ *
+ * `rows` remains the authoritative leaf truth — expansion, coverage,
+ * destination allocation, selection and Issue PO all run on it, unchanged.
+ * `registerRows` is ADDITIVE: the parent presentation and aggregation, one row
+ * per proceeded Sales Order, composed by the same one server read.
+ *
+ * The rest: where goods may be sent, which of those is the standing default,
+ * who currently holds PO Duty, who is covering it today, and whether THIS
+ * reader may issue. `mayIssue` is a convenience — the API and the creation RPC
+ * both refuse an unauthorised issue whatever the browser believes (Card §6;
+ * 0379).
+ */
+export const soBatchPurchaseResponseSchema = z.object({
+  today: z.string(),
+  rows: z.array(purchaseDemandRowSchema),
+  /** Card 02-B — one row per proceeded physical-goods Sales Order. */
+  registerRows: z.array(soBatchOrderRowSchema),
+  destinations: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      address: z.string().nullable().optional(),
+      isDefault: z.boolean(),
+      active: z.boolean(),
+    }),
+  ),
+  defaultDestinationId: z.string().nullable(),
+  /** The month's normal holder. `Team Work` groups by this person. */
+  currentPoDuty: z.object({ userId: z.string(), name: z.string() }).nullable(),
+  /**
+   * ⭐ 0379 — the dated buddy cover who may act TODAY, when one is set. It is a
+   * separate fact from the holder on purpose: the duty stays where management
+   * put it, and the audit must still say who actually pressed Issue PO.
+   */
+  actingPoDuty: z.object({ userId: z.string(), name: z.string() }).nullable(),
+  /**
+   * A holder/cover ID exists, but its display name could not be resolved.
+   * This is different from there being no configured PO duty holder.
+   */
+  poDutyNameUnavailable: z.boolean(),
+  /** The authoritative duty resolver itself could not be read. */
+  poDutyUnavailable: z.boolean(),
+  mayIssue: z.boolean(),
+  /** Who may collect from a factory, for the documents that need one. */
+  procurementPartners: z.array(z.object({ id: z.string(), name: z.string() })),
+  /**
+   * Card 02-A — the governed Safety days value (`order_by_buffer_days`), so
+   * the safety-band words follow the one setting instead of a hard-coded 14.
+   * The browser only PRINTS it; the arithmetic stays on the server.
+   */
+  safetyDays: z.number().int(),
+  /**
+   * The PO window settings could not be read, so no row carries `poWindow`.
+   * Buying still works; Work reports its Purchasing source as failed rather
+   * than showing an empty buying day (Purchasing §5.6.1).
+   */
+  poWindowsUnavailable: z.boolean().optional(),
+  poCutoffTimes: z.array(z.string()).optional(),
+  readyStockPriority: z.enum(["customer_delivery", "proceed_date"]).nullable().optional(),
+  /** Read-only dated rounds from the same window stamps as Work. Counts are SOs, not units. */
+  poRounds: z.array(z.object({ key: z.string(), unfinishedSoCount: z.number().int().nonnegative() })).optional(),
+});
+
+export type SoBatchPurchaseResponse = z.infer<typeof soBatchPurchaseResponseSchema>;
+
+// ─── Destinations ────────────────────────────────────────────────────────────
+
+export interface PurchasingDestination {
+  id: string;
+  name: string;
+  address?: string | null;
+  isDefault: boolean;
+  active: boolean;
+}
+
+export const purchasingDestinationSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  address: z.string().nullable().optional(),
+  isDefault: z.boolean(),
+  active: z.boolean(),
+});
+
+// ─── Selection ───────────────────────────────────────────────────────────────
+
+export interface DestinationAllocation {
+  destinationId: string;
+  qty: number;
+}
+
+export interface SoBatchSelection {
+  demandId: string;
+  allocations: DestinationAllocation[];
+}
+
+/**
+ * Whether this row may be ticked at all.
+ *
+ * Five conditions, and every one of them is the SERVER's fact: the state it
+ * derived, the remainder it computed, the supplier it resolved and the build
+ * reference it will accept back. A row missing any of them cannot be turned
+ * into a purchase order, so offering a tick-box would be offering an act that
+ * fails — the Register refuses it here and the API refuses it again.
+ *
+ * EVERY timing state is selectable (Card 02-A): the timing rows express risk,
+ * never `Cannot buy`, and Order By is a planned date, not an unlock date.
+ */
+export function isSelectableForBuying(row: PurchaseDemandRow): boolean {
+  return (
+    isPurchaseDemandTimingState(row.state) &&
+    row.toBuy != null &&
+    row.toBuy > 0 &&
+    row.supplierId != null &&
+    row.issueRef != null
+  );
+}
+
+/**
+ * Whether this row may be ticked ON THIS ORDER.
+ *
+ * `isSelectableForBuying` judges the DEMAND. This adds the one fact the demand
+ * cannot see: whether the order it belongs to has already bought everything it
+ * needed.
+ *
+ * WHY THE ROW ARITHMETIC IS NOT ENOUGH (YH, 2026-09-03 — "an ordered's
+ * checkbox still tickable"). The two numbers are computed from different
+ * facts and are allowed to disagree:
+ *
+ *   Status   per order line, `qty - stockTaken` against the units carried by
+ *            this order's OWN `po_line_sources` lineage on confirmed-sent
+ *            purchase orders. Customer-attributed and exact.
+ *   `toBuy`  the engine's remainder, drained from a per-SKU pool with NO
+ *            customer attribution.
+ *
+ * So an order whose own documents cover every unit it required could still
+ * carry a leaf with `toBuy > 0`, and the checkbox appeared beside an `Ordered`
+ * pill. Ticking it raises a SECOND purchase order for units this order has
+ * already bought and sent — the one duplication the pooled arithmetic cannot
+ * rule out on its own, because only lineage knows whose units they are.
+ *
+ * IT FAILS OPEN, deliberately. `ordered` requires lineage, and lineage exists
+ * only from migration 0382 with no backfill. An order whose purchase orders
+ * predate it scores `sentCoveredQty` 0, reads `blank`, and stays tickable —
+ * which is right: nothing has PROVEN those units were bought for this
+ * customer. This gate can therefore never hide genuine demand; it only refuses
+ * a buy the order's own documents already account for.
+ *
+ * ── ⭐ AND THE SCREEN AGREES WITH THE DOOR (owner correction 2026-09-11) ─────
+ *
+ * `isSelectableForBuying` above states the contract this register lives by:
+ * *"a row missing any of them cannot be turned into a purchase order, so
+ * offering a tick-box would be offering an act that fails — the Register
+ * refuses it here and the API refuses it again."*
+ *
+ * On 0430 the API started refusing one more shape, and the Register had no way
+ * to know. `POST /issue-batch` now answers **`already_on_po` (422)** for any
+ * selection whose engine build is `fullyOnPo`, naming the covering document —
+ * production had minted SIX open purchase orders against one 1-unit line of
+ * SO-1340 because nothing downstream of the receipt refused it. The tick was
+ * still offered, so the page invited an act the door then refused: the exact
+ * trap shape the contract above exists to prevent.
+ *
+ * The engine's own flag now rides the wire, so the gate closes here too. This
+ * is NOT a new buying rule and it disables no workflow — the workflow was
+ * already dead at the door; what changes is that the operator finds out before
+ * they arrange a destination and press a button, and the row says why.
+ *
+ * IT ALSO FAILS OPEN. `fullyOnPo` is optional: an older Worker sends none,
+ * `=== true` is false, and the row stays tickable exactly as it does today —
+ * the API still refuses it by name. A missing fact never hides demand.
+ */
+export function isSelectableForOrder(
+  row: PurchaseDemandRow,
+  orderStatus: SoBatchOrderStatus,
+): boolean {
+  return (
+    orderStatus !== "ordered" &&
+    /* ⭐ VERIFIED NOT COVERED, not merely "not known to be covered" (owner
+       correction 2026-09-11). `!== true` treated a MISSING flag as a licence:
+       the page could not tell an uncovered line from one it had no answer
+       about, and offered the tick for both. The carried build path always
+       sends the boolean (`purchase-demands.ts`), and a refused line carries
+       no `toBuy`/`issueRef` and fails the test below anyway — so the only
+       payload reaching this line without it is an older Worker's, and the
+       honest answer there is "could not be checked", not "go ahead".
+       soBatchToBuyState() prints that answer beside the row. */
+    /* ⭐ 2026-09-28 — a build covered ONLY by the anonymous pool, with a
+       `Use this PO` offer, may still be bought instead (owner ruling §9.1);
+       the issue door accepts exactly the same builds. */
+    (row.fullyOnPo === false || (row.fullyOnPo === true && row.poolOnly === true)) &&
+    isSelectableForBuying(row)
+  );
+}
+
+/**
+ * ⭐ WHAT THE `To buy` CELL IS ENTITLED TO SAY — owner correction 2026-09-11.
+ *
+ * THE CONTRADICTION THIS ENDS. The engine prints the covering document's
+ * quantity under `To buy` when the open-PO pool covers every unit of a build
+ * (T6 — a receipt states what it bought, and `0` would answer a question
+ * nobody asked). The Register then drew that figure on a row it does not offer
+ * for buying: **a covering quantity presented as a purchasing quantity**,
+ * under a heading that means *what is left to buy*.
+ *
+ * So a number appears only where the page is actually offering the buy.
+ * Everywhere else the cell prints its existing governed absence and the row
+ * says which non-actionable state it is in. **No arithmetic is invented, no
+ * server number is changed, and nothing is hidden**: the customer's original
+ * `Qty` and the historical `Ordered Qty` are untouched two columns away, and
+ * the documents themselves are one section below.
+ *
+ * The three answers are the three readings of the engine's own flag, which is
+ * why this lives beside `isSelectableForOrder` and reads it the same way.
+ */
+export type SoBatchToBuyState =
+  /** Verified uncovered: the remainder, and the quantity a tick allocates. */
+  | { kind: "buy"; qty: number }
+  /** `fullyOnPo` — the issue door refuses this by name (`already_on_po`). */
+  | { kind: "covered" }
+  /** No flag in this payload: eligibility is UNKNOWN, and unknown is not yes. */
+  | { kind: "unchecked" }
+  /** Nothing to say — a line with no remainder, or one this page cannot buy. */
+  | { kind: "none" };
+
+export function soBatchToBuyState(
+  row: PurchaseDemandRow,
+  orderStatus: SoBatchOrderStatus,
+): SoBatchToBuyState {
+  if (orderStatus === "ordered") return { kind: "none" };
+  if (!isSelectableForBuying(row)) return { kind: "none" };
+  if (row.fullyOnPo === true && row.poolOnly !== true) return { kind: "covered" };
+  if (row.fullyOnPo === true) return { kind: "buy", qty: row.toBuy ?? 0 };
+  if (row.fullyOnPo !== false) return { kind: "unchecked" };
+  return { kind: "buy", qty: row.toBuy ?? 0 };
+}
+
+/** Everything to Carres Klang — the standing Purchasing default (MASTER §5.4). */
+export function defaultAllocations(
+  row: PurchaseDemandRow,
+  defaultDestinationId: string,
+): DestinationAllocation[] {
+  const qty = row.toBuy ?? 0;
+  if (qty <= 0) return [];
+  return [{
+    destinationId: row.supplierCollection?.fixedDestinationId ?? defaultDestinationId,
+    qty,
+  }];
+}
+
+/**
+ * The whole row moves. Returns a NEW selection — the caller's array is left
+ * alone, because a React state object that is mutated in place is a re-render
+ * that never happens.
+ */
+export function setDestination(
+  selection: SoBatchSelection,
+  destinationId: string,
+  qty: number,
+): SoBatchSelection {
+  return {
+    demandId: selection.demandId,
+    allocations: qty > 0 ? [{ destinationId, qty }] : [],
+  };
+}
+
+/**
+ * The inline split. Two lines aimed at one destination are MERGED and an empty
+ * line is dropped — a purchase order that named the same place twice, or named
+ * a place it sends nothing to, would be a document nobody could read.
+ */
+export function splitAllocation(
+  selection: SoBatchSelection,
+  allocations: readonly DestinationAllocation[],
+): SoBatchSelection {
+  const merged = new Map<string, number>();
+  for (const a of allocations) {
+    if (a.qty <= 0) continue;
+    merged.set(a.destinationId, (merged.get(a.destinationId) ?? 0) + a.qty);
+  }
+  return {
+    demandId: selection.demandId,
+    allocations: [...merged].map(([destinationId, qty]) => ({ destinationId, qty })),
+  };
+}
+
+export type AllocationCheck = { ok: true } | { ok: false; message: string };
+
+/**
+ * The one check this module owns: **does the arrangement add back to the
+ * number the server gave us?**
+ *
+ * It is deliberately unable to compute the target. `row.toBuy` is read, never
+ * derived; if the server changes its mind, this check changes with it, and the
+ * API repeats the whole thing after its own recomputation anyway. The message
+ * prints both numbers because an operator fixing a split needs to know the gap,
+ * not that there is one.
+ */
+export function validateAllocations(
+  row: PurchaseDemandRow,
+  allocations: readonly DestinationAllocation[],
+  destinations: readonly PurchasingDestination[],
+): AllocationCheck {
+  if (!isSelectableForBuying(row)) {
+    return { ok: false, message: "This line cannot be bought yet." };
+  }
+  const target = row.toBuy ?? 0;
+  if (allocations.length === 0) {
+    return { ok: false, message: `Choose where the ${target} go.` };
+  }
+  const byId = new Map(destinations.map((d) => [d.id, d]));
+  let total = 0;
+  for (const a of allocations) {
+    const dest = byId.get(a.destinationId);
+    if (!dest) return { ok: false, message: "Choose a Deliver To that exists." };
+    if (!dest.active) {
+      return { ok: false, message: `${dest.name} is closed. Choose another Deliver To.` };
+    }
+    /* Named on the row BEFORE Issue: the issue door refuses a Deliver To with
+       no address, because the PO it would create could never be printed.
+       `undefined` is an older payload that did not carry the address, never
+       read as missing. */
+    if (dest.address !== undefined && (dest.address ?? "").trim() === "") {
+      return {
+        ok: false,
+        message: purchasingRefusalLine("destination_address_missing", { destination: dest.name }),
+      };
+    }
+    if (!Number.isInteger(a.qty) || a.qty <= 0) {
+      return { ok: false, message: `${dest.name} needs a whole number above zero.` };
+    }
+    total += a.qty;
+  }
+  if (total !== target) {
+    return { ok: false, message: `${total} of ${target} arranged.` };
+  }
+  return { ok: true };
+}
+
+// ─── Documents ───────────────────────────────────────────────────────────────
+
+/**
+ * ⭐ THE ONE DOCUMENT PARTITION — used by the browser AND the server.
+ *
+ * Four parts, and every one of them is load-bearing:
+ *
+ *   supplier      one PO has one supplier
+ *   destination   one PO has one `Deliver To` (Card §4.2)
+ *   category      a proposal is supplier × category, so a supplier's
+ *                 mattresses and its bedframes are already separate documents
+ *   source order  a SOFA is ONE PO PER CUSTOMER ORDER (locked 2026-07-27) —
+ *                 a matched set is made and delivered together
+ *
+ * ── WHY THIS FUNCTION EXISTS AT ALL ─────────────────────────────────────────
+ *
+ * Measured 2026-08-24: the browser grouped by supplier × destination and the
+ * server grouped by all four. So the operator could review ONE document, press
+ * Issue, and be handed THREE. The reviewed PO count did not match what the
+ * server created.
+ *
+ * A shared function is the only fix that stays fixed. Both sides now compute
+ * the same key from the same facts, so `Issue N POs`, `1 of N`, the server's
+ * grouping and `pos.length` cannot drift apart. The server still recomputes it
+ * from its own recomputation — this is
+ * agreement, not trust.
+ */
+export function documentPartitionKey(f: {
+  supplierId: string;
+  destinationId: string;
+  category: ProductCategory | null;
+  orderId: string;
+}): string {
+  /* A sofa is one PO per customer order; everything else consolidates across
+     orders inside its category. */
+  const perOrder = f.category != null && isOnePoPerOrder(f.category);
+  return [
+    f.supplierId,
+    f.destinationId,
+    f.category ?? "uncatalogued",
+    perOrder ? f.orderId : "",
+  ].join("::");
+}
+
+export interface SoBatchDocumentLine {
+  demandId: string;
+  orderId: string;
+  so: number | null;
+  /**
+   * ⭐ THE SOURCE THIS LINE CAME FROM, when it is not a Sales Order (owner
+   * instruction 2026-09-23). `Review Purchase Orders` is ONE surface for both
+   * buying lanes: SO Batch's lines print `SO-{n}` from `so`, and a Manual
+   * Purchase line prints its `MPR No` here. Absent for SO Batch, which keeps
+   * the number it always had.
+   */
+  sourceLabel?: string | null;
+  /** The requester's `Purchase requirement` (0562), read-only on the review —
+   *  the person checking the document must see what the goods must satisfy. */
+  purchaseRequirement?: string | null;
+  item: string;
+  variant: string | null;
+  skus: string[];
+  qty: number;
+  goodsMustArrive: string | null;
+  issueRef: { proposalKey: string; buildKey: string };
+  /** The parts this line puts on the document — one per SKU, with the quantity
+   *  the factory must make and the catalog cost behind it. */
+  parts: Array<{ sku: string; qty: number; unitCost: number | null }>;
+}
+
+export interface SoBatchDocument {
+  /** The four-part partition key (`documentPartitionKey`). */
+  key: string;
+  supplierId: string;
+  supplierName: string | null;
+  destinationId: string;
+  /** Part of the partition, and what the server groups on. */
+  category: ProductCategory | null;
+  /** Set only when this category is one-PO-per-customer-order (sofa). */
+  orderId: string | null;
+  qty: number;
+  lines: SoBatchDocumentLine[];
+  /** Factory pickup needs a procurement partner before this can be issued. */
+  supplierKind: "own_logistics" | "factory_pickup" | null;
+  /** The governed factory-collection rule, shown as a read-only fact. */
+  supplierCollection?: PurchaseDemandRow["supplierCollection"];
+  /**
+   * ── WHAT THE DRAFT PAPER NEEDS, AND WHY IT IS ON THE DOCUMENT ────────────
+   *
+   * The review renders the SAME PO template the supplier receives, so a
+   * preview missing the two addresses and the delivery date is a preview of a
+   * different document (owner instruction 2026-09-23). These carry the facts
+   * the SERVER resolved — the browser computes no date and invents no address.
+   * Optional because SO Batch's own read does not carry them yet; a document
+   * without them draws exactly what it drew before.
+   */
+  supplierAddress?: string | null;
+  destinationName?: string | null;
+  destinationAddress?: string | null;
+  /** The PO Delivery Date this document will be born with — `PO Date + n
+   *  Settings working days`, computed by the server (`poDeliveryDateOf`). */
+  poDeliveryDate?: string | null;
+  poDate?: string | null;
+  poDeliveryWorkingDays?: number | null;
+  deliveryMethod?: "we_collect" | "supplier_delivers" | null;
+}
+
+/**
+ * The documents the operator is about to create, in the order their first line
+ * was selected — so `1 of 3` means the same thing on every screen.
+ *
+ * A selection whose row is unknown or unbuyable is SKIPPED rather than guessed
+ * at: a stale tick from before a refetch must not become a purchase order.
+ */
+export function groupSelectionsIntoDocuments(
+  selections: readonly SoBatchSelection[],
+  rowsById: ReadonlyMap<string, PurchaseDemandRow>,
+  destinations: readonly PurchasingDestination[] = [],
+): SoBatchDocument[] {
+  const docs = new Map<string, SoBatchDocument>();
+  for (const selection of selections) {
+    const row = rowsById.get(selection.demandId);
+    if (!row || !isSelectableForBuying(row) || row.supplierId == null || !row.issueRef) {
+      continue;
+    }
+    for (const a of selection.allocations) {
+      if (a.qty <= 0) continue;
+      const key = documentPartitionKey({
+        supplierId: row.supplierId,
+        destinationId: a.destinationId,
+        category: row.category,
+        orderId: row.orderId,
+      });
+      let doc = docs.get(key);
+      if (!doc) {
+        doc = {
+          key,
+          supplierId: row.supplierId,
+          supplierName: row.supplier,
+          supplierAddress: row.supplierAddress ?? null,
+          poDate: row.poDate ?? null,
+          poDeliveryDate: row.poDeliveryDate ?? null,
+          poDeliveryWorkingDays: row.poDeliveryWorkingDays ?? null,
+          destinationId: a.destinationId,
+          destinationName: destinations.find((d) => d.id === a.destinationId)?.name ?? null,
+          destinationAddress: destinations.find((d) => d.id === a.destinationId)?.address ?? null,
+          deliveryMethod: row.supplierKind === "factory_pickup" ? "we_collect" : row.supplierKind === "own_logistics" ? "supplier_delivers" : null,
+          category: row.category,
+          orderId:
+            row.category != null && isOnePoPerOrder(row.category) ? row.orderId : null,
+          qty: 0,
+          lines: [],
+          supplierKind: row.supplierKind,
+          supplierCollection: row.supplierCollection ?? null,
+        };
+        docs.set(key, doc);
+      }
+      doc.qty += a.qty;
+      doc.lines.push({
+        demandId: row.id,
+        orderId: row.orderId,
+        so: row.so,
+        item: row.item,
+        variant: row.variant,
+        skus: row.skus,
+        qty: a.qty,
+        goodsMustArrive: row.goodsMustArrive,
+        issueRef: row.issueRef,
+        parts: row.parts.map((part) => ({
+          ...part, qty: poDocumentPartQuantity(row.parts.length, a.qty, part.qty),
+        })),
+      });
+    }
+  }
+  return [...docs.values()];
+}
+
+// ─── The selection bar ───────────────────────────────────────────────────────
+
+export interface SoBatchSelectionSummary {
+  lines: number;
+  units: number;
+  documents: number;
+  /** Empty when nothing is selected — a bar that says `0 selected` is noise. */
+  text: string;
+}
+
+export function soBatchSelectionSummary(
+  selections: readonly SoBatchSelection[],
+  rowsById: ReadonlyMap<string, PurchaseDemandRow>,
+): SoBatchSelectionSummary {
+  const documents = groupSelectionsIntoDocuments(selections, rowsById);
+  const lines = new Set(documents.flatMap((d) => d.lines.map((l) => l.demandId))).size;
+  const orders = new Set(documents.flatMap((d) => d.lines.map((line) => line.orderId))).size;
+  const items = new Set(documents.flatMap((d) => d.lines.flatMap((line) => {
+    const ids = rowsById.get(line.demandId)?.lineIds;
+    return ids?.length ? ids : [line.demandId];
+  }))).size;
+  const units = documents.reduce((sum, document) => sum + document.lines.reduce((qty, line) => qty + line.parts.reduce((n, part) => n + part.qty, 0), 0), 0);
+  if (lines === 0) return { lines: 0, units: 0, documents: 0, text: "" };
+  return {
+    lines,
+    units,
+    documents: documents.length,
+    text: `${orders} ${orders === 1 ? "Sales Order" : "Sales Orders"} · ${items} ${items === 1 ? "item" : "items"} · ${units} ${units === 1 ? "unit" : "units"} · Issue ${
+      documents.length
+    } ${documents.length === 1 ? "PO" : "POs"}`,
+  };
+}
+
+// ─── The wire ────────────────────────────────────────────────────────────────
+
+export const destinationAllocationSchema = z.object({
+  destinationId: z.string().uuid(),
+  qty: z.number().int().positive(),
+});
+
+export const soBatchSelectionSchema = z.object({
+  demandId: z.string().min(1),
+  allocations: z.array(destinationAllocationSchema).min(1),
+});
+
+// ─── The lines one document actually carries ─────────────────────────────────
+
+/** One customer order's claim on a purchase-order line (0382). */
+export interface PoLineSource {
+  orderId: string;
+  /** The customer-facing number. `null` on an order that has none yet. */
+  so: number | null;
+  /** `order_lines.id` — validated against its order in SQL, never trusted. */
+  orderLineId: string;
+  qty: number;
+}
+
+/** One line of one purchase order, with the lineage behind every unit. */
+export interface PoDocumentLine {
+  sku: string;
+  qty: number;
+  /** The catalog cost the engine read for this SKU. `null` = Catalog has none. */
+  cost: number | null;
+  /** Which customer order each unit is for. Sums to `qty`, always. */
+  sources: PoLineSource[];
+}
+
+/** What the caller allocated to ONE document, per demand. */
+export interface PoDocumentAllocation {
+  /** The build behind this demand — the thing being made. */
+  build: {
+    key: string;
+    /** Units the server says are still to buy on this build. */
+    qty: number;
+    lines: readonly { lineId: string; sku: string; qty: number; cost: number | null }[];
+  };
+  orderId: string;
+  so: number | null;
+  /** Units of that build going to THIS document's destination. */
+  qty: number;
+}
+
+export type PoDocumentLines =
+  | { ok: true; lines: PoDocumentLine[] }
+  | { ok: false; code: "nothing_to_issue" | "partial_split_not_allowed" };
+
+/**
+ * COMPOSE ONE DOCUMENT'S LINES FROM WHAT WAS ALLOCATED TO IT — not from the
+ * whole build (Card closure §4 · §5; 0382).
+ *
+ * ── THE DEFECT THIS REPLACES ────────────────────────────────────────────────
+ *
+ * Measured 2026-08-24: the issue endpoint grouped allocations into documents
+ * and then asked `planFromDocuments` for each group's lines. That function
+ * answers *what does this BUILD contain*, so a build of 11 split 10 + 1 across
+ * two destinations produced **two purchase orders of 11** — 22 units bought for
+ * an 11-unit demand. The split the Card promised was the one thing that broke
+ * it.
+ *
+ * Lines are therefore composed from the ALLOCATION. And because the aggregate
+ * loses which customer each unit belongs to, the lineage is composed with it in
+ * the same pass — one walk, so a line and its sources cannot disagree.
+ *
+ * ── AND A SET IS NOT SPLIT ──────────────────────────────────────────────────
+ *
+ * A build of several order lines is a matched set: a sofa's modules are made
+ * and delivered together (locked 2026-07-27). Its `qty` is 1, so a partial
+ * allocation cannot arise from the arrangement rules — but a hand-made request
+ * could ask for one, and there is no honest way to cut two modules in half.
+ * It is refused by name rather than guessed at.
+ */
+function poDocumentPartQuantity(partCount: number, allocatedQty: number, partQty: number): number {
+  return partCount === 1 ? allocatedQty : partQty;
+}
+
+export function composeDocumentLines(
+  allocations: readonly PoDocumentAllocation[],
+): PoDocumentLines {
+  const bySku = new Map<string, PoDocumentLine>();
+  for (const a of allocations) {
+    if (a.qty <= 0) continue;
+    const buildLines = a.build.lines;
+    if (buildLines.length === 0) continue;
+    /* A SET GOES WHOLE OR NOT AT ALL. */
+    if (buildLines.length > 1 && a.qty !== a.build.qty) {
+      return { ok: false, code: "partial_split_not_allowed" };
+    }
+    for (const l of buildLines) {
+      /* One line: the allocation IS the quantity. A set: the line's own,
+         because the whole set is on this document. */
+      const qty = poDocumentPartQuantity(buildLines.length, a.qty, l.qty);
+      if (qty <= 0) continue;
+      let hit = bySku.get(l.sku);
+      if (!hit) {
+        hit = { sku: l.sku, qty: 0, cost: l.cost, sources: [] };
+        bySku.set(l.sku, hit);
+      }
+      hit.qty += qty;
+      hit.sources.push({
+        orderId: a.orderId,
+        so: a.so,
+        orderLineId: l.lineId,
+        qty,
+      });
+    }
+  }
+  const lines = [...bySku.values()];
+  if (lines.length === 0) return { ok: false, code: "nothing_to_issue" };
+  return { ok: true, lines };
+}
+
+
+/** The two governed Register groups (owner ruling R1, 2026-09-16). Never a stored status. */
+export type SoBatchRegisterGroup = "to-buy" | "no-purchase-needed";
+
+/**
+ * Units still to buy on one Sales Order — the SAME shared line arithmetic the
+ * tick and the Ready Stock door already use (customer quantity less current
+ * Ready Stock coverage less exact, non-cancelled PO lineage). A generic open-PO
+ * pool is not proof that this order was bought, so it never lowers this number.
+ */
+export function soBatchOrderRemainingQty(order: Pick<SoBatchOrderRow, "lines">): number {
+  return order.lines.reduce((sum, line) => sum + soBatchOrderLineOutstandingQty(line), 0);
+}
+
+/**
+ * ⭐ ONE TABLE, TWO GROUPS — owner rulings R1/R2, 2026-09-16.
+ *
+ * `group` reads REMAINING DEMAND, never the raw blank/partial/ordered status:
+ * a Ready-Stock-only order is blank and needs nothing; a partly bought order
+ * still needs something. Blocked (setup) and unverified (`fullyOnPo` missing)
+ * demand is never assumed covered, so it stays in `To buy`.
+ *
+ * `date` is the engine's own Order By, the earliest over exactly the leaves the
+ * parent checkbox would tick. No calendar arithmetic happens here.
+ *
+ * `rank` is the default reading order inside `To buy`: 0 = a selectable Order
+ * By (ascending by date), 1 = remaining demand that cannot be planned yet
+ * (`Not planned`), 2 = nothing to buy. Ties fall back to SO No descending.
+ */
+export function soBatchOrderPlanning(order: SoBatchOrderRow, leaves: readonly PurchaseDemandRow[]): {
+  group: SoBatchRegisterGroup;
+  date: string | null;
+  /** ONLY missing setup — the one fact `Not planned` names (S1). */
+  notPlanned: boolean;
+  /**
+   * ⭐ S1 · THREE FACTS, THREE WORDS (owner follow-up, 2026-09-16). `Not
+   * planned` used to print for every undated `To buy` order, which covered
+   * three different truths with one word:
+   *
+   *   not_planned           a leaf is blocked by missing setup (no customer
+   *                         date, supplier, cost, production days, partner)
+   *   already_on_po         another open purchase order already covers the
+   *                         remaining leaf (`fullyOnPo === true`)
+   *   coverage_not_checked  whether an open PO covers it could not be
+   *                         verified (`fullyOnPo` absent)
+   *
+   * Null when the order has a date or nothing to buy. Precedence: setup is
+   * the operator's repair and is named first; an unverified leaf is named
+   * before a covered one, because unknown must never read as covered.
+   */
+  absence: SoBatchOrderByAbsence | null;
+  rank: 0 | 1 | 2;
+} {
+  const eligible = leaves.filter((r) => isSelectableForOrder(r, order.status));
+  const dates = eligible.map((r) => r.orderBy).filter((d): d is string => Boolean(d)).sort();
+  const blockedOrUnverified = order.status !== "ordered" && leaves.some((r) =>
+    !isPurchaseDemandTimingState(r.state) ||
+    (r.fullyOnPo !== true && (r.toBuy ?? 0) > 0 && !isSelectableForOrder(r, order.status)));
+  const toBuy = eligible.length > 0 || blockedOrUnverified || soBatchOrderRemainingQty(order) > 0;
+  const date = dates[0] ?? null;
+  if (!toBuy) {
+    return { group: "no-purchase-needed", date: null, notPlanned: false, absence: null, rank: 2 };
+  }
+  if (date) return { group: "to-buy", date, notPlanned: false, absence: null, rank: 0 };
+  const open = order.status === "ordered" ? [] : leaves;
+  const absence: SoBatchOrderByAbsence =
+    open.some((r) => !isPurchaseDemandTimingState(r.state)) || eligible.length > 0
+      ? "not_planned"
+      : open.some((r) => r.fullyOnPo !== true && r.fullyOnPo !== false)
+        ? "coverage_not_checked"
+        : open.some((r) => r.fullyOnPo === true)
+          ? "already_on_po"
+          : "not_planned";
+  return {
+    group: "to-buy",
+    date: null,
+    notPlanned: absence === "not_planned",
+    absence,
+    rank: 1,
+  };
+}
+
+/** Owner-approved 2026-10-04: quantity placement across all supplier lines.
+ * Only committed stock/PO reservations and exact PO lineage count; offers do not.
+ * Unknown or blocked demand cannot be reported as complete.
+ */
+export function soBatchPurchaseStatus(order: SoBatchOrderRow, leaves: readonly PurchaseDemandRow[]): "Pending" | "Partial" | "Done" {
+  const remaining = soBatchOrderRemainingQty(order);
+  if (order.lines.length > 0 && remaining <= 0 && soBatchOrderPlanning(order, leaves).group === "no-purchase-needed") return "Done";
+  const placed = order.lines.some(line => line.pos.some(po => po.qty > 0) || (line.poReserved ?? []).some(po => po.qty > 0));
+  return placed ? "Partial" : "Pending";
+}
+
+/** Explain the same eligibility facts that the checkbox and planning cell read. */
+export function soBatchOrderUnselectableReason(
+  order: SoBatchOrderRow,
+  leaves: readonly PurchaseDemandRow[],
+  stateWords: Readonly<Record<PurchaseDemandState, string>>,
+): string | null {
+  if (order.status === "ordered") return null;
+  if (leaves.some((row) => isSelectableForOrder(row, order.status))) return null;
+  const blocked = [...new Set(leaves.filter((row) => !isPurchaseDemandTimingState(row.state)).map((row) => stateWords[row.state]))];
+  if (blocked.length > 0) return blocked.join(" · ");
+  const plan = soBatchOrderPlanning(order, leaves);
+  return plan.absence ? soBatchOrderByAbsenceWord(plan.absence) : null;
+}
+
+/** Why a `To buy` order has no Order By (S1). */
+export type SoBatchOrderByAbsence = "not_planned" | "already_on_po" | "coverage_not_checked";
+
+/** The ONE word per absence — every word already governed in COPY-STANDARD. */
+export function soBatchOrderByAbsenceWord(absence: SoBatchOrderByAbsence): string {
+  switch (absence) {
+    case "not_planned":
+      return SO_BATCH_PURCHASE_WORDS.notPlanned;
+    case "already_on_po":
+      return SO_BATCH_PURCHASE_WORDS.toBuyAlreadyOnPo[0]!;
+    case "coverage_not_checked":
+      return SO_BATCH_PURCHASE_WORDS.toBuyNotChecked[0]!;
+  }
+}
+
+/**
+ * ⭐ THE PARENT `PO Safety Days` CELL — owner ruling 2026-09-18.
+ *
+ * ONE answer per Sales Order, over exactly the leaves the parent checkbox
+ * would tick: the TIGHTEST margin, because a row is as late as its latest
+ * line. Nothing left to buy prints nothing at all; a margin that cannot be
+ * stated prints the page's own governed absence word, never `0`.
+ *
+ * The engine owns the number. This picks the minimum of numbers it was given
+ * and performs no calendar arithmetic (Card 02-A: "no client calendar
+ * arithmetic is admitted").
+ */
+export type SoBatchSafetyDaysCell =
+  /** Nothing outstanding to buy — the cell is blank. */
+  | { kind: "none" }
+  /** The engine's margin. Negative = production overruns the customer date. */
+  | { kind: "days"; days: number }
+  /** Outstanding demand whose margin cannot be stated. NEVER printed as `0`. */
+  | { kind: "absent"; absence: SoBatchOrderByAbsence };
+
+export function soBatchOrderSafetyDays(
+  order: SoBatchOrderRow,
+  leaves: readonly PurchaseDemandRow[],
+): SoBatchSafetyDaysCell {
+  const plan = soBatchOrderPlanning(order, leaves);
+  if (plan.group === "no-purchase-needed") return { kind: "none" };
+  const eligible = leaves.filter((r) => isSelectableForOrder(r, order.status));
+  const measured = eligible
+    .map((r) => r.safetyDaysLeft)
+    .filter((n): n is number => typeof n === "number");
+  /* An eligible leaf whose margin the engine did not send is UNKNOWN, and one
+     unknown leaf makes the tightest margin unknowable — a minimum over the
+     rest would claim a floor nobody measured. */
+  if (measured.length > 0 && measured.length === eligible.length) {
+    return { kind: "days", days: Math.min(...measured) };
+  }
+  return { kind: "absent", absence: plan.absence ?? "not_planned" };
+}
+
+/**
+ * ⭐ `Need PO` / `No PO needed` — owner ruling 2026-09-18.
+ *
+ * The SAME remaining-demand reading that decides the two governed groups, so
+ * the word on the row and the heading above it can never disagree. It states
+ * the NEED for a new purchase order; it is not permission to raise one, and it
+ * renames no group and no rail row.
+ */
+export function soBatchOrderStatusWord(group: SoBatchRegisterGroup): string {
+  return group === "to-buy"
+    ? SO_BATCH_PURCHASE_WORDS.statusNeedPo
+    : SO_BATCH_PURCHASE_WORDS.statusNoPoNeeded;
+}
+
+/** Default order inside a group: rank → Order By ascending → SO No descending. */
+export function compareSoBatchPlanning(
+  a: { plan: ReturnType<typeof soBatchOrderPlanning>; so: number | null },
+  b: { plan: ReturnType<typeof soBatchOrderPlanning>; so: number | null },
+): number {
+  return a.plan.rank - b.plan.rank ||
+    (a.plan.date ?? "9999").localeCompare(b.plan.date ?? "9999") ||
+    (b.so ?? 0) - (a.so ?? 0);
+}
+
+/**
+ * ⭐ THE TWO-LINE STATUS RULE — owner ruling 2026-09-28, Purchasing §9.1.
+ *
+ * `Status` keeps its first line (`Need PO` · `No PO needed`). When the row
+ * cannot be ticked, line two states WHY — read from exactly the facts the
+ * refused tick reads (`soBatchOrderUnselectableReason`, the leaf's own state
+ * and `soBatchToBuyState`), never a second arithmetic — and names the door
+ * that fixes it when one exists: Catalog owns SKU, supplier and cost;
+ * Purchasing Settings owns production days and collection
+ * (`PURCHASE_DEMAND_OWNER_DUTY`).
+ */
+export type SoBatchStatusDoor = "catalog" | "settings" | "use_po";
+
+export const SO_BATCH_STATUS_DOOR: Partial<Record<PurchaseDemandState, SoBatchStatusDoor>> = {
+  no_sku: "catalog",
+  no_supplier: "catalog",
+  no_cost: "catalog",
+  no_stock_identity: "catalog",
+  no_production_days: "settings",
+  no_pickup_partner: "settings",
+};
+
+/**
+ * `usePo` names the exact act `Use this PO` performs — which item line, which
+ * purchase order — so the button never has to guess. Present only with the
+ * `use_po` door.
+ */
+export type SoBatchStatusWhy = {
+  text: string;
+  door: SoBatchStatusDoor | null;
+  usePo?: { orderLineId: string; poId: string };
+};
+
+/** Catalog first: an unknown SKU or supplier makes every later setting moot. */
+function doorOf(states: readonly PurchaseDemandState[]): SoBatchStatusDoor | null {
+  const doors = states.map((s) => SO_BATCH_STATUS_DOOR[s]);
+  if (doors.includes("catalog")) return "catalog";
+  if (doors.includes("settings")) return "settings";
+  return null;
+}
+
+/** The goods' words in the sentence: `Ohana Fenrir King`. */
+function goodsWordsOf(line: Pick<SoBatchOrderLineFact, "item" | "variant">): string {
+  return [line.item, line.variant].filter((w): w is string => Boolean(w)).join(" ");
+}
+
+/** `{PO No} has {n} {Item} available.` — COPY-STANDARD, owner ruling 2026-09-28. */
+export function soBatchPoOfferSentence(
+  line: Pick<SoBatchOrderLineFact, "item" | "variant">,
+  offer: { poId: string; qty: number },
+): string {
+  return `${offer.poId} has ${offer.qty} ${goodsWordsOf(line)} available.`;
+}
+
+/** `{n} {Item} on {PO No} is reserved for this order.` — one sentence per PO. */
+export function soBatchPoReservedSentences(
+  line: Pick<SoBatchOrderLineFact, "item" | "variant" | "poReserved">,
+): string[] {
+  return (line.poReserved ?? [])
+    .filter((r) => r.qty > 0)
+    .map((r) => `${r.qty} ${goodsWordsOf(line)} on ${r.poId} is reserved for this order.`);
+}
+
+/**
+ * Line two for a line whose remaining need only the anonymous open-PO pool
+ * covers: the offer when a PO has goods no order holds, `Coverage not
+ * checked` when that balance could not be read, otherwise null (the caller
+ * keeps its existing answer).
+ */
+function poOfferWhy(line: SoBatchOrderLineFact): SoBatchStatusWhy | null {
+  if (line.poOffer && line.poOffer.qty > 0) {
+    return {
+      text: soBatchPoOfferSentence(line, line.poOffer),
+      door: "use_po",
+      usePo: { orderLineId: line.orderLineId, poId: line.poOffer.poId },
+    };
+  }
+  if (line.poOfferUnread) {
+    return { text: soBatchOrderByAbsenceWord("coverage_not_checked"), door: null };
+  }
+  return null;
+}
+
+/** Line two of the parent row's Status, or null when the row can be ticked. */
+export function soBatchOrderStatusWhy(
+  order: SoBatchOrderRow,
+  leaves: readonly PurchaseDemandRow[],
+  stateWords: Readonly<Record<PurchaseDemandState, string>>,
+): SoBatchStatusWhy | null {
+  const plan = soBatchOrderPlanning(order, leaves);
+  if (plan.group !== "to-buy") {
+    /* Covered by goods reserved on a PO: say whose they are (owner ruling
+       2026-09-28). */
+    const reserved = order.lines.flatMap((l) => soBatchPoReservedSentences(l));
+    return reserved.length > 0 ? { text: reserved.join(" "), door: null } : null;
+  }
+  const text = soBatchOrderUnselectableReason(order, leaves, stateWords);
+  if (!text) {
+    /* Tickable, and a pool-covered leaf carries the `Use this PO` offer: the
+       offer shows, and never blocks buying (owner ruling 2026-09-28). */
+    if (!leaves.some((r) => r.poolOnly === true)) return null;
+    for (const line of order.lines) {
+      if (soBatchOrderLineOutstandingQty(line) <= 0) continue;
+      const offer = poOfferWhy(line);
+      if (offer?.door === "use_po") return offer;
+    }
+    return null;
+  }
+  if (plan.absence === "already_on_po") {
+    for (const line of order.lines) {
+      if (soBatchOrderLineOutstandingQty(line) <= 0) continue;
+      const offer = poOfferWhy(line);
+      if (offer) return offer;
+    }
+  }
+  return {
+    text,
+    door: doorOf(leaves.filter((r) => !isPurchaseDemandTimingState(r.state)).map((r) => r.state)),
+  };
+}
+
+/**
+ * Line two of one item line's Status, or null when the line can be ticked.
+ * `line` is the item line's own facts; with it a pool-covered line reads the
+ * `Use this PO` offer instead of the retired `Already on a PO`.
+ */
+export function soBatchLeafStatusWhy(
+  leaf: PurchaseDemandRow,
+  orderStatus: SoBatchOrderStatus,
+  stateWords: Readonly<Record<PurchaseDemandState, string>>,
+  line?: SoBatchOrderLineFact,
+): SoBatchStatusWhy | null {
+  if (orderStatus === "ordered") return null;
+  if (isSelectableForOrder(leaf, orderStatus)) {
+    /* A pool-only build is tickable AND carries the offer (owner ruling
+       2026-09-28: the second line never blocks buying). */
+    if (leaf.poolOnly === true && line) {
+      const offer = poOfferWhy(line);
+      return offer?.door === "use_po" ? offer : null;
+    }
+    return null;
+  }
+  if (!isPurchaseDemandTimingState(leaf.state)) {
+    return { text: stateWords[leaf.state], door: doorOf([leaf.state]) };
+  }
+  const state = soBatchToBuyState(leaf, orderStatus);
+  if (state.kind === "covered") {
+    return (line ? poOfferWhy(line) : null) ??
+      { text: soBatchOrderByAbsenceWord("already_on_po"), door: null };
+  }
+  if (state.kind === "unchecked") return { text: soBatchOrderByAbsenceWord("coverage_not_checked"), door: null };
+  return null;
+}
+
+/** Line two of an item line nothing is left to buy for, or null. */
+export function soBatchLineReservedWhy(line: SoBatchOrderLineFact): SoBatchStatusWhy | null {
+  const reserved = soBatchPoReservedSentences(line);
+  return reserved.length > 0 ? { text: reserved.join(" "), door: null } : null;
+}

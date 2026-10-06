@@ -1,5 +1,6 @@
 /**
- * KIT TOKENS — the machine-readable half of `docs/UI-KIT.md` §2 · §3 · §4 · §5.
+ * KIT TOKENS — the machine-readable half of `docs/01-design-tokens.md` (which
+ * replaced the retired `docs/UI-KIT.md` §2–§5).
  *
  * Card D0.5a. Every Foundation Component in `components/kit/` reads its type,
  * radius, tone and icon size FROM HERE, and `/ui` renders the same records — so
@@ -27,7 +28,7 @@ import type { OrderActionTone } from "@carres/shared";
  * ──────────────────────────────────────────────────────────────────────── */
 
 /** The six type tokens. A seventh does not exist and does not compile. */
-export type TypeToken = "page" | "title" | "strong" | "body" | "meta" | "label";
+export type TypeToken = "page" | "title" | "strong" | "body" | "meta" | "label" | "control";
 
 export interface TypeTokenSpec {
   token: TypeToken;
@@ -54,6 +55,7 @@ export const TYPE_TOKENS: readonly TypeTokenSpec[] = [
   { token: "body", className: "text-body", px: 13, weight: 400, lineHeight: 18, use: "default — table rows, prose, buttons" },
   { token: "meta", className: "text-meta", px: 12, weight: 400, lineHeight: 16, use: "secondary info, captions, timestamps" },
   { token: "label", className: "text-label", px: 11, weight: 500, lineHeight: 14, use: "field labels, micro-labels, pill text" },
+  { token: "control", className: "text-control", px: 14, weight: 400, lineHeight: 20, use: "workspace toolbar controls (Work, 2026-09-25)" },
 ] as const;
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -77,18 +79,39 @@ export const TONE_CLASS: Record<OrderActionTone, string> = {
   neutral: "bg-kit-slate-3 text-kit-slate-11",
 };
 
+/** Solid status presentation; action and toast surfaces retain TONE_CLASS. */
+export const STATUS_PILL_CLASS: Record<OrderActionTone, string> = {
+  danger: "bg-kit-red-11 text-white",
+  warning: "bg-kit-amber-11 text-white",
+  info: "bg-kit-blue-11 text-white",
+  success: "bg-kit-green-11 text-white",
+  neutral: "bg-kit-slate-11 text-white",
+};
+
 /** Every tone, in the order §3.6 lists them — used by `/ui` and by tests. */
 export const TONES: readonly OrderActionTone[] = ["danger", "warning", "info", "success", "neutral"];
 
 /* ─────────────────────────────────────────────────────────────────────────
  * §4.2 Radius — four, frozen.
+ *
+ * ⭐ A PILL IS A CAPSULE — owner ruling 2026-08-15 (Chai), re-ruling §4.
+ *
+ * The 4px row used to claim three uses and only one of them was honest. A
+ * "pill" at 4px is a rounded rectangle, and it sat beside search and the pill
+ * toolbar buttons, which have been fully rounded since Jess ruled the capsule
+ * language on 2026-08-01. The 4px row now names the ONE control that really
+ * wants it — the checkbox — and every pill and small tag joins `rounded-full`.
+ *
+ * `rounded-pill` KEEPS ITS NAME on purpose. §0: a label is presentation, an
+ * identifier is a contract, and renaming this class would be a breaking change
+ * across the Tailwind config, this record and the source scan for no gain.
  * ──────────────────────────────────────────────────────────────────────── */
 
 export const RADII = [
-  { px: 4, className: "rounded-pill", use: "pill · small tag · checkbox" },
+  { px: 4, className: "rounded-pill", use: "checkbox" },
   { px: 6, className: "rounded-control", use: "button · input · dropdown" },
   { px: 10, className: "rounded-card", use: "card · panel · modal · drawer" },
-  { px: null, className: "rounded-full", use: "avatar · status dot" },
+  { px: null, className: "rounded-full", use: "pill · small tag · avatar · status dot" },
 ] as const;
 
 /* ─────────────────────────────────────────────────────────────────────────

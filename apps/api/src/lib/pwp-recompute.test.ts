@@ -22,6 +22,11 @@ interface MockOpts {
   rulesError?: { message: string };
   combos?: Array<{ id: string; slots: string[][] }>;
   combosError?: { message: string };
+  /** 2026-08-24 - rows `pwp_discover_available` returns for a cross-order
+   *  code. Omit for the DEFAULT: the voucher was minted under `rule-1` and
+   *  carries that rule's own reward scope, which is what a real carry-forward
+   *  snapshot holds. Pass `[]` to simulate an unknown / already-USED code. */
+  discoverRows?: Array<Record<string, unknown>>;
 }
 
 function mockSb(opts: MockOpts = {}): SupabaseClient {
@@ -43,6 +48,9 @@ function mockSb(opts: MockOpts = {}): SupabaseClient {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const b: any = {
       eq: () => b,
+      // 2026-08-24: the active-rule read goes through the ONE ordered door
+      // (readActivePwpRules), so the chain is now .eq().order().order().
+      order: () => b,
       in: () => listRes(),
       maybeSingle: async () => ({ data: null, error: d.error ?? null }),
       // `.from(PWP_RULES).select("*").eq("active",true)` is awaited directly.
@@ -51,7 +59,33 @@ function mockSb(opts: MockOpts = {}): SupabaseClient {
     };
     return b;
   };
-  return { from: (table: string) => ({ select: () => builder(table) }) } as unknown as SupabaseClient;
+  // The cross-order snapshot door. A crossOrder claim reads the voucher's
+  // FROZEN reward scope through the DEFINER discover RPC rather than judging
+  // it against this cart allowance, so the double has to answer it.
+  const defaultDiscover = (code: string) => [
+    {
+      code,
+      rule_id: "rule-1",
+      type: "pwp",
+      reward_category: "bedframe",
+      reward_targets: [],
+      source_order_id: null,
+      expires_at: null,
+      phone_matches: true,
+      name_matches: true,
+    },
+  ];
+  return {
+    from: (table: string) => ({ select: () => builder(table) }),
+    rpc: async (name: string, args: Record<string, unknown>) => {
+      if (name === "pwp_discover_available") {
+        const rows =
+          opts.discoverRows ?? defaultDiscover(String(args?.p_code ?? ""));
+        return { data: rows, error: null };
+      }
+      return { data: null, error: null };
+    },
+  } as unknown as SupabaseClient;
 }
 
 /** product_skus fixture row carrying BOTH the resolveSkuInfo join fields and
@@ -594,5 +628,168 @@ describe("recomputePwpLines", () => {
     const lines = [line({ attrs: { pwp: { ruleId: "rule-1" } } })];
     const r = await recomputePwpLines(sb, lines);
     expect(r.status).toBe("server_error");
+  });
+});
+
+/**
+ * ⭐ THE REWARD-ONLY CART (2026-08-24) — the case carry-forward exists for, and
+ * the case this repo had no test for.
+ *
+ * A customer bought a mattress in June, the SO printed a voucher, and they come
+ * back in August for the bedframe alone. That cart has NO trigger, so
+ * `resolvePwp` builds an empty allowance, grants nothing, and the `!grant` gate
+ * used to 409 with "not eligible for the claimed offer". It was eligible. The
+ * only cart that could redeem was one that re-bought the trigger — where the
+ * same-cart offer already covers the line and the saved voucher adds nothing, so
+ * four migrations, a claim RPC, phone + name binding and printed codes were
+ * unreachable for their only purpose.
+ *
+ * A cross-order claim is judged by the reward scope FROZEN on the voucher at
+ * mint, never by this cart's allowance.
+ */
+describe("recomputePwpLines — cross-order redemption on a reward-only cart", () => {
+  const crossAttrs = (over: Record<string, unknown> = {}) => ({
+    pwp: {
+      ruleId: "rule-1",
+      code: "PWP-1234ABCD",
+      claimGroup: "33333333-3333-3333-3333-333333333333",
+      crossOrder: true,
+      ...over,
+    },
+  });
+
+  const bedOnlyCart = () => [line({ sku: "BED-1", unitPrice: 900, attrs: crossAttrs() })];
+
+  const bedSkus = [
+    skuRow("BED-1", { model_id: BED_MODEL, product_models: { category: "bedframe" }, pwp_price: 300 }),
+  ];
+
+  it("⭐ redeems with NO trigger in the cart, at the server-forced price", async () => {
+    const sb = mockSb({ rules: [ruleRow()], productSkus: bedSkus });
+    const r = await recomputePwpLines(sb, bedOnlyCart());
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    expect(r.lines[0]!.unitPrice).toBe(300);
+    const marker = (r.lines[0]!.attrs as Record<string, unknown>).pwp as Record<string, unknown>;
+    expect(marker.crossOrder).toBe(true);
+    expect(marker.code).toBe("PWP-1234ABCD");
+    // No trigger in THIS cart, so nothing to bind against. null is the honest
+    // answer — the voucher's own lineage lives on the code, not on this order.
+    expect(marker.triggerRef).toBeNull();
+  });
+
+  it("NEGATIVE CONTROL: a SAME-CART claim with no trigger is still refused", async () => {
+    // The carve-out must be reachable ONLY by a real cross-order voucher. If it
+    // leaked to same-cart claims, any dealer could price any line at the PWP
+    // figure by omitting the trigger.
+    const sameCart = [
+      line({
+        sku: "BED-1",
+        unitPrice: 900,
+        attrs: { pwp: { ruleId: "rule-1", code: "", claimGroup: "" } },
+      }),
+    ];
+    const sb = mockSb({ rules: [ruleRow()], productSkus: bedSkus });
+    const r = await recomputePwpLines(sb, sameCart);
+    expect(r.status).toBe("bad_request");
+    if (r.status !== "bad_request") return;
+    expect(r.code).toBe("pwp_not_eligible");
+  });
+
+  it("refuses a voucher whose FROZEN reward scope does not cover the line", async () => {
+    // The snapshot says the voucher rewards a MATTRESS; the line is a bedframe.
+    const sb = mockSb({
+      rules: [ruleRow()],
+      productSkus: bedSkus,
+      discoverRows: [
+        {
+          code: "PWP-1234ABCD",
+          rule_id: "rule-1",
+          type: "pwp",
+          reward_category: "mattress",
+          reward_targets: [],
+          source_order_id: null,
+          expires_at: null,
+          phone_matches: true,
+          name_matches: true,
+        },
+      ],
+    });
+    const r = await recomputePwpLines(sb, bedOnlyCart());
+    expect(r.status).toBe("bad_request");
+    if (r.status !== "bad_request") return;
+    expect(r.message).toMatch(/does not apply to this product/i);
+  });
+
+  it("refuses a voucher minted under a DIFFERENT rule than the one claimed", async () => {
+    // The same predicate pwp_claim_available_code enforces (rule_id = p_rule_id),
+    // asserted here so the failure is a clear 409 rather than a silent claim miss.
+    const sb = mockSb({
+      rules: [ruleRow()],
+      productSkus: bedSkus,
+      discoverRows: [
+        {
+          code: "PWP-1234ABCD",
+          rule_id: "some-other-rule",
+          type: "pwp",
+          reward_category: "bedframe",
+          reward_targets: [],
+          source_order_id: null,
+          expires_at: null,
+          phone_matches: true,
+          name_matches: true,
+        },
+      ],
+    });
+    const r = await recomputePwpLines(sb, bedOnlyCart());
+    expect(r.status).toBe("bad_request");
+    if (r.status !== "bad_request") return;
+    expect(r.message).toMatch(/does not belong to the claimed offer/i);
+  });
+
+  it("FAILS CLOSED when discovery returns nothing (unknown / already used / expired)", async () => {
+    // Never price a reward against a voucher we could not read. The atomic claim
+    // would refuse it moments later anyway; this makes the failure legible.
+    const sb = mockSb({ rules: [ruleRow()], productSkus: bedSkus, discoverRows: [] });
+    const r = await recomputePwpLines(sb, bedOnlyCart());
+    expect(r.status).toBe("bad_request");
+    if (r.status !== "bad_request") return;
+    expect(r.message).toMatch(/not found, or it has already been used/i);
+  });
+
+  it("a 'promo' voucher redeems FREE on a reward-only cart", async () => {
+    const sb = mockSb({
+      rules: [ruleRow({ type: "promo" })],
+      productSkus: [
+        skuRow("BED-1", { model_id: BED_MODEL, product_models: { category: "bedframe" }, pwp_price: null }),
+      ],
+      discoverRows: [
+        {
+          code: "PWP-1234ABCD",
+          rule_id: "rule-1",
+          type: "promo",
+          reward_category: "bedframe",
+          reward_targets: [],
+          source_order_id: null,
+          expires_at: null,
+          phone_matches: true,
+          name_matches: true,
+        },
+      ],
+    });
+    const r = await recomputePwpLines(sb, bedOnlyCart());
+    expect(r.status).toBe("ok");
+    if (r.status !== "ok") return;
+    // A promo is free BY THE RULE'S TYPE — pwp_price stays null and is not read.
+    expect(r.lines[0]!.unitPrice).toBe(0);
+  });
+
+  it("DORMANT is unchanged — a cart with no markers still reads nothing", async () => {
+    const sb = mockSb({ rules: [ruleRow()] });
+    const rpcSpy = vi.spyOn(sb, "rpc");
+    const r = await recomputePwpLines(sb, [line()]);
+    expect(r.status).toBe("ok");
+    // The discover door is opened ONLY for a cross-order claim.
+    expect(rpcSpy).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, Check, LayoutTemplate, Minus, Plus, Ticket, X } from "lucide-react";
+import { ArrowLeft, Check, LayoutTemplate, Menu, Minus, Plus, Ticket, X } from "lucide-react";
 import type {
   CatalogFabricDto,
   CatalogOptionPoolDto,
@@ -66,6 +66,8 @@ import {
  *  SO PDF / Create-PO / receive modals show the choice is still pending
  *  (the team's KIV vocabulary, same as the fabric/leg dropdowns). */
 export const GAP_KIV = "KIV";
+
+const PHONE_WIZARD_STEPS = ["Cart", "Customer", "Confirmed"] as const;
 
 /** The size table, the plan view and the container hook moved to
  *  `./MattressPlan` on 2026-08-06, when the Rent-to-Own configure surface
@@ -372,17 +374,24 @@ export default function PosConfigurePage({
   const sku = skus.find((s) => s.id === skuId);
   const sp = useSpecials(model, specialAddons, edit?.specials);
 
-  // Remark + optional ± RM price adjustment (Loo 2026-07-12) — a special
-  // remark sometimes ADJUSTS the price ("custom headboard +200"). The amount
-  // is optional (empty = plain note), PER UNIT like every other surcharge, and
-  // folds into unitPrice + attrs.remark_surcharge. Non-sofa unitPrice is
-  // client-priced (only options/specials totals are server-verified), so no
-  // API change is needed here.
-  const [remark, setRemark] = useState(edit?.remark ?? "");
-  const [remarkPrice, setRemarkPrice] = useState<string>(() =>
-    edit?.remarkSurcharge ? String(edit.remarkSurcharge) : "",
-  );
-  const remarkAdj = Math.round((parseFloat(remarkPrice) || 0) * 100) / 100;
+  // ⭐ THE REMARK CONTROL IS RETIRED (Loo — free-text remarks; YH confirmed on
+  // 2026-08-24 that the POS one is the target, the Warehouse box having already
+  // gone). Its text half was a free-text note wearing a price field: the
+  // placeholder itself read "custom headboard, deliver before CNY" — half
+  // pricing reason, half delivery instruction, structured as neither.
+  //
+  // BOTH halves go together, deliberately. Keeping the ± RM with no text would
+  // leave a price adjustment whose ONLY justification was the free text that was
+  // just retired — manufacturing exactly the untraceable discount the office
+  // lane is already criticised for. Special cases carry structured reasons now;
+  // Activity & notes (0138) is the surviving note channel.
+  //
+  // A STORED remark still CARRIES THROUGH on edit. Dropping it here would
+  // silently re-price a live line and erase the only record of why its price is
+  // what it is. Nothing can author or change one any more; what exists is
+  // preserved and printed exactly as before.
+  const remark = edit?.remark ?? "";
+  const remarkAdj = Math.round((edit?.remarkSurcharge ?? 0) * 100) / 100;
 
   // The option picks + their server-verifiable total — the SAME pure resolver
   // Hono re-runs on submit (option-picks-recompute), so this preview cannot
@@ -554,7 +563,7 @@ export default function PosConfigurePage({
     }
     if (!(customerPhone ?? "").trim()) {
       setPwpErr(
-        "Enter the customer's phone (step 02) first to redeem a saved voucher — or apply it from the cart.",
+        "Enter the customer's phone (step 02) first to redeem a saved voucher, or apply it from the cart.",
       );
       return;
     }
@@ -582,7 +591,7 @@ export default function PosConfigurePage({
       setPwpApplied({ ruleId: rule.id, code: v.code, crossOrder: true });
       setQty(1);
     } catch {
-      setPwpErr("Couldn't check that voucher — please retry.");
+      setPwpErr("Couldn't check that voucher. Please retry.");
     } finally {
       setPwpBusy(false);
     }
@@ -671,7 +680,7 @@ export default function PosConfigurePage({
 
   return createPortal(
     <div
-      className={`pos-proto cfg-root${wizardTopbar ? " has-wizardbar" : ""}`}
+      className={`pos-proto cfg-root cfg-root--mattress-bed${wizardTopbar ? " has-wizardbar" : ""}`}
       style={{ position: "fixed", inset: 0, zIndex: 50 }}
       role="dialog"
       aria-modal="true"
@@ -683,6 +692,58 @@ export default function PosConfigurePage({
       {wizardTopbar && (
         <div className="cfg-wizardbar">
           <ConfigureTopbarBrand ctx={wizardTopbar} onBack={onClose} />
+          <div className="cfg-wizardbar__mobile-main pos-mobile-topbar__main pos-tablet-topbar__main hidden">
+            <button
+              type="button"
+              className="pos-mobile-topbar__icon pos-tablet-topbar__icon"
+              aria-label="Categories unavailable while configuring"
+              disabled
+            >
+              <Menu size={18} strokeWidth={1.75} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="pos-wordmark pos-mobile-topbar__wordmark pos-tablet-topbar__wordmark"
+              onClick={onClose}
+              aria-label="Back to catalog"
+            >
+              CARRES
+            </button>
+            <span className="pos-topbar__crumb pos-mobile-topbar__context pos-tablet-topbar__context">
+              POS · {wizardTopbar.contextLabel}
+            </span>
+            <button
+              type="button"
+              className="pos-mobile-topbar__avatar pos-tablet-topbar__avatar"
+              aria-label="Staff profile unavailable while configuring"
+              disabled
+            >
+              <span className="pos-staff-chip__avatar" aria-hidden="true">
+                PR
+              </span>
+            </button>
+          </div>
+          <nav
+            className="cfg-wizardbar__mobile-steps pos-mobile-topbar__steps pos-tablet-topbar__steps hidden"
+            aria-label="Order steps"
+          >
+            {PHONE_WIZARD_STEPS.map((label, index) => (
+              <button
+                key={label}
+                type="button"
+                className={`pos-mobile-topbar__step pos-tablet-topbar__step ${index === 0 ? "is-active" : ""}`}
+                aria-current={index === 0 ? "step" : undefined}
+                disabled={index !== 0}
+              >
+                <span className="pos-mobile-topbar__step-pill pos-tablet-topbar__step-pill">
+                  <span className="pos-mobile-topbar__step-number pos-tablet-topbar__step-number">
+                    {index + 1}
+                  </span>
+                  {label}
+                </span>
+              </button>
+            ))}
+          </nav>
         </div>
       )}
       {/* Header — back arrow (non-wizard) · live summary · live total
@@ -1047,52 +1108,6 @@ export default function PosConfigurePage({
                 special remark sometimes ADJUSTS the price — the amount is
                 optional (per unit) and folds into the live total. Locked while
                 a PWP voucher is applied (the reward price is forced). */}
-            <div className="cfg-section" data-testid="cfg-remark-section">
-              <div className="cfg-section__head">
-                <span className="pos-eyebrow">Remark</span>
-                <span className="cfg-section__detail">
-                  {remarkAdj !== 0
-                    ? `${remarkAdj > 0 ? "+" : "−"}RM ${Math.abs(remarkAdj).toLocaleString("en-MY")}`
-                    : "± RM optional · adjusts the price"}
-                </span>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <textarea
-                  value={remark}
-                  onChange={(e) => setRemark(e.target.value)}
-                  placeholder="e.g. custom headboard, deliver before CNY…"
-                  rows={2}
-                  className="cfg-select"
-                  style={{ resize: "vertical" }}
-                  data-testid="cfg-remark"
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  value={remarkPrice}
-                  onChange={(e) => setRemarkPrice(e.target.value)}
-                  placeholder="± RM 0.00"
-                  aria-label="Remark price adjustment (RM)"
-                  disabled={pwpActive}
-                  title={
-                    pwpActive
-                      ? "A PWP-priced item can't take a manual adjustment"
-                      : undefined
-                  }
-                  className="cfg-select font-mono disabled:opacity-40"
-                  data-testid="cfg-remark-price"
-                />
-                {effUnitPrice < 0 && (
-                  <p
-                    style={{ margin: 0, fontSize: 12, color: "var(--c-danger, #B4321A)" }}
-                    data-testid="cfg-remark-negative"
-                  >
-                    The adjustment puts this item below RM 0 — reduce the discount.
-                  </p>
-                )}
-              </div>
-            </div>
-
             {/* PWP & Promo voucher — 2990s configurator rail parity. Rendered
                 only when the catalog carries an ACTIVE pwp_rule (DORMANT
                 otherwise). Auto Fill binds the same-cart RESERVED code; typing
@@ -1154,7 +1169,7 @@ export default function PosConfigurePage({
                         style={{ margin: 0, fontSize: 12, color: "var(--c-burnt, #A6471E)" }}
                         data-testid="cfg-pwp-ready"
                       >
-                        A PWP code from this cart is ready — tap Auto Fill.
+                        A PWP code from this cart is ready. Tap Auto Fill.
                       </p>
                     )}
                     <div style={{ display: "flex", gap: 8 }}>

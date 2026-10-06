@@ -8,6 +8,8 @@ import type {
   RawCreateOrderInput,
 } from "@carres/shared";
 import {
+  BUILDING_TYPE_OPTIONS,
+  DELIVERY_FACT_REFUSALS,
   ORDER_ENTRY_TABS,
   STRIPE_METHOD_KEY,
   STRIPE_PAYMENT_METHOD,
@@ -245,12 +247,26 @@ export default function PrincipalNewOrder() {
   const subtotal = activeLines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
   const paidPct = subtotal > 0 ? Math.round((draft.paid / subtotal) * 100) : 0;
 
-  const canCreate =
+  const rawFloors =
     !!dealerId &&
     c.name.trim().length > 0 &&
     activeLines.length > 0 &&
-    activeLines.every((l) => l.qty > 0 && l.unitPrice >= 0) &&
-    !createRaw.isPending;
+    activeLines.every((l) => l.qty > 0 && l.unitPrice >= 0);
+  /* ⛔ THE REQUIRED SALES FACTS FOR A DELIVERY (owner ruling 2026-09-13,
+     Delivery Card 18) — the office door refuses the same facts with the same
+     words as the POS schema, and says which one is missing HERE, not after
+     the round trip. Floor and lift always carry a value on this form. */
+  const factIssue =
+    c.addressLine1.trim().length < 5 || !c.addressCity || !c.addressPostcode
+      ? DELIVERY_FACT_REFUSALS.address
+      : !c.addressState
+        ? DELIVERY_FACT_REFUSALS.state
+        : !c.buildingType
+          ? DELIVERY_FACT_REFUSALS.buildingType
+          : !draft.delivery.date
+            ? DELIVERY_FACT_REFUSALS.date
+            : null;
+  const canCreate = rawFloors && !factIssue && !createRaw.isPending;
 
   // ── Submit — the extended raw door ────────────────────────────────────────
   async function handleCreate() {
@@ -277,6 +293,9 @@ export default function PrincipalNewOrder() {
       const fields = Object.fromEntries(
         Object.entries(c.custom ?? {}).filter(([, v]) => v.trim()),
       );
+      // Building type rides entry_data.fields (no orders column) — the same
+      // slot the POS submit writes, so Monitor reads ONE fact (Card 18).
+      if (c.buildingType.trim()) fields.building_type = c.buildingType.trim();
       // 0219 — the picked method's follow-up answers (e.g. the Credit/Debit
       // Bank) ride entry_data.payment, same as the POS submit.
       const followUps = Object.fromEntries(
@@ -289,14 +308,14 @@ export default function PrincipalNewOrder() {
         customer: {
           name: c.name.trim(),
           phone: c.phone.trim() || null,
-          address: c.addressUnknown ? null : composedAddress || c.address.trim() || null,
-          addressUnknown: c.addressUnknown,
+          address: composedAddress || c.address.trim() || null,
+          addressUnknown: false,
           // 0230 — structured parts ride alongside the composed string.
-          addressLine1: c.addressUnknown ? null : c.addressLine1.trim() || null,
-          addressLine2: c.addressUnknown ? null : c.addressLine2.trim() || null,
-          addressState: c.addressUnknown ? null : c.addressState || null,
-          addressCity: c.addressUnknown ? null : c.addressCity || null,
-          addressPostcode: c.addressUnknown ? null : c.addressPostcode || null,
+          addressLine1: c.addressLine1.trim() || null,
+          addressLine2: c.addressLine2.trim() || null,
+          addressState: c.addressState || null,
+          addressCity: c.addressCity || null,
+          addressPostcode: c.addressPostcode || null,
           billing: c.billingSame ? null : composedBilling || c.billing.trim() || null,
           billingSame: c.billingSame,
           emergency: composeEmergency(c) || null,
@@ -356,7 +375,7 @@ export default function PrincipalNewOrder() {
     if (
       stripeCollected <= 0 &&
       !window.confirm(
-        `Customer hasn't paid yet.\n\nOK — keep order SO-${stripeCollect.order.so} (the payment link stays valid for 24h).\nCancel — stay on the QR.`,
+        `Customer hasn't paid yet.\n\nOK: keep order SO-${stripeCollect.order.so} (the payment link stays valid for 24h).\nCancel: stay on the QR.`,
       )
     ) {
       return;
@@ -371,14 +390,14 @@ export default function PrincipalNewOrder() {
     if (!stripeCollect) return;
     if (
       !window.confirm(
-        `Void order SO-${stripeCollect.order.so}? The customer hasn't paid — the order is cancelled and you return to editing.`,
+        `Void order SO-${stripeCollect.order.so}? The customer hasn't paid. The order is cancelled and you return to editing.`,
       )
     ) {
       return;
     }
     try {
       await cancelPendingOrder.mutateAsync({ reason: "Stripe payment not completed at raw entry" });
-      toast.info(`Order SO-${stripeCollect.order.so} voided — nothing was charged.`);
+      toast.info(`Order SO-${stripeCollect.order.so} voided. Nothing was charged.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not void the order");
       return;
@@ -482,7 +501,7 @@ export default function PrincipalNewOrder() {
         <p className="text-label uppercase tracking-[0.05em] text-base-400">Maintain · New order</p>
         <h1 className="text-page mt-1">New Sales Order</h1>
         <p className="text-body text-base-500 mt-1">
-          Raw creation — no POS gates. Every line, price and date is saved exactly as you
+          Raw creation, no POS gates. Every line, price and date is saved exactly as you
           enter it.
         </p>
       </header>
@@ -536,8 +555,8 @@ export default function PrincipalNewOrder() {
             >
               <option value="">
                 {dealerId && outlets.length === 0
-                  ? `— none under this store —`
-                  : "— optional —"}
+                  ? `None under this store`
+                  : "Optional"}
               </option>
               {outlets.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -555,7 +574,7 @@ export default function PrincipalNewOrder() {
               disabled={!dealerId}
               className={dealerId ? INPUT_CLASS : INPUT_DISABLED}
             >
-              <option value="">— optional —</option>
+              <option value="">Optional</option>
               {salespersons.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -606,7 +625,7 @@ export default function PrincipalNewOrder() {
                 onChange={(e) => setC({ race: e.target.value })}
                 className={INPUT_CLASS}
               >
-                <option value="">—</option>
+                <option value="">Race</option>
                 {["Malay", "Chinese", "Indian", "Other"].map((r) => (
                   <option key={r} value={r}>
                     {r}
@@ -622,7 +641,7 @@ export default function PrincipalNewOrder() {
                 onChange={(e) => setC({ gender: e.target.value })}
                 className={INPUT_CLASS}
               >
-                <option value="">—</option>
+                <option value="">Gender</option>
                 {["Female", "Male"].map((g) => (
                   <option key={g} value={g}>
                     {g}
@@ -647,7 +666,7 @@ export default function PrincipalNewOrder() {
       {/* ── Order info ── */}
       <Section title="Order info">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Delivery date" hint="Any date — leave empty = TBD. No lead-time floor.">
+          <Field label="Delivery date *" hint="Ask the customer for the date before you save the order. No lead-time floor.">
             <input
               type="date"
               value={draft.delivery.date}
@@ -658,7 +677,7 @@ export default function PrincipalNewOrder() {
           </Field>
           <Field
             label="Proceed date · production start"
-            hint="Optional — saved only when a delivery date is set."
+            hint="Optional. Saved only when a delivery date is set."
           >
             <input
               type="date"
@@ -690,11 +709,13 @@ export default function PrincipalNewOrder() {
                 Lift access
               </label>
             </Field>
-            <Field label="Stair items" hint="Empty = all items">
+            {/* Unset is NONE since 2026-08-27, so the hint no longer promises
+                "all items" and the box carries the 0 it means. */}
+            <Field label="Stair items">
               <input
                 type="number"
                 min={0}
-                value={draft.delivery.stairItems ?? ""}
+                value={draft.delivery.stairItems ?? 0}
                 onChange={(e) =>
                   setDelivery({
                     stairItems:
@@ -716,7 +737,7 @@ export default function PrincipalNewOrder() {
                   className={INPUT_CLASS}
                   data-testid={`raw-custom-${f.key}`}
                 >
-                  <option value="">—</option>
+                  <option value="">{f.label}</option>
                   {f.options.map((o) => (
                     <option key={o} value={o}>
                       {o}
@@ -764,7 +785,7 @@ export default function PrincipalNewOrder() {
                 }
                 className={INPUT_CLASS}
               >
-                <option value="">—</option>
+                <option value="">Relationship</option>
                 {RELATIONSHIPS.map((r) => (
                   <option key={r} value={r}>
                     {r}
@@ -797,45 +818,35 @@ export default function PrincipalNewOrder() {
 
       {/* ── Delivery address ── */}
       <Section title="Delivery address">
-        <label className="flex items-start gap-2.5 mb-4 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={c.addressUnknown}
-            onChange={(e) =>
-              setC({
-                addressUnknown: e.target.checked,
-                ...(e.target.checked
-                  ? {
-                      addressLine1: "",
-                      addressLine2: "",
-                      addressState: "",
-                      addressCity: "",
-                      addressPostcode: "",
-                    }
-                  : {}),
-              })
-            }
-            className="mt-0.5 w-4 h-4"
-          />
-          <span>
-            <span className="text-body font-semibold block">Fill in address later</span>
-            <span className="text-meta text-base-500">
-              Customer hasn't confirmed the delivery address yet.
-            </span>
-          </span>
-        </label>
-        {!c.addressUnknown && (
-          <MYAddressFields
-            data={{
-              addressLine1: c.addressLine1,
-              addressLine2: c.addressLine2,
-              addressState: c.addressState,
-              addressCity: c.addressCity,
-              addressPostcode: c.addressPostcode,
-            }}
-            onChange={(patch) => setC(patch)}
-          />
-        )}
+        {/* The "Fill in address later" tick is RETIRED (owner ruling 2026-09-13,
+            Delivery Card 18): a valid new order carries its delivery address. */}
+        <MYAddressFields
+          data={{
+            addressLine1: c.addressLine1,
+            addressLine2: c.addressLine2,
+            addressState: c.addressState,
+            addressCity: c.addressCity,
+            addressPostcode: c.addressPostcode,
+          }}
+          onChange={(patch) => setC(patch)}
+        />
+        {/* Building type (Card 18) — the delivery-access fact Monitor plans
+            from; rides entry_data.fields.building_type like the POS. */}
+        <Field label="Building type *">
+          <select
+            value={c.buildingType}
+            onChange={(e) => setC({ buildingType: e.target.value })}
+            data-testid="raw-building-type"
+            className={INPUT_CLASS}
+          >
+            <option value="">Building type</option>
+            {BUILDING_TYPE_OPTIONS.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+        </Field>
         <label className="flex items-start gap-2.5 mt-4 cursor-pointer">
           <input
             type="checkbox"
@@ -878,12 +889,12 @@ export default function PrincipalNewOrder() {
       {/* ── Line items ── */}
       <Section
         title={`Line items (${activeLines.length})`}
-        hint="Pick from catalog or type free text — specs follow the product; every price stays editable"
+        hint="Pick from catalog or type free text. Specs follow the product; every price stays editable"
       >
         <div className="flex flex-col gap-2">
           <div className="hidden sm:grid grid-cols-[24px_1fr_180px_70px_110px_100px_64px] gap-2 px-1">
             <span />
-            <span className="text-label uppercase tracking-[0.05em] text-base-400">Product — pick or type</span>
+            <span className="text-label uppercase tracking-[0.05em] text-base-400">Product (pick or type)</span>
             <span className="text-label uppercase tracking-[0.05em] text-base-400">Remarks</span>
             <span className="text-label uppercase tracking-[0.05em] text-base-400">Qty</span>
             <span className="text-label uppercase tracking-[0.05em] text-base-400">Unit price</span>
@@ -986,7 +997,7 @@ export default function PrincipalNewOrder() {
                       type="button"
                       onClick={() => setEditRowId(l.localId)}
                       aria-label="Edit specs"
-                      title="Optional — open the product configurator for specs"
+                      title="Optional: open the product configurator for specs"
                       data-testid={`raw-edit-${l.localId}`}
                       className="grid place-items-center w-7 h-7 rounded-md text-base-400 hover:text-base-800 hover:bg-base-100"
                     >
@@ -1036,14 +1047,14 @@ export default function PrincipalNewOrder() {
       {/* ── Payment ── */}
       <Section
         title="Payment"
-        hint="Optional — a paid amount posts into the order's payment tracker (Balance ledger); later payments go through Finance / top-up"
+        hint="Optional. A paid amount posts into the order's payment tracker (Balance ledger); later payments go through Finance / top-up"
       >
         <div className="grid gap-4 sm:grid-cols-3">
           <Field
             label={isStripe ? "Amount to collect (RM)" : "Paid (RM)"}
             hint={
               isStripe
-                ? "The Stripe QR / payment link opens after Create — nothing is charged until the customer pays."
+                ? "The Stripe QR / payment link opens after Create. Nothing is charged until the customer pays."
                 : undefined
             }
           >
@@ -1070,7 +1081,7 @@ export default function PrincipalNewOrder() {
               data-testid="raw-payment-method"
               className={INPUT_CLASS}
             >
-              <option value="">— not recorded —</option>
+              <option value="">Not recorded</option>
               {paymentMethods.map((m) => (
                 <option key={m.key} value={m.key}>
                   {m.label}
@@ -1127,7 +1138,7 @@ export default function PrincipalNewOrder() {
                   data-testid={`raw-pay-followup-${fu.key}`}
                   className={INPUT_CLASS}
                 >
-                  <option value="">— select —</option>
+                  <option value="">{fu.label}</option>
                   {fu.options.map((o) => (
                     <option key={o} value={o}>
                       {o}
@@ -1145,13 +1156,18 @@ export default function PrincipalNewOrder() {
         )}
         {isStripe && (
           <p className="text-body text-base-600 mt-3" data-testid="raw-stripe-note">
-            No slip or reference code needed — the payment records itself with a Stripe
+            No slip or reference code needed. The payment records itself with a Stripe
             receipt once the customer pays (QR at the counter, or a WhatsApp link).
           </p>
         )}
       </Section>
 
       {/* ── Footer ── */}
+      {rawFloors && factIssue && (
+        <p className="text-meta text-base-700" data-testid="raw-first-issue">
+          {factIssue}
+        </p>
+      )}
       {submitError && (
         <p
           className="text-meta text-destructive bg-destructive/5 border border-destructive/30 rounded px-3 py-2"

@@ -37,6 +37,46 @@ function renderStep(draft: WizardDraft, cat = catalog()) {
   return changes;
 }
 
+function handoffReadyDraft(): WizardDraft {
+  const d = emptyDraft();
+  return {
+    ...d,
+    customer: {
+      ...d.customer,
+      name: "Nur Aina",
+      phone: "0123456789",
+      addressLine1: "12 Jalan Damai",
+      addressState: "Selangor",
+      addressCity: "Petaling Jaya",
+      addressPostcode: "47301",
+    },
+    delivery: { ...d.delivery, date: "2026-09-30" },
+    lines: [
+      {
+        localId: "L1",
+        sku: "MATT-A",
+        qty: 1,
+        attrs: null,
+        unitPrice: 1_200,
+        label: "Matt A · Queen",
+      },
+    ],
+    paid: 600,
+    payment: {
+      ...d.payment,
+      method: "cash",
+      slip: {
+        name: "receipt.png",
+        mime: "image/png",
+        size: 4,
+        dataUrl: "data:image/png;base64,eA==",
+      },
+    },
+    signature: "data:image/png;base64,eA==",
+    termsAccepted: true,
+  };
+}
+
 describe("Step3SignaturePayment — 0219 config-driven methods", () => {
   it("default config shows the 4 methods incl. CASH", () => {
     renderStep(draftWith({}));
@@ -136,6 +176,38 @@ describe("Step3SignaturePayment — Order recap free-gift parity", () => {
       catalog(),
     );
     expect(screen.queryByTestId("step3-gift-PILLOW")).toBeNull();
+  });
+});
+
+describe("Step3SignaturePayment — final-submit handoff message", () => {
+  it("says Operations receives the order only when every governed fact exists", () => {
+    renderStep(handoffReadyDraft());
+
+    expect(screen.getByText("✓ This order is complete.")).toBeTruthy();
+    expect(
+      screen.getByText("Operations receives this order automatically when you submit."),
+    ).toBeTruthy();
+  });
+
+  it.each([
+    ["no goods or price", (d: WizardDraft) => ({ ...d, lines: [] }), "goods and a price"],
+    [
+      "no customer name",
+      (d: WizardDraft) => ({ ...d, customer: { ...d.customer, name: "" } }),
+      "customer name is entered",
+    ],
+    ["no signature", (d: WizardDraft) => ({ ...d, signature: null }), "customer signs"],
+    [
+      "terms not accepted",
+      (d: WizardDraft) => ({ ...d, termsAccepted: false }),
+      "terms are accepted",
+    ],
+  ])("never calls an incomplete order complete: %s", (_label, change, missingFact) => {
+    renderStep(change(handoffReadyDraft()));
+
+    expect(screen.queryByText("✓ This order is complete.")).toBeNull();
+    expect(screen.getByText("⚠ This order is not ready.")).toBeTruthy();
+    expect(screen.getByText(new RegExp(missingFact))).toBeTruthy();
   });
 });
 

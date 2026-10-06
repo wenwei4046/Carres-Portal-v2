@@ -5,9 +5,33 @@ import Btn from "@/components/Btn";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
-import { lineCategory, stockMatchKey } from "@/lib/line-category";
-import type { ReserveFreeUnit } from "./ReserveStockDialog";
+import { READY_STOCK_CONDITION_WORDS } from "@carres/shared";
+import { resolvedCategory, stockMatchKey } from "@/lib/line-category";
 import PoolReasonPicker, { usePoolDrawReason } from "./PoolReasonPicker";
+
+/** One free warehouse unit, as the stock pickers receive it. */
+export interface ReserveFreeUnit {
+  id: string;
+  unitCode: string | null;
+  sku: string;
+  condition: "new" | "exhibition" | "old" | "refurbished" | "damaged";
+  poNo: string | null;
+  sourceRef: string | null;
+  dateIn: string | null;
+  /** Warehouse location (§7.8 Location column) — optional: older API builds
+   *  don't return it; the grid shows "—" until they do. */
+  location?: string | null;
+  /** Units this record represents (0218 bulk rows). Optional for the same
+   *  reason as `location`; absent reads as 1, which under-states a reserve
+   *  level warning rather than inventing one. */
+  qty?: number | null;
+  /** The CATALOG's category for this unit's SKU (D9, 2026-08-20), resolved
+   *  server-side by the one shared reader. `null` = the catalog was asked and
+   *  holds no row; the key ABSENT = this payload's endpoint does not carry it.
+   *  Read it through `resolvedCategory`, never `lineCategory` — the difference
+   *  between the two is a real sofa disappearing from the loan picker. */
+  category?: string | null;
+}
 
 /**
  * StockPickerGrid — the EMBEDDED stock-reserve grid (Jess 2026-06-30) that lives
@@ -27,14 +51,6 @@ import PoolReasonPicker, { usePoolDrawReason } from "./PoolReasonPicker";
  * project-catalog-empty-sku-naming); within the loan view, a token-overlap score
  * surfaces the closest sofas first.
  */
-
-const CONDITION_LABEL: Record<string, string> = {
-  new: "New",
-  exhibition: "Display",
-  old: "Fair (used)",
-  refurbished: "Refurbished",
-  damaged: "Damaged",
-};
 
 type Category = "Mattress" | "Bedframe" | "Sofa" | "Other";
 type Size = "King" | "Queen" | "Other";
@@ -137,7 +153,11 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
     const want = new Set(tokenize(sku));
     return units
       .filter((u) =>
-        loanMode ? lineCategory(u.sku) === "sofa" : stockMatchKey(u.sku) === matchKey,
+        loanMode
+          ? // D9, 2026-08-20 — the catalog's word, not the SKU text. Same
+            // filter-hides-a-real-unit failure as LoanPanel one screen over.
+            resolvedCategory(u.sku, u.category) === "sofa"
+          : stockMatchKey(u.sku) === matchKey,
       )
       .map((u) => {
         const ut = tokenize(u.sku);
@@ -157,7 +177,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
           ...u,
           cat: unitCategory(u.sku),
           size: unitSize(u.sku),
-          cond: CONDITION_LABEL[u.condition] ?? u.condition,
+          cond: READY_STOCK_CONDITION_WORDS[u.condition] ?? u.condition,
           dateLabel: u.dateIn ? fmtDate(u.dateIn) : "",
           ageDays,
           score,
@@ -234,7 +254,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
       toast.error(
         first?.reason instanceof ApiError
           ? first.reason.message
-          : "Could not reserve — units may have been grabbed already",
+          : "Could not reserve. Units may have been grabbed already",
       );
     }
   }
@@ -293,7 +313,7 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
       {/* Scope row — the same-model note + the sofa loan toggle. */}
       <div className="px-1.5 pt-1.5 pb-1 flex items-center justify-between gap-2 shrink-0">
         <span className="text-meta text-base-400 truncate">
-          {loanMode ? "any sofa — loan" : "same model + size"}
+          {loanMode ? "any sofa (loan)" : "same model + size"}
         </span>
         {isSofa && (
           <button
@@ -400,10 +420,10 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                   className="px-2 py-1 text-foreground tabular-nums truncate"
                   title={r.dateLabel ? `in since ${r.dateLabel}` : ""}
                 >
-                  {r.ageDays != null ? `${r.ageDays}d` : "—"}
+                  {r.ageDays != null ? `${r.ageDays}d` : ""}
                 </div>
                 <div className="px-2 py-1 font-mono text-foreground truncate" title={r.poNo ?? ""}>
-                  {r.poNo ?? "—"}
+                  {r.poNo ?? ""}
                 </div>
                 <div className="px-1 py-1 text-right">
                   {loaning ? (
@@ -441,8 +461,8 @@ export default function StockPickerGrid({ sku, soRef, need, units, isSofa, onRes
                 : loanMode
                   ? "No free sofas in stock to loan."
                   : isSofa
-                    ? "No same-model sofa ready — try “Loan any sofa”."
-                    : "No same-model free stock — raise a PO."}
+                    ? "No same-model sofa ready. Try “Loan any sofa”."
+                    : "No same-model free stock. Raise a PO."}
             </div>
           )}
         </div>

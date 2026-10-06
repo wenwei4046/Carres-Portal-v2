@@ -65,6 +65,19 @@ function wrap(node: React.ReactNode) {
 }
 
 const statusBtn = (name: RegExp) => screen.getByRole("button", { name });
+
+/** The filter rail group a heading belongs to (FilterGroup: label + pill list). */
+const railGroup = (label: string) => screen.getByText(label).parentElement!;
+/** Every pill in a rail group, in render order, as "Label count". The label and
+ *  the count are separate spans with no whitespace between them, so they are
+ *  joined explicitly rather than read off textContent. */
+const pillNames = (group: HTMLElement) =>
+  Array.from(group.querySelectorAll("button")).map((b) =>
+    Array.from(b.querySelectorAll("span"))
+      .map((s) => (s.textContent ?? "").trim())
+      .filter(Boolean)
+      .join(" "),
+  );
 // Default view is grouped (rollup, collapsed) — switch to Flat to assert on
 // individual unit rows.
 const showFlat = () => fireEvent.click(screen.getByRole("tab", { name: /Flat/ }));
@@ -143,6 +156,15 @@ describe("OperationStockOnHand", () => {
     expect(screen.queryByText("id-aaa111")).not.toBeInTheDocument();
   });
 
+  it("invents no category pill when the catalog answered nothing", async () => {
+    // The shared fixture pre-dates the catalog join, so no row carries one and
+    // all 7 fall in the no-match bucket. Nothing may be conjured from the SKU
+    // text "SKU-1" to fill the group.
+    wrap(<OperationStockOnHand />);
+    await waitFor(() => statusBtn(/^All\b/));
+    expect(pillNames(railGroup("Category"))).toEqual(["Any", "Not in catalog 7"]);
+  });
+
   it("Grouped view rolls units up by model (collapsed by default), expandable", async () => {
     wrap(<OperationStockOnHand />);
     // Default is grouped: the shared SKU-1 model appears as one collapsed group
@@ -156,5 +178,160 @@ describe("OperationStockOnHand", () => {
     await waitFor(() =>
       expect(screen.getByText("id-aaa111")).toBeInTheDocument(),
     );
+  });
+});
+
+/**
+ * The Category filter — CARD-2026-08-19-onhand-category-filter.
+ *
+ * The category is the CATALOG's answer (D9, ERP-ARCHITECTURE §3.1) and arrives
+ * already resolved on `/inventory`; this page only groups and labels it. The
+ * fixture mirrors live prod: catalogued furniture alongside free-text import
+ * SKUs the catalog has never held.
+ *
+ * Note the two uncatalogued SKUs: their TEXT contains "Pillow" and "Mattress".
+ * They must land in the no-match bucket regardless — a Mattress pill counting
+ * the protector would be D9 reappearing on a new screen.
+ */
+const SOFA = "TCF-Sofa-Lucca-3S-Beige";
+const MATTRESS = "Breeze FirmCare-B1201F-K";
+const PILLOW = "Essential Memory Pillow(L)";
+const MP_K = "Microfiber Waterproof Mattress Protector-K";
+
+const CATALOG_UNITS: OpsStockItem[] = [
+  makeUnit({ id: "s1", unitCode: "id-sofa01", sku: SOFA, category: "sofa" }),
+  makeUnit({
+    id: "s2",
+    unitCode: "id-sofa02",
+    sku: SOFA,
+    category: "sofa",
+    status: "reserved",
+    reservedRef: "SO-9001",
+  }),
+  makeUnit({ id: "m1", unitCode: "id-matt01", sku: MATTRESS, category: "mattress" }),
+  makeUnit({ id: "p1", unitCode: "id-pill01", sku: PILLOW, category: null }),
+  makeUnit({ id: "p2", unitCode: "id-pill02", sku: PILLOW, category: null }),
+  makeUnit({ id: "x1", unitCode: "id-prot01", sku: MP_K, category: null }),
+];
+
+describe("OperationStockOnHand — the Category filter", () => {
+  beforeEach(() => {
+    apiFetchMock.mockReset();
+    apiFetchMock.mockImplementation((path: string) => {
+      if (typeof path === "string" && path.includes("/ops/stock/inventory")) {
+        return Promise.resolve({
+          items: CATALOG_UNITS,
+          total: CATALOG_UNITS.length,
+        });
+      }
+      return Promise.resolve({ items: [], total: 0 });
+    });
+  });
+
+  it("lists the categories present, in catalog order, with the no-match bucket last", async () => {
+    wrap(<OperationStockOnHand />);
+    await waitFor(() => statusBtn(/^All\b/));
+    // Catalog order (mattress · bedframe · sofa · …), NOT count order and NOT
+    // alphabetical — and the honest bucket sits at the bottom, never folded
+    // into Accessory.
+    expect(pillNames(railGroup("Category"))).toEqual([
+      // `Any` is the rail's no-filter word for a facet; `All` belongs to the
+      // Status bucket list and must not be duplicated here.
+      "Any",
+      "Mattress 1",
+      "Sofa 2",
+      "Not in catalog 3",
+    ]);
+  });
+
+  it("still shows a category this page has no ruled order for", async () => {
+    // If the catalog gains a seventh category, its units must not become
+    // countable-but-unfilterable. Known order first, the stranger after it.
+    apiFetchMock.mockImplementation((path: string) =>
+      typeof path === "string" && path.includes("/ops/stock/inventory")
+        ? Promise.resolve({
+            items: [
+              ...CATALOG_UNITS,
+              makeUnit({
+                id: "n1",
+                unitCode: "id-new001",
+                sku: "NEW-1",
+                category: "hammock",
+              }),
+            ],
+            total: CATALOG_UNITS.length + 1,
+          })
+        : Promise.resolve({ items: [], total: 0 }),
+    );
+    wrap(<OperationStockOnHand />);
+    await waitFor(() => statusBtn(/^All\b/));
+    expect(pillNames(railGroup("Category"))).toEqual([
+      "Any",
+      "Mattress 1",
+      "Sofa 2",
+      "hammock 1",
+      "Not in catalog 3",
+    ]);
+  });
+
+  it("picking a category narrows the table to that category", async () => {
+    wrap(<OperationStockOnHand />);
+    await waitFor(() => statusBtn(/^All\b/));
+    showFlat();
+    fireEvent.click(within(railGroup("Category")).getByRole("button", { name: /^Sofa/ }));
+    await waitFor(() => {
+      expect(screen.getByText("id-sofa01")).toBeInTheDocument();
+    });
+    expect(screen.getByText("id-sofa02")).toBeInTheDocument();
+    expect(screen.queryByText("id-matt01")).not.toBeInTheDocument();
+    expect(screen.queryByText("id-pill01")).not.toBeInTheDocument();
+  });
+
+  it("the no-match bucket shows ONLY units the catalog does not hold", async () => {
+    wrap(<OperationStockOnHand />);
+    await waitFor(() => statusBtn(/^All\b/));
+    showFlat();
+    fireEvent.click(
+      within(railGroup("Category")).getByRole("button", { name: /^Not in catalog/ }),
+    );
+    await waitFor(() => {
+      expect(screen.getByText("id-pill01")).toBeInTheDocument();
+    });
+    expect(screen.getByText("id-pill02")).toBeInTheDocument();
+    // The protector's SKU says "Mattress"; the catalog does not. It belongs here.
+    expect(screen.getByText("id-prot01")).toBeInTheDocument();
+    expect(screen.queryByText("id-sofa01")).not.toBeInTheDocument();
+    expect(screen.queryByText("id-matt01")).not.toBeInTheDocument();
+  });
+
+  it("composes with Status as an AND, like every other rail group", async () => {
+    wrap(<OperationStockOnHand />);
+    await waitFor(() => statusBtn(/^All\b/));
+    showFlat();
+    fireEvent.click(within(railGroup("Category")).getByRole("button", { name: /^Sofa/ }));
+    fireEvent.click(statusBtn(/^Reserved\b/));
+    // Two sofas, one reserved → the reserved one only.
+    await waitFor(() => {
+      expect(screen.getByText("id-sofa02")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("id-sofa01")).not.toBeInTheDocument();
+    expect(screen.queryByText("id-pill01")).not.toBeInTheDocument();
+  });
+
+  it("clicking the active pill again clears it, and Clear filters resets it", async () => {
+    wrap(<OperationStockOnHand />);
+    await waitFor(() => statusBtn(/^All\b/));
+    const sofa = () =>
+      within(railGroup("Category")).getByRole("button", { name: /^Sofa/ });
+    fireEvent.click(sofa());
+    await waitFor(() => expect(screen.getByText(/Showing/)).toHaveTextContent("2"));
+    // Toggling the same pill off restores the full list.
+    fireEvent.click(sofa());
+    await waitFor(() => expect(screen.getByText(/Showing/)).toHaveTextContent("6"));
+    // And the rail's own reset clears it too.
+    fireEvent.click(sofa());
+    await waitFor(() => expect(screen.getByText(/Showing/)).toHaveTextContent("2"));
+    fireEvent.click(screen.getByRole("button", { name: /Clear filters/ }));
+    await waitFor(() => expect(screen.getByText(/Showing/)).toHaveTextContent("6"));
   });
 });

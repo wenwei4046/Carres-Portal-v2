@@ -78,26 +78,133 @@ export function bookingDayOf(read: BookingRead | null | undefined): BookingDay {
 }
 
 // ---------------------------------------------------------------------------
+// THE ONE DELIVERY-DAY READER — Delivery MASTER §15.1 (measured 2026-09-25,
+// Law D) · Workspace MASTER §5.9 gap 9
+// ---------------------------------------------------------------------------
+
+/** What each owner recorded about the day — the reader decides which wins. */
+export interface ScheduledDeliveryRead {
+  /** The LIVE Delivery Order's own day and window — the snapshot the
+   *  Warehouse and the partner work to. A voided document is not handed in. */
+  document?: { deliveryDate?: string | null; timeSlot?: string | null } | null;
+  /** Delivery's arrangement for the scope (the customer leg is leg 0). */
+  arrangement?: { confirmedDate?: string | null; confirmedTime?: string | null } | null;
+  /** The legacy D1 booking overlay (`ops_order_control`). */
+  booking?: BookingRead | null;
+}
+
+export interface ScheduledDelivery {
+  /** The scheduled day; null when nobody has scheduled one. */
+  iso: IsoDate | null;
+  /** The scheduled time when one was recorded — optional, never required. */
+  time: string | null;
+  source: "document" | "arrangement" | "booking" | null;
+}
+
+/**
+ * ⭐ WHICH DAY IS THIS DELIVERY SCHEDULED FOR — asked ONCE (Architecture Law D).
+ *
+ * The DOCUMENT wins when one exists; then Delivery's own arrangement; then the
+ * legacy booking, and only when it is CONFIRMED (stage word AND date). A
+ * carrier's provisional `logistic_eta` is never a scheduled day: nobody agreed
+ * it with the customer. Monitor, the Work feed and the rail Calendar read this
+ * — three readers once derived the day three ways.
+ */
+export function scheduledDeliveryOf(read: ScheduledDeliveryRead): ScheduledDelivery {
+  const doc = asDate(read.document?.deliveryDate);
+  if (doc) return { iso: doc, time: read.document?.timeSlot ?? null, source: "document" };
+  const arranged = asDate(read.arrangement?.confirmedDate);
+  if (arranged) return { iso: arranged, time: read.arrangement?.confirmedTime ?? null, source: "arrangement" };
+  const booking = bookingDayOf(read.booking);
+  if (booking.kind === "confirmed" && booking.date) {
+    return { iso: booking.date, time: booking.slot, source: "booking" };
+  }
+  return { iso: null, time: null, source: null };
+}
+
+/** One live Delivery Order, as an order-level reader sees it. */
+export interface CustomerLegDocumentRead {
+  leg?: number | null;
+  deliveryDate?: string | null;
+  timeSlot?: string | null;
+  issuedAt?: string | null;
+}
+
+/** One `ops_delivery_arrangements` row, as an order-level reader sees it. */
+export interface CustomerLegArrangementRead {
+  leg?: number | null;
+  confirmedDate?: string | null;
+  confirmedTime?: string | null;
+  partnerId?: string | null;
+}
+
+/**
+ * ⭐ THE CUSTOMER LEG'S SCHEDULED DAY — for a reader that sees a whole ORDER
+ * (the Work feed, the rail Calendar, Payment's collection clock) rather than
+ * one Monitor row. The customer leg is the highest leg Delivery recorded (0 on
+ * an ordinary order); its newest live document, then its arrangement, then a
+ * confirmed legacy booking — `scheduledDeliveryOf`'s one precedence. The
+ * caller hands in LIVE documents only.
+ */
+export function customerLegDeliveryOf(input: {
+  documents: ReadonlyArray<CustomerLegDocumentRead>;
+  arrangements: ReadonlyArray<CustomerLegArrangementRead>;
+  booking?: BookingRead | null;
+}): ScheduledDelivery & { leg: number; arrangement: CustomerLegArrangementRead | null } {
+  const leg = Math.max(
+    0,
+    ...input.documents.map((d) => Number(d.leg ?? 0) || 0),
+    ...input.arrangements.map((a) => Number(a.leg ?? 0) || 0),
+  );
+  const document =
+    input.documents
+      .filter((d) => (Number(d.leg ?? 0) || 0) === leg && asDate(d.deliveryDate))
+      .sort((a, b) => (b.issuedAt ?? "").localeCompare(a.issuedAt ?? ""))[0] ?? null;
+  const arrangement = input.arrangements.find((a) => (Number(a.leg ?? 0) || 0) === leg) ?? null;
+  return { ...scheduledDeliveryOf({ document, arrangement, booking: input.booking }), leg, arrangement };
+}
+
+/**
+ * ⭐ WHICH LOGISTICS COMPANY CARRIES THIS DELIVERY — asked ONCE.
+ *
+ * Delivery's own arrangement record wins (owner correction 2026-08-24: Delivery
+ * OWNS the arrangement); the order row's columns are only the fallback for a
+ * scope Delivery has not recorded. Monitor and the Work feed both read this,
+ * so `Assign logistics` cannot be open on one surface and closed on the other.
+ */
+export function assignedLogisticsIdOf(input: {
+  arrangementPartnerId?: string | null;
+  orderPartnerId?: string | null;
+  triagePartnerId?: string | null;
+}): string | null {
+  return input.arrangementPartnerId || input.orderPartnerId || input.triagePartnerId || null;
+}
+
+// ---------------------------------------------------------------------------
 // Ranges — Today / Tomorrow / This week
 // ---------------------------------------------------------------------------
 
 export type DeliveryRangeKey = "today" | "tomorrow" | "week";
 
+/**
+ * A range carries its DAYS and no word.
+ *
+ * **NO RELATIVE DATE WORDS — owner ruling 2026-08-15.** This interface used to
+ * hand every caller a `label` reading `Today` / `Tomorrow`. The owner extended
+ * the delivery word table's existing ban to the rail, so the two single-day
+ * ranges have no word left to carry: the caller prints the actual weekday +
+ * date from the ONE date home (`fmt-date.ts`), and a range that spans days
+ * keeps its ruled span word (`This week`). Deleting the field is the
+ * enforcement — a label nobody can read cannot rot back into a screenshot.
+ */
 export interface DeliveryRange {
   key: DeliveryRangeKey;
-  label: string;
   /** Inclusive, both ends. */
   fromIso: IsoDate;
   toIso: IsoDate;
 }
 
 export const DELIVERY_RANGE_KEYS = ["today", "tomorrow", "week"] as const;
-
-const RANGE_LABEL: Record<DeliveryRangeKey, string> = {
-  today: "Today",
-  tomorrow: "Tomorrow",
-  week: "This week",
-};
 
 function weekdayOf(iso: IsoDate): number {
   const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
@@ -136,18 +243,17 @@ export function daysInRange(fromIso: IsoDate, toIso: IsoDate): IsoDate[] {
  */
 export function deliveryRange(key: DeliveryRangeKey, todayIso: string): DeliveryRange {
   const today = todayIso.slice(0, 10);
-  const label = RANGE_LABEL[key];
-  if (key === "today") return { key, label, fromIso: today, toIso: today };
+  if (key === "today") return { key, fromIso: today, toIso: today };
   if (key === "tomorrow") {
     const t = shiftDays(today, 1);
-    return { key, label, fromIso: t, toIso: t };
+    return { key, fromIso: t, toIso: t };
   }
   const dow = weekdayOf(today);
   // Sunday (0): the week ahead is tomorrow's Mon → its Sat. Otherwise: today
   // (Mon=1 … Sat=6) → the Saturday of this same week.
   const from = dow === 0 ? shiftDays(today, 1) : today;
   const to = dow === 0 ? shiftDays(today, 6) : shiftDays(today, 6 - dow);
-  return { key, label, fromIso: from, toIso: to };
+  return { key, fromIso: from, toIso: to };
 }
 
 /** Is this day inside the range (both ends inclusive)? */
@@ -156,15 +262,20 @@ export function inRange(dateIso: string, range: DeliveryRange): boolean {
   return d >= range.fromIso && d <= range.toIso;
 }
 
-/** The day's own word, for a heading: `Today` · `Tomorrow` · else null (the
- *  caller prints the date, which is the house form — never a bare weekday). */
-export function dayWord(dateIso: string, todayIso: string): string | null {
-  const d = dateIso.slice(0, 10);
-  const t = todayIso.slice(0, 10);
-  if (d === t) return "Today";
-  if (d === shiftDays(t, 1)) return "Tomorrow";
-  return null;
-}
+/**
+ * `dayWord` was DELETED by the no-relative-dates ruling (owner, 2026-08-15).
+ *
+ * It returned `Today` / `Tomorrow` for a day heading, and both of its callers
+ * — the Quick Rail Calendar and the Delivery page — printed that word in front
+ * of the date. A relative word is only true on the day it is read: it rots in
+ * a screenshot and re-sorts itself overnight, which is why the delivery word
+ * table already banned it and why the owner extended the ban to the rail.
+ *
+ * A day heading now prints the actual weekday + date through `fmtDate`, the
+ * portal's one date spelling. There is nothing left for this helper to return,
+ * so it is gone rather than deprecated — a helper that still compiles is a
+ * helper the next chat will call.
+ */
 
 // ---------------------------------------------------------------------------
 // Carrier load on a day — T9's rules, shown where the day is
@@ -225,12 +336,12 @@ export function carrierDayLoads(
     const cur = acc.get(id) ?? {
       dateIso: day,
       partnerId: b.partnerId ?? null,
-      // COPY-STANDARD's ruled word for this fact is "No logistics picked" —
+      // COPY-STANDARD's ruled word for this fact is "Logistics not assigned" —
       // `Carrier` is a banned UI word (the Logistics word law, Jess
       // 2026-07-27). Fixed HERE, at the single source, so the right-rail
       // calendar and the Delivery module say the same thing (rule 8) instead
       // of the new page inventing a second word for one fact.
-      partnerName: b.partnerName?.trim() || "No logistics picked",
+      partnerName: b.partnerName?.trim() || "Logistics not assigned",
       confirmed: 0,
       provisional: 0,
       capacity: null,
@@ -272,10 +383,10 @@ export function carrierDayNote(load: CarrierDayLoad): string | null {
   // a rule none of them set.
   if (weekdayOf(load.dateIso) === 0) return null;
   if (!load.runs) {
-    return `${load.partnerName} is not running on this day — call them or move these`;
+    return `${load.partnerName} is not running on this day. Call them or move these`;
   }
   if (load.atLimit && load.capacity != null) {
-    return `${load.partnerName} is at its limit of ${load.capacity} deliveries a day — call them before promising more`;
+    return `${load.partnerName} is at its limit of ${load.capacity} deliveries a day. Call them before promising more`;
   }
   return null;
 }

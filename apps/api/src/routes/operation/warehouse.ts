@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { DB, adjustStockInput, reservedDrilldownQuery } from "@carres/shared";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { DB, reservedDrilldownQuery, buildInboundRegisterView, inboundArrivals, inboundUnresolvedSources, warehouseArrivalSourceFacts, warehouseCalendarArrivals, type InboundInput } from "@carres/shared";
+import { fail } from "../../lib/route-helpers";
+import { readOptionalRelation } from "../../lib/optional-relation";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -9,19 +10,25 @@ import type { AppEnv } from "../../types";
  * /api/operation/warehouse — Phase 4 M4 backend warehouse subsystem.
  *
  * Endpoints implemented:
- *   GET /        — composed query: warehouses + stock_balances aggregated per
- *                  warehouse with low_stock flags. (M4 Task 1)
- *   POST /adjust — wraps operation_adjust_stock RPC for manual stock
- *                  corrections (positive delta = inbound, negative = damage/
- *                  loss). (M4 Task 2)
+ *   GET /        — composed query: warehouses + the UNIT REGISTER's availability
+ *                  (0366's `stock_sku_availability`) per warehouse, with
+ *                  low_stock flags and the Settings thresholds beside them.
+ *
+ * 0366 — POST /adjust is GONE. Stock is counted from the exact Units; there is
+ * no door that moves a total without naming one.
  *
  * Future M4 tasks add: GET /movements (list).
  *
  * Aggregation contract (per spec §18.5):
  *   - low_stock_status badge is row-level (per SKU). Spec §18.5 wording:
  *     "OK (green) / Low (yellow, total ≤1) / Out (red, total = 0)".
- *   - Status uses qty thresholds (NOT qty-vs-reserved). Inline plan comment
- *     "Out=0, Low=1, OK>1" matches §18.5.
+ *   - Status uses qty thresholds (NOT qty-vs-reserved), per spec §18.5. Inline
+ *     plan comment "Out=0, Low=1, OK>1" matches it. 0366 changed only WHERE the
+ *     qty comes from — the unit register, summing each record's `qty` instead
+ *     of counting rows off a hand-adjustable total — never what the badge means.
+ *     Whether a shelf badge should instead ask what can be OFFERED (a unit in
+ *     repair sits in `qty` and can be promised to nobody) is a real question,
+ *     and it belongs to the Stock Register card with the rest of the presentation.
  *   - byWarehouse[wh_id][i].low_stock_status uses that warehouse's qty.
  *   - totalsBySku[sku].low_stock_status_aggregate uses summed qty across
  *     all warehouses (drives the "All warehouses" column badge).
@@ -45,6 +52,167 @@ operationWarehouseRouter.use("*", async (c, next) => {
     throw new HTTPException(403, { message: "operation only" });
   }
   await next();
+});
+
+/** Paginated, RLS-scoped reads: a truncated table must never look like a complete tally. */
+operationWarehouseRouter.get("/inbound", async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const limit = Math.min(
+    Math.max(1, Math.floor(Number(c.req.query("limit")) || 50)),
+    200,
+  );
+  const offset = Math.max(0, Math.floor(Number(c.req.query("offset")) || 0));
+  async function read(table: string, fields: string) {
+    const rows: Record<string, unknown>[] = [];
+    for (let offset = 0; ; offset += 500) {
+      const result = await sb.from(table).select(fields).order(table === "arrival_source_units" ? "source_id" : "id").order(table === "arrival_source_units" ? "stock_item_id" : "id").range(offset, offset + 499);
+      if (result.error) throw result.error;
+      rows.push(...(result.data ?? []) as unknown as Record<string, unknown>[]);
+      if ((result.data?.length ?? 0) < 500) return rows;
+    }
+  }
+  /* The arrival-source objects are approved Inbound truth whose tables are
+     still an unnumbered draft (docs/stock/MASTER.md §13.9). Their absence
+     means this source kind has no records — it may never mean the register
+     failed to open. A real authority failure still travels untouched. */
+  const optional = (table: string, fields: string) =>
+    readOptionalRelation(() => read(table, fields), [] as Record<string, unknown>[]);
+  try {
+    const [pos, sites, suppliers, destinations, units, receipts, results, lines, promises, arrivalSources, sourceUnits, parties, sourceEvents, productSkus, productModels] = await Promise.all([
+      read("purchase_orders", "id,version,supplier_id,warehouse_id,destination_id,status,official_delivery_date,eta_date,placed_at,so"),
+      read("warehouses", "id,name"),
+      read("suppliers", "id,name"),
+      read("purchasing_destinations", "id,warehouse_id,name"),
+      read("ops_stock_items", "id,unit_code,po_no,qty,sku"),
+      /* `arrival_source_id` arrives with those same draft tables; without it
+         every receipt is simply PO-backed, which is what production holds. */
+      readOptionalRelation(
+        () => read("warehouse_receipts", "id,po_id,arrival_source_id,actual_site_id,status,posted_at,grn_no,goods_received_at,do_number,lines,extra_lines"),
+        null,
+      ).then((rows) =>
+        rows ??
+        read("warehouse_receipts", "id,po_id,actual_site_id,status,posted_at,grn_no,goods_received_at,do_number,lines,extra_lines"),
+      ),
+      read("receiving_unit_results", "id,receipt_id,stock_item_id,outcome,issue_kind"),
+      read(
+        "purchase_order_lines",
+        "id,po_id,qty,destination_id,sku,received_qty,damaged_qty,wrong_item_qty,identity_mode",
+      ),
+      read("po_supplier_promises", "id,po_id,po_line_id,about_qty,answer_group,po_version,kind,answer,new_date,about_date,previous_date,reason,channel,recipient,evidence,reported_by,reported_at,recorded_by,recorded_at"),
+      optional("arrival_sources", "id,source_no,kind,claim_id,case_id,attempt_id,from_site_id,to_site_id,party_id,expected_date,collection_date,reason,cancelled_at,created_at,sales_order_ref"),
+      optional("arrival_source_units", "source_id,stock_item_id,replaces_item_id"),
+      optional("stock_operating_parties", "id,name"),
+      optional("arrival_source_events", "id,source_id,kind,unit_ids"),
+      read("product_skus", "id,sku,variant,model_id"),
+      read("product_models", "id,name,category"),
+    ]);
+    /* PRODUCT IDENTITY IS MODEL + VARIANT, NEVER THE VARIANT ALONE.
+       Measured on production 2026-09-14: a ten-line PO rendered as ten rows
+       reading only `King` or `Queen`, because this mapping took `variant` as
+       the product name. `King` does not identify a product — the warehouse
+       operator holding the delivery note cannot tell `B1201S King` from
+       `H1401S King` from `S1601F King`, and that PO carried all three.
+       The model name is the authoritative half and it was simply never read.
+       Nothing is inferred here: no supplier rule, no SKU-text parsing, no
+       invented name. Where a model is missing the SKU itself is the identity. */
+    const modelName = new Map(
+      (productModels as Array<{ id: string; name: string | null }>).map((row) => [
+        row.id,
+        row.name,
+      ]),
+    );
+    /* THE CATALOG'S OWN CATEGORY, read beside the name from the same rows.
+       `goodsCategoryWordOf` is the governed ladder — recorded category, then
+       the CATALOG, then a keyword classifier — and without this field the
+       Schedule could only ever reach its bottom rung. Measured on production
+       2026-09-14: 15 of the 37 distinct SKUs on the live purchasing surface
+       rendered `Other goods` while the catalog knew exactly what they were,
+       every `5539-*` and `LYYAR-*` sofa among them. A SKU the catalog has no
+       row for stays `null` — asked and silent, never guessed. */
+    const modelCategory = new Map(
+      (productModels as Array<{ id: string; category?: string | null }>).map(
+        (row) => [row.id, row.category ?? null],
+      ),
+    );
+    const productRows = productSkus as Array<{
+      sku: string;
+      variant: string | null;
+      model_id: string | null;
+    }>;
+    const skuNames = productRows.map((row) => {
+      const model = row.model_id ? modelName.get(row.model_id) ?? null : null;
+      const name = [model, row.variant].filter(Boolean).join(" ").trim();
+      return { sku: row.sku, name: name || null, category: row.model_id ? modelCategory.get(row.model_id) ?? null : null };
+    });
+    const input = { pos, sites, suppliers, destinations, units, receipts, results, lines, promises, arrivalSources, sourceUnits, parties, sourceEvents, skuNames } as unknown as InboundInput;
+    const all = inboundArrivals(input);
+    const filters = new URLSearchParams();
+    for (const key of ["status", "sourceType", "site", "source", "date", "from", "to", "q"])
+      if (c.req.query(key)) filters.set(key, c.req.query(key)!);
+    const view = buildInboundRegisterView(all, filters, offset, limit);
+    /* ADDITIVE, READ-ONLY — the two arrival facts an `InboundArrival` row
+       cannot carry: which ORIGINAL lines the arrangement ordered, and whether
+       its date rests on an agreement or an estimate. Both are computed from
+       rows this handler ALREADY reads, so no new query, table or permission is
+       involved; the arithmetic lives in `@carres/shared` so there is no second
+       copy of it here. Scoped to the sources this page actually returned.
+       Existing consumers that ignore the field are unaffected. */
+    const pagedSourceIds = new Set(view.rows.map((row) => row.sourceId));
+    const sourceFacts = warehouseArrivalSourceFacts({
+      pos: pos as unknown as Parameters<typeof warehouseArrivalSourceFacts>[0]["pos"],
+      lines: lines as unknown as Parameters<typeof warehouseArrivalSourceFacts>[0]["lines"],
+      promises: promises as unknown as Parameters<typeof warehouseArrivalSourceFacts>[0]["promises"],
+    }).filter((fact) => pagedSourceIds.has(fact.sourceId));
+    /* Scoped to the SKUs the returned arrangements actually mention, so the
+       field never describes goods the rows beside it do not contain. */
+    const pagedSkus = new Set<string>();
+    for (const row of view.rows) {
+      for (const unit of row.units) if (unit.sku) pagedSkus.add(unit.sku);
+      for (const product of row.products) if (product.sku) pagedSkus.add(product.sku);
+    }
+    for (const fact of sourceFacts)
+      for (const line of fact.lines) if (line.sku) pagedSkus.add(line.sku);
+    const skuCategories = productRows
+      .filter((row) => pagedSkus.has(row.sku))
+      .map((row) => ({
+        sku: row.sku,
+        category: row.model_id ? modelCategory.get(row.model_id) ?? null : null,
+      }));
+    /* WHICH DESTINATIONS HAVE GOODS COMING AND NO SITE TO RECEIVE THEM AT.
+       Additive and read-only: the Schedule ignores it, and Inbound uses it to
+       show the gap by name instead of leaving those arrangements invisible.
+       Named from the destination's OWN record — never an invented address. */
+    const unmappedDestinations = [
+      ...all
+        .filter((row) => !row.siteMapped)
+        .reduce((m, row) => {
+          const key = row.destinationId ?? "";
+          const entry = m.get(key) ?? {
+            id: row.destinationId,
+            name: row.destinationName,
+            arrivals: 0,
+          };
+          entry.arrivals += 1;
+          return m.set(key, entry);
+        }, new Map<string, { id: string | null; name: string | null; arrivals: number }>())
+        .values(),
+    ].sort((a, b) => (a.name ?? "~").localeCompare(b.name ?? "~"));
+    return c.json({
+      arrivals: view.rows,
+      ...(c.req.query("calendar") === "1" ? {
+        arrivalCalendar: warehouseCalendarArrivals(all, receipts as unknown as Parameters<typeof warehouseCalendarArrivals>[1], sites as unknown as InboundInput["sites"]),
+      } : {}),
+      sites,
+      unmappedDestinations,
+      sourceFacts,
+      skuCategories,
+      unresolvedSources: inboundUnresolvedSources(input),
+      page: { offset, limit, total: view.total },
+      facets: view.facets,
+    });
+  } catch (error) {
+    return fail(c, error as Parameters<typeof fail>[1]);
+  }
 });
 
 type LowStockStatus = "out" | "low" | "ok";
@@ -79,27 +247,44 @@ interface SkuTotals {
 
 operationWarehouseRouter.get("/", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const [whRes, sbRes] = await Promise.all([
+  const [whRes, sbRes, thrRes] = await Promise.all([
     // P4 (multi-location) — owning_partner_id surfaces own-WH (NULL = Carres own,
     // e.g. Klang; non-NULL = LP-owned, e.g. HOUZS Balakong). The Receiving GRN
     // queue uses it to show only goods coming INTO an own warehouse.
     sb.from("warehouses").select("id, name, address, owning_partner_id").order("name"),
+    // 0366 — the totals come from the UNIT REGISTER through the one
+    // availability authority, never from `stock_balances`, which is now a
+    // non-authoritative cache of the legacy RPCs. The thresholds beside it
+    // are Settings and are read separately and joined below.
     sb
-      .from("stock_balances")
-      // T42-pass3-C1 — include thresholds so the FE can prefill SetThresholdDialog.
-      .select("sku, warehouse_id, qty, reserved, low_threshold, high_threshold"),
+      .from("stock_sku_availability")
+      .select("sku, warehouse_id, on_hand, available, reserved"),
+    sb.from("stock_balances").select("sku, warehouse_id, low_threshold, high_threshold"),
   ]);
-  if (whRes.error) {
-    const m = mapPgError(whRes.error);
-    return c.json(m.body, m.status);
-  }
-  if (sbRes.error) {
-    const m = mapPgError(sbRes.error);
-    return c.json(m.body, m.status);
-  }
+  if (whRes.error) return fail(c, whRes.error);
+  if (sbRes.error) return fail(c, sbRes.error);
+  if (thrRes.error) return fail(c, thrRes.error);
 
   const warehouses = (whRes.data ?? []) as DB.WarehouseRow[];
-  const balances = (sbRes.data ?? []) as DB.StockBalanceRow[];
+  const balances = (sbRes.data ?? []) as Array<{
+    sku: string;
+    warehouse_id: string;
+    on_hand: number;
+    available: number;
+    reserved: number;
+  }>;
+  const thresholds = new Map<string, { low: number | null; high: number | null }>();
+  for (const t of (thrRes.data ?? []) as Array<{
+    sku: string;
+    warehouse_id: string;
+    low_threshold: number | null;
+    high_threshold: number | null;
+  }>) {
+    thresholds.set(`${t.sku}\u0000${t.warehouse_id}`, {
+      low: t.low_threshold ?? null,
+      high: t.high_threshold ?? null,
+    });
+  }
 
   // Initialise byWarehouse with every warehouse (so empty warehouses surface as []).
   const byWarehouse: Record<string, PerWarehouseStockEntry[]> = {};
@@ -109,8 +294,9 @@ operationWarehouseRouter.get("/", async (c) => {
   const totalsAccum: Record<string, { total_qty: number; total_reserved: number }> = {};
 
   for (const b of balances) {
-    const qty = Number(b.qty) || 0;
+    const qty = Number(b.on_hand) || 0;
     const reserved = Number(b.reserved) || 0;
+    const thr = thresholds.get(`${b.sku}\u0000${b.warehouse_id}`);
     // Only push to byWarehouse if the warehouse exists in the warehouses list.
     // Defensive: balance rows for deleted warehouses (cascade should remove them
     // but keep the route resilient) are skipped from BOTH the per-warehouse
@@ -123,8 +309,8 @@ operationWarehouseRouter.get("/", async (c) => {
       reserved,
       low_stock_status: statusFor(qty),
       // T42-pass3-C1 — surface raw thresholds for SetThresholdDialog prefill.
-      low_threshold: b.low_threshold ?? null,
-      high_threshold: b.high_threshold ?? null,
+      low_threshold: thr?.low ?? null,
+      high_threshold: thr?.high ?? null,
     });
 
     const t = (totalsAccum[b.sku] ??= { total_qty: 0, total_reserved: 0 });
@@ -184,10 +370,7 @@ operationWarehouseRouter.get("/reserved-drilldown", async (c) => {
     .eq("sku", sku)
     .eq("orders.warehouse_id", warehouseId)
     .in("orders.operation_stage", ["ready_to_dispatch", "dispatched"]);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   type LineWithOrder = {
     qty: number;
@@ -250,26 +433,17 @@ operationWarehouseRouter.get("/reserved-drilldown", async (c) => {
   return c.json({ warehouseId, sku, total, orders });
 });
 
-// ----- POST /adjust — manual stock adjustment -----
-// Wraps operation_adjust_stock RPC (0019). Per spec §17.4 A4 + adjustStockInput
-// schema: signed delta (P0001 negative_stock if delta would dip below 0;
-// P0001 below_reserved if it would dip below stock_balances.reserved). The RPC
-// also writes a stock_movements row (kind='adjust') and an audit_log entry.
-operationWarehouseRouter.post("/adjust", async (c) => {
-  const parsed = await parseJsonBody(c, adjustStockInput);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("operation_adjust_stock", {
-    p_sku: parsed.data.sku,
-    p_warehouse_id: parsed.data.warehouseId,
-    p_delta: parsed.data.delta,
-    p_reason: parsed.data.reason,
-  });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  return c.json(data);
-});
+// 0366 — POST /adjust IS GONE, with `operation_adjust_stock` behind it.
+//
+// It moved `stock_balances.qty` by a signed delta and never named a physical
+// Unit: stock appeared and disappeared with nothing behind it, and the totals
+// drifted from the register with nothing to reconcile against. That is the
+// "Add stock / Remove stock" door the Stock MASTER rejects (§2) and the stored
+// total the Unit Authority card forbids from deciding availability (§3).
+//
+// Stock is now COUNTED from the exact Units. What happened to a Unit is
+// recorded through its own governed door and the totals follow. The RPC
+// survives only to raise `unit_authority_only` at a client that has not caught
+// up.
 
 export default operationWarehouseRouter;

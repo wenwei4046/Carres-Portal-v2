@@ -1,9 +1,7 @@
 import { Navigate, NavLink, useParams } from "react-router-dom";
 import { PROCUREMENT_TAB_SLUGS, type ProcurementTabSlug } from "@carres/shared";
 import PurchasingTabs from "../PurchasingTabs";
-import OhanaBedFrameTab from "./OhanaBedFrameTab";
-import OhanaSofaTab from "./OhanaSofaTab";
-import NiceFutureMattressTab from "./NiceFutureMattressTab";
+import ProcurementTabContent from "./ProcurementTabContent";
 
 /**
  * TabbedProcurementShell — Phase 4.5 Chunk 2 Sprint F Task 34.
@@ -37,12 +35,6 @@ const TAB_LABELS: Record<ProcurementTabSlug, string> = {
   "hookka-bedframe": "Ohana Bed Frame",
 };
 
-const TAB_COMPONENTS: Record<ProcurementTabSlug, () => JSX.Element> = {
-  "nice-future": NiceFutureMattressTab,
-  "hookka-sofa": OhanaSofaTab,
-  "hookka-bedframe": OhanaBedFrameTab,
-};
-
 const DEFAULT_SLUG: ProcurementTabSlug = "nice-future";
 
 function isValidSlug(slug: string | undefined): slug is ProcurementTabSlug {
@@ -60,10 +52,12 @@ function isValidSlug(slug: string | undefined): slug is ProcurementTabSlug {
  * let `OrderDetailDrawer` push an order's shortages straight into that modal.
  * Both are gone, and `CreatePOModal` is deleted with them.
  *
- * `purchasing_issue_pos_batch(jsonb)` is now the ONLY authority that may create
- * a Purchase Order, and Batch Purchase is the only door that calls it. This page
- * keeps every one of its EXISTING-document responsibilities — the three channel
- * tabs and everything inside them — and creates nothing.
+ * `purchasing_issue_pos_batch(jsonb)` is the only authority that may create a
+ * Purchase Order, and it is reached only through the governed operator
+ * journeys — SO Batch Purchase and Manual Purchase (corrected 2026-08-23; this
+ * comment used to say Batch Purchase was the single door). This page keeps
+ * every one of its EXISTING-document responsibilities — the three channel tabs
+ * and everything inside them — and creates nothing.
  *
  * The prefill inbox is deliberately NOT replaced with a Batch Purchase deep
  * link: Card 4B forbids substituting another PO creation shortcut.
@@ -83,8 +77,6 @@ export default function TabbedProcurementShell() {
       />
     );
   }
-
-  const ActiveTab = TAB_COMPONENTS[rawSlug];
 
   return (
     /* h-full flex column: the two header rows stay put, only the tab body
@@ -132,10 +124,10 @@ export default function TabbedProcurementShell() {
         </div>
       </div>
 
-      {/* Active tab body — the ONLY scroll area. Child mounts on slug change
+      {/* Active tab body — the ONLY scroll area. `key` remounts it on slug change
           so each tab's TanStack query runs against its own slug-keyed cache. */}
       <div className="flex-1 min-h-0 overflow-y-auto pb-14">
-        <ActiveTab />
+        <ProcurementTabContent key={rawSlug} slug={rawSlug} />
       </div>
     </div>
   );

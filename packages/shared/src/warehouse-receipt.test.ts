@@ -9,6 +9,10 @@ import {
   warehouseReceiptTotals,
   warehouseReceiptOpensClaims,
   WAREHOUSE_RECEIPT_STATUS_LABEL,
+  RECEIVING_CATEGORY_ROWS,
+  receiptCategoryWords,
+  receivedByWords,
+  RECEIVING_AUTHORITY_LABEL,
   type WarehouseReceiptDraft,
   type WarehouseReceiptLineDraft,
 } from "./warehouse-receipt";
@@ -268,12 +272,13 @@ describe("warehouseReceiptTotals / summary", () => {
 describe("status words", () => {
   it("names WHO a submitted receipt is waiting for", () => {
     expect(WAREHOUSE_RECEIPT_STATUS_LABEL.submitted).toBe("Waiting Carres check");
-    // C2 (2026-08-03): the status word is `posted`. `checked_in` was renamed by
-    // 0314 — it named the ACT (`Check in`) while a status has to name the
-    // STATE — and this file was the last place still asserting the old word.
-    expect(warehouseReceiptStatusLabel("posted")).toBe("Checked in by Carres");
+    // Owner correction 2026-09-06: a GRN's DOCUMENT status words are
+    // `Valid` / `Cancelled` — `Posted` / `Voided` stay internal database
+    // statuses and never reach a normal user's screen. `Void Receiving`
+    // remains the ACT's name (a door, not a status).
+    expect(warehouseReceiptStatusLabel("posted")).toBe("Valid");
     expect(warehouseReceiptStatusLabel("returned")).toBe("Sent back to recount");
-    expect(warehouseReceiptStatusLabel("voided")).toBe("Reversed");
+    expect(warehouseReceiptStatusLabel("voided")).toBe("Cancelled");
     // An unknown key echoes rather than inventing a word.
     expect(warehouseReceiptStatusLabel("checked_in")).toBe("checked_in");
     expect(warehouseReceiptStatusLabel("returned")).toBe("Sent back to recount");
@@ -287,7 +292,7 @@ describe("status words", () => {
   });
 
   it("falls back to the raw value rather than a blank", () => {
-    expect(warehouseReceiptStatusLabel(null)).toBe("—");
+    expect(warehouseReceiptStatusLabel(null)).toBe("");
     expect(warehouseReceiptStatusLabel("something_new")).toBe("something_new");
   });
 });
@@ -316,6 +321,121 @@ describe("receivingRecordNo — the Receiving Record's document number", () => {
     expect(receivingRecordNo({ id: R.id, submitted_at: "2026-07-31T10:00:00Z" })).toMatch(
       /^GRN-310726-\d{4}$/,
     );
-    expect(receivingRecordNo({ id: R.id })).toBe("—");
+    expect(receivingRecordNo({ id: R.id })).toBe("");
   });
 });
+
+/* ── The Receiving rail's category vocabulary (owner correction 2026-09-06) ── */
+
+describe("receiptCategoryWords — the rail's five governed rows", () => {
+  const rl = (over: Partial<{
+    id: string; sku: string; received_now: number; damaged_qty: number;
+    wrong_item_qty: number;
+  }> = {}) => ({
+    id: "l1",
+    sku: "sku-x",
+    received_now: 1,
+    damaged_qty: 0,
+    wrong_item_qty: 0,
+    wrong_item_claim_type: null,
+    ...over,
+  });
+
+  it("is exactly the five labels, in the shared display order", () => {
+    expect(RECEIVING_CATEGORY_ROWS).toEqual([
+      "Mattress",
+      "Bedframe",
+      "Sofa",
+      "Pillow",
+      "Mattress protector",
+    ]);
+  });
+
+  it("answers from the CATALOG's category through the one shared ladder", () => {
+    const cats = new Map([
+      ["sku-a", "mattress"],
+      ["sku-b", "sofa"],
+    ]);
+    expect(
+      receiptCategoryWords(
+        [rl({ id: "a", sku: "sku-a" }), rl({ id: "b", sku: "sku-b" })],
+        cats,
+      ),
+    ).toEqual(["Mattress", "Sofa"]);
+  });
+
+  it("a catalog `accessory` resolves to its governed TYPE — MP prints as Mattress protector, never the abbreviation", () => {
+    const cats = new Map([
+      ["Memory Pillow", "accessory"],
+      ["M.P Queen", "accessory"],
+    ]);
+    const words = receiptCategoryWords(
+      [
+        rl({ id: "p", sku: "Memory Pillow" }),
+        rl({ id: "m", sku: "M.P Queen" }),
+      ],
+      cats,
+    );
+    expect(words).toEqual(["Pillow", "Mattress protector"]);
+    expect(words.join(" ")).not.toContain("MP");
+  });
+
+  it("never invents a row — goods outside the five light nothing", () => {
+    const cats = new Map([["Topper Deluxe", "accessory"]]);
+    expect(
+      receiptCategoryWords([rl({ id: "t", sku: "Topper Deluxe" })], cats),
+    ).toEqual([]);
+  });
+
+  it("only lines this delivery actually counted speak", () => {
+    const cats = new Map([["sku-a", "mattress"]]);
+    expect(
+      receiptCategoryWords(
+        [rl({ id: "a", sku: "sku-a", received_now: 0 })],
+        cats,
+      ),
+    ).toEqual([]);
+    // A damaged-only line still arrived physically.
+    expect(
+      receiptCategoryWords(
+        [rl({ id: "a", sku: "sku-a", received_now: 0, damaged_qty: 1 })],
+        cats,
+      ),
+    ).toEqual(["Mattress"]);
+  });
+});
+
+describe("receiptCategoryWords reads the Catalog only (owner 2026-09-28)", () => {
+  const rl = (sku: string) => ({
+    id: sku, sku, received_now: 1, damaged_qty: 0, wrong_item_qty: 0,
+    wrong_item_claim_type: null,
+  });
+  it("a SKU the Catalog cannot answer lights no row, even when its name looks like a mattress", () => {
+    expect(receiptCategoryWords([rl("KING MATTRESS SMOKE")], new Map())).toEqual([]);
+  });
+});
+
+describe("receivedByWords — the GRN receiver (owner ruling 2026-09-28)", () => {
+  it("a partner-run Site names the operating company", () => {
+    expect(receivedByWords({ received_by_kind: "company", received_by_name: "NETS" })).toBe("NETS");
+  });
+  it("a Carres-run Site names the staff member who saved", () => {
+    expect(receivedByWords({ received_by_kind: "staff", received_by_name: "Shasha" })).toBe("Shasha");
+  });
+  it("a shared login is never printed as a person", () => {
+    expect(receivedByWords({ received_by_kind: "staff", received_by_name: null })).toBe(
+      "Staff identity not recorded",
+    );
+  });
+  it("a GRN saved before the receiver was recorded says so, never a guess", () => {
+    expect(receivedByWords({ received_by_kind: null, received_by_name: null })).toBe("Not recorded");
+    expect(receivedByWords({})).toBe("Not recorded");
+  });
+});
+
+describe("RECEIVING_AUTHORITY_LABEL — every Operation staff member may post (owner 2026-09-25)", () => {
+  it("names a non-duty poster plainly", () => {
+    expect(RECEIVING_AUTHORITY_LABEL.operation_staff).toBe("Operation staff");
+  });
+});
+

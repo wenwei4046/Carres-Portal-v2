@@ -34,7 +34,7 @@ export const SALES_ORDER_WRITABLE_COLUMNS: Readonly<Record<string, readonly stri
     "proceed_date", "customer_email", "customer_race", "customer_gender",
     "customer_birthday", "entry_data", "customer_address_line1",
     "customer_address_line2", "customer_address_state", "customer_address_city",
-    "customer_address_postcode",
+    "customer_address_postcode", "proceeded_at", "sales_final_submitted_at",
   ],
   order_lines: [
     "id", "order_id", "sku", "qty", "attrs", "unit_price", "created_at",

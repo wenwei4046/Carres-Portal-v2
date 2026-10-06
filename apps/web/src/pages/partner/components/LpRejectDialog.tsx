@@ -43,9 +43,9 @@ export default function LpRejectDialog({ orderId, so, onClose }: Props) {
       if (e instanceof ApiError) {
         const body = readErrorBody(e);
         if (body.code === "already_accepted") {
-          toast.error("Already accepted — refresh and check");
+          toast.error("Already accepted. Refresh and check");
         } else if (body.code === "already_rejected") {
-          toast.error("Already rejected — refresh");
+          toast.error("Already rejected. Refresh");
         } else {
           toast.error(e.message || "Reject failed");
         }

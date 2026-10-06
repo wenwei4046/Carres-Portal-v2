@@ -5,7 +5,7 @@ import {
   patchDeliveryStopInputSchema,
   setDeliveryChainInputSchema,
 } from "@carres/shared";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -75,10 +75,7 @@ deliveryChainRouter.put("/:id/delivery-chain", async (c) => {
     p_order_id: idCheck.data,
     p_stops: parsed.data.stops,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   return c.json({ stops: parsed.data.stops });
 });
@@ -141,10 +138,7 @@ deliveryChainRouter.patch("/:id/delivery-stops/:leg", async (c) => {
     p_leg: legNum,
     p_patch: parsed.data,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   return c.json({ stop: data });
 });

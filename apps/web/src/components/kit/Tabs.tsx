@@ -22,6 +22,7 @@
  */
 import * as RadixTabs from "@radix-ui/react-tabs";
 import Badge from "./Badge";
+import Icon, { type IconName } from "./Icon";
 
 export interface TabDef {
   value: string;
@@ -31,6 +32,7 @@ export interface TabDef {
    *  is five numbers saying nothing, and §1.3 is a budget. */
   count?: number;
   disabled?: boolean;
+  icon?: IconName;
 }
 
 export default function Tabs({
@@ -38,19 +40,28 @@ export default function Tabs({
   value,
   onValueChange,
   label,
+  fill = false,
+  orientation = "horizontal",
+  variant = "underline",
 }: {
   tabs: readonly TabDef[];
   value: string;
   onValueChange: (value: string) => void;
   /** What the bar switches between, for a screen reader. Never drawn. */
   label: string;
+  /** The tabs share the bar's width by their own length, with no gap — a narrow pane that
+   *  must keep every tab on one row (Work's Communication, Workspace §5.10). */
+  fill?: boolean;
+  orientation?: "horizontal" | "vertical";
+  variant?: "underline" | "segmented";
 }) {
   return (
-    <RadixTabs.Root value={value} onValueChange={onValueChange}>
+    <RadixTabs.Root orientation={orientation} value={value} onValueChange={onValueChange}>
       <RadixTabs.List
         aria-label={label}
         data-kit="tabs"
-        className="flex items-center gap-4 border-b border-kit-slate-5"
+        data-variant={variant}
+        className={`flex items-center border-b border-kit-slate-5 ${fill ? "gap-0" : "gap-4"}`}
       >
         {tabs.map((t) => (
           <RadixTabs.Trigger
@@ -59,7 +70,7 @@ export default function Tabs({
             disabled={t.disabled}
             data-kit="tab"
             /* §3.5: "Underline tab hover — darken the text, not the
-             * background." The selected tab is the only blue on the bar.
+             * background." The selected label is dark semibold; its indicator is blue.
              *
              * The indicator is a BACKGROUND BAR, not a border, and that is
              * deliberate: §4.3 says borders are "1px only… no coloured
@@ -68,13 +79,14 @@ export default function Tabs({
              * forbids the underline — reported to the kit, and built the way
              * that breaks neither. */
             className={
-              "group relative flex items-center gap-2 px-1 py-2 text-body " +
+              `group relative flex items-center gap-2 px-1 py-2 text-body ${fill ? "flex-auto justify-center" : ""} ` +
               "text-kit-slate-11 hover:text-kit-slate-12 " +
-              "data-[state=active]:text-kit-slate-12 " +
+              "data-[state=active]:text-kit-slate-12 data-[state=active]:font-semibold " +
               "disabled:opacity-40 disabled:cursor-not-allowed " +
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
             }
           >
+            {t.icon && <Icon name={t.icon} />}
             {t.label}
             {t.count !== undefined && <Badge>{t.count}</Badge>}
             <span

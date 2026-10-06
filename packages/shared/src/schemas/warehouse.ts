@@ -17,7 +17,13 @@ import { z } from "zod";
 
 /** Same cap as R2's receive payload — a malformed client must not be able to
  *  write an unbounded jsonb array of photo paths. */
-const CLAIM_PHOTO_PATHS = z.array(z.string().min(1).max(400)).max(12);
+/** 0614 (§9.5): a plain storage key files a claim-level photo; `{path,
+ *  unitCode}` also names the Unit the photo shows, so the per-Unit inspector
+ *  can attribute it. `claimPhotoWire` reshapes it for the receive engine. */
+const CLAIM_PHOTO_PATHS = z.array(z.union([
+  z.string().min(1).max(400),
+  z.object({ path: z.string().min(1).max(400), unitCode: z.string().min(1).max(64) }),
+])).max(12);
 
 export const warehouseSubmitReceiptInput = z
   .object({
@@ -25,6 +31,31 @@ export const warehouseSubmitReceiptInput = z
     doNumber: z.string().trim().min(3, "DO number is required").max(64),
     doFilePath: z.string().trim().min(1, "A photo of the signed DO is required").max(500),
     note: z.string().trim().max(500).optional(),
+    /** 0601 — when the goods physically arrived (ISO with offset), captured
+     *  at the count. Omitted = now. Never in the future. */
+    goodsReceivedTime: z.string().datetime({ offset: true }).optional(),
+    /** 0426 — arrival photo/video evidence beside the signed DO. */
+    arrivalEvidence: z
+      .array(
+        z.object({
+          path: z.string().min(1).max(400),
+          kind: z.enum(["photo", "video"]),
+        }),
+      )
+      .max(30)
+      .optional(),
+    /** 0426 — extra goods, recorded separately; never Inventory, never
+     *  pending arithmetic. */
+    extraLines: z
+      .array(
+        z.object({
+          sku: z.string().min(1).max(120),
+          qty: z.number().int().positive(),
+          note: z.string().max(300).optional(),
+        }),
+      )
+      .max(50)
+      .optional(),
     lines: z
       .array(
         z.object({
@@ -37,6 +68,23 @@ export const warehouseSubmitReceiptInput = z
           damagedPhotos: CLAIM_PHOTO_PATHS.optional(),
           wrongItemClaimType: z.string().min(1).max(40).optional(),
           wrongItemPhotos: CLAIM_PHOTO_PATHS.optional(),
+          /** 0426 — one physical result per governed expected Unit
+           *  (ERP-ARCHITECTURE §3.4). */
+          units: z
+            .array(
+              z.object({
+                unitCode: z.string().min(3).max(30),
+                outcome: z.enum([
+                  "received",
+                  "received_with_issue",
+                  "not_received",
+                ]),
+                issueKind: z.enum(["damaged", "wrong_item"]).optional(),
+                note: z.string().max(300).optional(),
+              }),
+            )
+            .max(500)
+            .optional(),
         }),
       )
       .min(1),

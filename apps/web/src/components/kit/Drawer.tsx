@@ -24,6 +24,8 @@ export default function Drawer({
   onOpenChange,
   title,
   description,
+  headerActions,
+  variant,
   footer,
   children,
 }: {
@@ -31,17 +33,22 @@ export default function Drawer({
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: string;
+  headerActions?: ReactNode;
+  /** Accepted read-only quick-view template. */
+  variant?: "quick-view" | "compact-card";
   footer?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <DialogFrame
+      variant={variant}
       kind="drawer"
       place="side"
       open={open}
       onOpenChange={onOpenChange}
       title={title}
       description={description}
+      headerActions={headerActions}
       footer={footer}
     >
       {children}

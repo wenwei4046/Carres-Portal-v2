@@ -29,12 +29,12 @@ const LIVE: ReorderStockUnit[] = [
 describe("importAccessoryKind", () => {
   it("names the imported accessories by the word the operator already sees", () => {
     expect(importAccessoryKind(PILLOW)).toBe("Pillow");
-    expect(importAccessoryKind(MP_Q)).toBe("M.P");
+    expect(importAccessoryKind(MP_Q)).toBe("Mattress protector");
     expect(importAccessoryKind("Mattress Topper - Queen")).toBe("Topper");
   });
 
   it("is not fooled by 'Mattress Protector' looking like a mattress", () => {
-    expect(importAccessoryKind(MP_K)).toBe("M.P");
+    expect(importAccessoryKind(MP_K)).toBe("Mattress protector");
     expect(importAccessoryKind(MATTRESS)).toBeNull();
   });
 

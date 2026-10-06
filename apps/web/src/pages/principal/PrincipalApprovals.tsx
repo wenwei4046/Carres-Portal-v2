@@ -68,7 +68,6 @@ export default function PrincipalApprovals() {
 
       {items.length === 0 ? (
         <div className="bg-white border border-base-200 rounded-md p-12 text-center text-base-500">
-          <div className="text-page mb-2 text-base-300">—</div>
           <div className="font-display text-strong">Nothing here</div>
           <div className="text-meta mt-1">No approvals match this filter.</div>
         </div>

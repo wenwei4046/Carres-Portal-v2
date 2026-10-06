@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -12,30 +12,13 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000001")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("11111111-1111-1111-1111-000000000001", { email: `${role}@x`, app_metadata: { role } });
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -44,6 +27,67 @@ afterAll(() => _setJwksForTesting(null));
 const APPROVAL_ID = "00000000-0000-0000-0000-000000a99001";
 const ORDER_ID    = "00000000-0000-0000-0000-000000a99002";
 const PO_ID       = "PO-2046";
+
+describe("GET /api/finance/payments/register", () => {
+  function ledger(error: unknown = null) {
+    const rows = [{ id: "p1", receipt_no: "RC-060926-0001", amount: 200,
+      voided_at: "2026-09-06", recorded_by: null,
+      source_metadata: { duplicate_ack: true, provider_blob: "never reaches a browser" },
+      orders: { id: ORDER_ID, so: 100, customer_name: "Customer" } }];
+    const chain = { select: vi.fn(), order: vi.fn(), range: vi.fn() };
+    chain.select.mockReturnValue(chain);
+    chain.order.mockReturnValue(chain);
+    chain.range.mockResolvedValue({ data: error ? null : rows, error, count: 1 });
+    const sb = { from: vi.fn().mockReturnValue(chain) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    return { sb, chain, rows };
+  }
+  async function request(role: string, query = "") {
+    return app.fetch(new Request(`http://t/api/finance/payments/register${query}`, {
+      headers: { Authorization: `Bearer ${await makeJwt(role)}` },
+    }), env);
+  }
+  it.each(["operation", "finance", "principal"])("reads canonical receipts for %s, including void history", async (role) => {
+    const { sb } = ledger();
+    const res = await request(role);
+    expect(res.status).toBe(200);
+    expect(sb.from).toHaveBeenCalledWith("order_payments");
+    const body = await res.json() as { rows: Array<Record<string, unknown>>; total: number };
+    expect(body.total).toBe(1);
+    // §11 (0453): the acknowledgement is DERIVED to a boolean, and the raw
+    // metadata — which can hold a payment provider's payload — is dropped.
+    expect(body.rows[0]).toMatchObject({ id: "p1", duplicate_acknowledged: true });
+    expect(body.rows[0]).not.toHaveProperty("source_metadata");
+  });
+  it.each(["dealer", "supplier", "partner", "warehouse"])("refuses %s before reading money", async (role) => {
+    const res = await request(role);
+    expect(res.status).toBe(403);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+  it("does not turn a failed source read into an empty register", async () => {
+    ledger({ message: "source unavailable", code: "08006" });
+    const res = await request("finance");
+    expect(res.status).toBe(500);
+  });
+  it("resolves the recorder name from staff truth", async () => {
+    const { sb, chain, rows } = ledger();
+    Object.assign(rows[0], { recorded_by: "staff-1" });
+    sb.from.mockImplementation((table) => table === "app_users" ? {
+      select: () => ({ in: async () => ({ data: [{ id: "staff-1", name: "Staff One" }], error: null }) }),
+    } : chain);
+    const res = await request("finance");
+    expect(res.status).toBe(200);
+    expect((await res.json() as { rows: Array<{ recorded_by_name: string }> }).rows[0].recorded_by_name).toBe("Staff One");
+  });
+  it("pages deterministically and refuses invalid offsets", async () => {
+    const { chain } = ledger();
+    expect((await request("finance", "?offset=200&limit=100")).status).toBe(200);
+    expect(chain.range).toHaveBeenCalledWith(200, 299);
+    expect(chain.order).toHaveBeenCalledWith("id", { ascending: false });
+    expect((await request("finance", "?offset=-1")).status).toBe(422);
+    expect((await request("finance", "?limit=1001")).status).toBe(422);
+  });
+});
 
 describe("GET /api/finance/payments", () => {
   it("returns payments list with default order by paid_at desc", async () => {
@@ -321,6 +365,93 @@ describe("POST /api/finance/payments/order-receipt", () => {
     expect(sb.rpc).not.toHaveBeenCalled();
   });
 
+  it("a reused key on a different amount answers in plain words, not the database's", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: null, error: {
+      code: "22023", details: "idempotency_conflict",
+      message: "idempotency key was already used for a different payment" } }) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(
+      new Request("http://t/api/finance/payments/order-receipt", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("finance")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: ORDER_ID, amount: 100, method: "cash",
+          idempotencyKey: "00000000-0000-4000-8000-000000000052" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      code: "idempotency_conflict",
+      message: "This receipt is already recorded with another amount. Cancel, then check Payment history.",
+    });
+  });
+
+  it("refuses a third decimal before SQL, never rounds it", async () => {
+    const sb = { rpc: vi.fn() };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(
+      new Request("http://t/api/finance/payments/order-receipt", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("finance")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: ORDER_ID, amount: 12.345, method: "cash" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it.each(["bank_transfer", "probe_wallet"])(
+    "passes the method key %s through untouched — the SQL writer folds and checks it (0476)",
+    async (method) => {
+      const sb = { rpc: vi.fn().mockResolvedValue({ data: { already: false }, error: null }) };
+      vi.mocked(userClient).mockReturnValue(sb as never);
+      const res = await app.fetch(
+        new Request("http://t/api/finance/payments/order-receipt", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${await makeJwt("finance")}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId: ORDER_ID, amount: 500, method }),
+        }),
+        env,
+      );
+      expect(res.status).toBe(200);
+      expect(sb.rpc).toHaveBeenCalledWith("finance_record_receipt", expect.objectContaining({ p_method: method }));
+    },
+  );
+
+  it("a method that is not a key shape is refused before SQL", async () => {
+    const sb = { rpc: vi.fn() };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(
+      new Request("http://t/api/finance/payments/order-receipt", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("finance")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: ORDER_ID, amount: 500, method: "Grab Pay!" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("an unmapped method's SQL refusal reaches the caller as 422 with its sentence", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: null, error: {
+      code: "22023", details: "payment_account_unmapped",
+      message: 'payment method "grab_pay" has no money account — add it in Settings → Payment → Payment methods, then record this payment',
+    } }) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(
+      new Request("http://t/api/finance/payments/order-receipt", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("finance")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: ORDER_ID, amount: 500, method: "grab_pay" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { message: string }).message).toContain("has no money account");
+  });
+
   it("rejects operation role with 403", async () => {
     const sb = { rpc: vi.fn() };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -340,217 +471,238 @@ describe("POST /api/finance/payments/order-receipt", () => {
   });
 });
 
-describe("POST /api/finance/payments/po-pay", () => {
-  it("calls finance_po_pay RPC with mapped args", async () => {
-    const sb = {
-      rpc: vi.fn().mockResolvedValue({
-        data: { id: "p77", direction: "out", amount: 12500, po_id: PO_ID },
-        error: null,
-      }),
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-
-    const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request("http://t/api/finance/payments/po-pay", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          poId:      PO_ID,
-          amount:    12500,
-          method:    "bank_transfer",
-          reference: "MAYBANK-998812",
-        }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("finance_po_pay", {
-      p_po_id:     PO_ID,
-      p_amount:    12500,
-      p_method:    "bank_transfer",
-      p_reference: "MAYBANK-998812",
-    });
-  });
-
-  it("nulls reference when omitted", async () => {
-    const sb = {
-      rpc: vi.fn().mockResolvedValue({
-        data: { id: "p78", direction: "out", amount: 5000 },
-        error: null,
-      }),
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-
-    const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request("http://t/api/finance/payments/po-pay", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ poId: PO_ID, amount: 5000, method: "cheque" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("finance_po_pay", {
-      p_po_id:     PO_ID,
-      p_amount:    5000,
-      p_method:    "cheque",
-      p_reference: null,
-    });
-  });
-
-  it("maps SQLSTATE 22023 (po already paid) to 422", async () => {
-    const sb = {
-      rpc: vi.fn().mockResolvedValue({
-        data: null,
-        error: { code: "22023", message: "po already paid" },
-      }),
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-
-    const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request("http://t/api/finance/payments/po-pay", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ poId: PO_ID, amount: 5000, method: "bank_transfer" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-  });
-
-  it("rejects negative amount with 422 (zod gate)", async () => {
+// 0477 — the legacy supplier-pay door is retired: ONE door pays a supplier.
+describe.each(["po-pay", "po-schedule"])("POST /api/finance/payments/%s (retired)", (path) => {
+  it("answers 410 and points at Payment Vouchers without calling the database", async () => {
     const sb = { rpc: vi.fn() };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
 
     const jwt = await makeJwt("finance");
     const res = await app.fetch(
-      new Request("http://t/api/finance/payments/po-pay", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ poId: PO_ID, amount: -1, method: "cash" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    expect(sb.rpc).not.toHaveBeenCalled();
-  });
-
-  it("rejects dealer with 403", async () => {
-    const sb = { rpc: vi.fn() };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-
-    const jwt = await makeJwt("dealer");
-    const res = await app.fetch(
-      new Request("http://t/api/finance/payments/po-pay", {
+      new Request(`http://t/api/finance/payments/${path}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
         body: JSON.stringify({ poId: PO_ID, amount: 5000, method: "cash" }),
       }),
       env,
     );
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(410);
+    const body = (await res.json()) as { code: string; path: string; message: string };
+    expect(body.code).toBe("use_payment_voucher");
+    expect(body.path).toBe("/finance/payment-vouchers");
+    expect(body.message).toContain("Payment Voucher");
     expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("still refuses a dealer with 403", async () => {
+    const jwt = await makeJwt("dealer");
+    const res = await app.fetch(
+      new Request(`http://t/api/finance/payments/${path}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: "{}",
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
   });
 });
 
-describe("POST /api/finance/payments/po-schedule", () => {
-  it("calls finance_po_schedule RPC with mapped args", async () => {
-    const sb = {
-      rpc: vi.fn().mockResolvedValue({
-        data: { id: PO_ID, pay_status: "scheduled" },
-        error: null,
-      }),
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-
-    const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request("http://t/api/finance/payments/po-schedule", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ poId: PO_ID, scheduledFor: "2026-05-15" }),
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/finance/payments/:id/receipt-document — §4's reprint (0449)
+// ─────────────────────────────────────────────────────────────────────────────
+describe("GET /api/finance/payments/:id/receipt-document", () => {
+  const PAY = "00000000-0000-0000-0000-000000a99010";
+  function ledger(row: unknown, error: unknown = null) {
+    const chain = { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn() };
+    chain.select.mockReturnValue(chain);
+    chain.eq.mockReturnValue(chain);
+    chain.maybeSingle.mockResolvedValue({ data: row, error });
+    const sb = { from: vi.fn().mockReturnValue(chain) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    return sb;
+  }
+  async function request(role: string, id = PAY) {
+    const jwt = await makeJwt(role);
+    return app.fetch(
+      new Request(`http://t/api/finance/payments/${id}/receipt-document`, {
+        headers: { Authorization: `Bearer ${jwt}` },
       }),
       env,
     );
+  }
+
+  const SNAPSHOT = {
+    receipt_no: "RC-080926-0001", paid_on: "2026-09-08", so: 2099,
+    customer: { name: "LIM KUAN YANG" }, amount: 250, method: "duitnow_qr",
+    kind: "payment", reference: "REF-1", note: "thanks", currency: "MYR",
+  };
+
+  it("403 for a role with no payment sight", async () => {
+    ledger(null);
+    expect((await request("dealer")).status).toBe(403);
+  });
+
+  it("422 when the id is not a uuid", async () => {
+    ledger(null);
+    expect((await request("finance", "not-a-uuid")).status).toBe(422);
+  });
+
+  it("404 when the payment is not there", async () => {
+    ledger(null);
+    expect((await request("finance")).status).toBe(404);
+  });
+
+  /** The whole point of §4: the document is the SNAPSHOT, and a customer
+   *  renamed afterwards must not appear on a receipt already printed. */
+  it("reprints from the snapshot, not from the live order", async () => {
+    ledger({
+      id: PAY, order_id: "o1", receipt_no: "RC-080926-0001", voided_at: null,
+      void_reason: null, amount: 999, paid_on: "2026-11-30", method: "cash",
+      kind: "payment", reference: null, note: null, snapshot: SNAPSHOT,
+      orders: { so: 4242, customer_name: "RENAMED LATER" },
+    });
+    const res = await request("finance");
     expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("finance_po_schedule", {
-      p_po_id:         PO_ID,
-      p_scheduled_for: "2026-05-15",
+    const body = await res.json() as { from_snapshot: boolean; document: Record<string, unknown> };
+    expect(body.from_snapshot).toBe(true);
+    expect(body.document).toMatchObject({
+      receipt_no: "RC-080926-0001", issue_date: "2026-09-08",
+      order_code: "SO-2099", customer: { name: "LIM KUAN YANG" },
+      amount: 250, method: "duitnow_qr", reference: "REF-1",
     });
   });
 
-  it("nulls scheduledFor when omitted", async () => {
-    const sb = {
-      rpc: vi.fn().mockResolvedValue({
-        data: { id: PO_ID, pay_status: "scheduled" },
-        error: null,
-      }),
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-
-    const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request("http://t/api/finance/payments/po-schedule", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ poId: PO_ID }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("finance_po_schedule", {
-      p_po_id:         PO_ID,
-      p_scheduled_for: null,
+  /** A payment recorded before 0449 has no snapshot. It reads live and SAYS
+   *  so — it must never pretend to be a reprint of something nobody captured. */
+  it("falls back to the live read and says so when no snapshot exists", async () => {
+    ledger({
+      id: PAY, order_id: "o1", receipt_no: "RC-010826-0009", voided_at: null,
+      void_reason: null, amount: 100, paid_on: "2026-08-01", method: "bank",
+      kind: "deposit", reference: null, note: null, snapshot: null,
+      orders: { so: 1234, customer_name: "Old Customer" },
     });
+    const body = await (await request("finance")).json() as {
+      from_snapshot: boolean; document: Record<string, unknown>;
+    };
+    expect(body.from_snapshot).toBe(false);
+    expect(body.document).toMatchObject({ order_code: "SO-1234", amount: 100 });
   });
 
-  it("maps SQLSTATE 22023 (already scheduled / paid) to 422", async () => {
-    const sb = {
-      rpc: vi.fn().mockResolvedValue({
-        data: null,
-        error: { code: "22023", message: "cannot schedule (current pay_status: scheduled)" },
-      }),
+  it("a voided payment still has its receipt, carrying the reason", async () => {
+    ledger({
+      id: PAY, order_id: "o1", receipt_no: "RC-080926-0001",
+      voided_at: "2026-09-08T02:00:00Z", void_reason: "keyed twice",
+      amount: 250, paid_on: "2026-09-08", method: "cash", kind: "payment",
+      reference: null, note: null, snapshot: SNAPSHOT, orders: { so: 2099, customer_name: "x" },
+    });
+    const body = await (await request("finance")).json() as {
+      voided: boolean; void_reason: string; document: Record<string, unknown>;
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
+    expect(body.voided).toBe(true);
+    expect(body.void_reason).toBe("keyed twice");
+    expect(body.document).toMatchObject({ receipt_no: "RC-080926-0001" });
+  });
 
-    const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request("http://t/api/finance/payments/po-schedule", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ poId: PO_ID }),
-      }),
-      env,
-    );
+  it("lists the invoice numbers the payment settles, skipping voided allocations", async () => {
+    ledger({
+      id: PAY, order_id: "o1", receipt_no: "RC-080926-0001", voided_at: null, void_reason: null,
+      amount: 250, paid_on: "2026-09-08", method: "cash", kind: "payment",
+      reference: null, note: null, snapshot: SNAPSHOT, orders: { so: 2099, customer_name: "x" },
+      payment_allocations: [
+        { voided_at: "2026-09-09T00:00:00Z", invoices: { invoice_no: "INV-OLD" } },
+        { voided_at: null, invoices: { invoice_no: "INV-080926-0042" } },
+        { voided_at: null, invoices: null },
+      ],
+    });
+    const body = await (await request("finance")).json() as { document: { invoice_nos: string[] } };
+    expect(body.document.invoice_nos).toEqual(["INV-080926-0042"]);
+  });
+
+  it("a payment with no receipt number has no receipt", async () => {
+    ledger({
+      id: PAY, order_id: "o1", receipt_no: null, voided_at: null, void_reason: null,
+      amount: 10, paid_on: "2026-09-08", method: "cash", kind: "payment",
+      reference: null, note: null, snapshot: null, orders: { so: 1, customer_name: "x" },
+    });
+    const res = await request("finance");
     expect(res.status).toBe(422);
+    expect((await res.json() as { code: string }).code).toBe("no_receipt_number");
   });
+});
 
-  it("rejects operation role with 403", async () => {
-    const sb = { rpc: vi.fn() };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/finance/payments/po-schedule", {
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/finance/payments/:id/correct-allocation — §5's remedy (0450)
+// ─────────────────────────────────────────────────────────────────────────────
+describe("POST /api/finance/payments/:id/correct-allocation", () => {
+  const PAY = "00000000-0000-0000-0000-000000a99020";
+  const SO_A = "00000000-0000-0000-0000-000000a99021";
+  const SO_B = "00000000-0000-0000-0000-000000a99022";
+  function door(result: unknown, error: unknown = null) {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: result, error }) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    return sb;
+  }
+  async function post(role: string, body: unknown, id = PAY) {
+    const jwt = await makeJwt(role);
+    return app.fetch(
+      new Request(`http://t/api/finance/payments/${id}/correct-allocation`, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ poId: PO_ID }),
+        body: JSON.stringify(body),
       }),
       env,
     );
-    expect(res.status).toBe(403);
-    expect(sb.rpc).not.toHaveBeenCalled();
+  }
+  const GOOD = { reason: "wrong SO", allocations: [{ orderId: SO_A, amount: 200 }] };
+
+  it("403 for a role with no payment sight", async () => {
+    door(null);
+    expect((await post("dealer", GOOD)).status).toBe(403);
+  });
+
+  it("422 without a reason — the rule is never optional", async () => {
+    door(null);
+    expect((await post("finance", { ...GOOD, reason: "  " })).status).toBe(422);
+  });
+
+  it("422 with no lines at all", async () => {
+    door(null);
+    expect((await post("finance", { ...GOOD, allocations: [] })).status).toBe(422);
+  });
+
+  it("hands the door snake_case lines and the reason, unchanged", async () => {
+    const sb = door({ payment_id: PAY, before: [], after: [] });
+    const res = await post("finance", {
+      reason: "the customer paid for both SOs",
+      allocations: [{ orderId: SO_A, amount: 120 }, { orderId: SO_B, amount: 80 }],
+    });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("payment_correct_allocation", {
+      p_payment_id: PAY,
+      p_allocations: [
+        { order_id: SO_A, invoice_id: null, amount: 120 },
+        { order_id: SO_B, invoice_id: null, amount: 80 },
+      ],
+      p_reason: "the customer paid for both SOs",
+    });
+  });
+
+  /** Every rule lives in the door. The route only carries its answer back with
+   *  the right status, so the operator is told WHY, not just "no". */
+  it("carries the door's conserved-arithmetic refusal back as 422 with its figures", async () => {
+    door(null, { code: "22023", details: "sum_mismatch",
+      message: "The correction must add up to RM 200.00 — it adds up to RM 150.00." });
+    const res = await post("finance", GOOD);
+    expect(res.status).toBe(422);
+    expect((await res.json() as { message: string }).message).toContain("RM 200.00");
+  });
+
+  it("carries the door's authority refusal back as 403", async () => {
+    door(null, { code: "42501", details: "not_payment_approver",
+      message: "Only the Payment Approver can correct an allocation." });
+    expect((await post("finance", GOOD)).status).toBe(403);
   });
 });
+

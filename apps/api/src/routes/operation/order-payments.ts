@@ -14,9 +14,11 @@ import {
   docNumber,
   storageHold,
 } from "@carres/shared";
-import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
+import { todayIsoMYT } from "../../lib/today";
 import type { AppEnv } from "../../types";
+import { storageSkuCategories } from "../../lib/sku-categories";
 
 /**
  * Order payment LEDGER (balance job — Jess 2026-06-26 "complete all the balance
@@ -64,15 +66,46 @@ orderPaymentsRouter.get("/:id/payments", async (c) => {
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb
     .from("order_payments")
-    .select(PAYMENT_COLS)
+    .select(`${PAYMENT_COLS}, source_channel, source_metadata`)
     .eq("order_id", idCheck.data)
     .order("paid_on", { ascending: false })
     .order("created_at", { ascending: false });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+  if (error) return fail(c, error);
+  const rows = (data ?? []) as Array<Record<string, unknown>>;
+
+  /* WHO RECORDED IT, AS A NAME (Sales Order payment card, 2026-09-10). The
+     ledger stores `recorded_by` as a user id, and a uuid on screen tells an
+     operator nothing about who to ask. The SO PDF already resolves the same
+     column the same way (`routes/orders.ts` — "COLLECTED BY"), so this is that
+     lookup, not a second rule.
+     FAIL-SOFT: an unreadable or missing `app_users` row leaves the name null
+     and the screen prints `Not recorded`. A name is context; losing it must
+     never cost the operator the ledger itself. */
+  const recorderNames = new Map<string, string>();
+  const recorderIds = [...new Set(rows.map((r) => r.recorded_by).filter(Boolean).map(String))];
+  if (recorderIds.length > 0) {
+    const { data: users } = await sb.from("app_users").select("id, name").in("id", recorderIds);
+    for (const u of (users ?? []) as Array<{ id: unknown; name: unknown }>) {
+      if (u?.id != null && u?.name != null) recorderNames.set(String(u.id), String(u.name));
+    }
   }
-  return c.json({ payments: data ?? [] });
+
+  return c.json({
+    payments: rows.map(({ source_channel, source_metadata, ...r }) => {
+      // Sale-time deposits keep their uploaded proof in source metadata (0476).
+      // Resolve that exact payment's evidence for both old and new deposits;
+      // never borrow the order's initial slip for a later collection.
+      const metadata = source_metadata as { payment_slip_url?: unknown } | null;
+      const originalSlip = source_channel === "order_create" && r.kind === "deposit"
+        && typeof metadata?.payment_slip_url === "string"
+        ? metadata.payment_slip_url.trim() : null;
+      return {
+        ...r,
+        receipt_url: r.receipt_url || originalSlip || null,
+        recorded_by_name: r.recorded_by ? (recorderNames.get(String(r.recorded_by)) ?? null) : null,
+      };
+    }),
+  });
 });
 
 // POST /:id/payments — record one payment through the ONE writer (CARD 4,
@@ -101,41 +134,40 @@ orderPaymentsRouter.post("/:id/payments", async (c) => {
     note: parsed.data.note,
     receiptUrl: parsed.data.receiptUrl,
     idempotencyKey: parsed.data.idempotencyKey,
+    duplicateAck: parsed.data.duplicateAck,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   const out = data as { payment: unknown; orders_paid: number | null };
   return c.json({ payment: out.payment, ordersPaid: out.orders_paid }, 201);
 });
 
-// DELETE /:id/payments/:pid — VOID a mis-keyed entry. Principal only (a junior
-// operator records; only the principal reverses), mirroring the waiver gate.
-// CARD 4 (0343): a void is a STAMP, never a delete — the row survives with
-// voided_at/by, and the RPC reverses exactly the orders.paid contribution the
-// record made. The wire contract ({ok:true}) is unchanged.
+// DELETE /:id/payments/:pid — VOID a mis-keyed entry. 0430: the reason is
+// REQUIRED and the authority is the Payment Approver duty (Shared Duty
+// Resolver) or principal — the SQL door decides; this route only shapes the
+// request. CARD 4 (0343): a void is a STAMP, never a delete — the row
+// survives with voided_at/by, and the RPC reverses exactly the orders.paid
+// contribution the record made. The wire contract ({ok:true}) is unchanged.
+const voidPaymentInput = z.object({
+  reason: z.string().trim().min(1, "A reason is required to void a payment.").max(500),
+});
 orderPaymentsRouter.delete("/:id/payments/:pid", async (c) => {
   const auth = c.var.auth;
-  if (auth.role !== "principal") {
-    throw new HTTPException(403, { message: "Principal only" });
-  }
+  requireOperationOrPrincipal(auth.role);
 
   const idCheck = ORDER_ID.safeParse(c.req.param("id"));
   const pidCheck = PAYMENT_ID.safeParse(c.req.param("pid"));
   if (!idCheck.success || !pidCheck.success) {
     throw new HTTPException(404, { message: "Payment not found" });
   }
+  const parsed = await parseJsonBody(c, voidPaymentInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
 
   const sb = userClient(c.env, auth.jwt);
   const { error } = await sb.rpc("payment_void", {
     p_payment_id: pidCheck.data,
-    p_reason: null,
+    p_reason: parsed.data.reason,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ ok: true });
 });
 
@@ -162,10 +194,7 @@ orderPaymentsRouter.get("/:id/refunds", async (c) => {
     .select(REFUND_COLS)
     .eq("order_id", idCheck.data)
     .order("requested_at", { ascending: false });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ refunds: data ?? [] });
 });
 
@@ -185,10 +214,7 @@ orderPaymentsRouter.post("/:id/refunds", async (c) => {
     p_amount: parsed.data.amount,
     p_reason: parsed.data.reason,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ refund: data }, 201);
 });
 
@@ -210,10 +236,7 @@ orderPaymentsRouter.post("/:id/refunds/:rid/decide", async (c) => {
     p_decision: parsed.data.decision,
     p_note: parsed.data.note ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ refund: data });
 });
 
@@ -233,10 +256,7 @@ orderPaymentsRouter.post("/:id/refunds/:rid/paid", async (c) => {
     p_method: parsed.data.method,
     p_reference: parsed.data.reference ?? null,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ refund: data });
 });
 
@@ -272,21 +292,17 @@ orderPaymentsRouter.post("/:id/storage/collect", async (c) => {
     reference: parsed.data.reference,
     note: parsed.data.note,
     receiptUrl: parsed.data.receiptUrl,
+    idempotencyKey: parsed.data.idempotencyKey,
+    duplicateAck: parsed.data.duplicateAck,
   });
-  if (payErr) {
-    const m = mapPgError(payErr);
-    return c.json(m.body, m.status);
-  }
+  if (payErr) return fail(c, payErr);
 
   const { data: control, error: ctrlErr } = await sb
     .from("ops_order_control")
     .select(CONTROL_GATE_COLS)
     .eq("order_id", orderId)
     .maybeSingle();
-  if (ctrlErr) {
-    const m = mapPgError(ctrlErr);
-    return c.json(m.body, m.status);
-  }
+  if (ctrlErr) return fail(c, ctrlErr);
 
   const out = data as { payment: unknown };
   return c.json({ payment: out.payment, control }, 201);
@@ -322,10 +338,7 @@ orderPaymentsRouter.post("/:id/storage/waiver/request", async (c) => {
     )
     .select(CONTROL_GATE_COLS)
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ control: data });
 });
 
@@ -392,10 +405,7 @@ orderPaymentsRouter.post("/:id/storage/waiver/decide", async (c) => {
     .eq("order_id", orderId)
     .select(CONTROL_GATE_COLS)
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json(
       {
@@ -410,10 +420,10 @@ orderPaymentsRouter.post("/:id/storage/waiver/decide", async (c) => {
   const amount = fee != null ? `RM ${fee.toLocaleString()}` : "the storage fee";
   const line =
     decision === "released"
-      ? `Delivery released by manager — ${amount} storage fee still owed`
+      ? `Delivery released by manager. ${amount} storage fee still owed`
       : decision === "waived"
-        ? `Delivery released by manager — ${amount} storage fee written off`
-        : `Storage release refused — ${amount} to collect before delivery`;
+        ? `Delivery released by manager. ${amount} storage fee written off`
+        : `Storage release refused. ${amount} to collect before delivery`;
   await sb.rpc("operation_add_annotation", {
     p_order_id: orderId,
     p_content: line,
@@ -444,14 +454,19 @@ async function storageFeeOf(
     ]);
     const ctrl = ctrlRes?.data ?? null;
     if (!ctrl) return null;
+    // CARD-2026-08-28 - the CATALOG owns which rate applies. One bounded read;
+    // a SKU the catalog does not hold falls back to the parser, per line.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const storageSkus = (linesRes?.data ?? []).map((l: any) => String(l.sku));
+    const storageCats = await storageSkuCategories(sb, storageSkus);
     return storageHold({
       storageFrom: ctrl.storage_from ?? null,
       override: ctrl.storage_fee_override ?? null,
       importedMsbf: ctrl.storage_fee_msbf ?? null,
       importedSof: ctrl.storage_fee_sof ?? null,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      skus: (linesRes?.data ?? []).map((l: any) => String(l.sku)),
-      asOf: new Date().toISOString().slice(0, 10),
+      skus: storageSkus,
+      categories: storageCats,
+      asOf: todayIsoMYT(),
       collectedAt: ctrl.storage_collected_at ?? null,
       waiverStatus: ctrl.storage_waiver_status ?? null,
     }).fee;
@@ -493,10 +508,7 @@ orderPaymentsRouter.post("/:id/storage/extend", async (c) => {
     .select("id, delivery_date, ops_order_control(extension_count, extension_original_date)")
     .eq("id", orderId)
     .maybeSingle();
-  if (ordErr) {
-    const m = mapPgError(ordErr);
-    return c.json(m.body, m.status);
-  }
+  if (ordErr) return fail(c, ordErr);
   if (!order) throw new HTTPException(404, { message: "Order not found" });
 
   const ctrl = Array.isArray(order.ops_order_control)
@@ -511,7 +523,7 @@ orderPaymentsRouter.post("/:id/storage/extend", async (c) => {
         error: "rule_violation",
         code: "extension_used",
         message:
-          "This order's one-time storage extension is already used — a further extension needs principal approval.",
+          "This order's one-time storage extension is already used. A further extension needs principal approval.",
       },
       403,
     );
@@ -543,10 +555,7 @@ orderPaymentsRouter.post("/:id/storage/extend", async (c) => {
     )
     .select(CONTROL_EXTENSION_COLS)
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   // T4 done-when: the reason lands in activity history. The 0211 trigger does
   // not watch the extension columns, so append the fact through the existing
@@ -558,7 +567,7 @@ orderPaymentsRouter.post("/:id/storage/extend", async (c) => {
     { day: "numeric", month: "short", year: "2-digit" },
   );
   const reasonText = deliveryReasonLabel(parsed.data.reasonKey);
-  const noteText = parsed.data.note?.trim() ? ` — ${parsed.data.note.trim()}` : "";
+  const noteText = parsed.data.note?.trim() ? `: ${parsed.data.note.trim()}` : "";
   await sb.rpc("operation_add_annotation", {
     p_order_id: orderId,
     p_content: `Delivery postponed → ${newDateText} · ${reasonText}${noteText}`,
@@ -619,6 +628,7 @@ async function recordPayment(
     note?: string | null;
     receiptUrl?: string | null;
     idempotencyKey?: string;
+    duplicateAck?: boolean;
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<{ data: any; error: any }> {
@@ -638,6 +648,7 @@ async function recordPayment(
       p_receipt_no: receiptNo,
       p_counts_toward_paid: true,
       p_idempotency_key: args.idempotencyKey ?? receiptNo,
+      p_duplicate_ack: args.duplicateAck ?? false,
     });
     // 23505 = the receipt number is taken. Anything else is the caller's answer.
     if (!last.error || last.error.code !== "23505") return last;

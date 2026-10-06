@@ -14,6 +14,9 @@ import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { hasDuty, myDuties } from "../../lib/duties";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+import { parseBody } from "../../lib/route-helpers";
+import { resolveActorNames } from "../../lib/actor-names";
+import { todayIsoMYT } from "../../lib/delivery-order-issue";
 
 /**
  * Urgent restock — card K3 (migration 0290).
@@ -38,11 +41,6 @@ import type { AppEnv } from "../../types";
  */
 
 const opsStockEmergencyRouter = new Hono<AppEnv>();
-
-/** Today in Asia/Kuala_Lumpur — the only calendar the warehouse lives in. */
-function todayMyt(): string {
-  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
-}
 
 /**
  * How far back the lane reads. An urgent ask is a THIS-WEEK object; a year of
@@ -83,7 +81,7 @@ const COLUMNS =
 
 opsStockEmergencyRouter.get("/", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const asOf = todayMyt();
+  const asOf = todayIsoMYT();
 
   const duties = await myDuties(c);
   const { role, email } = c.var.auth;
@@ -116,7 +114,7 @@ opsStockEmergencyRouter.get("/", requireOperationOrPrincipal, async (c) => {
   }
   const raw = [...byId.values()];
 
-  const names = await nameMap(
+  const names = await resolveActorNames(
     sb,
     [
       ...new Set(
@@ -165,19 +163,6 @@ opsStockEmergencyRouter.get("/", requireOperationOrPrincipal, async (c) => {
   });
 });
 
-async function nameMap(
-  sb: ReturnType<typeof userClient>,
-  ids: string[],
-): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
-  if (ids.length === 0) return map;
-  const { data } = await sb.from("app_users").select("id,name").in("id", ids);
-  for (const u of (data ?? []) as { id: string; name: string | null }[]) {
-    if (u.name) map.set(u.id, u.name);
-  }
-  return map;
-}
-
 // =====================================================================
 // POST actions — thin wrappers over the DEFINER RPCs
 // =====================================================================
@@ -221,25 +206,6 @@ opsStockEmergencyRouter.post("/:id/ordered", requireOperationOrPrincipal, async 
 // =====================================================================
 // Helpers
 // =====================================================================
-
-async function parseBody<S extends import("zod").ZodTypeAny>(
-  c: import("hono").Context<AppEnv>,
-  schema: S,
-): Promise<import("zod").infer<S>> {
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    throw new HTTPException(400, { message: "Body must be valid JSON" });
-  }
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) {
-    throw new HTTPException(400, {
-      message: "Invalid input: " + parsed.error.issues[0]?.message,
-    });
-  }
-  return parsed.data;
-}
 
 /** A permission answer must read as 403, never as an outage. */
 function mapErr(error: { code?: string; message?: string }): HTTPException {

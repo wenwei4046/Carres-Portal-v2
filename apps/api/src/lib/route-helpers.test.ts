@@ -36,7 +36,7 @@ describe("mapPgError", () => {
     expect(m.body.message).toBe("not found");
   });
 
-  it("maps SQLSTATE 22023 to 422 invalid_param", () => {
+  it("maps an UNTAGGED SQLSTATE 22023 to 422 invalid_param", () => {
     const m = mapPgError({ code: "22023", message: "bad arg" });
     expect(m.status).toBe(422);
     expect(m.body).toEqual({
@@ -44,6 +44,26 @@ describe("mapPgError", () => {
       code: "invalid_param",
       message: "bad arg",
     });
+  });
+
+  /* 0535 / 0551 — _customer_payment_post raises these three next to the
+   * sentence the screen shows. The tag rides PostgrestError.details; each one
+   * must arrive as its own `code` so the form can act on it, and the sentence
+   * must arrive whole. */
+  it.each([
+    ["payment_reference_required", "a bank transfer needs its reference number"],
+    ["payment_reference_required", "a cheque payment needs its cheque number"],
+    ["payment_reference_required", "a DuitNow QR payment needs its reference number"],
+    ["payment_reference_required", "a card payment needs its approval code"],
+    ["payment_method_required", "choose how the customer paid"],
+    ["payment_account_unmapped",
+      'payment method "grab_pay" has no money account — add it in Settings → Payment → Payment methods, then record this payment'],
+    // 0622: the closed-month guard on gl_entries, which every posting door reaches.
+    ["books_closed", "The books are closed up to 31 Aug 2026. Date this in an open month."],
+  ])("a 22023 tagged %s reaches the caller as that code and its own sentence", (tag, sentence) => {
+    const m = mapPgError({ code: "22023", message: sentence, details: tag });
+    expect(m.status).toBe(422);
+    expect(m.body).toEqual({ error: "invalid_param", code: tag, message: sentence });
   });
 
   it("falls back to 'invalid param' message when 22023 has no message", () => {
@@ -77,13 +97,44 @@ describe("mapPgError", () => {
   });
 
   it("maps unknown SQLSTATE to 500 rpc_failed", () => {
-    const m = mapPgError({ code: "23505", message: "duplicate key" });
+    const m = mapPgError({ code: "XX000", message: "internal error" });
     expect(m.status).toBe(500);
     expect(m.body).toEqual({
       error: "rpc_failed",
       code: "rpc_failed",
-      message: "duplicate key",
+      message: "internal error",
     });
+  });
+
+  // 0543 dealer master: a `code` another dealer already has raised 23505, fell
+  // through to `default`, and Finance got HTTP 500 with the raw constraint name
+  // in the toast. A taken value is the keyer's mistake — 409, same as every
+  // route that already special-cases it (ops/issues.ts, rental.ts, catalog.ts).
+  it("maps SQLSTATE 23505 to 409 conflict (already_exists)", () => {
+    const m = mapPgError({
+      code: "23505",
+      message: 'duplicate key value violates unique constraint "dealers_code_unique"',
+      details: "Key (code)=(JB1) already exists.",
+    });
+    expect(m.status).toBe(409);
+    expect(m.body).toEqual({
+      error: "conflict",
+      code: "already_exists",
+      message: "That value is already used. Change it and save again.",
+    });
+  });
+
+  // The one case that must NOT forward error.message: a constraint name is not
+  // a sentence and the operator cannot read it.
+  it("23505 never leaks the constraint name or the Postgres key text", () => {
+    const m = mapPgError({
+      code: "23505",
+      message: 'duplicate key value violates unique constraint "dealers_code_unique"',
+      details: "Key (code)=(JB1) already exists.",
+    });
+    expect(m.body.message).not.toContain("dealers_code_unique");
+    expect(m.body.message).not.toContain("duplicate key");
+    expect(m.body.message).not.toContain("Key (code)");
   });
 
   // v3-active.1 (migration 0037): the batch RPC's _v3_claim_threads_for_po

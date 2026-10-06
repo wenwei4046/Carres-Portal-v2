@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { salesOrderWorkCompletion } from "../../lib/sales-order-work-completion";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
@@ -7,13 +8,9 @@ import {
   delayDecisionInput,
   signDeliveryPhotoUploadInput,
   attachDeliveryPhotoInput,
+  DELIVERY_PROOF_EXTENSION,
   type DeliveryPhoto,
-  bookingConfirmGate,
   deliveryAttemptRecordInputSchema,
-  deliveryOrderIssueGate,
-  docNumber,
-  orderActionDone,
-  storageHold,
   isSundayIso,
   type BookingGateResult,
   partnerBookingWarnings,
@@ -24,7 +21,6 @@ import {
   deliveryGroupLabel,
   deliveryScopeSentence,
   type DeliveryGroupKey,
-  stockMatchKey,
   stockEtaImportInput,
   matchStockRows,
   aggregateStorageFeesByRef,
@@ -43,9 +39,16 @@ import {
   type StockEtaImportResult,
   type SofaLoanDto,
   type BalancePayStatus,
+  loanOfferRecordInput,
+  unitIdOf,
 } from "@carres/shared";
+import { loadBookingContext } from "../../lib/booking-context";
+import {
+  attemptDeliveryOrderIssue,
+  todayIsoMYT,
+} from "../../lib/delivery-order-issue";
 import { requireDuty } from "../../lib/duties";
-import { mapPgError } from "../../lib/route-helpers";
+import { mapPgError, fail } from "../../lib/route-helpers";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -83,146 +86,22 @@ function requireOperationOrPrincipal(
   }
 }
 
-/**
- * The order's booking facts + the ONE goods/money reading of it.
- *
- * C7 extracted this from the confirm route so that route and the new
- * delivery-order route cannot answer "is this trip ready?" two different ways.
- * That is not tidiness: C5 and C9 each found the SAME number being read two
- * ways by two surfaces, one card apart, and both times the two disagreed on a
- * live order.
- */
-interface BookingContext {
-  order: {
-    id: string;
-    so: number;
-    paid: number | string | null;
-    do_number: string | null;
-    /** CARD 3 (0346) — the company currently assigned to carry this order. The
-     *  appointment stamps it at confirmation; it is never re-read afterwards. */
-    ops_assigned_logistic?: string | null;
-    delivery_partner_id?: string | null;
-  };
-  control: Record<string, unknown> | null;
-  lines: { sku: string; qty: number; unit_price: number | null }[];
-  gate: BookingGateResult;
-}
-type Loaded =
-  | { ok: true; ctx: BookingContext }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  | { ok: false; body: any; status: any };
-
-async function loadBookingContext(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  sb: any,
-  orderId: string,
-  deliverGroups: DeliveryGroupKey[] | null | undefined,
-): Promise<Loaded> {
-  // C5 (2026-07-27): `paid` rides this select because it is the money truth —
-  // the only figure a live payment path writes. C7 adds `do_number`, which is
-  // the delivery order's own completion signal.
-  const { data: order, error: orderErr } = await sb
-    .from("orders")
-    // CARD 3 (0346): the assignment rides this select so the confirm door can
-    // stamp the carrier the customer's appointment is agreed WITH.
-    .select("id, so, paid, do_number, ops_assigned_logistic, delivery_partner_id")
-    .eq("id", orderId)
-    .maybeSingle();
-  if (orderErr) {
-    const m = mapPgError(orderErr);
-    return { ok: false, body: m.body, status: m.status };
-  }
-  if (!order) throw new HTTPException(404, { message: "Order not found" });
-  const soRef = `SO-${order.so}`;
-
-  // C5: the `order_payments` read is GONE. It holds zero rows and no live
-  // payment path writes it, so summing it made "collected" RM 0 for every
-  // order and the gate refused bookings for customers who had already paid.
-  const [linesRes, addonsRes, controlRes, reservedRes] = await Promise.all([
-    sb.from("order_lines").select("sku, qty, unit_price").eq("order_id", orderId),
-    sb.from("order_addons").select("qty, unit_price").eq("order_id", orderId),
-    sb
-      .from("ops_order_control")
-      .select(
-        // C9 — the storage columns ride this select because an uncollected
-        // storage fee holds a delivery exactly as an unpaid balance does.
-        "line_received, balance, booking_stage, booking_groups, confirmed_date, confirmed_time_slot, confirmed_partner_id, customer_confirmed_at, customer_confirmed_by, delivery_trips, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status",
-      )
-      .eq("order_id", orderId)
-      .maybeSingle(),
-    sb
-      .from("ops_stock_items")
-      .select("sku, qty")
-      .eq("status", "reserved")
-      .eq("reserved_ref", soRef),
-  ]);
-  for (const r of [linesRes, addonsRes, controlRes, reservedRes]) {
-    if (r.error) {
-      const m = mapPgError(r.error);
-      return { ok: false, body: m.body, status: m.status };
-    }
-  }
-
-  const lines = (linesRes.data ?? []) as {
-    sku: string;
-    qty: number;
-    unit_price: number | null;
-  }[];
-  const sum = (rows: { qty: number; unit_price: number | null }[]) =>
-    rows.reduce((s, r) => s + Number(r.unit_price ?? 0) * Number(r.qty ?? 0), 0);
-  // C9 — the storage fee is part of the ONE money number, through the one rule
-  // the ladder and the dispatch gate also ask. A manager's release lifts the
-  // HOLD and leaves the fee owed, which is why the gate reads `holding`.
-  const ctrl = (controlRes.data ?? null) as Record<string, unknown> | null;
-  const hold = storageHold({
-    storageFrom: (ctrl?.storage_from as string | null) ?? null,
-    override: (ctrl?.storage_fee_override as number | string | null) ?? null,
-    importedMsbf: (ctrl?.storage_fee_msbf as number | string | null) ?? null,
-    importedSof: (ctrl?.storage_fee_sof as number | string | null) ?? null,
-    skus: lines.map((l) => l.sku),
-    asOf: new Date().toISOString().slice(0, 10),
-    collectedAt: (ctrl?.storage_collected_at as string | null) ?? null,
-    waiverStatus: (ctrl?.storage_waiver_status as string | null) ?? null,
-  });
-  const money = {
-    lineSum: sum(lines),
-    addonSum: sum(
-      (addonsRes.data ?? []) as { qty: number; unit_price: number | null }[],
-    ),
-    paid: (order as { paid?: number | string | null }).paid ?? 0,
-    controlBalance: (ctrl?.balance as number | string | null) ?? null,
-    storageOwing: hold.owing,
-    storageReleased: hold.released,
-  };
-  const reservedQtyByKey: Record<string, number> = {};
-  for (const u of (reservedRes.data ?? []) as { sku: string; qty: number | null }[]) {
-    const k = stockMatchKey(u.sku);
-    reservedQtyByKey[k] = (reservedQtyByKey[k] ?? 0) + Number(u.qty ?? 1);
-  }
-
-  const gate = bookingConfirmGate({
-    lines: lines.map((l) => ({ sku: l.sku, qty: Number(l.qty || 0) })),
-    lineReceived: (ctrl?.line_received as Record<string, number> | null) ?? null,
-    reservedQtyByKey,
-    money,
-    deliverGroups,
-  });
-  return { ok: true, ctx: { order, control: ctrl, lines, gate } };
-}
 
 /**
  * The goods + money sentences, phrased as WARNINGS.
  *
  * C7 moved the hard refusal onto issuing (`docs/ORDERS-WORKING-FLOW.md` §5), so
- * these no longer stop a confirmation — they tell the operator what the
- * delivery order will refuse if nobody clears it. Same facts, same figures, one
- * step later.
+ * these no longer stop a confirmation. Decision A (owner ruling 2026-08-16)
+ * then took money out of that refusal too — so the money sentence may WARN
+ * that collection is open, but it may no longer claim the delivery order will
+ * refuse: it will not. §8's surviving rule — agreeing a date WARNS about
+ * money — is exactly this line.
  */
 function bookingGateWarnings(gate: BookingGateResult): string[] {
   const out: string[] = [];
   if (!gate.goodsReady)
     out.push(
-      `Goods not reserved to this order yet: ${gate.notReadySkus.join(", ")} — the delivery order cannot be issued until they are.`,
+      `Goods not reserved to this order yet: ${gate.notReadySkus.join(", ")}. The delivery order cannot be issued until they are.`,
     );
   if (!gate.balanceReady) {
     // C9 — name WHICH money is missing. "RM 150 outstanding" on an order the
@@ -230,10 +109,10 @@ function bookingGateWarnings(gate: BookingGateResult): string[] {
     const goods = gate.holding - gate.storageOwing;
     out.push(
       goods > 0 && gate.storageOwing > 0
-        ? `RM ${goods.toFixed(2)} outstanding and RM ${gate.storageOwing.toFixed(2)} of storage fee not collected — the delivery order cannot be issued until both are collected.`
+        ? `RM ${goods.toFixed(2)} outstanding and RM ${gate.storageOwing.toFixed(2)} of storage fee not collected. Collection is still open.`
         : gate.storageOwing > 0
-          ? `Storage fee of RM ${gate.storageOwing.toFixed(2)} not collected — collect it, or a manager releases the delivery.`
-          : `RM ${gate.holding.toFixed(2)} outstanding — the delivery order cannot be issued until it is collected.`,
+          ? `Storage fee of RM ${gate.storageOwing.toFixed(2)} not collected. Collection is still open.`
+          : `RM ${gate.holding.toFixed(2)} outstanding. Collection is still open.`,
     );
   }
   return out;
@@ -256,10 +135,7 @@ orderControlRouter.get("/:id/control", async (c) => {
     )
     .eq("order_id", idCheck.data)
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   return c.json({ control: data ?? null });
 });
@@ -313,6 +189,34 @@ orderControlRouter.put("/:id/control", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
+  // 0504 — ONLY A PERSON CARRIES A CUSTOMER (owner ruling 2026-09-13). The
+  // responsible Operation person is answerable for the follow-up, the balance
+  // and the storage collection, so the assignment must name an ACTIVE
+  // INDIVIDUAL — a People record with a `staff_code`. A shared login or a robot
+  // account may record evidence and never owns; the responsibility read ignores
+  // one, which would leave the order silently unowned.
+  if ("assigned_staff" in parsed.data && parsed.data.assigned_staff != null) {
+    const { data: person } = await sb
+      .from("app_users")
+      .select("status, role, staff_code")
+      .eq("id", parsed.data.assigned_staff)
+      .maybeSingle();
+    const owns =
+      !!person &&
+      (person.status ?? "active") === "active" &&
+      (person.role === "operation" || person.role === "principal") &&
+      person.staff_code != null;
+    if (!owns) {
+      return c.json(
+        {
+          error: "invalid_input",
+          code: "invalid_param",
+          message: "The order can only be assigned to an active Operation person",
+        },
+        422,
+      );
+    }
+  }
   // Staff owner (0232): assigned_by / assigned_at are SERVER-stamped whenever
   // the assigned_staff key rides the patch — never trusted from the client.
   const assignStamp =
@@ -329,10 +233,7 @@ orderControlRouter.put("/:id/control", async (c) => {
       CONTROL_COLUMNS,
     )
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   return c.json({ control: data });
 });
@@ -389,7 +290,7 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
       {
         error: "booking_sunday",
         code: "booking_sunday",
-        message: "Sunday is not a delivery working day — pick another date",
+        message: "Sunday is not a delivery working day. Pick another date",
       },
       422,
     );
@@ -411,7 +312,7 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
         message:
           `Cannot confirm the booking: this order has ` +
           `${gate.groups.length > 0 ? gate.groups.map((g) => deliveryGroupLabel(g.key)).join(" + ") : "no goods to deliver"}` +
-          ` — it cannot be delivered as ${(deliverGroups ?? []).map(deliveryGroupLabel).join(" + ") || "nothing"}`,
+          `. It cannot be delivered as ${(deliverGroups ?? []).map(deliveryGroupLabel).join(" + ") || "nothing"}`,
       },
       422,
     );
@@ -423,7 +324,7 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
   // nobody promises a day the goods cannot make — but it does not refuse."
   // A date can be agreed with a customer while the goods and the money are
   // still coming; what may not happen is the PAPER existing for a trip that is
-  // not allowed to run, and that is `POST /:id/delivery-order` below.
+  // not allowed to run, and that is `attemptDeliveryOrderIssue`'s gate.
   //
   // What is still refused here is §5's own short list: date + slot both present
   // (zod, above) and no Sunday. The scope check above is a caller bug, not a
@@ -453,8 +354,8 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
         error: "booking_no_logistics",
         code: "booking_no_logistics",
         message:
-          "Assign a logistics company before confirming the delivery date — " +
-          "a booking has to name who is delivering it",
+          "Assign a logistics company before confirming the delivery date. " +
+          "A booking has to name who is delivering it",
       },
       422,
     );
@@ -522,10 +423,7 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
     )
     .select(CONTROL_COLUMNS)
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   // T8 — a split is the fact an operator must be able to find later ("why did
   // only the bed set go?"). The 0282 trigger logs the scope CHANGE; this adds
@@ -538,7 +436,7 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
   if (sentence) {
     await sb.rpc("operation_add_annotation", {
       p_order_id: idCheck.data,
-      p_content: `Delivery split — ${sentence}`,
+      p_content: `Delivery split: ${sentence}`,
       p_tag: null,
     });
   }
@@ -558,12 +456,96 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
     partnerWarnings = [];
   }
 
+  // ⭐ BLUEPRINT CARD §6 — A REBOOKED TRIP IS A NEW DOCUMENT. If the order
+  // already carries a document and the booking just recorded no longer matches
+  // it (a new date, a new slot, or a delivered first trip making way for the
+  // second), the old document steps aside so the system can issue the new one:
+  //   · a document with NO run yet is VOIDED (rescheduled) — reason, actor and
+  //     time on the record, through the ONE void door;
+  //   · a document whose run FAILED keeps its Delivery exception FOREVER — it
+  //     is never voided and never rewritten; it simply stops being the active
+  //     number;
+  //   · a DELIVERED document is history and is left untouched.
+  // In every case the mirror column empties so the idempotent mint can write
+  // the new number. FAIL-SOFT: a supersede hiccup never undoes the booking.
+  try {
+    const { data: activeOrder } = await sb
+      .from("orders")
+      .select("id, do_number")
+      .eq("id", idCheck.data)
+      .maybeSingle();
+    const activeNumber = (activeOrder?.do_number as string | null) ?? null;
+    if (activeNumber) {
+      const { data: doc } = await sb
+        .from("ops_delivery_orders")
+        .select("id, do_number, delivery_date, time_slot, voided_at")
+        .eq("do_number", activeNumber)
+        .maybeSingle();
+      const sameBooking =
+        doc &&
+        (doc.delivery_date as string | null) === confirmedDate &&
+        ((doc.time_slot as string | null) ?? null) ===
+          (confirmedTimeSlot ?? null);
+      if (doc && !doc.voided_at && !sameBooking) {
+        const { data: runs } = await sb
+          .from("delivery_attempts")
+          .select("result")
+          .eq("do_number", activeNumber);
+        const hasRun = (runs ?? []).length > 0;
+        if (!hasRun) {
+          // Un-run document: the trip it authorised no longer exists.
+          await sb.rpc("delivery_order_void", {
+            p_do_id: doc.id,
+            p_reason: "rescheduled",
+          });
+        }
+        const delivered = (runs ?? []).some(
+          (r: { result: string }) => r.result === "delivered",
+        );
+        if (!delivered || hasRun) {
+          // Clear the mirror so the mint below can write the new number.
+          // (A delivered doc also clears when a NEW booking differs — that is
+          // the split second trip asking for its own paper.)
+          await sb
+            .from("orders")
+            .update({ do_number: null })
+            .eq("id", idCheck.data)
+            .eq("do_number", activeNumber);
+        }
+      }
+    }
+  } catch {
+    // Not superseded — the old number stands and no new document mints; the
+    // booking itself is already recorded.
+  }
+
+  // SLICE 2 — the system issues the delivery order itself the moment the last
+  // requirement lands, and for most orders that moment is THIS confirmation
+  // (goods reserve early, Finance exceptions are rare). FAIL-SOFT, the same
+  // rule as the annotation and partner-check writes above: an issuance hiccup
+  // must never undo or refuse the booking the operator just recorded — the
+  // facts persist, and the next door (or Request Delivery Order) issues it.
+  let deliveryOrder: { do_number: string | null; issued: boolean } | null = null;
+  try {
+    const attempt = await attemptDeliveryOrderIssue(sb, idCheck.data);
+    if (attempt.outcome === "issued" || attempt.outcome === "already") {
+      deliveryOrder = {
+        do_number: attempt.doNumber,
+        issued: attempt.outcome === "issued",
+      };
+    }
+  } catch {
+    // Not issued yet — the gate facts persist and the next door tries again.
+  }
+
   // C7 — the goods/money sentences ride the SUCCESS response now. They are the
   // same figures the old 422 carried; what changed is that they no longer cost
   // the customer their confirmed date. `gateWarnings` is a new key, so an older
   // browser simply does not read it (the same degradation rule as
-  // `partnerWarnings`).
-  return c.json({ control: data, partnerWarnings, gateWarnings });
+  // `partnerWarnings`). `deliveryOrder` (Slice 2) degrades the same way: set
+  // only when the confirmation completed the gate and the system issued (or
+  // found) the document.
+  return c.json({ control: data, partnerWarnings, gateWarnings, deliveryOrder });
 });
 
 /**
@@ -594,7 +576,12 @@ orderControlRouter.post("/:id/booking/confirm", async (c) => {
  * direction for a gate standing between a customer and a call they should not
  * receive.
  */
-orderControlRouter.post("/:id/delay-decision", async (c) => {
+orderControlRouter.post(
+  "/:id/delay-decision",
+  // 0584 — the recorded decision is Sales Orders' completion fact for
+  // `delay_planning`.
+  salesOrderWorkCompletion({ rules: ["delay_planning"], orderId: (c) => c.req.param("id") ?? null }),
+  async (c) => {
   const auth = c.var.auth;
   requireOperationOrPrincipal(auth.role);
 
@@ -628,10 +615,7 @@ orderControlRouter.post("/:id/delay-decision", async (c) => {
     .select("stock_eta, line_etas")
     .eq("order_id", idCheck.data)
     .maybeSingle();
-  if (readErr) {
-    const m = mapPgError(readErr);
-    return c.json(m.body, m.status);
-  }
+  if (readErr) return fail(c, readErr);
 
   // Every factory date this order actually holds. The overlay is the only place
   // a supplier date lives (`docs/ORDERS-WORKING-FLOW.md` §2), so this set is the
@@ -652,8 +636,8 @@ orderControlRouter.post("/:id/delay-decision", async (c) => {
         message:
           `This order has no supplier ready date of ${supplierEta}` +
           (known.size > 0
-            ? ` — it holds ${[...known].sort().join(", ")}. Reload the order and decide again.`
-            : ` — no supplier has given a ready date yet. Record the ready date first.`),
+            ? `. It holds ${[...known].sort().join(", ")}. Reload the order and decide again.`
+            : `. No supplier has given a ready date yet. Record the ready date first.`),
       },
       422,
     );
@@ -675,10 +659,7 @@ orderControlRouter.post("/:id/delay-decision", async (c) => {
     )
     .select(CONTROL_COLUMNS)
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   // The decision is the one thing about this order a human will want to find
   // again months later ("why was the customer never told?"). The 0211 trigger
@@ -689,46 +670,14 @@ orderControlRouter.post("/:id/delay-decision", async (c) => {
     p_order_id: idCheck.data,
     p_content:
       decision === "keep"
-        ? `Delay planning — supplier ready ${supplierEta}, we can still make the promised date${note ? ` (${note})` : ""}`
-        : `Delay planning — supplier ready ${supplierEta}, we cannot make the promised date${note ? ` (${note})` : ""}`,
+        ? `Delay planning: supplier ready ${supplierEta}, we can still make the promised date${note ? ` (${note})` : ""}`
+        : `Delay planning: supplier ready ${supplierEta}, we cannot make the promised date${note ? ` (${note})` : ""}`,
     p_tag: null,
   });
 
   return c.json({ control: data });
 });
 
-/**
- * POST /:id/delivery-order — C7 · issue the delivery order (Jess 2026-07-27).
- *
- * **The whole card in one sentence:** the number was stamped by a DB trigger on
- * the DISPATCH transition (0098), which is a day too late to hand logistics the
- * paper they ask for the evening before — so the operator presses one button
- * once the customer's date is confirmed, and the SYSTEM produces the document.
- * Nobody authors a delivery order by hand (COPY-STANDARD's `Issue` verb: "the
- * SYSTEM produces a formal document", completion = "the document exists").
- *
- * **NO MIGRATION, and that was checked rather than assumed.** 0098's trigger
- * only fills `do_number` when it is NULL, so an order that already carries one
- * passes through it untouched: minting earlier cannot break dispatch for orders
- * that never take this path, which is exactly the condition the card set. The
- * trigger stays as the backstop for those.
- *
- * **The number is the LOCKED scheme** (`docNumber`, Jess 2026-07-19:
- * `DO-DDMMYY-NNNN`, tail seeded from the ORDER id so every paper of one order
- * shares it). Until now `orders.do_number` and the printed PDF disagreed — the
- * column got the trigger's `DO-000123` and the drawer's printer recomputed its
- * own number client-side. One number now, minted once, stored, and printed.
- *
- * **THIS IS THE HARD GATE** (`docs/ORDERS-WORKING-FLOW.md` §5). Goods reserved,
- * money collected, the date not a Sunday or a public holiday. It reads the same
- * `bookingConfirmGate` the confirm route reads, so the warning an operator saw
- * when agreeing the date and the refusal they meet here are the same sentence
- * about the same numbers.
- *
- * **Idempotent.** A second press returns the number already on the record
- * instead of minting a second one — a delivery order that changed its number
- * between two prints would be two documents for one trip.
- */
 /**
  * CARD 5 (0344) — record a PARTIAL or FAILED delivery attempt. A full success
  * walks the existing gated delivery door, which mints its own attempt. The
@@ -769,8 +718,8 @@ orderControlRouter.post("/:id/delivery-attempt", async (c) => {
   const { data, error } = await sb.rpc("delivery_attempt_record", {
     p_order_id: idCheck.data,
     p_result: parsed.data.result,
-    p_reason_key: parsed.data.reasonKey,
-    p_where_goods: parsed.data.whereGoods,
+    p_reason_key: parsed.data.reasonKey ?? null,
+    p_where_goods: parsed.data.whereGoods ?? null,
     p_note: parsed.data.note ?? null,
     p_delivered_item_ids: parsed.data.deliveredItemIds,
     p_returned: parsed.data.returned.map((r) => ({
@@ -778,11 +727,10 @@ orderControlRouter.post("/:id/delivery-attempt", async (c) => {
       action: r.action,
       note: r.note ?? null,
     })),
+    // 0491 — the Delivery scope: a Journey leg records its own result.
+    p_leg: parsed.data.leg,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data, 201);
 });
 
@@ -802,14 +750,21 @@ orderControlRouter.get("/:id/delivery-attempts", async (c) => {
     )
     .eq("order_id", idCheck.data)
     .order("attempt_no", { ascending: true });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ attempts: data ?? [] });
 });
 
-orderControlRouter.post("/:id/delivery-order", async (c) => {
+/**
+ * POST /:id/delivery-order/request — the `Request Delivery Order` door
+ * (owner ruling 2026-08-19, card §5). Outstation trips need the document
+ * BEFORE a customer-confirmed booking exists, because the partner schedules
+ * the customer. The door walks the SAME single issuing path with the SAME
+ * gates — goods Ready/Reserved, the money gate (0362) and no OPEN Finance
+ * exception — merely without waiting for the booking-confirm trigger. It is
+ * never a free-form create: no editable customer, goods, price or number, and
+ * a refusal names the failing gate.
+ */
+orderControlRouter.post("/:id/delivery-order/request", async (c) => {
   const auth = c.var.auth;
   requireOperationOrPrincipal(auth.role);
 
@@ -817,88 +772,33 @@ orderControlRouter.post("/:id/delivery-order", async (c) => {
   if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
 
   const sb = userClient(c.env, auth.jwt);
-  // The trip's scope is the one ALREADY booked (`booking_groups`), never a
-  // caller's opinion: this route issues the paper for the trip the customer
-  // confirmed, and it does not get to decide what that trip carries.
-  const first = await loadBookingContext(sb, idCheck.data, null);
-  if (!first.ok) return c.json(first.body, first.status);
-  const bookedScope =
-    (first.ctx.control?.booking_groups as DeliveryGroupKey[] | null) ?? null;
-  const loaded = bookedScope
-    ? await loadBookingContext(sb, idCheck.data, bookedScope)
-    : first;
-  if (!loaded.ok) return c.json(loaded.body, loaded.status);
-  const { order, control, gate } = loaded.ctx;
-
-  // Already issued → hand back the same number. Not an error: the operator
-  // pressing twice wants the document, and a second number would be a second
-  // document for one trip.
-  if (order.do_number) {
-    return c.json({ order: { id: order.id, do_number: order.do_number }, issued: false });
-  }
-
-  const issue = deliveryOrderIssueGate({
-    bookingConfirmed: (control?.booking_stage as string | null) === "confirmed",
-    confirmedDateIso: (control?.confirmed_date as string | null) ?? null,
-    confirmedTimeSlot: (control?.confirmed_time_slot as string | null) ?? null,
-    gate,
-    holidays: myHolidaySet(),
+  const attempt = await attemptDeliveryOrderIssue(sb, idCheck.data, {
+    waitBookingConfirm: false,
   });
-  if (!issue.ok) {
-    return c.json(
-      {
-        error: "delivery_order_gate",
-        code: "delivery_order_gate",
-        message: `Cannot issue the delivery order: ${issue.reasons.join(" ")}`,
-      },
-      422,
-    );
+  switch (attempt.outcome) {
+    case "issued":
+      return c.json({
+        order: { id: idCheck.data, do_number: attempt.doNumber },
+        issued: true,
+      });
+    case "already":
+      return c.json({
+        order: { id: idCheck.data, do_number: attempt.doNumber },
+        issued: false,
+      });
+    case "blocked":
+      return c.json(
+        {
+          error: "delivery_order_gate",
+          code: "delivery_order_gate",
+          message: `Cannot issue the delivery order: ${attempt.reasons.join(" ")}`,
+          reasons: attempt.reasons,
+        },
+        422,
+      );
+    case "error":
+      return c.json(attempt.body, attempt.status);
   }
-
-  // The document date is TODAY — the day it is issued and handed over, which is
-  // what the locked scheme's DDMMYY segment means.
-  const doNumber = docNumber({
-    prefix: "DO",
-    date: todayIsoMYT(),
-    seed: order.id,
-    digits: 4,
-  });
-  // `is("do_number", null)` makes the mint idempotent at the DATABASE, not just
-  // in the read above: two operators pressing at the same moment cannot produce
-  // two numbers, and the loser re-reads the winner's.
-  const { data: updated, error } = await sb
-    .from("orders")
-    .update({ do_number: doNumber })
-    .eq("id", idCheck.data)
-    .is("do_number", null)
-    .select("id, do_number")
-    .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  if (!updated) {
-    const { data: raced } = await sb
-      .from("orders")
-      .select("id, do_number")
-      .eq("id", idCheck.data)
-      .maybeSingle();
-    return c.json({ order: raced ?? { id: idCheck.data, do_number: null }, issued: false });
-  }
-
-  // The audit line. FAIL-SOFT, the same door and the same rule as T4/T6/T8: an
-  // annotation hiccup must never undo a document that has been issued.
-  try {
-    await sb.rpc("operation_add_annotation", {
-      p_order_id: idCheck.data,
-      p_content: `${orderActionDone("issue_delivery_order")} — ${doNumber}`,
-      p_tag: null,
-    });
-  } catch {
-    // Recorded nowhere else is better than refusing a document that exists.
-  }
-
-  return c.json({ order: updated, issued: true });
 });
 
 // ── T9 · logistic partner rules (migration 0283) ────────────────────────────
@@ -914,13 +814,6 @@ orderControlRouter.post("/:id/delivery-order", async (c) => {
 //
 // The warning text is composed by the SHARED engine, so the pre-check below and
 // the confirm response say the same sentence (no second wording).
-
-/** Today in MYT. The Worker's clock is UTC; between 16:00 and midnight UTC that
- *  is already tomorrow in Klang, and "you cannot book a date in the past" must
- *  not fire a day early (or late) because of it. */
-function todayIsoMYT(): string {
-  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
-}
 
 interface PartnerCheck {
   partner: { id: string; name: string } | null;
@@ -1055,11 +948,23 @@ orderControlRouter.get("/:id/booking/partner-check", async (c) => {
 // ops were never a working path for HQ here (same admin-signing pattern as
 // partner/pod.ts's 2026-05-13 path + the 0279 rental signature upload).
 
-/** The T6 gate: a delivery photo proves a delivery that HAPPENED — the order
- *  must read delivered before anything may be signed or attached. Same two
- *  signals the drawer's own delivered chip folds (orders.operation_stage /
- *  orders.status). Returns a Response to send, or null when the gate passes. */
-async function refuseUnlessDelivered(
+/**
+ * The T6 gate: a delivery photo proves a delivery that HAPPENED.
+ *
+ * ⭐ THE GATE FOLLOWS THE RECORDED RESULT, NOT ONLY THE ORDER STAGE (defect
+ * found while wiring the 2026-09-11 driver-submission ruling). It used to ask
+ * one question — is the ORDER delivered? — and `delivery_attempt_record`
+ * never touches `orders.operation_stage`, so a **Partially Delivered** trip
+ * sat in the register's own `Upload delivery photo` queue behind a door that
+ * refused every file. A queue nobody can empty is worse than no queue.
+ *
+ * The gate now asks what `missingDeliveryProofOf` asks: did goods REACH the
+ * customer? That is the order reading delivered, OR a recorded
+ * `delivered`/`partial` result. A failed trip still owes no delivery photo
+ * and is still refused here. Returns a Response to send, or null when the gate
+ * passes.
+ */
+async function refuseUnlessReachedCustomer(
   c: Context<AppEnv>,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sb: any,
@@ -1070,25 +975,55 @@ async function refuseUnlessDelivered(
     .select("id, status, operation_stage")
     .eq("id", orderId)
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!order) throw new HTTPException(404, { message: "Order not found" });
-  const delivered =
-    order.operation_stage === "delivered" || order.status === "delivered";
-  if (!delivered) {
-    return c.json(
-      {
-        error: "not_delivered",
-        code: "not_delivered",
-        message:
-          "A delivery photo can only be attached once the order is delivered",
-      },
-      422,
-    );
+  if (order.operation_stage === "delivered" || order.status === "delivered") {
+    return null;
   }
-  return null;
+  const attempts = await sb
+    .from("delivery_attempts")
+    .select("result")
+    .eq("order_id", orderId)
+    .in("result", ["delivered", "partial"])
+    .limit(1);
+  if (attempts.error) return fail(c, attempts.error);
+  if ((attempts.data ?? []).length > 0) return null;
+  return c.json(
+    {
+      error: "not_delivered",
+      code: "not_delivered",
+      message:
+        "A delivery photo can only be attached once the goods have reached the customer",
+    },
+    422,
+  );
+}
+
+/**
+ * ⭐ THE SUBMISSION NAMES ITS DOCUMENT, AND THE SERVER CHECKS THE NAME
+ * (owner ruling 2026-09-11).
+ *
+ * A client may say which Delivery Order a file came back from; it may not
+ * INVENT one. The number must be a document of THIS order — so a photo can
+ * never be stamped onto another order's trip, and a register counting per
+ * document counts recorded facts only. `null` = the caller named no
+ * document, which stays a legal (and pre-ruling) state.
+ */
+async function verifiedDoNumberOf(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  orderId: string,
+  doNumber: string | undefined,
+): Promise<{ value: string | null } | { refusal: "unknown_do" }> {
+  if (!doNumber) return { value: null };
+  const { data, error } = await sb
+    .from("ops_delivery_orders")
+    .select("do_number")
+    .eq("order_id", orderId)
+    .eq("do_number", doNumber)
+    .maybeSingle();
+  if (error || !data) return { refusal: "unknown_do" };
+  return { value: (data as { do_number: string }).do_number };
 }
 
 // POST /:id/delivery-photo/sign-upload — short-lived signed upload URL into
@@ -1122,15 +1057,11 @@ orderControlRouter.post("/:id/delivery-photo/sign-upload", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
-  const refusal = await refuseUnlessDelivered(c, sb, idCheck.data);
+  const refusal = await refuseUnlessReachedCustomer(c, sb, idCheck.data);
   if (refusal) return refusal;
 
-  const ext =
-    parsed.data.mimeType === "image/png"
-      ? "png"
-      : parsed.data.mimeType === "image/webp"
-        ? "webp"
-        : "jpg";
+  /* ONE mime → extension map, shared with the handover door (Law D). */
+  const ext = DELIVERY_PROOF_EXTENSION[parsed.data.mimeType] ?? "jpg";
   const path = `order/${idCheck.data}/${crypto.randomUUID()}-delivery.${ext}`;
   const admin = adminClient(c.env);
   const { data, error } = await admin.storage
@@ -1184,18 +1115,29 @@ orderControlRouter.post("/:id/delivery-photo/attach", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
-  const refusal = await refuseUnlessDelivered(c, sb, idCheck.data);
+  const refusal = await refuseUnlessReachedCustomer(c, sb, idCheck.data);
   if (refusal) return refusal;
+
+  /* The named document must be one of THIS order's own (2026-09-11). */
+  const doCheck = await verifiedDoNumberOf(sb, idCheck.data, parsed.data.doNumber);
+  if ("refusal" in doCheck) {
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: "That delivery order does not belong to this order",
+        field: "doNumber",
+      },
+      422,
+    );
+  }
 
   const { data: ctrl, error: ctrlErr } = await sb
     .from("ops_order_control")
     .select("delivery_photos")
     .eq("order_id", idCheck.data)
     .maybeSingle();
-  if (ctrlErr) {
-    const m = mapPgError(ctrlErr);
-    return c.json(m.body, m.status);
-  }
+  if (ctrlErr) return fail(c, ctrlErr);
   const existing: DeliveryPhoto[] = Array.isArray(ctrl?.delivery_photos)
     ? (ctrl.delivery_photos as DeliveryPhoto[])
     : [];
@@ -1203,6 +1145,8 @@ orderControlRouter.post("/:id/delivery-photo/attach", async (c) => {
     path: parsed.data.path,
     at: new Date().toISOString(),
     by: auth.id,
+    doNumber: doCheck.value,
+    kind: parsed.data.kind ?? "photo",
   };
 
   const { data, error } = await sb
@@ -1217,9 +1161,32 @@ orderControlRouter.post("/:id/delivery-photo/attach", async (c) => {
     )
     .select(CONTROL_COLUMNS)
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+  if (error) return fail(c, error);
+
+  // §6.1 (0489) — the SAME act binds the file to the Delivery Visit it proves:
+  // the latest recorded attempt of the named document. One door, two records
+  // (the ledger the register counts, the evidence the review judges). FAIL-
+  // SOFT for the same reason as the audit line below: the ledger write already
+  // happened, and the response says whether the binding did.
+  let evidenceBound = false;
+  if (doCheck.value) {
+    const latest = await sb
+      .from("delivery_attempts")
+      .select("id")
+      .eq("do_number", doCheck.value)
+      .in("result", ["delivered", "partial"])
+      .order("recorded_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const attemptId = (latest.data as { id: string } | null)?.id ?? null;
+    if (attemptId) {
+      const bound = await sb.rpc("delivery_attempt_evidence_record", {
+        p_attempt_id: attemptId,
+        p_path: entry.path,
+        p_kind: entry.kind === "video" ? "video" : "photo",
+      });
+      evidenceBound = !bound.error;
+    }
   }
 
   // T6 done-when: activity logs it. The 0211 trigger doesn't watch the overlay
@@ -1228,11 +1195,18 @@ orderControlRouter.post("/:id/delivery-photo/attach", async (c) => {
   // never undo a recorded photo), same as the T4 postpone write.
   await sb.rpc("operation_add_annotation", {
     p_order_id: idCheck.data,
-    p_content: "Delivery photo uploaded",
+    /* The activity line names the file's kind and its trip — an audit reader
+       must be able to tell a video of DO-A from a photo of DO-B. */
+    p_content: [
+      entry.kind === "video" ? "Delivery video uploaded" : "Delivery photo uploaded",
+      doCheck.value ? `· ${doCheck.value}` : "",
+    ]
+      .filter(Boolean)
+      .join(" "),
     p_tag: null,
   });
 
-  return c.json({ control: data }, 201);
+  return c.json({ control: data, evidenceBound }, 201);
 });
 
 // GET /:id/delivery-photos — the ledger + a short-lived signed VIEW url per
@@ -1250,10 +1224,7 @@ orderControlRouter.get("/:id/delivery-photos", async (c) => {
     .select("delivery_photos")
     .eq("order_id", idCheck.data)
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   const entries: DeliveryPhoto[] = Array.isArray(ctrl?.delivery_photos)
     ? (ctrl.delivery_photos as DeliveryPhoto[])
     : [];
@@ -1310,10 +1281,7 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
     .from("order_lines")
     .select("order_id, sku, source_po")
     .not("source_po", "is", null);
-  if (lineErr) {
-    const m = mapPgError(lineErr);
-    return c.json(m.body, m.status);
-  }
+  if (lineErr) return fail(c, lineErr);
   const lines: OrderLineRef[] = (lineData ?? []).map((l) => ({
     orderId: l.order_id as string,
     sku: l.sku as string,
@@ -1360,10 +1328,7 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
     const { data: orderData, error: ordErr } = await sb
       .from("orders")
       .select("id, source_ref");
-    if (ordErr) {
-      const m = mapPgError(ordErr);
-      return c.json(m.body, m.status);
-    }
+    if (ordErr) return fail(c, ordErr);
     const orderByRef = new Map<string, string>();
     for (const o of orderData ?? []) {
       for (const ref of (o.source_ref as string[] | null) ?? []) {
@@ -1458,10 +1423,7 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
       .from("ops_order_control")
       .select("order_id, line_etas, line_stock_status")
       .in("order_id", orderIds);
-    if (exErr) {
-      const m = mapPgError(exErr);
-      return c.json(m.body, m.status);
-    }
+    if (exErr) return fail(c, exErr);
     const existingEtas = new Map<string, Record<string, string>>();
     const existingStatus = new Map<string, Record<string, string>>();
     for (const row of existing ?? []) {
@@ -1495,10 +1457,7 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
     const { error: upErr } = await sb
       .from("ops_order_control")
       .upsert(upsertRows, { onConflict: "order_id" });
-    if (upErr) {
-      const m = mapPgError(upErr);
-      return c.json(m.body, m.status);
-    }
+    if (upErr) return fail(c, upErr);
     result.written = written;
   }
 
@@ -1520,10 +1479,7 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
     const { error: feeErr } = await sb
       .from("ops_order_control")
       .upsert(feeRows, { onConflict: "order_id" });
-    if (feeErr) {
-      const m = mapPgError(feeErr);
-      return c.json(m.body, m.status);
-    }
+    if (feeErr) return fail(c, feeErr);
     result.storageWritten = feeByOrder.size;
   }
 
@@ -1544,10 +1500,7 @@ orderControlRouter.post("/import-stock-eta", async (c) => {
     const { error: balErr } = await sb
       .from("ops_order_control")
       .upsert(balRows, { onConflict: "order_id" });
-    if (balErr) {
-      const m = mapPgError(balErr);
-      return c.json(m.body, m.status);
-    }
+    if (balErr) return fail(c, balErr);
     result.balanceWritten = balanceByOrder.size;
   }
 
@@ -1597,18 +1550,12 @@ orderControlRouter.post("/append-missing-lines", async (c) => {
     .from("orders")
     .select("id, so, source_ref")
     .eq("source_system", "autocount");
-  if (ordErr) {
-    const m = mapPgError(ordErr);
-    return c.json(m.body, m.status);
-  }
+  if (ordErr) return fail(c, ordErr);
   const orderIds = new Set((orderData ?? []).map((o) => o.id as string));
   const { data: lineData, error: lineErr } = await sb
     .from("order_lines")
     .select("order_id, sku, source_po");
-  if (lineErr) {
-    const m = mapPgError(lineErr);
-    return c.json(m.body, m.status);
-  }
+  if (lineErr) return fail(c, lineErr);
   const linesByOrder = new Map<string, { sku: string; sourcePo: string | null }[]>();
   for (const l of lineData ?? []) {
     const oid = l.order_id as string;
@@ -1652,10 +1599,7 @@ orderControlRouter.post("/append-missing-lines", async (c) => {
         attrs: cand.itemGroup ? { item_group: cand.itemGroup } : {},
       })),
     });
-    if (error) {
-      const m = mapPgError(error);
-      return c.json(m.body, m.status);
-    }
+    if (error) return fail(c, error);
     result.appended += Number((data as { appended?: number } | null)?.appended ?? 0);
     result.orders += 1;
   }
@@ -1692,22 +1636,92 @@ orderControlRouter.get("/:id/loans", async (c) => {
   const { data, error } = await sb
     .from("ops_sofa_loans")
     .select(
-      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, out_route, out_partner_id, dispatched_at, arrived_warehouse_at, loan_note_no, loan_note_signed_at, supplier_return_due, supplier_return_ref, ops_stock_items(sku, condition, po_no), suppliers(name), delivery_partners(name)",
+      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, out_route, out_partner_id, dispatched_at, arrived_warehouse_at, loan_note_no, loan_note_signed_at, supplier_return_due, supplier_return_ref, ops_stock_items(unit_code, sku, condition, po_no), suppliers(name), delivery_partners(name)",
     )
     .eq("order_id", idCheck.data)
     .order("loaned_at", { ascending: false });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   const loans: SofaLoanDto[] = (data ?? []).map((r) => mapLoanRow(r));
   return c.json({ loans });
+});
+
+/**
+ * 0492 (Delivery MASTER §14.2, Card 15) — the loan OFFER and the customer's
+ * answer, recorded on the Sales Order beside the loan itself. Orders owns the
+ * record; Logistics never makes the commercial offer.
+ *
+ *   GET  /:id/loan-offers   the whole history, newest first
+ *   POST /:id/loan-offers   one record through the governed door
+ */
+orderControlRouter.get("/:id/loan-offers", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("ops_loan_offers")
+    .select("id, seq, order_id, event, item_id, label, reason, recorded_by, recorded_at, ops_stock_items(unit_code, identity_scope)")
+    .eq("order_id", idCheck.data)
+    .order("seq", { ascending: false });
+  if (error) return fail(c, error);
+  const offers = (data ?? []).map((r) => {
+    const row = r as Record<string, unknown> & {
+      ops_stock_items?: { unit_code?: string | null; identity_scope?: string | null } | null;
+    };
+    const unit = Array.isArray(row.ops_stock_items) ? row.ops_stock_items[0] : row.ops_stock_items;
+    return {
+      id: row.id,
+      seq: row.seq,
+      order_id: row.order_id,
+      event: row.event,
+      item_id: row.item_id ?? null,
+      label: row.label ?? null,
+      reason: row.reason ?? null,
+      recorded_by: row.recorded_by ?? null,
+      recorded_at: row.recorded_at,
+      unit_id: unitIdOf({ unitCode: unit?.unit_code ?? null, identityScope: unit?.identity_scope ?? null }),
+    };
+  });
+  return c.json({ offers });
+});
+
+orderControlRouter.post("/:id/loan-offers", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = loanOfferRecordInput.safeParse(body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: issue?.message ?? "invalid input", field: issue?.path.join(".") ?? "unknown" },
+      422,
+    );
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_loan_offer_record", {
+    p_order_id: idCheck.data,
+    p_event: parsed.data.event,
+    p_item_id: parsed.data.itemId ?? null,
+    p_label: parsed.data.label ?? null,
+    p_reason: parsed.data.reason ?? null,
+  });
+  if (error) return fail(c, error);
+  return c.json({ offer: data }, 201);
 });
 
 /** Map a joined ops_sofa_loans row → the general SofaLoanDto (both sources). */
 function mapLoanRow(r: unknown): SofaLoanDto {
   const row = r as Record<string, unknown> & {
     ops_stock_items?: {
+      unit_code?: string | null;
       sku?: string | null;
       condition?: string | null;
       po_no?: string | null;
@@ -1722,6 +1736,9 @@ function mapLoanRow(r: unknown): SofaLoanDto {
     category: (row.category as string | null) ?? null,
     item_id: (row.item_id as string | null) ?? null,
     item_sku: row.ops_stock_items?.sku ?? null,
+    /* The label on the piece, not the row's primary key — a loan block that
+       prints a uuid tells the operator nothing they can check in a house. */
+    item_unit_code: row.ops_stock_items?.unit_code ?? null,
     item_condition: row.ops_stock_items?.condition ?? null,
     item_po: row.ops_stock_items?.po_no ?? null,
     supplier_id: (row.supplier_id as string | null) ?? null,
@@ -1781,31 +1798,32 @@ orderControlRouter.post("/:id/loan-sofa", async (c) => {
     .select("id, so")
     .eq("id", orderId)
     .maybeSingle();
-  if (ordErr) {
-    const m = mapPgError(ordErr);
-    return c.json(m.body, m.status);
-  }
+  if (ordErr) return fail(c, ordErr);
   if (!order) throw new HTTPException(404, { message: "Order not found" });
 
   // Claim the free unit (atomic on status='free' — 409 if someone grabbed it).
-  const now = new Date().toISOString();
-  const { data: claimed, error: claimErr } = await sb
-    .from("ops_stock_items")
-    .update({ status: "reserved", reserved_ref: `LOAN SO-${order.so}`, updated_at: now })
-    .eq("id", itemId)
-    .eq("status", "free")
-    .select("id, sku, condition, po_no")
-    .maybeSingle();
-  if (claimErr) {
-    const m = mapPgError(claimErr);
-    return c.json(m.body, m.status);
-  }
-  if (!claimed) {
+  // 0366 — through THE binding door, not a raw update. The register carries no
+  // write policy any more, and a loan is still a promise made to one exact
+  // physical sofa: the RPC binds only a free, uncontrolled, single unit and
+  // returns an empty array when someone else got there first.
+  const { data: boundIds, error: claimErr } = await sb.rpc("ops_stock_bind_units", {
+    p_item_ids: [itemId],
+    p_ref: `LOAN SO-${order.so}`,
+    p_note: null,
+  });
+  if (claimErr) return fail(c, claimErr);
+  if (!Array.isArray(boundIds) || boundIds.length === 0) {
     return c.json(
       { error: "not_free", code: "conflict", message: "That sofa is no longer free" },
       409,
     );
   }
+  const { data: claimed, error: readErr } = await sb
+    .from("ops_stock_items")
+    .select("id, unit_code, sku, condition, po_no")
+    .eq("id", itemId)
+    .maybeSingle();
+  if (readErr || !claimed) return fail(c, readErr ?? new Error("unit vanished after binding"));
 
   const { data: loan, error: loanErr } = await sb
     .from("ops_sofa_loans")
@@ -1826,10 +1844,10 @@ orderControlRouter.post("/:id/loan-sofa", async (c) => {
     // failed rollback was invisible — and there is no sweeper (three crons,
     // none touches ops_stock_items), so the only thing that frees the unit is
     // a person who has to be told.
-    const { error: rollbackErr } = await sb
-      .from("ops_stock_items")
-      .update({ status: "free", reserved_ref: null, updated_at: new Date().toISOString() })
-      .eq("id", itemId);
+    const { error: rollbackErr } = await sb.rpc("ops_stock_unbind_unit", {
+      p_item_id: itemId,
+      p_ref: `LOAN SO-${order.so}`,
+    });
     const m = mapPgError(loanErr);
     if (rollbackErr) {
       return c.json(
@@ -1850,6 +1868,7 @@ orderControlRouter.post("/:id/loan-sofa", async (c) => {
     category: null,
     item_id: loan.item_id as string,
     item_sku: (claimed.sku as string | null) ?? null,
+    item_unit_code: (claimed.unit_code as string | null) ?? null,
     item_condition: (claimed.condition as string | null) ?? null,
     item_po: (claimed.po_no as string | null) ?? null,
     supplier_id: null,
@@ -1936,10 +1955,7 @@ orderControlRouter.post("/:id/loan-borrow", async (c) => {
       "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, out_route, out_partner_id, dispatched_at, arrived_warehouse_at, loan_note_no, loan_note_signed_at, supplier_return_due, supplier_return_ref, suppliers(name), delivery_partners(name)",
     )
     .single();
-  if (loanErr) {
-    const m = mapPgError(loanErr);
-    return c.json(m.body, m.status);
-  }
+  if (loanErr) return fail(c, loanErr);
   return c.json({ loan: mapLoanRow(loan) });
 });
 
@@ -1986,13 +2002,10 @@ orderControlRouter.post("/:id/loan-update", async (c) => {
     .eq("id", loanId)
     .eq("order_id", orderId)
     .select(
-      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, out_route, out_partner_id, dispatched_at, arrived_warehouse_at, loan_note_no, loan_note_signed_at, supplier_return_due, supplier_return_ref, ops_stock_items(sku, condition, po_no), suppliers(name), delivery_partners(name)",
+      "id, order_id, source, category, item_id, do_number, status, loaned_at, returned_at, returned_to_supplier_at, supplier_id, borrowed_sku, borrowed_label, notes, out_route, out_partner_id, dispatched_at, arrived_warehouse_at, loan_note_no, loan_note_signed_at, supplier_return_due, supplier_return_ref, ops_stock_items(unit_code, sku, condition, po_no), suppliers(name), delivery_partners(name)",
     )
     .single();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ loan: mapLoanRow(loan) });
 });
 
@@ -2033,10 +2046,7 @@ orderControlRouter.post("/:id/loan-return", async (c) => {
     .eq("id", loanId)
     .eq("order_id", orderId)
     .maybeSingle();
-  if (loanErr) {
-    const m = mapPgError(loanErr);
-    return c.json(m.body, m.status);
-  }
+  if (loanErr) return fail(c, loanErr);
   if (!loan) throw new HTTPException(404, { message: "Loan not found" });
   if (loan.status !== "on_loan") {
     return c.json(
@@ -2051,10 +2061,7 @@ orderControlRouter.post("/:id/loan-return", async (c) => {
     .update({ status: "returned", returned_at: now, updated_at: now })
     .eq("id", loanId)
     .eq("status", "on_loan");
-  if (upErr) {
-    const m = mapPgError(upErr);
-    return c.json(m.body, m.status);
-  }
+  if (upErr) return fail(c, upErr);
   // Only a WAREHOUSE loan has an own-stock unit to recover; a supplier borrow
   // has item_id = null (the piece goes back to the supplier via a separate step).
   // CARD 6: the recovered unit enters the inspection hold through the governed
@@ -2064,12 +2071,9 @@ orderControlRouter.post("/:id/loan-return", async (c) => {
     const { error: holdErr } = await sb.rpc("ops_stock_hold_unit", {
       p_item_id: loan.item_id as string,
       p_reason: "inspection",
-      p_note: "Loan recovered from customer — inspect before resale",
+      p_note: "Loan recovered from customer. Inspect before resale",
     });
-    if (holdErr) {
-      const m = mapPgError(holdErr);
-      return c.json(m.body, m.status);
-    }
+    if (holdErr) return fail(c, holdErr);
   }
   return c.json({ ok: true });
 });
@@ -2106,10 +2110,7 @@ orderControlRouter.post("/:id/loan-return-supplier", async (c) => {
     .eq("id", loanId)
     .eq("order_id", orderId)
     .maybeSingle();
-  if (loanErr) {
-    const m = mapPgError(loanErr);
-    return c.json(m.body, m.status);
-  }
+  if (loanErr) return fail(c, loanErr);
   if (!loan) throw new HTTPException(404, { message: "Loan not found" });
   if (loan.source !== "supplier") {
     return c.json(
@@ -2134,10 +2135,7 @@ orderControlRouter.post("/:id/loan-return-supplier", async (c) => {
     })
     .eq("id", loanId)
     .is("returned_to_supplier_at", null);
-  if (upErr) {
-    const m = mapPgError(upErr);
-    return c.json(m.body, m.status);
-  }
+  if (upErr) return fail(c, upErr);
   return c.json({ ok: true });
 });
 

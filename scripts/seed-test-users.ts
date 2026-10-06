@@ -2,8 +2,6 @@
  * Comprehensive E2E test-user scaffold. Creates the `*-test@x.com` users that
  * the e2e/*.spec.ts files expect. Idempotent — re-running is safe.
  *
- * Replaces the older `seed-lp-test-user.ts` (kept for backward compat).
- *
  * Closes the structural gap surfaced 2026-05-09: the 14 fixme'd Playwright
  * specs were authored against `*-test@x.com` test users that don't exist
  * in `supabase/seed.sql`. Without this scaffold, only `phase-6-supplier-happy`

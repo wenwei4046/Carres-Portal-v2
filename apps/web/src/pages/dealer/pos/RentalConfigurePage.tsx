@@ -182,7 +182,7 @@ export default function RentalConfigurePage({
           <div className="cfg-header__totalLabel">Per month</div>
           <div className="cfg-header__totalNum" data-testid="rental-cfg-monthly">
             <sup>RM</sup>
-            {plan ? (plan.monthlyFee * qty).toLocaleString("en-MY") : "—"}
+            {plan ? (plan.monthlyFee * qty).toLocaleString("en-MY") : ""}
           </div>
           {/* Both figures are what the CUSTOMER pays, so both carry the
               quantity. Showing a per-unit fee beside a whole-cart total is how
@@ -258,7 +258,7 @@ export default function RentalConfigurePage({
               </div>
               {skus.length === 0 ? (
                 <div className="cfg-empty">
-                  No size of this model is on rental offer yet — author one in Admin → Rental.
+                  No size of this model is on rental offer yet. Author one in Admin → Rental.
                 </div>
               ) : (
                 <div className="cfg-optGrid">
@@ -379,7 +379,7 @@ export default function RentalConfigurePage({
                 </li>
                 <li>A rental cannot share an order with items bought outright.</li>
                 <li>
-                  After checkout, finance approves the credit — <b>no card is charged</b> until
+                  After checkout, finance approves the credit. <b>No card is charged</b> until
                   they do.
                 </li>
                 {plan && (
@@ -396,7 +396,3 @@ export default function RentalConfigurePage({
     document.body,
   );
 }
-
-/** Shown on the CTA once a line is staged (kept for parity with the bought
- *  configure page's Update-item affordance if editing lands later). */
-export const RENTAL_ADD_ICON = Check;

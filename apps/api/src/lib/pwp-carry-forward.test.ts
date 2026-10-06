@@ -104,12 +104,18 @@ function mockSb(opts: MockOpts): {
     }
     if (table === "pwp_rules") {
       return {
-        select: () => ({
-          eq: () => ({
+        // 2026-08-24: the read is `.eq().order().order()` through the one
+        // ordered door (readActivePwpRules), so this double must be
+        // CHAINABLE rather than a fixed two-deep shape.
+        select: () => {
+          const chain: Record<string, unknown> = {
+            eq: () => chain,
+            order: () => chain,
             then: (resolve: (v: unknown) => unknown) =>
               resolve(opts.rulesError ? { data: null, error: { message: opts.rulesError } } : { data: opts.rules, error: null }),
-          }),
-        }),
+          };
+          return chain;
+        },
       };
     }
     if (table === "product_skus") {

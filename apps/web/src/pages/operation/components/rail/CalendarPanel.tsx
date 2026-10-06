@@ -1,13 +1,17 @@
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import Select from "@/components/kit/Select";
+import MonthCalendar from "@/components/kit/MonthCalendar";
 import {
+  assignedLogisticsIdOf,
+  customerLegDeliveryOf,
+  documentDisplayNumber,
+  type WarehouseCalendarArrival,
   carrierDayLoads,
   carrierDayNote,
   daysInRange,
-  dayWord,
   deliveryRange,
   DELIVERY_RANGE_KEYS,
-  inRange,
   partnerDeliveryRules,
   type CarrierDayLoad,
   type DayBooking,
@@ -15,46 +19,25 @@ import {
   type PartnerDeliveryRules,
 } from "@carres/shared";
 import {
+  useDeliveryArrangements,
+  useDeliveryOrdersRegister,
   useOperationOrders,
-  usePurchaseToday,
-  useOperationSuppliers,
+  useWarehouseCalendar,
   useDeliveryPartners,
-  type operationOrderListRow,
 } from "@/lib/queries";
-import { orderBookingDay } from "@/lib/order-booking";
+import { orderBookingRead } from "@/lib/order-booking";
 import { cjkClassName } from "@/lib/cjk";
 import { locationForAddress } from "@/lib/region";
-import { fmtDateShort } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { displayCustomerName } from "@/lib/customer-name";
 
-/**
- * CalendarPanel — right-rail Calendar (Jess COO ask, extended 2026-07-23):
- * a month grid with tab-filtered activity from BOTH the customer-delivery
- * side and the supplier procurement side (Send POs by order-by · confirm by
- * expected-ready · Receive by ETA). Tabs let the operator see a single lens
- * without leaving the panel. Read-only — no new API (reuses purchase-today +
- * orders queries already cached by their pages).
- *
- * **T10 (delivery calendar as single source, 2026-07-27):** the Deliveries lens
- * used to bucket orders by `orders.delivery_date` — the date we PROMISED the
- * customer. That is not when a truck moves. Since D1 (0277) the truck's day is
- * the BOOKING (`booking_stage` + `confirmed_date`, with `logistic_eta` as the
- * logistics company's provisional word), and the two diverge the moment anything is
- * rescheduled — which is the entire reason D1 split them. So the lens now reads
- * the booking through the same `orderBookingDay` adapter the Orders list's
- * Delivery column reads: never a second store.
- *
- * The promise did not disappear from the screen. A day with an order promised
- * on it and nothing booked is real work — it is simply not a delivery, so it
- * never counts as one. It is listed as what it is, under the call that fixes it.
- *
- * Today / Tomorrow / This week (T10) select a RANGE of days; clicking a day in
- * the grid selects that one day. Exactly one of the two is active at a time.
- */
-const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
-
-
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** Shared Calendar reads owning-module dates. Expected Warehouse arrangements
+ * and actual receipts are separate event types; Receiving never republishes
+ * the same arrival. Module, location and day survive the record round trip. */
+/** The chip's own text. A single-day range names its day; the span keeps the
+ *  one ruled span word. This is the only place the three chips are worded. */
+function rangeChipLabel(key: DeliveryRangeKey, fromIso: string): string {
+  return key === "week" ? "This week" : fmtDate(fromIso);
 }
 
 /** One booked delivery, as the calendar shows it. */
@@ -66,19 +49,37 @@ interface DayDelivery extends DayBooking {
   address: string | null;
 }
 
-export default function CalendarPanel() {
-  const { data } = useOperationOrders();
+export default function CalendarPanel({ onOpenRecord }: { onOpenRecord?: () => void } = {}) {
+  const deliveryQuery = useOperationOrders();
+  const data = deliveryQuery.data;
   const orders = useMemo(() => data?.orders ?? [], [data]);
-  const { data: purchase } = usePurchaseToday();
-  const { data: suppliersData } = useOperationSuppliers();
+  /* Delivery's own records — the document and the arrangement outrank the
+     legacy booking in the ONE delivery-day reader. A failed read leaves the
+     next owner's answer standing; it never invents a day. */
+  const arrangementsQuery = useDeliveryArrangements();
+  const documentsQuery = useDeliveryOrdersRegister();
+  const warehouseQuery = useWarehouseCalendar();
   const { data: partnersData } = useDeliveryPartners();
-  const supplierNameById = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const s of suppliersData?.suppliers ?? []) m.set(s.id, s.name);
-    return m;
-  }, [suppliersData]);
-  const supplierName = (id: string, fallback: string | null) =>
-    fallback?.trim() || supplierNameById.get(id) || id.slice(0, 8);
+  const [params, setParams] = useSearchParams();
+  const moduleValue = params.get("calendarModule");
+  const module = moduleValue === "delivery" || moduleValue === "warehouse" ? moduleValue : "all";
+  const location = module === "warehouse" ? params.get("calendarLocation") : null;
+  const setCalendarFilter = (key: string, value: string | null) => {
+    setParams((previous) => {
+      const next = new URLSearchParams(previous);
+      if (value) next.set(key, value); else next.delete(key);
+      if (key === "calendarModule" && value !== "warehouse") next.delete("calendarLocation");
+      return next;
+    }, { replace: true });
+  };
+  const calendarHref = (href: string, day: string) => {
+    const [path, query = ""] = href.split("?");
+    const next = new URLSearchParams(query);
+    for (const key of ["calendarModule", "calendarLocation", "calendarDay", "calendarRange"])
+      if (params.get(key)) next.set(key, params.get(key)!);
+    next.set("calendarDay", day);
+    return `${path}?${next}`;
+  };
 
   // T9 logistics rules, keyed by company. A row that has never been
   // edited normalises to DEFAULT — zero warnings, which is every live company
@@ -100,70 +101,96 @@ export default function CalendarPanel() {
   }, [partnersData]);
 
 
-  const carrierOf = (o: operationOrderListRow): { id: string | null; name: string | null } => ({
-    id: o.delivery_partner_id ?? o.ops_assigned_logistic ?? null,
-    name: o.delivery_partners?.name ?? null,
-  });
-
-  // Bucket deliveries by the BOOKING day (T10) — confirmed date when the
-  // customer said yes, otherwise the logistics company's provisional date. An order with
-  // neither is not on any day; it is a queue item (Assign / confirm the date).
+  // Bucket deliveries by the SCHEDULED day — the ONE delivery-day reader
+  // Monitor and the Work feed read (`customerLegDeliveryOf`: the customer
+  // leg's live document, then Delivery's arrangement, then a CONFIRMED legacy
+  // booking; Delivery MASTER §15.1, Workspace §5.9). A carrier's provisional
+  // date is not a scheduled day and puts nothing on the calendar; an order
+  // with no scheduled day is a queue item (Assign / get the delivery date).
   const deliveriesByDay = useMemo(() => {
+    const docsByOrder = new Map<string, Array<{ leg: number | null; deliveryDate: string | null; timeSlot: string | null; issuedAt: string | null }>>();
+    for (const d of documentsQuery.data?.deliveryOrders ?? []) {
+      if (d.voided_at || !d.order_id) continue;
+      const list = docsByOrder.get(d.order_id) ?? [];
+      list.push({ leg: d.leg ?? 0, deliveryDate: d.delivery_date, timeSlot: d.time_slot ?? null, issuedAt: d.issued_at ?? null });
+      docsByOrder.set(d.order_id, list);
+    }
+    const arrangementsByOrder = new Map<string, Array<{ leg: number; confirmedDate: string | null; confirmedTime: string | null; partnerId: string | null; partnerName: string | null }>>();
+    for (const a of arrangementsQuery.data?.arrangements ?? []) {
+      const list = arrangementsByOrder.get(a.order_id) ?? [];
+      list.push({ leg: a.leg, confirmedDate: a.confirmed_date, confirmedTime: a.confirmed_time, partnerId: a.partner_id, partnerName: a.partner_name });
+      arrangementsByOrder.set(a.order_id, list);
+    }
+    const partnerNameById = new Map((partnersData?.partners ?? []).map((p) => [p.id, p.name] as const));
     const m = new Map<string, DayDelivery[]>();
     for (const o of orders) {
-      const booking = orderBookingDay(o);
-      if (booking.kind === "none" || !booking.date) continue;
-      const carrier = carrierOf(o);
+      const arrangements = arrangementsByOrder.get(o.id) ?? [];
+      const day = customerLegDeliveryOf({
+        documents: docsByOrder.get(o.id) ?? [],
+        arrangements,
+        booking: orderBookingRead(o),
+      });
+      if (!day.iso) continue;
+      const legArrangement = arrangements.find((a) => a.leg === day.leg) ?? null;
+      const partnerId = assignedLogisticsIdOf({
+        arrangementPartnerId: legArrangement?.partnerId,
+        orderPartnerId: o.delivery_partners?.id ?? o.delivery_partner_id,
+        triagePartnerId: o.ops_assigned_logistic,
+      });
       const entry: DayDelivery = {
         orderId: o.id,
         so: o.so,
-        customer: o.customer_name,
-        partnerId: carrier.id,
-        partnerName: carrier.name,
-        kind: booking.kind,
-        date: booking.date,
-        slot: booking.slot,
+        customer: displayCustomerName(o.customer_name),
+        partnerId,
+        partnerName:
+          (legArrangement?.partnerId && legArrangement.partnerId === partnerId ? legArrangement.partnerName : null) ??
+          (partnerId ? partnerNameById.get(partnerId) ?? (o.delivery_partners?.id === partnerId ? o.delivery_partners.name : null) : null),
+        kind: "confirmed",
+        date: day.iso,
+        slot: day.time,
         address: o.customer_address ?? null,
         // No `cancelled` flag to set: the list endpoint filters status IN
         // (place, proceed_order, delivered), so a cancelled order never
         // reaches this panel. `DayBooking.cancelled` exists for callers that
         // read a wider status set.
       };
-      const arr = m.get(booking.date) ?? [];
+      const arr = m.get(day.iso) ?? [];
       arr.push(entry);
-      m.set(booking.date, arr);
+      m.set(day.iso, arr);
     }
     return m;
-  }, [orders]);
+  }, [orders, documentsQuery.data, arrangementsQuery.data, partnersData]);
 
-  // Receiving is a dated business event. Procurement action queues stay in My Work.
+  // One Warehouse-owned read, with expected arrangements and physical receipt
+  // events kept distinct. No second arrival is published by Receiving.
   const receiveByDay = useMemo(() => {
-    const m = new Map<string, Array<{ poId: string; supplierId: string; units: number }>>();
-    for (const r of purchase?.receive ?? []) {
-      const iso = r.etaDate ?? r.expectedReadyDate;
-      if (!iso) continue;
-      const key = iso.slice(0, 10);
-      const arr = m.get(key) ?? [];
-      const units = r.items.reduce((s, it) => s + it.outstanding, 0);
-      arr.push({ poId: r.poId, supplierId: r.supplierId, units });
-      m.set(key, arr);
+    const map = new Map<string, WarehouseCalendarArrival[]>();
+    if (module === "delivery") return map;
+    for (const event of warehouseQuery.data?.events ?? []) {
+      if (location && location !== "all" && event.siteId !== location) continue;
+      const rows = map.get(event.date) ?? [];
+      rows.push(event); map.set(event.date, rows);
     }
-    return m;
-  }, [purchase]);
+    return map;
+  }, [warehouseQuery.data, module, location]);
+  const activeCount = (key: string): number =>
+    (receiveByDay.get(key)?.length ?? 0) + (module === "warehouse" ? 0 : deliveriesByDay.get(key)?.length ?? 0);
+  const loading = (module !== "delivery" && warehouseQuery.isPending) || (module !== "warehouse" && (deliveryQuery.isPending || arrangementsQuery.isPending));
+  const failed = (module !== "delivery" && warehouseQuery.error) || (module !== "warehouse" && deliveryQuery.error);
 
-  // Calendar counts only authoritative dated events, never action queues.
-  const activeCount = (key: string): number => {
-    return (receiveByDay.get(key)?.length ?? 0) + (deliveriesByDay.get(key)?.length ?? 0);
-  };
-
-  const today = new Date();
-  const todayKey = ymd(today);
-  const [view, setView] = useState({ y: today.getFullYear(), m: today.getMonth() });
+  const todayKey = appTodayIso();
+  const savedDay = params.get("calendarDay");
+  const picked = savedDay && /^\d{4}-\d{2}-\d{2}$/.test(savedDay)
+    && !Number.isNaN(Date.parse(savedDay))
+    && new Date(savedDay).toISOString().slice(0, 10) === savedDay ? savedDay : null;
+  const initialDay = picked ?? todayKey;
+  const [view, setView] = useState({ y: Number(initialDay.slice(0, 4)), m: Number(initialDay.slice(5, 7)) - 1 });
   // T10: exactly ONE of these is active. A range chip clears the picked day; a
   // grid click clears the range. Default = Today, so the panel opens on the
   // question an operator actually has.
-  const [range, setRange] = useState<DeliveryRangeKey | null>("today");
-  const [picked, setPicked] = useState<string | null>(null);
+  const savedRange = params.get("calendarRange");
+  const range: DeliveryRangeKey | null = picked ? null
+    : DELIVERY_RANGE_KEYS.includes(savedRange as DeliveryRangeKey) ? savedRange as DeliveryRangeKey : "today";
 
   const activeRange = range ? deliveryRange(range, todayKey) : null;
   const shownDays = activeRange
@@ -172,56 +199,50 @@ export default function CalendarPanel() {
       ? [picked]
       : [];
 
-  // Build the calendar grid (weeks of the current view month, padded).
-  const cells = useMemo(() => {
-    const first = new Date(view.y, view.m, 1);
-    const startPad = first.getDay(); // 0=Sun
-    const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
-    const out: ({ day: number; key: string } | null)[] = [];
-    for (let i = 0; i < startPad; i++) out.push(null);
-    for (let d = 1; d <= daysInMonth; d++) {
-      out.push({ day: d, key: ymd(new Date(view.y, view.m, d)) });
-    }
-    while (out.length % 7 !== 0) out.push(null);
-    return out;
-  }, [view]);
-
-  const monthLabel = new Date(view.y, view.m, 1).toLocaleDateString(undefined, {
-    month: "long",
-    year: "numeric",
-  });
-
-  // Is there anything to show for this day UNDER THE ACTIVE LENS? The
-  // "promised, no date yet" block only exists on a lens that shows deliveries,
-  // so it must not make a Send-lens day count as occupied — otherwise the range
-  // renders neither the day nor the empty line.
   const dayIsEmpty = (d: string) => activeCount(d) === 0;
   const hasAnything = shownDays.some((d) => !dayIsEmpty(d));
 
   return (
     <div className="flex flex-col h-full">
+      <div className="mb-3 space-y-2">
+        <Select id="calendar-module" label="Filter by module" value={module}
+          onValueChange={(value) => setCalendarFilter("calendarModule", value)}
+          options={[{ value: "all", label: "All modules" }, { value: "delivery", label: "Delivery" }, { value: "warehouse", label: "Warehouse" }]} />
+        {module === "warehouse" && <Select id="calendar-location" label="Filter by location" value={location ?? "all"}
+          onValueChange={(value) => setCalendarFilter("calendarLocation", value)}
+          options={[{ value: "all", label: "All" }, ...(warehouseQuery.data?.sites ?? []).map((site) => ({ value: site.id, label: site.name }))]} />}
+      </div>
+      {loading && <p role="status" className="text-meta text-base-500">Loading…</p>}
+      {failed && <p role="alert" className="text-meta text-danger">The schedule could not be read for this date.</p>}
+      {module !== "delivery" && (warehouseQuery.data?.undatedReceipts ?? 0) > 0 && <p className="text-meta text-base-500">Goods Received Date · Not recorded · {warehouseQuery.data!.undatedReceipts}</p>}
       {/* T10 range chips — Today / Tomorrow / This week. "This week" is the
           REST of the week, ending Saturday (Sunday is not a delivery day). */}
       <div className="flex gap-1 mb-2" data-testid="calendar-ranges">
         {DELIVERY_RANGE_KEYS.map((key) => {
           const r = deliveryRange(key, todayKey);
           const active = range === key;
-          const n = daysInRange(r.fromIso, r.toIso).reduce((s, d) => s + activeCount(d), 0);
           return (
             <button
               key={key}
               type="button"
+              data-testid={`calendar-range-${key}`}
               onClick={() => {
-                setRange(key);
-                setPicked(null);
+                setParams((previous) => {
+                  const next = new URLSearchParams(previous);
+                  next.set("calendarRange", key); next.delete("calendarDay"); return next;
+                }, { replace: true });
                 // Jump the grid to the month the range lives in.
                 const [y, m] = r.fromIso.split("-").map(Number);
                 if (y && m) setView({ y, m: m - 1 });
               }}
+              /* A SPAN still needs its hover — `This week` names no date.
+                 A single-day chip does NOT: THE YEAR RULE (owner ruling
+                 2026-08-15) put the full ruled date on the chip face, so a
+                 hover could only ever repeat it or, worse, say less. */
               title={
                 r.fromIso === r.toIso
-                  ? fmtDateShort(r.fromIso)
-                  : `${fmtDateShort(r.fromIso)} – ${fmtDateShort(r.toIso)}`
+                  ? undefined
+                  : `${fmtDateShort(r.fromIso)} to ${fmtDateShort(r.toIso)}`
               }
               className={`flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-label font-semibold transition-colors ${
                 active
@@ -229,89 +250,22 @@ export default function CalendarPanel() {
                   : "bg-white text-base-500 border border-base-200 hover:bg-hovertint"
               }`}
             >
-              <span>{r.label}</span>
-              {n > 0 && <span className="tabular-nums font-semibold">{n > 99 ? "99+" : n}</span>}
+              <span className="truncate">{rangeChipLabel(key, r.fromIso)}</span>
             </button>
           );
         })}
       </div>
 
-      {/* Month nav */}
-      <div className="flex items-center justify-between px-1 mb-2">
-        <button
-          type="button"
-          onClick={() => setView((v) => (v.m === 0 ? { y: v.y - 1, m: 11 } : { y: v.y, m: v.m - 1 }))}
-          className="p-1 rounded text-base-500 hover:bg-base-100"
-          aria-label="Previous month"
-        >
-          <ChevronLeft size={16} />
-        </button>
-        <div className="text-strong text-base-900">{monthLabel}</div>
-        <button
-          type="button"
-          onClick={() => setView((v) => (v.m === 11 ? { y: v.y + 1, m: 0 } : { y: v.y, m: v.m + 1 }))}
-          className="p-1 rounded text-base-500 hover:bg-base-100"
-          aria-label="Next month"
-        >
-          <ChevronRight size={16} />
-        </button>
-      </div>
-
-      {/* Weekday header */}
-      <div className="grid grid-cols-7 mb-1">
-        {WEEKDAYS.map((w, i) => (
-          <div key={i} className="text-center text-label font-semibold text-base-400 uppercase">
-            {w}
-          </div>
-        ))}
-      </div>
-
-      {/* Day grid */}
-      <div className="grid grid-cols-7 gap-0.5">
-        {cells.map((cell, i) => {
-          if (!cell) return <div key={i} />;
-          const count = activeCount(cell.key);
-          const isToday = cell.key === todayKey;
-          const isSel = activeRange
-            ? inRange(cell.key, activeRange)
-            : cell.key === picked;
-          const countTone =
-            count === 0
-              ? "text-transparent"
-              : "bg-base-100 text-base-800";
-          return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => {
-                setPicked(cell.key);
-                setRange(null);
-              }}
-              title={count > 0 ? `${count} dated event${count === 1 ? "" : "s"}` : undefined}
-              className={`aspect-square flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors ${
-                isSel ? "bg-base-100" : "hover:bg-base-100"
-              }`}
-            >
-              <span
-                className={`w-6 h-6 grid place-items-center rounded-full text-meta ${
-                  isToday
-                    ? "ring-1 ring-primary text-primary font-semibold"
-                    : isSel
-                      ? "ring-1 ring-base-900 text-base-900 font-semibold"
-                      : "text-base-700"
-                }`}
-              >
-                {cell.day}
-              </span>
-              <span
-                className={`h-3.5 min-w-[16px] px-1 grid place-items-center rounded-full text-label font-semibold leading-none ${countTone}`}
-              >
-                {count > 0 ? count : "0"}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <MonthCalendar
+        month={`${view.y}-${String(view.m + 1).padStart(2, "0")}`}
+        onMonthChange={(month) => {
+          const [y, m] = month.split("-").map(Number);
+          setView({ y, m: m - 1 });
+        }}
+        selected={picked ?? (activeRange?.fromIso === activeRange?.toIso ? activeRange?.fromIso ?? null : null)}
+        onSelect={(day) => setCalendarFilter("calendarDay", day)}
+        testId="shared-calendar-month"
+      />
 
       {/* The days themselves — one block per day in the active range (or the
           one picked day). Content adapts to the active tab. */}
@@ -321,43 +275,48 @@ export default function CalendarPanel() {
             Pick a day, or Today / Tomorrow / This week.
           </div>
         )}
-        {shownDays.length > 1 && !hasAnything && (
+        {shownDays.length > 1 && !hasAnything && !loading && !failed && (
           <div className="text-meta text-base-400 text-center py-4">
             Nothing on the books for these days.
           </div>
         )}
         {shownDays.map((day) => {
-          const dayDeliveries = deliveriesByDay.get(day) ?? [];
+          const dayDeliveries = module === "warehouse" ? [] : deliveriesByDay.get(day) ?? [];
           const dayReceive = receiveByDay.get(day) ?? [];
           // On a multi-day range an empty day is noise; on ONE day it is the
           // answer ("nothing that day") and must still be said out loud.
           if (shownDays.length > 1 && dayIsEmpty(day)) return null;
-          const word = dayWord(day, todayKey);
           const loads = carrierDayLoads(dayDeliveries, day, rulesByPartner);
           return (
             <div key={day} data-testid={`calendar-day-${day}`}>
+              {/* The heading is the DAY, spelled the one ruled way. It used to
+                  read `TODAY · 15 AUG 26`, and the relative half was the only
+                  part an operator read — on the wrong morning it was a lie. */}
               <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-2">
-                {word ? `${word} · ${fmtDateShort(day)}` : fmtDateShort(day)}
+                {fmtDate(day)}
               </div>
 
-              {dayIsEmpty(day) && shownDays.length === 1 && (
+              {dayIsEmpty(day) && shownDays.length === 1 && !loading && !failed && (
                 <div className="text-meta text-base-400 text-center py-3">No dated events this day.</div>
               )}
-              {dayReceive.length > 0 && (
-                <DaySection
-                  title="Receiving"
-                  tone="text-success"
-                  items={dayReceive.map((r) => ({
-                    key: `r-${r.poId}`,
-                    main: `${r.poId} · ${supplierName(r.supplierId, null)}`,
-                    sub: `${r.units} unit${r.units === 1 ? "" : "s"} · ETA today`,
-                  }))}
-                />
-              )}
+              {(["expected_arrival", "actual_arrival"] as const).map((kind) => {
+                const rows = dayReceive.filter((row) => row.kind === kind);
+                if (!rows.length) return null;
+                return <DaySection key={kind}
+                  onOpenRecord={onOpenRecord}
+                  title={kind === "expected_arrival" ? `Warehouse · ${rows.length} arriving` : `Warehouse · GRN Records · ${rows.length}`}
+                  tone="text-base-700"
+                  items={rows.map((row) => ({
+                    key: row.id,
+                    main: documentDisplayNumber(row.receiptRef ?? row.sourceRef ?? "Not recorded"),
+                    sub: `${row.siteName ?? "Not recorded"} · ${kind === "expected_arrival" ? "Pending Delivery Qty" : "Physical arrived Qty"} ${row.expectedQty ?? row.physicalQty ?? "Not recorded"}${row.extraQty ? ` · Extra Qty ${row.extraQty}` : ""}`,
+                    href: calendarHref(row.href, day),
+                  }))} />;
+              })}
               {dayDeliveries.length > 0 && (
                 <div className="space-y-1.5">
-                  <div className="text-label uppercase tracking-[0.05em] text-info">Deliveries</div>
-                  {dayDeliveries.map((d) => <DeliveryRow key={d.orderId} d={d} />)}
+                  <div className="text-label uppercase tracking-[0.05em] text-info">Delivery · {dayDeliveries.length} scheduled {dayDeliveries.length === 1 ? "delivery" : "deliveries"}</div>
+                  {dayDeliveries.map((d) => <DeliveryRow key={d.orderId} d={d} onOpenRecord={onOpenRecord} href={calendarHref(`/operation?tab=delivery&view=day&date=${day}`, day)} />)}
                   {loads.map((l) => (
                     <CarrierLoadRow key={l.partnerId ?? "none"} load={l} />
                   ))}
@@ -371,40 +330,34 @@ export default function CalendarPanel() {
   );
 }
 
-/** One booked delivery. Confirmed is the ONLY green (T1): the customer said
- *  yes. The carrier's own date is amber — a date nobody has agreed to. */
-function DeliveryRow({ d }: { d: DayDelivery }) {
-  const confirmed = d.kind === "confirmed";
+/** One scheduled delivery. Only a scheduled day reaches the calendar, so the
+ *  row is always the settled green; its face is the time when one was
+ *  recorded, else `Scheduled` (time is optional, owner ruling 2026-09-24). */
+function DeliveryRow({ d, href, onOpenRecord }: { d: DayDelivery; href: string; onOpenRecord?: () => void }) {
   const loc = locationForAddress(d.address);
-  const carrier = d.partnerName?.trim() || "No logistics picked";
+  const carrier = d.partnerName?.trim() || "Logistics not assigned";
   return (
-    <div
-      className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors"
-      title={
-        confirmed
-          ? "The customer confirmed this date."
-          : "Only logistics have given this date — not confirmed with the customer yet."
-      }
+    <Link to={href} onClick={onOpenRecord}
+      className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+      title="The customer confirmed this date."
     >
-      <span className={`w-1 rounded-full shrink-0 ${confirmed ? "bg-success" : "bg-warning"}`} />
+      <span className="w-1 rounded-full shrink-0 bg-success" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
           <span className="font-mono text-meta font-semibold text-base-900">SO-{d.so}</span>
-          <span
-            className={`text-label font-semibold shrink-0 ${confirmed ? "text-success" : "text-warning"}`}
-          >
-            {confirmed ? (d.slot ? shortSlot(d.slot) : "Confirmed") : "Logistics' date"}
+          <span className="text-label font-semibold shrink-0 text-success">
+            {d.slot ? shortSlot(d.slot) : "Scheduled"}
           </span>
         </div>
         <div className={`text-meta text-base-700 truncate ${cjkClassName(d.customer)}`}>
-          {d.customer || "—"}
+          {d.customer || ""}
         </div>
         <div className="text-label text-base-500 truncate">
           {carrier}
           {loc.label ? ` · ${loc.label}` : ""}
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -442,24 +395,26 @@ function DaySection({
   title,
   tone,
   items,
+  onOpenRecord,
 }: {
   title: string;
   tone: string;
-  items: Array<{ key: string; main: string; sub: string }>;
+  items: Array<{ key: string; main: string; sub: string; href: string }>;
+  onOpenRecord?: () => void;
 }) {
   return (
     <div className="mb-3">
       <div className={`text-label uppercase tracking-[0.05em] mb-1.5 ${tone}`}>{title}</div>
       <div className="space-y-1.5">
           {items.map((it) => (
-            <div key={it.key} className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors">
+            <Link key={it.key} to={it.href} onClick={onOpenRecord} className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9">
               <div className="min-w-0 flex-1">
-                <div className="font-mono text-meta font-semibold text-base-900 truncate">
+                <div className="font-mono text-meta font-semibold text-base-900 break-words">
                   {it.main}
                 </div>
-                <div className="text-label text-base-500 truncate">{it.sub}</div>
+                <div className="text-label text-base-500">{it.sub}</div>
               </div>
-            </div>
+            </Link>
           ))}
       </div>
     </div>

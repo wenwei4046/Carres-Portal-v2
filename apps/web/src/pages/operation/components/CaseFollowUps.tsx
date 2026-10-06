@@ -10,7 +10,7 @@ import {
   type CaseStep,
 } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 
 /**
  * S3 — the case drives the follow-ups.
@@ -129,7 +129,7 @@ function RecordStepForm({
   step: CaseStep;
   onDone: () => void;
 }) {
-  const [on, setOn] = useState(todayLocal());
+  const [on, setOn] = useState(appTodayIso());
   const [note, setNote] = useState("");
 
   const saveMut = useMutation({
@@ -184,11 +184,4 @@ function RecordStepForm({
       )}
     </div>
   );
-}
-
-/** Today in the operator's own timezone. `toISOString()` is UTC, which is
- *  yesterday in Malaysia until 8 AM — the wrong default on a date the operator
- *  is recording about today. */
-function todayLocal(): string {
-  return new Date().toLocaleDateString("en-CA");
 }

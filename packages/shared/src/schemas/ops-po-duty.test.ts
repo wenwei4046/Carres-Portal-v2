@@ -1,13 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  monthKeyMYT,
   isPoDayMYT,
   nextPoDayMYT,
   poUrgentBypass,
-  pickNextDutyHolder,
-  canRaisePo,
 } from "./ops-po-duty";
-import { isOpsManager } from "./ops-order-control";
 
 // Fixed instants (UTC) with known MYT (+8) counterparts.
 const MON_MYT = new Date("2026-07-20T01:00:00Z"); // Mon 09:00 MYT
@@ -17,16 +13,6 @@ const TUE_MYT = new Date("2026-07-21T01:00:00Z"); // Tue 09:00 MYT
 const THU_MYT = new Date("2026-07-23T01:00:00Z"); // Thu 09:00 MYT — no longer a PO day
 // 23:00 MYT Sun = 15:00Z Sun — crosses the UTC/MYT date boundary going in.
 const SUN_LATE_MYT = new Date("2026-07-19T15:00:00Z");
-// 07:00 MYT on Aug 1 = 23:00Z Jul 31 — month boundary case.
-const AUG1_EARLY_MYT = new Date("2026-07-31T23:00:00Z");
-
-describe("monthKeyMYT", () => {
-  it("uses the MYT calendar month, not UTC", () => {
-    expect(monthKeyMYT(MON_MYT)).toBe("2026-07");
-    expect(monthKeyMYT(AUG1_EARLY_MYT)).toBe("2026-08"); // still Jul in UTC
-  });
-});
-
 // P1 (0303): the PO days are a SETTING, passed in. The seed is Mon/Wed/Fri.
 const PO_DAYS = [1, 3, 5];
 
@@ -82,53 +68,5 @@ describe("poUrgentBypass", () => {
     // P1: nobody set a number, so nothing here may claim to know better.
     expect(poUrgentBypass("2026-07-20", 0, now)).toBe(false);
     expect(poUrgentBypass("2026-07-01", 0, now)).toBe(false);
-  });
-});
-
-describe("pickNextDutyHolder", () => {
-  const A = "aaaaaaaa-0000-0000-0000-000000000001";
-  const B = "bbbbbbbb-0000-0000-0000-000000000002";
-  const C = "cccccccc-0000-0000-0000-000000000003";
-  it("empty pool → null; empty history with a pool picks a member", () => {
-    expect(pickNextDutyHolder([{ month: "2026-07", user_id: A }], [])).toBeNull();
-    expect(pickNextDutyHolder([], [A])).toBe(A);
-  });
-  it("never-served members go first (fewest months)", () => {
-    const history = [
-      { month: "2026-07", user_id: A },
-      { month: "2026-08", user_id: B },
-    ];
-    expect(pickNextDutyHolder(history, [A, B, C])).toBe(C);
-  });
-  it("all served equally → longest-ago last service rotates", () => {
-    const history = [
-      { month: "2026-07", user_id: A },
-      { month: "2026-08", user_id: B },
-      { month: "2026-09", user_id: C },
-    ];
-    expect(pickNextDutyHolder(history, [A, B, C])).toBe(A); // A served longest ago
-  });
-  it("deterministic tie-break on userId", () => {
-    expect(pickNextDutyHolder([], [C, A, B])).toBe(A);
-  });
-  it("history rows for members no longer in the pool don't crash the pick", () => {
-    const history = [{ month: "2026-07", user_id: "dddddddd-0000-0000-0000-000000000004" }];
-    expect(pickNextDutyHolder(history, [A])).toBe(A);
-  });
-});
-
-describe("canRaisePo", () => {
-  const HOLDER = "aaaaaaaa-0000-0000-0000-000000000001";
-  const OTHER = "bbbbbbbb-0000-0000-0000-000000000002";
-  it("managers always can (jess@ / operation@ / principal)", () => {
-    expect(canRaisePo(HOLDER, OTHER, "operation", "jess@carres.com", isOpsManager)).toBe(true);
-    expect(canRaisePo(HOLDER, OTHER, "principal", "boss@x.com", isOpsManager)).toBe(true);
-  });
-  it("the month's holder can; other staff cannot", () => {
-    expect(canRaisePo(HOLDER, HOLDER, "operation", "shasha@carres.com", isOpsManager)).toBe(true);
-    expect(canRaisePo(HOLDER, OTHER, "operation", "liching@carres.com", isOpsManager)).toBe(false);
-  });
-  it("dormant (no holder) → everyone can — a missing feature never blocks work", () => {
-    expect(canRaisePo(null, OTHER, "operation", "liching@carres.com", isOpsManager)).toBe(true);
   });
 });

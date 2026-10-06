@@ -1,12 +1,7 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../test/jwt";
 import type {
   CatalogResponse,
   OutletsListResponse,
@@ -25,7 +20,6 @@ vi.mock("../lib/supabase", () => ({
 import { userClient } from "../lib/supabase";
 
 const SUPABASE_URL = "https://test.supabase.co";
-const KID = "test-kid-1";
 
 const env = {
   SUPABASE_URL,
@@ -34,19 +28,11 @@ const env = {
   SUPABASE_JWT_SECRET: "unused",
 };
 
-let signKey: KeyLike;
-let publicJwk: JWK;
-
 async function makeJwt(role: string, dealerId: string | null) {
-  return new SignJWT({
+  return signTestJwt("11111111-1111-1111-1111-000000000999", {
     email: "test@carres.com",
     app_metadata: { role, ...(dealerId ? { dealer_id: dealerId } : {}) },
-  })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000999")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  });
 }
 
 /**
@@ -105,17 +91,8 @@ function buildSb(
   } as any;
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -1704,6 +1681,72 @@ describe("POST /api/catalog/models/:id/generate-skus (idempotent skip)", () => {
     expect(rows[0]?.variant).toBe("King");
   });
 
+  // 2026-08-24 — an explicit supplierId overrides the category-cover
+  // auto-resolve. Two suppliers can both cover mattress; without this a
+  // keyer had no way to say a batch is Hookka's rather than whichever
+  // supplier's cat_covered[] happened to sort first.
+  it("an explicit supplierId is accepted (the schema no longer .strict()-rejects it)", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      scriptedSb({
+        reads: {
+          product_models: {
+            category: "mattress",
+            model_key: "carres-classic",
+            allowed_options: { sizes: ["Queen"] },
+          },
+          suppliers: { id: "00000000-0000-0000-0000-00000000ff01" },
+          product_skus__list: [],
+        },
+        inserted: [{ id: "00000000-0000-0000-0000-00000000bb33" }],
+        records,
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/generate-skus`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ supplierId: "00000000-0000-0000-0000-00000000ff01" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { generated: number };
+    expect(body.generated).toBe(1);
+  });
+
+  it("an explicit supplierId that resolves to no row is 404, distinct from the 422 no-supplier-for-category path", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      scriptedSb({
+        reads: {
+          product_models: {
+            category: "mattress",
+            model_key: "carres-classic",
+            allowed_options: { sizes: ["Queen"] },
+          },
+          // No supplier row at all — the override path's own lookup fails.
+          suppliers: null,
+          product_skus__list: [],
+        },
+        records,
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/generate-skus`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ supplierId: "00000000-0000-0000-0000-00000000dead" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("not_found");
+  });
+
   it("expands raw bed-size codes to full-name variants (K→King, SS→Super Single)", async () => {
     const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
     vi.mocked(userClient).mockReturnValue(
@@ -1742,6 +1785,170 @@ describe("POST /api/catalog/models/:id/generate-skus (idempotent skip)", () => {
       expect.objectContaining({ sku: "LUMI-CLASSIC-K", variant: "King" }),
       expect.objectContaining({ sku: "LUMI-CLASSIC-SS", variant: "Super Single" }),
     ]);
+  });
+
+  /* ⭐ THE SUPPLIER'S OWN CODE ON A GENERATED BATCH (2026-08-24).
+   *
+   * A quotation names the SUPPLIER's code, never Carres' SKU, and it usually
+   * lists a different one per size — so one shared box would have written the
+   * same wrong code onto every row. Batch default, per-piece override. */
+  function generateSkusMock(records: { table: string; op: "insert" | "update"; body: unknown }[]) {
+    vi.mocked(userClient).mockReturnValue(
+      scriptedSb({
+        reads: {
+          product_models: { category: "mattress", model_key: "lumi-classic", allowed_options: {} },
+          suppliers: { id: "00000000-0000-0000-0000-00000000ff01" },
+          product_skus__list: [],
+        },
+        inserted: [
+          { id: "00000000-0000-0000-0000-00000000bb41" },
+          { id: "00000000-0000-0000-0000-00000000bb42" },
+        ],
+        records,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as any,
+    );
+  }
+
+  async function generate(body: unknown) {
+    const jwt = await makeJwt("operation", null);
+    return app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/generate-skus`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+  }
+
+  it("writes ONE batch code onto every generated row", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({ variants: ["K", "SS"], supplierCode: "  HK-390  " });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as { supplier_code: string }[];
+    // Trimmed — a code with the keyer's stray spaces will not match a quotation.
+    expect(rows.map((r) => r.supplier_code)).toEqual(["HK-390", "HK-390"]);
+  });
+
+  it("⭐ lets ONE piece override the batch, keyed by the variant the caller sent", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({
+      variants: ["K", "SS"],
+      supplierCode: "HK-390",
+      // Keyed by the RAW variant. `K` becomes `King` on the way in, so a map
+      // keyed by the canonical name would silently never match.
+      supplierCodes: { K: "HK-390-KING" },
+    });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as {
+      sku: string;
+      supplier_code: string;
+    }[];
+    expect(rows).toEqual([
+      expect.objectContaining({ sku: "LUMI-CLASSIC-K", supplier_code: "HK-390-KING" }),
+      expect.objectContaining({ sku: "LUMI-CLASSIC-SS", supplier_code: "HK-390" }),
+    ]);
+  });
+
+  it("falls back to the batch when a piece's box was left blank", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({
+      variants: ["K", "SS"],
+      supplierCode: "HK-390",
+      supplierCodes: { K: "   " },
+    });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as { supplier_code: string }[];
+    expect(rows.map((r) => r.supplier_code)).toEqual(["HK-390", "HK-390"]);
+  });
+
+  it("⭐ names the column NOT AT ALL when nobody typed a code", async () => {
+    /* The deploy-order hazard `catalog.skus-supplier-code.test.ts` documents:
+       PostgREST refuses an INSERT naming a column that does not exist, so an
+       always-present `supplier_code: null` would take out SKU GENERATION rather
+       than just the new field. Absent stays byte-identical to pre-feature. */
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({ variants: ["K", "SS"] });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as Record<string, unknown>[];
+    for (const row of rows) expect(row).not.toHaveProperty("supplier_code");
+  });
+
+  it("keeps every row of one batch agreeing about its keys", async () => {
+    /* A bulk insert whose objects disagree about which columns they name is its
+       own hazard — so one piece carrying a code puts the key on ALL of them,
+       null where nothing was typed. */
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({ variants: ["K", "SS"], supplierCodes: { K: "HK-390-KING" } });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as Record<string, unknown>[];
+    for (const row of rows) expect(row).toHaveProperty("supplier_code");
+    expect(rows.map((r) => r.supplier_code)).toEqual(["HK-390-KING", null]);
+  });
+
+  /* ⭐ A QUOTATION PRICES EACH SIZE DIFFERENTLY (2026-08-25). The measured
+     case: Hookka's Cody bedframe is K 550 · Q 425 · S 395 · SS 407.50, and one
+     batch price wrote the wrong number on every generated row. Same contract
+     as supplierCodes: keyed by the RAW variant, own entry wins, absent falls
+     back to the batch price. */
+  it("⭐ prices each variant from its own entry, falling back to the batch", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({
+      variants: ["K", "SS"],
+      price: 550,
+      prices: { SS: 407.5 },
+    });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as {
+      sku: string;
+      price: number;
+    }[];
+    expect(rows).toEqual([
+      expect.objectContaining({ sku: "LUMI-CLASSIC-K", price: 550 }),
+      expect.objectContaining({ sku: "LUMI-CLASSIC-SS", price: 407.5 }),
+    ]);
+  });
+
+  it("keeps an explicit per-variant 0 — deliberately unpriced at that size", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({ variants: ["K", "SS"], price: 550, prices: { SS: 0 } });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as { price: number }[];
+    expect(rows.map((r) => r.price)).toEqual([550, 0]);
+  });
+
+  it("⭐ seeds pwp_price per variant, NULL where unset, the key on EVERY row", async () => {
+    /* The 0186 server law: pwp <= 0 means NOT SET, stored as NULL — never as a
+       zero that half-reads as a price. And rows of one bulk insert must agree
+       about their columns, so the key rides every row once any row has one. */
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({
+      variants: ["K", "SS"],
+      price: 550,
+      pwpPrices: { K: 495 },
+    });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as Record<string, unknown>[];
+    for (const row of rows) expect(row).toHaveProperty("pwp_price");
+    expect(rows.map((r) => r.pwp_price)).toEqual([495, null]);
+  });
+
+  it("names pwp_price NOT AT ALL when nobody set one", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({ variants: ["K", "SS"], price: 550 });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as Record<string, unknown>[];
+    for (const row of rows) expect(row).not.toHaveProperty("pwp_price");
   });
 
   // Loo 2026-07-21 — adding a size to an EXISTING model unions it into
@@ -2824,7 +3031,7 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
           product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa", name: "Ohana" }],
           sofa_compartments: [COMP_ROW],
           product_skus: [], // model has no existing sku → no own supplier
-          suppliers: [{ id: "sup-covers-sofa" }],
+          suppliers: [{ id: "00000000-0000-0000-0000-00000000ffa2" }],
         },
         writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ID, price_override: null, sort_order: 0 },
       }),
@@ -2844,7 +3051,144 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
     // fixture carries 250) is deliberately IGNORED (Loo 2026-07-20): prices
     // live in SKU Master only — legacy pool prices must never leak onto a
     // fresh model's SKUs.
-    expect(skuUpsert?.payload).toMatchObject({ supplier_id: "sup-covers-sofa", price: 0, pos_active: true });
+    expect(skuUpsert?.payload).toMatchObject({ supplier_id: "00000000-0000-0000-0000-00000000ffa2", price: 0, pos_active: true });
+  });
+
+  /* ⭐ AN EXPLICIT PICK BEATS THE SIBLING (YH, 2026-08-26). The old rule let
+     a sibling SKU's supplier overrule the keyer's pick — written when "one
+     model, one supplier" was an invariant. Dual-sourcing ended it: adding
+     Xammar compartments with Hookka Industries PICKED silently wrote Ohana.
+     A fork the keyer chose is a decision; a swap they did not see is a
+     defect. One precedence now, shared with generate-skus:
+     explicit → sibling inherit → category cover. */
+  it("PUT — sibling supplier EXISTS, caller picks a different one → the PICK wins", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "BOOQIT", category: "sofa", name: "Booqit" }],
+          sofa_compartments: [COMP_ROW],
+          // A sibling already supplied by Ohana — the OLD rule would inherit it.
+          product_skus: [{ supplier_id: "00000000-0000-0000-0000-00000000aaa1" }],
+          suppliers: [{ id: "00000000-0000-0000-0000-00000000fff1" }],
+        },
+        writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ROW.id, price_override: null, sort_order: 0 },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ROW.id}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ supplierId: "00000000-0000-0000-0000-00000000fff1" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const skuUpsert = recorded.find((r) => r.op === "upsert" && r.table === "product_skus");
+    // The keyer's pick, not the sibling's Ohana.
+    expect(skuUpsert?.payload).toMatchObject({ supplier_id: "00000000-0000-0000-0000-00000000fff1" });
+  });
+
+  // 2026-08-24 — the ONE ambiguous case: a model's first compartment, no
+  // sibling sku's supplier to inherit yet. An explicit supplierId must win
+  // over the category-cover guess, or a keyer has no way to say a brand-new
+  // sofa's compartments are Hookka's rather than whichever supplier's
+  // cat_covered[] happened to sort first.
+  it("PUT — no model-own supplier, caller passes supplierId → the OVERRIDE wins, not the category cover", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "BOOQIT", category: "sofa", name: "Booqit" }],
+          sofa_compartments: [COMP_ROW],
+          product_skus: [], // no existing sku → no own supplier to inherit
+          // The category-cover fallback WOULD pick this one — proving the
+          // override actually short-circuits it, not merely ignored.
+          suppliers: [{ id: "00000000-0000-0000-0000-00000000ffa2" }, { id: "00000000-0000-0000-0000-00000000ffa1" }],
+        },
+        writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ID, price_override: null, sort_order: 0 },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ID}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ priceOverride: null, supplierId: "00000000-0000-0000-0000-00000000ffa1" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const skuUpsert = recorded.find((r) => r.op === "upsert" && r.table === "product_skus");
+    expect(skuUpsert?.payload).toMatchObject({ supplier_id: "00000000-0000-0000-0000-00000000ffa1" });
+  });
+
+  it("PUT — a supplierId that resolves to no row is 404, not a silent fall-through to Auto", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "BOOQIT", category: "sofa", name: "Booqit" }],
+          sofa_compartments: [COMP_ROW],
+          product_skus: [],
+          suppliers: [{ id: "00000000-0000-0000-0000-00000000ffa2" }], // real supplier exists — just not this id
+        },
+        writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ID, price_override: null, sort_order: 0 },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ID}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ priceOverride: null, supplierId: "00000000-0000-0000-0000-00000000ffa9" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("not_found");
+  });
+
+  /* REWRITTEN 2026-08-26. This test used to pin the OPPOSITE — the sibling
+     beating an explicit pick — from the era when "one model, one supplier" was
+     an invariant. Dual-sourcing ended that era, and in production the old rule
+     silently swapped a keyer's PICKED Hookka Industries for Ohana. What
+     survives of the old rule is exactly this: with NO explicit pick, the
+     sibling's supplier is still inherited — the model's own answer beats the
+     category-cover guess. */
+  it("PUT — no explicit pick → the sibling's supplier is inherited, not the category cover", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa", name: "Ohana" }],
+          sofa_compartments: [COMP_ROW],
+          // The model already has a real supplier'd sku.
+          product_skus: [{ model_id: MODEL_ID_LIVE, supplier_id: "sup-ohana" }],
+          // The cover fallback WOULD pick this one — proving inherit wins.
+          suppliers: [{ id: "00000000-0000-0000-0000-00000000ffa3" }],
+        },
+        writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ID, price_override: null, sort_order: 0 },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ID}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ priceOverride: null }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const skuUpsert = recorded.find((r) => r.op === "upsert" && r.table === "product_skus");
+    expect(skuUpsert?.payload).toMatchObject({ supplier_id: "sup-ohana" });
   });
 
   it("PUT — re-offer of a LIVE row preserves price AND pos_active (no clobber of a manual OFF)", async () => {
@@ -3454,6 +3798,13 @@ describe("0179 — sofa combo pricing (GET bundle + principal-gated CRUD)", () =
 
 // ---------------------------------------------------------------------------
 // 2990s Products parity Phase 1 — POST /api/catalog/import-skus
+//
+// 0358 moved the WRITES into one catalog_import_skus RPC. What the route still
+// owns — and what these tests cover — is the reads, every rejection reason, the
+// payload it hands to Postgres, and how per-row results zip back to file line
+// numbers. What the SQL owns (find-or-create the model, absent-key-means-
+// preserve, in-order last-wins) is proved by the migration's own verification,
+// not here: a mock that re-implemented it would only be testing itself.
 // ---------------------------------------------------------------------------
 
 describe("POST /api/catalog/import-skus", () => {
@@ -3463,21 +3814,72 @@ describe("POST /api/catalog/import-skus", () => {
     failed: number;
     failures: { row: number; key: string; reason: string }[];
   };
+  type ImportPayload = {
+    models: { category: string; model_key: string; name: string; sizes: string[] }[];
+    rows: Record<string, unknown>[];
+  };
+  type RpcReply = { data: unknown; error: { message: string } | null };
 
-  async function importAs(
-    role: string,
-    rows: unknown[],
-    opts: {
-      reads?: Record<string, unknown>;
-      records?: { table: string; op: "insert" | "update"; body: unknown }[];
-      inserted?: unknown[];
-    } = {},
-  ) {
-    vi.mocked(userClient).mockReturnValue(
-      scriptedSb({ reads: opts.reads ?? {}, records: opts.records, inserted: opts.inserted }),
-    );
+  /**
+   * A mock shaped like the route's actual traffic: three read chains and one
+   * `.rpc`. It records every `.from(table)` so a test can assert the subrequest
+   * COUNT, which is the whole point of 0358.
+   */
+  function importSb(opts: {
+    models?: unknown[];
+    skus?: unknown[];
+    suppliers?: unknown[];
+    rpc?: (payload: ImportPayload) => RpcReply;
+  }) {
+    const reads: Record<string, unknown[]> = {
+      product_models: opts.models ?? [],
+      product_skus: opts.skus ?? [],
+      suppliers: opts.suppliers ?? [],
+    };
+    const fromCalls: string[] = [];
+    const rpcCalls: { name: string; payload: ImportPayload }[] = [];
+    const mk = (table: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const chain: any = {};
+      chain.select = () => chain;
+      chain.in = () => chain;
+      chain.order = () => chain;
+      chain.then = (resolve: (v: { data: unknown; error: null }) => unknown) =>
+        resolve({ data: reads[table] ?? [], error: null });
+      return chain;
+    };
+    const sb = {
+      from: (table: string) => {
+        fromCalls.push(table);
+        return mk(table);
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      rpc: async (name: string, args: any) => {
+        const payload = args.p_payload as ImportPayload;
+        rpcCalls.push({ name, payload });
+        return opts.rpc
+          ? opts.rpc(payload)
+          : {
+              data: {
+                created_models: payload.models.length,
+                rows: payload.rows.map(() => ({ result: "inserted" })),
+              },
+              error: null,
+            };
+      },
+      _from: fromCalls,
+      _rpc: rpcCalls,
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return sb as any;
+  }
+
+  type ImportSb = ReturnType<typeof importSb>;
+
+  async function importAs(role: string, rows: unknown[], sb: ImportSb = importSb({})) {
+    vi.mocked(userClient).mockReturnValue(sb);
     const jwt = await makeJwt(role, role === "dealer" ? DEALER_ID : null);
-    return app.fetch(
+    const res = await app.fetch(
       new Request("http://t/api/catalog/import-skus", {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
@@ -3485,6 +3887,7 @@ describe("POST /api/catalog/import-skus", () => {
       }),
       env,
     );
+    return { res, sb };
   }
 
   const baseRow = (over: Record<string, unknown> = {}) => ({
@@ -3496,155 +3899,303 @@ describe("POST /api/catalog/import-skus", () => {
     ...over,
   });
 
+  const OHANA = { id: "sup-ohana", slug: "hookka", name: "Ohana", cat_covered: ["sofa", "bedframe"] };
+  const sent = (sb: ImportSb) => sb._rpc[0].payload as ImportPayload;
+
   it("403s a dealer (internal only)", async () => {
-    const res = await importAs("dealer", [baseRow()]);
+    const { res } = await importAs("dealer", [baseRow()]);
     expect(res.status).toBe(403);
   });
 
   it("403s a non-principal that imports a price (0175 lock)", async () => {
-    const res = await importAs("operation", [baseRow({ price: 1899 })]);
+    const { res } = await importAs("operation", [baseRow({ price: 1899 })]);
     expect(res.status).toBe(403);
     expect(((await res.json()) as { code?: string }).code).toBe("import_pricing_principal_only");
   });
 
-  it("operation imports UNPRICED structure → creates model + sku", async () => {
-    const records: { table: string; op: string; body: unknown }[] = [];
-    const res = await importAs("operation", [baseRow()], {
-      reads: { suppliers__list: [{ id: "sup-ohana", slug: "hookka", name: "Ohana", cat_covered: ["sofa", "bedframe"] }] },
-      records: records as never,
-    });
+  // ---- 0358: the reason this endpoint was rewritten ------------------------
+  // The Workers Free plan hard-caps ONE invocation at 50 subrequests, and every
+  // supabase-js call is one. The old loop spent 3 + one INSERT per new model +
+  // one write per row, so a 40-row file introducing 8 models hit 51 and the
+  // overflow came back as ~455 identical "failed" reasons. This is the guard.
+  it("spends a CONSTANT four subrequests — 120 rows across 30 models is still one write call", async () => {
+    const rows = Array.from({ length: 120 }, (_, i) =>
+      baseRow({
+        model: `Model ${i % 30}`,
+        modelKey: `model-${i % 30}`,
+        variant: `V${i}`,
+      }),
+    );
+    const { res, sb } = await importAs("operation", rows, importSb({ suppliers: [OHANA] }));
     expect(res.status).toBe(200);
-    const body = (await res.json()) as ImportResult;
-    expect(body).toMatchObject({ upserted: 1, createdModels: 1, failed: 0 });
-    const modelIns = records.find((r) => r.table === "product_models" && r.op === "insert");
-    expect(modelIns?.body).toMatchObject({ category: "sofa", model_key: "booqit", name: "Booqit" });
-    const skuIns = records.find((r) => r.table === "product_skus" && r.op === "insert");
-    expect(skuIns?.body).toMatchObject({ sku: "BOOQIT-1S", variant: "1S", price: 0, cost: null, supplier_id: "sup-ohana" });
+    expect((await res.json()) as ImportResult).toMatchObject({ upserted: 120, failed: 0 });
+    // Three reads and exactly one write call — not 3 + 30 + 120.
+    expect(sb._from).toEqual(["suppliers", "product_models", "product_skus"]);
+    expect(sb._rpc).toHaveLength(1);
+    expect(sb._rpc[0].name).toBe("catalog_import_skus");
+    expect(sent(sb).rows).toHaveLength(120);
+    expect(sent(sb).models).toHaveLength(30);
   });
 
-  it("principal imports a priced sku (price reaches the insert body)", async () => {
-    const records: { table: string; op: string; body: unknown }[] = [];
-    const res = await importAs("principal", [baseRow({ price: 1899, cost: 900 })], {
-      reads: { suppliers__list: [{ id: "sup-ohana", slug: "hookka", name: "Ohana", cat_covered: ["sofa"] }] },
-      records: records as never,
-    });
+  it("operation imports UNPRICED structure → the model and the row reach the batch", async () => {
+    const { res, sb } = await importAs("operation", [baseRow()], importSb({ suppliers: [OHANA] }));
     expect(res.status).toBe(200);
-    const skuIns = records.find((r) => r.table === "product_skus" && r.op === "insert");
-    expect(skuIns?.body).toMatchObject({ price: 1899, cost: 900 });
+    expect((await res.json()) as ImportResult).toMatchObject({
+      upserted: 1,
+      createdModels: 1,
+      failed: 0,
+    });
+    expect(sent(sb).models[0]).toMatchObject({
+      category: "sofa",
+      model_key: "booqit",
+      name: "Booqit",
+      sizes: ["1S"], // seeds allowed_options.sizes on create
+    });
+    expect(sent(sb).rows[0]).toMatchObject({
+      sku: "BOOQIT-1S",
+      variant: "1S",
+      supplier_id: "sup-ohana",
+    });
   });
 
-  it("updates an existing sku and preserves blank fields (no price key in patch)", async () => {
-    const records: { table: string; op: string; body: unknown }[] = [];
-    const res = await importAs("operation", [baseRow({ description: "Updated blurb" })], {
-      reads: {
-        product_models__list: [{ id: "m-booqit", category: "sofa", model_key: "booqit" }],
-        product_skus__list: [{ id: "s-booqit-1s", sku: "BOOQIT-1S", model_id: "m-booqit" }],
-      },
-      records: records as never,
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as ImportResult;
-    expect(body).toMatchObject({ upserted: 1, createdModels: 0, failed: 0 });
-    const skuUpd = records.find((r) => r.table === "product_skus" && r.op === "update");
-    expect(skuUpd?.body).toMatchObject({ variant: "1S", description: "Updated blurb" });
-    expect(skuUpd?.body).not.toHaveProperty("price");
-    expect(skuUpd?.body).not.toHaveProperty("cost");
-    // no new model created, no insert on product_skus
-    expect(records.find((r) => r.op === "insert")).toBeUndefined();
-  });
-
-  it("preserves variant_kind on update when the column is omitted", async () => {
-    const records: { table: string; op: string; body: unknown }[] = [];
-    // Existing SKU is a 'preset'; the import row omits variant_kind entirely.
-    const res = await importAs(
-      "operation",
-      [{ model: "Booqit", modelKey: "booqit", category: "sofa", variant: "1S" }], // no variantKind
-      {
-        reads: {
-          product_models__list: [{ id: "m-booqit", category: "sofa", model_key: "booqit" }],
-          product_skus__list: [{ id: "s-booqit-1s", sku: "BOOQIT-1S", model_id: "m-booqit" }],
-        },
-        records: records as never,
-      },
+  it("principal imports a priced sku (price + cost reach the batch row)", async () => {
+    const { res, sb } = await importAs(
+      "principal",
+      [baseRow({ price: 1899, cost: 900 })],
+      importSb({ suppliers: [OHANA] }),
     );
     expect(res.status).toBe(200);
-    const skuUpd = records.find((r) => r.table === "product_skus" && r.op === "update");
-    // blank variant_kind must NOT be written — it would silently re-type the SKU.
-    expect(skuUpd?.body).not.toHaveProperty("variant_kind");
+    expect(sent(sb).rows[0]).toMatchObject({ price: 1899, cost: 900 });
+  });
+
+  // Blank cells are dropped upstream so an export → edit → re-import round-trip
+  // cannot zero a price. The key must be ABSENT, not null: the RPC reads
+  // absence as "keep the stored value".
+  it("an update omits the keys the file left blank — it never sends null", async () => {
+    const { res, sb } = await importAs(
+      "operation",
+      [baseRow({ description: "Updated blurb" })],
+      importSb({
+        models: [{ id: "m-booqit", category: "sofa", model_key: "booqit" }],
+        skus: [{ sku: "BOOQIT-1S", model_id: "m-booqit" }],
+        rpc: (p) => ({
+          data: { created_models: 0, rows: p.rows.map(() => ({ result: "updated" })) },
+          error: null,
+        }),
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect((await res.json()) as ImportResult).toMatchObject({
+      upserted: 1,
+      createdModels: 0,
+      failed: 0,
+    });
+    const row = sent(sb).rows[0];
+    expect(row).toMatchObject({ variant: "1S", description: "Updated blurb" });
+    expect(row).not.toHaveProperty("price");
+    expect(row).not.toHaveProperty("cost");
+  });
+
+  it("preserves variant_kind when the column is omitted (never re-types a preset SKU)", async () => {
+    const { sb } = await importAs(
+      "operation",
+      [{ model: "Booqit", modelKey: "booqit", category: "sofa", variant: "1S" }], // no variantKind
+      importSb({
+        models: [{ id: "m-booqit", category: "sofa", model_key: "booqit" }],
+        skus: [{ sku: "BOOQIT-1S", model_id: "m-booqit" }],
+      }),
+    );
+    expect(sent(sb).rows[0]).not.toHaveProperty("variant_kind");
+  });
+
+  it("an existing sku with no supplier column does not need a covering supplier", async () => {
+    // This is why the product_skus read survived the rewrite: editing a
+    // description must not demand a supplier for the category.
+    const { res, sb } = await importAs(
+      "operation",
+      [baseRow({ description: "Just a blurb" })],
+      importSb({
+        models: [{ id: "m-booqit", category: "sofa", model_key: "booqit" }],
+        skus: [{ sku: "BOOQIT-1S", model_id: "m-booqit" }],
+        suppliers: [], // nobody covers 'sofa'
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect((await res.json()) as ImportResult).toMatchObject({ failed: 0 });
+    expect(sent(sb).rows[0]).toMatchObject({ supplier_id: null, supplier_explicit: false });
   });
 
   it("fails a row whose derived code already belongs to a different model (cross-category collision)", async () => {
-    const res = await importAs(
+    const { res, sb } = await importAs(
       "operation",
       [{ model: "Booqit", modelKey: "booqit", category: "mattress", variant: "1S" }],
-      {
-        reads: {
-          // mattress 'booqit' model exists; the BOOQIT-1S code already lives under a SOFA model.
-          product_models__list: [{ id: "m-mattress", category: "mattress", model_key: "booqit" }],
-          product_skus__list: [{ id: "s-sofa", sku: "BOOQIT-1S", model_id: "m-sofa" }],
-        },
-      },
+      importSb({
+        // mattress 'booqit' model exists; the BOOQIT-1S code already lives under a SOFA model.
+        models: [{ id: "m-mattress", category: "mattress", model_key: "booqit" }],
+        skus: [{ sku: "BOOQIT-1S", model_id: "m-sofa" }],
+      }),
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as ImportResult;
     expect(body.upserted).toBe(0);
     expect(body.failed).toBe(1);
     expect(body.failures[0].reason.toLowerCase()).toContain("already belongs");
+    // Rejected before the write — the batch never sees it.
+    expect(sent(sb).rows).toHaveLength(0);
+  });
+
+  it("a code under a model this very file is creating is also a collision", async () => {
+    const { res } = await importAs(
+      "operation",
+      [baseRow({ category: "bedframe" })], // no bedframe 'booqit' model exists yet
+      importSb({ models: [], skus: [{ sku: "BOOQIT-1S", model_id: "m-sofa" }], suppliers: [OHANA] }),
+    );
+    const body = (await res.json()) as ImportResult;
+    expect(body.failed).toBe(1);
+    expect(body.failures[0].reason.toLowerCase()).toContain("already belongs");
   });
 
   it("resolves the supplier by NAME (not just slug), case-insensitively", async () => {
-    const records: { table: string; op: string; body: unknown }[] = [];
-    await importAs(
+    const { sb } = await importAs(
       "operation",
       [{ model: "Akka", modelKey: "akka", category: "mattress", variant: "K", supplier: "NICE FUTURE" }],
-      {
-        reads: { suppliers__list: [{ id: "sup-nf", slug: "nice-future", name: "Nice Future", cat_covered: ["mattress"] }] },
-        records: records as never,
-      },
+      importSb({
+        suppliers: [{ id: "sup-nf", slug: "nice-future", name: "Nice Future", cat_covered: ["mattress"] }],
+      }),
     );
-    const skuIns = records.find((r) => r.table === "product_skus" && r.op === "insert");
-    expect(skuIns?.body).toMatchObject({ supplier_id: "sup-nf" });
+    expect(sent(sb).rows[0]).toMatchObject({ supplier_id: "sup-nf", supplier_explicit: true });
   });
 
   it("auto-resolves the supplier by category for a new sku", async () => {
-    const records: { table: string; op: string; body: unknown }[] = [];
-    await importAs("operation", [baseRow({ model: "Akka", modelKey: "akka", category: "mattress", variant: "K" })], {
-      reads: { suppliers__list: [{ id: "sup-nf", slug: "nice-future", name: "Nice Future", cat_covered: ["mattress"] }] },
-      records: records as never,
-    });
-    const skuIns = records.find((r) => r.table === "product_skus" && r.op === "insert");
-    expect(skuIns?.body).toMatchObject({ supplier_id: "sup-nf" });
+    const { sb } = await importAs(
+      "operation",
+      [baseRow({ model: "Akka", modelKey: "akka", category: "mattress", variant: "K" })],
+      importSb({
+        suppliers: [{ id: "sup-nf", slug: "nice-future", name: "Nice Future", cat_covered: ["mattress"] }],
+      }),
+    );
+    // Auto-resolved, but NOT explicit — an update must not overwrite a stored supplier.
+    expect(sent(sb).rows[0]).toMatchObject({ supplier_id: "sup-nf", supplier_explicit: false });
   });
 
   it("a new accessory sku carries a null supplier (supplierless)", async () => {
-    const records: { table: string; op: string; body: unknown }[] = [];
-    await importAs("operation", [baseRow({ model: "Pillow", modelKey: "pillow", category: "accessory", variant: "STD" })], {
-      reads: { suppliers__list: [] },
-      records: records as never,
-    });
-    const skuIns = records.find((r) => r.table === "product_skus" && r.op === "insert");
-    expect(skuIns?.body).toMatchObject({ supplier_id: null });
+    const { sb } = await importAs(
+      "operation",
+      [baseRow({ model: "Pillow", modelKey: "pillow", category: "accessory", variant: "STD" })],
+      importSb({ suppliers: [] }),
+    );
+    expect(sent(sb).rows[0]).toMatchObject({ supplier_id: null });
   });
 
   it("fails a row with an unknown explicit supplier (others still process)", async () => {
-    const res = await importAs("principal", [baseRow({ supplier: "ghost-co" })], {
-      reads: { suppliers__list: [{ id: "sup-ohana", slug: "hookka", name: "Ohana", cat_covered: ["sofa"] }] },
-    });
+    const { res, sb } = await importAs(
+      "principal",
+      [baseRow({ supplier: "ghost-co" }), baseRow({ variant: "2S" })],
+      importSb({ suppliers: [OHANA] }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ImportResult;
+    expect(body.upserted).toBe(1);
+    expect(body.failed).toBe(1);
+    expect(body.failures[0]).toMatchObject({ row: 1, key: "BOOQIT-1S" });
+    expect(body.failures[0].reason.toLowerCase()).toContain("supplier");
+    // Only the good row was sent, and the ORDER of what is sent is preserved.
+    expect(sent(sb).rows.map((r) => r.sku)).toEqual(["BOOQIT-2S"]);
+  });
+
+  /* 0477 — Finance's landlord is a row in `suppliers`, but a file that names
+     it (by name or slug) must not put it in a catalog slot. */
+  it("fails a row that names Finance's other creditor, by name or by slug", async () => {
+    const LANDLORD = {
+      id: "sup-landlord",
+      slug: "bayview-properties",
+      name: "Bayview Properties",
+      kind: "other_creditor",
+      cat_covered: [],
+    };
+    const { res, sb } = await importAs(
+      "principal",
+      [
+        baseRow({ supplier: "Bayview Properties" }),
+        baseRow({ variant: "2S", supplier: "bayview-properties" }),
+        baseRow({ variant: "3S" }),
+      ],
+      importSb({ suppliers: [{ ...OHANA, kind: "factory_pickup" }, LANDLORD] }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ImportResult;
+    expect(body.failed).toBe(2);
+    expect(body.failures.map((f) => f.key)).toEqual(["BOOQIT-1S", "BOOQIT-2S"]);
+    expect(sent(sb).rows.map((r) => r.supplier_id)).toEqual(["sup-ohana"]);
+  });
+
+  it("zips a per-row error from the batch back to the right FILE row", async () => {
+    const { res } = await importAs(
+      "principal",
+      [baseRow({ variant: "1S" }), baseRow({ variant: "2S" }), baseRow({ variant: "3S" })],
+      importSb({
+        suppliers: [OHANA],
+        rpc: (p) => ({
+          data: {
+            created_models: 1,
+            rows: p.rows.map((r) =>
+              r.sku === "BOOQIT-2S"
+                ? { result: "error", error: "value too long for type character varying" }
+                : { result: "inserted" },
+            ),
+          },
+          error: null,
+        }),
+      }),
+    );
+    const body = (await res.json()) as ImportResult;
+    expect(body.upserted).toBe(2);
+    expect(body.failed).toBe(1);
+    expect(body.failures[0]).toMatchObject({ row: 2, key: "BOOQIT-2S" });
+    expect(body.failures[0].reason).toMatch(/too long/);
+  });
+
+  // Reporting every sent row beats a 500: the import is a transaction, so if the
+  // call itself failed nothing was written, and the operator needs to see that
+  // rather than a blank page.
+  it("reports every sent row when the batch call itself fails", async () => {
+    const { res } = await importAs(
+      "principal",
+      [baseRow({ variant: "1S" }), baseRow({ variant: "2S" })],
+      importSb({
+        suppliers: [OHANA],
+        rpc: () => ({ data: null, error: { message: "forbidden: catalog import is internal only" } }),
+      }),
+    );
     expect(res.status).toBe(200);
     const body = (await res.json()) as ImportResult;
     expect(body.upserted).toBe(0);
-    expect(body.failed).toBe(1);
-    expect(body.failures[0].reason.toLowerCase()).toContain("supplier");
+    expect(body.failed).toBe(2);
+    expect(body.failures.map((f) => f.row)).toEqual([1, 2]);
+    expect(body.failures[0].reason).toMatch(/internal only/);
+  });
+
+  it("sends a duplicated code once per row, in file order (the RPC merges last-wins)", async () => {
+    const { sb } = await importAs(
+      "principal",
+      [baseRow({ price: 100, description: "X" }), baseRow({ price: 200 })],
+      importSb({ suppliers: [OHANA] }),
+    );
+    const rows = sent(sb).rows;
+    expect(rows.map((r) => r.sku)).toEqual(["BOOQIT-1S", "BOOQIT-1S"]);
+    expect(rows[0]).toMatchObject({ price: 100, description: "X" });
+    expect(rows[1]).toMatchObject({ price: 200 });
+    expect(rows[1]).not.toHaveProperty("description"); // absent = keep "X"
   });
 
   it("422s a batch over 500 rows", async () => {
     const rows = Array.from({ length: 501 }, () => baseRow());
-    const res = await importAs("operation", rows);
+    const { res } = await importAs("operation", rows);
     expect(res.status).toBe(422);
   });
 
   it("422s an empty batch", async () => {
-    const res = await importAs("operation", []);
+    const { res } = await importAs("operation", []);
     expect(res.status).toBe(422);
   });
 });
@@ -3779,7 +4330,7 @@ describe("Special add-ons CRUD (/api/catalog/special-addons)", () => {
   });
 });
 
-describe("0182 — global option pools (GET bundle + principal-gated CRUD)", () => {
+describe("0182 — global option pools (GET bundle)", () => {
   const POOL_ID = "00000000-0000-0000-0000-0000000f0001";
   const POOL_ROW = {
     id: POOL_ID,
@@ -3861,163 +4412,6 @@ describe("0182 — global option pools (GET bundle + principal-gated CRUD)", () 
       sortOrder: 2,
       active: true,
     });
-  });
-
-  it("POST /option-pools — principal inserts → 201 (camel→snake)", async () => {
-    const recorded: AdminCall[] = [];
-    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded, writeReturn: POOL_ROW }));
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request("http://t/api/catalog/option-pools", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ pool: "mattress_size", value: "Queen", label: "Queen", dimensions: "152x190", sortOrder: 2 }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(201);
-    const ins = recorded.find((r) => r.op === "insert");
-    expect(ins?.table).toBe("catalog_option_pools");
-    expect(ins?.payload).toMatchObject({
-      pool: "mattress_size",
-      value: "Queen",
-      label: "Queen",
-      dimensions: "152x190",
-      sort_order: 2,
-    });
-    const body = (await res.json()) as { optionPool: { value: string; sortOrder: number } };
-    expect(body.optionPool).toMatchObject({ value: "Queen", sortOrder: 2 });
-  });
-
-  it("POST /option-pools — non-principal → 403", async () => {
-    const jwt = await makeJwt("operation", null);
-    const res = await app.fetch(
-      new Request("http://t/api/catalog/option-pools", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ pool: "mattress_size", value: "Queen" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(403);
-    expect(((await res.json()) as { message?: string }).message).toMatch(/Master Admin/i);
-  });
-
-  it("POST /option-pools — duplicate (pool,value) → 409", async () => {
-    vi.mocked(userClient).mockReturnValue(
-      buildWriteSb({
-        writeError: { code: "23505", message: 'duplicate key value violates unique constraint "catalog_option_pools_pool_value_key"' },
-      }),
-    );
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request("http://t/api/catalog/option-pools", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ pool: "mattress_size", value: "Queen" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(409);
-    expect(((await res.json()) as { code?: string }).code).toBe("duplicate_option_pool_value");
-  });
-
-  it("PATCH /option-pools/:id — principal updates → 200, maps camel→snake, never writes pool", async () => {
-    const recorded: AdminCall[] = [];
-    vi.mocked(userClient).mockReturnValue(
-      buildWriteSb({ recorded, writeReturn: { ...POOL_ROW, value: "Super King", sort_order: 5 } }),
-    );
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/option-pools/${POOL_ID}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ value: "Super King", sortOrder: 5 }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    const upd = recorded.find((r) => r.op === "update");
-    expect(upd?.payload).toMatchObject({ value: "Super King", sort_order: 5 });
-    expect(upd?.payload).not.toHaveProperty("pool");
-    const body = (await res.json()) as { optionPool: { value: string; sortOrder: number } };
-    expect(body.optionPool).toMatchObject({ value: "Super King", sortOrder: 5 });
-  });
-
-  it("PATCH /option-pools/:id — empty body → 422", async () => {
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/option-pools/${POOL_ID}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-  });
-
-  it("PATCH /option-pools/:id — non-principal → 403", async () => {
-    const jwt = await makeJwt("operation", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/option-pools/${POOL_ID}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ value: "X" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(403);
-  });
-
-  it("PATCH /option-pools/:id — value rename collision (23505) → 409", async () => {
-    // A rename onto an existing (pool,value) must surface the SAME friendly 409
-    // as POST, not the generic 500 mapPgError defaults 23505 to.
-    vi.mocked(userClient).mockReturnValue(
-      buildWriteSb({
-        writeError: { code: "23505", message: 'duplicate key value violates unique constraint "catalog_option_pools_pool_value_key"' },
-      }),
-    );
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/option-pools/${POOL_ID}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ value: "Queen" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(409);
-    expect(((await res.json()) as { code?: string }).code).toBe("duplicate_option_pool_value");
-  });
-
-  it("DELETE /option-pools/:id — HARD delete → 200 { ok: true }", async () => {
-    const recorded: AdminCall[] = [];
-    vi.mocked(userClient).mockReturnValue(buildWriteSb({ recorded }));
-    const jwt = await makeJwt("principal", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/option-pools/${POOL_ID}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${jwt}` },
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true });
-    const del = recorded.find((r) => r.op === "delete");
-    expect(del?.table).toBe("catalog_option_pools");
-  });
-
-  it("DELETE /option-pools/:id — non-principal → 403", async () => {
-    const jwt = await makeJwt("operation", null);
-    const res = await app.fetch(
-      new Request(`http://t/api/catalog/option-pools/${POOL_ID}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${jwt}` },
-      }),
-      env,
-    );
-    expect(res.status).toBe(403);
   });
 });
 
@@ -6260,5 +6654,19 @@ describe("0202 — fabric master batch save + history", () => {
       supplierCode: "PC151-01",
       sofaTier: "PRICE_2",
     });
+  });
+});
+
+describe("catalog snapshots are dated with KL today (0520)", () => {
+  it("both batch-save doors no longer stamp the history row with the UTC clock", () => {
+    const mig = fs.readFileSync(
+      path.resolve(__dirname, "../../../../supabase/migrations/0520_catalog_snapshots_are_dated_kl_today.sql"),
+      "utf-8",
+    );
+    const bodies = mig.slice(mig.indexOf("-- 1. Option pools"));
+    expect(bodies).not.toContain("current_date");
+    expect(bodies).toContain("FUNCTION public.catalog_pool_batch_save(");
+    expect(bodies).toContain("FUNCTION public.catalog_fabrics_batch_save(");
+    expect(bodies.match(/\(timezone\('Asia\/Kuala_Lumpur', now\(\)\)\)::date/g)?.length).toBe(2);
   });
 });

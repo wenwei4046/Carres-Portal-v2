@@ -15,7 +15,7 @@ export default function Badge({ children }: { children: ReactNode }) {
   return (
     <span
       data-kit="badge"
-      className="inline-flex items-center rounded-pill bg-kit-slate-3 px-2 py-1 text-label text-kit-slate-11 tabular-nums"
+      className="inline-flex items-center rounded-full bg-kit-slate-3 px-2 py-1 text-label text-kit-slate-11 tabular-nums"
     >
       {children}
     </span>

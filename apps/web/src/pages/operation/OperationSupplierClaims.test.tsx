@@ -1,1133 +1,396 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { claimNextMove } from "@carres/shared";
+import type { SupplierClaimListRow, SupplierClaimRecord } from "@/lib/queries";
 import OperationSupplierClaims from "./OperationSupplierClaims";
-import type { SupplierClaimListRow, SupplierClaimsResponse } from "@/lib/queries";
+import { openRailGroups } from "@/test/rail";
 
 /**
- * R2 + R3 — the Claims queue.
- *
- * R2's tests pin the facts: the row says who, what, how many and off which PO,
- * and the empty state is a real answer rather than a shrug.
- *
- * R3's pin the lifecycle: every open claim names WHO OWES THE NEXT MOVE, the
- * two sides are recorded separately and cannot be rewritten once answered, a
- * claim will not close half-told, and a closed claim still shows both sides.
+ * Supplier Claims — Purchasing MASTER §9.5: the confirmed register
+ * (2026-09-18) and the record where the supplier reply is recorded
+ * (2026-09-25).
  */
+const renderOpen = ((...args: Parameters<typeof render>) => {
+  const result = render(...args);
+  openRailGroups();
+  return result;
+}) as typeof render;
 const claimsQuery = vi.fn();
 const photosQuery = vi.fn();
-const suppliersQuery = vi.fn();
-const requestMutate = vi.fn();
-const responseMutate = vi.fn();
-const closeMutate = vi.fn();
-const holdMutate = vi.fn();
-const resolutionMutate = vi.fn();
+const recordQuery = vi.fn();
+const doorMutate = vi.fn();
+const refreshPhotos = vi.fn();
+const apiMock = vi.fn();
+const returnsQuery = vi.fn();
+const writeMutate = vi.fn();
+const inspectionQuery = vi.fn();
+const refreshInspection = vi.fn();
+vi.mock("@/lib/api", () => ({ apiFetch: (...args: unknown[]) => apiMock(...args), ApiError: class ApiError extends Error {} }));
+vi.mock("@/lib/queries", () => ({
+  fetchOperationSupplierClaimPhotos: (...args: unknown[]) => refreshPhotos(...args),
+  useOperationSupplierClaims: (...args: unknown[]) => claimsQuery(...args),
+  useOperationSupplierClaimPhotos: (...args: unknown[]) => photosQuery(...args),
+  useSupplierClaimInspection: (...args: unknown[]) => inspectionQuery(...args),
+  fetchSupplierClaimInspection: (...args: unknown[]) => refreshInspection(...args),
+  useSupplierClaimRecord: (...args: unknown[]) => recordQuery(...args),
+  useSupplierClaimDoor: (_id: string, door: string) => ({ mutate: (body: unknown, opts?: { onSuccess?: () => void }) => { doorMutate(door, body); opts?.onSuccess?.(); }, isPending: false, error: null }),
+  useOperationPurchaseReturns: (...args: unknown[]) => returnsQuery(...args),
+  usePurchaseReturnWrite: (path: string) => ({ mutate: (body: unknown, opts?: { onSuccess?: (out: unknown) => void }) => { writeMutate(path, body); opts?.onSuccess?.({ id: "pr1" }); }, isPending: false, error: null }),
+  usePurchaseReturnIssueSource: () => ({ data: undefined, isLoading: true, isError: false }),
+}));
+vi.mock("./PurchasingTabs", () => ({ default: () => <header>Supplier Claims</header> }));
+vi.mock("./components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
+vi.mock("./SalesOrderLedger", () => ({ RecordRanks: ({ words }: { words: { title: string; identity: string; detail: string[] } }) => <><span>{words.title}</span><span>{words.identity}</span><span>{words.detail.join(" · ")}</span></> }));
 
-function mutation(mutateAsync: ReturnType<typeof vi.fn>) {
-  return { mutateAsync, isPending: false, isError: false, error: null };
-}
-
-vi.mock("@/lib/queries", async () => {
-  const actual =
-    await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
-  return {
-    ...actual,
-    useOperationSupplierClaims: (status: string) => claimsQuery(status),
-    useOperationSupplierClaimPhotos: (id: string | null) => photosQuery(id),
-    useOperationSuppliers: () => suppliersQuery(),
-    useSupplierClaimRequestMutation: () => mutation(requestMutate),
-    useSupplierClaimResponseMutation: () => mutation(responseMutate),
-    useSupplierClaimCloseMutation: () => mutation(closeMutate),
-    useSupplierClaimHoldResolveMutation: () => mutation(holdMutate),
-    useSupplierClaimCustomerResolutionMutation: () => mutation(resolutionMutate),
-  };
-});
-
-function wrap(node: React.ReactNode) {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return (
-    <MemoryRouter>
-      <QueryClientProvider client={qc}>{node}</QueryClientProvider>
-    </MemoryRouter>
-  );
-}
-
-/** Build a row the way the API does — `next_move` is computed server-side by
- *  the SAME shared function, so the fixture cannot drift from production. */
+const unit = (id: string, code: string | null, scope = "unit") => ({ id, unit_code: code, identity_scope: scope, qty: 1, status: "on_hold" });
 function row(over: Partial<SupplierClaimListRow> = {}): SupplierClaimListRow {
   const base: SupplierClaimListRow = {
-    id: "c1",
-    claim_no: "SC-1001",
-    po_id: "PO-2050",
-    po_line_id: "l1",
-    supplier_id: "s1",
-    supplier_name: "Ohana",
-    sku: "mattress:carres-cloud:King",
-    product_category: "mattress",
-    claim_type: "damaged",
-    qty: 2,
-    status: "open",
-    do_number: "DO-5231",
-    note: null,
-    reported_by_name: "Shasha",
-    reported_at: "2026-07-27T02:00:00Z",
-    photo_count: 2,
-    requested_action: null,
-    requested_at: null,
-    supplier_response: null,
-    supplier_response_note: null,
-    responded_at: null,
-    closed_at: null,
-    close_note: null,
-    customer_resolution: null,
-    customer_resolution_note: null,
-    customer_resolution_at: null,
-    line_pending: null,
-    held_units: 0,
-    hold_reason: null,
+    id: "c1", claim_no: "SC-1001", po_id: "PO-2050", po_line_id: "l1", supplier_id: "s1", supplier_name: "Ohana",
+    sku: "mattress:carres-cloud:King", product_category: "mattress", claim_type: "damaged", qty: 2, status: "open",
+    do_number: "DO-5231", note: null, reported_by_name: "Shasha", reported_at: "2026-07-27T02:00:00Z", photo_count: 2,
+    requested_action: null, requested_at: null, supplier_response: null, supplier_response_note: null, responded_at: null,
+    closed_at: null, close_note: null, customer_resolution: null, customer_resolution_note: null, customer_resolution_at: null,
+    carres_execution: null, carres_execution_note: null, carres_execution_at: null, line_pending: null, held_units: 0,
+    hold_reason: null, product_description: "Carres Cloud", product_variant: "King",
+    units: [unit("u1", "U1-000-075")], sent: false,
     next_move: { key: "ask", owner: "carres", label: "" },
     ...over,
   };
   return { ...base, next_move: claimNextMove(base) };
 }
-
-const DAMAGED = row();
-const WRONG = row({
-  id: "c3",
-  claim_no: "SC-1003",
-  supplier_id: "s2",
-  supplier_name: "Nice Future",
-  claim_type: "wrong_sku",
-  qty: 1,
-  photo_count: 1,
-});
-const LATE = row({
-  id: "c2",
-  claim_no: "SC-1002",
-  claim_type: "late_delivery",
-  qty: 3,
-  note: "Promised 20 Jul 26 — still pending delivery.",
-  reported_by_name: null,
-  photo_count: 0,
-  requested_action: "deliver_remaining",
-  requested_at: "2026-07-27T02:00:00Z",
-  line_pending: true,
+const RECORD = (over: Partial<SupplierClaimRecord> = {}): SupplierClaimRecord => ({
+  replies: [], sends: [], units: [unit("u1", "U1-000-075"), unit("u2", "U1-000-076")], requested_by_name: "Shasha",
+  repair_orders: [], purchase_returns: [], authorised_outcome: null, plan_repair: { allowed: false, missing: "Authorised Outcome" },
+  po_duty_name: "Shasha", approver_name: "Jess", ...over,
 });
 
-function ok(data: SupplierClaimsResponse) {
-  return { data, isLoading: false, isError: false, error: null, refetch: vi.fn() };
+function show(at = "/operation?tab=claims") {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return renderOpen(<MemoryRouter initialEntries={[at]}><OperationSupplierClaims /></MemoryRouter>, {
+    wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+  });
 }
-
 beforeEach(() => {
-  claimsQuery.mockReset();
-  photosQuery.mockReset();
-  suppliersQuery.mockReset();
-  requestMutate.mockReset();
-  responseMutate.mockReset();
-  closeMutate.mockReset();
-  holdMutate.mockReset();
-  resolutionMutate.mockReset();
-  resolutionMutate.mockResolvedValue({});
+  vi.useFakeTimers({ toFake: ["Date"] });
+  // Thursday 1 Oct 2026, 12:00 KL.
+  vi.setSystemTime(new Date("2026-10-01T04:00:00Z"));
+  apiMock.mockReset();
+  refreshPhotos.mockReset();
+  doorMutate.mockReset();
+  localStorage.clear();
+  claimsQuery.mockReturnValue({ data: { claims: [row(), row({ id: "c2", claim_no: "SC-1002", supplier_name: "Hooka", status: "closed" })] }, isLoading: false, isError: false });
   photosQuery.mockReturnValue({ data: { photos: [] }, isLoading: false, isError: false });
-  suppliersQuery.mockReturnValue({
-    data: {
-      suppliers: [
-        { id: "s1", name: "Ohana", whatsapp_group_url: "https://chat.whatsapp.com/x" },
-      ],
-    },
-  });
-  requestMutate.mockResolvedValue({});
-  responseMutate.mockResolvedValue({});
-  closeMutate.mockResolvedValue({});
-  holdMutate.mockResolvedValue({});
-  Object.assign(navigator, {
-    clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
-  });
-  vi.spyOn(window, "open").mockImplementation(() => null);
+  recordQuery.mockReturnValue({ data: RECORD(), isLoading: false, isError: false });
+  returnsQuery.mockReturnValue({ data: { returns: [] }, isLoading: false, isError: false });
+  writeMutate.mockReset();
+  inspectionQuery.mockReturnValue({ data: { files: [], problems: [] }, isLoading: false, isError: false });
+  refreshInspection.mockReset();
 });
+afterEach(() => vi.useRealTimers());
 
-describe("OperationSupplierClaims — the facts (R2)", () => {
-  it("states the facts of each claim — supplier, item, problem, PO, reporter", () => {
-    claimsQuery.mockReturnValue(
-      ok({ claims: [DAMAGED], counts: { open: 1, closed: 0, all: 1 } }),
-    );
-    render(wrap(<OperationSupplierClaims />));
-    expect(screen.getByText("SC-1001")).toBeInTheDocument();
-    expect(screen.getAllByText("Ohana").length).toBeGreaterThan(0);
-    expect(screen.getByText("2 units")).toBeInTheDocument();
-    expect(screen.getByTestId("claim-type-SC-1001")).toHaveTextContent("Damaged");
-    expect(screen.getByText("PO-2050")).toBeInTheDocument();
-    expect(screen.getByText("DO DO-5231")).toBeInTheDocument();
-    expect(screen.getByText("Shasha")).toBeInTheDocument();
+const headers = () => screen.getAllByRole("columnheader").map((th) => th.getAttribute("title")).filter(Boolean);
+
+describe("Supplier Claims register — the confirmed twelve columns (§9.5, 2026-09-18)", () => {
+  it("keeps the confirmed order after the two leading controls", () => {
+    show();
+    expect(headers().slice(0, 10)).toEqual(["Claim status", "Supplier Claim No", "Claim Reported", "Supplier", "PO No", "GRN No", "Items", "Qty", "Problem", "Supplier Response"]);
+    expect(screen.getAllByRole("checkbox", { name: "Select row" })).toHaveLength(2);
+    expect(headers()).not.toContain("Customer Resolution");
+    expect(headers()).not.toContain("Carres Execution");
   });
-
-  it("names the nightly sweep as the reporter of a late delivery instead of printing a blank", () => {
-    claimsQuery.mockReturnValue(
-      ok({ claims: [LATE], counts: { open: 1, closed: 0, all: 1 } }),
-    );
-    render(wrap(<OperationSupplierClaims />));
-    expect(screen.getByTestId("claim-type-SC-1002")).toHaveTextContent(
-      "Late delivery",
-    );
-    expect(screen.getByText("System")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Promised 20 Jul 26 — still pending delivery\./),
-    ).toBeInTheDocument();
+  it("reads In progress for an open claim, and Not issued when it has no number", () => {
+    claimsQuery.mockReturnValue({ data: { claims: [row({ claim_no: "" })] }, isLoading: false });
+    show();
+    expect(screen.getByTestId("claim-status-in-progress")).toHaveTextContent("In progress");
+    expect(screen.getByRole("button", { name: "Not issued" })).toBeInTheDocument();
+    expect(screen.queryByText("Open")).not.toBeInTheDocument();
   });
-
-  it("opens on the OPEN queue and switches status on the tabs", () => {
-    claimsQuery.mockReturnValue(
-      ok({ claims: [], counts: { open: 4, closed: 9, all: 13 } }),
-    );
-    render(wrap(<OperationSupplierClaims />));
-    expect(claimsQuery).toHaveBeenCalledWith("open");
-    fireEvent.click(screen.getByRole("tab", { name: /Closed/ }));
-    expect(claimsQuery).toHaveBeenLastCalledWith("closed");
+  it("prints the Unit identity on PO No line two, five ways, never invented", () => {
+    claimsQuery.mockReturnValue({ data: { claims: [
+      row(),
+      row({ id: "c3", claim_no: "SC-3", units: [unit("a", "U1-000-080"), unit("b", "U1-000-081")] }),
+      row({ id: "c4", claim_no: "SC-4", units: [unit("q", null, "quantity")] }),
+      row({ id: "c5", claim_no: "SC-5", units: [] }),
+      row({ id: "c6", claim_no: "SC-6", units: null }),
+    ] }, isLoading: false });
+    show();
+    const po = screen.getAllByRole("link", { name: "PO-2050" }).map((link) => link.closest("td")!.textContent);
+    expect(po).toEqual(["PO-2050U1-000-075", "PO-20502 Units", "PO-2050Counted stock", "PO-2050Unit not recorded", "PO-2050Units could not be loaded"]);
   });
-
-  it("an empty open queue answers the question instead of shrugging", () => {
-    claimsQuery.mockReturnValue(
-      ok({ claims: [], counts: { open: 0, closed: 0, all: 0 } }),
-    );
-    render(wrap(<OperationSupplierClaims />));
-    expect(
-      screen.getByText(/every delivery so far arrived complete and on time/i),
-    ).toBeInTheDocument();
+  it("opens the row's own expansion from `{n} Units`, the same state as ▸", () => {
+    claimsQuery.mockReturnValue({ data: { claims: [row({ units: [unit("a", "U1-000-080"), unit("b", "U1-000-081")] })] }, isLoading: false });
+    show();
+    const link = screen.getByTestId("claim-units-c1");
+    expect(link).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(link);
+    const inspector = screen.getByTestId("claim-inspector");
+    expect(inspector).toHaveTextContent("U1-000-080");
+    expect(inspector).toHaveTextContent("U1-000-081");
+    expect(within(inspector).queryByRole("combobox")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("claim-inspect-SC-1001"));
+    expect(screen.queryByTestId("claim-inspector")).not.toBeInTheDocument();
   });
-
-  it("fetches the evidence only when the row is opened", async () => {
-    claimsQuery.mockReturnValue(
-      ok({ claims: [DAMAGED], counts: { open: 1, closed: 0, all: 1 } }),
-    );
-    photosQuery.mockImplementation((id: string | null) => ({
-      data: id
-        ? { photos: [{ path: "PO-2050/a.jpg", url: "https://x/a.jpg" }] }
-        : { photos: [] },
-      isLoading: false,
-      isError: false,
-    }));
-    render(wrap(<OperationSupplierClaims />));
-    // The panel is what asks for photos, and the panel does not exist until the
-    // row is opened — so a closed queue mints no signed URLs at all.
-    expect(photosQuery).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByTestId("claim-open-SC-1001"));
-    await waitFor(() => expect(photosQuery).toHaveBeenLastCalledWith("c1"));
-    expect(screen.getByAltText(/Claim evidence/)).toBeInTheDocument();
+  it("keeps GRN in its own column and Items on two lines; a Catalog-silent SKU says so", () => {
+    claimsQuery.mockReturnValue({ data: { claims: [row({ warehouse_receipt_id: "r1", grn_no: "GRN-20260907-1001" }), row({ id: "c9", claim_no: "SC-9", product_description: null, product_variant: null, sku: "SMOKE King" })] }, isLoading: false });
+    show();
+    expect(screen.getAllByRole("link", { name: "PO-2050" })[0]!.closest("td")).not.toBe(screen.getByRole("link", { name: "GRN-260907-1001" }).closest("td"));
+    expect(screen.getByRole("link", { name: "GRN-260907-1001" })).toHaveAttribute("href", "/operation?tab=receiving&session=r1");
+    expect(screen.getByText("Carres Cloud").closest("td")).toBe(screen.getAllByText("King")[0]!.closest("td"));
+    expect(screen.getByText("Recorded SKU").closest("td")).toHaveTextContent("SMOKE King");
   });
-
-  it("never says credit note — claim resolutions are goods actions", () => {
-    claimsQuery.mockReturnValue(
-      ok({ claims: [DAMAGED, LATE], counts: { open: 2, closed: 0, all: 2 } }),
-    );
-    const { container } = render(wrap(<OperationSupplierClaims />));
-    expect(container.textContent).not.toMatch(/credit note/i);
+  it("counts claims only in the footer, filtered and whole", () => {
+    show();
+    expect(screen.getByText("2 Supplier Claims")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Hooka 1" }));
+    expect(screen.getByText("1 of 2 Supplier Claims")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(screen.getByText("2 Supplier Claims")).toBeInTheDocument();
+  });
+  it("draws the four factual rail groups and no Evidence group", () => {
+    show();
+    const rail = screen.getByTestId("supplier-claims-rail");
+    expect([...rail.querySelectorAll("[data-rail-group]")].map((g) => g.getAttribute("data-rail-group"))).toEqual(["Supplier", "Problem", "Claim status", "Supplier Response"]);
+    expect(within(rail).getByRole("button", { name: "In progress 1" })).toBeInTheDocument();
+  });
+  it("keeps a failed read distinct from an empty register, inside the grid", () => {
+    claimsQuery.mockReturnValue({ isError: true, error: Object.assign(new Error("boom"), { status: 500 }), refetch: vi.fn() });
+    show();
+    expect(screen.getByRole("alert")).toHaveTextContent("Supplier Claims could not be loaded");
+    expect(screen.queryByText("No Supplier Claims yet.")).not.toBeInTheDocument();
+    claimsQuery.mockReturnValue({ data: { claims: [] }, isLoading: false });
+  });
+  it("uses selection for Export only", () => {
+    show();
+    fireEvent.click(screen.getAllByRole("checkbox", { name: "Select row" })[0]!);
+    expect(screen.getByRole("button", { name: /Export Excel.*1/ })).toBeInTheDocument();
   });
 });
 
-describe("R3 — who owes the next move", () => {
-  it("a fresh claim is OURS, and the row says what to do about it", () => {
-    claimsQuery.mockReturnValue(
-      ok({ claims: [DAMAGED], counts: { open: 1, closed: 0, all: 1 } }),
-    );
-    render(wrap(<OperationSupplierClaims />));
-    expect(screen.getByTestId("claim-owner-SC-1001")).toHaveTextContent("Carres");
-    expect(screen.getByTestId("claim-next-move-SC-1001")).toHaveTextContent(
-      "Call Ohana — agree the fix",
-    );
+describe("the claim record — where the supplier reply is recorded (§9.5, 2026-09-25)", () => {
+  it("replaces the not-available line with the two Supplier buttons, in order", () => {
+    show("/operation?tab=claims&claim=c1");
+    expect(screen.queryByText(/reply recording are not available here yet/)).not.toBeInTheDocument();
+    const ask = screen.getByTestId("claim-record-ask");
+    const reply = screen.getByTestId("claim-record-reply");
+    expect(ask).toHaveTextContent("Record what we asked");
+    expect(reply).toHaveTextContent("Record supplier reply");
+    expect(ask.compareDocumentPosition(reply) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
-
-  it("a late claim already asked for the rest, so the SUPPLIER owes the move", () => {
-    claimsQuery.mockReturnValue(
-      ok({ claims: [LATE], counts: { open: 1, closed: 0, all: 1 } }),
-    );
-    render(wrap(<OperationSupplierClaims />));
-    expect(screen.getByTestId("claim-owner-SC-1002")).toHaveTextContent("Ohana");
-    // R8 — the row now prints the dictionary's own line, which is the SAME
-    // string the queue tile above it prints the action-less form of.
-    expect(screen.getByTestId("claim-next-move-SC-1002")).toHaveTextContent(
-      "Call Ohana — confirm what happens next",
-    );
+  it("leads with ONE current action: record the ask, then the send, then the reply", () => {
+    show("/operation?tab=claims&claim=c1");
+    expect(screen.getByTestId("claim-current-action")).toHaveTextContent("The supplier claim is not issued");
+    expect(screen.getByTestId("claim-primary")).toHaveTextContent("Record what we asked");
   });
-
-  it("a late claim whose goods arrived comes back to US", () => {
-    claimsQuery.mockReturnValue(
-      ok({
-        claims: [row({ ...LATE, line_pending: false })],
-        counts: { open: 1, closed: 0, all: 1 },
-      }),
-    );
-    render(wrap(<OperationSupplierClaims />));
-    expect(screen.getByTestId("claim-owner-SC-1002")).toHaveTextContent("Carres");
-    expect(screen.getByTestId("claim-next-move-SC-1002")).toHaveTextContent(
-      "delivered the rest",
-    );
+  it("walks the reply state from the ask: Reply expected → Reply overdue → Escalated to {name}", () => {
+    // Asked Mon 28 Sep → Reply expected Wed 30 Sep → escalation Fri 2 Oct.
+    claimsQuery.mockReturnValue({ data: { claims: [row({ requested_action: "replace", requested_at: "2026-09-28T02:00:00Z", sent: true })] }, isLoading: false });
+    recordQuery.mockReturnValue({ data: RECORD({ sends: [{ id: "s1", version: 1, recipient: "Ohana Mr Lee", channel: "whatsapp", note: null, sent_at: "2026-09-28T03:00:00Z", sent_by_name: "Shasha" }] }), isLoading: false });
+    const view = show("/operation?tab=claims&claim=c1");
+    expect(screen.getByTestId("claim-reply-state")).toHaveTextContent("Reply overdue · Wed, 30 Sep");
+    expect(screen.getByTestId("claim-send-line")).toHaveTextContent("Claim sent · WhatsApp · Ohana Mr Lee");
+    expect(screen.getByTestId("claim-primary")).toHaveTextContent("Record supplier reply");
+    view.unmount();
+    vi.setSystemTime(new Date("2026-10-02T04:00:00Z"));
+    show("/operation?tab=claims&claim=c1");
+    expect(screen.getByTestId("claim-reply-state")).toHaveTextContent("Escalated to Jess");
   });
-
-  it("a closed claim keeps BOTH sides on the row", () => {
-    claimsQuery.mockReturnValue(
-      ok({
-        claims: [
-          row({
-            status: "closed",
-            requested_action: "replace",
-            requested_at: "2026-07-27T03:00:00Z",
-            supplier_response: "repair",
-            responded_at: "2026-07-27T04:00:00Z",
-            closed_at: "2026-07-27T05:00:00Z",
-          }),
-        ],
-        counts: { open: 0, closed: 1, all: 1 },
-      }),
-    );
-    render(wrap(<OperationSupplierClaims />));
-    // What we wanted vs what we got — the whole point of two fields.
-    expect(screen.getByText(/Asked Replace → got Repair/)).toBeInTheDocument();
-    expect(screen.queryByTestId("claim-owner-SC-1001")).not.toBeInTheDocument();
+  it("dates Reply expected from the timing the ask snapshotted (0607), not a live setting", () => {
+    claimsQuery.mockReturnValue({ data: { claims: [row({ requested_action: "replace", requested_at: "2026-09-28T02:00:00Z", sent: true, reply_waiting_days: 3, escalation_extra_days: 2 })] }, isLoading: false });
+    show("/operation?tab=claims&claim=c1");
+    expect(screen.getByTestId("claim-reply-state")).toHaveTextContent("Reply expected Thu, 1 Oct");
   });
-});
-
-describe("R3 — recording the two sides", () => {
-  function openPanel(claim: SupplierClaimListRow) {
-    claimsQuery.mockReturnValue(
-      ok({ claims: [claim], counts: { open: 1, closed: 0, all: 1 } }),
-    );
-    render(wrap(<OperationSupplierClaims />));
-    fireEvent.click(screen.getByTestId(`claim-open-${claim.claim_no}`));
-  }
-
-  /**
-   * The ask chips, scoped to their own group.
-   *
-   * Layer ③ put a `Customer Resolution` picker on this same panel, and it
-   * legitimately carries a `Replace` and a `Repair` of its own — the supplier
-   * saying it and Carres deciding it are different facts about different
-   * parties. So a bare `getByRole("button", { name: "Replace" })` now finds
-   * two, correctly. Each decision's chips sit in a `role="group"` with the
-   * section's own name, which is how a screen reader tells them apart too.
-   */
-  const askChips = () => within(screen.getByTestId("claim-ask-options"));
-  const answerChips = () => within(screen.getByTestId("claim-answer-options"));
-
-  it("offers Jess's five asks, sends the message and stamps what we asked", async () => {
-    openPanel(DAMAGED);
-    for (const label of [
-      "Replace",
-      "Deliver missing parts",
-      "Deliver correct item",
-      "Repair",
-      "Return for inspection",
-    ]) {
-      expect(askChips().getByRole("button", { name: label })).toBeInTheDocument();
-    }
-    // Never the machine word for a late claim's ask.
-    expect(
-      askChips().queryByRole("button", { name: "Deliver remaining" }),
-    ).not.toBeInTheDocument();
-
-    fireEvent.click(askChips().getByRole("button", { name: "Replace" }));
-    fireEvent.click(screen.getByTestId("claim-send-ask"));
-    await waitFor(() =>
-      expect(requestMutate).toHaveBeenCalledWith({
-        claimId: "c1",
-        requested_action: "replace",
-      }),
-    );
-    // One act: recorded, copied, group opened.
-    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled());
-    expect(window.open).toHaveBeenCalledWith(
-      "https://chat.whatsapp.com/x",
-      "_blank",
-      "noopener,noreferrer",
-    );
+  it("names what is missing beside the button and does not save", () => {
+    claimsQuery.mockReturnValue({ data: { claims: [row({ requested_action: "replace", requested_at: "2026-09-28T02:00:00Z", sent: true })] }, isLoading: false });
+    show("/operation?tab=claims&claim=c1");
+    fireEvent.click(screen.getByTestId("claim-record-reply"));
+    fireEvent.click(screen.getByTestId("claim-reply-save"));
+    expect(screen.getByTestId("claim-reply-missing")).toHaveTextContent("Choose the supplier's answer.");
+    // `Applies to` starts on `Whole claim`, so it never reads as missing.
+    expect(screen.getByTestId("claim-reply-missing")).not.toHaveTextContent("Choose what the answer applies to.");
+    expect(screen.getByTestId("claim-reply-missing")).toHaveTextContent("Add the evidence: a file, or who spoke and when.");
+    expect(doorMutate).not.toHaveBeenCalled();
   });
-
-  it("the WhatsApp message leads with the supplier's OWN delivery note", () => {
-    openPanel(DAMAGED);
-    fireEvent.click(askChips().getByRole("button", { name: "Replace" }));
-    expect(screen.getByText(/DO DO-5231 \(PO PO-2050\)/)).toBeInTheDocument();
-    expect(screen.getByText(/Please \*replace\* for the 2 units\./)).toBeInTheDocument();
+  it("opens on Whole claim with no Unit ticks, and shows the phone facts only for a Phone call", () => {
+    claimsQuery.mockReturnValue({ data: { claims: [row({ requested_action: "replace", requested_at: "2026-09-28T02:00:00Z", sent: true })] }, isLoading: false });
+    show("/operation?tab=claims&claim=c1");
+    fireEvent.click(screen.getByTestId("claim-record-reply"));
+    const form = screen.getByTestId("claim-reply-form");
+    expect(within(form).getByRole("combobox", { name: "Applies to" })).toHaveTextContent("Whole claim");
+    expect(screen.queryByTestId("claim-reply-units")).not.toBeInTheDocument();
+    expect(within(form).queryByLabelText("Who spoke")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("claim-reply-phone"));
+    expect(within(form).getByLabelText("Who spoke")).toBeInTheDocument();
+    expect(screen.getByTestId("claim-reply-phone-fields")).toHaveTextContent("When they spoke");
+    fireEvent.click(screen.getByTestId("claim-reply-phone"));
+    expect(within(form).queryByLabelText("Who spoke")).not.toBeInTheDocument();
   });
-
-  it("still records the ask when the supplier has no group link, and says how to fix it", () => {
-    suppliersQuery.mockReturnValue({
-      data: { suppliers: [{ id: "s1", name: "Ohana", whatsapp_group_url: null }] },
-    });
-    openPanel(DAMAGED);
-    fireEvent.click(askChips().getByRole("button", { name: "Replace" }));
-    expect(
-      screen.getByText(/WhatsApp group is not saved\. Ask a manager to add it/),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("claim-send-ask")).toHaveTextContent(
-      "Save what we asked",
-    );
+  it("shows the recorded answer as a claim-level fact, never spread across Units", () => {
+    claimsQuery.mockReturnValue({ data: { claims: [row({ requested_action: "replace", requested_at: "2026-09-28T02:00:00Z", supplier_response: "repair", sent: true })] }, isLoading: false });
+    recordQuery.mockReturnValue({ data: RECORD({ replies: [{ id: "r1", response: "repair", scope: "claim", unit_ids: [], supplier_date: "2026-10-05", note: null, spoke_with: "Mr Lee", spoken_at: "2026-09-29T02:00:00Z", recorded_at: "2026-09-29T03:00:00Z", recorded_by_name: "Shasha", formal_at: "2026-09-29T03:00:00Z", current: true, evidence: [] }] }), isLoading: false });
+    show("/operation?tab=claims&claim=c1");
+    expect(screen.getByTestId("claim-answer")).toHaveTextContent("Repair · Whole claim · by Mon, 5 Oct · recorded Tue, 29 Sep · Shasha");
+    expect(screen.getByTestId("claim-answer")).not.toHaveTextContent("U1-000-075");
+    expect(screen.getByTestId("claim-answer")).toHaveTextContent("Evidence 1");
+    // A supplier's Repair is an offer: no Plan Repair without an Authorised Outcome.
+    expect(screen.queryByTestId("claim-plan-repair")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("claim-current-action")).not.toBeInTheDocument();
   });
-
-  it("a late claim has nothing to pick and says why", () => {
-    openPanel(LATE);
-    expect(screen.getByTestId("claim-request-recorded")).toHaveTextContent(
-      "Deliver remaining",
-    );
-    expect(
-      screen.getByText(/a late delivery can only be asked to deliver the rest/i),
-    ).toBeInTheDocument();
+  it("keeps saved claim photos in the ONE shared viewer with the claim's own context", () => {
+    photosQuery.mockReturnValue({ data: { photos: [{ path: "lost.jpg", url: null, at: "2026-09-04T02:00:00Z" }] } });
+    show("/operation?tab=claims&claim=c1");
+    fireEvent.click(screen.getByRole("button", { name: "Photo 1" }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/SC-1001 · Evidence/)).toHaveTextContent("Fri, 4 Sep");
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Photo 1 could not be loaded");
   });
-
-  it("refuses to take an answer before a question has been asked", () => {
-    openPanel(DAMAGED);
-    expect(
-      screen.getByText(/Ask Ohana first — an answer needs a question\./),
-    ).toBeInTheDocument();
-    expect(screen.queryByTestId("claim-save-answer")).not.toBeInTheDocument();
+  it("opens a closed Claim outside the PO filter and preserves that filter on return", async () => {
+    show("/operation?tab=claims&po=PO-other&claim=c2");
+    expect(screen.getByTestId("object-identity")).toHaveTextContent("SC-1002");
+    expect(screen.queryByTestId("claim-record-reply")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "Back to Supplier Claims" }));
+    await waitFor(() => expect(screen.queryByTestId("claim-object")).not.toBeInTheDocument());
+    expect(screen.getByTestId("claims-rail-source")).toHaveTextContent("PO: PO-other");
   });
-
-  it("records the supplier's answer, and does NOT narrow it to what we asked", async () => {
-    openPanel(row({ requested_action: "replace", requested_at: "2026-07-27T03:00:00Z" }));
-    // They may answer anything — including something other than Replace.
-    fireEvent.click(answerChips().getByRole("button", { name: "Repair" }));
-    fireEvent.click(screen.getByTestId("claim-save-answer"));
-    await waitFor(() =>
-      expect(responseMutate).toHaveBeenCalledWith({
-        claimId: "c1",
-        supplier_response: "repair",
-        note: undefined,
-      }),
-    );
-  });
-
-  it("a refusal cannot be saved without a reason", async () => {
-    openPanel(row({ requested_action: "replace", requested_at: "2026-07-27T03:00:00Z" }));
-    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
-    expect(screen.getByTestId("claim-save-answer")).toBeDisabled();
-    expect(
-      screen.getByText(/must say what was agreed, or why/i),
-    ).toBeInTheDocument();
-
-    fireEvent.change(screen.getByTestId("claim-answer-note"), {
-      target: { value: "Out of warranty, 8 months old" },
-    });
-    fireEvent.click(screen.getByTestId("claim-save-answer"));
-    await waitFor(() =>
-      expect(responseMutate).toHaveBeenCalledWith({
-        claimId: "c1",
-        supplier_response: "reject",
-        note: "Out of warranty, 8 months old",
-      }),
-    );
-  });
-
-  it("freezes the ask once the supplier has answered — history is not rewritten", () => {
-    openPanel(
-      row({
-        requested_action: "replace",
-        requested_at: "2026-07-27T03:00:00Z",
-        supplier_response: "repair",
-        responded_at: "2026-07-27T04:00:00Z",
-      }),
-    );
-    expect(screen.getByTestId("claim-request-recorded")).toHaveTextContent("Replace");
-    expect(screen.getByTestId("claim-response-recorded")).toHaveTextContent("Repair");
-    expect(
-      screen.queryByRole("button", { name: "Deliver correct item" }),
-    ).not.toBeInTheDocument();
+  it("keeps a missing object distinct from an empty register", () => {
+    show("/operation?tab=claims&claim=missing");
+    expect(screen.getByText("Claim is not available.")).toBeInTheDocument();
   });
 });
 
-describe("R3 — the close keeps both sides", () => {
-  function openPanel(claim: SupplierClaimListRow) {
-    claimsQuery.mockReturnValue(
-      ok({ claims: [claim], counts: { open: 1, closed: 0, all: 1 } }),
-    );
-    render(wrap(<OperationSupplierClaims />));
-    fireEvent.click(screen.getByTestId(`claim-open-${claim.claim_no}`));
-  }
-
-  it("will not close a claim with either side blank, and says which", () => {
-    openPanel(DAMAGED);
-    expect(screen.getByTestId("claim-close-blocked")).toHaveTextContent(
-      "Say what we asked the supplier to do.",
-    );
-    expect(screen.getByTestId("claim-close-blocked")).toHaveTextContent(
-      "Record what the supplier answered.",
-    );
-    expect(screen.queryByTestId("claim-close")).not.toBeInTheDocument();
+describe("the claim record's Result — `Record what Carres does next` and `Issue Purchase Return` (§9.6, 2026-09-25)", () => {
+  it("says what Carres does is not recorded, and offers the door only when the server confirms PO Duty", () => {
+    show("/operation?tab=claims&claim=c1");
+    expect(screen.getByTestId("claim-what-carres-does")).toHaveTextContent("What Carres does · Not recorded");
+    expect(screen.queryByTestId("claim-record-next")).not.toBeInTheDocument();
   });
-
-  it("closes once both sides are on file", async () => {
-    openPanel(
-      row({
-        requested_action: "replace",
-        requested_at: "2026-07-27T03:00:00Z",
-        supplier_response: "replacement",
-        responded_at: "2026-07-27T04:00:00Z",
-      }),
-    );
-    fireEvent.click(screen.getByTestId("claim-close"));
-    await waitFor(() =>
-      expect(closeMutate).toHaveBeenCalledWith({ claimId: "c1", note: undefined }),
-    );
+  it("records one of the three supplier-side decisions through the existing route", () => {
+    recordQuery.mockReturnValue({ data: RECORD({ may_record_next: true }), isLoading: false });
+    show("/operation?tab=claims&claim=c1");
+    fireEvent.click(screen.getByTestId("claim-record-next"));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("combobox"));
+    const options = screen.getAllByRole("option").map((o) => o.textContent);
+    // OWNER RULING 2026-09-29: the three supplier-side decisions only.
+    expect(options).toEqual(["Return to supplier", "Repair", "Replacement"]);
+    fireEvent.click(screen.getByRole("option", { name: "Return to supplier" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Record what Carres does next" }));
+    expect(writeMutate).toHaveBeenCalledWith("/api/operation/supplier-claims/c1/carres-execution", { carres_execution: "return_to_supplier" });
   });
-
-  it("offers nothing to change on a claim that is already closed", () => {
-    openPanel(
-      row({
-        status: "closed",
-        requested_action: "replace",
-        requested_at: "2026-07-27T03:00:00Z",
-        supplier_response: "replacement",
-        responded_at: "2026-07-27T04:00:00Z",
-        closed_at: "2026-07-27T05:00:00Z",
-        close_note: "New unit delivered 30 Jul",
-      }),
-    );
-    expect(screen.queryByTestId("claim-close")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("claim-send-ask")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("claim-save-answer")).not.toBeInTheDocument();
-    expect(screen.getByText("New unit delivered 30 Jul")).toBeInTheDocument();
+  it("once `Return to supplier` is recorded, leads with `Issue Purchase Return` and opens the 50/50 form", () => {
+    recordQuery.mockReturnValue({ data: RECORD({ decision: "return_to_supplier", decision_at: "2026-09-29T02:00:00Z", decision_by_name: "Mei", may_record_next: true }), isLoading: false });
+    claimsQuery.mockReturnValue({ data: { claims: [row({ requested_action: "replace", requested_at: "2026-09-28T02:00:00Z", supplier_response: "return_and_replace", carres_execution: "return_to_supplier" })] }, isLoading: false });
+    show("/operation?tab=claims&claim=c1");
+    expect(screen.getByTestId("claim-what-carres-does")).toHaveTextContent("What Carres does · Return to supplier · Tue, 29 Sep · Mei");
+    expect(screen.getByTestId("claim-current-action")).toHaveTextContent("Issue the purchase return to Ohana");
+    expect(screen.getByTestId("claim-primary")).toHaveTextContent("Issue Purchase Return");
+    // One obvious button: the Result does not repeat the door the Current action leads with.
+    expect(screen.queryByTestId("claim-issue-return")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("claim-primary"));
+    expect(screen.queryByTestId("claim-result")).not.toBeInTheDocument();
   });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// P2 — the click behaviour (docs/UI-KIT.md §8.2)
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// Before this card the page had NO facet rail and NO filter state, so not one
-// line of the interaction law could be true here. Every test below locks a
-// behaviour a screenshot cannot prove.
-
-describe("Claims · §8.2 the queue tile (card P2)", () => {
-  function renderAll() {
-    claimsQuery.mockReturnValue(
-      ok({
-        claims: [DAMAGED, LATE, WRONG],
-        counts: { open: 3, closed: 0, all: 3 },
-      }),
-    );
-    return render(wrap(<OperationSupplierClaims />));
-  }
-
-  it("takes the tile's name and its empty state VERBATIM from the dictionary", () => {
-    // A tile's name IS its action, and `Claims` is the TAB — a place and an
-    // action may not share one word (COPY-STANDARD).
-    renderAll();
-    expect(screen.getByTestId("facet-queue-answer")).toHaveTextContent(
-      "Confirm what happens next",
-    );
-    expect(screen.queryByTestId("facet-queue-claims")).toBeNull();
+  it("an issued return reads `Sending not confirmed` and Stock's pickup word, never `not sent`", () => {
+    recordQuery.mockReturnValue({ data: RECORD({ decision: "return_to_supplier", purchase_returns: [{ id: "pr1", pr_no: "PR-20260929-1001" }] }), isLoading: false });
+    returnsQuery.mockReturnValue({ data: { returns: [{ id: "pr1", pr_no: "PR-20260929-1001", pr_doc_date: "2026-09-29T02:00:00Z", supplier_id: "s1", supplier_name: "Ohana", claim_no: "SC-1001", grn_no: null, sent_at: null, confirmed_pickup_date: null, sends: [], confirmations: [],
+      units: [{ unit_id: "U1-000-075", po_id: null, category: null, item: null, item_spec: null, pickup_location: null, return_to: "Lot 9", collected_by: null, actual_pickup_date: null, supplier_received_date: null, evidence: [] }] }] }, isLoading: false });
+    show("/operation?tab=claims&claim=c1");
+    const box = screen.getByTestId("claim-purchase-returns");
+    expect(box).toHaveTextContent("PR-20260929-1001");
+    expect(box).toHaveTextContent("Sending not confirmed");
+    expect(box).toHaveTextContent("Pickup date not confirmed · Not picked up");
+    expect(box).toHaveTextContent("Supplier Received Date Not recorded");
+    expect(box).not.toHaveTextContent(/not sent/i);
+    expect(screen.queryByTestId("claim-issue-return")).not.toBeInTheDocument();
   });
-
-  // ── R8 · the tile and the row stop spelling one action two ways ────────────
-  it("the row line is the tile's own action, party named", () => {
-    renderAll();
-    // P2 shipped the tile from the dictionary and left the row on R3's own
-    // sentence, so this ONE screen said `Confirm what happens next` at the top
-    // and `confirm what they will do` in the column. Both now come out of
-    // `order-action-words.ts`.
-    const tile = screen.getByTestId("facet-queue-answer").textContent ?? "";
-    const row = screen.getByTestId("claim-next-move-SC-1002").textContent ?? "";
-    expect(tile).toContain("Confirm what happens next");
-    expect(row).toBe("Call Ohana — confirm what happens next");
-    // The queue word carries no party (a queue holds many); the row does.
-    expect(tile).not.toContain("Ohana");
+  it("Replacement opens only its existing owning door; a legacy customer movement stays readable", () => {
+    recordQuery.mockReturnValue({ data: RECORD({ decision: "replacement", decision_at: "2026-09-29T02:00:00Z", decision_by_name: "Mei", legacy_words: ["Collect First"], plan_replacement: { allowed: true } }), isLoading: false });
+    show("/operation?tab=claims&claim=c1");
+    expect(screen.getByTestId("claim-what-carres-does")).toHaveTextContent("What Carres does · Replacement");
+    expect(screen.getByTestId("claim-plan-replacement")).toHaveAttribute("href", "/operation?tab=arrival-source&kind=supplier-replacement&claim=c1");
+    expect(screen.getByTestId("claim-legacy-decision")).toHaveTextContent("Earlier record · Collect First");
+    expect(screen.queryByTestId("claim-plan-repair")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("claim-issue-return")).not.toBeInTheDocument();
   });
-
-  it("renders no explanatory paragraph above the list (Loo, 2026-07-28)", () => {
-    const { container } = renderAll();
-    // UI-KIT §1.1 question 3 — if it were removed, could today's work still be
-    // finished? YES, so the gate does not admit it, and §1.3's budget is 200px.
-    expect(container.textContent).not.toMatch(/What the supplier still owes us/);
-    expect(container.textContent).not.toMatch(/Opened by receiving/);
-  });
-
-  it("filters to the claims the supplier still owes an answer on", () => {
-    renderAll();
-    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(3);
-
-    fireEvent.click(screen.getByTestId("facet-queue-answer"));
-
-    // Only the late claim has been asked and not answered.
-    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(1);
-    expect(screen.getByText("SC-1002")).toBeInTheDocument();
-    expect(screen.queryByText("SC-1001")).toBeNull();
-  });
-
-  it("clicking it again clears it, and so does its ✕ chip", () => {
-    renderAll();
-    fireEvent.click(screen.getByTestId("facet-queue-answer"));
-    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(1);
-
-    fireEvent.click(screen.getByTestId("facet-queue-answer"));
-    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(3);
-
-    // …and the chip does the same job.
-    fireEvent.click(screen.getByTestId("facet-queue-answer"));
-    const chips = screen.getByTestId("listshell-active-chips");
-    expect(chips).toHaveTextContent("Confirm what happens next");
-    // Scoped to the chip row: the tile in the rail carries the same word, which
-    // is the point — a queue and its chip may not spell one action two ways.
-    fireEvent.click(
-      within(chips).getByRole("button", { name: /Confirm what happens next/ }),
-    );
-    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(3);
-  });
-
-  it("an empty queue says the dictionary's sentence, not a shrug", () => {
-    claimsQuery.mockReturnValue(
-      ok({ claims: [DAMAGED], counts: { open: 1, closed: 0, all: 1 } }),
-    );
-    render(wrap(<OperationSupplierClaims />));
-    // Nobody is waiting on a supplier — the tile still renders (a quiet screen
-    // must mean watched and fine, never nobody looked).
-    expect(screen.getByTestId("facet-queue-answer")).toHaveTextContent("0");
-    fireEvent.click(screen.getByTestId("facet-queue-answer"));
-    expect(
-      screen.getByText("No claim is waiting for a supplier answer."),
-    ).toBeInTheDocument();
+  it("`Plan Repair` appears only when the server confirms all three facts", () => {
+    recordQuery.mockReturnValue({ data: RECORD({ decision: "repair", authorised_outcome: "Repair", plan_repair: { allowed: true, missing: null } }), isLoading: false });
+    show("/operation?tab=claims&claim=c1");
+    expect(screen.getByTestId("claim-plan-repair")).toHaveAttribute("href", "/operation?tab=repair-orders&create=1&claim=c1");
   });
 });
 
-describe("Claims · §8.2 two picks, two ✕-able chips (card P2)", () => {
-  function renderAll() {
-    claimsQuery.mockReturnValue(
-      ok({
-        claims: [DAMAGED, LATE, WRONG],
-        counts: { open: 3, closed: 0, all: 3 },
-      }),
-    );
-    return render(wrap(<OperationSupplierClaims />));
-  }
+describe("Row expansion — the per-Unit evidence inspector (§9.5, owner-confirmed 2026-09-18)", () => {
+  const file = (path: string, unit_code: string | null, kind: "photo" | "video" = "photo") => ({ path, at: "2026-09-04T02:00:00Z", kind, unit_code, url: `https://signed/${path}` });
+  const twoUnits = () => claimsQuery.mockReturnValue({ data: { claims: [row({ note: "Both legs cracked", supplier_response: "repair", response_reply: { scope: "units", unit_ids: ["a"], supplier_date: null }, units: [unit("a", "U1-000-080"), unit("b", "U1-000-081")] })] }, isLoading: false });
 
-  it("clicking the same supplier again clears it", () => {
-    renderAll();
-    const cell = screen.getByTestId("facet-supplier-s2");
-
-    fireEvent.click(cell);
-    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(1);
-    expect(screen.getByTestId("listshell-active-chips")).toHaveTextContent(
-      "Supplier: Nice Future",
-    );
-
-    fireEvent.click(cell);
-    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(3);
-    expect(screen.queryByTestId("listshell-active-chips")).toBeNull();
+  it("draws one row per held Unit, Qty 1, in the confirmed five columns, with no editor, uploader or delete", () => {
+    twoUnits();
+    inspectionQuery.mockReturnValue({ data: { files: [file("a1.jpg", "U1-000-080"), file("a2.jpg", "U1-000-080"), file("a3.mp4", "U1-000-080", "video"), file("old.jpg", null)], problems: [{ stock_item_id: "a", note: "Left leg cracked" }] }, isLoading: false, isError: false });
+    show();
+    fireEvent.click(screen.getByTestId("claim-inspect-SC-1001"));
+    const inspector = screen.getByTestId("claim-inspector");
+    expect(within(inspector).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["PO No", "Items", "Qty", "Problem & Evidence", "Supplier Response"]);
+    const rows = within(inspector).getAllByTestId(/^claim-unit-row-/);
+    expect(rows.map((r) => r.getAttribute("data-testid"))).toEqual(["claim-unit-row-a", "claim-unit-row-b", "claim-unit-row-claim"]);
+    expect(rows[0]).toHaveTextContent("U1-000-080");
+    expect(rows[0]).toHaveTextContent("Left leg cracked");
+    expect(within(rows[0]!).getByRole("button", { name: "Photos 2" })).toHaveAttribute("aria-expanded", "false");
+    expect(within(rows[0]!).getByRole("button", { name: "Video 1" })).toBeInTheDocument();
+    expect(rows[0]).toHaveTextContent("Repair");
+    // B has no file: no dead control, and the Units answer is not spread to it.
+    expect(within(rows[1]!).queryByRole("button", { name: /Photo|Video/ })).not.toBeInTheDocument();
+    expect(rows[1]).toHaveTextContent("Not recorded");
+    // The pre-0614 photo names no Unit: it stays on the honest claim-level row.
+    expect(rows[2]).toHaveTextContent("Whole claim");
+    expect(rows[2]).toHaveTextContent("Both legs cracked");
+    expect(within(rows[2]!).getByRole("button", { name: "Photo 1" })).toBeInTheDocument();
+    for (const u of within(inspector).getAllByTestId(/^claim-unit-row-/)) expect(u.querySelectorAll("td")[2]!.textContent).toMatch(/^[12]$/);
+    expect(within(inspector).queryByRole("textbox")).not.toBeInTheDocument();
+    expect(within(inspector).queryByText(/Upload|Delete|Add evidence/)).not.toBeInTheDocument();
   });
 
-  it("two picks show two chips, and each ✕ clears only its own", () => {
-    renderAll();
-    fireEvent.click(screen.getByTestId("facet-supplier-s1"));
-    fireEvent.click(screen.getByTestId("facet-problem-damaged"));
-
-    const chips = screen.getByTestId("listshell-active-chips");
-    expect(chips).toHaveTextContent("Supplier: Ohana");
-    expect(chips).toHaveTextContent("Problem: Damaged");
-    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(1);
-    expect(screen.getByText("SC-1001")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /Problem: Damaged/ }));
-    expect(screen.getByTestId("listshell-active-chips")).toHaveTextContent(
-      "Supplier: Ohana",
-    );
-    expect(
-      screen.queryByRole("button", { name: /Problem: Damaged/ }),
-    ).toBeNull();
-    // Ohana's two claims are back; Nice Future's is still filtered out.
-    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(2);
+  it("expands that Unit's evidence beneath it, independently, and opens the shared viewer naming the Unit", () => {
+    twoUnits();
+    inspectionQuery.mockReturnValue({ data: { files: [file("a1.jpg", "U1-000-080"), file("b1.jpg", "U1-000-081")], problems: [] }, isLoading: false, isError: false });
+    show();
+    fireEvent.click(screen.getByTestId("claim-inspect-SC-1001"));
+    const a = screen.getByTestId("claim-unit-row-a");
+    const b = screen.getByTestId("claim-unit-row-b");
+    fireEvent.click(within(a).getByRole("button", { name: "Photo 1" }));
+    fireEvent.click(within(b).getByRole("button", { name: "Photo 1" }));
+    expect(within(a).getByRole("button", { name: "Photo 1" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByTestId("claim-unit-evidence-a")).toBeInTheDocument();
+    expect(screen.getByTestId("claim-unit-evidence-b")).toBeInTheDocument();
+    fireEvent.click(within(screen.getByTestId("claim-unit-evidence-a")).getByRole("button", { name: /Photo 1/ }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("SC-1001 · U1-000-080 · Problem evidence");
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    fireEvent.click(within(a).getByRole("button", { name: "Photo 1" }));
+    expect(screen.queryByTestId("claim-unit-evidence-a")).not.toBeInTheDocument();
+    expect(screen.getByTestId("claim-unit-evidence-b")).toBeInTheDocument();
   });
 
-  it("never offers a pick that would empty the table", () => {
-    renderAll();
-    // Every group is counted with every filter EXCEPT its own, and a zero row
-    // is not rendered — so a visible cell always returns rows.
-    expect(screen.getByTestId("facet-problem-wrong_sku")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId("facet-supplier-s1"));
-    // Ohana has no wrong-SKU claim, so the cell that would blank the table is
-    // gone rather than sitting there reading 0.
-    expect(screen.queryByTestId("facet-problem-wrong_sku")).toBeNull();
-    expect(screen.getByTestId("facet-problem-damaged")).toBeInTheDocument();
-    expect(screen.getByTestId("facet-problem-late_delivery")).toBeInTheDocument();
+  it("never prints a count it does not know: a failed read says so with Try again", () => {
+    twoUnits();
+    const refetch = vi.fn();
+    inspectionQuery.mockReturnValue({ data: undefined, isLoading: false, isError: true, refetch });
+    show();
+    fireEvent.click(screen.getByTestId("claim-inspect-SC-1001"));
+    const inspector = screen.getByTestId("claim-inspector");
+    expect(inspector).toHaveTextContent("Evidence could not be loaded");
+    expect(inspector).not.toHaveTextContent(/Photos 0|Photo 0/);
+    fireEvent.click(within(inspector).getByRole("button", { name: "Try again" }));
+    expect(refetch).toHaveBeenCalled();
+    // The Units still show; only their evidence is unknown.
+    expect(inspector).toHaveTextContent("U1-000-080");
   });
 
-  it("Reset filters clears every pick at once", () => {
-    renderAll();
-    fireEvent.click(screen.getByTestId("facet-queue-answer"));
-    fireEvent.click(screen.getByTestId("facet-supplier-s1"));
-    expect(screen.getByTestId("listshell-active-chips")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Reset filters" }));
-    expect(screen.queryByTestId("listshell-active-chips")).toBeNull();
-    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(3);
-  });
-});
-
-describe("Claims · §8.2 the status tabs are a STAGE picker (card P2)", () => {
-  function renderAll() {
-    claimsQuery.mockReturnValue(
-      ok({
-        claims: [DAMAGED, LATE, WRONG],
-        counts: { open: 3, closed: 0, all: 3 },
-      }),
-    );
-    return render(wrap(<OperationSupplierClaims />));
-  }
-
-  it("re-clicking the tab you are already on is a NO-OP, filters included", () => {
-    renderAll();
-    fireEvent.click(screen.getByTestId("facet-supplier-s1"));
-    expect(screen.getByTestId("listshell-active-chips")).toHaveTextContent(
-      "Supplier: Ohana",
-    );
-
-    // One of the three is always on and there is nothing to clear into, so a
-    // second click must not run a reset (UI-KIT §8.2's no-empty-state shape).
-    fireEvent.click(screen.getByRole("tab", { name: /Open/ }));
-
-    expect(screen.getByTestId("listshell-active-chips")).toHaveTextContent(
-      "Supplier: Ohana",
-    );
-    expect(claimsQuery).toHaveBeenLastCalledWith("open");
-  });
-
-  it("a DIFFERENT tab is a different list, so it clears the picks", () => {
-    renderAll();
-    fireEvent.click(screen.getByTestId("facet-supplier-s1"));
-    expect(screen.getByTestId("listshell-active-chips")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: /Closed/ }));
-
-    expect(screen.queryByTestId("listshell-active-chips")).toBeNull();
-    expect(claimsQuery).toHaveBeenLastCalledWith("closed");
-  });
-});
-
-describe("Claims · §8.2 the row opens it, and closing gives the list back (card P2)", () => {
-  function renderAll() {
-    claimsQuery.mockReturnValue(
-      ok({
-        claims: [DAMAGED, LATE, WRONG],
-        counts: { open: 3, closed: 0, all: 3 },
-      }),
-    );
-    return render(wrap(<OperationSupplierClaims />));
-  }
-
-  it("clicking the ROW opens the claim — not only the button", () => {
-    renderAll();
-    expect(screen.queryByTestId("claim-panel-SC-1001")).toBeNull();
-
-    fireEvent.click(screen.getAllByTestId("supplier-claim-row")[0]);
-    expect(screen.getByTestId("claim-panel-SC-1001")).toBeInTheDocument();
-
-    fireEvent.click(screen.getAllByTestId("supplier-claim-row")[0]);
-    expect(screen.queryByTestId("claim-panel-SC-1001")).toBeNull();
-  });
-
-  it("the Open/Hide button fires ONCE — the row click underneath must not fire too", () => {
-    // The whole row became a click target, so the button now sits inside one.
-    // Two handlers for one click is invisible on the panel (both toggles read
-    // the same render's state and agree) and NOT invisible on the scroll: the
-    // second close reads a snapshot the first one has already spent, and the
-    // position is silently lost.
-    renderAll();
-    const box = screen.getByTestId("claims-table-scroll");
-    Object.defineProperty(box, "scrollHeight", { value: 900, configurable: true });
-    Object.defineProperty(box, "clientHeight", { value: 400, configurable: true });
-    box.scrollTop = 310;
-
-    fireEvent.click(screen.getByTestId("claim-open-SC-1001"));
-    expect(screen.getByTestId("claim-panel-SC-1001")).toBeInTheDocument();
-    box.scrollTop = 0;
-
-    fireEvent.click(screen.getByTestId("claim-open-SC-1001"));
-    expect(screen.queryByTestId("claim-panel-SC-1001")).toBeNull();
-    expect(box.scrollTop).toBe(310);
-  });
-
-  it("closing keeps the filter AND the table's scroll position", () => {
-    renderAll();
-    fireEvent.click(screen.getByTestId("facet-supplier-s1"));
-    expect(screen.getAllByTestId("supplier-claim-row")).toHaveLength(2);
-
-    // jsdom has no layout, so give the box a real scrollable geometry first —
-    // otherwise scrollTop can only ever be 0 and the assertion proves nothing.
-    const box = screen.getByTestId("claims-table-scroll");
-    Object.defineProperty(box, "scrollHeight", { value: 900, configurable: true });
-    Object.defineProperty(box, "clientHeight", { value: 400, configurable: true });
-    box.scrollTop = 240;
-
-    fireEvent.click(screen.getAllByTestId("supplier-claim-row")[0]);
-    expect(screen.getByTestId("claim-panel-SC-1001")).toBeInTheDocument();
-    box.scrollTop = 0; // what losing the panel's height does to it
-
-    fireEvent.click(screen.getAllByTestId("supplier-claim-row")[0]);
-
-    expect(screen.queryByTestId("claim-panel-SC-1001")).toBeNull();
-    expect(screen.getByTestId("listshell-active-chips")).toHaveTextContent(
-      "Supplier: Ohana",
-    );
-    expect(box.scrollTop).toBe(240);
-  });
-
-  it("gives the scroll back when a filter takes the open claim off the list", () => {
-    renderAll();
-    const box = screen.getByTestId("claims-table-scroll");
-    Object.defineProperty(box, "scrollHeight", { value: 900, configurable: true });
-    Object.defineProperty(box, "clientHeight", { value: 400, configurable: true });
-    box.scrollTop = 120;
-
-    fireEvent.click(screen.getAllByTestId("supplier-claim-row")[0]);
-    expect(screen.getByTestId("claim-panel-SC-1001")).toBeInTheDocument();
-    box.scrollTop = 0;
-
-    // Nobody clicked the panel shut — the filter took it away.
-    fireEvent.click(screen.getByTestId("facet-supplier-s2"));
-
-    expect(screen.queryByTestId("claim-panel-SC-1001")).toBeNull();
-    expect(box.scrollTop).toBe(120);
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// R4 — the goods (migration 0299)
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// The quarantine itself is the database's (a trigger refuses `on_hold →
-// reserved|sold|transferred` whichever door tries it). What the panel owes is
-// that a human can SEE the units are held and SAY what happened to them —
-// without that, the hold is a black hole and the units are lost on purpose.
-
-describe("OperationSupplierClaims — the goods (R4)", () => {
-  function openClaim(claim: SupplierClaimListRow) {
-    claimsQuery.mockReturnValue(
-      ok({ claims: [claim], counts: { open: 1, closed: 0, all: 1 } }),
-    );
-    render(wrap(<OperationSupplierClaims />));
-    fireEvent.click(screen.getByTestId(`claim-open-${claim.claim_no}`));
-  }
-
-  it("says the units are held AND that they cannot be sold", () => {
-    openClaim(row({ held_units: 2, hold_reason: "damaged" }));
-    const panel = screen.getByTestId("claim-held-stock");
-    expect(panel).toHaveTextContent("2 units on hold");
-    expect(panel).toHaveTextContent("Arrived damaged");
-    // The whole point of the card, said out loud rather than left to a status
-    // word nobody scrolls to.
-    expect(panel).toHaveTextContent("cannot be sold, reserved or delivered");
-  });
-
-  it("offers the card's three outcomes and nothing else", () => {
-    openClaim(row({ held_units: 1, hold_reason: "wrong_item" }));
-    expect(screen.getByTestId("hold-outcome-back_to_stock")).toBeInTheDocument();
-    expect(screen.getByTestId("hold-outcome-returned")).toBeInTheDocument();
-    expect(screen.getByTestId("hold-outcome-written_off")).toBeInTheDocument();
-  });
-
-  it("records what happened, and the browser never names the status", async () => {
-    openClaim(row({ held_units: 2, hold_reason: "damaged" }));
-    fireEvent.click(screen.getByTestId("hold-outcome-returned"));
-    fireEvent.click(screen.getByTestId("hold-resolve"));
-    await waitFor(() => expect(holdMutate).toHaveBeenCalled());
-    // `outcome`, never `status`: which status each outcome means is the
-    // database's answer, mirrored once in the shared module.
-    expect(holdMutate).toHaveBeenCalledWith({
-      claimId: "c1",
-      outcome: "returned",
-      note: undefined,
-    });
-  });
-
-  it("will not write off units without saying why", async () => {
-    openClaim(row({ held_units: 1, hold_reason: "damaged" }));
-    fireEvent.click(screen.getByTestId("hold-outcome-written_off"));
-    expect(screen.getByTestId("hold-resolve")).toBeDisabled();
-    expect(screen.getByTestId("claim-held-stock")).toHaveTextContent(
-      "Say why the units were written off.",
-    );
-
-    fireEvent.change(screen.getByTestId("hold-outcome-note"), {
-      target: { value: "Frame cracked through" },
-    });
-    expect(screen.getByTestId("hold-resolve")).not.toBeDisabled();
-    fireEvent.click(screen.getByTestId("hold-resolve"));
-    await waitFor(() => expect(holdMutate).toHaveBeenCalled());
-    expect(holdMutate).toHaveBeenCalledWith({
-      claimId: "c1",
-      outcome: "written_off",
-      note: "Frame cracked through",
-    });
-  });
-
-  it("a late-delivery claim holds nothing, and says so instead of showing buttons", () => {
-    // Nothing arrived, so there is nothing to quarantine. 0 is an answer.
-    openClaim(LATE);
-    const panel = screen.getByTestId("claim-held-stock");
-    expect(panel).toHaveTextContent("Nothing on hold");
-    expect(screen.queryByTestId("hold-resolve")).not.toBeInTheDocument();
-  });
-
-  it("a resolved claim stops offering the buttons — the units already moved", () => {
-    openClaim(
-      row({
-        held_units: 0,
-        hold_reason: null,
-        requested_action: "replace",
-        requested_at: "2026-07-27T03:00:00Z",
-        supplier_response: "replacement",
-        responded_at: "2026-07-27T04:00:00Z",
-      }),
-    );
-    expect(screen.queryByTestId("hold-outcome-returned")).not.toBeInTheDocument();
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Layer ③ · Customer Resolution (Loo, 2026-08-05)
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// The panel answered three questions and never the one the CUSTOMER waits on.
-// The test that made it a second FIELD rather than four more options in an
-// existing list is Loo's own — can both be true at the same time? — and the
-// third test below is that sentence written as code.
-
-describe("Customer Resolution — the second decision", () => {
-  function openClaim(claim: SupplierClaimListRow) {
-    claimsQuery.mockReturnValue(
-      ok({ claims: [claim], counts: { open: 1, closed: 0, all: 1 } }),
-    );
-    render(wrap(<OperationSupplierClaims />));
-    fireEvent.click(screen.getByTestId(`claim-open-${claim.claim_no}`));
-  }
-
-  it("asks what we are doing for the customer, and offers Loo's four", () => {
-    openClaim(row());
-    const panel = screen.getByTestId("claim-customer-resolution");
-    expect(panel).toHaveTextContent("Customer Resolution");
-    expect(panel).toHaveTextContent("What are we doing for the customer?");
-    expect(screen.getByTestId("customer-resolution-replace")).toHaveTextContent(
-      "Replace",
-    );
-    expect(screen.getByTestId("customer-resolution-repair")).toHaveTextContent(
-      "Repair",
-    );
-    expect(screen.getByTestId("customer-resolution-accept_as_is")).toHaveTextContent(
-      "Accept As-Is",
-    );
-    expect(
-      screen.getByTestId("customer-resolution-no_replacement_required"),
-    ).toHaveTextContent("No Replacement Required");
-  });
-
-  it("offers no option that answers a different question", () => {
-    // Every one of these is named and removed in the MASTER: two are ITEM
-    // outcomes, the rest are the supplier's own answers, and `Refund` has no
-    // frozen business meaning.
-    openClaim(row({ held_units: 1, hold_reason: "damaged" }));
-    const panel = screen.getByTestId("claim-customer-resolution");
-    for (const gone of [
-      "Return to Supplier",
-      "Write Off",
-      "Cancel Outstanding",
-      "Reject",
-      "Deliver remaining",
-      "Return and Replace",
-      "Refund",
-    ]) {
-      expect(panel, gone).not.toHaveTextContent(gone);
-    }
-  });
-
-  it("BOTH decisions are on screen at once — the customer cancelled AND the item is destroyed", () => {
-    // The worked case that produced the split. Under one list the operator
-    // would have to choose which of the two truths to record.
-    openClaim(row({ held_units: 1, hold_reason: "damaged" }));
-    expect(screen.getByTestId("claim-customer-resolution")).toBeInTheDocument();
-    expect(screen.getByTestId("claim-held-stock")).toHaveTextContent("Item Outcome");
-
-    fireEvent.click(
-      screen.getByTestId("customer-resolution-no_replacement_required"),
-    );
-    fireEvent.click(screen.getByTestId("hold-outcome-written_off"));
-    // Neither picker cleared the other: both answers are still selected.
-    expect(
-      screen.getByTestId("customer-resolution-no_replacement_required"),
-    ).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByTestId("hold-outcome-written_off")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-  });
-
-  it("records the resolution, with its optional note", async () => {
-    openClaim(row());
-    fireEvent.click(screen.getByTestId("customer-resolution-repair"));
-    fireEvent.change(screen.getByTestId("customer-resolution-note"), {
-      target: { value: "Customer agreed to wait for the repair" },
-    });
-    fireEvent.click(screen.getByTestId("customer-resolution-save"));
-    await waitFor(() => expect(resolutionMutate).toHaveBeenCalled());
-    expect(resolutionMutate).toHaveBeenCalledWith({
-      claimId: "c1",
-      customer_resolution: "repair",
-      note: "Customer agreed to wait for the repair",
-    });
-  });
-
-  it("explains the selected option in one line, and names no consequence", () => {
-    openClaim(row());
-    fireEvent.click(screen.getByTestId("customer-resolution-replace"));
-    const guide = screen.getByTestId("customer-resolution-meaning");
-    expect(guide).toHaveTextContent("The customer gets a NEW item.");
-    // Consequences are f(Resolution, Execution) and Execution is unbuilt, so
-    // nothing here may claim what happens to stock or money.
-    expect(guide).not.toHaveTextContent(/stock|refund|credit|outstanding/i);
-  });
-
-  it("does NOT wait for the supplier — a customer who cancels does not wait for the factory", () => {
-    openClaim(row());
-    expect(screen.getByTestId("customer-resolution-replace")).not.toBeDisabled();
-    fireEvent.click(screen.getByTestId("customer-resolution-replace"));
-    expect(screen.getByTestId("customer-resolution-save")).not.toBeDisabled();
-  });
-
-  it("has nothing to save until something changes", () => {
-    openClaim(
-      row({
-        customer_resolution: "replace",
-        customer_resolution_at: "2026-08-05T09:00:00Z",
-      }),
-    );
-    // The recorded answer is pre-selected and the button is dead: pressing it
-    // would write the same answer again.
-    expect(screen.getByTestId("customer-resolution-replace")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(screen.getByTestId("customer-resolution-save")).toBeDisabled();
-    expect(screen.getByTestId("customer-resolution-recorded")).toHaveTextContent(
-      "Recorded",
-    );
-
-    // Loo's law 2: Carres may switch a repair to a replacement when the
-    // customer cannot wait, so an OPEN claim's resolution stays editable.
-    fireEvent.click(screen.getByTestId("customer-resolution-repair"));
-    expect(screen.getByTestId("customer-resolution-save")).not.toBeDisabled();
-  });
-
-  it("a closed claim shows what was decided, read-only", () => {
-    openClaim(
-      row({
-        status: "closed",
-        requested_action: "replace",
-        requested_at: "2026-08-05T08:22:00Z",
-        supplier_response: "replacement",
-        responded_at: "2026-08-05T08:23:00Z",
-        closed_at: "2026-08-05T08:23:48Z",
-        customer_resolution: "replace",
-        customer_resolution_note: "New unit promised for 12 Aug",
-        customer_resolution_at: "2026-08-05T08:23:00Z",
-      }),
-    );
-    const panel = screen.getByTestId("claim-customer-resolution");
-    expect(panel).toHaveTextContent("Replace");
-    expect(panel).toHaveTextContent("New unit promised for 12 Aug");
-    expect(screen.queryByTestId("customer-resolution-save")).not.toBeInTheDocument();
-  });
-
-  it("a claim closed without one states the fact rather than showing a blank", () => {
-    // SC-1014 in production is exactly this row: settled before the field
-    // existed. A blank would read as "nobody decided anything today".
-    openClaim(
-      row({
-        status: "closed",
-        requested_action: "replace",
-        requested_at: "2026-08-05T08:22:00Z",
-        supplier_response: "replacement",
-        responded_at: "2026-08-05T08:23:00Z",
-        closed_at: "2026-08-05T08:23:48Z",
-      }),
-    );
-    expect(screen.getByTestId("claim-customer-resolution")).toHaveTextContent(
-      "Nothing recorded — this claim closed without one.",
-    );
-  });
-
-  it("does not gate the close — the close still asks for both sides and nothing more", () => {
-    openClaim(
-      row({
-        requested_action: "replace",
-        requested_at: "2026-08-05T08:22:00Z",
-        supplier_response: "replacement",
-        responded_at: "2026-08-05T08:23:00Z",
-      }),
-    );
-    // No resolution on file, and `Close claim` is still offered.
-    expect(screen.queryByTestId("claim-close-blocked")).not.toBeInTheDocument();
-    expect(screen.getByTestId("claim-close")).not.toBeDisabled();
-  });
-});
-
-/**
- * ⭐ P20.6 — LANDING ON AN EMPTY `Open` QUEUE MUST STILL ANSWER THE QUESTION.
- *
- * PRODUCTION, 2026-08-08: one claim, and it is CLOSED. So the front door of
- * this tab opens on `Open 0` while `All` holds 1 — which is the RIGHT default
- * (a work queue opens on the work, and a queue is never hidden at zero), but it
- * made two things visible that were not right.
- *
- * ① The sentence asserted something the data denies. ② It was centred on the
- * 1,439px TABLE rather than on what the operator can see — measured in a
- * browser, its centre is pinned at 721px at every pane width, so below a ~700px
- * pane it is off-screen entirely and the operator lands on a blank grid.
- */
-describe("P20.6 · the empty Open queue", () => {
-  it("does NOT claim every delivery was fine when a claim has been filed", () => {
-    // Production's own shape: nothing open, one closed.
-    claimsQuery.mockReturnValue(
-      ok({ claims: [], counts: { open: 0, closed: 1, all: 1 } }),
-    );
-    render(wrap(<OperationSupplierClaims />));
-    expect(screen.getByText("No open claims.")).toBeInTheDocument();
-    // A closed claim IS a delivery that did not arrive complete. The
-    // reassurance is the half that is false, and it is the half that reassures.
-    expect(
-      screen.queryByText(/every delivery so far arrived complete and on time/i),
-    ).toBeNull();
-  });
-
-  it("keeps the reassurance for the case it actually describes", () => {
-    claimsQuery.mockReturnValue(
-      ok({ claims: [], counts: { open: 0, closed: 0, all: 0 } }),
-    );
-    render(wrap(<OperationSupplierClaims />));
-    expect(
-      screen.getByText(/every delivery so far arrived complete and on time/i),
-    ).toBeInTheDocument();
-  });
-
-  /**
-   * jsdom has no layout, so this pins the STRUCTURE the browser then centres
-   * on — the same recipe `po-listing` uses for Purchase Orders' expanded
-   * record. `sticky left-0` is NOT the alternative and that is measured: card
-   * Q10 probed it inside this kit's `<td>` and it scrolled straight off,
-   * because a sticky element whose containing block is a table cell does not
-   * hold horizontally.
-   */
-  it("the empty state is sized to the VISIBLE pane, not to the 1,439px table", () => {
-    claimsQuery.mockReturnValue(
-      ok({ claims: [], counts: { open: 0, closed: 1, all: 1 } }),
-    );
-    const { container } = render(wrap(<OperationSupplierClaims />));
-
-    const empty = container.querySelector('[data-kit="empty-state"]');
-    expect(empty).not.toBeNull();
-    // Its box is the visible width…
-    const box = empty!.parentElement!;
-    expect(box.className).toContain("w-[100cqi]");
-    // …and `100cqi` only means anything if an ancestor is a query container.
-    const host = box.closest('[class*="container-type:inline-size"]');
-    expect(host).not.toBeNull();
-    // A promise the kit cannot keep: a table cell cannot hold a sticky child.
-    expect(box.className).not.toContain("sticky");
+  it("keeps counted stock on one row with its genuine quantity", () => {
+    claimsQuery.mockReturnValue({ data: { claims: [row({ units: [{ ...unit("q", null, "quantity"), qty: 3 }] })] }, isLoading: false });
+    show();
+    fireEvent.click(screen.getByTestId("claim-inspect-SC-1001"));
+    const r = screen.getByTestId("claim-unit-row-q");
+    expect(r).toHaveTextContent("Counted stock");
+    expect(r.querySelectorAll("td")[2]!.textContent).toBe("3");
   });
 });

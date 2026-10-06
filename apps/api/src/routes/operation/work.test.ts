@@ -1,0 +1,1237 @@
+import { describe, expect, it } from "vitest";
+import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
+import type { OperationWorkItem, OperationWorkResponse } from "@carres/shared";
+import {
+  projectOverpaymentReviewWork,
+  projectStorageCheckWork,
+  composeOperationWorkResponse,
+  createOperationWorkRouter,
+  loadWorkSource,
+  manualPurchaseWorkInputsFromRegister,
+  receivingWorkSourceFromModuleFacts,
+  projectManualPurchaseWork,
+  projectPaymentCollectionWork,
+  projectPurchaseOrderReplyWork,
+  projectPurchaseOrderArrivalCheckWork,
+  projectPoWindowWork,
+  PURCHASING_WINDOW_OWNED,
+  projectReceivingWork,
+  projectSalesOrderWork,
+  projectSalesOrdersFromModuleFacts,
+  type OperationWorkSourceResult,
+} from "./work";
+import type { AppEnv } from "../../types";
+
+const base: OperationWorkItem = {
+  contractVersion: 2,
+  id: "orders:SO-1318:missing_delivery_date",
+  module: "orders",
+  ruleKey: "missing_delivery_date",
+  ruleVersion: 1,
+  object: { kind: "sales_order", id: "order-1", label: "SO-1318" },
+  problem: "No delivery date",
+  action: "Ask customer for a delivery date",
+  recipient: "Customer",
+  requiredResult: "Customer Delivery exists",
+  completionPredicate: "orders.delivery_date exists",
+  completionStatement: "The customer delivery date is recorded",
+  owner: {
+    rule: "salesperson",
+    dutyKey: null,
+    normal: { userId: "shasha", name: "Shasha" },
+    activeCover: null,
+    coverEvidence: null,
+    acting: { userId: "shasha", name: "Shasha" },
+    state: "primary",
+  },
+  timing: {
+    businessDueOn: "2026-09-06",
+    actionOn: "2026-09-06",
+    placement: "on_day",
+    missedAge: {
+      state: "counted",
+      workingDays: 0,
+      basis: { calendarKey: "office+person:shasha", from: "2026-09-06", to: "2026-09-06" },
+    },
+    eligibility: "eligible",
+    noDateReason: null,
+    calendar: {
+      module: { key: "office", source: "purchasing_settings", state: "ready" },
+      actor: { key: "person:shasha", source: "people", state: "ready" },
+      holidayName: null,
+    },
+  },
+  communication: null,
+  blocker: null,
+  nextConsequence: null,
+  interaction: {
+    mode: "open_module",
+    fallbackDestination: "/operation/orders/so/order-1",
+  },
+  destination: "/operation/orders/so/order-1",
+  observedAt: "2026-09-06T01:00:00.000Z",
+  sourceVersion: "orders:2026-09-06T01:00:00.000Z",
+  tone: "warning",
+  locked: false,
+  broken: false,
+};
+
+const sourceKeys = ["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const;
+const healthySources = (ordersItems: OperationWorkItem[] = []): OperationWorkSourceResult[] => sourceKeys.map((key) => ({
+  health: {
+    key,
+    state: "healthy" as const,
+    observedAt: "2026-09-06T01:00:00.000Z",
+    lastSuccessfulAt: "2026-09-06T01:00:00.000Z",
+    errorLabel: null,
+  },
+  items: key === "orders" ? ordersItems : [],
+}));
+
+describe("operation Work response composition", () => {
+  it("serves the one composed response from GET /api/operation/work", async () => {
+    const app = new Hono<AppEnv>();
+    app.use("*", async (c, next) => {
+      c.set("auth", {
+        id: "user-1",
+        email: "ops@carres.test",
+        role: "operation",
+        dealerId: null,
+        supplierId: null,
+        partnerId: null,
+        outletId: null,
+        warehouseId: null,
+        jwt: "jwt",
+      });
+      await next();
+    });
+    app.route(
+      "/api/operation/work",
+      createOperationWorkRouter(
+        async () => composeOperationWorkResponse(healthySources([base]), [], "2026-09-06"),
+        { read: async () => [], readCompleted: async () => [], recordRequestSent: async () => "", recordReplyReceived: async () => "" },
+      ),
+    );
+
+    const response = await app.request("/api/operation/work");
+    expect(response.status).toBe(200);
+    const body = await response.json() as OperationWorkResponse;
+    expect(body.items).toHaveLength(1);
+    expect(body.complete).toBe(true);
+    expect(body.closureReceipt).toBeNull();
+  });
+
+  it("returns one validated set and removes only duplicate stable identities", () => {
+    const receiving: OperationWorkItem = {
+      ...base,
+      id: "receiving:PO-2041:receiving.check_in",
+      module: "receiving",
+      ruleKey: "receiving.check_in",
+      object: { kind: "receiving", id: "receipt-1", label: "PO-2041" },
+      problem: "Goods arrived · GRN not posted",
+      action: "Check in PO-2041 from Nice Future",
+      requiredResult: "GRN posted",
+      completionPredicate: "a posted Receiving Session",
+      completionStatement: "The GRN is posted",
+      destination: "/operation?tab=receiving&session=receipt-1",
+    };
+    const sources = healthySources([base, base]);
+    sources.find((source) => source.health.key === "receiving")!.items = [receiving];
+    const response = composeOperationWorkResponse(
+      sources,
+      [{ userId: "shasha", name: "Shasha", email: "shasha@carres.test" }],
+      "2026-09-06",
+    );
+
+    expect(response.items.map((item) => item.id)).toEqual([base.id, receiving.id]);
+    expect(response.staff).toHaveLength(1);
+    expect(response.generatedOn).toBe("2026-09-06");
+    expect(response.closureReceipt).toBeNull();
+    expect(response.items).toHaveLength(2);
+  });
+
+  it("keeps healthy work visible when one admitted source fails", () => {
+    const sources = healthySources([base]);
+    const receiving = sources.find((source) => source.health.key === "receiving")!;
+    receiving.health = {
+      key: "receiving",
+      state: "failed",
+      observedAt: null,
+      lastSuccessfulAt: "2026-09-05T01:00:00.000Z",
+      errorLabel: "Could not refresh Receiving",
+    };
+    const response = composeOperationWorkResponse(sources, [], "2026-09-06");
+
+    expect(response.complete).toBe(false);
+    expect(response.items.map((item) => item.id)).toEqual([base.id]);
+    expect(response.sources).toContainEqual(receiving.health);
+    expect(response.items).toHaveLength(1);
+  });
+
+  it("isolates an operational source error without swallowing permission refusal", async () => {
+    const failed = await loadWorkSource(
+      "receiving",
+      "2026-09-06T01:00:00.000Z",
+      async () => { throw new Error("database unavailable"); },
+    );
+    expect(failed).toEqual({
+      health: {
+        key: "receiving",
+        state: "failed",
+        observedAt: null,
+        lastSuccessfulAt: null,
+        errorLabel: "Could not refresh Receiving",
+      },
+      items: [],
+    });
+
+    await expect(loadWorkSource(
+      "receiving",
+      "2026-09-06T01:00:00.000Z",
+      async () => { throw new HTTPException(403, { message: "forbidden" }); },
+    )).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("rejects an invalid module projection instead of returning a false empty desk", () => {
+    expect(() =>
+      composeOperationWorkResponse(
+        healthySources([{ ...base, completionPredicate: "" } as OperationWorkItem]),
+        [],
+        "2026-09-06",
+      ),
+    ).toThrow();
+  });
+
+  it("projects submitted Receiving facts with GRN Duty cover and an exact session door", () => {
+    const items = projectReceivingWork({
+      source: {
+        submitted: [{
+          id: "receipt-1",
+          po_id: "PO-2041",
+          supplier_name: "Nice Future",
+          goods_received_at: "2026-09-05",
+          submitted_at: "2026-09-05T09:00:00Z",
+        }],
+      },
+      duty: {
+        dutyKey: "grn_duty",
+        onDate: "2026-09-06",
+        normalOwner: { userId: "shasha", name: "Shasha" },
+        buddy: { userId: "yujun", name: "Yu Jun" },
+        activeCover: { userId: "yujun", name: "Yu Jun" },
+        actingPerson: { userId: "yujun", name: "Yu Jun" },
+        state: "covered",
+        assignmentId: "assignment-1",
+      },
+      today: "2026-09-06",
+      workingDaysLate: () => 1,
+    });
+
+    expect(items).toHaveLength(1);
+    expect(items[0]?.owner.normal?.userId).toBe("shasha");
+    expect(items[0]?.owner.acting?.userId).toBe("yujun");
+    expect(items[0]?.destination).toBe(
+      "/operation?tab=receiving&session=receipt-1",
+    );
+    expect(items[0]?.problem).toBe("Goods arrived · GRN not posted");
+  });
+
+  it("keeps Manual Purchase approval and PO issuance as separately owned actions", () => {
+    const common = {
+      requestId: "request-1",
+      context: "Manual Purchase · Office use · Klang · Nice Future",
+      remainingQty: 2,
+      orderBy: "2026-09-06",
+      hasPos: false,
+      posAllSent: false,
+    } as const;
+    const poDuty = {
+      dutyKey: "po_duty",
+      onDate: "2026-09-06",
+      normalOwner: { userId: "shasha", name: "Shasha" },
+      buddy: { userId: "yujun", name: "Yu Jun" },
+      activeCover: { userId: "yujun", name: "Yu Jun" },
+      actingPerson: { userId: "yujun", name: "Yu Jun" },
+      state: "covered" as const,
+      assignmentId: "assignment-1",
+    };
+    const approval = projectManualPurchaseWork({
+      requests: [{ ...common, status: "waiting_approval" }],
+      approver: { userId: "jess", name: "Jess" },
+      poDuty,
+      today: "2026-09-06",
+    });
+    const issuance = projectManualPurchaseWork({
+      requests: [{ ...common, status: "ready_to_order" }],
+      approver: { userId: "jess", name: "Jess" },
+      poDuty,
+      today: "2026-09-06",
+    });
+
+    expect(approval[0]?.action).toBe("Approve purchase");
+    expect(approval[0]?.owner.acting?.userId).toBe("jess");
+    expect(approval[0]?.completionPredicate).toContain("stored approval or refusal");
+    /* ⭐ THE APPROVER LANDS ON THE DECISION (owner ruling 2026-09-11) — the
+       object is one six-section scroll, and hunting for the section is the
+       step this row exists to remove. */
+    expect(approval[0]?.destination).toBe(
+      "/operation?tab=manual-purchase&mp=request-1&section=approval",
+    );
+    expect(issuance[0]?.action).toBe("Issue PO");
+    expect(issuance[0]?.owner.normal?.userId).toBe("shasha");
+    expect(issuance[0]?.owner.acting?.userId).toBe("yujun");
+    /* `Issue PO` has no section of its own — its act is the Register's
+       selected action — so it opens the object plainly. */
+    expect(issuance[0]?.destination).toBe(
+      "/operation?tab=manual-purchase&mp=request-1",
+    );
+    expect(issuance[0]?.requiredResult).toBe("Current PO version marked as sent");
+    /* Owner review 2026-09-25 (items 6/7): the document number is the
+       reference; the composed context stands in only while none exists. */
+    expect(issuance[0]?.object.label).toBe("Manual Purchase · Office use · Klang · Nice Future");
+    const numbered = projectManualPurchaseWork({
+      requests: [{ ...common, reference: "MPR250924-4827", status: "ready_to_order" }],
+      approver: null, poDuty, today: "2026-09-06",
+    });
+    expect(numbered[0]?.object.label).toBe("MPR250924-4827");
+  });
+
+  it("an ordered Manual Purchase opens its existing unsent PO without buying again", () => {
+    const items = projectManualPurchaseWork({
+      requests: [
+        {
+          requestId: "request-2",
+          context: "Manual Purchase · Ready Stock · Klang · Ohana",
+          status: "ordered",
+          remainingQty: 0,
+          orderBy: "2026-09-06",
+          hasPos: true,
+          posAllSent: false,
+          unsentPoId: "PO /2",
+        },
+      ],
+      approver: { userId: "jess", name: "Jess" },
+      poDuty: null,
+      today: "2026-09-06",
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0]?.action).toBe("Confirm PO sent to supplier");
+    expect(items[0]?.destination).toBe("/operation/procurement?po=PO%20%2F2");
+    expect(items[0]?.requiredResult).toBe("Current PO version marked as sent");
+  });
+
+  it("projects separate Sales Order actions with their own owner rules", () => {
+    const poDuty = {
+      dutyKey: "po_duty",
+      onDate: "2026-09-06",
+      normalOwner: { userId: "po-normal", name: "Po Normal" },
+      buddy: null,
+      activeCover: null,
+      actingPerson: { userId: "po-normal", name: "Po Normal" },
+      state: "primary" as const,
+      assignmentId: "assignment-2",
+    };
+    const items = projectSalesOrderWork({
+      open: [{ key: "issue_po", track: "goods", tone: "warning" }],
+      context: {
+        orderId: "order-1318",
+        so: 1318,
+        picName: "Order PIC",
+        picUserId: "pic-1",
+        dutyResolutions: { po_duty: poDuty },
+        salespersonName: "Shasha",
+        askDeliveryDate: true,
+        promisedDateIso: null,
+        confirmedDateIso: null,
+        deliveredAtIso: null,
+        delayDetectedAtIso: null,
+        delayDecisionAtIso: null,
+      },
+      customer: "Tan Qu Qu",
+      today: "2026-09-06",
+    });
+
+    const issuePo = items.find((item) => item.ruleKey === "issue_po");
+    const askDate = items.find((item) => item.ruleKey === "ask_delivery_date");
+    expect(issuePo?.owner.rule).toBe("po_duty");
+    expect(issuePo?.owner.acting?.userId).toBe("po-normal");
+    expect(askDate?.owner.rule).toBe("salesperson");
+    expect(askDate?.owner.acting?.name).toBe("Shasha");
+    expect(askDate?.object.label).toBe("SO-1318");
+    expect(askDate?.problem).toBe("No delivery date");
+    expect(askDate?.destination).toBe("/operation/orders/so/order-1318");
+  });
+
+  it("presents Delivery-owned actions as Delivery objects with Delivery doors", () => {
+    const context = {
+      orderId: "order-2041",
+      so: 2041,
+      picName: "Operation PIC",
+      picUserId: "pic-1",
+      promisedDateIso: "2026-09-08",
+      confirmedDateIso: "2026-09-08",
+      deliveredAtIso: null,
+      delayDetectedAtIso: null,
+      delayDecisionAtIso: null,
+    };
+    const [arrangement] = projectSalesOrderWork({
+      open: [{ key: "confirm_delivery_date", track: "delivery", tone: "warning" }],
+      context: { ...context, confirmedDateIso: null },
+      customer: "Tan Qu Qu",
+      today: "2026-09-07",
+    });
+    expect(arrangement).toMatchObject({
+      module: "delivery",
+      object: { kind: "delivery_scope", id: "order-2041", label: "SO-2041" },
+      destination: "/operation?tab=delivery&view=all&open=order-2041",
+    });
+
+    const [run] = projectSalesOrderWork({
+      open: [{ key: "deliver_today", track: "delivery", tone: "danger" }],
+      context,
+      customer: "Tan Qu Qu",
+      deliveryOrderNumber: "DO-2041",
+      today: "2026-09-08",
+    });
+    expect(run).toMatchObject({
+      id: "delivery:DO-2041:deliver_today",
+      module: "delivery",
+      object: { kind: "delivery_order", id: "DO-2041", label: "DO-2041" },
+      destination: "/operation/delivery-orders/DO-2041",
+    });
+    expect(run?.action).not.toContain("Operation PIC");
+  });
+
+  it("admits only Delivery proof review as an embedded Work action", () => {
+    const context = {
+      orderId: "order-2041",
+      so: 2041,
+      picName: "Operation PIC",
+      picUserId: "pic-1",
+      promisedDateIso: "2026-09-08",
+      confirmedDateIso: "2026-09-08",
+      deliveredAtIso: "2026-09-08T08:00:00.000Z",
+      delayDetectedAtIso: null,
+      delayDecisionAtIso: null,
+    };
+    const items = projectSalesOrderWork({
+      open: [
+        { key: "check_delivery_proof", track: "delivery", tone: "warning" },
+        { key: "upload_delivery_photo", track: "delivery", tone: "warning" },
+      ],
+      context,
+      customer: "Tan Qu Qu",
+      deliveryOrderNumber: "DO-2041",
+      today: "2026-09-08",
+    });
+
+    expect(items.find((item) => item.ruleKey === "check_delivery_proof")?.interaction).toMatchObject({
+      mode: "embedded",
+      actionKey: "delivery.proof_review",
+      componentKey: "delivery.proof_review",
+      fallbackDestination: "/operation/delivery-orders/DO-2041",
+    });
+    expect(items.find((item) => item.ruleKey === "upload_delivery_photo")?.interaction).toEqual({
+      mode: "open_module",
+      fallbackDestination: "/operation/delivery-orders/DO-2041",
+    });
+  });
+
+  it("derives Manual Purchase projector input from the module register facts", () => {
+    const inputs = manualPurchaseWorkInputsFromRegister({
+      requests: [{
+        id: "request-2",
+        purpose: "ready_stock",
+        destination_id: "destination-1",
+        why: "Printer toner",
+        approval_required: false,
+        /* R1 — the stored switch is history; approval is what makes it buyable. */
+        approved_at: "2026-09-01T02:00:00Z",
+        refused_at: null,
+        refuse_reason: null,
+        for_service_case_id: null,
+        for_staff_user_id: null,
+        for_subsidiary_name: null,
+      }],
+      lines: [{
+        request_id: "request-2",
+        qty: 2,
+        approved_qty: 2,
+        issued_qty: 0,
+        cancelled_at: null,
+        po_id: null,
+        po_ids: [],
+        supplier_id: "supplier-1",
+        order_by: "2026-09-08",
+      }],
+      destinations: [{ id: "destination-1", name: "Klang" }],
+      suppliers: [{ id: "supplier-1", name: "Nice Future" }],
+      users: [],
+      serviceCases: [],
+      pos: [],
+    });
+
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]?.status).toBe("ready_to_order");
+    expect(inputs[0]?.remainingQty).toBe(2);
+    expect(inputs[0]?.recipient).toBe("Nice Future");
+    expect(inputs[0]?.context).toContain("Ready Stock");
+  });
+
+  it("derives Receiving source only from actual submitted physical reports", () => {
+    const source = receivingWorkSourceFromModuleFacts({
+      receipts: [{
+        id: "receipt-1",
+        po_id: "PO-1",
+        supplier_name: "Nice Future",
+        status: "submitted",
+        goods_received_at: "2026-09-06",
+        submitted_at: "2026-09-06T08:00:00Z",
+      }, {
+        id: "receipt-2",
+        po_id: "PO-2",
+        supplier_name: "Done Supplier",
+        status: "posted",
+        goods_received_at: "2026-09-05",
+        submitted_at: "2026-09-05T08:00:00Z",
+      }],
+    });
+
+    expect(source.submitted.map((row) => row.id)).toEqual(["receipt-1"]);
+    expect(Object.keys(source)).toEqual(["submitted"]);
+  });
+
+  it("projects an Orders route row through shared signals and per-action owners", () => {
+    const items = projectSalesOrdersFromModuleFacts({
+      orders: [{
+        id: "order-9",
+        so: 1309,
+        status: "proceed_order",
+        operation_stage: "in_production",
+        customer_name: "Tan Qu Qu",
+        delivery_date: null,
+        delivery_date_tbd: false,
+        placed_at: "2026-09-01",
+        do_number: null,
+        paid: 0,
+        ops_assigned_logistic: null,
+        delivery_partner_id: null,
+        salesperson_id: "sales-1",
+        salespersons: { name: "Shasha" },
+        po_skus: [],
+        order_lines: [{ sku: "SOFA-1", qty: 1, unit_price: 1000 }],
+        order_addons: [],
+        order_supplier_threads: [],
+        order_finance_exceptions: [],
+        ops_sofa_loans: [],
+        ops_order_control: {
+          assigned_staff: "pic-1",
+          booking_stage: null,
+          confirmed_date: null,
+          delivery_photos: [],
+          line_etas: null,
+          line_stock_status: null,
+        },
+      }],
+      stock: [{ sku: "SOFA-1", available: 0 }],
+      staff: [{ user_id: "pic-1", name: "Order PIC", email: "pic@carres.test" }],
+      dutyResolutions: {
+        po_duty: {
+          dutyKey: "po_duty",
+          onDate: "2026-09-06",
+          normalOwner: { userId: "po-1", name: "PO Person" },
+          buddy: null,
+          activeCover: null,
+          actingPerson: { userId: "po-1", name: "PO Person" },
+          state: "primary",
+          assignmentId: "assignment-3",
+        },
+      },
+      today: "2026-09-06",
+      safetyDays: 3,
+    });
+
+    expect(items.find((item) => item.ruleKey === "issue_po")?.owner.acting?.userId)
+      .toBe("po-1");
+    expect(items.find((item) => item.ruleKey === "ask_delivery_date")?.owner.acting?.name)
+      .toBe("Shasha");
+  });
+
+  it("gate convergence: an unpaid storage PAPER keeps the money work open on a goods-paid SO, and full payment closes it", () => {
+    const base = {
+      id: "order-10",
+      so: 1310,
+      status: "proceed_order",
+      operation_stage: "ready_to_dispatch",
+      customer_name: "Storage Customer",
+      delivery_date: "2026-09-10",
+      delivery_date_tbd: false,
+      placed_at: "2026-09-01",
+      do_number: null,
+      paid: 1000, // goods fully paid
+      ops_assigned_logistic: "NETS",
+      delivery_partner_id: "partner-1",
+      salesperson_id: null,
+      salespersons: null,
+      po_skus: [],
+      order_lines: [{ sku: "SOFA-1", qty: 1, unit_price: 1000 }],
+      order_addons: [],
+      order_supplier_threads: [],
+      order_finance_exceptions: [],
+      ops_sofa_loans: [],
+      ops_order_control: {
+        assigned_staff: null, booking_stage: null, confirmed_date: null,
+        delivery_photos: [], line_etas: null,
+        line_stock_status: { "SOFA-1": "ready" },
+      },
+    };
+    const project = (paid: number, storageSum: number) =>
+      projectSalesOrdersFromModuleFacts({
+        orders: [{ ...base, paid }],
+        stock: [{ sku: "SOFA-1", available: 1 }],
+        staff: [],
+        dutyResolutions: {},
+        today: "2026-09-06",
+        safetyDays: 3,
+        invoiceStorageByOrder: new Map([["order-10", storageSum]]),
+      });
+    // Unpaid RM150 storage paper → the collection work stays OPEN.
+    const owing = project(1000, 150);
+    expect(owing.some((i) => i.ruleKey === "collect")).toBe(true);
+    // Paid covering the COMBINED obligation → no stale money work.
+    const settled = project(1150, 150);
+    expect(settled.some((i) => i.ruleKey === "collect")).toBe(false);
+    // No paper at all → nothing invented.
+    const clean = project(1000, 0);
+    expect(clean.some((i) => i.ruleKey === "collect")).toBe(false);
+  });
+
+  it("does not admit a sent-but-unanswered PO as Work (supplier_reply retired 2026-09-24)", () => {
+    const items = projectPurchaseOrderReplyWork({
+      pos: [{
+        id: "PO-2041",
+        supplier_id: "supplier-1",
+        status: "open",
+        version: 2,
+        promises: [],
+        sends: [{ kind: "confirmed_sent", channel: "whatsapp", sent_at: "2026-09-03T17:00:00Z", po_version: 2 }],
+        purchase_order_lines: [{ qty: 4, received_qty: 0 }],
+      }],
+      suppliers: [{ id: "supplier-1", name: "Nice Future" }],
+      poDuty: null,
+      today: "2026-09-08",
+    });
+    // The PO waits for goods from the supplier; silence is not a task.
+    expect(items).toEqual([]);
+  });
+
+  /* ── THE ADVANCE ARRIVAL CHECK reaches shared Work (owner ruling
+     2026-09-10). The rule and its engine both existed; the projection that
+     puts the obligation in front of the duty holder did not. ───────────── */
+  describe("purchasing.confirm_tomorrows_delivery in shared Work", () => {
+    const person = { userId: "po-duty", name: "Khor Yee" };
+    const poDuty = {
+      dutyKey: "po_duty" as const,
+      onDate: "2026-09-10",
+      normalOwner: person,
+      buddy: null,
+      activeCover: null,
+      actingPerson: person,
+      state: "primary" as const,
+      assignmentId: "assignment-1",
+    };
+    const po = (over: Record<string, unknown> = {}) => ({
+      id: "PO-3001",
+      supplier_id: "supplier-1",
+      status: "open" as const,
+      version: 1,
+      eta_date: "2026-09-11",
+      tomorrow_answer_about_date: null,
+      promises: [],
+      /* The current version was SENT (printed and handed over — a channel
+         that records no supplier chat, so the act still says `Ask`). An unsent
+         PO has no day-before check at all; see the test below. */
+      sends: [{ kind: "confirmed_sent" as const, channel: "print", po_version: 1, sent_at: "2026-09-03T02:00:00Z" }],
+      purchase_order_lines: [{ qty: 4, received_qty: 0 }],
+      ...over,
+    });
+    const project = (over: Record<string, unknown> = {}, today = "2026-09-10") =>
+      projectPurchaseOrderArrivalCheckWork({
+        pos: [po(over)],
+        suppliers: [{ id: "supplier-1", name: "Ohana" }],
+        poDuty,
+        today,
+      });
+
+    it("opens one office working day before the arrival, owned by the current PO Duty", () => {
+      const [item] = project();
+      expect(item).toMatchObject({
+        // One occurrence per effective date (2026-09-24).
+        id: "purchasing:PO-3001:purchasing.confirm_tomorrows_delivery:@2026-09-11",
+        module: "purchasing",
+        object: { kind: "purchase_order", id: "PO-3001", label: "PO-3001" },
+        /* Owner wording 2026-09-25: no recorded channel → ask; the fact names the obligation. */
+        action: "Ask Ohana for the Supplier DO for PO-3001",
+        problem: "Confirm tomorrow's supplier delivery",
+        recipient: "Ohana",
+        owner: { dutyKey: "po_duty", normal: person, acting: person },
+        destination: "/operation?tab=purchase-orders&po=PO-3001",
+      });
+      /* Fri 11 Sep arrival − 1 OFFICE working day = Thu 10 Sep. */
+      expect(item?.timing).toMatchObject({ actionOn: "2026-09-10", placement: "on_day", missedAge: { state: "not_calculable" } });
+      /* The owner is a resolved person, never spelled into the sentence. */
+      expect(item?.action).not.toContain("Khor Yee");
+    });
+
+    /* Workspace BUILD finding 2026-09-28 (PO-20260903-4316 / -7907, issued
+       3 Sep, never sent): the check asked for a Supplier DO on a PO the
+       supplier never received, and opened a form that cannot record it —
+       Purchasing §5.7 draws the supplier answer only after the send mark.
+       An unsent PO acts through the PO window's send line alone. */
+    it("derives no day-before check until the PO's CURRENT version is marked sent", () => {
+      expect(project({ sends: [] })).toHaveLength(0);
+      /* Opening the chat is communication history, not the send mark. */
+      expect(project({ sends: [{ kind: "external_open", channel: "whatsapp", po_version: 1, sent_at: "2026-09-03T02:00:00Z" }] })).toHaveLength(0);
+      /* A send of an OLDER version does not cover the revised PO. */
+      expect(project({ version: 2, sends: [{ kind: "confirmed_sent", channel: "print", po_version: 1, sent_at: "2026-09-03T02:00:00Z" }] })).toHaveLength(0);
+      expect(project()).toHaveLength(1);
+    });
+
+    it("skips a public holiday when stepping back to the check day", () => {
+      /* Malaysia Day, Wed 16 Sep 2026, is in `MY_HOLIDAYS_2026`. Thu 17 Sep
+         arrival steps back over it to Tue 15 Sep — the shared calendar's
+         answer, not a second one. */
+      const [item] = project({ eta_date: "2026-09-17" }, "2026-09-15");
+      expect(item?.timing?.actionOn).toBe("2026-09-15");
+    });
+
+    it("stays silent with no anchor, on a settled PO, and before the window opens", () => {
+      expect(project({ eta_date: null })).toHaveLength(0);
+      expect(project({ purchase_order_lines: [{ qty: 4, received_qty: 4 }] })).toHaveLength(0);
+      expect(project({ status: "cancelled" })).toHaveLength(0);
+      /* Arrival still four days out — the check has not opened yet. */
+      expect(project({ eta_date: "2026-09-18" }, "2026-09-10")).toHaveLength(0);
+    });
+
+    const DEST = "11111111-0000-4000-8000-00000000d001";
+    const confirmation = (over: Record<string, unknown> = {}) => ({
+      po_version: 1, for_date: "2026-09-11", destination_id: DEST, kind: "supplier_confirmation", ...over,
+    });
+
+    it("anchors on the ORIGINAL PO Delivery Date, never our planning estimate (owner ruling 2026-09-24)", () => {
+      const [item] = project({ official_delivery_date: "2026-09-11", eta_date: "2026-09-09" });
+      expect(item?.id).toBe("purchasing:PO-3001:purchasing.confirm_tomorrows_delivery:@2026-09-11");
+      expect(item?.timing?.actionOn).toBe("2026-09-10");
+    });
+
+    it("closes only on the Supplier DO or an evidenced confirmation for THIS date and the PO's own Warehouse", () => {
+      const base = { official_delivery_date: "2026-09-11", destination_id: DEST };
+      /* The old "any answer about the date" no longer closes it. */
+      expect(project({ ...base, tomorrow_answer_about_date: "2026-09-11" })).toHaveLength(1);
+      expect(project({ ...base, arrival_confirmations: [confirmation()] })).toHaveLength(0);
+      expect(project({ ...base, arrival_confirmations: [confirmation({ kind: "supplier_do" })] })).toHaveLength(0);
+      /* Another Warehouse, another date or an older version proves nothing. */
+      expect(project({ ...base, arrival_confirmations: [confirmation({ destination_id: "other" })] })).toHaveLength(1);
+      expect(project({ ...base, arrival_confirmations: [confirmation({ for_date: "2026-09-10" })] })).toHaveLength(1);
+      /* Version 2 was sent too — otherwise it would have no check at all. */
+      expect(project({
+        ...base,
+        version: 2,
+        sends: [{ kind: "confirmed_sent", channel: "print", po_version: 2, sent_at: "2026-09-04T02:00:00Z" }],
+        arrival_confirmations: [confirmation()],
+      })).toHaveLength(1);
+    });
+
+    it("an evidenced delay moves the effective arrival: the old date's check retires and a new one opens for the new date", () => {
+      const delay = {
+        kind: "tomorrow_delivery", answer: "delayed", po_version: 1, about_date: "2026-09-11", previous_date: null,
+        new_date: "2026-09-15", reason: "Transport delay", channel: "whatsapp", recipient: "Ohana group",
+        evidence: "PO-3001/delay.png", reported_by: "Ah Hock", reported_at: "2026-09-09T02:00:00Z",
+        recorded_by: "u-1", recorded_at: "2026-09-09T02:05:00Z",
+      };
+      const base = { official_delivery_date: "2026-09-11", destination_id: DEST, promises: [delay] };
+      /* On Thu 10 Sep the old check (for Fri 11) is gone. */
+      expect(project(base, "2026-09-10")).toHaveLength(0);
+      /* On Mon 14 Sep the check for Tue 15 Sep is open, as a NEW occurrence. */
+      const [next] = project(base, "2026-09-14");
+      expect(next?.id).toBe("purchasing:PO-3001:purchasing.confirm_tomorrows_delivery:@2026-09-15");
+      /* The confirmation for the OLD date proves nothing about the new one. */
+      expect(project({ ...base, arrival_confirmations: [confirmation()] }, "2026-09-14")).toHaveLength(1);
+      expect(project({ ...base, arrival_confirmations: [confirmation({ for_date: "2026-09-15" })] }, "2026-09-14")).toHaveLength(0);
+    });
+
+    it("a split answer derives ONE occurrence per batch date, and the card clicks the supplier's recorded channel (0587)", () => {
+      const evidenced = {
+        kind: "tomorrow_delivery", po_version: 1, about_date: "2026-09-11", previous_date: null, channel: "whatsapp",
+        recipient: "Ohana group", evidence: "PO-3001/a.png", reported_by: "Ah Hock", reported_at: "2026-09-09T02:00:00Z",
+        recorded_by: "u-1", recorded_at: "2026-09-09T02:05:00Z", answer_group: "g1", po_line_id: "L1",
+      };
+      const base = {
+        official_delivery_date: "2026-09-11", destination_id: DEST,
+        sends: [{ kind: "confirmed_sent", channel: "whatsapp", sent_at: "2026-09-01T01:00:00Z", po_version: 1 }],
+        purchase_order_lines: [{ id: "L1", qty: 4, received_qty: 0 }],
+        promises: [
+          { ...evidenced, about_qty: 3, answer: "confirmed", reason: null, new_date: "2026-09-11" },
+          { ...evidenced, about_qty: 1, answer: "delayed", reason: "Partial quantity ready", new_date: "2026-09-15" },
+        ],
+      };
+      const first = project(base, "2026-09-10");
+      expect(first.map((i) => i.id)).toEqual(["purchasing:PO-3001:purchasing.confirm_tomorrows_delivery:@2026-09-11"]);
+      expect(first[0]?.action).toBe("Click WhatsApp, ask Ohana for the Supplier DO for PO-3001");
+      /* On Mon 14 Sep the unconfirmed first batch is still open (and late) beside the second batch's check. */
+      const second = project(base, "2026-09-14");
+      expect(second.map((i) => i.id)).toEqual([
+        "purchasing:PO-3001:purchasing.confirm_tomorrows_delivery:@2026-09-11",
+        "purchasing:PO-3001:purchasing.confirm_tomorrows_delivery:@2026-09-15",
+      ]);
+      /* The first batch's confirmation closes the first occurrence only. */
+      expect(project({ ...base, arrival_confirmations: [confirmation()] }, "2026-09-10")).toHaveLength(0);
+      expect(project({ ...base, arrival_confirmations: [confirmation()] }, "2026-09-14").map((i) => i.id))
+        .toEqual(["purchasing:PO-3001:purchasing.confirm_tomorrows_delivery:@2026-09-15"]);
+    });
+
+    it("stays open and turns late once the check day has passed", () => {
+      const [late] = project({}, "2026-09-14");
+      expect(late).toBeTruthy();
+      expect(late?.timing?.placement).toBe("missed");
+      expect(late?.timing?.missedAge).toEqual({ state: "not_calculable", workingDays: null, basis: null });
+    });
+  });
+
+  it("admits due invoice collection under the Responsible Delivery Operation and closes only on money truth", () => {
+    const person = { userId: "payment-duty", name: "Shasha" };
+    const [item] = projectPaymentCollectionWork({
+      invoices: [{
+        id: "invoice-1",
+        invoice_no: "INV-2041",
+        status: "issued",
+        kind: "sales",
+        amount: 1000,
+        tax_amount: 0,
+        issued_at: "2026-09-01T00:00:00Z",
+        voided_at: null,
+        void_reason: null,
+        replaces_invoice_id: null,
+        created_at: "2026-09-01T00:00:00Z",
+        order_id: "order-2041",
+        orders: {
+          id: "order-2041",
+          so: 2041,
+          customer_name: "Tan Qu Qu",
+          status: "proceed_order",
+          paid: 200,
+          delivery_date: "2026-09-09",
+          delivery_date_tbd: false,
+          delivered_at: null,
+          order_payments: [],
+          payment_communications: [],
+          order_lines: [{ sku: "SOFA-1", qty: 1, unit_price: 1000 }],
+          order_addons: [],
+          ops_order_control: [{
+            balance: null,
+            confirmed_date: "2026-09-09",
+            line_etas: null,
+            line_stock_status: { "SOFA-1": "ready" },
+          }],
+        },
+      }],
+      ownerFor: () => ({
+        dutyKey: "delivery_duty",
+        onDate: "2026-09-08",
+        normalOwner: person,
+        buddy: null,
+        activeCover: null,
+        actingPerson: person,
+        state: "primary",
+        assignmentId: "assignment-payment",
+      }),
+      today: "2026-09-08",
+    });
+
+    expect(item).toMatchObject({
+      id: "payment:invoice-1:payment.collect_customer_balance",
+      module: "payment",
+      object: { kind: "invoice", id: "invoice-1", label: "INV-2041" },
+      problem: "Customer payment should have been received",
+      action: "Ask customer to pay",
+      recipient: "Tan Qu Qu",
+      owner: { dutyKey: "delivery_duty", normal: person, acting: person },
+      timing: { actionOn: "2026-09-07", placement: "missed", missedAge: { state: "not_calculable" } },
+      destination: "/finance/monitor?invoice=invoice-1",
+    });
+    expect(item?.completionPredicate).toContain("outstanding balance is RM 0");
+    expect(item?.action).not.toContain("Shasha");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §10 row 2 (0446 + the registry entry) — a promise the customer broke
+// ─────────────────────────────────────────────────────────────────────────────
+describe("payment.missed_promise — the promise outranks the window", () => {
+  const person = { userId: "payment-duty", name: "Shasha" };
+  const duty = {
+    dutyKey: "delivery_duty" as const,
+    onDate: "2026-09-08",
+    normalOwner: person,
+    buddy: null,
+    activeCover: null,
+    actingPerson: person,
+    state: "primary" as const,
+    assignmentId: "assignment-payment",
+  };
+  /** With no delivery date at all the collection CLOCK has no anchor and
+   *  raises nothing — which is exactly the case the promise must reach on its
+   *  own. Pass a date to get the ordinary window item back. */
+  function invoice(deliveryDate: string | null) {
+    return {
+      id: "invoice-9", invoice_no: "INV-2099", status: "issued" as const, kind: "sales" as const,
+      amount: 1000, tax_amount: 0, issued_at: "2026-09-01T00:00:00Z",
+      voided_at: null, void_reason: null, replaces_invoice_id: null,
+      created_at: "2026-09-01T00:00:00Z", order_id: "order-2099",
+      orders: {
+        id: "order-2099", so: 2099, customer_name: "Tan Qu Qu",
+        status: "proceed_order", paid: 200, delivery_date: deliveryDate,
+        delivery_date_tbd: false, delivered_at: null,
+        order_payments: [], payment_communications: [],
+        order_lines: [{ sku: "SOFA-1", qty: 1, unit_price: 1000 }], order_addons: [],
+        ops_order_control: [{ balance: null, confirmed_date: deliveryDate,
+          line_etas: null, line_stock_status: { "SOFA-1": "ready" } }],
+      },
+    };
+  }
+  function outcome(over: Partial<{ outcome: string; promised_date: string | null; recorded_at: string }>) {
+    return {
+      id: "oc-1", order_id: "order-2099", invoice_id: "invoice-9",
+      outcome: (over.outcome ?? "will_pay_on_date") as "will_pay_on_date",
+      promised_date: over.promised_date ?? "2026-09-05",
+      note: null, recorded_at: over.recorded_at ?? "2026-09-02T02:00:00Z",
+    };
+  }
+
+  it("raises the work on the day the CUSTOMER chose, even when the clock has no anchor", () => {
+    const [item] = projectPaymentCollectionWork({
+      invoices: [invoice(null)],
+      ownerFor: () => duty,
+      today: "2026-09-08",
+      outcomes: [outcome({})],
+    });
+    expect(item).toMatchObject({
+      id: "payment:invoice-9:payment.missed_promise",
+      module: "payment",
+      problem: "Customer promise was missed",
+      action: "Ask customer to pay",
+      // Due on the promised day — not the delivery window's day.
+      timing: { actionOn: "2026-09-05", placement: "missed" },
+    });
+    expect(item?.timing.missedAge).toEqual({ state: "not_calculable", workingDays: null, basis: null });
+    expect(item?.completionPredicate).toContain("outstanding balance is RM 0");
+  });
+
+  it("raises ONE row, never the window item beside it", () => {
+    const items = projectPaymentCollectionWork({
+      invoices: [invoice("2026-09-09")],
+      ownerFor: () => duty,
+      today: "2026-09-08",
+      outcomes: [outcome({})],
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0]?.id).toContain("payment.missed_promise");
+  });
+
+  it("a promise still in the future is not missed", () => {
+    const items = projectPaymentCollectionWork({
+      invoices: [invoice(null)],
+      ownerFor: () => duty,
+      today: "2026-09-08",
+      outcomes: [outcome({ promised_date: "2026-09-20" })],
+    });
+    expect(items).toHaveLength(0);
+  });
+
+  it("the LATEST promise decides — a newer, later promise cancels the broken one", () => {
+    const items = projectPaymentCollectionWork({
+      invoices: [invoice(null)],
+      ownerFor: () => duty,
+      today: "2026-09-08",
+      outcomes: [
+        outcome({ promised_date: "2026-09-05", recorded_at: "2026-09-02T02:00:00Z" }),
+        outcome({ promised_date: "2026-09-20", recorded_at: "2026-09-06T02:00:00Z" }),
+      ],
+    });
+    expect(items).toHaveLength(0);
+  });
+
+  /** §3: `Customer paid` is NOT money. The balance stands, so does the work —
+   *  but it is the ordinary window item, not a broken promise. */
+  it("a said-paid order with money still owed is not a missed promise", () => {
+    const items = projectPaymentCollectionWork({
+      invoices: [invoice("2026-09-09")],
+      ownerFor: () => duty,
+      today: "2026-09-08",
+      outcomes: [outcome({ outcome: "customer_paid", promised_date: null })],
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0]?.id).toContain("payment.collect_customer_balance");
+  });
+
+  it("a settled balance closes it — a broken promise never outlives the money truth", () => {
+    const paid = invoice(null);
+    paid.orders.paid = 1000;
+    const items = projectPaymentCollectionWork({
+      invoices: [paid],
+      ownerFor: () => duty,
+      today: "2026-09-08",
+      outcomes: [outcome({})],
+    });
+    expect(items).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §10 — `Overpaid/unallocated money | Payment Approver | Review RM {amount}`
+// ─────────────────────────────────────────────────────────────────────────────
+describe("payment.review_overpayment", () => {
+  const approver = { userId: "payment-approver", name: "Jess" };
+  const duty = {
+    dutyKey: "payment_approver" as const,
+    onDate: "2026-09-08",
+    normalOwner: approver,
+    buddy: null,
+    activeCover: null,
+    actingPerson: approver,
+    state: "primary" as const,
+    assignmentId: "assignment-approver",
+  };
+  function invoice(paid: number) {
+    return {
+      id: "inv-9", invoice_no: "INV-9", status: "issued" as const, kind: "sales" as const,
+      amount: 1000, tax_amount: 0, issued_at: "2026-09-01", voided_at: null,
+      void_reason: null, replaces_invoice_id: null, created_at: "2026-09-01T00:00:00Z",
+      order_id: "order-9",
+      orders: {
+        id: "order-9", so: 3001, customer_name: "Tan Qu Qu", status: "proceed_order",
+        paid, delivery_date: null, delivery_date_tbd: false, delivered_at: null,
+        order_payments: [], payment_communications: [],
+        order_lines: [{ sku: "SOFA-1", qty: 1, unit_price: 1000 }], order_addons: [],
+        ops_order_control: [{ balance: null, confirmed_date: null, line_etas: null,
+          line_stock_status: null }],
+      },
+    };
+  }
+
+  it("raises the review naming the exact extra money, owned by the Payment Approver", () => {
+    const [item] = projectOverpaymentReviewWork({
+      invoices: [invoice(1200)], refunds: [], approver: duty, today: "2026-09-08",
+    });
+    expect(item).toMatchObject({
+      id: "payment:inv-9:payment.review_overpayment",
+      module: "payment",
+      problem: "The order holds more money than it asks for",
+      action: "Review RM 200.00",
+    });
+    expect(item?.owner.dutyKey).toBe("payment_approver");
+    expect(item?.owner.acting).toEqual(approver);
+    expect(item?.requiredResult).toContain("RM 200.00 allocated");
+  });
+
+  it("an order that owes money is not an overpayment", () => {
+    const items = projectOverpaymentReviewWork({
+      invoices: [invoice(400)], refunds: [], approver: duty, today: "2026-09-08",
+    });
+    expect(items).toHaveLength(0);
+  });
+
+  it("an exactly settled order raises nothing", () => {
+    const items = projectOverpaymentReviewWork({
+      invoices: [invoice(1000)], refunds: [], approver: duty, today: "2026-09-08",
+    });
+    expect(items).toHaveLength(0);
+  });
+
+  /** §10's "classified" ending: the exceptional refund §13 allows. Without
+   *  this the item would stay open forever after the decision settled it. */
+  it("an approved refund covering the excess closes it", () => {
+    const items = projectOverpaymentReviewWork({
+      invoices: [invoice(1200)],
+      refunds: [{ order_id: "order-9", amount: 200, status: "approved" }],
+      approver: duty, today: "2026-09-08",
+    });
+    expect(items).toHaveLength(0);
+  });
+
+  it("a refund still only REQUESTED settles nothing", () => {
+    const items = projectOverpaymentReviewWork({
+      invoices: [invoice(1200)],
+      refunds: [{ order_id: "order-9", amount: 200, status: "requested" }],
+      approver: duty, today: "2026-09-08",
+    });
+    expect(items).toHaveLength(1);
+  });
+
+  it("a refund smaller than the excess leaves the review open", () => {
+    const items = projectOverpaymentReviewWork({
+      invoices: [invoice(1200)],
+      refunds: [{ order_id: "order-9", amount: 50, status: "paid" }],
+      approver: duty, today: "2026-09-08",
+    });
+    expect(items).toHaveLength(1);
+  });
+
+  it("raises ONE row per Sales Order, however many invoices it has", () => {
+    const a = invoice(1200);
+    const b = { ...invoice(1200), id: "inv-10", invoice_no: "INV-10" };
+    const items = projectOverpaymentReviewWork({
+      invoices: [a, b], refunds: [], approver: duty, today: "2026-09-08",
+    });
+    expect(items).toHaveLength(1);
+  });
+
+  /** §12 gives this to the Payment Approver and nobody else, so an unassigned
+   *  duty leaves it honestly ownerless rather than borrowing the collection owner. */
+  it("an unassigned approver leaves it ownerless, never reassigned", () => {
+    const [item] = projectOverpaymentReviewWork({
+      invoices: [invoice(1200)], refunds: [], approver: null, today: "2026-09-08",
+    });
+    expect(item?.owner.state).toBe("not_assigned");
+    expect(item?.owner.acting).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §6 (0452) — `Check the stored furniture`, every configured interval
+// ─────────────────────────────────────────────────────────────────────────────
+describe("payment.check_stored_furniture", () => {
+  const CASE = {
+    caseId: "case-1", orderId: "order-1", so: 2099,
+    productGroup: "mattress_bedframe", storageStart: "2026-07-01",
+    lastCheckedOn: null as string | null, inspectionDays: 30,
+  };
+
+  it("raises the check on the interval, naming the day and how late it is", () => {
+    const [item] = projectStorageCheckWork({ cases: [CASE], today: "2026-09-08" });
+    expect(item).toMatchObject({
+      id: "payment:case-1:payment.check_stored_furniture",
+      module: "payment",
+      problem: "Stored furniture has not been checked",
+      action: "Check the stored furniture",
+      timing: { actionOn: "2026-07-31", placement: "missed", missedAge: { state: "not_calculable" } },
+    });
+    expect(item?.completionPredicate).toContain("storage inspection recorded");
+    // §6 names no warehouse duty roster, so there is no duty KEY to resolve —
+    // the rule stands and the owner is honestly unassigned.
+    expect(item?.owner.rule).toBe("warehouse_duty");
+    expect(item?.owner.dutyKey).toBeNull();
+    expect(item?.owner.state).toBe("not_assigned");
+  });
+
+  /** A case checked on time never builds a backlog — the clock restarts at the
+   *  check, so one look closes the item until the next interval. */
+  it("a recent check closes it until the next interval", () => {
+    const items = projectStorageCheckWork({
+      cases: [{ ...CASE, lastCheckedOn: "2026-09-05" }],
+      today: "2026-09-08",
+    });
+    expect(items).toHaveLength(0);
+  });
+
+  it("raises nothing before the first interval has passed", () => {
+    const items = projectStorageCheckWork({
+      cases: [{ ...CASE, storageStart: "2026-09-01" }],
+      today: "2026-09-08",
+    });
+    expect(items).toHaveLength(0);
+  });
+
+  /** The interval is a SETTING, not a case snapshot: a shorter one makes the
+   *  same case due sooner, from now on. */
+  it("follows the configured interval, not a fixed thirty days", () => {
+    const items = projectStorageCheckWork({
+      cases: [{ ...CASE, storageStart: "2026-09-01", inspectionDays: 5 }],
+      today: "2026-09-08",
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0]?.timing.actionOn).toBe("2026-09-06");
+  });
+});
+
+describe("the PO window card — one occurrence per window, never one per Sales Order (Purchasing §5.6.1)", () => {
+  const poDuty = {
+    dutyKey: "po_duty",
+    onDate: "2026-09-25",
+    normalOwner: { userId: "shasha", name: "Shasha" },
+    buddy: null,
+    activeCover: null,
+    actingPerson: { userId: "shasha", name: "Shasha" },
+    state: "primary" as const,
+    assignmentId: "assignment-1",
+  };
+  const demand = (id: string, orderId: string, supplierId: string, supplier: string, toBuy: number, poWindow: string | null) => ({
+    id, orderId, so: null, supplierId, supplier, toBuy, poWindow,
+    state: "safety_days_full", issueRef: { proposalKey: "p", buildKey: "b" },
+  });
+  const read = (rows: unknown[], pos: unknown[] = []) => ({
+    rows,
+    registerRows: [{ orderId: "o1", pos }],
+  }) as unknown as Parameters<typeof projectPoWindowWork>[0]["read"];
+  const suppliers = [
+    { id: "ohana", whatsapp_group_url: "https://chat.whatsapp.com/ohana" },
+    { id: "hookka", contact_email: "po@hookka.test" },
+  ];
+
+  it("gives PO Duty one card over the window's exact demand, due at the window", () => {
+    const items = projectPoWindowWork({
+      read: read([
+        demand("r1", "o1", "ohana", "Ohana", 2, "2026-09-25T11:30"),
+        demand("r2", "o2", "hookka", "Hookka", 1, "2026-09-25T11:30"),
+        demand("r3", "o3", "ohana", "Ohana", 4, "2026-09-25T16:00"),
+      ]),
+      suppliers, poDuty, today: "2026-09-25", now: "2026-09-25T02:00:00.000Z",
+    });
+    expect(items.map((i) => [i.object.id, i.object.label, i.problem, i.action, i.recipient, i.timing.actionOn, i.owner.acting?.name])).toEqual([
+      ["2026-09-25T11:30", "11:30 AM PO window", "Buy 3 items for 2 Sales Orders", "Issue the POs by 11:30 AM", "2 suppliers", "2026-09-25", "Shasha"],
+      ["2026-09-25T16:00", "4:00 PM PO window", "Buy 4 items for 1 Sales Order", "Issue the POs by 4:00 PM", "Ohana", "2026-09-25", "Shasha"],
+    ]);
+    expect(items[0]!.ruleKey).toBe("purchasing.po_window");
+    expect(items[0]!.destination).toBe("/operation?tab=purchase&window=2026-09-25T11%3A30");
+    expect(items[0]!.interaction.mode).toBe("open_module");
+    expect(items[0]!.tone).toBe("info");
+  });
+
+  it("after issue: speaks the send line and embeds the one shared send area", () => {
+    const [item] = projectPoWindowWork({
+      read: read([], [{ poId: "PO250925-4827", status: "open", supplierId: "ohana", supplierName: "Ohana", destinationId: null, officialDeliveryDate: null, sentCurrentVersion: false, version: 1, poWindow: "2026-09-25T11:30" }]),
+      suppliers, poDuty, today: "2026-09-25", now: "2026-09-25T04:00:00.000Z",
+    });
+    expect(item!.problem).toBe("1 PO issued · 1 not sent yet");
+    expect(item!.action).toBe("Click WhatsApp, send PO250925-4827(1) to Ohana");
+    expect(item!.interaction).toMatchObject({ mode: "embedded", componentKey: "purchasing.po_issue_evidence", staleRefusal: "stale_po_version" });
+    // 12:00 MYT is past 11:30 — the card warns within the day.
+    expect(item!.tone).toBe("warning");
+  });
+
+  it("goods completion keeps the window's current sending obligation open until confirmed", () => {
+    const received = { poId: "PO250925-4827", status: "received", supplierId: "ohana", supplierName: "Ohana", destinationId: null, officialDeliveryDate: null, sentCurrentVersion: false, version: 2, poWindow: "2026-09-25T11:30" };
+    const project = (sentCurrentVersion: boolean) => projectPoWindowWork({
+      read: read([], [{ ...received, sentCurrentVersion }]),
+      suppliers, poDuty, today: "2026-09-25", now: "2026-09-25T04:00:00.000Z",
+    });
+    const [item] = project(false);
+    expect(item?.problem).toBe("1 PO issued · 1 not sent yet");
+    expect(item?.action).toBe("Click WhatsApp, send PO250925-4827(2) to Ohana");
+    expect(item?.interaction).toMatchObject({ mode: "embedded", componentKey: "purchasing.po_issue_evidence" });
+    expect(project(true)).toEqual([]);
+    expect(received.status).toBe("received");
+  });
+
+  it("unreadable window settings fail the Purchasing source instead of showing an empty day", () => {
+    expect(() => projectPoWindowWork({
+      read: { rows: [], registerRows: [], poWindowsUnavailable: true } as never,
+      suppliers, poDuty, today: "2026-09-25", now: "2026-09-25T04:00:00.000Z",
+    })).toThrow(/unavailable/);
+  });
+
+  it("the per-Sales-Order issue_po and the retired confirm_ready_date are the window card's, not Work's", () => {
+    expect([...PURCHASING_WINDOW_OWNED].sort()).toEqual(["confirm_ready_date", "issue_po"]);
+  });
+});

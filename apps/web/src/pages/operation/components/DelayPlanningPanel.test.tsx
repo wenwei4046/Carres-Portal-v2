@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import DelayPlanningPanel from "./DelayPlanningPanel";
+import { fmtDateShort } from "@/lib/fmt-date";
 
 /**
  * C8 · the form that closes `Delay planning` — and the gate that keeps the
@@ -55,8 +56,8 @@ describe("DelayPlanningPanel", () => {
   it("states both dates as FACTS and offers no control that could move either", () => {
     render(wrap(panel()));
     const el = screen.getByTestId("delay-planning-panel");
-    expect(el.textContent).toContain("20 Aug 26");
-    expect(el.textContent).toContain("30 Aug 26");
+    expect(el.textContent).toContain(fmtDateShort("2026-08-20"));
+    expect(el.textContent).toContain(fmtDateShort("2026-08-30"));
     // §3 stage 3 / invariant 1: `orders.delivery_date` stays at what was sold.
     // The only inputs on this panel are the two radios and the optional note —
     // there is no date field, so this flow structurally cannot rewrite history.

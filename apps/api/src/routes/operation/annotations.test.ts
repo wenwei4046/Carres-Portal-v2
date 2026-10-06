@@ -1,17 +1,17 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
 import { userClient } from "../../lib/supabase";
+vi.mock("../../lib/actor-names", async importOriginal => ({
+  ...await importOriginal<typeof import("../../lib/actor-names")>(),
+  resolveActorIdentities: vi.fn(async () => new Map([
+    ["person", { name: "Jess", role: "principal", isPerson: true }],
+    ["shared", { name: "Operation login", role: "operation", isPerson: false }],
+  ])),
+}));
 
 const SUPABASE_URL = "https://test.supabase.co";
 const env = {
@@ -20,38 +20,22 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "test-service",
   SUPABASE_JWT_SECRET: "unused",
 };
-const KID = "test-kid-annotations";
 const ORDER_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 
-let signKey: KeyLike;
-let publicJwk: JWK;
-
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@carres.com`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000001")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("11111111-1111-1111-1111-000000000001", { email: `${role}@carres.com`, app_metadata: { role } });
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 afterAll(() => _setJwksForTesting(null));
 
-function mockRpc(returnData: unknown, error: unknown = null) {
+function mockRpc(returnData: unknown, error: unknown = null, activities: unknown[] = [], notes: unknown[] = []) {
   const rpcFn = vi.fn(() => Promise.resolve({ data: returnData, error }));
-  vi.mocked(userClient).mockReturnValue({ rpc: rpcFn } as unknown as ReturnType<typeof userClient>);
+  const from = vi.fn((table: string) => ({ select: () => ({ eq: () => ({ in: () => Promise.resolve({ data: table === "ops_activity_log" ? activities : notes, error: null }) }) }) }));
+  vi.mocked(userClient).mockReturnValue({ rpc: rpcFn, from } as unknown as ReturnType<typeof userClient>);
   return rpcFn;
 }
 
@@ -155,6 +139,18 @@ describe("GET /api/operation/orders/:id/timeline", () => {
     expect(Array.isArray(body)).toBe(true);
     expect(body).toHaveLength(2);
     expect(rpc).toHaveBeenCalledWith("operation_get_timeline", { p_order_id: ORDER_ID });
+  });
+
+  it("distinguishes people, shared logins, missing identity and recorded automation", async () => {
+    mockRpc([{ id: "human", kind: "annotation" }, { id: "shared", kind: "activity", detail: {} }, { id: "unknown", kind: "activity", detail: {} }, { id: "automatic", kind: "activity", detail: { actor: "system" } }], null, [{ id: "shared", actor_id: "shared" }, { id: "unknown", actor_id: null }, { id: "automatic", actor_id: null }], [{ id: "human", created_by: "person" }]);
+    const res = await app.fetch(new Request(`http://x/api/operation/orders/${ORDER_ID}/timeline`, { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } }), env);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([
+      expect.objectContaining({ actor_name: "Jess", actor_kind: "human", actor_role: "Principal" }),
+      expect.objectContaining({ actor_name: "Staff identity not recorded", actor_kind: "missing", actor_role: "Operation" }),
+      expect.objectContaining({ actor_name: "Staff identity not recorded", actor_kind: "missing" }),
+      expect.objectContaining({ actor_name: "System", actor_kind: "system" }),
+    ]);
   });
 
   it("returns empty array when no entries", async () => {

@@ -84,7 +84,7 @@ describe("PoolPanel — view mode", () => {
     );
   });
 
-  it("priced variant shows RM surcharge right-aligned and — when null", () => {
+  it("priced variant shows RM surcharge right-aligned and nothing when null", () => {
     render(
       <PoolPanel
         pool="divan_height"
@@ -96,7 +96,7 @@ describe("PoolPanel — view mode", () => {
       />,
     );
     expect(screen.getByTestId('pool-row-divan_height-10"')).toHaveTextContent("RM125.00");
-    expect(screen.getByTestId('pool-row-divan_height-4"')).toHaveTextContent("—");
+    expect(screen.getByTestId('pool-row-divan_height-4"')).not.toHaveTextContent(/[—–]/);
   });
 
   it("non-principal: no Edit button, History still available", () => {
@@ -126,7 +126,7 @@ describe("PoolPanel — view mode", () => {
       />,
     );
     fireEvent.click(screen.getByTestId("pool-history-bedframe_size"));
-    expect(screen.getByText("History — Bedframe Sizes")).toBeInTheDocument();
+    expect(screen.getByText("History: Bedframe Sizes")).toBeInTheDocument();
     expect(screen.getByText("Baseline — ported from 2990s Portal (0201)")).toBeInTheDocument();
   });
 });

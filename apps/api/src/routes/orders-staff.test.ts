@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../test/jwt";
 import app from "../index";
 import { _setJwksForTesting } from "../middleware/auth";
 import { mintStaffToken } from "../lib/staff-token";
@@ -12,7 +12,6 @@ vi.mock("../lib/supabase", () => ({
 import { userClient, adminClient } from "../lib/supabase";
 
 const SUPABASE_URL = "https://test.supabase.co";
-const KID = "test-kid-ostaff";
 const STAFF_SESSION_SECRET = "test-staff-secret-orders-0233";
 
 const env = {
@@ -23,6 +22,13 @@ const env = {
   STAFF_SESSION_SECRET,
 };
 
+/** A date safely past any configurable earliest-sell floor. */
+const isoIn = (days: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+
 const DEALER_A = "00000000-0000-0000-0000-000000000d01";
 const DEALER_B = "00000000-0000-0000-0000-000000000d02";
 const OUTLET_1 = "00000000-0000-0000-0000-00000000ee01";
@@ -31,19 +37,11 @@ const SP1 = "00000000-0000-0000-0000-00000000ff01";
 const SP_OTHER = "00000000-0000-0000-0000-00000000ff09";
 const ORDER_ID = "11111111-1111-1111-1111-111111111111";
 
-let signKey: KeyLike;
-let publicJwk: JWK;
-
 async function makeJwt(role: string, dealerId: string | null) {
-  return new SignJWT({
+  return signTestJwt("11111111-1111-1111-1111-000000000999", {
     email: "store@carres.com",
     app_metadata: { role, ...(dealerId ? { dealer_id: dealerId } : {}) },
-  })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000999")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  });
 }
 
 function staffToken(tier: "principal" | "manager" | "salesperson", oid: string | null, sid: string | null, did = DEALER_A) {
@@ -164,7 +162,7 @@ function fullOrderRow(over: Record<string, unknown> = {}) {
 }
 
 /** POST create mock — table-aware (salespersons validation + orders re-fetch)
- *  + create_order rpc capture. Every recompute table is dormant/empty. */
+ *  + final-submit create RPC capture. Every recompute table is dormant/empty. */
 function mockCreate(opts: { salespersonRow?: unknown | null; fetchedRow?: unknown }) {
   const rpcCalls: Array<{ name: string; args: { payload?: Record<string, unknown> } }> = [];
   function chain(table: string) {
@@ -193,7 +191,7 @@ function mockCreate(opts: { salespersonRow?: unknown | null; fetchedRow?: unknow
       }),
       rpc: async (name: string, args: { payload?: Record<string, unknown> }) => {
         rpcCalls.push({ name, args });
-        if (name === "create_order") return { data: { id: ORDER_ID }, error: null };
+        if (name === "create_order_from_sales_portal") return { data: { id: ORDER_ID }, error: null };
         return { data: null, error: null };
       },
       _rpcCalls: rpcCalls,
@@ -212,12 +210,16 @@ function createBody(over: Record<string, unknown> = {}) {
       phone: "012-3456789",
       address: "123 Jalan Sample, 50000 KL",
       addressUnknown: false,
+      /* The required Sales facts (owner ruling 2026-09-13, Delivery Card 18). */
+      addressState: "Kuala Lumpur",
       billing: null,
       billingSame: true,
       emergency: "Tan Junior · 012-9988776 · Spouse",
     },
-    // TBD date — skips the server lead-time floor entirely.
-    delivery: { date: null, proceedDate: null, dateTbd: true, floor: 1, hasLift: false },
+    // A date far past the lead-time floor. It used to be TBD, which the
+    // 2026-08-15 owner ruling retired: a new Sales Order is never dateless.
+    delivery: { date: isoIn(400), proceedDate: isoIn(0), dateTbd: false, floor: 1, hasLift: false },
+    entryData: { fields: { building_type: "Condo" } },
     lines: [{ sku: "mattress:carres-classic:queen", qty: 1, attrs: null, unitPrice: 1500 }],
     addons: [],
     paid: 750,
@@ -244,17 +246,8 @@ function postOrder(jwt: string, token: string | null, body: unknown) {
   );
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
   vi.mocked(adminClient).mockReset();
 });
@@ -479,7 +472,7 @@ describe("GET /api/orders/:id — staff scoping", () => {
 // ---------------------------------------------------------------------------
 describe("POST /api/orders — staff scoping", () => {
   function payloadOf(sb: ReturnType<typeof mockCreate>) {
-    const call = sb._rpcCalls.find((r: { name: string }) => r.name === "create_order");
+    const call = sb._rpcCalls.find((r: { name: string }) => r.name === "create_order_from_sales_portal");
     return call?.args?.payload as Record<string, unknown> | undefined;
   }
 
@@ -577,7 +570,7 @@ describe("POST /api/orders — staff scoping", () => {
     const jwt = await makeJwt("salesperson", DEALER_A);
     const res = await postOrder(jwt, null, createBody({ salespersonId: SP_OTHER }));
     expect(res.status).toBe(201);
-    const created = m._rpcCalls.find((r: { name: string }) => r.name === "create_order");
+    const created = m._rpcCalls.find((r: { name: string }) => r.name === "create_order_from_sales_portal");
     expect(created?.args.payload?.salesperson_id).toBe(SP1);
     expect(created?.args.payload?.outlet_id).toBe(OUTLET_1);
   });

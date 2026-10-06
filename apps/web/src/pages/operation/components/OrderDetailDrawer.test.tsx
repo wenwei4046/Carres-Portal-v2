@@ -144,22 +144,40 @@ describe("OrderDetailDrawer — no Purchase Order creation door", () => {
  * Same source-scan reasoning as above: these are facts about which branch
  * exists at all, and the drawer is 7,000 lines of branches.
  */
-describe("OrderDetailDrawer — C7, the delivery order", () => {
-  it("renders a delivery-order row, and spells its verb from the dictionary", () => {
+describe("OrderDetailDrawer — C7 → Slice 2, the delivery order", () => {
+  it("⭐ renders a delivery-order row whose ONLY control is the governed request door (2026-08-19)", () => {
+    // `docs/orders/MASTER.md` §8: the SYSTEM issues the DO — no Issue,
+    // Release or Approve button in any state. The one control the owner ruled
+    // (card §5, 2026-08-19) is `Request Delivery Order`: the manual door for
+    // the outstation trip, walking the SAME path with the SAME gates. The
+    // issued state keeps its one READ door: the number navigates to the DO
+    // object page (§0.1).
     expect(SRC).toContain("<DeliveryOrderRow");
-    // The button word is READ, never typed here — so a rename in
-    // COPY-STANDARD's mirror reaches this screen without touching this file.
-    expect(SRC).toMatch(/orderActionButton\("issue_delivery_order"\)/);
-    // Nor is the DONE message typed: the toast asks the same mirror.
-    expect(SRC).toMatch(/orderActionDone\("issue_delivery_order"\)/);
+    expect(SRC).not.toMatch(/orderActionButton\("issue_delivery_order"\)/);
+    expect(SRC).not.toMatch(/useIssueDeliveryOrder/);
+    const i = SRC.indexOf("function DeliveryOrderRow(");
+    expect(i, "DeliveryOrderRow is missing").toBeGreaterThan(-1);
+    // (slice to the next top-level function — the multi-line props block
+    // means "\n}" lands inside the signature)
+    const body = SRC.slice(i, SRC.indexOf("\nfunction ", i + 1));
+    // The one governed control, spelt the dictionary's way — and it walks the
+    // request endpoint, never a free-form create.
+    expect(body).toContain("Request Delivery Order");
+    expect(body).toContain("/delivery-order/request");
+    expect(body).not.toMatch(/Issue delivery order|Release|Approve/);
+    // the issued branch's only onClick is the navigation door to the page
+    expect(body).toContain("/operation/delivery-orders/");
   });
 
   it("the row shows the number as a FACT once it exists — no second press", () => {
     const i = SRC.indexOf("function DeliveryOrderRow(");
     expect(i, "DeliveryOrderRow is missing").toBeGreaterThan(-1);
-    const body = SRC.slice(i, i + 1600);
-    // The issued branch has no Btn at all: the document already exists.
+    const body = SRC.slice(i, SRC.indexOf("\nfunction ", i + 1));
+    // The issued branch prints the number as the door to its page; the
+    // unissued branch reads the governed absence SENTENCE (COPY-STANDARD:
+    // an absent value reads as words, never a dash).
     expect(body).toMatch(/doNumber \?/);
+    expect(body).toContain("No delivery order yet");
   });
 
   it("goods and money no longer disable the Confirm button (§5)", () => {
@@ -170,9 +188,24 @@ describe("OrderDetailDrawer — C7, the delivery order", () => {
   });
 
   it("the hint line names the step that actually refuses", () => {
-    expect(SRC).toContain("the delivery order cannot");
+    expect(SRC).toContain("The delivery order cannot");
     // The old sentence pointed at a refusal that no longer happens.
     expect(SRC).not.toMatch(/system refuses to\s*\n?\s*confirm/);
+  });
+
+  it("⭐ money never rides the goods refusal sentence — decision A (2026-08-16)", () => {
+    /* Found in the Slice 3 production walk: the booking hint lumped the
+       outstanding balance into "the delivery order cannot be issued until
+       these are cleared" — a refusal that no longer happens. Goods still
+       block; money warns on its own line and says so. */
+    // The balance is no longer pushed into the blocking gateHints list…
+    expect(SRC).not.toMatch(/gateHints\.push\(`RM /);
+    // …it has its own sentence, in the server warning's own voice…
+    expect(SRC).toContain(
+      "Collection is still open; it does not block the delivery order",
+    );
+    // …and the blocking sentence survives for the thing that DOES refuse.
+    expect(SRC).toContain("be issued until these are cleared");
   });
 
   it("the kebab no longer says `Confirm delivery` — the door it opens marks delivered", () => {
@@ -239,5 +272,80 @@ describe("OrderDetailDrawer — a voided payment is not money (CARD 4, 0347)", (
     expect(SRC).toContain("{isPrincipal && !voided && (");
     // It stays visible: the history is the point of keeping the row.
     expect(SRC).toContain("Voided");
+  });
+});
+
+/**
+ * D4 - ONE MONEY RULE, ASKED ONCE (docs/orders/MASTER.md 12).
+ *
+ * The audit recorded D4 as "the drawer separately fetches `order_payments` for
+ * Collected", and that half was corrected on 2026-07-27 (C5). What survived was
+ * different and worse: the goods half came through the shared `orderMoney`
+ * while the storage half was re-derived here as
+ * `invoiceTotal - collectedAll`, clamped as one figure. The screen then carried
+ * TWO "outstanding" numbers - the money sticker showing the shared rule's
+ * goods-only figure, the payment dial showing the local goods+storage one - and
+ * they disagreed on every order with a storage fee owing.
+ *
+ * Source scan, in this file's established method: the divergence only appears
+ * on an order that is BOTH overpaid on goods AND carrying a fee, which is a
+ * state no fixture mounts.
+ */
+describe("OrderDetailDrawer - one money rule, asked once (D4)", () => {
+  it("asks the shared rule for the storage half instead of re-deriving it", () => {
+    expect(SRC).toContain("storageOwing: storageOwingAmount,");
+    expect(SRC).toContain("storageReleased,");
+    // The retired second arithmetic, in full. Its return is the whole defect.
+    expect(SRC).not.toContain("Math.max(0, invoiceTotal - collectedAll)");
+  });
+
+  it("the owed figure IS the shared rule's, not a second sum", () => {
+    expect(SRC).toContain("const balanceDue = money.outstanding;");
+  });
+
+  it("a released fee is still owed - the waiver drops the hold, not the debt", () => {
+    // C9. The amount asks what was COLLECTED; the waiver rides separately, so
+    // `orderMoney` can keep it in `outstanding` and out of `holding`. Folding
+    // them together - which the boolean `storageOwing` does - would zero a
+    // waived fee out of the invoice the customer still owes.
+    expect(SRC).toContain("!form.control?.storage_collected_at");
+    expect(SRC).toContain(
+      'const storageReleased = form.control?.storage_waiver_status === "approved";',
+    );
+  });
+
+  it("the rule is called once, with everything it needs", () => {
+    const calls = SRC.match(/orderMoney\(\{/g) ?? [];
+    expect(calls, "a second call is a second answer waiting to happen").toHaveLength(1);
+  });
+});
+
+/**
+ * CARD-2026-08-28 - THE STORAGE RATE ASKS THE CATALOG.
+ *
+ * The storage SCOPE (`hasMsbf` / `hasSof`) decided which rate applies and asked
+ * `lineCategory` - the keyword parser `carry-forwards.md` records as
+ * display-only. That made this screen a SECOND wrong answer beside the server's
+ * prefix parser, so the Storage tab and the delivery gate could disagree about
+ * whether an order was even in scope.
+ *
+ * Source scan, in this file's established method: the divergence needs a
+ * catalogued SKU whose string shape disagrees with its category, which no
+ * fixture mounts.
+ */
+describe("OrderDetailDrawer - storage scope asks the catalog (CARD-2026-08-28)", () => {
+  it("hasMsbf / hasSof read the resolved category, not the SKU string", () => {
+    expect(SRC).toContain("const c = resolvedCategory(l.sku, l.category);");
+    expect(SRC).toContain(
+      'const hasSof = lines.some((l) => resolvedCategory(l.sku, l.category) === "sofa");',
+    );
+  });
+
+  it("no storage-scope caller of the parser survives", () => {
+    // The three remaining `lineCategory` uses are the Stock card's category
+    // rows, the line-kind display split and the sofa-builder flag - none of
+    // them decides a RATE, and the Card's boundaries forbid touching them.
+    expect(SRC).not.toContain("const c = lineCategory(l.sku);");
+    expect(SRC).not.toContain('lineCategory(l.sku) === "sofa"');
   });
 });

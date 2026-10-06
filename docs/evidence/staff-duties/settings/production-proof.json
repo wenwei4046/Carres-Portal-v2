@@ -1,0 +1,53 @@
+{
+  "card": "Workspace CARD 02",
+  "verifiedAt": "2026-09-29T08:12:01.911510+00:00",
+  "releaseCommit": "5fa933a5a06bdf7177043d892141e8cdd81e2f26",
+  "ciRun": 36538315010,
+  "deployRun": 36539744277,
+  "markers": [
+    {
+      "url": "https://carres-portal.pages.dev/__carres_deploy.json",
+      "commit": "5fa933a5a06bdf7177043d892141e8cdd81e2f26"
+    },
+    {
+      "url": "https://carres-pos.pages.dev/__carres_deploy.json",
+      "commit": "5fa933a5a06bdf7177043d892141e8cdd81e2f26"
+    },
+    {
+      "url": "https://erp.carresofficial.com/__carres_deploy.json",
+      "commit": "5fa933a5a06bdf7177043d892141e8cdd81e2f26"
+    },
+    {
+      "url": "https://pos.carresofficial.com/__carres_deploy.json",
+      "commit": "5fa933a5a06bdf7177043d892141e8cdd81e2f26"
+    },
+    {
+      "url": "https://api.carresofficial.com/health",
+      "commit": "5fa933a5a06bdf7177043d892141e8cdd81e2f26"
+    }
+  ],
+  "downloadedBundle": {
+    "predecessorDeployment": "https://e709d5e7.carres-portal.pages.dev",
+    "predecessorBytes": 7270590,
+    "currentOrigin": "https://erp.carresofficial.com",
+    "scripts": [
+      "/assets/index-CKNxE3Xo.js"
+    ],
+    "currentBytes": 7272210,
+    "counts": {
+      "newTitle": {
+        "before": 0,
+        "after": 1
+      },
+      "retiredTitle": {
+        "before": 1,
+        "after": 0
+      },
+      "unchangedControl": {
+        "before": 1,
+        "after": 1
+      }
+    }
+  },
+  "authenticatedBrowser": "Recorded in Workspace MASTER and Card after the read-only native-browser journey; these JSON marker checks alone do not prove authenticated UI."
+}

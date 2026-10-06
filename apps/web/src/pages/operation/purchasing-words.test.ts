@@ -38,7 +38,6 @@ const LANE = [
   "pages/operation/OperationToOrder.tsx",
   "pages/operation/OperationReceiving.tsx",
   "pages/operation/OperationSupplierClaims.tsx",
-  "pages/operation/components/WarehouseReceiptsPanel.tsx",
   "pages/operation/procurement/ProcurementTabContent.tsx",
   "pages/warehouse/WarehouseCountModal.tsx",
   // Added AFTER the first deploy, by the deploy grep itself: the ops right-rail
@@ -51,14 +50,18 @@ const LANE = [
   // to production, and to the SUPPLIER's own dashboard, while every rule below
   // was green. A lane list that does not grow with the lane is a lane list
   // that quietly stops being one.
-  "pages/operation/OperationPurchaseOrders.tsx",
-  // Added by P14 (2026-08-04), the day `CreatePurchaseDialog` moved out of
-  // `OperationToOrder.tsx` into its own file. Its words were scanned by every
-  // rule below while it lived inside the page; leaving it off this list would
-  // have let a PURE MOVE quietly retire five of them, and every rule here is a
-  // NEGATIVE assertion — the suite would have gone on passing, more easily.
-  // That is the failure the note above records having already been paid for.
-  "pages/operation/CreatePurchaseDialog.tsx",
+  //
+  // The rules follow the page to `purchase-orders/PurchaseOrdersPage.tsx`
+  // (2026-09-15): `OperationPurchaseOrders.tsx` had become a re-export of it
+  // plus an unrendered legacy copy, so the scan was reading dead code while
+  // the live page went unscanned.
+  "pages/operation/purchase-orders/PurchaseOrdersPage.tsx",
+  // Added by P14 (2026-08-04) as `CreatePurchaseDialog.tsx`; the dialog
+  // retired on CARD-2026-08-18-manual-purchase and its door moved to the
+  // Manual Purchase page — the scan follows the words to their new file for
+  // exactly the reason P14 added the old one: a PURE MOVE may not quietly
+  // retire a negative assertion.
+  "pages/operation/OperationManualPurchase.tsx",
 ];
 
 const read = (rel: string) => readFileSync(join(WEB_SRC, rel), "utf8");
@@ -78,7 +81,7 @@ function visibleSource(rel: string): string {
 
 describe("R8 · the Purchasing lane speaks the dictionary", () => {
   it("scans every lane file (a rename must not silently empty this suite)", () => {
-    expect(LANE.length).toBe(9);
+    expect(LANE.length).toBe(8);
     for (const f of LANE) expect(read(f).length, f).toBeGreaterThan(500);
   });
 
@@ -172,9 +175,21 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
     ]) {
       expect(read(f), f).not.toMatch(/function FacetRow\(/);
     }
-    for (const f of ["pages/operation/OperationSupplierClaims.tsx"]) {
-      expect(read(f), f).toMatch(/from "@\/components\/FacetRow"/);
+    // UI MASTER's current rail grammar supersedes the old FacetRow import.
+    // The law is WHICH MODULE the rail comes from and that all three parts
+    // come from it — not the punctuation of one import line. A page that also
+    // imports another shared control from `workspace-rail` (`ShowFiltersButton`,
+    // extracted 2026-09-18) still obeys it, and pinning the exact named set
+    // made a compliant extraction look like a violation.
+    const claims = read("pages/operation/OperationSupplierClaims.tsx");
+    const railImport = claims.match(
+      /import \{([^}]*)\} from "\.\/components\/workspace-rail"/,
+    );
+    expect(railImport, "Supplier Claims imports the shared rail").toBeTruthy();
+    for (const part of ["FilterRail", "FilterRailGroup", "FilterRailRow"]) {
+      expect(railImport?.[1]).toContain(part);
     }
+    expect(claims).not.toMatch(/from "@\/components\/FacetRow"/);
     // Receiving left this list on 2026-08-03 (Slice B): it is no longer a
     // facet-rail list page, it is the Purchasing module's WORKSPACE template —
     // 200px navigation rail + kit DataTable + a 400px workspace pane, copied
@@ -211,17 +226,16 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
         /`Factory: /,
       );
     }
-    // Claims still names the facet on its ✕-able chip.
+    // Claims names its governed rail group Supplier; the old chip is retired.
     expect(
       visibleSource("pages/operation/OperationSupplierClaims.tsx"),
-    ).toMatch(/Supplier: /);
-    // Receiving names it as the RAIL GROUP's title instead — the Workspace
-    // template has a navigation rail, not filter chips, so the word moved but
-    // the law did not: it is `Supplier`, never `Factory`.
-    expect(
-      visibleSource("pages/operation/OperationReceiving.tsx"),
-      "Receiving must still call the facet Supplier",
-    ).toMatch(/RailGroup title="Supplier"/);
+    ).toMatch(/supplier: "Supplier"/);
+    // Receiving's approved two-view rail keeps Supplier in the shared column
+    // filter. The dictionary binds its name, not the retired rail placement.
+    const receiving = visibleSource("pages/operation/OperationReceiving.tsx");
+    expect(receiving, "Receiving must still call the column filter Supplier")
+      .toMatch(/key: "supplier",\s*label: "Supplier"/);
+    expect(receiving).not.toMatch(/FilterRailGroup title="Supplier"/);
   });
 });
 
@@ -239,35 +253,46 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
  * they are not true at all.
  */
 describe("Communication Truthfulness · the PO workspace claims only what it saw", () => {
-  const PO = "pages/operation/OperationPurchaseOrders.tsx";
+  const PO = "pages/operation/purchase-orders/PurchaseOrdersPage.tsx";
 
   it("never claims a send — no `sent via`, no `sent to`", () => {
-    const src = visibleSource(PO);
+    const src = visibleSource(PO)
+      // The ONE knowing exception, named rather than regexed around: the
+      // `Sent to Supplier` column (COPY-STANDARD) prints recorded
+      // `confirmed_sent` evidence, which is an observed fact, not a claim.
+      .replace(/"Sent to Supplier"/g, " ")
+      // The approved act button (COPY-STANDARD, Jess 2026-09-17): the
+      // person's own statement that they sent it, never proof of receipt.
+      .replace(/PO sent to supplier/g, " ");
     expect(src, "the timeline may not say a message was sent").not.toMatch(/sent via/i);
     expect(src, "the timeline may not name a recipient it never reached").not.toMatch(
       /sent to /i,
     );
   });
 
-  it("says Snapshot, never Revision, to the operator", () => {
-    // `purchase_orders` is never edited by this path (proved 2026-08-03: the
-    // only writer of `po_revisions` is `purchasing_record_send`, and it only
-    // ever SELECTs the PO). Every other tool an operator has used — Git,
-    // Google Docs, Office, any ERP — means "the document changed" by
-    // `Revision`, so the word would keep manufacturing a belief that is false.
-    //
-    // The STORE keeps its names: `po_revisions` and `rev_no` are internal, and
-    // an internal name never defines UI truth (Jess, 2026-08-03). The scan
-    // therefore bans the visible word, not the identifiers.
-    const visibleWord = visibleSource(PO)
-      .replace(/po_revisions/g, " ")
-      .replace(/rev_no/g, " ");
-    expect(visibleWord, "the operator must read Snapshot").not.toMatch(/Revision/);
-    expect(visibleSource(PO)).toMatch(/· Snapshot \{/);
-  });
+  // "Says Snapshot, never Revision" is retired here, not moved. It banned
+  // `Revision` for the send-snapshot timeline, which the live page does not
+  // draw. The live page's `Revisions` view is the PO document changing, which
+  // COPY-STANDARD's 2026-09-06 correction card rules in by name.
+
+  /**
+   * ⭐ THE DOORS MOVED INTO THE ONE COMMUNICATION AREA
+   * (CARD-2026-08-22-purchasing-02 closure §7, 2026-08-24).
+   *
+   * They used to be rendered TWICE for one document — once by this page's own
+   * Communication band and once by the governed evidence surface below it — so
+   * one purchase order had two sets of send controls and two accounts of what
+   * had happened to it. The labels are unchanged and the law is unchanged; what
+   * changed is that exactly one component draws them.
+   */
+  const EVIDENCE = "pages/operation/components/PoIssueEvidence.tsx";
 
   it("labels every door by what the click opens", () => {
-    const src = visibleSource(PO);
+    /* The channel `<option>`s are stripped first. `WhatsApp` inside the
+       Channel select is the NAME OF A RECORDED CHANNEL — the fact the operator
+       is declaring about a send that already happened — not a door label. The
+       ban is on a control that names no door. */
+    const src = visibleSource(EVIDENCE).replace(/<option[\s\S]*?<\/option>/g, " ");
     // COPY-STANDARD's WhatsApp table, verbatim — plus `Open email`, which Jess
     // ruled on 2026-08-03 into the same shape: the button says which
     // application opens, never what we hope happens afterwards.
@@ -281,6 +306,28 @@ describe("Communication Truthfulness · the PO workspace claims only what it saw
     );
     expect(src, "`WhatsApp` alone names no door").not.toMatch(/>\s*WhatsApp\s*</);
     expect(src, "`Email` alone reads as an outcome").not.toMatch(/>\s*Email\s*</);
+  });
+
+  it("draws each door ONCE — the Purchase Order page renders none of them itself", () => {
+    const src = visibleSource(PO);
+    for (const label of ["Copy message", "Open WhatsApp group", "Open email"]) {
+      expect(src, `${label} must be drawn only by the evidence surface`).not.toMatch(
+        new RegExp(`>\\s*${label}\\s*<`),
+      );
+    }
+    // It still supplies the supplier's real doors, because it knows the supplier.
+    expect(src).toMatch(/doors=\{doorsForIssuedPo\(/);
+  });
+
+  it("hands over a PDF, never the payload behind it", () => {
+    const src = visibleSource(EVIDENCE);
+    // `Download PDF` used to be an anchor at `/print-data`, so it handed the
+    // operator — and any supplier they forwarded it to — a JSON response.
+    expect(src).toMatch(/"Download PDF"/);
+    expect(src).toMatch(/renderPoPdf\(data\)/);
+    expect(src, "no href may point at the JSON endpoint").not.toMatch(
+      /href=\{`\/api\/operation\/pos\/[^`]*print-data/,
+    );
   });
 });
 

@@ -60,7 +60,7 @@ function Row({ row, canClose }: { row: CorrectionWorkRow; canClose: boolean }) {
         <span className="text-label font-semibold tracking-wide text-base-700 uppercase">
           {OWNER_WORD[row.module]}
           {row.shared && (
-            <span className="ml-2 rounded-pill bg-base-900 px-2 py-0.5 text-meta font-semibold text-white normal-case">
+            <span className="ml-2 rounded-full bg-base-900 px-2 py-0.5 text-meta font-semibold text-white normal-case">
               Shared
             </span>
           )}
@@ -76,7 +76,7 @@ function Row({ row, canClose }: { row: CorrectionWorkRow; canClose: boolean }) {
       {done ? (
         <p className="text-meta text-base-500 mt-1.5">
           Closed {fmtDate(row.closed_at, { time: true })}
-          {row.closed_note ? ` — ${row.closed_note}` : ""}
+          {row.closed_note ? `: ${row.closed_note}` : ""}
         </p>
       ) : canClose ? (
         <div className="mt-2">
@@ -116,7 +116,7 @@ function Row({ row, canClose }: { row: CorrectionWorkRow; canClose: boolean }) {
       ) : (
         /* The read-only side says WHY there is no button here. */
         <p className="text-meta text-base-500 mt-1.5">
-          {OWNER_WORD[row.module]} closes this — the sales order raised it.
+          {OWNER_WORD[row.module]} closes this. The sales order raised it.
         </p>
       )}
     </li>

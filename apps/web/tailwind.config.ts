@@ -98,6 +98,19 @@ export default {
           // is the only piece proto adds on top.
           soft: "hsl(var(--error-soft))",
         },
+        /* The Work page's own ladder (Work middle-card kit, 2026-09-24).
+         * Values live in index.css; only Work reads these names. */
+        work: {
+          line: "var(--work-line)",
+          "line-hover": "var(--work-line-hover)",
+          ink: "var(--work-ink)",
+          slate: "var(--work-slate)",
+          muted: "var(--work-muted)",
+          tabs: "var(--work-tabs)",
+          "missed-fill": "var(--work-missed-fill)",
+          "missed-line": "var(--work-missed-line)",
+          "missed-ink": "var(--work-missed-ink)",
+        },
         /* ⭐ THE KIT PALETTE (UI-KIT §3.2 · §3.3, card D0.5a) — Radix steps,
          * namespaced under `kit` so they ADD to the palette instead of
          * overriding Tailwind's own blue/green/amber/red, which 76 live class
@@ -112,10 +125,11 @@ export default {
            * greys per page, maximum. Copy Linear: the chrome greys sit so
            * close to white the data always outweighs them. Runs on Purchase
            * Orders first; flows back portal-wide after she reviews it live. */
-          canvas: "#F7F8FA", // app background (Jess, 2026-08-02 — not a Radix step; her exact number)
+          canvas: "hsl(var(--background))", // THE one canvas token = #F7F8FA (Jess 2026-08-02; UI MASTER §6.7 2026-09-17) — body and every page read the same variable
           // `strip` retired the same day (Jess's polish: too many greys were
           // competing) — the header strip sits on the canvas, no grey of its own.
           slate: {
+            2: slate.slate2, // expansion area under an opened register row (owner ruling R5, 2026-09-16 · additive)
             3: slate.slate3, // table header #F1F3F5 (Jess, 2026-08-02) · page canvas on unmigrated pages (Q2)
             4: slate.slate4, // quiet control border (Jess, 2026-08-01; thead moved to slate-3, 2026-08-02)
             5: slate.slate5, // hairline — table lines, card edge
@@ -127,11 +141,19 @@ export default {
           blue: {
             2: blue.blue2, // row HOVER — one step under selected (Jess, 2026-08-01)
             3: blue.blue3, // selected row · info fill
+            /* The EDGE of a tinted surface (Warehouse Schedule, owner-approved
+             * design 2026-09-14). A tinted card needs a border one step up from
+             * its own fill or it dissolves into the column, and slate-5 over an
+             * amber or blue fill reads as a mistake. Radix step 6 is each ramp's
+             * own "subtle border" step, so this is the palette's answer rather
+             * than a hex someone matched by eye. ADDITIVE — no existing step
+             * moves, so no shipped page changes colour. */
+            6: blue.blue6, // border of a blue-3 surface
             9: blue.blue9, // the one action fill · focus ring
             11: blue.blue11, // action ink
           },
           green: { 3: green.green3, 11: green.green11 }, // done · received · in stock
-          amber: { 3: amber.amber3, 11: amber.amber11 }, // needs attention · waiting
+          amber: { 3: amber.amber3, 6: amber.amber6, 11: amber.amber11 }, // needs attention · waiting
           red: { 3: red.red3, 9: red.red9, 11: red.red11 }, // late · act now
         },
       },
@@ -151,6 +173,9 @@ export default {
         body: ["13px", { lineHeight: "18px", fontWeight: "400" }],
         meta: ["12px", { lineHeight: "16px", fontWeight: "400" }],
         label: ["11px", { lineHeight: "14px", fontWeight: "500" }],
+        /* The workspace toolbar control (Work, owner density ruling
+           2026-09-25): 14/20 in a 36px (40px below 600px) control. */
+        control: ["14px", { lineHeight: "20px", fontWeight: "400" }],
       },
       fontFamily: {
         // v17 (2026-06-09): Inter is the workhorse UI font for body + display.
@@ -212,6 +237,27 @@ export default {
       maxWidth: {
         modal: "512px", // a question, an answer, and two buttons
         "modal-wide": "600px", // a header and a LINE LIST — see above
+        /* ⭐ THE THIRD WIDTH IS A PICTURE, AND IT IS MEASURED (Delivery driver
+         * submission, 2026-09-11). The set stays CLOSED and the value stays
+         * here — a page still cannot type a number — but a modal that shows a
+         * PHOTO is not "a question and two buttons" and not "a line list": its
+         * binding constraint is the height cap above it.
+         *
+         * Measured at 1440×900 against this stylesheet. `max-h-dialog` is 85vh
+         * = 765px; the surface spends 56px on its header, 48px on the viewer's
+         * previous/next row and 32px on padding, leaving 629px of image. A
+         * phone photo is 4:3 (4032×3024 on the cameras Carres drivers carry),
+         * so 629px of height wants 839px of width:
+         *
+         *     width   image box   4:3 at 629px tall fits?
+         *      600       568       NO  — letterboxed, 61px of height wasted
+         *      800       768       NO  — 71px short
+         *      880       848       YES, 9px of headroom
+         *
+         * The algebraic minimum is 871; 880 is the round number above it, and
+         * the headroom is deliberate for the same reason P19's was — box
+         * widths round and text metrics are fractional. */
+        "modal-viewer": "880px", // a PHOTO, sized by the height cap — see above
         drawer: "560px", // a record read beside the list it came from
       },
       maxHeight: {
@@ -227,6 +273,7 @@ export default {
         pill: "4px", // pill · small tag · checkbox
         control: "6px", // button · input · dropdown
         card: "10px", // card · panel · modal · drawer
+        work: "9px", // Work page sections and middle cards (Work kit 2026-09-24)
       },
       keyframes: {
         "accordion-down": { from: { height: "0" }, to: { height: "var(--radix-accordion-content-height)" } },

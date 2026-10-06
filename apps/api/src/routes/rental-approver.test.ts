@@ -1,12 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../test/jwt";
 import app from "../index";
 import { _setJwksForTesting } from "../middleware/auth";
 
@@ -57,20 +50,11 @@ const env = {
   PUBLIC_WEB_URL: "https://pos.test",
 };
 
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
-
 async function makeJwt(role: string, dealerId: string | null = null) {
-  return new SignJWT({
+  return signTestJwt("11111111-1111-1111-1111-000000000999", {
     email: `${role}@x`,
     app_metadata: { role, ...(dealerId ? { dealer_id: dealerId } : {}) },
-  })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000999")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  });
 }
 
 function makeSb(rpc?: { data: unknown; error: unknown }, single?: { data: unknown; error: unknown }) {
@@ -96,17 +80,8 @@ function makeSb(rpc?: { data: unknown; error: unknown }, single?: { data: unknow
   return { from, rpc: rpcFn, calls };
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
   vi.mocked(adminClient).mockReset();
 });
@@ -554,5 +529,28 @@ describe("0275 — a rental mints a Sales Order", () => {
       approve: false, note: "x",
     });
     expect(((await res.json()) as { orderCancelled: boolean }).orderCancelled).toBe(true);
+  });
+});
+
+describe("0538 — the month across agreements, and the credit check", () => {
+  it("GET /month passes the first of the month and refuses bd", async () => {
+    const sb = makeSb({ data: [], error: null });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await get("/api/rental/month?month=2026-09", "finance");
+    expect(res.status).toBe(200);
+    expect(sb.calls.rpc[0]).toEqual({ name: "rental_billings_for_month", args: { p_month: "2026-09-01" } });
+    expect((await get("/api/rental/month?month=2026-09", "bd")).status).toBe(403);
+    expect((await get("/api/rental/month?month=2026-13", "finance")).status).toBe(422);
+  });
+
+  it("approve sends the check and its reference when typed", async () => {
+    const sb = makeSb({ data: { agreement: { ...PENDING_ROW, status: "active" } }, error: null });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    await post(`/api/rental/agreements/${AG_ID}/decide`, "finance", {
+      approve: true, creditCheck: "CTOS", creditReference: "R-1",
+    });
+    expect(sb.calls.rpc[0].args).toEqual({
+      p_agreement_id: AG_ID, p_note: null, p_credit_check: "CTOS", p_credit_reference: "R-1",
+    });
   });
 });

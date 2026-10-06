@@ -273,7 +273,7 @@ function PerModelConfig({
           </div>
           {tierDrafts.length === 0 && (
             <div className="text-meta text-base-500">
-              No tiers yet — add one below.
+              No tiers yet. Add one below.
             </div>
           )}
           {tierDrafts.map((t, i) => (
@@ -353,7 +353,7 @@ function PerModelConfig({
         </div>
         {milestoneDrafts.length === 0 && (
           <div className="text-meta text-base-500">
-            No milestones yet — add one below.
+            No milestones yet. Add one below.
           </div>
         )}
         {milestoneDrafts.map((m, i) => (
@@ -450,7 +450,7 @@ function PerModelConfig({
       </div>
 
       <div className="text-meta text-base-500">
-        Highest reached tier pays — tiers do not stack. Example: a{" "}
+        Highest reached tier pays. Tiers do not stack. Example: a{" "}
         {rm(100)} bonus at 5 units and a {rm(300)} bonus at 10 units pay{" "}
         {rm(300)} (not {rm(400)}) when 10 units are sold.
       </div>
@@ -715,7 +715,7 @@ export default function HrSetupTab({
                     </span>
                   </div>
                   <div className="shrink-0 text-meta text-base-500 t-num">
-                    now {pct != null ? `${pct}%` : "—"}
+                    now {pct != null ? `${pct}%` : ""}
                   </div>
                   <div className="shrink-0 flex items-center gap-1.5">
                     <input
@@ -842,7 +842,7 @@ export default function HrSetupTab({
                     <option value="cbo">CBO</option>
                   </select>
                   <div className="shrink-0 text-meta text-base-500 t-num">
-                    now {pct != null ? `${pct}%` : "—"}
+                    now {pct != null ? `${pct}%` : ""}
                   </div>
                   <div className="shrink-0 flex items-center gap-1.5">
                     <input
@@ -917,7 +917,7 @@ export default function HrSetupTab({
                         }))
                       }
                     >
-                      <option value="">— No BD owner —</option>
+                      <option value="">No BD owner</option>
                       {bdUsers.map((u) => (
                         <option key={u.id} value={u.id}>
                           {u.name}

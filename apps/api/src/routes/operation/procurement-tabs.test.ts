@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -12,30 +12,13 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "ptk-1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000777")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("11111111-1111-1111-1111-000000000777", { email: `${role}@x`, app_metadata: { role } });
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -115,8 +98,10 @@ describe("GET /api/operation/procurement/:slug", () => {
       delivery_date: string | null;
     }>;
   }) {
-    // Pass A chain
-    const passAEq = vi.fn().mockResolvedValue({ data: opts.matchedLines, error: null });
+    // Pass A chain — PAGED: `.like().eq().order().range()`, one range per page.
+    const passARange = vi.fn().mockResolvedValue({ data: opts.matchedLines, error: null });
+    const passAOrder = vi.fn().mockReturnValue({ range: passARange });
+    const passAEq = vi.fn().mockReturnValue({ order: passAOrder });
     const passALike = vi.fn().mockReturnValue({ eq: passAEq });
     const passASelect = vi.fn().mockReturnValue({ like: passALike });
 
@@ -142,6 +127,7 @@ describe("GET /api/operation/procurement/:slug", () => {
       passASelect,
       passALike,
       passAEq,
+      passARange,
       passBSelect,
       passBIn,
       passBOrder,
@@ -433,6 +419,32 @@ describe("GET /api/operation/procurement/:slug", () => {
       const [col, vals] = m.passCIn.mock.calls[0]!;
       expect(col).toBe("so");
       expect([...(vals as number[])].sort()).toEqual([5001, 5002]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("urgency uses the KL calendar date, not the UTC date (00:00-08:00 MYT window)", async () => {
+    // 2026-05-31T17:00Z is 2026-06-01 01:00 MYT. KL today = 06-01, UTC today = 05-31.
+    // delivery 2026-06-07 is 6 KL-days out → critical. UTC math says 7 → urgent.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-31T17:00:00Z"));
+    try {
+      const PO = { ...NICE_FUTURE_PO, id: "PO-3003", so: 5003, so_refs: null };
+      mockSinglePass(
+        [PO],
+        [{ so: 5003, customer_name: "Tan", delivery_date: "2026-06-07" }],
+      );
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request("http://t/api/operation/procurement/nice-future", {
+          headers: { Authorization: `Bearer ${jwt}` },
+        }),
+        env,
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { pos: Array<{ id: string; urgency: string | null }> };
+      expect(body.pos.find((p) => p.id === "PO-3003")?.urgency).toBe("critical");
     } finally {
       vi.useRealTimers();
     }

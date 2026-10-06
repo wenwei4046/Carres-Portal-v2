@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ledgerAccountCodeShape } from "../finance-ledger";
 
 /**
  * Order payment ledger — the balance job's foundation (Jess 2026-06-26
@@ -11,7 +12,10 @@ import { z } from "zod";
  * collect-before-delivery gate. See `docs/superpowers/plans/2026-06-26-balance-job.md`.
  */
 
-/** How the money came in. */
+/** How the money came in. 0430 adds the governed manual methods from
+ *  payment/MASTER.md §16 — duitnow_qr · credit_card · debit_card — matching
+ *  the widened SQL dictionary and column CHECK. `online` remains
+ *  provider-recorded (Stripe) and is never a manual selection. */
 export const PAYMENT_METHODS = [
   "cash",
   "bank",
@@ -19,8 +23,54 @@ export const PAYMENT_METHODS = [
   "cheque",
   "online",
   "other",
+  "duitnow_qr",
+  "credit_card",
+  "debit_card",
 ] as const;
 export type OrderPaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+/**
+ * 0476 — a payment method is a KEY, not a fixed word. `PAYMENT_METHODS` stays
+ * the list of words the system itself knows; the methods a manager adds in
+ * Settings → Payment → Payment methods (`payment_method_save`) are keys of the
+ * same shape. The SQL writer decides which keys are real (a system word or a
+ * registered method) and refuses one with no money account — the API only
+ * checks the shape, so a new method needs no code change.
+ */
+export const PAYMENT_METHOD_KEY_RE = /^[a-z][a-z0-9_]{1,39}$/;
+export const paymentMethodKeySchema = z
+  .string()
+  .trim()
+  .regex(PAYMENT_METHOD_KEY_RE, "choose a payment method from the list");
+/** A method as stored on a receipt: a system word or a registered key. */
+export type PaymentMethodKey = OrderPaymentMethod | (string & {});
+
+/** One row of the registry (`payment_method_registry()`). */
+export interface PaymentMethodRegistryRow {
+  method: string;
+  label: string;
+  /** The money account customer money of this method lands in; null = none yet. */
+  account_code: string | null;
+  account_name: string | null;
+  active: boolean;
+  sort: number;
+}
+
+/** One account a method may choose (`payment_method_money_accounts()`). */
+export interface PaymentMoneyAccount {
+  code: string;
+  name: string;
+}
+
+/** Add (method null), rename, (de)activate a method and choose its account —
+ *  POST /api/finance/payment-settings/method/save → payment_method_save. */
+export const paymentMethodSaveInput = z.object({
+  method: paymentMethodKeySchema.nullish(),
+  label: z.string().trim().min(1, "a payment method needs a name").max(40, "keep the name to 40 characters"),
+  accountCode: z.string().trim().regex(ledgerAccountCodeShape, "choose an account"),
+  active: z.boolean().default(true),
+});
+export type PaymentMethodSaveInput = z.infer<typeof paymentMethodSaveInput>;
 
 /** What the payment is for. `storage` = a storage-fee collection (proof of
  *  collection gates delivery); `deposit`/`payment` reduce the goods balance. */
@@ -33,7 +83,10 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected yyyy-mm-dd");
 export const recordPaymentInputSchema = z.object({
   amount: z.number().positive("amount must be greater than 0"),
   paidOn: isoDate,
-  method: z.enum(PAYMENT_METHODS).default("cash"),
+  /** 0476: a system word or a method from Settings → Payment (the SQL writer
+   *  checks which; an alias like `bank_transfer` folds to `bank`). 0535: no
+   *  default — a payment with no method is refused, never guessed as cash. */
+  method: paymentMethodKeySchema,
   kind: z.enum(PAYMENT_KINDS).default("payment"),
   reference: z.string().trim().max(120).nullish(),
   note: z.string().trim().max(500).nullish(),
@@ -44,8 +97,35 @@ export const recordPaymentInputSchema = z.object({
    *  payments still record, only the slip link waits for the deploy. */
   receiptUrl: z.string().trim().max(300).nullish(),
   idempotencyKey: z.string().uuid().optional(),
+  /** §5 (0448): the operator opened the earlier payment this one resembles and
+   *  says it is a different one. The SERVER decides whether that continuation
+   *  is allowed — a match only continues for the Payment Approver duty or
+   *  principal — so this flag ASKS, it never grants. Distinct from
+   *  `idempotencyKey`, which answers whether this is the same submission. */
+  duplicateAck: z.boolean().optional(),
 });
 export type RecordPaymentInput = z.infer<typeof recordPaymentInputSchema>;
+
+/** payment/MASTER.md §16 — the reference a method must carry, or null when
+ *  it is optional. Mirrors the check in `_customer_payment_post` (0535,
+ *  widened by 0551): the key folds like `payment_method_key` (POS `credit` /
+ *  `installment` are card, `bank_transfer` is bank).
+ *
+ *  0551 added bank and DuitNow QR because card settlement for every non-GHL
+ *  acquirer is matched BY the reference — it is a reconciliation key, not
+ *  paperwork. Cash, online, other and a method a manager adds stay optional,
+ *  exactly as the writer leaves them: this list is closed, never "anything
+ *  not cash". THE one predicate — every form asks it, so no screen can drift
+ *  from the database. */
+export function requiredPaymentReference(
+  method: string | null | undefined,
+): "Approval code" | "Cheque number" | "Reference number" | null {
+  const k = (method ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (k === "cheque") return "Cheque number";
+  if (["card", "credit", "installment", "credit_card", "debit_card"].includes(k)) return "Approval code";
+  if (["bank", "bank_transfer", "duitnow_qr"].includes(k)) return "Reference number";
+  return null;
+}
 
 /** Collect a storage fee — POST /api/operation/orders/:id/storage/collect. Same
  *  shape as a payment minus `kind` (the route forces `kind:'storage'` + stamps
@@ -109,13 +189,17 @@ export interface OrderPaymentRow {
   order_id: string;
   amount: number;
   paid_on: string;
-  method: OrderPaymentMethod;
+  method: PaymentMethodKey;
   kind: PaymentKind;
   reference: string | null;
   receipt_no: string | null;
   receipt_url: string | null;
   note: string | null;
   recorded_by: string | null;
+  /** `app_users.name` of `recorded_by`, resolved fail-soft by the reading
+   *  endpoint. Null when the id is absent or the row is unreadable — a screen
+   *  prints `Not recorded` rather than a uuid. */
+  recorded_by_name?: string | null;
   created_at: string;
   /** 0343 — did this row bump `orders.paid`? False on a HISTORY MIRROR of a
    *  deposit the create door already put inside `orders.paid`, and on every
@@ -145,9 +229,20 @@ export function isLivePayment(p: { voided_at?: string | null }): boolean {
   return p.voided_at == null;
 }
 
+/**
+ * NO `paid` FIELD, deliberately (2026-08-17). It used to carry Σ of every row
+ * REGARDLESS OF KIND, and it had zero readers — measured across `apps/` and
+ * `packages/`. That is not merely dead weight, it is a loaded gun: goods money
+ * and a storage collection are different debts with different clocks and
+ * different gates, and the whole codebase is arranged to keep them apart. The
+ * first person to reach for an innocent-looking "total paid" would have got
+ * them silently added together.
+ *
+ * Whoever needs "how much has this order received" must say WHICH money:
+ * `byKind.payment + byKind.deposit` for goods, `storageCollected` for storage.
+ * Being made to name it is the point.
+ */
 export interface PaymentSummary {
-  /** Σ of every ledger row (all kinds) — for the "total received" display. */
-  paid: number;
   byKind: Record<PaymentKind, number>;
   /** Order-goods balance still owed = bill − (payment + deposit), floored at 0. */
   outstanding: number;
@@ -170,19 +265,27 @@ export function summarizePayments(
   bill: number,
 ): PaymentSummary {
   const byKind: Record<PaymentKind, number> = { payment: 0, deposit: 0, storage: 0 };
-  let paid = 0;
   for (const p of payments) {
     if (!isLivePayment(p)) continue;
-    const amt = Number(p.amount) || 0;
-    byKind[p.kind] = (byKind[p.kind] ?? 0) + amt;
-    paid += amt;
+    byKind[p.kind] = (byKind[p.kind] ?? 0) + (Number(p.amount) || 0);
   }
   const goodsPaid = byKind.payment + byKind.deposit;
   const safeBill = Number(bill) || 0;
   return {
-    paid,
     byKind,
     outstanding: safeBill > 0 ? Math.max(0, safeBill - goodsPaid) : 0,
     storageCollected: byKind.storage,
   };
+}
+
+/** Goods money (payment + deposit, live rows only) recorded at or before an
+ *  invoice was issued — the "received before this invoice" line on the Sales
+ *  Invoice PDF (deposit then final invoice, KL Gateway 2026-09-18). */
+export function receivedBeforeInvoice(
+  payments: ReadonlyArray<{ amount: number; kind: PaymentKind; voided_at?: string | null; created_at: string }>,
+  issuedAt: string,
+): number {
+  const cut = Date.parse(issuedAt);
+  const s = summarizePayments(payments.filter((p) => Date.parse(p.created_at) <= cut), 0);
+  return Math.round((s.byKind.payment + s.byKind.deposit) * 100) / 100;
 }

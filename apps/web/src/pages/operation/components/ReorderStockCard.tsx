@@ -24,12 +24,6 @@ import type { OpsReorderRow } from "@carres/shared";
  * has to mean "watched and fine", never "nobody has looked".
  */
 
-const KIND_HINT: Record<string, string> = {
-  Pillow: "Pillow",
-  "M.P": "Protector",
-  Topper: "Topper",
-};
-
 export default function ReorderStockCard() {
   const { data, isLoading, isError } = useReorderStock();
   const [editing, setEditing] = useState<string | null>(null);
@@ -61,7 +55,7 @@ export default function ReorderStockCard() {
             <span className="text-strong text-base-900">Reorder</span>
           </div>
           <div className="text-meta text-base-600 mt-0.5">
-            Pillow and protector come from China — about 2 months. Order before
+            Pillow and protector come from China, about 2 months. Order before
             the shelf runs down.
           </div>
         </div>
@@ -135,7 +129,10 @@ function ReorderRow({
         </div>
         {row.kind ? (
           <div className="text-label text-base-500">
-            {KIND_HINT[row.kind] ?? row.kind}
+            {/* `kind` IS the governed word now (`accShort`), so the old
+                M.P → "Protector" translation table is gone — one word, one
+                place. */}
+            {row.kind}
             {row.leadDays != null ? ` · ${row.leadDays} days to arrive` : ""}
           </div>
         ) : null}
@@ -152,7 +149,7 @@ function ReorderRow({
         {row.incoming}
       </span>
       <span className="text-right font-mono text-body text-base-700">
-        {row.reorderPoint == null ? "—" : row.reorderPoint}
+        {row.reorderPoint == null ? "" : row.reorderPoint}
       </span>
 
       <div className="min-w-0">

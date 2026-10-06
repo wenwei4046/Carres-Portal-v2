@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
 import { renderInvoicePdf } from "@/lib/pdf/render";
 import type { InvoiceTemplateData } from "@/lib/pdf/types";
+import type { Role } from "@carres/shared/domain";
 
 /**
  * 2026-05-13 (Loo) — Sales Invoice PDF reprint button for the operation
@@ -25,21 +26,8 @@ import type { InvoiceTemplateData } from "@/lib/pdf/types";
  *   - variant: "primary" / "secondary" — matches Submit / outline styling
  */
 
-type Role =
-  | "dealer"
-  | "showroom"
-  | "salesperson"
-  | "operation"
-  | "finance"
-  | "partner"
-  | "supplier"
-  | "principal"
-  | "bd"
-  | "hr"
-  // R6 — present so the two Role unions stay assignable; deliberately NOT in
-  // ALLOWED below. An invoice is money, and a warehouse never sees money.
-  | "warehouse";
-
+// A warehouse is deliberately NOT in ALLOWED: an invoice is money, and a
+// warehouse never sees money.
 const ALLOWED: ReadonlySet<Role> = new Set([
   "operation",
   "finance",

@@ -325,13 +325,13 @@ describe("the words", () => {
   it("names the customer in the action", () => {
     const c = caseSlaClock({ openedAt: OPENED, todayIso: DAY_10 });
     expect(caseSlaAction(c, "Ahmad Tan")).toBe(
-      "Call Ahmad Tan — say why it is taking longer",
+      "Call Ahmad Tan to say why it is taking longer",
     );
   });
 
   it("falls back to the role word when no name is stored", () => {
     const c = caseSlaClock({ openedAt: OPENED, todayIso: DAY_10 });
-    expect(caseSlaAction(c, "   ")).toBe("Call the customer — say why it is taking longer");
+    expect(caseSlaAction(c, "   ")).toBe("Call the customer to say why it is taking longer");
   });
 
   it("asks for nothing when nothing is owed", () => {
@@ -390,7 +390,7 @@ describe("the words", () => {
 
   it("passes an unknown reason key through rather than printing nothing", () => {
     expect(caseDelayReasonLabel("retired_key")).toBe("retired_key");
-    expect(caseDelayReasonLabel(null)).toBe("—");
+    expect(caseDelayReasonLabel(null)).toBe("");
     expect(caseDelayReasonLabel("no_stock")).toBe("No replacement in stock");
   });
 });

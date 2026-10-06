@@ -73,17 +73,10 @@ export default function OperationStockPlan() {
 
   return (
     <>
-      <StockTabs />
-      <div className="px-9 py-8 pb-14" data-testid="operation-stock-plan">
-        <div className="mb-5 flex items-start justify-between gap-4">
-          <div>
-            <div className="kicker">HQ · Operations · Carres Klang</div>
-            <h1 className="text-page font-display mt-1.5">Ready stock</h1>
-            <div className="text-body text-base-600 mt-1.5">
-              How much to keep on the floor next month. Everyone asks, the
-              manager cuts, the COO approves — then Operations orders it.
-            </div>
-          </div>
+      {/* The destination header draws the page word (壳画头); the month
+          selector and status pill live in its right slot. */}
+      <StockTabs
+        right={
           <div className="flex items-center gap-2 shrink-0">
             <select
               value={period}
@@ -107,7 +100,9 @@ export default function OperationStockPlan() {
               </span>
             ) : null}
           </div>
-        </div>
+        }
+      />
+      <div className="px-9 py-8 pb-14" data-testid="operation-stock-plan">
 
         {/* K5 — the review layer, FIRST on the tab. The card's Done-when is
             "the COO opens one tab and knows what needs attention today", so
@@ -187,7 +182,7 @@ function NoPlanYet({
       </div>
       <div className="text-body text-base-600 mt-1 max-w-md mx-auto">
         Open the month and the team can start asking for what they want on the
-        floor. One plan per month — opening it twice lands on the same one.
+        floor. One plan per month. Opening it twice lands on the same one.
       </div>
       <button
         type="button"
@@ -231,7 +226,7 @@ function PlanTrail({
         <div key={s.label} className="text-meta">
           <span className="text-base-500">{s.label}: </span>
           <span className={s.who ? "text-base-900" : "text-base-400"}>
-            {s.who ?? "—"}
+            {s.who ?? ""}
           </span>
         </div>
       ))}
@@ -266,9 +261,9 @@ function CoverageNote({
       ) : (
         <>
           <span className="text-base-900 font-semibold">
-            Not enough sales history to suggest quantities yet
+            Not enough sales history to suggest quantities yet.
           </span>{" "}
-          — {coverage.days} {coverage.days === 1 ? "day" : "days"} on record. The
+          {coverage.days} {coverage.days === 1 ? "day" : "days"} on record. The
           suggestion appears by itself once there is enough.{" "}
         </>
       )}
@@ -382,10 +377,10 @@ function PlanRow({
         <Num v={row.sold30} dim={row.sold30 === 0} />
         <Num v={row.sold90} dim={row.sold90 === 0} />
         <span className="text-right font-mono text-body text-base-500">
-          {row.weekendShare == null ? "—" : `${Math.round(row.weekendShare * 100)}%`}
+          {row.weekendShare == null ? "" : `${Math.round(row.weekendShare * 100)}%`}
         </span>
         <span className="text-right font-mono text-body text-base-700">
-          {row.suggestedQty == null ? "—" : row.suggestedQty}
+          {row.suggestedQty == null ? "" : row.suggestedQty}
         </span>
         <Num v={row.proposedQty} strong />
 
@@ -413,7 +408,7 @@ function PlanRow({
         <div className="px-4 pb-2.5 -mt-1" data-testid={`plan-asks-${row.sku}`}>
           {row.proposals.length === 0 ? (
             <div className="text-meta text-base-500">
-              No individual asks — this line was added at consolidation.
+              No individual asks. This line was added at consolidation.
             </div>
           ) : (
             row.proposals.map((p) => (
@@ -473,7 +468,7 @@ function QtyCell({
         className="text-right font-mono text-body text-base-700"
         data-testid={`plan-${kind}-${sku}`}
       >
-        {value == null ? "—" : value}
+        {value == null ? "" : value}
       </span>
     );
   }
@@ -723,7 +718,7 @@ function PoList({ rows }: { rows: { sku: string; qty: number }[] }) {
       </header>
       {rows.length === 0 ? (
         <div className="px-4 py-6 text-center text-body text-base-500">
-          Every line was cut to zero — nothing to order.
+          Every line was cut to zero. Nothing to order.
         </div>
       ) : (
         rows.map((r) => (

@@ -20,7 +20,7 @@ import { useHrReport } from "@/lib/queries";
  * is the answer HR wants most mornings, not a sign the page is broken.
  */
 
-function StatTile({
+export function StatTile({
   label,
   value,
   sub,
@@ -97,7 +97,7 @@ export default function HrOverviewTab({
   const todos: { text: string; to: string }[] = [];
   if (commissionTotal === 0 && staffWithoutRate.length === activeStaff.length && activeStaff.length > 0) {
     todos.push({
-      text: "No commission rates set up yet — everyone earns RM 0",
+      text: "No commission rates set up yet. Everyone earns RM 0",
       to: "/hr?tab=setup",
     });
   } else if (staffWithoutRate.length > 0) {
@@ -158,7 +158,7 @@ export default function HrOverviewTab({
           {legacyUnattributed > 0 && (
             <p className="text-meta text-base-500 px-2 pt-2 border-t border-base-200 mt-2">
               {legacyUnattributed} imported archive order
-              {legacyUnattributed === 1 ? " is" : "s are"} not counted here — they
+              {legacyUnattributed === 1 ? " is" : "s are"} not counted here. They
               came from the old system, before the portal recorded sales.
             </p>
           )}

@@ -79,7 +79,7 @@ export default function PartnerRequestForDeliveryDialog({
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-card rounded-lg p-6 max-w-md w-full">
         <h2 className="text-strong font-semibold mb-4">
-          Request for Delivery — {poLabel ?? threadId.slice(0, 8)}
+          Request for Delivery: {poLabel ?? threadId.slice(0, 8)}
         </h2>
         {error && <p className="text-red-600 text-body mb-2">{error}</p>}
         <div className="flex gap-2 justify-end">

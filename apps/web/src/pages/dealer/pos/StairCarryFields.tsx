@@ -1,5 +1,5 @@
-import { MAX_DELIVERY_FLOOR, type FloorConfigDto } from "@carres/shared";
-import { floorSurchargeRaw } from "@/lib/order-totals";
+import { LIFT_OPTIONS, MAX_DELIVERY_FLOOR, type FloorConfigDto } from "@carres/shared";
+import { floorSurchargeRaw, stairCarryCount } from "@/lib/order-totals";
 import { rm } from "@/lib/format-currency";
 import type { WizardDraft } from "../new-order/draft";
 
@@ -27,15 +27,20 @@ export default function StairCarryFields({
     setDelivery({ floor: Math.max(1, Math.min(MAX_DELIVERY_FLOOR, next)) });
   }
   function bumpStairItems(delta: number, maxItems: number) {
-    const current = draft.delivery.stairItems ?? maxItems;
+    /* `?? 0` follows the 2026-08-27 ruling — unset is NONE, so `+` from an
+       untouched stepper goes to 1, not to maxItems + 1. */
+    const current = draft.delivery.stairItems ?? 0;
     setDelivery({ stairItems: Math.max(0, Math.min(maxItems, current + delta)) });
   }
 
   const itemsTotal = draft.lines.reduce((s, l) => s + l.qty, 0);
-  const stairItemsEffective =
-    draft.delivery.stairItems == null
-      ? itemsTotal
-      : Math.max(0, Math.min(itemsTotal, draft.delivery.stairItems));
+  /* ⭐ UNSET MEANS NONE — owner ruling 2026-08-27 (YH). This read `null =>
+     itemsTotal`, so a dealer who never touched the stepper quoted the maximum
+     stair fee. Somebody now has to say how many items need carrying before the
+     customer is charged for carrying them. The same rule runs in
+     `order-totals.ts` for a saved order, so this quote and the office page
+     cannot disagree about the money. */
+  const stairItemsEffective = stairCarryCount(itemsTotal, draft.delivery.stairItems);
   const stair = floorSurchargeRaw(
     draft.delivery.floor,
     draft.delivery.hasLift,
@@ -48,7 +53,7 @@ export default function StairCarryFields({
       <div className="flex items-baseline justify-between mb-3">
         <h3 className="kicker">Delivery access</h3>
         <p className="text-[11px] text-base-500">
-          1F–{cfg.freeUpToFloor}F free · {rm(cfg.perFloorPerItem)} per floor per item from{" "}
+          1F to {cfg.freeUpToFloor}F free · {rm(cfg.perFloorPerItem)} per floor per item from{" "}
           {cfg.freeUpToFloor + 1}F · max {MAX_DELIVERY_FLOOR}F
         </p>
       </div>
@@ -104,7 +109,7 @@ export default function StairCarryFields({
                 setDelivery({ stairItems: safe });
               }}
               disabled={itemsTotal === 0}
-              placeholder={itemsTotal === 0 ? "—" : ""}
+              placeholder={itemsTotal === 0 ? "" : ""}
               className="flex-1 min-w-0 text-center text-sm font-mono bg-transparent outline-none border-none py-1 disabled:opacity-50"
             />
             <button
@@ -119,22 +124,27 @@ export default function StairCarryFields({
           </div>
         </Field>
 
+        {/* ⭐ THE WORDS COME FROM SHARED (Jess, 2026-08-26). They were typed
+            here and nowhere else until the Sales Order object page had to ask
+            the same question; two hand-typed copies of one answer list is how
+            the two surfaces stop tallying. The SHAPE stays a pill pair — this
+            is a tablet on a shop floor and a two-option pill is a bigger target
+            than a select — but the list is no longer this file's to invent. */}
         <Field label="Lift available?">
           <div className="grid grid-cols-2 gap-1.5">
-            <button
-              type="button"
-              onClick={() => setDelivery({ hasLift: false })}
-              className={pillClass(!draft.delivery.hasLift)}
-            >
-              No lift
-            </button>
-            <button
-              type="button"
-              onClick={() => setDelivery({ hasLift: true })}
-              className={pillClass(draft.delivery.hasLift)}
-            >
-              Has lift
-            </button>
+            {LIFT_OPTIONS.map((word) => {
+              const isLift = word === "Has lift";
+              return (
+                <button
+                  key={word}
+                  type="button"
+                  onClick={() => setDelivery({ hasLift: isLift })}
+                  className={pillClass(draft.delivery.hasLift === isLift)}
+                >
+                  {word}
+                </button>
+              );
+            })}
           </div>
         </Field>
 

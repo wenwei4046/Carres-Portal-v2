@@ -160,6 +160,23 @@ export function orderActionChecklist(
     case "collect":
       return [closes("collect")];
 
+    // §0.1 Action Owner Engine row 1 (composed 2026-08-27) — a single act
+    // with no earlier step: asking IS where the promise track starts.
+    case "ask_delivery_date":
+      return [closes("ask_delivery_date")];
+
+    // Blueprint card §7 (2026-08-16) — two single-step acts. The loan comes
+    // back on the trip (no earlier step: the delivery day IS the moment), and
+    // only Finance can clear its exception (no operation step precedes a
+    // Finance decision).
+    case "collect_loan_item":
+      return [closes("collect_loan_item")];
+    // §6.1 (Card 13) — one act: the review itself closes it.
+    case "check_delivery_proof":
+      return [closes("check_delivery_proof")];
+    case "resolve_payment_exception":
+      return [closes("resolve_payment_exception")];
+
     // FACTS, never actions: there is nothing to close.
     case "delivering":
     case "done":

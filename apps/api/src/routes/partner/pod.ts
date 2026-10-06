@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -162,10 +162,7 @@ partnerPodRouter.post("/:threadId/attach", async (c) => {
     p_signature_url: parsed.data.signaturePath,
     p_signed_by:     parsed.data.signerName,
   });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json(data);
 });
 

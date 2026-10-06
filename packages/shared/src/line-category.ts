@@ -56,7 +56,11 @@ export type LineClass = CoreCat | "acc" | "unknown";
  */
 const ACCESSORY_TYPES: readonly { name: string; test: RegExp }[] = [
   { name: "Pillow", test: /pillow/ },
-  { name: "M.P", test: /protector|protect|\bm\.?p\b/ },
+  // The NAME is the governed word (`COPY-STANDARD.md`: "mattress protector"),
+  // never the AutoCount import code. `M.P` is the supplier sheet's abbreviation
+  // and it stays on the RIGHT of this line — the TEST reads it, the screen
+  // never prints it.
+  { name: "Mattress protector", test: /protector|protect|\bm\.?p\b/ },
   { name: "Disposal", test: /disposal|dispose/ },
   { name: "Service", test: /floor|lift|stair|transport|delivery|charge|install/ },
   { name: "Topper", test: /topper/ },
@@ -130,6 +134,55 @@ export function lineClass(sku: string): LineClass {
  * give `unknown` its own header and DELETE this function. It exists to keep one
  * lie in one place with its address written on it, not to be lived with.
  */
+/**
+ * ⭐ THE CATALOG'S ANSWER FIRST — the parser only where the catalog is silent.
+ *
+ * D9 (`ERP-ARCHITECTURE.md:28`): *"what kind of product is this?"* had three
+ * answers and no owner, and the one that is right — the CATALOG — was never
+ * asked. `56239a3c` (PR #859) closed Stock's half by making `/inventory` read
+ * `sku -> product_skus -> product_models.category` through the one shared
+ * reader. This is the Sales Order half: the drawer's loan flow was still
+ * deducing the category from the SKU TEXT in the browser, and it was not doing
+ * it cosmetically — it was FILTERING WAREHOUSE STOCK with the result.
+ *
+ * Two arguments, and the second one is deliberately three-valued:
+ *
+ *   category === undefined   ABSENT. Nobody asked. The payload came from an
+ *                            endpoint that does not carry the field, or from a
+ *                            Worker built before it did. Parse, exactly as
+ *                            before — this is the version-skew branch and the
+ *                            only one that is purely defensive.
+ *   category === null        ASKED, and the catalog holds no row for this SKU.
+ *   category === "sofa"      ASKED and ANSWERED. The catalog wins outright; no
+ *                            keyword list is consulted, ever.
+ *
+ * **Why `null` still falls through to the parser, which looks like the defect
+ * this function exists to remove.** It is a measured decision, not an
+ * oversight. On 2026-08-19 the catalog held a row for 49 of 74 distinct live
+ * SKUs; the other 87 records — 975 units — do not join
+ * (`CARD-2026-08-19-onhand-category-filter`). Treating `null` as "not this
+ * category" would drop nearly the whole warehouse out of the loan picker in one
+ * commit, which is a far larger regression than the guess it removes. So the
+ * parser keeps that bucket, and the bucket shrinks every time someone keys a
+ * product into the catalog. **The day it is empty, this branch and
+ * `lineCategory` die together** — that is the exit condition, and it is the
+ * reason the two cases are written apart even though they return the same thing
+ * today.
+ *
+ * A catalog value this codebase has no core word for (a future `accessory`,
+ * `service`, anything Settings adds) reads as `acc`, never as a core good:
+ * an unknown word must not be able to substitute for a sofa.
+ */
+export function resolvedCategory(sku: string, category?: string | null): CoreCat | "acc" {
+  // ABSENT — version skew. Nobody asked; the parser is all there is.
+  if (category === undefined) return lineCategory(sku);
+  // ASKED, catalog silent. See the measured reason above; this is the branch
+  // that deletes itself once the catalog is populated.
+  if (category === null) return lineCategory(sku);
+  const c = category.trim().toLowerCase();
+  return c === "sofa" || c === "bedframe" || c === "mattress" ? (c as CoreCat) : "acc";
+}
+
 export function lineCategory(sku: string): CoreCat | "acc" {
   const c = lineClass(sku);
   return c === "unknown" ? "acc" : c;
@@ -184,8 +237,12 @@ export function stockMatchKey(sku: string): string {
 }
 
 /** Short proper TYPE name for a non-core line — the list shows these instead of
- *  a generic "accessories" (Loo: show Pillow / M.P / Disposal by name). The
- *  drawer shows the full original name; this is the short form. */
+ *  a generic "accessories" (Loo: show Pillow / Mattress protector / Disposal by
+ *  name). The drawer shows the full original name; this is the short form.
+ *
+ *  **What this returns is SCREEN COPY** (the Sales Orders register footer
+ *  prints it verbatim), so every name in `ACCESSORY_TYPES` is a governed word.
+ */
 export function accShort(sku: string): string {
   const named = accessoryType(sku);
   if (named) return named;
@@ -215,7 +272,7 @@ export function lineKind(sku: string): ItemKind {
 
 /**
  * Display sequence rank for an order line (Jess 2026-06-22): always list in the
- * order mattress → bedframe → sofa → pillow → M.P → service / others. Lower
+ * order mattress → bedframe → sofa → pillow → protector → service / others. Lower
  * sorts first; ties keep their original order (Array.sort is stable). Use as
  * `lines.sort((a, b) => lineSortRank(a.sku) - lineSortRank(b.sku))`.
  *
@@ -231,7 +288,7 @@ export function lineSortRank(sku: string): number {
   if (cat === "unknown") return 3;
   const name = accShort(sku);
   if (name === "Pillow") return 4;
-  if (name === "M.P") return 5;
+  if (name === "Mattress protector") return 5;
   if (name === "Disposal" || name === "Service") return 7; // service last
   return 6; // other accessories (Topper / Footrest / …) before service
 }
@@ -241,7 +298,7 @@ export function lineSortRank(sku: string): number {
  *   • core furniture (Mattress / Bedframe / Sofa) → its SUPPLIER name — it's made
  *     to order and sits at the supplier until received. Current core suppliers:
  *     mattress = Nice Future, bedframe + sofa = Ohana ([[supplier-core-mapping]]).
- *   • accessory goods (Pillow / M.P / Topper / Footrest) → "Carres Klang" — kept
+ *   • accessory goods (Pillow / Mattress protector / Topper / Footrest) → "Carres Klang" — kept
  *     as ready warehouse stock.
  *   • service charges (No Lift / Disposal / floor) → null — no physical location.
  * It's only a DEFAULT — the drawer dropdown lets the operator override per line.
@@ -261,6 +318,93 @@ export function defaultLineLocation(
   if (l.includes("houzs")) return "Houzs Balakong";
   if (l === "al") return "AL";
   return "Carres Klang"; // own warehouse — the default consolidation point
+}
+
+/**
+ * ⭐ THE GOVERNED CATEGORY-WORD LADDER — one copy, every register
+ * (extracted from `SalesOrdersRegister.footerWord`, 2026-09-06, when the
+ * Receiving rail needed the same answer; Law D forbids a second ladder).
+ *
+ * The ladder is: recorded `attrs.category` → the catalog's `category` → the
+ * keyword classifier — the SAME order the SO document reads, so a register
+ * can always reproduce the document's word. The classifier branch survives
+ * only for the measured catalog gap (`resolvedCategory` documents the exit
+ * condition); no caller may write its own SKU-text rule instead of this one.
+ *
+ * A recorded category outside this vocabulary (e.g. `guarantee`) falls
+ * through to the SKU path unchanged — the ladder prints ONLY these words, by
+ * construction. `MP` and every other supplier abbreviation never reach the
+ * screen: the display word is always `Mattress protector`.
+ */
+export const GOODS_CATEGORY_WORDS = [
+  "Mattress",
+  "Bedframe",
+  "Sofa",
+  "Pillow",
+  "Mattress protector",
+  "Topper",
+  "Footrest",
+  "Accessory",
+  "Service",
+  "Other goods",
+] as const;
+
+export type GoodsCategoryWord = (typeof GOODS_CATEGORY_WORDS)[number];
+
+export function goodsCategoryWordOf(line: {
+  sku: string;
+  attrs?: Record<string, unknown> | null;
+  category?: string | null;
+}): GoodsCategoryWord {
+  const sku = line.sku;
+  if (lineKind(sku) === "service") return "Service";
+  const recorded = (
+    (typeof line.attrs?.category === "string" ? line.attrs.category : "") ||
+    (typeof line.category === "string" ? line.category : "")
+  )
+    .trim()
+    .toLowerCase();
+  if (recorded === "mattress") return "Mattress";
+  if (recorded === "bedframe") return "Bedframe";
+  if (recorded === "sofa") return "Sofa";
+  if (recorded === "service") return "Service";
+  if (recorded === "accessory") {
+    const short = accShort(sku);
+    return (GOODS_CATEGORY_WORDS as readonly string[]).includes(short)
+      ? (short as GoodsCategoryWord)
+      : "Accessory";
+  }
+  const cls = lineClass(sku);
+  if (cls === "mattress") return "Mattress";
+  if (cls === "bedframe") return "Bedframe";
+  if (cls === "sofa") return "Sofa";
+  const short = accShort(sku);
+  return (GOODS_CATEGORY_WORDS as readonly string[]).includes(short)
+    ? (short as GoodsCategoryWord)
+    : "Other goods";
+}
+
+/**
+ * ⭐ A RECEIPT READS THE CATALOG — owner ruling 2026-09-28 (Purchasing §9.4).
+ *
+ * The GRN reader, its register expansion and the GRN paper print the goods'
+ * Catalog category (`product_models.category`) through the governed words.
+ * When the Catalog cannot answer — no row, a failed read, or a category that
+ * is not goods (`guarantee`) — the fact prints `Not recorded`. It never falls
+ * to the SKU-text classifier or to `Other goods`: a receiving document states
+ * what is recorded, never a guess.
+ */
+export const CATALOG_CATEGORY_NOT_RECORDED = "Not recorded" as const;
+
+export function catalogCategoryWordOf(
+  sku: string,
+  catalogCategory: string | null | undefined,
+): GoodsCategoryWord | typeof CATALOG_CATEGORY_NOT_RECORDED {
+  const recorded = (catalogCategory ?? "").trim().toLowerCase();
+  if (!["mattress", "bedframe", "sofa", "accessory", "service"].includes(recorded)) {
+    return CATALOG_CATEGORY_NOT_RECORDED;
+  }
+  return goodsCategoryWordOf({ sku, category: recorded });
 }
 
 // NOTE: STOCK_LOCATIONS is NOT re-exported here — it already leaves the shared

@@ -86,7 +86,7 @@ describe("R4 · which statuses can be sold", () => {
 
   it("an unknown status prints itself rather than a blank", () => {
     expect(opsStockStatusLabel("brand_new_thing")).toBe("brand_new_thing");
-    expect(opsStockStatusLabel(null)).toBe("—");
+    expect(opsStockStatusLabel(null)).toBe("");
   });
 });
 
@@ -101,7 +101,7 @@ describe("R4 · why a unit is held", () => {
   it("labels are words, not keys", () => {
     expect(stockHoldReasonLabel("damaged")).toBe("Arrived damaged");
     expect(stockHoldReasonLabel("wrong_item")).toBe("Wrong item");
-    expect(stockHoldReasonLabel(null)).toBe("—");
+    expect(stockHoldReasonLabel(null)).toBe("");
   });
 });
 
@@ -136,7 +136,7 @@ describe("R4 · how a hold ends", () => {
     for (const o of STOCK_HOLD_OUTCOMES) {
       expect(stockHoldOutcomeLabel(o.key)).toBe(o.label);
     }
-    expect(stockHoldOutcomeLabel(null)).toBe("—");
+    expect(stockHoldOutcomeLabel(null)).toBe("");
   });
 });
 
@@ -189,7 +189,7 @@ describe("R4 · the sentence the panel shows", () => {
     const line = heldUnitsLine(2, "damaged");
     expect(line).toContain("2 units on hold");
     expect(line).toContain("Arrived damaged");
-    expect(line).toContain("cannot be sold, reserved or delivered");
+    expect(line).toContain("Cannot be sold, reserved or delivered");
   });
 
   it("counts one unit as one unit", () => {
@@ -201,7 +201,7 @@ describe("R4 · the sentence the panel shows", () => {
     // A late-delivery claim, or a partner warehouse that keeps no per-unit
     // register: 0 means "there is nothing here", never "still loading".
     expect(heldUnitsLine(0)).toBe(
-      "Nothing on hold — these units are not in the register.",
+      "Nothing on hold. These units are not in the register.",
     );
   });
 });

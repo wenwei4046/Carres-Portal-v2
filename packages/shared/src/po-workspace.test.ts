@@ -11,6 +11,10 @@ import {
   poArrivalGapOf,
   poCurrentActionOf,
   poOverdueDays,
+  poRecordedReplyOf,
+  poReplyDateOf,
+  poSupplierDeliveryDateOf,
+  poSupplierReplyOf,
   poWorkStateOf,
   type PoWorkspacePo,
 } from "./po-workspace";
@@ -267,13 +271,15 @@ describe("the listing's short spellings", () => {
     expect(PO_WORK_STATE_LABEL.waiting).toBe("Waiting for Goods");
   });
 
-  it("the delay-reason dropdown is Jess's six, and Remarks is NOT one of them", () => {
+  it("the delay-reason dropdown is the eight governed reasons (owner ruling 2026-09-24), and Remarks is NOT one of them", () => {
     expect([...PO_DELAY_REASONS]).toEqual([
-      "Production Delay",
-      "Material Shortage",
-      "Transport Delay",
-      "Waiting Customer Confirmation",
-      "Factory Closed",
+      "Production delay",
+      "Material unavailable",
+      "Capacity / scheduling delay",
+      "Quality issue / remake",
+      "Transport delay",
+      "Supplier closed / holiday",
+      "Partial quantity ready",
       "Other",
     ]);
   });
@@ -536,5 +542,228 @@ describe("comparePoRisk — the register's default order", () => {
       "PO-2038",
       "PO-QUIET",
     ]);
+  });
+});
+
+/* ── PO REVISIONS (0364, Jess 2026-08-18) — the version words + derivations ── */
+import {
+  poDocumentNumberOf,
+  poLineSupplierAnswersOf,
+  poSupplierAnswerSummaryOf,
+  poReviseSaveGapOf,
+  poUnsharedVersionNoticeOf,
+  poVersionLabelOf,
+} from "./po-workspace";
+
+/* ── THE NUMBER A SUPPLIER READS (owner ruling 2026-09-23, MASTER §6.1) ──── */
+describe("poDocumentNumberOf — the version marker follows the NUMBER's own form", () => {
+  it("a new-form PO wears `(n)`, with no space", () => {
+    expect(poDocumentNumberOf("PO260924-4827", 1)).toBe("PO260924-4827(1)");
+    expect(poDocumentNumberOf("PO260924-4827", 2)).toBe("PO260924-4827(2)");
+    expect(poDocumentNumberOf("PO260924-4827", 10)).toBe("PO260924-4827(10)");
+  });
+
+  it("⭐ A PRE-CUTOVER NUMBER KEEPS THE ` V{n}` ITS SUPPLIER ALREADY HOLDS", () => {
+    /* The permanence carve-out, enforced by the spelling rather than by a
+       stored flag: a kept version's payload carries its old number, so a
+       reprint of a 2026-09-22 send still reads exactly as it was sent. */
+    expect(poDocumentNumberOf("PO-20260904-4665", 2)).toBe("PO-20260904-4665 V2");
+    expect(poDocumentNumberOf("PO-2054", 1)).toBe("PO-2054 V1");
+  });
+
+  it("version 1 is PRINTED, never suppressed (0378)", () => {
+    expect(poDocumentNumberOf("PO260924-4827")).toBe("PO260924-4827(1)");
+    expect(poDocumentNumberOf("PO260924-4827", null)).toBe("PO260924-4827(1)");
+    expect(poDocumentNumberOf("PO-20260904-4665", null)).toBe("PO-20260904-4665 V1");
+  });
+
+  it("a subscription twin or any other 2–4 letter prefix reads the same way", () => {
+    expect(poDocumentNumberOf("SPO260924-4827", 1)).toBe("SPO260924-4827(1)");
+    expect(poDocumentNumberOf("MPR260924-4827", 3)).toBe("MPR260924-4827(3)");
+  });
+
+  it("an unrecognised shape is never dressed as a new number", () => {
+    expect(poDocumentNumberOf("PO26092-482", 2)).toBe("PO26092-482 V2");
+    expect(poDocumentNumberOf("po260924-4827", 2)).toBe("po260924-4827 V2");
+  });
+});
+
+describe("the version label — Version 1 is just the PO", () => {
+  it("says nothing for an unrevised PO", () => {
+    expect(poVersionLabelOf(1)).toBeNull();
+    expect(poVersionLabelOf(null)).toBeNull();
+    expect(poVersionLabelOf(undefined)).toBeNull();
+  });
+  it("names the version from the first revise on", () => {
+    expect(poVersionLabelOf(2)).toBe("Version 2");
+    expect(poVersionLabelOf(5)).toBe("Version 5");
+  });
+});
+
+describe("the disabled Save NAMES its gap, first gap wins", () => {
+  it("the floor outranks everything — it is the ruling's red line", () => {
+    expect(
+      poReviseSaveGapOf({
+        belowFloorSku: "SKU-CODY-Q",
+        nothingChanged: true,
+        reasonEmpty: true,
+      }),
+    ).toBe("Save: below received");
+  });
+  it("an unchanged document cannot mint a version", () => {
+    expect(
+      poReviseSaveGapOf({
+        belowFloorSku: null,
+        nothingChanged: true,
+        reasonEmpty: true,
+      }),
+    ).toBe("Save: nothing changed");
+  });
+  it("a change without a why is refused by name", () => {
+    expect(
+      poReviseSaveGapOf({
+        belowFloorSku: null,
+        nothingChanged: false,
+        reasonEmpty: true,
+      }),
+    ).toBe("Save: say why");
+  });
+  it("nothing missing → Save runs", () => {
+    expect(
+      poReviseSaveGapOf({
+        belowFloorSku: null,
+        nothingChanged: false,
+        reasonEmpty: false,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("the unshared-version sentence — derived, never stored", () => {
+  const base = { id: "PO-2041", version: 2, revised_at: "2026-08-19T03:00:00Z" };
+  it("a revised PO with no later hand-over raises the governed sentence", () => {
+    expect(poUnsharedVersionNoticeOf({ ...base, sends: [] }, "Ohana")).toBe(
+      "PO-2041 Version 2 has not reached Ohana",
+    );
+    expect(
+      poUnsharedVersionNoticeOf(
+        { ...base, sends: [{ sent_at: "2026-08-18T09:00:00Z" }] },
+        "Ohana",
+      ),
+    ).toBe("PO-2041 Version 2 has not reached Ohana");
+  });
+  it("a hand-over AFTER the revise silences it — that send carried the new version", () => {
+    expect(
+      poUnsharedVersionNoticeOf(
+        { ...base, sends: [{ sent_at: "2026-08-19T05:00:00Z" }] },
+        "Ohana",
+      ),
+    ).toBeNull();
+  });
+  it("Version 1 never raises it — the Issue ladder owns the first share story", () => {
+    expect(
+      poUnsharedVersionNoticeOf(
+        { id: "PO-2041", version: 1, revised_at: null, sends: [] },
+        "Ohana",
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("the reply readers after 0430 — one date rule, two truth levels", () => {
+  const base = {
+    kind: "tomorrow_delivery",
+    about_date: "2026-09-10",
+    previous_date: null,
+    reason: null,
+    po_version: 2,
+    channel: "whatsapp",
+    recipient: "Factory group",
+    evidence: "PO-1/reply.png",
+    reported_by: "Factory staff",
+    reported_at: "2026-09-01T08:00:00Z",
+    recorded_by: "u1",
+    recorded_at: "2026-09-01T08:05:00Z",
+  };
+
+  it("poReplyDateOf reads the legacy vocabulary AND 0430's", () => {
+    expect(poReplyDateOf({ ...base, answer: "shipping", new_date: null } as never)).toBe("2026-09-10");
+    expect(poReplyDateOf({ ...base, answer: "confirmed", new_date: "2026-09-10" } as never)).toBe("2026-09-10");
+    expect(poReplyDateOf({ ...base, answer: "earlier", new_date: "2026-09-05" } as never)).toBe("2026-09-05");
+    expect(poReplyDateOf({ ...base, answer: "delayed", new_date: "2026-09-15" } as never)).toBe("2026-09-15");
+    expect(poReplyDateOf({ ...base, answer: "reported", new_date: "2026-09-12" } as never)).toBe("2026-09-12");
+  });
+
+  it("an EARLIER answer is an evidenced reply — it is not a delay and not an absence", () => {
+    const rows = [{ ...base, answer: "earlier", new_date: "2026-09-05" }] as never[];
+    expect(poSupplierDeliveryDateOf(rows as never, 2)).toBe("2026-09-05");
+  });
+
+  it("a previous-version reply never confirms the current version", () => {
+    const rows = [{ ...base, answer: "confirmed", new_date: "2026-09-10", po_version: 1 }] as never[];
+    expect(poSupplierReplyOf(rows as never, 2)).toBeNull();
+    expect(poRecordedReplyOf(rows as never, 2)).toBeNull();
+  });
+
+  it("a version-linked reply WITHOUT evidence is recorded, not qualifying", () => {
+    /* 0430 backfilled po_version=1 onto pre-evidence replies of never-revised
+       POs. They must surface as "recorded without evidence" — never as the
+       governed supplier date, and never as a proven absence. */
+    const rows = [{
+      ...base, answer: "shipping", new_date: null,
+      channel: null, recipient: null, evidence: null, reported_by: null,
+      reported_at: null, recorded_by: null, po_version: 1,
+    }] as never[];
+    expect(poSupplierReplyOf(rows as never, 1)).toBeNull();
+    expect(poRecordedReplyOf(rows as never, 1)).not.toBeNull();
+    expect(poReplyDateOf(poRecordedReplyOf(rows as never, 1)!)).toBe("2026-09-10");
+  });
+});
+
+describe("0587 · the supplier's answer per goods line", () => {
+  const base = {
+    kind: "tomorrow_delivery", po_version: 1, channel: "whatsapp", recipient: "Factory group",
+    evidence: "PO-1/a.png", reported_by: "Factory", reported_at: "2026-09-25T02:00:00Z",
+    recorded_by: "u1", recorded_by_name: "Shasha", about_date: "2026-10-09", previous_date: null, remarks: null,
+  };
+  const L1 = "line-1"; const L2 = "line-2";
+  it("a line's newest answer group is its batches in date order; a line without one falls back to the PO-level answer", () => {
+    const promises = [
+      { ...base, answer: "delayed", reason: "Production delay", new_date: "2026-10-16", recorded_at: "2026-09-20T00:00:00Z" },
+      { ...base, po_line_id: L1, about_qty: 3, answer: "confirmed", reason: null, new_date: "2026-10-09", answer_group: "g1", recorded_at: "2026-09-25T00:00:00Z" },
+      { ...base, po_line_id: L1, about_qty: 1, answer: "delayed", reason: "Partial quantity ready", new_date: "2026-10-16", answer_group: "g1", recorded_at: "2026-09-25T00:00:00Z" },
+      /* an OLDER answer on the same line is history, not the answer */
+      { ...base, po_line_id: L1, about_qty: 4, answer: "delayed", reason: "Other", remarks: "x", new_date: "2026-10-30", answer_group: "g0", recorded_at: "2026-09-21T00:00:00Z" },
+    ];
+    const answers = poLineSupplierAnswersOf(promises, 1, [L1, L2]);
+    expect(answers.get(L1)?.batches).toEqual([
+      { qty: 3, date: "2026-10-09", answer: "confirmed", reason: null, remarks: null },
+      { qty: 1, date: "2026-10-16", answer: "delayed", reason: "Partial quantity ready", remarks: null },
+    ]);
+    expect(answers.get(L2)?.batches).toEqual([{ qty: null, date: "2026-10-16", answer: "delayed", reason: "Production delay", remarks: null }]);
+    expect(answers.get(L2)?.poLineId).toBe(L2);
+  });
+  it("an unevidenced row or another version's row is never an answer", () => {
+    const promises = [
+      { ...base, po_line_id: L1, about_qty: 4, answer: "confirmed", reason: null, new_date: "2026-10-09", evidence: "", recorded_at: "2026-09-25T00:00:00Z" },
+      { ...base, po_line_id: L1, about_qty: 4, answer: "confirmed", reason: null, new_date: "2026-10-09", po_version: 2, recorded_at: "2026-09-26T00:00:00Z" },
+    ];
+    expect(poLineSupplierAnswersOf(promises, 1, [L1]).size).toBe(0);
+  });
+  it("the Register parent prints ONE date, or `{n} dates`, and counts the lines that moved", () => {
+    const promises = [
+      { ...base, po_line_id: L1, about_qty: 4, answer: "confirmed", reason: null, new_date: "2026-10-09", answer_group: "g1", recorded_at: "2026-09-25T00:00:00Z" },
+      { ...base, po_line_id: L2, about_qty: 2, answer: "delayed", reason: "Transport delay", new_date: "2026-10-12", answer_group: "g1", recorded_at: "2026-09-25T00:00:00Z" },
+    ];
+    const summary = poSupplierAnswerSummaryOf(promises, 1, [L1, L2], "2026-10-09");
+    expect(summary.date).toBeNull();
+    expect(summary.distinctDates).toEqual(["2026-10-09", "2026-10-12"]);
+    expect(summary.answeredLines).toBe(2);
+    expect(summary.changed).toBe(1);
+    expect(summary.changedFrom).toBe("2026-10-09");
+    const same = poSupplierAnswerSummaryOf(promises.slice(0, 1), 1, [L1, L2], "2026-10-09");
+    expect(same.date).toBe("2026-10-09");
+    expect(same.changed).toBe(0);
+    expect(poSupplierAnswerSummaryOf([], 1, [L1], "2026-10-09").date).toBeNull();
   });
 });

@@ -214,8 +214,8 @@ describe("CustomerStep — 2990s Image-#4 parity", () => {
     expect(screen.getByTestId("pos-customer-race")).toBeTruthy();
     expect(screen.getByTestId("pos-customer-gender")).toBeTruthy();
     expect(screen.getByTestId("pos-customer-birthday")).toBeTruthy();
-    // Probe idle (no phone) → em-dash placeholder.
-    expect((screen.getByTestId("pos-customer-type") as HTMLInputElement).value).toBe("—");
+    // Probe idle (no phone) → empty, never a dash.
+    expect((screen.getByTestId("pos-customer-type") as HTMLInputElement).value).toBe("");
     expect(screen.getByTestId("pos-order-summary")).toBeTruthy();
     expect(screen.getByText(/Phase 1 of 2/i)).toBeTruthy();
   });
@@ -414,6 +414,51 @@ describe("CustomerStep — Full-name autocomplete (existing customers)", () => {
     );
   });
 
+  /* THE ASTERISK MUST REFUSE (found by YH on production, 2026-08-28).
+     `canAdvanceAt` is documented as mirroring `draft.ts step1FirstIssue`.
+     Jess added Building type to that validator on 2026-08-21; this mirror
+     did not follow, so Next stayed enabled on an address sub-step with an
+     empty required field. The pin is the INVARIANT — every field the address
+     sub-step marks required also gates Next — not this one field’s name. */
+  it("Next refuses while a required address field is empty, and allows once filled", () => {
+    const d = emptyDraft();
+    d.customer.addressLine1 = "12 Jalan Besar";
+    d.customer.addressState = "Selangor";
+    d.customer.addressCity = "Petaling Jaya";
+    d.customer.addressPostcode = "46200";
+    d.customer.billingSame = true;
+    d.customer.buildingType = "";
+    const first = wrap(
+      <CustomerStep
+        draft={d}
+        onChange={() => {}}
+        outlets={[]}
+        salespersons={[]}
+        catalog={catalog()}
+        minLeadDays={14}
+        initialSubStep={1}
+      />,
+    );
+    // Everything else on the sub-step is complete — only Building type is empty.
+    expect(screen.getByTestId("pos-customer-next")).toBeDisabled();
+    first.unmount();
+
+    const filled = emptyDraft();
+    filled.customer = { ...d.customer, buildingType: "Condo" };
+    wrap(
+      <CustomerStep
+        draft={filled}
+        onChange={() => {}}
+        outlets={[]}
+        salespersons={[]}
+        catalog={catalog()}
+        minLeadDays={14}
+        initialSubStep={1}
+      />,
+    );
+    expect(screen.getByTestId("pos-customer-next")).toBeEnabled();
+  });
+
   it("blur closes the dropdown", () => {
     mockCustomerSearch.mockReturnValue({ data: { customers: [HIT] } });
     wrap(
@@ -558,7 +603,13 @@ describe("CustomerStep — clickable step pills", () => {
     d.customer.race = "Chinese";
     d.customer.gender = "Female";
     d.customer.birthday = "1990-01-01";
-    d.customer.addressUnknown = true; // address gate satisfied
+    /* The address gate has no escape since 2026-09-13 — it is satisfied by
+       the facts themselves. */
+    d.customer.addressLine1 = "12 Jalan Besar";
+    d.customer.addressState = "Selangor";
+    d.customer.addressCity = "Petaling Jaya";
+    d.customer.addressPostcode = "46200";
+    d.customer.buildingType = "Condo";
     wrap(
       <CustomerStep
         draft={d}

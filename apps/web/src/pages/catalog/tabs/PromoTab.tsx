@@ -174,6 +174,46 @@ function accessorySkus(catalog: CatalogResponse): ProductSkuDto[] {
   return catalog.skus.filter((s) => catByModel.get(s.modelId) === "accessory");
 }
 
+/**
+ * ⭐ CAN THIS RULE'S REWARD EVER BE PRICED? — the born-dead guard.
+ *
+ * A 'pwp' reward's price is NOT on the rule. It lives per-SKU on
+ * `product_skus.pwp_price`, edited on a DIFFERENT tab (SKU Master), and nothing
+ * connected the two — so a principal could author a complete, Active rule whose
+ * reward SKUs carried no price at all. That rule is invisible at the till (the
+ * offer is skipped when there is no price) AND the voucher layer still mints
+ * codes off its trigger and prints them on the customer's receipt: a voucher for
+ * a discount that cannot exist.
+ *
+ * Returns how many reward SKUs the rule could land on and how many carry a
+ * usable price. `total === 0` means the TARGETING matches nothing.
+ *
+ * TWO KINDS ARE DELIBERATELY EXEMPT — never route them here:
+ *   · a 'promo' rule — always free; the server returns 0 without ever reading
+ *     pwp_price, so an unpriced reward is correct, not broken
+ *   · a SOFA reward  — priced from the combo PWP map, not from this column
+ */
+export function rewardPriceCoverage(
+  catalog: CatalogResponse,
+  rewardCategory: ProductCategory,
+  targets: RuleTarget[],
+): { total: number; priced: number } {
+  const catByModel = new Map(catalog.models.map((m) => [m.id, m.category]));
+  const targeted = new Set(targets.map((t) => t.modelId));
+  // Empty targeting means the WHOLE category — not "nothing". Same reading the
+  // engine uses, and the same one the help text under the picker states.
+  const candidates = catalog.skus.filter(
+    (s) =>
+      catByModel.get(s.modelId) === rewardCategory &&
+      (targeted.size === 0 || targeted.has(s.modelId)),
+  );
+  return {
+    total: candidates.length,
+    // The server's own test, character for character: `p == null || p <= 0`.
+    priced: candidates.filter((s) => typeof s.pwpPrice === "number" && s.pwpPrice > 0).length,
+  };
+}
+
 /** Friendly name for a gift accessory SKU: the accessory's MODEL name — the
  *  PRODUCT NAME (an accessory is one model = one product, e.g. "Memory Foam
  *  Pillow"; Loo 2026-07-11: show the product name, NOT the description) →
@@ -272,7 +312,7 @@ function DefaultGiftsSection({
       <div className="flex items-center justify-between mb-1">
         <div className="text-strong font-display flex items-center gap-2">
           <Gift size={16} strokeWidth={1.75} className="text-primary" />
-          GWP — per Model
+          GWP per Model
         </div>
       </div>
       <p className="text-meta text-base-500 mb-4 pb-3 border-b border-base-100">
@@ -280,7 +320,7 @@ function DefaultGiftsSection({
         order. Applies to every SKU of the Model; a complete sofa of the Model grants its gift once.
         Changes apply to new orders only. Use &ldquo;+ New GWP&rdquo; above to add one gift to many
         Models at once.
-        {!isPrincipal && " Principal only — read-only for your role."}
+        {!isPrincipal && " Principal only. Read-only for your role."}
       </p>
 
       {gwpOpen && isPrincipal && (
@@ -294,7 +334,7 @@ function DefaultGiftsSection({
 
       {accSkus.length === 0 && isPrincipal && (
         <p className="text-meta text-warning mb-3">
-          No accessory SKUs exist yet — add an accessory in the SKU Master / Modular tabs before
+          No accessory SKUs exist yet. Add an accessory in the SKU Master / Modular tabs before
           configuring a GWP.
         </p>
       )}
@@ -677,9 +717,9 @@ function BulkGwpModal({
   }
 
   return (
-    <Modal title="New GWP — add to Models" onClose={onClose} size="lg">
+    <Modal title="New GWP: add to Models" onClose={onClose} size="lg">
       <p className="text-meta text-base-500 mb-3">
-        Pick the Models, choose the gift, then Add. The gift is appended — a Model can hold several
+        Pick the Models, choose the gift, then Add. The gift is appended. A Model can hold several
         (e.g. 2 pillows + a protector). 🎁 marks Models that already have a gift.
       </p>
 
@@ -791,7 +831,7 @@ function BulkGwpModal({
       {sizeOptions.length > 0 && (
         <div className="mt-3">
           <div className="text-meta text-base-500 mb-1.5">
-            Only for these sizes (optional — mattress / bed frame; none = any size)
+            Only for these sizes (optional, for mattress / bed frame; none = any size)
           </div>
           <div className="flex flex-wrap gap-1.5">
             {sizeOptions.map((code) => {
@@ -874,11 +914,11 @@ function FreeItemCampaignsSection({
         </div>
       </div>
       <p className="text-meta text-base-500 mb-4 pb-3 border-b border-base-100">
-        A giveaway a salesperson can apply to an eligible cart line ("Make free") — the line books at
+        A giveaway a salesperson can apply to an eligible cart line ("Make free"). The line books at
         RM0. Set which models / sizes / sofa builds qualify and how many units ONE order can get free
         (counted across all its lines). A campaign is
         dormant until you flip it Active. Use &ldquo;+ New Free Item&rdquo; above to add one.
-        {!isPrincipal && " Principal only — read-only for your role."}
+        {!isPrincipal && " Principal only. Read-only for your role."}
       </p>
 
       {campaignOpen && isPrincipal && (
@@ -1092,8 +1132,8 @@ function CampaignForm({
 // ---------------------------------------------------------------------------
 
 const KIND_LABEL: Record<PwpRuleDto["type"], string> = {
-  pwp: "PWP — redeem at a set price",
-  promo: "Promo — may redeem free",
+  pwp: "PWP: redeem at a set price",
+  promo: "Promo: may redeem free",
 };
 
 function PwpRulesSection({
@@ -1121,10 +1161,10 @@ function PwpRulesSection({
       </div>
       <p className="text-meta text-base-500 mb-4 pb-3 border-b border-base-100">
         Pair a trigger product with a reward product. Buying the trigger unlocks the reward up to a
-        set count per trigger — sold at the reward SKU's PWP price (set in SKU Master); a Promo may
+        set count per trigger. The reward is sold at the reward SKU's PWP price (set in SKU Master); a Promo may
         redeem free (RM 0). Use &ldquo;+ New PWP&rdquo; / &ldquo;+ New Promo&rdquo; above to create
         one. Empty targeting = the whole category.
-        {!isPrincipal && " Principal only — read-only for your role."}
+        {!isPrincipal && " Principal only. Read-only for your role."}
       </p>
 
       {newRuleKind !== null && isPrincipal && (
@@ -1182,7 +1222,7 @@ function PwpRuleRow({
   const del = useDeletePwpRule();
 
   function remove() {
-    if (!confirm(`Delete this ${KIND_LABEL[rule.type]} rule?`)) return;
+    if (!confirm(`Delete this ${rule.type === "pwp" ? "PWP" : "Promo"} rule?`)) return;
     del.mutate(rule.id, {
       onSuccess: () => toast.success("Rule deleted"),
       onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Delete failed"),
@@ -1302,8 +1342,23 @@ function PwpRuleForm({
   // explicit model or combo selection (empty ≠ every sofa build).
   const sofaTriggerInvalid = triggerCategory === "sofa" && finalTrigger.length === 0;
   const sofaRewardInvalid = rewardCategory === "sofa" && finalReward.length === 0;
+  // A 'promo' is always free and a sofa reward is priced from the combo map, so
+  // neither reads pwp_price and neither can be born dead this way.
+  const rewardPriceApplies = type === "pwp" && rewardCategory !== "sofa";
+  const coverage = rewardPriceApplies
+    ? rewardPriceCoverage(catalog, rewardCategory, finalReward)
+    : null;
+  // Refuse only the ARITHMETIC impossibility — not a preference. Zero priced
+  // rewards means no cart can ever be granted this rule. Partial coverage
+  // (3 of 12) is legitimate and only earns the count shown under the picker.
+  const rewardUnpriced = coverage !== null && coverage.priced === 0;
   const valid =
-    Number.isInteger(qtyNum) && qtyNum >= 1 && daysValid && !sofaTriggerInvalid && !sofaRewardInvalid;
+    Number.isInteger(qtyNum) &&
+    qtyNum >= 1 &&
+    daysValid &&
+    !sofaTriggerInvalid &&
+    !sofaRewardInvalid &&
+    !rewardUnpriced;
 
   async function submit() {
     if (!valid) return;
@@ -1346,8 +1401,8 @@ function PwpRuleForm({
           <div className="flex gap-1.5" data-testid="pwp-kind">
             {(
               [
-                ["pwp", "PWP — redeem at a set price"],
-                ["promo", "Promo — may redeem free (RM 0)"],
+                ["pwp", "PWP: redeem at a set price"],
+                ["promo", "Promo: may redeem free (RM 0)"],
               ] as const
             ).map(([v, lbl]) => (
               <button
@@ -1422,7 +1477,16 @@ function PwpRuleForm({
           Category
           <select
             value={triggerCategory}
-            onChange={(e) => setTriggerCategory(e.target.value as ProductCategory)}
+            onChange={(e) => {
+              // ⭐ THE TARGETS BELONG TO THE CATEGORY THAT IS LEAVING. The engine
+              // needs category AND target to BOTH hold, so keeping mattress models
+              // under a sofa category produces a rule that can never match — and
+              // the Save guard below never catches it, because it counts how many
+              // targets were picked, never whether they belong. Clearing is the
+              // only honest option: no mattress model maps onto a sofa one.
+              setTriggerCategory(e.target.value as ProductCategory);
+              setTriggerTargets([]);
+            }}
             className={`${INPUT_CLS} w-40`}
             data-testid="pwp-trigger-category"
           >
@@ -1441,7 +1505,7 @@ function PwpRuleForm({
         />
         <p className={`text-meta ${sofaTriggerInvalid ? "text-danger" : "text-base-400"}`}>
           {triggerCategory === "sofa"
-            ? "Pick at least one sofa model / combo — “any sofa” has no meaning as a trigger."
+            ? "Pick at least one sofa model / combo. “Any sofa” has no meaning as a trigger."
             : `Add the models that qualify as the trigger. None added = any ${triggerCategory}.`}
         </p>
       </div>
@@ -1453,7 +1517,12 @@ function PwpRuleForm({
           Category
           <select
             value={rewardCategory}
-            onChange={(e) => setRewardCategory(e.target.value as ProductCategory)}
+            onChange={(e) => {
+              // Same reason as the trigger side above — the picked models belong
+              // to the outgoing category and cannot follow it.
+              setRewardCategory(e.target.value as ProductCategory);
+              setRewardTargets([]);
+            }}
             className={`${INPUT_CLS} w-40`}
             data-testid="pwp-reward-category"
           >
@@ -1473,10 +1542,25 @@ function PwpRuleForm({
         <p className={`text-meta ${sofaRewardInvalid ? "text-danger" : "text-base-400"}`}>
           {rewardCategory === "sofa"
             ? "Pick at least one reward combo for a sofa reward."
-            : `The reward is sold at each reward SKU's PWP price (set in SKU Master)${
-                type === "promo" ? " — for a Promo, a PWP price of RM 0 redeems the reward free" : ""
-              }. None added = any ${rewardCategory}.`}
+            : type === "promo"
+              ? `A Promo gives the reward free. It never reads a PWP price. None added = any ${rewardCategory}.`
+              : `The reward is sold at each reward SKU's PWP price (set in SKU Master). None added = any ${rewardCategory}.`}
         </p>
+        {/* The born-dead guard, stated where the author can act on it. Without a
+            priced reward the rule matches nothing at the till, so Save is
+            refused rather than saving a rule that only LOOKS complete. */}
+        {coverage !== null && (
+          <p
+            className={`text-meta ${rewardUnpriced ? "text-danger" : "text-base-400"}`}
+            data-testid="pwp-reward-price-coverage"
+          >
+            {coverage.total === 0
+              ? "No reward SKU matches this targeting. Nothing can be granted."
+              : rewardUnpriced
+                ? `None of the ${coverage.total} reward SKUs has a PWP price. Set one in SKU Master, or make this a Promo if the reward is free.`
+                : `${coverage.priced} of ${coverage.total} reward SKUs have a PWP price. The rest cannot be granted.`}
+          </p>
+        )}
       </div>
 
       <div className="flex items-center justify-end gap-2">
@@ -1544,10 +1628,10 @@ function BundlesSection({
       <p className="text-meta text-base-500 mb-4 pb-3 border-b border-base-100">
         Several products sold together at ONE bundle price (e.g. 2 mattresses + a bed frame, King
         each, at RM 2,500). The POS shows a bundle card; adding it books every item at a
-        proportional share of the bundle price — the lines always total EXACTLY the bundle price.
+        proportional share of the bundle price. The lines always total EXACTLY the bundle price.
         A bundle is dormant until you flip it Active. Use &ldquo;+ New Bundle&rdquo; above to add
         one.
-        {!isPrincipal && " Principal only — read-only for your role."}
+        {!isPrincipal && " Principal only. Read-only for your role."}
       </p>
 
       {bundleOpen && isPrincipal && (
@@ -1907,8 +1991,8 @@ function BundleForm({
       <div className="flex gap-1.5" data-testid="bundle-kind">
         {(
           [
-            ["fixed", "Fixed set — items pinned"],
-            ["custom", "Customizable — customer picks"],
+            ["fixed", "Fixed set: items pinned"],
+            ["custom", "Customizable: customer picks"],
           ] as const
         ).map(([v, lbl]) => (
           <button
@@ -1931,7 +2015,7 @@ function BundleForm({
       {kind === "custom" && (
         <div className="flex flex-col gap-3" data-testid="bundle-slots-editor">
           <span className="label block">
-            Item slots — the customer picks each one in order at the POS
+            Item slots: the customer picks each one in order at the POS
           </span>
           {slotRows.map((r, i) => {
             const pickable = catalog.models.filter(
@@ -2116,7 +2200,7 @@ function BundleForm({
                       <option value="">Pick…</option>
                       {skusFor(fixedModel.id).map((s) => (
                         <option key={s.sku} value={s.sku}>
-                          {(s.variant?.trim() || s.description || s.sku) + ` — ${rm(s.price)}`}
+                          {(s.variant?.trim() || s.description || s.sku) + `: ${rm(s.price)}`}
                         </option>
                       ))}
                     </select>
@@ -2140,7 +2224,7 @@ function BundleForm({
           </button>
           <p className="text-meta text-base-400">
             The customer picks one product per slot (Any variant = they choose the size too), then
-            its specs — the bundle price covers the set; spec surcharges add on top. Modular sofas
+            its specs. The bundle price covers the set; spec surcharges add on top. Modular sofas
             can&rsquo;t join a bundle.
           </p>
         </div>
@@ -2188,7 +2272,7 @@ function BundleForm({
                 <option value="">Pick…</option>
                 {skusFor(row.modelId).map((s) => (
                   <option key={s.sku} value={s.sku}>
-                    {(s.variant?.trim() || s.description || s.sku) + ` — ${rm(s.price)}`}
+                    {(s.variant?.trim() || s.description || s.sku) + `: ${rm(s.price)}`}
                   </option>
                 ))}
               </select>
@@ -2236,12 +2320,12 @@ function BundleForm({
       )}
       {goneSkus.length > 0 && (
         <p role="alert" className="text-meta text-danger" data-testid="bundle-gone-warning">
-          No longer in the catalog: {goneSkus.join(", ")} — replace or remove those rows to save.
+          No longer in the catalog: {goneSkus.join(", ")}. Replace or remove those rows to save.
         </p>
       )}
       {(offPosSkus.length > 0 || offPosModels.length > 0) && (
         <p className="text-meta text-warning" data-testid="bundle-offpos-warning">
-          Not sellable at the POS right now: {[...offPosSkus, ...offPosModels].join(", ")} — the
+          Not sellable at the POS right now: {[...offPosSkus, ...offPosModels].join(", ")}. The
           bundle card will stay greyed out until every item has an ACTIVE SKU (switch it on in the
           Modular tab).
         </p>
@@ -2249,7 +2333,7 @@ function BundleForm({
 
       {kind === "fixed" && priceValid && !preview && (pendingRows.length > 0 || components.length < 2) && (
         <p className="text-meta text-base-400" data-testid="bundle-preview-pending">
-          Pick a size for every item — the live split shows once all items are complete.
+          Pick a size for every item. The live split shows once all items are complete.
         </p>
       )}
 

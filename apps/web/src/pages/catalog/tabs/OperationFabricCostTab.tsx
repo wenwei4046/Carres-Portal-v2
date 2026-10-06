@@ -5,6 +5,7 @@ import { ApiError } from "@/lib/api";
 import { useSetCatalogFabricCost } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CodeChip } from "../components/atoms";
+import { fmtRm } from "../format";
 
 /**
  * Operation Catalog › Fabric (0226) — the procurement fabric master
@@ -18,13 +19,6 @@ import { CodeChip } from "../components/atoms";
 
 // code · series · description · supplier · cost
 const GRID_COLS = "150px minmax(90px,0.9fr) minmax(150px,1.2fr) minmax(120px,1fr) 130px";
-
-function fmtRm(n: number): string {
-  return `RM ${n.toLocaleString("en-MY", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
 
 export default function OperationFabricCostTab({ catalog }: { catalog: CatalogResponse }) {
   const fabrics = (catalog.fabrics ?? []).slice().sort((a, b) => a.sortOrder - b.sortOrder);
@@ -92,7 +86,7 @@ export default function OperationFabricCostTab({ catalog }: { catalog: CatalogRe
         {visible.length === 0 && (
           <div className="text-body text-base-500 px-3 py-6 text-center">
             {fabrics.length === 0
-              ? "No fabrics yet — the principal adds them in Product & Maintenance."
+              ? "No fabrics yet. The principal adds them in Product & Maintenance."
               : "No fabrics match the search."}
           </div>
         )}
@@ -136,13 +130,13 @@ function FabricCostRow({ fabric, editMode }: { fabric: CatalogFabricDto; editMod
         <CodeChip>{fabric.fabricCode}</CodeChip>
       </div>
       <div className="text-body text-base-700 truncate">
-        {fabric.series || <span className="text-base-300">—</span>}
+        {fabric.series || null}
       </div>
       <div className="text-body text-base-800 truncate" title={fabric.description ?? ""}>
-        {fabric.description || <span className="text-base-300">—</span>}
+        {fabric.description || null}
       </div>
       <div className="text-body text-base-700 truncate">
-        {fabric.supplierCode || <span className="text-base-300">—</span>}
+        {fabric.supplierCode || null}
       </div>
       <div className="text-right" data-testid={`opcost-fabric-cost-${fabric.fabricCode}`}>
         {editMode ? (
@@ -151,7 +145,7 @@ function FabricCostRow({ fabric, editMode }: { fabric: CatalogFabricDto; editMod
             min={0}
             step="0.01"
             defaultValue={fabric.cost ?? ""}
-            placeholder="—"
+            placeholder=""
             onBlur={(e) => commitCost(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();

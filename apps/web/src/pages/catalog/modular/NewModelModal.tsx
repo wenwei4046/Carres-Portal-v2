@@ -110,7 +110,7 @@ export default function NewModelModal({ onClose }: { onClose: () => void }) {
           >
             <div className="text-body font-semibold text-amber-800">Model created</div>
             <div className="text-meta text-amber-700 mt-0.5">
-              The model exists — fix the issue above and click again to retry SKU generation only.
+              The model exists. Fix the issue above and click again to retry SKU generation only.
             </div>
           </div>
         )}
@@ -169,7 +169,7 @@ export default function NewModelModal({ onClose }: { onClose: () => void }) {
                 {sizes.length > 8 ? ` … (+${sizes.length - 8})` : ""}
               </>
             ) : (
-              "Leave blank to create the model only — add SKUs later in the drawer."
+              "Leave blank to create the model only. Add SKUs later in the drawer."
             )}
           </div>
           {!sizesOk && (
@@ -200,7 +200,7 @@ export default function NewModelModal({ onClose }: { onClose: () => void }) {
           >
             <div className="text-body text-base-600">Price</div>
             <div className="text-meta text-base-400 mt-0.5">
-              Generated SKUs are created unpriced — the principal (Master Admin) prices them.
+              Generated SKUs are created unpriced. The principal (Master Admin) prices them.
             </div>
           </div>
         )}

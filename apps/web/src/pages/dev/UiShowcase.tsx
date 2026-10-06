@@ -1,7 +1,8 @@
 /**
  * `/ui` — THE live showcase (UI-KIT's third body, card D0.5a).
  *
- * `docs/UI-KIT.md` explains what the kit means; `lib/design-standard.ts`
+ * `docs/01-design-tokens.md` · `docs/02-components.md` explain what the kit
+ * means (they replaced the retired `docs/UI-KIT.md`, 2026-07-31); `lib/design-standard.ts`
  * records it; **this page IS it.** It imports the real components and renders
  * the real tokens, so it structurally cannot describe something the code does
  * not do — which is the one failure the first two bodies cannot rule out.
@@ -25,14 +26,19 @@
  * to the components' own declarations so they can never drift into a
  * hand-painted lookalike.
  */
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Badge from "@/components/kit/Badge";
+import Block from "@/components/kit/Block";
+import ChecklistRow from "@/components/kit/ChecklistRow";
+import QuietRouteRow from "@/components/kit/QuietRouteRow";
+import RouteStop from "@/components/kit/RouteStop";
 import Button from "@/components/kit/Button";
 import Card from "@/components/kit/Card";
 import Checkbox from "@/components/kit/Checkbox";
 import DataTable, { type Column } from "@/components/kit/DataTable";
 import DatePicker from "@/components/kit/DatePicker";
 import DetailShell, { type IdentitySlot } from "@/components/kit/DetailShell";
+import DocumentTable from "@/components/kit/DocumentTable";
 import Drawer from "@/components/kit/Drawer";
 import DropdownMenu from "@/components/kit/DropdownMenu";
 import EmptyState from "@/components/kit/EmptyState";
@@ -42,6 +48,8 @@ import Loading from "@/components/kit/Loading";
 import Modal from "@/components/kit/Modal";
 import PageShell from "@/components/kit/PageShell";
 import Panel from "@/components/kit/Panel";
+import PdfPreview from "@/components/kit/PdfPreview";
+import SavedEvidenceViewer from "@/components/kit/SavedEvidenceViewer";
 import SectionHeader from "@/components/kit/SectionHeader";
 import Popover from "@/components/kit/Popover";
 import SearchInput from "@/components/kit/SearchInput";
@@ -51,7 +59,11 @@ import Tabs from "@/components/kit/Tabs";
 import Textarea from "@/components/kit/Textarea";
 import Toast from "@/components/kit/Toast";
 import Tooltip from "@/components/kit/Tooltip";
+import TotalsSummary from "@/components/kit/TotalsSummary";
 import { Z_LADDER } from "@/components/kit/overlay-layer";
+import ServerRegisterExample from "@/pages/dev/ServerRegisterExample";
+import CompactCardExample from "@/pages/dev/CompactCardExample";
+import { fmtDate } from "@/lib/fmt-date";
 import {
   ICON_STROKE,
   RADII,
@@ -70,6 +82,47 @@ const FORCED_FOCUS_INPUT = "[&_input]:ring-2 [&_input]:ring-kit-blue-9 [&_input]
 
 const LONG =
   "Kuala Lumpur Sri Damansara warehouse transfer — customer requested the whole set delivered together";
+
+function SavedEvidenceSample() {
+  const [active, setActive] = useState<string | null>(null);
+  return <>
+    <Button onClick={() => setActive("example")}>View</Button>
+    <SavedEvidenceViewer activeId={active} onClose={() => setActive(null)}
+      files={[
+        { id: "example", kind: "photo", url: "/carres-logo.png", context: "Example · Arrival evidence", unitCodes: ["U1-000-001"] },
+        { id: "unreadable", kind: "photo", url: null, context: "Example · Arrival evidence" },
+        { id: "video", kind: "video", url: "/ui-evidence-example.mp4", context: "Example · Arrival evidence" },
+      ]}
+      onRetry={async (id) => id === "example" ? "/carres-logo.png" : id === "video" ? "/ui-evidence-example.mp4" : null} />
+  </>;
+}
+
+function PdfPreviewSample() {
+  const [src, setSrc] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => () => { if (src) URL.revokeObjectURL(src); }, [src]);
+  async function openSample(broken: boolean) {
+    setLoading(true);
+    try {
+      const { renderPoPdf } = await import("@/lib/pdf/render");
+      const blob = broken ? new Blob(["Unavailable document"], { type: "application/pdf" }) : await renderPoPdf({
+        draft: true, po_number: "DRAFT", po_id: "", version: 0, issue_date: "2026-09-24",
+        supplier: { name: "Example supplier", address: "Example address", contact: null },
+        destination: { name: "Example destination", address: "Example warehouse address" },
+        delivery_instructions: null, eta_date: "2026-10-02", terms: null,
+        lines: [{ sku: "EXAMPLE", description: "Example item", qty: 2, unit: "unit" }],
+      });
+      setSrc(URL.createObjectURL(blob));
+    } finally { setLoading(false); }
+  }
+  return <div className="flex flex-col gap-3">
+    <div className="flex flex-wrap gap-2">
+      <Button loading={loading} onClick={() => void openSample(false)}>Show preview</Button>
+      <Button disabled={loading} onClick={() => void openSample(true)}>Show failed preview</Button>
+    </div>
+    {src && <div className="flex h-[70vh] min-w-0 bg-kit-canvas p-4"><PdfPreview src={src} title="Example document" /></div>}
+  </div>;
+}
 
 function Section({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
   return (
@@ -115,7 +168,7 @@ interface DemoRow {
 const DEMO_ROWS: DemoRow[] = [
   { id: "1", ref: "SO-1256", customer: "Tan Wei Ming", owing: "2,000" },
   { id: "2", ref: "SO-1257", customer: "Lim Ah Kaw", owing: "480" },
-  { id: "3", ref: "SO-1258", customer: "Nurul Aisyah", owing: "—" },
+  { id: "3", ref: "SO-1258", customer: "Nurul Aisyah", owing: "" },
 ];
 
 const DEMO_COLUMNS: Column<DemoRow>[] = [
@@ -126,7 +179,7 @@ const DEMO_COLUMNS: Column<DemoRow>[] = [
     label: "Status",
     width: 20,
     cell: () => (
-      <StatusPill tone="warning" icon="waiting">
+      <StatusPill tone="warning">
         Waiting
       </StatusPill>
     ),
@@ -146,7 +199,10 @@ const DEMO_IDENTITY: IdentitySlot = {
   persistentFacts: [
     { label: "Customer", value: "Tan Wei Ming" },
     { label: "Ref", value: <span className="font-mono">SO-1256</span> },
-    { label: "Promised", value: "Sun, 27 Jul 26" },
+    /* Through the formatter, never a literal — the showcase is the law's own
+       mirror, and a hard-coded date here quietly outlived the 2026-08-15
+       year ruling AND named 27 Jul 2026 a Sunday when it is a Monday. */
+    { label: "Promised", value: fmtDate("2026-07-27") },
     { label: "Outstanding", value: "RM 2,000" },
   ],
 };
@@ -190,6 +246,7 @@ export default function UiShowcase() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [carrier, setCarrier] = useState<string | undefined>(undefined);
   const [tab, setTab] = useState("to-order");
+  const [registerView, setRegisterView] = useState("table");
   const [ordersTab, setOrdersTab] = useState("open");
   const [picked, setPicked] = useState(true);
   const [some, setSome] = useState<boolean | "indeterminate">("indeterminate");
@@ -204,7 +261,8 @@ export default function UiShowcase() {
           <h1 className="text-page text-kit-slate-12">Carres UI-KIT</h1>
           <p className="text-body text-kit-slate-11">
             The live showcase. Every box below is the real component — if it renders here, it exists in
-            the code. Read the law in <span className="font-mono">docs/UI-KIT.md</span>.
+            the code. Read the law in <span className="font-mono">docs/01-design-tokens.md</span> ·{" "}
+            <span className="font-mono">docs/02-components.md</span> · <span className="font-mono">docs/ui/MASTER.md</span>.
           </p>
         </header>
 
@@ -270,6 +328,14 @@ export default function UiShowcase() {
         </Section>
 
         {/* ─── 2 · Tokens ─────────────────────────────────────────────────── */}
+        <Section id="saved-evidence" title="Saved evidence" note="Read-only photos and video. Source, Unit and failure states remain visible.">
+          <SavedEvidenceSample />
+        </Section>
+
+        <Section id="pdf-preview" title="PDF preview" note="Actual pages, fit width, enlargement, loading and retry. Issuance remains with the owning page.">
+          <PdfPreviewSample />
+        </Section>
+
         <Section id="type" title="Typography — §2.1" note="Six tokens. Nothing above 24, nothing below 11.">
           <Card>
             <div className="flex flex-col gap-4">
@@ -530,23 +596,23 @@ export default function UiShowcase() {
                     </StatusPill>
                   ))}
                 </Sample>
-                <Sample label="with a status glyph">
-                  <StatusPill tone="success" icon="ready">
+                <Sample label="solid status text without decorative icons">
+                  <StatusPill tone="success">
                     Ready
                   </StatusPill>
-                  <StatusPill tone="warning" icon="waiting">
+                  <StatusPill tone="warning">
                     Waiting
                   </StatusPill>
-                  <StatusPill tone="danger" icon="late">
+                  <StatusPill tone="danger">
                     Late
                   </StatusPill>
-                  <StatusPill tone="neutral" icon="on-hold">
+                  <StatusPill tone="neutral">
                     On hold
                   </StatusPill>
                 </Sample>
                 <Sample label="long text — truncates inside its cell, never wraps the row">
                   <div className="w-48">
-                    <StatusPill tone="warning" icon="waiting">
+                    <StatusPill tone="warning">
                       {LONG}
                     </StatusPill>
                   </div>
@@ -574,6 +640,10 @@ export default function UiShowcase() {
           </Grid>
         </Section>
 
+        <Section id="compact-card" title="Compact module card — §4.3" note="Owner-confirmed 3 Oct 2026. One component for every module card: header, module tabs, four facts with inline editors, items, Communication and Timeline. Filled here with the confirmed Delivery sample; each module passes its own facts. Dark identity Header approved 4 Oct 2026; remaining body palette, font and radius await the owner's token decision. Embedded presentation (owner 5 Oct 2026): the Purchase Order · Sales Order tab state shows a host card whose Sales Order tab holds the same SO card with a light identity area, no Close and no module tabs.">
+          <CompactCardExample />
+        </Section>
+
         <Section id="surfaces" title="Card · Panel — §6" note="A Card holds. A Panel holds and says what it is.">
           <Grid>
             <Card>
@@ -585,7 +655,7 @@ export default function UiShowcase() {
             <Panel
               title="Panel — with a right slot"
               right={
-                <Button size="sm" icon="open">
+                <Button iconOnly icon="open">
                   Open order
                 </Button>
               }
@@ -712,21 +782,21 @@ export default function UiShowcase() {
           </Modal>
 
           <Drawer
+            variant="quick-view"
             open={drawerOpen}
             onOpenChange={setDrawerOpen}
             title="SO-1256 · Tan Wei Ming"
-            footer={<Button icon="open">Open order</Button>}
+            headerActions={<><Button variant="ghost" iconOnly icon="print" aria-label="Print sales order" /><Button variant="ghost" iconOnly icon="open" aria-label="Open full page" /></>}
           >
-            <div className="flex flex-col gap-4">
-              <p className="text-body text-kit-slate-11">
-                The surface only. §1.4's ordered blocks — identity · current action · current issues ·
-                progress · sections · activity — are `DetailShell`, card D0.5c.
-              </p>
-              <EmptyState
-                icon="goods"
-                title="Nothing waiting on stock"
-                detail="Every line on this order has arrived."
-              />
+            <div className="flex flex-col gap-4" data-testid="sales-order-quick-view">
+              <Block title="SO info" tone="muted">
+                <p className="text-body">Customer Phone · Not recorded</p>
+                <p className="text-body">Email · Not recorded</p>
+              </Block>
+              <Block title="Delivery"><p className="text-body">Not recorded</p></Block>
+              <Block title="Items"><p className="text-body">No items on this order</p></Block>
+              <Block title="Payment"><p className="text-body">Not recorded</p></Block>
+              <Block title="Related documents"><p className="text-body">No PO yet</p></Block>
             </div>
           </Drawer>
         </Section>
@@ -817,6 +887,10 @@ export default function UiShowcase() {
           </Grid>
         </Section>
 
+        <Section id="server-register" title="Paged register filters" note="Preview only: five rows are loaded. Supplier B exists only at record 61; choose it in the Supplier column filter, then clear the filter to restore all 61 records.">
+          <ServerRegisterExample />
+        </Section>
+
         <Section
           id="tabs"
           title="Tabs — §8.2's stage picker"
@@ -825,6 +899,7 @@ export default function UiShowcase() {
           <Card>
             <div className="flex flex-col gap-4">
               <Tabs label="Purchasing" tabs={MODULE_TABS} value={tab} onValueChange={setTab} />
+              <Tabs variant="segmented" label="Register presentation" value={registerView} onValueChange={setRegisterView} tabs={[{ value: "table", label: "Table", icon: "table" }, { value: "cards", label: "Cards", icon: "cards" }]} />
               <p className="text-meta text-kit-slate-11">
                 A count is a `Badge`, never a coloured pill — a badge that could be red would be a
                 status wearing a different name. Tabs with nothing to count show no number at all.
@@ -858,7 +933,7 @@ export default function UiShowcase() {
             </Card>
             <Card>
               <div className="flex flex-col gap-8">
-                <Sample label="a date — the canonical Sun, 19 Jul 26, from fmtDate()">
+                <Sample label={`a date — the canonical ${fmtDate("2026-07-19")}, from fmtDate(); the year shows only off-year`}>
                   <div className="w-full">
                     <DatePicker id="ui-date" label="Delivery date" value={date} onChange={setDate} />
                   </div>
@@ -884,6 +959,44 @@ export default function UiShowcase() {
               </div>
             </Card>
           </Grid>
+        </Section>
+
+        <Section
+          id="route"
+          title="Route stop · Checklist row · Quiet route row · Block"
+          note="The Work route (Workspace MASTER §5.10, admitted 2026-09-28). Placeholders in braces; a page fills them from records."
+        >
+          <div className="max-w-[640px] rounded-card border border-kit-slate-5 bg-white p-6">
+            <RouteStop label="{Stop}" tone="missed" data-testid="ui-route-stop-missed">
+              <Block
+                title="{What to do}"
+               
+                why={{ text: "{Why it is owed now}", tone: "missed" }}
+                headerSlot={<Button size="touch">{"{Owning form}"}</Button>}
+              >
+                <div className="flex flex-col">
+                  <ChecklistRow mark="done" step="{Step done}" value="{date}" doc={<span className="text-meta underline">{"{Document No}"}</span>} />
+                  <ChecklistRow mark="missed" step="{Step that is the act}" value="{state}" />
+                </div>
+                <p className="self-end text-meta text-kit-slate-11">1 of 2 done</p>
+              </Block>
+            </RouteStop>
+            <RouteStop label="{Stop}" tone="due">
+              <Block title="{What to do}" why={{ text: "{Why}", tone: "due" }}>
+                <ChecklistRow mark="due" step="{Step that is the act}" value="{state}" />
+                <ChecklistRow mark="none" step="{A fact}" value="{Opens date}" />
+              </Block>
+            </RouteStop>
+            <RouteStop label="{Stop}" tone="none" hideLabel>
+              <QuietRouteRow label="{STOP}" status="{Who has not done what}" progress="0 of 2 done" open={false} onToggle={() => {}} />
+            </RouteStop>
+            <RouteStop label="{Stop}" tone="done" last hideLabel>
+              <QuietRouteRow label="{STOP}" status="{Done sentence}" progress="2 of 2 done" open={false} onToggle={() => {}} />
+            </RouteStop>
+          </div>
+          <div className="max-w-[640px]">
+            <ChecklistRow mark="open" step="{Step not yet}" value="{state}" stacked />
+          </div>
         </Section>
 
         <Section
@@ -1006,7 +1119,7 @@ export default function UiShowcase() {
                     rows={[]}
                     columns={DEMO_COLUMNS}
                     rowId={(r) => r.id}
-                    totals={{ label: "Totals", cell: () => "—" }}
+                    totals={{ label: "Totals", cell: () => "" }}
                     empty="No demands match this filter"
                   />
                 </div>
@@ -1025,6 +1138,47 @@ export default function UiShowcase() {
             first drag. The layout is NOT remembered between sessions: §0.4 rules that the tool's
             shape is the company's, not the operator's, so a reload puts the columns back.
           </p>
+        </Section>
+
+        {/* ─── Table recipes 3 and 4 — owner ruling 2026-09-27 ─────────────── */}
+        <Section
+          id="document-table"
+          title="DocumentTable · TotalsSummary — table recipes 3 and 4"
+          note="The table a document draws inside a card, and its totals tail. Row lines only, no column lines; numbers right and tabular; only the closing total is 600. A row may be a door, opened from its first cell."
+        >
+          <Grid>
+            <Sample label="DocumentTable — two door rows, one plain row, the closing total">
+              <Card>
+                <DocumentTable
+                  label="Example document table"
+                  columns={[
+                    { key: "month", label: "Month" },
+                    { key: "mattress", label: "Mattress", numeric: true },
+                    { key: "sofa", label: "Sofa", numeric: true },
+                    { key: "total", label: "Total Qty", numeric: true },
+                  ]}
+                  rows={[
+                    { key: "a", cells: { month: "{Mon YYYY}", mattress: 4, sofa: 1, total: 5 }, onOpen: () => {}, openLabel: "Open Sales Orders for {Mon YYYY}" },
+                    { key: "b", cells: { month: "{Mon YYYY}", mattress: 0, sofa: 2, total: 2 }, onOpen: () => {}, openLabel: "Open Sales Orders for {Mon YYYY}" },
+                    { key: "c", cells: { month: "No delivery date", mattress: 1, sofa: 0, total: 1 } },
+                    { key: "t", cells: { month: "Total", mattress: 5, sofa: 3, total: 8 }, total: true },
+                  ]}
+                />
+              </Card>
+            </Sample>
+            <Sample label="TotalsSummary — no frame, one line between rows, one strong row">
+              <Card>
+                <TotalsSummary
+                  label="Example totals"
+                  rows={[
+                    { key: "total", label: "Total Qty", value: 8 },
+                    { key: "delivered", label: "Delivered", value: 3 },
+                    { key: "owed", label: "Not delivered", value: 5, strong: true },
+                  ]}
+                />
+              </Card>
+            </Sample>
+          </Grid>
         </Section>
 
         <Section

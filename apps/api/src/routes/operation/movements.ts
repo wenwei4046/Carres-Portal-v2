@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { listMovementsQuery, type ListMovementsQuery } from "@carres/shared";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -120,10 +120,7 @@ operationMovementsRouter.get("/", async (c) => {
   q = q.order("occurred_at", { ascending: false }).limit(200);
 
   const { data: rows, error } = await q;
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ rows: rows ?? [], limit: 200 });
 });
 

@@ -5,6 +5,9 @@ import {
   isShowroom,
   minDeliveryDateISO,
   resolveFormTab,
+  BUILDING_TYPE_OPTIONS,
+  CUSTOMER_GENDER_OPTIONS,
+  CUSTOMER_RACE_OPTIONS,
   storeNoun,
   type CatalogResponse,
   type CustomField,
@@ -18,7 +21,7 @@ import { composeAddress } from "@/data/malaysia-postcodes";
 import { useStaffSession } from "@/lib/staff";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { useCustomerSearch, useCustomerTypeProbe, type CustomerSearchHit } from "@/lib/queries";
-import { step2FirstDisposalIssue, step3DateValid, type WizardDraft } from "../new-order/draft";
+import { cartGoodsIssue, step2FirstDisposalIssue, step3DateValid, type WizardDraft } from "../new-order/draft";
 import Step3Delivery from "../new-order/Step3Delivery";
 import BirthdayWheelField from "./date-keyin/BirthdayWheelField";
 import AddonsPanel, { offerableAddons } from "./AddonsPanel";
@@ -26,11 +29,14 @@ import StairCarryFields from "./StairCarryFields";
 import OrderSummaryRail from "./OrderSummaryRail";
 import { customerPatchFromHit, RELATIONSHIPS } from "./customer-autofill";
 
-/** MY-standard demographic option lists (0200 — feed Sales analysis). */
-const RACE_OPTIONS = ["Malay", "Chinese", "Indian", "Other"] as const;
-const GENDER_OPTIONS = ["Female", "Male"] as const;
-/** Delivery-address building types (Loo 2026-07-19). */
-const BUILDING_TYPES = ["Landed", "Condo", "Apartment", "Office", "Retail", "Other"] as const;
+/** MY-standard demographic option lists (0200 — feed Sales analysis) and the
+ *  delivery-address building types (Loo 2026-07-19). All three moved to
+ *  `@carres/shared` on 2026-08-15: the Sales Order object page corrects the
+ *  same fields and must offer the same choices, and two lists is how one of
+ *  them grows an option the other has never heard of. */
+const RACE_OPTIONS = CUSTOMER_RACE_OPTIONS;
+const GENDER_OPTIONS = CUSTOMER_GENDER_OPTIONS;
+const BUILDING_TYPES = BUILDING_TYPE_OPTIONS;
 
 const PHONE_RE = /^[0-9-+\s]{8,}/;
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
@@ -141,7 +147,7 @@ export default function CustomerStep({
   const probe = useCustomerTypeProbe(debouncedPhone);
   const customerType =
     debouncedPhone.length < 8
-      ? "—"
+      ? ""
       : probe.isLoading
         ? "Checking…"
         : probe.data?.existing
@@ -251,11 +257,18 @@ export default function CustomerStep({
     }
     if (idx === 1) {
       const addressOk =
-        c.addressUnknown ||
         (c.addressLine1.trim().length >= 5 &&
           !!c.addressState &&
           !!c.addressCity &&
-          !!c.addressPostcode);
+          !!c.addressPostcode &&
+          /* Building type is Jess’s 2026-08-21 requirement and it lives in
+             `step1FirstIssue` inside this same `!addressUnknown` branch. This
+             mirror was written before that rule and never caught up, so the
+             field wore a `*`, refused nothing here, and stopped the sale two
+             sub-steps later at CONFIRM — far from the box that was empty.
+             A required mark that does not refuse teaches the operator that
+             the mark means nothing. */
+          !!c.buildingType);
       // 2026-07-19 (Loo) — billing keys in with the SAME MY cascade as
       // delivery, so its gate mirrors the delivery rules field-for-field.
       const billingOk =
@@ -282,6 +295,10 @@ export default function CustomerStep({
     return (
       step3DateValid(draft, minLeadDays) &&
       step2FirstDisposalIssue(draft) === null &&
+      /* ⛔ A SALES ORDER MUST CONTAIN GOODS (owner ruling 2026-08-15) — the
+         cart drawer refuses it first; the last gate before CONFIRM refuses it
+         again for a cart edited after the drawer closed. */
+      cartGoodsIssue(draft, catalog) === null &&
       customsValid(targetTab)
     );
   }
@@ -324,7 +341,7 @@ export default function CustomerStep({
         </div>
         <p className="handover__sub">
           Hand the tablet to the customer to fill in their details. Quote items have been carried
-          over — no re-entry needed.
+          over. No re-entry needed.
         </p>
 
         <div className="steps">
@@ -403,7 +420,7 @@ export default function CustomerStep({
 
         {dealerPending ? (
           <p style={{ fontSize: 13, color: "var(--fg-muted)" }}>
-            Pick a store to continue — the lists below follow it.
+            Pick a store to continue. The lists below follow it.
           </p>
         ) : (
           <>
@@ -421,8 +438,8 @@ export default function CustomerStep({
                     >
                       <option value="">
                         {branchesEmpty
-                          ? `— no ${branchLabel.toLowerCase()} yet —`
-                          : `— pick ${branchLabel.toLowerCase()} —`}
+                          ? `No ${branchLabel.toLowerCase()} yet`
+                          : `Pick ${branchLabel.toLowerCase()}`}
                       </option>
                       {outlets.map((o) => (
                         <option key={o.id} value={o.id}>
@@ -438,7 +455,7 @@ export default function CustomerStep({
                         in their own POS Staff overlay. */}
                     {branchesEmpty && !outletLockedByStaff && (
                       <span className="field__hint" data-testid="pos-outlet-empty">
-                        This store has no {branchLabel.toLowerCase()} yet — add one under{" "}
+                        This store has no {branchLabel.toLowerCase()} yet. Add one under{" "}
                         {dealerPick ? "Admin → Accounts" : "Staff → Outlets"} before placing an
                         order for it.
                       </span>
@@ -456,8 +473,8 @@ export default function CustomerStep({
                     >
                       <option value="">
                         {spOptions.length === 0
-                          ? `— none in this ${branchLabel.toLowerCase()} —`
-                          : "— pick salesperson —"}
+                          ? `None in this ${branchLabel.toLowerCase()}`
+                          : "Pick salesperson"}
                       </option>
                       {spOptions.map((sp) => (
                         <option key={sp.id} value={sp.id}>
@@ -530,7 +547,7 @@ export default function CustomerStep({
                       <input
                         type="email"
                         value={c.email}
-                        placeholder="customer@example.com — for receipt & order updates"
+                        placeholder="customer@example.com (for receipt & order updates)"
                         onChange={(e) => setC({ email: e.target.value })}
                       />
                     </div>
@@ -560,7 +577,7 @@ export default function CustomerStep({
                         onChange={(e) => setC({ race: e.target.value })}
                         data-testid="pos-customer-race"
                       >
-                        <option value="">— select —</option>
+                        <option value="">Race</option>
                         {RACE_OPTIONS.map((r) => (
                           <option key={r} value={r}>
                             {r}
@@ -577,7 +594,7 @@ export default function CustomerStep({
                         onChange={(e) => setC({ gender: e.target.value })}
                         data-testid="pos-customer-gender"
                       >
-                        <option value="">— select —</option>
+                        <option value="">Gender</option>
                         {GENDER_OPTIONS.map((g) => (
                           <option key={g} value={g}>
                             {g}
@@ -612,40 +629,10 @@ export default function CustomerStep({
             {/* ── 2 · Address ── */}
             {stepIdx === 1 && (
               <div className="fade-in">
-                <label className={`addr-toggle ${c.addressUnknown ? "is-on" : ""}`}>
-                  <input
-                    type="checkbox"
-                    checked={c.addressUnknown}
-                    onChange={(e) =>
-                      setC({
-                        addressUnknown: e.target.checked,
-                        // Wipe structured fields when toggled on so a later
-                        // un-toggle doesn't surface stale data.
-                        ...(e.target.checked
-                          ? {
-                              addressLine1: "",
-                              addressLine2: "",
-                              addressState: "",
-                              addressCity: "",
-                              addressPostcode: "",
-                            }
-                          : {}),
-                      })
-                    }
-                  />
-                  <span className="addr-toggle__box">
-                    {c.addressUnknown && <Check size={12} strokeWidth={3} />}
-                  </span>
-                  <span>
-                    <strong>Fill in address later</strong>
-                    <span className="addr-toggle__hint">
-                      Customer hasn't confirmed the delivery address yet — it's required before
-                      the order can move to operation.
-                    </span>
-                  </span>
-                </label>
-
-                {!c.addressUnknown && (
+                {/* The "Fill in address later" tick is RETIRED (owner ruling
+                    2026-09-13, Delivery Card 18): a valid new order carries its
+                    delivery address — Sales asks before the sale is filed. */}
+                {(
                   <div style={{ marginTop: 22 }}>
                     <div
                       style={{
@@ -667,17 +654,22 @@ export default function CustomerStep({
                       }}
                       onChange={(patch) => setC(patch)}
                     />
-                    {/* Building type (Loo 2026-07-19) — delivery-access info for
-                        operation; optional, rides entry_data.fields. */}
+                    {/* Building type (Loo 2026-07-19) — delivery-access info
+                        for operation; rides entry_data.fields.
+                        REQUIRED since 2026-08-21 (Jess): stairs, lift access
+                        and van parking hang off it, and Operations was chasing
+                        the shop for it after the sale. `step1FirstIssue` names
+                        it as the missing field, exactly like the address parts
+                        above; it is asked only when an address exists. */}
                     <label className="block mt-3.5">
-                      <span className="label block mb-1.5">Building type</span>
+                      <span className="label block mb-1.5">Building type *</span>
                       <select
                         value={c.buildingType}
                         onChange={(e) => setC({ buildingType: e.target.value })}
                         data-testid="pos-building-type"
                         className="w-full px-3 py-2.5 border border-base-300 rounded bg-white text-sm outline-none focus:border-primary max-w-[260px]"
                       >
-                        <option value="">— select —</option>
+                        <option value="">Building type</option>
                         {BUILDING_TYPES.map((b) => (
                           <option key={b} value={b}>
                             {b}
@@ -771,7 +763,7 @@ export default function CustomerStep({
             {stepIdx === 2 && !emergencyBlock?.enabled && (
               <div className="fade-in">
                 <p style={{ fontSize: 12, color: "var(--fg-muted)", marginBottom: 16 }}>
-                  Emergency contact is switched off in the order-entry config — nothing to
+                  Emergency contact is switched off in the order-entry config. Nothing to
                   fill here.
                 </p>
                 {emgTab.custom.length > 0 && (
@@ -813,7 +805,7 @@ export default function CustomerStep({
                         })
                       }
                     >
-                      <option value="">— Relationship —</option>
+                      <option value="">Relationship</option>
                       {RELATIONSHIPS.map((r) => (
                         <option key={r} value={r}>
                           {r}
@@ -874,7 +866,7 @@ export default function CustomerStep({
                     <div className="flex items-baseline justify-between mb-3">
                       <h3 className="kicker">Order add-ons</h3>
                       <p className="text-[11px] text-base-500">
-                        Optional services charged on this order — e.g. dispose old mattress
+                        Optional services charged on this order, e.g. dispose old mattress
                       </p>
                     </div>
                     <AddonsPanel
@@ -968,7 +960,7 @@ function CustomFieldsInputs({
           </span>
           {f.type === "select" ? (
             <select value={values[f.key] ?? ""} onChange={(e) => onSet(f.key, e.target.value)}>
-              <option value="">— select —</option>
+              <option value="">{f.label}</option>
               {f.options.map((o) => (
                 <option key={o} value={o}>
                   {o}

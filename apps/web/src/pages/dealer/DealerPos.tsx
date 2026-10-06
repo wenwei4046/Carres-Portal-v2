@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Bookmark, ListOrdered, LogOut, ShoppingBag, Users } from "lucide-react";
+import { Bookmark, ListOrdered, LogOut, Menu, ShoppingBag, Users } from "lucide-react";
 import { toast } from "sonner";
 import type {
   CreateOrderInput,
@@ -18,6 +18,7 @@ import { useAuth } from "@/lib/auth";
 import { useStaffSession } from "@/lib/staff";
 import StaffManagePage from "./staff/StaffManagePage";
 import StaffSwitchChip from "./staff/StaffSwitchChip";
+import { staffColorHex, staffInitials } from "./staff/staff-ui";
 import {
   useBdDealers,
   useCancelOrder,
@@ -28,7 +29,6 @@ import {
   useOrder,
   useOutlets,
   usePrincipalDealers,
-  useProceedOrder,
   usePwpAvailableForPhone,
   useCreateRentalAgreement,
   useRentalPosPlans,
@@ -43,6 +43,7 @@ import { triggerLinesInCart, type PwpTriggerLine } from "./pos/pwp-line";
 import { extensionForMime, uploadDataUrl } from "@/lib/storage";
 import {
   type WizardDraft,
+  cartGoodsIssue,
   clearDraft,
   composeEmergency,
   emptyDraft,
@@ -174,8 +175,23 @@ export default function DealerPos({
   const cancelPendingOrder = useCancelOrder(stripePending?.orderId ?? "");
   const [uploading, setUploading] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [categoryOpen, setCategoryOpen] = useState(false);
   const [quotesOpen, setQuotesOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
+  // The category drawer belongs only to catalog step 1. Close it before a
+  // later step mounts so returning to the catalog never revives stale UI.
+  useEffect(() => {
+    if (step !== 1) setCategoryOpen(false);
+  }, [step]);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const nonPhone = window.matchMedia("(min-width: 768px)");
+    const closeOutsidePhone = (event: MediaQueryListEvent) => {
+      if (event.matches) setCategoryOpen(false);
+    };
+    nonPhone.addEventListener("change", closeOutsidePhone);
+    return () => nonPhone.removeEventListener("change", closeOutsidePhone);
+  }, []);
   // 0255 — the Rent-to-Own lane overlay (its own flow; never touches the cart).
   const [teamOpen, setTeamOpen] = useState(false);
   // BD only (2026-07-19) — the Accounts overlay (open dealer accounts +
@@ -195,7 +211,6 @@ export default function DealerPos({
   const staffMember = useStaffSession((s) => s.staff);
   const clearStaffToken = useStaffSession((s) => s.clearToken);
   const createOrder = useCreateOrder();
-  const proceedOrder = useProceedOrder();
   // Loo 2026-07-26 — rent-to-own is a catalog CATEGORY now. Empty result = the
   // Rental rail simply never appears, so a store with nothing on offer sees the
   // catalog exactly as before.
@@ -455,17 +470,6 @@ export default function DealerPos({
     return maxLeadDaysFor([...cats], catalogQ.data.earliestSellDays ?? 0);
   }, [draft.lines, catalogQ.data]);
 
-  // ASAP deposit hard-gate — when ASAP is on we auto-proceed after create, and
-  // Proceed needs ≥50%; reject at submit rather than create-then-bounce.
-  const asapDepositOk = useMemo(() => {
-    if (!draft.delivery.asap) return true;
-    const lineSub = draft.lines.reduce((s, l) => s + l.unitPrice * l.qty, 0);
-    const addonSub = draft.addons.reduce((s, a) => s + a.unitPrice * a.qty, 0);
-    const totalForPct = lineSub + addonSub;
-    if (totalForPct <= 0) return false;
-    return (draft.paid / totalForPct) * 100 >= 50;
-  }, [draft]);
-
   // CATALOG (step 1) advances via the cart drawer, which gates on step2Valid
   // itself; the shell only gates the CUSTOMER → CONFIRM → submit transitions.
   // An internal operator must have picked the acting dealer before advancing.
@@ -484,8 +488,12 @@ export default function DealerPos({
       !!effectiveDealerId &&
       step1Valid(draft, entryFormCfg) &&
       step2Valid(draft) &&
+      /* ⛔ A SALES ORDER MUST CONTAIN GOODS (owner ruling 2026-08-15). The
+         shell's own gate, so a cart edited outside the drawer cannot reach
+         CONFIRM either. */
+      cartGoodsIssue(draft, catalogQ.data ?? null) === null &&
       step3DateValid(draft, minLeadDays),
-    [draft, minLeadDays, effectiveDealerId, entryFormCfg],
+    [draft, minLeadDays, effectiveDealerId, entryFormCfg, catalogQ.data],
   );
   // 0276 — a RENTAL cart collects nothing at signing, so the payment half of
   // step4Valid does not apply to it (it made the Complete button permanently
@@ -502,8 +510,8 @@ export default function DealerPos({
     () =>
       isRentalCart
         ? step4ValidRental(draft) && rentalAgreementReady
-        : step4Valid(draft, paymentMethods) && asapDepositOk,
-    [draft, asapDepositOk, paymentMethods, isRentalCart, rentalAgreementReady],
+        : step4Valid(draft, paymentMethods),
+    [draft, paymentMethods, isRentalCart, rentalAgreementReady],
   );
 
   // Footer total (shown on step 3) — the shared draftTotals grand, so this bar,
@@ -632,7 +640,7 @@ export default function DealerPos({
       // happened, or the store re-submits and double-signs the customer.
       setSubmitError(
         done.length > 0
-          ? `${done.map((d) => d.agreementNo).join(", ")} created, then it failed: ${msg}. Do NOT retry the whole cart — check Admin → Rental first.`
+          ? `${done.map((d) => d.agreementNo).join(", ")} created, then it failed: ${msg}. Do NOT retry the whole cart. Check Admin → Rental first.`
           : msg,
       );
     } finally {
@@ -732,9 +740,12 @@ export default function DealerPos({
           birthday: draft.customer.birthday || null,
         },
         delivery: {
-          date: draft.delivery.dateTbd ? null : draft.delivery.date,
-          proceedDate: draft.delivery.dateTbd ? null : (draft.delivery.proceedDate || null),
-          dateTbd: draft.delivery.dateTbd,
+          /* ⛔ Owner ruling 2026-08-15 — a new Sales Order always carries a
+             real Requested Delivery Date date. `step3DateValid` has already refused
+             an empty one, and the create door refuses `dateTbd` outright. */
+          date: draft.delivery.date,
+          proceedDate: draft.delivery.proceedDate || null,
+          dateTbd: false,
           floor: draft.delivery.floor,
           hasLift: draft.delivery.hasLift,
           stairItems: draft.delivery.stairItems,
@@ -830,16 +841,6 @@ export default function DealerPos({
 
       clearDraft();
       setSubmitted(created);
-
-      if (draft.delivery.asap) {
-        try {
-          await proceedOrder.mutateAsync(created.id);
-          toast.success(`Order SO-${created.so} auto-proceeded · ASAP`);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : "Auto-proceed failed";
-          toast.warning(`Order created, but auto-proceed failed: ${msg}`);
-        }
-      }
     } catch (err) {
       setUploading(false);
       const msg = err instanceof Error ? err.message : "Submit failed";
@@ -861,7 +862,7 @@ export default function DealerPos({
     setStripeAutoFire(false);
     if (stripePending || uploading || createOrder.isPending) return;
     if (draft.paid <= 0) {
-      toast.info("Pick the amount to collect first — 50% / Full / Custom above.");
+      toast.info("Pick the amount to collect first: 50% / Full / Custom above.");
       return;
     }
     if (!draft.signature || !draft.signature.startsWith("data:image/")) {
@@ -907,13 +908,13 @@ export default function DealerPos({
     if (!sp) return;
     if (
       !window.confirm(
-        `Void order CO-${sp.so}? The customer hasn't paid — the order is cancelled and you return to editing.`,
+        `Void order CO-${sp.so}? The customer hasn't paid. The order is cancelled and you return to editing.`,
       )
     )
       return;
     try {
       await cancelPendingOrder.mutateAsync({ reason: "Stripe payment not completed at handover" });
-      toast.info(`Order CO-${sp.so} voided — nothing was charged.`);
+      toast.info(`Order CO-${sp.so} voided. Nothing was charged.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not void the order");
       return;
@@ -926,7 +927,7 @@ export default function DealerPos({
     if (stripePaidPending > 0) return stripeFinalize("paid");
     if (
       window.confirm(
-        "Customer hasn't paid yet.\n\nOK — keep the order and finish (the payment link stays valid for 24h; collect from My orders).\nCancel — stay on the QR.",
+        "Customer hasn't paid yet.\n\nOK: keep the order and finish (the payment link stays valid for 24h; collect from My orders).\nCancel: stay on the QR.",
       )
     ) {
       stripeFinalize("keep");
@@ -1019,6 +1020,12 @@ export default function DealerPos({
     onExit();
   }
 
+  function handleLogoHome() {
+    if (submitted || rentalDone) startAnotherOrder();
+    else if (step !== 1) setStep(1);
+    else onExit?.();
+  }
+
   const outletName = draft.outletId
     ? outlets.find((o) => o.id === draft.outletId)?.name
     : undefined;
@@ -1043,7 +1050,7 @@ export default function DealerPos({
       style={{ background: "var(--pos-bg)" }}
     >
       {/* Top bar — prototype .pos-topbar (Loo's Claude Design 2026-07-04). */}
-      <header className="pos-topbar" style={{ height: 56, flexShrink: 0 }}>
+      <header className="pos-topbar pos-topbar--desktop" style={{ height: 56, flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
           {/* Loo 2026-07-26 — the logo is the "home" button: back to the
               catalog. Mid-wizard it just returns to step 1 (draft kept, same
@@ -1053,18 +1060,7 @@ export default function DealerPos({
           <button
             type="button"
             className="pos-wordmark"
-            onClick={() => {
-              // Three states, and the third one had no branch at all: sitting on
-              // step 1 with nothing submitted, this handler ran no statement and
-              // the logo was a live, focusable, silent button. An operator who
-              // clicks a dead control twice stops trying it on the screens where
-              // it DOES work, so the meaning is now total: finished → next sale,
-              // mid-wizard → back to the catalog, already at the catalog → leave
-              // POS through the door the shell already owns.
-              if (submitted || rentalDone) startAnotherOrder();
-              else if (step !== 1) setStep(1);
-              else onExit?.();
-            }}
+            onClick={handleLogoHome}
             aria-label="Back to catalog"
             data-testid="pos-logo-home"
           >
@@ -1212,6 +1208,182 @@ export default function DealerPos({
         </div>
       </header>
 
+      {/* Phone-only top bar. The category button opens Day 5's catalog drawer;
+          the existing catalog FAB remains the only phone cart entrance until
+          it becomes Day 8's sticky cart bar. */}
+      <header className={`pos-mobile-topbar hidden${submitted ? " is-complete" : ""}`}>
+        <div className="pos-mobile-topbar__main">
+          <button
+            type="button"
+            className="pos-mobile-topbar__icon"
+            aria-label={step === 1 ? "Open categories" : "Categories available in catalog"}
+            onClick={() => setCategoryOpen(true)}
+            disabled={step !== 1}
+          >
+            <Menu size={18} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            className="pos-wordmark pos-mobile-topbar__wordmark"
+            onClick={handleLogoHome}
+            aria-label="Back to catalog"
+          >
+            CARRES
+          </button>
+
+          <span className="pos-topbar__crumb pos-mobile-topbar__context">
+            POS · {contextLabel}
+          </span>
+
+          {staffMember ? (
+            <button
+              type="button"
+              className="pos-mobile-topbar__avatar"
+              onClick={clearStaffToken}
+              aria-label={`Switch staff. Current staff: ${staffMember.name}`}
+            >
+              <span
+                className="pos-staff-chip__avatar"
+                style={{ background: staffColorHex(staffMember.color) }}
+                aria-hidden="true"
+              >
+                {staffInitials(staffMember.name)}
+              </span>
+            </button>
+          ) : (
+            <Link
+              to="/me"
+              className="pos-mobile-topbar__avatar"
+              aria-label="Open profile"
+            >
+              <span className="pos-staff-chip__avatar" aria-hidden="true">
+                {initials}
+              </span>
+            </Link>
+          )}
+        </div>
+
+        {!submitted && (
+          <nav className="pos-mobile-topbar__steps" aria-label="Order steps">
+            {STEPS.map((s) => {
+              const clickable = s.n < step;
+              return (
+                <button
+                  key={s.n}
+                  type="button"
+                  onClick={() => clickable && setStep(s.n)}
+                  disabled={!clickable && s.n !== step}
+                  aria-current={step === s.n ? "step" : undefined}
+                  className={`pos-mobile-topbar__step ${step === s.n ? "is-active" : ""}`}
+                >
+                  <span className="pos-mobile-topbar__step-pill">
+                    <span className="pos-mobile-topbar__step-number">{s.n}</span>
+                    {s.label}
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+        )}
+      </header>
+
+      {/* Tablet portrait gets the same compact hierarchy as phone, with a
+          count-only cart shortcut. It stays a separate header so neither the
+          phone nor the >=1024px desktop composition needs to change. */}
+      <header className={`pos-tablet-topbar hidden${submitted ? " is-complete" : ""}`}>
+        <div className="pos-tablet-topbar__main">
+          <button
+            type="button"
+            className="pos-tablet-topbar__icon"
+            aria-label="Categories menu unavailable"
+            disabled
+          >
+            <Menu size={18} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            className="pos-wordmark pos-tablet-topbar__wordmark"
+            onClick={handleLogoHome}
+            aria-label="Back to catalog"
+          >
+            CARRES
+          </button>
+
+          <span className="pos-topbar__crumb pos-tablet-topbar__context">
+            POS · {contextLabel}
+          </span>
+
+          {!submitted && itemCount > 0 && (
+            <button
+              type="button"
+              className="pos-tablet-topbar__cart"
+              onClick={() => {
+                setStep(1);
+                setCartOpen(true);
+              }}
+              aria-label={`Open cart, ${itemCount} item${itemCount === 1 ? "" : "s"}`}
+            >
+              <ShoppingBag size={18} strokeWidth={1.75} aria-hidden="true" />
+              <span className="pos-tablet-topbar__cart-badge" aria-hidden="true">
+                {itemCount}
+              </span>
+            </button>
+          )}
+
+          {staffMember ? (
+            <button
+              type="button"
+              className="pos-tablet-topbar__avatar"
+              onClick={clearStaffToken}
+              aria-label={`Switch staff. Current staff: ${staffMember.name}`}
+            >
+              <span
+                className="pos-staff-chip__avatar"
+                style={{ background: staffColorHex(staffMember.color) }}
+                aria-hidden="true"
+              >
+                {staffInitials(staffMember.name)}
+              </span>
+            </button>
+          ) : (
+            <Link
+              to="/me"
+              className="pos-tablet-topbar__avatar"
+              aria-label="Open profile"
+            >
+              <span className="pos-staff-chip__avatar" aria-hidden="true">
+                {initials}
+              </span>
+            </Link>
+          )}
+        </div>
+
+        {!submitted && (
+          <nav className="pos-tablet-topbar__steps" aria-label="Order steps">
+            {STEPS.map((s) => {
+              const clickable = s.n < step;
+              return (
+                <button
+                  key={s.n}
+                  type="button"
+                  onClick={() => clickable && setStep(s.n)}
+                  disabled={!clickable && s.n !== step}
+                  aria-current={step === s.n ? "step" : undefined}
+                  className={`pos-tablet-topbar__step ${step === s.n ? "is-active" : ""}`}
+                >
+                  <span className="pos-tablet-topbar__step-pill">
+                    <span className="pos-tablet-topbar__step-number">{s.n}</span>
+                    {s.label}
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+        )}
+      </header>
+
       {/* No resume banner (Loo 2026-07-11): an unsaved draft silently restores
           into the cart — "Clear cart" in the drawer covers starting fresh. */}
 
@@ -1290,6 +1462,8 @@ export default function DealerPos({
               }}
               cartOpen={cartOpen}
               onCartOpenChange={setCartOpen}
+              categoryOpen={categoryOpen}
+              onCategoryOpenChange={setCategoryOpen}
               pwpReservedCodes={reservedCodesQ.data?.codes ?? []}
               pwpClaimGroup={pwpActive ? getClaimGroup() : undefined}
               customerPhone={pwpActive ? customerPhone : undefined}

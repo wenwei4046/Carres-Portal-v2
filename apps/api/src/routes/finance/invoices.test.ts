@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -12,30 +12,13 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("11111111-1111-1111-1111-000000000001")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("11111111-1111-1111-1111-000000000001", { email: `${role}@x`, app_metadata: { role } });
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -87,240 +70,97 @@ describe("GET /api/finance/invoices", () => {
   });
 });
 
-describe("POST /api/finance/invoices/issue", () => {
-  function mockOrderLookup(status: string) {
-    return {
-      single: vi.fn().mockResolvedValue({
-        data: { status, paid: 5970 },
-        error: null,
-      }),
-    };
-  }
-
-  it("issues invoice when order is delivered", async () => {
+describe("POST /:id/collection-outcome (§3, 0446)", () => {
+  it("passes the result to the ONE SQL door, invoice scoped to its order", async () => {
+    const rpc = vi.fn(async () => ({ data: { id: "out-1" }, error: null }));
     const sb = {
-      from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue(mockOrderLookup("delivered")),
-        }),
-      }),
-      rpc: vi.fn().mockResolvedValue({
-        data: { id: "i1", invoice_no: "INV-2026-1240", amount: 5970, tax_amount: 442 },
-        error: null,
-      }),
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({ maybeSingle: async () => ({ data: { id: INVOICE_ID, order_id: ORDER_ID }, error: null }) })),
+        })),
+      })),
+      rpc,
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-
-    const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request("http://t/api/finance/invoices/issue", {
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(new Request(
+      `http://t/api/finance/invoices/${INVOICE_ID}/collection-outcome`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: ORDER_ID, amount: 5970, taxAmount: 442 }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("invoice_issue", {
-      p_order_id:   ORDER_ID,
-      p_amount:     5970,
-      p_tax_amount: 442,
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ outcome: "will_pay_on_date", promisedDate: "2026-09-20", note: "salary" }),
+      }), env);
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("payment_record_collection_outcome", {
+      p_order_id: ORDER_ID,
+      p_outcome: "will_pay_on_date",
+      p_promised_date: "2026-09-20",
+      p_note: "salary",
+      p_invoice_id: INVOICE_ID,
     });
   });
-
-  it("rejects when order is not delivered (422 order_not_delivered)", async () => {
-    const sb = {
-      from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue(mockOrderLookup("place")),
-        }),
-      }),
-      rpc: vi.fn(),
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-
-    const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request("http://t/api/finance/invoices/issue", {
+  it("422 refuses an outcome word that is not one of the five, before any database call", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await app.fetch(new Request(
+      `http://t/api/finance/invoices/${INVOICE_ID}/collection-outcome`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: ORDER_ID, amount: 5970 }),
-      }),
-      env,
-    );
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ outcome: "customer_shouted" }),
+      }), env);
     expect(res.status).toBe(422);
-    const body = (await res.json()) as { code: string };
-    expect(body.code).toBe("order_not_delivered");
-    expect(sb.rpc).not.toHaveBeenCalled();
-  });
-
-  it("returns 404 when order not found", async () => {
-    const sb = {
-      from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ data: null, error: { code: "PGRST116", message: "not found" } }),
-          }),
-        }),
-      }),
-      rpc: vi.fn(),
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-
-    const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request("http://t/api/finance/invoices/issue", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: ORDER_ID, amount: 5970 }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(404);
-    expect(sb.rpc).not.toHaveBeenCalled();
-  });
-
-  it("rejects negative amount with 422", async () => {
-    const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request("http://t/api/finance/invoices/issue", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: ORDER_ID, amount: -100 }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-  });
-
-  it("rejects dealer with 403", async () => {
-    const jwt = await makeJwt("dealer");
-    const res = await app.fetch(
-      new Request("http://t/api/finance/invoices/issue", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: ORDER_ID, amount: 5970 }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
   });
 });
 
-describe("POST /api/finance/invoices/:id/void", () => {
-  it("voids an issued invoice and audit-logs", async () => {
-    const auditInsert = vi.fn().mockResolvedValue({ data: null, error: null });
-    const sb = {
-      from: vi.fn().mockImplementation((tbl: string) => {
-        if (tbl === "invoices") {
-          return {
-            update: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                is: vi.fn().mockReturnValue({
-                  select: vi.fn().mockReturnValue({
-                    single: vi.fn().mockResolvedValue({
-                      data: { id: INVOICE_ID, invoice_no: "INV-2026-1240", voided_at: "2026-05-08" },
-                      error: null,
-                    }),
-                  }),
-                }),
-              }),
-            }),
-          };
-        }
-        return { insert: auditInsert };
-      }),
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
+/*
+ * 0476 — one invoice door per act. The Phase-5 issue and void doors answer
+ * 410 and name the governed door; they never reach the database.
+ */
+describe("the closed Phase-5 invoice doors (0476)", () => {
+  async function post(path: string, body: unknown) {
+    const sb = { from: vi.fn(), rpc: vi.fn() };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(new Request(`http://t/api/finance/invoices/${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt("finance")}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+    return { res, sb };
+  }
 
-    const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/void`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: "customer disputed line items" }),
-      }),
-      env,
-    );
+  it("POST /issue is gone and names Generate invoice and the governed issue door", async () => {
+    const { res, sb } = await post("issue", { orderId: ORDER_ID, amount: 5970, taxAmount: 442 });
+    expect(res.status).toBe(410);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("door_closed");
+    expect(body.message).toContain("Generate invoice");
+    expect(body.message).toContain("/api/orders/:id/issue-invoice");
+    expect(body.message).toContain("/api/finance/invoices/:id/issue");
+    expect(sb.rpc).not.toHaveBeenCalled();
+    expect(sb.from).not.toHaveBeenCalled();
+  });
+
+  it("POST /:id/void is gone and names void and replace", async () => {
+    const { res, sb } = await post(`${INVOICE_ID}/void`, { reason: "customer disputed line items" });
+    expect(res.status).toBe(410);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("door_closed");
+    expect(body.message).toContain("/api/finance/invoices/:id/void-replace");
+    expect(sb.from).not.toHaveBeenCalled();
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("the governed void-replace door is still open beside it", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { voided: { id: INVOICE_ID } }, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await app.fetch(new Request(`http://t/api/finance/invoices/${INVOICE_ID}/void-replace`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt("principal")}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: "wrong amount" }),
+    }), env);
     expect(res.status).toBe(200);
-    expect(auditInsert).toHaveBeenCalled();
-  });
-
-  it("rejects non-uuid invoice id with 422", async () => {
-    const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request("http://t/api/finance/invoices/INV-001/void", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: "x" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-  });
-
-  it("rejects empty reason with 422 (zod min 1)", async () => {
-    const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/void`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: "" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-  });
-
-  it("returns 422 not_voidable when invoice already voided (PGRST116)", async () => {
-    const sb = {
-      from: vi.fn().mockReturnValue({
-        update: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            is: vi.fn().mockReturnValue({
-              select: vi.fn().mockReturnValue({
-                single: vi.fn().mockResolvedValue({
-                  data: null,
-                  error: { code: "PGRST116", message: "no rows" },
-                }),
-              }),
-            }),
-          }),
-        }),
-      }),
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-
-    const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/void`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: "double issued" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    const body = (await res.json()) as { code: string };
-    expect(body.code).toBe("not_voidable");
-  });
-
-  it("rejects dealer with 403", async () => {
-    const jwt = await makeJwt("dealer");
-    const res = await app.fetch(
-      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/void`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: "x" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(403);
+    expect(rpc).toHaveBeenCalledWith("payment_invoice_void_replace", {
+      p_invoice_id: INVOICE_ID, p_reason: "wrong amount",
+    });
   });
 });
 
@@ -387,6 +227,17 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
             select: vi.fn().mockResolvedValue({ data: guaranteeTerms, error: null }),
           };
         }
+        if (table === "order_payments") {
+          // A deposit before the invoice, the balance after it.
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [
+                { amount: 2000, kind: "deposit", voided_at: null, created_at: "2026-04-01T00:00:00Z" },
+                { amount: 3970, kind: "payment", voided_at: null, created_at: "2026-05-02T00:00:00Z" },
+              ], error: null }),
+            }),
+          };
+        }
         throw new Error(`unexpected table ${table}`);
       }),
     };
@@ -416,6 +267,7 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
     expect(body.invoice_no).toBe("INV-2026-1240");
     expect(body.order_code).toBe("SO-1240");
     expect(body.total).toBe(5970);
+    expect(body.received_before).toBe(2000);
     expect(body.lines).toHaveLength(1);
     // No guarantee sold on this order → the block is empty, not absent-and-broken.
     expect(body.guarantees).toEqual([]);
@@ -506,6 +358,26 @@ describe("GET /api/finance/invoices/:id/pdf (Chunk C)", () => {
     const sb = mockChain(
       { id: INVOICE_ID, invoice_no: "INV-2026-1240", order_id: ORDER_ID, amount: 5970, tax_amount: 442, issued_at: "2026-04-30", voided_at: null },
       { id: ORDER_ID, so: 1240, status: "delivered", customer_name: "Tan", customer_phone: null, customer_address: "addr", dealer_id: "d1", paid: 1000, dealers: null },
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("finance");
+    const res = await app.fetch(
+      new Request(`http://t/api/finance/invoices/${INVOICE_ID}/pdf-data`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("not_fully_paid");
+  });
+
+  it("returns 422 when the order is one sen short", async () => {
+    const sb = mockChain(
+      { id: INVOICE_ID, invoice_no: "INV-2026-1240", order_id: ORDER_ID, amount: 5970, tax_amount: 442, issued_at: "2026-04-30", voided_at: null },
+      { id: ORDER_ID, so: 1240, status: "delivered", customer_name: "Tan", customer_phone: null, customer_address: "addr", dealer_id: "d1", paid: "5969.99", dealers: null },
     );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);

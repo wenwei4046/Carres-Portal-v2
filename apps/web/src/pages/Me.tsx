@@ -77,9 +77,9 @@ export default function Me() {
           </h2>
           <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 font-mono text-body">
             <dt className="text-muted-foreground">user.id</dt>
-            <dd className="break-all">{user?.id ?? "—"}</dd>
+            <dd className="break-all">{user?.id ?? ""}</dd>
             <dt className="text-muted-foreground">user.email</dt>
-            <dd>{user?.email ?? "—"}</dd>
+            <dd>{user?.email ?? ""}</dd>
           </dl>
         </section>
 
@@ -98,13 +98,13 @@ export default function Me() {
               <dt className="text-muted-foreground">role</dt>
               <dd className="font-semibold text-primary">{me.role}</dd>
               <dt className="text-muted-foreground">dealerId</dt>
-              <dd className="break-all">{me.dealerId ?? "—"}</dd>
+              <dd className="break-all">{me.dealerId ?? ""}</dd>
               <dt className="text-muted-foreground">supplierId</dt>
-              <dd className="break-all">{me.supplierId ?? "—"}</dd>
+              <dd className="break-all">{me.supplierId ?? ""}</dd>
               <dt className="text-muted-foreground">partnerId</dt>
-              <dd className="break-all">{me.partnerId ?? "—"}</dd>
+              <dd className="break-all">{me.partnerId ?? ""}</dd>
               <dt className="text-muted-foreground">outletId</dt>
-              <dd className="break-all">{me.outletId ?? "—"}</dd>
+              <dd className="break-all">{me.outletId ?? ""}</dd>
             </dl>
           )}
         </section>
@@ -149,7 +149,7 @@ function ChangePasswordCard({ email }: { email: string }) {
     setSuccess(false);
     const v = validate();
     if (v) { setError(v); return; }
-    if (!email) { setError("Missing session email — sign in again"); return; }
+    if (!email) { setError("Missing session email. Sign in again"); return; }
 
     setBusy(true);
     try {

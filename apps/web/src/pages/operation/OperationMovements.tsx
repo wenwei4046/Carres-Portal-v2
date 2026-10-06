@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { appTodayIso } from "@/lib/fmt-date";
 import {
   useCatalog,
   useOperationMovements,
@@ -225,7 +226,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
           ? "last 30 days"
           : period === "90d"
             ? "last 90 days"
-            : `${fromDate || "—"} to ${toDate || "—"}`;
+            : `${fromDate || ""} to ${toDate || ""}`;
   const skuLabel = sku ? (skuByCode.get(sku)?.variant ?? sku) : "all SKUs";
 
   function clearAll() {
@@ -264,7 +265,7 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `stock-movements-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `stock-movements-${appTodayIso()}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -318,11 +319,10 @@ export default function OperationMovements({ initialFilters, setTab, clearInitia
               ← Warehouse
             </button>
             <span className="mx-1.5 text-base-300">/</span>
-            <span>Movement log</span>
+            <span>In &amp; out</span>
           </div>
-          <h1 className="text-page font-display mt-1.5 text-base-900">
-            Stock in &amp; out history
-          </h1>
+          {/* The page word (`In & out`) is drawn by the destination header
+              (StockTabs, 壳画头) — no duplicate h1 below it. */}
           <div
             className="font-body text-body text-base-600 mt-1"
             data-testid="movements-summary"
@@ -837,12 +837,9 @@ function MovementTableRow({
             {row.note}
           </div>
         ) : null}
-        {!row.ref && !row.note ? (
-          <div className="text-label text-base-400">—</div>
-        ) : null}
       </div>
       <div className="font-body text-label text-base-500 capitalize truncate">
-        {row.by_role ?? "—"}
+        {row.by_role ?? ""}
       </div>
     </div>
   );

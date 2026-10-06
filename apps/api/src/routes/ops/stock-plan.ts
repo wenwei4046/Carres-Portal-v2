@@ -20,6 +20,9 @@ import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { myDuties } from "../../lib/duties";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+import { parseBody } from "../../lib/route-helpers";
+import { resolveActorNames } from "../../lib/actor-names";
+import { todayIsoMYT } from "../../lib/delivery-order-issue";
 
 /**
  * Ready stock plan — card K2 (migration 0287).
@@ -50,11 +53,6 @@ function monthAnchor(period: string): string {
   return `${period}-01`;
 }
 
-/** Today in Asia/Kuala_Lumpur — the only calendar the warehouse lives in. */
-function todayMyt(): string {
-  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
-}
-
 function isoDaysAgo(days: number): string {
   return new Date(Date.now() + 8 * 3_600_000 - days * 86_400_000)
     .toISOString()
@@ -81,7 +79,7 @@ interface PlanRow {
 
 opsStockPlanRouter.get("/", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const asOf = todayMyt();
+  const asOf = todayIsoMYT();
   const requested = c.req.query("period");
   const period =
     requested && /^\d{4}-(0[1-9]|1[0-2])$/.test(requested)
@@ -139,7 +137,7 @@ opsStockPlanRouter.get("/", requireOperationOrPrincipal, async (c) => {
       proposed_by: string;
       note: string | null;
     }[];
-    const names = await nameMap(
+    const names = await resolveActorNames(
       sb,
       unique([
         ...raw.map((p) => p.proposed_by),
@@ -292,19 +290,6 @@ function unique(ids: (string | null)[]): string[] {
   return [...new Set(ids.filter((v): v is string => !!v))];
 }
 
-async function nameMap(
-  sb: ReturnType<typeof userClient>,
-  ids: string[],
-): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
-  if (ids.length === 0) return map;
-  const { data } = await sb.from("app_users").select("id,name").in("id", ids);
-  for (const u of (data ?? []) as { id: string; name: string | null }[]) {
-    if (u.name) map.set(u.id, u.name);
-  }
-  return map;
-}
-
 // =====================================================================
 // POST actions — thin wrappers over the DEFINER RPCs
 // =====================================================================
@@ -373,25 +358,6 @@ opsStockPlanRouter.post("/:planId/decide", requireOperationOrPrincipal, async (c
 // =====================================================================
 // Helpers
 // =====================================================================
-
-async function parseBody<S extends import("zod").ZodTypeAny>(
-  c: import("hono").Context<AppEnv>,
-  schema: S,
-): Promise<import("zod").infer<S>> {
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    throw new HTTPException(400, { message: "Body must be valid JSON" });
-  }
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) {
-    throw new HTTPException(400, {
-      message: "Invalid input: " + parsed.error.issues[0]?.message,
-    });
-  }
-  return parsed.data;
-}
 
 /** A permission answer must read as 403, never as an outage. */
 function mapErr(error: { code?: string; message?: string }): HTTPException {

@@ -53,6 +53,11 @@ against a real session.
   locked out.
 - **A residual is accepted and documented:** a token issued BEFORE the disable lives out its
   hour.
+- **Settings → Staff & Duties is the ONE company-wide Duty assignment door** (owner rulings
+  2026-09-01 / 2026-09-03; Settings placement production verified 2026-09-29, PR #1791, Workspace §4). It keeps the Duty catalogue, each Duty's one Primary holder, optional
+  assignment changes and effective dates. `Team` may show staff and workload, but it is not a second Duty
+  editor. No module Settings surface keeps another approver list or rota. The Shared Duty Resolver
+  defined by ERP Architecture Law F.1 is the only reader exposed to pages and Work.
 
 # §3 · People — one record per CR-coded human
 
@@ -66,7 +71,57 @@ against a real session.
 - **HR may disable a login**, because the only disable route was principal-only and offboarding
   could not offboard. **Offboarding is TWO shapes** — the PIN path already refuses an inactive
   salesperson.
+- **OFFBOARDING HAS AN EFFECTIVE DATE — owner ruling 2026-09-01.** The COO records the actual last
+  working date and disables access; this People/account fact is the one source consumed by shared
+  duty resolution. On the effective date, open and future duty-owned Work automatically resolves
+  among the remaining active staff, including two-person and one-person operation. Historical actor,
+  avatar, receipt, handover, approval and cover evidence remain unchanged. HR/People does not store
+  a second PO Duty, GRN Duty or Warehouse rota; that one duty model remains in
+  `../purchasing/MASTER.md` §5.3 and its one edit door is Settings → Staff & Duties
+  (placement production verified, PR #1791; Workspace §4).
+- **Rotation entry timing — owner-approved 2026-09-28 / APPROVED TARGET / NOT BUILT:** a newcomer
+  enters routine monthly Duty rotation on the first day of the next month after acquiring the
+  required People-owned eligibility. Account creation alone does not enrol them. Departure exclusion
+  takes effect immediately on its effective date, not the next month (Workspace §4).
+  Owner-approved PO timing 2026-09-28: exclude newcomers from PO in their calendar month of
+  joining for responsibility allocation only; automatically admit them from the following month
+  while active and otherwise eligible. Owner clarification 2026-09-29: newcomers may actually place
+  PO and perform ordinary Operation work in their joining month; no execution waiting period.
+  No separate manager competency confirmation or training sign-off is required (Workspace §4).
 - **Checklists are a shared constant, not a config table.**
+- **PEOPLE ENTRY — FINAL BLUEPRINT OWNER-APPROVED 2026-09-29 / NOT BUILT:** Staff & Duties
+  provides `Manage staff` to authorised personnel managers, opening the existing People surface
+  with return context. It creates no second employee record or parallel management permission.
+- **ONE DEPARTURE FLOW — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT:** the
+  authorised People/account manager selects the employee, records the last working day, reviews
+  the effects and confirms once. The workflow records departure and arranges the corresponding
+  access disablement together; it must not require a second, unrelated disable-account action.
+  When departure takes effect, disable access, remove the person from default active staff lists,
+  current choices and routine Duty allocation, and re-resolve affected current/future routing.
+  Employment and Access remain distinct source facts, coordinated by this one workflow, not copied
+  into Workspace. A future departure confirmation schedules its effects; it does not claim access
+  has already been disabled or hide a still-current employee early. Preserve entered facts on
+  failure, identify any unfinished effect and never announce full completion on partial success.
+  Completion means the due departure/access effects are recorded and reflected by their owning
+  sources. Retain actor/time and history; the existing HQ-login and store-PIN distinction remains.
+- **FORMER STAFF VISIBILITY / ACCESS — OWNER-APPROVED 2026-09-29 / TARGET / NOT BUILT:**
+  departure automatically removes the account from Settings and other default active staff lists;
+  no second remove/delete action is needed. Ordinary staff cannot browse or open former employee
+  account/profile details. Only users with the existing personnel-management permission may
+  deliberately look up those retained records; those users also default to the current-staff list.
+  Enforce this on reads and direct detail access, not just by hiding a row. Existing separate
+  sensitive-field controls still apply. Preserve historical PO/GRN and other actual-actor names
+  for users already entitled to those source documents; seeing a historical name does not grant
+  access to the person's account/profile. Do not delete the identity or rewrite past evidence.
+  This approves a unified departure workflow and its access boundary, not a second employee store
+  or an unreviewed redesign of the whole HR module.
+- **Monthly order — owner-approved 2026-09-29 / NOT BUILT:** Workspace maintains a stable
+  PO/GRN cycle; admitted newcomers join its tail, effective departures leave it, and existing
+  people keep their relative order. People supplies eligibility without maintaining a second rota.
+- **People owns Duty eligibility, not Duty assignment** (owner ruling 2026-09-01): employee name,
+  personal account, active/disabled, last working date and membership of the eligible Carres staff
+  rotation pool. A last-working-date change removes the person from future resolution; People does
+  not store any Duty assignment or reassignment.
 
 # §4 · Commission
 
@@ -117,7 +172,9 @@ against a real session.
 
 | What | Why it is not built |
 |---|---|
-| **Roster / presence / leave** | **DROPPED by Loo at the design stage.** Never started; nothing to remove. |
+| **Operation flexible working hours** | **OWNER RULING 2026-09-29 / APPROVED TARGET.** Usual hours are 9:00 AM–6:00 PM; arrival by 10:00 AM with departure at 7:00 PM is allowed, provided eight hours are worked. A permitted 10:00 AM start is not late or absent. Workspace’s 10:30 AM / 3:00 PM checks are work-routing checkpoints, not an attendance calculation or proof of eight hours worked. Office lunch is fixed at **1:00–2:00 PM**, excluded from the eight working hours. Workspace’s morning activity window starts at 9:00 AM and its afternoon window at 2:00 PM, ending at their respective configured checks. Lunch or morning activity cannot satisfy the afternoon check. No payroll calculation is introduced. |
+| **Leave fact for work assignment** | **APPROVED TARGET / NOT BUILT.** People owns dated leave and eligibility. Workspace §4.4 consumes them for recorded assignment changes and owns the two daily work-activity checks (10:30 AM / 3:00 PM defaults, manager-editable). Neither mechanism creates a second HR rota. |
+| **Work activity versus HR attendance** | **OWNER RULING 2026-09-29 / APPROVED TARGET / NOT BUILT.** Two period-specific activity checks may change unfinished Work assignment without a manager recording MC. An activity gap does not establish MC, attendance, employment status or access; no automated HR finding is created. Morning activity cannot satisfy the afternoon check, and background heartbeat is not fresh work-period evidence. |
 | **BD revenue on the cost screen** | Cost shows; revenue reads *not enrolled* — 0 dealers have a BD owner. Wiring it needs a dealer-channel revenue read, **not a widening of the showroom-only source.** |
 | **Effective dating on the other four config tables** | Approved. Today only rates carry it, so editing model rates, tiers, milestones or the scheme method rewrites live figures. Harmless for CLOSED months **because the run freezes the lines** — which is exactly why closed months must be read, never recomputed. |
 | **Pro-rating salary by join date** | Approved; blocked because `join_date` is filled for 0 of 9. |

@@ -26,20 +26,25 @@
  */
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { AgreementForm, AgreementOnRecord } from "./customer-agreement";
 import Button from "@/components/kit/Button";
 import DatePicker from "@/components/kit/DatePicker";
 import Modal from "@/components/kit/Modal";
 import Textarea from "@/components/kit/Textarea";
 import Input from "@/components/kit/Input";
+import Select from "@/components/kit/Select";
+import { INSTALMENT_MONTHS } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
 import { fmtDate } from "@/lib/fmt-date";
 import {
   useDecideSalesOrderAmendment,
+  useRecordAmendmentAgreement,
   useSalesOrderAmendment,
   useSalesOrderAmendmentImpact,
   useSubmitSalesOrderAmendment,
   type AmendmentProposal,
 } from "@/lib/queries";
+
 
 export interface AmendmentLine {
   id?: string;
@@ -55,6 +60,8 @@ export default function SalesOrderAmendment({
   currentDeliveryDateTbd = false,
   currentInstallmentMonths = null,
   proposalSeed,
+  openSignal,
+  inlineTrigger = true,
 }: {
   orderId: string;
   /** The order's lines today — the proposal starts as a copy of them. */
@@ -63,11 +70,26 @@ export default function SalesOrderAmendment({
   currentDeliveryDateTbd?: boolean;
   currentInstallmentMonths?: number | null;
   proposalSeed?: AmendmentProposal | null;
+  /** ⭐ OPENED FROM `More actions` (YH, 2026-08-26). Bump this number to start
+   *  a proposal from outside — the counter, rather than a boolean, is what lets
+   *  the same menu item work a second time after the modal was cancelled. */
+  openSignal?: number;
+  /** When false the idle strip renders NOTHING: a rare act does not hold
+   *  permanent space on the card, it lives in `More actions`. The LIVE
+   *  proposal panel is unaffected either way — a pending amendment is truth,
+   *  not an action, and truth stays on the page. */
+  inlineTrigger?: boolean;
 }) {
   const liveQ = useSalesOrderAmendment(orderId);
   const amendment = liveQ.data?.amendment ?? null;
   const impactQ = useSalesOrderAmendmentImpact(amendment?.id ?? null);
   const role = useAuth((s) => s.role);
+
+  /* 0562 · the two facts the approve button answers to. Both come from the
+     server on every read — the screen never decides for itself that a change
+     is agreed, and the database refuses the approval regardless. */
+  const agreementRecorded = !!amendment?.customer_agreement_kind;
+  const agreementCovers = amendment?.customer_agreement_covers_proposal === true;
 
   const [open, setOpen] = useState(false);
   const [lines, setLines] = useState<AmendmentLine[]>([]);
@@ -76,6 +98,9 @@ export default function SalesOrderAmendment({
   const [deliveryDate, setDeliveryDate] = useState<string | null>(currentDeliveryDate);
   const [deliveryDateTbd, setDeliveryDateTbd] = useState(currentDeliveryDateTbd);
   const [installmentMonths, setInstallmentMonths] = useState<number | null>(currentInstallmentMonths);
+  /* The basis for the customer's acceptance, recorded through its own door —
+     a proposal is still written when the evidence is not in yet. The FORM owns
+     the three fields; this screen owns only the act. */
 
   const submitMut = useSubmitSalesOrderAmendment(orderId, {
     onSuccess: (r) => {
@@ -83,6 +108,10 @@ export default function SalesOrderAmendment({
       setOpen(false);
       setReason("");
     },
+    onError: (e) => toast.error(e.message),
+  });
+  const agreementMut = useRecordAmendmentAgreement(orderId, {
+    onSuccess: () => toast.success("Customer agreement recorded"),
     onError: (e) => toast.error(e.message),
   });
   const decideMut = useDecideSalesOrderAmendment(orderId, {
@@ -108,6 +137,15 @@ export default function SalesOrderAmendment({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proposalSeed]);
 
+  /* `More actions → Propose a change to the customer`. Guarded on > 0 so the
+     first render never opens it, and keyed on the counter so a cancelled
+     modal can be reopened from the same menu item. */
+  useEffect(() => {
+    if (openSignal && openSignal > 0) startProposal();
+    // Same reason as the seed above — the facts are captured at the click.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openSignal]);
+
   const changed = lines.some((l, i) => {
     const was = currentLines[i];
     return !was || was.qty !== l.qty || was.unit_price !== l.unit_price;
@@ -132,7 +170,7 @@ export default function SalesOrderAmendment({
         >
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <span className="text-label font-semibold tracking-wide text-base-700 uppercase">
-              {amendment.stale ? "Out of date — propose again" : "Waiting for management"}
+              {amendment.stale ? "Out of date. Propose again" : "Waiting for management"}
             </span>
             <span className="text-meta text-base-500">
               From Rev {amendment.base_revision} · {fmtDate(amendment.submitted_at, { time: true })}
@@ -140,12 +178,12 @@ export default function SalesOrderAmendment({
           </div>
 
           {amendment.reason && (
-            <p className="text-meta text-base-700 mt-1.5 break-words">Reason — {amendment.reason}</p>
+            <p className="text-meta text-base-700 mt-1.5 break-words">Reason: {amendment.reason}</p>
           )}
 
           <p className="text-body text-base-900 mt-2">
             {amendment.stale
-              ? "The order's items, price or promised date changed after this was written. The customer would be agreeing to something that is no longer true — write a new proposal from the order as it stands now."
+              ? "The order's items, price or promised date changed after this was written. The customer would be agreeing to something that is no longer true. Write a new proposal from the order as it stands now."
               : "The proposal has not been approved, so the Sales Order has not changed. Contact and address corrections are still free to save."}
           </p>
 
@@ -168,6 +206,33 @@ export default function SalesOrderAmendment({
             </div>
           )}
 
+          {/* ⭐ THE CUSTOMER AGREEMENT — 0562, owner ruling 2026-09-22.
+              It sits ABOVE the decision, because it is the thing the approver
+              is being asked to check: "Sales records the confirmation basis;
+              the authorised approver checks that it covers the proposed
+              change." */}
+          <div className="mt-3 border-t border-kit-slate-5 pt-2" data-testid="amendment-agreement">
+            <div className="text-label text-base-500">Customer agreement</div>
+            <AgreementOnRecord
+              kind={amendment.customer_agreement_kind}
+              reference={amendment.customer_agreement_reference}
+              detail={amendment.customer_agreement_detail}
+              coversProposal={agreementRecorded ? agreementCovers : undefined}
+            />
+
+            {/* Sales records it — not the approver. A change of terms after the
+                customer agreed re-opens this form, which is the same rule. */}
+            {(role === "operation" || role === "principal") && (!agreementRecorded || !agreementCovers) && (
+              <div data-testid="amendment-agreement-form">
+                <AgreementForm
+                  idPrefix="amendment-agreement"
+                  busy={agreementMut.isPending}
+                  onRecord={(a) => agreementMut.mutate({ amendmentId: amendment.id, ...a })}
+                />
+              </div>
+            )}
+          </div>
+
           {role === "principal" && !amendment.stale && (
             <div className="mt-3 border-t border-kit-slate-5 pt-3">
               <Textarea
@@ -186,10 +251,16 @@ export default function SalesOrderAmendment({
                 >
                   Reject
                 </Button>
+                {/* ⭐ APPROVE WAITS ON THE CUSTOMER, NOT ON THE APPROVER'S
+                    CONFIDENCE (0562). `Reject` beside it is deliberately NOT
+                    gated: refusing a change needs no customer agreement. The
+                    database refuses this press too — this only stops the
+                    principal walking into a refusal they cannot fix from here. */}
                 <Button
                   variant="primary"
-                  disabled={!decisionReason.trim()}
+                  disabled={!decisionReason.trim() || !agreementRecorded || !agreementCovers}
                   loading={decideMut.isPending}
+                  data-testid="amendment-approve"
                   onClick={() => decideMut.mutate({ amendmentId: amendment.id, decision: "approve", note: decisionReason.trim() })}
                 >
                   Approve and apply
@@ -199,15 +270,31 @@ export default function SalesOrderAmendment({
           )}
         </div>
       ) : (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-meta text-base-500">
-            Items, price and the promised date are what the customer agreed to — they change by
-            proposal, not by editing.
-          </p>
-          <Button size="sm" variant="neutral" onClick={() => startProposal()} data-testid="amendment-open-form">
-            Propose a change to the customer
-          </Button>
-        </div>
+        /* ⭐ THE IDLE STRIP IS GONE FROM THE CARD — YH, 2026-08-26.
+           It was a standing sentence ("Items, price and the promised date are
+           what the customer agreed to…") beside a button, on every order,
+           forever. The sentence explained why some fields opened and others did
+           not, back when those three sat beside editable boxes; they are
+           read-only facts now, so it explained a distinction the screen no
+           longer draws.
+
+           The DOOR did not go with it — it MOVED, to `More actions`, which is
+           the precedent this page already set: `Report a problem` made exactly
+           this journey on 2026-08-15 and its permanent card was deleted in the
+           same breath. Proposing an amendment is rarer than reading an order,
+           and rare acts do not hold permanent space.
+
+           That matters because this modal is the ONLY way to change ITEMS,
+           UNIT PRICE and INSTALMENT MONTHS anywhere on the Sales Order —
+           `Change delivery date` submits a date and nothing else. Deleting the
+           button outright would have retired three capabilities silently. */
+        inlineTrigger ? (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button size="sm" variant="neutral" onClick={() => startProposal()} data-testid="amendment-open-form">
+              Propose a change to the customer
+            </Button>
+          </div>
+        ) : null
       )}
 
       <Modal
@@ -272,18 +359,38 @@ export default function SalesOrderAmendment({
           <div className="grid grid-cols-2 gap-3">
             <DatePicker
               id="amd-delivery-date"
-              label="Promised delivery"
+              label="Requested Delivery Date"
               disabled={deliveryDateTbd}
               value={deliveryDate}
               onChange={setDeliveryDate}
             />
-            <Input
+            {/* ⭐ A TERM THAT CANNOT BE OFFERED CANNOT BE TYPED (YH,
+                2026-09-01).
+                This was a free number box, and it is why the failure existed:
+                a proposal of 9 months saved, travelled through every layer, and
+                died on `0007`'s CHECK at the PRINCIPAL's Approve press — raw
+                constraint text on the screen of the person who had just decided
+                the change was fine.
+                The owner's ruling: if the POS sells 6 and 12, keep 6 and 12,
+                and widen only if she can still hit that error. She cannot. A
+                picker of the same two plans makes the failure structurally
+                impossible rather than merely refused earlier — nobody can
+                propose a term nobody can enter. A migration widening the
+                database was written for this and withdrawn unapplied, because
+                it fixed a value that can no longer be typed.
+                The options come from `INSTALMENT_MONTHS`, the one list every
+                door is built from. `No instalment` is the null: an amendment
+                can also take the plan OFF, which a number box could only
+                express as a blank. */}
+            <Select
               id="amd-installment-months"
               label="Instalment months"
-              type="number"
-              min={0}
-              value={installmentMonths == null ? "" : String(installmentMonths)}
-              onChange={(e) => setInstallmentMonths(e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0))}
+              value={installmentMonths == null ? "none" : String(installmentMonths)}
+              onValueChange={(v) => setInstallmentMonths(v === "none" ? null : Number(v))}
+              options={[
+                { value: "none", label: "No instalment" },
+                ...INSTALMENT_MONTHS.map((m) => ({ value: String(m), label: `${m} months` })),
+              ]}
             />
           </div>
           <label className="flex items-center gap-2 text-body text-base-700">

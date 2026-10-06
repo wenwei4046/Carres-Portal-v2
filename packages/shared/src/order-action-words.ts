@@ -11,8 +11,15 @@
  *           only possible where a single order is on screen.
  *
  * The law states that split explicitly for the delivery step: queue
- * `Confirm delivery date`, row line `Call {logistics} — confirm delivery date`.
- * Every action follows the same shape, so a new hire reads one grammar.
+ * `Confirm delivery date`, row line `Call {logistics}` over `Confirm the
+ * delivery date`. Every action follows the same shape, so a new hire reads one
+ * grammar.
+ *
+ * ⭐ A DELIVERY WORK SENTENCE IS TWO STRUCTURED LINES (owner ruling
+ * 2026-09-13, Delivery MASTER §10): line one is the ACT with its recipient,
+ * line two is the REQUIRED RESULT, and no `—` joins them. `orderActionLines`
+ * returns both; `orderActionLine` is line one, for the surfaces that print a
+ * single sentence.
  *
  * `Chase` is banned — it names a mood, not an outcome. So is any word that
  * hides a to-do inside a fact (`need booking`, `Unscheduled`, `Pending`).
@@ -47,15 +54,39 @@ export type OrderActionKey =
   | "issue_delivery_order"
   | "deliver_today"
   | "upload_delivery_photo"
+  // Delivery MASTER §6.1 (Card 13, 2026-09-13): Operation reviews the proof
+  // the driver sent — Proof Accepted · More Proof Required · Proof Rejected.
+  | "check_delivery_proof"
   | "delivering"
   | "collect"
+  // §0.1 Action Owner Engine row 1 (owner ruling 2026-08-20, composed
+  // 2026-08-27) — the missing customer promise is the salesperson's work.
+  // Raised by the Work feed's composition only, never by the ladder, so no
+  // register row or drawer headline changes (owner ruling 2026-08-18: the
+  // register states the amber fact alone; the ACTION lives in Work).
+  | "ask_delivery_date"
+  // The blueprint card's two NEW acts (owner-approved 2026-08-16, §7):
+  // the loan comes back on the delivery day, and Finance resolves the one
+  // thing money can do to a delivery.
+  | "collect_loan_item"
+  | "resolve_payment_exception"
   | "done";
 
 /** The real names this order knows. Absent / blank → the role word. */
 export interface OrderActionParties {
   supplier?: string | null;
+  /** `Confirm tomorrow's supplier delivery` — the PO the Supplier DO is for,
+   *  and the supplier's recorded channel (Purchasing §5.7, owner 2026-09-25). */
+  poNo?: string | null;
+  channel?: "whatsapp" | "email" | "phone" | "in_person" | null;
   logistics?: string | null;
   customer?: string | null;
+  /** `Confirm delivery date` — the DAY is agreed and only the WINDOW is
+   *  missing (owner ruling 2026-09-12), so line two asks for the time. */
+  dayAgreed?: boolean | null;
+  /** `Collect the loan item` — the exact Unit on loan, when the record names
+   *  one (Delivery MASTER §14.2). */
+  loanUnit?: string | null;
   /**
    * `Collect RM {amount}` — the amount owed, as a NUMBER.
    *
@@ -107,6 +138,9 @@ interface OrderActionWord {
    * therefore means "not mirrored yet", never "this action records nothing".
    */
   done: string | null;
+  /** Line two of a two-line Delivery Work sentence — the REQUIRED RESULT.
+   *  null for an action that is spoken on one line. */
+  result?: (p: OrderActionParties) => string;
 }
 
 /** Trim to a real name, else the role word — never an empty slot. */
@@ -147,7 +181,7 @@ const WORDS: readonly OrderActionWord[] = [
   {
     key: "confirm_ready_date",
     queue: "Confirm ready date",
-    line: (p) => `Call ${party(p.supplier, "supplier")} — confirm ready date`,
+    line: (p) => `Call ${party(p.supplier, "supplier")} to confirm ready date`,
     button: "Record ready date",
     done: null,
   },
@@ -194,8 +228,8 @@ const WORDS: readonly OrderActionWord[] = [
     // CONVERSATION is logistics'; the ACTION in this portal is ours.
     key: "arrange_new_delivery_date",
     queue: "Arrange new delivery date",
-    line: (p) =>
-      `Call ${party(p.logistics, "logistics")} — arrange new delivery date`,
+    line: (p) => `Call ${party(p.logistics, "logistics")}`,
+    result: () => "Arrange a new delivery date",
     button: "Record new date",
     done: null,
   },
@@ -205,15 +239,19 @@ const WORDS: readonly OrderActionWord[] = [
     key: "assign_logistics",
     queue: "Assign logistics",
     line: () => "Assign logistics",
+    result: () => "Choose the company that carries this delivery",
     button: "Assign logistics",
     done: null,
   },
   {
+    // ⭐ THE SCHEDULED DATE IS THE RESULT (owner ruling 2026-09-24, overwriting
+    // the 2026-09-12 day-then-window split): the time is optional, so a row
+    // never asks for a time on its own.
     key: "confirm_delivery_date",
     queue: "Confirm delivery date",
-    line: (p) =>
-      `Call ${party(p.logistics, "logistics")} — confirm delivery date`,
-    button: "Confirm booking",
+    line: (p) => `Call ${party(p.logistics, "logistics")}`,
+    result: () => "Get the scheduled delivery date",
+    button: "Save scheduled delivery",
     done: null,
   },
   {
@@ -234,17 +272,35 @@ const WORDS: readonly OrderActionWord[] = [
     done: "Delivery order issued",
   },
   {
+    // The line names the actual weekday and date (the Delivery dictionary
+    // bans `Today`); the caller spells the day through the one date home and
+    // hands it in as `deliveryDate`. Without one the queue word stands.
     key: "deliver_today",
     queue: "Deliver today",
-    line: () => "Deliver today",
-    button: "Mark delivered",
+    line: (p) => {
+      const date = (p.deliveryDate ?? "").trim();
+      return date ? `Deliver on ${date}` : "Deliver today";
+    },
+    result: () => "Record the delivery result",
+    button: "Record Delivery Result",
     done: null,
   },
   {
     key: "upload_delivery_photo",
     queue: "Upload delivery photo",
-    line: () => "Upload delivery photo",
+    line: () => "Upload the delivery photo",
+    result: (p) => `Attach the photo from ${party(p.logistics, "logistics")}`,
     button: "Upload delivery photo",
+    done: null,
+  },
+  {
+    // §6.1 — a file on record is not proof accepted. The reviewer says which
+    // of the three governed words it is, and why (Card 13).
+    key: "check_delivery_proof",
+    queue: "Check delivery proof",
+    line: () => "Check the delivery proof",
+    result: () => "Accept it, ask for more, or reject it",
+    button: "Check delivery proof",
     done: null,
   },
   {
@@ -274,6 +330,20 @@ const WORDS: readonly OrderActionWord[] = [
     done: null,
   },
   {
+    // §0.1 Action Owner Engine row 1 — the missing customer promise, the
+    // salesperson's work. `Ask` is a governed verb (COPY-STANDARD § action
+    // naming); the line names the customer the way every other line names
+    // its party, and stays clear of the retired `agree` vocabulary (C8).
+    // The register hover's fuller guidance sentence is unchanged. No button:
+    // no Work surface renders a closing control for it — the governed date
+    // door (ConfirmDateModal) closes the fact.
+    key: "ask_delivery_date",
+    queue: "Ask for the delivery date",
+    line: (p) => `Ask ${party(p.customer, "customer")} for the delivery date`,
+    button: null,
+    done: null,
+  },
+  {
     key: "collect",
     queue: "Collect",
     line: (p) => {
@@ -282,6 +352,32 @@ const WORDS: readonly OrderActionWord[] = [
       return money ? `${money} from ${who}` : `Collect from ${who}`;
     },
     button: "Record payment",
+    done: null,
+  },
+  {
+    // Blueprint card §7 (2026-08-16) — the loan sofa/mattress comes back on
+    // the delivery day. COPY-STANDARD already registered the generic form
+    // (`Collect the loan item`, 2026-08-16): a loan is not always a sofa.
+    key: "collect_loan_item",
+    queue: "Collect the loan item",
+    line: () => "Collect the loan item",
+    result: (p) => `Bring back ${party(p.loanUnit, "the loan item")} on the delivery day`,
+    button: "Record loan collected",
+    // null = "not mirrored yet", never "records nothing" (C10's dead-code
+    // rule): a DONE string joins when a surface actually renders it.
+    done: null,
+  },
+  {
+    // Blueprint card §7 (2026-08-16) — an OPEN Finance exception is the ONE
+    // money blocker (decision A), and only Finance clears it. The reason
+    // rides the fact line of whichever surface prints this; the words here
+    // never restate a balance, because the exception is a decision, not a
+    // derived state.
+    key: "resolve_payment_exception",
+    queue: "Resolve the payment exception",
+    line: () => "Resolve the payment exception",
+    result: () => "Finance clears it with evidence",
+    button: "Open Finance exceptions",
     done: null,
   },
   {
@@ -331,6 +427,30 @@ export function orderActionLine(
   return wordFor(key).line(parties);
 }
 
+/** The two structured lines of a Delivery Work sentence (owner ruling
+ *  2026-09-13): the ACT with its recipient, and the REQUIRED RESULT. */
+export interface OrderActionLines {
+  act: string;
+  /** null for an action spoken on one line (the non-Delivery keys). */
+  result: string | null;
+}
+
+/**
+ * Both lines — `Call NETS` over `Confirm the delivery date`. Surfaces that
+ * print a single sentence keep `orderActionLine` (line one); no surface joins
+ * the two with `—`.
+ */
+export function orderActionLines(
+  key: OrderActionKey,
+  parties: OrderActionParties = {},
+): OrderActionLines {
+  const word = wordFor(key);
+  return {
+    act: orderActionLine(key, parties),
+    result: word.result ? word.result(parties) : null,
+  };
+}
+
 /**
  * The money PILL — the amount without the customer, for the narrow second pill
  * in the Actions column (`Collect RM 2,455.00`). The row line names the
@@ -376,7 +496,7 @@ export function orderActionDone(key: OrderActionKey): string | null {
  * to-do word — so it names the outstanding thing instead of the gap.
  */
 export function deliveryDateGapFact(logistics?: string | null): string {
-  return `${party(logistics, "Logistics")} — confirm delivery date`;
+  return `${party(logistics, "Logistics")}: confirm delivery date`;
 }
 
 /** Queue word → its action, for surfaces that only carry the label (the queue
@@ -454,10 +574,17 @@ const PURCHASING_ONLY: Record<
     // P3 · §3's "the action the portal is missing today". The day before the
     // goods are due, somebody asks the factory whether the van goes tomorrow —
     // and that is when they say it will be late.
+    // Owner wording 2026-09-25 (Purchasing §5.7): the card says which app to
+    // click and what to ask for — the Supplier DO for THIS PO — by the
+    // supplier's recorded channel. No channel on file: just ask.
     queue: "Confirm tomorrow's delivery",
-    line: (p) =>
-      `Call ${party(p.supplier, "supplier")} — confirm tomorrow's delivery`,
-    button: "Record answer",
+    line: (p) => {
+      const ask = `ask ${party(p.supplier, "the supplier")} for the Supplier DO for ${party(p.poNo, "the PO")}`;
+      return p.channel === "whatsapp" ? `Click WhatsApp, ${ask}`
+        : p.channel === "email" ? `Click Email, ${ask}`
+        : ask.charAt(0).toUpperCase() + ask.slice(1);
+    },
+    button: "Record supplier answer",
     done: "Answer recorded",
     empty: "Nothing arriving tomorrow.",
   },
@@ -473,7 +600,7 @@ const PURCHASING_ONLY: Record<
     // Counted per PO LINE — the only one of the six that is.
     queue: "Confirm balance delivery date",
     line: (p) =>
-      `Call ${party(p.supplier, "supplier")} — confirm balance delivery date`,
+      `Call ${party(p.supplier, "supplier")} to confirm balance delivery date`,
     button: "Record balance date",
     done: "Balance date recorded",
     empty: "Nothing short today.",
@@ -481,7 +608,7 @@ const PURCHASING_ONLY: Record<
   confirm_what_happens_next: {
     queue: "Confirm what happens next",
     line: (p) =>
-      `Call ${party(p.supplier, "supplier")} — confirm what happens next`,
+      `Call ${party(p.supplier, "supplier")} to confirm what happens next`,
     button: "Record what happens next",
     done: null,
     empty: "No claim is waiting for a supplier answer.",
@@ -555,6 +682,19 @@ export function checkedInDone(received: number, ordered: number): string {
  * `Shipping tomorrow`, answered two days late, is a sentence about a day that
  * has already gone.
  *
+ * ⭐ THE VERB NAMES ARRIVAL, NOT SHIPPING (owner ruling 2026-09-10). The date
+ * these answers carry is `purchase_orders.eta_date` — OUR predicted ARRIVAL,
+ * `expectedArrivalOf`'s production-days result (the supplier transit leg was
+ * removed by owner ruling 2026-09-29) — and the call that asks the question
+ * is anchored on that same field. The retired spelling (`It ships on {date}`)
+ * put a shipping verb on an arrival date. A supplier answer that genuinely names a FACTORY-ready
+ * or dispatch day is a different fact with its own door (`Confirm ready
+ * date` → `expected_ready_date`), and it becomes an arrival only by going
+ * through `arrivalFromReadyDate`.
+ *
+ * `answer` keeps its stored spelling (`shipping`) because it is the ledger's
+ * value, not a word on a screen; only the sentence changed.
+ *
  * `date` is the caller's already-formatted string (`Wed, 5 Aug 26`): this
  * module owns WORDS and never dates.
  */
@@ -563,8 +703,8 @@ export function tomorrowDeliveryAnswerLabel(
   date: string,
 ): string {
   return answer === "shipping"
-    ? `It ships on ${date}`
-    : `It ships later than ${date}`;
+    ? `It arrives on ${date}`
+    : `It arrives later than ${date}`;
 }
 
 /** Every purchasing queue word, in §4's display order — for a banned-word

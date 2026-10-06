@@ -62,3 +62,11 @@ export function myHolidaySet(
 ): Set<IsoDate> {
   return new Set(holidays.map((h) => h.date));
 }
+
+/** The holiday's name for `iso`, or null — the same calendar `myHolidaySet` reads. */
+export function myHolidayName(
+  iso: IsoDate,
+  holidays: readonly Holiday[] = [...MY_HOLIDAYS_2026, ...MY_HOLIDAYS_2027_EARLY],
+): string | null {
+  return holidays.find((h) => h.date === iso.slice(0, 10))?.name ?? null;
+}

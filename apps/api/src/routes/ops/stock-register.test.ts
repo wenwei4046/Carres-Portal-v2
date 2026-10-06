@@ -1,0 +1,493 @@
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
+import { Hono } from "hono";
+import { authMiddleware, _setJwksForTesting } from "../../middleware/auth";
+import stockRouter from "./stock";
+import type { AppEnv } from "../../types";
+import { migration, statementOf, stockRegisterDatabase, verifyInventorySql } from "../../test/stock-register-database";
+
+/**
+ * GET /api/ops/stock/register — the Stock Register's read surface.
+ * CARD-2026-08-20-stock-register §6.
+ *
+ * What these tests exist to hold:
+ *
+ *  1. It reads `stock_unit_register_v` — the governed view — and NEVER
+ *     `ops_stock_items` (0366 left that table with no write policy and the
+ *     register has no business reading around the view) and never
+ *     `stock_balances` (a non-authoritative cache since 0366 that may not
+ *     answer whether goods can be offered).
+ *  2. It does not RE-DERIVE availability. Whatever the view says arrives on the
+ *     wire unchanged — that is Law D, and it is the whole point of Card 1.
+ *  3. A Unit is addressed by its PERMANENT Carres Unit ID, not a row uuid.
+ *  4. An ended Unit still resolves on the detail route: Card §1 keeps ended
+ *     Units out of the default LIST, not out of history.
+ *  5. The lineage comes back ordered by `seq`, never `event_at` (0372: two
+ *     events in one statement can share a clock reading to the microsecond).
+ */
+
+vi.mock("../../lib/supabase", () => ({ userClient: vi.fn(), adminClient: vi.fn() }));
+import { userClient } from "../../lib/supabase";
+
+const SUPABASE_URL = "https://test.supabase.co";
+const env = {
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY: "test-anon",
+  SUPABASE_SERVICE_ROLE_KEY: "test-service",
+  SUPABASE_JWT_SECRET: "unused",
+};
+
+function buildApp() {
+  const app = new Hono<AppEnv>();
+  app.onError((err, c) => {
+    const status = (err as { status?: number }).status ?? 500;
+    const message = err instanceof Error ? err.message : "Internal server error";
+    return c.json({ error: "server_error", message }, status as 400 | 401 | 403 | 404 | 500);
+  });
+  const api = new Hono<AppEnv>();
+  api.use("*", authMiddleware);
+  api.route("/ops/stock", stockRouter);
+  app.route("/api", api);
+  return app;
+}
+const app = buildApp();
+
+async function makeJwt(role: string, email = "inventory-test@example.test") {
+  return signTestJwt("11111111-1111-1111-1111-000000000999", { email, app_metadata: { role } });
+}
+
+beforeEach(() => {
+  useTestJwks();
+  vi.mocked(userClient).mockReset();
+});
+
+afterAll(() => _setJwksForTesting(null));
+
+/** Mapping fixture only. The SQL-backed contract regression below verifies
+ *  which columns the committed view actually supplies. */
+function viewRow(over: Record<string, unknown> = {}) {
+  return {
+    id: "u-1",
+    unit_code: "id-aaa111111",
+    sku: "BF03-Jager-K",
+    category: "bedframe",
+    warehouse_id: "wh-klang",
+    site_name: "Carres Klang Warehouse",
+    holder_party_id: null,
+    holder_name: null,
+    ownership: "carres_owned",
+    supplier: "Ohana",
+    po_no: "PO/2508-116",
+    status: "free",
+    condition: "new",
+    needs_repair: false,
+    hold_reason: null,
+    reserved_ref: null,
+    sold_order_id: null,
+    qty: 1,
+    date_in: "2026-08-01",
+    last_verified_at: null,
+    availability: "available",
+    lifecycle_outcome: "active",
+    last_event_at: null,
+    last_event: null,
+    ...over,
+  };
+}
+
+interface SbOpts {
+  rows?: unknown[];
+  single?: unknown | null;
+  events?: unknown[];
+  sourceError?: { code: string; message: string };
+}
+
+/** The tables the register reads for Goods Received Date · Ship Date ·
+ *  Pickup By · Delivery Location (owner rulings 2026-09-25). */
+const PHYSICAL_FACT_TABLES = [
+  "receiving_unit_results", "warehouse_receipts",
+  "delivery_handover_event_units", "delivery_handover_events", "ops_delivery_orders",
+  "arrival_source_events", "arrival_sources", "stock_operating_parties", "warehouses",
+];
+
+function buildSb(opts: SbOpts = {}) {
+  const tables: string[] = [];
+  const orders: { col: string; asc: boolean }[] = [];
+  const eqs: { col: string; val: unknown }[] = [];
+
+  function chain(rows: unknown[], single?: unknown | null, error: unknown = null) {
+    const c: Record<string, unknown> = {};
+    c.select = () => c;
+    c.in = () => c;
+    c.overlaps = () => c;
+    c.eq = (col: string, val: unknown) => {
+      eqs.push({ col, val });
+      return c;
+    };
+    // 0453 — the Unit lookup is case/punctuation tolerant on INPUT, so it
+    // matches with ilike. Recorded the same way, so the assertions still see
+    // exactly which column was interrogated with what.
+    c.ilike = (col: string, val: unknown) => {
+      eqs.push({ col, val });
+      return c;
+    };
+    c.order = (col: string, o?: { ascending?: boolean }) => {
+      orders.push({ col, asc: o?.ascending !== false });
+      return c;
+    };
+    c.limit = () => c;
+    c.maybeSingle = () => Promise.resolve({ data: single ?? null, error: null });
+    c.then = (res: (v: unknown) => unknown) => res({ data: rows, error });
+    return c;
+  }
+
+  const sb = {
+    from(table: string) {
+      tables.push(table);
+      if (table === "stock_unit_events") return chain(opts.events ?? []);
+      if (["product_skus", "purchase_orders", "orders"].includes(table)) return chain([], null, opts.sourceError);
+      if (PHYSICAL_FACT_TABLES.includes(table)) return chain([]);
+      return chain(opts.rows ?? [], opts.single);
+    },
+  };
+  return { sb, tables, orders, eqs };
+}
+
+describe("GET /register — the one current listing", () => {
+  it("narrows the owning register to the requested showroom before enrichment", async () => {
+    const { sb, eqs, tables } = buildSb({ rows: [viewRow({ site_name: "PJ Showroom" })] });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.request("/api/ops/stock/register?site=PJ%20Showroom", {
+      headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+    }, env);
+    expect(res.status).toBe(200);
+    expect(eqs).toContainEqual({ col: "site_name", val: "PJ Showroom" });
+    expect(tables[0]).toBe("stock_unit_register_v");
+  });
+
+  it("a site query never grants a Dealer access to the internal stock register", async () => {
+    const res = await app.request("/api/ops/stock/register?site=PJ%20Showroom", {
+      headers: { Authorization: `Bearer ${await makeJwt("dealer")}` },
+    }, env);
+    expect(res.status).toBe(403);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+
+  it("does not report missing source facts when their lookup failed", async () => {
+    const { sb } = buildSb({ rows: [viewRow()], sourceError: { code: "42703", message: "Source contract unavailable" } });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.request("/api/ops/stock/register", {
+      headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+    }, env);
+    expect(res.status).toBe(500);
+    expect(await res.json()).not.toHaveProperty("units");
+  });
+  it("executes both real route projections against the committed SQL and catches the missing migration", async () => {
+    const db = await stockRegisterDatabase();
+    const tables: string[] = [];
+    const sb = {
+      from(table: string) {
+        tables.push(table);
+        let projection = "*";
+        // Every filter the route applies becomes a real predicate against
+        // PGlite, so a column the committed SQL does not have fails here.
+        const where: { sql: (n: number) => string; value: unknown }[] = [];
+        let order = "";
+        const execute = async (single = false) => {
+          try {
+            const columns = table === "product_skus"
+              ? "sku, variant, (select json_build_object('name',name) from product_models where id=product_skus.model_id) as product_models"
+              : projection;
+            if (table === "product_skus") expect(projection).toBe("sku, variant, product_models(name)");
+            const clause = where.length ? ` where ${where.map((w, i) => w.sql(i + 1)).join(" and ")}` : "";
+            const result = await db.query(`select ${columns} from public.${table}${clause}${order}`, where.map((w) => w.value));
+            return { data: single ? result.rows[0] ?? null : result.rows, error: null };
+          } catch (error) {
+            return { data: null, error };
+          }
+        };
+        const chain = {
+          select(columns: string) { projection = columns; return chain; },
+          in(column: string, list: unknown[]) {
+            expect(["sku", "id", "stock_item_id", "outcome", "item_id"]).toContain(column);
+            where.push({ sql: (n) => `${column} = any($${n})`, value: list });
+            return chain;
+          },
+          overlaps(column: string, list: unknown[]) { where.push({ sql: (n) => `${column} && $${n}`, value: list }); return chain; },
+          eq(column: string, value: unknown) { where.push({ sql: (n) => `${column} = $${n}`, value }); return chain; },
+          // 0453 — the Unit lookup matches case-insensitively, so the contract
+          // test must execute the real `ilike` against real PostgreSQL.
+          ilike(column: string, value: unknown) { where.push({ sql: (n) => `${column} ilike $${n}`, value }); return chain; },
+          order(column: string, options?: { ascending?: boolean }) { order = ` order by ${column} ${options?.ascending === false ? "desc" : "asc"}`; return chain; },
+          limit() { return chain; },
+          maybeSingle() { return execute(true); },
+          then(resolve: (value: unknown) => unknown) { return execute().then(resolve); },
+        };
+        return chain;
+      },
+    };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const headers = { Authorization: `Bearer ${await makeJwt("operation")}` };
+    try {
+      // Negative control is the actual production shape (0373), not a
+      // fabricated Supabase error: PostgreSQL must reject the route's SELECT.
+      for (const path of ["/api/ops/stock/register", "/api/ops/stock/register/id-contract1"]) {
+        const broken = await app.request(path, { headers }, env);
+        expect(broken.status).toBe(500);
+        expect(await broken.json()).toMatchObject({ message: expect.stringContaining('site_name') });
+      }
+      await db.exec(migration("0417_the_register_names_the_site_and_the_holder"));
+      // 0453 · the register must expose identity_scope, or no surface can tell
+      // an identity from a counted row's technical key. Real committed SQL.
+      const correction = migration("0453_a_quantity_row_is_keyed_not_identified");
+      await db.exec(statementOf(correction, "create or replace view public.stock_unit_availability_v", "FROM ops_stock_items i;"));
+      await db.exec(statementOf(correction, "create or replace view public.stock_unit_register_v", "LIMIT 1) e ON true;"));
+      // 0589 · the clearance fact joins the arithmetic; the availability view
+      // calls the five-argument form in its LIVE shape (0471's two reservation
+      // columns) — 0588 recreated the 0453 shape and production refused it.
+      const clearance = migration("0589_a_unit_problem_is_reported_through_the_issue_door");
+      await db.exec(statementOf(clearance, "alter table public.ops_stock_items", "sale_cleared_at timestamptz;"));
+      await db.exec(statementOf(clearance, "create or replace function public.unit_availability(\n  p_status       text,\n  p_needs_repair boolean,\n  p_hold_reason  text,\n  p_condition    text,\n  p_sale_cleared boolean", "$$;"));
+      await db.exec(statementOf(clearance, "-- The four-argument form", "$$;"));
+      await db.exec(statementOf(clearance, "create or replace view public.stock_unit_availability_v", "FROM ops_stock_items i;"));
+      await db.exec(verifyInventorySql);
+      const response = await app.request("/api/ops/stock/register", { headers }, env);
+      expect(response.status).toBe(200);
+      const body = await response.json() as { total: number; units: Record<string, unknown>[] };
+      expect(body.total).toBe(2);
+      expect(body.units[0]).toMatchObject({ siteName: "Fixture site", holderName: "Fixture holder", availability: "not_available", lastEvent: "latest" });
+      expect(body.units[0]).toMatchObject({ productName: "Fixture sofa · Three seater", expectedArrival: expect.stringContaining("2026-09-09"), purchasePurpose: "service_case" });
+      expect(String(body.units[0].poDate)).toContain("2026-08-01");
+      expect(String(body.units[0].soDate)).toContain("2026-08-02");
+      expect(body.units[1]).toMatchObject({ siteName: null, holderName: null, lifecycleOutcome: "delivered" });
+      // Owner rulings 2026-09-25: a Unit booked in before Receiving existed keeps
+      // its recorded date in; nothing has left, so the road facts stay absent.
+      expect(String(body.units[0].goodsReceivedDate)).toContain("2026-07-30");
+      expect(body.units[0]).toMatchObject({ shipDate: null, pickupBy: null, deliveryLocation: null });
+      // unit-2: the POSTED receipt (not the draft) is Goods Received Date; the
+      // Warehouse `handed_over` event (not `ready_for_handover`, not the
+      // Logistics side) is Ship Date, with the DO's company and the order's address.
+      expect(String(body.units[1].goodsReceivedDate)).toContain("2026-08-20");
+      expect(String(body.units[1].shipDate)).toContain("2026-08-25");
+      expect(body.units[1]).toMatchObject({ pickupBy: "NETS", deliveryLocation: "12 Jalan Fixture, Klang" });
+      const detail = await app.request("/api/ops/stock/register/id-contract2", { headers }, env);
+      expect(detail.status).toBe(200);
+      expect(await detail.json()).toMatchObject({ unit: { unitCode: "id-contract2", lifecycleOutcome: "delivered" } });
+      // The view, the lineage, the three source tables and the physical-fact
+      // tables — a batched read with no ids is never sent, so the allowed set
+      // bounds the reads; the governed core is always present.
+      const allowed = new Set(["stock_unit_register_v", "stock_unit_events", "product_skus", "purchase_orders", "orders", ...PHYSICAL_FACT_TABLES]);
+      for (const table of new Set(tables)) expect(allowed).toContain(table);
+      for (const core of ["stock_unit_register_v", "stock_unit_events", "product_skus", "purchase_orders", "orders", "receiving_unit_results", "warehouse_receipts", "delivery_handover_events"]) expect(tables).toContain(core);
+      const grants = await db.query("select grantee, privilege_type from information_schema.role_table_grants where table_name='stock_unit_register_v' and grantee in ('authenticated','anon')");
+      expect(grants.rows).toEqual([{ grantee: "authenticated", privilege_type: "SELECT" }]);
+    } finally {
+      await db.close();
+    }
+  }, 30_000);
+
+  it("reads the governed view, and nothing else", async () => {
+    const { sb, tables } = buildSb({ rows: [viewRow()] });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    const res = await app.request(
+      "/api/ops/stock/register",
+      { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } },
+      env,
+    );
+    expect(res.status).toBe(200);
+
+    expect(tables).toContain("stock_unit_register_v");
+    // The two tables a Register must never reach around the view to read.
+    expect(tables).not.toContain("ops_stock_items");
+    expect(tables).not.toContain("stock_balances");
+  });
+
+  it("passes availability and lifecycle through WITHOUT re-deriving them (Law D)", async () => {
+    // A deliberately contradictory row: the status says free, the view says
+    // not_available. The route must repeat the VIEW, because the view is the
+    // one arithmetic and the route has no opinion.
+    const { sb } = buildSb({
+      rows: [viewRow({ status: "free", needs_repair: false, availability: "not_available" })],
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    const res = await app.request(
+      "/api/ops/stock/register",
+      { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } },
+      env,
+    );
+    const body = (await res.json()) as { units: { availability: string }[] };
+    expect(body.units[0].availability).toBe("not_available");
+  });
+
+  it("camel-cases the row and keeps an absent fact absent", async () => {
+    const { sb } = buildSb({ rows: [viewRow({ holder_name: null, last_event_at: null })] });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    const res = await app.request(
+      "/api/ops/stock/register",
+      { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } },
+      env,
+    );
+    const body = (await res.json()) as { units: Record<string, unknown>[]; total: number };
+    expect(body.total).toBe(1);
+    expect(body.units[0].unitCode).toBe("id-aaa111111");
+    expect(body.units[0].siteName).toBe("Carres Klang Warehouse");
+    // Not recorded stays null — never a plausible-looking default.
+    expect(body.units[0].holderName).toBeNull();
+    expect(body.units[0].lastEventAt).toBeNull();
+  });
+
+  it("refuses a caller who is not operations", async () => {
+    const { sb } = buildSb({ rows: [viewRow()] });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.request(
+      "/api/ops/stock/register",
+      { headers: { Authorization: `Bearer ${await makeJwt("dealer")}` } },
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("GET /register/:unitCode — one exact Unit", () => {
+  it("looks the Unit up by its PERMANENT id, not a row uuid", async () => {
+    const { sb, eqs } = buildSb({ single: viewRow() });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    const res = await app.request(
+      "/api/ops/stock/register/id-aaa111111",
+      { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } },
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(eqs.some((e) => e.col === "unit_code" && e.val === "id-aaa111111")).toBe(true);
+    expect(eqs.some((e) => e.col === "id")).toBe(false);
+  });
+
+  it("still resolves a Unit whose life has ENDED — history is not deleted", async () => {
+    const { sb } = buildSb({
+      single: viewRow({ availability: "ended", status: "sold", lifecycle_outcome: "delivered" }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    const res = await app.request(
+      "/api/ops/stock/register/id-aaa111111",
+      { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } },
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { unit: { lifecycleOutcome: string } };
+    expect(body.unit.lifecycleOutcome).toBe("delivered");
+  });
+
+  it("orders the lineage by seq, never by event_at (0372)", async () => {
+    const { sb, orders } = buildSb({ single: viewRow(), events: [] });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    await app.request(
+      "/api/ops/stock/register/id-aaa111111",
+      { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } },
+      env,
+    );
+    const seq = orders.find((o) => o.col === "seq");
+    expect(seq, "the lineage must be ordered by seq").toBeTruthy();
+    expect(seq?.asc).toBe(false);
+    expect(orders.some((o) => o.col === "event_at")).toBe(false);
+  });
+
+  it("says plainly that no Unit carries the id", async () => {
+    const { sb } = buildSb({ single: null });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    const res = await app.request(
+      "/api/ops/stock/register/id-nope000000",
+      { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } },
+      env,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  // ── 0453 · the Unit ID correction ────────────────────────────────────────
+
+  it("finds the Unit when the scanner dropped the hyphens", async () => {
+    const { sb, eqs } = buildSb({ single: viewRow({ unit_code: "U1-000-082" }) });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    const res = await app.request(
+      "/api/ops/stock/register/u1000082",
+      { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } },
+      env,
+    );
+    expect(res.status).toBe(200);
+    // it tried what was typed, and then the canonical spelling of it
+    expect(eqs.some((e) => e.col === "unit_code" && e.val === "u1000082")).toBe(true);
+    // and what comes BACK is the stored identity, untouched by the search
+    const body = (await res.json()) as { unit: { unitCode: string } };
+    expect(body.unit.unitCode).toBe("U1-000-082");
+  });
+
+  it("refuses to resolve COUNTED GOODS — a technical key is not a Unit", async () => {
+    const { sb } = buildSb({
+      single: viewRow({ unit_code: "QTY-000000001", identity_scope: "quantity" }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    const res = await app.request(
+      "/api/ops/stock/register/QTY-000000001",
+      { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } },
+      env,
+    );
+    // Nothing was ever printed, so nothing can be scanned.
+    expect(res.status).toBe(404);
+  });
+
+  it("does not let a wildcard in the URL become a match-everything read", async () => {
+    const { sb, eqs } = buildSb({ single: null });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    const res = await app.request(
+      "/api/ops/stock/register/%25",
+      { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } },
+      env,
+    );
+    expect(res.status).toBe(404);
+    // the `%` reached the driver escaped, not as a wildcard
+    const asked = eqs.filter((e) => e.col === "unit_code").map((e) => e.val);
+    expect(asked).toContain("\\%");
+    expect(asked).not.toContain("%");
+  });
+
+  it("reports the scope, so no screen has to guess what the row is", async () => {
+    const { sb } = buildSb({ single: viewRow({ identity_scope: "unit" }) });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    const res = await app.request(
+      "/api/ops/stock/register/id-aaa111111",
+      { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } },
+      env,
+    );
+    const body = (await res.json()) as { unit: { identityScope: string } };
+    expect(body.unit.identityScope).toBe("unit");
+  });
+});
+
+
+describe("physical evidence read boundary", () => {
+  it("refuses a counted row's technical key before reading movement sources", async () => {
+    const { sb, tables } = buildSb({ single: { id: "bulk", identity_scope: "quantity" } });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const response = await app.request("/api/ops/stock/register/technical-key/movements", {
+      headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+    }, env);
+    expect(response.status).toBe(404);
+    expect(tables).toEqual(["stock_unit_register_v"]);
+  });
+  it("does not admit a dealer to Warehouse physical history", async () => {
+    const response = await app.request("/api/ops/stock/register/U1-000-001/movements", {
+      headers: { Authorization: `Bearer ${await makeJwt("dealer")}` },
+    }, env);
+    expect(response.status).toBe(403);
+  });
+});

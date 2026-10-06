@@ -413,7 +413,7 @@ export default function RentalOfferEditor({
         <p className="text-meta text-base-400 mt-2">
           {isSofa
             ? "By compartment: the customer builds the sofa and the parts add up. By combo: a fixed monthly for a set shape."
-            : "Each size is priced on its own — a king rents for more than a single."}
+            : "Each size is priced on its own. A king rents for more than a single."}
         </p>
       </Section>
 
@@ -421,14 +421,14 @@ export default function RentalOfferEditor({
       {rentEnabled && (
         <Section
           step={nextStep()}
-          label="Rent — monthly price"
+          label="Rent: monthly price"
           right={
             <TermChips terms={terms} onChange={setTerms} />
           }
         >
           {targets.length === 0 ? (
             <p className="text-body text-base-500" data-testid="offer-no-targets">
-              Nothing to price yet — this model has no live SKUs
+              Nothing to price yet. This model has no live SKUs
               {isSofa ? " / compartments / combos" : ""}. Author them in SKU Master or Modular first.
             </p>
           ) : (
@@ -458,7 +458,7 @@ export default function RentalOfferEditor({
                     <div className="text-meta text-base-400 truncate">{t.sub}</div>
                   </div>
                   <div className="text-right t-num text-meta text-base-500">
-                    {t.listPrice == null ? "—" : rm(t.listPrice)}
+                    {t.listPrice == null ? "" : rm(t.listPrice)}
                   </div>
                   {terms.map((term) => (
                     <div key={term} className="text-right">
@@ -468,7 +468,7 @@ export default function RentalOfferEditor({
                         min={0}
                         step="0.01"
                         value={rentFee(t.key, term)}
-                        placeholder="—"
+                        placeholder=""
                         onChange={(e) =>
                           setRentDraft((d) => ({
                             ...d,
@@ -506,7 +506,7 @@ export default function RentalOfferEditor({
 
       {/* 3 · buy lane */}
       {buyEnabled && (
-        <Section step={nextStep()} label="Buy — outright price">
+        <Section step={nextStep()} label="Buy: outright price">
           <div className="border border-base-200 rounded-[4px] overflow-x-auto">
             <div
               className="grid items-center gap-3 px-3 py-2 bg-base-100 border-b border-base-200 min-w-[640px]"
@@ -532,7 +532,7 @@ export default function RentalOfferEditor({
                     <div className="text-meta text-base-400 truncate">{t.sub}</div>
                   </div>
                   <div className="text-right t-num text-meta text-base-500">
-                    {t.listPrice == null ? "—" : rm(t.listPrice)}
+                    {t.listPrice == null ? "" : rm(t.listPrice)}
                   </div>
                   <div className="text-right">
                     <input
@@ -571,7 +571,7 @@ export default function RentalOfferEditor({
           </div>
           <p className="text-meta text-base-400 mt-2">
             Blank price = sell at whatever SKU Master says. Cleaning and care are not part of the
-            purchase — they are service plans below.
+            purchase. They are service plans below.
           </p>
         </Section>
       )}
@@ -583,7 +583,7 @@ export default function RentalOfferEditor({
           label="Options the customer may choose"
           right={
             <span className="text-meta text-base-400">
-              Every option can carry its own price — once, or every month
+              Every option can carry its own price, once or every month
             </span>
           }
         >
@@ -714,7 +714,7 @@ export default function RentalOfferEditor({
       >
         {surcharges.length === 0 && (
           <p className="text-body text-base-500 mb-2" data-testid="surcharges-empty">
-            No surcharges — add one for delivery, installation, a care upgrade, anything.
+            No surcharges. Add one for delivery, installation, a care upgrade, anything.
           </p>
         )}
         {surcharges.map((s, i) => (
@@ -805,7 +805,7 @@ export default function RentalOfferEditor({
         </button>
         <p className="text-meta text-base-400 mt-2">
           <b>Always</b> is charged on every agreement; <b>optional</b> is a tick the store can add.
-          A store can never type its own amount — every ringgit collected is authored here.
+          A store can never type its own amount. Every ringgit collected is authored here.
         </p>
       </Section>
 
@@ -819,7 +819,7 @@ export default function RentalOfferEditor({
       >
         {attachablePackages.length === 0 ? (
           <p className="text-body text-base-500" data-testid="offer-services-empty">
-            No service package for this product family yet — create one below and it appears here.
+            No service package for this product family yet. Create one below and it appears here.
           </p>
         ) : (
           <div className="border border-base-200 rounded-[4px] overflow-x-auto">
@@ -854,7 +854,7 @@ export default function RentalOfferEditor({
                   data-testid={`offer-service-${p.id}`}
                 >
                   <div className="text-body truncate">{p.name}</div>
-                  <div className="text-meta text-base-500 truncate">{p.sku ?? "—"}</div>
+                  <div className="text-meta text-base-500 truncate">{p.sku ?? ""}</div>
                   <div className="text-meta text-base-600">
                     {p.visitsPerYear} / yr ·{" "}
                     <b>{serviceVisitsTotal(p.durationMonths, p.visitsPerYear)} total</b>
@@ -891,7 +891,7 @@ export default function RentalOfferEditor({
                       min={0}
                       step="0.01"
                       value={d.monthly}
-                      placeholder="—"
+                      placeholder=""
                       onChange={(e) => set({ monthly: e.target.value })}
                       data-testid={`offer-service-monthly-${p.id}`}
                     />
@@ -903,7 +903,7 @@ export default function RentalOfferEditor({
                       min={0}
                       step="0.01"
                       value={d.outright}
-                      placeholder="—"
+                      placeholder=""
                       onChange={(e) => set({ outright: e.target.value })}
                       data-testid={`offer-service-outright-${p.id}`}
                     />
@@ -924,7 +924,7 @@ export default function RentalOfferEditor({
         )}
         <p className="text-meta text-base-400 mt-2">
           <b>Free with</b> decides which lane gets the plan for nothing and <b>free visits</b> says
-          how many are on us — the rest stay billable. Attach nothing and the product is
+          how many are on us. The rest stay billable. Attach nothing and the product is
           self-service.
         </p>
       </Section>
@@ -961,7 +961,7 @@ export default function RentalOfferEditor({
         </div>
         {!splitValid && (
           <p className="text-meta text-danger mt-2" data-testid="offer-split-error">
-            Supplier + commission cannot exceed 100% — a collected month would pay out more than it
+            Supplier + commission cannot exceed 100%. A collected month would pay out more than it
             collects.
           </p>
         )}
@@ -982,7 +982,7 @@ export default function RentalOfferEditor({
             onChange={(e) => setActive(e.target.checked)}
             data-testid="offer-active"
           />
-          On sale — stores can rent and sell this
+          On sale: stores can rent and sell this
         </label>
       </Section>
     </div>

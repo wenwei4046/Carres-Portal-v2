@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -31,10 +31,7 @@ operationDashboardRouter.get("/", async (c) => {
 
   const sb = userClient(c.env, auth.jwt);
   const { data, error } = await sb.rpc("operation_dashboard_summary");
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
 
   // Pipeline v2 extra counts. PostgREST's `head: true, count: 'exact'` returns
   // the count via response metadata without fetching rows.
@@ -51,14 +48,8 @@ operationDashboardRouter.get("/", async (c) => {
     sb.from("orders").select("id", { count: "exact", head: true })
       .or("operation_stage.eq.confirmed,and(status.eq.place,source_system.eq.autocount)"),
   ]);
-  if (placedRes.error) {
-    const m = mapPgError(placedRes.error);
-    return c.json(m.body, m.status);
-  }
-  if (proceedReqRes.error) {
-    const m = mapPgError(proceedReqRes.error);
-    return c.json(m.body, m.status);
-  }
+  if (placedRes.error) return fail(c, placedRes.error);
+  if (proceedReqRes.error) return fail(c, proceedReqRes.error);
 
   // Merge into the RPC's `pipeline` object. Spread the RPC payload first so
   // any future RPC-side addition wins; placed/confirmed only ever come

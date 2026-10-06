@@ -205,13 +205,13 @@ export default function GuaranteeScopeFields({
                 <option value="">Pick a combo…</option>
                 {combos.map((cb) => (
                   <option key={cb.id} value={cb.id}>
-                    {cb.label ?? "Combo"} · {modelName(cb.modelId) ?? "—"}
+                    {cb.label ?? "Combo"} · {modelName(cb.modelId) ?? ""}
                   </option>
                 ))}
               </select>
               {combos.length === 0 && (
                 <p className="text-meta text-base-500 mt-1">
-                  No combos authored yet — add one under Sofa Combos first.
+                  No combos authored yet. Add one under Sofa Combos first.
                 </p>
               )}
             </label>

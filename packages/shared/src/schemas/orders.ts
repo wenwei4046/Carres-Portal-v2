@@ -1,5 +1,40 @@
 import { z } from "zod";
+import { DELIVERY_FACT_REFUSALS } from "../sales-order-form";
 import { MAX_DELIVERY_FLOOR } from "../constants";
+
+/**
+ * ⭐ THE INSTALMENT TERM, WRITTEN ONCE (YH, 2026-09-01).
+ *
+ * SIX OR TWELVE MONTHS, OR NONE — the terms Carres sells, enforced identically
+ * by every door.
+ *
+ * ⚠️ THIS BRANCH BRIEFLY WIDENED IT TO ANY WHOLE NUMBER, AND THE OWNER
+ * REVERSED THAT. The reasoning is worth keeping, because it is why the shape
+ * below is the right one rather than a compromise.
+ *
+ * THE FAILURE. A proposal of 9 months saved, travelled through every layer,
+ * and died on `0007`'s CHECK at the PRINCIPAL's Approve press — raw constraint
+ * text on the screen of the person who had just decided the change was fine.
+ * The first reading was "the 9 was not the mistake, refusing it was", and the
+ * fix was to widen the database.
+ *
+ * THE OWNER'S ANSWER: if the POS sells 6 and 12, keep 6 and 12 — and widen
+ * only if Jess can still hit that error. She cannot. The error existed because
+ * the amendment form was a free NUMBER BOX while every other door enforced the
+ * pair; a term nobody can type is a term nobody can propose, so the amendment
+ * form is a picker of the same two plans and the failure is structurally
+ * impossible rather than merely refused earlier.
+ *
+ * That is why `0411` was written and then withdrawn unapplied: widening the
+ * database was a fix for a value that can no longer be entered.
+ *
+ * `INSTALMENT_MONTHS` is the list this is built from and the list the pickers
+ * render, so a term cannot be offered on screen that the schema refuses.
+ * `instalment-months.test.ts` pins the two together in both directions.
+ */
+export const installmentMonthsField = z
+  .union([z.literal(6), z.literal(12)])
+  .nullable();
 
 /**
  * Single Order schema with optional rels. Lists return arrays of orders without
@@ -15,11 +50,23 @@ export const orderStatusSchema = z.enum([
 ]);
 export type OrderStatus = z.infer<typeof orderStatusSchema>;
 
+/**
+ * The stage an order IS in — this list must equal the Postgres enum exactly,
+ * because `orderSchema.parse()` runs on live rows and a value it does not know
+ * throws.
+ *
+ * It had drifted both ways. `placed` was listed here but migration 0167 remapped
+ * it to `confirmed` and dropped it from the type, so no row can hold it —
+ * `placed` survives only as a SYNTHETIC FILTER value (`ListOperationOrdersQuery`),
+ * where the route turns it into `status='place'`. And `waiting` — a real value
+ * since 0028, set by the partner-rejection lane (`resume-dispatch.ts`) — was
+ * missing, so parsing any order in that stage threw.
+ */
 export const operationStageSchema = z.enum([
-  "placed",
   "confirmed",
   "in_production",
   "ready_to_dispatch",
+  "waiting",
   "dispatched",
   "delivered",
 ]);
@@ -108,7 +155,7 @@ export const orderSchema = z.object({
   // the historical trio. Widened from the old enum; existing values parse.
   paymentMethod: z.string().max(40).nullable(),
   approvalCode: z.string().nullable(),
-  installmentMonths: z.union([z.literal(6), z.literal(12)]).nullable(),
+  installmentMonths: installmentMonthsField,
   /** 0219 — POS entry extras: payment follow-up answers (e.g.
    *  { payment: { bank: "Maybank" } }) + custom form-field values
    *  ({ fields: {...} }). Optional so pre-0219 responses still parse. */
@@ -217,9 +264,15 @@ export const createOrderInputSchema = z.object({
   }),
   delivery: z.object({
     date: z.string().nullable(),
-    // Phase 11.1 — proceed date pairs with `date` (both-or-neither via
-    // `dateTbd`) and must be <= `date`. Cross-field rules in the superRefine.
+    // Phase 11.1 — proceed date pairs with `date` and must be <= `date`.
+    // Cross-field rules in the superRefine.
     proceedDate: z.string().nullable(),
+    /** ⛔ OWNER RULING 2026-08-15 — a NEW Sales Order may never be dateless.
+     *  The field stays on the wire (existing callers keep their shape) but the
+     *  superRefine refuses `true`: if the date is not confirmed with the
+     *  customer, Operation must not receive the order. Legacy rows that
+     *  already carry `delivery_date_tbd = TRUE` are untouched — this door
+     *  creates orders, it does not rewrite them. */
     dateTbd: z.boolean(),
     floor: z.number().int().min(1).max(MAX_DELIVERY_FLOOR),
     hasLift: z.boolean(),
@@ -245,7 +298,7 @@ export const createOrderInputSchema = z.object({
   approvalCode: z.string().nullable(),
   /** Installment plan months. Only valid when paymentMethod === "installment".
    *  RPC re-checks the cross-field rule and rejects with 22023. */
-  installmentMonths: z.union([z.literal(6), z.literal(12)]).nullable(),
+  installmentMonths: installmentMonthsField,
   /** Attribution dealer for an order an INTERNAL role (principal/operation/
    *  finance/bd) places ON BEHALF OF a dealer it picks. Additive + optional: a
    *  dealer/salesperson/showroom omits it — the API uses their JWT dealer and
@@ -285,20 +338,48 @@ export const createOrderInputSchema = z.object({
     .strict()
     .optional(),
 }).superRefine((data, ctx) => {
-  // Phase 11.1 — Proceed date pairs with Delivery date. When the order is NOT
-  // marked TBD, both dates are required and proceed date must be on/before the
-  // delivery date (you can't start building after you promised delivery). ISO
-  // YYYY-MM-DD strings compare lexicographically, so a plain `>` is correct.
-  if (!data.delivery.dateTbd) {
-    if (!data.delivery.date) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "date"], message: "delivery date is required unless marked TBD" });
-    }
-    if (!data.delivery.proceedDate) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: "proceed date is required unless marked TBD" });
-    }
-    if (data.delivery.date && data.delivery.proceedDate && data.delivery.proceedDate > data.delivery.date) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: "proceed date must be on or before the delivery date" });
-    }
+  /* ⛔ THE REQUIRED SALES FACTS FOR A DELIVERY (owner ruling 2026-09-13, Card 18).
+     The wizard's "Fill in address later" escape is gone; this is the server
+     half, so a stale tab or a curl cannot file an order Delivery cannot plan.
+     Floor and lift are already required by shape; the date by the rule below. */
+  if (data.customer.addressUnknown || !data.customer.address?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["customer", "address"], message: DELIVERY_FACT_REFUSALS.address });
+  }
+  if (!data.customer.addressState?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["customer", "addressState"], message: DELIVERY_FACT_REFUSALS.state });
+  }
+  if (!data.entryData?.fields?.building_type?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["entryData", "fields", "building_type"], message: DELIVERY_FACT_REFUSALS.buildingType });
+  }
+  /* ⛔ OWNER RULING 2026-08-15 — CUSTOMER DELIVERY IS MANDATORY AT ORDER ENTRY.
+     The wizard's "Confirm later" option is gone; this is the server half of the
+     same rule, so a curl or a stale tab cannot file a dateless order either.
+     The date is a PROMISE (`docs/orders/MASTER.md` — THE THREE DELIVERY DATES),
+     and a promise nobody made is not a fact Operation can work from. */
+  if (data.delivery.dateTbd) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["delivery", "dateTbd"],
+      message: "Delivery date is required. Ask the customer for the date before you save the order.",
+    });
+  }
+  // Phase 11.1 — Proceed date pairs with Delivery date: both are required and
+  // proceed date must be on/before the delivery date (you can't start building
+  // after you promised delivery). ISO YYYY-MM-DD strings compare
+  // lexicographically, so a plain `>` is correct.
+  if (!data.delivery.date) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "date"], message: "Delivery date is required. Ask the customer for the date before you save the order." });
+  }
+  if (!data.delivery.proceedDate) {
+    // ONE SPELLING (YH, 2026-08-28). This read "Proceed date is required.
+    // Choose the day production should start." — a second wording for the same
+    // refusal `draft.ts:611` already made in the ruled words, so the POS said
+    // one thing and its own schema said another. COPY-STANDARD:1447 governs it;
+    // the office door (0391) uses the same sentence, so all three agree.
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: "Proceed date: pick the day production should start" });
+  }
+  if (data.delivery.date && data.delivery.proceedDate && data.delivery.proceedDate > data.delivery.date) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: "proceed date must be on or before the delivery date" });
   }
   // 0219 — the per-method approval-code requirement is CONFIG-DRIVEN now
   // (order_entry_config.approvalCodeRequired), so it's enforced in the route
@@ -394,7 +475,7 @@ export const rawCreateOrderInputSchema = z.object({
   // you have it"): a phone/backfill order creates fine with none of these.
   paymentMethod: z.string().trim().min(1).max(40).nullable().optional(),
   approvalCode: z.string().trim().nullable().optional(),
-  installmentMonths: z.union([z.literal(6), z.literal(12)]).nullable().optional(),
+  installmentMonths: installmentMonthsField.optional(),
   signaturePath: z.string().min(1).nullable().optional(),
   paymentSlipPath: z.string().min(1).nullable().optional(),
   termsAccepted: z.boolean().optional(),
@@ -407,6 +488,29 @@ export const rawCreateOrderInputSchema = z.object({
     })
     .strict()
     .optional(),
+}).superRefine((data, ctx) => {
+  /* ⛔ OFFICE DOOR PARITY (owner ruling 2026-09-13, Card 18): the raw door
+     still gates no price, no lead time and no payment — but it is a create
+     door, and a valid new order carries the facts Delivery plans from. ONE
+     spelling with the POS schema and the wizard. */
+  if (data.customer.addressUnknown || !data.customer.address?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["customer", "address"], message: DELIVERY_FACT_REFUSALS.address });
+  }
+  if (!data.customer.addressState?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["customer", "addressState"], message: DELIVERY_FACT_REFUSALS.state });
+  }
+  if (!data.entryData?.fields?.building_type?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["entryData", "fields", "building_type"], message: DELIVERY_FACT_REFUSALS.buildingType });
+  }
+  if (data.deliveryFloor == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["deliveryFloor"], message: DELIVERY_FACT_REFUSALS.floor });
+  }
+  if (data.deliveryHasLift == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["deliveryHasLift"], message: DELIVERY_FACT_REFUSALS.lift });
+  }
+  if (!data.deliveryDate) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["deliveryDate"], message: DELIVERY_FACT_REFUSALS.date });
+  }
 });
 /** z.input — `paid` stays optional for the POSTing client. */
 export type RawCreateOrderInput = z.input<typeof rawCreateOrderInputSchema>;

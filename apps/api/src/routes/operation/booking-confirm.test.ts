@@ -3,15 +3,8 @@
  * The gates live on the SERVER: date+slot both (invariant #1), no Sunday
  * (invariant #8), goods ready + balance ready (frozen §7 Stage 2).
  */
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -24,17 +17,9 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("u1")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("u1", { email: `${role}@x`, app_metadata: { role } });
 }
 
 type Result = { data: unknown; error: unknown };
@@ -65,27 +50,27 @@ function makeSb(tables: Record<string, ReturnType<typeof tableMock>>) {
     }),
     // T8 — the split confirm appends a plain-English activity line through the
     // existing SECURITY DEFINER annotation door (fail-soft, same as T4/T6).
-    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    rpc: vi.fn((fn: string) =>
+      Promise.resolve(
+        /* 0575 · the allocator answers; nothing derives a number any more. */
+        fn === "delivery_document_number_draw"
+          ? { data: DRAWN_DO, error: null }
+          : { data: null, error: null },
+      ),
+    ),
   };
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
 afterAll(() => _setJwksForTesting(null));
 
 const ORDER_ID = "00000000-0000-0000-0000-00000000010a";
+/** What the database's allocator hands back (0575). */
+const DRAWN_DO = "DO2609-4827";
 /** CARD 3 (0346) — the logistics company assigned to the order under test. */
 const PARTNER_ID = "00000000-0000-0000-0000-0000000002be";
 const URL = `http://t/api/operation/orders/${ORDER_ID}/booking/confirm`;
@@ -143,6 +128,8 @@ function happyTables(overrides?: Partial<Record<string, ReturnType<typeof tableM
       { data: confirmedRow, error: null },
     ),
     ops_stock_items: tableMock({ data: [], error: null }),
+    // Gate convergence (2026-09-07): the feeder reads the SO's storage papers.
+    invoices: tableMock({ data: [], error: null }),
     ...overrides,
   };
 }
@@ -211,6 +198,51 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { gateWarnings: string[] };
     expect(body.gateWarnings.join(" ")).toContain("1500.00");
+  });
+
+  it("gate convergence — an unpaid Storage Invoice warns with the COMBINED remainder on a goods-paid SO", async () => {
+    // Goods RM 2,500 fully paid; a live issued Storage Invoice of RM 150 + 8
+    // tax stands ⇒ the SO still owes RM 158 and the confirm door says so.
+    const sb = makeSb(
+      happyTables({
+        invoices: tableMock({
+          data: [
+            { kind: "storage", status: "issued", amount: 150, tax_amount: 8, voided_at: null },
+            // dead and draft papers ask nothing (§2)
+            { kind: "additional_storage", status: "voided", amount: 99, tax_amount: 0, voided_at: "2026-09-01" },
+            { kind: "storage", status: "draft", amount: 999, tax_amount: 0, voided_at: null },
+          ],
+          error: null,
+        }),
+      }),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post(await makeJwt("operation"), OK_BODY);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { gateWarnings: string[] };
+    expect(body.gateWarnings.join(" ")).toContain("158.00");
+  });
+
+  it("gate convergence — payment covering the combined obligation leaves NO stale storage warning", async () => {
+    const sb = makeSb(
+      happyTables({
+        orders: tableMock({
+          data: { id: ORDER_ID, so: 1234, paid: 2658, ops_assigned_logistic: PARTNER_ID },
+          error: null,
+        }),
+        invoices: tableMock({
+          data: [{ kind: "storage", status: "issued", amount: 150, tax_amount: 8, voided_at: null }],
+          error: null,
+        }),
+      }),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post(await makeJwt("operation"), OK_BODY);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { gateWarnings: string[] };
+    expect(body.gateWarnings.filter((w) => /RM/.test(w))).toEqual([]);
   });
 
   it("the reserved-units ledger (SO-ref) satisfies goods ready without line_received", async () => {
@@ -623,6 +655,126 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
     // No scope at all: the order is deliverable in full despite the pillow.
     const res = await post(await makeJwt("operation"), OK_BODY);
     expect(res.status).toBe(200);
+  });
+
+  /* ─── ⭐ SLICE 2 · the SYSTEM issues the DO on the confirm flip ─────────────
+     Owner ruling 2026-08-16, rule 12. The confirm is the last human step of
+     the normal flow, so when the gate is ready the paper mints itself on the
+     tail of this route — and when Finance holds, it deliberately does not. */
+
+  /** A confirmed-state table set the auto-issue can complete against: the
+   *  control READ already shows the confirmed booking (a legal re-confirm),
+   *  goods are received, no Finance exception, and `orders` accepts the
+   *  idempotent do_number update. */
+  function autoIssueTables(financeRows: unknown[], paid = 2500) {
+    const confirmedControl = {
+      line_received: { [MATTRESS]: 1 },
+      balance: null,
+      booking_stage: "confirmed",
+      confirmed_date: OK_BODY.confirmedDate,
+      confirmed_time_slot: OK_BODY.confirmedTimeSlot,
+      booking_groups: null,
+    };
+    const orderRead = {
+      data: {
+        id: ORDER_ID,
+        so: 1234,
+        paid, // default paid in full — the 2026-08-19 money gate holds the mint otherwise
+        do_number: null,
+        ops_assigned_logistic: PARTNER_ID,
+      },
+      error: null,
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const orders: any = {
+      select: vi.fn(() => orders),
+      eq: vi.fn(() => orders),
+      is: vi.fn(() => orders),
+      update: vi.fn(() => orders),
+      maybeSingle: vi.fn(() =>
+        Promise.resolve(
+          orders.update.mock.calls.length > 0
+            ? { data: { id: ORDER_ID, do_number: "DO-STAMPED" }, error: null }
+            : orderRead,
+        ),
+      ),
+      single: vi.fn().mockResolvedValue(orderRead),
+      then: (res: (v: Result) => unknown, rej?: (e: unknown) => unknown) =>
+        Promise.resolve(orderRead).then(res, rej),
+    };
+    return happyTables({
+      orders,
+      ops_order_control: tableMock(
+        { data: confirmedControl, error: null },
+        { data: confirmedControl, error: null },
+      ),
+      order_finance_exceptions: tableMock({ data: financeRows, error: null }),
+      // 0362 — the approval record. Empty: nothing asked.
+      order_delivery_payment_approvals: tableMock({ data: [], error: null }),
+      // The repeat-letter lookup (0356): no prior document rows here.
+      ops_delivery_orders: tableMock({ data: [], error: null }),
+    });
+  }
+
+  it("⭐ Slice 2 — confirming a ready, PAID order mints the DO by itself", async () => {
+    const t = autoIssueTables([]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(makeSb(t) as any);
+    const res = await post(await makeJwt("operation"), OK_BODY);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      deliveryOrder: { do_number: string; issued: boolean } | null;
+    };
+    // The lib reports the number it MINTED (the locked scheme), and issued=true.
+    expect(body.deliveryOrder?.do_number).toBe(DRAWN_DO);
+    expect(body.deliveryOrder?.issued).toBe(true);
+    // The mint went through the ONE shared write: an idempotent update guarded
+    // on the empty column, never an unconditional set.
+    expect(t.orders.update).toHaveBeenCalledWith(
+      expect.objectContaining({ do_number: DRAWN_DO }),
+    );
+    expect(t.orders.is).toHaveBeenCalledWith("do_number", null);
+  });
+
+  it("⭐ an OWING order confirms its booking fine — and mints NOTHING without an approval (2026-08-19)", async () => {
+    const t = autoIssueTables([], 0); // owes the full RM 2,500
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(makeSb(t) as any);
+    const res = await post(await makeJwt("operation"), OK_BODY);
+    expect(res.status).toBe(200); // the booking is never hostage to the courtesy
+    const body = (await res.json()) as { deliveryOrder: unknown };
+    expect(body.deliveryOrder).toBeNull();
+    expect(t.orders.update).not.toHaveBeenCalled();
+  });
+
+  it("⭐ Slice 2 — an OPEN Finance exception stops the auto-issue, and the confirm still succeeds", async () => {
+    const t = autoIssueTables([
+      {
+        id: "fe-1",
+        status: "open",
+        reason: "Chargeback under investigation",
+        opened_at: "2026-08-16T02:00:00Z",
+        cleared_at: null,
+        clear_evidence: null,
+      },
+    ]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(makeSb(t) as any);
+    const res = await post(await makeJwt("operation"), OK_BODY);
+    expect(res.status).toBe(200); // the booking is never hostage to the courtesy
+    const body = (await res.json()) as { deliveryOrder: unknown };
+    expect(body.deliveryOrder).toBeNull();
+    expect(t.orders.update).not.toHaveBeenCalled();
+  });
+
+  it("⭐ Slice 2 — a missing exceptions read fails SOFT: the confirm succeeds, nothing mints", async () => {
+    // happyTables has no order_finance_exceptions mock at all — the helper's
+    // read throws, the catch eats it, and the human path stands untouched.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(makeSb(happyTables()) as any);
+    const res = await post(await makeJwt("operation"), OK_BODY);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { deliveryOrder: unknown }).deliveryOrder).toBeNull();
   });
 
   it("generic PUT /control refuses booking_stage — the one door is the confirm endpoint", async () => {

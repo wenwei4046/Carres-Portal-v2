@@ -13,6 +13,8 @@ import {
   type OpsStockItem,
   type OpsStockListResponse,
   type PoolUseReason,
+  unitIdOf,
+  READY_STOCK_CONDITION_WORDS,
 } from "@carres/shared";
 import { AlertTriangle } from "lucide-react";
 
@@ -366,7 +368,7 @@ export default function OpsStockListView(props: Props) {
                   value={add.condition}
                   onChange={(e) => setAdd((a) => ({ ...a, condition: e.target.value }))}
                 >
-                  {Object.entries(CONDITION_LABEL).map(([v, l]) => (
+                  {Object.entries(READY_STOCK_CONDITION_WORDS).map(([v, l]) => (
                     <option key={v} value={v}>{l}</option>
                   ))}
                 </select>
@@ -693,14 +695,6 @@ export default function OpsStockListView(props: Props) {
   );
 }
 
-const CONDITION_LABEL: Record<string, string> = {
-  new: "New",
-  exhibition: "Display",
-  old: "Fair (used)",
-  refurbished: "Refurbished",
-  damaged: "Damaged",
-};
-
 function RowItem({
   row,
   actions,
@@ -735,20 +729,19 @@ function RowItem({
   const [takeoutNote, setTakeoutNote] = useState("");
   return (
     <tr className="border-t border-base-200 hover:bg-base-50">
-      {/* Unit ID = the minted per-unit serial (id-abc123456). Falls back to "—"
-          for legacy/seed rows that never got a unit_code. Previously this cell
-          showed row.sku, which (a) was wrong and (b) left the header row one
-          column wider than the body — fixed by adding the dedicated SKU cell
-          that follows. */}
+      {/* Unit ID = the permanent Carres identity, `U1-000-001`. Counted goods
+          have none and print "": their row still needs a database key, but a
+          key is not an identity and never appears here (0453). Grandfathered
+          `id-…` codes print exactly as stored — they are on real labels. */}
       <td className="px-3 py-2 font-mono text-label text-base-900 whitespace-nowrap">
-        {row.unitCode ?? <span className="text-base-400">—</span>}
+        {unitIdOf(row) ?? null}
       </td>
       <td className="px-3 py-2 font-mono text-base-700">
         {row.sku}
         {row.qty && row.qty > 1 ? (
           <span
             className="ml-1.5 rounded bg-base-100 px-1.5 py-0.5 text-label font-semibold text-base-600"
-            title="Bulk line — this record represents this many units"
+            title="Bulk line. This record represents this many units"
           >
             ×{row.qty}
           </span>
@@ -761,7 +754,7 @@ function RowItem({
           disabled={busy}
           className="rounded border border-base-200 bg-white px-1.5 py-0.5 text-meta text-base-700 focus:border-primary focus:outline-none disabled:opacity-50"
         >
-          {Object.entries(CONDITION_LABEL).map(([v, l]) => (
+          {Object.entries(READY_STOCK_CONDITION_WORDS).map(([v, l]) => (
             <option key={v} value={v}>{l}</option>
           ))}
         </select>
@@ -788,12 +781,12 @@ function RowItem({
           {opsStockStatusLabel(row.status)}
         </span>
       </td>
-      <td className="px-3 py-2 text-base-700">{row.reservedRef ?? "—"}</td>
+      <td className="px-3 py-2 text-base-700">{row.reservedRef ?? ""}</td>
       <td className="px-3 py-2 text-meta text-base-500">
-        {row.refHistory.length > 0 ? row.refHistory.join(", ") : "—"}
+        {row.refHistory.length > 0 ? row.refHistory.join(", ") : ""}
       </td>
-      <td className="px-3 py-2 text-meta text-base-600 font-mono">{row.poNo ?? "—"}</td>
-      <td className="px-3 py-2 text-meta text-base-500 font-mono">{row.sourceRef ?? "—"}</td>
+      <td className="px-3 py-2 text-meta text-base-600 font-mono">{row.poNo ?? ""}</td>
+      <td className="px-3 py-2 text-meta text-base-500 font-mono">{row.sourceRef ?? ""}</td>
       <td className="px-3 py-2 text-meta text-base-500">{fmtDate(row.dateIn)}</td>
       <td className="px-3 py-2 text-right">
         <div className="flex flex-wrap gap-1 justify-end items-center">

@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { loginSchema } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
+import { readReturnTo } from "@/lib/return-to";
 import { supabase, supabaseConfigured } from "@/lib/supabase";
 import "./Login.css";
 
@@ -53,7 +54,7 @@ export default function Login() {
 
   useEffect(() => {
     if (session && role) {
-      const from = (location.state as { from?: string } | null)?.from;
+      const from = readReturnTo(location.state);
       const defaultHome =
         role === "principal"
           ? "/principal"
@@ -70,7 +71,7 @@ export default function Login() {
                     : role === "dealer" || role === "salesperson" || role === "showroom"
                       ? "/dealer"
                       : "/me";
-      navigate(from && from !== "/login" ? from : defaultHome, { replace: true });
+      navigate(from ?? defaultHome, { replace: true });
     }
   }, [session, role, location.state, navigate]);
 
@@ -198,7 +199,7 @@ export default function Login() {
             </h1>
 
             <p className="deck">
-              <strong>One workspace</strong> for dealers, suppliers, operation &amp; finance — every order, every approval, every signal in one place.
+              <strong>One workspace</strong> for dealers, suppliers, operation &amp; finance. Every order, every approval, every signal in one place.
             </p>
           </div>
 
@@ -235,7 +236,7 @@ export default function Login() {
             )}
             {!supabaseConfigured && (
               <div className="alert alert-error">
-                Supabase not configured — set apps/web/.env.local
+                Supabase not configured. Set apps/web/.env.local
               </div>
             )}
 

@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { salesOrderWorkCompletion } from "../lib/sales-order-work-completion";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
@@ -22,7 +23,6 @@ import {
   ordersListResponseSchema,
   orderStatusSchema,
   parseOrderEntryConfigRow,
-  docNumber,
   resolvePaymentMethods,
   STRIPE_METHOD_KEY,
   STRIPE_PAYMENT_METHOD,
@@ -35,7 +35,9 @@ import {
   updateOrderInputSchema,
   type AutocountImportResult,
   type StaffTierDto,
+  receivedBeforeInvoice,
 } from "@carres/shared";
+import { invoicePayments } from "./finance/invoices";
 import { userClient, adminClient } from "../lib/supabase";
 import { getStaffContext, isStoreActivated } from "../lib/staff-token";
 import {
@@ -43,9 +45,17 @@ import {
   validateDeliveryLeadTime,
   type LeadTimeViolation,
 } from "../lib/lead-time";
+import { validateOrderHasGoods } from "../lib/sku-categories";
 import { recomputeAndExplodeSofaBuildLines } from "../lib/sofa-recompute";
 import { recomputeOptionPickLines } from "../lib/option-picks-recompute";
 import { recomputeSpecialAddonLines } from "../lib/special-addons-recompute";
+import { recomputeStairCarry } from "../lib/stair-carry-recompute";
+import {
+  restampAfterLineWrite,
+  restampStairCarry,
+  touchesStairInputs,
+} from "../lib/stair-carry-restamp";
+import { SERVER_EXCLUSIVE_ADDON_KEYS } from "@carres/shared";
 import { recomputeDeliveryFee } from "../lib/delivery-fee-recompute";
 import { validateFreeItemClaims, resolveDefaultFreeGiftLines } from "../lib/free-gift-resolve";
 import { recomputePwpLines } from "../lib/pwp-recompute";
@@ -110,6 +120,9 @@ type SalesOrderData = {
   }>;
   addons: Array<{
     label: string;
+    /** The Item Code: `addons.service_sku` for a linked service, else the
+     *  stored `addon_key` as saved. An absent code printed `ADD-ON`. */
+    sku: string;
     qty: number;
     unit_price: number;
     line_total: number;
@@ -255,9 +268,15 @@ ordersRouter.get("/", async (c) => {
   // PostgREST: select.eq*.order — .order() ends the chain (returns awaitable).
   // We embed minimal `unit_price/qty` from order_lines + order_addons so the
   // dashboard can show the per-card RM total and the monthly-spend subtitle
-  // without an extra round-trip per order. Stair carry is intentionally
-  // EXCLUDED here (matches the prototype's `monthValue` definition which sums
-  // line+addon only — stair is a delivery-time concern, not a sales metric).
+  // without an extra round-trip per order.
+  //
+  // ⛔ THE OLD NOTE HERE SAID stair carry was "a delivery-time concern, not a
+  // sales metric". That is RETIRED (owner ruling YH, 2026-08-28): stair carry
+  // is money the customer owes. Nothing in this query changes, because 0393
+  // makes the fee an `order_addons` row — so `order_addons(unit_price, qty)`
+  // now carries it and this sum includes it without a second reader. The note
+  // is corrected rather than deleted because a comment contradicting the
+  // MASTER is exactly how the fee went uncollectable for four months.
   let q = sb.from("orders").select(
     "*, line_count:order_lines(count), order_lines(unit_price, qty), order_addons(unit_price, qty)",
   );
@@ -413,14 +432,15 @@ ordersRouter.get("/customer-search", async (c) => {
 });
 
 /**
- * POST /api/orders — atomic create via RPC `create_order(payload jsonb)`.
+ * POST /api/orders — atomic final submit via the governed Sales Portal wrapper.
  *
  * Flow:
  *   1. Verify caller is dealer/salesperson/internal (middleware sets c.var.auth)
  *   2. Validate camelCase input with zod
  *   3. Adapter converts → snake_case jsonb RPC payload (+ injects dealerId from JWT)
- *   4. Call RPC — atomic insert across 5 tables (orders + lines + addons +
- *      history + audit_log). If anything fails, Postgres rolls back the whole TX.
+ *   4. Call `create_order_from_sales_portal` — atomic insert across 5 tables
+ *      plus the governed Sales → Operations handoff when its facts are ready.
+ *      If anything fails, Postgres rolls back the whole TX.
  *   5. Re-fetch the inserted order with rels (same shape as GET /:id) so the
  *      client can route directly to /dealer/orders/:id without a second fetch.
  *
@@ -469,7 +489,7 @@ ordersRouter.post("/", async (c) => {
     (ORDER_CREATE_INTERNAL_ROLES.has(auth.role) ? parsed.data.dealerId ?? null : null);
   if (!effectiveDealerId) {
     throw new HTTPException(403, {
-      message: "An order needs a dealer to place it under — pick a dealer first",
+      message: "An order needs a dealer to place it under. Pick a dealer first",
     });
   }
 
@@ -624,6 +644,17 @@ ordersRouter.post("/", async (c) => {
     const skus = parsed.data.lines.map((l) => l.sku);
     const violation = await validateDeliveryLeadTime(sb, skus, parsed.data.delivery.date);
     if (violation) return c.json(leadTimeBody(violation), 422);
+  }
+
+  // ⛔ A SALES ORDER MUST CONTAIN GOODS — owner ruling 2026-08-15. The cart
+  // gate refuses this in the wizard; this is the same rule at the door, so a
+  // curl cannot file a service-only "sale". Standalone service is a Service
+  // Case and belongs to the Service channel.
+  {
+    const goods = await validateOrderHasGoods(sb, parsed.data.lines.map((l) => l.sku));
+    if (goods) {
+      return c.json({ error: "rule_violation", code: goods.code, message: goods.message }, 422);
+    }
   }
 
   // 0185 (free items) — free-item-campaign claims + anti-tamper, FIRST. A line
@@ -878,12 +909,33 @@ ordersRouter.post("/", async (c) => {
     throw new HTTPException(500, { message: deliveryRecompute.message });
   }
 
+  // 0393 (STAIR CARRY IS MONEY, owner ruling YH 2026-08-28) — the same road
+  // 0184 built. The fee was computed in the browser and written down nowhere,
+  // so the customer signed a total the order could not describe and no payment
+  // door could collect the difference. It is STAMPED here: the rate is a live
+  // singleton a principal can PATCH, and a charge a customer signed for may not
+  // move because a rate changed afterwards. Zero (lift / free floor / unset
+  // count) appends nothing, so a dormant rate leaves totals byte-identical.
+  const stairRecompute = await recomputeStairCarry(sb, finalLines, {
+    floor: parsed.data.delivery.floor,
+    hasLift: parsed.data.delivery.hasLift,
+    stairItems: parsed.data.delivery.stairItems,
+  });
+  if (stairRecompute.status === "server_error") {
+    await rollbackPwpClaims();
+    throw new HTTPException(500, { message: stairRecompute.message });
+  }
+
   // 0184 honest-pricing — the delivery fee is SERVER-authoritative. Strip any
   // client-sent delivery addon (DELIVERY / DELIVERY_CROSS / DELIVERY_ADD) BEFORE
   // merging, so the charge comes SOLELY from the server recompute above — a
   // tampered client cannot inject or pre-empt a delivery line.
-  const DELIVERY_ADDON_KEYS = new Set(["DELIVERY", "DELIVERY_CROSS", "DELIVERY_ADD"]);
-  const clientAddons = parsed.data.addons.filter((a) => !DELIVERY_ADDON_KEYS.has(a.addonKey));
+  // The ONE server-exclusive set (`@carres/shared`). It used to be spelled out
+  // here, and again at the raw door, and again in the add-lines pricer — so a
+  // new computed key had three chances to be added to two of them.
+  const clientAddons = parsed.data.addons.filter(
+    (a) => !SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addonKey),
+  );
 
   // Feed the fully-verified line set (sofa-exploded + special-checked + freed
   // items + appended RM0 gifts) + the appended delivery addons into the RPC.
@@ -894,11 +946,16 @@ ordersRouter.post("/", async (c) => {
       salespersonId: attributedSalespersonId,
       outletId: attributedOutletId ?? parsed.data.outletId,
       lines: finalLines,
-      addons: [...clientAddons, ...deliveryRecompute.addons],
+      addons: [...clientAddons, ...deliveryRecompute.addons, ...stairRecompute.addons],
     },
     effectiveDealerId,
   );
-  const { data: created, error } = await sb.rpc("create_order", { payload });
+  // 0396 — final Sales Portal submit is the handoff. The wrapper creates the
+  // order and attempts the canonical Proceed inside one database transaction;
+  // an incomplete order stays in Place with its blocker, while a complete one
+  // reaches Purchasing without a second salesperson action. `/raw` below uses
+  // the separate, draft-capable `create_raw_order` wrapper deliberately.
+  const { data: created, error } = await sb.rpc("create_order_from_sales_portal", { payload });
   if (error) {
     // exit 10 (§4.5) — the create_order TX rolled back, so the claimed voucher
     // codes must un-claim. Placed as the FIRST line of the error block so ALL FOUR
@@ -1061,7 +1118,9 @@ ordersRouter.post("/", async (c) => {
 // recognises a raw line as a marker line, and client delivery addons are
 // dropped (those keys are server-exclusive on the POS door). The create_order
 // RPC still enforces: dealer required, ≥1 line, the sofa ↔ mattress/bed-frame
-// composition rule, and the internal-role gate (SECURITY DEFINER re-check).
+// composition rule. `create_raw_order` re-checks the internal role inside the
+// database. The old Worker retains temporary compatibility access to the
+// underlying primitive only until this Worker is verified in production.
 // ---------------------------------------------------------------------------
 
 const ORDER_RAW_CREATE_ROLES = new Set<string>(["principal", "operation"]);
@@ -1101,8 +1160,8 @@ ordersRouter.post("/raw", async (c) => {
 
   // Client delivery addons are server-exclusive on the POS door — same rule
   // here, even though the raw door never appends its own (no engine runs).
-  const RAW_DELIVERY_ADDON_KEYS = new Set(["DELIVERY", "DELIVERY_CROSS", "DELIVERY_ADD"]);
-  const addons = input.addons.filter((a) => !RAW_DELIVERY_ADDON_KEYS.has(a.addonKey));
+  // Same ONE set as the POS door — the raw door is not a lighter gate.
+  const addons = input.addons.filter((a) => !SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addonKey));
 
   // deposit_pct only feeds the RPC's order_history line — derive it so the
   // timeline text matches what the operator saw. Addons count toward the total
@@ -1176,7 +1235,7 @@ ordersRouter.post("/raw", async (c) => {
   };
 
   const sb = userClient(c.env, auth.jwt);
-  const { data: created, error } = await sb.rpc("create_order", { payload });
+  const { data: created, error } = await sb.rpc("create_raw_order", { payload });
   if (error) {
     if (error.code === "42501" || /forbidden/i.test(error.message ?? "")) {
       throw new HTTPException(403, { message: "Forbidden" });
@@ -1201,39 +1260,13 @@ ordersRouter.post("/raw", async (c) => {
   const { id } = (created ?? {}) as { id?: string };
   if (!id) throw new HTTPException(500, { message: "Order create returned no id" });
 
-  // Loo 2026-07-18 — the at-creation payment posts BACK into the order_payments
-  // ledger, same as an operation-recorded payment. CARD 4 (0343): through the
-  // ONE writer, as a HISTORY MIRROR (`p_counts_toward_paid: false`) — the
-  // create RPC already put this deposit inside `orders.paid`, so counting it
-  // again would double the money. BEST-EFFORT after the committed create — a
-  // ledger miss must not fail the order (the PDF falls back to orders.paid).
-  if (input.paid > 0) {
-    const LEDGER_METHOD: Record<string, string> = {
-      cash: "cash",
-      bank: "bank",
-      online: "online",
-      credit: "card",
-      card: "card",
-      installment: "card",
-      cheque: "cheque",
-    };
-    const paidOn = new Date().toISOString().slice(0, 10);
-    const { error: ledgerErr } = await sb.rpc("payment_record", {
-      p_order_id: id,
-      p_amount: input.paid,
-      p_paid_on: paidOn,
-      p_method: LEDGER_METHOD[input.paymentMethod ?? ""] ?? "other",
-      p_kind: "deposit",
-      p_reference: input.approvalCode || null,
-      p_note: "Recorded at New Order (raw) creation",
-      p_receipt_url: null,
-      p_receipt_no: docNumber({ prefix: "RC", date: paidOn, seed: `${id}:1`, digits: 4 }),
-      p_counts_toward_paid: false,
-    });
-    if (ledgerErr) {
-      console.error("raw create: order_payments ledger insert failed (non-fatal):", ledgerErr.message);
-    }
-  }
+  // 0476 — the money paid with the new order is recorded INSIDE create_raw_order,
+  // through the one customer-payment writer: a counted deposit with a receipt,
+  // an allocation and a journal entry, in the create transaction. The
+  // best-effort history mirror that used to follow here (payment_record with
+  // p_counts_toward_paid false, its failure logged and swallowed) is gone: a
+  // deposit the ledger cannot place now fails the create with a 400 naming the
+  // method, instead of leaving orders.paid with no receipt behind it.
 
   // Same response contract as POST / — the full order, so the client can show
   // the SO number + land on the standard order shape without a second GET.
@@ -1629,7 +1662,7 @@ ordersRouter.post("/import", async (c) => {
       .limit(1)
       .single();
     if (dealerErr || !dealerRow) {
-      throw new HTTPException(500, { message: "No dealer account found — create one first." });
+      throw new HTTPException(500, { message: "No dealer account found. Create one first." });
     }
     dealerId = dealerRow.id as string;
   }
@@ -1772,42 +1805,6 @@ ordersRouter.post("/import", async (c) => {
     results,
   };
   return c.json(autocountImportResponseSchema.parse(resp));
-});
-
-/**
- * POST /api/orders/:id/accept-autocount-items — one-shot unlock for the
- * portal-wins-AutoCount guard. Clears `orders.items_edited`, so the next
- * AutoCount re-import REPLACES the order's items array with AutoCount's
- * version (instead of preserving the portal-edited one).
- *
- * Use when AutoCount has the truer items list (e.g. customer changed
- * configuration after order, ops's earlier edit is now stale).
- *
- * Allowed: operation, principal (mirrors /import gate). Only valid while
- * the order is at status='place' — past that, items are frozen anyway by
- * the proceed flow.
- */
-ordersRouter.post("/:id/accept-autocount-items", async (c) => {
-  const auth = c.var.auth;
-  if (auth.role !== "operation" && auth.role !== "principal") {
-    throw new HTTPException(403, { message: "Operation or principal only" });
-  }
-  const id = c.req.param("id");
-  const sb = userClient(c.env, auth.jwt);
-  const { data, error } = await sb
-    .from("orders")
-    .update({ items_edited: false, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("status", "place")
-    .select("id, items_edited")
-    .maybeSingle();
-  if (error) throw new HTTPException(500, { message: error.message });
-  if (!data) {
-    throw new HTTPException(404, {
-      message: "Order not found, not at status='place', or RLS-hidden",
-    });
-  }
-  return c.json({ id: data.id, items_edited: data.items_edited });
 });
 
 /**
@@ -2286,7 +2283,10 @@ ordersRouter.post("/:id/address", (c) =>
 
 /** The 0184 server-exclusive trip-fee addon keys the add-lines delivery
  *  recompute replaces (mirrors the create route's strip set). */
-const ADD_LINES_DELIVERY_KEYS = new Set(["DELIVERY", "DELIVERY_CROSS", "DELIVERY_ADD"]);
+/* The add-lines pricer refuses a server-exclusive key outright rather than
+   stripping it: this door is an explicit operator pick, so a computed fee
+   arriving here is a mistake worth naming, not noise to drop. Same ONE set. */
+const ADD_LINES_DELIVERY_KEYS = SERVER_EXCLUSIVE_ADDON_KEYS;
 
 interface AddLinesWriteSet {
   pLines: Array<{
@@ -2433,7 +2433,7 @@ async function computeAddLinesWriteSet(
           error: "rule_violation",
           code: "pwp_voucher_add_not_supported",
           message:
-            "A voucher-coded PWP claim can't ride an added line — apply the voucher on a new order.",
+            "A voucher-coded PWP claim can't ride an added line. Apply the voucher on a new order.",
         },
         409,
       );
@@ -2491,7 +2491,7 @@ async function computeAddLinesWriteSet(
         error: "add_lines_blocked",
         code: "existing_build_unsupported",
         message:
-          "This order carries a raw (un-exploded) sofa build — products can't be added to it. Place a new order.",
+          "This order carries a raw (un-exploded) sofa build. Products can't be added to it. Place a new order.",
       },
       422,
     );
@@ -2515,7 +2515,7 @@ async function computeAddLinesWriteSet(
         error: "rule_violation",
         code: "pwp_add_conflict",
         message:
-          "This order already has a promo applied — place a new order to claim another promo price.",
+          "This order already has a promo applied. Place a new order to claim another promo price.",
       },
       409,
     );
@@ -2873,6 +2873,8 @@ ordersRouter.post("/:id/lines", async (c) => {
   });
   const errRes = addLinesRpcError(c, rpcError, "add_lines_blocked");
   if (errRes) return errRes;
+  /* ⭐ THE GOODS ARE A STAIR-FEE INPUT — see `restampAfterLineWrite`. */
+  await restampAfterLineWrite(sb, id);
   return c.json(await fetchAndShapeOrder(sb, id));
 });
 
@@ -2923,7 +2925,7 @@ async function computeReplaceWriteSet(
       {
         error: errorTag,
         code: "line_not_found",
-        message: "The item is no longer on this order — refresh and retry.",
+        message: "The item is no longer on this order. Refresh and retry.",
       },
       422,
     );
@@ -3017,7 +3019,7 @@ async function computeReplaceWriteSet(
         code: "downsell_blocked",
         message:
           `The new configuration totals RM ${newTotal.toFixed(2)}, below the original ` +
-          `RM ${oldTotal.toFixed(2)} — edits can only upgrade the order.`,
+          `RM ${oldTotal.toFixed(2)}. Edits can only upgrade the order.`,
         oldTotal,
         newTotal,
       },
@@ -3100,6 +3102,8 @@ ordersRouter.post("/:id/lines/replace", async (c) => {
   });
   const errRes = addLinesRpcError(c, rpcError, "replace_blocked");
   if (errRes) return errRes;
+  /* Same reason: a replace moves the item count. */
+  await restampAfterLineWrite(sb, id);
   return c.json(await fetchAndShapeOrder(sb, id));
 });
 
@@ -3174,6 +3178,40 @@ ordersRouter.post("/:id/addons/:addonId/edit", async (c) => {
   return c.json(await fetchAndShapeOrder(sb, id));
 });
 
+/** POST /api/orders/:id/addons/:addonId/remove — 0396 (YH, 2026-08-28: a
+ *  service picked by mistake has to be takeable back). Deliberately a SIBLING
+ *  of the edit route above rather than a flag on it: removing is a different
+ *  act from editing, and folding it in would have meant teaching
+ *  `edit_order_addon` to accept a qty it spent 0258 refusing.
+ *
+ *  The RPC is the authority — same place gate, same cross-dealer check, same
+ *  refusal on the four system-computed keys. The up-sell law in
+ *  `edit_order_addon` is untouched: this door corrects a slip, it does not open
+ *  a downsell. */
+ordersRouter.post("/:id/addons/:addonId/remove", async (c) => {
+  const auth = c.var.auth;
+  const idCheck = z.string().uuid().safeParse(c.req.param("id"));
+  const addonCheck = z.string().uuid().safeParse(c.req.param("addonId"));
+  if (!idCheck.success || !addonCheck.success) {
+    throw new HTTPException(404, { message: "Not found" });
+  }
+  const id = idCheck.data;
+  if (!ORDER_MUTATE_ROLES.has(auth.role)) {
+    throw new HTTPException(403, { message: "Role cannot mutate orders" });
+  }
+  if ((auth.role === "dealer" || auth.role === "salesperson" || auth.role === "showroom") && !auth.dealerId) {
+    throw new HTTPException(403, { message: "Dealer scope missing on JWT" });
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { error: rpcError } = await sb.rpc("remove_order_addon", {
+    p_order_id: id,
+    p_addon_id: addonCheck.data,
+  });
+  const errRes = addLinesRpcError(c, rpcError, "remove_addon_blocked");
+  if (errRes) return errRes;
+  return c.json(await fetchAndShapeOrder(sb, id));
+});
+
 /** GET /api/orders/:id/change-requests — RLS-scoped list (dealer own /
  *  internal all), newest first. Powers the POS pending banner + ops panel. */
 ordersRouter.get("/:id/change-requests", async (c) => {
@@ -3221,7 +3259,7 @@ function submitLineMarkerGates(
           error: "rule_violation",
           code: "pwp_voucher_add_not_supported",
           message:
-            "A voucher-coded PWP claim can't ride a submitted line — apply the voucher on a new order.",
+            "A voucher-coded PWP claim can't ride a submitted line. Apply the voucher on a new order.",
         },
         409,
       );
@@ -3537,7 +3575,7 @@ ordersRouter.post("/:id/change-requests/:reqId/decide", async (c) => {
         {
           error: "decide_blocked",
           code: "invalid_payload",
-          message: "The stored request payload is malformed — reject it and ask for a resubmission",
+          message: "The stored request payload is malformed. Reject it and ask for a resubmission",
         },
         422,
       );
@@ -3555,7 +3593,7 @@ ordersRouter.post("/:id/change-requests/:reqId/decide", async (c) => {
           error: "decide_blocked",
           code: "line_in_production",
           message:
-            "This item already has a live procurement thread — reject the request and handle the change manually.",
+            "This item already has a live procurement thread. Reject the request and handle the change manually.",
         },
         422,
       );
@@ -3580,6 +3618,8 @@ ordersRouter.post("/:id/change-requests/:reqId/decide", async (c) => {
     });
     const errRes = addLinesRpcError(c, rpcError, "decide_blocked");
     if (errRes) return errRes;
+    /* An APPROVED replace moves the count exactly as the direct door does. */
+    await restampAfterLineWrite(sb, id);
     return c.json(await fetchAndShapeOrder(sb, id));
   }
 
@@ -3595,7 +3635,7 @@ ordersRouter.post("/:id/change-requests/:reqId/decide", async (c) => {
         {
           error: "decide_blocked",
           code: "invalid_payload",
-          message: "The stored request payload is malformed — reject it and ask for a resubmission",
+          message: "The stored request payload is malformed. Reject it and ask for a resubmission",
         },
         422,
       );
@@ -3619,7 +3659,7 @@ ordersRouter.post("/:id/change-requests/:reqId/decide", async (c) => {
       {
         error: "decide_blocked",
         code: "invalid_payload",
-        message: "The stored request payload is malformed — reject it and ask for a resubmission",
+        message: "The stored request payload is malformed. Reject it and ask for a resubmission",
       },
       422,
     );
@@ -3643,6 +3683,8 @@ ordersRouter.post("/:id/change-requests/:reqId/decide", async (c) => {
   });
   const errRes = addLinesRpcError(c, rpcError, "decide_blocked");
   if (errRes) return errRes;
+  /* An APPROVED add moves the count exactly as the direct door does. */
+  await restampAfterLineWrite(sb, id);
   return c.json(await fetchAndShapeOrder(sb, id));
 });
 
@@ -3651,7 +3693,12 @@ ordersRouter.post("/:id/change-requests/:reqId/decide", async (c) => {
  *  sofa 21d — see shared `DELIVERY_LEAD_DAYS`) is enforced via async
  *  pre-flight because the wizard's client-side gate doesn't apply once
  *  the order is already in Place with `dateTbd: true`. */
-ordersRouter.post("/:id/date", (c) =>
+ordersRouter.post(
+  "/:id/date",
+  // 0584 — recording the date is Sales Orders' completion fact for
+  // `ask_delivery_date`; the writer observes this door, never edits it.
+  salesOrderWorkCompletion({ rules: ["ask_delivery_date"], orderId: (c) => c.req.param("id") ?? null }),
+  (c) =>
   dispatchOrderMutation(c, {
     schema: setOrderDateInputSchema,
     rpcName: "set_order_date",
@@ -3798,6 +3845,23 @@ ordersRouter.patch("/:id", async (c) => {
       );
     }
     throw new HTTPException(500, { message: rpcError.message });
+  }
+
+  /* 0394 — A STAIR FEE FOLLOWS THE FLOOR THAT CHANGED. `update_order` writes
+     delivery_floor / delivery_has_lift / delivery_stair_items, and the fee 0393
+     stamped at create is priced from exactly those three. Without this the POS
+     could move a floor and leave the order describing a charge its own inputs
+     no longer produce — the same defect as never writing the fee at all, one
+     edit later.
+
+     Non-fatal on purpose: the update already succeeded, so failing here would
+     report a lost edit that was not lost. The response is re-fetched below, so
+     a successful re-stamp is visible to the caller immediately. */
+  if (touchesStairInputs(flat as Record<string, unknown>)) {
+    const restamp = await restampStairCarry(sb, id);
+    if (!restamp.ok) {
+      console.error("stair carry re-stamp failed", { orderId: id, reason: restamp.reason });
+    }
   }
 
   return c.json(await fetchAndShapeOrder(sb, id));
@@ -4012,14 +4076,21 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
 
   // Add-on labels: human `addons.name` over the raw key ("dispose-mattress").
   const addonNameByKey = new Map<string, string>();
+  /* The catalogue's own Service SKU for a linked service (0172 — `addons.service_sku`,
+     e.g. `dispose-mattress` → `SVC-DISPOSE-MATTRESS`). An unlinked service
+     (`DELIVERY`, `STAIR_CARRY` — bare by design, 0393) has none. */
+  const addonSkuByKey = new Map<string, string>();
   try {
     const addonKeys = [...new Set(addons.map((a) => String(a.addon_key)))];
     if (addonKeys.length > 0) {
-      const { data: addonDefs } = await sb.from("addons").select("key, name").in("key", addonKeys);
+      const { data: addonDefs } = await sb.from("addons").select("key, name, service_sku").in("key", addonKeys);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       for (const r of (addonDefs ?? []) as any[]) {
         if (typeof r.name === "string" && r.name.trim().length > 0) {
           addonNameByKey.set(String(r.key), r.name.trim());
+        }
+        if (typeof r.service_sku === "string" && r.service_sku.trim().length > 0) {
+          addonSkuByKey.set(String(r.key), r.service_sku.trim());
         }
       }
     }
@@ -4099,6 +4170,11 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     const unitPrice = Number(a.unit_price);
     return {
       label: addonNameByKey.get(String(a.addon_key)) ?? String(a.addon_key),
+      /* The Item Code: the catalogue Service SKU when the service is linked,
+         otherwise the saved key exactly as stored — never rewritten. Without a
+         code the paper printed the `ADD-ON` placeholder (a defect by the owner
+         review 2026-08-09, `lib/pdf/types.ts`). */
+      sku: addonSkuByKey.get(String(a.addon_key)) ?? String(a.addon_key),
       qty,
       unit_price: unitPrice,
       line_total: qty * unitPrice,
@@ -4194,7 +4270,7 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
   // Golden SO (STAGE 2, BUILD-QUEUE): the canonical format is `SO-1256` —
   // NO zero-padding, no second format, header · ORDER DETAILS · footer alike.
   const so_number = `SO-${o.so}`;
-  const issue_date = (o.placed_at as string | null)?.slice(0, 10) ?? "—";
+  const issue_date = (o.placed_at as string | null)?.slice(0, 10) ?? "";
   const statusLabel =
     o.status === "place"
       ? "Awaiting fulfilment"
@@ -4224,8 +4300,8 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
     status_label: statusLabel,
     channel,
     customer: {
-      name: String(o.customer_name ?? "—"),
-      address: String(o.customer_address ?? "—"),
+      name: String(o.customer_name ?? ""),
+      address: String(o.customer_address ?? ""),
       phone: o.customer_phone ?? null,
       email: o.customer_email ?? null,
       emergency: o.customer_emergency ?? null,
@@ -4240,7 +4316,7 @@ ordersRouter.get("/:id/sales-order-data", async (c) => {
       salesperson_phone: o.salespersons?.phone ?? null,
     },
     delivery: {
-      date: o.delivery_date_tbd ? "To be confirmed" : String(o.delivery_date ?? "—"),
+      date: o.delivery_date_tbd ? "To be confirmed" : String(o.delivery_date ?? ""),
       floor: Number(o.delivery_floor ?? 1),
       has_lift: Boolean(o.delivery_has_lift),
     },
@@ -4303,7 +4379,7 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
   const ord: any = order;
   if (!ord.invoice_no) {
     throw new HTTPException(422, {
-      message: "Invoice not yet issued (auto-issued at dispatch — wait until operation_stage='dispatched')",
+      message: "Invoice not yet issued (auto-issued at dispatch, wait until operation_stage='dispatched')",
     });
   }
 
@@ -4318,7 +4394,7 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const i: any = inv;
   if (i.voided_at) {
-    throw new HTTPException(422, { message: "Invoice has been voided — re-issue first" });
+    throw new HTTPException(422, { message: "Invoice has been voided. Re-issue first" });
   }
 
   const { data: lines, error: linErr } = await sb
@@ -4358,7 +4434,7 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
     order_code: `SO-${ord.so}`,
     customer: {
       name: String(ord.customer_name ?? ""),
-      address: String(ord.customer_address ?? "—"),
+      address: String(ord.customer_address ?? ""),
       phone: ord.customer_phone ?? null,
     },
     dealer: {
@@ -4381,6 +4457,7 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
     tax_amount: taxAmount,
     total,
     currency: "MYR",
+    received_before: receivedBeforeInvoice(await invoicePayments(sb, id), String(i.issued_at)),
   });
 });
 
@@ -4388,12 +4465,19 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
  * POST /api/orders/:id/issue-invoice — Balance tab §10 "Generate invoice"
  * (Jess 2026-07-18).
  *
- * Issues the Sales Invoice ON DEMAND (before dispatch) via the 0229
- * `issue_order_invoice` RPC — idempotent, same INV-YYYY-{so} formula as the
- * 0098 dispatch auto-issue, so the two paths can never mint two numbers for
- * one order. Body carries the Balance tab's invoice total (goods + storage)
- * because AutoCount-imported orders have no per-line prices; a native order
- * may omit it and the RPC falls back to the line+addon sum.
+ * Issues the Sales Invoice ON DEMAND (before dispatch) via the
+ * `issue_order_invoice` RPC — idempotent. Since 0476 it issues the order's
+ * prepared draft (or a new one) through `payment_invoice_issue`, the ONE
+ * numbering authority: the number is the governed INV-DDMMYY-NNNN, given at
+ * issue and never reused after a void, and the journal entry posts in the same
+ * transaction (Dr 1210 / Cr 4100 · 4300 · 4400). Body carries the Balance
+ * tab's invoice total (goods + storage) because AutoCount-imported orders have
+ * no per-line prices; a native order may omit it and the RPC uses the prepared
+ * draft's amount, else the line+addon sum.
+ *
+ * A ledger refusal (a storage fee already on a Storage Invoice, a figure the
+ * lines cannot explain) is 22023 and reaches the operator as a 422 with the
+ * ledger's own sentence — nothing was issued.
  *
  * Roles: operation / finance / principal (same internal-doc gate as
  * invoice-pdf-data; RPC re-checks server-side).
@@ -4422,6 +4506,13 @@ ordersRouter.post("/:id/issue-invoice", async (c) => {
     }
     if (error.code === "P0002") {
       throw new HTTPException(404, { message: "Order not found" });
+    }
+    if (error.code === "22023" || error.code === "P0001") {
+      return c.json({
+        error: "rule_violation",
+        code: (error as { details?: string }).details || "invalid_param",
+        message: error.message ?? "The invoice could not be issued.",
+      }, 422);
     }
     throw new HTTPException(500, { message: error.message });
   }

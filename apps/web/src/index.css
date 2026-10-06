@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    /* ===== ⭐ UI-KIT v4 (2026-07-15, docs/UI-KIT.md) — overwrites
+    /* ===== ⭐ UI-KIT v4 (2026-07-15; its doc is retired — today's law is docs/01-design-tokens.md) — overwrites
      * all prior baselines (v17 cream et al). White content base; brand colour
      * only in the left nav; colour = action/selection/status/alert ONLY.
      * Token NAMES unchanged (zero component churn) — VALUES follow v4.
@@ -16,7 +16,18 @@
     --dial-red: #e24b4a;    --dial-red-soft: #fcebeb;
     --dial-green: #639922;  --dial-green-soft: #eaf3de;
     --dial-check: #3b6d11;
-    --background: 220 14% 96%;         /* #F3F4F6 — v4 §11a COOL neutral canvas (warm retired) */
+    --background: 220 23% 97.5%;       /* #F7F8FA — the ONE canvas (UI MASTER §6.7, Jess 2026-09-17); #F3F4F6 retired */
+    /* ===== WORK MIDDLE-CARD KIT (owner-approved Work kit 2026-09-24,
+     * docs/workspace/MASTER.md §5.5) — the Work page's section
+     * edge, card ink ladder and date-status fills. Read ONLY through the
+     * `work-*` Tailwind names; no other page uses them. */
+    --work-line: #ccd7e5;          /* every Work section and card edge */
+    --work-line-hover: #aebfd3;    /* card edge under the pointer */
+    --work-ink: #17243a;           /* card fact · date number */
+    --work-slate: #40516a;         /* card action · module name */
+    --work-muted: #66758b;         /* party · weekday · document number */
+    --work-tabs: #e9eef5;          /* the To do / Waiting / Completed rail */
+    --work-missed-fill: #fff0f1;   --work-missed-line: #efb7bd;   --work-missed-ink: #c62835;
     --foreground: 0 0% 10%;            /* #1A1A1A — v4 text primary near-black */
 
     --card: 0 0% 100%;                 /* white cards */
@@ -180,7 +191,7 @@
   .t4-row        { @apply text-[13px] font-medium text-foreground; }
   .t4-row-strong { @apply text-[13px] font-semibold text-foreground; }
 
-  /* v4 button hierarchy (2026-07-17, Jess — docs/UI-KIT.md §A5): `.btn-hero` =
+  /* v4 button hierarchy (2026-07-17, Jess — button law now in docs/02-components.md): `.btn-hero` =
    * the ONE flame CTA per page/block; `.btn-primary` = the GREY-SOFT workhorse
    * (solid black is retired — "no heavy black buttons"); `.btn-secondary` =
    * white box, tertiary; `.btn-danger` = red text on white, never red-filled.
@@ -488,4 +499,88 @@
     .pos-fab { transition: none; }
     .pos-fab:hover, .pos-fab:active { transform: none; }
   }
+}
+
+/* Finance only — figures carry a PLAIN zero. The slashed/dotted zero reads
+ * as an 8 in money columns, so inside Finance the mono surfaces switch to
+ * Inter tabular figures (oval 0) and the `zero` feature is turned off. */
+.finance-surface code,
+.finance-surface kbd,
+.finance-surface .font-mono,
+.finance-surface .t-num {
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "zero" 0;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* Owner-approved SO representative template, 2026-10-01. Existing tokens only. */
+.so-template-rail { background: theme('colors.kit.slate.2'); }
+.so-template-rail [data-testid='sales-orders-rail-fixed'] { padding: 8px 12px; }
+.so-rail-navigation [data-kit='tabs'] { flex-direction: column; align-items: stretch; gap: 4px; border: 0; padding-right: 28px; }
+.so-rail-navigation [data-kit='tab'] { height: 36px; justify-content: flex-start; padding: 0 8px; border-radius: 6px; font-weight: 500; }
+.so-rail-navigation [data-kit='tab'][data-state='active'] { background: theme('colors.kit.blue.3'); color: theme('colors.kit.blue.11'); font-weight: 600; }
+.so-rail-navigation [data-kit='tab-indicator'] { display: none; }
+.so-template-rail [data-rail-group] { border-top: 0; padding: 4px 0; }
+.so-template-rail [data-rail-group] > button { min-height: 36px; padding-top: 6px; padding-bottom: 6px; }
+.so-template-rail [data-rail-group] > div > button { min-height: 32px; padding-top: 7px; padding-bottom: 7px; }
+.so-template-rail [data-rail-group] > div > button[aria-pressed='true'] { background: theme('colors.kit.blue.3'); color: theme('colors.kit.blue.11'); }
+@media (max-width: 767px) {
+ .so-template-rail [data-kit='tab'], .so-template-rail [data-rail-group] button { min-height: 40px; }
+}
+
+/* Shared compact view switch; no underline stage-tab styling. */
+[data-kit='tabs'][data-variant='segmented'] { gap: 2px; padding: 2px; border: 1px solid theme('colors.kit.slate.6'); border-radius: 6px; background: white; }
+[data-kit='tabs'][data-variant='segmented'] [data-kit='tab'] { height: 26px; padding: 0 10px; border-radius: 4px; font-size: 13px; line-height: 18px; font-weight: 500; }
+[data-kit='tabs'][data-variant='segmented'] [data-kit='tab'][data-state='active'] { background: theme('colors.kit.blue.3'); color: theme('colors.kit.blue.11'); font-weight: 600; }
+[data-kit='tabs'][data-variant='segmented'] [data-kit='tab-indicator'] { display: none; }
+@media (max-width: 767px) { [data-kit='tabs'][data-variant='segmented'] [data-kit='tab'] { height: 34px; } }
+/* SO filter card palette: neutral headings and white content. */
+.so-template-rail [data-rail-group] > button { background: theme('colors.kit.slate.3'); border-radius: 4px; }
+.so-template-rail [data-rail-group] > button:hover { background: theme('colors.kit.slate.4'); }
+.so-template-rail [data-rail-group] > div { padding-left: 16px; }
+.so-template-rail [data-rail-group] > div > button { font-size: 12px; line-height: 18px; }
+[data-testid='register-column']:has([data-presentation-tools]) { background: theme('colors.kit.canvas'); }
+/* Owner-selected C2 replaces B's unframed groups in the SO pilot. */
+.so-template-rail [data-rail-group] { margin: 4px 0; padding: 0; border: 1px solid theme('colors.kit.slate.6'); border-radius: 6px; background: white; }
+.so-template-rail [data-rail-group] > button { width: 100%; border-radius: 5px; }
+.so-template-rail [data-rail-group] > button[aria-expanded='true'] { border-radius: 5px 5px 0 0; border-bottom: 1px solid theme('colors.kit.slate.6'); }
+.so-template-rail [data-rail-group] > div { margin-top: 0; padding: 4px 8px 4px 16px; }
+
+/* SO representative surface hierarchy: blue selection is unchanged. */
+.so-template-rail { border-right-color: theme('colors.kit.slate.6'); }
+.so-template-rail [data-rail-group] button[aria-pressed='true'] { background: theme('colors.kit.blue.3'); color: theme('colors.kit.blue.11'); }
+@media (max-width: 767px) {
+ .so-template-rail [data-rail-group] button { min-height: 40px; }
+}
+
+/* Sales Order summary leaves the existing 64px utility rail visible. */
+@media (min-width: 768px) {
+  [data-kit='drawer'][data-variant='quick-view'] { right: 4rem; }
+}
+
+/* Shared quick view: owner-approved dark identity bar and fact typography. */
+[data-kit='drawer'][data-variant='quick-view'] > header { background: theme("colors.kit.slate.12"); color: white; }
+[data-kit='drawer'][data-variant='quick-view'] > header h2,
+[data-kit='drawer'][data-variant='quick-view'] > header button { color: white; }
+
+[data-kit='drawer'][data-variant='quick-view'] dt { font-size: 12px; color: theme("colors.kit.slate.11"); }
+[data-kit='drawer'][data-variant='quick-view'] dd { font-weight: 600; margin-top: 4px; }
+[data-kit="drawer"][data-variant="quick-view"] > header button:hover { background: theme("colors.kit.slate.11"); }
+
+@media (max-width: 767px) {
+  [data-kit='drawer'][data-variant='quick-view'] > header { flex-wrap: wrap; gap: 8px; }
+  [data-kit='drawer'][data-variant='quick-view'] > header > div:first-child { flex-basis: 100%; }
+  [data-kit='drawer'][data-variant='quick-view'] > header > div:last-child { width: 100%; justify-content: flex-end; }
+}
+
+/* Object identity/actions wrap by available content width, including shell rails. */
+[data-kit='object-header'] { container-type: inline-size; }
+@container (max-width: 1023px) {
+  [data-kit='object-header'] [data-slot='object-header-row'] { flex-wrap: wrap; height: auto; }
+  [data-kit='object-header'] [data-slot='object-header-row'] > a { order: 1; }
+  [data-kit='object-header'] [data-slot='object-header-divider'], [data-kit='object-header'] [data-slot='object-header-spacer'] { display: none; }
+  [data-kit='object-header'] [data-testid='object-header-identity'] { order: 3; flex: 1 1 0%; height: 44px; }
+  [data-kit='object-header'] [data-testid='object-header-actions'] { order: 4; }
+  [data-kit='object-header'] [data-testid='object-header-global'] { order: 2; margin-left: auto; }
+  [data-kit='object-header'] [data-testid='object-header-break'] { display: block; order: 2; flex-basis: 100%; }
 }

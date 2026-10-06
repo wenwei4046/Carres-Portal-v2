@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolvePwp, type PwpRule, type PwpLineInput } from "./pwp";
+import { resolvePwp, voucherCoversLine, type PwpRule, type PwpLineInput } from "./pwp";
 
 // Standard rule: buy an eligible Mattress model → redeem an eligible Bed Frame
 // model at PWP price, 1 per mattress unit. Ported from 2990s pwp.test.ts and
@@ -351,5 +351,74 @@ describe("resolvePwp — Carres RuleTarget scopes", () => {
       line(1, "ACCESSORY", "acc-ok", { pwp: true }),
     ];
     expect(grantedIdx([COMBO_RULE], lines, comboMap)).toEqual([]);
+  });
+});
+
+/**
+ * ⭐ voucherCoversLine — the CROSS-ORDER eligibility test.
+ *
+ * `resolvePwp` cannot judge a saved voucher: it builds its allowance from the
+ * CURRENT cart's trigger lines, and a carried-forward voucher is spent on a
+ * later order that need not contain the trigger at all. Asking it anyway is how
+ * the whole P8d layer came to be reachable only by carts that did not need it.
+ *
+ * What applies instead is the reward scope FROZEN onto the code at mint. This is
+ * that check, shared so the POS and the server answer identically.
+ *
+ * It deliberately answers ONE question. Status, single-use, expiry and the
+ * customer phone + name binding all belong to `pwp_claim_available_code`'s
+ * atomic UPDATE; re-checking them here would be two arithmetics for one fact.
+ */
+describe("voucherCoversLine", () => {
+  const MODEL_A = "aaaaaaaa-0000-4000-8000-00000000aaaa";
+  const MODEL_B = "bbbbbbbb-0000-4000-8000-00000000bbbb";
+  const at = (category: string, modelId: string | null) => ({
+    category,
+    modelId,
+    sizeCode: null,
+    builtCompartments: [],
+  });
+
+  it("empty targets mean the WHOLE reward category, not nothing", () => {
+    // The same reading `lineMatchesTargets` and the rule form both use. Treating
+    // empty as "match nothing" would make every whole-category voucher dead.
+    const snap = { rewardCategory: "bedframe", rewardTargets: [] };
+    expect(voucherCoversLine(snap, at("bedframe", MODEL_A))).toBe(true);
+    expect(voucherCoversLine(snap, at("bedframe", null))).toBe(true);
+  });
+
+  it("a different category never matches, whatever the targets say", () => {
+    const snap = { rewardCategory: "bedframe", rewardTargets: [] };
+    expect(voucherCoversLine(snap, at("mattress", MODEL_A))).toBe(false);
+  });
+
+  it("category comparison is case-insensitive", () => {
+    // The snapshot is stored text; a stored "Bedframe" must not silently kill a
+    // real voucher.
+    const snap = { rewardCategory: "BedFrame", rewardTargets: [] };
+    expect(voucherCoversLine(snap, at("bedframe", MODEL_A))).toBe(true);
+  });
+
+  it("named targets narrow the category to those models", () => {
+    const snap = {
+      rewardCategory: "bedframe",
+      rewardTargets: [{ modelId: MODEL_A, scope: "model" as const }],
+    };
+    expect(voucherCoversLine(snap, at("bedframe", MODEL_A))).toBe(true);
+    expect(voucherCoversLine(snap, at("bedframe", MODEL_B))).toBe(false);
+  });
+
+  it("a line with no model cannot satisfy a model-scoped voucher", () => {
+    const snap = {
+      rewardCategory: "bedframe",
+      rewardTargets: [{ modelId: MODEL_A, scope: "model" as const }],
+    };
+    expect(voucherCoversLine(snap, at("bedframe", null))).toBe(false);
+  });
+
+  it("the combo map is optional — omitting it must not throw", () => {
+    // Both callers pass one, but the default keeps the signature usable from a
+    // context that has no sofa combos loaded.
+    expect(voucherCoversLine({ rewardCategory: "accessory", rewardTargets: [] }, at("accessory", null))).toBe(true);
   });
 });

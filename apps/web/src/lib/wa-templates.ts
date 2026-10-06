@@ -18,22 +18,25 @@
  *    customer for the final slot; if the customer asks about delivery, ops
  *    replies with the partner's contact.
  *  - {salutation} = the optional preferred-name/title field when set, else the
- *    Title-Cased customer name. NEVER auto-infer Mr/Ms.
+ *    customer name through the ONE display rule. NEVER auto-infer Mr/Ms.
+ */
+import { displayCustomerName } from "@/lib/customer-name";
+
+/*
+ * `titleCaseName` is DELETED — owner ruling 2026-08-15.
+ *
+ * It lowercased the tail of every word to soften `LEE WEI YANG` into
+ * `Lee Wei Yang`, which reads well until the name is initials: it also turned
+ * `KJ NG` into `Kj Ng`, and a WhatsApp message addressed to `Kj` is addressed
+ * to nobody. The owner ruled that a greeting obeys the same capitalize-up rule
+ * as the screen. `displayCustomerName` is the one entry point, and this
+ * function is deleted rather than re-pointed at it, because a second name for
+ * one rule is how two rules come back.
  */
 
-/** "LEE WEI YANG" → "Lee Wei Yang". Leaves CJK and mixed tokens intact. */
-export function titleCaseName(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .map((w) =>
-      /^[A-Za-z]/.test(w) ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w,
-    )
-    .join(" ");
-}
-
 /** The customer salutation: the optional preferred-name/title field if set,
- *  else Title-Case of the customer name. Never auto-infers Mr/Ms. */
+ *  else the customer name through the ONE display rule (capitalize up only —
+ *  `@/lib/customer-name`). Never auto-infers Mr/Ms. */
 export function salutationOf(
   preferred: string | null | undefined,
   customerName: string | null | undefined,
@@ -41,7 +44,7 @@ export function salutationOf(
   const p = (preferred ?? "").trim();
   if (p) return p;
   const n = (customerName ?? "").trim();
-  return n ? titleCaseName(n) : "there";
+  return n ? displayCustomerName(n) : "there";
 }
 
 /** RM figure for templates — thousands-separated, no currency prefix
@@ -51,8 +54,14 @@ export function rmAmount(n: number): string {
 }
 
 /** {items} block — ONE line per item: "{qty}× {model}". */
+/** One labelled message line; an absent value omits the whole line — a message
+ *  never prints a dash for a value (no dash anywhere, owner ruling 2026-09-26). */
+function factLine(label: string, value: string | null | undefined, suffix = ""): string {
+  return value ? `${label}: ${value}${suffix}\n` : "";
+}
+
 export function itemsBlock(lines: { sku: string; qty: number }[]): string {
-  if (lines.length === 0) return "—";
+  if (lines.length === 0) return "";
   return lines.map((l) => `${l.qty}× ${l.sku}`).join("\n");
 }
 
@@ -72,9 +81,9 @@ export function buildCustomerReminder(i: CustomerChaseInput): string {
     `Hi ${i.salutation},\n` +
     `Just a friendly reminder regarding your order.\n` +
     `\n` +
-    `REF: ${i.ref ?? "—"}\n` +
+    factLine("REF", i.ref) +
     `Outstanding: RM ${i.outstanding}\n` +
-    `Item: ${itemsBlock(i.lines)}\n` +
+    factLine("Item", itemsBlock(i.lines)) +
     `\n` +
     `Do let us know once arranged. Thank you!`
   );
@@ -90,11 +99,12 @@ export function buildCustomerFinalReminder(
 ): string {
   return (
     `Hi ${i.salutation},\n` +
-    `Final reminder — your delivery is arranged for ${i.when} and the balance below is still outstanding.\n` +
+    `Final reminder.\n` +
+    `Your delivery is arranged for ${i.when} and the balance below is still outstanding.\n` +
     `\n` +
-    `REF: ${i.ref ?? "—"}\n` +
+    factLine("REF", i.ref) +
     `Outstanding: RM ${i.outstanding}\n` +
-    `Item: ${itemsBlock(i.lines)}\n` +
+    factLine("Item", itemsBlock(i.lines)) +
     `\n` +
     `Kindly settle before delivery so everything can proceed as planned. Thank you!`
   );
@@ -104,11 +114,12 @@ export function buildCustomerFinalReminder(
 export function buildCustomerChase(i: CustomerChaseInput): string {
   return (
     `Hi ${i.salutation},\n` +
-    `Following up on your order — the balance below is still outstanding.\n` +
+    `Following up on your order.\n` +
+    `The balance below is still outstanding.\n` +
     `\n` +
-    `REF: ${i.ref ?? "—"}\n` +
+    factLine("REF", i.ref) +
     `Outstanding: RM ${i.outstanding}\n` +
-    `Item: ${itemsBlock(i.lines)}\n` +
+    factLine("Item", itemsBlock(i.lines)) +
     `\n` +
     `Kindly arrange payment so we can proceed. Thank you!`
   );
@@ -130,11 +141,12 @@ export interface LogisticChaseInput {
 export function buildLogisticReminder(i: LogisticChaseInput): string {
   return (
     `Hi ${i.logistic ?? "team"},\n` +
-    `Friendly reminder — this delivery still needs an arrangement.\n` +
+    `Friendly reminder.\n` +
+    `This delivery still needs an arrangement.\n` +
     `\n` +
-    `REF: ${i.ref ?? "—"}\n` +
-    `Customer: ${i.customer ?? "—"}${i.region ? ` (${i.region})` : ""}\n` +
-    `Item: ${itemsBlock(i.lines)}\n` +
+    factLine("REF", i.ref) +
+    factLine("Customer", i.customer, i.region ? ` (${i.region})` : "") +
+    factLine("Item", itemsBlock(i.lines)) +
     `Deadline: ${i.deadline}\n` +
     `\n` +
     `Please confirm the delivery date + time slot with the customer. Thank you!`
@@ -145,12 +157,13 @@ export function buildLogisticReminder(i: LogisticChaseInput): string {
 export function buildLogisticChase(i: LogisticChaseInput): string {
   return (
     `Hi ${i.logistic ?? "team"},\n` +
-    `Following up — this delivery is still not booked${i.overdue ? " and the deadline has passed" : ""}.\n` +
+    `Following up.\n` +
+    `This delivery is still not booked${i.overdue ? " and the deadline has passed" : ""}.\n` +
     `\n` +
-    `REF: ${i.ref ?? "—"}\n` +
-    `Customer: ${i.customer ?? "—"}${i.region ? ` (${i.region})` : ""}\n` +
-    `Item: ${itemsBlock(i.lines)}\n` +
-    `Deadline: ${i.deadline}${i.overdue ? " — overdue" : ""}\n` +
+    factLine("REF", i.ref) +
+    factLine("Customer", i.customer, i.region ? ` (${i.region})` : "") +
+    factLine("Item", itemsBlock(i.lines)) +
+    `Deadline: ${i.deadline}${i.overdue ? " (overdue)" : ""}\n` +
     `\n` +
     `Please confirm the delivery date + time slot with the customer today. Thank you!`
   );
@@ -169,11 +182,12 @@ export interface SupplierChaseInput {
 export function buildSupplierReminder(i: SupplierChaseInput): string {
   return (
     `Hi,\n` +
-    `Friendly reminder — checking the stock ETA for this PO.\n` +
+    `Friendly reminder.\n` +
+    `Checking the stock ETA for this PO.\n` +
     `\n` +
-    `PO: ${i.poNo ?? "—"}\n` +
-    `Our ref: ${i.ref ?? "—"}\n` +
-    `Item: ${itemsBlock(i.lines)}\n` +
+    factLine("PO", i.poNo) +
+    factLine("Our ref", i.ref) +
+    factLine("Item", itemsBlock(i.lines)) +
     `Needed by: ${i.deadline}\n` +
     `\n` +
     `Please advise when the stock will be ready. Thank you!`
@@ -184,11 +198,12 @@ export function buildSupplierReminder(i: SupplierChaseInput): string {
 export function buildSupplierChase(i: SupplierChaseInput): string {
   return (
     `Hi,\n` +
-    `Following up — we still need the stock ETA for this PO.\n` +
+    `Following up.\n` +
+    `We still need the stock ETA for this PO.\n` +
     `\n` +
-    `PO: ${i.poNo ?? "—"}\n` +
-    `Our ref: ${i.ref ?? "—"}\n` +
-    `Item: ${itemsBlock(i.lines)}\n` +
+    factLine("PO", i.poNo) +
+    factLine("Our ref", i.ref) +
+    factLine("Item", itemsBlock(i.lines)) +
     `Needed by: ${i.deadline}\n` +
     `\n` +
     `Please confirm the ready date today so we can plan the delivery. Thank you!`
@@ -221,7 +236,7 @@ export function buildSupplierGroupMessage(
 ): string {
   const opener =
     mode === "chase"
-      ? `Hi ${supplierName} 👋 following up — we still need the ready date for these, customers are waiting:`
+      ? `Hi ${supplierName} 👋 following up.\nWe still need the ready date for these, customers are waiting:`
       : `Hi ${supplierName} 👋 please confirm the ready date for these:`;
   const closer =
     mode === "chase"
@@ -232,19 +247,19 @@ export function buildSupplierGroupMessage(
   let totalUnits = 0;
   for (const r of rows) {
     const refTag = includePo
-      ? `${r.ref ?? "—"}${r.po ? ` (PO ${r.po})` : ""}`
-      : (r.ref ?? "—");
+      ? [r.ref, r.po ? (r.ref ? `(PO ${r.po})` : `PO ${r.po}`) : null].filter(Boolean).join(" ")
+      : (r.ref ?? "");
     for (const it of r.items) {
       const e = bySku.get(it.sku) ?? { qty: 0, refs: [] };
       e.qty += it.qty;
-      if (!e.refs.includes(refTag)) e.refs.push(refTag);
+      if (refTag && !e.refs.includes(refTag)) e.refs.push(refTag);
       bySku.set(it.sku, e);
       totalUnits += it.qty;
     }
   }
   const body = [...bySku.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([sku, e]) => `*${sku}* ×${e.qty}\n_${e.refs.join(", ")}_`)
+    .map(([sku, e]) => `*${sku}* ×${e.qty}${e.refs.length > 0 ? `\n_${e.refs.join(", ")}_` : ""}`)
     .join("\n\n");
   return `${opener}\n\n${body}\n\nTotal ${totalUnits} unit${totalUnits === 1 ? "" : "s"}. ${closer}`;
 }
@@ -287,7 +302,7 @@ export function buildSupplierClaimMessage(i: SupplierClaimMessageInput): string 
   return [
     `Hi ${i.supplierName} 👋 we have a problem with ${doc}:`,
     ``,
-    `*${i.sku}* ×${i.qty} — ${i.problemLabel}`,
+    `*${i.sku}* ×${i.qty}: ${i.problemLabel}`,
     ``,
     `Please *${i.requestLabel.toLowerCase()}* for the ${units}.`,
     `Photos are attached. Kindly confirm what you will do and by when. Thank you!`,
@@ -321,7 +336,7 @@ export function buildPartnerGroupMessage(
 ): string {
   const opener =
     mode === "chase"
-      ? `Hi ${partnerName} 👋 following up — these deliveries still need a booked slot with the customer:`
+      ? `Hi ${partnerName} 👋 following up.\nThese deliveries still need a booked slot with the customer:`
       : `Hi ${partnerName} 👋 please confirm the delivery date + time slot for these:`;
   const closer =
     mode === "chase"
@@ -329,10 +344,11 @@ export function buildPartnerGroupMessage(
       : `Appreciate a confirmed date + slot per delivery. Thank you!`;
   const body = rows
     .map((r) => {
-      const head = `_${r.ref ?? "—"}_ — ${r.customer ?? "—"}${r.region ? ` (${r.region})` : ""}`;
+      const who = r.customer ? `${r.customer}${r.region ? ` (${r.region})` : ""}` : "";
+      const head = [r.ref ? `_${r.ref}_` : "", who].filter(Boolean).join(" · ");
       const items = itemsBlock(r.items);
-      const when = `by ${r.deadline}${r.overdue ? " — overdue" : ""}`;
-      return `${head}\n${items}\n${when}`;
+      const when = `by ${r.deadline}${r.overdue ? " (overdue)" : ""}`;
+      return [head, items, when].filter(Boolean).join("\n");
     })
     .join("\n\n");
   return `${opener}\n\n${body}\n\n${rows.length} deliver${rows.length === 1 ? "y" : "ies"}. ${closer}`;

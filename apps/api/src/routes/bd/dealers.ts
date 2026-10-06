@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { userClient } from "../../lib/supabase";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import type { AppEnv } from "../../types";
 
 /**
@@ -14,7 +14,6 @@ import type { AppEnv } from "../../types";
  *
  *   GET /                 — dealers list with PO+GMV+outstanding stats
  *   GET /:id              — single dealer + dealer's recent 30 orders
- *   GET /orders/:so       — single order detail (line items + addons)
  *
  * BD sees DEALERS only (Loo 2026-07-25): every route here drops / 404s
  * Carres' own showroom-channel stores — BD's world is the external network.
@@ -33,10 +32,7 @@ bdDealersRouter.use("*", async (c, next) => {
 bdDealersRouter.get("/", async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("dealers_with_stats_list");
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   // Loo 2026-07-25 — BD sees DEALERS only: Carres' own showrooms are the
   // principal's world and stay entirely off the BD surface (this ONE list
   // feeds the BD board's store menu, the Accounts roster AND the POS
@@ -44,10 +40,7 @@ bdDealersRouter.get("/", async (c) => {
   // alongside and DROP showroom rows. Fail closed: a broken channel read
   // must not silently leak showrooms in (or reclassify them as dealers).
   const chan = await sb.from("dealers").select("id, channel");
-  if (chan.error) {
-    const m = mapPgError(chan.error);
-    return c.json(m.body, m.status);
-  }
+  if (chan.error) return fail(c, chan.error);
   const channelById = new Map<string, string>(
     (chan.data ?? []).map((r) => [r.id as string, (r.channel as string) ?? "dealer"]),
   );
@@ -86,10 +79,7 @@ bdDealersRouter.get("/activity", async (c) => {
     .not("dealer_id", "is", null)
     .order("occurred_at", { ascending: false })
     .limit(limit);
-  if (auditRes.error) {
-    const m = mapPgError(auditRes.error);
-    return c.json(m.body, m.status);
-  }
+  if (auditRes.error) return fail(c, auditRes.error);
 
   const dealerIds = Array.from(
     new Set((auditRes.data ?? []).map((a) => a.dealer_id).filter(Boolean) as string[]),
@@ -99,10 +89,7 @@ bdDealersRouter.get("/activity", async (c) => {
     // Channel rides along so showroom-touching events stay off the BD feed
     // (Loo 2026-07-25: BD sees dealers only). Fail closed on a broken read.
     const dRes = await sb.from("dealers").select("id, name, channel").in("id", dealerIds);
-    if (dRes.error) {
-      const m = mapPgError(dRes.error);
-      return c.json(m.body, m.status);
-    }
+    if (dRes.error) return fail(c, dRes.error);
     (dRes.data ?? []).forEach((d) =>
       dealerMap.set(d.id, { name: d.name, channel: (d.channel as string) ?? "dealer" }),
     );
@@ -131,10 +118,7 @@ bdDealersRouter.get("/:id", async (c) => {
   // A showroom id reads as not-found for BD (Loo 2026-07-25: BD sees dealers
   // only — the list never offers one, but the drill-down must not leak either).
   const chanRes = await sb.from("dealers").select("channel").eq("id", id).maybeSingle();
-  if (chanRes.error) {
-    const m = mapPgError(chanRes.error);
-    return c.json(m.body, m.status);
-  }
+  if (chanRes.error) return fail(c, chanRes.error);
   if ((chanRes.data?.channel ?? "dealer") === "showroom") {
     return c.json(
       { error: "not_found", code: "not_found", message: "Dealer not found" },
@@ -143,10 +127,7 @@ bdDealersRouter.get("/:id", async (c) => {
   }
 
   const dealerRes = await sb.rpc("dealer_with_stats", { p_id: id });
-  if (dealerRes.error) {
-    const m = mapPgError(dealerRes.error);
-    return c.json(m.body, m.status);
-  }
+  if (dealerRes.error) return fail(c, dealerRes.error);
   if (
     !dealerRes.data ||
     (Array.isArray(dealerRes.data) && dealerRes.data.length === 0)
@@ -169,10 +150,7 @@ bdDealersRouter.get("/:id", async (c) => {
     .eq("dealer_id", id)
     .order("placed_at", { ascending: false, nullsFirst: false })
     .limit(50);
-  if (ordersRes.error) {
-    const m = mapPgError(ordersRes.error);
-    return c.json(m.body, m.status);
-  }
+  if (ordersRes.error) return fail(c, ordersRes.error);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const orders = (ordersRes.data ?? []).map((o: any) => {
@@ -206,91 +184,6 @@ bdDealersRouter.get("/:id", async (c) => {
   });
 
   return c.json({ dealer, orders });
-});
-
-// ---------- GET /orders/:so ----------
-bdDealersRouter.get("/orders/:so", async (c) => {
-  const soNum = Number.parseInt(c.req.param("so"), 10);
-  if (!Number.isFinite(soNum)) {
-    return c.json(
-      { error: "invalid_input", code: "invalid_param", message: "Invalid SO" },
-      422,
-    );
-  }
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from("orders")
-    .select(
-      "id, so, dealer_id, status, customer_name, customer_phone, customer_address, paid, placed_at, delivery_date, " +
-        "order_lines(id, sku, attrs, qty, unit_price), " +
-        "order_addons(id, kind, qty, unit_price), " +
-        "order_history(id, kind, text, at, occurred_at, role, actor_text)",
-    )
-    .eq("so", soNum)
-    .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  if (!data) {
-    return c.json(
-      { error: "not_found", code: "not_found", message: "Order not found" },
-      404,
-    );
-  }
-
-  // Resolve dealer name for the header — and 404 a showroom's order (Loo
-  // 2026-07-25: BD sees dealers only).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const order = data as any;
-  let dealerName: string | null = null;
-  if (order.dealer_id) {
-    const dRes = await sb
-      .from("dealers")
-      .select("name, channel")
-      .eq("id", order.dealer_id)
-      .maybeSingle();
-    if (((dRes.data?.channel as string) ?? "dealer") === "showroom") {
-      return c.json(
-        { error: "not_found", code: "not_found", message: "Order not found" },
-        404,
-      );
-    }
-    dealerName = dRes.data?.name ?? null;
-  }
-
-  const lineTotal = (order.order_lines ?? []).reduce(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (s: number, l: any) => s + Number(l.unit_price) * Number(l.qty),
-    0,
-  );
-  const addonTotal = (order.order_addons ?? []).reduce(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (s: number, a: any) => s + Number(a.unit_price) * Number(a.qty),
-    0,
-  );
-
-  return c.json({
-    order: {
-      id: order.id,
-      so: order.so,
-      dealerId: order.dealer_id,
-      dealerName,
-      status: order.status,
-      customerName: order.customer_name,
-      customerPhone: order.customer_phone,
-      customerAddress: order.customer_address,
-      paid: Number(order.paid ?? 0),
-      total: lineTotal + addonTotal,
-      lineTotal,
-      addonTotal,
-      placedAt: order.placed_at,
-      deliveryDate: order.delivery_date,
-      lines: order.order_lines ?? [],
-      addons: order.order_addons ?? [],
-      history: order.order_history ?? [],
-    },
-  });
 });
 
 export default bdDealersRouter;

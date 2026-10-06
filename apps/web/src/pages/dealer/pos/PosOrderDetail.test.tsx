@@ -5,7 +5,7 @@
  * un-proceed visibility rules and the diff-only save payload.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within, cleanup } from "@testing-library/react";
 import type { CatalogResponse, Order } from "@carres/shared";
 import PosOrderDetail from "./PosOrderDetail";
 
@@ -117,6 +117,11 @@ const CATALOG = {
     { key: "dispose-mattress", name: "Dispose old mattress", price: 80, active: true, sizeOptions: ["King", "Queen"] },
     { key: "dispose-sofa", name: "Dispose old sofa", price: 50, active: true, sizeOptions: null },
   ],
+  /* ⚠️ `freeUpToFloor: 3` with the order's `floor: 5` below is deliberate: it
+     makes the LIVE surcharge non-zero, so a screen that adds it on top of the
+     stamped row is visible in the total. The previous pair — a floor inside the
+     free band AND `hasLift: true` — zeroed the live half three ways over and is
+     what hid a doubled charge on the collection screen. */
   floorConfig: { id: 1, freeUpToFloor: 3, perFloorPerItem: 20 },
 } as unknown as CatalogResponse;
 
@@ -149,9 +154,11 @@ function order(over: Partial<Order> = {}): Order {
       date: FUTURE,
       proceedDate: FUTURE,
       dateTbd: false,
-      floor: 1,
-      hasLift: true,
-      stairItems: null,
+      /* A REAL stair-carry order: above the free band, no lift, one item
+         needing the carry. The stamped `STAIR_CARRY` row below is the fee. */
+      floor: 5,
+      hasLift: false,
+      stairItems: 1,
     },
     paid: 1500,
     signatureUrl: "sig.png",
@@ -224,10 +231,64 @@ function orderWithAddons(over: Partial<Order> = {}): Order {
         unitPrice: 250,
         attrs: null,
       },
+      // 0406 — the FOURTH server-computed fee. It sits in the shared fixture on
+      // purpose: every pencil count in this file then guards the gate, and a
+      // regression shows up as an off-by-one rather than as a missing test.
+      {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-0000000000a4",
+        orderId: "00000000-0000-0000-0000-000000001201",
+        addonKey: "STAIR_CARRY",
+        qty: 1,
+        unitPrice: 150,
+        attrs: null,
+      },
     ],
     ...over,
   } as Partial<Order>);
 }
+
+/**
+ * ⭐ THE STAIR FEE IS CHARGED ONCE (YH, 2026-09-02 — live money on the
+ * collection screen).
+ *
+ * `addonSubtotal` sums EVERY `order.addons` row, and `0393` stamps the
+ * `STAIR_CARRY` row at birth. This screen ALSO added `floorSurcharge(order,
+ * catalog.floorConfig)` — a live recomputation — on top, so the fee landed in
+ * the total twice and printed twice: once as its own addon row, once as a
+ * `Stair carry` line beneath. `total` drives `outstanding`, and `outstanding`
+ * prefills the record-payment amount, so the POS asked the customer for it
+ * twice.
+ *
+ * ⚠️ THE FIXTURE IS WHAT HID IT, which is why it was un-rigged in the same
+ * commit. It used `floor: 1, hasLift: true, stairItems: null` — three separate
+ * ways of zeroing the live half — while a `unitPrice: 150` STAIR_CARRY row sat
+ * in its addons. Every assertion passed with the bug present.
+ */
+describe("the stair carry is counted once", () => {
+  it("totals the stamped row and does not add a live recomputation on top", () => {
+    renderDrawer(orderWithAddons());
+    const items = screen.getByTestId("pos-od-overlay");
+    /* Lines 3,000 + addons 450 (dispose-sofa 50 · DELIVERY 250 · the stamped
+       STAIR_CARRY 150) = 3,450.
+       The LIVE surcharge on this fixture is floor 5, no lift, 1 item, free to
+       3, RM 20 per floor per item = RM 40 — a DIFFERENT number from the stamped
+       150, chosen so a reintroduced double count cannot hide behind a
+       coincidence. Adding it back gives 3,490. */
+    expect(items.textContent).toContain("3,450");
+    expect(items.textContent).not.toContain("3,490");
+  });
+
+  it("prints the fee once — as its addon row, not as a second Stair carry line", () => {
+    renderDrawer(orderWithAddons());
+    const items = screen.getByTestId("pos-od-overlay");
+    /* The addon row's label resolves through the catalog, which this fixture
+       does not stock — so it prints the raw key here and `Stair carry` in
+       production (0393 seeds that name). Count BOTH spellings: what is being
+       pinned is that the fee appears ONCE, not which word it wears. */
+    const hits = (items.textContent ?? "").match(/Stair carry|STAIR_CARRY/g) ?? [];
+    expect(hits).toHaveLength(1);
+  });
+});
 
 describe("place lane", () => {
   it("renders the 5-chip checklist and an enabled Move to Proceed when all checks pass", async () => {
@@ -426,11 +487,13 @@ describe("line edit (0255)", () => {
     expect(h.replaceMutateAsync).not.toHaveBeenCalled();
   });
 
-  // 0258 — service add-on rows get the pencil too; DELIVERY* stays locked.
-  it("addon pencil edits qty directly in the place lane (DELIVERY row locked)", async () => {
+  // 0258 — service add-on rows get the pencil too; a server-computed fee stays
+  // locked. 0406 — that is all FOUR computed keys, not only the delivery trio.
+  it("addon pencil edits qty directly in the place lane (computed rows locked)", async () => {
     renderDrawer(orderWithAddons());
     const pencils = screen.getAllByTestId("pos-od-edit-addon");
-    expect(pencils).toHaveLength(1); // dispose-sofa only — DELIVERY has none
+    // dispose-sofa only — DELIVERY and STAIR_CARRY are both server-computed.
+    expect(pencils).toHaveLength(1);
     fireEvent.click(pencils[0]);
     expect(screen.getByTestId("pos-od-addon-modal")).toBeTruthy();
     // qty 1 → 2 (minus disabled at the original qty — up-sell law).
@@ -495,6 +558,27 @@ describe("line edit (0255)", () => {
       }),
     );
     expect(h.editAddonMutateAsync).not.toHaveBeenCalled();
+  });
+
+  // 0406 — a computed fee is not a pickable service, on EVERY surface. The
+  // office screen closed this door on 2026-08-29; this one stayed open because
+  // its gate read a local label map instead of the exported list. The bug was
+  // a double charge: one click sent qty 2 and the customer owed RM 300 for a
+  // carry nobody quoted.
+  it("never offers the pencil on a stair carry — in either editable lane", () => {
+    for (const over of [
+      {} as Partial<Order>, // place lane — the fixture's own status
+      { status: "proceed_order", operationStage: "confirmed" } as Partial<Order>,
+    ]) {
+      const onClose = renderDrawer(orderWithAddons(over));
+      // The row is still SHOWN and still carries its money — it is locked, not
+      // hidden. A fee the customer owes must remain readable.
+      expect(screen.getByText("150")).toBeTruthy();
+      // ...and exactly one pencil exists, on the one service a human picked.
+      expect(screen.getAllByTestId("pos-od-edit-addon")).toHaveLength(1);
+      onClose();
+      cleanup();
+    }
   });
 
   it("proceed pencil hides while a change request is pending; delivered hides it too", () => {
@@ -576,7 +660,7 @@ describe("line edit (0255)", () => {
     fireEvent.click(screen.getByTestId("stub-emit-down"));
     await waitFor(() => expect(screen.getByTestId("pos-od-items-err")).toBeTruthy());
     expect(screen.getByTestId("pos-od-items-err").textContent).toContain(
-      "edits can only upgrade the order",
+      "Edits can only upgrade the order",
     );
     expect(h.replaceMutateAsync).not.toHaveBeenCalled();
   });

@@ -34,7 +34,16 @@ import InviteDealerModal from "./components/InviteDealerModal";
  */
 type StatusFilter = "all" | "active" | "pending" | "suspended" | "rejected";
 
-export default function PrincipalDealers({ channel }: { channel: StoreChannel }) {
+// 0543 — `financeView`: the same list mounted under Finance. Finance edits
+// the master fields of existing dealers; inviting and suspending stay with
+// the principal, so the create button and the status actions are hidden.
+export default function PrincipalDealers({
+  channel,
+  financeView = false,
+}: {
+  channel: StoreChannel;
+  financeView?: boolean;
+}) {
   const { data, isLoading } = usePrincipalDealers();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -84,7 +93,8 @@ export default function PrincipalDealers({ channel }: { channel: StoreChannel })
         const q = search.toLowerCase();
         if (
           !d.name.toLowerCase().includes(q) &&
-          !d.region.toLowerCase().includes(q)
+          !d.region.toLowerCase().includes(q) &&
+          !(d.code ?? "").toLowerCase().includes(q)
         ) {
           return false;
         }
@@ -119,22 +129,26 @@ export default function PrincipalDealers({ channel }: { channel: StoreChannel })
           </div>
           <div className="text-meta text-base-500 mt-1">{t.blurb}</div>
         </div>
-        {/* A dealer is invited (pending → approval); a showroom is ours, so it
-            is born straight out of Accounts with its login + first staff PIN. */}
-        <button
-          type="button"
-          onClick={() =>
-            showroomPage
-              ? navigate("/principal?tab=accounts&new=showroom")
-              : setShowInvite(true)
-          }
-          className="btn-primary"
-        >
-          {t.cta}
-        </button>
       </div>
 
+      {/* UI MASTER §6.0 rule 1: the one create button leads the toolbar,
+          beside Search, not off in the header corner.
+          A dealer is invited (pending → approval); a showroom is ours, so it
+          is born straight out of Accounts with its login + first staff PIN. */}
       <div className="flex gap-2 mb-3.5 items-center">
+        {!financeView && (
+          <button
+            type="button"
+            onClick={() =>
+              showroomPage
+                ? navigate("/principal?tab=accounts&new=showroom")
+                : setShowInvite(true)
+            }
+            className="btn-primary"
+          >
+            {t.cta}
+          </button>
+        )}
         <input
           type="search"
           placeholder={t.searchPlaceholder}
@@ -166,7 +180,6 @@ export default function PrincipalDealers({ channel }: { channel: StoreChannel })
 
       {filtered.length === 0 ? (
         <div className="bg-white border border-base-200 rounded-md p-12 text-center text-base-500">
-          <div className="text-page mb-2 text-base-300">—</div>
           <div className="font-display text-strong">{t.empty}</div>
           <div className="text-meta mt-1">{t.emptyHint}</div>
         </div>
@@ -204,7 +217,11 @@ export default function PrincipalDealers({ channel }: { channel: StoreChannel })
       )}
 
       {openId && (
-        <DealerDrawer dealerId={openId} onClose={() => setOpenId(null)} />
+        <DealerDrawer
+          dealerId={openId}
+          onClose={() => setOpenId(null)}
+          canSetStatus={!financeView}
+        />
       )}
       {/* Dealer page only — the showroom CTA navigates to Accounts instead. */}
       {showInvite && (

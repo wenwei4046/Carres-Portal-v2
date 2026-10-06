@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 // Unified Internal Portal — shared role-aware rail (no props, self-owned state).
 import PortalSidebar from "@/pages/portal/PortalSidebar";
 import PageHeader from "@/components/PageHeader";
+import { appTodayIso } from "@/lib/fmt-date";
 import HrOverviewTab from "./HrOverviewTab";
 import HrCommissionTab from "./HrCommissionTab";
 import HrCommissionTabs from "./HrCommissionTabs";
@@ -108,8 +109,8 @@ export default function HrApp() {
       : "overview";
 
   const [ym, setYm] = useState<YearMonth>(() => {
-    const now = new Date();
-    return { year: now.getFullYear(), month: now.getMonth() + 1 };
+    const [year, month] = appTodayIso().split("-").map(Number);
+    return { year, month };
   });
 
   const title =

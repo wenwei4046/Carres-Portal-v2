@@ -6,13 +6,10 @@ import {
   opsStockReleaseInputSchema,
   opsStockReassignInputSchema,
   opsStockTakeoutInputSchema,
-  opsStockHoldUnitInputSchema,
-  opsStockResolveUnitHoldInputSchema,
   opsStockFlagRepairInputSchema,
   opsStockRefurbishInputSchema,
   opsStockRefurbishCompleteInputSchema,
   opsStockUpdateConditionInputSchema,
-  opsStockCreateInputSchema,
   opsStockImportInputSchema,
   opsReorderPointInputSchema,
   opsReserveLevelInputSchema,
@@ -29,17 +26,37 @@ import {
   stockHealthHeadline,
   computeSlowMovers,
   computePlanAccuracy,
+  type StockRegisterUnit,
   type StockUnitKeyParts,
   type PlanSalesLine,
   type PlanStatus,
   type PlanStockUnit,
   type PoolUsageEntry,
   type PoolUseReason,
+  unitAvailability,
+  unitLifecycleOutcome,
+  canonicalUnitIdFrom,
+} from "@carres/shared";
+import {
+  buildIssueEnglish,
+  unitCountAgainAction,
+  unitProblemAction,
+  unitProblemChoice,
+  unitProblemIntake,
+  unitProblemReportInputSchema,
+  type UnitProblemUnit,
+  supplierReturnPickupInputSchema,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
+import { stockMovementEvidence } from "../../lib/stock-movement-evidence";
+import { stockRegisterContext } from "../../lib/stock-register-context";
+import { attemptDeliveryOrderIssue, todayIsoMYT } from "../../lib/delivery-order-issue";
 import { myDuties } from "../../lib/duties";
+import { skuCategories } from "../../lib/sku-categories";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+import { parseBody } from "../../lib/route-helpers";
+import { resolveActorNames } from "../../lib/actor-names";
 
 /**
  * Per-unit stock register (migration 0137) — Carres Klang scope.
@@ -48,7 +65,10 @@ import type { AppEnv } from "../../types";
  *   /ready      — status='free' AND condition∈('new','exhibition') AND !needs_repair
  *   /reserved   — status='reserved'
  *   /repair     — needs_repair=true OR condition∈('old','damaged')
- *   /inventory  — everything (master grid)
+ *   /inventory  — everything (master grid), each row carrying its CATALOG
+ *                 category (D9). The other three do not ask, so their rows
+ *                 carry no `category` key at all rather than a null that would
+ *                 read as "the catalog has no row for this".
  *
  * POST endpoints (5 actions, each calls a SECURITY DEFINER RPC):
  *   /reserve, /release, /reassign, /takeout, /flag-repair
@@ -118,6 +138,19 @@ opsStockRouter.get("/repair", requireOperationOrPrincipal, async (c) => {
   return c.json({ items: shape(data ?? []), total: (data ?? []).length });
 });
 
+/**
+ * /inventory — the master grid, and the only list view that carries a CATEGORY.
+ *
+ * D9 (ERP-ARCHITECTURE §3.1): *"what kind of product is this?"* is the
+ * CATALOG's answer and nobody else's. The category is resolved through
+ * `sku → product_skus → product_models.category` by the ONE shared reader every
+ * other gate already asks (`skuCategories`), so this screen can never disagree
+ * with the earliest-sell floor or the goods gate about what a sofa is.
+ *
+ * **Nothing here reads the SKU TEXT.** The prefix/regex guessers that D9 was
+ * raised against are wrong for every live SKU; a unit the catalog does not hold
+ * comes back `category: null` and says so on screen.
+ */
 opsStockRouter.get("/inventory", requireOperationOrPrincipal, async (c) => {
   const auth = c.var.auth;
   const sb = userClient(c.env, auth.jwt);
@@ -127,7 +160,475 @@ opsStockRouter.get("/inventory", requireOperationOrPrincipal, async (c) => {
     .order("sku", { ascending: true })
     .order("status", { ascending: true });
   if (error) throw new HTTPException(500, { message: error.message });
-  return c.json({ items: shape(data ?? []), total: (data ?? []).length });
+  const rows = (data ?? []) as RawRow[];
+  const categories = await skuCategories(sb, rows.map((r) => r.sku));
+  const items = shape(rows).map((item) => ({
+    ...item,
+    category: categories.get(item.sku) ?? null,
+  }));
+  return c.json({ items, total: rows.length });
+});
+
+// =====================================================================
+// THE STOCK REGISTER — CARD-2026-08-20-stock-register
+// =====================================================================
+
+/**
+ * GET /register — the one current listing of controlled Units.
+ *
+ * READ-ONLY, AND THAT IS THE DESIGN. Stock exposes no second reservation
+ * editor: choosing, binding, substituting and releasing an exact Unit are the
+ * Sales Order's decisions (Stock MASTER §4, Card §2). This endpoint therefore
+ * has no sibling POST and the page it feeds has no row-level editor.
+ *
+ * It reads `stock_unit_register_v` (0373) — the Unit register plus the last
+ * PHYSICAL event — and nothing else. It does NOT:
+ *   · touch `ops_stock_items` directly (0366 left it with no write policy, and
+ *     a register has no business reading around the governed view anyway);
+ *   · read `stock_balances`, which since 0366 is a non-authoritative cache and
+ *     may never answer whether goods can be offered;
+ *   · re-derive availability. `availability` and `lifecycle_outcome` arrive
+ *     already decided by the one arithmetic, and this route copies them across
+ *     without an opinion (Law D).
+ *
+ * The whole current register is returned in one read and filtered in the
+ * browser, exactly as `/inventory` has been: 136 Units today, and the rail has
+ * to count every section (`Available 85`, `Not in catalog 87`) to draw itself,
+ * which a server-side page of 50 cannot do without a second round trip per
+ * chip. When the register outgrows one read, the counts move to
+ * `stock_sku_availability` and the rows paginate — the shape that changes then
+ * is this endpoint's, not the page's.
+ */
+opsStockRouter.get("/register", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  let query = sb
+    .from("stock_unit_register_v")
+    .select(
+      "id, unit_code, sku, category, warehouse_id, site_name, holder_party_id, " +
+        "holder_name, ownership, supplier, po_no, status, condition, needs_repair, " +
+        "hold_reason, reserved_ref, sold_order_id, qty, date_in, last_verified_at, " +
+        "availability, lifecycle_outcome, last_event_at, last_event, identity_scope",
+    )
+    .order("unit_code", { ascending: true });
+  // Internal readers retain their existing role/RLS boundary. Narrow before
+  // enrichment/export so a Showroom surface receives its owning Site only.
+  const site = c.req.query("site");
+  if (site) query = query.eq("site_name", site);
+  const { data, error } = await query;
+  if (error) throw mapErr(error);
+
+  const units = (data ?? []).map((r) => {
+    const row = r as unknown as Record<string, unknown>;
+    return {
+      id: row.id as string,
+      unitCode: row.unit_code as string,
+      // 0453 — the register finally says WHICH KIND of row this is, so no
+      // surface can print a counted row's technical key as a Unit ID.
+      identityScope: ((row.identity_scope as string | null) ??
+        "unit") as StockRegisterUnit["identityScope"],
+      sku: row.sku as string,
+      category: (row.category as string | null) ?? null,
+      warehouseId: (row.warehouse_id as string | null) ?? null,
+      siteName: (row.site_name as string | null) ?? null,
+      holderPartyId: (row.holder_party_id as string | null) ?? null,
+      holderName: (row.holder_name as string | null) ?? null,
+      ownership: row.ownership as string,
+      supplier: (row.supplier as string | null) ?? null,
+      poNo: (row.po_no as string | null) ?? null,
+      status: row.status as string,
+      condition: row.condition as string,
+      needsRepair: Boolean(row.needs_repair),
+      holdReason: (row.hold_reason as string | null) ?? null,
+      reservedRef: (row.reserved_ref as string | null) ?? null,
+      soldOrderId: (row.sold_order_id as string | null) ?? null,
+      qty: (row.qty as number | null) ?? 1,
+      dateIn: (row.date_in as string | null) ?? null,
+      lastVerifiedAt: (row.last_verified_at as string | null) ?? null,
+      availability: row.availability as StockRegisterUnit["availability"],
+      lifecycleOutcome: row.lifecycle_outcome as string,
+      lastEventAt: (row.last_event_at as string | null) ?? null,
+      lastEvent: (row.last_event as string | null) ?? null,
+    } satisfies StockRegisterUnit;
+  });
+
+  try {
+    return c.json({ units: await stockRegisterContext(sb, units), total: units.length });
+  } catch (error) {
+    throw mapErr(error as { code?: string; message?: string });
+  }
+});
+
+/**
+ * GET /register/:unitCode — one Unit, for the Unit object page.
+ *
+ * Looked up by the PERMANENT Carres Unit ID, never by the row's uuid: the ID is
+ * what is printed on the supplier's label and what an operator types, and it is
+ * the thing 0366 promised never changes and is never reused. A Unit whose life
+ * has ended still resolves here — Card §1 keeps ended Units out of the default
+ * LIST, not out of history.
+ *
+ * `events` is the append-only physical lineage, newest first, ordered by `seq`
+ * and never by `event_at` (0372: two events in one statement can share a clock
+ * reading to the microsecond, and a lineage ordered by a tying key is not a
+ * lineage).
+ */
+opsStockRouter.get("/register/:unitCode", requireOperationOrPrincipal, async (c) => {
+  const unitCode = c.req.param("unitCode");
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  // SEARCH IS TOLERANT, THE STORED IDENTITY IS NOT TOUCHED. A scanner may drop
+  // the hyphens and a keyboard may be left on caps; both name the same Unit. We
+  // look up the spelling as typed, then its canonical `U1-000-001` form.
+  const SELECT =
+    "id, unit_code, sku, category, warehouse_id, site_name, holder_party_id, " +
+    "holder_name, ownership, supplier, po_no, status, condition, needs_repair, " +
+    "hold_reason, reserved_ref, sold_order_id, qty, date_in, last_verified_at, " +
+    "availability, lifecycle_outcome, last_event_at, last_event, identity_scope";
+
+  // `ilike` reads `%` and `_` as wildcards, and this value comes straight off
+  // the URL. Escape them, or `…/register/%` matches every row and the
+  // single-row read fails with a 500 where the honest answer is "no such Unit".
+  const forIlike = (v: string) => v.replace(/([\\%_])/g, "\\$1");
+  const candidates = Array.from(
+    new Set(
+      [unitCode, canonicalUnitIdFrom(unitCode)].filter(
+        (v): v is string => typeof v === "string" && v.trim() !== "",
+      ),
+    ),
+  );
+
+  let data: unknown = null;
+  for (const candidate of candidates) {
+    const { data: hit, error } = await sb
+      .from("stock_unit_register_v")
+      .select(SELECT)
+      .ilike("unit_code", forIlike(candidate))
+      .maybeSingle();
+    if (error) throw mapErr(error);
+    if (hit) {
+      data = hit;
+      break;
+    }
+  }
+  if (!data) throw new HTTPException(404, { message: "No Unit with that ID" });
+
+  // 0453 — a counted row's key is a database fact, not an identity. Nobody may
+  // reach a bulk row by "scanning" it, because nothing was ever printed.
+  if ((data as Record<string, unknown>).identity_scope === "quantity") {
+    throw new HTTPException(404, { message: "No Unit with that ID" });
+  }
+
+  const row = data as unknown as Record<string, unknown>;
+  const unit = {
+    id: row.id as string,
+    unitCode: row.unit_code as string,
+    identityScope: ((row.identity_scope as string | null) ??
+      "unit") as StockRegisterUnit["identityScope"],
+    sku: row.sku as string,
+    category: (row.category as string | null) ?? null,
+    warehouseId: (row.warehouse_id as string | null) ?? null,
+    siteName: (row.site_name as string | null) ?? null,
+    holderPartyId: (row.holder_party_id as string | null) ?? null,
+    holderName: (row.holder_name as string | null) ?? null,
+    ownership: row.ownership as string,
+    supplier: (row.supplier as string | null) ?? null,
+    poNo: (row.po_no as string | null) ?? null,
+    status: row.status as string,
+    condition: row.condition as string,
+    needsRepair: Boolean(row.needs_repair),
+    holdReason: (row.hold_reason as string | null) ?? null,
+    reservedRef: (row.reserved_ref as string | null) ?? null,
+    soldOrderId: (row.sold_order_id as string | null) ?? null,
+    qty: (row.qty as number | null) ?? 1,
+    dateIn: (row.date_in as string | null) ?? null,
+    lastVerifiedAt: (row.last_verified_at as string | null) ?? null,
+    availability: row.availability as StockRegisterUnit["availability"],
+    lifecycleOutcome: row.lifecycle_outcome as string,
+    lastEventAt: (row.last_event_at as string | null) ?? null,
+    lastEvent: (row.last_event as string | null) ?? null,
+  } satisfies StockRegisterUnit;
+
+  const { data: evRows, error: evErr } = await sb
+    .from("stock_unit_events")
+    .select("id, event, from_value, to_value, note, event_at, seq")
+    .eq("unit_id", unit.id)
+    .order("seq", { ascending: false })
+    .limit(200);
+  if (evErr) throw mapErr(evErr);
+
+  const events = (evRows ?? []).map((e) => {
+    const ev = e as unknown as Record<string, unknown>;
+    return {
+      id: ev.id as string,
+      event: ev.event as string,
+      fromValue: (ev.from_value as string | null) ?? null,
+      toValue: (ev.to_value as string | null) ?? null,
+      note: (ev.note as string | null) ?? null,
+      eventAt: ev.event_at as string,
+    };
+  });
+
+  const context = await stockRegisterContext(sb, [unit]);
+  return c.json({ unit: context[0], events });
+});
+
+opsStockRouter.get("/register/:unitCode/movements", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const code = c.req.param("unitCode").replace(/([\\%_])/g, "\\$1");
+  const { data: unit, error } = await sb.from("stock_unit_register_v")
+    .select("id,identity_scope").ilike("unit_code", code).maybeSingle();
+  if (error) throw mapErr(error);
+  if (!unit || unit.identity_scope === "quantity") throw new HTTPException(404, { message: "No Unit with that ID" });
+  return c.json({ evidence: await stockMovementEvidence(sb, unit.id) });
+});
+
+// =====================================================================
+// Unit Detail `⋮` — Report a problem · Make available for sale · Count again
+// Stock MASTER §6 · §7 · §12.4 (owner rulings 2026-09-25, design approved
+// 2026-09-26). Migration 0589.
+// =====================================================================
+
+const UNIT_ACTION_SELECT =
+  "id, unit_code, sku, warehouse_id, site_name, status, condition, needs_repair, " +
+  "hold_reason, reserved_ref, sold_order_id, availability, identity_scope";
+
+/** The exact Unit behind a `⋮` act — by its permanent ID, never a counted row. */
+async function unitForAction(sb: ReturnType<typeof userClient>, unitCode: string): Promise<UnitProblemUnit & { needsRepair: boolean }> {
+  const code = unitCode.replace(/([\\%_])/g, "\\$1");
+  const { data: found, error } = await sb.from("stock_unit_register_v").select(UNIT_ACTION_SELECT).ilike("unit_code", code).maybeSingle();
+  if (error) throw mapErr(error);
+  const data = (found ?? null) as Record<string, unknown> | null;
+  if (!data || data.identity_scope === "quantity") throw new HTTPException(404, { message: "No Unit with that ID" });
+  const { data: catalog } = await sb.from("product_skus").select("sku, variant, product_models(name)").eq("sku", data.sku as string).maybeSingle();
+  const model = catalog ? (Array.isArray(catalog.product_models) ? catalog.product_models[0] : catalog.product_models) : null;
+  return {
+    id: data.id as string,
+    unitCode: data.unit_code as string,
+    sku: data.sku as string,
+    productName: model?.name ? [model.name, catalog?.variant].filter(Boolean).join(" · ") : null,
+    availability: data.availability as string,
+    status: data.status as string,
+    reservedRef: (data.reserved_ref as string | null) ?? null,
+    soldOrderId: (data.sold_order_id as string | null) ?? null,
+    siteName: (data.site_name as string | null) ?? null,
+    needsRepair: Boolean(data.needs_repair),
+  };
+}
+
+/** The open Issues that name this Unit, with their current action. */
+async function openIssuesForUnit(sb: ReturnType<typeof userClient>, unitId: string) {
+  const { data, error } = await sb
+    .from("issues")
+    .select("id, issue_no, status, observed_problem, official_english, observed_on, issue_links!inner(object_kind, object_id), issue_actions(id, status, trigger, owner_rule, action, recipient, required_result, due_on)")
+    .eq("issue_links.object_kind", "unit")
+    .eq("issue_links.object_id", unitId)
+    .not("status", "in", "(closed,voided)")
+    .order("observed_on", { ascending: false });
+  if (error) throw mapErr(error);
+  return (data ?? []).map((row: Record<string, unknown>) => {
+    const actions = (row.issue_actions as Array<Record<string, unknown>> | null) ?? [];
+    const current = actions.find((a) => a.status === "open") ?? null;
+    return {
+      id: row.id as string,
+      issueNo: row.issue_no as string,
+      status: row.status as string,
+      observedProblem: row.observed_problem as string,
+      officialEnglish: row.official_english as string,
+      observedOn: row.observed_on as string,
+      currentAction: current
+        ? {
+            id: current.id as string,
+            trigger: current.trigger as string,
+            ownerRule: current.owner_rule as string,
+            action: current.action as string,
+            recipient: current.recipient as string,
+            requiredResult: current.required_result as string,
+            dueOn: current.due_on as string,
+          }
+        : null,
+    };
+  });
+}
+
+/** A door that refuses for a business reason answers 409 with its sentence. */
+function unitDoorRefusal(error: { code?: string; message?: string; details?: string }) {
+  const detail = error.details ?? "";
+  const refused = new Set(["problem_open", "in_repair", "in_transit", "no_site", "resolve_through_claim", "not_cannot_sell", "not_a_unit", "inspection_hold_needs_pool_unit"]);
+  if (refused.has(detail)) return new HTTPException(409, { message: error.message ?? detail });
+  if (error.code === "42501") return new HTTPException(403, { message: error.message ?? "forbidden" });
+  return mapErr(error);
+}
+
+// GET /register/:unitCode/issues — the Unit's open problems and their current action.
+opsStockRouter.get("/register/:unitCode/issues", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const unit = await unitForAction(sb, c.req.param("unitCode"));
+  return c.json({ issues: await openIssuesForUnit(sb, unit.id) });
+});
+
+// POST /register/:unitCode/report-problem — ONE door (0589): the Issue and the
+// derived protective control commit together or not at all.
+opsStockRouter.post("/register/:unitCode/report-problem", requireOperationOrPrincipal, async (c) => {
+  const parsed = await parseBody(c, unitProblemReportInputSchema);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const unit = await unitForAction(sb, c.req.param("unitCode"));
+  const today = todayIsoMYT();
+  const observedOn = parsed.observedOn ?? today;
+  const names = await resolveActorNames(sb, [c.var.auth.id]);
+  const foundByName = names.get(c.var.auth.id) ?? c.var.auth.email ?? "Warehouse";
+  const intake = unitProblemIntake(unit, parsed, foundByName, observedOn);
+  const action = unitProblemAction(unit, parsed.problem, today);
+  const { data, error } = await sb.rpc("stock_unit_report_problem", {
+    p_request_id: parsed.requestId,
+    p_item_id: unit.id,
+    p_observed: unitProblemChoice(parsed.problem).observed,
+    p_issue: {
+      problem_object: intake.problemObject,
+      observed_problem: intake.observedProblem,
+      source_module: "warehouse",
+      business_impact: intake.impact,
+      materiality: "routine",
+      observed_on: intake.observedOn,
+      affected_object: intake.affectedObject,
+      official_english: buildIssueEnglish(intake),
+      optional_detail: intake.optionalDetail ?? null,
+      found_by_kind: intake.foundByKind,
+      found_by_name: intake.foundByName,
+    },
+    p_links: intake.linkedObjects,
+    // Each file is its own proof line, so the Issue keeps the object key.
+    p_evidence: parsed.evidence.map((e) => ({ kind: e.kind, label: e.path })),
+    p_action: action,
+  });
+  if (error) throw unitDoorRefusal(error);
+  const result = data as { id: string; issue_no: string; official_english: string; replayed: boolean; protection: string };
+  return c.json({
+    issueId: result.id,
+    issueNo: result.issue_no,
+    officialEnglish: result.official_english,
+    protection: result.protection,
+    action,
+    replayed: result.replayed === true,
+  }, result.replayed ? 200 : 201);
+});
+
+// POST /register/:unitCode/make-available — the way back from Cannot sell (0589).
+opsStockRouter.post("/register/:unitCode/make-available", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const unit = await unitForAction(sb, c.req.param("unitCode"));
+  const { data, error } = await sb.rpc("stock_unit_make_available", { p_item_id: unit.id });
+  if (error) throw unitDoorRefusal(error);
+  return c.json(data ?? { item_id: unit.id });
+});
+
+// POST /register/:unitCode/count-again — a repeat look for a Unit an open
+// `Not found` report names: the current action gets its result and the next
+// dated look replaces it (Issue Tracker's one result door).
+opsStockRouter.post("/register/:unitCode/count-again", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const unit = await unitForAction(sb, c.req.param("unitCode"));
+  const issues = await openIssuesForUnit(sb, unit.id);
+  const notFound = issues.find((i) => i.observedProblem === "missing" && i.currentAction);
+  if (!notFound?.currentAction) {
+    throw new HTTPException(409, { message: "No open Not found report names this Unit" });
+  }
+  const next = unitCountAgainAction(unit, todayIsoMYT());
+  const { data, error } = await sb.rpc("issue_record_action_result", {
+    p_issue_id: notFound.id,
+    p_action_id: notFound.currentAction.id,
+    p_result_code: "answer_recorded",
+    p_result: "Count again requested",
+    p_next_action: next,
+  });
+  if (error) throw unitDoorRefusal(error);
+  return c.json({ issueId: notFound.id, action: next, result: data ?? null });
+});
+
+// =====================================================================
+// Outbound `Return to supplier` — the supplier collects exact Units of a
+// Purchase Return (Stock MASTER §12.8 · Purchasing §9.6, owner approval
+// 2026-09-29). Migration 0612. Purchasing issues the return; Stock records
+// the physical handover and moves custody; nothing here decides money.
+// =====================================================================
+
+/** GET /supplier-returns — every issued Purchase Return with a Unit still to be
+ *  collected, with its Units, Pickup Location and Confirmed Pickup date. */
+opsStockRouter.get("/supplier-returns", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data: units, error } = await sb
+    .from("purchase_return_units")
+    .select("purchase_return_id, stock_item_id, unit_code, item, item_spec, pickup_location, return_to, actual_pickup_date, collected_by_name")
+    .order("unit_code");
+  if (error) throw mapErr(error);
+  const byReturn = new Map<string, Array<Record<string, unknown>>>();
+  for (const u of units ?? []) {
+    const id = u.purchase_return_id as string;
+    byReturn.set(id, [...(byReturn.get(id) ?? []), u]);
+  }
+  const open = [...byReturn.entries()].filter(([, list]) => list.some((u) => !u.actual_pickup_date)).map(([id]) => id);
+  if (open.length === 0) return c.json({ returns: [] });
+  const { data: docs, error: docErr } = await sb
+    .from("purchase_returns")
+    .select("id, pr_no, pr_doc_date, confirmed_pickup_date, supplier_id")
+    .in("id", open);
+  if (docErr) throw mapErr(docErr);
+  const supplierIds = [...new Set((docs ?? []).map((d) => d.supplier_id as string))];
+  const { data: suppliers, error: supErr } = supplierIds.length
+    ? await sb.from("suppliers").select("id, name").in("id", supplierIds)
+    : { data: [], error: null };
+  if (supErr) throw mapErr(supErr);
+  const supplierName = new Map((suppliers ?? []).map((s) => [s.id as string, s.name as string]));
+  const returns = (docs ?? [])
+    .map((d) => ({
+      id: d.id as string,
+      prNo: d.pr_no as string,
+      prDocDate: d.pr_doc_date as string,
+      confirmedPickupDate: (d.confirmed_pickup_date as string | null) ?? null,
+      supplier: supplierName.get(d.supplier_id as string) ?? null,
+      units: (byReturn.get(d.id as string) ?? []).map((u) => ({
+        stockItemId: u.stock_item_id as string,
+        unitCode: u.unit_code as string,
+        item: (u.item as string | null) ?? null,
+        itemSpec: (u.item_spec as string | null) ?? null,
+        pickupLocation: (u.pickup_location as string | null) ?? null,
+        returnTo: (u.return_to as string | null) ?? null,
+        actualPickupDate: (u.actual_pickup_date as string | null) ?? null,
+        collectedByName: (u.collected_by_name as string | null) ?? null,
+      })),
+    }))
+    .sort((a, b) => (a.confirmedPickupDate ?? "9999").localeCompare(b.confirmedPickupDate ?? "9999") || a.prNo.localeCompare(b.prNo));
+  return c.json({ returns });
+});
+
+/** POST /supplier-returns/:id/pickup — ONE door (0612): exact Units, the
+ *  supplier's collector, the actual time and proof; custody moves per Unit. */
+opsStockRouter.post("/supplier-returns/:id/pickup", requireOperationOrPrincipal, async (c) => {
+  const id = c.req.param("id");
+  if (!/^[0-9a-f-]{36}$/i.test(id)) throw new HTTPException(404, { message: "Purchase return not found" });
+  const parsed = await parseBody(c, supplierReturnPickupInputSchema);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("stock_record_supplier_return_pickup", {
+    p_request_id: parsed.requestId,
+    p_purchase_return_id: id,
+    p_unit_ids: parsed.unitIds,
+    p_collector_name: parsed.collectorName,
+    p_picked_up_at: parsed.pickedUpAt,
+    p_evidence: parsed.proof,
+    p_note: parsed.note ?? null,
+  });
+  if (error) {
+    if (error.code === "23505") throw new HTTPException(409, { message: error.message ?? "request already used" });
+    throw mapErr(error);
+  }
+  const r = data as { handover_id: string; units: number; open_units: number; total_units: number; replayed: boolean };
+  return c.json({
+    handoverId: r.handover_id,
+    units: r.units,
+    openUnits: r.open_units,
+    totalUnits: r.total_units,
+    replayed: r.replayed === true,
+  }, r.replayed ? 200 : 201);
 });
 
 // =====================================================================
@@ -232,7 +733,7 @@ opsStockRouter.get("/usage", requireOperationOrPrincipal, async (c) => {
     taken_at: string;
   }[];
 
-  const names = await nameMap(sb, [...new Set(raw.map((r) => r.taken_by))]);
+  const names = await resolveActorNames(sb, [...new Set(raw.map((r) => r.taken_by))]);
   const entries: PoolUsageEntry[] = raw.map((r) => ({
     id: r.id,
     sku: r.sku,
@@ -290,7 +791,7 @@ opsStockRouter.get("/usage", requireOperationOrPrincipal, async (c) => {
  */
 opsStockRouter.get("/health", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const asOf = todayMyt();
+  const asOf = todayIsoMYT();
 
   // The plans decide how far back the sales window must reach: a month can only
   // be scored if its own sales were fetched. Read them first for that reason.
@@ -502,6 +1003,33 @@ opsStockRouter.put("/reserve-level", requireOperationOrPrincipal, async (c) => {
 // POST actions — thin wrappers over the SECURITY DEFINER RPCs.
 // =====================================================================
 
+/**
+ * SLICE 2 — reserving a unit to a Sales Order may have been the LAST open
+ * requirement on its delivery-order gate, and the ruling says the SYSTEM
+ * issues the document the moment every requirement holds
+ * (`docs/orders/MASTER.md` §8: no Release button, no manual bypass).
+ *
+ * FAIL-SOFT and FIRE-AND-CHECK: an issuance hiccup must never undo or refuse
+ * the reservation the operator just made — the facts persist, and the next
+ * door (or Request Delivery Order) issues it. Only a `SO-{n}` ref can name an
+ * order; every other ref (loans, partners) has no delivery-order gate.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function attemptIssueForReservedRef(sb: any, ref: string): Promise<void> {
+  const m = /^SO-(\d+)$/.exec(ref.trim());
+  if (!m) return;
+  try {
+    const { data: order } = await sb
+      .from("orders")
+      .select("id")
+      .eq("so", Number(m[1]))
+      .maybeSingle();
+    if (order?.id) await attemptDeliveryOrderIssue(sb, order.id as string);
+  } catch {
+    // Not issued yet — the gate facts persist and the next door tries again.
+  }
+}
+
 // /reserve — take the OLDEST free unit of a SKU (the On-hand box). K4 (0292):
 // the pick rule is unchanged (FIFO, SKIP LOCKED, same warehouse default); what
 // changed is that the reason is written in the same transaction, so the "no
@@ -517,6 +1045,10 @@ opsStockRouter.post("/reserve", requireOperationOrPrincipal, async (c) => {
     p_sku: parsed.sku,
     p_condition: parsed.condition ?? null,
     p_wh: parsed.warehouseId ?? null,
+    /* 0471 — this door picks by SKU and names no line. For an `SO-`
+       reference the draw door resolves the item line itself and refuses when
+       more than one could be meant, so no reservation is stored without one. */
+    p_order_line_id: null,
   });
   if (error) throw mapErr(error);
   if (!data) {
@@ -524,6 +1056,7 @@ opsStockRouter.post("/reserve", requireOperationOrPrincipal, async (c) => {
       message: "No matching free unit available for this SKU",
     });
   }
+  await attemptIssueForReservedRef(sb, parsed.ref);
   return c.json({ itemId: data });
 });
 
@@ -544,6 +1077,10 @@ opsStockRouter.post("/reserve-item", requireOperationOrPrincipal, async (c) => {
     p_sku: null,
     p_condition: null,
     p_wh: null,
+    /* 0471 — the order drawer's picker has never carried an item line, so it
+       may send none and the draw door resolves one from this order's lines
+       that still need these goods; several candidates is a named refusal. */
+    p_order_line_id: parsed.orderLineId ?? null,
   });
   if (error) throw mapErr(error);
   if (!data) {
@@ -551,6 +1088,7 @@ opsStockRouter.post("/reserve-item", requireOperationOrPrincipal, async (c) => {
       message: "Unit is no longer free (already reserved / sold / flagged)",
     });
   }
+  await attemptIssueForReservedRef(sb, parsed.ref);
   return c.json({ itemId: data });
 });
 
@@ -567,36 +1105,6 @@ opsStockRouter.post("/release", requireOperationOrPrincipal, async (c) => {
     });
   }
   return c.json({ itemId: data });
-});
-
-// CARD 2 (0341) — the inspection ENTRY door. A wrong / surplus / released /
-// customer-rejected unit goes free|reserved → on_hold with a reason and NO
-// supplier claim (claims are still born only at receiving). A reserved unit's
-// ref moves into ref_history; the SO keeps owing through Card 1's truth.
-opsStockRouter.post("/hold", requireOperationOrPrincipal, async (c) => {
-  const parsed = await parseBody(c, opsStockHoldUnitInputSchema);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("ops_stock_hold_unit", {
-    p_item_id: parsed.itemId,
-    p_reason: parsed.reason,
-    p_note: parsed.note ?? null,
-  });
-  if (error) throw mapErr(error);
-  return c.json(data);
-});
-
-// CARD 2 (0341) — the inspection EXIT door. A claimless hold ends
-// back_to_stock (Available) or written_off; `returned` needs the claim door.
-opsStockRouter.post("/hold-resolve", requireOperationOrPrincipal, async (c) => {
-  const parsed = await parseBody(c, opsStockResolveUnitHoldInputSchema);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("ops_stock_resolve_unit_hold", {
-    p_item_id: parsed.itemId,
-    p_outcome: parsed.outcome,
-    p_note: parsed.note ?? null,
-  });
-  if (error) throw mapErr(error);
-  return c.json(data);
 });
 
 opsStockRouter.post("/reassign", requireOperationOrPrincipal, async (c) => {
@@ -635,14 +1143,19 @@ opsStockRouter.post("/takeout", requireOperationOrPrincipal, async (c) => {
   return c.json({ itemId: data });
 });
 
+// 0366 — every write below goes through a governed SECURITY DEFINER door.
+// The register no longer carries a write policy at all, so a raw
+// `.update()` here would simply be refused by RLS; these are not stylistic
+// wrappers, they are the only way in.
 opsStockRouter.patch("/:itemId/condition", requireOperationOrPrincipal, async (c) => {
   const itemId = c.req.param("itemId");
   const parsed = await parseBody(c, opsStockUpdateConditionInputSchema);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { error } = await sb
-    .from("ops_stock_items")
-    .update({ condition: parsed.condition, updated_at: new Date().toISOString() })
-    .eq("id", itemId);
+  const { error } = await sb.rpc("ops_stock_set_condition", {
+    p_item_id: itemId,
+    p_condition: parsed.condition,
+    p_note: null,
+  });
   if (error) throw mapErr(error);
   return c.json({ itemId });
 });
@@ -668,22 +1181,11 @@ opsStockRouter.post("/flag-repair", requireOperationOrPrincipal, async (c) => {
 opsStockRouter.post("/refurbish", requireOperationOrPrincipal, async (c) => {
   const parsed = await parseBody(c, opsStockRefurbishInputSchema);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from("ops_stock_items")
-    .update({ needs_repair: true, updated_at: new Date().toISOString() })
-    .eq("id", parsed.itemId)
-    .eq("status", "free")
-    .eq("needs_repair", false)
-    .select("id")
-    .maybeSingle();
+  const { data, error } = await sb.rpc("ops_stock_refurbish", {
+    p_item_id: parsed.itemId,
+  });
   if (error) throw mapErr(error);
-  if (!data) {
-    throw new HTTPException(409, {
-      message:
-        "Unit is not a free in-pool unit (already reserved/sold, or already in repair)",
-    });
-  }
-  return c.json({ itemId: (data as { id: string }).id });
+  return c.json({ itemId: data as string });
 });
 
 // POST /refurbish-complete — repair done: grade the unit up to 'refurbished'
@@ -692,61 +1194,23 @@ opsStockRouter.post("/refurbish", requireOperationOrPrincipal, async (c) => {
 opsStockRouter.post("/refurbish-complete", requireOperationOrPrincipal, async (c) => {
   const parsed = await parseBody(c, opsStockRefurbishCompleteInputSchema);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from("ops_stock_items")
-    .update({
-      condition: "refurbished",
-      needs_repair: false,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", parsed.itemId)
-    .eq("needs_repair", true)
-    .select("id")
-    .maybeSingle();
+  const { data, error } = await sb.rpc("ops_stock_refurbish_complete", {
+    p_item_id: parsed.itemId,
+  });
   if (error) throw mapErr(error);
-  if (!data) {
-    throw new HTTPException(409, { message: "Unit is not in repair" });
-  }
-  return c.json({ itemId: (data as { id: string }).id });
+  return c.json({ itemId: data as string });
 });
 
-// POST / — "+ Add stock": book in a new unit (or N identical units) at the
-// warehouse (GRN-in). Direct insert via the user session (RLS), mirroring the
-// /condition PATCH; no RPC needed (Jess 2026-06-29). Defaults to Carres Klang.
-opsStockRouter.post("/", requireOperationOrPrincipal, async (c) => {
-  const parsed = await parseBody(c, opsStockCreateInputSchema);
-  const sb = userClient(c.env, c.var.auth.jwt);
-
-  let whId = parsed.warehouseId ?? null;
-  if (!whId) {
-    const { data: wh } = await sb
-      .from("warehouses")
-      .select("id")
-      .ilike("name", "%klang%")
-      .limit(1)
-      .maybeSingle();
-    whId = (wh as { id: string } | null)?.id ?? null;
-  }
-  if (!whId) {
-    throw new HTTPException(400, { message: "Carres Klang warehouse not found" });
-  }
-
-  const reservedRef = parsed.status === "reserved" ? parsed.reservedRef ?? null : null;
-  const rows = Array.from({ length: parsed.qty }, () => ({
-    sku: parsed.sku,
-    warehouse_id: whId,
-    condition: parsed.condition,
-    status: parsed.status,
-    reserved_ref: reservedRef,
-    supplier: parsed.supplier ?? null,
-    po_no: parsed.poNo ?? null,
-    source_ref: parsed.sourceRef ?? null,
-  }));
-
-  const { data, error } = await sb.from("ops_stock_items").insert(rows).select("id");
-  if (error) throw mapErr(error);
-  return c.json({ created: (data ?? []).length }, 201);
-});
+// 0366 — "+ Add stock" IS GONE. A Unit is BORN when a PO or Consignment
+// Order is confirmed (Card §2), and inventory that appears without one is
+// inventory nobody ordered. `POST /` had no browser caller; the endpoint
+// itself was the last way to mint stock outside Purchasing.
+//
+// 0366 — `DELETE /:itemId` IS GONE too. A Unit ID must follow the physical
+// item forever and is never reused after cancellation, delivery, supplier
+// return, write-off or disposal. A mis-keyed row now ends its lifecycle
+// (void / write-off) and keeps its identity; the database refuses the delete
+// even if a client tries.
 
 // POST /import — bulk book-in from the "Klg Warehouse" ready-stock sheet.
 // The sheet is LINE-based: one sheet line = one stock record carrying its `qty`
@@ -817,40 +1281,32 @@ opsStockRouter.post("/import", requireOperationOrPrincipal, async (c) => {
 
   const units = toInsert.map((r) => ({
     sku: r.sku,
-    warehouse_id: whId,
     condition: r.condition,
     status: r.status,
     qty: r.qty,
-    reserved_ref: r.status === "reserved" ? r.reservedRef ?? null : null,
+    reservedRef: r.status === "reserved" ? r.reservedRef ?? null : null,
     supplier: r.supplier ?? null,
-    po_no: r.poNo ?? null,
-    source_ref: r.sourceRef ?? null,
-    date_in: r.dateIn ?? null,
+    poNo: r.poNo ?? null,
+    sourceRef: r.sourceRef ?? null,
+    dateIn: r.dateIn ?? null,
   }));
 
+  // 0366 — the one surviving book-in path, and it is a DOOR: the RPC mints an
+  // identity per row, refuses a bulk sofa, stamps ownership and leaves the
+  // lineage behind. The register itself no longer accepts a raw insert.
   let created = 0;
   for (let i = 0; i < units.length; i += 500) {
-    const { data, error } = await sb
-      .from("ops_stock_items")
-      .insert(units.slice(i, i + 500))
-      .select("id");
+    const { data, error } = await sb.rpc("ops_stock_book_in_units", {
+      p_rows: units.slice(i, i + 500),
+      p_warehouse_id: whId,
+    });
     if (error) throw mapErr(error);
-    created += (data ?? []).length;
+    created += Number(data ?? 0);
   }
   return c.json(
     { created, alreadyIn: alreadyInCount, total: desiredCount },
     201,
   );
-});
-
-// DELETE /:itemId — remove a mis-keyed unit (hard delete). For fixing a wrong
-// entry; selling/transferring goes through /takeout, not this.
-opsStockRouter.delete("/:itemId", requireOperationOrPrincipal, async (c) => {
-  const itemId = c.req.param("itemId");
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { error } = await sb.from("ops_stock_items").delete().eq("id", itemId);
-  if (error) throw mapErr(error);
-  return c.json({ itemId });
 });
 
 // =====================================================================
@@ -890,6 +1346,14 @@ interface RawRow {
   // 0153 — sale linkage set on delivery.
   sold_at: string | null;
   sold_order_id: string | null;
+  // 0366 — the authoritative Unit facts. `hold_reason` joins them because the
+  // availability arithmetic reads it; `ownership` and `holder_party_id` are
+  // Carres-vs-consignment and WHO HAS IT, and `last_verified_at` is the last
+  // time a person actually looked at the goods.
+  hold_reason: string | null;
+  ownership: "carres_owned" | "supplier_consignment";
+  holder_party_id: string | null;
+  last_verified_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -913,6 +1377,20 @@ function shape(rows: RawRow[]) {
     reserveReason: r.reserve_reason ?? null,
     soldAt: r.sold_at,
     soldOrderId: r.sold_order_id,
+    ownership: r.ownership ?? "carres_owned",
+    holderPartyId: r.holder_party_id ?? null,
+    lastVerifiedAt: r.last_verified_at ?? null,
+    // 0366 — DERIVED here by the one arithmetic, and by the same arithmetic
+    // the database uses. The browser never recomputes it from `status`.
+    availability: unitAvailability({
+      status: r.status,
+      needsRepair: r.needs_repair,
+      holdReason: r.hold_reason,
+      // 0371 — condition is part of the arithmetic: a damaged unit released
+      // back to `free` is controlled, not sellable.
+      condition: r.condition,
+    }),
+    lifecycleOutcome: unitLifecycleOutcome(r.status),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   }));
@@ -921,11 +1399,6 @@ function shape(rows: RawRow[]) {
 /** This month in Asia/Kuala_Lumpur — the only calendar the warehouse lives in. */
 function thisMonthMyt(): string {
   return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 7);
-}
-
-/** Today in the same calendar. K5 dates everything from here. */
-function todayMyt(): string {
-  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
 }
 
 /** A malformed `?period=` reads as "this month" rather than 500-ing: the
@@ -947,41 +1420,22 @@ function nextMonth(period: string): string {
     : `${y}-${String(m + 1).padStart(2, "0")}`;
 }
 
-async function nameMap(
-  sb: ReturnType<typeof userClient>,
-  ids: string[],
-): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
-  if (ids.length === 0) return map;
-  const { data } = await sb.from("app_users").select("id,name").in("id", ids);
-  for (const u of (data ?? []) as { id: string; name: string | null }[]) {
-    if (u.name) map.set(u.id, u.name);
-  }
-  return map;
-}
-
-async function parseBody<S extends import("zod").ZodTypeAny>(
-  c: import("hono").Context<AppEnv>,
-  schema: S,
-): Promise<import("zod").infer<S>> {
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    throw new HTTPException(400, { message: "Body must be valid JSON" });
-  }
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) {
-    throw new HTTPException(400, {
-      message: "Invalid input: " + parsed.error.issues[0]?.message,
-    });
-  }
-  return parsed.data;
-}
-
 function mapErr(error: { code?: string; message?: string }): HTTPException {
   if (error.code === "42501") return new HTTPException(403, { message: error.message ?? "Forbidden" });
   if (error.code === "22023") return new HTTPException(400, { message: error.message ?? "Invalid" });
+  // 0366 — P0001 is how EVERY governed door on this router says no: the unit is
+  // not free, it is not in repair, a bulk record cannot carry one customer's
+  // promise, that Site does not exist, a total is derived and never written.
+  // Those are the caller's mistakes, not the system breaking, and returning 500
+  // for them sends an operator hunting for an outage that is not there while
+  // burying the real 500s in the noise (the same finding `mapPgError` records
+  // for P0002). The sentence the database wrote is already the right sentence,
+  // so it is passed through unchanged.
+  if (error.code === "P0001") return new HTTPException(422, { message: error.message ?? "rule violation" });
+  // A missing row is a 404, for the same reason.
+  if (error.code === "P0002" || error.code === "42P01") {
+    return new HTTPException(404, { message: error.message ?? "not found" });
+  }
   return new HTTPException(500, { message: error.message ?? "ops_stock RPC failed" });
 }
 

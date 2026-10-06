@@ -1,6 +1,8 @@
 import { maxLeadDaysFor } from "@carres/shared";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadPurchasingNumbers } from "./purchasing-settings";
+import { skuCategories } from "./sku-categories";
+import { todayIsoMYT } from "./today";
 
 export interface LeadTimeViolation {
   code: "lead_time_violation";
@@ -33,24 +35,8 @@ export async function maxLeadDaysForSkus(
   } catch {
     return 0;
   }
-  const { data, error } = await sb
-    .from("product_skus")
-    .select("sku, product_models(category)")
-    .in("sku", skus);
-  if (error) return 0;
-  const cats = new Set<string>();
-  for (const row of (data ?? []) as Array<{
-    product_models: { category: string } | { category: string }[] | null;
-  }>) {
-    const pm = row.product_models;
-    if (!pm) continue;
-    // PostgREST 1:1 embed returns object; some clients return array of 1.
-    if (Array.isArray(pm)) {
-      for (const m of pm) if (m?.category) cats.add(m.category);
-    } else if (pm.category) {
-      cats.add(pm.category);
-    }
-  }
+  // ONE catalog read, shared with the goods gate (`sku-categories.ts`).
+  const cats = new Set((await skuCategories(sb, skus)).values());
   return maxLeadDaysFor([...cats], earliestSellDays);
 }
 
@@ -60,29 +46,25 @@ export async function maxLeadDaysForSkus(
  * the caller can wrap in a 422 JSON response.
  *
  * The minDate comparison uses ISO yyyy-mm-dd string ordering (stable
- * because both sides are zero-padded). Server timezone is UTC on
- * Workers; we anchor the floor to UTC midnight so a request landing at
- * 23:59 MYT (~15:59 UTC) doesn't accidentally accept a date that would
- * become invalid an hour later.
+ * because both sides are zero-padded). The Worker's clock is UTC; between
+ * 00:00 and 08:00 MYT the UTC date is still yesterday, so the floor is
+ * anchored to the KL calendar date via todayIsoMYT().
  */
 export async function validateDeliveryLeadTime(
   sb: SupabaseClient,
   skus: readonly string[],
   date: string,
-  now: Date = new Date(),
 ): Promise<LeadTimeViolation | null> {
   if (!date) return null;
   const leadDays = await maxLeadDaysForSkus(sb, skus);
   if (leadDays === 0) return null;
-  const min = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  );
+  const min = new Date(todayIsoMYT());
   min.setUTCDate(min.getUTCDate() + leadDays);
   const minDate = min.toISOString().slice(0, 10);
   if (date < minDate) {
     return {
       code: "lead_time_violation",
-      message: `Earliest delivery date is ${minDate} (${leadDays} days — the earliest date a store may sell)`,
+      message: `Earliest delivery date is ${minDate} (${leadDays} days, the earliest date a store may sell)`,
       minDate,
       leadDays,
     };

@@ -131,7 +131,7 @@ export const createAccountInput = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["initialStaff", "staffRole"],
-        message: "Showroom staff cap at Sales Manager — its principal is Carres",
+        message: "Showroom staff cap at Sales Manager. Its principal is Carres",
       });
     }
     if ((v.role === "dealer" || v.role === "showroom" || v.role === "supplier" || v.role === "partner") && !v.companyName) {

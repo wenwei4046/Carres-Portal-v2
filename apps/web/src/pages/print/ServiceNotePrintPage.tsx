@@ -3,6 +3,14 @@ import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
+
+/** ⭐ A PRINTED DOCUMENT ALWAYS CARRIES ITS YEAR — owner ruling 2026-08-15.
+ *  THE YEAR RULE drops the year from a current-year date because a SCREEN is
+ *  read today and the reader already knows which year that is. A service note
+ *  is printed, filed, and re-read by a customer or a technician in a later
+ *  year with no such context, so `Request Date: Wed, 12 Aug` would have lost a
+ *  fact the document exists to carry. Same formatter, document mode. */
+const DOC_DATE = { year: "always" } as const;
 import type { ServiceNote } from "@carres/shared";
 
 /**
@@ -92,9 +100,9 @@ export default function ServiceNotePrintPage() {
             <InfoRow label="Address" value={sn.customerAddress} multiline />
           </div>
           <div>
-            <InfoRow label="Request Date" value={fmtDate(sn.requestDate)} />
-            <InfoRow label="Deadline" value={fmtDate(sn.deadline)} />
-            <InfoRow label="Delivered Date" value={fmtDate(sn.deliveredDate)} />
+            <InfoRow label="Request Date" value={fmtDate(sn.requestDate, DOC_DATE)} />
+            <InfoRow label="Deadline" value={fmtDate(sn.deadline, DOC_DATE)} />
+            <InfoRow label="Delivered Date" value={fmtDate(sn.deliveredDate, DOC_DATE)} />
             <InfoRow label="Category" value={sn.category} />
             <InfoRow label="Status" value={sn.status === "ongoing" ? "Ongoing" : "Closed"} />
             <InfoRow label="Type" value={sn.type} />
@@ -105,7 +113,7 @@ export default function ServiceNotePrintPage() {
         <div style={{ marginBottom: 10 }}>
           <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>What Happened</div>
           <div style={{ border: "1px solid #d1d5db", borderRadius: 3, padding: "4px 6px", minHeight: 28, fontSize: 11 }}>
-            {sn.whatHappened || "—"}
+            {sn.whatHappened || ""}
           </div>
         </div>
 
@@ -127,9 +135,9 @@ export default function ServiceNotePrintPage() {
                   <tr key={it.no}>
                     <td style={{ textAlign: "center" }}>{it.no}</td>
                     <td>{it.item}</td>
-                    <td style={{ fontFamily: "monospace" }}>{it.poNo ?? "—"}</td>
+                    <td style={{ fontFamily: "monospace" }}>{it.poNo ?? ""}</td>
                     <td style={{ textAlign: "center" }}>{it.qty}</td>
-                    <td>{it.remark ?? "—"}</td>
+                    <td>{it.remark ?? ""}</td>
                   </tr>
                 ))}
               </tbody>
@@ -149,7 +157,7 @@ export default function ServiceNotePrintPage() {
               <div style={{ gridColumn: "1 / -1" }}>
                 <InfoRow label="Address" value={sn.customerAddress} multiline />
               </div>
-              <InfoRow label="Deliver Date" value={fmtDate((sn.sectionA as { deliverDate?: string }).deliverDate)} />
+              <InfoRow label="Deliver Date" value={fmtDate((sn.sectionA as { deliverDate?: string }).deliverDate, DOC_DATE)} />
               <InfoRow label="Logistic" value={(sn.sectionA as { logisticCompany?: string }).logisticCompany} />
               {(sn.sectionA as { note?: string }).note && (
                 <div style={{ gridColumn: "1 / -1" }}>
@@ -167,7 +175,7 @@ export default function ServiceNotePrintPage() {
               <div style={{ gridColumn: "1 / -1" }}>
                 <InfoRow label="Supplier Instructions" value={(sn.sectionB as { task?: string }).task} />
               </div>
-              <InfoRow label="Deliver Date" value={fmtDate((sn.sectionB as { deliverDate?: string }).deliverDate)} />
+              <InfoRow label="Deliver Date" value={fmtDate((sn.sectionB as { deliverDate?: string }).deliverDate, DOC_DATE)} />
               <InfoRow label="Supplier" value={(sn.sectionB as { supplierName?: string }).supplierName} />
             </div>
           </SectionBlock>
@@ -198,7 +206,7 @@ function InfoRow({ label, value, multiline }: { label: string; value?: string | 
     <div style={{ marginBottom: 4 }}>
       <span style={{ fontSize: 9, color: "#6b7280", marginRight: 4 }}>{label}:</span>
       <span style={{ fontSize: 11, whiteSpace: multiline ? "pre-wrap" : undefined }}>
-        {value || "—"}
+        {value || ""}
       </span>
     </div>
   );

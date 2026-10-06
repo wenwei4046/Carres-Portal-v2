@@ -7,15 +7,16 @@
  * has. If the register ever returns to client-only search, the second test
  * here fails: the hook would never see the term.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { operationOrderListRow } from "@/lib/queries";
 import SalesOrdersRegister from "./SalesOrdersRegister";
+import { fmtDate } from "@/lib/fmt-date";
 
 let listHookState: {
-  data: { orders: operationOrderListRow[] } | undefined;
+  data: { orders: operationOrderListRow[]; salesOrderTotal?: number | null } | undefined;
   isLoading: boolean;
   isError: boolean;
   error: unknown;
@@ -28,17 +29,70 @@ let expansionHookState: {
       lineId: string;
       sku: string;
       unitIds: string[];
+      unverifiedUnitIds?: string[];
+      verifiedUnitIds?: string[];
+      unitQuantityMismatch?: boolean;
       deliverTo: Array<{ name: string; qty: number }>;
     }>;
   } | undefined;
   isLoading: boolean;
   isError: boolean;
+  refetch?: () => void;
 };
 
 /* A spy AROUND the hook: the component's calls — and the filters it passes —
  * are the assertion surface. */
 const useOperationOrdersSpy = vi.fn((..._args: unknown[]) => listHookState);
 const useSalesOrderExpansionSpy = vi.fn((..._args: unknown[]) => expansionHookState);
+/* The product catalog — the NAME behind a SKU (orders MASTER 2026-09-21). */
+let catalogHookState: { data: unknown };
+const useCatalogSpy = vi.fn((..._args: unknown[]) => catalogHookState);
+/* D4 · a tripwire, not a fixture. The register must NOT consult this hook:
+ * its read is capped at the newest 500 Delivery Orders, so order 501 and
+ * older printed "No delivery order yet" while holding a DO. It answers with
+ * nothing, so a register that went back to it would fail twice — here on the
+ * call, and below on the DO number that vanished. */
+/* Monthly demand's facts — only read while that view is chosen. */
+/* The Order list's server facts (obligations, cases), per order id. */
+let registerFactsState: { data?: unknown; isError?: boolean } = {
+  data: { facts: {}, failed: { obligations: false, cases: false } },
+};
+const useSalesOrderRegisterFactsSpy = vi.fn((..._args: unknown[]) => registerFactsState);
+const useMonthlyDemandFactsSpy = vi.fn((..._args: unknown[]) => ({
+  data: {
+    orders: [
+      {
+        id: "o-1",
+        so: 1303,
+        deliveryDate: "2026-10-12",
+        deliveryDateTbd: false,
+        salesLocation: "{dealer 1}",
+        state: "Selangor",
+        city: "Petaling Jaya",
+        lines: [{ id: "l-1", sku: "MS12 Firmcare 10inch Queen", qty: 2, category: "mattress" }],
+        delivered: [],
+      },
+    ],
+    toBuyByLine: new Map([["l-1", 1]]),
+  },
+  isLoading: false,
+  isError: false,
+  error: null,
+  refetch: vi.fn(),
+}));
+const useDeliveryOrdersRegisterSpy = vi.fn((..._args: unknown[]) => ({
+  data: { deliveryOrders: [], attempts: [], handoverEvents: [] },
+  isLoading: false,
+  isError: false,
+  error: null,
+  refetch: vi.fn(),
+}));
+
+const printSalesOrdersSpy = vi.hoisted(() => vi.fn(async (_rows: ReadonlyArray<{ id: string }>) => {}));
+vi.mock("./record-print", async () => {
+  const actual = await vi.importActual<typeof import("./record-print")>("./record-print");
+  return { ...actual, printSalesOrdersOrSay: printSalesOrdersSpy };
+});
 
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
@@ -46,6 +100,10 @@ vi.mock("@/lib/queries", async () => {
     ...actual,
     useOperationOrders: (...args: unknown[]) => useOperationOrdersSpy(...args),
     useSalesOrderExpansion: (...args: unknown[]) => useSalesOrderExpansionSpy(...args),
+    useCatalog: (...args: unknown[]) => useCatalogSpy(...args),
+    useDeliveryOrdersRegister: (...args: unknown[]) => useDeliveryOrdersRegisterSpy(...args),
+    useMonthlyDemandFacts: (...args: unknown[]) => useMonthlyDemandFactsSpy(...args),
+    useSalesOrderRegisterFacts: (...args: unknown[]) => useSalesOrderRegisterFactsSpy(...args),
   };
 });
 
@@ -78,16 +136,22 @@ const order = (over: Partial<operationOrderListRow>): operationOrderListRow =>
     paid: 1250,
     order_lines: [{ sku: "B1201S-K", qty: 1, unit_price: 2499, label: "B1201S · King" }],
     order_addons: [],
+    original_request: [{ revision: 1, snapshot: { header: { delivery_date: "delivery_date" in over ? over.delivery_date : "2026-08-30", delivery_date_tbd: over.delivery_date_tbd ?? false } } }],
     ...over,
   }) as operationOrderListRow;
 
-function mount() {
+/** A word printed by the page itself, not by the rail's choices (the rail
+ *  lists every dealer, state and date range as a filter). */
+const outsideRail = (text: string) =>
+  screen.getAllByText(text).filter((el) => !el.closest('[data-testid="sales-orders-rail"]'));
+
+function mount(at = "/operation/orders") {
   /* The register's own list hook is the mocked spy; the provider serves the
    * OTHER live hooks on the page chrome (ModuleHeader's top-bar badges). */
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/operation/orders"]}>
+      <MemoryRouter initialEntries={[at]}>
         <SalesOrdersRegister />
         <LocationProbe />
       </MemoryRouter>
@@ -103,6 +167,7 @@ function LocationProbe() {
 beforeEach(() => {
   useOperationOrdersSpy.mockClear();
   useSalesOrderExpansionSpy.mockClear();
+  useDeliveryOrdersRegisterSpy.mockClear();
   window.localStorage.clear();
   listHookState = {
     data: { orders: [order({})] },
@@ -112,19 +177,94 @@ beforeEach(() => {
     refetch: vi.fn(),
   };
   expansionHookState = { data: { lines: [] }, isLoading: false, isError: false };
+  catalogHookState = { data: undefined };
 });
 
 describe("FIX 1 · the register asks the SERVER", () => {
-  it("mounts asking for the unfiltered population (no search key)", () => {
+  it("distinguishes a server search with no matches from an empty system", async () => {
+    listHookState.data = { orders: [] };
+    mount();
+    expect(screen.getByText("No sales orders yet")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "missing-order" } });
+    await waitFor(() => expect(screen.getByText("No sales orders match these filters")).toBeInTheDocument());
+    expect(screen.queryByText("No sales orders yet")).not.toBeInTheDocument();
+  });
+
+  /* The rail narrows the rows BEFORE the grid sees them, so the grid alone
+     cannot tell "nothing exists" from "nothing matches this choice". */
+  it.each([
+    ["the server's total", 1],
+    ["the unsearched load when the total is unknown", undefined],
+  ])("a rail choice that leaves nothing says the filters do, judged by %s", (_by, total) => {
+    listHookState.data = { orders: [order({ customer_address_state: "Selangor" })], ...(total === undefined ? {} : { salesOrderTotal: total }) };
+    mount("/operation/orders?state=Johor");
+    expect(screen.getByText("No sales orders match these filters")).toBeInTheDocument();
+    expect(screen.queryByText("No sales orders yet")).not.toBeInTheDocument();
+  });
+
+  it("says No sales orders yet only when the permitted population itself is empty", () => {
+    listHookState.data = { orders: [], salesOrderTotal: 0 };
+    mount("/operation/orders?state=Johor");
+    expect(screen.getByText("No sales orders yet")).toBeInTheDocument();
+    expect(screen.queryByText("No sales orders match these filters")).not.toBeInTheDocument();
+  });
+
+  it("a search answered with nothing, over a population that exists, says the filters do", async () => {
+    listHookState.data = { orders: [], salesOrderTotal: 24 };
+    mount("/operation/orders?search=0123456789");
+    await waitFor(() => expect(screen.getByText("No sales orders match these filters")).toBeInTheDocument());
+    expect(screen.queryByText("No sales orders yet")).not.toBeInTheDocument();
+  });
+
+  it("names phone in what the search box covers — the server now matches it", () => {
+    mount();
+    const box = screen.getByRole("searchbox");
+    const scope = "Search sales orders by SO number, customer, phone, imported reference or linked document number";
+    expect(box).toHaveAttribute("title", scope);
+    expect(box).toHaveAttribute("aria-description", scope);
+  });
+
+  it("asks the server with the phone exactly as the Existing customer link carries it", () => {
+    mount(`/operation/orders?search=${encodeURIComponent("019-83372393")}`);
+    expect(useOperationOrdersSpy).toHaveBeenCalledWith({ stage: "proceeded", search: "019-83372393" });
+  });
+
+  it.each(["loading", "error"])("never calls %s expansion data Not allocated", (state) => {
+    expansionHookState = { data: undefined, isLoading: state === "loading", isError: state === "error", refetch: vi.fn() };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    expect(screen.queryByText("Not allocated")).not.toBeInTheDocument();
+    if (state === "error") {
+      expect(screen.getByRole("alert")).toHaveTextContent("Could not load goods details");
+      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+      expect(expansionHookState.refetch).toHaveBeenCalledOnce();
+    } else expect(within(screen.getByTestId("row-expansion")).getByRole("status")).toHaveTextContent("Loading…");
+  });
+
+  it("keeps fourteen uncertain IDs inspectable without claiming they belong to the Qty 1 line", () => {
+    listHookState.data = { orders: [order({ order_lines: [{ id: "l1", sku: "H1401F-K", qty: 1, unit_price: 100 }] })] };
+    expansionHookState.data = { lines: [{ lineId: "l1", sku: "H1401F-K", unitIds: Array.from({ length: 14 }, (_, i) => `ID-${i}`), verifiedUnitIds: [], unverifiedUnitIds: Array.from({ length: 14 }, (_, i) => `ID-${i}`), deliverTo: [] }] };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    expect(screen.getByText("Unit ID link not verified")).toBeInTheDocument();
+    expect(screen.queryByText("ID-13")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Unit ID (14)" }));
+    expect(screen.getByText("ID-0")).toBeInTheDocument();
+    expect(screen.getByText("ID-13")).toBeInTheDocument();
+  });
+
+  /* ⭐ POPULATION — owner ruling 2026-09-21: only proceeded orders. A Placed
+     order is never asked for, so it can never appear. */
+  it("mounts asking for the proceeded population only (no search key)", () => {
     mount();
     expect(useOperationOrdersSpy).toHaveBeenCalled();
     const first = useOperationOrdersSpy.mock.calls[0]![0] as Record<string, unknown>;
-    expect(first).toEqual({});
+    expect(first).toEqual({ stage: "proceeded" });
   });
 
   it("the typed term reaches useOperationOrders as { search } — the API is asked, not just the loaded rows filtered", async () => {
     mount();
-    const box = screen.getByPlaceholderText("SO number, customer, phone or item…");
+    const box = screen.getByRole("searchbox", { name: "Search" });
     fireEvent.change(box, { target: { value: "  Umi  " } });
     /* The engine debounces 150ms and emits the TRIMMED term; the register
      * must re-call the hook with it. Client-only search would leave every
@@ -134,13 +274,13 @@ describe("FIX 1 · the register asks the SERVER", () => {
       const calls = useOperationOrdersSpy.mock.calls.map(
         (c) => c[0] as Record<string, unknown>,
       );
-      expect(calls.some((f) => f && f.search === "Umi")).toBe(true);
+      expect(calls.some((f) => f && f.search === "Umi" && f.stage === "proceeded")).toBe(true);
     });
   });
 
   it("clearing the box returns the hook to the unfiltered population", async () => {
     mount();
-    const box = screen.getByPlaceholderText("SO number, customer, phone or item…");
+    const box = screen.getByRole("searchbox", { name: "Search" });
     fireEvent.change(box, { target: { value: "Umi" } });
     await waitFor(() => {
       expect(
@@ -151,8 +291,11 @@ describe("FIX 1 · the register asks the SERVER", () => {
     });
     fireEvent.change(box, { target: { value: "" } });
     await waitFor(() => {
-      const last = useOperationOrdersSpy.mock.calls.at(-1)![0] as Record<string, unknown>;
-      expect(last).toEqual({});
+      /* The top bar reads its own list; only the Register asks for `proceeded`. */
+      const mine = useOperationOrdersSpy.mock.calls
+        .map((c) => c[0] as Record<string, unknown>)
+        .filter((f) => f?.stage === "proceeded");
+      expect(mine.at(-1)).toEqual({ stage: "proceeded" });
     });
   });
 });
@@ -166,41 +309,134 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByText("Sales Order")).not.toBeInTheDocument();
   });
 
-  it("renders exactly one work toolbar and one Search", () => {
+  it("the Destination Header is 50px, wordmark-only, at the governed 24px (§6.7)", () => {
+    mount();
+    const word = screen.getByTestId("sales-orders-destination-header-module-word");
+    expect(word).toHaveTextContent("Sales Orders");
+    /* The icon is gone: the word alone carries the identity, so nothing else
+     * may sit inside the nameplate. */
+    expect(word.querySelector("svg")).toBeNull();
+    expect(word).toHaveClass("text-page");
+    /* ⭐ 50px IS A FLOOR, NOT A CEILING (2026-09-18). It is exact at every
+       width where the identity fits on one line — which is every desktop
+       canvas — and it grows only when a phone forces the governed 24px word to
+       wrap, because the alternative measured on 390px was the whole page
+       scrolling sideways, which §6.7 rule 8 forbids. */
+    expect(screen.getByTestId("sales-orders-destination-header")).toHaveClass("min-h-[50px]");
+  });
+
+  it("Sales Location prints the outlet in full, as the SO PDF does", () => {
+    listHookState.data = { orders: [order({
+      outlets: { name: "Carres Maluri Cheras" },
+    })] };
+    mount();
+    expect(outsideRail("Carres Maluri Cheras")).toHaveLength(1);
+  });
+
+  it("keeps one work toolbar and an accessible page-tools door without business actions", () => {
     mount();
     expect(screen.getAllByTestId("work-toolbar")).toHaveLength(1);
     expect(screen.getAllByRole("searchbox")).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Filters" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Export" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Columns" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "New Sales Order" })).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("sales-orders-destination-header")).getByRole("button", {
-        name: "New Sales Order",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("work-toolbar")).queryByRole("button", {
-        name: "New Sales Order",
-      }),
-    ).not.toBeInTheDocument();
+    const tools = screen.getByRole("button", { name: "Page tools" });
+    fireEvent.keyDown(tools, { key: "Enter" });
+    expect(screen.getByRole("menuitem", { name: "Export" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Columns" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Cancel SO" })).not.toBeInTheDocument();
+    /* ⭐ OWNER RULING 2026-09-27 (Jess: "add new sales order should not be
+     * here"). A customer order is born in the Sales Portal and nowhere else:
+     * the Register carries no create button, on either row. */
+    expect(screen.queryByRole("button", { name: "New Sales Order" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("new-sales-order")).not.toBeInTheDocument();
     expect(screen.queryByText("current view")).not.toBeInTheDocument();
     expect(screen.queryByText(/\d+\/\d+/)).not.toBeInTheDocument();
-    expect(screen.queryByText("Not delivered")).not.toBeInTheDocument();
+    /* `Not delivered` is a rail FACT filter (owner approved 2026-09-22), never a
+       toolbar status. */
+    expect(within(screen.getByTestId("work-toolbar")).queryByText("Not delivered")).not.toBeInTheDocument();
   });
 
-  it("shows a governed missing Customer Delivery exception instead of a passive empty value", () => {
-    listHookState.data = { orders: [order({
-      delivery_date: null,
-      delivery_date_tbd: true,
-      customer_name: "Kimmy",
-      salespersons: { name: "Shasha" },
-    })] };
+  it("Export behind page tools still offers Excel, PDF and Print", async () => {
     mount();
-    const exception = screen.getByText("No delivery date");
-    expect(exception).toHaveAttribute("data-attention", "warning");
-    expect(screen.getByText("Shasha · Confirm the date with Kimmy · Record the agreed date")).toBeInTheDocument();
-    expect(screen.queryByText("No date yet")).not.toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("button", { name: "Page tools" }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Export" }));
+    expect(await screen.findByRole("menuitem", { name: "Excel" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "PDF" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Print sales orders" })).toBeInTheDocument();
+  });
+
+  it("ticking rows offers the REAL sales orders, not a picture of the list (§6.7)", () => {
+    mount();
+    /* Normal state carries the list outputs only — no document action is
+     * offered for a selection that does not exist yet. */
+    expect(screen.queryByRole("button", { name: /Print \d+ sales order/ })).not.toBeInTheDocument();
+    /* Re-query after each tick: selection REPLACES the toolbar, so the
+     * select-all box leaves the DOM and a stale snapshot holds detached nodes. */
+    const rowBoxes = () => screen.getAllByRole("checkbox").slice(-2);
+    fireEvent.click(rowBoxes()[0]!);
+    /* Selection replaces the toolbar in place and prints the truthful count. */
+    expect(screen.getByTestId("selection-bar")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Print 1 sales order" })).toBeInTheDocument();
+    /* Excel stays scoped to the same selection beside it — the selection bar
+     * offers list output AND document output, both counting the same rows. */
+    expect(screen.getByRole("button", { name: /Export Excel \(1\)/ })).toBeInTheDocument();
+  });
+
+  /* ⭐ A REQUIRED FACT PRINTS NO ABSENCE WORD — owner ruling 2026-09-21. The
+     Requested Delivery Date is mandatory at order entry, so an empty one is a
+     system error fixed at its source: no `To be confirmed`, no amber
+     `No delivery date`, no action sentence and no hover guidance. */
+  it("prints no absence word, warning or guidance for a missing Customer’s original requested delivery", () => {
+    listHookState.data = { orders: [
+      order({ id: "a", so: 1, delivery_date: null, delivery_date_tbd: true, salespersons: { name: "Shasha" } }),
+      order({ id: "b", so: 2, delivery_date: null, delivery_date_tbd: false, salespersons: { name: "Shasha" }, outlets: null }),
+    ] };
+    mount();
+    for (const word of ["To be confirmed", "No delivery date", "Not recorded", "Confirm delivery date"]) {
+      expect(screen.queryByText(word)).not.toBeInTheDocument();
+    }
+    expect(document.querySelector("[data-attention]")).toBeNull();
+    expect(screen.queryByTitle(/Delivery date to be confirmed/)).toBeNull();
+  });
+
+  /* ⭐ CUSTOMER NAME — CAPITALIZE UP ONLY, owner ruling 2026-08-15. */
+  it("capitalizes a lowercase customer name and leaves existing capitals alone", () => {
+    listHookState.data = {
+      orders: [
+        order({ id: "a", so: 1, customer_name: "jimmy" }),
+        order({ id: "b", so: 2, customer_name: "mei emi" }),
+        order({ id: "c", so: 3, customer_name: "KJ NG" }),
+        order({ id: "d", so: 4, customer_name: "LIM KUAN YANG" }),
+      ],
+    };
+    mount();
+    expect(screen.getByText("Jimmy")).toBeInTheDocument();
+    expect(screen.getByText("Mei Emi")).toBeInTheDocument();
+    // Initials and an all-capitals name survive untouched — the rule raises a
+    // first letter and never lowers one.
+    expect(screen.getByText("KJ NG")).toBeInTheDocument();
+    expect(screen.getByText("LIM KUAN YANG")).toBeInTheDocument();
+    expect(screen.queryByText("Kj Ng")).not.toBeInTheDocument();
+    expect(screen.queryByText("Lim Kuan Yang")).not.toBeInTheDocument();
+    // Display only — nothing is written back to the record.
+    expect(listHookState.data.orders.map((o) => o.customer_name)).toEqual([
+      "jimmy", "mei emi", "KJ NG", "LIM KUAN YANG",
+    ]);
+  });
+
+  /* ⭐ THE YEAR RULE — owner ruling 2026-08-15. */
+  it("prints a current-year date without its year and an off-year date with it", () => {
+    const thisYear = new Date().getFullYear();
+    listHookState.data = {
+      orders: [
+        order({ id: "a", so: 1, delivery_date: `${thisYear}-08-12`, delivery_date_tbd: false }),
+        order({ id: "b", so: 2, delivery_date: `${thisYear + 1}-01-15`, delivery_date_tbd: false }),
+      ],
+    };
+    mount();
+    expect(screen.getByText(fmtDate(`${thisYear}-08-12`))).toBeInTheDocument();
+    expect(fmtDate(`${thisYear}-08-12`)).not.toMatch(/\d{2}$/);
+    expect(screen.getByText(fmtDate(`${thisYear + 1}-01-15`))).toBeInTheDocument();
+    expect(fmtDate(`${thisYear + 1}-01-15`)).toMatch(/ \d{2}$/);
   });
 
   it("collapses duplicate city and state into one concise locality", () => {
@@ -210,7 +446,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       customer_address_state: "Kuala Lumpur",
     })] };
     mount();
-    expect(screen.getByText("Kuala Lumpur")).toBeInTheDocument();
+    expect(screen.queryAllByText("Kuala Lumpur")).toHaveLength(0);
     expect(screen.queryByText("Kuala Lumpur, Kuala Lumpur")).not.toBeInTheDocument();
     expect(screen.queryByText("12 Long Street, Kuala Lumpur, Kuala Lumpur")).not.toBeInTheDocument();
   });
@@ -222,29 +458,423 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
           order_lines: [
             { sku: "B1201S-K", qty: 2, unit_price: 2499, label: "B1201S · King" },
             { sku: "Essential Memory Pillow(L)", qty: 4, unit_price: 99, label: "Pillow" },
-            { sku: "Microfiber Waterproof Mattress Protector-K", qty: 3, unit_price: 129, label: "M.P" },
+            { sku: "Microfiber Waterproof Mattress Protector-K", qty: 3, unit_price: 129, label: "Mattress protector" },
           ],
         }),
       ],
     };
     mount();
     const footer = screen.getByTestId("grid-footer");
-    expect(footer).toHaveTextContent("1 order");
+    expect(footer).toHaveTextContent("1 sales order");
     expect(footer).toHaveTextContent("Mattress 2");
     expect(footer).toHaveTextContent("Pillow 4");
-    expect(footer).toHaveTextContent("M.P 3");
+    /* The governed word, never the AutoCount sheet's `M.P` abbreviation. */
+    expect(footer).toHaveTextContent("Mattress protector 3");
+    expect(footer).not.toHaveTextContent("M.P");
     expect(footer).not.toHaveTextContent("Reset layout");
     expect(footer).not.toHaveTextContent("rows");
   });
 
-  it("shows only the customer name in the default cell while retaining phone search context", () => {
+  /**
+   * ⭐ THE FOOTER COUNTS EVERYTHING IT SEES, IN THE DICTIONARY'S WORDS.
+   *
+   * Owner ruling 2026-08-15. The tally used to be filtered through the same
+   * array that ordered it, so any word outside that list was silently DROPPED
+   * — an unrecognised accessory vanished from a count that claims to describe
+   * the filtered result. A footer that under-counts is worse than one that
+   * abbreviates: it is a number the operator trusts and cannot reproduce.
+   */
+  it("an unrecognised line prints no `Other goods` and no raw SKU word (owner 2026-09-22)", () => {
+    listHookState.data = {
+      orders: [
+        order({
+          order_lines: [
+            { sku: "B1201S-K", qty: 1, unit_price: 2499, label: "B1201S · King" },
+            // Nothing recognises these two — the old whitelist dropped both.
+            { sku: "M.P/QUEEN", qty: 2, unit_price: 129, label: "M.P" },
+            { sku: "Leg 4\"", qty: 5, unit_price: 20, label: "Leg" },
+          ],
+        }),
+      ],
+    };
     mount();
-    const customer = screen.getByTitle("Kimmy · 019-3478913");
-    expect(customer).toHaveTextContent("Kimmy");
-    expect(customer).not.toHaveTextContent("019-3478913");
+    const footer = screen.getByTestId("grid-footer");
+    expect(footer).toHaveTextContent("Mattress 1");
+    /* `M.P/QUEEN` IS positively recognised as a protector — the governed word
+       prints and the sheet's abbreviation never does. */
+    expect(footer).toHaveTextContent("Mattress protector 2");
+    /* Owner ruling 2026-09-22: an unclassified line is a catalogue data
+       error — never printed as a kind of goods, and never silently dropped:
+       it is counted apart under the dictionary's `Not in catalog`. */
+    expect(footer).not.toHaveTextContent("Other goods");
+    expect(footer).toHaveTextContent(/Not in catalog 5$/);
+    expect(footer).not.toHaveTextContent("M.P");
+    expect(footer).not.toHaveTextContent("Leg");
   });
 
-  it("renders the locked six-column goods table with Stock Unit IDs and Purchasing Deliver To", () => {
+  /**
+   * THE FOOTER READS THE SAME LADDER AS THE DOCUMENT (2026-08-24).
+   *
+   * Jess: "Other goods 44 - the number doesn't tally." The arithmetic was
+   * never wrong; the CLASSIFIER was. The footer read the SKU text alone
+   * while the SO detail reads recorded `attrs.category`, then the catalog,
+   * then the SKU - so a product the document named MATTRESS counted here as
+   * `Other goods`, and the number could not be reproduced from the orders
+   * the operator can open.
+   */
+  it("counts an AutoCount line by its CATALOG category, not the unreadable SKU text", () => {
+    listHookState.data = {
+      orders: [
+        order({
+          order_lines: [
+            // Free-text AutoCount SKU no parser can read - but the catalog
+            // knows it, and the server now sends that word.
+            { sku: "1013Jager/Fab3-King/PC151-01", qty: 2, unit_price: 3200, category: "mattress" },
+          ],
+        }),
+      ],
+    };
+    mount();
+    const footer = screen.getByTestId("grid-footer");
+    expect(footer).toHaveTextContent("Mattress 2");
+    expect(footer).not.toHaveTextContent("Other goods");
+  });
+
+  it("prefers what the ORDER recorded over what the catalog says today", () => {
+    // `attrs.category` is what this order agreed to. A later catalog
+    // re-classification must never rewrite a committed line.
+    listHookState.data = {
+      orders: [
+        order({
+          order_lines: [
+            {
+              sku: "FREE-TEXT-THING",
+              qty: 1,
+              unit_price: 500,
+              attrs: { category: "sofa" },
+              category: "mattress",
+            },
+          ],
+        }),
+      ],
+    };
+    mount();
+    expect(screen.getByTestId("grid-footer")).toHaveTextContent("Sofa 1");
+  });
+
+  it("a catalog ACCESSORY whose type is recognised prints the TYPE, not the bare word", () => {
+    listHookState.data = {
+      orders: [
+        order({
+          order_lines: [
+            { sku: "SOME-PILLOW-CODE", qty: 4, unit_price: 89, category: "accessory" },
+          ],
+        }),
+      ],
+    };
+    mount();
+    expect(screen.getByTestId("grid-footer")).toHaveTextContent("Pillow 4");
+  });
+
+  it("a catalog ACCESSORY whose type nothing recognises prints `Accessory`, NOT `Other goods`", () => {
+    // The catalog positively says accessory. Calling it `Other goods` would
+    // report a classification failure over a line that IS classified.
+    listHookState.data = {
+      orders: [
+        order({
+          order_lines: [{ sku: "XZ-9931", qty: 3, unit_price: 40, category: "accessory" }],
+        }),
+      ],
+    };
+    mount();
+    const footer = screen.getByTestId("grid-footer");
+    expect(footer).toHaveTextContent("Accessory 3");
+    expect(footer).not.toHaveTextContent("Other goods");
+  });
+
+  /* ⭐ THIS IS NOW THE LOAD-BEARING HALF (YH, 2026-08-27).
+     While `Other goods` printed, a laundered line was merely mislabelled and
+     visible. Now that the word is hidden, laundering would be INVISIBLE — an
+     unrecognised line quietly inflating `Accessory` or `Mattress` with nobody
+     able to see it. So the assertion inverts with the ruling: an unrecognised
+     line must reach NO printed category at all. */
+  it("NEGATIVE CONTROL: a line nothing recognises is laundered into no category", () => {
+    listHookState.data = {
+      orders: [
+        order({ order_lines: [{ sku: "Leg 4\"", qty: 5, unit_price: 20, category: null }] }),
+      ],
+    };
+    mount();
+    const footer = screen.getByTestId("grid-footer");
+    for (const word of [
+      "Mattress",
+      "Bedframe",
+      "Sofa",
+      "Pillow",
+      "Topper",
+      "Footrest",
+      "Accessory",
+      "Service",
+    ]) {
+      expect(footer, `an unrecognised line reached \`${word}\``).not.toHaveTextContent(word);
+    }
+    expect(footer).not.toHaveTextContent("Other goods");
+    expect(footer).toHaveTextContent(/^1 sales order · Not in catalog 5$/);
+  });
+
+  /* Owner ruling 2026-09-22 (Jess): {n} is the PHYSICAL quantity, and the
+     click lists SO No · original SKU · product name · qty. */
+  it("`Not in catalog {n}` counts physical qty and opens the lines behind it", () => {
+    listHookState.data = {
+      orders: [
+        order({ id: "o-a", so: 1206, order_lines: [
+          { id: "a1", sku: "M1201F-K", qty: 1, unit_price: 2999, category: null, attrs: {}, label: "Mystery mattress" },
+          { id: "a2", sku: "B1201S-K", qty: 1, unit_price: 2499, category: "mattress" },
+        ] }),
+        order({ id: "o-b", so: 1300, order_lines: [
+          { id: "b1", sku: "ODD-THING", qty: 3, unit_price: 10, category: null, attrs: {} },
+        ] }),
+      ],
+    };
+    mount();
+    const footer = screen.getByTestId("grid-footer");
+    // 1 + 3 physical pieces, not 2 lines or 2 orders.
+    expect(footer).toHaveTextContent(/Not in catalog 4$/);
+    fireEvent.click(screen.getByTestId("footer-not-in-catalog"));
+    const list = screen.getByTestId("not-in-catalog-list");
+    const rows = within(list).getAllByRole("row").slice(1).map((r) => r.textContent);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toContain("SO-1206");
+    expect(rows[0]).toContain("M1201F-K");
+    expect(rows[0]).toContain("1");
+    expect(rows[1]).toContain("SO-1300");
+    expect(rows[1]).toContain("ODD-THING");
+    expect(rows[1]).toContain("3");
+    fireEvent.click(within(list).getByRole("button", { name: "SO-1206" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/operation/orders/so/o-a");
+  });
+
+  it("the goods Category cell says `Not in catalog`, muted, never `Other goods`", () => {
+    listHookState.data = {
+      orders: [order({ order_lines: [{ id: "l-x", sku: "M1201F-K", qty: 1, unit_price: 2999, category: null, attrs: {} }] })],
+    };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const row = screen.getByTestId("expanded-good-M1201F-K");
+    expect(row).not.toHaveTextContent("Other goods");
+    const cell = within(row).getByText("Not in catalog");
+    expect(cell).toHaveAttribute("data-absence", "true");
+  });
+
+  /* Owner ruling 2026-09-22: services never enter `Qty:`; they print apart. */
+  it("prints services apart as `Services {n}`, never inside Qty:", () => {
+    listHookState.data = {
+      orders: [
+        order({
+          order_lines: [{ sku: "B1201S-K", qty: 1, unit_price: 2499, category: "mattress" }],
+          order_addons: [{ addon_key: "delivery", qty: 2, unit_price: 50 }],
+        }),
+      ],
+    };
+    mount();
+    const footer = screen.getByTestId("grid-footer");
+    expect(footer).toHaveTextContent(/^1 sales order · Qty: Mattress 1 · Services 2$/);
+    expect(footer).not.toHaveTextContent("Service 2");
+  });
+
+  it("an OLDER Worker that sends no category behaves exactly as before", () => {
+    // Absent (not null) - the field simply is not on the wire. The parser
+    // rungs still answer, so this build is safe against a lagging Worker.
+    listHookState.data = {
+      orders: [order({ order_lines: [{ sku: "B1201S-K", qty: 1, unit_price: 2499 }] })],
+    };
+    mount();
+    expect(screen.getByTestId("grid-footer")).toHaveTextContent("Mattress 1");
+  });
+
+  /**
+   * ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15.
+   * The words are unchanged; only their weight moves, so search, filter, sort
+   * and Export still read the same string.
+   */
+  it("mutes `Not recorded` in the document columns while a real PO number stays full ink", () => {
+    listHookState.data = {
+      orders: [order({ po_numbers: ["PO-2041"], do_number: null })],
+    };
+    mount();
+    const absences = document.querySelectorAll('[data-absence="true"]');
+    expect(absences.length).toBeGreaterThan(0);
+    for (const el of absences) expect(el.className).toContain("text-kit-slate-11");
+    // The real document is a link, never a muted absence.
+    expect(screen.getByText("PO-2041").closest("[data-absence]")).toBeNull();
+  });
+
+  /* ⭐ THE REGISTER COMPOSITION — owner ruling 2026-09-21, exactly this order. */
+  it("prints the owner's eleven columns in order: Proceed Date · SO Doc Date · SO No first", () => {
+    listHookState.data = { orders: [order({ outlets: { name: "Carres Kelana Jaya" }, salespersons: { name: "Khoo Aik Yean" } })] };
+    mount();
+    const headers = [...screen.getByTestId("grid-header").querySelectorAll("th")].map((th) =>
+      (th.textContent ?? "").trim(),
+    );
+    const business = headers.filter(Boolean);
+    expect(business.map((h) => h.replace(/[AV]$/, "").replace(/\s+/g, " ").trim())).toEqual([
+      "Proceed Date",
+      "SO Doc Date",
+      "SO No",
+      "Stock Status",
+      "Sales Location",
+      "Salesperson",
+      "Customer’s original requested delivery",
+      "Customer",
+      "Items",
+      "PO No",
+      "DO No",
+      "Category",
+      "Payment Status",
+    ]);
+    expect(outsideRail("Carres Kelana Jaya")).toHaveLength(1);
+    expect(screen.getByText("Khoo Aik Yean")).toBeInTheDocument();
+    /* The retired word never prints (COPY-STANDARD, SO Doc Date). */
+    expect(screen.queryByText("SO Date")).not.toBeInTheDocument();
+    /* Flat: no status groups, no Service Case column. */
+    expect(document.querySelector("[data-testid^='grid-group-']")).toBeNull();
+    /* `Service Cases` is a rail FACT filter, never a column (owner approved 2026-09-22). */
+    expect(
+      screen.queryAllByText(/Service Case/).filter((el) => !el.closest('[data-testid="sales-orders-rail"]')),
+    ).toHaveLength(0);
+  });
+
+  /* SO representative correction 2026-10-01: desktop32, touch40. */
+  it("sets its own 32px row through the engine rowHeight, never a page stylesheet", () => {
+    mount();
+    const grid = document.querySelector("[data-row-height]") as HTMLElement;
+    expect(grid).toHaveAttribute("data-row-height", "32");
+    expect(grid.style.getPropertyValue("--grid-row-h")).toBe("32px");
+  });
+
+  it("says No PO yet · No DO yet, muted, when neither document exists", () => {
+    listHookState.data = { orders: [order({ do_number: null, po_numbers: [] })] };
+    mount();
+    expect(screen.getByText("No DO yet")).toHaveAttribute("data-absence", "true");
+    expect(screen.getByText("No PO yet")).toHaveAttribute("data-absence", "true");
+    expect(screen.queryByText("No delivery order yet")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not recorded")).not.toBeInTheDocument();
+  });
+
+  it("names goods by catalog, keeps additional line count separate from quantity, and retains expansion", () => {
+    catalogHookState = { data: {
+      models: [{ id: "m-1", name: "Cody" }],
+      skus: [{ id: "s-1", modelId: "m-1", sku: "B1201S-K", variant: "Super King" }],
+      addons: [],
+    } };
+    listHookState.data = { orders: [order({ order_lines: [
+      { id: "line-1", sku: "B1201S-K", qty: 1, unit_price: 2499, attrs: {} },
+      { id: "line-2", sku: "PILLOW-9", qty: 2, unit_price: 99, attrs: {} },
+    ] })] };
+    mount();
+    const summary = within(screen.getByTestId("grid-parent-row")).getByRole("button", { name: "Items · SO-1303" });
+    expect(summary).toHaveTextContent("Cody+1");
+    expect(within(summary).getByText("+1")).toHaveClass("shrink-0");
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const row = screen.getByTestId("expanded-good-B1201S-K");
+    const itemCell = within(row).getByText("Cody").closest("td")!;
+    expect(itemCell).toHaveTextContent("CodySuper King");
+    /* The SKU keeps its own column and is not repeated as the item. */
+    expect(itemCell).not.toHaveTextContent("B1201S-K");
+    /* Owner review 2026-09-22: nothing here is bold. The name is plain 13px,
+       the configuration the 11px slate-11 second fact, and the SKU plain on
+       one line — never a scroll box that cuts it. */
+    expect(within(row).getByText("Cody").className).not.toContain("font-medium");
+    const config = within(row).getByText("Super King");
+    expect(config.closest("div")!.className).toContain("text-[11px]");
+    /* Owner review 2026-09-22 (§6.8): ONE two-line geometry. The configuration
+       is one line (the engine's OverflowText: nowrap + … + door), in a fixed
+       14px second line that a row WITHOUT configuration keeps too. */
+    expect(config.closest("div")!.className).toContain("h-[14px]");
+    expect(config.className).toMatch(/overflowText/);
+    const bare = screen.getByTestId("expanded-good-PILLOW-9");
+    const bareSecond = within(bare).getByTestId("so-goods-item").children[1] as HTMLElement;
+    expect(bareSecond.className).toContain("h-[14px]");
+    const sku = within(row).getByText("B1201S-K");
+    expect(sku.className).not.toContain("font-medium");
+    expect(sku.className).not.toContain("overflow-x-auto");
+  });
+
+  it("reads the Delivery Orders off the order row, not a second capped read", () => {
+    listHookState.data = {
+      orders: [order({ ops_delivery_orders: [{ do_number: "DO-200826-1234" }] })],
+    };
+    mount();
+    expect(screen.getByRole("button", { name: "DO-200826-1234" })).toBeInTheDocument();
+    expect(useDeliveryOrdersRegisterSpy).not.toHaveBeenCalled();
+  });
+
+  it("opens the one authoritative Delivery Order when exactly one exists", () => {
+    listHookState.data = {
+      orders: [order({ ops_delivery_orders: [{ do_number: "DO-200826-1234" }] })],
+    };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "DO-200826-1234" }));
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/operation/delivery-orders/DO-200826-1234",
+    );
+  });
+
+  it("shows every Delivery Order relationship instead of hiding all but one", () => {
+    listHookState.data = {
+      orders: [
+        order({
+          ops_delivery_orders: [
+            { do_number: "DO-200826-1234" },
+            { do_number: "DO-210826-5678" },
+          ],
+        }),
+      ],
+    };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "2 Delivery Orders" }));
+    expect(screen.getByRole("button", { name: "DO-200826-1234" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "DO-210826-5678" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/operation/delivery-orders/DO-210826-5678");
+  });
+
+  it.each(["RC-SECOND", "INV-SECOND", "DO-SECOND"])("searches hidden linked number %s", async (term) => {
+    listHookState.data = { orders: [order({
+      receipt_documents: [{ id: "p1", receipt_no: "RC-FIRST" }],
+      allocated_receipts: [{ order_payments: { id: "p2", receipt_no: "RC-SECOND" } }],
+      invoice_documents: [{ id: "i1", invoice_no: "INV-FIRST" }, { id: "i2", invoice_no: "INV-SECOND" }],
+      ops_delivery_orders: [{ do_number: "DO-FIRST" }, { do_number: "DO-SECOND" }],
+    })] };
+    mount();
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: term } });
+    await waitFor(() => expect(useOperationOrdersSpy.mock.calls.some(call => (call[0] as { search?: string })?.search === term)).toBe(true));
+    await waitFor(() => expect(screen.getByTestId("grid-footer")).toHaveTextContent("1 sales order"));
+    expect(screen.getByRole("button", { name: "SO-1303" })).toBeInTheDocument();
+  });
+
+  it("optional receipt and invoice columns open exact ledger objects", async () => {
+    listHookState.data = { orders: [order({ receipt_documents: [{ id: "p-exact", receipt_no: "RC-EXACT" }], invoice_documents: [{ id: "i-exact", invoice_no: "INV-EXACT" }] })] };
+    mount();
+    fireEvent.keyDown(screen.getByRole("button", { name: "Page tools" }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Columns" }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Receipt No" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Invoice No" }));
+    fireEvent.keyDown(screen.getByRole("checkbox", { name: "Invoice No" }), { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: "RC-EXACT" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/finance/payments?payment=p-exact");
+    fireEvent.click(screen.getByRole("button", { name: "INV-EXACT" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/finance/monitor?invoice=i-exact");
+  });
+
+  it("shows only the customer name in the default cell while retaining phone search context", () => {
+    mount();
+    const row = screen.getByTestId("grid-parent-row");
+    const customer = within(row).getByText("Kimmy");
+    expect(customer).not.toHaveTextContent("019-3478913");
+    expect(row).not.toHaveTextContent("019-3478913");
+  });
+
+  it("renders six goods columns with separate SKU, Stock Unit IDs and Purchasing Deliver To", () => {
     listHookState.data = {
       orders: [
         order({
@@ -287,12 +917,15 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     const table = screen.getByRole("table", { name: "Goods on SO-1303" });
     expect(table).toBeInTheDocument();
     expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
-      "Category", "Unit ID", "SKU", "Qty", "Item", "Deliver To",
+      "Category", "Unit ID", "Deliver To", "SKU", "Qty", "Item",
     ]);
     const row = screen.getByTestId("expanded-good-B1201S-K");
-    expect(row).toHaveTextContent("MATTRESS");
-    expect(row).toHaveTextContent("id-001");
-    expect(row).toHaveTextContent("id-002");
+    expect(row).toHaveTextContent("Mattress");
+    expect(row).toHaveTextContent("Unit ID (2)");
+    expect(within(row).queryByText("id-001")).not.toBeInTheDocument();
+    fireEvent.click(within(row).getByRole("button", { name: "Unit ID (2)" }));
+    expect(screen.getByText("id-001")).toBeInTheDocument();
+    expect(screen.getByText("id-002")).toBeInTheDocument();
     expect(row).toHaveTextContent("B1201S-K");
     expect(row).toHaveTextContent("11");
     expect(row).toHaveTextContent("B1201S · King");
@@ -334,12 +967,109 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     };
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
-    expect(screen.getByText("MATTRESS")).toBeInTheDocument();
+    expect(screen.getAllByText("Mattress").length).toBeGreaterThan(0);
     expect(screen.getByText("Not allocated")).toBeInTheDocument();
-    expect(screen.queryByText("OTHER GOODS")).not.toBeInTheDocument();
+    expect(screen.queryByText(/other goods/i)).not.toBeInTheDocument();
   });
 
-  it("uses a dash for Service Unit ID and routing instead of inventing a non-applicable state", () => {
+  it("hangs flush under its row with the shared 1px connector to a bordered goods frame (§6.8–§6.9)", () => {
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const gutters = screen.getAllByTestId(/^grid-expansion-gutter-/);
+    expect(gutters.map((cell) => cell.dataset.testid)).toEqual([
+      "grid-expansion-gutter-__select__",
+      "grid-expansion-gutter-__expand__",
+    ]);
+    /* §6.9 (UI #1492): the line starts under the caret — the drop in the caret
+       cell, the curve in the caret column's gutter — and the checkbox gutter
+       stays empty. */
+    expect(gutters[0]).toBeEmptyDOMElement();
+    expect(within(gutters[1]!).getByTestId("expansion-connector-elbow")).toBeInTheDocument();
+    expect(screen.getByTestId("expansion-connector-drop")).toBeInTheDocument();
+    const cell = screen.getByTestId("grid-expansion-cell");
+    expect(cell).toHaveAttribute("colspan", "13");
+    expect(cell.querySelector('[class*="100cqw"]')).toBeNull();
+    /* §6.8 (owner review 2026-09-22): measured widths, the table takes their
+       sum and never stretches to the sheet; the frame hugs it. */
+    const goods = within(cell).getByRole("table");
+    expect(goods).toHaveStyle({ width: "986px" });
+    expect(goods.className).not.toContain("w-full");
+    expect(within(cell).getByTestId("goods-mini-table").className).toContain("w-fit");
+    /* The Purchasing reference: flush under the row, and the section stack
+       draws the line from the caret to the goods frame and ends there. */
+    expect(cell).toHaveStyle({ paddingTop: "0px", paddingBottom: "0px" });
+    expect(within(cell).getByTestId("section-run-goods")).toBeInTheDocument();
+    expect(within(cell).queryByTestId("section-elbow-goods")).toBeNull();
+    expect(within(cell).queryByTestId("section-trunk-goods")).toBeNull();
+    expect(within(cell).getByTestId("goods-mini-table").className).toContain("border");
+  });
+
+  /** The child of a record is its own object, and the frame is what says so. */
+  it("draws the child table as a bordered box, not a continuation of the sheet", () => {
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const box = screen.getByTestId("goods-mini-table");
+    expect(box.className).toContain("rounded-control");
+    expect(box.className).toContain("border-base-200");
+    expect(box.className).not.toContain("border-y");
+  });
+
+  it("draws a readable grid through every expanded goods column and row", () => {
+    listHookState.data = { orders: [order({ order_lines: [
+      { id: "line-1", sku: "B1201S-K", qty: 1, unit_price: 2499, label: "B1201S · King" },
+      { id: "line-2", sku: "SOFA9", qty: 1, unit_price: 3999, label: "Sofa 9" },
+    ] })] };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const goods = screen.getByRole("table", { name: "Goods on SO-1303" });
+    const [head, body] = within(goods).getAllByRole("rowgroup");
+    expect(within(head).getByRole("row").className).toContain("divide-x");
+    expect(body.className).toContain("divide-y");
+    expect(body.className).toContain("divide-base-200");
+    for (const row of within(body).getAllByRole("row")) {
+      expect(row.className).toContain("divide-x");
+      expect(row.className).toContain("divide-base-200");
+    }
+  });
+
+  /**
+   * ⭐ TWO TYPE LEVELS, AND A REGISTER SELECTS NOTHING (owner rulings
+   * 2026-08-15). The header is the parent header's own 11px grey; every value
+   * is 13px `text-body`; and no child row on a TRUTH register may carry a
+   * checkbox — the parent row's tick already scopes Export, and a second tick
+   * inside the box would claim the register can act on one line.
+   */
+  it("prints the child header at 11px with no checkbox, and every value at 13px", () => {
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const goods = screen.getByRole("table", { name: "Goods on SO-1303" });
+    for (const header of within(goods).getAllByRole("columnheader")) {
+      expect(header.className).toContain("text-label");
+      /* S5 (2026-09-16): the shared child header follows the slate Register
+         header — slate-11 ink, 600, normal casing. */
+      expect(header.className).toContain("text-kit-slate-11");
+      expect(header.className).not.toContain("uppercase");
+    }
+    expect(within(goods).queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(within(goods).getAllByRole("rowgroup")[1].className).toContain("text-body");
+  });
+
+  /** An absence keeps its word and loses its weight — inside the box too. */
+  it("mutes the governed absences in the child table", () => {
+    listHookState.data = { orders: [order({ order_lines: [
+      { id: "line-1", sku: "B1201S-K", qty: 1, unit_price: 2499, label: "B1201S · King" },
+    ] })] };
+    expansionHookState.data = { lines: [] };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    const goods = screen.getByRole("table", { name: "Goods on SO-1303" });
+    expect(within(goods).getByText("Not allocated")).toHaveAttribute("data-absence", "true");
+    /* Before any PO line there is no supplier destination (owner ruling 2026-09-21). */
+    expect(within(goods).getByText("No PO yet")).toHaveAttribute("data-absence", "true");
+    expect(within(goods).queryByText("Not recorded")).toBeNull();
+  });
+
+  it("draws nothing for Service Unit ID and routing, never a dash and never an invented non-applicable state", () => {
     listHookState.data = {
       orders: [order({ order_lines: [], order_addons: [{ addon_key: "disposal_service", qty: 1, unit_price: 0 }] })],
     };
@@ -347,7 +1077,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
     const goods = screen.getByRole("table", { name: "Goods on SO-1303" });
     expect(goods).not.toHaveTextContent("Not applicable");
-    expect(within(goods).getAllByText("—")).toHaveLength(2);
+    expect(goods).not.toHaveTextContent(/[—–]/);
   });
 
   it("keeps loading inside the work surface instead of adding an outer band", () => {
@@ -365,46 +1095,727 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
   });
 });
 
-describe("Copy to new Sales Order", () => {
-  it("opens the authoritative create workspace with the source order as a draft seed", () => {
+/* COPY IS RETIRED — Jess, 2026-08-28, relayed by YH.
+ *
+ * This block used to prove the copy door opened the authoritative create
+ * workspace with the source order as a seed. That behaviour is GONE, and the
+ * reason is not tidiness: a copied order silently dropped each line’s
+ * configuration (fabric, colour), so Purchasing received a PO it could not
+ * autofill — a quiet wrong order rather than a visible failure. Jess called
+ * the act dangerous and it is not retained.
+ *
+ * The pin is rewritten to its SURVIVING invariant rather than deleted: the
+ * register offers no copy act, and no hand-typed `?copyFrom=` URL is minted
+ * from here. If copy ever returns it needs a card, a configuration answer and
+ * a new test — not the quiet return of this one.
+ */
+describe("order view before editing", () => {
+  /* ONE ROW MENU — owner ruling 2026-10-05: `View · Print · ─ Cancel SO`.
+   * Edit is reached through View (a button on the read-first page). */
+  it("opens the one row menu: View · Print · ─ Cancel SO", () => {
     mount();
     fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
-    fireEvent.click(screen.getByRole("button", { name: "Copy to new Sales Order" }));
-    expect(screen.getByTestId("location")).toHaveTextContent(
-      "/operation/orders/so/new?copyFrom=00000000-0000-0000-0000-00000000cafe",
-    );
+    const menu = screen.getByRole("menu", { name: "Row actions" });
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["View", "Print", "Cancel SO"]);
+    expect(within(menu).getAllByRole("separator")).toHaveLength(1);
+    expect(within(menu).queryByRole("menuitem", { name: "Edit" })).not.toBeInTheDocument();
+  });
+  it("View opens the full read-first page, never the quick card", () => {
+    mount();
+    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "View" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/operation/orders/so/00000000-0000-0000-0000-00000000cafe");
+    expect(screen.queryByTestId("sales-order-quick-view")).not.toBeInTheDocument();
+  });
+  it("Print runs the governed SO paper for that one order", () => {
+    printSalesOrdersSpy.mockClear();
+    mount();
+    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Print" }));
+    expect(printSalesOrdersSpy).toHaveBeenCalledTimes(1);
+    expect(printSalesOrdersSpy.mock.calls[0]?.[0]).toEqual([expect.objectContaining({ id: "00000000-0000-0000-0000-00000000cafe" })]);
+    expect(screen.getByTestId("location")).toHaveTextContent(/^\/operation\/orders$/);
+  });
+  it("Cancel SO opens the one governed cancellation door", () => {
+    mount();
+    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Cancel SO" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent(/^\/operation\/orders$/);
+  });
+  it("the Menu key opens the same menu from the keyboard", () => {
+    mount();
+    fireEvent.keyDown(screen.getByTestId("grid-parent-row"), { key: "F10", shiftKey: true });
+    expect(screen.getByRole("menu", { name: "Row actions" })).toBeInTheDocument();
+  });
+  it("opens a read-only summary from the order number, then offers the full page", () => {
+    mount();
+    fireEvent.click(screen.getByRole("button", {name:"SO-1303"}));
+    const summary=screen.getByTestId("sales-order-quick-view");
+    expect(summary).toHaveTextContent("Balance due");
+    expect(summary).toHaveTextContent("RM 1,249.00");
+    expect(within(summary).getByRole("button", { name: "Items" })).toHaveAttribute("aria-expanded", "false");
+    expect(within(summary).queryByRole("button",{name:"Edit"})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button",{name:"Open full page"}));
+    expect(screen.getByTestId("location")).toHaveTextContent("/operation/orders/so/");
   });
 });
 
-describe("Cancel SO", () => {
-  /* The register writes nothing itself: the menu entry may only OPEN the one
-   * governed cancellation door, and the row it names is the door's subject.
-   * If a future edit ever makes the register cancel directly, the dialog stops
-   * being the single door and this test is the thing that notices. */
-  it("opens the governed cancellation door for the row, and navigates nowhere", () => {
+
+describe("Sales Orders table correction", () => {
+  it("keeps the full date label on its sort and filter doors", () => {
     mount();
-    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
-    fireEvent.click(screen.getByRole("button", { name: "Cancel SO" }));
-    expect(screen.getByText("Cancel SO-1303")).toBeInTheDocument();
-    expect(screen.getByTestId("location")).toHaveTextContent("/operation/orders");
+    const sort = within(screen.getByTestId("register-column")).getByRole("button", { name: "Customer’s original requested delivery" });
+    expect(sort.querySelector("br")).not.toBeNull();
+    fireEvent.click(sort);
+    expect(within(screen.getByTestId("register-column")).getByRole("button", { name: "Customer’s original requested delivery" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Filter Customer’s original requested delivery" }));
+    expect(outsideRail("Today")).toHaveLength(1);
   });
 
-  it("keeps the destructive entry last, below a divider, so a slipped click cannot reach it", () => {
+  it("preserves saved widths and optional columns, but a saved order cannot move Proceed Date · SO Doc Date · SO No off the front", () => {
+    /* A v5 layout is retired: the key moved so it cannot resurrect the old order. */
+    localStorage.setItem("carres.salesOrders.register.v5.anon", JSON.stringify({
+      order: ["customer", "so", "ordered"], widths: {}, hidden: ["proceeded"], groupBy: [], sort: null,
+    }));
+    const saved = {
+      order: ["customer", "so", "ordered", "proceeded", "customer_delivery", "delivery_location", "sales_location", "po_number", "do_number", "phone"],
+      widths: { customer: 288, customer_delivery: 240 },
+      hidden: [], groupBy: [], sort: null,
+    };
+    localStorage.setItem("carres.salesOrders.register.v6.anon", JSON.stringify(saved));
     mount();
-    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
-    const labels = screen
-      .getAllByRole("button")
-      .map((b) => b.textContent?.trim())
-      .filter((t): t is string =>
-        [
-          "View",
-          "Edit",
-          "Preview PDF",
-          "Print PDF",
-          "Copy to new Sales Order",
-          "Cancel SO",
-        ].includes(t ?? ""),
+    const business = [...screen.getByTestId("grid-header").querySelectorAll("th")].map((th) => th.getAttribute("title")).filter(Boolean);
+    expect(business.slice(0, 4)).toEqual(["Proceed Date", "SO Doc Date", "SO No", "Customer"]);
+    expect(screen.getByRole("button", { name: "Customer" }).closest("th")).toHaveStyle({width: "288px"});
+    expect(within(screen.getByTestId("register-column")).getByRole("button", { name: "Customer’s original requested delivery" }).closest("th")).toHaveStyle({width: "240px"});
+    expect(screen.getByRole("button", { name: "Filter Phone" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    expect(screen.getAllByTestId(/^grid-expansion-gutter-/).map((e) => e.dataset.testid)).toEqual([
+      "grid-expansion-gutter-__select__", "grid-expansion-gutter-__expand__",
+    ]);
+    expect(JSON.parse(localStorage.getItem("carres.salesOrders.register.v6.anon")!).widths).toEqual(saved.widths);
+  });
+});
+
+/**
+ * LISTING STANDARD — owner approved 2026-09-16, the page-local half.
+ * (The shared search, palette, width rule, `Reset columns` label and keyboard
+ * row menu wait for the shared register work in PR #1395.)
+ */
+describe("Listing Standard 2026-09-16 · page-local", () => {
+  it("counts sales orders by their document name, singular and filtered", async () => {
+    listHookState.data = { orders: [order({}), order({ id: "o-2", so: 1304, customer_name: "Wong Mei Ling" })], salesOrderTotal: 2 };
+    mount();
+    const footer = screen.getByTestId("grid-footer");
+    expect(footer).toHaveTextContent(/^2 sales orders/);
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Wong" } });
+    await waitFor(() => expect(footer).toHaveTextContent(/^1 of 2 sales orders/));
+    expect(footer).not.toHaveTextContent(/\borders\b(?! )/);
+  });
+
+  /* ⭐ `{m}` IS THE SERVER'S COUNT (2026-09-17). Not `rows.length`, not a
+     number remembered from an earlier unsearched read. */
+  describe("the total is the server's count", () => {
+    const wong = order({ id: "o-3", so: 1305, customer_name: "Wong Mei Ling" });
+    const everyone = [order({}), order({ id: "o-2", so: 1304 }), wong];
+    const searchOf = (args: unknown[]) => (args[0] as { search?: string } | undefined)?.search;
+    const serverAnswered = (term: string) =>
+      waitFor(() => expect(useOperationOrdersSpy.mock.calls.some((c) => searchOf(c) === term)).toBe(true));
+    afterEach(() => useOperationOrdersSpy.mockImplementation((..._args: unknown[]) => listHookState));
+
+    it("a search answered BEFORE any unsearched load still says `of` the server total", async () => {
+      /* The unsearched read never arrives; only the searched answer does. */
+      useOperationOrdersSpy.mockImplementation((...args: unknown[]) =>
+        searchOf(args)
+          ? { ...listHookState, data: { orders: [wong], salesOrderTotal: 3 } }
+          : { ...listHookState, data: undefined });
+      mount();
+      fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Wong" } });
+      await serverAnswered("Wong");
+      await waitFor(() => expect(screen.getByTestId("grid-footer")).toHaveTextContent(/^1 of 3 sales orders/));
+    });
+
+    it("an order created during a search moves the total on the next read", async () => {
+      let total = 3;
+      useOperationOrdersSpy.mockImplementation((...args: unknown[]) => ({
+        ...listHookState,
+        data: searchOf(args) ? { orders: [wong], salesOrderTotal: total } : { orders: everyone, salesOrderTotal: total },
+      }));
+      const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      const tree = () => (
+        <QueryClientProvider client={qc}>
+          <MemoryRouter initialEntries={["/operation/orders"]}>
+            <SalesOrdersRegister />
+          </MemoryRouter>
+        </QueryClientProvider>
       );
-    expect(labels[labels.length - 1]).toBe("Cancel SO");
+      const view = render(tree());
+      fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Wong" } });
+      await serverAnswered("Wong");
+      await waitFor(() => expect(screen.getByTestId("grid-footer")).toHaveTextContent(/^1 of 3 sales orders/));
+      /* Another operator creates an order; the list query is invalidated and re-read. */
+      total = 4;
+      view.rerender(tree());
+      await waitFor(() => expect(screen.getByTestId("grid-footer")).toHaveTextContent(/^1 of 4 sales orders/));
+    });
+
+    it("a limited read (the 500-row cap) is `{loaded} of {server total}`, not `{loaded}`", () => {
+      listHookState.data = { orders: everyone, salesOrderTotal: 612 };
+      mount();
+      expect(screen.getByTestId("grid-footer")).toHaveTextContent(/^3 of 612 sales orders/);
+    });
+
+    it.each([
+      ["null", null],
+      ["absent (older Worker)", undefined],
+    ])("an unknown total (%s) prints the count alone — never a guessed `of`", async (_label, unknown) => {
+      useOperationOrdersSpy.mockImplementation((...args: unknown[]) => ({
+        ...listHookState,
+        data: { orders: searchOf(args) ? [wong] : everyone, ...(unknown === undefined ? {} : { salesOrderTotal: unknown }) },
+      }));
+      mount();
+      expect(screen.getByTestId("grid-footer")).toHaveTextContent(/^3 sales orders/);
+      fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Wong" } });
+      await serverAnswered("Wong");
+      await waitFor(() => expect(screen.getByTestId("grid-footer")).toHaveTextContent(/^1 sales order\b/));
+      expect(screen.getByTestId("grid-footer")).not.toHaveTextContent(" of ");
+    });
+  });
+
+  /* ⭐ THE 390px DEFECT (Card 12): SO Doc Date led and SO No started past the
+     fold. Below a 768px canvas SO No leads and pins alone on first paint, and
+     the two dates follow it — still locked, never hideable. */
+  it("below a 768px canvas SO No leads and pins alone, and the two dates stay locked", async () => {
+    const width = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400);
+    try {
+      mount();
+      const ths = [...screen.getByTestId("grid-header").querySelectorAll("th")].filter((th) => th.getAttribute("title"));
+      expect(ths.slice(0, 3).map((th) => th.getAttribute("title"))).toEqual(["SO No", "Proceed Date", "SO Doc Date"]);
+      expect(ths[0]!.style.left).not.toBe("");
+      expect(ths[1]!.style.left).toBe("");
+      fireEvent.keyDown(screen.getByRole("button", { name: "Page tools" }), { key: "Enter" });
+      fireEvent.click(screen.getByRole("menuitem", { name: "Columns" }));
+      await screen.findByRole("checkbox", { name: "SO No" });
+      for (const label of ["SO No", "Proceed Date", "SO Doc Date"]) {
+        expect(screen.getByRole("checkbox", { name: label })).toBeDisabled();
+      }
+    } finally {
+      width.mockRestore();
+    }
+  });
+
+  it("names a single ticked row in the singular", () => {
+    mount();
+    fireEvent.click(screen.getAllByRole("checkbox", { name: "Select row" })[0]!);
+    expect(screen.getByTestId("grid-footer")).toHaveTextContent(/^1 selected sales order\b/);
+  });
+
+  it("says a failed load in one kit error with the fact and Try again", () => {
+    const refetch = vi.fn();
+    listHookState = { data: undefined, isLoading: false, isError: true, error: new Error("socket hang up"), refetch };
+    mount();
+    const alert = screen.getByRole("alert");
+    expect(alert.querySelector('[data-kit="empty-state"]')).not.toBeNull();
+    expect(alert).toHaveTextContent("Sales orders could not be loaded");
+    expect(alert).not.toHaveTextContent("socket hang up");
+    expect(alert.innerHTML).not.toMatch(/\bbase-\d/);
+    fireEvent.click(within(alert).getByRole("button", { name: "Try again" }));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the toolbar when the list fails to load", () => {
+    listHookState = { data: undefined, isLoading: false, isError: true, error: new Error("x"), refetch: vi.fn() };
+    mount();
+    expect(screen.getByTestId("work-toolbar")).toBeInTheDocument();
+    expect(screen.getByTestId("grid-footer")).not.toHaveTextContent("sales order");
+  });
+
+  it("runs the shared slate register palette and governed search", () => {
+    mount();
+    const root = screen.getByTestId("work-toolbar").parentElement!;
+    expect(root.className).toMatch(/rootPaletteSlate/);
+    expect(root.className).toMatch(/rootSearchResponsive/);
+  });
+
+  it("prints Delivery Location as left-aligned text, not a centred button that cuts both ends", () => {
+    mount();
+    const row = screen.getByTestId("grid-parent-row");
+    expect(within(row).queryByRole("button", { name: /Kelana|Selangor|Not recorded/ })).toBeNull();
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * THE RAIL — ONE VIEW SELECTOR (owner rulings 2026-09-22 / 26 / 27).
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe("the Sales Orders rail and its two views", () => {
+  beforeEach(() => {
+    window.localStorage.setItem("carres.salesOrders.rail", "1");
+    listHookState = {
+      data: {
+        orders: [
+          order({ id: "a", so: 1401, delivery_date: "2026-10-05" }),
+          order({ id: "b", so: 1402, delivery_date: "2026-11-05" }),
+          order({ id: "c", so: 1403, delivery_date: "2026-09-05" }),
+        ],
+        salesOrderTotal: 3,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+    useMonthlyDemandFactsSpy.mockClear();
+  });
+
+  it("switches Order list and Monthly demand with a tab bar, and has no Clear filters", () => {
+    mount();
+    const rail = screen.getByTestId("sales-orders-rail");
+    /* Two views of the same orders: a tab bar, not a collapsible group (owner ruling 2026-09-28). */
+    expect(within(rail).getByRole("tab", { name: "Listing" })).toBeInTheDocument();
+    expect(within(rail).getByRole("tab", { name: "Monthly demand" })).toBeInTheDocument();
+    expect(within(rail).queryByText("View")).not.toBeInTheDocument();
+    expect(within(rail).queryByText(/Clear filters/i)).not.toBeInTheDocument();
+  });
+
+  it("opens on the Order list, which does not read Monthly demand", () => {
+    mount();
+    expect(screen.getByRole("tab", { name: "Listing" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("register-column")).toBeInTheDocument();
+    expect(useMonthlyDemandFactsSpy).toHaveBeenLastCalledWith(false);
+  });
+
+  it("choosing Monthly demand writes it to the URL, replaces the list, and reads its facts", () => {
+    mount();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Monthly demand" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("view=monthly");
+    expect(screen.queryByTestId("register-column")).not.toBeInTheDocument();
+    expect(useMonthlyDemandFactsSpy).toHaveBeenLastCalledWith(true);
+    const rail = screen.getByTestId("sales-orders-rail");
+    for (const group of ["Period", "Sales Location", "Customer Delivery Location", "Product category"]) {
+      expect(within(rail).getByText(group)).toBeInTheDocument();
+    }
+  });
+
+  it("a month door narrows the Order list to that month, and says so", () => {
+    mount("/operation/orders?requested=2026-10");
+    const grid = screen.getByTestId("register-column");
+    expect(within(grid).getByText("SO-1401")).toBeInTheDocument();
+    expect(within(grid).queryByText("SO-1402")).not.toBeInTheDocument();
+    expect(within(grid).queryByText("SO-1403")).not.toBeInTheDocument();
+    expect(grid).toHaveTextContent("Customer’s original requested delivery: Oct 2026");
+  });
+
+  it("a Before door narrows to everything owed before the window", () => {
+    mount("/operation/orders?requested=before%3A2026-10");
+    const grid = screen.getByTestId("register-column");
+    expect(within(grid).getByText("SO-1403")).toBeInTheDocument();
+    expect(within(grid).queryByText("SO-1401")).not.toBeInTheDocument();
+  });
+
+  it("a monthly drill-down clears the prior list search instead of restoring it from session", async () => {
+    mount("/operation/orders?search=Kimmy");
+    expect(screen.getByRole("searchbox")).toHaveValue("Kimmy");
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Monthly demand" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Sales Orders for Oct 2026" }));
+    await waitFor(() => expect(screen.getByRole("searchbox")).toHaveValue(""));
+    expect(screen.getByTestId("location").textContent).not.toContain("search=");
+    await waitFor(() => expect(useOperationOrdersSpy.mock.calls.map(call => call[0] as { stage?: string; search?: string }).filter(input => input.stage === "proceeded").at(-1)).toEqual({ stage: "proceeded" }));
+  });
+
+  it("an explicit month drill-down preserves the contributing location, destination and category, with visible clearable conditions", async () => {
+    listHookState.data!.orders = [
+      order({ id: "a", so: 1401, delivery_date: "2026-10-05", dealers: { name: "{dealer 1}" }, customer_address_state: "Selangor", customer_address_city: "Petaling Jaya", order_lines: [{ sku: "B1201S-K", qty: 1, unit_price: 100, category: "mattress" }] }),
+      order({ id: "b", so: 1402, delivery_date: "2026-10-05", dealers: { name: "{dealer 2}" }, customer_address_state: "Selangor", customer_address_city: "Petaling Jaya", order_lines: [{ sku: "B1201S-K", qty: 1, unit_price: 100, category: "mattress" }] }),
+      order({ id: "c", so: 1403, delivery_date: "2026-10-05", dealers: { name: "{dealer 1}" }, customer_address_state: "Selangor", customer_address_city: "Petaling Jaya", order_lines: [{ sku: "BED", qty: 1, unit_price: 100, category: "bedframe" }] }),
+    ];
+    mount("/operation/orders?view=monthly&dealer=%7Bdealer%201%7D&state=Selangor&city=Petaling+Jaya&category=Mattress&search=Kimmy");
+    fireEvent.click(screen.getByRole("button", { name: "Open Sales Orders for Oct 2026" }));
+    const grid = await screen.findByTestId("register-column");
+    await waitFor(() => expect(within(grid).getByText("SO-1401")).toBeInTheDocument());
+    expect(within(grid).queryByText("SO-1402")).not.toBeInTheDocument();
+    expect(within(grid).queryByText("SO-1403")).not.toBeInTheDocument();
+    expect(grid).toHaveTextContent("Product category: Mattress");
+    expect(screen.getByRole("searchbox")).toHaveValue("");
+    expect(screen.getByTestId("location")).toHaveTextContent("category=Mattress");
+    expect(screen.getByTestId("location")).toHaveTextContent("dealer=");
+    fireEvent.click(screen.getByRole("button", { name: "Remove Product category: Mattress" }));
+    await waitFor(() => expect(within(grid).getByText("SO-1403")).toBeInTheDocument());
+    expect(within(grid).queryByText("SO-1402")).not.toBeInTheDocument();
+  });
+
+  it("Monthly demand's filters never carry into the Order list", () => {
+    mount("/operation/orders?view=monthly&dealer=%7Bdealer%201%7D&months=3");
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Listing" }));
+    const at = screen.getByTestId("location").textContent ?? "";
+    expect(at).not.toContain("view=");
+    expect(at).not.toContain("dealer=");
+    expect(at).not.toContain("months=");
+  });
+});
+
+describe("the Order list rail: read-only fact filters (owner approved 2026-09-22)", () => {
+  const sold = (sku: string, qty = 1) => ({ sku, status: "sold" as const, qty });
+  beforeEach(() => {
+    window.localStorage.setItem("carres.salesOrders.rail", "1");
+    listHookState = {
+      data: {
+        orders: [
+          order({
+            id: "a", so: 1501, dealers: { name: "{dealer 1}" },
+            customer_address_state: "{state 1}", customer_address_city: "{city 1}",
+            order_lines: [{ sku: "B1201S-K", qty: 2, unit_price: 100 }],
+            allocated_units: [],
+          }),
+          order({
+            id: "b", so: 1502, dealers: { name: "{dealer 2}" },
+            customer_address_state: "{state 2}", customer_address_city: "{city 2}",
+            order_lines: [{ sku: "B1201S-K", qty: 2, unit_price: 100 }],
+            allocated_units: [sold("B1201S-K")],
+          }),
+          order({
+            id: "c", so: 1503, dealers: { name: "{dealer 2}" },
+            customer_address_state: "{state 2}", customer_address_city: "{city 3}",
+            order_lines: [{ sku: "B1201S-K", qty: 1, unit_price: 100 }],
+            allocated_units: [sold("B1201S-K")],
+          }),
+        ],
+        salesOrderTotal: 3,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+  });
+  const shown = () => {
+    const grid = screen.getByTestId("register-column");
+    return [1501, 1502, 1503].filter((n) => within(grid).queryByText(`SO-${n}`));
+  };
+
+  it("the Order list carries Sales Location, Customer Delivery Location and Delivery, no Date group and no Clear filters", () => {
+    mount();
+    const rail = screen.getByTestId("sales-orders-rail");
+    for (const group of ["Customer’s original requested delivery", "Order summary"]) {
+      expect(within(rail).getByText(group)).toBeInTheDocument();
+    }
+    /* A date is narrowed on its own column's ▽ (Jess, 2026-09-28). */
+    expect(within(rail).queryByText("Date")).not.toBeInTheDocument();
+    expect(within(rail).queryByText("Proceed Date")).not.toBeInTheDocument();
+    expect(within(rail).queryByText(/Clear/i)).not.toBeInTheDocument();
+    expect(shown()).toEqual([1501, 1502, 1503]);
+  });
+
+  it("Sales Location URL narrows to where the order was sold", () => {
+    mount("/operation/orders?dealer=%7Bdealer%202%7D");
+    expect(shown()).toEqual([1502, 1503]);
+    expect(screen.getByTestId("register-column")).toHaveTextContent("Sales Location: {dealer 2}");
+  });
+
+  it("multiple locations combine while another group's Delivery condition still applies", () => {
+    mount("/operation/orders?dealer=%7Bdealer%201%7D&dealer=%7Bdealer%202%7D&delivery=partially_delivered");
+    expect(shown()).toEqual([1502]);
+  });
+
+  it("State narrows, City narrows within it, and a new State clears the City", () => {
+    mount("/operation/orders?state=%7Bstate%202%7D&city=%7Bcity%203%7D");
+    expect(shown()).toEqual([1503]);
+    expect(screen.queryByRole("button", { name: "Select State" })).not.toBeInTheDocument();
+  });
+
+  it("requested month narrows the existing table and can be cleared", () => {
+    listHookState.data!.orders = [
+      order({ id: "a", so: 1501, delivery_date: "2026-10-10" }),
+      order({ id: "b", so: 1502, delivery_date: "2026-11-10" }),
+      order({ id: "c", so: 1503, delivery_date: "2026-12-10" }),
+    ];
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-06T04:00:00Z"));
+    try {
+      mount();
+      fireEvent.change(screen.getByRole("combobox", { name: "Select month" }), { target: { value: "2026-11" } });
+      expect(shown()).toEqual([1502]);
+      fireEvent.click(screen.getByTestId("requested-all"));
+      expect(shown()).toEqual([1501, 1502, 1503]);
+      fireEvent.change(screen.getByRole("combobox", { name: "Select month" }), { target: { value: "2026-12" } });
+      expect(shown()).toEqual([1503]);
+      /* The empty option clears the month, exactly as `All dates` does. */
+      fireEvent.change(screen.getByRole("combobox", { name: "Select month" }), { target: { value: "" } });
+      expect(shown()).toEqual([1501, 1502, 1503]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("Select month is the rail's own select: no month input, its empty option reads its label, never a dash", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-06T04:00:00Z"));
+    try {
+      mount();
+      const rail = screen.getByTestId("sales-orders-rail");
+      /* A native month input printed `--------- ----` when empty. */
+      expect(rail.querySelector('input[type="month"]')).toBeNull();
+      const select = within(rail).getByRole("combobox", { name: "Select month" }) as HTMLSelectElement;
+      expect(select.tagName).toBe("SELECT");
+      expect(select.value).toBe("");
+      expect(select.options[0]!.textContent).toBe("Select month");
+      const labels = [...select.options].map((option) => option.textContent ?? "");
+      /* The span `Starting month` lists: twelve back, this month, eleven ahead. */
+      expect(labels.slice(1, 2)).toEqual(["Oct 2025"]);
+      expect(labels).toContain("Oct 2026");
+      expect(labels.at(-1)).toBe("Sep 2027");
+      for (const label of labels) expect(label).not.toMatch(/[-–—]/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a linked month outside the listed span stays chosen in Select month", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-06T04:00:00Z"));
+    try {
+      listHookState.data!.orders = [
+        order({ id: "a", so: 1501, delivery_date: "2024-02-10" }),
+        order({ id: "b", so: 1502, delivery_date: "2026-11-10" }),
+      ];
+      mount("/operation/orders?requested=2024-02");
+      expect(shown()).toEqual([1501]);
+      const select = screen.getByRole("combobox", { name: "Select month" }) as HTMLSelectElement;
+      expect(select.value).toBe("2024-02");
+      expect(select.selectedOptions[0]!.textContent).toBe("Feb 2024");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("requested range includes both ends and excludes adjacent dates", () => {
+    listHookState.data!.orders = [
+      order({ id: "a", so: 1501, delivery_date: "2026-10-31" }),
+      order({ id: "b", so: 1502, delivery_date: "2026-11-01" }),
+      order({ id: "c", so: 1503, delivery_date: "2026-12-31" }),
+    ];
+    mount("/operation/orders?requested=range:2026-11-01:2026-12-31");
+    expect(shown()).toEqual([1502, 1503]);
+  });
+
+  it("summaries follow the table search and status filters stay in columns", async () => {
+    mount();
+    const rail = screen.getByTestId("sales-orders-rail");
+    for (const label of ["Stock Status", "Delivery Status", "Payment Status"]) expect(within(rail).queryByText(label)).not.toBeInTheDocument();
+    expect(screen.getByTestId("sales-orders-summary")).toHaveTextContent("Sales orders3");
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), { target: { value: "SO-1502" } });
+    await waitFor(() => expect(screen.getByTestId("sales-orders-summary")).toHaveTextContent("Sales orders1"));
+  });
+
+  it("an old date link no longer narrows the list: no filter the rail cannot show", () => {
+    const today = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+    listHookState.data!.orders = [
+      order({ id: "a", so: 1501, proceeded_at: `${today}T01:00:00Z` }),
+      order({ id: "b", so: 1502, proceeded_at: "2020-01-02T01:00:00Z" }),
+    ];
+    mount("/operation/orders?date=doc&range=today");
+    expect(shown()).toEqual([1501, 1502]);
+    expect(screen.getByTestId("register-column")).not.toHaveTextContent("Today");
+  });
+
+  it("the Order list's filters never carry into Monthly demand", () => {
+    mount("/operation/orders?dealer=%7Bdealer%201%7D&delivery=not_delivered");
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Monthly demand" }));
+    const at = screen.getByTestId("location").textContent ?? "";
+    expect(at).not.toContain("dealer=");
+    expect(at).not.toContain("delivery=");
+  });
+});
+
+describe("the Order list rail: Obligations and Service Cases are the server's facts", () => {
+  beforeEach(() => {
+    window.localStorage.setItem("carres.salesOrders.rail", "1");
+    listHookState = {
+      data: {
+        orders: [order({ id: "a", so: 1601 }), order({ id: "b", so: 1602 }), order({ id: "c", so: 1603 })],
+        salesOrderTotal: 3,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+    registerFactsState = {
+      data: {
+        facts: {
+          a: { obligations: "outstanding", cases: "open" },
+          b: { obligations: "none", cases: "none" },
+          c: { obligations: null, cases: "closed" },
+        },
+        failed: { obligations: false, cases: false },
+      },
+    };
+  });
+  afterEach(() => {
+    registerFactsState = { data: { facts: {}, failed: { obligations: false, cases: false } } };
+  });
+  const shown = () => {
+    const grid = screen.getByTestId("register-column");
+    return [1601, 1602, 1603].filter((n) => within(grid).queryByText(`SO-${n}`));
+  };
+
+  it("removed Obligations does not hide orders through an old URL", () => {
+    mount("/operation/orders?obligations=outstanding");
+    expect(screen.queryByText("Obligations")).not.toBeInTheDocument();
+    expect(shown()).toEqual([1601, 1602, 1603]);
+  });
+
+  it("retired Service Cases filters do not hide orders", () => {
+    mount("/operation/orders?cases=open");
+    expect(screen.queryByTestId("sales-orders-rail-cases-open")).not.toBeInTheDocument();
+    expect(shown()).toEqual([1601, 1602, 1603]);
+  });
+
+  it("a read the server could not make says so instead of pretending none", () => {
+    registerFactsState = {
+      data: { facts: {}, failed: { obligations: true, cases: true } },
+    };
+    mount("/operation/orders?cases=none");
+    expect(screen.queryByTestId("sales-orders-rail-obligations-unread")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sales-orders-rail-cases-unread")).not.toBeInTheDocument();
+    expect(shown()).toEqual([1601, 1602, 1603]);
+  });
+});
+
+
+describe("the isolated shared-template pilot", () => {
+  it("keeps active filters before tools in both Table and Cards", () => {
+    /* The order is IN the chosen state: a rail choice that left nothing would
+       show the empty state's own `Clear filters` instead of `Clear all`. */
+    listHookState.data = { orders: [order({ customer_address_state: "Selangor" })] };
+    mount("/operation/orders?state=Selangor");
+    const conditions=screen.getByTestId("active-conditions");
+    const tools=screen.getByTestId("work-toolbar");
+    expect(conditions.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(conditions).not.toHaveTextContent("Showing only:");
+    expect(within(conditions).getByRole("button", {name:"Clear all"})).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole("tab", {name:"Cards"}));
+    expect(screen.getByTestId("active-conditions").compareDocumentPosition(screen.getByTestId("work-toolbar")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+  it("carries search and selection through Table and Cards without changing the selected output", async () => {
+    listHookState.data = { orders: [order({ id: "a", so: 101, customer_name: "Kimmy" }), order({ id: "b", so: 102, customer_name: "Other" })] };
+    mount("/operation/orders?view=cards");
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Kimmy" } });
+    await waitFor(() => expect(screen.queryByTestId("sales-order-card-102")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select SO-101" }));
+    expect(screen.getByRole("button", { name: "Export Excel (1)" })).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Table" }));
+    expect(screen.getAllByTestId("grid-parent-row")).toHaveLength(1);
+    expect(screen.getByRole("checkbox", { name: "Select row" })).toBeChecked();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Cards" }));
+    expect(screen.getByRole("checkbox", { name: "Select SO-101" })).toBeChecked();
+  });
+  it("uses the governed register delivery projection in Cards instead of hardcoded unavailability", () => {
+    listHookState.data = { orders: [order({ allocated_units: [{ sku: "B1201S-K", status: "sold", qty: 1 }] })] };
+    mount("/operation/orders?view=cards");
+    const cardStatus = within(screen.getByTestId("sales-orders-cards")).getByText("Fully delivered");
+    expect(cardStatus).toBeInTheDocument();
+    expect(within(screen.getByTestId("sales-orders-cards")).queryByText("Unavailable")).not.toBeInTheDocument();
+  });
+  it("opens goods-only inspection with actual additional line count, never quantity", () => {
+    listHookState.data = { orders: [order({ order_lines: [{ id: "l1", sku: "A", qty: 10, unit_price: 1 }, { id: "l2", sku: "B", qty: 20, unit_price: 1 }] })] };
+    mount("/operation/orders?view=cards");
+    const trigger = screen.getByRole("button", { name: "Items · SO-1303" });
+    expect(trigger).toHaveTextContent("+1");
+    fireEvent.click(trigger);
+    const drawer = screen.getByRole("dialog", { name: "SO-1303 · Items" });
+    expect(within(drawer).getByText("Qty 10")).toBeInTheDocument();
+    expect(within(drawer).getByText("Qty 20")).toBeInTheDocument();
+    expect(within(drawer).queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+  });
+});
+
+
+describe("approved solid SO status presentation", () => {
+  it.each([
+    ["received", "Fully received", "success", 2, "Fully delivered", "success", 100, "Paid in full", "success"],
+    ["partial", "Partially received", "info", 1, "Partially delivered", "info", 40, "Partially paid", "info"],
+    ["pending", "Awaiting receipt", "neutral", 0, "Not delivered", "neutral", 0, "Unpaid", "neutral"],
+    ["issue", "Received with issue", "warning", 0, "Not delivered", "neutral", 0, "Unpaid", "neutral"],
+    ["unknown", "Receipt unconfirmed", "neutral", 0, "Not delivered", "neutral", 0, "Unpaid", "neutral"],
+  ])("keeps %s status meaning and quick-view parity", async (stockKey, stockLabel, stockTone, sold, deliveryLabel, deliveryTone, paid, paymentLabel, paymentTone) => {
+    const source = order({ paid: Number(paid), order_lines: [{ sku: "B1201S-K", qty: 2, unit_price: 50 }], allocated_units: Number(sold) ? [{ sku: "B1201S-K", status: "sold", qty: Number(sold) }] : [] });
+    listHookState.data = { orders: [source] };
+    registerFactsState = { data: { facts: { [source.id]: { stock: { "B1201S-K": stockKey } } }, failed: {} } };
+    mount();
+    const check = (root: HTMLElement, word: string, tone: string) => {
+      const pills = [...root.querySelectorAll('[data-kit="status-pill"]')].filter(node => node.textContent === word);
+      expect(pills.length, word).toBeGreaterThan(0);
+      for (const pill of pills) { expect(pill).toHaveAttribute("data-tone", tone); expect(pill.querySelector("svg,[data-icon]")).toBeNull(); }
+    };
+    fireEvent.keyDown(screen.getByRole("button", { name: "Page tools" }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Columns" }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Delivery Status" }));
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    check(screen.getByTestId("grid-parent-row"), String(deliveryLabel), String(deliveryTone));
+    check(screen.getByTestId("grid-parent-row"), String(stockLabel), String(stockTone));
+    check(screen.getByTestId("grid-parent-row"), String(paymentLabel), String(paymentTone));
+    fireEvent.click(screen.getByRole("button", { name: "SO-1303" }));
+    const drawer = screen.getByRole("dialog", { name: "SO-1303 · Kimmy" });
+    fireEvent.click(within(drawer).getByRole("button", { name: "Items" }));
+    expect(within(drawer).queryByRole("button", { name: "Info · Order details" })).toBeNull();
+    expect(within(drawer).getByRole("columnheader", { name: "Stock Status" })).toBeVisible();
+    expect(within(drawer).queryByText("Payment Status")).toBeNull();
+    expect(within(drawer).queryByText("Delivery Status")).toBeNull();
+    expect(within(drawer).getByText("Total payable")).toBeVisible();
+    expect(within(drawer).getByText("Paid to date")).toBeVisible();
+  });
+});
+
+
+describe("confirmed optional listing grouping", () => {
+  it.each([['delivery', 'Not delivered'], ['stock', 'Receipt unconfirmed'], ['payment', 'Partially paid']])("groups by %s, collapses without changing totals and restores None", async (key, label) => {
+    mount(`/operation/orders?group=${key}`);
+    const group = await screen.findByRole('button', { name: `${label} 1` });
+    expect(group).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(group);
+    expect(group).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('grid-parent-row')).not.toBeInTheDocument();
+    expect(screen.getByTestId('grid-footer')).toHaveTextContent('1 sales order');
+    fireEvent.click(group);
+    expect(screen.getByTestId('grid-parent-row')).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Page tools' }), { key: 'Enter' });
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Group by: None' }));
+    expect(screen.queryByTestId(`grid-group-toggle-${key}`)).not.toBeInTheDocument();
+    expect(screen.getByTestId('grid-header')).toBeInTheDocument();
+    expect(screen.getByTestId('location')).not.toHaveTextContent('group=');
+  });
+  it('shares grouping and collapse between Table and Cards without changing the summary', async () => {
+    mount('/operation/orders?group=payment');
+    fireEvent.click(await screen.findByRole('button', { name: 'Partially paid 1' }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Cards' }));
+    expect(screen.getByRole('button', { name: 'Partially paid 1' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('sales-order-card-1303')).not.toBeInTheDocument();
+    expect(screen.getByTestId('grid-footer')).toHaveTextContent('1 sales order');
+    fireEvent.click(screen.getByRole('button', { name: 'Partially paid 1' }));
+    expect(screen.getByTestId('sales-order-card-1303')).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Table' }));
+    expect(screen.getByRole('button', { name: 'Partially paid 1' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('grid-parent-row')).toBeInTheDocument();
+  });
+  it('does not lose orders with no physical goods when grouping delivery', async () => {
+    listHookState.data = { orders: [order({ order_lines: [] })] };
+    mount('/operation/orders?group=delivery');
+    expect(await screen.findByRole('button', { name: 'Not applicable 1' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('grid-parent-row')).toBeInTheDocument();
+    expect(screen.getByTestId('grid-footer')).toHaveTextContent('1 sales order');
+  });
+  it('None remains flat even when an older personal layout had column grouping', () => {
+    window.localStorage.setItem('carres.salesOrders.register.v6.anon', JSON.stringify({ order: [], hidden: [], widths: {}, groupBy: ['customer'], sort: null }));
+    mount();
+    expect(screen.getByTestId('grid-header')).toBeInTheDocument();
+    expect(screen.getByTestId('grid-parent-row')).toBeInTheDocument();
+    expect(screen.queryByText('Customer: Kimmy')).not.toBeInTheDocument();
+  });
+  it('keeps the count in the footer without duplicating it in the toolbar', () => {
+    mount();
+    expect(screen.getByTestId('grid-footer')).toHaveTextContent('1 sales order');
+    expect(screen.queryByLabelText('1 sales orders')).not.toBeInTheDocument();
   });
 });

@@ -1,9 +1,10 @@
 import { Hono } from "hono";
-import { warehouseSubmitReceiptInput } from "@carres/shared";
+import { claimPhotoWire, warehouseSubmitReceiptInput } from "@carres/shared";
 import { requireWarehouse } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+import { rpcWithArrivalTime } from "../../lib/receiving-time";
 
 /**
  * /api/warehouse — R6 of the receiving & claim queue
@@ -76,24 +77,34 @@ warehouseReceivingRouter.post("/receipts", requireWarehouse, async (c) => {
   const body = parsed.data;
 
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("warehouse_submit_receipt", {
+  const { data, error } = await rpcWithArrivalTime((args) => sb.rpc("warehouse_submit_receipt", args), {
     p_po_id: body.poId,
     p_do_number: body.doNumber,
     p_do_file_path: body.doFilePath,
     p_note: body.note ?? null,
+    // 0426 — arrival photo/video evidence and extra goods ride the count.
+    p_arrival_evidence: body.arrivalEvidence ?? [],
+    p_extra_lines: body.extraLines ?? [],
     p_lines: body.lines.map((l) => ({
       id: l.id,
       received_now: l.receivedNow ?? 0,
       damaged_qty: l.damagedQty ?? 0,
       wrong_item_qty: l.wrongItemQty ?? 0,
       wrong_item_claim_type: l.wrongItemClaimType ?? null,
-      // Storage KEYS, as plain strings — `supplier_claim_photo_entries` (0288)
-      // reads string elements and silently drops anything else, so wrapping
-      // them in objects here would look tidier and file a photo-less claim.
-      damaged_photos: l.damagedPhotos ?? [],
-      wrong_item_photos: l.wrongItemPhotos ?? [],
+      // Storage KEYS: a plain string files a claim-level photo; since 0614
+      // `supplier_claim_photo_entries` also reads `{path, unit_code}` and keeps
+      // the Unit the photo shows. Any other shape is still dropped.
+      damaged_photos: (l.damagedPhotos ?? []).map(claimPhotoWire),
+      wrong_item_photos: (l.wrongItemPhotos ?? []).map(claimPhotoWire),
+      // 0426 — one physical result per governed expected Unit.
+      units: (l.units ?? []).map((u) => ({
+        unit_code: u.unitCode,
+        outcome: u.outcome,
+        issue_kind: u.issueKind ?? null,
+        note: u.note ?? null,
+      })),
     })),
-  });
+  }, body.goodsReceivedTime);
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);

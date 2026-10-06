@@ -8,9 +8,8 @@ import TabbedProcurementShell from "./TabbedProcurementShell";
  * TabbedProcurementShell — Phase 4.5 Chunk 2 Sprint F Task 34.
  *
  * The shell renders tab nav + the active child component + the page-level
- * "+ New PO" button (T42-C2 restore). The child tabs (NiceFutureMattressTab
- * / OhanaSofaTab / OhanaBedFrameTab) all wrap `ProcurementTabContent`,
- * which calls `useProcurementTab(slug)` plus the three reference hooks
+ * "+ New PO" button (T42-C2 restore). The active tab is
+ * `ProcurementTabContent`, which calls `useProcurementTab(slug)` plus the three reference hooks
  * (suppliers / warehouse / catalog). The modal is `CreatePOModal`, which
  * additionally calls useDeliveryPartners + the create mutations + the
  * shortage/alerts lazy hooks. Mock all of them so the suite stays hermetic
@@ -44,13 +43,6 @@ vi.mock("@/lib/queries", async () => {
     // Card 4B — the CreatePOModal-only stubs went with the modal. Only
     // `useDeliveryPartners` stays: the child tabs read it too.
     useDeliveryPartners: () => ({ data: { partners: [] } }),
-    useAwaitingStockShortage: () => ({
-      data: undefined,
-      isFetching: false,
-      isFetched: false,
-      isError: false,
-      refetch: vi.fn(),
-    }),
     useStockAlerts: () => ({
       data: undefined,
       isFetching: false,

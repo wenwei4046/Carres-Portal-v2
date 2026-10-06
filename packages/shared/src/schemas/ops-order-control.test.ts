@@ -10,6 +10,7 @@ import {
   decideStorageWaiverInput,
   recordStorageExtensionInput,
   distributeOrders,
+  planOpsAssignment,
   seenTodayMYT,
   countsAsInToday,
 } from "./ops-order-control";
@@ -113,6 +114,74 @@ describe("storageCategoryForSku", () => {
   it("everything else is other", () => {
     expect(storageCategoryForSku("PILLOW-01")).toBe("other");
     expect(storageCategoryForSku("SVC-DISPOSAL")).toBe("other");
+  });
+});
+
+/**
+ * CARD-2026-08-28 - THE RATE ASKS THE CATALOG.
+ *
+ * The prefix parser above is wrong for every real SKU. Measured 2026-08-28
+ * against production shapes: B1201S-K, B1201S, MODEL-C, ESS-PILLOW, B2003-Q,
+ * SF-3STR, NF-MATT-K and OH-BF-Q ALL return "other", so no rate applies and
+ * the fee computes RM 0 against a live RM150/month + RM200 table. `B1201S-K`
+ * is the same SKU docs/orders/MASTER.md records as a production-verified
+ * MATTRESS - it reads correctly everywhere the catalog is asked.
+ *
+ * ERP-ARCHITECTURE 6.1 (FROZEN 2026-08-06) rules that Money In's arithmetic
+ * asks the CATALOG. These lock that.
+ */
+describe("storageCategoryForSku - the catalog answers, the parser only fills in", () => {
+  it("a catalogued mattress or bed frame bills at the MS/BF rate", () => {
+    expect(storageCategoryForSku("B1201S-K", "mattress")).toBe("msbf");
+    expect(storageCategoryForSku("NF-MATT-K", "mattress")).toBe("msbf");
+    expect(storageCategoryForSku("OH-BF-Q", "bedframe")).toBe("msbf");
+  });
+
+  it("a catalogued sofa bills at the SOF rate", () => {
+    expect(storageCategoryForSku("SF-3STR", "sofa")).toBe("sof");
+    expect(storageCategoryForSku("MODEL-C", "sofa")).toBe("sof");
+  });
+
+  it("a catalogued accessory is out of scope", () => {
+    expect(storageCategoryForSku("ESS-PILLOW", "pillow")).toBe("other");
+  });
+
+  it("the CATALOG wins over the SKU string, both ways", () => {
+    // The prefix would say msbf; the catalog says this is an accessory.
+    expect(storageCategoryForSku("MS-PROTECTOR", "accessory")).toBe("other");
+    // The prefix would say other; the catalog says mattress. This is the
+    // measured defect - every real SKU is this case.
+    expect(storageCategoryForSku("B2003-Q", "mattress")).toBe("msbf");
+  });
+
+  it("no catalog answer falls back to the parser, and says so by behaviour", () => {
+    // null = asked, catalog silent. undefined = nobody asked (version skew).
+    // Both keep today's behaviour rather than dropping a line out of scope.
+    expect(storageCategoryForSku("MS1001", null)).toBe("msbf");
+    expect(storageCategoryForSku("MS1001", undefined)).toBe("msbf");
+    expect(storageCategoryForSku("B1201S-K", null)).toBe("other");
+  });
+});
+
+describe("orderStorageScope - with the catalog", () => {
+  it("real production SKUs come into scope once the catalog is asked", () => {
+    const skus = ["B1201S-K", "ESS-PILLOW"];
+    // Today, without categories: nothing is in scope. That is the defect.
+    expect(orderStorageScope(skus)).toEqual({ hasMsbf: false, hasSof: false });
+    // With the catalog: the mattress is in scope and the pillow is not.
+    const cats = new Map([
+      ["B1201S-K", "mattress"],
+      ["ESS-PILLOW", "pillow"],
+    ]);
+    expect(orderStorageScope(skus, cats)).toEqual({ hasMsbf: true, hasSof: false });
+  });
+
+  it("a SKU absent from the catalog still falls back to the parser", () => {
+    const cats = new Map([["B1201S-K", "mattress"]]);
+    expect(orderStorageScope(["B1201S-K", "MS1001"], cats)).toEqual({
+      hasMsbf: true,
+      hasSof: false,
+    });
   });
 });
 
@@ -353,5 +422,98 @@ describe("decideStorageWaiverInput", () => {
 
   it("refuses anything else — a release is not a free-text field", () => {
     expect(decideStorageWaiverInput.safeParse({ decision: "maybe" }).success).toBe(false);
+  });
+});
+
+// ── 0504 · THE DEAL IS ONCE, AND IT STICKS (owner ruling 2026-09-13) ─────────
+describe("planOpsAssignment", () => {
+  const SHASHA = "u-shasha";
+  const YUJUN = "u-yujun";
+  const SHARED = "u-shared-login"; // no People record — records evidence, never owns
+  const LEFT = "u-resigned";
+  const individuals = new Set([SHASHA, YUJUN]);
+  const mayOwn = (id: string | null | undefined) => !!id && individuals.has(id);
+  const pool = [SHASHA, YUJUN];
+
+  it("deals only what nobody carries, and never moves an order that already rests with a person", () => {
+    const plan = planOpsAssignment(
+      [
+        { orderId: "o1", assignedStaff: null, assignedBy: null },
+        { orderId: "o2", assignedStaff: SHASHA, assignedBy: null },
+        { orderId: "o3", assignedStaff: YUJUN, assignedBy: null },
+      ],
+      pool,
+      mayOwn,
+    );
+    // both carry one already, so the tie breaks deterministically on userId
+    expect(plan).toEqual([{ orderId: "o1", userId: SHASHA }]);
+  });
+
+  it("a quiet re-run writes nothing — every open order already has its person", () => {
+    expect(planOpsAssignment(
+      [
+        { orderId: "o1", assignedStaff: SHASHA, assignedBy: null },
+        { orderId: "o2", assignedStaff: YUJUN, assignedBy: null },
+      ],
+      pool,
+      mayOwn,
+    )).toEqual([]);
+  });
+
+  it("an order the SYSTEM put on an account that may not own is dealt again — a shared login and somebody who left both count as nobody", () => {
+    const plan = planOpsAssignment(
+      [
+        { orderId: "o1", assignedStaff: SHARED, assignedBy: null },
+        { orderId: "o2", assignedStaff: LEFT, assignedBy: null },
+      ],
+      pool,
+      mayOwn,
+    );
+    expect(plan.map((p) => p.orderId).sort()).toEqual(["o1", "o2"]);
+    expect(new Set(plan.map((p) => p.userId))).toEqual(new Set([SHASHA, YUJUN]));
+  });
+
+  it("a HUMAN assignment is never touched, even when it names an account that may not own", () => {
+    expect(planOpsAssignment(
+      [{ orderId: "o1", assignedStaff: SHARED, assignedBy: "manager" }],
+      pool,
+      mayOwn,
+    )).toEqual([]);
+  });
+
+  it("loads count every open order a person already carries, so the deal levels the real workload", () => {
+    const plan = planOpsAssignment(
+      [
+        { orderId: "o1", assignedStaff: SHASHA, assignedBy: null },
+        { orderId: "o2", assignedStaff: SHASHA, assignedBy: null },
+        { orderId: "o3", assignedStaff: null, assignedBy: null },
+        { orderId: "o4", assignedStaff: null, assignedBy: null },
+      ],
+      pool,
+      mayOwn,
+    );
+    // Yu Jun carries nothing, so both new orders go to her before Shasha
+    expect(plan).toEqual([
+      { orderId: "o3", userId: YUJUN },
+      { orderId: "o4", userId: YUJUN },
+    ]);
+  });
+
+  it("nobody in the pool may own → nothing is dealt, and no order lands on a shared login", () => {
+    expect(planOpsAssignment(
+      [{ orderId: "o1", assignedStaff: null, assignedBy: null }],
+      [SHARED],
+      mayOwn,
+    )).toEqual([]);
+  });
+
+  it("two operators sweeping at once agree — the plan is deterministic", () => {
+    const open = [
+      { orderId: "o9", assignedStaff: null, assignedBy: null },
+      { orderId: "o1", assignedStaff: null, assignedBy: null },
+      { orderId: "o5", assignedStaff: null, assignedBy: null },
+    ];
+    expect(planOpsAssignment(open, pool, mayOwn))
+      .toEqual(planOpsAssignment([...open].reverse(), [...pool].reverse(), mayOwn));
   });
 });

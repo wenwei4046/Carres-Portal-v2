@@ -1,0 +1,1152 @@
+{
+  "1440x900-collapsed": {
+    "viewport": [
+      1440,
+      900
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": null,
+    "summary": {
+      "top": 188,
+      "bottom": 268,
+      "h": 80,
+      "w": 716
+    },
+    "route": {
+      "top": 276,
+      "bottom": 382,
+      "h": 106,
+      "w": 716
+    },
+    "logistics": {
+      "top": 390,
+      "bottom": 498,
+      "h": 108,
+      "w": 716
+    },
+    "customer": {
+      "top": 506,
+      "bottom": 578,
+      "h": 72,
+      "w": 716
+    },
+    "customerHeading": {
+      "top": 523,
+      "bottom": 543,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 586,
+      "bottom": 658,
+      "h": 72,
+      "w": 716
+    },
+    "supplierHeading": {
+      "top": 603,
+      "bottom": 623,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Contact logistics today"
+    ],
+    "focused": null,
+    "consoleErrors": []
+  },
+  "1440x900-customer-open": {
+    "viewport": [
+      1440,
+      900
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": null,
+    "summary": {
+      "top": 159,
+      "bottom": 239,
+      "h": 80,
+      "w": 716
+    },
+    "route": {
+      "top": 247,
+      "bottom": 353,
+      "h": 106,
+      "w": 716
+    },
+    "logistics": {
+      "top": 361,
+      "bottom": 469,
+      "h": 108,
+      "w": 716
+    },
+    "customer": {
+      "top": 477,
+      "bottom": 884,
+      "h": 407,
+      "w": 716
+    },
+    "customerHeading": {
+      "top": 494,
+      "bottom": 514,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 892,
+      "bottom": 964,
+      "h": 72,
+      "w": 716
+    },
+    "supplierHeading": {
+      "top": 909,
+      "bottom": 929,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Contact logistics today"
+    ],
+    "focused": "party-customer-toggle"
+  },
+  "1440x900-supplier-open": {
+    "viewport": [
+      1440,
+      900
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": null,
+    "summary": {
+      "top": -202,
+      "bottom": -122,
+      "h": 80,
+      "w": 716
+    },
+    "route": {
+      "top": -114,
+      "bottom": -8,
+      "h": 106,
+      "w": 716
+    },
+    "logistics": {
+      "top": 0,
+      "bottom": 108,
+      "h": 108,
+      "w": 716
+    },
+    "customer": {
+      "top": 116,
+      "bottom": 188,
+      "h": 72,
+      "w": 716
+    },
+    "customerHeading": {
+      "top": 133,
+      "bottom": 153,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 196,
+      "bottom": 1026,
+      "h": 830,
+      "w": 716
+    },
+    "supplierHeading": {
+      "top": 213,
+      "bottom": 233,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Copy message"
+    ],
+    "focused": "party-supplier-toggle"
+  },
+  "1180x820-collapsed": {
+    "viewport": [
+      1180,
+      820
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": null,
+    "summary": {
+      "top": 188,
+      "bottom": 268,
+      "h": 80,
+      "w": 732
+    },
+    "route": {
+      "top": 276,
+      "bottom": 382,
+      "h": 106,
+      "w": 732
+    },
+    "logistics": {
+      "top": 390,
+      "bottom": 498,
+      "h": 108,
+      "w": 732
+    },
+    "customer": {
+      "top": 506,
+      "bottom": 578,
+      "h": 72,
+      "w": 732
+    },
+    "customerHeading": {
+      "top": 523,
+      "bottom": 543,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 586,
+      "bottom": 658,
+      "h": 72,
+      "w": 732
+    },
+    "supplierHeading": {
+      "top": 603,
+      "bottom": 623,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Contact logistics today"
+    ],
+    "focused": null,
+    "consoleErrors": []
+  },
+  "1180x820-customer-open": {
+    "viewport": [
+      1180,
+      820
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": null,
+    "summary": {
+      "top": 79,
+      "bottom": 159,
+      "h": 80,
+      "w": 732
+    },
+    "route": {
+      "top": 167,
+      "bottom": 273,
+      "h": 106,
+      "w": 732
+    },
+    "logistics": {
+      "top": 281,
+      "bottom": 389,
+      "h": 108,
+      "w": 732
+    },
+    "customer": {
+      "top": 397,
+      "bottom": 804,
+      "h": 407,
+      "w": 732
+    },
+    "customerHeading": {
+      "top": 414,
+      "bottom": 434,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 812,
+      "bottom": 884,
+      "h": 72,
+      "w": 732
+    },
+    "supplierHeading": {
+      "top": 829,
+      "bottom": 849,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Contact logistics today"
+    ],
+    "focused": "party-customer-toggle"
+  },
+  "1180x820-supplier-open": {
+    "viewport": [
+      1180,
+      820
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": null,
+    "summary": {
+      "top": -202,
+      "bottom": -122,
+      "h": 80,
+      "w": 732
+    },
+    "route": {
+      "top": -114,
+      "bottom": -8,
+      "h": 106,
+      "w": 732
+    },
+    "logistics": {
+      "top": 0,
+      "bottom": 108,
+      "h": 108,
+      "w": 732
+    },
+    "customer": {
+      "top": 116,
+      "bottom": 188,
+      "h": 72,
+      "w": 732
+    },
+    "customerHeading": {
+      "top": 133,
+      "bottom": 153,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 196,
+      "bottom": 1026,
+      "h": 830,
+      "w": 732
+    },
+    "supplierHeading": {
+      "top": 213,
+      "bottom": 233,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Copy message"
+    ],
+    "focused": "party-supplier-toggle"
+  },
+  "820x900-collapsed": {
+    "viewport": [
+      820,
+      900
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": {
+      "top": 228,
+      "bottom": 268,
+      "h": 40,
+      "w": 102
+    },
+    "summary": {
+      "top": 276,
+      "bottom": 356,
+      "h": 80,
+      "w": 796
+    },
+    "route": {
+      "top": 364,
+      "bottom": 470,
+      "h": 106,
+      "w": 796
+    },
+    "logistics": {
+      "top": 478,
+      "bottom": 568,
+      "h": 90,
+      "w": 796
+    },
+    "customer": {
+      "top": 576,
+      "bottom": 648,
+      "h": 72,
+      "w": 796
+    },
+    "customerHeading": {
+      "top": 593,
+      "bottom": 613,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 656,
+      "bottom": 728,
+      "h": 72,
+      "w": 796
+    },
+    "supplierHeading": {
+      "top": 673,
+      "bottom": 693,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Contact logistics today"
+    ],
+    "focused": "work-back",
+    "consoleErrors": []
+  },
+  "820x900-customer-open": {
+    "viewport": [
+      820,
+      900
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": {
+      "top": 133,
+      "bottom": 173,
+      "h": 40,
+      "w": 102
+    },
+    "summary": {
+      "top": 181,
+      "bottom": 261,
+      "h": 80,
+      "w": 796
+    },
+    "route": {
+      "top": 269,
+      "bottom": 375,
+      "h": 106,
+      "w": 796
+    },
+    "logistics": {
+      "top": 383,
+      "bottom": 473,
+      "h": 90,
+      "w": 796
+    },
+    "customer": {
+      "top": 481,
+      "bottom": 888,
+      "h": 407,
+      "w": 796
+    },
+    "customerHeading": {
+      "top": 498,
+      "bottom": 518,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 896,
+      "bottom": 968,
+      "h": 72,
+      "w": 796
+    },
+    "supplierHeading": {
+      "top": 913,
+      "bottom": 933,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Contact logistics today"
+    ],
+    "focused": "party-customer-toggle"
+  },
+  "820x900-supplier-open": {
+    "viewport": [
+      820,
+      900
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": {
+      "top": -192,
+      "bottom": -152,
+      "h": 40,
+      "w": 102
+    },
+    "summary": {
+      "top": -144,
+      "bottom": -64,
+      "h": 80,
+      "w": 796
+    },
+    "route": {
+      "top": -56,
+      "bottom": 50,
+      "h": 106,
+      "w": 796
+    },
+    "logistics": {
+      "top": 58,
+      "bottom": 148,
+      "h": 90,
+      "w": 796
+    },
+    "customer": {
+      "top": 156,
+      "bottom": 228,
+      "h": 72,
+      "w": 796
+    },
+    "customerHeading": {
+      "top": 173,
+      "bottom": 193,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 236,
+      "bottom": 1066,
+      "h": 830,
+      "w": 796
+    },
+    "supplierHeading": {
+      "top": 253,
+      "bottom": 273,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Copy message"
+    ],
+    "focused": "party-supplier-toggle"
+  },
+  "743x704-collapsed": {
+    "viewport": [
+      743,
+      704
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": {
+      "top": 228,
+      "bottom": 268,
+      "h": 40,
+      "w": 102
+    },
+    "summary": {
+      "top": 276,
+      "bottom": 356,
+      "h": 80,
+      "w": 719
+    },
+    "route": {
+      "top": 364,
+      "bottom": 470,
+      "h": 106,
+      "w": 719
+    },
+    "logistics": {
+      "top": 478,
+      "bottom": 568,
+      "h": 90,
+      "w": 719
+    },
+    "customer": {
+      "top": 576,
+      "bottom": 648,
+      "h": 72,
+      "w": 719
+    },
+    "customerHeading": {
+      "top": 593,
+      "bottom": 613,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 656,
+      "bottom": 728,
+      "h": 72,
+      "w": 719
+    },
+    "supplierHeading": {
+      "top": 673,
+      "bottom": 693,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Contact logistics today"
+    ],
+    "focused": "work-back",
+    "consoleErrors": []
+  },
+  "743x704-customer-open": {
+    "viewport": [
+      743,
+      704
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": {
+      "top": -63,
+      "bottom": -23,
+      "h": 40,
+      "w": 102
+    },
+    "summary": {
+      "top": -15,
+      "bottom": 65,
+      "h": 80,
+      "w": 719
+    },
+    "route": {
+      "top": 73,
+      "bottom": 179,
+      "h": 106,
+      "w": 719
+    },
+    "logistics": {
+      "top": 187,
+      "bottom": 277,
+      "h": 90,
+      "w": 719
+    },
+    "customer": {
+      "top": 285,
+      "bottom": 692,
+      "h": 407,
+      "w": 719
+    },
+    "customerHeading": {
+      "top": 302,
+      "bottom": 322,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 700,
+      "bottom": 772,
+      "h": 72,
+      "w": 719
+    },
+    "supplierHeading": {
+      "top": 717,
+      "bottom": 737,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Contact logistics today"
+    ],
+    "focused": "party-customer-toggle"
+  },
+  "743x704-supplier-open": {
+    "viewport": [
+      743,
+      704
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": {
+      "top": -192,
+      "bottom": -152,
+      "h": 40,
+      "w": 102
+    },
+    "summary": {
+      "top": -144,
+      "bottom": -64,
+      "h": 80,
+      "w": 719
+    },
+    "route": {
+      "top": -56,
+      "bottom": 50,
+      "h": 106,
+      "w": 719
+    },
+    "logistics": {
+      "top": 58,
+      "bottom": 148,
+      "h": 90,
+      "w": 719
+    },
+    "customer": {
+      "top": 156,
+      "bottom": 228,
+      "h": 72,
+      "w": 719
+    },
+    "customerHeading": {
+      "top": 173,
+      "bottom": 193,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 236,
+      "bottom": 1066,
+      "h": 830,
+      "w": 719
+    },
+    "supplierHeading": {
+      "top": 253,
+      "bottom": 273,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Copy message"
+    ],
+    "focused": "party-supplier-toggle"
+  },
+  "390x844-collapsed": {
+    "viewport": [
+      390,
+      844
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": {
+      "top": 334,
+      "bottom": 374,
+      "h": 40,
+      "w": 102
+    },
+    "summary": {
+      "top": 382,
+      "bottom": 558,
+      "h": 176,
+      "w": 366
+    },
+    "route": {
+      "top": 566,
+      "bottom": 672,
+      "h": 106,
+      "w": 366
+    },
+    "logistics": {
+      "top": 680,
+      "bottom": 786,
+      "h": 106,
+      "w": 366
+    },
+    "customer": {
+      "top": 794,
+      "bottom": 866,
+      "h": 72,
+      "w": 366
+    },
+    "customerHeading": {
+      "top": 811,
+      "bottom": 831,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 874,
+      "bottom": 946,
+      "h": 72,
+      "w": 366
+    },
+    "supplierHeading": {
+      "top": 891,
+      "bottom": 911,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Contact logistics today"
+    ],
+    "focused": "work-back",
+    "consoleErrors": []
+  },
+  "390x844-customer-open": {
+    "viewport": [
+      390,
+      844
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": {
+      "top": -35,
+      "bottom": 5,
+      "h": 40,
+      "w": 102
+    },
+    "summary": {
+      "top": 13,
+      "bottom": 189,
+      "h": 176,
+      "w": 366
+    },
+    "route": {
+      "top": 197,
+      "bottom": 303,
+      "h": 106,
+      "w": 366
+    },
+    "logistics": {
+      "top": 311,
+      "bottom": 417,
+      "h": 106,
+      "w": 366
+    },
+    "customer": {
+      "top": 425,
+      "bottom": 832,
+      "h": 407,
+      "w": 366
+    },
+    "customerHeading": {
+      "top": 442,
+      "bottom": 462,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 840,
+      "bottom": 912,
+      "h": 72,
+      "w": 366
+    },
+    "supplierHeading": {
+      "top": 857,
+      "bottom": 877,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Contact logistics today"
+    ],
+    "focused": "party-customer-toggle"
+  },
+  "390x844-supplier-open": {
+    "viewport": [
+      390,
+      844
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": {
+      "top": -198,
+      "bottom": -158,
+      "h": 40,
+      "w": 102
+    },
+    "summary": {
+      "top": -150,
+      "bottom": -22,
+      "h": 128,
+      "w": 366
+    },
+    "route": {
+      "top": -14,
+      "bottom": 92,
+      "h": 106,
+      "w": 366
+    },
+    "logistics": {
+      "top": 100,
+      "bottom": 206,
+      "h": 106,
+      "w": 366
+    },
+    "customer": {
+      "top": 214,
+      "bottom": 286,
+      "h": 72,
+      "w": 366
+    },
+    "customerHeading": {
+      "top": 231,
+      "bottom": 251,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 294,
+      "bottom": 1172,
+      "h": 878,
+      "w": 366
+    },
+    "supplierHeading": {
+      "top": 311,
+      "bottom": 331,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Copy message"
+    ],
+    "focused": "party-supplier-toggle"
+  },
+  "1440-customer-delay": {
+    "viewport": [
+      1440,
+      900
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": null,
+    "summary": {
+      "top": 47,
+      "bottom": 127,
+      "h": 80,
+      "w": 716
+    },
+    "route": {
+      "top": 135,
+      "bottom": 241,
+      "h": 106,
+      "w": 716
+    },
+    "logistics": {
+      "top": 249,
+      "bottom": 357,
+      "h": 108,
+      "w": 716
+    },
+    "customer": {
+      "top": 365,
+      "bottom": 884,
+      "h": 519,
+      "w": 716
+    },
+    "customerHeading": {
+      "top": 382,
+      "bottom": 402,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 892,
+      "bottom": 964,
+      "h": 72,
+      "w": 716
+    },
+    "supplierHeading": {
+      "top": 909,
+      "bottom": 929,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Open Sales Order"
+    ],
+    "focused": "party-customer-toggle"
+  },
+  "1440-customer-another-date": {
+    "viewport": [
+      1440,
+      900
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": null,
+    "summary": {
+      "top": 21,
+      "bottom": 101,
+      "h": 80,
+      "w": 716
+    },
+    "route": {
+      "top": 109,
+      "bottom": 215,
+      "h": 106,
+      "w": 716
+    },
+    "logistics": {
+      "top": 223,
+      "bottom": 331,
+      "h": 108,
+      "w": 716
+    },
+    "customer": {
+      "top": 339,
+      "bottom": 858,
+      "h": 519,
+      "w": 716
+    },
+    "customerHeading": {
+      "top": 356,
+      "bottom": 376,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 866,
+      "bottom": 938,
+      "h": 72,
+      "w": 716
+    },
+    "supplierHeading": {
+      "top": 883,
+      "bottom": 903,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Open in Delivery"
+    ],
+    "focused": "party-customer-toggle"
+  },
+  "1440-customer-refused": {
+    "viewport": [
+      1440,
+      900
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": null,
+    "summary": {
+      "top": 17,
+      "bottom": 97,
+      "h": 80,
+      "w": 716
+    },
+    "route": {
+      "top": 105,
+      "bottom": 211,
+      "h": 106,
+      "w": 716
+    },
+    "logistics": {
+      "top": 219,
+      "bottom": 327,
+      "h": 108,
+      "w": 716
+    },
+    "customer": {
+      "top": 335,
+      "bottom": 884,
+      "h": 549,
+      "w": 716
+    },
+    "customerHeading": {
+      "top": 352,
+      "bottom": 372,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 892,
+      "bottom": 964,
+      "h": 72,
+      "w": 716
+    },
+    "supplierHeading": {
+      "top": 909,
+      "bottom": 929,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Open in Delivery"
+    ],
+    "focused": "party-customer-toggle"
+  },
+  "1440-no-po-loan": {
+    "viewport": [
+      1440,
+      900
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": null,
+    "summary": {
+      "top": 188,
+      "bottom": 268,
+      "h": 80,
+      "w": 716
+    },
+    "route": {
+      "top": 276,
+      "bottom": 382,
+      "h": 106,
+      "w": 716
+    },
+    "logistics": {
+      "top": 390,
+      "bottom": 498,
+      "h": 108,
+      "w": 716
+    },
+    "customer": {
+      "top": 506,
+      "bottom": 578,
+      "h": 72,
+      "w": 716
+    },
+    "customerHeading": {
+      "top": 523,
+      "bottom": 543,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 586,
+      "bottom": 658,
+      "h": 72,
+      "w": 716
+    },
+    "supplierHeading": {
+      "top": 603,
+      "bottom": 623,
+      "h": 20,
+      "w": 60
+    },
+    "blue": [
+      "Contact logistics today"
+    ],
+    "focused": null
+  },
+  "1440-not-assigned": {
+    "viewport": [
+      1440,
+      900
+    ],
+    "pageOverflowX": 0,
+    "routeScrollX": 0,
+    "back": null,
+    "summary": {
+      "top": 188,
+      "bottom": 268,
+      "h": 80,
+      "w": 716
+    },
+    "route": {
+      "top": 276,
+      "bottom": 398,
+      "h": 122,
+      "w": 716
+    },
+    "logistics": {
+      "top": 406,
+      "bottom": 492,
+      "h": 86,
+      "w": 716
+    },
+    "customer": {
+      "top": 500,
+      "bottom": 572,
+      "h": 72,
+      "w": 716
+    },
+    "customerHeading": {
+      "top": 517,
+      "bottom": 537,
+      "h": 20,
+      "w": 204
+    },
+    "supplier": {
+      "top": 580,
+      "bottom": 652,
+      "h": 72,
+      "w": 716
+    },
+    "supplierHeading": {
+      "top": 597,
+      "bottom": 617,
+      "h": 20,
+      "w": 153
+    },
+    "blue": [
+      "Assign logistics"
+    ],
+    "focused": null
+  }
+}

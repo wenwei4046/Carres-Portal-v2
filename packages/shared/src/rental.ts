@@ -224,6 +224,54 @@ export function rentalLateInterest(
   return round2((amountDue * ratePctPerMonth * daysLate) / (100 * 30));
 }
 
+/**
+ * 0538 — one calendar month of billing months across ALL agreements, as
+ * Finance reads it: what was due, what was collected, what is still unpaid,
+ * and the unpaid months with how many days late each one is.
+ *
+ * Waived and written-off months are not money anyone is chasing, so they sit
+ * outside all three totals. `today` is the Kuala Lumpur calendar day.
+ */
+export interface RentalMonthBilling {
+  billingId: string;
+  agreementId: string;
+  agreementNo: string;
+  seq: number;
+  dueDate: string;
+  amountDue: number;
+  status: string;
+  paidAmount: number | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  orderId: string | null;
+  orderSo: string | null;
+  salespersonName: string | null;
+}
+
+export interface RentalMonthView {
+  due: number;
+  collected: number;
+  outstanding: number;
+  unpaid: Array<RentalMonthBilling & { daysLate: number }>;
+}
+
+export function rentalMonthView(rows: RentalMonthBilling[], today: string): RentalMonthView {
+  const live = rows.filter((r) => r.status !== "waived" && r.status !== "written_off");
+  const paid = live.filter((r) => r.status === "paid");
+  const unpaid = live.filter((r) => r.status !== "paid");
+  const sum = (xs: number[]) => round2(xs.reduce((a, x) => a + x, 0));
+  const todayMs = Date.parse(`${today}T00:00:00Z`);
+  return {
+    due: sum(live.map((r) => r.amountDue)),
+    collected: sum(paid.map((r) => r.paidAmount ?? 0)),
+    outstanding: sum(unpaid.map((r) => r.amountDue)),
+    unpaid: unpaid.map((r) => ({
+      ...r,
+      daysLate: Math.max(0, Math.floor((todayMs - Date.parse(`${r.dueDate}T00:00:00Z`)) / MS_PER_DAY)),
+    })),
+  };
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
  * 0264 — the OFFER layer: service SKU codes + the pick → money resolver.
  *

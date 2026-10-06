@@ -1,3 +1,4 @@
+import { amber, blue, green, red, slate } from "@radix-ui/colors";
 /**
  * Foundation components — the RULES, not the pixels (card D0.5a).
  *
@@ -27,7 +28,7 @@ import Panel from "./Panel";
 import SearchInput from "./SearchInput";
 import StatusPill from "./StatusPill";
 import Textarea from "./Textarea";
-import { TONE_CLASS, TONES, TYPE_TOKENS } from "./tokens";
+import { STATUS_PILL_CLASS, TONE_CLASS, TONES, TYPE_TOKENS } from "./tokens";
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 1 · Component API — a chat cannot restyle a kit component (UI-KIT §0.1)
@@ -73,7 +74,7 @@ describe("closed sets", () => {
     void <Icon name="edit" size={20} />;
     // @ts-expect-error — §3.6 lists a sixth "money" tone; OrderActionTone has five (reported)
     void <StatusPill tone="money">RM 2,000</StatusPill>;
-    // @ts-expect-error — a pill takes a STATUS glyph, not an action one
+    // @ts-expect-error — solid status pills do not accept decorative icons
     void <StatusPill tone="info" icon="add">x</StatusPill>;
     // @ts-expect-error — Badge has no tone: a coloured badge is a status in disguise
     void <Badge tone="danger">3</Badge>;
@@ -84,10 +85,21 @@ describe("closed sets", () => {
     expect(true).toBe(true);
   });
 
-  it("carries §5.3's 40 meanings + the 4 additions, and renders the mapped glyph", () => {
+  it("carries the admitted icon meanings and renders the mapped glyph", () => {
     // 40 = §5.3 verbatim; +3 = mattress · bedframe · sofa (Loo, 2026-07-31,
     // the To Order rail); +1 = columnFilter (Jess, 2026-08-01, the Excel ▼).
-    expect(ICON_NAMES).toHaveLength(44);
+    // +2 = pillow · protector for the owner-approved line-by-line calendar cards.
+    // +1 = mail, the Email door in Work's Communication (Workspace §5.10
+    // BUILD SHEET, Jess 2026-09-28).
+    // Table and Cards are admitted by the owner-approved2026-10-01 template amendment.
+    expect(ICON_NAMES).toHaveLength(54);
+    expect(ICON_NAMES).toContain("jump");
+    expect(ICON_NAMES).toContain("table");
+    expect(ICON_NAMES).toContain("cards");
+    expect(ICON_NAMES).toContain("mail");
+    expect(ICON_NAMES).toContain("panelToggle");
+    expect(ICON_NAMES).toContain("pillow");
+    expect(ICON_NAMES).toContain("protector");
     // one meaning, one glyph — `ready` and `confirm` deliberately share Check
     render(
       <>
@@ -99,9 +111,11 @@ describe("closed sets", () => {
     expect(document.querySelector('[data-icon="on-hold"]')).toBeInTheDocument();
   });
 
-  it("has six type tokens and no seventh", () => {
-    expect(TYPE_TOKENS).toHaveLength(6);
-    expect(TYPE_TOKENS.map((t) => t.px)).toEqual([24, 20, 15, 13, 12, 11]);
+  // The seventh, `control` (14/20), is the owner's Work toolbar ruling
+  // 2026-09-25 — an eighth still means editing this line.
+  it("has seven type tokens and no eighth", () => {
+    expect(TYPE_TOKENS).toHaveLength(7);
+    expect(TYPE_TOKENS.map((t) => t.px)).toEqual([24, 20, 15, 13, 12, 11, 14]);
   });
 
   it("has one class pair per tone and no more", () => {
@@ -178,11 +192,26 @@ describe("Textarea and SearchInput", () => {
 });
 
 describe("StatusPill", () => {
+  it("keeps white text at WCAG AA contrast on every canonical solid fill, without icons", () => {
+    const fills = { danger: red.red11, warning: amber.amber11, info: blue.blue11, success: green.green11, neutral: slate.slate11 };
+    render(<>{TONES.map(tone => <StatusPill key={tone} tone={tone}>{tone}</StatusPill>)}</>);
+    for (const tone of TONES) {
+      const components = fills[tone].slice(1).match(/../g)!.map(value => parseInt(value, 16) / 255)
+        .map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+      const luminance = components[0]! * 0.2126 + components[1]! * 0.7152 + components[2]! * 0.0722;
+      expect(1.05 / (luminance + 0.05), tone).toBeGreaterThanOrEqual(4.5);
+      const pill = screen.getByText(tone).closest('[data-kit="status-pill"]')!;
+      expect(pill).toHaveClass("text-white");
+      expect(pill.querySelector("svg,[data-icon]")).toBeNull();
+    }
+    expect(TONE_CLASS.warning).toBe("bg-kit-amber-3 text-kit-amber-11");
+  });
+
   it("paints the tone the engine computed and says which one it was", () => {
     render(<StatusPill tone="danger">Late</StatusPill>);
     const pill = screen.getByText("Late").closest('[data-kit="status-pill"]');
     expect(pill).toHaveAttribute("data-tone", "danger");
-    for (const cls of TONE_CLASS.danger.split(" ")) expect(pill).toHaveClass(cls);
+    for (const cls of STATUS_PILL_CLASS.danger.split(" ")) expect(pill).toHaveClass(cls);
   });
 
   it("renders every tone without a page choosing a colour", () => {

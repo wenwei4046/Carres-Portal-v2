@@ -7,9 +7,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const read = (path: string) => readFileSync(join(here, path), "utf8");
 
 describe("ERP Shell V1 quick rail contract", () => {
-  it("uses the approved four panels in order and governed width", () => {
+  it("keeps Work as one navigation peek and uses the governed width", () => {
     const src = read("OperationRightRail.tsx");
-    expect(src).toContain('label: "Team"');
+    expect(src).not.toContain('label: "Team"');
     expect(src).toContain('label: "Calendar"');
     expect(src).toContain('label: "My Work"');
     expect(src).toContain('label: "Activity"');
@@ -17,13 +17,28 @@ describe("ERP Shell V1 quick rail contract", () => {
     expect(src).toContain("w-[340px]");
   });
 
-  it("keeps Team an ERP-wide people snapshot with PO and GRN duty", () => {
-    const src = read("rail/TeamPanel.tsx");
-    expect(src).toContain("PO Duty");
-    expect(src).toContain("GRN Duty");
-    expect(src).toContain("View Team Work");
-    expect(src).not.toContain("Issue PO");
-    expect(src).not.toContain("Confirm ready date");
+  /**
+   * The rail's My Work is the `Work` destination's PEEK (ui/MASTER.md §5), so
+   * it wears that destination's face — owner ruling 2026-08-15. It used to
+   * wear the Flag borrowed from the Orders follow-up column, a different
+   * system entirely. One TABS entry drives both the collapsed icon strip and
+   * the expanded panel header, so the two states cannot drift apart.
+   */
+  it("gives My Work the same icon as the left-navigation Work destination", () => {
+    const rail = read("OperationRightRail.tsx");
+    const nav = read("../../portal/portal-nav.ts");
+    const navIcon = /\{\s*key:\s*"work",[^}]*icon:\s*(\w+)/.exec(nav)?.[1];
+    expect(navIcon).toBe("ListTodo");
+    expect(rail).toMatch(
+      new RegExp(`key:\\s*"tasks",\\s*label:\\s*"My Work",\\s*icon:\\s*${navIcon}\\b`),
+    );
+    expect(rail).not.toContain("icon: Flag");
+  });
+
+  it("does not put duty editing or a second Team queue in Quick Rail", () => {
+    const src = read("OperationRightRail.tsx");
+    expect(src).not.toContain("TeamPanel");
+    expect(src).not.toContain("useUpdatePoDuty");
   });
 
   it("keeps Calendar about dated events instead of action taxonomy", () => {
@@ -35,8 +50,12 @@ describe("ERP Shell V1 quick rail contract", () => {
 
   it("makes My Work derived and removes generic manual workflow controls", () => {
     const src = read("rail/TasksPanel.tsx");
-    expect(src).toContain("Overdue");
-    expect(src).toContain("Today");
+    expect(src).toContain('label: "Missed"');
+    expect(src).toContain('label: "Today"');
+    expect(src).not.toContain('label: "Later"');
+    expect(src).toContain('day=missed');
+    expect(src).toContain("useOpenWorkSet");
+    expect(src).not.toContain("/api/ops/tasks");
     expect(src).not.toContain("Add a task");
     expect(src).not.toContain("Take it");
     expect(src).not.toContain("Mark done");

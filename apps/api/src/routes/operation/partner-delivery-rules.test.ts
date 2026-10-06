@@ -8,15 +8,8 @@
  * date the carrier cannot honour still confirms — the operator may have already
  * phoned them. Only OUR obligations (goods, balance, Sunday) refuse.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import {
-  SignJWT,
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  type JWK,
-  type KeyLike,
-} from "jose";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { signTestJwt, useTestJwks } from "../../test/jwt";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -29,17 +22,9 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "s",
   SUPABASE_JWT_SECRET: "",
 };
-const KID = "k1";
-let signKey: KeyLike;
-let publicJwk: JWK;
 
 async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
-    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
-    .setSubject("u1")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(signKey);
+  return signTestJwt("u1", { email: `${role}@x`, app_metadata: { role } });
 }
 
 type Result = { data: unknown; error: unknown };
@@ -73,17 +58,8 @@ function makeSb(
   };
 }
 
-beforeAll(async () => {
-  const kp = await generateKeyPair("ES256", { extractable: true });
-  signKey = kp.privateKey;
-  publicJwk = await exportJWK(kp.publicKey);
-  publicJwk.kid = KID;
-  publicJwk.alg = "ES256";
-  publicJwk.use = "sig";
-});
-
 beforeEach(() => {
-  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  useTestJwks();
   vi.mocked(userClient).mockReset();
 });
 
@@ -413,7 +389,7 @@ describe("GET /api/operation/orders/:id/booking/partner-check", () => {
     const res = await get(await makeJwt("operation"), checkUrl("2036-08-25"));
     const body = (await res.json()) as CheckBody;
     expect(body.warnings.map((w) => w.key)).toEqual(["capacity"]);
-    expect(body.warnings[0]!.message).toContain("its limit is 1 a day");
+    expect(body.warnings[0]!.message).toContain("Its limit is 1 a day");
   });
 });
 
@@ -458,6 +434,8 @@ describe("POST /:id/booking/confirm — partner rules warn, they never block", (
         },
       ),
       ops_stock_items: tableMock({ data: [], error: null }),
+      // Gate convergence (2026-09-07): the feeder reads the SO's storage papers.
+      invoices: tableMock({ data: [], error: null }),
       delivery_partners: tableMock({ data: partner, error: null }),
     };
   }

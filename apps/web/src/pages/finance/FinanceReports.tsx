@@ -1,307 +1,365 @@
-import { useState } from "react";
-import { toast } from "sonner";
-import {
-  useFinanceMonthlyPl,
-  useFinanceTopSkus,
-  type FinanceMonthlyPlRow,
-  type FinanceTopSkuRow,
-} from "@/lib/queries";
-import { rm, rmCompact } from "@/lib/format-currency";
-
-type PeriodChoice = "6m" | "ytd" | "12m";
-
-const PERIOD_LABEL: Record<PeriodChoice, string> = {
-  "6m":  "Last 6 months",
-  "ytd": "YTD 2026",
-  "12m": "Last 12 months",
-};
-
-const PERIOD_MONTHS: Record<PeriodChoice, number> = {
-  "6m":  6,
-  "ytd": ytdMonths(),
-  "12m": 12,
-};
-
-function ytdMonths(): number {
-  // Year-to-date = month index of current date + 1 (Jan=1, ..., Dec=12).
-  // Fallback to 6 if running without browser-host date semantics.
-  const m = new Date().getMonth() + 1;
-  return Math.max(1, Math.min(12, m));
-}
-
 /**
- * Finance Reports page — Phase 5 Chunk B.
+ * Finance → Reports → Profit and Loss, and → Balance Sheet: two pages, one
+ * rail row each (Chew, 2026-10-03; Finance MASTER §4). The Profit and Loss for
+ * a period with a twelve-month trend, and the Balance Sheet on a day, both read
+ * from the ledger (gl_profit_and_loss and gl_balance_sheet). Every other report,
+ * Reports → Payment among them, is its own row on the rail, so this page keeps
+ * no list of doors.
  *
- * Visual reference: `reference/proto/finance-reports.jsx:1-143`. Wires:
- *   - useFinanceMonthlyPl: GET /reports/monthly-pl?months=N
- *     → finance_monthly_pl RPC (V1 placeholder cogs=55%/opex=42k, see
- *       migration 0064 docstring for the planned real-source switch)
- *   - useFinanceTopSkus: GET /reports/top-skus?limit=8
- *     → finance_top_skus RPC
+ * Every figure is a ledger sum served by the API; the page adds nothing up.
+ * Each account line opens the Journal narrowed to that account and dates.
  *
- * Layout per proto:
- *   - Period dropdown + Export PDF button (PDF stubs to Chunk C — Q7=A
- *     locks server-side render via @react-pdf/renderer)
- *   - 4 KPIs from latest month (Revenue with MoM% / COGS / Net profit /
- *     Opex)
- *   - P&L 6-col table (Month / Revenue / COGS / Gross profit / Opex / Net)
- *   - Revenue trend SVG polyline + dots
- *   - Top SKUs horizontal bar list
+ * Removed, and why:
+ *  - The monthly table, its four KPIs and the revenue trend. They read
+ *    finance_monthly_pl, which set cost at 55% of revenue and running cost
+ *    at RM 42,000 a month. Nobody entered those figures.
+ *  - Top SKUs. finance_top_skus adds up order lines (price × qty) for all
+ *    time, whatever period is chosen. That is order value, not income the
+ *    ledger recognised, so it would be a second revenue figure.
+ *
+ * The trend asks gl_profit_and_loss once per month (twelve at most, none
+ * before go-live), through the same query the statement uses, so the month on
+ * screen is not read twice.
+ *
+ * `By month` on either statement does the same: one column per month (3, 6 or
+ * 12, the latest first), each the statement's own read for that month, so a
+ * month there never disagrees with the statement for that month.
  */
-export default function FinanceReports() {
-  const [period, setPeriod] = useState<PeriodChoice>("6m");
-  const months = PERIOD_MONTHS[period];
+import { Link, useSearchParams } from "react-router-dom";
+import { useQueries } from "@tanstack/react-query";
+import { ledgerAccountHref } from "@carres/shared/finance-ledger";
+import Button from "@/components/kit/Button";
+import DocumentTable from "@/components/kit/DocumentTable";
+import Loading from "@/components/kit/Loading";
+import DatePicker from "@/components/kit/DatePicker";
+import Panel from "@/components/kit/Panel";
+import Select from "@/components/kit/Select";
+import Tabs from "@/components/kit/Tabs";
+import { appTodayIso, fmtDate, fmtMonth } from "@/lib/fmt-date";
+import { rm } from "@/lib/format-currency";
+import ModuleHeader from "@/pages/operation/components/ModuleHeader";
+import StatementTable, { indent, nothingInPeriod, nothingOnDay, paidBeforeInvoiceNote } from "./reports/StatementTable";
+import { packMonths, statementExport } from "./month-end-pack";
+import ExportStatement from "./reports/ExportStatement";
+import { monthChoices, monthEnd, readDay, readPeriod, wholeMonth } from "./reports/period";
+import { balanceSheetQuery, profitAndLossQuery, useBalanceSheet, useProfitAndLoss, type ProfitAndLoss } from "./reports/report-queries";
+import { byMonthExport, byMonthLines, lastMonths, MONTH_CHOICES, readMonthCount } from "./reports/by-month";
+import { DepartmentFilter, departmentWord, useDepartmentParam, useDepartments } from "./department";
 
-  const pl      = useFinanceMonthlyPl(months);
-  const topSkus = useFinanceTopSkus(8);
+const notStartedError = (error: unknown) => (error as { status?: number } | null)?.status === 409;
 
-  const rows = pl.data?.rows ?? [];
-  const skus = topSkus.data?.rows ?? [];
 
-  const latest = rows[rows.length - 1];
-  const prev   = rows[rows.length - 2];
+const beforeGoLive =(goLiveOn: string) => `The ledger started on ${fmtDate(goLiveOn)}. Pick a day from then on.`;
 
-  const revGrowth = (latest && prev && prev.revenue > 0)
-    ? ((latest.revenue - prev.revenue) / prev.revenue) * 100
-    : 0;
-  const margin = (latest && latest.revenue > 0)
-    ? (latest.net / latest.revenue) * 100
-    : 0;
-
-  function handleExport() {
-    toast.info("PDF export lands in Chunk C (server-side @react-pdf/renderer per Q7=A).");
-  }
-
-  return (
-    <div className="p-9 max-w-[1400px] mx-auto">
-      <header className="flex items-end justify-between gap-4 flex-wrap mb-7">
-        <div>
-          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">
-            Finance · Reports
-          </div>
-          <h1 className="font-display text-page mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
-            Reports
-          </h1>
-          <div className="text-body text-muted-foreground">
-            Monthly P&amp;L · revenue trend · top SKUs
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <select
-            aria-label="Period"
-            value={period}
-            onChange={(e) => setPeriod(e.target.value as PeriodChoice)}
-            className="px-2.5 py-1.5 border border-border rounded text-meta bg-background"
-          >
-            {(Object.keys(PERIOD_LABEL) as PeriodChoice[]).map((k) => (
-              <option key={k} value={k}>{PERIOD_LABEL[k]}</option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={handleExport}
-            className="px-3 py-2 rounded-md border border-border bg-background text-meta font-semibold"
-          >
-            Export PDF
-          </button>
-        </div>
-      </header>
-
-      <div className="grid grid-cols-4 gap-3.5 mb-6">
-        <Kpi
-          label={`Revenue · ${latest?.m ?? "—"}`}
-          value={rmCompact(latest?.revenue ?? 0)}
-          hint={prev ? `${revGrowth >= 0 ? "+" : ""}${revGrowth.toFixed(1)}% MoM` : "—"}
-          tone={revGrowth >= 0 ? "ok" : "warn"}
-        />
-        <Kpi
-          label={`COGS · ${latest?.m ?? "—"}`}
-          value={rmCompact(latest?.cogs ?? 0)}
-          hint={latest && latest.revenue > 0 ? `${Math.round(latest.cogs / latest.revenue * 100)}% of rev` : "—"}
-        />
-        <Kpi
-          label="Net profit"
-          value={rmCompact(latest?.net ?? 0)}
-          hint={`${margin.toFixed(1)}% margin`}
-          tone="ok"
-          accent
-        />
-        <Kpi
-          label="Opex"
-          value={rmCompact(latest?.opex ?? 0)}
-          hint="Rent · payroll · ops"
-        />
-      </div>
-
-      {/* P&L table */}
-      <div className="bg-card rounded-md border border-border mb-6 overflow-auto">
-        <div className="px-5 py-3.5 border-b border-border">
-          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">Profit &amp; Loss</div>
-          <div className="text-body font-semibold mt-0.5">{PERIOD_LABEL[period]}</div>
-        </div>
-        <div
-          className="grid items-center px-5 py-2.5 bg-muted/40 border-b border-border text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground"
-          style={{ gridTemplateColumns: "120px repeat(5, 1fr)", minWidth: 720 }}
-        >
-          <span>Month</span>
-          <span className="text-right">Revenue</span>
-          <span className="text-right">COGS</span>
-          <span className="text-right">Gross profit</span>
-          <span className="text-right">Opex</span>
-          <span className="text-right">Net</span>
-        </div>
-        {pl.isLoading ? (
-          <div className="p-12 text-center text-meta text-muted-foreground">Loading…</div>
-        ) : rows.length === 0 ? (
-          <div className="p-12 text-center text-meta text-muted-foreground">No revenue in this period.</div>
-        ) : (
-          rows.map((m) => <PlTableRow key={m.m} m={m} />)
-        )}
-      </div>
-
-      {/* Revenue trend + Top SKUs */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-3.5">
-        <div className="bg-card rounded-md border border-border px-5 py-4">
-          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">Revenue trend</div>
-          <div className="text-body font-semibold mt-0.5 mb-3">Monthly revenue</div>
-          {rows.length > 0 ? (
-            <RevenueTrend rows={rows} />
-          ) : (
-            <div className="p-8 text-center text-meta text-muted-foreground">No data</div>
-          )}
-        </div>
-
-        <div className="bg-card rounded-md border border-border">
-          <div className="px-5 py-3.5 border-b border-border">
-            <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">Top SKUs</div>
-            <div className="text-body font-semibold mt-0.5">Revenue by SKU</div>
-          </div>
-          {topSkus.isLoading ? (
-            <div className="p-8 text-center text-meta text-muted-foreground">Loading…</div>
-          ) : skus.length === 0 ? (
-            <div className="p-8 text-center text-meta text-muted-foreground">No SKU data.</div>
-          ) : (
-            skus.map((s) => <TopSkuRow key={s.sku} s={s} max={skus[0].revenue} />)
-          )}
-        </div>
-      </div>
-
-      {pl.error && (
-        <div className="mt-5 p-3 text-meta rounded-md bg-destructive/5 text-destructive border border-destructive/30">
-          Failed to load P&amp;L: {String(pl.error)}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PlTableRow({ m }: { m: FinanceMonthlyPlRow }) {
-  const gp = m.revenue - m.cogs;
-  return (
-    <div
-      className="grid items-center px-5 py-2.5 border-b border-border text-meta last:border-0"
-      style={{ gridTemplateColumns: "120px repeat(5, 1fr)", minWidth: 720 }}
-    >
-      <span className="font-semibold">{m.m}</span>
-      <span className="font-mono text-right">{rm(m.revenue)}</span>
-      <span className="font-mono text-right text-muted-foreground">{rm(m.cogs)}</span>
-      <span className="font-mono text-right text-success">{rm(gp)}</span>
-      <span className="font-mono text-right text-muted-foreground">{rm(m.opex)}</span>
-      <span className="font-mono text-right font-semibold">{rm(m.net)}</span>
-    </div>
-  );
-}
-
-function RevenueTrend({ rows }: { rows: FinanceMonthlyPlRow[] }) {
-  const W = 600, H = 180, pad = 32;
-  const maxRev = Math.max(...rows.map((m) => m.revenue), 1);
-  const points = rows.map((m, i) => {
-    const x = pad + (rows.length === 1 ? 0 : (i / (rows.length - 1)) * (W - pad * 2));
-    const y = H - pad - (m.revenue / maxRev) * (H - pad * 2);
-    return { x, y, label: m.m };
-  });
-  const polylinePoints = points.map((p) => `${p.x},${p.y}`).join(" ");
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[200px] block" role="img" aria-label="Monthly revenue trend">
-      {[0, 0.25, 0.5, 0.75, 1].map((g, i) => {
-        const y = H - pad - g * (H - pad * 2);
-        return (
-          <line
-            key={i}
-            x1={pad}
-            x2={W - pad}
-            y1={y}
-            y2={y}
-            stroke="currentColor"
-            className="text-border"
-          />
-        );
-      })}
-      <polyline
-        points={polylinePoints}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2.2}
-        className="text-primary"
-      />
-      {points.map((p, i) => (
-        <g key={i}>
-          <circle cx={p.x} cy={p.y} r={3.5} fill="currentColor" className="text-primary" />
-          <text
-            x={p.x}
-            y={H - 10}
-            fontSize="9.5"
-            textAnchor="middle"
-            fill="currentColor"
-            className="text-muted-foreground"
-          >
-            {p.label}
-          </text>
-        </g>
-      ))}
-    </svg>
-  );
-}
-
-function TopSkuRow({ s, max }: { s: FinanceTopSkuRow; max: number }) {
-  const pct = max > 0 ? (s.revenue / max) * 100 : 0;
-  return (
-    <div className="px-5 py-2.5 border-b border-border last:border-0">
-      <div className="flex items-baseline justify-between mb-1.5 text-meta">
-        <span className="font-semibold truncate">{s.name}</span>
-        <span className="font-mono text-label">{rm(s.revenue)}</span>
-      </div>
-      <div className="h-1 rounded bg-muted overflow-hidden">
-        <div
-          className="h-full bg-primary"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <div className="text-label text-muted-foreground mt-1">{s.qty} units sold</div>
-    </div>
-  );
-}
-
-function Kpi({
-  label, value, hint, tone, accent,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  tone?: "warn" | "ok";
-  accent?: boolean;
+function ReadFailed({ testId, sentence, retrying, onRetry }: {
+  testId: string;
+  sentence: string;
+  retrying: boolean;
+  onRetry: () => void;
 }) {
-  const valueTone = tone === "warn" ? "text-primary" : tone === "ok" ? "text-success" : "text-foreground";
-  return (
-    <div className={`bg-card rounded-md border ${accent ? "border-primary" : "border-border"} px-5 py-[18px]`}>
-      <div className={`text-label uppercase tracking-[0.06em] font-semibold ${accent ? "text-primary" : "text-muted-foreground"}`}>
-        {label}
-      </div>
-      <div className={`font-display text-page mt-1.5 leading-none tabular-nums ${valueTone}`}>
-        {value}
-      </div>
-      {hint && <div className="text-label text-muted-foreground mt-1.5">{hint}</div>}
+  return <div role="alert" data-testid={testId} className="flex flex-col items-start gap-3 text-body">
+    <p>{sentence}</p>
+    <Button variant="neutral" loading={retrying} onClick={onRetry}>Try again</Button>
+  </div>;
+}
+
+const TREND_MONTHS = 12;
+
+/** A section's served total; a section with no accounts in the chart is 0. */
+const sectionTotal = (pl: Extract<ProfitAndLoss, { status: "ok" }>, kind: string) =>
+  pl.sections.find((s) => s.kind === kind)?.total ?? 0;
+
+/** Income, expense and net result for each of the last twelve months since go-live, oldest first.
+ *  The department picked above filters the trend too, so the twelve months and the statement
+ *  on the same page never answer with different money. */
+function ProfitAndLossTrend({ goLive, today, dept }: { goLive: string; today: string; dept: string }) {
+  const months = packMonths(today, goLive).slice(0, TREND_MONTHS).reverse();
+  const reads = useQueries({ queries: months.map((ym) => profitAndLossQuery(`${ym}-01`, monthEnd(ym), dept)) });
+  if (reads.some((r) => r.isError)) {
+    return <ReadFailed testId="pl-trend-failed" sentence="The profit and loss could not be loaded. Try again."
+      retrying={reads.some((r) => r.isFetching)}
+      onRetry={() => reads.forEach((r) => { if (r.isError) void r.refetch(); })} />;
+  }
+  if (reads.some((r) => !r.data)) return <Loading variant="skeleton" lines={2} />;
+  // A month the ledger calls before go-live has no figures: it is left out, never shown as RM 0.00.
+  const points = months.flatMap((ym, i) => {
+    const pl = reads[i]!.data!;
+    return pl.status === "ok" ? [{ ym, income: sectionTotal(pl, "INCOME"), expense: sectionTotal(pl, "EXPENSE"), net: pl.net }] : [];
+  });
+  const peak = Math.max(0, ...points.map((p) => Math.max(p.income, p.expense)));
+  const height = (n: number) => `${peak > 0 ? (Math.max(n, 0) / peak) * 100 : 0}%`;
+  return <div className="flex flex-col gap-3.5" data-testid="pl-trend">
+    <div className="flex flex-wrap items-center justify-end gap-3.5 text-label text-kit-slate-11">
+      <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-kit-green-11" />Income</span>
+      <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-kit-slate-11" />Expense</span>
     </div>
+    <div className="overflow-x-auto">
+      <ol className="flex min-w-max gap-2">
+        {points.map((p) => (
+          <li key={p.ym} className="flex w-24 flex-col items-center gap-1" data-testid={`pl-trend-month-${p.ym}`}>
+            <span className="flex h-24 w-full items-end justify-center gap-1" aria-hidden>
+              <span className="w-3 rounded-sm bg-kit-green-11" style={{ height: height(p.income) }} />
+              <span className="w-3 rounded-sm bg-kit-slate-11" style={{ height: height(p.expense) }} />
+            </span>
+            <span className="text-label text-kit-slate-11">{fmtMonth(p.ym)}</span>
+            <span className="text-label tabular-nums">{rm(p.net)}</span>
+            <span className="sr-only">Income {rm(p.income)} · Expense {rm(p.expense)}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </div>;
+}
+
+const VIEWS = {
+  pl: [{ value: "period", label: "One period" }, { value: "month", label: "By month" }],
+  bs: [{ value: "day", label: "One day" }, { value: "month", label: "By month" }],
+} as const;
+
+/** The Profit and Loss or the Balance Sheet by month: one column per month, the latest first.
+ *  A Profit and Loss column is the month's first day to its last; a Balance Sheet column is
+ *  as of the month's last day, or today while the month is still running (the day the
+ *  Balance Sheet opens on). Each is read through the statement's own query, with the
+ *  department picked above. */
+function StatementByMonth({ statement, count, onCount, today, dept, deptWord }: {
+  statement: "pl" | "bs";
+  count: number;
+  onCount: (n: string) => void;
+  today: string;
+  dept: string;
+  deptWord: string | null;
+}) {
+  const isPl = statement === "pl";
+  const months = lastMonths(today, count);
+  const asOf = (ym: string) => (monthEnd(ym) > today ? today : monthEnd(ym));
+  const reads = useQueries({
+    queries: months.map((ym) => (isPl ? profitAndLossQuery(`${ym}-01`, monthEnd(ym), dept) : balanceSheetQuery(asOf(ym), dept))),
+  });
+  const name = isPl ? "Profit and Loss" : "Balance Sheet";
+  const word = isPl ? "profit and loss" : "balance sheet";
+  const testId = isPl ? "profit-and-loss-by-month" : "balance-sheet-by-month";
+  const heads = (year?: "always") => months.map((ym) => (isPl ? fmtMonth(ym) : fmtDate(asOf(ym), year && { year })));
+
+  const data = reads.every((r) => r.data) ? reads.map((r) => r.data!) : null;
+  const goLive = data?.[0]?.goLiveOn ?? null;
+  const lines = data && byMonthLines(
+    data.map((d) => (d.status === "ok" ? d.sections : null)),
+    isPl ? nothingInPeriod : nothingOnDay,
+    isPl ? { label: "Net result", amounts: data.map((d) => (d.status === "ok" && "net" in d ? d.net : null)) }
+    // The ledger's own check, only when a month failed it: the pack's words, the amount per month.
+    : data.some((d) => d.status === "ok" && "balances" in d && !d.balances)
+      ? { label: "Assets differ from liabilities plus equity by",
+        amounts: data.map((d) => (d.status === "ok" && "balances" in d && !d.balances ? Math.abs(d.difference) : null)) }
+      : null,
   );
+  const started = data?.some((d) => d.status === "ok") ?? false;
+
+  return <div className="flex flex-col gap-4">
+    <div className="flex flex-wrap items-end gap-3">
+      <div className="w-40">
+        <Select id={`reports-${statement}-months`} label="Months" value={String(count)} onValueChange={onCount}
+          options={MONTH_CHOICES.map((n) => ({ value: String(n), label: `${n} months` }))} />
+      </div>
+      <ExportStatement testId={`${testId}-export`} word={word} pdf={false}
+        build={lines && goLive && started ? () => byMonthExport(name, months, heads("always"), lines, goLive, deptWord) : null} />
+    </div>
+    {reads.some((r) => r.isError) ? <ReadFailed testId={`${testId}-failed`}
+      sentence={`The ${word} could not be loaded. Try again.`}
+      retrying={reads.some((r) => r.isFetching)}
+      onRetry={() => reads.forEach((r) => { if (r.isError) void r.refetch(); })} />
+    : !lines || !goLive ? <Loading variant="skeleton" lines={4} />
+    : !started ? <p className="text-body">{beforeGoLive(goLive)}</p>
+    : <>
+      {data!.some((d) => d.status === "before_go_live") && <p className="text-body text-kit-slate-11" data-testid={`${testId}-go-live`}>
+        The ledger started on {fmtDate(goLive)}. Months before then have no figures.
+      </p>}
+      <div data-testid={testId}>
+        <DocumentTable label={`${name} by month`}
+          columns={[{ key: "account", label: "Account" }, ...heads().map((label, i) => ({ key: months[i]!, label, numeric: true }))]}
+          rows={lines.map((l) => ({
+            key: l.id,
+            total: l.id === "bottom",
+            cells: {
+              account: <span className={`${l.strong ? "font-semibold" : ""} ${l.id.endsWith(":nothing") ? "text-kit-slate-11" : ""} ${indent(l.depth)}`}>
+                {l.label}</span>,
+              ...Object.fromEntries(months.map((ym, i) => {
+                const a = l.amounts[i];
+                return [ym, a === null || a === undefined ? null : l.strong ? <span className="font-semibold">{rm(a)}</span> : rm(a)];
+              })),
+            },
+          }))} />
+      </div>
+    </>}
+  </div>;
+}
+
+/** The two statements, each its own page under Reports. */
+export type Statement = "pl" | "bs";
+const STATEMENT_WORD: Record<Statement, string> = { pl: "Profit and Loss", bs: "Balance Sheet" };
+const STATEMENT_ID: Record<Statement, string> = { pl: "profit-and-loss", bs: "balance-sheet" };
+
+export default function FinanceReports({ statement }: { statement: Statement }) {
+  const word = STATEMENT_WORD[statement];
+  return <div className="flex h-full min-h-0 flex-col">
+    <ModuleHeader destinationHeader testId={`${STATEMENT_ID[statement]}-destination-header`} word={word} docTitle={`${word} · Carres`} />
+    <div className="min-h-0 flex-1 overflow-auto p-6">
+      {statement === "pl" ? <ProfitAndLossPage /> : <BalanceSheetPage />}
+    </div>
+  </div>;
+}
+
+const NotStarted = () => <div role="alert" className="text-body">
+  <p>The ledger has no start date yet. Nothing can be totalled.</p>
+</div>;
+
+const GoLiveLine = ({ goLive }: { goLive: string }) =>
+  <p className="text-body text-kit-slate-11" data-testid="reports-go-live">Since {fmtDate(goLive)} · No opening balances</p>;
+
+/** What both statements keep in the address: the department, the view and its months. */
+function useReportAddress() {
+  const [params, setParams] = useSearchParams();
+  const [dept, setDept] = useDepartmentParam();
+  const { data: departments = [] } = useDepartments();
+  const edit = (change: (next: URLSearchParams) => void) => setParams((before) => {
+    const next = new URLSearchParams(before);
+    change(next);
+    return next;
+  });
+  // `?plView=month` · `?plMonths=6`: the view and its months stay in the address, as the dates do.
+  const pickView = (key: "plView" | "bsView", v: string) => edit((next) => {
+    if (v === "month") next.set(key, "month"); else next.delete(key);
+  });
+  const pickCount = (key: "plMonths" | "bsMonths", v: string) => edit((next) => next.set(key, String(readMonthCount(v))));
+  return { params, edit, pickView, pickCount, dept, setDept, deptWord: departmentWord(dept, departments), today: appTodayIso() };
+}
+
+function ProfitAndLossPage() {
+  const { params, edit, pickView, pickCount, dept, setDept, deptWord, today } = useReportAddress();
+  const { from, to } = readPeriod(params, today);
+  const pl = useProfitAndLoss(from, to, dept);
+  const plReport = pl.data;
+  if (notStartedError(pl.error)) return <NotStarted />;
+  const goLive = plReport?.goLiveOn ?? null;
+
+  const pickMonth = (ym: string) => {
+    if (!/^\d{4}-\d{2}$/.test(ym)) return;
+    edit((next) => {
+      next.set("from", `${ym}-01`);
+      next.set("to", monthEnd(ym));
+    });
+  };
+  // Both dates are always written, from the period on screen. Writing one
+  // alone would leave the other to its default, which moves with the month.
+  const pickFrom = (iso: string | null) => {
+    if (!iso) return;
+    edit((next) => {
+      next.set("from", iso);
+      next.set("to", iso > to ? iso : to);
+    });
+  };
+  const pickTo = (iso: string | null) => {
+    if (!iso) return;
+    edit((next) => {
+      next.set("to", iso);
+      next.set("from", iso < from ? iso : from);
+    });
+  };
+
+  const month = wholeMonth(from, to);
+  const plView = params.get("plView") === "month" ? "month" : "period";
+
+  // grid-cols-1 lets a wide By month table scroll inside its panel, not the page.
+  return <div className="grid grid-cols-1 gap-6">
+    {goLive && <GoLiveLine goLive={goLive} />}
+    <DepartmentFilter value={dept} onChange={setDept} />
+    <Panel title="Profit and Loss">
+      <div className="flex flex-col gap-4">
+        <Tabs label="Profit and Loss view" tabs={VIEWS.pl} value={plView} onValueChange={(v) => pickView("plView", v)} />
+        {plView === "month" ? <StatementByMonth statement="pl" count={readMonthCount(params.get("plMonths"))}
+          onCount={(v) => pickCount("plMonths", v)} today={today} dept={dept} deptWord={deptWord} />
+        : <>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="w-40">
+            <Select id="reports-pl-month" label="Month" value={month ?? ""} onValueChange={pickMonth}
+              placeholder="Custom Date Range"
+              options={monthChoices(goLive, today, month).map((m) => ({ value: m, label: fmtMonth(m) }))} />
+          </div>
+          <div className="w-40">
+            <DatePicker id="reports-pl-from" label="From" value={from} onChange={pickFrom} />
+          </div>
+          <div className="w-40">
+            <DatePicker id="reports-pl-to" label="Up to" value={to} minDate={from} onChange={pickTo} />
+          </div>
+          <ExportStatement testId="profit-and-loss-export" word="profit and loss"
+            build={plReport?.status === "ok" ? () => statementExport(plReport, deptWord) : null} />
+        </div>
+        {pl.isError ? <ReadFailed testId="profit-and-loss-failed"
+          sentence="The profit and loss could not be loaded. Try again."
+          retrying={pl.isFetching} onRetry={() => void pl.refetch()} />
+        : <StatementTable label="Profit and Loss" testId="profit-and-loss"
+          sections={plReport?.status === "ok" ? plReport.sections : []}
+          loading={pl.isPending}
+          empty={plReport?.status === "before_go_live" ? beforeGoLive(plReport.goLiveOn) : nothingInPeriod("INCOME")}
+          nothing={nothingInPeriod}
+          accountHref={(code) => ledgerAccountHref(code, from, to)}
+          bottomLine={plReport?.status === "ok" ? { label: "Net result", amount: plReport.net } : null} />}
+        </>}
+      </div>
+    </Panel>
+
+    {goLive && <Panel title="Profit and Loss · Last 12 months">
+      <ProfitAndLossTrend goLive={goLive} today={today} dept={dept} />
+    </Panel>}
+  </div>;
+}
+
+function BalanceSheetPage() {
+  const { params, edit, pickView, pickCount, dept, setDept, deptWord, today } = useReportAddress();
+  const asOf = readDay(params.get("asOf")) ?? today;
+  const bs = useBalanceSheet(asOf, dept);
+  const bsReport = bs.data;
+  if (notStartedError(bs.error)) return <NotStarted />;
+  const goLive = bsReport?.goLiveOn ?? null;
+
+  const pickAsOf = (iso: string | null) => {
+    if (iso) edit((next) => next.set("asOf", iso));
+  };
+  const bsView = params.get("bsView") === "month" ? "month" : "day";
+
+  return <div className="grid grid-cols-1 gap-6">
+    {goLive && <GoLiveLine goLive={goLive} />}
+    <DepartmentFilter value={dept} onChange={setDept} />
+    <Panel title="Balance Sheet">
+      <div className="flex flex-col gap-4">
+        <Tabs label="Balance Sheet view" tabs={VIEWS.bs} value={bsView} onValueChange={(v) => pickView("bsView", v)} />
+        {bsView === "month" ? <StatementByMonth statement="bs" count={readMonthCount(params.get("bsMonths"))}
+          onCount={(v) => pickCount("bsMonths", v)} today={today} dept={dept} deptWord={deptWord} />
+        : <>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="w-40">
+            <DatePicker id="reports-bs-as-of" label="As of" value={asOf} onChange={pickAsOf} />
+          </div>
+          <ExportStatement testId="balance-sheet-export" word="balance sheet"
+            build={bsReport?.status === "ok" ? () => statementExport(bsReport, deptWord) : null} />
+        </div>
+        {bsReport?.status === "ok" && !bsReport.balances && <div role="status" data-testid="balance-sheet-differs"
+          className="flex flex-wrap items-center gap-2 rounded-control bg-kit-amber-3 px-4 py-2 text-body text-kit-amber-11">
+          ⚠ Assets differ from liabilities plus equity by {rm(Math.abs(bsReport.difference))}.
+          <Link className="underline underline-offset-2" to="/finance/ledger/self-check">Open Self-check</Link>
+        </div>}
+        {bs.isError ? <ReadFailed testId="balance-sheet-failed"
+          sentence="The balance sheet could not be loaded. Try again."
+          retrying={bs.isFetching} onRetry={() => void bs.refetch()} />
+        : <StatementTable label="Balance Sheet" testId="balance-sheet"
+          sections={bsReport?.status === "ok" ? bsReport.sections : []}
+          loading={bs.isPending}
+          empty={bsReport?.status === "before_go_live" ? beforeGoLive(bsReport.goLiveOn) : nothingOnDay("ASSET")}
+          nothing={nothingOnDay}
+          accountHref={(code) => ledgerAccountHref(code, bsReport?.goLiveOn ?? null, asOf)}
+          lineNote={paidBeforeInvoiceNote}
+          bottomLine={null} />}
+        </>}
+      </div>
+    </Panel>
+  </div>;
 }

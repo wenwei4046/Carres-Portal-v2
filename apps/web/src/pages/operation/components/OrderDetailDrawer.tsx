@@ -1,9 +1,7 @@
 import {
   type ReactNode,
-  type MutableRefObject,
   Fragment,
   useEffect,
-  useRef,
   useState,
 } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -66,16 +64,16 @@ import {
   effectiveGuaranteeStatus,
   deliveryDateGapFact,
   orderActionButton,
-  orderActionDone,
   updateOrderInputSchema,
   type OpsStockListResponse,
   type OpsOrderControl,
-  type OrderPaymentMethod,
   type OrderActionTrack,
+  requiredPaymentReference,
 } from "@carres/shared";
 import { apiFetch, ApiError } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { ATTACHMENTS_BUCKET } from "@/lib/storage";
+import { viewSlip } from "@/lib/payment-display";
 import {
   renderDoPdf,
   renderReceiptPdf,
@@ -88,6 +86,7 @@ import type {
   InvoiceTemplateData,
   SalesOrderTemplateData,
   PoTemplateData,
+  ReceiptTemplateData,
 } from "@/lib/pdf/types";
 import {
   qk,
@@ -103,19 +102,18 @@ import {
   useVoidPayment,
   useSaveOrderControl,
   useConfirmBooking,
-  useIssueDeliveryOrder,
   usePartnerBookingCheck,
-  useSetPartnerDeliveryRules,
   useDeliveryPhotos,
-  useUploadDeliveryPhoto,
   useOrderServiceCases,
   useOrderGuarantees,
   type OrderPaymentRow,
   type operationOrderDetailLine,
   type operationOrderDetailPo,
 } from "@/lib/queries";
+import { methodLabel, useManualMethods } from "@/lib/payment-methods";
 import { cjkClassName } from "@/lib/cjk";
-import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { displayCustomerName } from "@/lib/customer-name";
 import { orderStatusPill } from "@/lib/status-pill";
 import { locationForAddress } from "@/lib/region";
 import { lineReadiness, readinessCounts } from "@/lib/line-readiness";
@@ -129,10 +127,10 @@ import {
   buildSupplierReminder,
   rmAmount,
   salutationOf,
-  titleCaseName,
 } from "@/lib/wa-templates";
 import {
   lineCategory,
+  resolvedCategory,
   lineSize,
   lineKind,
   lineSortRank,
@@ -143,20 +141,19 @@ import { useAuth } from "@/lib/auth";
 import { Modal } from "./Modal";
 import { SectionCard, SectionBand } from "@/components/SectionPanel";
 import Btn from "@/components/Btn";
-import GuaranteeCoverStrip from "@/components/GuaranteeCoverStrip";
 import Money from "@/components/Money";
 import { fieldCls } from "@/components/Field";
+import { waLink } from "@/lib/wa-link";
 import BookingSpine from "./BookingSpine";
 import DeliveryChain from "./DeliveryChain";
 import LoanPanel from "./LoanPanel";
-import { MiniStopsBar, StopsEditor } from "./RouteJourneyBar";
+import { MiniStopsBar, StopsEditor } from "./RouteStops";
 import {
   useOrderControlForm,
   RoutingFields,
   LogisticEtaField,
   StorageCollectWaiver,
   StorageExtensionRow,
-  RemarkControlField,
   OrderControlSaveBar,
   FieldGrid,
   FieldRow,
@@ -165,12 +162,12 @@ import ServiceNoteModal from "./ServiceNoteModal";
 import GenerateInvoiceOverlay from "./GenerateInvoiceOverlay";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import DownloadInvoiceButton from "@/components/DownloadInvoiceButton";
-import { type OperationStage } from "./StageChip";
+import { displayStageOf, type OperationStage } from "./StageChip";
 import DispatchModal from "./DispatchModal";
 import DOAttachModal from "./DOAttachModal";
+import { DeliveryProofUploadButton } from "./DriverSubmission";
 import AbandonOrderModal from "./AbandonOrderModal";
 import ConfirmProceedDialog from "./ConfirmProceedDialog";
-import TransferReadyDialog from "./TransferReadyDialog";
 import StockPickerGrid from "./StockPickerGrid";
 import FollowUpForm from "./FollowUpForm";
 import AnnotationTimeline from "./AnnotationTimeline";
@@ -328,7 +325,6 @@ export default function OrderDetailDrawer({
   const [showDO, setShowDO] = useState(false);
   const [showAbandon, setShowAbandon] = useState(false);
   const [showConfirmProceed, setShowConfirmProceed] = useState(false);
-  const [showTransferReady, setShowTransferReady] = useState(false);
   const [showTopUp, setShowTopUp] = useState(false);
   const [showServiceNote, setShowServiceNote] = useState(false);
   const [showFollowUp, setShowFollowUp] = useState(false);
@@ -342,7 +338,6 @@ export default function OrderDetailDrawer({
       showDO ||
       showAbandon ||
       showConfirmProceed ||
-      showTransferReady ||
       showTopUp ||
       showServiceNote;
     if (anyModalOpen) return;
@@ -360,7 +355,6 @@ export default function OrderDetailDrawer({
     showDO,
     showAbandon,
     showConfirmProceed,
-    showTransferReady,
     showTopUp,
     showServiceNote,
   ]);
@@ -404,7 +398,6 @@ export default function OrderDetailDrawer({
               onDOClick={() => setShowDO(true)}
               onAbandonClick={() => setShowAbandon(true)}
               onConfirmProceedClick={() => setShowConfirmProceed(true)}
-              onTransferReadyClick={() => setShowTransferReady(true)}
               onTopUpClick={() => setShowTopUp(true)}
               onServiceNoteClick={() => setShowServiceNote(true)}
               onFollowUpClick={() => setShowFollowUp(true)}
@@ -435,13 +428,6 @@ export default function OrderDetailDrawer({
                 order={data.order}
                 lines={data.lines}
                 onClose={() => setShowConfirmProceed(false)}
-              />
-            )}
-            {showTransferReady && (
-              <TransferReadyDialog
-                order={data.order}
-                lines={data.lines}
-                onClose={() => setShowTransferReady(false)}
               />
             )}
             {showTopUp && (
@@ -558,7 +544,6 @@ interface DrawerBodyProps {
   onDOClick: () => void;
   onAbandonClick: () => void;
   onConfirmProceedClick: () => void;
-  onTransferReadyClick: () => void;
   onTopUpClick: () => void;
   onFollowUpClick: () => void;
 }
@@ -703,9 +688,11 @@ function PanelMenu({
 
 /** Tiny status counter for a panel header — tighter than the full `.pill` so up
  *  to three fit on one header row. Colours track the locked stock vocab. */
-/** "23 Aug" — the chip's day-month form (Loo's D1 chip spec: no year, no
- *  weekday; the full "24 Aug 26" date-law form stays on the card rows). */
-const dayMon = (iso: string) => fmtDateShort(iso).replace(/\s\d{2}$/, "");
+/* `dayMon` is DELETED (owner ruling 2026-08-15). Loo's D1 chip spec — day and
+ * month, no year, no weekday — was implemented by regexing the year back off
+ * `fmtDateShort`. THE YEAR RULE means `fmtDateShort` already answers "23 Aug"
+ * for a current-year date, and answers "15 Jan 27" for the one case where the
+ * regex was hiding the fact that mattered. The chips call it directly. */
 
 /** Chip form of a time slot: "Afternoon (12pm–3pm)" → "12pm–3pm"; free text
  *  passes through unchanged. */
@@ -720,7 +707,7 @@ function MiniBadge({
 }) {
   // v4 §6 — status = soft tint + dark same-hue text, NEVER a solid block
   // (the old solid-red nopo badge is gone). red = blocks · amber = warning ·
-  // green = ok; values from docs/UI-KIT.md §1.
+  // green = ok; values from docs/01-design-tokens.md.
   const TONE: Record<string, string> = {
     nopo: "bg-[#FCEBEB] text-[#A32D2D]",
     waiting: "bg-[#FAEEDA] text-[#854F0B]",
@@ -815,7 +802,7 @@ function DeliveryNotesLog({
           if (e.key === "Enter") add();
         }}
         onBlur={add}
-        placeholder="+ add note — date stamps itself"
+        placeholder="+ add note. Date stamps itself"
         aria-label="Add a customer note (auto-dated)"
         className="mt-1 w-full border border-base-300 rounded-[5px] bg-white px-1.5 py-0.5 text-body outline-none hover:border-base-400 focus:border-primary placeholder:text-base-300"
       />
@@ -964,8 +951,8 @@ function CallsPanel({
         className="kpi-box grid place-items-center py-2 shrink-0"
         title={
           rows.length === 0
-            ? "Calls — 0 calls to make"
-            : `Calls — ${rows.map((r) => `${r.label} · ${r.sub}`).join(" / ")}`
+            ? "Calls: 0 calls to make"
+            : `Calls: ${rows.map((r) => `${r.label} · ${r.sub}`).join(" / ")}`
         }
       >
         <span className="relative">
@@ -1120,7 +1107,7 @@ function CurrentIssuesPanel({
     return (
       <div
         className="kpi-box grid place-items-center py-2 shrink-0"
-        title={`Current issues — ${rows.map((r) => r.text).join(" / ")}`}
+        title={`Current issues: ${rows.map((r) => r.text).join(" / ")}`}
       >
         <span className="relative">
           <AlertCircle
@@ -1168,7 +1155,7 @@ function CurrentIssuesPanel({
             }`}
             onClick={r.onOpen}
             role={r.onOpen ? "button" : undefined}
-            title={r.onOpen ? `${label} — open where this is worked` : label}
+            title={r.onOpen ? `${label}. Open where this is worked` : label}
           >
             {/* The track icon labels the group; only the FIRST row of a track
                 carries it, so three issues on one track read as one group. */}
@@ -1200,7 +1187,7 @@ function CurrentIssuesPanel({
  *  → em-dash, never the lowercase normalize slug. */
 function skuCode(sku: string): string {
   const m = sku.trim().match(/([A-Za-z]{0,3}\d{3,}[A-Za-z]{0,2}(?:-[A-Za-z])?)\s*$/);
-  return m ? m[1].toUpperCase() : "—";
+  return m ? m[1].toUpperCase() : "";
 }
 
 /** Site SHORT name for the Items LOCATION column (§9 — "Klang/NETS", never
@@ -1294,7 +1281,6 @@ function DrawerBody({
   onDOClick,
   onAbandonClick,
   onConfirmProceedClick,
-  onTransferReadyClick,
   onTopUpClick,
   onServiceNoteClick,
   onFollowUpClick,
@@ -1388,14 +1374,14 @@ function DrawerBody({
         body: JSON.stringify({ itemId }),
       }),
     onSuccess: () => {
-      toast.success("Unreserved — the unit is back in free stock");
+      toast.success("Unreserved. The unit is back in free stock");
       setUnreserveSku(null);
       void qc.invalidateQueries({ queryKey: ["operation", "ops-stock"] });
       void qc.invalidateQueries({ queryKey: qk.operation.order(order.id) });
     },
     onError: (e: Error) => {
       setUnreserveSku(null);
-      toast.error(`Couldn't unreserve — ${e.message}`);
+      toast.error(`Couldn't unreserve: ${e.message}`);
     },
   });
   const reservedUnitIdFor = (sku: string): string | null =>
@@ -1404,20 +1390,11 @@ function DrawerBody({
         u.reservedRef === soRef &&
         stockMatchKey(u.sku) === stockMatchKey(sku),
     )?.id ?? null;
-  // Pipeline v2 (C1): widen stage derivation to honor 'place' status + the
-  // new placed/confirmed enum values without falling through to a
-  // bogus in_production default.
-  const stage: OperationStage = (() => {
-    // AutoCount-imported orders arrive ALREADY proceeded — they carry a PO, so
-    // they are NEVER "placed / waiting for the dealer to push" (Jess 2026-07-02,
-    // project-order-lifecycle-flow: "the 'waiting for dealer' copy is WRONG for
-    // these"). Only a native dealer/POS order sits at 'placed'.
-    const autocount = order.source_system === "autocount";
-    if (order.status === "place" && !autocount) return "placed";
-    if (order.operation_stage) return order.operation_stage as OperationStage;
-    if (order.status === "delivered") return "delivered";
-    return "in_production";
-  })();
+  /* D3 — the DISPLAY stage, spelt once in `StageChip`. This was a local IIFE
+     carrying Jess's 2026-07-02 AutoCount ruling; the list needs the RAW slot for
+     its tab routing, so the two questions now have two names instead of one
+     name written twice. */
+  const stage: OperationStage = displayStageOf(order);
   // Line-sum of the order (native/priced orders). AutoCount imports carry no line
   // prices → grandTotal is 0 and Total falls back to the keyed balance (see the
   // Money block below). hasLineTotal drives whether Total is auto (read-only) or
@@ -1481,8 +1458,14 @@ function DrawerBody({
   // Combine duplicate-SKU lines into ONE row (Jess: don't repeat the same item),
   // then list mattress → bedframe → sofa → pillow → M.P → service.
   const orderedLines = Object.values(
-    lines.reduce<Record<string, { sku: string; qty: number }>>((acc, l) => {
-      const e = acc[l.sku] ?? { sku: l.sku, qty: 0 };
+    lines.reduce<Record<string, { sku: string; qty: number; category?: string | null }>>((acc, l) => {
+      // D9 (2026-08-20) — the CATALOG's category rides through the merge. It is
+      // a property of the SKU, so every duplicate row carries the same value:
+      // seed it once and never overwrite. `e.category ?? l.category` would be
+      // wrong — it turns a legitimate `null` (asked, catalog silent) into a
+      // later row's `undefined` (nobody asked), and those two mean different
+      // things downstream.
+      const e = acc[l.sku] ?? { sku: l.sku, qty: 0, category: l.category };
       e.qty += Number(l.qty || 0);
       acc[l.sku] = e;
       return acc;
@@ -1501,11 +1484,19 @@ function DrawerBody({
     if (po.eta_date)
       for (const pl of po.lines)
         if (!poEtaBySku.has(pl.sku)) poEtaBySku.set(pl.sku, po.eta_date);
+  /* CARD-2026-08-28 - STORAGE SCOPE ASKS THE CATALOG.
+     These two decided which storage RATE applies, and they asked
+     `lineCategory` - the keyword parser `carry-forwards.md` records as
+     display-only. That made the Storage tab a SECOND wrong answer beside the
+     server's prefix parser: two functions, two rules, and nothing forcing the
+     screen and the delivery gate to agree about whether an order was even in
+     scope. `resolvedCategory` is already imported here and the lines already
+     carry the catalog's `category` (D9, 2026-08-20) - nobody was asking. */
   const hasMsbf = lines.some((l) => {
-    const c = lineCategory(l.sku);
+    const c = resolvedCategory(l.sku, l.category);
     return c === "mattress" || c === "bedframe";
   });
-  const hasSof = lines.some((l) => lineCategory(l.sku) === "sofa");
+  const hasSof = lines.some((l) => resolvedCategory(l.sku, l.category) === "sofa");
   // Contact-by basis (Jess): operation must reach the customer N days BEFORE the
   // deadline to confirm stock + timing. N = ops_order_control.contact_by_days
   // (default 3, editable per order); a daily cron (migration 0197) drops the
@@ -1636,7 +1627,7 @@ function DrawerBody({
   // is still >1 day away; red "Hold Delivery" from ETA−1 if still uncollected.
   // Applies to BOTH the goods balance and the storage fee; the header rolls up
   // the red (blocking) ones into one HOLD DELIVERY status.
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = appTodayIso();
   const daysToDelivery =
     !order.delivery_date_tbd && order.delivery_date
       ? Math.round(
@@ -1662,16 +1653,10 @@ function DrawerBody({
   const keyedBalance = form.draft.balance.trim()
     ? Number(form.draft.balance)
     : form.control?.balance ?? null;
-  const money = orderMoney({
-    lineSum: hasLineTotal ? grandTotal : 0,
-    paid: order.paid,
-    controlBalance: keyedBalance,
-  });
-  const collected = money.paid;
-  const orderTotal = money.total ?? 0;
-  const totalSet = money.known;
-  const moneyOutstanding = money.goodsOwing;
-  const balanceOwing = money.owing;
+  /* D4 - the money rule is asked ONCE, and it is asked below, after the storage
+     figures exist. It used to run here on the goods alone, which left the
+     storage half to a second arithmetic further down and put two different
+     "outstanding" numbers on one screen. See the call site. */
   // ── AUTO storage (Jess 2026-07-18): the machine counts, nobody clicks.
   // Anchor = (supplier late ? latest goods ETA : deadline) + 7d — a
   // supplier-late stretch never bills the customer. A manual From date
@@ -1720,9 +1705,6 @@ function DrawerBody({
   const storageFee =
     Number(form.control?.storage_fee_msbf ?? 0) +
     Number(form.control?.storage_fee_sof ?? 0);
-  // "hold" = red block (ETA−1 uncollected) · "warn" = amber reminder · null = ok.
-  const balanceGate = balanceOwing ? (pastLastCall ? "hold" : "warn") : null;
-  const storageGate = storageOwing ? (pastLastCall ? "hold" : "warn") : null;
   // ── Balance v3 invoice math (2026-07-17) — the Balance tab reads as an
   // INVOICE: CHARGES (goods + the storage fee) − PAYMENTS (all kinds) =
   // Balance due. The storage FEE flows in as one charge line; the Storage tab
@@ -1750,9 +1732,58 @@ function DrawerBody({
     .reduce((s, p) => s + Number(p.amount || 0), 0);
   /** The newest payment that still stands — what `Print receipt` means. */
   const latestLivePayment = ledger.find(isLivePayment) ?? null;
+  /* D4 - ONE MONEY RULE, ASKED ONCE, WITH EVERYTHING IT NEEDS.
+     The goods half already came through `orderMoney`; the storage half was a
+     second arithmetic right here - `invoiceTotal - collectedAll`, clamped as
+     one figure - and it drove the payment dial and the "still owes ... before
+     delivery" step while the money sticker three lines away showed the shared
+     rule's goods-only number. Two "outstanding" figures on one screen, and one
+     of them captioned `holding delivery`.
+
+     `orderMoney` already took `storageOwing` and `storageReleased` and already
+     returned `outstanding` / `holding` / `holds`; nobody was passing them. This
+     is a migration, not a design - the capability was already there.
+
+     TWO THINGS THE MOVE CHANGES ON PURPOSE:
+     - A RELEASED FEE IS STILL OWED. C9 rules that a manager release drops the
+       HOLD and not the debt, so the amount is computed from what has actually
+       been COLLECTED and the waiver is passed separately. The boolean
+       `storageOwing` above folds the two together and would have zeroed a
+       waived fee out of the invoice.
+     - OVERPAID GOODS NO LONGER OFFSET A STORAGE FEE. The retired line clamped
+       goods and storage together, so an overpayment silently paid down a fee
+       only a manager may waive (ERP-ARCHITECTURE 6.1). The shared rule clamps
+       goods on their own and adds storage, which is what the delivery gate and
+       the Orders row have always used. */
+  const storageOwingAmount =
+    storageIncurred && !form.control?.storage_collected_at
+      ? Math.max(0, storageCharge - storageCollected)
+      : 0;
+  const storageReleased = form.control?.storage_waiver_status === "approved";
+  const money = orderMoney({
+    lineSum: hasLineTotal ? grandTotal : 0,
+    paid: order.paid,
+    controlBalance: keyedBalance,
+    storageOwing: storageOwingAmount,
+    storageReleased,
+  });
+  const collected = money.paid;
+  const orderTotal = money.total ?? 0;
+  const totalSet = money.known;
+  const moneyOutstanding = money.goodsOwing;
+  /* GOODS only, and deliberately so: storage has its own `storageGate`, and
+     `balanceOwing || storageOwing` below proves the two were always meant to
+     be separate. `money.owing` now counts storage as well, so reading it here
+     would make both gates fire on one fee. `goodsOwing` is exactly what this
+     flag meant before the storage half joined the call. */
+  const balanceOwing = money.goodsOwing > 0;
+  // "hold" = red block (ETA−1 uncollected) · "warn" = amber reminder · null = ok.
+  const balanceGate = balanceOwing ? (pastLastCall ? "hold" : "warn") : null;
+  const storageGate = storageOwing ? (pastLastCall ? "hold" : "warn") : null;
   const invoiceTotal = orderTotal + storageCharge;
   const collectedAll = collected + storageCollected;
-  const balanceDue = totalSet ? Math.max(0, invoiceTotal - collectedAll) : 0;
+  /** Everything still owed - the shared rule's number, not a second sum. */
+  const balanceDue = money.outstanding;
   // Collect-by = delivery − 7d (the date collectByLabel shows) — past it and
   // still owing ⇒ the dial family reads Overdue.
   const collectByPast =
@@ -1808,7 +1839,7 @@ function DrawerBody({
   // stays unaffected.
   const quickSave = useSaveOrderControl(order.id, {
     onSuccess: () => toast.success("Saved"),
-    onError: (e) => toast.error(`Couldn't save — ${e.message}`),
+    onError: (e) => toast.error(`Couldn't save: ${e.message}`),
   });
   // Follow-up stamp (0221, deploy-gated) — SILENT on error so a not-yet-
   // deployed API never blocks the message itself (the copy already happened).
@@ -1828,7 +1859,7 @@ function DrawerBody({
     ? "TBD"
     : order.delivery_date
       ? fmtDate(order.delivery_date).split(", ")[0]
-      : "—";
+      : "";
   // Full canonical date (date law §A0: weekday ALWAYS on a displayed date) —
   // the Delivery card shows this; deadlineLabel (weekday stripped) stays for
   // the short message-template strings only.
@@ -1836,7 +1867,7 @@ function DrawerBody({
     ? "TBD"
     : order.delivery_date
       ? fmtDate(order.delivery_date)
-      : "—";
+      : "";
   // Optional preferred-name/title for customer messages — never auto Mr/Ms.
   // Local-only for now (an ops_order_control column is deploy-gated), keyed by
   // order so it sticks across sessions on this machine.
@@ -1899,11 +1930,11 @@ function DrawerBody({
     const customerWa = aud === "customer" ? waLink(order.customer_phone) : null;
     if (customerWa) {
       window.open(`${customerWa}?text=${encodeURIComponent(text)}`, "_blank");
-      toast.success(`${toneWord} — opening WhatsApp to the customer, hit send`);
+      toast.success(`${toneWord}. Opening WhatsApp to the customer, hit send`);
     } else if (aud === "customer") {
-      toast.success(`${toneWord} copied — no customer number on file, paste into WhatsApp`);
+      toast.success(`${toneWord} copied. No customer number on file, paste into WhatsApp`);
     } else {
-      toast.success(`${toneWord} copied — paste into the WhatsApp group`);
+      toast.success(`${toneWord} copied. Paste into the WhatsApp group`);
     }
     // The logged follow-up event — a manual send stamps it; the future portal
     // auto-fire writes the SAME event.
@@ -2116,7 +2147,7 @@ function DrawerBody({
         return;
       case "delivery_photo":
         if (row.photoUrl) window.open(row.photoUrl, "_blank", "noopener");
-        else toast.error("That photo's link expired — reopen the order");
+        else toast.error("That photo's link expired. Reopen the order");
         return;
     }
   };
@@ -2227,7 +2258,7 @@ function DrawerBody({
     });
     void navigator.clipboard.writeText(text);
     toast.success(
-      `${tone === "reminder" ? "Reminder" : "Call text"} copied — ${g.label}`,
+      `${tone === "reminder" ? "Reminder" : "Call text"} copied: ${g.label}`,
     );
     chaseStamp.mutate({ last_chased_at: new Date().toISOString() });
   };
@@ -2340,7 +2371,7 @@ function DrawerBody({
   if (balanceOwing) {
     chaseRows.push({
       key: "customer",
-      label: order.customer_name ? titleCaseName(order.customer_name) : "Customer",
+      label: order.customer_name ? displayCustomerName(order.customer_name) : "Customer",
       sub: `${RM(moneyOutstanding)} outstanding`,
       urgency: balanceGate === "hold" ? "overdue" : "attention",
       onAct: (tone) => copyChase("customer", tone),
@@ -2466,7 +2497,7 @@ function DrawerBody({
           ? `${RM(collectedAll)} in`
           : totalSet
             ? "nothing received yet"
-            : "—",
+            : "",
     },
     {
       panel: "Items",
@@ -2513,7 +2544,7 @@ function DrawerBody({
               : storageIncurred && storageCleared
                 ? "collected"
                 : supplierLate
-                  ? "waiting supplier — not counting"
+                  ? "waiting supplier, not counting"
                   : "not counting",
           },
         ]
@@ -2635,7 +2666,6 @@ function DrawerBody({
           orderId={order.id}
           pipelineStatus={pipelineStatus}
           onServiceNoteClick={onServiceNoteClick}
-          onTransferReadyClick={onTransferReadyClick}
           onConfirmProceedClick={onConfirmProceedClick}
           onTopUpClick={onTopUpClick}
           onAbandonClick={onAbandonClick}
@@ -2819,7 +2849,7 @@ function DrawerBody({
               type="button"
               onClick={() => setTab(t.key)}
               aria-selected={tab === t.key}
-              title={t.label + (t.v ? ` — ${t.v}` : "") + (t.w ? ` ${t.w}` : "")}
+              title={t.label + (t.v ? `: ${t.v}` : "") + (t.w ? ` ${t.w}` : "")}
               className={`h-10 rounded-lg flex items-center gap-2 shrink-0 ${
                 railCollapsed ? "justify-center px-0" : "px-2.5"
               } text-body font-semibold transition-colors ${
@@ -3051,21 +3081,21 @@ function DrawerBody({
                                 t: "Ready",
                                 c: "pill-confirmed",
                                 hint: isAcc
-                                  ? "Accessory — always in the Klang warehouse"
+                                  ? "Accessory. Always in the Klang warehouse"
                                   : "A unit is locked to this order",
                               }
                             : rd === "to_reserve"
                               ? {
                                   t: `Need ${Math.max(1, l.qty - received)}`,
                                   c: "pill-warning",
-                                  hint: "Matching free stock exists — reserve it to this SO",
+                                  hint: "Matching free stock exists. Reserve it to this SO",
                                 }
                               : rd === "on_po"
                                 ? etaPassed
                                   ? {
                                       t: "Delayed",
                                       c: "pill-overdue",
-                                      hint: "The PO's ETA has passed — call the supplier for a new ready date",
+                                      hint: "The PO's ETA has passed. Call the supplier for a new ready date",
                                     }
                                   : {
                                       t: "On PO",
@@ -3129,7 +3159,7 @@ function DrawerBody({
                                           behavior: "smooth",
                                         });
                                     }}
-                                    title="Matching stock is free — click to reserve a unit to this order"
+                                    title="Matching stock is free. Click to reserve a unit to this order"
                                     className={`inline-flex items-center gap-1 text-meta font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c} hover:brightness-90`}
                                   >
                                     {pill.t}
@@ -3164,7 +3194,7 @@ function DrawerBody({
                                         e.stopPropagation();
                                         setUnreserveSku(l.sku);
                                       }}
-                                      title="A unit is locked to this order — click to unreserve it"
+                                      title="A unit is locked to this order. Click to unreserve it"
                                       className={`inline-flex items-center gap-1 text-meta font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pill.c} hover:brightness-95`}
                                     >
                                       <Check size={14} strokeWidth={2.5} aria-hidden="true" />
@@ -3183,7 +3213,7 @@ function DrawerBody({
                                   </span>
                                 )
                               ) : (
-                                <span className="text-base-300 text-meta">—</span>
+                                null
                               )}
                             </td>
                             {/* STOCK ETA — red alert when late / missing;
@@ -3191,7 +3221,7 @@ function DrawerBody({
                                 no longer repeats it). */}
                             <td className="border-b border-base-100 px-2 py-1.5 align-middle">
                               {isService || isAcc || rd === "reserved" ? (
-                                <span className="text-base-300 text-meta">—</span>
+                                null
                               ) : etaEditSku === l.sku ? (
                                 <input
                                   type="date"
@@ -3216,7 +3246,7 @@ function DrawerBody({
                                   }`}
                                   title={
                                     etaPassed
-                                      ? "ETA has passed — goods not in"
+                                      ? "ETA has passed. Goods not in"
                                       : !order.delivery_date_tbd &&
                                           !!order.delivery_date &&
                                           etaValue > order.delivery_date
@@ -3244,7 +3274,7 @@ function DrawerBody({
                               ) : (
                                 <span
                                   className="inline-flex items-center gap-1 text-meta font-medium text-danger cursor-pointer"
-                                  title="No stock ETA — click to set it, or call the supplier for the ready date"
+                                  title="No stock ETA. Click to set it, or call the supplier for the ready date"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setEtaEditSku(l.sku);
@@ -3292,7 +3322,7 @@ function DrawerBody({
                                   >
                                     {l.sku}
                                   </span>
-                                  {(lineSize(l.sku) || skuCode(l.sku) !== "—") && (
+                                  {(lineSize(l.sku) || skuCode(l.sku) !== "") && (
                                     <span className="block text-meta text-base-500 leading-tight truncate">
                                       {lineSize(l.sku) === "K"
                                         ? "King"
@@ -3301,10 +3331,10 @@ function DrawerBody({
                                           : lineSize(l.sku) === "S"
                                             ? "Single"
                                             : null}
-                                      {lineSize(l.sku) && skuCode(l.sku) !== "—"
+                                      {lineSize(l.sku) && skuCode(l.sku) !== ""
                                         ? " · "
                                         : null}
-                                      {skuCode(l.sku) !== "—" ? (
+                                      {skuCode(l.sku) !== "" ? (
                                         <span className="font-mono text-label">
                                           {skuCode(l.sku)}
                                         </span>
@@ -3325,7 +3355,7 @@ function DrawerBody({
                             {/* PO — In stock / PO#### */}
                             <td className="border-b border-base-100 px-2 py-1.5 align-middle">
                               {isService ? (
-                                <span className="text-base-300 text-meta">—</span>
+                                null
                               ) : poNo ? (
                                 <span className="font-mono text-meta text-base-700 truncate block max-w-[110px]" title={poNo}>
                                   {poNo}
@@ -3339,7 +3369,7 @@ function DrawerBody({
                                 quiet fact; [+ Arrived] records an arrival. */}
                             <td className="border-b border-base-100 px-1.5 py-1 align-middle">
                               {isService || isAcc || !poNo ? (
-                                <span className="text-base-300 text-meta">—</span>
+                                null
                               ) : (
                                 <span className="inline-flex items-center gap-1.5">
                                   <span
@@ -3496,27 +3526,24 @@ function DrawerBody({
                 </tbody>
               </table>
             </div>
-            {/* Panel footer (doesn't scroll): linked POs (GRN) + warehouse remark. */}
-            <div className="border-t border-base-100 px-3 py-2 space-y-2 shrink-0">
-              {pos.length > 0 && (
-                <div>
-                  <div className="label mb-1">Linked POs</div>
-                  <div className="border border-base-100 rounded-[6px]">
-                    {pos.map((po, i) => (
-                      <PoRow key={po.id} po={po} divider={i > 0} />
-                    ))}
-                  </div>
+            {/* Panel footer (doesn't scroll): linked POs (GRN).
+                The free-text `Warehouse remark` box was RETIRED here (Loo,
+                2026-08-21): free-text remarks go; a special case carries a
+                STRUCTURED reason instead (cancel 0350 · PO delay
+                PO_DELAY_REASONS · supplier dates 0310), and hand-written
+                follow-up belongs in Activity & notes, which is append-only,
+                tagged, and reaches the dashboard. The `warehouse_remark`
+                COLUMN stays — history is never deleted for a UI retirement. */}
+            {pos.length > 0 && (
+              <div className="border-t border-base-100 px-3 py-2 shrink-0">
+                <div className="label mb-1">Linked POs</div>
+                <div className="border border-base-100 rounded-[6px]">
+                  {pos.map((po, i) => (
+                    <PoRow key={po.id} po={po} divider={i > 0} />
+                  ))}
                 </div>
-              )}
-              <FieldGrid>
-                <RemarkControlField
-                  form={form}
-                  field="warehouse_remark"
-                  label="Warehouse remark"
-                  placeholder="Note for the warehouse team"
-                />
-              </FieldGrid>
-            </div>
+              </div>
+            )}
           </Panel>
           </SectionCard>
 
@@ -3578,7 +3605,6 @@ function DrawerBody({
             <Panel
               title="Warehouse stock"
               grow
-              summary={<MiniBadge tone="muted">—</MiniBadge>}
               actions={warehouseMenu}
             >
               <div className="flex-1 grid place-items-center text-meta text-base-400 p-6">
@@ -3618,9 +3644,16 @@ function DrawerBody({
               orderCategories={[
                 // CORE categories only — a loaner substitutes a mattress /
                 // bedframe / sofa; "acc" would let keyword-missed units leak in.
+                //
+                // D9, 2026-08-20: `resolvedCategory` asks the CATALOG first and
+                // only parses the SKU text where the catalog is silent. The
+                // "keyword-missed" the comment above worries about is exactly
+                // what that fixes — and it had a second, unstated cost: a line
+                // the keyword list missed contributed NOTHING to this set, so
+                // its own category could not be matched by any free unit.
                 ...new Set(
                   goodsLines
-                    .map((l) => lineCategory(l.sku))
+                    .map((l) => resolvedCategory(l.sku, l.category))
                     .filter((c) => c !== "acc"),
                 ),
               ]}
@@ -3760,7 +3793,7 @@ function DrawerBody({
                 <span
                   title={
                     balanceGate === "hold"
-                      ? "Delivery on hold — collect before dispatch"
+                      ? "Delivery on hold. Collect before dispatch"
                       : `Collected ${RM(collectedAll)} of ${RM(invoiceTotal)}`
                   }
                   className={`inline-flex items-center gap-1.5 text-meta font-semibold whitespace-nowrap ${payToneCls}`}
@@ -3878,7 +3911,7 @@ function DrawerBody({
                   <span
                     title={
                       storageGate === "hold"
-                        ? "Delivery on hold — clear storage before dispatch"
+                        ? "Delivery on hold. Clear storage before dispatch"
                         : storageGate === "warn"
                           ? "Collect storage before delivery"
                           : "Storage fee running"
@@ -3903,7 +3936,7 @@ function DrawerBody({
                         const end =
                           form.draft.storage_to.trim() ||
                           form.draft.logistic_eta.trim() ||
-                          new Date().toISOString().slice(0, 10);
+                          appTodayIso();
                         const days = Math.max(
                           0,
                           Math.round(
@@ -4041,7 +4074,7 @@ function DrawerBody({
                   if (balanceGate === "hold" || storageGate === "hold")
                     return (
                       <span
-                        title="Delivery on hold — collect the balance / storage fee before dispatch"
+                        title="Delivery on hold. Collect the balance / storage fee before dispatch"
                         className="inline-flex items-center gap-1 text-meta font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-[#FCEBEB] text-[#A32D2D]"
                       >
                         <AlertCircle size={14} strokeWidth={2.5} />
@@ -4064,7 +4097,7 @@ function DrawerBody({
                   )
                     return (
                       <MiniBadge tone="ready">
-                        confirmed {dayMon(form.control.confirmed_date)}
+                        confirmed {fmtDateShort(form.control.confirmed_date)}
                         {form.control.confirmed_time_slot
                           ? ` · ${shortSlot(form.control.confirmed_time_slot)}`
                           : ""}
@@ -4074,7 +4107,7 @@ function DrawerBody({
                   if (eta)
                     return (
                       <MiniBadge tone="waiting">
-                        not confirmed · logistics said {dayMon(eta)}
+                        not confirmed · logistics said {fmtDateShort(eta)}
                       </MiniBadge>
                     );
                   // C1 (Jess 2026-07-27): T1 banned "Unscheduled" and this badge
@@ -4088,7 +4121,7 @@ function DrawerBody({
                         {deliveryDateGapFact(chasePartnerName)}
                       </MiniBadge>
                     );
-                  return <MiniBadge tone="muted">No logistics picked</MiniBadge>;
+                  return <MiniBadge tone="muted">Logistics not assigned</MiniBadge>;
                 })()}
                 {/* deadline date lives ONCE — on the card header below (mono);
                     a second sans copy here read as "two fonts" (Jess). */}
@@ -4128,7 +4161,7 @@ function DrawerBody({
                           ? "Not confirmed"
                           : order.ops_assigned_logistic
                             ? deliveryDateGapFact(chasePartnerName)
-                            : "No logistics picked";
+                            : "Logistics not assigned";
                 return (
                   <div className="max-w-[700px]">
                     {/* Grounded delivery card (Loan template; Jess 2026-07-19) —
@@ -4157,9 +4190,9 @@ function DrawerBody({
                               className={`text-body font-semibold truncate ${
                                 deliveredDone ? "text-base-500" : "text-base-900"
                               }`}
-                              title={chasePartnerName ?? "No logistics picked yet"}
+                              title={chasePartnerName ?? "Logistics not assigned"}
                             >
-                              {chasePartnerName ?? "No logistics picked yet"}
+                              {chasePartnerName ?? "Logistics not assigned"}
                             </div>
                           </div>
                         </div>
@@ -4175,7 +4208,7 @@ function DrawerBody({
                           <button
                             type="button"
                             onClick={() => void openDoPdf(order.id)}
-                            title="Print the Delivery Order (DO) — the driver's what-to-do sheet: items, address, RM to collect"
+                            title="Print the Delivery Order (DO). The driver's what-to-do sheet: items, address, RM to collect"
                             className="inline-flex items-center gap-1 text-label text-primary"
                           >
                             <Printer size={14} /> DO
@@ -4268,7 +4301,7 @@ function DrawerBody({
                                 {c.allReady ? (
                                   " ✓"
                                 ) : (
-                                  <span className="text-warning"> — {c.status}</span>
+                                  <span className="text-warning">, {c.status}</span>
                                 )}
                               </span>
                             ))}
@@ -4346,7 +4379,10 @@ function DrawerBody({
                           not-yet-delivered order; this row simply doesn't
                           render until then. */}
                       {deliveredDone && (
-                        <DeliveryPhotoRow orderId={order.id} />
+                        <DeliveryPhotoRow
+                          orderId={order.id}
+                          doNumber={order.do_number ?? null}
+                        />
                       )}
                       {/* The fields nobody fills (ETA 1.6% · chase-day 0.5%) —
                           tucked behind a fold, opened only when needed (Jess
@@ -4409,7 +4445,7 @@ function DrawerBody({
                                   <button
                                     type="button"
                                     onClick={() => setEditingChaseDays(true)}
-                                    title="Automatic — a task is created by itself this many days before the deadline. Click to change."
+                                    title="Automatic. A task is created by itself this many days before the deadline. Click to change."
                                     className="text-base-400 hover:text-base-600 whitespace-nowrap shrink-0"
                                   >
                                     · −{contactByDays}d auto
@@ -4424,7 +4460,7 @@ function DrawerBody({
                           (pre-golive guardrail #2). */}
                       {deliveredDone && (
                         <div className="px-3 py-2.5 text-center text-meta font-semibold text-base-500">
-                          Delivered — nothing to do
+                          Delivered. Nothing to do
                         </div>
                       )}
                     </div>
@@ -4535,7 +4571,7 @@ function LoanSofaModal({
           );
           onClose();
         },
-        onError: (e) => toast.error(`Couldn't loan — ${e.message}`),
+        onError: (e) => toast.error(`Couldn't loan: ${e.message}`),
       },
     );
   }
@@ -4652,7 +4688,7 @@ function CustomerIdentityCard({
     return (
       <div
         className="kpi-box grid place-items-center py-2"
-        title={`${order.customer_name ? titleCaseName(order.customer_name) : "—"} · #${order.so} · ${statusWord}`}
+        title={`${order.customer_name ? displayCustomerName(order.customer_name) : ""} · #${order.so} · ${statusWord}`}
       >
         <span className="size-[34px] rounded-full grid place-items-center shrink-0 bg-base-100 text-base-500">
           <User size={18} strokeWidth={2} aria-hidden="true" />
@@ -4671,7 +4707,7 @@ function CustomerIdentityCard({
             className={`block text-body font-semibold leading-tight ${cjkClassName(order.customer_name ?? "")}`}
             title={order.customer_name ?? undefined}
           >
-            {order.customer_name ? titleCaseName(order.customer_name) : "—"}
+            {order.customer_name ? displayCustomerName(order.customer_name) : ""}
           </span>
           <span className="mt-0.5 flex items-center gap-1.5 min-w-0 flex-wrap">
             {/* The ONE black element on the page — the order id badge. */}
@@ -4803,7 +4839,7 @@ function CustomerIdentityCard({
           {/* Data-honest (no customer master table exists — each order keeps
               its own copy): this edit changes THIS ORDER ONLY. */}
           <div className="text-meta text-base-500 leading-snug">
-            Updates this order only — other orders keep their own copy.
+            Updates this order only. Other orders keep their own copy.
           </div>
           {err && <div className="text-meta text-danger">{err}</div>}
           <div className="flex items-center gap-1.5">
@@ -4842,204 +4878,29 @@ function CustomerIdentityCard({
 }
 
 /**
- * Customer block of the Order section — read-only, with an inline Edit on a
- * Place order so operation can correct a customer's name / phone / address
- * before the order proceeds (typo, customer moved, etc.). Saves via
- * `useUpdateOrder` → PATCH /api/orders/:id; the `update_order` RPC 422s on any
- * non-Place order, so the Edit affordance only shows for status 'place' (which
- * is every real AutoCount order). Validates with the SAME shared zod schema the
- * API uses. (Jess 2026-06-25, #4 drawer edit.)
- */
-
-export function OrderCustomerCard({
-  order,
-  startEditRef,
-}: {
-  order: {
-    id: string;
-    status: string;
-    customer_name: string | null;
-    customer_phone: string | null;
-    customer_address: string | null;
-    placed_at?: string | null;
-  };
-  /** Lets an outside control (the panel ⋮) open this card's safe-edit mode. */
-  startEditRef?: MutableRefObject<(() => void) | null>;
-}) {
-  const qc = useQueryClient();
-  const [editing, setEditing] = useState(false);
-  const [name, setName] = useState(order.customer_name ?? "");
-  const [phone, setPhone] = useState(order.customer_phone ?? "");
-  const [address, setAddress] = useState(order.customer_address ?? "");
-  const [err, setErr] = useState<string | null>(null);
-
-  const update = useUpdateOrder(order.id, {
-    onSuccess: () => {
-      setEditing(false);
-      toast.success("Customer details updated");
-      // useUpdateOrder invalidates the dealer order keys; the drawer reads the
-      // operation detail under a different key, so refresh that one too.
-      void qc.invalidateQueries({ queryKey: qk.operation.order(order.id) });
-    },
-    onError: (e) => setErr(e.message),
-  });
-
-  function start() {
-    setName(order.customer_name ?? "");
-    setPhone(order.customer_phone ?? "");
-    setAddress(order.customer_address ?? "");
-    setErr(null);
-    setEditing(true);
-  }
-
-  // Expose `start` to the panel ⋮ (Edit details) — kept current each render.
-  useEffect(() => {
-    if (startEditRef) startEditRef.current = start;
-  });
-
-  function save() {
-    setErr(null);
-    // Only send fields the user actually changed — the RPC updates by presence.
-    const customer: Record<string, unknown> = {};
-    if (name.trim() !== (order.customer_name ?? "")) customer.name = name.trim();
-    if (phone.trim() !== (order.customer_phone ?? "")) customer.phone = phone.trim();
-    if (address.trim() !== (order.customer_address ?? ""))
-      customer.address = address.trim() || null;
-    if (Object.keys(customer).length === 0) {
-      setEditing(false);
-      return;
-    }
-    const parsed = updateOrderInputSchema.safeParse({ customer });
-    if (!parsed.success) {
-      setErr(parsed.error.issues[0]?.message ?? "Invalid input");
-      return;
-    }
-    update.mutate(parsed.data);
-  }
-
-  if (editing) {
-    const field =
-      "mt-0.5 w-full px-2 py-1.5 border border-base-200 rounded text-body bg-white outline-none focus:border-base-700";
-    return (
-      <div className="space-y-2">
-        <label className="block">
-          <span className="text-meta text-base-500">Customer name</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} className={field} />
-        </label>
-        <label className="block">
-          <span className="text-meta text-base-500">Phone</span>
-          <input
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            inputMode="tel"
-            className={field}
-          />
-        </label>
-        <label className="block">
-          <span className="text-meta text-base-500">Address</span>
-          <textarea
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            rows={2}
-            className={`${field} resize-none`}
-          />
-        </label>
-        {err && <p className="text-meta text-danger">{err}</p>}
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setEditing(false)}
-            disabled={update.isPending}
-            className="btn-ghost text-meta"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={save}
-            disabled={update.isPending}
-            className="btn-primary text-meta"
-          >
-            {update.isPending ? "Saving…" : "Save"}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Compact read-mode (Jess 4-col): label-above-value rows, no bordered table;
-  // click Edit to change (place-status only). Ordered date anchored to the
-  // card bottom so the column aligns with its siblings.
-  return (
-    <div className="flex flex-col h-full text-meta">
-      <CompactField label="Name">
-        <span className={`font-medium ${cjkClassName(order.customer_name)}`}>
-          {order.customer_name || <span className="text-base-400">—</span>}
-        </span>
-      </CompactField>
-      <CompactField label="Phone">
-        {order.customer_phone || <span className="text-base-400">—</span>}
-      </CompactField>
-      <CompactField label="Address">
-        <span className="leading-snug text-base-600">
-          {order.customer_address || <span className="text-base-400">—</span>}
-        </span>
-      </CompactField>
-      {/* Edit moved to the panel ⋮ (Jess 2026-07-11 — every panel's actions live in
-          its header ⋮; the redundant inline button is gone). Read-only by default;
-          the ⋮ "Edit details" opens the safe Save / Cancel mode. */}
-      {/* 0261-0263 — "did this customer buy a guarantee". Renders nothing when
-          they didn't, so pre-guarantee orders look untouched. */}
-      <GuaranteeCoverStrip orderId={order.id} />
-    </div>
-  );
-}
-
-/**
  * Build a wa.me link from a MY customer phone (weak-English staff want one tap to
  * message the customer). Takes the FIRST number if the field lists several
  * ("014-… | 012-…"), strips non-digits, and normalises a local `0…` to `60…`.
  */
-export function waLink(phone: string | null | undefined): string | null {
-  if (!phone) return null;
-  const first = phone.split(/[|,/]/)[0] ?? "";
-  let d = first.replace(/\D/g, "");
-  if (!d) return null;
-  if (d.startsWith("60")) {
-    /* already international */
-  } else if (d.startsWith("0")) {
-    d = `60${d.slice(1)}`;
-  } else {
-    d = `60${d}`;
-  }
-  return `https://wa.me/${d}`;
-}
-
-/** Compact label-left / value-right read row (Jess: match the clean mockup). */
-function CompactField({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 py-[3px] border-b border-base-100/70 last:border-b-0">
-      <span className="text-meta text-base-400 shrink-0">{label}</span>
-      <span className="min-w-0 text-right text-base-900">{children}</span>
-    </div>
-  );
-}
+// waLink lives in @/lib/wa-link; re-exported for existing importers.
+export { waLink };
 
 /** Grounded-card KV row — the Loan-card language, STANDARD kit tokens (label
  *  base-500 uppercase 11/600 — READABLE, not the washed base-300; value base-900;
  *  36px). Used by the Delivery card. */
 /**
- * C7 — the delivery order, in one row.
+ * C7 → SLICE 2 — the delivery order, in one row, and it is a FACT in both
+ * states.
  *
- * Not issued → ONE button, and it is the dictionary's own BUTTON word so this
- * file spells no verb. Issued → the number, as a plain fact; there is nothing
- * to press, because the document already exists.
- *
- * **The gate is the server's** (`docs/ORDERS-WORKING-FLOW.md` §5 — goods
- * reserved, money collected, no Sunday or public holiday). This row does not
- * re-implement it: a client-side copy is a second engine, and the two would
- * disagree the first time either changed. So the button stays live and the 422
- * comes back as the sentence that names what is missing.
+ * Issued → the number, a door to the document's page. Not issued → the words,
+ * because the SYSTEM issues the document itself the moment every requirement
+ * is met (`docs/orders/MASTER.md` §8 — no Issue, Release or Approve button in
+ * any state) — PLUS the one governed manual door the owner ruled 2026-08-19
+ * (card §5): `Request Delivery Order`, for the outstation trip whose partner
+ * schedules the customer, so the paper is needed BEFORE a confirmed booking
+ * exists. The door walks the SAME issuing path with the SAME gates — goods,
+ * money (0362) and the Finance exception — merely without waiting for the
+ * booking-confirm trigger. A refusal names the failing gate.
  */
 function DeliveryOrderRow({
   orderId,
@@ -5048,34 +4909,53 @@ function DeliveryOrderRow({
   orderId: string;
   doNumber: string | null;
 }) {
-  const issue = useIssueDeliveryOrder(orderId, {
-    // COPY-STANDARD's DONE MESSAGE for this action, read from the dictionary
-    // mirror rather than typed here, plus the number the document carries.
-    onSuccess: (res) =>
-      toast.success(
-        `${orderActionDone("issue_delivery_order")} — ${res.order.do_number}`,
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const request = useMutation({
+    mutationFn: () =>
+      apiFetch<{ order: { do_number: string | null }; issued: boolean }>(
+        `/api/operation/orders/${encodeURIComponent(orderId)}/delivery-order/request`,
+        { method: "POST" },
       ),
-    onError: (e) =>
-      toast.error(
-        e instanceof ApiError ? e.message : "Couldn't issue the delivery order",
-      ),
+    onSuccess: (res) => {
+      void qc.invalidateQueries({ queryKey: qk.operation.order(orderId) });
+      void qc.invalidateQueries({ queryKey: qk.operation.orders() });
+      if (res.order.do_number) {
+        toast.success(`Delivery order issued: ${res.order.do_number}`);
+      }
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
   return (
     <DRow k="Delivery order">
       {doNumber ? (
-        <span className="font-mono text-body font-semibold text-base-900">
-          {doNumber}
-        </span>
-      ) : (
-        <Btn
-          variant="box"
-          size="sm"
-          disabled={issue.isPending}
-          title="The system writes the delivery order and stamps its number — nobody types one by hand"
-          onClick={() => issue.mutate()}
+        /* The number is a DOOR to the document's own page (§0.1: DO → DO). */
+        <button
+          type="button"
+          className="font-mono text-body font-semibold text-blue-700 underline-offset-2 hover:underline"
+          onClick={() =>
+            navigate(`/operation/delivery-orders/${encodeURIComponent(doNumber)}`)
+          }
         >
-          {orderActionButton("issue_delivery_order")}
-        </Btn>
+          {doNumber}
+        </button>
+      ) : (
+        <span className="flex items-center gap-2 flex-wrap justify-end min-w-0">
+          {/* An absent value reads as WORDS, never a dash (COPY-STANDARD
+              2026-08-15) — and the words say who acts: the system, or this
+              one governed request door. */}
+          <span className="text-meta text-base-500">
+            No delivery order yet. The system issues it when the goods, money
+            and date are ready
+          </span>
+          <Btn
+            data-testid="request-delivery-order"
+            disabled={request.isPending}
+            onClick={() => request.mutate()}
+          >
+            Request Delivery Order
+          </Btn>
+        </span>
       )}
     </DRow>
   );
@@ -5125,7 +5005,6 @@ function BookingBlock({
   // Confirm button never reads it, because a partner's working pattern is the
   // partner's fact, not one of our obligations — the operator may have already
   // phoned them.
-  const [rulesOpen, setRulesOpen] = useState(false);
   const partnerCheck = usePartnerBookingCheck(orderId, open ? date : "");
   const partnerWarnings = partnerCheck.data?.warnings ?? [];
   const checkedPartner = partnerCheck.data?.partner ?? null;
@@ -5145,7 +5024,7 @@ function BookingBlock({
     : [];
   const confirm = useConfirmBooking(orderId, {
     onSuccess: (res) => {
-      toast.success("Booking confirmed — the customer's date + slot are recorded");
+      toast.success("Booking confirmed. The customer's date + slot are recorded");
       // T9 — the booking is SAVED either way; if the company's own rules bend
       // on that date, say so once so the operator knows to ring them.
       const first = res.partnerWarnings?.[0];
@@ -5156,7 +5035,6 @@ function BookingBlock({
       // last step.
       for (const w of res.gateWarnings ?? []) toast.warning(w);
       setOpen(false);
-      setRulesOpen(false);
       setTripGroups(null);
     },
     onError: (e) =>
@@ -5178,8 +5056,14 @@ function BookingBlock({
         : "goods not all reserved",
     );
   else if (!goodsReadyHint && !tripGroups) gateHints.push("goods not all reserved");
-  if (balanceOwingHint)
-    gateHints.push(`RM ${outstandingHint.toFixed(2)} outstanding`);
+  // Decision A (owner ruling 2026-08-16, docs/orders/MASTER.md §8) — money no
+  // longer blocks the delivery order, so it may not ride the "cannot be
+  // issued" sentence above. It gets its own honest line: the collection stays
+  // open, and the paper issues regardless. Same voice as the server's own
+  // warning ("collection is still open").
+  const moneyHint = balanceOwingHint
+    ? `RM ${outstandingHint.toFixed(2)} outstanding. Collection is still open; it does not block the delivery order`
+    : null;
   const FIELD =
     "rounded border border-base-300 bg-white px-1.5 py-0.5 text-body text-base-900 outline-none hover:border-base-400 focus:border-primary";
   return (
@@ -5250,10 +5134,10 @@ function BookingBlock({
           produce the paper by hand — the number was stamped by a DB trigger on
           the DISPATCH transition (0098), a day too late to hand over. One press
           now, the moment the customer's date is confirmed, and the SYSTEM
-          writes it. The row appears only when there is a trip to paper. */}
-      {(confirmed || doNumber) && (
-        <DeliveryOrderRow orderId={orderId} doNumber={doNumber} />
-      )}
+          writes it. The row always renders: an outstation trip needs its
+          paper BEFORE a confirmed booking exists (owner ruling 2026-08-19),
+          so the request door must be reachable in that state too. */}
+      <DeliveryOrderRow orderId={orderId} doNumber={doNumber} />
       {/* T8 — the second trip. A split order still owes the customer a group;
           this row is the ONLY place that says so, and it stays until that
           group is booked. The button re-opens the same confirm panel scoped to
@@ -5301,7 +5185,7 @@ function BookingBlock({
                   variant={tripGroups === null ? "box" : "ghost"}
                   size="sm"
                   onClick={() => setTripGroups(null)}
-                  title="Nothing is delivered until every item is in — one trip"
+                  title="Nothing is delivered until every item is in. One trip"
                 >
                   Wait for everything
                 </Btn>
@@ -5330,7 +5214,7 @@ function BookingBlock({
               aria-label="Customer-confirmed time slot"
               className={`${FIELD} w-[190px]`}
             >
-              <option value="">— time slot —</option>
+              <option value="">Time slot</option>
               {DELIVERY_TIME_SLOTS.map((s) => (
                 <option key={s} value={s}>
                   {s}
@@ -5347,7 +5231,7 @@ function BookingBlock({
               disabled={!date || !slot || sunday || confirm.isPending}
               title={
                 !date || !slot
-                  ? "Date AND time slot both needed — a date alone is not a confirmation"
+                  ? "Date AND time slot both needed. A date alone is not a confirmation"
                   : undefined
               }
               onClick={() =>
@@ -5369,7 +5253,7 @@ function BookingBlock({
           </div>
           {sunday && (
             <div className="text-right text-meta text-danger py-0.5">
-              Sunday is not a delivery working day — pick another date
+              Sunday is not a delivery working day. Pick another date
             </div>
           )}
           {/* T9 (0283) — the company's own rules against THIS date. Amber, not
@@ -5384,31 +5268,30 @@ function BookingBlock({
             </div>
           )}
           {checkedPartner && (
+            /* D5 relocated (owner ruling 2026-09-13): a partner's delivery
+               rules are maintained in Delivery Settings, never in this drawer.
+               The drawer keeps the DOOR and loses the editor. */
             <div className="text-right py-0.5">
-              <Btn
-                variant="ghost"
-                size="sm"
-                onClick={() => setRulesOpen((v) => !v)}
+              <Link
+                className="text-meta font-semibold text-kit-blue-11"
+                to={`/operation/settings/delivery/partners/${encodeURIComponent(checkedPartner.id)}/schedule`}
+                data-testid="drawer-partner-rules-door"
               >
-                {rulesOpen ? "Close" : `${checkedPartner.name} delivery rules`}
-              </Btn>
+                {checkedPartner.name} delivery rules
+              </Link>
             </div>
-          )}
-          {rulesOpen && checkedPartner && (
-            <PartnerRulesEditor
-              partnerId={checkedPartner.id}
-              partnerName={checkedPartner.name}
-              rules={partnerCheck.data?.rules ?? null}
-              onSaved={() => {
-                setRulesOpen(false);
-                void partnerCheck.refetch();
-              }}
-            />
           )}
           {gateHints.length > 0 && (
             <div className="text-right text-meta text-warning py-0.5">
-              Not ready yet: {gateHints.join(" · ")} — the delivery order cannot
+              Not ready yet: {gateHints.join(" · ")}. The delivery order cannot
               be issued until these are cleared
+            </div>
+          )}
+          {/* Money is a separate sentence because it is a separate truth
+              (decision A): it warns, it never blocks the paper. */}
+          {moneyHint && (
+            <div className="text-right text-meta text-warning py-0.5">
+              {moneyHint}
             </div>
           )}
         </DRow>
@@ -5422,200 +5305,27 @@ function BookingBlock({
   );
 }
 
-/** T9 (0283) — the logistics company's own delivery rules, edited where FIRST
- *  read (L6: "build the fields WITH the first consumer, not as an admin page up
- *  front"). Four facts, plain words: which days it runs, days it is not running
- *  at all, how many drops it takes, and how much notice it needs.
- *
- *  Sunday is not offered: nobody delivers on Sunday, and the booking gate
- *  refuses it for every company — showing a switch for it would suggest the
- *  rule is negotiable per partner.
- *
- *  The rules belong to the CARRIER, not this order: saving here changes what
- *  the portal warns about on every order that uses it, which is why the panel
- *  says so out loud and why the write is audited server-side. */
-function PartnerRulesEditor({
-  partnerId,
-  partnerName,
-  rules,
-  onSaved,
-}: {
-  partnerId: string;
-  partnerName: string;
-  rules: {
-    offDays: number[];
-    blackoutDates: string[];
-    dailyCapacity: number | null;
-    bookingLeadDays: number;
-  } | null;
-  onSaved: () => void;
-}) {
-  const [offDays, setOffDays] = useState<number[]>(rules?.offDays ?? [0]);
-  const [blackouts, setBlackouts] = useState<string[]>(rules?.blackoutDates ?? []);
-  const [capacity, setCapacity] = useState<string>(
-    rules?.dailyCapacity != null ? String(rules.dailyCapacity) : "",
-  );
-  const [lead, setLead] = useState<string>(String(rules?.bookingLeadDays ?? 0));
-  const [newBlackout, setNewBlackout] = useState("");
-  const save = useSetPartnerDeliveryRules(partnerId, {
-    onSuccess: () => {
-      toast.success(`${partnerName} delivery rules saved`);
-      onSaved();
-    },
-    onError: (e) =>
-      toast.error(
-        e instanceof ApiError ? e.message : "Couldn't save the delivery rules",
-      ),
-  });
-  const FIELD =
-    "rounded border border-base-300 bg-white px-1.5 py-0.5 text-body text-base-900 outline-none hover:border-base-400 focus:border-primary";
-  const WEEK = [
-    { n: 1, label: "Mon" },
-    { n: 2, label: "Tue" },
-    { n: 3, label: "Wed" },
-    { n: 4, label: "Thu" },
-    { n: 5, label: "Fri" },
-    { n: 6, label: "Sat" },
-  ];
-  const runsOn = (n: number) => !offDays.includes(n);
-  const toggleDay = (n: number) =>
-    setOffDays((cur) =>
-      cur.includes(n) ? cur.filter((d) => d !== n) : [...cur, n],
-    );
-  // Sunday is always off; the API validates the same thing, this keeps the
-  // operator from saving a company that runs no day at all.
-  const runsSomeDay = WEEK.some((d) => runsOn(d.n));
-  const capacityNum = capacity.trim() === "" ? null : Number(capacity);
-  const leadNum = Number(lead || 0);
-  const valid =
-    runsSomeDay &&
-    Number.isInteger(leadNum) &&
-    leadNum >= 0 &&
-    leadNum <= 30 &&
-    (capacityNum === null ||
-      (Number.isInteger(capacityNum) && capacityNum >= 1 && capacityNum <= 999));
-  return (
-    <DRow k={`${partnerName} rules`} block>
-      <div className="py-1 space-y-1.5 text-right">
-        <div className="text-label text-base-500">
-          These are {partnerName}&apos;s own rules — they apply to every order
-          this logistics company delivers, and they warn, never block.
-        </div>
-        <div className="flex items-center gap-1.5 flex-wrap justify-end">
-          <span className="text-meta text-base-600">Delivers on</span>
-          {WEEK.map((d) => (
-            <Btn
-              key={d.n}
-              variant={runsOn(d.n) ? "box" : "ghost"}
-              size="sm"
-              onClick={() => toggleDay(d.n)}
-              title={
-                runsOn(d.n)
-                  ? `${partnerName} runs on ${d.label}`
-                  : `${partnerName} does not run on ${d.label}`
-              }
-            >
-              {d.label}
-            </Btn>
-          ))}
-        </div>
-        {!runsSomeDay && (
-          <div className="text-meta text-danger">
-            A logistics company must run on at least one day of the week
-          </div>
-        )}
-        <div className="flex items-center gap-1.5 flex-wrap justify-end">
-          <span className="text-meta text-base-600">Needs</span>
-          <input
-            type="number"
-            min={0}
-            max={30}
-            value={lead}
-            onChange={(e) => setLead(e.target.value)}
-            aria-label={`${partnerName} booking notice in working days`}
-            className={`${FIELD} w-[70px]`}
-          />
-          <span className="text-meta text-base-600">
-            working days notice · takes at most
-          </span>
-          <input
-            type="number"
-            min={1}
-            max={999}
-            value={capacity}
-            placeholder="not set"
-            onChange={(e) => setCapacity(e.target.value)}
-            aria-label={`${partnerName} deliveries a day`}
-            className={`${FIELD} w-[90px]`}
-          />
-          <span className="text-meta text-base-600">deliveries a day</span>
-        </div>
-        <div className="flex items-center gap-1.5 flex-wrap justify-end">
-          <span className="text-meta text-base-600">Not running on</span>
-          {blackouts.length === 0 && (
-            <span className="text-meta text-base-400">no dates</span>
-          )}
-          {blackouts.map((b) => (
-            <Btn
-              key={b}
-              variant="ghost"
-              size="sm"
-              onClick={() => setBlackouts((cur) => cur.filter((x) => x !== b))}
-              title="Remove this date"
-            >
-              {fmtDate(b).split(",")[0]} ×
-            </Btn>
-          ))}
-          <input
-            type="date"
-            value={newBlackout}
-            onChange={(e) => {
-              const v = e.target.value;
-              setNewBlackout("");
-              if (v && !blackouts.includes(v))
-                setBlackouts((cur) => [...cur, v].sort());
-            }}
-            aria-label={`Add a date ${partnerName} is not running`}
-            className={`${FIELD} w-[150px]`}
-          />
-        </div>
-        <div className="flex items-center gap-1.5 justify-end">
-          <Btn
-            variant="box"
-            size="sm"
-            disabled={!valid || save.isPending}
-            onClick={() =>
-              save.mutate({
-                offDays: [0, ...WEEK.filter((d) => !runsOn(d.n)).map((d) => d.n)],
-                blackoutDates: blackouts,
-                dailyCapacity: capacityNum,
-                bookingLeadDays: leadNum,
-              })
-            }
-          >
-            {save.isPending ? "Saving…" : "Save rules"}
-          </Btn>
-        </div>
-      </div>
-    </DRow>
-  );
-}
 
-/** T6 (0280) — the delivery-photo row inside the delivery card, shown only
- *  once the order is delivered. Existing photos open in a new tab via
- *  short-lived signed urls (the bucket is private); Upload shrinks the file
- *  browser-side, then runs the sign-upload → attach flow. The SERVER is the
- *  gate (delivered-only + own-order path prefix) — this row is assistance. */
-function DeliveryPhotoRow({ orderId }: { orderId: string }) {
+/**
+ * T6 (0280) — the delivery-photo row inside the delivery card, shown only once
+ * the order is delivered. Existing files open in a new tab via short-lived
+ * signed urls (the bucket is private).
+ *
+ * ⭐ ONE UPLOADER, AND IT NAMES THE TRIP (owner ruling 2026-09-11). The
+ * picker is the shared `DeliveryProofUploadButton` the Delivery Orders
+ * register renders - a second picker here would be a second form for one act
+ * (Law C) - and it passes the order's own DO number so the file belongs to a
+ * document instead of floating at order level. An order with no DO number yet
+ * uploads UNBOUND, which is the honest answer, not a guessed one.
+ */
+function DeliveryPhotoRow({
+  orderId,
+  doNumber,
+}: {
+  orderId: string;
+  doNumber: string | null;
+}) {
   const photosQ = useDeliveryPhotos(orderId);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const upload = useUploadDeliveryPhoto(orderId, {
-    onSuccess: () => toast.success("Delivery photo uploaded"),
-    onError: (e) =>
-      toast.error(
-        e instanceof ApiError ? e.message : "Couldn't upload the delivery photo",
-      ),
-  });
   const photos = photosQ.data?.photos ?? [];
   return (
     <DRow k="Delivery photo">
@@ -5644,27 +5354,7 @@ function DeliveryPhotoRow({ orderId }: { orderId: string }) {
             ),
           )
         )}
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className="hidden"
-          aria-label="Delivery photo file"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) upload.mutate(f);
-            e.target.value = "";
-          }}
-        />
-        <Btn
-          variant="box"
-          size="sm"
-          icon={Upload}
-          disabled={upload.isPending}
-          onClick={() => inputRef.current?.click()}
-        >
-          {upload.isPending ? "Uploading…" : "Upload delivery photo"}
-        </Btn>
+        <DeliveryProofUploadButton orderId={orderId} doNumber={doNumber} />
       </span>
     </DRow>
   );
@@ -5751,8 +5441,16 @@ async function openReceipt(
   meta: { orderCode: string; customerName: string },
 ) {
   try {
-    const blob = await renderReceiptPdf({
-      receipt_no: row.receipt_no ?? row.id.slice(0, 8),
+    // §4 — a numbered receipt prints from the one receipt document (the 0449
+    // snapshot plus the invoices it settles), same as Payment Records.
+    const doc = row.receipt_no
+      ? await apiFetch<{ document: ReceiptTemplateData; voided: boolean; void_reason: string | null }>(
+          `/api/finance/payments/${row.id}/receipt-document`)
+      : null;
+    const blob = await renderReceiptPdf(doc
+      ? { ...doc.document, voided: doc.voided, void_reason: doc.void_reason }
+      : {
+      receipt_no: row.id.slice(0, 8),
       issue_date: row.paid_on,
       order_code: meta.orderCode,
       customer: { name: meta.customerName },
@@ -5765,7 +5463,7 @@ async function openReceipt(
     });
     window.open(URL.createObjectURL(blob), "_blank");
   } catch (e) {
-    toast.error(`Couldn't open receipt — ${(e as Error).message}`);
+    toast.error(`Couldn't open receipt: ${(e as Error).message}`);
   }
 }
 
@@ -5783,7 +5481,7 @@ async function openInvoicePdf(orderId: string, so: number) {
     toast.success(`Invoice INV-${String(so).padStart(6, "0")} opened`);
   } catch (e) {
     const msg = e instanceof ApiError ? e.message : String(e);
-    toast.error(`No invoice yet (issued at dispatch) — ${msg}`);
+    toast.error(`No invoice yet (issued at dispatch): ${msg}`);
   }
 }
 
@@ -5807,7 +5505,7 @@ async function openDoPdf(orderId: string) {
     window.open(URL.createObjectURL(blob), "_blank", "noopener,noreferrer");
   } catch (e) {
     const msg = e instanceof ApiError ? e.message : String(e);
-    toast.error(`Print delivery order failed — ${msg}`);
+    toast.error(`Print delivery order failed: ${msg}`);
   }
 }
 
@@ -5827,7 +5525,7 @@ async function openSalesOrderPdf(orderId: string, so: number) {
     toast.success(`Sales Order SO-${String(so).padStart(6, "0")} opened`);
   } catch (e) {
     const msg = e instanceof ApiError ? e.message : String(e);
-    toast.error(`Open sales order failed — ${msg}`);
+    toast.error(`Open sales order failed: ${msg}`);
   }
 }
 
@@ -5842,7 +5540,7 @@ async function openPoPdf(poId: string) {
     window.open(URL.createObjectURL(blob), "_blank", "noopener,noreferrer");
   } catch (e) {
     const msg = e instanceof ApiError ? e.message : String(e);
-    toast.error(`Open purchase order failed — ${msg}`);
+    toast.error(`Open purchase order failed: ${msg}`);
   }
 }
 
@@ -5855,7 +5553,7 @@ async function openSupplierDo(path: string) {
     .from("delivery-orders")
     .createSignedUrl(path, 3600);
   if (error || !data?.signedUrl) {
-    toast.error(`Couldn't open the supplier DO — ${error?.message ?? "no URL"}`);
+    toast.error(`Couldn't open the supplier DO: ${error?.message ?? "no URL"}`);
     return;
   }
   window.open(data.signedUrl, "_blank", "noopener");
@@ -5881,7 +5579,7 @@ const MY_BANKS = [
 /** PaymentForm (Balance-tab inline spec, 2026-07-18) — ONE payment entry
  *  form, used INLINE in the Balance tab's Payments column and (wrapped in a
  *  Modal) by the collapsed band's Add-payment shortcut. Amount · Date ·
- *  Method (Cash / Bank transfer / Cheque / e-wallet) · Bank (when transfer) ·
+ *  Method (0476: the Active methods in Settings → Payment) · Bank (when transfer) ·
  *  Ref no · receipt UPLOAD (drag/tap, image/PDF → orders-attachments, live
  *  via the 0180 internal-write policy) · Save/Cancel. Saving uploads the slip
  *  first, then records with `receiptUrl` (persistence deploy-gated — the live
@@ -5897,8 +5595,14 @@ function PaymentForm({
   onCancel: () => void;
 }) {
   const [amount, setAmount] = useState("");
-  const [paidOn, setPaidOn] = useState(new Date().toISOString().slice(0, 10));
-  const [method, setMethod] = useState<OrderPaymentMethod>("bank");
+  const [paidOn, setPaidOn] = useState(appTodayIso());
+  // 0476 — the methods are the Settings → Payment list; a method switched off
+  // there disappears here. Bank transfer is the default when it is Active.
+  const { methods } = useManualMethods();
+  const [chosenMethod, setMethod] = useState<string>("bank");
+  const method = methods.some((m) => m.value === chosenMethod)
+    ? chosenMethod
+    : methods[0].value;
   const [bank, setBank] = useState("");
   const [refNo, setRefNo] = useState("");
   const [note, setNote] = useState("");
@@ -5906,10 +5610,13 @@ function PaymentForm({
   const [dragOver, setDragOver] = useState(false);
   const [saving, setSaving] = useState(false);
   const record = useRecordPayment(orderId, {
-    onError: (e) => toast.error(`Couldn't record payment — ${e.message}`),
+    onError: (e) => toast.error(`Couldn't record payment: ${e.message}`),
   });
   const amt = Number(amount);
-  const amtOk = amount.trim() !== "" && Number.isFinite(amt) && amt > 0;
+  // §16 (0535) — a cheque needs its number, a card its approval code.
+  const refWord = requiredPaymentReference(method);
+  const amtOk = amount.trim() !== "" && Number.isFinite(amt) && amt > 0
+    && (!refWord || refNo.trim() !== "");
   const cell = `mt-0.5 ${fieldCls}`; // THE one input recipe (components/Field)
 
   const acceptFile = (f: File | undefined | null) => {
@@ -5919,7 +5626,7 @@ function PaymentForm({
       return;
     }
     if (f.size > 10 * 1024 * 1024) {
-      toast.error("Receipt too large — max 10 MB");
+      toast.error("Receipt too large. Max 10 MB");
       return;
     }
     setFile(f);
@@ -5943,7 +5650,7 @@ function PaymentForm({
         });
       if (error) {
         setSaving(false);
-        toast.error(`Slip upload failed — ${error.message}`);
+        toast.error(`Slip upload failed: ${error.message}`);
         return;
       }
       receiptUrl = `${ATTACHMENTS_BUCKET}/${path}`;
@@ -6002,14 +5709,15 @@ function PaymentForm({
           <span className="t4-label">Method</span>
           <select
             value={method}
-            onChange={(e) => setMethod(e.target.value as OrderPaymentMethod)}
+            onChange={(e) => setMethod(e.target.value)}
             aria-label="Payment method"
             className={cell}
           >
-            <option value="cash">Cash</option>
-            <option value="bank">Bank transfer</option>
-            <option value="cheque">Cheque</option>
-            <option value="online">e-wallet</option>
+            {methods.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
           </select>
         </label>
         {method === "bank" ? (
@@ -6021,7 +5729,7 @@ function PaymentForm({
               aria-label="Receiving bank"
               className={cell}
             >
-              <option value="">—</option>
+              <option value="">Bank</option>
               {MY_BANKS.map((b) => (
                 <option key={b} value={b}>
                   {b}
@@ -6031,7 +5739,7 @@ function PaymentForm({
           </label>
         ) : (
           <label className="block">
-            <span className="t4-label">Ref no (optional)</span>
+            <span className="t4-label">{refWord ?? "Ref no (optional)"}</span>
             <input
               type="text"
               value={refNo}
@@ -6165,37 +5873,10 @@ function AddPaymentModal({
   );
 }
 
-/** Method → display label (Balance v3 payment rows + the record modal). */
-const PAY_METHOD_LABEL: Record<OrderPaymentMethod, string> = {
-  cash: "Cash",
-  bank: "Bank transfer",
-  card: "Card",
-  cheque: "Cheque",
-  online: "e-wallet",
-  other: "Other",
-};
-
-/** Open a payment's uploaded proof: an https receipt URL directly, or a
- *  storage path via a fresh signed URL (internal read, 1h TTL). */
-async function viewSlip(p: OrderPaymentRow) {
-  const u = p.receipt_url;
-  if (!u) return;
-  if (/^https?:/i.test(u)) {
-    window.open(u, "_blank", "noopener");
-    return;
-  }
-  const path = u.startsWith(`${ATTACHMENTS_BUCKET}/`)
-    ? u.slice(ATTACHMENTS_BUCKET.length + 1)
-    : u;
-  const { data, error } = await supabase.storage
-    .from(ATTACHMENTS_BUCKET)
-    .createSignedUrl(path, 3600);
-  if (error || !data?.signedUrl) {
-    toast.error(`Couldn't open slip — ${error?.message ?? "no URL"}`);
-    return;
-  }
-  window.open(data.signedUrl, "_blank", "noopener");
-}
+/* `viewSlip` lives in `@/lib/payment-display` so the Sales Order detail's
+   payment card opens the same slip through the same door (ownership Law D).
+   A payment row's method reads through `methodLabel` (0476, lib/payment-methods):
+   the Settings → Payment name, never the raw key. */
 
 /** "Where this order is" — the SPINE (Jess 2026-07-18): ONE vertical
  *  progress line that is ALSO the section nav. Steps in doing order with
@@ -6263,7 +5944,7 @@ function JourneyCard({
             type="button"
             onClick={() => onGo(st.tab, i)}
             aria-selected={active}
-            title={`${st.title} — ${st.sub}`}
+            title={`${st.title}: ${st.sub}`}
             className={`relative w-full flex items-start text-left group rounded-lg ${
               collapsed
                 ? "justify-center px-0 py-1.5"
@@ -6360,7 +6041,7 @@ function StorageCard({
   exempt: boolean;
   delivered: boolean;
 }) {
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = appTodayIso();
   const { draft, set } = form;
   const endSet = draft.storage_to.trim();
   const endEff = endSet || draft.logistic_eta.trim() || todayIso;
@@ -6511,7 +6192,7 @@ function StorageCard({
             )}
           </span>
         ) : (
-          <span className={soft}>—</span>
+          null
         )}
           </DRow>
 
@@ -6773,8 +6454,16 @@ function MoneyCard({
   // The INLINE Record-payment form (Balance-tab spec — no modal here; the
   // collapsed band's shortcut still wraps the same form in a Modal).
   const [addingInline, setAddingInline] = useState(false);
+  // 0430 — a void wears its reason: the Undo2 icon opens this inline ask
+  // instead of firing one-click; the SQL door refuses a blank reason anyway.
+  const [voidingId, setVoidingId] = useState<string | null>(null);
+  const [voidReason, setVoidReason] = useState("");
   const voidPay = useVoidPayment(orderId, {
-    onError: (e) => toast.error(`Couldn't void — ${e.message}`),
+    onError: (e) => toast.error(`Couldn't void: ${e.message}`),
+    onSuccess: () => {
+      setVoidingId(null);
+      setVoidReason("");
+    },
   });
 
   // CHARGES — merge same-SKU lines; per-line amounts only exist on a
@@ -6823,7 +6512,7 @@ function MoneyCard({
       <button
         type="button"
         onClick={() => setEditingTotal(true)}
-        title="Keyed total — click to edit"
+        title="Keyed total. Click to edit"
         className="underline decoration-dotted decoration-base-300 underline-offset-2"
       >
         <Money value={orderTotal} tone="row" className="text-base-900" />
@@ -6997,8 +6686,8 @@ function MoneyCard({
                 // refuse it anyway — `already_voided`).
                 const voided = !isLivePayment(p);
                 return (
+                <div key={p.id}>
                 <div
-                  key={p.id}
                   className={`flex items-center gap-2.5 py-2 ${voided ? "opacity-60" : ""}`}
                   data-testid={voided ? "payment-voided" : undefined}
                 >
@@ -7036,7 +6725,7 @@ function MoneyCard({
                       />
                     </div>
                     <div className="text-meta text-base-500 truncate">
-                      {fmtDate(p.paid_on)} · {PAY_METHOD_LABEL[p.method] ?? p.method}
+                      {fmtDate(p.paid_on)} · {methodLabel(p.method)}
                       {p.reference ? ` · ${p.reference}` : ""}
                     </div>
                   </div>
@@ -7068,15 +6757,49 @@ function MoneyCard({
                   {isPrincipal && !voided && (
                     <button
                       type="button"
-                      onClick={() => voidPay.mutate(p.id)}
+                      onClick={() => {
+                        setVoidingId(voidingId === p.id ? null : p.id);
+                        setVoidReason("");
+                      }}
                       disabled={voidPay.isPending}
-                      title="Void this payment (reversible — payments are never deleted)"
+                      title="Void this payment (reversible: payments are never deleted)"
                       aria-label={`Void payment ${p.receipt_no ?? p.id}`}
                       className="text-base-500 hover:text-danger shrink-0"
                     >
                       <Undo2 size={14} />
                     </button>
                   )}
+                </div>
+                {voidingId === p.id && !voided && (
+                  // 0430 — the reason is required; the payment and its
+                  // reversal keep it forever.
+                  <div className="flex items-center gap-2 pb-2">
+                    <input
+                      type="text"
+                      value={voidReason}
+                      onChange={(e) => setVoidReason(e.target.value)}
+                      placeholder="Why is this payment wrong?"
+                      aria-label="Void reason"
+                      autoFocus
+                      className={fieldCls}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => voidPay.mutate({ paymentId: p.id, reason: voidReason.trim() })}
+                      disabled={voidPay.isPending || !voidReason.trim()}
+                      className="text-meta font-semibold text-danger shrink-0 disabled:opacity-40"
+                    >
+                      Void payment
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVoidingId(null)}
+                      className="text-meta text-base-500 shrink-0"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
                 </div>
                 );
               })}
@@ -7109,7 +6832,7 @@ function MoneyCard({
               }`}
             >
               Collect by {collectByLabel}
-              {collectByPast ? " — passed" : ""}
+              {collectByPast ? " (passed)" : ""}
             </div>
           )}
         </div>
@@ -7207,7 +6930,6 @@ function ActionsMenu({
   orderId,
   pipelineStatus,
   onServiceNoteClick,
-  onTransferReadyClick,
   onConfirmProceedClick,
   onTopUpClick,
   onAbandonClick,
@@ -7220,7 +6942,6 @@ function ActionsMenu({
   orderId: string;
   pipelineStatus: PipelineStatus;
   onServiceNoteClick: () => void;
-  onTransferReadyClick: () => void;
   onConfirmProceedClick: () => void;
   onTopUpClick: () => void;
   onAbandonClick: () => void;
@@ -7268,8 +6989,9 @@ function ActionsMenu({
                     /operation/procurement carrying a CreatePOModal prefill, and
                     that modal called the legacy ungoverned create RPCs.
                     `purchasing_issue_pos_batch(jsonb)` is the only authority
-                    that may create a Purchase Order, and Batch Purchase is the
-                    only door that calls it. */}
+                    that may create a Purchase Order, and it is reached only
+                    through the governed journeys — SO Batch Purchase and
+                    Manual Purchase (corrected 2026-08-23). */}
                 {pipelineStatus === "ready" && (
                   <MenuItem
                     icon={<Truck className="w-4 h-4" />}
@@ -7324,15 +7046,6 @@ function ActionsMenu({
                   />
                 )}
                 <MenuItem
-                  icon={<PackagePlus className="w-4 h-4" />}
-                  label="Transfer to ready"
-                  title="Mark stock on-hand → ready (manual bridge)"
-                  onClick={() => {
-                    close();
-                    onTransferReadyClick();
-                  }}
-                />
-                <MenuItem
                   icon={<Pencil className="w-4 h-4" />}
                   label="Record top-up"
                   onClick={() => {
@@ -7361,7 +7074,7 @@ function ActionsMenu({
               icon={<AlertCircle className="w-4 h-4" />}
               label="Issue"
               disabled
-              title="Issues module coming — needs the ops_issues table"
+              title="Issues module coming. Needs the ops_issues table"
             />
             <div className="border-t border-base-100 my-0.5" />
             {/* Download ▶ flyout (Google-Sheets style): one parent row that
@@ -7471,7 +7184,7 @@ function PoRow({ po, divider }: { po: operationOrderDetailPo; divider: boolean }
           </div>
         ))}
         <div className="text-meta text-base-500 mt-0.5">
-          ETA {po.eta_date ?? "—"} · Σ {got}/{totalQty}
+          ETA {po.eta_date ?? ""} · Σ {got}/{totalQty}
         </div>
       </div>
       <div className="flex flex-col items-end gap-1.5">

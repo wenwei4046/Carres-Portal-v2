@@ -138,8 +138,8 @@ export default function OperationAllOrders() {
                 <td className="px-4 py-2.5 font-mono">
                   <strong>SO-{o.so}</strong>
                 </td>
-                <td className="px-4 py-2.5 text-base-700">{o.dealerName ?? "—"}</td>
-                <td className="px-4 py-2.5">{o.customerName ?? "—"}</td>
+                <td className="px-4 py-2.5 text-base-700">{o.dealerName ?? ""}</td>
+                <td className="px-4 py-2.5">{o.customerName ?? ""}</td>
                 <td className="px-4 py-2.5 text-base-600 text-meta">
                   {o.qtyTotal} item{o.qtyTotal !== 1 ? "s" : ""}
                 </td>

@@ -1,4 +1,8 @@
 import { useEffect, useState } from "react";
+import { Menu } from "lucide-react";
+import Button from "@/components/kit/Button";
+import Drawer from "@/components/kit/Drawer";
+import CalendarPanel from "./components/rail/CalendarPanel";
 import {
   Navigate,
   Route,
@@ -11,7 +15,6 @@ import {
 // Principal / Finance) merged into ONE role-aware PortalSidebar.
 import PortalSidebar from "@/pages/portal/PortalSidebar";
 import { useAuth } from "@/lib/auth";
-import { apiFetch } from "@/lib/api";
 import OperationDashboard from "./OperationDashboard";
 // ⭐ SALES ORDER PRODUCTION CUTOVER (owner ruling, 2026-08-10 —
 // `docs/SALES-ORDER-CUTOVER.md`). The two Orders pages now live at TWO
@@ -31,26 +34,33 @@ import OperationDashboard from "./OperationDashboard";
 // named in the cutover card — revert + redeploy the previous Pages build.
 import OperationOrdersControl from "./OperationOrdersControl";
 import SalesOrdersRegister from "./SalesOrdersRegister";
+import DeliveryOrderPage from "./DeliveryOrderPage";
+import DeliveryOrdersRegister from "./DeliveryOrdersRegister";
 import SalesOrderWorkspace from "./SalesOrderWorkspace";
 import SettingsWorkspace from "./SettingsWorkspace";
 // T11 (2026-07-27) — the Delivery module: the ONE new sidebar item in the
 // build plan. Tab-state driven like Payments / Stock (only orders and
 // procurement are path-driven), so `?tab=delivery` deep-links it.
 import OperationDelivery from "./OperationDelivery";
-import OperationPayments from "./OperationPayments";
+import EditDeliveryRedirect from "./EditDeliveryRedirect";
 import OperationWork from "./OperationWork";
 import OperationRental from "./OperationRental";
 // Purchase / Procurement MRP cockpit — the "what to buy today" guided worklist.
 import OperationToOrder from "./OperationToOrder";
+import OperationManualPurchase from "./OperationManualPurchase";
 import OperationWarehouse from "./OperationWarehouse";
 import OperationMovements from "./OperationMovements";
 import TabbedProcurementShell from "./procurement/TabbedProcurementShell";
-import OperationPurchaseOrders from "./OperationPurchaseOrders";
+import OperationPurchaseOrders from "./purchase-orders/PurchaseOrdersPage";
 // P3 (Jess redesign Q3a=B) — GRN receiving station, split out from the
 // Purchase Order (procurement) menu.
 import OperationReceiving from "./OperationReceiving";
+import OperationReceivingReport from "./OperationReceivingReport";
+import OperationDeliveryReport from "./OperationDeliveryReport";
 // R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
 import OperationSupplierClaims from "./OperationSupplierClaims";
+import OperationPurchaseReturns from "./OperationPurchaseReturns";
+import OperationRepairOrders from "./OperationRepairOrders";
 import OperationPurchasingSettings from "./OperationPurchasingSettings";
 // Q3 (Loo, 2026-08-04) — Purchasing → Report: the "look at the numbers" layer.
 import OperationPurchasingReport from "./OperationPurchasingReport";
@@ -62,6 +72,7 @@ import { CATALOG_TAB_PARAM } from "@/pages/catalog/catalog-tabs";
 import OperationStock from "./OperationStock";
 import OperationAllOrders from "./OperationAllOrders";
 import OperationSuppliers from "./OperationSuppliers";
+import OperationSupplierItems from "./OperationSupplierItems";
 // 2026-05-20 — Phase A · AutoCount integration tabs.
 import OperationImport from "./OperationImport";
 import OperationInbox from "./OperationInbox";
@@ -73,7 +84,13 @@ import OperationOpsReady from "./OperationOpsReady";
 import OperationOpsReserved from "./OperationOpsReserved";
 import OperationOpsRepair from "./OperationOpsRepair";
 import OperationOpsInventory from "./OperationOpsInventory";
-import OperationStockOnHand from "./OperationStockOnHand";
+import WarehouseStockRegister from "./WarehouseStockRegister";
+import WarehouseWorkspace from "./WarehouseWorkspace";
+import { LEGACY_SCHEDULE_TABS } from "./warehouse-schedule-view";
+import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
+import WarehouseInbound from "./WarehouseInbound";
+import WarehouseOutboundWork from "./WarehouseOutboundWork";
+import WarehouseUnitDetail from "./WarehouseUnitDetail";
 // K2 (0287) — Ready stock, the middle Stock tab K0 reserved.
 import OperationStockPlan from "./OperationStockPlan";
 // Migration 0140 — Service Notes / Issue Tracker.
@@ -107,21 +124,18 @@ import type { MovementsFilters } from "@/lib/queries";
  */
 export default function OperationApp() {
   const location = useLocation();
-  const navigate = useNavigate();
-  // Presence heartbeat (0235, Jess: opens portal = came to work = available
-  // for auto-assign; MC/no-show = never stamped = skipped). Stamps the
-  // caller's OWN app_users.last_seen_at on mount + every 15 min; fails soft
-  // on a Worker that predates the route.
+  const phone = usePhone();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const calendarDestination = new URLSearchParams(location.search);
+  for (const key of ["calendarModule", "calendarLocation", "calendarDay", "calendarRange"]) calendarDestination.delete(key);
+  const calendarDestinationKey = calendarDestination.toString();
+  useEffect(() => { setCalendarOpen(false); }, [location.pathname, calendarDestinationKey]);
+  /* A chosen page closes the drawer. */
   useEffect(() => {
-    const beat = () => {
-      void apiFetch("/api/operation/staff/heartbeat", { method: "POST" }).catch(
-        () => {},
-      );
-    };
-    beat();
-    const t = setInterval(beat, 15 * 60_000);
-    return () => clearInterval(t);
-  }, []);
+    setMenuOpen(false);
+  }, [location.pathname, location.search]);
+  const navigate = useNavigate();
   // Catalog split (Loo 2026-07-25) — the selling Product & Maintenance moved
   // to the Admin area (/principal?tab=catalog); Operations keeps only the
   // costing Operation Catalog (0226). A stale `?tab=catalog` deep link here
@@ -149,12 +163,48 @@ export default function OperationApp() {
   // sub-path: `startsWith` would then light BOTH sidebar items at once, and a
   // door that shares the new register's prefix reads as part of it.
   const isOldOrdersUrl = location.pathname.startsWith("/operation/old-orders");
+  // The Delivery Orders register + DO object page (blueprint card 2026-08-16).
+  // Its own prefix, NOT `/operation/orders/…`, for the same sidebar-lighting
+  // reason as old-orders above.
+  const isDeliveryOrdersUrl = location.pathname.startsWith(
+    "/operation/delivery-orders",
+  );
+  // Only the REGISTER hands scroll ownership to its grid; the DO object page
+  // scrolls like a normal page.
+  const isDeliveryOrdersRegisterUrl =
+    location.pathname === "/operation/delivery-orders";
+  /* EDIT DELIVERY (2026-08-24) draws its own 50px Destination Header, so the
+     slim global bar must stand down — the SAME rule Delivery Work needed and
+     Manual Purchase needed before it. A page that draws a header joins this
+     list in the PR that gives it one. */
+  const isEditDeliveryUrl = location.pathname.startsWith("/operation/delivery/edit");
   /* The one Settings Workspace is its own route, not a module tab — the
      Page Header gear is the ERP's single Settings entry (ui/MASTER.md). */
   const isSettingsUrl = location.pathname.startsWith("/operation/settings");
   const isIssuesUrl = location.pathname.startsWith("/operation/issues");
+  /* 【WAREHOUSE】 CARD 02 — one exact Unit, addressed by its permanent Carres
+     Unit ID. The Route shipped 2026-08-21 and never joined this gate, so the
+     URL fell through to the `?tab=` branch and rendered the DASHBOARD over a
+     real Unit address — the exact defect the Edit Delivery note below names:
+     a new route joins BOTH lists in the same commit. Measured live 2026-09-03
+     on /operation/stock/unit/id-aam135002 before the fix. */
+  const isStockUnitUrl = location.pathname.startsWith("/operation/stock/unit");
+  /* The legacy `/operation/purchasing` address rendered the old Operation
+     dashboard (owner ruling 2026-09-28, Purchasing §9.1). It is a real route
+     now — a redirect to SO Batch Purchase — so it joins this gate too. */
+  const isLegacyPurchasingUrl =
+    location.pathname === "/operation/purchasing" ||
+    location.pathname.startsWith("/operation/purchasing/");
   const isUrlDriven =
-    isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl || isSettingsUrl || isIssuesUrl;
+    isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl ||
+    /* Edit Delivery (2026-08-24) is a real route. Its flag joined the
+       GlobalTopBar suppression on day one but NOT this gate, so the URL fell
+       through to the `?tab=` branch and rendered an empty main pane — found on
+       the production walk, invisible to a component test that never mounts the
+       router. A new route joins BOTH lists in the same commit. */
+    isEditDeliveryUrl ||
+    isDeliveryOrdersUrl || isSettingsUrl || isIssuesUrl || isStockUnitUrl ||
+    isLegacyPurchasingUrl;
 
   const [tab, setTab] = useState<string>("dashboard");
   // Sidebar collapse moved into PortalSidebar (Unified Internal Portal,
@@ -184,6 +234,10 @@ export default function OperationApp() {
   // Rides along on the stale-catalog-link forward so a deep-linked tab
   // (`?section=promo`) survives the hop to the Admin door.
   const catalogSection = searchParams.get(CATALOG_TAB_PARAM);
+  /* The retired Payments desk scoped itself with `?so=<SO No>` and the order's
+     Money door still spells it that way in old links. It rides along on the
+     forward below so a scoped bookmark keeps its order. */
+  const legacyPaymentsSo = searchParams.get("so");
   useEffect(() => {
     if (
       !urlTab
@@ -191,15 +245,21 @@ export default function OperationApp() {
       || isToOrderUrl
       || isOrdersUrl
       || isOldOrdersUrl
+      || isDeliveryOrdersUrl
       || isSettingsUrl
       || isIssuesUrl
     )
       return;
     setMovementsPrefill((p) => (urlTab === "movements" ? p : undefined));
     setWarehousePrefill((p) => (urlTab === "warehouse" ? p : undefined));
-    setTab(urlTab);
+    /* WAREHOUSE SCHEDULE (owner ruling 2026-09-14) — the combined Monitor is
+       replaced by two pages. Both retired addresses resolve to Arrival
+       Schedule and keep every other parameter they arrived with, so a
+       bookmarked `date`/`site` still opens the day it was bookmarked for
+       (the stock-onhand precedent). */
+    setTab(LEGACY_SCHEDULE_TABS.has(urlTab) ? "warehouse-arrival-schedule" : urlTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlTab, isProcurementUrl, isToOrderUrl, isOrdersUrl, isOldOrdersUrl, isSettingsUrl, isIssuesUrl]);
+  }, [urlTab, isProcurementUrl, isToOrderUrl, isOrdersUrl, isOldOrdersUrl, isDeliveryOrdersUrl, isSettingsUrl, isIssuesUrl]);
 
   // When the URL leaves a URL-driven section (e.g. user navigated via Back
   // to `/operation`), make sure the local tab state has a sensible value so
@@ -279,11 +339,54 @@ export default function OperationApp() {
       style={{
         // PortalSidebar owns its own collapse state + intrinsic width (232px
         // expanded ⇄ icon rail collapsed), so the grid column just follows it.
-        gridTemplateColumns: "auto minmax(0, 1fr) auto",
+        // On a phone (owner review 2026-09-25) the page has the whole width:
+        // the rail is a drawer behind `Menu`, and the right rail is not drawn.
+        gridTemplateColumns: phone ? "minmax(0, 1fr)" : "auto minmax(0, 1fr) auto",
       }}
     >
-      <PortalSidebar />
+      {phone ? (
+        <>
+          {menuOpen ? (
+            <button
+              type="button"
+              aria-label="Close menu"
+              data-testid="phone-menu-backdrop"
+              onClick={() => setMenuOpen(false)}
+              className="fixed inset-0 z-40 bg-base-900/40"
+            />
+          ) : null}
+          <div
+            data-testid="phone-menu"
+            aria-hidden={!menuOpen}
+            className={`fixed inset-y-0 left-0 z-50 shadow-lg transition-transform duration-[180ms] motion-reduce:transition-none ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}
+          >
+            <PortalSidebar drawer />
+          </div>
+        </>
+      ) : (
+        <PortalSidebar />
+      )}
       <main className="min-w-0 bg-base-50 flex flex-col overflow-hidden">
+        {phone ? (
+          <div className="flex h-11 shrink-0 items-center border-b border-base-200 bg-white px-2">
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              aria-expanded={menuOpen}
+              data-testid="phone-menu-button"
+              className="inline-flex h-9 items-center gap-2 rounded-control px-2 text-control text-base-900 hover:bg-hovertint"
+            >
+              <Menu size={18} />
+              Menu
+            </button>
+            <div className="ml-auto">
+              <Button variant="ghost" icon="date" onClick={() => setCalendarOpen(true)} aria-expanded={calendarOpen}>Calendar</Button>
+            </div>
+            <Drawer open={calendarOpen} onOpenChange={setCalendarOpen} title="Calendar">
+              {calendarOpen && <CalendarPanel onOpenRecord={() => setCalendarOpen(false)} />}
+            </Drawer>
+          </div>
+        ) : null}
         {/* Site-wide utility bar (Alerts · Help · Settings) — pinned above the
             routed page on every operation screen. The Orders list is the ONE
             exception: its own white header surface embeds <TopBarIcons />, so
@@ -294,17 +397,79 @@ export default function OperationApp() {
             Receiving — Jess 2026-07-22, Q9 Option B — one clean top row, not
             two, so the module tab bar is the only chrome). */}
         {!isOrdersUrl &&
+          location.pathname !== "/operation/settings/staff-duties" &&
+          !isDeliveryOrdersUrl &&
+          !isEditDeliveryUrl &&
           !isOldOrdersUrl &&
           !isProcurementUrl &&
           !isToOrderUrl &&
+          /* CARD-2026-08-22-purchasing-02 — SO Batch Purchase draws the
+             Purchasing Destination Header itself, so the slim global bar would
+             be a second top row. */
           tab !== "purchase" &&
+          /* CARD-2026-08-21-delivery-02 — the SAME defect Manual Purchase
+             shipped with, caught on the production walk: Delivery Work draws
+             its own 50px Destination Header (which embeds TopBarIcons), so the
+             slim bar put a second Jump to, a second bell reading 59, a second
+             Help and a second gear on one screen. `Delivery Orders` never had
+             it because it is a real route and is suppressed above. */
+          tab !== "delivery" &&
+          tab !== "manual-purchase" &&
           tab !== "receiving" &&
           tab !== "claims" &&
+          /* §9.6 Purchase Returns — the SIXTH page to ship this exact defect.
+             It draws PurchasingTabs, which is a ModuleHeader and embeds
+             TopBarIcons, so the slim bar put a second Jump to, a second bell,
+             a second Help and a second gear on one screen. Found on the
+             production walk, like every one before it; the test below now
+             catches the whole CLASS instead of waiting for the next walk. */
+          tab !== "purchase-returns" &&
+          /* §9.7 Repair Orders draws PurchasingTabs (its own ModuleHeader). */
+          tab !== "repair-orders" &&
+          /* The SEVENTH, and nobody was looking for it: `Supplier items` is a
+             live rail destination that draws its own ModuleHeader and has been
+             showing two top rows. The class test above found it the minute it
+             existed, which is the whole reason that test is a rule and not a
+             list of six names. */
+          tab !== "supplier-items" &&
           tab !== "purchasing-report" &&
-          tab !== "purchasing-settings" && <GlobalTopBar />}
+          tab !== "purchasing-settings" &&
+          /* 【RECEIVING】 CARD 01 — Receiving & Inbound and Staff & Duties draw
+             their own Destination Header; the slim bar would be a second top
+             row (the same defect the Warehouse walks caught, found live on
+             this card's production walk). */
+          tab !== "receiving-report" &&
+          /* 【DELIVERY】 CARD 17 — Reports → Delivery draws the Delivery
+             destination header (ModuleHeader embeds TopBarIcons). */
+          tab !== "delivery-report" &&
+          tab !== "staff-duties" &&
+          /* 【WAREHOUSE】 CARD 02 — the Inventory Register, the two
+             de-navigated legacy Stock pages and Unit Detail all draw their own
+             50px Destination Header (ModuleHeader embeds TopBarIcons), so the
+             slim bar was a second Jump to, a second bell, a second gear on one
+             screen — the same defect Manual Purchase and Delivery Work each
+             shipped with, measured live on the CARD 01 walk. */
+          tab !== "stock-onhand" &&
+          tab !== "showroom" &&
+          tab !== "stock-plan" &&
+          tab !== "movements" &&
+          /* WAREHOUSE — Monitor, Inbound and Outbound draw their own
+             Destination Header; the slim bar would be a second top row. */
+          tab !== "warehouse-arrival-schedule" &&
+          tab !== "warehouse-pickup-schedule" &&
+          tab !== "warehouse-inbound" &&
+          tab !== "warehouse-outbound" &&
+          tab !== "arrival-source" &&
+          /* WORK — its one-row workspace header carries TopBarIcons (density
+             ruling 2026-09-25); the slim bar was a second 44px top row that
+             pushed the 743×704 detail below the fold. */
+          tab !== "work" &&
+          !isStockUnitUrl && <GlobalTopBar />}
         <div
           className={`flex-1 min-h-0 ${
-            isSalesOrdersRegisterUrl ? "overflow-hidden" : "overflow-auto"
+            isSalesOrdersRegisterUrl || isDeliveryOrdersRegisterUrl
+              ? "overflow-hidden"
+              : "overflow-auto"
           }`}
           data-testid={isSalesOrdersRegisterUrl ? "sales-orders-work-surface" : undefined}
         >
@@ -338,23 +503,50 @@ export default function OperationApp() {
                 Batch Purchase component. Query params (`?so=` plus its rail
                 filters) remain component-owned; no second mode or engine. */}
             <Route path="to-order" element={<OperationToOrder />} />
+            {/* Legacy address (owner ruling 2026-09-28): SO Batch Purchase. */}
+            <Route path="purchasing/*" element={<Navigate to="/operation?tab=purchase" replace />} />
             <Route path="procurement" element={<OperationPurchaseOrders />} />
             <Route
               path="procurement/:slug"
               element={<TabbedProcurementShell />}
             />
             <Route path="orders" element={<SalesOrdersRegister />} />
+            {/* The Delivery Orders register + the DO object page (blueprint
+                card 2026-08-16). The register address is a real destination
+                again (CARD-2026-09-04-delivery-01 four-page map) — the
+                2026-08-24 redirect into the unified page is retired with that
+                page. `:doId` accepts the row id or the document number
+                itself, so `DO-…` anywhere in the portal is a door. */}
+            <Route path="delivery-orders" element={<DeliveryOrdersRegister />} />
+            <Route path="delivery-orders/:doId" element={<DeliveryOrderPage />} />
+            {/* One exact Unit, addressed by its PERMANENT Carres Unit ID —
+                the thing printed on the supplier label and the thing 0366
+                promised never changes and is never reused. */}
+            <Route path="stock/unit/:unitCode" element={<WarehouseUnitDetail />} />
             {/* STAGE 1 — the workspace route the register's rows open.
-                STAGE 2 — `so/new` is the office birth door ([+ New Sales
-                Order]); static `new` outranks `:orderId`. Declared before
+                `so/new` was the office birth door, retired 2026-09-27; static
+                `new` outranks `:orderId`. Declared before
                 `orders/:stage` in source for the reader; React Router ranks
                 them higher anyway. */}
             {/* The one Settings Workspace. Reached only from the Page Header
                 gear's launcher — never a tab, nav item or Work Toolbar action. */}
             <Route path="settings/*" element={<SettingsWorkspace />} />
+            {/* EDIT DELIVERY (owner ruling 2026-08-24) — Delivery's own
+                full-screen surface, and where a Delivery Work row now opens.
+                `?leg=` names the Journey leg; absent means the whole-order
+                scope. It is a REAL route, so the shell suppresses its slim top
+                bar the same way it does for every other page that draws its own
+                Destination Header. */}
+            {/* Edit Delivery is RETIRED (owner ruling 2026-09-13): the
+                Delivery-owned writes live inside the Monitor row's brief. A
+                saved or pasted link lands on that row, brief unfolded. */}
+            <Route path="delivery/edit/:orderId" element={<EditDeliveryRedirect />} />
             <Route path="issues" element={<OperationIssueTracker />} />
             <Route path="issues/reports" element={<IssueRelatedPartyReport />} />
-            <Route path="orders/so/new" element={<SalesOrderWorkspace />} />
+            {/* The office create door is RETIRED (owner ruling 2026-09-27): a
+                Sales Order is born in the Sales Portal. A saved or pasted link
+                lands on the Register. */}
+            <Route path="orders/so/new" element={<Navigate to="/operation/orders" replace />} />
             <Route path="orders/so/:orderId" element={<SalesOrderWorkspace />} />
             <Route path="orders/:stage" element={<SalesOrdersRegister />} />
             {/* ⭐ THE TEMPORARY DOOR — the old control table, on its own route.
@@ -398,10 +590,23 @@ export default function OperationApp() {
                 Purchase Order menu (TabbedProcurementShell at
                 /operation/procurement); this is tab-state driven. */}
             {tab === "receiving" && <OperationReceiving />}
+            {/* Central Reports → Receiving & Inbound (2026-09-04 card) —
+                reachable by direct URL, like the Purchasing Report. */}
+            {tab === "receiving-report" && <OperationReceivingReport />}
+            {/* Central Reports → Delivery (Delivery MASTER §12, CARD 17) —
+                reachable by direct URL, like the Receiving report. */}
+            {tab === "delivery-report" && <OperationDeliveryReport />}
+            {/* Preserve legacy bookmarks at the one Settings destination. */}
+            {tab === "staff-duties" && <Navigate replace state={location.state} to={`/operation/settings/staff-duties?${new URLSearchParams([...searchParams].filter(([key]) => key !== "tab"))}`} />}
             {/* R2 — the supplier-claim queue: what receiving found wrong, and
                 what an unkept ETA turned into. Fourth Purchasing tab, no new
                 sidebar entry. */}
             {tab === "claims" && <OperationSupplierClaims />}
+            {/* §9.6 — Purchase Returns: the goods an approved claim outcome
+                sends back. Read-only; issuing a return is §7.4's own door and
+                moving the goods is Stock's. */}
+            {tab === "purchase-returns" && <OperationPurchaseReturns />}
+            {tab === "repair-orders" && <OperationRepairOrders />}
             {/* P1 — Purchasing → Settings: the numbers the ordering engine
                 reads. Manager-only; the tab is hidden for everyone else and
                 the RPCs refuse the write regardless. */}
@@ -417,13 +622,42 @@ export default function OperationApp() {
                 open work set (Card 9's engine). The page writes nothing; a
                 row opens the Sales Order Workspace. */}
             {tab === "work" && <OperationWork />}
-            {/* 0165 — Payments / collection (Master Sheet Balance tab) */}
-            {tab === "payments" && <OperationPayments />}
+            {/* ⭐ THE OLD PAYMENTS URL LEADS TO THE CANONICAL EXPERIENCE
+                (entry-point correction, 2026-09-09). `?tab=payments` was the
+                0165 Master-Sheet "Balance" desk — its own Summary band, its
+                own queue chips and its own editable balance / storage-fee
+                fields. Payment MASTER §16 gave that act ONE home: the
+                read-only Payments Register, its `Payments · Invoices`
+                toolbar, and the Invoice object that owns every write. The
+                desk is deleted, and every bookmark, saved link and shared URL
+                still lands — carrying its order scope, which the Register
+                reads as `?order=<SO No>`. */}
+            {tab === "payments" && (
+              <Navigate
+                to={`/finance/monitor${
+                  legacyPaymentsSo ? `?order=${encodeURIComponent(legacyPaymentsSo)}` : ""
+                }`}
+                replace
+              />
+            )}
             {/* 0247-0249 — Rental base: agreements + deployed-unit registry */}
             {tab === "rental" && <OperationRental />}
-            {/* Purchasing → To Order — the Planning Workspace, rebuilt from
-                the Golden Template 2026-07-31 (docs/03-page-patterns.md). */}
+            {/* Purchasing → SO Batch Purchase — the buying Register and the
+                guided PO issue journey (CARD-2026-08-22-purchasing-02). */}
             {tab === "purchase" && <OperationToOrder />}
+            {/* CARD-2026-08-22-purchasing-02 — `Purchase Demands` was never a
+                destination. `purchase_demand` is hidden canonical truth
+                (`docs/purchasing/MASTER.md` §4), and its useful capability —
+                the six states, the blockers, the coverage arithmetic — now
+                lives inside SO Batch Purchase. The old address REDIRECTS
+                rather than 404s: a bookmark an operator saved must land
+                somewhere that answers the same question. */}
+            {tab === "purchase-demands" && (
+              <Navigate to="/operation?tab=purchase" replace />
+            )}
+            {/* Purchasing → Manual Purchase — the typed request lane
+                (CARD-2026-08-18-manual-purchase). */}
+            {tab === "manual-purchase" && <OperationManualPurchase />}
             {tab === "catalog" &&
               (role === "principal" ? (
                 <Navigate
@@ -439,12 +673,34 @@ export default function OperationApp() {
               ))}
             {tab === "op-catalog" && <OperationCatalogPage />}
             {/* Jess redesign step 3 — unified per-unit Stock On Hand list. */}
-            {tab === "stock-onhand" && <OperationStockOnHand />}
+            {/* CARD-2026-08-20-stock-register: the Stock Register replaces the
+                On hand surface. Same `?tab=` address, new page. */}
+            {tab === "stock-onhand" && <WarehouseStockRegister />}
+            {tab === "showroom" && <WarehouseStockRegister showroom />}
+            {/* WAREHOUSE (owner ruling 2026-09-14) — Arrival Schedule and
+                Pickup Schedule are two independent dated boards; Inbound and
+                Outbound are their own rail + Register work pages. */}
+            {tab === "warehouse-arrival-schedule" && (
+              <WarehouseWorkspace direction="arrival" />
+            )}
+            {tab === "warehouse-pickup-schedule" && (
+              <WarehouseWorkspace direction="pickup" />
+            )}
+            {tab === "warehouse-inbound" && <WarehouseInbound />}
+            {tab === "warehouse-outbound" && <WarehouseOutboundWork />}
+            {/* Non-PO inbound source object. Inbound owns the register; this
+                hidden destination owns creating and reviewing one source. */}
+            {tab === "arrival-source" && <ArrivalSourceWorkspace />}
             {/* K2 — Ready stock: the monthly propose → approve plan. */}
             {tab === "stock-plan" && <OperationStockPlan />}
             {tab === "stock" && <OperationStock />}
             {tab === "all-orders" && <OperationAllOrders />}
             {tab === "suppliers" && <OperationSuppliers />}
+            {/* 0375 — the supplier's own item code, joined to ours. A separate
+                DESTINATION rather than a tab inside the roster: the roster is
+                about parties, this is about items, and the sidebar already
+                gives a module more than one page. */}
+            {tab === "supplier-items" && <OperationSupplierItems />}
             {/* 2026-05-20 — Phase A · AutoCount integration */}
             {tab === "ops-import" && <OperationImport />}
             {tab === "ops-inbox" && <OperationInbox />}
@@ -465,7 +721,27 @@ export default function OperationApp() {
           the Sales Orders routes, same as every other operation page. This
           supersedes SO-1's "rail not mounted" ruling — later owner statement
           wins (BUILD-QUEUE governance). */}
-      <OperationRightRail />
+      {phone ? null : <OperationRightRail />}
     </div>
   );
+}
+
+/** Below 768px the shell is the phone shell (owner review 2026-09-25). */
+function usePhone(): boolean {
+  const query = "(max-width: 767px)";
+  const [phone, setPhone] = useState<boolean>(() => {
+    try {
+      return window.matchMedia?.(query).matches === true;
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    const media = window.matchMedia?.(query);
+    if (!media) return;
+    const onChange = (event: MediaQueryListEvent) => setPhone(event.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+  return phone;
 }

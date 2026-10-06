@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
-import OhanaSofaTab from "./OhanaSofaTab";
+import ProcurementTabContent from "./ProcurementTabContent";
 import { purchasingActionButton } from "@carres/shared";
 import type { CatalogResponse } from "@carres/shared";
 import type {
@@ -158,7 +158,7 @@ describe("OhanaSofaTab — slug + read view", () => {
     posListState = [
       makeSofaPo({ id: "PO-SOFA-001", sup_status: "ready_confirm_sent" }),
     ];
-    render(wrap(<OhanaSofaTab />));
+    render(wrap(<ProcurementTabContent slug="hookka-sofa" />));
     expect(useProcurementTabSpy).toHaveBeenCalledWith("hookka-sofa");
     expect(screen.getByTestId("po-row-PO-SOFA-001")).toBeInTheDocument();
     expect(screen.getByText("Nordic Sofa · 3 seater")).toBeInTheDocument();
@@ -179,7 +179,7 @@ describe("OhanaSofaTab — AssignPickupDialog (factory_pickup ready_for_pickup)"
         sup_status: "ready_for_pickup",
       }),
     ];
-    render(wrap(<OhanaSofaTab />));
+    render(wrap(<ProcurementTabContent slug="hookka-sofa" />));
     fireEvent.click(screen.getByTestId("assign-pickup-PO-2060"));
     expect(
       screen.getByText(/Assign pickup partner · PO-2060/),
@@ -193,7 +193,7 @@ describe("OhanaSofaTab — AssignPickupDialog (factory_pickup ready_for_pickup)"
         sup_status: "ready_for_pickup",
       }),
     ];
-    render(wrap(<OhanaSofaTab />));
+    render(wrap(<ProcurementTabContent slug="hookka-sofa" />));
     fireEvent.click(screen.getByTestId("assign-pickup-PO-2061"));
     // Two buttons named "Assign partner": the row CTA and the modal's primary.
     // The modal-rendered one is inside [role=dialog]; pick that one.
@@ -241,11 +241,13 @@ describe("OhanaSofaTab — pickup-flight sup_status branches (v3-S2.2)", () => {
   // their words — `Check in` (the primary) vs `Direct receive →` (the hatch) —
   // because they share one testid.
   //
-  // 🟡 REPORTED, NOT FIXED — that shared testid is the reason this took a
-  // measurement instead of a glance. `receive-po-<id>` names two different
-  // controls with two different meanings; a test cannot tell them apart by
-  // handle, only by word. Renaming one reaches the component, and the S2 card
-  // rules components DO NOT TOUCH, so it is written down here instead.
+  // ✅ FIXED 2026-08-28 (D11). The shared testid is gone: the hatch is
+  // `direct-receive-<id>` and the primary keeps `receive-po-<id>`, so a test
+  // can now tell them apart by HANDLE. It stayed open this long for a boundary
+  // reason, not a technical one — renaming reaches the component and the S2
+  // card ruled components DO NOT TOUCH, so it was written down here instead.
+  // The helpers below still match by word, which is now a second, independent
+  // way of saying the same thing rather than the only way.
   // ─────────────────────────────────────────────────────────────────────────
   const CHECK_IN = purchasingActionButton("check_in");
 
@@ -262,7 +264,7 @@ describe("OhanaSofaTab — pickup-flight sup_status branches (v3-S2.2)", () => {
     posListState = [
       makeSofaPo({ id: "PO-3005", sup_status: "ready_for_pickup" }),
     ];
-    render(wrap(<OhanaSofaTab />));
+    render(wrap(<ProcurementTabContent slug="hookka-sofa" />));
     expect(screen.getByTestId("assign-pickup-PO-3005")).toBeInTheDocument();
     expect(primaryCheckIn()).toBeNull();
     expect(escapeHatch()).toBeInTheDocument();
@@ -272,7 +274,7 @@ describe("OhanaSofaTab — pickup-flight sup_status branches (v3-S2.2)", () => {
     posListState = [
       makeSofaPo({ id: "PO-3006", sup_status: "pickup_assigned" }),
     ];
-    render(wrap(<OhanaSofaTab />));
+    render(wrap(<ProcurementTabContent slug="hookka-sofa" />));
     expect(primaryCheckIn()).toBeNull();
     expect(escapeHatch()).toBeInTheDocument();
     const row = screen.getByTestId("po-row-PO-3006");
@@ -283,7 +285,7 @@ describe("OhanaSofaTab — pickup-flight sup_status branches (v3-S2.2)", () => {
     posListState = [
       makeSofaPo({ id: "PO-3007", sup_status: "pickup_accepted" }),
     ];
-    render(wrap(<OhanaSofaTab />));
+    render(wrap(<ProcurementTabContent slug="hookka-sofa" />));
     expect(primaryCheckIn()).toBeNull();
     expect(escapeHatch()).toBeInTheDocument();
     const row = screen.getByTestId("po-row-PO-3007");
@@ -294,7 +296,7 @@ describe("OhanaSofaTab — pickup-flight sup_status branches (v3-S2.2)", () => {
     posListState = [
       makeSofaPo({ id: "PO-3008", sup_status: "picked_up" }),
     ];
-    render(wrap(<OhanaSofaTab />));
+    render(wrap(<ProcurementTabContent slug="hookka-sofa" />));
     expect(primaryCheckIn()).toBeNull();
     expect(escapeHatch()).toBeInTheDocument();
     const row = screen.getByTestId("po-row-PO-3008");
@@ -305,7 +307,7 @@ describe("OhanaSofaTab — pickup-flight sup_status branches (v3-S2.2)", () => {
     // Without this, all four assertions above would still pass if the button
     // vanished from the page entirely, and the suite would be guarding nothing.
     posListState = [makeSofaPo({ id: "PO-3009", sup_status: "delivered" })];
-    render(wrap(<OhanaSofaTab />));
+    render(wrap(<ProcurementTabContent slug="hookka-sofa" />));
     expect(primaryCheckIn()).toBeInTheDocument();
   });
 });

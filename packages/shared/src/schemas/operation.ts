@@ -1,3 +1,4 @@
+import { PO_DELAY_REASONS } from "../po-workspace";
 import { z } from 'zod';
 
 /**
@@ -105,6 +106,77 @@ export const recordSendInput = z.object({
 }).strict();
 export type RecordSendInput = z.infer<typeof recordSendInput>;
 
+/**
+ * CONFIRMED OUTBOUND EVIDENCE (0377; CARD-2026-08-22-purchasing-02 §7.4).
+ *
+ * The operator states that the official PDF actually reached the supplier.
+ * `recipient` is required and is not decoration: "sent" that cannot say TO WHOM
+ * is a claim nobody can check against the supplier later. The VERSION is not
+ * here on purpose — the server reads it off the purchase order, because a
+ * caller able to name it could claim Version 1 was shared while the factory
+ * holds Version 2.
+ */
+export const confirmPoSentInput = z.object({
+  channel: z.enum(["whatsapp", "email", "print"]),
+  recipient: z.string().trim().min(1).max(200),
+  /**
+   * ⭐ THE VERSION THE OPERATOR ACTUALLY RENDERED (0378).
+   *
+   * 0377 left this out and had SQL read the newest version instead, reasoning
+   * that a caller able to name a version could lie about it. That was
+   * backwards, and it built the defect it meant to stop: send Version 1, let
+   * another session revise to Version 2, confirm — and Carres records Version 2
+   * as shared while the supplier holds Version 1.
+   *
+   * DECLARING IS NOT TRUSTING. The caller says which document it saw; SQL locks
+   * the row, compares, refuses `stale_po_version` on a mismatch, and still
+   * stores only its own read. A caller that names a version it never rendered
+   * is refused, not believed.
+   */
+  poVersion: z.number().int().positive(),
+  note: z.string().trim().max(300).optional(),
+}).strict();
+export type ConfirmPoSentInput = z.infer<typeof confirmPoSentInput>;
+
+/** Human-confirmed supplier email: one selected supplier, independent rendered PO PDFs. */
+export const supplierPoEmailInput = z.object({
+  supplierId: z.string().uuid(),
+  recipient: z.string().trim().email().max(200),
+  subject: z.string().trim().min(1).max(200),
+  message: z.string().max(20_000),
+  attemptId: z.string().uuid(),
+  resend: z.boolean().default(false),
+  documents: z.array(z.object({
+    id: z.string().min(1).max(100),
+    version: z.number().int().positive(),
+    filename: z.string().min(1).max(200),
+    content: z.string().min(1).max(7_000_000),
+  }).strict()).min(1).max(25),
+}).strict();
+export type SupplierPoEmailInput = z.infer<typeof supplierPoEmailInput>;
+
+
+/**
+ * PO Revisions (0364, Jess 2026-08-18) — POST /api/operation/pos/:id/revise →
+ * `purchasing_revise_po`. A sent PO keeps its number and mints a version:
+ * EXISTING lines only, qty floored at `received_qty` (the RPC refuses with
+ * `received_floor` — the server is the floor's authority, this schema only
+ * shapes the wire), destination from the governed registry (null = follow the
+ * PO), and the reason is REQUIRED — the SQL door refuses without it, this
+ * mirror just fails faster.
+ */
+export const revisePoInput = z.object({
+  reason: z.string().min(1).max(300),
+  lines: z.array(
+    z.object({
+      lineId: z.string().uuid(),
+      qty: z.number().int().min(1),
+      destinationId: z.string().uuid().nullable(),
+    }).strict(),
+  ).min(1),
+}).strict();
+export type RevisePoInput = z.infer<typeof revisePoInput>;
+
 /** ONE company-wide supplier-message template. */
 export const setMessageTemplateInput = z.object({
   text: z.string().max(2000),
@@ -112,20 +184,23 @@ export const setMessageTemplateInput = z.object({
 export type SetMessageTemplateInput = z.infer<typeof setMessageTemplateInput>;
 
 /**
- * Where each LINE goes (Jess, 2026-08-02) — the three per-line write doors
- * (0311). Purchasing's only per-line job is the destination; the ops remark
- * is its own internal note and never prints.
+ * `Change Deliver To` (Purchasing MASTER §5.4, Jess 2026-09-22 · build
+ * 2026-09-29, 0610) — POST /api/operation/pos/:id/change-deliver-to →
+ * `purchasing_change_po_deliver_to`. Part or all of ONE line's undelivered
+ * qty moves to another open Deliver To on the SAME PO as its next version.
+ * Exact-unit goods name the Unit IDs that move; omitted, the server takes the
+ * line's last n. The reason is required in SQL; this mirror fails faster.
+ * It replaces 0311's `/lines/:id/split`, which moved neither Units nor
+ * Sales Order lineage and minted no version.
  */
-export const setLineDestinationInput = z.object({
+export const changePoDeliverToInput = z.object({
+  lineId: z.string().uuid(),
+  qty: z.number().int().min(1),
   destinationId: z.string().uuid(),
+  reason: z.string().trim().min(1).max(300),
+  unitCodes: z.array(z.string().min(1)).max(500).optional(),
 }).strict();
-export type SetLineDestinationInput = z.infer<typeof setLineDestinationInput>;
-
-export const splitLineDestinationInput = z.object({
-  moveQty: z.number().int().min(1),
-  destinationId: z.string().uuid(),
-}).strict();
-export type SplitLineDestinationInput = z.infer<typeof splitLineDestinationInput>;
+export type ChangePoDeliverToInput = z.infer<typeof changePoDeliverToInput>;
 
 export const setLineOpsRemarkInput = z.object({
   text: z.string().max(500),
@@ -163,7 +238,10 @@ export type RecordBalanceDateInput = z.infer<typeof recordBalanceDateInput>;
  * dispute resolution need the actual artefact, not just a typed-in number.
  */
 export const attachDoInput = z.object({
-  doNumber: z.string().min(3),
+  // 0575 · The number the order already carries. Absent only when the order
+  // reached delivery without a document: the API then DRAWS one from the one
+  // allocator — the browser never invents a number.
+  doNumber: z.string().min(3).optional(),
   doNote: z.string().optional(),
   signed: z.literal(true),
   doFilePath: z.string().min(3).max(300),
@@ -210,7 +288,13 @@ export type AttachDoInput = z.infer<typeof attachDoInput>;
  * ANY door that raises the counters without a covering claim. Photo paths are
  * capped so a malformed client cannot write an unbounded jsonb array.
  */
-const CLAIM_PHOTO_PATHS = z.array(z.string().min(1).max(400)).max(12);
+/** 0614 (§9.5): a plain storage key files a claim-level photo; `{path,
+ *  unitCode}` also names the Unit the photo shows, so the per-Unit inspector
+ *  can attribute it. `claimPhotoWire` reshapes it for the receive engine. */
+const CLAIM_PHOTO_PATHS = z.array(z.union([
+  z.string().min(1).max(400),
+  z.object({ path: z.string().min(1).max(400), unitCode: z.string().min(1).max(64) }),
+])).max(12);
 
 export const receivePoWithDoInput = z.object({
   doNumber: z.string().min(3),
@@ -268,7 +352,38 @@ export const officeReceiveInput = z.object({
   doFilePath: z.string().min(1).max(400),
   // ISO yyyy-mm-dd. Bounds are the server's — a browser clock is not evidence.
   goodsReceivedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  /** 0601 — Goods Received Date as a time point (ISO with offset). The
+   *  server refuses a future time or one before the PO date; omitted = now. */
+  goodsReceivedTime: z.string().datetime({ offset: true }).optional(),
   note: z.string().max(500).optional(),
+  /** 0426 — where the goods PHYSICALLY arrived, when it differs from the
+   *  PO's booked warehouse. Never overwrites Deliver To. */
+  actualSiteId: z.string().uuid().optional(),
+  /** 0426 — arrival evidence supports both photo and video. */
+  arrivalEvidence: z
+    .array(
+      z.object({
+        path: z.string().min(1).max(400),
+        kind: z.enum(["photo", "video"]),
+      }),
+    )
+    .max(30)
+    .optional(),
+  /** 0426 — extra goods, recorded separately; never Inventory, never pending
+   *  arithmetic. */
+  extraLines: z
+    .array(
+      z.object({
+        sku: z.string().min(1).max(120),
+        qty: z.number().int().positive(),
+        note: z.string().max(300).optional(),
+      }),
+    )
+    .max(50)
+    .optional(),
+  /** 0426 — client idempotency key: a retried Save returns the first posting
+   *  instead of minting a second GRN. */
+  saveKey: z.string().uuid().optional(),
   lines: z.array(z.object({
     id: z.string().uuid(),
     receivedNow: z.number().int().nonnegative(),
@@ -277,24 +392,125 @@ export const officeReceiveInput = z.object({
     damagedPhotos: CLAIM_PHOTO_PATHS.optional(),
     wrongItemClaimType: z.string().min(1).max(40).optional(),
     wrongItemPhotos: CLAIM_PHOTO_PATHS.optional(),
+    /** 0426 — one physical result per governed expected Unit
+     *  (ERP-ARCHITECTURE §3.4). Quantity-only lines stay legal for
+     *  governed interchangeable goods. */
+    units: z
+      .array(
+        z.object({
+          unitCode: z.string().min(3).max(30),
+          outcome: z.enum(["received", "received_with_issue", "not_received"]),
+          issueKind: z.enum(["damaged", "wrong_item"]).optional(),
+          note: z.string().max(300).optional(),
+        }),
+      )
+      .max(500)
+      .optional(),
   })).min(1),
 }).strict();
 export type OfficeReceiveInput = z.infer<typeof officeReceiveInput>;
 
+/** `receivingAmendInput` — POST /api/operation/warehouse-receipts/:id/amend
+ *  (0426 `receiving_amend`). A posted GRN has no ordinary Edit: a correction
+ *  carries its reason, and only the named facts may move. */
+export const receivingAmendInput = z
+  .object({
+    reason: z.string().min(3).max(500),
+    saveKey: z.string().uuid().optional(),
+    /** 0601 — the GRN version this correction starts from. First save wins:
+     *  an older one is refused whole (`Someone changed this GRN.`). */
+    basedOnRevision: z.number().int().nonnegative(),
+    goodsReceivedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    /** 0601 — Goods Received Date as a time point (ISO with offset). */
+    goodsReceivedTime: z.string().datetime({ offset: true }).optional(),
+    /** 0601 — the person names each exact Unit: Received ↔ Not received.
+     *  The system never picks a Unit. */
+    units: z
+      .array(
+        z.object({
+          stockItemId: z.string().uuid(),
+          outcome: z.enum(["received", "not_received"]),
+        }),
+      )
+      .max(500)
+      .optional(),
+    doNumber: z.string().min(3).max(60).optional(),
+    actualSiteId: z.string().uuid().nullable().optional(),
+    /** A corrected signed-DO file (0427) — the old path is preserved in the
+     *  amendment's before/after, never deleted. */
+    doFilePath: z.string().min(3).max(300).optional(),
+    /** Additional arrival evidence (0427) — APPEND-ONLY; an amendment never
+     *  removes recorded evidence. */
+    arrivalEvidenceAdd: z
+      .array(
+        z.object({
+          path: z.string().min(3).max(300),
+          kind: z.enum(["photo", "video"]),
+        }),
+      )
+      .max(20)
+      .optional(),
+    lines: z
+      .array(
+        z.object({
+          id: z.string().uuid(),
+          receivedNow: z.number().int().nonnegative(),
+        }),
+      )
+      .max(200)
+      .optional(),
+  })
+  .strict();
+export type ReceivingAmendInput = z.infer<typeof receivingAmendInput>;
+
+/** `receivingVoidInput` — POST /api/operation/warehouse-receipts/:id/void
+ *  (0426 `receiving_void`). Only for a GRN that should never have existed. */
+export const receivingVoidInput = z
+  .object({ reason: z.string().min(3).max(500) })
+  .strict();
+export type ReceivingVoidInput = z.infer<typeof receivingVoidInput>;
+
+/** `Workspace → Staff & Duties` (0425) — assign one primary holder. The SQL
+ *  door owns every rule (manager gate, active staff, no self-assignment). */
+export const workspaceAssignDutyInput = z
+  .object({
+    dutyKey: z.string().regex(/^[a-z][a-z0-9_]{2,39}$/),
+    holderId: z.string().uuid(),
+    effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    effectiveUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    note: z.string().max(300).optional(),
+  })
+  .strict();
+export type WorkspaceAssignDutyInput = z.infer<typeof workspaceAssignDutyInput>;
+
+/** `Workspace → Staff & Duties` (0425) — a dated buddy cover. */
+export const workspaceCoverDutyInput = z
+  .object({
+    dutyKey: z.string().regex(/^[a-z][a-z0-9_]{2,39}$/),
+    actingUserId: z.string().uuid(),
+    startsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    endsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    reason: z.string().max(300).optional(),
+  })
+  .strict();
+export type WorkspaceCoverDutyInput = z.infer<typeof workspaceCoverDutyInput>;
+
 /**
- * `adjustStockInput` — POST /api/operation/warehouse/adjust.
- * Maps to `operation_adjust_stock(sku, warehouse_id, delta, reason)` RPC.
- * `delta` is signed (positive for ad-hoc inbound, negative for damage/loss);
- * `reason` is required for the audit trail. Server enforces qty >= reserved
- * post-adjust via CHECK constraint (P0001 below_reserved otherwise).
+ * `adjustStockInput` IS GONE — 0366.
+ *
+ * It mapped to `operation_adjust_stock(sku, warehouse_id, delta, reason)`,
+ * which moved a stored total by a signed delta and never named a physical
+ * Unit. That is the "Add stock / Remove stock" door the Stock MASTER rejects
+ * (§2) and the stored total the Card forbids from deciding availability (§3):
+ * inventory appeared and disappeared with no Unit behind it, and
+ * `stock_balances` drifted away from the register with nothing to reconcile
+ * against.
+ *
+ * Stock is now COUNTED from the exact Units. What actually happened to a Unit
+ * is recorded through its own governed door — receipt, hold, takeout,
+ * write-off, site change — and the totals follow. The RPC survives only to
+ * raise `unit_authority_only` at any client that has not caught up.
  */
-export const adjustStockInput = z.object({
-  sku: z.string().min(1),
-  warehouseId: z.string().uuid(),
-  delta: z.number().int(),
-  reason: z.string().min(1),
-}).strict();
-export type AdjustStockInput = z.infer<typeof adjustStockInput>;
 
 /**
  * `abandonOrderInput` — POST /api/operation/orders/:id/abandon.
@@ -314,19 +530,15 @@ export type AbandonOrderInput = z.infer<typeof abandonOrderInput>;
  * Both routes are retired and the RPCs behind them are revoked from every browser
  * role (migration 0339), so the schemas describe doors that no longer exist.
  *
- * Purchase Order creation has ONE wire contract now — Batch Purchase's issue
- * payload — and ONE authority behind it, `purchasing_issue_pos_batch(jsonb)`. */
+ * Purchase Order creation has ONE authority behind it,
+ * `purchasing_issue_pos_batch(jsonb)`, reached through the governed operator
+ * journeys — SO Batch Purchase and Manual Purchase — each with its own wire
+ * contract. (Corrected 2026-08-23: this said there was one wire contract; there
+ * is one AUTHORITY, and more than one governed way in.) */
 
-/**
- * `warehousePickInput` — POST /api/operation/orders/:id/warehouse.
- * Maps to `operation_warehouse_pick(order_id, warehouse_id)` RPC. Manual
- * override of the auto-picked source warehouse. Only allowed when
- * `operation_stage = in_production` AND no open POs (P0001 has_open_pos).
- */
-export const warehousePickInput = z.object({
-  warehouseId: z.string().uuid(),
-}).strict();
-export type WarehousePickInput = z.infer<typeof warehousePickInput>;
+/* `warehousePickInput` (POST /:id/warehouse → `operation_warehouse_pick`) is
+ * RETIRED — 【DELIVERY】 CARD 21, migration 0501. The door wrote a stock total
+ * by hand; a total is derived from the unit register (0366). */
 
 /**
  * `confirmProceedRequestInputSchema` — POST /api/operation/orders/:id/confirm-proceed.
@@ -382,22 +594,8 @@ export const lpRejectOrderInput = z.object({
 }).strict();
 export type LpRejectOrderInput = z.infer<typeof lpRejectOrderInput>;
 
-/**
- * `transferReadyInputSchema` — POST /api/operation/orders/:id/transfer-ready
- * (Pipeline v2, C2 / migration 0024). Maps to RPC
- * `operation_warehouse_pick(p_order_id, p_warehouse_id)` — the RPC's
- * source-stage guard widens to IN ('confirmed', 'in_production'),
- * so this same RPC powers both warehouse-override and the v2 transfer flow.
- * Naming kept distinct from `warehousePickInput` because the FE entry points
- * are conceptually different (one is "change warehouse", the other is
- * "mark ready"). `warehouseId` is required — the RPC `operation_warehouse_pick`
- * rejects NULL with `warehouse_required`. confirm-proceed accepts NULL via a
- * different RPC; do not conflate.
- */
-export const transferReadyInputSchema = z.object({
-  warehouseId: z.string().uuid(),
-}).strict();
-export type TransferReadyInput = z.infer<typeof transferReadyInputSchema>;
+/* `transferReadyInputSchema` (POST /:id/transfer-ready → the same
+ * `operation_warehouse_pick`) is RETIRED with it — 【DELIVERY】 CARD 21. */
 
 /**
  * `recheckStockInput` — POST /api/operation/orders/:id/recheck-stock.
@@ -488,9 +686,17 @@ export type ReassignPoWarehouseInput = z.infer<typeof reassignPoWarehouseInput>;
  *   yet) and 'confirmed' (post-proceed_order, pre-triage).
  * channel: 'all' (default) | 'dealers' | 'showrooms'.
  * search: free-text matched against customer_name (ILIKE) AND parsed as int for so exact match.
+ *
+ * 'waiting' was missing from this list while being a live DB value since 0028,
+ * so an operator could not filter to the orders a partner had rejected — the
+ * one stage where somebody has to act. 'placed' stays: it is synthetic, and the
+ * route turns it into `status='place'` rather than a stage match.
  */
 export const ListOperationOrdersQuery = z.object({
-  stage: z.enum(['all', 'placed', 'confirmed', 'in_production', 'ready_to_dispatch', 'dispatched', 'delivered']).default('all'),
+  // `proceeded` (Sales Orders Register, owner ruling 2026-09-21): only orders
+  // Sales has handed to Operation — every status except `place`. A Placed
+  // order is not on that Register. Every other caller keeps its stage.
+  stage: z.enum(['all', 'placed', 'proceeded', 'confirmed', 'in_production', 'ready_to_dispatch', 'waiting', 'dispatched', 'delivered']).default('all'),
   channel: z.enum(['all', 'dealers', 'showrooms']).default('all'),
   search: z.string().trim().max(100).optional(),
 }).strict();
@@ -816,3 +1022,101 @@ export const OperationReceiveThreadsInput = z.object({
   signed: z.literal(true),
 }).strict();
 export type OperationReceiveThreadsInput = z.infer<typeof OperationReceiveThreadsInput>;
+
+/** The exact sent PO and the outside answer, recorded together.
+ *
+ * 0430 — the wire carries ONE date. The browser no longer classifies the
+ * answer: the server compares `supplierDate` with the PO's recorded original
+ * and writes `confirmed` · `earlier` · `delayed` (with the reason) · or
+ * `reported` when the original is genuinely unknown. A `reason` travels only
+ * when the operator was shown the delay question. */
+/**
+ * 0585 · the day-before check's evidence: the Supplier DO, or an evidenced
+ * supplier confirmation, that the PO's goods go to its own Warehouse on the
+ * exact effective arrival. The server checks the date, the Warehouse and the
+ * version; this schema only refuses an incomplete body.
+ */
+export const recordArrivalConfirmationInput = z.object({
+  poVersion: z.number().int().positive(),
+  forDate: z.string().date(),
+  destinationId: z.string().uuid(),
+  kind: z.enum(["supplier_do", "supplier_confirmation"]),
+  supplierDoNo: z.string().trim().min(1).max(100).optional(),
+  evidence: z.array(z.string().trim().min(1).max(2000)).min(1).max(20),
+  channel: z.enum(["whatsapp", "email", "phone", "in_person"]).optional(),
+  recipient: z.string().trim().min(1).max(200).optional(),
+  reportedBy: z.string().trim().min(1).max(200).optional(),
+  reportedAt: z.string().datetime({ offset: true }).optional(),
+}).strict()
+  .refine((b) => b.kind !== "supplier_do" || !!b.supplierDoNo, {
+    message: "Record the Supplier DO number.", path: ["supplierDoNo"],
+  })
+  .refine((b) => b.kind !== "supplier_confirmation" || (!!b.channel && !!b.recipient && !!b.reportedBy && !!b.reportedAt), {
+    message: "Record the reply channel, recipient, reporter and time.", path: ["channel"],
+  });
+
+/**
+ * 0587 · the supplier's answer PER PO GOODS LINE (Purchasing §5.7, owner
+ * 2026-09-25): `no_change` · `confirmed` (the line's current expected date
+ * stands) · `new_date` · `split` (dated batches that must total the line's
+ * still-to-deliver quantity — the server checks the total). The server
+ * classifies every date against the immutable PO Delivery Date; a later date
+ * needs one of the eight governed reasons and `Other` needs a note. At least
+ * one evidence file (photo, video or PDF) — the Supplier DO file counts when it
+ * is the only one. Any active Operation person may record; the recorder is
+ * stored beside PO Duty and its cover.
+ */
+const supplierAnswerBatch = z.object({
+  qty: z.number().int().positive(),
+  date: z.string().date(),
+  reason: z.enum(PO_DELAY_REASONS).optional(),
+  remarks: z.string().trim().max(500).optional(),
+}).strict();
+
+export const recordSupplierAnswersInput = z.object({
+  poVersion: z.number().int().positive(),
+  channel: z.enum(["whatsapp", "email", "phone", "in_person"]),
+  recipient: z.string().trim().min(1).max(200),
+  reportedBy: z.string().trim().min(1).max(200),
+  reportedAt: z.string().datetime({ offset: true }),
+  evidence: z.array(z.string().trim().min(1).max(2000)).max(20),
+  supplierDo: z.object({
+    number: z.string().trim().min(3).max(50),
+    file: z.string().trim().min(1).max(2000),
+  }).strict().nullable().optional(),
+  lines: z.array(z.object({
+    /** The PO goods line's own id, exactly as the register read it; the SQL
+     *  door refuses a line that is not on this PO. */
+    poLineId: z.string().trim().min(1).max(64),
+    answer: z.enum(["no_change", "confirmed", "new_date", "split"]),
+    date: z.string().date().optional(),
+    reason: z.enum(PO_DELAY_REASONS).optional(),
+    remarks: z.string().trim().max(500).optional(),
+    batches: z.array(supplierAnswerBatch).min(1).max(20).optional(),
+  }).strict()
+    .refine((l) => l.answer !== "new_date" || !!l.date, { message: "Record the supplier delivery date.", path: ["date"] })
+    .refine((l) => l.answer !== "split" || (l.batches?.length ?? 0) > 0, { message: "Add at least one delivery date to the split.", path: ["batches"] })
+    .refine((l) => l.reason !== "Other" || !!l.remarks?.trim(), { message: "Write why the supplier moved the date.", path: ["remarks"] })
+    .refine((l) => !l.batches || l.batches.every((b) => b.reason !== "Other" || !!b.remarks?.trim()), { message: "Write why the supplier moved the date.", path: ["batches"] }),
+  ).max(200),
+}).strict()
+  .refine((b) => b.evidence.length > 0 || !!b.supplierDo, { message: "Add the WhatsApp screenshot of the supplier's answer.", path: ["evidence"] })
+  .refine((b) => b.lines.some((l) => l.answer !== "no_change") || !!b.supplierDo, { message: "Answer at least one goods line or record the Supplier DO.", path: ["lines"] });
+export type RecordSupplierAnswersInput = z.infer<typeof recordSupplierAnswersInput>;
+
+export const recordSupplierReplyInput = z.object({
+  poVersion: z.number().int().positive(),
+  supplierDate: z.string().date(),
+  reason: z.enum(PO_DELAY_REASONS).optional(),
+  remarks: z.string().trim().max(500).optional(),
+  channel: z.enum(["whatsapp", "email", "phone", "in_person"]),
+  recipient: z.string().trim().min(1).max(200),
+  evidence: z.string().trim().min(1).max(2000),
+  /** 0585 · further WhatsApp screenshots beside the evidence file. */
+  screenshots: z.array(z.string().trim().min(1).max(2000)).max(20).optional(),
+  reportedBy: z.string().trim().min(1).max(200),
+  reportedAt: z.string().datetime({ offset: true }),
+}).strict().refine((b) => b.reason !== "Other" || !!b.remarks?.trim(), {
+  message: "Write why the supplier moved the date.",
+  path: ["remarks"],
+});

@@ -116,7 +116,7 @@ export function caseEvidenceSlot(key: string | null | undefined): CaseEvidenceSl
 /** Stored slot key → display label. An unknown key displays as itself rather
  *  than vanishing, so a file filed under a retired slot is still visible. */
 export function caseEvidenceSlotLabel(key: string | null | undefined): string {
-  if (!key) return "—";
+  if (!key) return "";
   return caseEvidenceSlot(key)?.label ?? key;
 }
 

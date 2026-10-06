@@ -3,6 +3,7 @@ import type { FloorConfigDto, Order } from "@carres/shared";
 import {
   addonSubtotal,
   floorSurcharge,
+  stairCarryCount,
   floorSurchargeRaw,
   lineSubtotal,
   orderTotal,
@@ -101,9 +102,12 @@ describe("floorSurcharge — un-stubbed in 2B.1", () => {
   });
 
   it("charges (floor − freeUpToFloor) × perFloorPerItem × total_qty when no lift", () => {
-    // 2 items, floor 5, free up to 2 → flights=3, 3 × 50 × 2 = 300
+    /* 2 items, floor 5, free up to 2 → flights=3, 3 × 50 × 2 = 300.
+       `stairItems` is now STATED rather than left null: unset means NONE since
+       the 2026-08-27 ruling, so a null here would exercise the zero path and
+       stop testing the arithmetic this test is named for. */
     const o = baseOrder({
-      delivery: { date: null, dateTbd: false, floor: 5, hasLift: false, stairItems: null, proceedDate: null },
+      delivery: { date: null, dateTbd: false, floor: 5, hasLift: false, stairItems: 2, proceedDate: null },
       lines: lineQty2,
     });
     expect(floorSurcharge(o, CFG)).toBe(300);
@@ -112,13 +116,57 @@ describe("floorSurcharge — un-stubbed in 2B.1", () => {
   it("multi-line items sum into qty correctly for surcharge", () => {
     // 3 items total (qty 2 + qty 1), floor 4, free up to 2 → flights=2, 2 × 50 × 3 = 300
     const o = baseOrder({
-      delivery: { date: null, dateTbd: false, floor: 4, hasLift: false, stairItems: null, proceedDate: null },
+      delivery: { date: null, dateTbd: false, floor: 4, hasLift: false, stairItems: 3, proceedDate: null },
       lines: [
         { id: "a", orderId: "x", sku: "s1", qty: 2, attrs: null, unitPrice: 100 },
         { id: "b", orderId: "x", sku: "s2", qty: 1, attrs: null, unitPrice: 50 },
       ],
     });
     expect(floorSurcharge(o, CFG)).toBe(300);
+  });
+});
+
+/**
+ * THE COUNT CAN NEVER EXCEED THE ORDER (F-2, found by the field audit
+ * 2026-08-28; fixed 2026-08-29).
+ *
+ * `delivery_stair_items` is a free number input; the API takes
+ * `z.number().int().min(0)` with no max and the column has no CHECK. The
+ * clamp was written by hand in four places and `floorSurcharge` had only the
+ * lower half, so a typed 99 on a three-item order priced ninety-nine carries
+ * on the saved-order path while the office page priced three.
+ *
+ * These pin the INVARIANT — nobody is charged for carrying more items than
+ * they bought, on ANY surface — not the shape of the clamp.
+ */
+describe("stairCarryCount — the one clamp, both sides", () => {
+  it("never exceeds the number of items on the order", () => {
+    expect(stairCarryCount(3, 99)).toBe(3);
+  });
+
+  it("never goes below zero, and unset means none", () => {
+    expect(stairCarryCount(3, -5)).toBe(0);
+    expect(stairCarryCount(3, null)).toBe(0);
+    expect(stairCarryCount(3, undefined)).toBe(0);
+  });
+
+  it("passes a count that is already within the order straight through", () => {
+    expect(stairCarryCount(3, 2)).toBe(2);
+  });
+
+  it("floorSurcharge charges the ORDER, not the typed number", () => {
+    /* Three items on the order, 99 typed into the box. Before the fix this
+       priced 99 carries — real money, on the surface a shop reads back to a
+       customer. Floor 5, free to 2 → 3 flights × RM50 × 3 items = RM450. */
+    const o = baseOrder({
+      delivery: { date: null, dateTbd: false, floor: 5, hasLift: false, stairItems: 99, proceedDate: null },
+      lines: [
+        { id: "a", orderId: "x", sku: "s1", qty: 2, attrs: null, unitPrice: 100 },
+        { id: "b", orderId: "x", sku: "s2", qty: 1, attrs: null, unitPrice: 50 },
+      ],
+    });
+    expect(floorSurcharge(o, CFG)).toBe(450);
+    expect(floorSurcharge(o, CFG)).not.toBe(floorSurchargeRaw(5, false, 99, CFG));
   });
 });
 
@@ -137,7 +185,7 @@ describe("floorSurchargeRaw — single source of truth shared with wizard", () =
 
   it("matches floorSurcharge(order, cfg) for the same inputs", () => {
     const o = {
-      delivery: { date: null, dateTbd: false, floor: 5, hasLift: false, stairItems: null, proceedDate: null },
+      delivery: { date: null, dateTbd: false, floor: 5, hasLift: false, stairItems: 2, proceedDate: null },
       lines: [{ id: "x", orderId: "y", sku: "s", qty: 2, attrs: null, unitPrice: 100 }],
     } as unknown as Parameters<typeof floorSurcharge>[0];
     expect(floorSurcharge(o, CFG)).toBe(floorSurchargeRaw(5, false, 2, CFG));
@@ -157,9 +205,45 @@ describe("orderTotal", () => {
   it("includes stair-carry charge when applicable", () => {
     const o = baseOrder({
       lines: [{ id: "a", orderId: "x", sku: "s1", qty: 1, attrs: null, unitPrice: 1000 }],
-      delivery: { date: null, dateTbd: false, floor: 4, hasLift: false, stairItems: null, proceedDate: null },
+      delivery: { date: null, dateTbd: false, floor: 4, hasLift: false, stairItems: 1, proceedDate: null },
     });
     // 1000 + 0 + (4−2) × 50 × 1 = 1100
     expect(orderTotal(o, CFG)).toBe(1100);
+  });
+});
+
+/**
+ * ⭐ UNSET MEANS NONE — owner ruling 2026-08-27 (YH), and it is a PRICING
+ * decision rather than a formatting one, so it gets its own pin.
+ *
+ * It used to mean EVERY item: an order where nobody was asked how many pieces
+ * needed carrying was charged the maximum stair fee. Four tests above quietly
+ * depended on that by leaving `stairItems: null` and asserting a full charge —
+ * they now STATE their count, so they test the arithmetic they are named for
+ * instead of the default underneath it.
+ *
+ * ⛔ Migration 0104's column comment still reads "NULL = auto = every item". A
+ * committed migration may not be edited (red line 6); the current meaning lives
+ * in `docs/orders/MASTER.md` and is enforced here.
+ */
+describe("stair carry — an unset count charges nothing", () => {
+  const twoItems = [{ id: "a", orderId: "x", sku: "s1", qty: 2, attrs: null, unitPrice: 100 }];
+  const at = (stairItems: number | null) =>
+    baseOrder({
+      delivery: { date: null, dateTbd: false, floor: 5, hasLift: false, stairItems, proceedDate: null },
+      lines: twoItems,
+    });
+
+  it("null stairItems is 0 items, not every item", () => {
+    expect(floorSurcharge(at(null), CFG)).toBe(0);
+  });
+
+  it("a stated count still charges, so the rule is a DEFAULT and not a mute", () => {
+    // floor 5, free up to 2 → flights 3 × RM50 × 2 items = 300
+    expect(floorSurcharge(at(2), CFG)).toBe(300);
+  });
+
+  it("0 and null agree — there is one zero, reached two ways", () => {
+    expect(floorSurcharge(at(null), CFG)).toBe(floorSurcharge(at(0), CFG));
   });
 });

@@ -1,0 +1,175 @@
+import { Hono } from "hono";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AppEnv } from "../../types";
+import sources from "./arrival-sources";
+import receiving from "./warehouse-receipts";
+vi.mock("../../lib/supabase", () => ({
+  userClient: vi.fn(),
+  adminClient: vi.fn(),
+}));
+import { userClient, adminClient } from "../../lib/supabase";
+const id = "00000000-0000-4000-8000-000000000001";
+const other = "00000000-0000-4000-8000-000000000002";
+const rpc = vi.fn();
+const input = {
+  id,
+  kind: "transfer",
+  claim_id: null,
+  case_id: null,
+  from_site_id: id,
+  to_site_id: other,
+  party_id: id,
+  expected_date: "2026-09-12",
+  collection_date: null,
+  reason: "Display request",
+  unit_ids: [id],
+};
+function app(role = "operation") {
+  const a = new Hono<AppEnv>();
+  a.use("*", async (c, next) => {
+    c.set("auth", { id, role, jwt: "actor-token" } as never);
+    await next();
+  });
+  a.route("/sources", sources);
+  a.route("/receiving", receiving);
+  return a;
+}
+const post = (a: ReturnType<typeof app>, path: string, body: unknown) =>
+  a.request(path, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+beforeEach(() => {
+  vi.clearAllMocks();
+  rpc.mockResolvedValue({ data: { id }, error: null });
+  vi.mocked(userClient).mockReturnValue({ rpc } as never);
+});
+describe("source and Receiving ownership", () => {
+  it("creates source work using the authenticated database authority", async () => {
+    expect((await post(app(), "/sources", input)).status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("arrival_source_create", {
+      p_input: input,
+    });
+    expect(adminClient).not.toHaveBeenCalled();
+  });
+  it("rejects bulk/duplicate identities before calling the database", async () => {
+    expect(
+      (await post(app(), "/sources", { ...input, unit_ids: [id, id] })).status,
+    ).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+  it("a dealer cannot create or hand over a source", async () => {
+    expect((await post(app("dealer"), "/sources", input)).status).toBe(403);
+    expect(
+      (await post(app("dealer"), `/sources/${id}/handover`, {})).status,
+    ).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+  it("refuses a condition-failed collection without a governed observed reason", async () => {
+    const handover = {
+      key: id,
+      kind: "collection_refused",
+      unit_ids: [id],
+      party_id: id,
+      person: "NETS driver",
+      occurred_at: "2026-09-12T02:00:00.000Z",
+      evidence: "Mattress stayed with the customer",
+      collection_review: {
+        passed_conditions: [],
+        evidence_paths: [`${id}/actor/photo.jpg`],
+      },
+    };
+    const missing = await post(app(), `/sources/${id}/handover`, handover);
+    expect(missing.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+
+    const recorded = await post(app(), `/sources/${id}/handover`, {
+      ...handover,
+      collection_review: {
+        ...handover.collection_review,
+        failed_reason: "stain",
+      },
+    });
+    expect(recorded.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("arrival_source_handover", {
+      p_id: id,
+      p_input: expect.objectContaining({
+        collection_review: expect.objectContaining({ failed_reason: "stain" }),
+      }),
+    });
+  });
+  it("source router offers no receipt writer", async () => {
+    expect((await post(app(), `/sources/${id}/receive`, {})).status).toBe(404);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+  it("Receiving delegates exact outcomes to the existing GRN authority", async () => {
+    const r = {
+      key: id,
+      goods_received_at: "2026-09-07",
+      actual_site_id: id,
+      holder_party_id: id,
+      handover_person: "Recorded person",
+      do_number: "DO-1",
+      do_file_path: `${id}/proof.pdf`,
+      note: "",
+      units: [
+        {
+          stock_item_id: id,
+          outcome: "received_with_issue",
+          issue_kind: "damaged",
+          note: "Torn",
+        },
+      ],
+    };
+    expect((await post(app(), `/receiving/arrival/${id}`, r)).status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("receiving_arrival_post", {
+      p_source_id: id,
+      p_input: r,
+    });
+    rpc.mockResolvedValueOnce({
+      data: null,
+      error: { code: "42501", message: "not GRN Duty" },
+    });
+    const denied = await post(app(), `/receiving/arrival/${id}`, r);
+    expect(denied.status).toBe(403);
+    expect(((await denied.json()) as { message: string }).message).toBe(
+      "not GRN Duty",
+    );
+  });
+  it("reports later Unit changes as a correction conflict, not success", async () => {
+    rpc.mockResolvedValue({
+      data: null,
+      error: { code: "40001", message: "Unit changed after Receiving" },
+    });
+    expect(
+      (
+        await post(app(), `/receiving/arrival-receipts/${id}/void`, {
+          reason: "Count corrected",
+        })
+      ).status,
+    ).toBe(409);
+  });
+});
+
+
+describe("selected Showroom goods options", () => {
+  it("rejects malformed source identities before reading any stock", async () => {
+    const response = await app().request("/sources/options?unit=not-an-id");
+    expect(response.status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+  it("applies explicit IDs before the 100-row cap can hide old showroom goods", async () => {
+    const filters: unknown[] = [];
+    const chain = {
+      select: () => chain, eq: () => chain, order: () => chain, limit: () => chain,
+      in: (column: string, values: string[]) => { filters.push([column, values]); return chain; },
+      then: (resolve: (result: unknown) => void) => resolve({data: [],error: null}),
+    };
+    vi.mocked(userClient).mockReturnValue({from: () => chain} as never);
+    const response=await app().request(`/sources/options?unit=${id}&unit=${other}`);
+    expect(response.status).toBe(200);
+    expect(filters).toContainEqual(["id", [id,other]]);
+    expect(adminClient).not.toHaveBeenCalled();
+  });
+});

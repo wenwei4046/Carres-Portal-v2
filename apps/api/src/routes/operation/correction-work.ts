@@ -16,7 +16,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { requireOperation } from "../../lib/auth-guards";
-import { mapPgError } from "../../lib/route-helpers";
+import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -48,10 +48,7 @@ correctionWorkRouter.get("/", requireOperation, async (c) => {
   if (parsed.data.module) q = q.eq("module", parsed.data.module);
   if (parsed.data.state !== "all") q = q.eq("state", parsed.data.state);
   const { data, error } = await q.order("raised_at", { ascending: false }).limit(200);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ work: data ?? [] });
 });
 
@@ -62,10 +59,7 @@ correctionWorkRouter.get("/order/:orderId", requireOperation, async (c) => {
     .select(SELECT)
     .eq("order_id", c.req.param("orderId"))
     .order("raised_at", { ascending: false });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ work: data ?? [] });
 });
 
@@ -96,8 +90,7 @@ correctionWorkRouter.post("/:id/close", requireOperation, async (c) => {
         403,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json(data);
 });

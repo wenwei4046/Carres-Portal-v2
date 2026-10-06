@@ -1,6 +1,8 @@
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { appTodayIso } from "@/lib/fmt-date";
 import {
   CASE_REPORTERS,
   caseFollowUpPlan,
@@ -66,7 +68,7 @@ export default function ServiceCaseModal({
   const [carresAction, setCarresAction]       = useState("");
   const [whatAffected, setWhatAffected]       = useState("");
   const [incurredCharges, setIncurredCharges] = useState("");
-  const [openedAt, setOpenedAt] = useState(today());
+  const [openedAt, setOpenedAt] = useState(appTodayIso());
 
   // lookup state
   const [lookupTerm, setLookupTerm] = useState("");
@@ -88,7 +90,7 @@ export default function ServiceCaseModal({
     setCarresAction(d.carresAction ?? "");
     setWhatAffected(d.whatAffected ?? "");
     setIncurredCharges(d.incurredCharges ?? "");
-    setOpenedAt(d.openedAt ?? today());
+    setOpenedAt(d.openedAt ?? appTodayIso());
   }, [existingQ.data]);
 
   // default status to first config status on create
@@ -113,9 +115,9 @@ export default function ServiceCaseModal({
         setCustomerPhone(res.order.customerPhone ?? "");
         setCustomerAddress(res.order.customerAddress ?? "");
         if (res.order.refNos.length && !refNo) setRefNo(res.order.refNos[0]);
-        setLookupMsg(`✓ Matched ${res.order.so} — customer auto-filled.`);
+        setLookupMsg(`✓ Matched ${res.order.so}. Customer auto-filled.`);
       } else if (res.matches > 1) {
-        setLookupMsg(`⚠ ${res.matches} orders matched — ambiguous. Fill customer manually.`);
+        setLookupMsg(`⚠ ${res.matches} orders matched, ambiguous. Fill customer manually.`);
       } else {
         setLookupMsg("⚠ No order matched. Fill customer manually.");
       }
@@ -182,6 +184,7 @@ export default function ServiceCaseModal({
         </div>
 
         <div className="space-y-5 px-6 py-5">
+          {mode === "edit" && id && <div className="flex flex-wrap gap-4 text-body"><Link className="text-kit-blue-11" to={`/operation?tab=arrival-source&kind=customer-return&case=${id}`}>Plan Customer Return</Link><Link className="text-kit-blue-11" to={`/operation?tab=arrival-source&kind=failed-delivery-return&case=${id}`}>Plan Failed Delivery return</Link><Link className="text-kit-blue-11" to={`/operation?tab=arrival-source&kind=repair-return&case=${id}`}>Plan Repair</Link></div>}
           {/* Lookup */}
           {mode === "create" && (
             <div className="rounded border border-base-200 bg-base-50 p-3">
@@ -252,7 +255,7 @@ export default function ServiceCaseModal({
             <Field label="Case Type">
               <select value={caseTypeId} onChange={(e) => setCaseTypeId(e.target.value)}
                 className="w-full rounded border border-base-300 px-2 py-1.5 text-body bg-white">
-                <option value="">— select —</option>
+                <option value="">Case Type</option>
                 {configQ.data?.types.map((t) => (
                   <option key={t.id} value={t.id}>{t.label}</option>
                 ))}
@@ -266,7 +269,7 @@ export default function ServiceCaseModal({
                   option: the gate is the transition, not a lock on the row. */}
               <select value={statusId} onChange={(e) => setStatusId(e.target.value)}
                 className="w-full rounded border border-base-300 px-2 py-1.5 text-body bg-white">
-                <option value="">— select —</option>
+                <option value="">Status</option>
                 {configQ.data?.statuses.map((s) => (
                   <option key={s.id} value={s.id} disabled={s.isClosed && !canClose}>
                     {s.label}
@@ -426,18 +429,14 @@ function IntakeRow({ label, value }: { label: string; value: string | null }) {
   return (
     <div className="flex gap-2">
       <dt className="text-meta w-24 shrink-0 pt-0.5 text-base-500">{label}</dt>
-      <dd className="text-body text-base-800">{value || "—"}</dd>
+      <dd className="text-body text-base-800">{value || ""}</dd>
     </div>
   );
 }
 
 function reporterLabel(key: string | null | undefined): string {
-  if (!key) return "—";
+  if (!key) return "";
   return CASE_REPORTERS.find((r) => r.key === key)?.label ?? key;
-}
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 /** The create-mode lookup hands back the SO as a string ("SO-1147"); the link

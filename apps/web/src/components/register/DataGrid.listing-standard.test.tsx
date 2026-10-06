@@ -1,0 +1,405 @@
+/**
+ * LISTING STANDARD — owner approved 2026-09-16, the shared engine half.
+ *
+ * Every capability here is default-safe or opt-in, and each is asserted at the
+ * engine so every register that runs it inherits the same behaviour:
+ *   · `Reset columns` names the act
+ *   · a grid is ONE Tab stop; ↑/↓ move row to row; Shift+F10 / Menu key open
+ *     the row menu, which takes focus and gives it back
+ *   · a governed group heading is reachable by Tab
+ *   · a load failure keeps the toolbar
+ *   · a cut value shows whole on hover and keyboard focus, and opens whole by
+ *     click or Enter (`overflowText`, ui MASTER §6.0 rule 5)
+ *   · the header sort indicator is an icon, and says its direction
+ *   · below a 768px canvas the row checkbox has a 40×40 target
+ *   · with the governed search, the query is a condition and `Clear filters`
+ *     clears it — and a no-match state never shows the button twice
+ */
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { DataGrid, type DataGridColumn } from "./DataGrid";
+import styles from "./DataGrid.module.css";
+
+interface Row {
+  id: string;
+  so: string;
+  customer: string;
+}
+
+const ROWS: Row[] = [
+  { id: "a", so: "SO-1301", customer: "Tan Sri Dato' Seri Muhammad Hafizuddin" },
+  { id: "b", so: "SO-1302", customer: "Lim Wei" },
+  { id: "c", so: "SO-1303", customer: "Wong Mei Ling" },
+];
+
+const COLUMNS: DataGridColumn<Row>[] = [
+  {
+    key: "so",
+    label: "SO No",
+    width: 85,
+    accessor: (r) => (
+      <button type="button" data-testid={`link-${r.id}`}>
+        {r.so}
+      </button>
+    ),
+    searchValue: (r) => r.so,
+  },
+  { key: "customer", label: "Customer", width: 190, accessor: (r) => r.customer, overflowText: (r) => r.customer },
+];
+
+const menu = (onCancel = vi.fn()) => () => [
+  { label: "View", onClick: vi.fn() },
+  { divider: true },
+  { label: "Cancel SO", danger: true, onClick: onCancel },
+];
+
+function mount(extra: Partial<Parameters<typeof DataGrid<Row>>[0]> = {}) {
+  return render(
+    <DataGrid<Row>
+      rows={ROWS}
+      columns={COLUMNS}
+      storageKey={`ls-${Math.random()}`}
+      rowKey={(r) => r.id}
+      contextMenu={menu()}
+      {...extra}
+    />,
+  );
+}
+
+const parentRows = () =>
+  [...document.querySelectorAll<HTMLTableRowElement>("tbody tr[data-row-nav]")];
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+describe("Columns · Reset columns", () => {
+  it("names the reset act `Reset columns`, not a bare `Reset`", () => {
+    mount({ appearance: "reference", labelledToolbar: true });
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    expect(screen.getByRole("button", { name: "Reset columns" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reset" })).toBeNull();
+  });
+});
+
+describe("keyboard rows", () => {
+  it("makes the grid ONE Tab stop and moves row to row with the arrows", () => {
+    mount();
+    const rows = parentRows();
+    expect(rows.map((r) => r.tabIndex)).toEqual([0, -1, -1]);
+    act(() => rows[0]!.focus());
+    fireEvent.keyDown(rows[0]!, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(rows[1]);
+    /* The Tab stop follows the operator, so Tab-away-and-back returns here. */
+    expect(parentRows().map((r) => r.tabIndex)).toEqual([-1, 0, -1]);
+    fireEvent.keyDown(rows[1]!, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(rows[0]);
+  });
+
+  it("Enter opens what a double-click opens; Space ticks the row", () => {
+    const open = vi.fn();
+    const onToggle = vi.fn();
+    mount({ onRowDoubleClick: open, selectable: { selectedKeys: new Set(), onToggle, onToggleAll: vi.fn() } });
+    const row = parentRows()[1]!;
+    fireEvent.keyDown(row, { key: "Enter" });
+    expect(open).toHaveBeenCalledWith(ROWS[1]);
+    fireEvent.keyDown(row, { key: " " });
+    expect(onToggle).toHaveBeenCalledWith("b");
+  });
+
+  it("Shift+F10 opens the row menu with focus on its first act; Escape gives focus back", () => {
+    const onCancel = vi.fn();
+    mount({ contextMenu: menu(onCancel) });
+    const row = parentRows()[0]!;
+    act(() => row.focus());
+    fireEvent.keyDown(row, { key: "F10", shiftKey: true });
+    const items = screen.getAllByRole("menuitem");
+    expect(items.map((i) => i.textContent)).toEqual(["View", "Cancel SO"]);
+    expect(document.activeElement).toBe(items[0]);
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "ArrowDown" });
+    expect(document.activeElement).toBe(items[1]);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(row);
+  });
+
+  it("the Menu key opens the same menu from a control INSIDE the row", () => {
+    mount();
+    const link = screen.getByTestId("link-b");
+    act(() => link.focus());
+    fireEvent.keyDown(link, { key: "ContextMenu" });
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Tab" });
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(link);
+  });
+
+  it("controls inside a row keep their own arrow keys", () => {
+    mount();
+    const link = screen.getByTestId("link-a");
+    act(() => link.focus());
+    fireEvent.keyDown(link, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(link);
+  });
+
+  it("a governed group heading is reachable by Tab", () => {
+    mount({
+      fixedGroups: {
+        groups: [{ key: "open", label: "To buy", alwaysOpen: true }, { key: "rest", label: "Other" }],
+        groupOf: (r) => (r.id === "a" ? "open" : "rest"),
+      },
+    });
+    expect(screen.getByRole("heading", { name: /To buy/ })).toHaveAttribute("tabindex", "0");
+    expect(screen.getByTestId("grid-group-toggle-rest").tagName).toBe("BUTTON");
+  });
+});
+
+describe("load failure keeps the toolbar", () => {
+  it("draws the page's error inside the work surface, with the toolbar and its create action still there", () => {
+    mount({
+      appearance: "reference",
+      labelledToolbar: true,
+      toolbarStart: <button type="button">New Sales Order</button>,
+      errorState: <div role="alert">Sales orders could not be loaded</div>,
+      statusSummary: (rows) => <span>{`${rows.length} sales orders`}</span>,
+    });
+    expect(within(screen.getByTestId("work-toolbar")).getByRole("button", { name: "New Sales Order" })).toBeInTheDocument();
+    expect(within(screen.getByTestId("grid-error")).getByRole("alert")).toHaveTextContent("Sales orders could not be loaded");
+    expect(parentRows()).toHaveLength(0);
+    /* A failed read is not `0 sales orders`. */
+    expect(screen.getByTestId("grid-footer")).not.toHaveTextContent("sales orders");
+  });
+});
+
+describe("a cut value opens whole", () => {
+  it("turns ONLY a cut cell into a Popover trigger that opens the full value", async () => {
+    vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(function (this: HTMLElement) {
+      return (this.textContent ?? "").length > 20 ? 400 : 50;
+    });
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(180);
+    mount();
+    const triggers = screen.getAllByTestId("cell-overflow");
+    expect(triggers).toHaveLength(1);
+    expect(triggers[0]).toHaveAccessibleName("Customer: Tan Sri Dato' Seri Muhammad Hafizuddin");
+    fireEvent.click(triggers[0]!);
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("Tan Sri Dato' Seri Muhammad Hafizuddin");
+    /* Opening the value never selects or opens the row. */
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  /* ⭐ ui MASTER §6.0 rule 5 (Card 12 review, 2026-09-21): hover and keyboard
+     focus show the whole value too, without taking focus off the cell. */
+  it("shows a cut value whole on keyboard focus and on hover, keeping focus on the cell", async () => {
+    vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(function (this: HTMLElement) {
+      return (this.textContent ?? "").length > 20 ? 400 : 50;
+    });
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(180);
+    mount();
+    const trigger = screen.getByTestId("cell-overflow");
+    act(() => trigger.focus());
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Tan Sri Dato' Seri Muhammad Hafizuddin");
+    expect(document.activeElement).toBe(trigger);
+    act(() => trigger.blur());
+    await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull());
+    fireEvent.pointerMove(trigger, { pointerType: "mouse" });
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Tan Sri Dato' Seri Muhammad Hafizuddin");
+  });
+
+  it("prints a value that fits as plain text — no extra control per cell", () => {
+    mount();
+    expect(screen.queryAllByTestId("cell-overflow")).toHaveLength(0);
+    expect(screen.getByText("Lim Wei").closest("button")).toBeNull();
+  });
+});
+
+describe("touch target below a 768px canvas", () => {
+  function stubViewport(width: number) {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(width);
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    );
+  }
+  const selectable = { selectedKeys: new Set<string>(), onToggle: vi.fn(), onToggleAll: vi.fn() };
+
+  it("wraps the row checkbox in a 40×40 target and widens its column to 40", () => {
+    stubViewport(600);
+    mount({ selectable });
+    const box = screen.getAllByRole("checkbox", { name: "Select row" })[0]!;
+    expect(box.parentElement).toHaveClass(styles.checkHitNarrow);
+    expect(box.closest("td")!.style.width).toBe("40px");
+  });
+
+  it("keeps the dense 30px gutter on a wide canvas", () => {
+    stubViewport(1140);
+    mount({ selectable });
+    const box = screen.getAllByRole("checkbox", { name: "Select row" })[0]!;
+    expect(box.parentElement).not.toHaveClass(styles.checkHitNarrow);
+    expect(box.closest("td")!.style.width).toBe("30px");
+  });
+});
+
+describe("the governed search is a condition", () => {
+  it("lists the query and `Clear filters` clears it, which re-asks the server for everything", async () => {
+    const onSearchChange = vi.fn();
+    mount({ searchPresentation: "responsive", onSearchChange });
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), { target: { value: "SO-1302" } });
+    await waitFor(() => expect(onSearchChange).toHaveBeenLastCalledWith("SO-1302"));
+    expect(screen.getByTestId("active-conditions")).toHaveTextContent("Search: SO-1302");
+    fireEvent.click(screen.getByTestId("clear-filters"));
+    expect(screen.getByRole("searchbox", { name: "Search" })).toHaveValue("");
+    await waitFor(() => expect(onSearchChange).toHaveBeenLastCalledWith(""));
+    expect(screen.queryByTestId("active-conditions")).toBeNull();
+  });
+
+  it("shows ONE `Clear filters` when nothing matches", async () => {
+    mount({ searchPresentation: "responsive", noMatchMessage: "No sales orders match these filters" });
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), { target: { value: "nothing-like-this" } });
+    await screen.findByText("No sales orders match these filters");
+    expect(screen.getAllByRole("button", { name: "Clear filters" })).toHaveLength(1);
+    expect(screen.getByTestId("active-conditions")).toHaveTextContent("Search: nothing-like-this");
+  });
+
+  it("leaves a grid without the governed search exactly as it was", async () => {
+    mount();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), { target: { value: "SO-1302" } });
+    await waitFor(() => expect(screen.queryByTestId("link-a")).toBeNull());
+    expect(screen.getByTestId("link-b")).toBeInTheDocument();
+    expect(screen.queryByTestId("active-conditions")).toBeNull();
+  });
+});
+
+/* ⭐ THE SORT IS AN ICON (Card 12 review, 2026-09-21): a 12px Lucide arrow in
+   the header ink beside the Filter icon — never the letters `v` / `^`. */
+describe("header sort indicator", () => {
+  it("draws a 12px arrow icon for each direction and names the direction", () => {
+    mount();
+    const header = screen.getByRole("button", { name: /^Customer/ });
+    fireEvent.click(header);
+    const asc = screen.getByTestId("sort-asc");
+    expect(asc.querySelector("svg")).toHaveAttribute("width", "12");
+    expect(asc).toHaveTextContent("sorted ascending");
+    expect(asc.textContent).not.toContain("^");
+    fireEvent.click(screen.getByRole("button", { name: /^Customer/ }));
+    const desc = screen.getByTestId("sort-desc");
+    expect(desc.querySelector("svg")).toHaveAttribute("width", "12");
+    expect(desc).toHaveTextContent("sorted descending");
+    expect(desc.textContent?.replace("sorted descending", "")).not.toContain("v");
+  });
+});
+
+/* ⭐ AN EMPTY CELL IS EMPTY — owner ruling 2026-09-26 (COPY-STANDARD "NO DASH
+   ANYWHERE ON A SCREEN", UI MASTER §6.0, Orders MASTER §0.1 REGISTER CLOSE-OUT
+   item 2). The engine draws nothing for a blank value, on every listing; a
+   real zero is a value and still prints. */
+describe("an empty cell is empty", () => {
+  interface Fact {
+    id: string;
+    name: string | null | undefined;
+    note: string | null | undefined;
+    qty: number | null;
+  }
+  const FACTS: Fact[] = [
+    { id: "n", name: null, note: null, qty: 0 },
+    { id: "u", name: undefined, note: undefined, qty: null },
+    { id: "e", name: "", note: "", qty: 7 },
+  ];
+  const FACT_COLUMNS: DataGridColumn<Fact>[] = [
+    { key: "name", label: "Name", width: 120, accessor: (r) => r.name },
+    { key: "note", label: "Note", width: 120, accessor: (r) => r.note },
+    {
+      key: "qty",
+      label: "Qty",
+      width: 80,
+      align: "right",
+      filterType: "number",
+      numberValue: (r) => r.qty,
+      accessor: (r) => r.qty,
+    },
+  ];
+  const DASH = /[—–]/;
+  const mountFacts = (extra: Partial<Parameters<typeof DataGrid<Fact>>[0]> = {}) =>
+    render(
+      <DataGrid<Fact>
+        rows={FACTS}
+        columns={FACT_COLUMNS}
+        storageKey={`empty-${Math.random()}`}
+        rowKey={(r) => r.id}
+        {...extra}
+      />,
+    );
+  const bodyCells = (container: HTMLElement) =>
+    [...container.querySelectorAll<HTMLTableCellElement>("tbody tr[data-row-nav] td")];
+
+  it("draws nothing for null, undefined and an empty string", () => {
+    const { container } = mountFacts();
+    const cells = bodyCells(container);
+    expect(cells).toHaveLength(9);
+    const blank = cells.filter((td) => td.textContent === "");
+    /* name + note on all three rows, and the one null quantity. */
+    expect(blank).toHaveLength(7);
+    for (const td of blank) expect(td.childElementCount).toBe(0);
+    expect(container.querySelector("tbody")?.textContent ?? "").not.toMatch(DASH);
+  });
+
+  it("still prints a real zero", () => {
+    const { container } = mountFacts();
+    const texts = bodyCells(container).map((td) => td.textContent);
+    expect(texts).toContain("0");
+    expect(texts).toContain("7");
+  });
+
+  it("announces no dash either — no aria-label or title carries one", () => {
+    const { container } = mountFacts();
+    for (const el of container.querySelectorAll("[aria-label], [title]")) {
+      expect(el.getAttribute("aria-label") ?? "").not.toMatch(DASH);
+      expect(el.getAttribute("title") ?? "").not.toMatch(DASH);
+    }
+  });
+
+  it("draws nothing beside the chevron when the expansion's own column is blank", () => {
+    const { container } = mountFacts({
+      expandable: {
+        renderExpansion: () => <div>goods</div>,
+        trigger: { columnKey: "name" },
+      },
+    });
+    const triggers = [...container.querySelectorAll<HTMLButtonElement>("tbody button[aria-expanded]")];
+    expect(triggers.length).toBeGreaterThan(0);
+    for (const b of triggers) expect(b.textContent ?? "").not.toMatch(DASH);
+    expect(container.querySelector("tbody")?.textContent ?? "").not.toMatch(DASH);
+  });
+
+  it("names a number filter's two boxes by their own words, never a dash", () => {
+    mountFacts();
+    fireEvent.click(screen.getByRole("button", { name: "Filter Qty" }));
+    const min = screen.getByLabelText("Min");
+    const max = screen.getByLabelText("Max");
+    expect(min).toHaveAttribute("placeholder", "Min");
+    expect(max).toHaveAttribute("placeholder", "Max");
+  });
+});
+
+
+describe("the opt-in fixed condition row", () => {
+  it("keeps the same slot before filtering and after Clear all without empty controls", () => {
+    mount({ reserveConditionRow: true, searchPresentation: "responsive" });
+    const slot = screen.getByTestId("active-conditions");
+    expect(slot).toHaveClass(styles.conditionBarReserved);
+    expect(screen.queryByRole("button", { name: "Clear all" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("Search…"), { target: { value: "SO-1301" } });
+    expect(screen.getByTestId("active-conditions")).toBe(slot);
+    fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
+    expect(screen.getByTestId("active-conditions")).toBe(slot);
+    expect(slot).toBeEmptyDOMElement();
+  });
+  it("leaves registers without the opt-in free of an empty strip", () => {
+    mount();
+    expect(screen.queryByTestId("active-conditions")).not.toBeInTheDocument();
+  });
+});

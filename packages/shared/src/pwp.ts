@@ -170,3 +170,40 @@ export function resolvePwp(
 
   return grants;
 }
+
+/**
+ * ⭐ DOES A SAVED VOUCHER'S OWN SNAPSHOT COVER THIS LINE?
+ *
+ * A carried-forward voucher is not a same-cart grant, and the whole point of the
+ * cross-order layer is that it is redeemed on a LATER order — one that need not
+ * contain the trigger at all. `resolvePwp` cannot answer for it: it resolves an
+ * allowance built from the CURRENT cart's trigger lines, and a reward-only cart
+ * has none. Asking it anyway is how the entire carry-forward layer came to be
+ * reachable only by carts that re-buy the trigger, where the same-cart offer
+ * already covers the line and the saved voucher adds nothing.
+ *
+ * The eligibility that DOES apply is the reward scope frozen onto the voucher at
+ * mint (`reward_category` + `reward_targets`, snapshotted so a later rule edit can
+ * never invalidate an outstanding voucher). That is what this function checks, and
+ * it is deliberately the ONLY question it answers.
+ *
+ * WHAT IT DELIBERATELY DOES NOT CHECK, because another owner already does:
+ *   · status / single-use / expiry   — the atomic UPDATE in pwp_claim_available_code
+ *   · the customer phone + name binding — the same RPC's WHERE clause
+ *   · the reward PRICE                 — forced server-side after this passes
+ * Re-checking any of them here would make two arithmetics for one fact (Law D)
+ * and the copy would drift from the RPC's.
+ *
+ * Shared so the POS and the server recompute answer identically — the same
+ * honest-pricing reason `resolvePwp` itself is shared.
+ */
+export function voucherCoversLine(
+  snapshot: { rewardCategory: string; rewardTargets: RuleTarget[] },
+  line: RuleLineInput,
+  comboModulesById: Map<string, string[][]> = new Map(),
+): boolean {
+  if (upper(line.category) !== upper(snapshot.rewardCategory)) return false;
+  // An empty target list means the WHOLE reward category — `lineMatchesTargets`
+  // already reads it that way, and the mint snapshotted whatever the rule held.
+  return lineMatchesTargets(line, snapshot.rewardTargets, comboModulesById);
+}

@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  type IssueIntake,
   buildIssueEnglish,
-  buildIssueWorkTitle,
-  createIssueInputSchema,
-  decideProblemHome,
+  issueActionInputSchema,
+  issueActionResultInputSchema,
   issueIntakeSchema,
+  projectIssueActionWork,
   reconcileIssueMoney,
   relatedPartyReportRows,
 } from "./issue-tracker";
@@ -21,38 +22,15 @@ const intake = {
   evidence: [{ kind: "photo" as const, count: 3 }],
 };
 
+describe("official English agrees with its proof", () => {
+  it("one photo WAS added; several WERE", () => {
+    const base: Omit<IssueIntake, "evidence"> = { problemObject: "item", observedProblem: "damaged", foundByKind: "warehouse", foundByName: "Mei Ling", observedOn: "2026-08-14", linkedObjects: [{ kind: "purchase_order", id: "po", label: "PO-2041" }], affectedObject: "Unit CU-000128", impact: "SO-1319 cannot use this Unit" };
+    expect(buildIssueEnglish({ ...base, evidence: [{ kind: "photo", count: 1 }] })).toContain("1 photo was added by Mei Ling");
+    expect(buildIssueEnglish({ ...base, evidence: [{ kind: "photo", count: 3 }] })).toContain("3 photos were added by Mei Ling");
+  });
+});
+
 describe("Issue Tracker operating model", () => {
-  it("routes customer remedy to Service Case and keeps pure internal failure in Issue Tracker", () => {
-    expect(decideProblemHome({ customerResolutionRequired: true, internalFailureObserved: false })).toEqual({
-      home: "service_case",
-      linkedIssueRequired: false,
-    });
-    expect(decideProblemHome({ customerResolutionRequired: false, internalFailureObserved: true })).toEqual({
-      home: "issue_tracker",
-      linkedIssueRequired: false,
-    });
-    expect(decideProblemHome({ customerResolutionRequired: true, internalFailureObserved: true })).toEqual({
-      home: "service_case",
-      linkedIssueRequired: true,
-    });
-    expect(decideProblemHome({ customerResolutionRequired: false, internalFailureObserved: false })).toEqual({
-      home: "owning_module",
-      linkedIssueRequired: false,
-    });
-  });
-
-  it("requires a Service Case link when an internal Issue also affected a customer", () => {
-    const work = { owner: "Yu Jun", object: "New issue", recipient: "Operations", action: "Check the missed label step", requiredResult: "The check result is recorded", dueOn: "2026-08-17" };
-    const withoutCase = createIssueInputSchema.safeParse({ intake, scope: "customer_impact_linked", sourceModule: "receiving", work });
-    expect(withoutCase.success).toBe(false);
-    expect(createIssueInputSchema.safeParse({
-      intake: { ...intake, linkedObjects: [...intake.linkedObjects, { kind: "service_case" as const, id: "case-1", label: "SC-104" }] },
-      scope: "customer_impact_linked",
-      sourceModule: "receiving",
-      work,
-    }).success).toBe(true);
-  });
-
   it("creates official English from facts without asking staff to compose it", () => {
     expect(issueIntakeSchema.parse(intake)).toEqual(intake);
     expect(buildIssueEnglish(intake)).toBe(
@@ -60,11 +38,46 @@ describe("Issue Tracker operating model", () => {
     );
   });
 
-  it("rejects a bare action and builds WHO + OBJECT + RECIPIENT + RESULT + WHEN", () => {
-    expect(() => buildIssueWorkTitle({ owner: "Yu Jun", object: "IS-204", recipient: "Hookka", action: "Call", requiredResult: "", dueOn: "2026-08-17" })).toThrow();
-    expect(buildIssueWorkTitle({ owner: "Yu Jun", object: "IS-204", recipient: "Hookka", action: "Call about the wrong item", requiredResult: "Ask if they accept RM80", dueOn: "2026-08-17" })).toBe(
-      "Yu Jun · Call about the wrong item for IS-204 · Contact Hookka · Need: Ask if they accept RM80 · By 17 Aug 2026",
-    );
+  it("keeps the owner rule structured and rejects owner prose in the action", () => {
+    const action = issueActionInputSchema.parse({
+      trigger: "Supplier has not answered the evidence request",
+      ownerRule: "issue_triage_duty",
+      action: "Ask supplier to accept or reject the evidence",
+      recipient: "Hookka",
+      requiredResult: "Acceptance or rejection recorded",
+      dueOn: "2026-08-17",
+    });
+    expect(action.ownerRule).toBe("issue_triage_duty");
+    expect(action.action).not.toContain("Yu Jun");
+    expect(() => issueActionInputSchema.parse({ ...action, action: "Yu Jun · Ask supplier to reply" })).toThrow();
+  });
+
+  it("requires a governed result when completing the current action", () => {
+    expect(issueActionResultInputSchema.parse({ resultCode: "accepted", result: "Supplier accepted the evidence" })).toEqual({ resultCode: "accepted", result: "Supplier accepted the evidence" });
+    expect(() => issueActionResultInputSchema.parse({ resultCode: "", result: "Done" })).toThrow();
+  });
+
+  it("projects one open Issue action with duty cover and an exact Issue door", () => {
+    const [item] = projectIssueActionWork({
+      actions: [{ id: "action-1", issueId: "issue-1", issueNo: "IS-2608-0001", trigger: "Supplier has not answered", ownerRule: "issue_triage_duty", action: "Ask supplier for an answer", recipient: "Hookka", requiredResult: "Supplier answer recorded", dueOn: "2026-09-06", materiality: "significant" }],
+      dutyResolutions: { issue_triage_duty: { dutyKey: "issue_triage_duty", onDate: "2026-09-07", normalOwner: { userId: "staff-1", name: "Shasha" }, buddy: { userId: "staff-2", name: "Yu Jun" }, activeCover: { userId: "staff-2", name: "Yu Jun" }, actingPerson: { userId: "staff-2", name: "Yu Jun" }, state: "covered", assignmentId: "assignment-1" } },
+      today: "2026-09-07",
+      observedAt: "2026-09-07T01:00:00.000Z",
+    });
+    expect(item).toMatchObject({
+      id: "issue_tracker:action-1:current_action",
+      module: "issue_tracker",
+      object: { id: "issue-1", label: "IS-2608-0001" },
+      problem: "Supplier has not answered",
+      action: "Ask supplier for an answer",
+      owner: { rule: "issue_triage_duty", normal: { name: "Shasha" }, acting: { name: "Yu Jun" }, state: "covered" },
+      timing: {
+        placement: "missed",
+        missedAge: { state: "not_calculable" },
+        calendar: { actor: { state: "not_configured" } },
+      },
+      destination: "/operation/issues?issue=issue-1",
+    });
   });
 
   it("keeps incurred, recoverable and recovered separate", () => {

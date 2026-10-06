@@ -9,10 +9,14 @@
  * WhatsApp · Email.
  *
  * Persistence (option C): the first output click ISSUES the invoice through
- * POST /api/orders/:id/issue-invoice (0229 RPC — idempotent, same
- * INV-YYYY-{so} formula as the dispatch auto-issue, amount = the Balance
- * tab's goods+storage total) and the issue lands in order_history +
- * audit_log. Real e-mail SENDING needs a mail provider (not configured) —
+ * POST /api/orders/:id/issue-invoice (issue_order_invoice — idempotent; 0476:
+ * it issues the order's prepared draft if one exists, draws a governed
+ * INV-DDMMYY-NNNN number the same way the dispatch auto-issue does, and posts
+ * the Sales Invoice to the ledger; amount = the Balance tab's goods+storage
+ * total). The number is drawn, never predicted, so the preview reads `Draft`
+ * until the issue answers. The issue lands in order_history + audit_log. A
+ * ledger refusal comes back as a 422 with the ledger's own sentence.
+ * Real e-mail SENDING needs a mail provider (not configured) —
  * the Email output opens a prefilled mailto: draft; attach the saved PDF.
  */
 import { useEffect, useMemo, useState } from "react";
@@ -20,6 +24,7 @@ import { FileText, Mail, MessageCircle, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api";
+import { appTodayIso } from "@/lib/fmt-date";
 import { renderInvoicePdf } from "@/lib/pdf/render";
 import type { InvoiceTemplateData } from "@/lib/pdf/types";
 import { rmAmount, salutationOf } from "@/lib/wa-templates";
@@ -34,11 +39,6 @@ type IssueInvoiceResponse = {
   amount: number;
   already_issued: boolean;
 };
-
-/** The deterministic on-demand number — MUST match the 0229 RPC (and 0098). */
-function predictedInvoiceNo(so: number): string {
-  return `INV-${new Date().getFullYear()}-${String(so).padStart(6, "0")}`;
-}
 
 export default function GenerateInvoiceOverlay({
   orderId,
@@ -84,7 +84,9 @@ export default function GenerateInvoiceOverlay({
   const imported = !hasLineTotal;
   const [issued, setIssued] = useState<IssueInvoiceResponse | null>(null);
   const [issuing, setIssuing] = useState(false);
-  const effectiveNo = issued?.invoice_no ?? invoiceNo ?? predictedInvoiceNo(so);
+  // 0476 — numbers are drawn at issue (random, governed), so there is nothing
+  // to predict: before the issue the invoice is a Draft.
+  const effectiveNo = issued?.invoice_no ?? invoiceNo ?? null;
   const isIssued = !!(issued?.invoice_no ?? invoiceNo);
 
   // ── The same charge merge the Balance tab renders (same-SKU lines fold). ──
@@ -150,13 +152,13 @@ export default function GenerateInvoiceOverlay({
         : [];
     return {
       doc_title: imported ? "PAYMENT REQUEST" : undefined,
-      invoice_no: imported ? `SO-${so}` : effectiveNo,
-      issue_date: (issued?.issued_at ?? new Date().toISOString()).slice(0, 10),
+      invoice_no: imported ? `SO-${so}` : (effectiveNo ?? "DRAFT"),
+      issue_date: issued?.issued_at ? issued.issued_at.slice(0, 10) : appTodayIso(),
       order_id: orderId,
       order_code: `SO-${so}`,
       customer: {
         name: customerName,
-        address: customerAddress ?? "—",
+        address: customerAddress ?? "",
         phone: customerPhone,
       },
       dealer: { name: "Carres", contact: null },
@@ -211,8 +213,8 @@ export default function GenerateInvoiceOverlay({
     if (!totalSet) {
       toast.error(
         imported
-          ? "Key the outstanding first — a statement needs an amount"
-          : "Set the goods total first — an invoice needs an amount",
+          ? "Key the outstanding first. A statement needs an amount"
+          : "Set the goods total first. An invoice needs an amount",
       );
       return null;
     }
@@ -232,7 +234,7 @@ export default function GenerateInvoiceOverlay({
       return res.invoice_no;
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : String(e);
-      toast.error(`Couldn't issue invoice — ${msg}`);
+      toast.error(`Couldn't issue invoice: ${msg}`);
       return null;
     } finally {
       setIssuing(false);
@@ -248,7 +250,7 @@ export default function GenerateInvoiceOverlay({
       window.open(url, "_blank", "noopener");
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) {
-      toast.error(`Invoice PDF failed — ${(e as Error).message}`);
+      toast.error(`Invoice PDF failed: ${(e as Error).message}`);
     }
   }
 
@@ -265,18 +267,18 @@ export default function GenerateInvoiceOverlay({
       `Total: RM ${rmAmount(invoiceTotal)}`,
       ...(balanceDue > 0
         ? [`Outstanding: RM ${rmAmount(balanceDue)}`]
-        : ["Fully settled — thank you!"]),
+        : ["Fully settled. Thank you!"]),
       "",
       "Do let us know if you need anything. Thank you!",
     ].join("\n");
     await navigator.clipboard.writeText(text);
-    toast.success("WhatsApp message copied — paste it in the chat");
+    toast.success("WhatsApp message copied. Paste it in the chat");
   }
 
   async function outputEmail() {
     const no = await ensureIssued();
     if (!no) return;
-    const subject = `Invoice ${no} — Carres (SO-${so})`;
+    const subject = `Carres Invoice ${no} (SO-${so})`;
     const body = [
       `Hi ${salutationOf(null, customerName)},`,
       "",
@@ -313,8 +315,7 @@ export default function GenerateInvoiceOverlay({
             {imported ? "Payment request" : "Generate invoice"}
           </span>
           <span className="font-mono text-meta text-base-500">
-            {imported ? `SO-${so} · statement` : effectiveNo}
-            {!imported && !isIssued && " · draft"}
+            {imported ? `SO-${so} · statement` : (effectiveNo ?? "Draft")}
           </span>
           <button
             type="button"
@@ -376,7 +377,7 @@ export default function GenerateInvoiceOverlay({
             </div>
             {!totalSet && (
               <div className="mt-2 text-meta text-danger">
-                No goods total set — close this and key the total in the
+                No goods total set. Close this and key the total in the
                 Balance tab first.
               </div>
             )}
@@ -393,7 +394,7 @@ export default function GenerateInvoiceOverlay({
           <div className="min-w-0 bg-base-50 grid place-items-stretch">
             {previewErr ? (
               <div className="place-self-center text-meta text-danger px-6 text-center">
-                Preview failed — {previewErr}
+                Preview failed: {previewErr}
               </div>
             ) : previewUrl ? (
               <iframe
@@ -413,10 +414,10 @@ export default function GenerateInvoiceOverlay({
         <div className="flex items-center gap-2 px-4 h-[52px] border-t border-base-200 shrink-0">
           <span className="text-meta text-base-500 min-w-0 truncate">
             {imported
-              ? "Statement only — the tax invoice for an imported order lives in AutoCount"
+              ? "Statement only. The tax invoice for an imported order lives in AutoCount"
               : isIssued
                 ? `Issued · ${effectiveNo}`
-                : "Not issued yet — the first output issues it and logs to the order history"}
+                : "Not issued yet. The first output issues it and logs to the order history"}
           </span>
           <div className="ml-auto flex items-center gap-2">
             <Btn icon={Mail} disabled={issuing} onClick={() => void outputEmail()}>

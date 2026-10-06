@@ -1,0 +1,31 @@
+.receiving-workspace { container: receiving-form / inline-size; }
+.receiving-details-row { overflow-wrap: anywhere; }
+.receiving-details-row > :not(:first-child),
+.receiving-details-row :is(input, select, textarea) { min-width: 0; max-width: 100%; }
+.receiving-actions button { max-width: 100%; min-height: 28px; height: auto; white-space: normal; overflow-wrap: anywhere; }
+
+/* Reflow by the form canvas: the portal's two rails consume phone width. */
+@container receiving-form (width < 480px) {
+  .receiving-workspace .receiving-header { flex-direction: column; align-items: stretch; }
+  .receiving-workspace .receiving-details-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    margin-top: 8px;
+  }
+  .receiving-details-row > :first-child { width: auto; }
+  .receiving-details-row > :not(:first-child) { width: 100%; }
+  .receiving-actions [data-testid="pending-after-save"] {
+    order: -1;
+    width: 100%;
+    margin-left: 0;
+  }
+  .receiving-actions [data-testid="receiving-save"] { margin-left: auto; }
+}
+
+/* The GRN record and its amend form share the receiving form's width rules. */
+.receiving-record-sheet { overflow-wrap: anywhere; }
+.receiving-record-sheet input[type="file"] { min-width: 0; max-width: 100%; }
+@container receiving-form (width < 480px) {
+  .receiving-item-row > :first-child { flex-basis: 100%; }
+}

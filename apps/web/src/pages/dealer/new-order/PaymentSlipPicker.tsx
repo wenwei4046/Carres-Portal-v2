@@ -39,7 +39,7 @@ export default function PaymentSlipPicker({ label, hint, slip, onChange }: Props
     if (f.size > MAX_BYTES) {
       // Trade UX nicety for code simplicity — we just bail. The dealer can
       // re-pick a smaller file. The 5 MB cap is signposted in the hint.
-      alert(`File is ${(f.size / 1024 / 1024).toFixed(1)} MB — max is 5 MB.`);
+      alert(`File is ${(f.size / 1024 / 1024).toFixed(1)} MB. Max is 5 MB.`);
       e.target.value = "";
       return;
     }

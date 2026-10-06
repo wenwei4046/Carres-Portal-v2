@@ -18,8 +18,6 @@ import {
   agreementTemplatePatchSchema,
   agreementTokens,
   serviceSkuCode,
-  phoneKeyMy,
-  customerInputSchema,
   createRentalAgreementInputSchema,
   recordRentalPaymentInputSchema,
   chargeRentalInterestInputSchema,
@@ -27,6 +25,8 @@ import {
   // 0300 — the ONE interest implementation. The SQL mirror in the migration
   // asserts the same worked examples, so the two cannot drift apart silently.
   rentalLateInterest,
+  rentalMonthView,
+  type RentalMonthBilling,
   RENTAL_AGREEMENT_DOC_KEY,
   CUSTOMERS,
   SERVICE_PACKAGES,
@@ -41,10 +41,11 @@ import {
   PRODUCT_MODELS,
   PRODUCT_SKUS,
 } from "@carres/shared";
-import { mapPgError, parseJsonBody } from "../lib/route-helpers";
+import { parseJsonBody, fail } from "../lib/route-helpers";
 import { ensureFixedTermSchedule, ensureRentalPlanStripeObjects, CARRES_SOURCE } from "../lib/rental-stripe";
 import { stripeClient, stripeConfigured } from "../lib/stripe";
 import { adminClient, userClient } from "../lib/supabase";
+import { todayIsoMYT } from "../lib/today";
 import type { AppEnv } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -102,7 +103,7 @@ function sellerOnly(c: { var: { auth: { role: string } } }) {
 function requireStripeConfigured(c: { env: AppEnv["Bindings"] }) {
   if (!stripeConfigured(c.env)) {
     throw new HTTPException(503, {
-      message: "Stripe is not set up yet — ask the principal to add the Stripe keys.",
+      message: "Stripe is not set up yet. Ask the principal to add the Stripe keys.",
     });
   }
 }
@@ -270,7 +271,7 @@ async function ensureServiceSku(
   if (!model) {
     return {
       ok: false,
-      message: "no service-category model in the catalog — create one in Modular before authoring service plans",
+      message: "no service-category model in the catalog. Create one in Modular before authoring service plans",
     };
   }
   const { error: insErr } = await sb.from(PRODUCT_SKUS).insert({
@@ -336,8 +337,7 @@ rentalRouter.post("/service-packages", async (c) => {
         422,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   if (!data) {
     return c.json({ error: "rpc_failed", code: "rpc_failed", message: "service package insert returned no row" }, 500);
@@ -390,8 +390,7 @@ rentalRouter.patch("/service-packages/:id", async (c) => {
         422,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "service package not found" }, 404);
@@ -410,12 +409,11 @@ rentalRouter.delete("/service-packages/:id", async (c) => {
   if (error) {
     if (error.code === "23503") {
       return c.json(
-        { error: "conflict", code: "package_in_use", message: "service package has entitlements minted against it — deactivate it instead" },
+        { error: "conflict", code: "package_in_use", message: "service package has entitlements minted against it. Deactivate it instead" },
         409,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ ok: true });
 });
@@ -470,8 +468,7 @@ rentalRouter.post("/plans", async (c) => {
         422,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   if (!data) {
     return c.json({ error: "rpc_failed", code: "rpc_failed", message: "rental plan insert returned no row" }, 500);
@@ -531,8 +528,7 @@ rentalRouter.patch("/plans/:id", async (c) => {
         422,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "rental plan not found" }, 404);
@@ -576,12 +572,11 @@ rentalRouter.delete("/plans/:id", async (c) => {
   if (error) {
     if (error.code === "23503") {
       return c.json(
-        { error: "conflict", code: "plan_in_use", message: "rental plan has agreements signed against it — deactivate it instead" },
+        { error: "conflict", code: "plan_in_use", message: "rental plan has agreements signed against it. Deactivate it instead" },
         409,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ ok: true });
 });
@@ -623,7 +618,7 @@ rentalRouter.post("/offers", async (c) => {
   if (error) {
     if (error.code === "23505") {
       return c.json(
-        { error: "conflict", code: "duplicate_offer", message: "this model already has an offer — edit that one" },
+        { error: "conflict", code: "duplicate_offer", message: "this model already has an offer. Edit that one" },
         409,
       );
     }
@@ -633,8 +628,7 @@ rentalRouter.post("/offers", async (c) => {
         422,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   if (!data) {
     return c.json({ error: "rpc_failed", code: "rpc_failed", message: "offer insert returned no row" }, 500);
@@ -673,10 +667,7 @@ rentalRouter.patch("/offers/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "offer not found" }, 404);
   }
@@ -698,13 +689,12 @@ rentalRouter.delete("/offers/:id", async (c) => {
         {
           error: "conflict",
           code: "offer_in_use",
-          message: "this offer has agreements signed against it — switch it off instead",
+          message: "this offer has agreements signed against it. Switch it off instead",
         },
         409,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ ok: true });
 });
@@ -748,8 +738,7 @@ rentalRouter.post("/offers/:offerId/buy-prices", async (c) => {
         422,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   if (!data) {
     return c.json({ error: "rpc_failed", code: "rpc_failed", message: "buy price insert returned no row" }, 500);
@@ -781,10 +770,7 @@ rentalRouter.patch("/buy-prices/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "buy price not found" }, 404);
   }
@@ -796,10 +782,7 @@ rentalRouter.delete("/buy-prices/:id", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error } = await sb.from(RENTAL_BUY_PRICES).delete().eq("id", id);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ ok: true });
 });
 
@@ -844,8 +827,7 @@ rentalRouter.post("/offers/:offerId/services", async (c) => {
         422,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   if (!data) {
     return c.json({ error: "rpc_failed", code: "rpc_failed", message: "offer service insert returned no row" }, 500);
@@ -881,10 +863,7 @@ rentalRouter.patch("/offer-services/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "offer service not found" }, 404);
   }
@@ -896,10 +875,7 @@ rentalRouter.delete("/offer-services/:id", async (c) => {
   const id = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error } = await sb.from(RENTAL_OFFER_SERVICES).delete().eq("id", id);
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ ok: true });
 });
 
@@ -949,12 +925,11 @@ rentalRouter.post("/agreement-templates", async (c) => {
   if (error) {
     if (error.code === "23505") {
       return c.json(
-        { error: "conflict", code: "duplicate_version", message: "that version already exists — reload and try again" },
+        { error: "conflict", code: "duplicate_version", message: "that version already exists. Reload and try again" },
         409,
       );
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   if (!data) {
     return c.json({ error: "rpc_failed", code: "rpc_failed", message: "template insert returned no row" }, 500);
@@ -990,10 +965,7 @@ rentalRouter.patch("/agreement-templates/:id", async (c) => {
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!data) {
     return c.json({ error: "not_found", code: "not_found", message: "agreement wording not found" }, 404);
   }
@@ -1084,6 +1056,9 @@ const decideRentalAgreementSchema = z
   .object({
     approve: z.boolean(),
     note: z.string().trim().max(500).optional(),
+    // 0538 — which check Finance ran and its reference, typed by hand.
+    creditCheck: z.string().trim().max(100).optional(),
+    creditReference: z.string().trim().max(200).optional(),
   })
   .refine((v) => v.approve || (v.note != null && v.note.length > 0), {
     message: "A rejection needs a reason",
@@ -1097,11 +1072,28 @@ rentalRouter.get("/approvals", async (c) => {
   approverOnly(c);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("rental_pending_approvals");
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   return c.json({ approvals: (data ?? []) as unknown[] });
+});
+
+// GET /month?month=YYYY-MM — 0538. One calendar month of billing months across
+// every agreement: due, collected, outstanding, and the unpaid ones with the
+// salesperson on the order (Finance hands the chase to them). Read only.
+rentalRouter.get("/month", async (c) => {
+  approverOnly(c);
+  const month = c.req.query("month") ?? todayIsoMYT().slice(0, 7);
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+    return c.json({ error: "bad_month", code: "bad_month", message: "month must be YYYY-MM" }, 422);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("rental_billings_for_month", { p_month: `${month}-01` });
+  if (error) return fail(c, error);
+  const rows = ((data ?? []) as RentalMonthBilling[]).map((r) => ({
+    ...r,
+    amountDue: Number(r.amountDue),
+    paidAmount: r.paidAmount == null ? null : Number(r.paidAmount),
+  }));
+  return c.json({ month, ...rentalMonthView(rows, todayIsoMYT()) });
 });
 
 // GET /agreements/:id/collections — 0281. What has actually been collected.
@@ -1154,8 +1146,9 @@ rentalRouter.get("/agreements/:id/collections", async (c) => {
     .filter((r) => r.status === "paid")
     .reduce((a, r) => a + num(r.paid_amount), 0);
   const contract = Math.round(num(ag.monthly_fee) * num(ag.term_months) * 100) / 100;
-  const today = new Date().toISOString().slice(0, 10);
-  /** Whole days between a due date and today, floored at 0. UTC both sides. */
+  const today = todayIsoMYT();
+  /** Whole days between a due date and today, floored at 0. Both are calendar
+   *  days in Kuala Lumpur; the `Z` suffix only makes the subtraction DST-free. */
   const daysLate = (due: string): number =>
     Math.max(0, Math.floor((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${due}T00:00:00Z`)) / 86_400_000));
 
@@ -1289,8 +1282,7 @@ rentalRouter.post("/agreements/:id/collections/:seq/record", async (c) => {
     if (detail === "billing_not_found") {
       return c.json({ error: "not_found", code: detail, message: error.message }, 404);
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ recorded: data });
 });
@@ -1335,8 +1327,7 @@ rentalRouter.post("/agreements/:id/collections/:seq/interest", async (c) => {
     if (detail === "not_overdue" || detail === "not_owing" || detail === "no_interest") {
       return c.json({ error: "rule_violation", code: detail, message: error.message }, 422);
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ charged: data });
 });
@@ -1357,8 +1348,7 @@ rentalRouter.get("/agreements/:id/settlement-quote", async (c) => {
     if (detail === "agreement_not_found") {
       return c.json({ error: "not_found", code: detail, message: error.message }, 404);
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ quote: data });
 });
@@ -1449,8 +1439,7 @@ rentalRouter.post("/agreements/:id/settle", async (c) => {
     ) {
       return c.json({ error: "rule_violation", code: detail, message: error.message }, 422);
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   return c.json({ settled: data });
 });
@@ -1463,12 +1452,17 @@ rentalRouter.post("/agreements/:id/decide", async (c) => {
   const id = c.req.param("id");
   const parsed = await parseJsonBody(c, decideRentalAgreementSchema);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const { approve, note } = parsed.data;
+  const { approve, note, creditCheck, creditReference } = parsed.data;
+  // Sent only when typed, so a decision without a check calls the same way it always did.
+  const credit = {
+    ...(creditCheck ? { p_credit_check: creditCheck } : {}),
+    ...(creditReference ? { p_credit_reference: creditReference } : {}),
+  };
 
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = approve
-    ? await sb.rpc("rental_approve_agreement", { p_agreement_id: id, p_note: note ?? null })
-    : await sb.rpc("rental_reject_agreement", { p_agreement_id: id, p_reason: note ?? "" });
+    ? await sb.rpc("rental_approve_agreement", { p_agreement_id: id, p_note: note ?? null, ...credit })
+    : await sb.rpc("rental_reject_agreement", { p_agreement_id: id, p_reason: note ?? "", ...credit });
 
   if (error) {
     const detail = (error as { details?: string | null }).details ?? "";
@@ -1481,8 +1475,7 @@ rentalRouter.post("/agreements/:id/decide", async (c) => {
     if (detail === "not_pending" || detail === "reason_required") {
       return c.json({ error: "decide_blocked", code: detail, message: error.message }, 422);
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
 
   const out = data as {
@@ -1526,80 +1519,6 @@ rentalRouter.get("/units", async (c) => {
   return c.json({
     units: ((data ?? []) as DB.RentalStockUnitRow[]).map((r) => Adapters.rentalStockUnitFromRow(r)),
   });
-});
-
-// ---------------------------------------------------------------------------
-// Customers — the 0247 first-class customer entity (internal-HQ for the base;
-// the POS sell lane widens access in its own phase).
-// ---------------------------------------------------------------------------
-
-// GET /customers?q= — pick-list search. Case-insensitive contains on name OR
-// phone; no/short q returns the newest 50 so the picker is never blank.
-rentalRouter.get("/customers", async (c) => {
-  internalOnly(c);
-  const q = (c.req.query("q") ?? "").trim();
-  const sb = userClient(c.env, c.var.auth.jwt);
-  let query = sb.from(CUSTOMERS).select("*");
-  if (q.length >= 2) {
-    // Escape ilike wildcards (a literal %/_ must not widen the match; PostgREST
-    // also treats * as %) and drop .or() syntax characters (comma/parens would
-    // split the clause).
-    const pattern =
-      "%" + q.replace(/[,()*]/g, " ").replace(/[\\%_]/g, (m) => "\\" + m) + "%";
-    query = query.or(`name.ilike.${pattern},phone.ilike.${pattern}`);
-  }
-  const { data, error } = await query.order("created_at", { ascending: false }).limit(50);
-  if (error) throw new HTTPException(500, { message: error.message });
-  return c.json({
-    customers: ((data ?? []) as DB.CustomerRow[]).map((r) => Adapters.customerFromRow(r)),
-  });
-});
-
-// POST /customers — create (internal). phone_key is computed SERVER-side with
-// the canonical MY-aware helper (phoneKeyMy — the JS twin of the SQL
-// pwp_phone_key, 0188): one customer per canonical phone, enforced by the
-// UNIQUE(phone_key) → friendly 409 customer_exists.
-rentalRouter.post("/customers", async (c) => {
-  internalOnly(c);
-  const parsed = await parseJsonBody(c, customerInputSchema);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const d = parsed.data;
-  const key = phoneKeyMy(d.phone);
-  if (!key) {
-    return c.json(
-      { error: "invalid_input", code: "invalid_param", message: "phone has no usable digits" },
-      422,
-    );
-  }
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb
-    .from(CUSTOMERS)
-    .insert({
-      name: d.name,
-      phone: d.phone,
-      phone_key: key,
-      email: d.email ?? null,
-      address: d.address ?? null,
-      notes: d.notes ?? null,
-      updated_at: new Date().toISOString(),
-      created_by: c.var.auth.id,
-    })
-    .select("*")
-    .maybeSingle();
-  if (error) {
-    if (error.code === "23505") {
-      return c.json(
-        { error: "conflict", code: "customer_exists", message: "a customer with that phone already exists" },
-        409,
-      );
-    }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  if (!data) {
-    return c.json({ error: "rpc_failed", code: "rpc_failed", message: "customer insert returned no row" }, 500);
-  }
-  return c.json({ customer: Adapters.customerFromRow(data as DB.CustomerRow) }, 201);
 });
 
 // ---------------------------------------------------------------------------
@@ -1789,8 +1708,7 @@ rentalRouter.post("/agreements", async (c) => {
     ) {
       return c.json({ error: "invalid_param", code: detail, message: error.message }, 422);
     }
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    return fail(c, error);
   }
   const out = data as CreateAgreementRpcResult | null;
   if (!out?.agreement) {
@@ -1910,7 +1828,7 @@ rentalRouter.post("/agreements/:id/stripe/checkout", async (c) => {
         error: "rental_checkout_blocked",
         code: pending ? "pending_approval" : "wrong_status",
         message: pending
-          ? "Waiting for finance to approve this rental — you can collect once it is approved."
+          ? "Waiting for finance to approve this rental. You can collect once it is approved."
           : ag.status === "rejected"
             ? "This rental application was rejected."
             : "Agreement is not active.",
@@ -1932,7 +1850,7 @@ rentalRouter.post("/agreements/:id/stripe/checkout", async (c) => {
   }
   if (!ag.plan_id) {
     return c.json(
-      { error: "rental_checkout_blocked", code: "plan_not_synced", message: "Agreement has no plan link — collect manually." },
+      { error: "rental_checkout_blocked", code: "plan_not_synced", message: "Agreement has no plan link. Collect manually." },
       422,
     );
   }
@@ -1947,7 +1865,7 @@ rentalRouter.post("/agreements/:id/stripe/checkout", async (c) => {
   const plan = planData as { stripe_price_id: string | null; monthly_fee: number | string } | null;
   if (!plan?.stripe_price_id) {
     return c.json(
-      { error: "rental_checkout_blocked", code: "plan_not_synced", message: "Plan is not synced to Stripe yet — ask the principal to open Catalog → Rental and press Sync." },
+      { error: "rental_checkout_blocked", code: "plan_not_synced", message: "Plan is not synced to Stripe yet. Ask the principal to open Catalog → Rental and press Sync." },
       422,
     );
   }
@@ -1956,7 +1874,7 @@ rentalRouter.post("/agreements/:id/stripe/checkout", async (c) => {
   // silently charging a different figure (guardrail #4: no silent money).
   if (Number(plan.monthly_fee) !== Number(ag.monthly_fee)) {
     return c.json(
-      { error: "rental_checkout_blocked", code: "plan_repriced", message: "The plan's fee changed after signup — re-sign the agreement on the current plan." },
+      { error: "rental_checkout_blocked", code: "plan_repriced", message: "The plan's fee changed after signup. Re-sign the agreement on the current plan." },
       422,
     );
   }
@@ -2009,7 +1927,7 @@ rentalRouter.post("/agreements/:id/stripe/checkout", async (c) => {
     .eq("agreement_id", ag.id)
     .neq("status", "paid")
     .gte("seq", 2)
-    .gt("due_date", new Date().toISOString().slice(0, 10))
+    .gt("due_date", todayIsoMYT())
     .order("seq")
     .limit(1)
     .maybeSingle();
@@ -2033,7 +1951,7 @@ rentalRouter.post("/agreements/:id/stripe/checkout", async (c) => {
           currency: "myr",
           unit_amount: Math.round(Number(ag.monthly_fee) * 100),
           product_data: {
-            name: `Rental ${ag.agreement_no} — first month`,
+            name: `Rental ${ag.agreement_no}: first month`,
           },
         },
         quantity: 1,
@@ -2081,8 +1999,7 @@ rentalRouter.post("/agreements/:id/stripe/checkout", async (c) => {
   if (insErr) {
     // Money safety: a link we can't track must not stay payable.
     await stripe.checkout.sessions.expire(session.id).catch(() => {});
-    const m = mapPgError(insErr);
-    return c.json(m.body, m.status);
+    return fail(c, insErr);
   }
 
   return c.json({ session: shapeRentalSession(row as RentalSessionRow) }, 201);
@@ -2111,10 +2028,7 @@ rentalRouter.get("/agreements/:id/stripe/checkout/:sid", async (c) => {
     .eq("session_id", sidCheck.data)
     .eq("agreement_id", idCheck.data)
     .maybeSingle();
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
+  if (error) return fail(c, error);
   if (!row) throw new HTTPException(404, { message: "Checkout session not found" });
 
   let current = row as RentalSessionRow;

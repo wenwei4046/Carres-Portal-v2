@@ -151,7 +151,7 @@ function DeliveryTripFeeSection({
         line, plus a reduced cross-order follow-up rate on a second SO that
         completes a sofa + mattress/bedframe purchase across two orders. Leave
         both at 0 to keep it dormant.
-        {!isPrincipal && " Principal only — read-only for your role."}
+        {!isPrincipal && " Principal only. Read-only for your role."}
       </p>
       <div className="bg-white border border-base-200 rounded-[4px] p-4 flex flex-col gap-4">
         <div className="flex flex-wrap gap-5 items-end">
@@ -279,7 +279,7 @@ function SpecialDeliveryRulesSection({
       <p className="text-meta text-base-500 mb-3">
         Override the base trip fee for specific models / sizes / sofa combos /
         compartments (e.g. a bulky model that needs a special transport rate).
-        {!isPrincipal && " Principal only — read-only for your role."}
+        {!isPrincipal && " Principal only. Read-only for your role."}
       </p>
 
       {adding && isPrincipal && (

@@ -25,6 +25,7 @@ import {
   useHrSetKpiTarget,
   useHrSetStoreManager,
 } from "@/lib/queries";
+import { StatTile } from "./HrOverviewTab";
 
 /**
  * Performance (HR-P6, migration 0276) — "are we on track this month".
@@ -66,33 +67,6 @@ const BAR: Record<string, string> = {
 
 function fmt(kpiKey: KpiKey, n: number): string {
   return kpiMetric(kpiKey).unit === "rm" ? rm(n) : String(n);
-}
-
-/** One tile of the top strip. */
-function Tile({
-  label,
-  value,
-  sub,
-  muted,
-}: {
-  label: string;
-  value: string;
-  sub: string;
-  muted?: boolean;
-}) {
-  return (
-    <div className="flex-1 min-w-[160px] rounded-lg border border-base-200 bg-card px-4 py-3">
-      <div className="text-label uppercase tracking-[0.05em] text-base-500">{label}</div>
-      <div
-        className={`t-num text-page leading-8 font-semibold ${
-          muted ? "text-base-400" : "text-base-900"
-        }`}
-      >
-        {value}
-      </div>
-      <div className="text-meta text-base-500">{sub}</div>
-    </div>
-  );
 }
 
 /** The attainment bar. Width is capped at 100% so an over-achiever does not
@@ -140,7 +114,7 @@ function ScoreRow({
         )}
       </div>
       <div className="w-[52px] shrink-0 text-right text-strong font-semibold t-num">
-        {row.pct === null ? <span className="text-base-400">—</span> : `${row.pct}%`}
+        {row.pct === null ? null : `${row.pct}%`}
       </div>
       <div className="w-[86px] shrink-0 text-right">
         <span className={PILL[tone]}>{STATE_LABEL[row.state]}</span>
@@ -321,7 +295,7 @@ function ManagerCard({ source }: { source: KpiSource }) {
                       manager set
                     </div>
                     <div className="text-meta text-base-500">
-                      Set it on the Team tab — it climbs the chart on its own.
+                      Set it on the Team tab. It climbs the chart on its own.
                     </div>
                   </div>
                 </div>
@@ -482,22 +456,22 @@ export default function HrPerformanceTab({
       </div>
 
       <div className="flex gap-3 flex-wrap">
-        <Tile
+        <StatTile
           label={metric.unit === "rm" ? "Sold" : metric.label}
           value={fmt(kpiKey, s.totals.actual)}
           sub={`${s.totals.orderCount} order${s.totals.orderCount === 1 ? "" : "s"} · ${
             s.totals.scored
           } ${s.totals.scored === 1 ? "person" : "people"}`}
         />
-        <Tile
+        <StatTile
           label="Target"
-          value={s.totals.target === null ? "—" : fmt(kpiKey, s.totals.target)}
+          value={s.totals.target === null ? "" : fmt(kpiKey, s.totals.target)}
           sub={s.totals.target === null ? "no store target set" : `${s.stores.length} store`}
           muted={s.totals.target === null}
         />
-        <Tile
+        <StatTile
           label="Attainment"
-          value={s.totals.pct === null ? "—" : `${s.totals.pct}%`}
+          value={s.totals.pct === null ? "" : `${s.totals.pct}%`}
           sub={
             s.totals.target === null
               ? "set a target to see this"
@@ -507,7 +481,7 @@ export default function HrPerformanceTab({
           }
           muted={s.totals.pct === null}
         />
-        <Tile
+        <StatTile
           label="On track"
           value={`${s.totals.onTrack} of ${s.totals.scored}`}
           sub="people at 100% or better"
@@ -594,7 +568,7 @@ export default function HrPerformanceTab({
                 {targetRows.map((t) => (
                   <tr key={t.id} className="hover:bg-hovertint">
                     <td className="px-2.5 h-11 text-body">
-                      {t.subjectName ?? "—"}
+                      {t.subjectName ?? ""}
                       {t.staffCode && (
                         <span className="text-meta text-base-400 t-num"> {t.staffCode}</span>
                       )}
@@ -607,7 +581,7 @@ export default function HrPerformanceTab({
                     </td>
                     <td className="px-2.5 h-11 text-body t-num">{t.effectiveFrom}</td>
                     <td className="px-2.5 h-11 text-body text-base-500">
-                      {t.setByName ?? "—"}
+                      {t.setByName ?? ""}
                     </td>
                   </tr>
                 ))}
@@ -616,7 +590,7 @@ export default function HrPerformanceTab({
           </div>
         )}
         <p className="text-meta text-base-500 px-3 py-2 border-t border-base-200">
-          A target is never edited in place — changing it writes a new row from a date
+          A target is never edited in place. Changing it writes a new row from a date
           you choose, so last month keeps the number it was actually judged on. A
           person's own target wins over their store's; with no personal target the
           store's is <b>not</b> split across heads, the person simply reads “no target”.

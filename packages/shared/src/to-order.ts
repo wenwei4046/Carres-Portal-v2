@@ -1,3 +1,4 @@
+import { allocateWholeStockRecords } from "./so-batch-stock-match";
 /**
  * To Order — the Planning Workspace projection.
  *
@@ -43,6 +44,39 @@ import type { IsoDate } from "./working-days";
 // ── The words ───────────────────────────────────────────────────────────────
 
 /**
+ * ⭐ A GOODS CELL THAT HOLDS NOTHING SAYS WHY — owner ruling 2026-09-27 (Jess:
+ * "dash meaning not showing as blank, I want just write clear why blank").
+ * No `—` and no empty cell on a goods table: each absence names its reason.
+ * COPY-STANDARD "A goods cell with nothing in it" is the dictionary entry.
+ */
+export const GOODS_ABSENCE_WORDS = {
+  /** `Unit ID` on a line Catalog counts by quantity (accessories) — it has none by law. */
+  countedByQuantity: "Counted by quantity",
+  /** `Unit ID` before the PO exists — Units are born with the official PO (0443). */
+  unitAtIssue: "Created when PO is issued",
+  /** `Order By` on a line that is already ordered. */
+  alreadyOrdered: "Already ordered",
+  /** `Ordered Qty` when Ready Stock answered the line and no PO exists. */
+  fromReadyStock: "From ready stock",
+  /** `Supplier Deliver To` on a line nothing is bought for. */
+  noPurchaseNeeded: "No purchase needed",
+  /** `Supplier` when Catalog names none. */
+  supplierNotSet: "Supplier not set",
+  /** `PO Delivery Date` before a PO exists. */
+  noPoYet: "No PO yet",
+  /** The ☑ cell of a line that is a service, not goods. */
+  service: "Service",
+  /** A fact nobody recorded. */
+  notRecorded: "Not recorded",
+  /** `To buy` when nothing is left to buy. */
+  nothingToBuy: "Nothing to buy",
+  /** A receiving quantity before the count. */
+  notCounted: "Not counted",
+  /** A choice the form still asks for (SO Batch Deliver To, the MPR preview). */
+  notChosen: "Not chosen",
+} as const;
+
+/**
  * Every fixed string To Order shows. A word that is not here has not been
  * ruled, and inventing one on a screen is the failure this module exists to
  * make impossible (COPY-STANDARD is the canonical home; this is its mirror).
@@ -59,7 +93,7 @@ export const TO_ORDER_WORDS = {
   //    Preferred Delivery · SO No. · Model · Qty · PO No. Category is NOT a
   //    column (the left panel already said it) and Customer is not either
   //    (Loo: noise). PO No. rightmost = "did today's order happen". ───────
-  colPreferred: "Customer Delivery",
+  colPreferred: "Requested Delivery Date",
   colSoNo: "SO No.",
   colModel: "Model",
   colQty: "Qty",
@@ -196,7 +230,7 @@ export const TO_ORDER_WORDS = {
   clearSalesOrderScope: "Clear Sales Order scope",
   scopeNotFound: "Sales Order not found.",
   scopeBlockedProductionDays: "Set a number before this demand can be issued.",
-  scopeBlockedDeliveryDate: "No delivery date — this demand cannot be issued.",
+  scopeBlockedDeliveryDate: "No delivery date. This demand cannot be issued.",
   scopeUnresolved: "Purchasing cannot resolve this demand from the catalog.",
   scopeAlreadyCovered: "Demand is already covered by an open Purchase Order.",
   scopeAlreadyIssued: "Purchase Order already issued.",
@@ -232,24 +266,43 @@ export const TO_ORDER_WORDS = {
    */
   reason: "Reason",
   /**
-   * The six. **FOUR of them can be recorded and two cannot**, and the split is
-   * the database's, not this file's: `purchase_demands.purpose` has a CHECK
-   * holding exactly `ready_stock` · `display` · `office` · `warranty`, and
-   * 0323 opened the write door to those four and no more.
-   *
-   * `reasonSpareParts` and `reasonOther` therefore have NO value to be stored
-   * as and are NOT offered by the dialog — see `DEMAND_PURPOSES`, which is the
-   * list a control may render. They stay here because they are ruled words a
-   * later card may need; a word with no home in the store is a word the server
-   * refuses by name, which is exactly the failure 0322 paid for on the pool's
-   * reasons.
+   * THE APPROVED PURPOSE VOCABULARY — owner ruling 2026-08-28 (Purchasing
+   * Card 03; widened by Card 04, 2026-08-29). Exactly six creatable
+   * purposes; the doors (0399/0401: `purchasing_create_request` /
+   * `purchasing_create_demand`) admit exactly these values and refuse
+   * everything else — a retired value included — by name
+   * (`unknown_purpose`). Management is included under
+   * `Internal Staff Purchase`; there is no `Management Purchase`. Only
+   * `Other Purchase` asks — and must answer — `What is this for?`.
    */
   reasonReadyStock: "Ready Stock",
+  reasonShowroomDisplay: "Showroom Display",
+  reasonServiceCase: "Service Case",
+  reasonInternalStaffPurchase: "Internal Staff Purchase",
+  reasonSubsidiaryPurchase: "Subsidiary Purchase",
+  reasonOtherPurchase: "Other Purchase",
+  /**
+   * THE RETIRED FOUR — history's own words, never offered again (Card 03).
+   * Rows stored before the 2026-08-28 ruling keep printing the word they were
+   * actually asked as: an office-supplies buy was never a staff purchase, and
+   * relabelling old rows into the new vocabulary is the false mapping the
+   * Card bans. `RETIRED_DEMAND_PURPOSE_LABELS` below is their one home.
+   */
   reasonDisplay: "Display",
   reasonWarranty: "Warranty",
   reasonSpareParts: "Spare Parts",
   reasonOffice: "Office",
+  /**
+   * `reasonOther` still has NO value to be stored as and is NOT offered — see
+   * `DEMAND_PURPOSES`, which is the list a control may render. It stays here
+   * because it is a ruled word a later card may need; a word with no home in
+   * the store is a word the server refuses by name, which is exactly the
+   * failure 0322 paid for on the pool's reasons.
+   */
   reasonOther: "Other…",
+  /** The customer lane's auto-stamp (0361) — never offered in a picker; a PO
+   *  born from sales orders says so itself. */
+  reasonCustomerSales: "Customer Sales",
   // ── P15 (Loo, 2026-08-04) — the item picker stops being one word per row ──
   /**
    * The picker's SKU column. **This is the card's first and worst defect**:
@@ -460,28 +513,60 @@ export const TO_ORDER_WORDS = {
  * ── The Source a typed demand may carry (card P15, Loo 2026-08-04) ──────────
  *
  * **THE MIRROR OF A DATABASE LIST, NOT A MENU SOMEBODY CHOSE.** The values are
- * `purchase_demands.purpose`'s CHECK, and the write door
- * (`purchasing_create_demand`, opened by 0323) names the same four. Three
- * places must agree — the CHECK, the function's own gate, and this — and 0322
- * is why: when the pool's reasons lived in four places and only two were
- * widened, every dropdown offered a word the server refused by name.
+ * the ones the write doors admit (`purchasing_create_request` /
+ * `purchasing_create_demand`, gates re-ruled by 0399 to the owner-approved
+ * five, Card 03 2026-08-28; widened to six by 0401, Card 04 2026-08-29).
+ * Three places must agree — the doors, the API enums, and this — and 0322 is
+ * why: when the pool's reasons lived in four places and only two were
+ * widened, every dropdown offered a word the server refused by name. The
+ * CHECKs are deliberately WIDER than this list: they also hold the retired
+ * history values no door accepts any more.
  *
- * This array is therefore the ONLY list a control may render. `Spare Parts`
- * and `Other…` are ruled WORDS in `TO_ORDER_WORDS` and are deliberately not
- * here: neither has ever had a value to be stored as, and inventing one would
- * be a screen ruling on a business question ("other" than what?).
+ * This array is therefore the ONLY list a control may render.
+ * `Other Purchase` (Card 04) is the ruled catch-all with a value of its own,
+ * and it is the ONE purpose that asks — and must answer —
+ * `What is this for?`; the bare `Other…` word above remains a word with no
+ * stored value.
  *
- * THE ORDER IS THE DISPLAY ORDER and it is the frequency order, not the
- * CHECK's: Ready Stock is what almost every typed demand is, so it leads and
- * is the default; the other three are the exceptions this field exists to tell
- * apart.
+ * THE ORDER IS THE DISPLAY ORDER — the owner-approved order (Cards 03/04).
+ * Ready Stock is what almost every typed demand is, so it leads and is the
+ * default; the other five are the exceptions this field exists to tell apart.
  */
 export const DEMAND_PURPOSES = [
   { value: "ready_stock", label: TO_ORDER_WORDS.reasonReadyStock },
-  { value: "display", label: TO_ORDER_WORDS.reasonDisplay },
-  { value: "warranty", label: TO_ORDER_WORDS.reasonWarranty },
-  { value: "office", label: TO_ORDER_WORDS.reasonOffice },
+  { value: "showroom_display", label: TO_ORDER_WORDS.reasonShowroomDisplay },
+  { value: "service_case", label: TO_ORDER_WORDS.reasonServiceCase },
+  { value: "internal_staff_purchase", label: TO_ORDER_WORDS.reasonInternalStaffPurchase },
+  { value: "subsidiary_purchase", label: TO_ORDER_WORDS.reasonSubsidiaryPurchase },
+  { value: "other_purchase", label: TO_ORDER_WORDS.reasonOtherPurchase },
 ] as const;
+
+/**
+ * THE RETIRED VALUES — readable on history, creatable never (Card 03,
+ * 2026-08-28). The doors refuse them by name; the Register and object keep
+ * printing the word each row was actually asked as. NOT part of
+ * `DEMAND_PURPOSES`, so no control can offer one.
+ */
+export const RETIRED_DEMAND_PURPOSE_LABELS: Record<string, string> = {
+  display: TO_ORDER_WORDS.reasonDisplay,
+  warranty: TO_ORDER_WORDS.reasonWarranty,
+  office: TO_ORDER_WORDS.reasonOffice,
+  spare_parts: TO_ORDER_WORDS.reasonSpareParts,
+};
+
+/**
+ * What a stored demand/request purpose prints as — approved and retired
+ * values both answer; anything else is `null` (the caller decides what
+ * nothing looks like). ONE label arithmetic for every surface (Law D).
+ */
+export function demandPurposeLabelOf(v: string | null | undefined): string | null {
+  if (!v) return null;
+  return (
+    DEMAND_PURPOSES.find((p) => p.value === v)?.label ??
+    RETIRED_DEMAND_PURPOSE_LABELS[v] ??
+    null
+  );
+}
 
 export type DemandPurpose = (typeof DEMAND_PURPOSES)[number]["value"];
 
@@ -493,6 +578,20 @@ export const DEMAND_PURPOSE_VALUES = DEMAND_PURPOSES.map((p) => p.value) as read
 
 export function isDemandPurpose(v: unknown): v is DemandPurpose {
   return typeof v === "string" && DEMAND_PURPOSE_VALUES.includes(v);
+}
+
+/**
+ * What a PO's `purpose` (0361) prints as — the `Need for` fact on the PO
+ * surfaces. `customer_sales` is the customer lane's auto-stamp; typed
+ * purposes — approved and retired alike — reuse the one demand-label
+ * arithmetic above (Law D). NULL — every PO issued before 0361, deliberately
+ * not backfilled — prints nothing, and the caller decides what nothing looks
+ * like.
+ */
+export function poPurposeLabelOf(v: string | null | undefined): string | null {
+  if (!v) return null;
+  if (v === "customer_sales") return TO_ORDER_WORDS.reasonCustomerSales;
+  return demandPurposeLabelOf(v);
 }
 
 /**
@@ -623,8 +722,8 @@ export function soCountLabel(n: number): string {
 //   3. IT NAMES THE PARTY. `Reserve 2 to SO-1209` says who it is for.
 //
 // THE DRAWER IS NOT TOUCHED. This card moves the NEWER screen onto the older
-// one, never the reverse — `ReserveStockDialog` and `StockPickerGrid` keep
-// their wording byte for byte, and a test asserts it.
+// one, never the reverse — `StockPickerGrid` keeps its wording byte for
+// byte, and a test asserts it.
 
 /** `Carres Klang: 2 available` — the expanded row's one sentence. */
 export function freeStockLine(warehouse: string, n: number): string {
@@ -1203,6 +1302,16 @@ export interface ToOrderBuild {
    * joins the pool. Nothing is lost when it moves; the allocation moved.
    */
   fullyOnPo?: boolean;
+  /**
+   * Card 02-A — the engine's own timing facts, off the SAME bundle that
+   * produced this build's `arriveBy`. `orderBy` is the bundle's `raiseBy` (a
+   * bed set gates on its earlier leg on purpose) and `readyIfOrderedToday` is
+   * the bundle's `promiseIfOrderedToday` (the set is done when its last member
+   * is). They are CARRIED so the SO Batch rail can classify order timing
+   * without a second working-day arithmetic anywhere.
+   */
+  orderBy?: IsoDate | null;
+  readyIfOrderedToday?: IsoDate | null;
 }
 
 export interface ToOrderRow {
@@ -1563,30 +1672,19 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
     const groupOf = (l: ToOrderLine) => `${l.orderId}::${l.buildKey ?? `line::${l.lineId}`}`;
     for (const l of eligible) groupSize.set(groupOf(l), (groupSize.get(groupOf(l)) ?? 0) + 1);
 
-    const pool = new Map<string, { id: string; qty: number }[]>();
-    for (const [k, recs] of Object.entries(input.freeStock)) pool.set(k, [...recs]);
-
-    for (const r of net.lines) {
-      const line = r.line as ToOrderLine;
-      const need = r.toOrder;
-      if (need <= 0) continue;
-      if ((groupSize.get(groupOf(line)) ?? 1) > 1) continue;
-      const recs = pool.get(line.stockKey ?? line.sku);
-      if (!recs || recs.length === 0) continue;
-      let qty = 0;
-      const itemIds: string[] = [];
-      for (let i = 0; i < recs.length && qty < need; i += 1) {
-        const rec = recs[i]!;
-        if (qty + rec.qty > need) continue; // would over-reserve — skip, never split
-        qty += rec.qty;
-        itemIds.push(rec.id);
-      }
-      if (qty <= 0) continue;
-      pool.set(
-        line.stockKey ?? line.sku,
-        recs.filter((rec) => !itemIds.includes(rec.id)),
-      );
-      offerByLine.set(line.lineId, { qty, itemIds });
+    const records = Object.entries(input.freeStock).flatMap(([stockKey, units]) =>
+      units.map(unit => ({ ...unit, stockKey })));
+    const offers = allocateWholeStockRecords(net.lines, records,
+      result => result.toOrder,
+      (result, record) => {
+        const line = result.line as ToOrderLine;
+        return (groupSize.get(groupOf(line)) ?? 1) <= 1 && record.stockKey === (line.stockKey ?? line.sku);
+      });
+    for (const [result, records] of offers) {
+      offerByLine.set((result.line as ToOrderLine).lineId, {
+        qty: records.reduce((sum, record) => sum + record.qty, 0),
+        itemIds: records.map(record => record.id),
+      });
     }
   }
 
@@ -1696,7 +1794,7 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
           ),
           title:
             (nameCount.get(named) ?? 0) > 1
-              ? `${unitLabel(category, 1)} ${i} — ${named}`
+              ? `${unitLabel(category, 1)} ${i}: ${named}`
               : named,
           spec: buildSpec(members),
           codes: members.map((m) => m.sku).join(" · "),
@@ -1741,6 +1839,10 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
           coveredByOpenPoPos: namePos(
             members.flatMap((m) => poRefsByLine.get(m.lineId) ?? []),
           ),
+          // Card 02-A — the bundle's own dates, never recomputed here.
+          orderBy: bundleByLine.get(members[0]!.lineId)?.raiseBy ?? null,
+          readyIfOrderedToday:
+            bundleByLine.get(members[0]!.lineId)?.promiseIfOrderedToday ?? null,
         });
       }
 
@@ -1765,7 +1867,7 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
       rows.push({
         orderId,
         so: orderLines[0].so,
-        customer: orderLines[0].customerName ?? "—",
+        customer: orderLines[0].customerName ?? "",
         // A Ready Stock row has no customer and no SO; what it HAS is a
         // destination, and that is what the group header says instead.
         readyStock: orderLines[0].readyStock === true ? true : undefined,
@@ -1958,9 +2060,7 @@ export type IssuePlanError =
   | "duplicate_build"
   | "unknown_build"
   | "sofa_merge"
-  | "batch_too_large"
-  /** T6 — the build is on the sheet as a receipt; every unit is already bought. */
-  | "already_on_po";
+  | "batch_too_large";
 
 export interface IssuePlanCheck {
   ok: boolean;
@@ -2033,22 +2133,26 @@ export function validateIssuePlan(
           count: active.length,
         };
       }
-      /**
-       * T6 — a fully covered build is on the sheet now, as a RECEIPT. The page
-       * cannot tick one (`selectable` refuses a row with a purchase order), so
-       * this can only be reached by a stale tab or a hand-made request — and
-       * either way it would buy goods that are already bought. Refused HERE,
-       * server-side, because a rule that lives only in the browser is not a
-       * rule.
-       */
-      if (b.fullyOnPo) {
-        return {
-          ok: false,
-          code: "already_on_po",
-          message: "Something on this plan is already on a purchase order.",
-          count: active.length,
-        };
-      }
+      /* A FULLY COVERED BUILD IS ISSUABLE, and this is where it used to be
+         refused (`already_on_po`).
+
+         The rule rested on a premise that stopped being true on 2026-09-03:
+         "the page cannot tick one". It can now — YH ruled that a line with a
+         supplier, a cost and a price is buyable and that the buyer judges the
+         coverage. So the refusal had become a TRAP: the register offered the
+         tick, the operator ticked it, and the server answered "One line is
+         already on an open purchase order. Go back to buying and untick that
+         line" without saying which line, on a page that had just invited the
+         act.
+
+         The coverage it defended against is also not the duplication anyone
+         feared. `fullyOnPo` is drawn from a per-SKU pool with NO customer
+         attribution (T6), so the covering document routinely belongs to
+         ANOTHER customer; refusing here blocked a first purchase order for
+         this one. The duplication that IS real — an order whose OWN
+         `po_line_sources` lineage already covers every unit it required — is
+         refused by `isSelectableForOrder`, which reads the attributed fact
+         rather than the pool. */
       orders.add(b.orderId);
     }
     // A merged sofa purchase order is forbidden: fabric, size and configuration

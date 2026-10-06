@@ -175,11 +175,15 @@ describe("POST /api/warehouse/receipts", () => {
       validBody,
     );
     expect(res.status).toBe(201);
+    // 0426 — an absent arrivalEvidence/extraLines/units degrades to [] at the
+    // RPC, never to null/undefined (jsonb parameters read arrays).
     expect(sb.rpc).toHaveBeenCalledWith("warehouse_submit_receipt", {
       p_po_id: "PO-1001",
       p_do_number: "DO-5512",
       p_do_file_path: "PO-1001/abc-do.jpg",
       p_note: null,
+      p_arrival_evidence: [],
+      p_extra_lines: [],
       p_lines: [
         {
           id: LINE,
@@ -189,9 +193,127 @@ describe("POST /api/warehouse/receipts", () => {
           wrong_item_claim_type: null,
           damaged_photos: [],
           wrong_item_photos: [],
+          units: [],
         },
       ],
     });
+  });
+
+  it("carries the arrival time captured at the count (0601)", async () => {
+    const sb = makeSb({ data: { id: "r1" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req("/api/warehouse/receipts", "POST", await warehouseJwt(), {
+      ...validBody,
+      goodsReceivedTime: "2026-09-28T09:15:00+08:00",
+    });
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith(
+      "warehouse_submit_receipt",
+      expect.objectContaining({ p_goods_received_time: "2026-09-28T09:15:00+08:00" }),
+    );
+  });
+
+  it("still files the count, dated, on a database that does not take the time yet (0601 not applied)", async () => {
+    const sb = makeSb({ data: { id: "r1" } });
+    sb.rpc
+      .mockResolvedValueOnce({ data: null, error: { code: "PGRST202", message: "Could not find the function public.warehouse_submit_receipt" } })
+      .mockResolvedValueOnce({ data: { id: "r1" }, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req("/api/warehouse/receipts", "POST", await warehouseJwt(), {
+      ...validBody,
+      goodsReceivedTime: "2026-09-28T00:30:00+08:00",
+    });
+    expect(res.status).toBe(201);
+    const second = sb.rpc.mock.calls[1]![1] as Record<string, unknown>;
+    expect(second).not.toHaveProperty("p_goods_received_time");
+    expect(second.p_goods_received_at).toBe("2026-09-28");
+  });
+
+  it("maps arrival evidence, extra lines and per-unit outcomes onto the RPC (0426)", async () => {
+    const sb = makeSb({ data: { id: "r1" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const res = await req("/api/warehouse/receipts", "POST", await warehouseJwt(), {
+      ...validBody,
+      arrivalEvidence: [
+        { path: "PO-1001/arrival-1.jpg", kind: "photo" },
+        { path: "PO-1001/arrival-2.mp4", kind: "video" },
+      ],
+      extraLines: [{ sku: "EXTRA-SKU", qty: 2, note: "not on the PO" }],
+      lines: [
+        {
+          id: LINE,
+          receivedNow: 1,
+          damagedQty: 1,
+          damagedPhotos: ["PO-1001/x-claim.jpg"],
+          units: [
+            { unitCode: "U-260904-0001", outcome: "received" },
+            {
+              unitCode: "U-260904-0002",
+              outcome: "received_with_issue",
+              issueKind: "damaged",
+              note: "corner crushed",
+            },
+            { unitCode: "U-260904-0003", outcome: "not_received" },
+          ],
+        },
+      ],
+    });
+    expect(res.status).toBe(201);
+
+    const args = sb.rpc.mock.calls[0][1] as {
+      p_arrival_evidence: unknown;
+      p_extra_lines: unknown;
+      p_lines: Array<Record<string, unknown>>;
+    };
+    expect(args.p_arrival_evidence).toEqual([
+      { path: "PO-1001/arrival-1.jpg", kind: "photo" },
+      { path: "PO-1001/arrival-2.mp4", kind: "video" },
+    ]);
+    expect(args.p_extra_lines).toEqual([
+      { sku: "EXTRA-SKU", qty: 2, note: "not on the PO" },
+    ]);
+    // camelCase in, snake_case out — and a missing issueKind/note becomes
+    // null, never undefined (jsonb drops undefined keys silently).
+    expect(args.p_lines[0].units).toEqual([
+      {
+        unit_code: "U-260904-0001",
+        outcome: "received",
+        issue_kind: null,
+        note: null,
+      },
+      {
+        unit_code: "U-260904-0002",
+        outcome: "received_with_issue",
+        issue_kind: "damaged",
+        note: "corner crushed",
+      },
+      {
+        unit_code: "U-260904-0003",
+        outcome: "not_received",
+        issue_kind: null,
+        note: null,
+      },
+    ]);
+  });
+
+  it("422 on a unit outcome outside the governed three", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(makeSb() as any);
+    const res = await req("/api/warehouse/receipts", "POST", await warehouseJwt(), {
+      ...validBody,
+      lines: [
+        {
+          id: LINE,
+          receivedNow: 1,
+          units: [{ unitCode: "U-260904-0001", outcome: "lost" }],
+        },
+      ],
+    });
+    expect(res.status).toBe(422);
   });
 
   it("never calls the receive engine — a submission moves no goods", async () => {

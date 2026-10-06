@@ -1,10 +1,54 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { describe, it, expect } from "vitest";
 import {
   addOrderLinesInputSchema,
+  operationStageSchema,
   replaceOrderLinesInputSchema,
   submitOrderChangeRequestInputSchema,
   updateOrderInputSchema,
 } from "./orders";
+
+/**
+ * `orderSchema.parse()` runs on live rows in four routes, so this enum must
+ * equal the Postgres one exactly. It had drifted BOTH ways at once: `placed`
+ * was listed here after 0167 removed it from the type, and `waiting` — live
+ * since 0028 — was absent, so parsing a partner-rejected order threw.
+ *
+ * The migration file is the source of truth, so this test reads it rather than
+ * repeating the list. A second hard-coded copy is how the drift happened.
+ */
+describe("operationStageSchema matches the database enum", () => {
+  const migration = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "../../../../supabase/migrations/0167_clean_operation_stage_values.sql",
+  );
+
+  function dbValues(): string[] {
+    const sql = readFileSync(migration, "utf8");
+    const block = sql.match(/create type public\.operation_stage as enum \(([^)]*)\)/i);
+    if (!block) throw new Error("0167 no longer declares the enum in the expected shape");
+    return [...block[1]!.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]!);
+  }
+
+  it("declares exactly the values 0167 created", () => {
+    expect([...operationStageSchema.options].sort()).toEqual(dbValues().sort());
+  });
+
+  it("rejects `placed` — 0167 remapped it to confirmed; it is a FILTER value only", () => {
+    expect(operationStageSchema.safeParse("placed").success).toBe(false);
+  });
+
+  it("accepts `waiting` — the partner-rejection lane sets it", () => {
+    expect(operationStageSchema.safeParse("waiting").success).toBe(true);
+  });
+
+  it("negative control — the migration really is being read", () => {
+    expect(dbValues()).toContain("waiting");
+    expect(dbValues()).not.toContain("placed");
+  });
+});
 
 // 0220 — POS proceed-lane edits: customer.email joins the editable set.
 describe("updateOrderInputSchema.customer.email (0220)", () => {

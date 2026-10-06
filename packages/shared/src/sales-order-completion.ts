@@ -97,7 +97,7 @@ export function resolveOrderCompletion(input: CompletionInput): OrderCompletion 
   const moneyOutOpen = openRefunds.length > 0;
   const moneyOutWhy = moneyOutOpen
     ? openRefunds.some((r) => r.status === "approved")
-      ? "an approved refund is unpaid — Carres still owes the customer"
+      ? "an approved refund is unpaid. Carres still owes the customer"
       : "a refund request is undecided"
     : null;
 

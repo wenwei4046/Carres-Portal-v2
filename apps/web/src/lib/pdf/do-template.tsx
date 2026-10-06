@@ -33,8 +33,9 @@
  */
 
 import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { displayCustomerName } from "@/lib/customer-name";
 import { NOTO_SANS_SC_FAMILY } from "./fonts/noto";
-import { CARRES_COMPANY } from "./letterhead";
+import { CARRES_COMPANY, niceDate } from "./letterhead";
 import type { DoTemplateData } from "./types";
 
 const INK = "#1A1714";
@@ -48,19 +49,6 @@ const mm = (v: number) => v * 2.83465;
 const MARGIN = mm(12);
 const HEADER_H = mm(20);
 const FOOTER_H = mm(8);
-
-/** `2026-08-24` → `Mon, 24 Aug 26` (SO-PDF-STANDARD body-date form). */
-function niceDate(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso));
-  if (!m) return String(iso);
-  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
-    new Date(Date.UTC(y, mo - 1, d)).getUTCDay()
-  ];
-  const mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][mo - 1];
-  return `${dow}, ${d} ${mon} ${String(y).slice(2)}`;
-}
 
 const styles = StyleSheet.create({
   page: {
@@ -103,7 +91,10 @@ const styles = StyleSheet.create({
   colCode: { width: mm(30) },
   colUnit: { width: mm(26) },
   colPo: { width: mm(22) },
-  colQty: { width: mm(18), textAlign: "right", paddingRight: mm(5) },
+  // A quantity is a COUNT: centred, one weight (owner 2026-09-22,
+  // DOCUMENT-KIT.md §3 rule 5). The 5mm right inset went with the
+  // right-alignment it existed to soften.
+  colQty: { width: mm(18), textAlign: "center" },
   bandRow: {
     flexDirection: "row",
     backgroundColor: BAND_BG,
@@ -121,7 +112,7 @@ const styles = StyleSheet.create({
   descSub: { fontSize: 7, color: GREY, marginTop: mm(0.8), paddingLeft: mm(2), lineHeight: 1.2 },
   cellUnit: { fontSize: 7, color: GREY, width: mm(26), lineHeight: 1.3 },
   cellPo: { fontSize: 7, color: GREY, width: mm(22), lineHeight: 1.3 },
-  cellQty: { fontSize: 7, width: mm(18), textAlign: "right", paddingRight: mm(5), lineHeight: 1 },
+  cellQty: { fontSize: 7, width: mm(18), textAlign: "center", lineHeight: 1 },
 
   // ── sofa layout drawing (ported from po-template — direction contract) ──
   layout: { marginTop: mm(4), paddingHorizontal: mm(4) },
@@ -149,6 +140,18 @@ const styles = StyleSheet.create({
   signImage: { width: mm(55), height: mm(14), objectFit: "contain" },
   signCaption: { fontSize: 6.5, color: GREY, lineHeight: 1 },
   ackLine: { fontSize: 7, color: GREY, lineHeight: 1.3, marginTop: mm(2.5), paddingHorizontal: mm(4) },
+
+  // ── the COD band (0362, owner ruling 2026-08-19) — the one ruled
+  //    exception to "a delivery doc never talks money": the driver's
+  //    instruction, loud enough that goods cannot come down past it. ──
+  codBand: {
+    borderWidth: 1.4,
+    borderColor: "#000000",
+    paddingVertical: mm(2.2),
+    paddingHorizontal: mm(3),
+    marginBottom: mm(4),
+  },
+  codText: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4 },
 
   // ── footer (fixed) — §9 ──
   footer: {
@@ -306,7 +309,7 @@ export function DoTemplate(data: DoTemplateData) {
             <Text style={styles.blockLabel}>Deliver To</Text>
             <View style={{ marginTop: mm(1.5) }}>
               {([
-                ["Name", customer.name],
+                ["Name", displayCustomerName(customer.name)],
                 ["Address", deliveryAddress],
                 ["Tel", customer.phone],
                 /* who the driver calls when the customer is unreachable */
@@ -335,6 +338,14 @@ export function DoTemplate(data: DoTemplateData) {
             </View>
           </View>
         </View>
+        {/* ── COD (0362) — issued under the owner's approval and still owing:
+            the goods may be SEEN on the truck, but they come down only after
+            the full balance lands by online transfer. No cash. ── */}
+        {data.cod_instruction ? (
+          <View style={styles.codBand} minPresenceAhead={30}>
+            <Text style={styles.codText}>{data.cod_instruction}</Text>
+          </View>
+        ) : null}
         {/* ── items — quantity only; a delivery doc never talks money.
             Non-sofa lines share ONE table; each sofa SET gets its own page
             below — rows + drawing together, the PO law's one-set-per-page. ── */}
@@ -363,16 +374,16 @@ export function DoTemplate(data: DoTemplateData) {
                     <Text style={styles.cellCode}>{line.sku}</Text>
                     {hasUnits ? (
                       <Text style={styles.cellUnit}>
-                        {line.unit_codes && line.unit_codes.length > 0 ? line.unit_codes.join("\n") : "—"}
+                        {line.unit_codes && line.unit_codes.length > 0 ? line.unit_codes.join("\n") : " "}
                       </Text>
                     ) : null}
                     <View style={styles.desc}>
                       <Text style={styles.descMain}>{line.description}</Text>
                     </View>
                     <Text style={styles.cellPo}>
-                      {line.source_po && line.source_po.length > 0 ? line.source_po.join("\n") : "—"}
+                      {line.source_po && line.source_po.length > 0 ? line.source_po.join("\n") : " "}
                     </Text>
-                    <Text style={line.qty > 1 ? [styles.cellQty, { fontWeight: 700 }] : styles.cellQty}>
+                    <Text style={styles.cellQty}>
                       {line.qty}
                     </Text>
                   </View>
@@ -418,19 +429,19 @@ export function DoTemplate(data: DoTemplateData) {
               <Text style={styles.cellCode}>{model}</Text>
               {hasUnits ? (
                 <Text style={styles.cellUnit}>
-                  {modules.flatMap((m) => m.unit_codes ?? []).join("\n") || "—"}
+                  {modules.flatMap((m) => m.unit_codes ?? []).join("\n") || " "}
                 </Text>
               ) : null}
               <View style={styles.desc}>
-                <Text style={styles.descMain}>{setName(modules)} — 1 set · {modules.length} modules</Text>
+                <Text style={styles.descMain}>{setName(modules)} · 1 set · {modules.length} modules</Text>
                 {modules.map((m, mi) => (
                   <Text key={mi} style={styles.descSub}>
-                    · {moduleCodeOf(m)} — {moduleSpec(m)}
+                    · {moduleCodeOf(m)}: {moduleSpec(m)}
                   </Text>
                 ))}
               </View>
               <Text style={styles.cellPo}>
-                {[...new Set(modules.flatMap((m) => m.source_po ?? []))].join("\n") || "—"}
+                {[...new Set(modules.flatMap((m) => m.source_po ?? []))].join("\n") || " "}
               </Text>
               <Text style={styles.cellQty}>1</Text>
             </View>
@@ -475,7 +486,7 @@ export function DoTemplate(data: DoTemplateData) {
           <View style={styles.signZone}>
             <View style={styles.signBox}>
               {podSigned ? <Image src={pod!.signature_url!} style={styles.signImage} /> : null}
-              <Text style={styles.signCaption}>Customer Signature · {customer.name}</Text>
+              <Text style={styles.signCaption}>Customer Signature · {displayCustomerName(customer.name)}</Text>
             </View>
           </View>
           <Text style={styles.ackLine}>
@@ -490,7 +501,13 @@ export function DoTemplate(data: DoTemplateData) {
             <Text style={styles.footerCenter}>Computer-generated document · Signatures above are the delivery record.</Text>
             <Text
               style={styles.footerPage}
-              render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+              /* Sub-document counters, exactly as the SO template reads them:
+                 in the batch print (`Print N delivery orders`) each DO keeps
+                 its OWN `Page 1 of 1`; for a single document the counters are
+                 equal and the output is byte-identical to before. */
+              render={({ subPageNumber, subPageTotalPages }) =>
+                `Page ${subPageNumber} of ${subPageTotalPages}`
+              }
             />
           </View>
         </View>
