@@ -497,7 +497,7 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
     kind: "number", num: (r) => r.o.installment_months ?? null },
 
   /* ── DATES — every stamp, whatever act produced it ──────────────────────── */
-  { key: "proceed_date", label: "Proceed date", width: W.date, group: "Dates",
+  { key: "proceed_date", label: "Planned production start", width: W.date, group: "Dates",
     text: (r) => date(r.o.proceed_date, NOT_RECORDED), sortBy: (r) => r.o.proceed_date ?? "",
     kind: "date", iso: (r) => r.o.proceed_date ?? null },
   { key: "dispatched", label: "Dispatched", width: W.date, group: "Dates",

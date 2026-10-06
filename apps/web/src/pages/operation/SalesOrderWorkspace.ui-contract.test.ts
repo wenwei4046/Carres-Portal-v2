@@ -475,8 +475,12 @@ describe("Sales Order object template contract", () => {
       workspace.indexOf('data-pos-field="proceedDate"'),
       workspace.search(/<Block[^>]*title="Delivery">/),
     );
-    /* A recorded date is a photograph. */
-    expect(field).toContain('<Fact label="Proceed Date"');
+    /* A recorded date is a photograph. Its name is `Planned production start`
+       (two dates, two names, owner ruling 2026-10-06); `Proceed Date` is only
+       the actual hand-off and is never this field's label. */
+    expect(field).toContain('<Fact label="Planned production start"');
+    expect(field).toContain('<DatePicker id="so-proceed" label="Planned production start"');
+    expect(field).not.toMatch(/label="Proceed Date"/);
     expect(field).toContain('<DatePicker id="so-proceed"');
     /* The correction door, and the one thing that makes it safe: the test is
        the SAVED value. Reading `draft` would lock the control the instant a
@@ -1213,7 +1217,7 @@ describe("Sales Order object page — one form grammar", () => {
       return i;
     };
     const ruled = [
-      "SO Doc Date", "Proceed Date", "Customer Requested Delivery Date",
+      "SO Doc Date", "Planned production start", "Customer Requested Delivery Date",
       "Sales Location", "Salesperson", "Dealer",
     ];
     const seen = ruled.map(at);
@@ -1224,7 +1228,10 @@ describe("Sales Order object page — one form grammar", () => {
        SALES ORDER INFO block is read here too and must carry the same order. */
     const rows = pdfTemplate.indexOf("const orderDetailRows");
     const info = pdfTemplate.slice(rows, pdfTemplate.indexOf("];", rows));
-    const paper = ["SO Doc Date", "Proceed Date", "Customer Requested", "Sales Location", "Salesperson"];
+    const paper = ["SO Doc Date", "Planned production start", "Customer Requested", "Sales Location", "Salesperson"];
+    /* Two dates, two names (owner ruling 2026-10-06): the planned date never
+       prints under the hand-off's name. */
+    expect(info).not.toContain('"Proceed Date"');
     const onPaper = paper.map((w) => {
       const i = info.indexOf(w);
       expect(i, `${w} is on the document`).toBeGreaterThan(-1);

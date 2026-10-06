@@ -539,7 +539,8 @@ phone glyph 12×12px, SO No underline offset 2px; requested-date label two lines
 type, 16px pin glyph (stroke 1.6), full address left, access facts right in a 200px column with 12px gap,
 stacking at ≤440px. Sales facts padding 10×12px (≤460px: 10×8px), `SO Doc Date / Planned production start / Sales
 Location / Salesperson` in columns `1fr 1fr 1.55fr .75fr` with 12px gap, two columns at ≤440px (8px gap at
-≤420px); label 11px, value 12px/17px 500. Summary strip `Total payable · Paid to date · Balance due` as in
+≤420px); label 11px, value 12px/17px 500; above 440px the four labels share one row and the four values the
+next (subgrid, 4px between), so the wrapped `Planned production start` label never drops its value below the others. Summary strip `Total payable · Paid to date · Balance due` as in
 Info. Card width is the available width up to 560px; checked at 560/440/416/396/366px with no overflow.
 
 **Responsive rules — actual card width, not viewport width:**

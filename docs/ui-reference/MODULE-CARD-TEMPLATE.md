@@ -225,6 +225,7 @@ because three global fixes touch every state. Card height equal: **118 of 125**.
 | Owner rule | 5 | After a not-agreed result the cell keeps `Date not confirmed` (reference prints `No Answer`) | same |
 | Owner rule | 10 | Service lines read `Service`, not `—` | same |
 | Reference behaviour removed | Customer saves | No `Preview only · Recorded at …` note | same |
+| Owner rule · governed word (2026-10-06) | sales facts shown | The planned-date fact reads `Planned production start` (the hash-pinned reference still prints the retired `Proceed date`); on a card wider than 440px the label wraps to two lines and the four values share one row below the labels | **+16px** on the 560px card; same at ≤440px |
 
 ## Open — not approved (tracked in UI MASTER §7)
 

@@ -49,7 +49,11 @@ function Glyph({ name }: { name: keyof typeof GLYPH }) {
 export const CARD_WORDS = {
   orderDetails: "Order details",
   orderDate: "SO Doc Date",
-  proceedDate: "Proceed date",
+  /* `orders.proceed_date` — the day Sales PLANS production to start. Two dates,
+     two names (owner ruling 2026-10-06; COPY-STANDARD): `Proceed Date` names
+     only the actual hand-off (`orders.proceeded_at`), never this card fact. */
+  proceedDate: "Planned production start",
+  dayCountTitle: "Calendar days from Planned production start to customer’s original requested delivery",
   salesLocation: "Sales Location",
   salesperson: "Salesperson",
   address: "Delivery address",
@@ -320,7 +324,7 @@ export default function CompactModuleCard(p: CompactModuleCardProps) {
             ) : null}
           </div>}
           <div className={s.target}>
-            {p.target ? <><span className={s.targetLabel} title={p.target.label}>{p.target.labelLines?.map(line => <span key={line}>{line}</span>)}</span><b>{p.target.label && p.target.badge ? <><small title="Calendar days from Proceed date to customer’s original requested delivery">{p.target.badge}</small><span aria-hidden="true">·</span></> : null}<Glyph name="calendar" />{p.target.date}</b>{!p.target.label && p.target.badge ? <small className={s.badge}>{p.target.badge}</small> : null}</> : null}
+            {p.target ? <><span className={s.targetLabel} title={p.target.label}>{p.target.labelLines?.map(line => <span key={line}>{line}</span>)}</span><b>{p.target.label && p.target.badge ? <><small title={CARD_WORDS.dayCountTitle}>{p.target.badge}</small><span aria-hidden="true">·</span></> : null}<Glyph name="calendar" />{p.target.date}</b>{!p.target.label && p.target.badge ? <small className={s.badge}>{p.target.badge}</small> : null}</> : null}
           </div>
           <div className={s.actions}>
             {p.onOpen ? <button type="button" aria-label={p.openLabel ?? "Open order"} title={p.openLabel ?? "Open order"} onClick={p.onOpen}>↗</button> : null}

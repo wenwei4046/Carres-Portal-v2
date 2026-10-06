@@ -79,6 +79,7 @@ import {
   salesOrderNumberWord,
   salesOrderParamOf,
   mytDayOf,
+  PLANNED_PRODUCTION_START_REFUSALS,
   type CustomField,
   type OrderEntryTab,
   type SalesOrderRouteMap as SalesOrderRouteModel,
@@ -1667,7 +1668,9 @@ function SalesOrderWorkspaceBody() {
       return `Delivery is too soon. The earliest this cart can be promised is ${fmtDate(earliestPromise)}`;
     }
     if (draft.proceed_date && draft.delivery_date && draft.proceed_date > draft.delivery_date) {
-      return "The proceed date is after the delivery date";
+      /* One refusal, one wording, every door (COPY-STANDARD); the planned date
+         is `Planned production start` since the owner ruling of 2026-10-06. */
+      return PLANNED_PRODUCTION_START_REFUSALS.afterDelivery;
     }
     /* Building type is DELIVERY's fact — stairs, lift access, van parking all
      * hang off it (Jess, 2026-08-21: it must be filled, delivery needs it).
@@ -1775,7 +1778,7 @@ function SalesOrderWorkspaceBody() {
     if (after.lines.some((l) => l.removed && !protectedLine(l)) && after.lines.some((l) => protectedLine(l) && !l.removed))
       out.push("Free item: check it is still allowed without the cancelled item");
     if (after.header["proceed_date"] !== undefined && after.header["proceed_date"] !== (order?.proceed_date ?? null))
-      out.push("Proceed Date: Purchasing's release timing moves");
+      out.push("Planned production start: Purchasing's release timing moves");
     if (after.header["delivery_date"] !== undefined && after.header["delivery_date"] !== (order?.delivery_date ?? null))
       out.push("Requested Delivery Date: Delivery and Purchasing plan to the new date");
     const before = baseline.lines.filter((l) => !l.removed).reduce((n, l) => n + l.qty * l.unit_price, 0)
@@ -1801,7 +1804,7 @@ function SalesOrderWorkspaceBody() {
     customer_address_state: "State", customer_address_postcode: "Postcode", customer_address_unknown: "Address not given yet",
     customer_emergency: "Emergency contact", customer_billing: "Billing address", customer_billing_same: "Billing address same as delivery",
     entry_fields: "Other details", delivery_floor: "Floor", delivery_has_lift: "Lift available?",
-    delivery_stair_items: "Items needing stair carry", proceed_date: "Proceed Date",
+    delivery_stair_items: "Items needing stair carry", proceed_date: "Planned production start",
     delivery_date: "Requested Delivery Date", delivery_date_tbd: "Delivery date to be confirmed",
   };
   const factWord = (k: string, v: unknown): string => {
@@ -2718,6 +2721,11 @@ function SalesOrderWorkspaceBody() {
       <Block title="SO info">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Fact own={false} label="SO Doc Date" value={fmtDate(order?.placed_at ?? null)} />
+          {/* TWO DATES, TWO NAMES (owner ruling 2026-10-06): this field is
+              `orders.proceed_date`, the PLANNED production start, and reads
+              `Planned production start` here and on the PDF; `Proceed Date`
+              names only the actual hand-off (`orders.proceeded_at`). The
+              notes below predate the rename and say `Proceed Date` for it. */}
           {/* ⭐ THE RULED ORDER IS `SO Doc Date · Proceed Date · Customer
               Requested Delivery Date` (CARD ORDER AND NAMES, Jess 2026-09-21).
               It was built with the last two swapped, and the SALES ORDER PDF
@@ -2754,7 +2762,7 @@ function SalesOrderWorkspaceBody() {
           <div data-pos-field="proceedDate">
             {/* A never-recorded date reads `Not recorded` while locked; Edit opens the picker. */}
             {mode === "object" && editing ? (
-              <DatePicker id="so-proceed" label="Proceed Date" value={draft.proceed_date}
+              <DatePicker id="so-proceed" label="Planned production start" value={draft.proceed_date}
                 hint={
                   !baseline.proceed_date
                     ? "Never recorded. Fill it in once, then it locks"
@@ -2768,7 +2776,7 @@ function SalesOrderWorkspaceBody() {
                 onChange={(iso) => setField("proceed_date", iso)} />
             ) : (
               <span id="so-proceed">
-                <Fact label="Proceed Date" value={fmtDate(draft.proceed_date) || "Not recorded"} />
+                <Fact label="Planned production start" value={fmtDate(draft.proceed_date) || "Not recorded"} />
               </span>
             )}
           </div>

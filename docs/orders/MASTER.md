@@ -407,7 +407,7 @@ This is the current owner-approved Sales Order operating model and UI authority.
 older Sales Order placement, route-copy and action-presentation wording wherever they conflict.
 The implementation record that follows is evidence, not a competing target.
 
-**Two dates, two names — OWNER RULING 2026-10-06 (Jess) · APPROVED / screens NOT BUILT.**
+**Two dates, two names — OWNER RULING 2026-10-06 (Jess) · APPROVED / BUILT ON BRANCH (rename PR open, not merged or deployed).**
 `Proceed Date` = the actual day the order was handed to Operation (`orders.proceeded_at`, written by
 the system at final submit). `Planned production start` = the day Sales plans production to start
 (`orders.proceed_date`, asked at order entry, on or before the delivery date). Names only: no date
@@ -416,7 +416,13 @@ deadline (Sales may return an order to `Placed` only until it passes; `unproceed
 header day count; it does not set purchasing timing, SO Batch admission, Ready Stock priority or any
 reservation. The old name `Proceed date` for the planned date is retired on every surface (Sales
 Portal, SO page, compact card and its tooltip, SO PDF, Workspace, To Order); stale PR #1494 (move the
-PDF to `proceeded_at`) is withdrawn. Screens keep the old name until the rename build ships.
+PDF to `proceeded_at`) is withdrawn. The rename build covers the Sales Portal Step 3 field and refusals, the POS order
+detail, the principal raw-order form, the SO page field/Edit/change review/revision history, the Sales Orders
+optional column, the compact card fact and its `{n}d` tooltip (SO register and SO Batch), the SO PDF, Workspace,
+To Order, the old Orders control export header and every API refusal (mapped by DETAIL code; the database
+sentences are unchanged). `Proceed Date` stays on the register's first column, SO Batch and Ready Stock priority
+(all `proceeded_at`). 🟡 The SO page change review still says `Planned production start: Purchasing's release
+timing moves`, which contradicts the verified fact above; rewording it needs its own approval.
 
 **SO Header composition correction — owner approved 2026-10-05:** remove the separate Ampang/area cell; retain the full address below Header. Requested-date label has two small lines, date and day count together beneath. The day-count tooltip states `Calendar days from Planned production start to customer’s original requested date`. This changes no SO numbering or existing issued documents.
 

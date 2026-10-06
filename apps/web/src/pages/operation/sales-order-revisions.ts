@@ -23,7 +23,7 @@ const HEADER_LABELS: ReadonlyArray<[key: string, label: string, isDate?: boolean
   ["customer_billing", "Billing address"],
   ["delivery_date", "Requested Delivery Date", true],
   ["delivery_date_tbd", "Delivery date to be confirmed"],
-  ["proceed_date", "Proceed date", true],
+  ["proceed_date", "Planned production start", true],
   ["delivery_floor", "Floor"],
   /* R-13 — 0354 widened the writer to the portal's remaining questions and
      `sales_order_snapshot` sees every one of them, but this table never grew.
