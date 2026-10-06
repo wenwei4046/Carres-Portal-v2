@@ -180,7 +180,12 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
   });
   const data = batch.data;
   /* The whole batch: every supplier's POs and lines stamped in this window. */
-  const windowPos = useMemo(() => data ? batchPos(data).filter((po) => po.poWindow === windowKey && po.status !== "received") : [], [data, windowKey]);
+  /* Law D · ONE count: the same POs and the same `sentCurrentVersion` fact the
+     Tasks row and the Work completion read (`poWindowWorkFromSoBatch`). A
+     received PO whose current version is not marked sent still keeps the window
+     open there, so it is listed here too (production acceptance 2026-10-06:
+     row 11, panel 13, Info 16). */
+  const windowPos = useMemo(() => data ? batchPos(data).filter((po) => po.poWindow === windowKey) : [], [data, windowKey]);
   const windowLines = useMemo(() => data ? buyLines(data).filter((row) => row.poWindow === windowKey) : [], [data, windowKey]);
   /* Suppliers with work first (POs to send, then lines to buy), then the rest. */
   const suppliers = useMemo(() => {
@@ -243,7 +248,11 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
   useEffect(() => { try { sessionStorage.setItem(attemptsKey, JSON.stringify(attempts)); } catch { /* shown already */ } }, [attemptsKey, attempts]);
 
   const rows: PoFacts[] = facts.data ?? [];
-  const isSent = (fact: PoFacts) => !!fact.document && confirmedSendFor(fact.sends, fact.document.version);
+  /* Sent = the read's current-version fact (what completes the task); a send
+     recorded in this panel counts at once, before the read refreshes. A PDF
+     that cannot be built never turns a sent PO back into "to send". */
+  const sentInRead = new Set(pos.filter((po) => po.sentCurrentVersion).map((po) => po.poId));
+  const isSent = (fact: PoFacts) => sentInRead.has(fact.po.id) || (!!fact.document && confirmedSendFor(fact.sends, fact.document.version));
   const sent = rows.filter(isSent);
   const unsent = rows.filter((fact) => !isSent(fact));
 
@@ -546,10 +555,13 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
      are never added together). */
   const batchPoCount = data ? batchPos(data).filter((po) => po.poWindow === windowKey).length : 0;
   const batchToBuy = new Set(windowLines.map((row) => row.orderId)).size;
+  /* "This task" is what the row says: the POs still to send (the row's
+     `Send {n} POs`), never every PO the window ever issued. */
+  const toSendInWindow = windowPos.filter((po) => !po.sentCurrentVersion).length;
   const infoRows: Array<[string, string]> = [
-    [T.thisTask, `${windowPos.length ? T.posToSupplier(windowPos.length, parties) : T.itemsToBuy(windowLines.reduce((sum, row) => sum + (row.toBuy ?? 0), 0))} · ${T.salesOrders(orderIds.length)}`],
+    [T.thisTask, `${toSendInWindow ? T.posToSupplier(toSendInWindow, parties) : T.itemsToBuy(windowLines.reduce((sum, row) => sum + (row.toBuy ?? 0), 0))} · ${T.salesOrders(orderIds.length)}`],
     [T.wholeBatch, T.wholeBatchLine(batchPoCount, batchSuppliers, batchToBuy)],
-    [T.thisTaskDoneWhen, windowPos.length ? T.taskDoneRule(windowPos.length, parties) : T.taskDoneIssueRule(parties)],
+    [T.thisTaskDoneWhen, toSendInWindow ? T.taskDoneRule(toSendInWindow, parties) : T.taskDoneIssueRule(parties)],
     [T.batchDoneWhen, T.batchDoneRule],
   ];
   const infoContent = <dl className="flex flex-col px-3 py-2" data-testid="batch-info">

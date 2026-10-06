@@ -120,6 +120,24 @@ describe("batchTasksOf — one task per supplier and batch, never the word round
   });
 });
 
+describe("BatchPanel — one count with the Tasks row and the Work completion (Law D)", () => {
+  /* Production acceptance 2026-10-06: the row said `Send 11 POs`, the panel
+     listed 13 to send. A sent PO whose PDF cannot be built (no Deliver To
+     address) fell back to "to send" in the panel only. */
+  it("a PO the read marks sent stays sent even when its PDF cannot be built", async () => {
+    fake.pos[0]!.sends.push({ kind: "confirmed_sent", channel: "whatsapp", po_version: 1, sent_at: "2026-10-05T06:10:00Z", note: null });
+    const base = api.getMockImplementation()!;
+    api.mockImplementation(async (path: string, init?: { method?: string; body?: string }) => {
+      if (path.includes("4585") && path.endsWith("/print-data")) throw new ApiError(422, "destination_address_missing", { code: "destination_address_missing" });
+      return base(path, init);
+    });
+    mount();
+    await loaded();
+    expect(within(panel()).getByText("1 PO to send · Sending not confirmed")).toBeInTheDocument();
+    expect(within(panel()).queryByText(/2 POs to send/)).toBeNull();
+  });
+});
+
 describe("BatchPanel — opened by window key from any page", () => {
   it("header is the supplier over the time and date; tabs open on SO Batch Purchase; every PO is ticked", async () => {
     mount();
