@@ -197,6 +197,9 @@ window.fetch = async (input, init) => {
      id desc, `nextCursor` = the page's last row, the total on page one only. */
   if (/\/api\/operation\/orders(\?|$)/.test(url) && new URL(url, window.location.href).searchParams.get("paged") === "1") {
     const after = new URL(url, window.location.href).searchParams.get("after");
+    /* Every page read is recorded, so a measurement can show the walk. */
+    const reads = ((window as unknown as { __soListPageReads?: string[] }).__soListPageReads ??= []);
+    reads.push(new URL(url, window.location.href).search);
     const population = scenario === "empty" ? [] : [...orders].sort((a, b) =>
       b.placed_at.localeCompare(a.placed_at) || b.id.localeCompare(a.id));
     const keyOf = (o: (typeof orders)[number]) => `${o.placed_at}|${o.id}`;

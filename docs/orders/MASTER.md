@@ -933,8 +933,8 @@ FILTERS    active search + header filters shown as conditions · one `Clear filt
            (`salesOrderTotal`: permitted scope, rentals excluded, search not applied);
            unknown total → `{n} sales orders`, never a guessed `of`
 IDENTITY   Proceed Date · SO Doc Date · SO No lead (2026-09-21); SO No is a door to the order
-FOOTER     `{n} sales orders` unfiltered; `{n} of {m}` only when search, a header filter or the
-           server's row cap narrows the list (Card 12)
+FOOTER     `{n} sales orders` unfiltered; `{n} of {m}` only when search, a header filter or a
+           rail choice narrows the list (the 500-row cap no longer applies to this Register)
 1440       identity + main decision columns fully visible; the rest scrolls inside the grid;
            no auto-hidden default column, no squeezed text
 COLUMNS    resize · reorder · hide · visible `Reset columns` · personal, browser storage for now
@@ -962,6 +962,24 @@ applied), re-read with every list refresh (create/cancel invalidate the list). R
 total 612 → `24 of 612` and, searching, `3 of 612`; total unknown → `24 sales orders` / `3 sales
 orders`. The production SHA is recorded on the PR. **Owed:** the authenticated owner walk in
 production of the date-first order (fixture evidence is not production evidence).
+**Whole population (§0.0 Register scope, SO A3-3, 2026-10-06) — BUILT, merged with its PR
+`【SALES ORDERS】 A3-3`.** The Register no longer reads the one-answer list that stops at the newest
+500 orders. It reads `GET /api/operation/orders?paged=1`: the same `listScope`, search clauses and
+caller RLS, in pages of 500 ordered `placed_at` desc then `id` desc, each page handing back a keyset
+`nextCursor` (its last row); `salesOrderTotal` is counted once, on the first page. The browser
+(`useSalesOrderRegisterOrders`) follows the cursor to the last page and answers only then, so the
+rail `Order summary`, the footer `{n} of {m}`, `Group by` counts, Table and Cards all count the same
+complete population and, while a page is outstanding, print the existing `Loading` treatment, never
+a partial number. Export of the current view (Excel and list PDF) is the grid's own filtered and
+sorted result over that complete population; ticked-row export stays the ticked rows. Every other
+caller of the list (Delivery, Work, Payments, the dashboard, SO Batch's single-order lookup,
+`orderId=`, `count=only`) sends no `paged` and keeps its newest-500 answer unchanged. Evidence:
+API tests over a 1,203-order in-memory population (three pages, ties straddling both page edges,
+an order placed and one cancelled mid-walk — no row skipped or repeated; rows equal the total and
+`count=only`); web tests over a 612-order Register (list, summary, footer, groups, Cards, Excel,
+PDF, search, ticked export); each fails against the pre-fix source. Measured in the dev preview at
+1440 with 600 orders: no page-level sideways scroll. **Owed:** the authenticated production walk
+past 500 permitted orders (production holds test data today).
 
 ### The two-line cell law
 

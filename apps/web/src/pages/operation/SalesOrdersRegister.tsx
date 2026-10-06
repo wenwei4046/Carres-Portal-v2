@@ -1032,7 +1032,13 @@ export default function SalesOrdersRegister() {
      Memoized per role so the engine's memo actually hits; the layout store is
      per-role so one machine's Finance login does not restyle Operations'. */
   const [filteredSummaryRows, setFilteredSummaryRows] = useState<RegisterRow[] | null>(null);
-  const receiveSummaryRows = useCallback((next: RegisterRow[]) => setFilteredSummaryRows(previous => previous && previous.length === next.length && previous.every((row, index) => row.id === next[index].id && JSON.stringify([row.total, row.paid, row.balance]) === JSON.stringify([next[index].total, next[index].paid, next[index].balance])) ? previous : next), []);
+  /* While the pages load the grid holds no rows and reports an empty result;
+     kept, that empty result printed `0` and `RM 0` in the frame the complete
+     list arrived (measured at 1440, SO A3-3). It is not a result, so it is
+     not kept: the first frame after loading sums the complete list itself. */
+  const listLoading = useRef(isLoading);
+  listLoading.current = isLoading;
+  const receiveSummaryRows = useCallback((next: RegisterRow[]) => listLoading.current ? undefined : setFilteredSummaryRows(previous => previous && previous.length === next.length && previous.every((row, index) => row.id === next[index].id && JSON.stringify([row.total, row.paid, row.balance]) === JSON.stringify([next[index].total, next[index].paid, next[index].balance])) ? previous : next), []);
   const summaryRows = filteredSummaryRows ?? rows;
   const [quickOrderSnapshot, setQuickOrder] = useState<RegisterRow | null>(null);
   const quickOrder = quickOrderSnapshot ? all.find(row => row.id === quickOrderSnapshot.id) ?? quickOrderSnapshot : null;
