@@ -2665,7 +2665,7 @@ it now has two words, and each appears once per screen:
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
-| The money, as a fact line | **`RM {amount} unpaid`** (the 2026-09-25 screen-line rule: money says `Paid` or `RM {amount} unpaid`); **`Balance due`** is the label/column header and the Sales Order document word (2026-09-22) | Amount needed · Outstanding (on Payment/Work) · to collect · still needed · still to collect |
+| The money, as a fact line | **`RM {amount} unpaid`** (the 2026-09-25 screen-line rule: money says `Paid` or `RM {amount} unpaid`); **`Balance due`** is the label/column header and the Sales Order document word (2026-09-22) — the goods money only, never storage (owner ruling 2026-10-06); with an unpaid storage paper Payment adds **`Storage Invoice unpaid`** and the sum **`Pay before delivery`** (Payment MASTER §2) | Amount needed · Outstanding (on Payment/Work) · to collect · still needed · still to collect · a Balance due that includes storage · Total due · Grand total |
 | The date | **`Payment due {day}`** / **`Payment due today`** — the Monitor's own fact, on every Payment and Work surface (owner reconciliation 2026-09-25 of #1635's `by {date}`) | by {date} · to collect by · Due T−2 · Collect by |
 | Work middle card for collection | line 1 `PAYMENT · {customer}` · problem **`RM {amount} unpaid`** · action **`Ask customer to pay`** · footer **`SO-{n}`** | an Invoice number as the object · `Customer balance due` |
 | Work Route exception line | **`Payment due {day}`** — the deadline, once; `Payment · Hold delivery · Finance hold · {reason}` | the amount repeated here · by {date} |
