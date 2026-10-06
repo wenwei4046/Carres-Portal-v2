@@ -87,7 +87,7 @@ export const SO_GRID_COLUMNS: SoGridColumnDef[] = [
 
   // --- Delivery ----------------------------------------------------------
   { key: "delivery_date", label: "Delivery Date", group: "Delivery", type: "date", source: "order", defaultVisible: true, defaultWidth: 120 },
-  { key: "proceed_date", label: "Proceed Date", group: "Delivery", type: "date", source: "order", defaultVisible: false, defaultWidth: 120 },
+  { key: "proceed_date", label: "Planned production start", group: "Delivery", type: "date", source: "order", defaultVisible: false, defaultWidth: 120 },
   { key: "delivery_date_tbd", label: "Date TBD", group: "Delivery", type: "bool", source: "order", defaultVisible: false, defaultWidth: 90 },
   { key: "warehouse_name", label: "Location", group: "Delivery", type: "option", source: "resolved", defaultVisible: true, defaultWidth: 130, option: true },
   { key: "delivery_floor", label: "Floor", group: "Delivery", type: "number", source: "order", defaultVisible: false, defaultWidth: 70, align: "right" },

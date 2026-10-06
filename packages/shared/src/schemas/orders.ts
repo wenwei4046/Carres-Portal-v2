@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DELIVERY_FACT_REFUSALS } from "../sales-order-form";
+import { DELIVERY_FACT_REFUSALS, PLANNED_PRODUCTION_START_REFUSALS } from "../sales-order-form";
 import { MAX_DELIVERY_FLOOR } from "../constants";
 
 /**
@@ -371,15 +371,14 @@ export const createOrderInputSchema = z.object({
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "date"], message: "Delivery date is required. Ask the customer for the date before you save the order." });
   }
   if (!data.delivery.proceedDate) {
-    // ONE SPELLING (YH, 2026-08-28). This read "Proceed date is required.
-    // Choose the day production should start." — a second wording for the same
-    // refusal `draft.ts:611` already made in the ruled words, so the POS said
-    // one thing and its own schema said another. COPY-STANDARD:1447 governs it;
-    // the office door (0391) uses the same sentence, so all three agree.
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: "Proceed date: pick the day production should start" });
+    // ONE SPELLING (YH, 2026-08-28), and since 2026-10-06 ONE NAME: the
+    // planned date is `Planned production start` (owner ruling; COPY-STANDARD
+    // "Any door refuses a missing production start"). The wizard (`draft.ts`)
+    // and the API's mapping of the database refusal read the same constant.
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: PLANNED_PRODUCTION_START_REFUSALS.required });
   }
   if (data.delivery.date && data.delivery.proceedDate && data.delivery.proceedDate > data.delivery.date) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: "proceed date must be on or before the delivery date" });
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["delivery", "proceedDate"], message: PLANNED_PRODUCTION_START_REFUSALS.afterDelivery });
   }
   // 0219 — the per-method approval-code requirement is CONFIG-DRIVEN now
   // (order_entry_config.approvalCodeRequired), so it's enforced in the route
@@ -757,7 +756,7 @@ export const setOrderDateInputSchema = z.object({
   proceedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 }).refine((v) => v.proceedDate <= v.date, {
   path: ["proceedDate"],
-  message: "proceed date must be on or before the delivery date",
+  message: PLANNED_PRODUCTION_START_REFUSALS.afterDelivery,
 });
 export type SetOrderDateInput = z.infer<typeof setOrderDateInputSchema>;
 
