@@ -141,6 +141,14 @@ Dealer commission rules:
   - **A receipt counts in the month the system records it.** The workbook let a claim sheet move a receipt between months only because nothing was systematic yet (「到时就是根据每个月的真实收款」).
   - **The system's own records are the source.** The workbook's corrections to hand-made source files do not carry over (「到时就是根据系统的记录来算了」).
 - **Subscription is not dealer commission (Chew 2026-10-05).** 「subscription 是subscription， dealer 是dealer, 不是一样的东西」. Subscription commission stays in Rental, Jess's module. The dealer report, statement and payout leave it out.
+- **Subscription, Chew's review (2026-10-06).** Rental is Jess's module, so these are Chew's positions to take to Jess, except the ledger, which is Finance's:
+  - Billing should start when the goods reach the customer, not at signing. Today month 1 falls due on the signing day. Jess's 2026-09-23 target starts *service* at the customer's receipt and says it does not change billing timing (Rental MASTER §5.6, §5.9), so this is a new rule for Jess.
+  - A transfer is recorded on the day it arrives. Today the `Record transfer` button records the day it is pressed: the API takes a received date, but the screen does not ask for one.
+  - Lateness must not come from Carres recording late. Today a month is late until it is recorded, counted from its due date to today, and late interest (charged by hand) uses the same count.
+  - Early settlement, buyout, default and repossession: to be confirmed. Settlement exists (remaining rent plus interest charged, no discount); the others are statuses with no function.
+  - Suppliers and whoever earns the commission should have a login to see their subscriptions' status. External logins are Jess's to authorise (ERP-ARCHITECTURE §6.4–6.5).
+  - Who the commission is for: Chew reads it as the agent's; the code does not say (screens call it "store" or "sales").
+  - Finance's own part: how a collected month enters the books is to be confirmed. Today it posts the whole month as rental income (Dr bank, cash or card; Cr 4200), with no supplier payable, commission payable or interest.
 - **Subscription, measured 2026-10-05.** Subscription commission is a separate mechanism inside Rental (Jess's module). Each plan carries its own commission rate, set in Rental's plan settings. The rate is copied onto the agreement when it is signed. Each collected month records commission = the month's payment × that rate, beside the supplier's share. It is not in the dealer commission report and has no payout. It shows only on Rental's collection screen, and it does not say whether it is the dealer's or a salesperson's. A subscription's sales order is priced at RM 0, so it earns nothing in the dealer report and is not counted twice.
 - **Noted for later (Chew 2026-10-05).** A list's search box opens already typed-into, not behind a click. To change together with other UI items; first check whether it is the shared kit search.
 
