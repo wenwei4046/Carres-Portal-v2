@@ -115,15 +115,27 @@ function mount(at = "/operation/orders") {
     </QueryClientProvider>,
   );
 }
+/* 612 rows is a big DOM for jsdom: these read by test id, label and CSS
+   rather than by role, which would name every button on every row. */
 const summary = () => screen.getByTestId("sales-orders-summary");
 const summaryValue = (label: string) => within(summary()).getByText(label).nextElementSibling as HTMLElement;
 const footer = () => screen.getByTestId("grid-footer");
+const rowBoxes = () => [...document.querySelectorAll<HTMLInputElement>('input[type="checkbox"][aria-label="Select row"]')];
+const pageTools = () => document.querySelector<HTMLElement>('button[aria-label="Page tools"]')!;
+const menuItem = (name: string) =>
+  [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((item) => item.textContent?.trim() === name);
 async function exportCurrentViewAs(format: "Excel" | "PDF") {
-  fireEvent.keyDown(screen.getByRole("button", { name: "Page tools" }), { key: "Enter" });
-  fireEvent.click(screen.getByRole("menuitem", { name: "Export" }));
-  fireEvent.click(await screen.findByRole("menuitem", { name: format }));
+  fireEvent.keyDown(pageTools(), { key: "Enter" });
+  await waitFor(() => expect(menuItem("Export")).toBeDefined());
+  fireEvent.click(menuItem("Export")!);
+  await waitFor(() => expect(menuItem(format)).toBeDefined());
+  fireEvent.click(menuItem(format)!);
 }
-const exportedSoNumbers = () => (mocks.sheet.mock.calls[0]![0] as Array<Record<string, string>>).map((row) => row["SO No"]);
+const exportedSoNumbers = (call = 0) =>
+  (mocks.sheet.mock.calls[call]![0] as Array<Record<string, string>>).map((row) => row["SO No"]);
+/* jsdom has no object URLs; the list PDF preview only needs one to exist. */
+const blobUrls = URL as unknown as { createObjectURL?: unknown; revokeObjectURL?: unknown };
+const realBlobUrls = { create: blobUrls.createObjectURL, revoke: blobUrls.revokeObjectURL };
 
 beforeEach(() => {
   answers.clear();
@@ -134,20 +146,25 @@ beforeEach(() => {
   everyPageSpy.mockClear();
   oneAnswer.mockClear();
   localStorage.clear();
+  blobUrls.createObjectURL = () => "blob:preview";
+  blobUrls.revokeObjectURL = () => {};
 });
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+  blobUrls.createObjectURL = realBlobUrls.create;
+  blobUrls.revokeObjectURL = realBlobUrls.revoke;
+});
 
 describe("A3-3 · more than 500 permitted orders", () => {
-  it("lists all 612 — the oldest included — and asks for every page, not the newest 500", () => {
+  it("lists all 612; summary, footer and total reconcile; Excel and PDF of the current view write all 612", async () => {
     mount();
+    /* The Register asks for EVERY page — never the one-answer newest 500. */
     expect(everyPageSpy).toHaveBeenCalledWith({ stage: "proceeded" });
     expect(oneAnswer.mock.calls.some((args) => (args[0] as { stage?: string } | undefined)?.stage === "proceeded")).toBe(false);
+    expect(rowBoxes()).toHaveLength(POPULATION);
     expect(screen.getAllByText(OLDEST_SO)).not.toHaveLength(0);
-    expect(screen.getAllByRole("checkbox", { name: "Select row" })).toHaveLength(POPULATION);
-  });
 
-  it("the rail summary, the footer and the server total reconcile", () => {
-    mount();
     expect(summaryValue("Sales orders")).toHaveTextContent(String(POPULATION));
     expect(summaryValue("Total payable")).toHaveTextContent("612,000");
     expect(summaryValue("Paid to date")).toHaveTextContent("76,500");
@@ -155,31 +172,15 @@ describe("A3-3 · more than 500 permitted orders", () => {
     /* Nothing narrows the list, so the footer is the plain count of all 612. */
     expect(footer()).toHaveTextContent(/^612 sales orders/);
     expect(footer()).not.toHaveTextContent(" of ");
-  });
 
-  it("Export Excel of the current view writes all 612 rows, the oldest included", async () => {
-    mount();
     await exportCurrentViewAs("Excel");
     await waitFor(() => expect(mocks.write).toHaveBeenCalledTimes(1));
     expect(exportedSoNumbers()).toHaveLength(POPULATION);
     expect(exportedSoNumbers()).toContain(OLDEST_SO);
-  });
 
-  it("the list PDF of the current view carries the same 612 rows", async () => {
-    /* jsdom has no object URLs; the preview only needs one to exist. */
-    const blobUrls = URL as unknown as { createObjectURL?: unknown; revokeObjectURL?: unknown };
-    const saved = { create: blobUrls.createObjectURL, revoke: blobUrls.revokeObjectURL };
-    blobUrls.createObjectURL = () => "blob:preview";
-    blobUrls.revokeObjectURL = () => {};
-    try {
-      mount();
-      await exportCurrentViewAs("PDF");
-      await waitFor(() => expect(mocks.pdf).toHaveBeenCalledTimes(1));
-      expect((mocks.pdf.mock.calls[0]![0] as { rows: unknown[] }).rows).toHaveLength(POPULATION);
-    } finally {
-      blobUrls.createObjectURL = saved.create;
-      blobUrls.revokeObjectURL = saved.revoke;
-    }
+    await exportCurrentViewAs("PDF");
+    await waitFor(() => expect(mocks.pdf).toHaveBeenCalledTimes(1));
+    expect((mocks.pdf.mock.calls[0]![0] as { rows: unknown[] }).rows).toHaveLength(POPULATION);
   });
 
   it("a search over the whole population: list, summary, footer and export are the same 306", async () => {
@@ -192,16 +193,17 @@ describe("A3-3 · more than 500 permitted orders", () => {
     await exportCurrentViewAs("Excel");
     await waitFor(() => expect(mocks.write).toHaveBeenCalledTimes(1));
     expect(exportedSoNumbers()).toHaveLength(306);
+    /* An order past the first 500 of the population is in the file. */
     expect(exportedSoNumbers()).toContain(`SO-${30_000 - 610}`);
   });
 
   it("ticked-row export stays exactly the ticked rows", async () => {
     mount();
-    const boxes = screen.getAllByRole("checkbox", { name: "Select row" });
-    fireEvent.click(boxes[0]!);
-    fireEvent.click(boxes[POPULATION - 1]!);
+    fireEvent.click(rowBoxes()[0]!);
+    fireEvent.click(rowBoxes()[POPULATION - 1]!);
     expect(footer()).toHaveTextContent(/^2 selected sales orders/);
-    fireEvent.click(screen.getByRole("button", { name: /Export Excel \(2\)/ }));
+    const selectedExport = [...document.querySelectorAll("button")].find((b) => /Export Excel \(2\)/.test(b.textContent ?? ""))!;
+    fireEvent.click(selectedExport);
     await waitFor(() => expect(mocks.write).toHaveBeenCalledTimes(1));
     expect(exportedSoNumbers()).toEqual(["SO-30000", OLDEST_SO]);
   });
@@ -214,7 +216,7 @@ describe("A3-3 · more than 500 permitted orders", () => {
 
   it("Cards show every order of the population", () => {
     mount("/operation/orders?view=cards");
-    expect(within(screen.getByTestId("sales-orders-cards")).getAllByTestId(/^sales-order-card-/)).toHaveLength(POPULATION);
+    expect(screen.getByTestId("sales-orders-cards").querySelectorAll('[data-testid^="sales-order-card-"]')).toHaveLength(POPULATION);
   });
 
   it("while pages are still loading, no count, total or footer number is printed", () => {
