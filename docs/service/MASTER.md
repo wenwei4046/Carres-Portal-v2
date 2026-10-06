@@ -597,6 +597,9 @@ Service Note prints from the Case; data stays.
 
 ## 7.9 · Work Engine actions — resolved shared Operation ownership and pending admission
 
+**RULING / APPROVED — internal processing deadlines, owner confirmation 2026-10-06.** Once required evidence is complete, evidence review / remedy decision is handled by the next Office working day; when an exception request is ready, the governed Approver handles it by the next Office working day; when all required execution facts are ready, the assigned Case owner follows up for final customer confirmation by the next Office working day. “Handled” means a recorded check, reasoned decision or actual contact result as applicable; it does not mean the customer must respond or the supplier must finish by then. A failed-collection result or recorded public complaint is handled on the same Office working day; after-office receipt moves the internal response deadline to the next Office working day. Existing shared Office calendar/hours govern the boundary; no undocumented page-local cutoff is introduced. The assigned Case owner / authorised cover owns routine acts; exception approval/public response uses its governed Approver. These due dates start from the exact applicable source fact, are not reset by refresh, helping or reassignment, and do not replace any original Delivery/Payment/Purchasing obligation. Opening a page, drafting/sending a message or waiting does not itself complete the required outcome or pause the §4 Case clock. Intake missing-evidence chasing and other unlisted steps do not acquire a new approved due merely because they appear in the action catalogue.
+
+
 **RULING 2026-10-06 (Jess) — routine Service Case work stays inside Operation and is SHARED.**
 *"operation wont pass back to sales person. service duty ppl need to share."* Therefore a governed
 `Service Duty` exists in Settings → Staff & Duties; the Sales Order PIC is never the Case owner and
@@ -621,7 +624,7 @@ the Duty switches from per-Case round robin to monthly allocation and nothing el
 
 **CURRENT ADMISSION LIMIT — measured at main `678c27346`, 2026-10-06.** The owner rule above is resolved; do not re-interview the owner or revive a monthly single-holder proposal. Workspace §6.1/§11.5 still records the earlier admission hold, and the Work reader does not demonstrate routine Service actions. The remaining boundary is implementation plus approval of proposed per-step clock laws, not absence of the routine owner decision. The existing 14-working-day deadline/day-10 event is a reusable Case source, not evidence that Service is already in Tasks. No Service routine Tasks production verification is claimed.
 
-**PROPOSAL / NOT LAW — action catalogue for later Workspace admission (owner rule is resolved; proposed step clocks are not automatically approved):**
+**Action catalogue for later Workspace admission — owner rule and explicitly scoped deadlines in §7.9 are APPROVED; unlisted clocks, approval scope and new actions remain PROPOSAL / NOT LAW.**
 
 | Action identity | Fact (line 1) · act (line 2) | Owner rule | Due | Closes when |
 |---|---|---|---|---|
@@ -782,7 +785,7 @@ Payment · Sales Order. Tally recorded here as sent / acknowledged / aligned.
 
 **RULING / APPROVED — all-Case first response, owner 2026-10-06.** Every Case receives a substantive first response within two Office working days (§7.2); acknowledgment alone is not completion.
 
-**PROPOSAL / NOT LAW — remaining response timing for owner review.** Internal evidence review, remedy decisions, approval and final-confirmation follow-up should have a next-Office-working-day action deadline from the triggering fact; failed collection and public escalation should be handled the same Office working day (after hours: next Office working day). These are proposed action response deadlines, never promised supplier repair, stock arrival or customer-response dates. Waiting or sending never closes an obligation or pauses the existing 14-working-day Case deadline. Preserve §4's derived calendar rule, bounded extension and deadline-bound call events; do not introduce the conflicting proposed settings snapshot for existing Case deadlines. New source obligations keep their occurrence, original trigger, owner and due across repeated events and reassignment.
+**RULING / APPROVED — internal processing timing, owner 2026-10-06 (§7.9).** Evidence review, remedy decisions, approval and final-confirmation follow-up have the scoped next-Office-working-day processing rule; failed collection and public escalation use the same-Office-day / after-hours-next-day rule. These are proposed action response deadlines, never promised supplier repair, stock arrival or customer-response dates. Waiting or sending never closes an obligation or pauses the existing 14-working-day Case deadline. Preserve §4's derived calendar rule, bounded extension and deadline-bound call events; do not introduce the conflicting proposed settings snapshot for existing Case deadlines. New source obligations keep their occurrence, original trigger, owner and due across repeated events and reassignment.
 
 Recommend ordinary policy-authorised remedies proceed with the assigned Case owner's recorded decision; exceptions (goodwill, charge waiver, refusing an eligible entitlement, refund, condition waiver, public-escalation decision) require the governed Approver and cannot override an absolute policy safety/condition prohibition. Payment executes approved customer money; Purchasing owns supplier recovery independently. Trade-off: faster normal handling with clearer response expectations increases Operation workload and requires monitored Duty coverage; exception control remains. This recommendation is overturned by evidence that two-day replies cannot be staffed, that ordinary remedies require commercial approval by policy, or that existing source deadlines would be duplicated. Any contrary approved policy wins and the conflict stays visible for resolution.
 
@@ -793,7 +796,7 @@ Recommend ordinary policy-authorised remedies proceed with the assigned Case own
 | 待审项 | 已批准边界 | 推荐与操作影响 |
 |---|---|---|
 | 首次实质回复覆盖 | 全部Case两Office工作日已批准，2026-10-06 | 已解决，不重问；Operation owner／cover负责，收到式回复不算 |
-| 新内部动作期限 | 原14日／四日前联系／一次有界延期保持 | 下一Office工作日，拒收和公开投诉当日／非办公时间下一Office日；不替代外部执行承诺 |
+| 内部处理期限 | §7.9 owner已批准，2026-10-06；原Case规则保持 | 已解决：审证据／决定／审批／最终确认跟进next Office日，拒收／公开投诉同日或after-hours next日；未列步骤不自动获批 |
 | 审批范围 | Service Case Approver与绝对政策限制保持 | 普通政策内由Case owner执行，例外走Approver；绝对禁止项不能被审批绕过 |
 | No remedy／Withdrawn／reopen | 现有close gate保留 | 需要明确各自证据、授权、客户告知、重开触发和期限；不得默认当Solved或绕过确认 |
 | Excel发现的扩展 | Excel事实不等于新增rule批准 | §7.26 A1–A9仍提案，尤重复维修、多个SO、外部表单替换；先核对现有authority，不把它们漏交工程猜 |
@@ -951,7 +954,7 @@ Case instead of a sheet per case; counts that withhold themselves when unmeasura
 ### 7.27.7 · 期限与每日操作
 
 - Case 完成期限沿用 §4：14工作日、适用公司日历、期限前四工作日联系、一次有界延期、联系事件绑定当时的期限。不得把 Office 日历和 Case 的 Mon–Sat 日历混成一个。
-- 全Case首次回复两Office工作日已批准；其他新内部动作期限仍是提案；必须有 original trigger、calendar、owner、completion fact，不能只写“urgent”。等待客户／供应商和发消息均不暂停 Case 时钟。
+- 全Case首次回复两Office工作日及§7.9列明的内部处理期限已批准；未列步骤期限仍是提案；必须有 original trigger、calendar、owner、completion fact，不能只写“urgent”。等待客户／供应商和发消息均不暂停 Case 时钟。
 - 新期限不得与 Delivery、Payment、Purchasing 原动作产生第二个 due。多人协助、重复消息、刷新页面不重开同一 action occurrence 或推迟 due。
 - **早上：**看分配给自己的未完成动作、新回复和到期事项；打开 exact Case，先处理必需动作，不从表格筛选猜工作优先级。
 - **白天：**接报 → 核对重复 → 回复／补证 → 决定／审批 → 原模块安排执行。客户来电时读相同 Case 历史，不再找多份表格。
