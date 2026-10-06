@@ -62,6 +62,14 @@ Carres has one cross-module Work coordination surface. Module Registers, queues 
 may show the same obligation, but never become separate Work Engines. One obligation retains one
 identity, owner rule, due rule, completion fact and deep link everywhere.
 
+**Customer enquiries — shared contract, 2026-10-06.** Read
+[`Customer Service MASTER`](../customer-service/MASTER.md) §§4, 13–16 before building its projection.
+The approved target reuses the same Tasks/working panel and Staff & Duties, including enquiries
+without an SO. Customer Service owns its first-response rule and handling evidence; Case response
+and results remain Service-owned. Conversation discovery inside Workspace is a supported
+recommendation awaiting owner/shared-UI consolidation, not approval of another page or task engine.
+No enquiry projection, connected message history or rollout is claimed by this pointer.
+
 ## 2 · Action admission contract
 
 An action enters Work only when its owning module supplies:

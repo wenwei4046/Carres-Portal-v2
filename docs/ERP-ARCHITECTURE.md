@@ -320,6 +320,14 @@ no canonical module MASTER; that is a current authority gap, not permission for 
 invent Catalog truth.** Receiving and Supplier Claim remain responsibilities governed inside the
 Purchasing MASTER until an approved re-ruling gives either a separate MASTER.
 
+**Customer communication boundary — Blueprint consolidated 2026-10-06.**
+[`customer-service/MASTER.md`](customer-service/MASTER.md) owns customer-enquiry answer and
+handover rules, the approved first-response coverage and the connected staff-workspace target.
+Communication includes pre-purchase contacts and links source records without fabricating an SO
+or Case. Workspace projects its admitted source obligations; business outcomes remain with the
+owners above. That MASTER distinguishes approved boundaries from proposed full enquiry lifecycle
+and discovery placement. It authorises neither a second inbox nor channel activation.
+
 Workspace is deliberately absent from this business-record ownership table. Dashboard and Work are
 cross-module projections and own no business outcome. `docs/workspace/MASTER.md` is the single
 Workspace authority. Its Staff & Duties, Shared Duty Resolver, one cross-module Work boundary and
