@@ -62,6 +62,8 @@ import {
   STAIR_CARRY_ADDON_KEY,
   SERVER_EXCLUSIVE_ADDON_KEYS,
   type SalesOrderChangeSide,
+  salesOrderChangedSinceOpened,
+  type SalesOrderEditBaseline,
   composeEmergencyContact,
   CUSTOMER_GENDER_OPTIONS,
   CUSTOMER_RACE_OPTIONS,
@@ -135,6 +137,8 @@ import {
   useSubmitSalesOrderChanges,
   type SalesOrderRevisionRow,
   type SalesOrderSnapshot,
+  type SalesOrderEditStale,
+  type operationOrderDetailResponse,
 } from "@/lib/queries";
 import { routeActionOwnersOf } from "./workspace-duty-owner";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
@@ -142,7 +146,7 @@ import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CorrectionWorkList from "./CorrectionWorkList";
 import { DraftReview, WaitingRequest } from "./SalesOrderChangePanels";
 import type { RecordedAgreement } from "./customer-agreement";
-import { configWords, diffRows, serviceSizeDraft, resizeService, sizeServiceUnit, NOT_IN_CATALOG, servicesWords, type EditAddon, type EditLine } from "./sales-order-change";
+import { configWords, diffRows, serviceSizeDraft, resizeService, sizeServiceUnit, NOT_IN_CATALOG, servicesWords, type DiffRow, type EditAddon, type EditLine } from "./sales-order-change";
 import { useAuth } from "@/lib/auth";
 import SalesOrderAttribution, { useCanChangeSalesOwnership } from "./SalesOrderAttribution";
 import SalesOrderLedger from "./SalesOrderLedger";
@@ -727,6 +731,95 @@ export function snapshotTemplateData(
   } as SalesOrderTemplateData;
 }
 
+/** The order as the edit form holds it — ONE builder for the first seed and
+ *  for a refused commit's re-read (concurrent editing), so both forms agree. */
+export function draftFromOrderDetail(
+  order: operationOrderDetailResponse["order"],
+  detailLines: operationOrderDetailResponse["lines"],
+  detailAddons: operationOrderDetailResponse["addons"],
+): Draft {
+  const bag = order as unknown as Record<string, unknown>;
+  const str = (k: string) => (bag[k] == null ? "" : String(bag[k]));
+  const entryFields =
+    ((order as { entry_data?: { fields?: Record<string, unknown> } | null }).entry_data?.fields ??
+      {}) as Record<string, unknown>;
+  const emergency = parseEmergencyContact(order.customer_emergency);
+  const custom: Record<string, string> = {};
+  for (const [k, v] of Object.entries(entryFields)) {
+    if (k === "building_type") continue;
+    custom[k] = v == null ? "" : String(v);
+  }
+  return {
+    customer_name: order.customer_name ?? "",
+    customer_phone: order.customer_phone ?? "",
+    customer_email: str("customer_email"),
+    customer_race: str("customer_race"),
+    customer_gender: str("customer_gender"),
+    customer_birthday: str("customer_birthday").slice(0, 10) || null,
+    customer_address: order.customer_address ?? "",
+    customer_address_line1: str("customer_address_line1"),
+    customer_address_line2: str("customer_address_line2"),
+    customer_address_city: str("customer_address_city"),
+    customer_address_state: str("customer_address_state"),
+    customer_address_postcode: str("customer_address_postcode"),
+    customer_address_unknown: Boolean(order.customer_address_unknown),
+    building_type: entryFields.building_type == null ? "" : String(entryFields.building_type),
+    emergency_name: emergency.name,
+    emergency_phone: emergency.phone,
+    emergency_relationship: emergency.relationship,
+    customer_billing: order.customer_billing ?? "",
+    customer_billing_same: order.customer_billing_same !== false,
+    dealer_id: order.dealer_id ?? null,
+    outlet_id: order.outlet_id ?? null,
+    salesperson_id: order.salesperson_id ?? null,
+    delivery_date: order.delivery_date,
+    delivery_date_tbd: order.delivery_date_tbd,
+    proceed_date: order.proceed_date ?? null,
+    delivery_floor: (order as { delivery_floor?: number }).delivery_floor ?? 1,
+    delivery_has_lift: (order as { delivery_has_lift?: boolean }).delivery_has_lift ?? false,
+    delivery_stair_items:
+      (order as { delivery_stair_items?: number | null }).delivery_stair_items ?? null,
+    custom,
+    lines: detailLines.map((l) => ({
+      key: nextKey(),
+      id: l.id,
+      sku: l.sku,
+      qty: l.qty,
+      unit_price: Number(l.unit_price),
+      ...(l.attrs ? { attrs: l.attrs } : {}),
+    })),
+    addons: detailAddons.map((a) => ({
+      key: nextKey(),
+      id: a.id,
+      addon_key: a.addon_key,
+      qty: Number(a.qty),
+      unit_price: Number(a.unit_price),
+      attrs: (a.attrs as Record<string, unknown> | null) ?? null,
+    })),
+    installment_months: (order as { installment_months?: number | null }).installment_months ?? null,
+  };
+}
+
+/** CONCURRENT EDITING (orders/MASTER §0.0, owner-approved 2026-10-01:
+ *  "conflict keeps the draft and exposes what changed"). After a refused commit
+ *  the draft moves onto the order as it is NOW: every fact this editor did not
+ *  touch takes the current value; every fact this editor changed keeps their
+ *  value — and the review then shows it against the current order, so taking
+ *  a colleague's value away is visible, never silent. Same draft, same review,
+ *  same one commit. */
+export function rebaseDraft(draft: Draft, opened: Draft, current: Draft): Draft {
+  const strip = <T extends { key: string }>(rows: T[]) => JSON.stringify(rows.map(({ key: _k, ...r }) => r));
+  const touched = (k: keyof Draft): boolean =>
+    k === "lines" || k === "addons"
+      ? strip(draft[k] as Array<{ key: string }>) !== strip(opened[k] as Array<{ key: string }>)
+      : JSON.stringify(draft[k]) !== JSON.stringify(opened[k]);
+  const out = { ...current } as Record<keyof Draft, unknown>;
+  for (const k of Object.keys(current) as Array<keyof Draft>) {
+    if (touched(k)) out[k] = draft[k];
+  }
+  return out as unknown as Draft;
+}
+
 /** An old revision's snapshot → the same form shape, so a historical view
  *  shows THAT version's fields rather than today's values behind a pill. */
 function draftFromSnapshot(snap: SalesOrderSnapshot): Draft {
@@ -1233,6 +1326,13 @@ function SalesOrderWorkspaceBody() {
   /* ── The draft — seeded from the order. ─────────────────────────────── */
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [baseline, setBaseline] = useState<Draft>(EMPTY_DRAFT);
+  /* CONCURRENT EDITING (orders/MASTER §0.0, owner-approved 2026-10-01): the
+     order exactly as the server answered it when `baseline` was seeded. Frozen
+     with the draft (the seed never moves while editing) and carried back by the
+     commit, which the server refuses when the order has moved since. */
+  const [editBaseline, setEditBaseline] = useState<SalesOrderEditBaseline | null>(null);
+  /** What a colleague changed since this page opened — shown after a refused commit. */
+  const [changedSinceOpened, setChangedSinceOpened] = useState<DiffRow[] | null>(null);
   const [draftSeed, setDraftSeed] = useState<string>("");
   const order = detailQ.data?.order;
   const detailLines = detailQ.data?.lines ?? [];
@@ -1256,68 +1356,10 @@ function SalesOrderWorkspaceBody() {
     const seed = `${orderId}:${detailQ.dataUpdatedAt}`;
     if (!order || draftSeed === seed) return;
     if (dirtyRef.current || editingRef.current) return;
-    const bag = order as unknown as Record<string, unknown>;
-    const str = (k: string) => (bag[k] == null ? "" : String(bag[k]));
-    const entryFields =
-      ((order as { entry_data?: { fields?: Record<string, unknown> } | null }).entry_data?.fields ??
-        {}) as Record<string, unknown>;
-    const emergency = parseEmergencyContact(order.customer_emergency);
-    const custom: Record<string, string> = {};
-    for (const [k, v] of Object.entries(entryFields)) {
-      if (k === "building_type") continue;
-      custom[k] = v == null ? "" : String(v);
-    }
-    const next: Draft = {
-      customer_name: order.customer_name ?? "",
-      customer_phone: order.customer_phone ?? "",
-      customer_email: str("customer_email"),
-      customer_race: str("customer_race"),
-      customer_gender: str("customer_gender"),
-      customer_birthday: str("customer_birthday").slice(0, 10) || null,
-      customer_address: order.customer_address ?? "",
-      customer_address_line1: str("customer_address_line1"),
-      customer_address_line2: str("customer_address_line2"),
-      customer_address_city: str("customer_address_city"),
-      customer_address_state: str("customer_address_state"),
-      customer_address_postcode: str("customer_address_postcode"),
-      customer_address_unknown: Boolean(order.customer_address_unknown),
-      building_type: entryFields.building_type == null ? "" : String(entryFields.building_type),
-      emergency_name: emergency.name,
-      emergency_phone: emergency.phone,
-      emergency_relationship: emergency.relationship,
-      customer_billing: order.customer_billing ?? "",
-      customer_billing_same: order.customer_billing_same !== false,
-      dealer_id: order.dealer_id ?? null,
-      outlet_id: order.outlet_id ?? null,
-      salesperson_id: order.salesperson_id ?? null,
-      delivery_date: order.delivery_date,
-      delivery_date_tbd: order.delivery_date_tbd,
-      proceed_date: order.proceed_date ?? null,
-      delivery_floor: (order as { delivery_floor?: number }).delivery_floor ?? 1,
-      delivery_has_lift: (order as { delivery_has_lift?: boolean }).delivery_has_lift ?? false,
-      delivery_stair_items:
-        (order as { delivery_stair_items?: number | null }).delivery_stair_items ?? null,
-      custom,
-      lines: detailLines.map((l) => ({
-        key: nextKey(),
-        id: l.id,
-        sku: l.sku,
-        qty: l.qty,
-        unit_price: Number(l.unit_price),
-        ...(l.attrs ? { attrs: l.attrs } : {}),
-      })),
-      addons: (detailQ.data?.addons ?? []).map((a) => ({
-        key: nextKey(),
-        id: a.id,
-        addon_key: a.addon_key,
-        qty: Number(a.qty),
-        unit_price: Number(a.unit_price),
-        attrs: (a.attrs as Record<string, unknown> | null) ?? null,
-      })),
-      installment_months: (order as { installment_months?: number | null }).installment_months ?? null,
-    };
+    const next = draftFromOrderDetail(order, detailLines, detailQ.data?.addons ?? []);
     setDraft(next);
     setBaseline(next);
+    setEditBaseline(detailQ.data?.editBaseline ?? null);
     setDraftSeed(seed);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -1833,6 +1875,31 @@ function SalesOrderWorkspaceBody() {
 
   const changeCount = draftRows.filter((r) => !SUMMARY_ROWS.has(r.what)).length;
 
+  /** The colleague's change, in the SAME Change · Before · After grammar as
+   *  `Your changes`: Before = what this page opened, After = the order now. */
+  const colleagueRows = (opened: SalesOrderEditBaseline, current: SalesOrderEditBaseline): DiffRow[] => {
+    const moved = salesOrderChangedSinceOpened(opened, current);
+    const asLines = (b: SalesOrderEditBaseline) => b.lines.map((l) => ({ ...l, key: l.id })) as EditLine[];
+    const asAddons = (b: SalesOrderEditBaseline) => b.addons.map((a) => ({ ...a, key: a.id })) as EditAddon[];
+    const rows = diffRows({
+      header: [
+        ...moved
+          .filter((k): k is (typeof SALES_ORDER_EDIT_HEADER_KEYS)[number] => (SALES_ORDER_EDIT_HEADER_KEYS as readonly string[]).includes(k))
+          .map((k) => ({ label: HEADER_LABEL[k] ?? k, before: factWord(k, opened.header?.[k]), after: factWord(k, current.header[k]) })),
+        ...(moved.includes("installment_months")
+          ? [{ label: "Instalment months", before: String(opened.installment_months ?? "None"), after: String(current.installment_months ?? "None") }]
+          : []),
+      ],
+      before: { lines: asLines(opened), addons: asAddons(opened) },
+      after: { lines: asLines(current), addons: asAddons(current) },
+      nameOfSku,
+      nameOfAddon,
+      categoryOf: categoryOfSku,
+    });
+    /* The summary rows say only what moved; an unmoved total is not a change. */
+    return rows.filter((r) => !SUMMARY_ROWS.has(r.what) || r.before !== r.after);
+  };
+
   const startEdit = (seed?: Draft, replaceId?: string | null) => {
     if (seed) setDraft(seed);
     setReviewOpen(false);
@@ -1840,6 +1907,7 @@ function SalesOrderWorkspaceBody() {
     setChangeAskedOn(null);
     setChangeAgreement(null);
     setReplaceAmendmentId(replaceId ?? null);
+    setChangedSinceOpened(null);
     setEditing(true);
     setObjectView("Order");
   };
@@ -1848,6 +1916,7 @@ function SalesOrderWorkspaceBody() {
     setDraft(baseline);
     setEditing(false);
     setReplaceAmendmentId(null);
+    setChangedSinceOpened(null);
   };
   /* ⭐ 0565 · AN ISSUED VERSION KEEPS ITS DOCUMENT — owner ruling 2026-09-23:
      "Newly issued versions after this release: preserve their original issued
@@ -1899,6 +1968,7 @@ function SalesOrderWorkspaceBody() {
       setEditing(false);
       setReviewOpen(false);
       setReplaceAmendmentId(null);
+      setChangedSinceOpened(null);
       void revisionsQ.refetch();
       void baseQ.refetch();
       void detailQ.refetch();
@@ -1906,8 +1976,34 @@ function SalesOrderWorkspaceBody() {
       /* A correction mints a version; that version keeps the sheet it issued. */
       if (r.action === "saved") void keepIssuedDocument(r.revision);
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => {
+      const stale = (e.body as SalesOrderEditStale | null)?.code === "order_edit_stale";
+      if (!stale) return void toast.error(e.message);
+      void reviewAfterColleague();
+    },
   });
+  /* ⛔ TWO EDITORS CANNOT SILENTLY OVERWRITE ONE ANOTHER. The server refused
+     because the order moved after this page opened. Nothing was written. The
+     draft stays on screen; read the order as it is now, show what the colleague
+     changed (Before = what this page opened, After = now), move the draft onto
+     the current order and leave the same review open for a second look. */
+  const reviewAfterColleague = async () => {
+    const opened = editBaseline;
+    const fresh = await detailQ.refetch();
+    const data = fresh.data;
+    if (!data?.order || !data.editBaseline || !opened) {
+      setChangedSinceOpened([]);
+      return;
+    }
+    const current = data.editBaseline;
+    setChangedSinceOpened(colleagueRows(opened, current));
+    const now = draftFromOrderDetail(data.order, data.lines ?? [], data.addons ?? []);
+    setDraft((d) => rebaseDraft(d, baseline, now));
+    setBaseline(now);
+    setEditBaseline(current);
+    setDraftSeed(`${orderId}:${fresh.dataUpdatedAt}`);
+    void amendmentQ.refetch();
+  };
   const onCommit = () => {
     if (!changeClass || changeClass.action === "none") return;
     const err = validateDraft();
@@ -1922,6 +2018,7 @@ function SalesOrderWorkspaceBody() {
       customerAskedOn: changeAskedOn,
       agreement: changeAgreement ?? undefined,
       replaceAmendmentId,
+      expected: editBaseline,
     });
   };
   const decideMut = useDecideSalesOrderAmendment(orderId ?? "", {
@@ -3528,6 +3625,7 @@ function SalesOrderWorkspaceBody() {
               onClick={onCommit} data-testid="workspace-confirm-save">{commitWord}</Button>
           </>}>
         <DraftReview
+          changedSinceOpened={changedSinceOpened}
           rows={draftRows}
           consequences={consequencesFor({ lines: draft.lines, addons: draft.addons, header: draftHeader() })}
           commercial={changeClass?.action === "submit"}

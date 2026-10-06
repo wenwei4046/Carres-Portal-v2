@@ -1,4 +1,4 @@
-import { workspaceActivitySettingsResponseSchema, type WorkspaceActivitySettingsResponse } from "@carres/shared";
+import { workspaceActivitySettingsResponseSchema, type WorkspaceActivitySettingsResponse, type SalesOrderEditBaseline } from "@carres/shared";
 import { supabase } from "@/lib/supabase";
 import {
   keepPreviousData,
@@ -3310,6 +3310,10 @@ export interface operationOrderDetailPo {
   lines: operationOrderDetailPoLine[];
 }
 export interface operationOrderDetailResponse {
+  /** Concurrent editing (orders/MASTER §0.0, owner-approved 2026-10-01): the
+   *  order exactly as the edit page opens it. Frozen with the draft and sent
+   *  back with the commit as `expected`. */
+  editBaseline?: SalesOrderEditBaseline;
   order: operationOrderDetailOrder;
   lines: operationOrderDetailLine[];
   addons: operationOrderDetailAddon[];
@@ -6692,6 +6696,18 @@ export interface SalesOrderChangesInput {
   /** 0564 — the governed agreement, recorded with the request in one act. */
   agreement?: { kind: CustomerAgreementKind; reference: string; detail?: string };
   replaceAmendmentId?: string | null;
+  /** The order exactly as this page opened it. A commit whose baseline is no
+   *  longer the order is refused (409 `order_edit_stale`) and writes nothing. */
+  expected: SalesOrderEditBaseline | null;
+}
+/** The 409 body of a refused commit: the governed sentence and which facts
+ *  moved since the page opened (edit header keys, `lines`, `addons`,
+ *  `installment_months`, `status`). */
+export interface SalesOrderEditStale {
+  error: "conflict";
+  code: "order_edit_stale";
+  message: string;
+  changed: string[];
 }
 export type SalesOrderChangesResult =
   | { action: "saved"; revision: number; changed?: string[] }
