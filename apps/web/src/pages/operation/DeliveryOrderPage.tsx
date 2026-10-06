@@ -10,6 +10,7 @@ import {
   signedDeliveryDocumentOf,
   deliveryReasonLabel,
   deliveryScopeSentence,
+  financeHoldLineOf,
   orderDeliveryGroups,
   type DeliveryGroupKey,
   type OrderActionTone,
@@ -624,7 +625,9 @@ export default function DeliveryOrderPage() {
                 ))}
                 {openFinance.map((e) => (
                   <li key={e.id} className="flex flex-col">
-                    <span className="text-body text-base-900">Finance is holding this delivery: {e.reason}</span>
+                    {/* COPY (Card 16, re-worded 2026-09-25): `Hold delivery · Finance hold · {reason}`,
+                        one line per open exception, through the shared spelling. */}
+                    <span className="text-body text-base-900">Hold delivery · {financeHoldLineOf([e])}</span>
                     <span className="text-label text-base-600">{e.opened_at ? fmtDate(e.opened_at) : "Open"}</span>
                   </li>
                 ))}
