@@ -97,6 +97,26 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
+/* Owner ruling 2026-10-06: two facts, two names. The checks start on the
+   PROCEED day (`proceeded_at`, the hand-off), read as the Kuala Lumpur day;
+   the Planned production start (`proceed_date`) never stands in for it. */
+describe("the checks start on the proceed day — proceeded_at only", () => {
+  it("a check due before the hand-off day is passed, counted on the Kuala Lumpur day", () => {
+    /* 23 Oct 17:00 UTC is 24 Oct 01:00 in Kuala Lumpur: the 23 Oct check was
+       behind the delivery before it started. */
+    vi.setSystemTime(new Date("2026-10-24T02:00:00Z"));
+    scopeState.card = card({}, { proceeded_at: "2026-10-23T17:00:00Z" });
+    draw();
+    expect(screen.getByTestId("logistics-card-progress").textContent).toBe("Checks 1 of 3");
+  });
+
+  it("never starts the checks on the Planned production start when no hand-off is recorded", () => {
+    scopeState.card = card({}, { proceeded_at: null, proceed_date: "2026-10-24" });
+    draw();
+    expect(screen.getByTestId("logistics-card-progress").textContent).toBe("Checks 0 of 3");
+  });
+});
+
 describe("collapsed — at most five facts", () => {
   it("company, the one action, the check count — nothing else when nothing is scheduled or wrong", () => {
     draw();

@@ -89,7 +89,9 @@ export function useMissionRoute(orderId: string) {
         : null;
     return missionRouteModel({
       todayIso: today,
-      proceededIso: o.proceeded_at ? mytDayOf(o.proceeded_at) : o.proceed_date ? o.proceed_date.slice(0, 10) : null,
+      /* `Proceed` is `proceeded_at` only (owner ruling 2026-10-06): never the
+         Planned production start (`proceed_date`), a different fact. */
+      proceededIso: o.proceeded_at ? mytDayOf(o.proceeded_at) : null,
       loan,
       supplier: supplier ?? null,
       /* From stock only when no goods still need a PO (owner decision 2026-09-25). */
