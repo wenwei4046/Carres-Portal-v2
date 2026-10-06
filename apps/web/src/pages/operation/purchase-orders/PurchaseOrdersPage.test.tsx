@@ -391,7 +391,7 @@ describe("Purchase Orders Register", () => {
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       renderPage();
-      fireEvent.click(await screen.findByRole("button", { name: /^PO-20260828-4827$/ }));
+      fireEvent.click(await screen.findByRole("button", { name: /^PO-260828-4827-V2$/ }));
       expect(await screen.findByTestId("purchase-order-object")).toBeInTheDocument();
       expect(screen.getByTestId("po-document-panes")).toHaveAttribute("data-layout", "50-50");
       expect(errors.mock.calls.flat().join(" ")).not.toContain("Maximum update depth");
@@ -423,7 +423,7 @@ describe("Purchase Orders Register", () => {
     renderPage();
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Cards" }), { button: 0, ctrlKey: false });
     const cards = screen.getByTestId("purchase-orders-cards");
-    expect(cards).toHaveTextContent("PO-20260828-4827");
+    expect(cards).toHaveTextContent("PO-260828-4827-V2");
     const choice = within(cards).getByRole("checkbox", { name: "Select PO-20260828-4827" });
     fireEvent.click(choice);
     expect(choice).toBeChecked();
@@ -665,13 +665,28 @@ describe("Purchase Orders Register", () => {
     delete po.grns;
   });
 
+  it("PO No prints the shortened identity with its version and stays findable by the stored number", () => {
+    renderPage();
+    expect(screen.getByRole("button", { name: /^PO-260828-4827-V2$/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^PO-20260828-4827$/ })).not.toBeInTheDocument();
+    const column = lastGridProps.columns.find((c: any) => c.key === "po");
+    const row = lastGridProps.rows.find((r: any) => r.id === "PO-20260828-4827");
+    expect(column.searchValue(row)).toContain("PO-20260828-4827");
+    expect(column.searchValue(row)).toContain("PO-260828-4827-V2");
+    expect(column.filterValue(row)).toBe("PO-260828-4827-V2");
+    expect(column.exportValue(row)).toBe("PO-260828-4827-V2");
+    const legacy = lastGridProps.rows.find((r: any) => r.id === "PO-LEGACY");
+    expect(column.exportValue(legacy)).toBe(`PO-LEGACY-V${legacy.facts.version}`);
+  });
+
   it("PO Version reads the CURRENT version and its sent mark only", () => {
     renderPage();
-    expect(screen.getByTestId("po-version-PO-20260828-4827")).toHaveTextContent("PO V2Sending not confirmed");
-    expect(screen.getByTestId("po-version-PO-20260828-4827")).not.toHaveTextContent("PO V1");
+    expect(screen.getByTestId("po-version-PO-20260828-4827")).toHaveTextContent("Sending not confirmed");
+    expect(screen.getByTestId("po-version-PO-20260828-4827")).not.toHaveTextContent("PO V");
     queryData.pos[0]!.sends[0]!.po_version = 2;
     const marked = renderPage();
-    expect(screen.getAllByTestId("po-version-PO-20260828-4827").at(-1)).toHaveTextContent("PO V2PO sent to supplier · WhatsApp · Thu, 27 Aug");
+    expect(screen.getAllByTestId("po-version-PO-20260828-4827").at(-1)).toHaveTextContent("PO sent to supplier · WhatsApp · Thu, 27 Aug");
+    expect(screen.getAllByTestId("po-version-PO-20260828-4827").at(-1)).not.toHaveTextContent("PO V2");
     marked.unmount();
   });
 
@@ -813,7 +828,7 @@ describe("Purchase Orders Register", () => {
 
   it("opens an object from the live register without changing the page's Hook order", () => {
     renderPage();
-    fireEvent.click(screen.getByRole("button", { name: "PO-20260828-4827" }));
+    fireEvent.click(screen.getByRole("button", { name: "PO-260828-4827-V2" }));
     expect(screen.getByTestId("purchase-order-object")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /PO-260828-4827-V2/ })).toBeInTheDocument();
   });
