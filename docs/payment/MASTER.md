@@ -94,10 +94,27 @@ Invoice is the closing document, issued automatically the moment `Balance due` r
 with the Receipt. There is no manual `Generate invoice` door and no draft/issue step for staff.
 Unknown and zero differ. No screen recalculates `Balance due` or storage independently.
 
-**PROPOSAL / NOT LAW — Storage (to be settled in the Storage segment of the 2026-09-25 Blueprint
-review):** a storage charge is one more line of the same `Balance due`, not a separate Storage
-Invoice that asks for money; the one closing Invoice prints it. Falsifier: the owner keeps the
-Storage Invoice / Additional Storage Invoice as separate customer documents.
+**`Balance due` IS THE GOODS MONEY ONLY; STORAGE KEEPS ITS OWN PAPER — OWNER RULING (Jess,
+2026-10-06) · APPROVED / NOT BUILT.** `Balance due` means one thing on every surface: what the
+customer still owes on the Sales Order's goods and services, the figure the Sales Order page and PDF
+print. It never includes storage. Storage money is asked for by its own paper, the Storage Invoice /
+Additional Storage Invoice (§4, §7 — unchanged); the 2026-09-25 PROPOSAL to fold storage into
+`Balance due` is withdrawn. "An Invoice never asks for money" above is the Sales Invoice, the closing
+document. Payment shows the parts and their sum, never one blended figure:
+
+```text
+Balance due                 RM 1,379.00     the Sales Order's goods money (orderMoney)
+Storage Invoice unpaid        RM 400.00     each live issued storage paper, still unpaid
+────────────────────────────────────────
+Pay before delivery         RM 1,779.00     what the Delivery Order gate needs paid (0441)
+```
+
+`Pay before delivery` = `Balance due` + every live issued Storage / Additional Storage Invoice still
+unpaid — the same sum the DO money gate already blocks on (0441), so the screen and the gate agree.
+The storage line is drawn only when a storage paper is unpaid; with no storage, `Balance due` is the
+last line. An accrued, not yet issued storage charge stays in `Storage` as `RM {amount} so far` and
+enters neither figure. Measured 2026-10-06 (BUILD gap): the built Monitor prints one blended figure
+(`soRemaining`, goods + storage papers − paid) under the money word; the build splits it as above.
 
 One successful `Record payment` atomically creates Payment, allocates it, updates derived
 outstanding, mints one receipt, appends SO activity, and closes/recalculates Work. Failure rolls
@@ -139,7 +156,7 @@ Workspace          duties, cover, working calendars
 ### Payment Monitor
 
 Payment Monitor is a full-width control listing keyed on the Sales Order: one row per Proceeded SO
-whose `Balance due` is above RM 0 (owner ruling 2026-09-25 — the row is the Sales Order, never an
+whose `Pay before delivery` is above RM 0 — goods money or an unpaid storage paper (owner ruling 2026-09-25; the sum named 2026-10-06 — the row is the Sales Order, never an
 Invoice; an order with no Invoice is still a row). It is not a calendar, a document register, a KPI dashboard or a
 second My Work.
 
@@ -170,9 +187,10 @@ SO No | Customer | Balance due | Items & Stock | Storage | Requested Delivery Da
   customer's own reference(s) move to the opened order, never joined into one number.
 - **Customer** — the name on one line; the phone moves to the opened order (2026-09-25).
 - **Balance due** = the Sales Order's total payable − money received (the one arithmetic; owner
-  ruling 2026-09-25 — the word was `Amount needed` until then), right-aligned. Line 2 `includes storage RM {amount}` only while an issued
-  Storage Invoice is inside it. An accrued, not yet issued storage charge stays in `Storage` as
-  `RM {amount} so far` and never enters Balance due.
+  ruling 2026-09-25 — the word was `Amount needed` until then), right-aligned, goods money only
+  (owner ruling 2026-10-06 — never includes storage). An unpaid storage paper shows in the `Storage`
+  column (`Storage Invoice issued · RM {x} not paid`) and in the opened order's `Pay before delivery`
+  sum (§2), never inside this cell.
 - **Items & Stock** — Delivery's own cell, Delivery's own arithmetic (`monitorGoodsOf` over the
   Stock register's allocated Units and Purchasing's recorded arrivals), for the whole Sales Order:
   `Ready` (green) / `Not ready` (orange) over `2 of 2` · `1 of 2 · 1 short` · `Arriving after the
@@ -207,7 +225,7 @@ SO No | Customer | Balance due | Items & Stock | Storage | Requested Delivery Da
   order below. The Work item's action (`Ask customer to pay` · `Wait` · `Send the invoice and
   collect payment`) lives on the opened order and on the Work card, never in this cell. The person
   and the assignment grammar (`Assigned to {name}` · `Completed by {name}` · `Not assigned` →
-  `Nobody is assigned to this order. Assign it in Sales Orders → Team`, door the Sales Orders Team;
+  `Nobody assigned to this order` over `Manager assigns in Settings → Staff & Duties` (owner ruling 2026-09-26);
   0504: the owner is the individual the Sales Order was dealt to) live in `Collection owner`.
 - Rows sort by risk: should have been paid · Storage Invoice not paid · promised today · due today
   · ask today · due later · waiting · no date · value not recorded. Sorting `Payment timing`
@@ -239,10 +257,10 @@ SO No | Customer | Balance due | Items & Stock | Storage | Requested Delivery Da
     has passed with money still owed). `Payment due later` = a clock exists but the ask day has not
     come. `Waiting for goods` = `Arrival not confirmed` (催钱前先看货). `Finance hold` and `Needs
     review` are other people's work shown so the desk is complete; they carry no Operation action.
-    `Paid orders` = `Balance due` RM 0 — the row that gives a paid Sales Order its home: the listing
+    `Paid orders` = `Pay before delivery` RM 0 (goods and every storage paper paid) — the row that gives a paid Sales Order its home: the listing
     prints `Paid` in `Payment timing` and its expansion holds the Documents (Receipts · Invoice ·
-    Statement) and Communication History. *`Storage Invoice not paid` stands until the Storage
-    segment settles whether storage folds into `Balance due`.
+    Statement) and Communication History. `Storage Invoice not paid` stays a status: storage keeps
+    its own paper (owner ruling 2026-10-06, §2).
   - The group headings are the four English words above in the rail's governed group style (UI
     MASTER §6.7 rail style C); the Chinese here is the explanation, never on screen.
   - The rail keeps the governed collapse (below 1100px a 44px strip with `Show filters`; a drawer on
@@ -286,7 +304,7 @@ zero. Empty: `No customer money is needed right now.` / `No follow-up planned on
 `No paid orders yet.` Error: `The collection desk could not be loaded.` + `Try again`, the last
 good list kept. Permission (Finance): the same statuses from Payment's own read, no owner avatars,
 `Stock facts are Operation's.`, `Owner facts are Operation's.`; the page's acts hidden, the paper
-readable. Missing data: `No delivery date` · `Not assigned` → `Assign it in Sales Orders → Team` ·
+readable. Missing data: `No delivery date` · `Not assigned` → `Manager assigns in Settings → Staff & Duties` ·
 `No reference` · `No phone recorded`. A failed posting keeps everything typed and writes nothing.
 
 ### Monitor versus shared Work
@@ -531,7 +549,7 @@ evidence. A voided Receipt cannot be sent as a valid Receipt.
 | Customer Statement | read BUILT, **PDF MISSING** | build the printed statement (`GET /invoices/statement/:orderId` already derives it) |
 | Credit Note | numbering approved (`CN2609-4827`), **NOT BUILT** | build it: an amendment that lowers the price after money was paid, and the exceptional refund, need it |
 | Sales Order document (prints `Balance due`) | Sales Orders' | the paper the customer pays against; Payment references it, never re-prints it |
-| Storage Invoice · Additional Storage Invoice | BUILT | PROPOSAL / NOT LAW: folded into `Balance due` under the 2026-09-25 money rule — settled in the Storage segment |
+| Storage Invoice · Additional Storage Invoice | BUILT | KEPT — the storage paper that asks for storage money (§7; owner ruling 2026-10-06, §2: the fold PROPOSAL is withdrawn; `Balance due` never includes storage; Payment shows `Storage Invoice unpaid` and the `Pay before delivery` sum) |
 
 
 - Receipt proves money was recorded; the Invoice is the closing document issued at `Balance due`
@@ -623,7 +641,9 @@ evidence. Planned date is not completion. Carres-caused non-delivery days are ex
 in mixed/partial delivery ends separately.
 
 During storage show `Storage charge so far`. Once delivery is confirmed, calculate through that
-date, issue Storage Invoice and collect before delivery. If customer delays after issue/payment,
+date, issue Storage Invoice and collect before delivery. **Measured 2026-10-06 (BUILD gap, the rule stands):** the
+built charge door (0438, `POST /finance/payment-storage/charge`) mints every commenced period whenever
+staff press it, before delivery is confirmed; the build gates it on the confirmed delivery day. If customer delays after issue/payment,
 keep the old invoice immutable and issue Additional Storage Invoice for only the new amount. A
 live storage invoice holds the DO. Under the locked 2026-09-01 Sales Order money gate, full money
 must be in before delivery and there is no live unpaid-release request door.
@@ -736,10 +756,12 @@ else, a filter or a page reload never changes it, and a split delivery has one o
 owner is keyed by the Sales Order. Work assignment can change through the shared recorded policy; source PIC changes require a
 formal handover (`payment_collection_owner_handover`, gated like Staff & Duties), which now moves
 the assignment with it and refuses a new owner who is not an individual. Nobody resolvable →
-nothing is established and the action stays visible with its governed failure: `Nobody is
-assigned to this order.` with the door `Assign it in Sales Orders → Team` (owner instruction
-2026-09-16; the Monitor row's short word is `Not assigned`). Staff & Duties is not named, because
-it cannot fix an unassigned order. `Payment Duty` is RETIRED: no caller remained,
+nothing is established and the action stays visible with its governed failure: `Nobody assigned
+to this order` over `Manager assigns in Settings → Staff & Duties` (owner ruling 2026-09-26, which
+overwrites the 2026-09-16 `Assign it in Sales Orders → Team` door: the system deals every order, an
+unassigned order is a system error, and only a manager adds a person or assigns the order; the
+Team door does not exist on the current register; the Monitor row's short word is `Not assigned`;
+code still prints the 2026-09-16 words, Delivery MASTER §15.1). `Payment Duty` is RETIRED: no caller remained,
 so the catalogue no longer offers it. There is no universal Sales Order Owner.
 
 My Work omits self avatar; Team Work groups by owner. Cover preserves normal owner, today's cover
