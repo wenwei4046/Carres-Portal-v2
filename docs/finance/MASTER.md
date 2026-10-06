@@ -31,6 +31,16 @@
 >
 > **Reference.** The Houzs Finance Specification V5 (2026-10-02) is **evidence, not specification**. Per the CLAUDE.md Decision Gate, external systems are evidence. The spec's own instruction to "follow its rules" does not apply here. Chew keeps the spec locally. It is **not** in this public repository, because it holds another company's internal figures.
 
+## 0 · The business, as Finance records it (Chew 2026-10-06)
+
+Carres buys and sells furniture through three channels (「我们的生意是买卖家私，只是渠道不一样」):
+
+1. **Showroom:** Carres staff sell directly.
+2. **Dealer:** a dealer sells; the customer pays HQ; the dealer earns commission, the renovation rebate and the KPI allowance.
+3. **Subscription:** the customer pays monthly; part of each month goes to the supplier (Diglant) and part to commission.
+
+Finance must show clearly where each sum of money comes in and goes out, channel by channel (「我finance 这里记录需要分的很清楚这笔钱是从哪里进哪里出」). Measured: since 0540 every income and expense line carries a department. A department is a showroom outlet, a dealer, Subscription, or Office; Office carries costs only. Sales invoices, customer payments and rental collections take their department from the order. The four hand-made documents (supplier bill, payment voucher, other debtor invoice, other receipt) are set line by line. The P&L and other reports filter by department. Still to settle with Chew: how bills, bank movements and shared Office costs are separated, and whether the new chart of accounts splits income by channel.
+
 ## 1 · Boundary: Finance only
 
 Chew, 2026-10-03: 「总之jess 的功能，ui 等等都别动到。我只专做我的finance 模块，我其他的资料也只是链接过来罢了」.
