@@ -169,7 +169,7 @@ Dealer commission rules:
 - **Dealer questions for management** (Chew 2026-10-06): whether accessories earn commission (Chew says 25%; YH's 2026-09-30 code gives nothing); whether the KPI count restarts monthly or yearly; how dealers receive their statement; and the default for a cancelled order whose money was kept.
 - **Further questions found on review, 2026-10-06** (PROPOSAL to raise, not law):
   - Card payments: commission is worked on the amount the customer paid, before the card fee (「照1000 算」, Chew 2026-10-06).
-  - An amended order is worked out again, and the difference is adjusted in the month of the amendment (「改单的话能重新算 … 就是几时改单的月份调」, Chew 2026-10-06). Open: whether the recalculation uses the original order date's rates or the amendment day's.
+  - An amended order is worked out again, and the difference is adjusted in the month of the amendment (「改单的话能重新算 … 就是几时改单的月份调」, Chew 2026-10-06). The recalculation uses the rates of the original order date (「甲，用原本下单那天的%」).
   - Paying commission, rebate and KPI to dealers may need a self-billed e-invoice under LHDN e-Invoice rules; to check with the company's tax adviser.
   - Subscription late interest is 8% a month, simple (0300), about 96% a year. Is that the company's policy, and does the agreement say so?
   - Whose asset is a subscription mattress while it is rented, Carres's or Diglant's? This decides the balance sheet and any depreciation.
