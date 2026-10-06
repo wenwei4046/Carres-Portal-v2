@@ -243,7 +243,7 @@ order for the legacy readers. A split-trip mint path exists in source (`delivery
 trip arrangement and end-to-end scope convergence remain incomplete (§15.1).
 
 - **Delivery document number — OWNER RULING 2026-09-23 (Jess) · APPROVED / LOCKED · BUILT
-  (migration `0575`, PR #1550).** Outright trips issue **`DO2609-4827`** (four random digits, 10,000 a month), Subscription trips
+  (migration `0575`, PR #1550).** Outright trips issue **`DO2609-4827`** (four random digits, 10,000 a month — owner re-confirmed 2026-09-26: four digits stay; a used-up month refuses by name and never widens), Subscription trips
   issue **`SDO2609-48271`** (five, 100,000 a month): prefix + two-digit year + two-digit month of
   **issue** + `-` + random digits (leading zeros allowed). The two businesses are
   told apart by the prefix; the document model, gates and team are one. Fixed width — the system
@@ -1949,8 +1949,13 @@ Failed saves do not complete Work. Helping never silently changes assignment or 
 past evidence. Approval, amendment/void, Warehouse and external-partner boundaries remain separate.
 
 For customer-order work, Delivery Duty is not the routine owner. It is used when the Sales Order has no PIC so
-the action is not lost: the row stays visible under `Delivery Duty` and prints `Nobody holds
-Delivery Duty.` with `Set the holder in Settings → Staff & Duties`. Once a PIC exists, every open
+the action is not lost: the row stays visible under `Delivery Duty` and prints **`Nobody assigned to
+this order`** over **`Manager assigns in Settings → Staff & Duties`** (owner ruling 2026-09-26: the
+system deals every order to a person, so an unassigned order is a system error and only a manager can
+add a person or assign the order; the line names the manager's door, never a Duty to fill —
+`Nobody holds Delivery Duty.` / `Set the holder …` are retired here. The ruling's original door
+`Sales Orders → Team` does not exist on the current register; Staff & Duties is the manager's current
+door, with `Manage staff` to People per Workspace §4. Code and door gaps: §15.1). Once a PIC exists, every open
 and future routine Delivery action resolves through that PIC and the recorded Work assignment movements. Governed delivery-charge
 exceptions continue to route to `delivery_charge_approver`. Corrections of saved facts,
 exceptional proof and refusal closure without an approved action definition enter no engine and
@@ -2160,6 +2165,7 @@ their absence as a design blind spot:
 | the Delivery Orders register's date-first pair `DO Date · DO No` (§8.7, UI §6.7) | `DeliveryOrdersRegister.tsx` (`stickyIdentity` → `leadingColumns`) |
 | the Delivery Order brief inside the register row and the two-column DO object (§8.7, §9, owner ruling 2026-09-26) | `DeliveryOrdersRegister.tsx` (`DoExpansion`), `DeliveryOrderPage.tsx`; the acts reuse `DeliveryResultAction`, `WarehouseHandoverBlock`, `DeliveryEvidencePanel` |
 | the POS required-facts gate for address, state, building type, floor, lift and access | **BUILT 2026-09-13 (Delivery Card 18)** — `createOrderInputSchema`, `rawCreateOrderInputSchema`, the POS wizard and the office create door refuse the facts with one wording; `Order details incomplete` now names legacy rows only |
+| `Nobody assigned to this order` over `Manager assigns in Settings → Staff & Duties` (§13.1, owner ruling 2026-09-26). Code still prints `Nobody is assigned to this order.` · `Assign it in Sales Orders → Team` (href `/operation/orders`) on Payment and collection surfaces. Staff & Duties' `Manage staff` entry to People is built (`StaffDuties.tsx`, personnel managers), so a manager can add the missing person there; one door limit stays named, not hidden: the current Sales Orders register has no per-order assign control (the manager's manual assign and pool tools live only on the temporary `/operation/old-orders` page). Unreachable while the Operation pool holds an active individual | `packages/shared/src/payment-collection-owner.ts` (`NOBODY_ASSIGNED_TO_ORDER`, `ASSIGN_IN_SALES_ORDERS`, `ASSIGN_IN_SALES_ORDERS_HREF`), `PaymentMonitor.tsx`, `InvoiceCollectionOwner.tsx`; Work prints the short `Not assigned` (`WorkCard.tsx`, `WorkMission.tsx`) |
 
 **2026-09-30 convergence audit — measured source; production evidence is recorded in §16.**
 The current approved business rules above resolve these points; missing code does not reopen them

@@ -267,8 +267,9 @@ order enters Operations, `ops_order_control.assigned_staff` names the one normal
 order, customer, delivery and ordinary collection work. The Work Engine routes today's action to
 the current work assignment, initially that PIC and subsequently any recorded §4.4 assignment movement. The Sales Order PIC remains a separate source fact. Delivery
 Duty is not the routine customer-order owner. For customer-order work it is the explicit fallback
-when a Sales Order has no PIC; that exception stays visible under `Delivery Duty` and prints `Nobody holds Delivery Duty.`
-and `Set the holder in Settings → Staff & Duties`. Delivery Settings never holds a roster or a
+when a Sales Order has no PIC; that exception stays visible under `Delivery Duty` and prints `Nobody assigned to this order`
+over `Manager assigns in Settings → Staff & Duties` (owner ruling 2026-09-26: an unassigned order is a system error and
+only a manager can add a person or assign the order; `Manage staff` opens People). Delivery Settings never holds a roster or a
 second owner list (`../delivery/MASTER.md` §13.1).
 
 **SHOWROOM ASSIGNMENTS — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.** For display
