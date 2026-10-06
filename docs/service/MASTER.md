@@ -994,3 +994,20 @@ Visual Service Note 是照片／QR 工作辅助，不代替 DO、GRN、Claim/RO�
 | 无权限／读取失败 | 明确受限／失败，不泄漏字段和数量 | 空白当作没有记录／已完成，Export 泄漏 |
 
 **进入 BUILD 前的门槛：**完整业务规则获批，所有用于执行的 deadline／approval／closure 路径无未决定分支；共用 UI controller 的统一组合获批，COPY 准入完成；每个 business fact 的 owner、source、scope 和 completion 清楚。未满足的 capability标为未批准／未实现，不交给工程猜。该 Blueprint 本身不是上线证明，不据此宣告 PLAN MISSION COMPLETE。
+## 7.28 · 跨模块通知记录 — FACT，2026-10-06
+
+Jess 在本 Service chat 明确授权向 UI、Workspace、Sales Orders、Delivery、Warehouse、Purchasing、Payment、Guarantee 和 Rental chats 发送 PLAN 依赖核对通知。已发送消息明确限定：不授权 Cards、实施、合并、部署、外部联系或恢复暂停 BUILD；本 Blueprint 未全部批准。要求各模块核对 source identity、原门、权限、completion facts 和冲突，在各自 chat 报告；不要求越权回复或转发。
+
+| Chat（原名称） | Thread ID | 状态 |
+|---|---|---|
+| UI/UX update master | `01a10c26-587f-7d90-a4ab-55b8197296f8` | sent; acknowledgment/alignment not yet verified |
+| Workspace (Houzs) | `01a0f6ab-41bb-7070-b8f1-68f796c3e3c6` | sent; acknowledgment/alignment not yet verified |
+| Sales Order | `01a10eb9-c4a2-7220-86b6-6c695f5898a5` | sent; acknowledgment/alignment not yet verified |
+| Delivery | `01a10c26-58c1-7a82-a991-18e8582dd3d9` | sent; acknowledgment/alignment not yet verified |
+| Warehouse | `01a10c26-58e6-7172-be05-34bff7497f2c` | sent; acknowledgment/alignment not yet verified |
+| Purchasing | `01a10c26-5b48-7d02-bab9-8acc235ee8aa` | sent; acknowledgment/alignment not yet verified |
+| Payment | `01a10eb9-c407-7870-a7b6-6f8ce01e5627` | sent; acknowledgment/alignment not yet verified |
+| Guarantee | 未定位明确当前 owning chat | 未发送；Terms review 不自动等于 Guarantee owner |
+| Rental | 未定位明确当前 owning chat | 未发送；发现历史 Subscription Blueprint archive，不自动恢复／替代当前 owner |
+
+通知已发送不等于接收方已确认，也不等于接口已接通。现有场景：有原记录自动带入已有资料，仅补问题／要求／证据；无来源手动记录，不造 SO/Unit；每个执行模块保留自己的身份、时钟、权限和实际完成事实。共享 UI 提交的是业务 payload 与 kit gap 核对，未宣称 Service 自定义 tabs/layout 已批准。
