@@ -14,7 +14,7 @@
 
 ---
 
-**RESUME HERE — 2026-10-06, Service PLAN / final review.** Read §7.25 (approval scope and remaining decisions) → §7.27 (complete operator workflow, Excel mapping and business acceptance) → §7.28–§7.29 (cross-module review evidence). The approved rulings below are in force; the entire Blueprint is not yet approved. Code baseline is main `678c27346`; this documentation branch contains subsequent scoped owner rulings, not proof of delivery. The old Oct-03 HTML is historical review evidence, not the current shared UI acceptance.
+**RESUME HERE — 2026-10-06, Service PLAN / final review.** Read §7.30 (the final review pack: what is resolved from authority and the five owner decisions still open) → §7.25 (approval scope) → §7.27 (complete operator workflow, Excel mapping and business acceptance) → §7.28–§7.29 (cross-module review evidence). The approved rulings below are in force; the entire Blueprint is not yet approved. Code baseline is main `678c27346`; this documentation branch contains subsequent scoped owner rulings, not proof of delivery. The old Oct-03 HTML is historical review evidence, not the current shared UI acceptance.
 
 **APPROVED IN THIS CHAT — one current scope:** Operation shares routine service work with one per-Case owner and helpers (§7.9); every Case receives a substantive first response within two Office working days (§7.2); the scoped internal processing deadlines are §7.9; every formal repair/replacement/charge/customer-movement decision goes through Service Case Approver (§7.4), with no repeat approval for unchanged approved-scope follow-up. Original Case clock, source-module permissions and actual completion facts remain.
 
@@ -679,8 +679,7 @@ named (entitlement result block · document checklist row with a state word · s
 | Paid-policy cutover | 2026-08-01 (code constant) | Service Settings | NOT BUILT |
 | Mattress threshold | `> 2 cm` (code) | read-only display | NOT BUILT |
 | Trial length / transport minimum | 100 days / RM 250 (code) | Service Settings | NOT BUILT |
-| `First response within {n} working days` | 2 (code constant) | Service Settings, editable 1–5, Office working days (owner asked 2026-10-06 "got setting?"; answer: yes, this row) | NOT BUILT |
-| `Finish within {n} working days` · `Call the customer at day {n}` | 14 · 10 (code) | Service Settings, editable; a change never moves an existing case's deadline (snapshot on `opened_at`, the Purchasing §9.5 pattern) | engine BUILT, setting NOT BUILT |
+| First response · finish · day-10 call | 2 Office working days · 14 working days · day 10 (owner-approved rules, code constants) | **read-only display only** in central Settings; no edit control. RESOLVED 2026-10-06 by reduction (§7.30 item 4): an editable value would need an existing-Case snapshot that conflicts with §4's calendar-derived rule, and the owner approved the numbers, not their editability. A future edit control is a new ruling. | engine BUILT for 14 · day 10; first response NOT BUILT |
 | Delay reasons · condition refusal reasons | code constants (shared with Delivery) | read-only display | BUILT |
 
 ## 7.17 · Reports and export
@@ -790,9 +789,9 @@ Payment · Sales Order. Tally recorded here as sent / acknowledged / aligned.
 | 首次实质回复覆盖 | 全部Case两Office工作日已批准，2026-10-06 | 已解决，不重问；Operation owner／cover负责，收到式回复不算 |
 | 内部处理期限 | §7.9 owner已批准，2026-10-06；原Case规则保持 | 已解决：审证据／决定／审批／最终确认跟进next Office日，拒收／公开投诉同日或after-hours next日；未列步骤不自动获批 |
 | 审批范围 | §7.4正式处理决定审批已批准，2026-10-06 | 已解决：Operation准备，Approver批准；原模块执行门保持，不重复审批已批准范围的普通跟进 |
-| No remedy／Withdrawn／reopen | 现有close gate保留 | 需要明确各自证据、授权、客户告知、重开触发和期限；不得默认当Solved或绕过确认 |
-| Excel发现的扩展 | Excel事实不等于新增rule批准 | §7.26 A1–A9仍提案，尤重复维修、多个SO、外部表单替换；先核对现有authority，不把它们漏交工程猜 |
-| Settings期限改变 | §4现有calendar-derived rule | 保留原规则，暂不引入existing Case snapshot冲突；可编辑哪些设置须明确批准 |
+| No remedy／Withdrawn／Entered in error／reopen | 现有close gate保留 | 推荐答案已写在 §7.30 第1–3项（证据、授权、客户告知、重开触发、期限）；**等 owner 一次审阅**，未批准前不得实现 |
+| Excel发现的扩展 | Excel事实不等于新增rule批准 | §7.30 第5项：A1、A2、A3、A4、A6、A7、A8 已从现有 authority 解决（RESOLVED FROM AUTHORITY，引用列出）；A5 多个SO 与 A9 外部客户表单仍是 owner 决定 |
+| Settings期限改变 | §4现有calendar-derived rule | §7.30 第4项：已解决（以减少解决）——首版只读显示，不提供编辑，不引入 existing Case snapshot；之后要编辑是新裁定 |
 
 首次回复规则已批准；其他新screen copy以及shared host/tabs/layout不包含在以上业务批准内。正式handoff只用可取得的合并commit，不用本地草稿替代main。
 
@@ -1073,3 +1072,95 @@ Jess 在本 Service chat 明确授权向 UI、Workspace、Sales Orders、Deliver
 **FACT，main678c27346只读复核，未运行测试／生产验证：**`routes/operation/repair-orders.ts` 201–204 的 inspected 从 returned fact + 当前 inspection hold 不存在推导，未在该返回字段提供独立inspection结果/执行人。`lib/repair-order-work.ts` 的 returnDatePassed 完成依据为每Unit goods_received_date 与GRN；它证明原RO归还跟进条件，不证明每Unit修好。`routes/operation/order-payments.ts` 有 refund_request/refund_decide/refund_mark_paid；另有 `routes/finance/refunds.ts` 的refund_pay路径。不能把两套现存门任意选一或合并成Service退款引擎；必须按Payment MASTER的适用客户金额/source规则读写。接口存在不是部署或到账验证。
 
 **尚欠核实而非owner重问：**hold解除的正式权限/证据模型、有效取消receipt的排除、客户refund适用原门、Case到各腿的真实关系、跨源action去重。未证实前不得将这些行标READY或VERIFIED。以上是完整业务完成要求，不是迁移/测试文件/工程执行方案。
+
+## 7.30 · 最终审阅包 — remaining owner decisions with recommendations (PROPOSAL / NOT LAW, 2026-10-06)
+
+**Lane: PLAN.** Read at main `848ad3268`. This section closes every open row of §7.25 that can be
+closed from authority, and states one recommendation for each genuine business choice that remains.
+Items 1–3, 5b and 5c need the owner's single review; nothing here is LAW until she approves it, and
+no BUILD, Card or READY scope follows from this section. Already approved rulings (§7.2 first
+response, §7.4 decision approval, §7.9 ownership and processing timing, §7.25 processing chain) are
+not reopened.
+
+### 1 · `Closed · No remedy` — PROPOSAL
+
+- **When:** the policy result is `Not eligible` and the customer declines paid service, or the
+  Approver declines the request (a formal decision, already routed to Service Case Approver by §7.4).
+- **What must exist:** the Approver's recorded decision with its policy reason; an `outcome_sent`
+  event (channel · who · time · evidence of the message) telling the customer the result in approved
+  wording; every already-started leg finished or cancelled in its owning module.
+- **Customer confirmation:** not required, because a customer may disagree. In its place the close
+  needs the outcome message plus either the customer's reply or **5 Office working days** with no reply
+  after the outcome was sent. The Case keeps the customer's disagreement as a recorded fact.
+- **Who closes:** the assigned Case owner, after the Approver decision. The server and the database
+  trigger accept this close reason only with those facts present.
+- **Falsifier:** the owner wants every close, including a refusal, to wait for the customer's own reply.
+
+### 2 · `Closed · Withdrawn` and `Closed · Entered in error` — PROPOSAL
+
+- **Withdrawn:** the customer says the problem no longer needs help. Requires the customer's own words
+  as evidence (message screenshot or call note with time). No approval needed unless a charge was
+  accepted or goods have moved; then those legs finish or are cancelled through their owners first.
+- **Entered in error:** a duplicate, a test or a wrong key-in (Excel SN/2601-05 "wrongly key in").
+  Copies the Issue Tracker void pattern (Issue Tracker MASTER §3: actor, date, reason, surviving link):
+  the reason is required, a duplicate names the surviving Case, the record stays readable, and the
+  Numbers report excludes it from counts. Approval: Service Case Approver, because it removes a case
+  from the promise measurement.
+- **Falsifier:** the owner wants wrong key-ins deleted rather than kept as voided records.
+
+### 3 · Reopen — PROPOSAL
+
+- **Trigger:** the customer reports that the **same problem on the same item** is not solved after the
+  Case closed as Solved (Excel: TCF0197 three times, TCF0124 twice). A different problem, or a
+  different item, opens a new Case linked to the old one (§7.27.2).
+- **Window:** while the item's policy cover still runs; outside cover it is a new Case whose policy
+  result is computed fresh.
+- **What happens:** the same Case number reopens with a recorded reason and the reporter; the earlier
+  closure, confirmation and evidence stay unchanged in history. A new cycle starts from the reopen
+  date: first response within 2 Office working days (§7.2) and a new 14-working-day period (§4). The
+  earlier period's on-time result is never rewritten. The remedy decision goes to the Approver again
+  (§7.4 already requires approval for a changed remedy). The reopen raises an Issue candidate
+  (Issue Tracker MASTER §5 lists "reopened Service Case" as a candidate source).
+- **Who reopens:** any Operation person recording the customer's report; the Case returns to its
+  original owner if still eligible, otherwise round robin (§7.9).
+- **Falsifier:** the owner wants a reopened problem counted only against the original deadline.
+
+### 4 · Settings — RESOLVED by reduction (planner decision, recorded)
+
+The approved numbers stay code constants and Settings shows them read-only (§7.16). An editable value
+would need a snapshot rule for existing Cases that conflicts with §4. The owner approved the numbers,
+not their editability. A future edit control is a new ruling.
+
+### 5 · Excel extensions A1–A9 — checked against authority
+
+| Item | Verdict | Authority |
+|---|---|---|
+| A1 Case with a non-customer fault owner candidates a linked Issue | **RESOLVED FROM AUTHORITY** | Issue Tracker MASTER §2 ("the system may record/candidate an Issue") and §5 candidate sources; the reviewer still confirms or rejects |
+| A2 a leg may name part of an item | **RESOLVED FROM AUTHORITY**, narrowed | ERP-ARCHITECTURE §3.1: independently saleable or replaceable modules are their own Units, so a seater or headboard is named by its Unit ID; only a non-Unit part (legs, screws) is a component word on the leg |
+| A3 loan while repaired | **RESOLVED FROM AUTHORITY** | Orders owns the loan offer and Loan Note; the Case links it read-only; collection is Delivery's action |
+| A4 repeat complaint | **RESOLVED FROM AUTHORITY** | §7.4 sends every formal decision to the Approver; the Case shows "Earlier cases on this item" as a fact; reopen rule is item 3 |
+| A5 one Case linked to several Sales Orders | **5b · OWNER DECISION** | no authority; Sales Order review (§7.29) asks for a clear multi-item scope first |
+| A6 charged leg waits for Payment | **RESOLVED FROM AUTHORITY** | Payment owns money; Delivery's hold gate; the Case cannot mark Paid (§7.27.4) |
+| A7 failed or refused leg reopens the decision on the same Case | **RESOLVED FROM AUTHORITY** | §1 condition-gated collection: refusal returns to Operation for a formal outcome on the same Case |
+| A8 approved wording library from the Template sheet | **RESOLVED FROM AUTHORITY** | §1 First-day law ("approved call/WhatsApp wording beside the action"); each script still goes through COPY; balance-payment scripts belong to Payment |
+| A9 replace the four Google Forms with an ERP customer form | **5c · OWNER DECISION** | an external channel change; CLAUDE.md PLAN AUTHORITY BOUNDARY forbids cutover without explicit owner authorisation |
+
+**5b recommendation — several Sales Orders on one Case:** allow it only when one customer reports one
+problem that spans goods from several orders (Excel SN with CR0963 + CR0198 + TCF0308). Each affected
+item keeps its own order, line, policy result and legs; the first linked order is the header identity;
+a Case never mixes two customers. Falsifier: the owner wants one Case per Sales Order.
+
+**5c recommendation — customer claim form:** build the capability later on the existing external-link
+pattern (Delivery §5.5), but keep the Google Forms running until the owner separately authorises the
+switch. Approving the capability is not approving the cutover.
+
+### 6 · What still blocks PLAN MISSION COMPLETE
+
+1. The owner's review of items 1, 2, 3, 5b and 5c.
+2. The UI controller's combined review of the Service Register / Working Panel / Object / Tasks row
+   (sent 2026-10-06, §7.28; not acknowledged as aligned).
+3. COPY admission of the §7.20 words plus the close-reason words above.
+
+When 1–3 are done, the approved parts overwrite §1–§6 and this section, READY scopes are derived
+(§7.25 order), and the BUILD lane starts from a new chat. No code, Card or deployment before that.
+
