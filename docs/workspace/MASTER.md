@@ -559,7 +559,7 @@ manual-exception convergence across a changing monthly baseline, full legacy-his
 and original/update/completion Work assignment snapshots with originating-surface audit. The
 two-period movement ledger must not be reported as those capabilities.
 
-**AUTOMATIC PO/GRN LEAVE COVER — BUILT ON BRANCH 2026-10-06 (`build/workspace-auto-cover`,
+**AUTOMATIC PO/GRN LEAVE COVER — BUILT ON BRANCH 2026-10-06 (PR #1966, `build/workspace-auto-cover`,
 migration 0653); production apply PENDING, not deployed.** Measured before the change: the only
 recorded leave fact is the Operation pool away switch (`ops_staff_settings.available = false`,
 0232, undated, `ops_manager`-gated). Only the minute cron (`* 1-10 * * 1-5`, weekday 09:00–18:59
