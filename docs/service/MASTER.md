@@ -521,11 +521,7 @@ own reason sentence (e.g. `Body indentation must be more than 2 cm with nothing 
 | Not eligible | `Paid service` (quote) · `No remedy` | as above when paid | charged |
 | Any | `Goodwill exception` | any | recorded cost, Approver, reason |
 
-**Approval (RESOLVED owner routing; PROPOSAL on scope):** the remedy within the policy's own
-result needs no approver. `Service Case Approver` approval is required for: goodwill exception ·
-waiving a charge or the condition rule · declining an eligible claim · any refund (then Payment
-executes as its exceptional route) · a Case marked `Public escalation`. Falsifier: the owner wants
-every remedy approved.
+**RULING / APPROVED — formal Case decision approval scope, owner confirmation 2026-10-06.** The assigned Operation Case owner replies, collects/reviews evidence, assesses the applicable policy and prepares the remedy proposal without an extra approval for each routine activity. Every formal repair/replacement/charge/customer-movement decision is approved by `Service Case Approver` before execution, preserving ERP-ARCHITECTURE's Service Case decision gate. The submitted proposal identifies exact goods/Units, policy/version and result, remedy/movement, charge/payer where applicable, reason and evidence. Approval/refusal records the actual actor, business result and source decision identity. Routine follow-up inside that approved decision does not repeat approval; a change to remedy, charge or scope requires a new governed decision approval with prior facts retained. Service approval does not issue/complete a DO, move stock, approve/settle a customer refund or bypass Payment/Purchasing/Delivery/Stock's own permissions and gates. Absolute policy/condition prohibitions cannot be overridden by approval. The explicitly approved next-Office-working-day internal processing rule applies to a ready approval request (§7.9). Approval of this rule does not claim implementation or approve new close paths/UI. The former proposal to exempt ordinary policy-authorised remedies from decision approval is superseded and removed.
 
 **Refund:** never a remedy button. An exceptional refund is a goodwill decision by the Approver;
 the Case links Payment's refund record read-only (Payment §13).
@@ -624,7 +620,7 @@ the Duty switches from per-Case round robin to monthly allocation and nothing el
 
 **CURRENT ADMISSION LIMIT — measured at main `678c27346`, 2026-10-06.** The owner rule above is resolved; do not re-interview the owner or revive a monthly single-holder proposal. Workspace §6.1/§11.5 still records the earlier admission hold, and the Work reader does not demonstrate routine Service actions. The remaining boundary is implementation plus approval of proposed per-step clock laws, not absence of the routine owner decision. The existing 14-working-day deadline/day-10 event is a reusable Case source, not evidence that Service is already in Tasks. No Service routine Tasks production verification is claimed.
 
-**Action catalogue for later Workspace admission — owner rule and explicitly scoped deadlines in §7.9 are APPROVED; unlisted clocks, approval scope and new actions remain PROPOSAL / NOT LAW.**
+**Action catalogue for later Workspace admission — owner rule and explicitly scoped deadlines in §7.9 are APPROVED; unlisted clocks and new actions remain PROPOSAL / NOT LAW; formal decision approval scope is approved in §7.4.**
 
 | Action identity | Fact (line 1) · act (line 2) | Owner rule | Due | Closes when |
 |---|---|---|---|---|
@@ -787,7 +783,7 @@ Payment · Sales Order. Tally recorded here as sent / acknowledged / aligned.
 
 **RULING / APPROVED — internal processing timing, owner 2026-10-06 (§7.9).** Evidence review, remedy decisions, approval and final-confirmation follow-up have the scoped next-Office-working-day processing rule; failed collection and public escalation use the same-Office-day / after-hours-next-day rule. These are proposed action response deadlines, never promised supplier repair, stock arrival or customer-response dates. Waiting or sending never closes an obligation or pauses the existing 14-working-day Case deadline. Preserve §4's derived calendar rule, bounded extension and deadline-bound call events; do not introduce the conflicting proposed settings snapshot for existing Case deadlines. New source obligations keep their occurrence, original trigger, owner and due across repeated events and reassignment.
 
-Recommend ordinary policy-authorised remedies proceed with the assigned Case owner's recorded decision; exceptions (goodwill, charge waiver, refusing an eligible entitlement, refund, condition waiver, public-escalation decision) require the governed Approver and cannot override an absolute policy safety/condition prohibition. Payment executes approved customer money; Purchasing owns supplier recovery independently. Trade-off: faster normal handling with clearer response expectations increases Operation workload and requires monitored Duty coverage; exception control remains. This recommendation is overturned by evidence that two-day replies cannot be staffed, that ordinary remedies require commercial approval by policy, or that existing source deadlines would be duplicated. Any contrary approved policy wins and the conflict stays visible for resolution.
+**RULING / APPROVED — decision approval, owner 2026-10-06 (§7.4).** Operation prepares; Service Case Approver approves every formal repair/replacement/charge/customer-movement decision. Approved-scope routine follow-up does not repeat approval; changed remedy/charge/scope does. Original module permissions, commercial approval and absolute policy prohibitions remain. No ordinary-remedy exemption applies.
 
 **唯一阅读路径：**§7.1–§7.9定义业务／来源／政策／负责人及动作；§7.27定义逐步操作和业务验收；§7.26是Excel事实与尚未批准扩展；§7.28–§7.29是协调／测量证据。已有裁定不重问；其他建议尚未成为LAW。UI组合仍交共享UI controller，不由本chat画新variant。
 
@@ -797,7 +793,7 @@ Recommend ordinary policy-authorised remedies proceed with the assigned Case own
 |---|---|---|
 | 首次实质回复覆盖 | 全部Case两Office工作日已批准，2026-10-06 | 已解决，不重问；Operation owner／cover负责，收到式回复不算 |
 | 内部处理期限 | §7.9 owner已批准，2026-10-06；原Case规则保持 | 已解决：审证据／决定／审批／最终确认跟进next Office日，拒收／公开投诉同日或after-hours next日；未列步骤不自动获批 |
-| 审批范围 | Service Case Approver与绝对政策限制保持 | 普通政策内由Case owner执行，例外走Approver；绝对禁止项不能被审批绕过 |
+| 审批范围 | §7.4正式处理决定审批已批准，2026-10-06 | 已解决：Operation准备，Approver批准；原模块执行门保持，不重复审批已批准范围的普通跟进 |
 | No remedy／Withdrawn／reopen | 现有close gate保留 | 需要明确各自证据、授权、客户告知、重开触发和期限；不得默认当Solved或绕过确认 |
 | Excel发现的扩展 | Excel事实不等于新增rule批准 | §7.26 A1–A9仍提案，尤重复维修、多个SO、外部表单替换；先核对现有authority，不把它们漏交工程猜 |
 | Settings期限改变 | §4现有calendar-derived rule | 保留原规则，暂不引入existing Case snapshot冲突；可编辑哪些设置须明确批准 |
@@ -861,7 +857,7 @@ Case instead of a sheet per case; counts that withhold themselves when unmeasura
 
 ## 7.27 · 逐步工作流程与业务验收说明 — PROPOSAL / NOT LAW
 
-**Jess 2026-10-06 要求：Blueprint 必须写清细节和工作流，防止 BUILD 自行猜测。** 本节是可审阅的业务流程说明，不是 Card 或代码执行计划。§7.9 的 Operation 共享负责、每案一名负责人以及已批准的处理链继续有效；本节中的新权限细化、动作期限、文案和例外处理仍是提案。没有得到批准的部分不得被 BUILD 当作法律。共享布局只引用 UI MASTER，不新增 Service 版本；本节说明它必须承载什么工作，不替 UI controller 决定组件排列。
+**Jess 2026-10-06 要求：Blueprint 必须写清细节和工作流，防止 BUILD 自行猜测。** 本节是可审阅的业务流程说明，不是 Card 或代码执行计划。§7.9 的 Operation 共享负责、每案一名负责人以及已批准的处理链继续有效；本节中的尚未明确批准的权限细化、动作期限、文案和例外处理仍是提案。没有得到批准的部分不得被 BUILD 当作法律。共享布局只引用 UI MASTER，不新增 Service 版本；本节说明它必须承载什么工作，不替 UI controller 决定组件排列。
 
 ### 7.27.1 · 阅读和批准方式
 
@@ -922,7 +918,7 @@ Case instead of a sheet per case; counts that withhold themselves when unmeasura
 | 例外审批 | 原政策结果、申请差异、理由、成本／收费事实、证据 | Approver 记录批准／拒绝及理由；案件负责人看到结果后继续 | 所有未批准的例外不得先执行；审批人缺失时显示阻塞，不用常规负责人代替 |
 | 有收费 | 实际提案金额、付款人、已接受条款与 Payment 原记录 | 对方接受提案有记录；Payment 创建／记录正式客户金额和付款 | 在 Case 输入“Paid”不构成付款；收取／派送遵守 Delivery/Payment 的实际门槛 |
 
-**审批范围仍是提案：**普通政策内补救由案件负责人决定；goodwill、收费豁免、拒绝符合资格案件、退款及其他政策允许的例外由 Service Case Approver 决定。公共投诉的对外回应由一名授权 spokesperson 处理；公开发帖不自动改变资格或费用。
+**审批范围已批准，2026-10-06（§7.4）：**Operation准备并记录建议，Service Case Approver批准正式维修、更换、收费及商品收换决定；改变处理方式、费用或范围重新审批。已批准范围内的正常跟进不重复审批。退款等同时遵守Payment原权限门；政策禁止项不得绕过。公共投诉由一名授权spokesperson处理，公开发帖不自动改变资格或费用。
 
 **政策冲突：**§7.4 的示例表不是独立政策来源。如模型选择、运输收费、Guarantee 消耗或条件检查与当前 Guarantee/Payment/Delivery MASTER 不同，显示 REAL GAP 并以各 owning MASTER 的已批准规则为准，不能为了补齐表格猜定。
 
