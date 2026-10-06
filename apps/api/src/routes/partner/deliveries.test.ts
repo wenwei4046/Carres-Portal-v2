@@ -191,7 +191,126 @@ describe("GET / — only MY deliveries", () => {
   });
 });
 
-describe("PUT /:orderId/arrangement — Save Delivery Arrangement", () => {
+describe("GET / — Hold delivery, a yes/no and nothing more (owner ruling 2026-09-25, §3/§5.4)", () => {
+  const ARRANGED = {
+    id: "arr-1",
+    order_id: ORDER_A,
+    leg: 0,
+    partner_id: ME,
+    confirmed_date: "2026-09-05",
+    confirmed_time: null,
+    expected_arrival: null,
+    logistics_note: null,
+  };
+  /** The `Hold delivery` read's row: RM 1,200.00 of goods. */
+  const holdRow = (over: Record<string, unknown> = {}) => ({
+    id: ORDER_A,
+    paid: 0,
+    delivery_stops: null,
+    order_lines: [{ sku: "mattress:M1401F-K", qty: 1, unit_price: 1200 }],
+    order_addons: [],
+    ops_order_control: null,
+    invoices: [],
+    order_finance_exceptions: [],
+    order_delivery_payment_approvals: [],
+    ops_delivery_orders: [],
+    ...over,
+  });
+
+  async function cardOf(arrangement: Record<string, unknown> | null, hold: Record<string, unknown>) {
+    const { from } = mockAdmin([
+      PARTNER_ROW,
+      { data: arrangement ? [arrangement] : [] },
+      { data: [ORDER_ROW] },
+      { data: [] }, // events
+      { data: [hold] }, // the Hold delivery read
+      { data: [] }, // the storage catalogue (scheduled orders only)
+    ]);
+    const res = await call("/", "partner", ME);
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    const body = JSON.parse(text) as { deliveries: Array<Record<string, unknown>> };
+    return { text, card: body.deliveries[0]!, from };
+  }
+
+  it("scheduled and unpaid → true, and the response carries no money and no reason", async () => {
+    const { text, card } = await cardOf(ARRANGED, holdRow());
+    expect(card.holdDelivery).toBe(true);
+    expect(text).not.toMatch(/1,?200|unpaid|outstanding|"paid"|amount|reason|Finance|RM /i);
+    expect(Object.keys(card).sort()).toEqual(
+      [
+        "area", "building", "cannotDeliverReported", "confirmedDate", "confirmedTime", "customerName",
+        "customerPhone", "doNumber", "expectedArrival", "goodsSummary", "holdDelivery", "leg", "note",
+        "orderId", "requestedDate", "specialRequirements",
+      ].sort(),
+    );
+  });
+
+  it("scheduled and an OPEN Finance exception → true; the reason never leaves", async () => {
+    const { text, card } = await cardOf(
+      ARRANGED,
+      holdRow({ paid: 1200, order_finance_exceptions: [{ status: "open", reason: "Cheque bounced" }] }),
+    );
+    expect(card.holdDelivery).toBe(true);
+    expect(text).not.toMatch(/Cheque bounced|Finance/);
+  });
+
+  it("scheduled and paid → false; owed under an approved pre-closure approval → false", async () => {
+    expect((await cardOf(ARRANGED, holdRow({ paid: 1200 }))).card.holdDelivery).toBe(false);
+    expect(
+      (await cardOf(ARRANGED, holdRow({ order_delivery_payment_approvals: [{ status: "approved" }] }))).card.holdDelivery,
+    ).toBe(false);
+  });
+
+  it("NOT scheduled → false and money is never asked: booking runs in parallel with payment", async () => {
+    const { card, from } = await cardOf(
+      { ...ARRANGED, confirmed_date: null },
+      holdRow({ order_finance_exceptions: [{ status: "open", reason: "X" }] }),
+    );
+    expect(card.holdDelivery).toBe(false);
+    /* The storage catalogue read is skipped when nothing is scheduled. */
+    expect(from.mock.calls.map((c) => c[0])).not.toContain("product_skus");
+  });
+
+  it("a live Delivery Order's day counts as Scheduled (the one day reader)", async () => {
+    const { card } = await cardOf(
+      { ...ARRANGED, confirmed_date: null },
+      holdRow({
+        order_finance_exceptions: [{ status: "open" }],
+        ops_delivery_orders: [{ leg: 0, delivery_date: "2026-09-05", time_slot: null, voided_at: null, issued_at: "2026-09-01T00:00:00Z" }],
+      }),
+    );
+    expect(card.holdDelivery).toBe(true);
+  });
+
+  it("a voided Delivery Order is not a Scheduled day", async () => {
+    const { card } = await cardOf(
+      { ...ARRANGED, confirmed_date: null },
+      holdRow({
+        ops_delivery_orders: [{ leg: 0, delivery_date: "2026-09-05", time_slot: null, voided_at: "2026-09-02T00:00:00Z", issued_at: "2026-09-01T00:00:00Z" }],
+      }),
+    );
+    expect(card.holdDelivery).toBe(false);
+  });
+
+  it("one batched read for every card — never one round trip per delivery", async () => {
+    const SECOND = "00000000-0000-0000-0000-0000000a0002";
+    const { from } = mockAdmin([
+      PARTNER_ROW,
+      { data: [ARRANGED, { ...ARRANGED, id: "arr-2", order_id: SECOND }] },
+      { data: [ORDER_ROW, { ...ORDER_ROW, id: SECOND }] },
+      { data: [] },
+      { data: [holdRow(), holdRow({ id: SECOND, paid: 1200 })] },
+      { data: [] },
+    ]);
+    const res = await call("/", "partner", ME);
+    const body = (await res.json()) as { deliveries: Array<{ orderId: string; holdDelivery: boolean }> };
+    expect(Object.fromEntries(body.deliveries.map((d) => [d.orderId, d.holdDelivery]))).toEqual({ [ORDER_A]: true, [SECOND]: false });
+    expect(from.mock.calls.filter((c) => c[0] === "orders")).toHaveLength(2); // the list + ONE hold read
+  });
+});
+
+describe("PUT /:orderId/arrangement — Save delivery date", () => {
   const save = (body: unknown, partnerId = ME) =>
     call(`/${ORDER_A}/arrangement?leg=0`, "partner", partnerId, {
       method: "PUT",

@@ -11,6 +11,7 @@ import {
   myHolidaySet,
   type ExternalDeliveryLinkView,
 } from "@carres/shared";
+import { heldDeliveryScopes, holdKey } from "../../lib/delivery-hold";
 import { mapPgError } from "../../lib/route-helpers";
 import { adminClient } from "../../lib/supabase";
 import { todayIsoMYT } from "../../lib/today";
@@ -35,6 +36,9 @@ import type { AppEnv } from "../../types";
  * reference (never the internal SO number), the customer and address it must
  * deliver to, the goods without prices, the pickup route, the requested date
  * and what it already saved. No money, no other delivery, no commercial term.
+ * While a Scheduled delivery exists and the DO money gate holds, the view's
+ * `holdDelivery` is true and the page prints `Hold delivery` alone — never an
+ * amount, never the Finance reason (owner ruling 2026-09-25, §3).
  *
  * ```
  * GET  /:token                  the view
@@ -134,6 +138,16 @@ publicDeliveryLinkRouter.get("/:token", async (c) => {
     const nameOf = new Map(((skuRows ?? []) as Array<{ sku: string; variant: string | null }>).map((s) => [s.sku, s.variant]));
     const refs = Array.isArray(r.order.source_ref) ? r.order.source_ref : r.order.source_ref ? [r.order.source_ref] : [];
     const arr = arrangement as { confirmed_date: string | null; confirmed_time: string | null } | null;
+    /* ⭐ `Hold delivery` (owner ruling 2026-09-25, §3/§5.5): a Scheduled
+       delivery exists AND the DO money gate holds. The view carries the
+       yes/no and nothing else — never money, never why. */
+    const held = await heldDeliveryScopes(sb, [
+      {
+        orderId: r.link.order_id,
+        leg: r.link.leg,
+        arrangement: { confirmedDate: arr?.confirmed_date ?? null, confirmedTime: arr?.confirmed_time ?? null },
+      },
+    ]);
     const view: ExternalDeliveryLinkView = {
       company: r.partner.name,
       reference: refs.filter(Boolean).join(" · ") || null,
@@ -148,6 +162,7 @@ publicDeliveryLinkRouter.get("/:token", async (c) => {
         .map((route) => [STOCK_ROUTE_LABEL[route.key], route.place].filter(Boolean).join(" · ")),
       scheduledDate: arr?.confirmed_date ?? null,
       scheduledTime: arr?.confirmed_time ?? null,
+      holdDelivery: held.has(holdKey(r.link.order_id, r.link.leg)),
     };
     return c.json(view);
   } catch (err) {
