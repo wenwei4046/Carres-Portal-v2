@@ -1064,6 +1064,8 @@ Jess 在本 Service chat 明确授权向 UI、Workspace、Sales Orders、Deliver
 
 
 
+**最新协调核对 — REPORTED，2026-10-06，接收方读取 f06af529b / PR1960。** Workspace已确认本chat新批准的owner、all-Case两Office日、指定内部处理期限和formal decision gate，不再作为未决业务问题；routine Service task实现仍未证明。Workspace另报告Customer Enquiry的一小时first-response是不同来源义务；本Service chat不据报告扩展或改写Customer Service法律，必须读其owningMASTER确认。Case两Office日仍从自己的批准trigger起算；创建Case不完成、取消或重置原enquiry动作，也不证明交接已接受。关联只保留两个不同义务的准确身份／due／结果，禁止复制同一义务为两个Tasks。UI controller正在核对PR，未确认Service组合，不标aligned。其关于enquiry查找视图的建议是Customer Service／Workspace提案，不是新增Service页面或批准外部WhatsApp启用。
+
 **本chat独立来源复核（事实，非运行验证）：**
 
 **FACT，独立只读复核基准 main678c27346，未运行测试／未生产写入。** `ServiceCaseWizard.tsx` saveMut 保存 orderId、单个orderLineId、SKU、原Reference及客户资料；没有把 deliveryDate／原承诺版本传入 create input。`service-cases.ts` POST / 插入 order_id/order_line_id，不见同route的line-belongs-to-order检查或Case重复匹配。`0285_service_case_guided_intake.sql` 为 order_line_id 建外键，证明line存在，不单独证明该line属于本案order；此次未穷尽所有后续DB约束，归属保证仍UNVERIFIED。来源lookup多匹配要求SO号码，不等于Case duplicate检查；同名不合并。
