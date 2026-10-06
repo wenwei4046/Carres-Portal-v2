@@ -1000,14 +1000,33 @@ Jess 在本 Service chat 明确授权向 UI、Workspace、Sales Orders、Deliver
 
 | Chat（原名称） | Thread ID | 状态 |
 |---|---|---|
-| UI/UX update master | `01a10c26-587f-7d90-a4ab-55b8197296f8` | sent; acknowledgment/alignment not yet verified |
-| Workspace (Houzs) | `01a0f6ab-41bb-7070-b8f1-68f796c3e3c6` | sent; acknowledgment/alignment not yet verified |
-| Sales Order | `01a10eb9-c4a2-7220-86b6-6c695f5898a5` | sent; acknowledgment/alignment not yet verified |
-| Delivery | `01a10c26-58c1-7a82-a991-18e8582dd3d9` | sent; acknowledgment/alignment not yet verified |
-| Warehouse | `01a10c26-58e6-7172-be05-34bff7497f2c` | sent; acknowledgment/alignment not yet verified |
-| Purchasing | `01a10c26-5b48-7d02-bab9-8acc235ee8aa` | sent; acknowledgment/alignment not yet verified |
-| Payment | `01a10eb9-c407-7870-a7b6-6f8ce01e5627` | sent; acknowledgment/alignment not yet verified |
+| UI/UX update master | `01a10c26-587f-7d90-a4ab-55b8197296f8` | review completed in recipient chat; findings recorded below; integration/alignment not verified |
+| Workspace (Houzs) | `01a0f6ab-41bb-7070-b8f1-68f796c3e3c6` | review completed in recipient chat; findings recorded below; integration/alignment not verified |
+| Sales Order | `01a10eb9-c4a2-7220-86b6-6c695f5898a5` | review completed in recipient chat; findings recorded below; integration/alignment not verified |
+| Delivery | `01a10c26-58c1-7a82-a991-18e8582dd3d9` | review completed in recipient chat; findings recorded below; integration/alignment not verified |
+| Warehouse | `01a10c26-58e6-7172-be05-34bff7497f2c` | review completed in recipient chat; findings recorded below; integration/alignment not verified |
+| Purchasing | `01a10c26-5b48-7d02-bab9-8acc235ee8aa` | review completed in recipient chat; findings recorded below; integration/alignment not verified |
+| Payment | `01a10eb9-c407-7870-a7b6-6f8ce01e5627` | review completed in recipient chat; findings recorded below; integration/alignment not verified |
 | Guarantee | 未定位明确当前 owning chat | 未发送；Terms review 不自动等于 Guarantee owner |
 | Rental | 未定位明确当前 owning chat | 未发送；发现历史 Subscription Blueprint archive，不自动恢复／替代当前 owner |
 
 通知已发送不等于接收方已确认，也不等于接口已接通。现有场景：有原记录自动带入已有资料，仅补问题／要求／证据；无来源手动记录，不造 SO/Unit；每个执行模块保留自己的身份、时钟、权限和实际完成事实。共享 UI 提交的是业务 payload 与 kit gap 核对，未宣称 Service 自定义 tabs/layout 已批准。
+
+
+## 7.29 · 跨模块核对结果与验收缺口 — FACT / REPORTED，2026-10-06
+
+已只读取得 §7.28 七个接收 chats 的核对结果。下表是接收方报告，不等于本 chat 独立运行测试或生产验证；依据版本不同的内容不能混作同一 main 真相。通知接收／review completed 不等于接口 aligned。所有新增修正仍须进入完整 Blueprint 审阅；不据此启动 BUILD。
+
+| 接收 chat | 报告基准 | 具体发现 | Blueprint 的必需检查／正确业务结果 |
+|---|---|---|---|
+| Sales Order | origin/main 678c27346；只读代码 | intake已有 orderId/customer/line；当前只一个affected line；deliveryDate带到wizard但创建请求未保存原承诺；未找到Case duplicate检查；order-line归属及完整权限负向检查未证明；取消SO门欠核 | 来源查找不等于重复案匹配；原来源／当时承诺应可追溯，不从当前SO修改后日期重构历史；多商品范围必须明确，未支持不能宣传；line必须属于对应order，权限服务端验证；取消SO不能凭取消状态丢失历史问题报告能力 |
+| Workspace (Houzs) | Service 009d3a6c6 + main 678c27346 | Operation共享／round-robin owner规则已解决，routine Work未接；SLA与customer-confirmed代码存在，未运行测试或生产操作；Workspace仍有旧owner未决定文字 | 保留新Service §7.9裁定；不重问owner；Work接入必须有精确obligation、owner、source clock和completion，既有14日代码不证明九动作已可用 |
+| UI/UX update master | 指定工作树与当前checkout有差异 | Case原身份、不造SO、共享组件未采用；Service合并布局仍未审；证据清单组件须继续核对 | 将本branch/commit内容明确标识local；不能拿另一个checkout的MASTER自动覆盖；共享host/tabs/row menu必须统一review，本通知不是UI批准 |
+| Delivery | 当前远端Delivery MASTER；未生产操作 | DO同intake关联未证实；condition拒收边界报告BUILT migration0516；partial Unit/仓库/替换闭环欠验证；source与proof仍Delivery拥有 | Collected是实物装载/接收事实；condition失败货仍客户；安排/到仓/Delivered各自独立；没有逐Unit证据不能整案Done；原付款release门不重置 |
+| Warehouse | checkout128328c6b，不同于main；migration0341/0344代码 | Customer Return hold/检查规则存在；Case→receipt→Unit→inspection完整关联未验证；Stock §12.8引用已失效 | 当前Stock MASTER §5为接收方指出的rule location，正式改引用前核对同一批准版本；Delivery attempt不是完整customer-return收货证明；Case关案不移动Unit |
+| Purchasing | main678c273464代码 | Claim↔RO、Stock交接、Receiving归还GRN已有；Case↔Claim/RO双向只读链未发现；仅hold解除被用作inspection推断，缺显式检查结果/人/证据；跨源去重欠证明 | 维修结果必须以原模块规定的验收证据判定；解除hold的含义先核实，不把它扩张成所有检查通过；每Unit的实际归还及修复证据可追溯，Case不自造完成 |
+| Payment | checkout128328c6b与main678c27346权威不同 | Payment Records问题门未见，Service已有NOT BUILT标记；Case收费/退款关联欠证据；refund request/decide/paid接口存在，未验证部署；Work去重/door欠验证 | 获取批准当前Payment规则后校对；Caseapproval不替代actualrefund，invoice不存在就保留缺口；originalallocation/settlement及owner clock唯一 |
+
+**不得凭接收方报告改写已批准业务：**Delivery报告将movement顺序整体称proposal，与Service已有四种movement裁定不应混淆；已批准词义/能力保持，具体新增组合和链接尚未批准／实现。Warehouse/Payment的128328c6b与main差异需要统一版本复核。跨模块新动作、关闭权限和商业政策不会因为另一chat建议就成为LAW。
+
+**依赖结论：**不用等每个模块全部完成，但进入本Case流程的真实来源与实际完成证据必须闭合。若界面能开Case却丢原承诺、误关联line或没有duplicate检查，不能称“完整开案”；若能显示RO却没有逐Unit有效完成证据，不能称“完整维修闭环”；未授权或失败的source读取不能显示为已完成。现阶段不声明READY或PLAN COMPLETE。
