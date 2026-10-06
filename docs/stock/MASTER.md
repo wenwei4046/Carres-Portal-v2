@@ -691,9 +691,21 @@ rather than hiding the row. After a successful save the affected row, its quanti
 counts and the receipt records are re-read; a failed save preserves what the operator typed.
 Inbound still owns no write path and carries no Work column or duty avatar.
 
-**INBOUND REGISTER — owner ruling 2026-09-25, APPROVED TARGET / NOT BUILT (overwrites the
-2026-09-15 four-group composite cells above as design; that card's Site tabs, three filters,
-on-row `Receive`, full-width Receiving Workspace and `Destinations without a Site` tab stay).**
+**INBOUND REGISTER — owner ruling 2026-09-25, BUILT 2026-10-06 under the owner's two-line
+directive (approved UI delivered on the shared template; branch `build/warehouse-approved-ui-fixes`;
+production walk owed) (overwrites the 2026-09-15 four-group composite cells above as design; that
+card's Site tabs, three filters, on-row `Receive`, full-width Receiving Workspace and
+`Destinations without a Site` tab stay).** Measured on the rendered harness at 1440 with the
+production chrome: eleven registry-width columns total 1,494px on an 892px grid (date 120 ·
+date 123 · 140 · 170 · 140 · 150 · 208 · 112 · 112 · 123 · 96), rows 40px, header 36px; six heads
+stand in view at rest and `Receive` — the owner's last column — is reached by the grid's own
+scroll. 🟡 A trailing pinned action column is a KIT GAP raised to the UI controller 2026-10-06; until
+the kit admits it, the owner's order stands as ruled. `Goods Received Date` prints one receipt's
+own date, or the registry's `{n} receipt dates` when several trucks posted; each date stands beside
+its own DO number in the expansion. `Supplier DO No` lists every DO number on one line, each its own
+link. The `Item` cell prints the goods, `{n} items ▸` for several, `Expected {date} · not received`
+as its first line for an overdue arrangement and the governed status word (`Records incomplete`) for
+an unreadable receipt; `Status` and `Exceptions` stay in Columns.
 One row is one arrangement, 40px, one fact per cell, dates first, in the owner's order:
 
 ```
@@ -1075,9 +1087,15 @@ The default includes outstanding loading, missing evidence and unmatched driver 
 Not loaded yet, Awaiting driver confirmation, Loaded and Evidence not submitted remain specific
 filters. Loading completion never claims the driver's act. Counts, rows and exports use one scope.
 
-**OUTBOUND REGISTER — owner ruling 2026-09-25, APPROVED TARGET / NOT BUILT (overwrites the
+**OUTBOUND REGISTER — owner ruling 2026-09-25, BUILT 2026-10-06 under the owner's two-line
+directive (branch `build/warehouse-approved-ui-fixes`; production walk owed) (overwrites the
 composite `Document` / `Units` cells above as design; the Pickup status rail, the on-row `Loading`
 door, the full-width Loading workspace and the separate `Loaded` / `Driver confirmed` facts stay).**
+Measured on the rendered harness at 1440 with the production chrome: eleven registry-width columns
+total 1,554px on an 892px grid (120 · 120 · 170 · 90 · 150 · 240 · 208 · 120 · 120 · 120 · 96), rows
+40px; `Scheduled handover` keeps the approved 11px second line (`Driver pickup {time}` or `Time not
+provided`); the `Assigned Driver` line moved into the Loading work surface and stays a Columns
+option; exception sentences (`Loaded, not confirmed by {company}`) print in the row's expansion.
 One row is one DO + Site scope, 40px, one fact per cell, in the owner's order:
 
 ```
@@ -2209,10 +2227,11 @@ are separate milestones. No Warehouse surface is frozen into the UI Kit by this 
 | Capability | Existing owner and implementation | Current limit / delivery evidence |
 |---|---|---|
 | Unit identity and availability | 0366 authority, 0371 condition correction, 0453 quantity identity separation; stock_unit_register_v is the listing | Quantity records have no displayable Unit ID; no negative or manually adjusted total |
-| Inbound | warehouse-inbound shared projection; actual Receiving Site, formal source, full products and receipt outcomes | Awaiting receipt / Fully received / All arrivals; accepted, physical arrived and pending quantities remain distinct |
+| Inbound | warehouse-inbound shared projection; actual Receiving Site, formal source, full products and receipt outcomes; `WarehouseInbound.tsx` prints the owner's eleven columns (BUILT 2026-10-06) | Awaiting receipt / Fully received / All arrivals; accepted, physical arrived and pending quantities remain distinct; `Receive` is the last column and scrolls off an 892px grid until the kit admits a trailing pinned column (KIT GAP) |
 | Receiving | ReceivingWorkspace and existing receipt writer; posted GRN and receiving_unit_results | Same-page work, stable retry identity, source evidence and actual goods receipt date; no second Stock Add |
-| Outbound | 0424 exact DO Unit scope, prep and two-sided handover; explicit Loading workspace | Loading does not confirm for the driver; loaded with zero driver confirmations remains open |
-| Inventory | WarehouseStockRegister and WarehouseUnitDetail read the Unit authority; `inventory-words.ts` (shared) is the one arithmetic for `Inventory Status` and `Stock Condition`; `stock-register-context.ts` reads the physical facts | Eleven single-line 40px columns in the owner's order, rail `STOCK · CATEGORY · OWNERSHIP · CONTROL`, footer `{n} still to arrive · see Inbound`; the PGlite contract test executes the physical-fact reads against committed column names. PO issue dates never stand in for actual receipts. Unit Detail `⋮` actions not built |
+| Outbound | 0424 exact DO Unit scope, prep and two-sided handover; explicit Loading workspace; `WarehouseOutboundWork.tsx` prints the owner's eleven columns with `Done` only when loaded AND driver-confirmed (BUILT 2026-10-06) | Loading does not confirm for the driver; loaded with zero driver confirmations remains open |
+| Inventory | WarehouseStockRegister and WarehouseUnitDetail read the Unit authority; `inventory-words.ts` (shared) is the one arithmetic for `Inventory Status` and `Stock Condition`; `stock-register-context.ts` reads the physical facts | Eleven single-line 40px columns in the owner's order, rail `STOCK · CATEGORY · OWNERSHIP · CONTROL`, footer `{n} still to arrive · see Inbound`; the PGlite contract test executes the physical-fact reads against committed column names. PO issue dates never stand in for actual receipts. 2026-10-06: the rail follows the shared 896px available-canvas rule (`useFilterRailOpen`) so a phone opens on the grid with `Show filters`; `Request Transfer` is the toolbar create pill, no longer a control in the Shell header row. The narrow-screen open overlay/backdrop/Escape composition stays a KIT GAP. Unit Detail `⋮` actions BUILT 2026-09-26 |
+| Schedule date heading | `WarehouseWorkspace.tsx` `DateHeading` | 2026-10-06: the weekday always prints (COPY: never `Today` as a date word); today keeps its blue ink, 2px underline and `data-today`, and a screen reader still hears `Today` |
 | Physical Site visits | Posted receiving_unit_results + warehouse_receipts.actual_site_id / goods_received_at; arrival_source_events.collected with source.from_site_id | Only unambiguous same-Unit, same-Site evidence pairs. Every later receipt opens another visit. Missing or overlapping evidence remains visibly unpaired |
 | Historical DO departures | delivery_handover_event_units warehouse side + handed_over event | These old events have no historical Site field. Preserve the departure independently; do not infer Site from the Unit's current warehouse, rewrite history or fabricate a backfill |
 | Arrival Schedule / Pickup Schedule | WarehouseWorkspace, warehouse-schedule projection and Site operating dates | Separate pages; normal white cards and quiet date provenance badges, overdue work highlighted, undated/delayed work reachable, including older overdue and dated non-working-day entries without changing their dates. Pickup opens exact Loading scope |

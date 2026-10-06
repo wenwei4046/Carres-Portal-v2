@@ -122,10 +122,14 @@ export default function WarehouseStockRegister({ showroom = false }: { showroom?
   };
   const { data, isLoading, isError, error, refetch } = useStockRegister(showroom ? "PJ Showroom" : undefined);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [responsiveRailOpen, setResponsiveRailOpen] = useFilterRailOpen("carres.showroom.filterRail", canvasRef);
-  const [stockRailOpen, setStockRailOpen] = useState(true);
-  const railOpen = showroom ? responsiveRailOpen : stockRailOpen;
-  const setRailOpen = showroom ? setResponsiveRailOpen : setStockRailOpen;
+  /* Below an 896px available canvas the rail starts hidden and the register
+     takes the width (UI MASTER §6.1); the browser remembers the choice. The
+     Inventory page used a fixed open rail here and left one column of the
+     grid visible on a phone. */
+  const [railOpen, setRailOpen] = useFilterRailOpen(
+    showroom ? "carres.showroom.filterRail" : "carres.warehouse.inventory.filterRail",
+    canvasRef,
+  );
   const requestedView = params.get("view");
   const view: InventoryView =
     params.get("history") === "1" || requestedView === "history"
@@ -520,11 +524,6 @@ export default function WarehouseStockRegister({ showroom = false }: { showroom?
             testId="stock-register-destination-header"
             word={showroom ? "Showroom" : "Inventory"}
             docTitle={showroom ? "Showroom · Carres" : "Inventory · Warehouse — Carres"}
-            right={showroom ? undefined :
-              <Link className="text-kit-blue-11 text-body" to="/operation?tab=arrival-source&kind=transfer">
-                Request Transfer
-              </Link>
-            }
             destinationHeader
           />
         )}
@@ -666,6 +665,21 @@ export default function WarehouseStockRegister({ showroom = false }: { showroom?
                   },
                 }] : undefined}
                 exportName="Inventory"
+                /* The create door lives in the toolbar, never in the Shell
+                   header row (UI MASTER §4): a Transfer is born in Stock. */
+                toolbarEnd={
+                  showroom ? undefined : (
+                    <Button
+                      variant="primary"
+                      shape="pill"
+                      icon="add"
+                      onClick={() => navigate("/operation?tab=arrival-source&kind=transfer")}
+                      data-testid="request-transfer"
+                    >
+                      Request Transfer
+                    </Button>
+                  )
+                }
                 searchPlaceholder="Unit ID, item, SO No, PO No or supplier…"
                 isLoading={isLoading || !data}
                 onSearchChange={setSearch}

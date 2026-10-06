@@ -11,6 +11,7 @@ import {
   type InboundArrival,
 } from "@carres/shared";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
+import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import {
   useOperationPos,
@@ -85,6 +86,53 @@ function useIsNarrow(): boolean {
  *  the URL names none. Matched by the governed name the server returns, and
  *  falling back to the FIRST Site rather than to a guess. */
 const DEFAULT_SITE_NAME = "Carres Klang Warehouse";
+
+/** A fact that has not happened yet (no receipt, no supplier answer on a
+ *  non-PO source) stays BLANK — never a dash, never an absence word. */
+function Blank() {
+  return <span aria-hidden="true" />;
+}
+
+/** The `Item` cell — ONE line of 13px with the approved 11px second line.
+ *  An arrangement past its date with no receipt prints
+ *  `Expected {date} · not received` as its first line (owner 2026-09-25) and
+ *  an unreadable receipt prints the governed status word, so the operator
+ *  reads WHY the quantity cells are empty without opening Columns. Several
+ *  goods print `{n} items` and keep the row expansion — the one Inbound
+ *  exception to "no expansion". */
+function InboundItemCell({ row: r, today }: { row: InboundArrival; today: string }) {
+  const overdue =
+    r.date != null && r.date < today && r.sessions.length === 0 && (!r.quantities.known || r.quantities.arrivedQty === 0);
+  const incomplete = r.identitiesMissing || !r.quantities.known;
+  const goods =
+    r.products.length === 0
+      ? "Products not recorded"
+      : r.products.length > 1
+        ? `${r.products.length} items`
+        : (r.products[0]!.name ?? r.products[0]!.sku ?? "Product not recorded");
+  const first = overdue
+    ? `Expected ${fmtDate(r.date!)} · not received`
+    : incomplete
+      ? inboundStatusWordOf(r)
+      : null;
+  return (
+    <span className="block leading-[18px]" data-testid={`inbound-item-${r.id}`}>
+      {first ? (
+        <>
+          <span className="block" data-testid={`inbound-item-first-${r.id}`}>{first}</span>
+          <span className="block text-label font-normal leading-[14px] text-kit-slate-11">{goods}</span>
+        </>
+      ) : (
+        <>
+          <span className="block">{goods}</span>
+          {r.products.length === 1 && r.products[0]!.name && r.products[0]!.sku ? (
+            <span className="block text-label font-normal leading-[14px] text-kit-slate-11">{r.products[0]!.sku}</span>
+          ) : null}
+        </>
+      )}
+    </span>
+  );
+}
 
 /** The Document number opens the DOCUMENT — never the work surface. */
 function documentHref(r: InboundArrival) {
@@ -242,85 +290,224 @@ export default function WarehouseInbound() {
   const dutyAllowed = dutyQ.data?.allowed ?? false;
   const dutyKnown = !dutyQ.isLoading;
   /**
-   * THE DEFAULT COLUMN SET IS WHAT FITS THE SCREEN (2026-09-15 correction).
+   * THE INBOUND REGISTER — owner ruling 2026-09-25 (Stock MASTER §7).
    *
-   * The first cut of this Register declared FOURTEEN default columns —
-   * 2,130px of them — inside roughly 1,010px of grid at 1280px with the rail
-   * open. Every date, every quantity and the Receive button itself sat past
-   * the right edge. `No page-level horizontal scroll` was true and proved
-   * nothing: the GRID scrolls, and an operator does not find an action they
-   * cannot see.
+   * One row is one arrangement, 40px, ONE FACT PER CELL, in the owner's own
+   * order: the three dates first (planned · supplier-confirmed · actual), then
+   * the two documents and the supplier, then the goods and the three
+   * quantities, `Receive` last.
    *
-   * Four numeric columns became one `Receiving progress` cell, `Supplier` and
-   * the delivery notes became one, the repeated Site name left the row, and
-   * `Receiving` now sits AHEAD of `Status` so the action is inside the
-   * visible width by construction. Nothing was deleted: every retired column
-   * is one click away in the Columns chooser and keeps its own sort and
-   * filter. No font was reduced and no column was squeezed below its content.
+   *   PO Delivery Date · Supplier Delivery Date · Goods Received Date · PO No ·
+   *   Supplier · Supplier DO No · Item · Order Qty · Received Qty ·
+   *   Pending Delivery Qty · Receive
+   *
+   * The 2026-09-15 composite cells (`Document` · `Receiving progress`) are
+   * retired as design. Nothing is deleted: `Damaged Qty` · `Wrong Item Qty` ·
+   * `PO Issued` · `SO No` · `To` · `Status` · `Exceptions` stay one click away
+   * in Columns with their own sort and filter. Widths come from the registry,
+   * never a typed number; no governed font is reduced.
    */
   const columns = useMemo<DataGridColumn<InboundArrival>[]>(
     () => [
       {
-        key: "document",
-        label: "Document",
-        width: 245,
-        wrap: true,
-        searchValue: (r) => `${r.documentWord} ${r.documentNo} ${r.sourceId}`,
-        accessor: (r) => (
-          <div className="py-0.5 leading-[18px]">
-            <Link
-              className="font-mono text-kit-blue-11 hover:underline"
-              onClick={(event) => event.stopPropagation()}
-              to={documentHref(r)}
-              data-testid={`inbound-document-${r.id}`}
+        key: "poDeliveryDate",
+        label: "PO Delivery Date",
+        headerLines: ["PO Delivery", "Date"] as const,
+        width: REGISTER_FIELD_WIDTH.date,
+        sortable: true,
+        filterType: "date",
+        chooserGroup: "Dates",
+        dateValue: (r) => r.poDeliveryDate ?? r.date,
+        searchValue: (r) => r.poDeliveryDate ?? r.date ?? "",
+        exportValue: (r) => r.poDeliveryDate ?? r.date ?? "",
+        accessor: (r) => {
+          /* A non-PO arrangement (Transfer · Return · Repair) has no PO date;
+             its own expected date stands in the planned-date column. */
+          const iso = r.poDeliveryDate ?? r.date;
+          return iso ? (
+            <span data-testid={`inbound-po-date-${r.id}`}>{fmtDate(iso)}</span>
+          ) : (
+            <span className="text-kit-slate-11" data-testid={`inbound-po-date-${r.id}`}>Date not recorded</span>
+          );
+        },
+      },
+      {
+        key: "supplierDeliveryDate",
+        label: "Supplier Delivery Date",
+        headerLines: ["Supplier Delivery", "Date"] as const,
+        width: REGISTER_FIELD_WIDTH.date,
+        sortable: true,
+        filterType: "date",
+        chooserGroup: "Dates",
+        dateValue: (r) => r.supplierDeliveryDate,
+        searchValue: supplierDeliveryWord,
+        filterValue: supplierDeliveryWord,
+        exportValue: supplierDeliveryWord,
+        accessor: (r) =>
+          r.sourceType === "supplier-delivery" ? (
+            <span
+              className={r.supplierDeliveryDate ? undefined : "text-kit-slate-11"}
+              data-testid={`inbound-supplier-date-${r.id}`}
             >
-              {r.documentNo}
-            </Link>
-            {/* A non-PO arrangement keeps its OWN document word — `Transfer
-                No`, `Repair Order No`, `Claim No`. Never `PO / Source No`. */}
-            <div className="text-label text-base-500">
-              {r.sourceType === "supplier-delivery"
-                ? r.poIssued
-                  ? `PO Issued ${fmtDate(r.poIssued)}`
-                  : "PO Issued date not recorded"
-                : r.documentWord}
-            </div>
-            <div>{r.from}</div>
-            <div>Expected arrival {r.date ? fmtDate(r.date) : "Date not recorded"}</div>
-            {r.sourceType === "supplier-delivery" && <div className="text-meta text-base-600">PO Delivery Date: {r.poDeliveryDate ? fmtDate(r.poDeliveryDate) : "Date not recorded"}</div>}
-            {r.sourceType === "supplier-delivery" && <div className="text-meta text-base-600">Supplier Delivery Date: {supplierDeliveryWord(r)}</div>}
-            {r.sessions.map((s) => <div key={s.id} className="text-meta">
-              <Link data-testid={`inbound-receipt-${s.id}`} className="font-mono text-kit-blue-11 hover:underline" onClick={(event) => event.stopPropagation()} to={`/operation?${new URLSearchParams({ tab: "receiving", session: s.id })}`}>{s.doNumber ?? s.grnNo ?? "Receipt"}</Link>
-              {" · Goods received on "}{s.receivedAt ? fmtDate(s.receivedAt) : "Date not recorded"}
-            </div>)}
-          </div>
+              {supplierDeliveryWord(r)}
+            </span>
+          ) : (
+            <Blank />
+          ),
+      },
+      {
+        key: "goodsReceivedDate",
+        label: "Goods Received Date",
+        headerLines: ["Goods Received", "Date"] as const,
+        width: REGISTER_FIELD_WIDTH.goodsReceivedDate,
+        sortable: true,
+        filterType: "date",
+        chooserGroup: "Dates",
+        dateValue: (r) => r.sessions.at(-1)?.receivedAt ?? null,
+        searchValue: (r) => r.sessions.map((s) => s.receivedAt ?? "").join(" "),
+        exportValue: (r) => r.sessions.map((s) => s.receivedAt ?? "Date not recorded").join(" · "),
+        accessor: (r) => {
+          /* One receipt prints its own actual date. Several receipts print
+             the registry's `{n} receipt dates`; each date stands beside its
+             own DO number in the expansion, so no truck hides behind the
+             latest one. */
+          if (r.sessions.length === 0) return <Blank />;
+          if (r.sessions.length === 1) {
+            const at = r.sessions[0]!.receivedAt;
+            return at ? (
+              <span data-testid={`inbound-received-${r.id}`}>{fmtDate(at)}</span>
+            ) : (
+              <span className="text-kit-slate-11" data-testid={`inbound-received-${r.id}`}>Date not recorded</span>
+            );
+          }
+          return <span data-testid={`inbound-received-${r.id}`}>{r.sessions.length} receipt dates</span>;
+        },
+      },
+      {
+        key: "poNo",
+        label: "PO No",
+        width: REGISTER_FIELD_WIDTH.documentNo,
+        sortable: true,
+        chooserGroup: "Documents",
+        searchValue: (r) => `${r.documentWord} ${r.documentNo} ${r.sourceId}`,
+        exportValue: (r) => r.documentNo,
+        /* A non-PO arrangement keeps its OWN document word on hover —
+           `Transfer No` · `Repair Order No` · `Claim No` — never `PO / Source No`. */
+        accessor: (r) => (
+          <Link
+            className="font-mono text-kit-blue-11 hover:underline"
+            onClick={(event) => event.stopPropagation()}
+            to={documentHref(r)}
+            title={r.sourceType === "supplier-delivery" ? undefined : `${r.documentWord} ${r.documentNo}`}
+            data-testid={`inbound-document-${r.id}`}
+          >
+            {r.documentNo}
+          </Link>
         ),
       },
       {
+        key: "supplier",
+        label: "Supplier",
+        width: REGISTER_FIELD_WIDTH.supplier,
+        sortable: true,
+        filterType: "enum",
+        chooserGroup: "Documents",
+        searchValue: (r) => r.from,
+        filterValue: (r) => r.from,
+        exportValue: (r) => r.from,
+        accessor: (r) => <span className="block truncate" title={r.from} data-testid={`inbound-supplier-${r.id}`}>{r.from}</span>,
+      },
+      {
+        key: "supplierDoNo",
+        label: "Supplier DO No",
+        headerLines: ["Supplier", "DO No"] as const,
+        width: REGISTER_FIELD_WIDTH.supplierDoNo,
+        sortable: true,
+        chooserGroup: "Documents",
+        searchValue: (r) => r.sessions.map((s) => s.doNumber ?? s.grnNo ?? "").join(" "),
+        exportValue: (r) => r.sessions.map((s) => s.doNumber ?? s.grnNo ?? "Receipt").join(" · "),
+        accessor: (r) =>
+          r.sessions.length === 0 ? (
+            <Blank />
+          ) : (
+            /* A PO delivered in two trucks lists two DO numbers, each its own
+               link to its own receipt (owner 2026-09-25). */
+            <span className="whitespace-nowrap" data-testid={`inbound-do-${r.id}`}>
+              {r.sessions.map((s, i) => (
+                <span key={s.id}>
+                  {i > 0 ? <span className="text-kit-slate-11"> · </span> : null}
+                  <Link
+                    className="font-mono text-kit-blue-11 hover:underline"
+                    onClick={(event) => event.stopPropagation()}
+                    to={`/operation?${new URLSearchParams({ tab: "receiving", session: s.id })}`}
+                    data-testid={`inbound-receipt-${s.id}`}
+                  >
+                    {s.doNumber ?? s.grnNo ?? "Receipt"}
+                  </Link>
+                </span>
+              ))}
+            </span>
+          ),
+      },
+      {
+        key: "item",
+        label: "Item",
+        width: REGISTER_FIELD_WIDTH.items,
+        sortable: true,
+        chooserGroup: "Goods",
+        searchValue: (r) =>
+          r.products
+            .map((p) => `${p.name ?? ""} ${p.sku ?? ""}`)
+            .concat(r.units.map((u) => u.code))
+            .join(" "),
+        exportValue: (r) =>
+          r.products.map((p) => `${p.name ?? p.sku ?? "Product not recorded"} × ${p.qty}`).join(" · "),
+        accessor: (r) => <InboundItemCell row={r} today={today} />,
+      },
+      /* The three governed quantities, each its own number in its own column
+         (one family, one registry width). The operator never subtracts, and
+         damaged goods never settle the supplier's debt. An unreadable receipt
+         reads `Not recorded`, never zero. */
+      ...(
+        [
+          ["orderQty", "Order Qty", ["Order", "Qty"]],
+          ["receivedQty", "Received Qty", ["Received", "Qty"]],
+          ["pendingDeliveryQty", "Pending Delivery Qty", ["Pending Delivery", "Qty"]],
+        ] as const
+      ).map(([key, label, lines]) => ({
+        key,
+        label,
+        headerLines: lines as readonly [string, string],
+        width: REGISTER_FIELD_WIDTH.receiptQty,
+        align: "right" as const,
+        sortable: true,
+        filterType: "number" as const,
+        chooserGroup: "Goods",
+        numberValue: (r: InboundArrival) =>
+          r.quantities.known ? r.quantities[key] : null,
+        searchValue: (r: InboundArrival) =>
+          r.quantities.known ? String(r.quantities[key]) : "Not recorded",
+        exportValue: (r: InboundArrival) =>
+          r.quantities.known ? r.quantities[key] : "Not recorded",
+        accessor: (r: InboundArrival) => (
+          <span
+            className={`tabular-nums ${r.quantities.known ? "" : "text-kit-slate-11"}`}
+            data-testid={`inbound-qty-${key}-${r.id}`}
+          >
+            {r.quantities.known ? r.quantities[key] : "Not recorded"}
+          </span>
+        ),
+      })),
+      {
         key: "receive",
-        /**
-         * THE ACTION SITS SECOND, BESIDE THE IDENTITY — measured on
-         * PRODUCTION 2026-09-15, not in a harness.
-         *
-         * The preview this page was tuned against renders Inbound WITHOUT the
-         * portal sidebar, so it reported a 1,024px grid at a 1,280px viewport.
-         * The real page carries the portal nav (240px) AND the filter rail
-         * (240px) before the grid begins: at a LARGER 1,366px viewport the
-         * grid is 826px, and `Receive` was still off the right edge. A
-         * register cannot be sized against a harness that is missing 240px of
-         * the application.
-         *
-         * Ordering by operational priority is the only thing that survives a
-         * grid whose width is not ours to choose: the operator sees WHICH
-         * document, WHAT to do, WHAT is in it and HOW MUCH is still owed
-         * before anything scrolls.
-         */
-        label: "Receiving",
-        width: 85,
-        wrap: true,
-        /* A DOOR IS NOT A FACT — no funnel on an action column. */
+        /* `Receive` is the owner's LAST column (2026-09-25). A door is not a
+           fact — no funnel, no sort. Its three words are `Receive` ·
+           `Checking…` · and the no-Site tab's `No Site linked`. */
+        label: "Receive",
+        width: REGISTER_FIELD_WIDTH.shortFact,
+        sortable: false,
         filterable: false,
-        exportLabel: "Receiving",
+        exportLabel: "Receive",
         exportValue: () => "",
         accessor: (r) => {
           /* GOODS THAT NEVER REACH A CARRES SITE GET NO RECEIPT DOOR. */
@@ -353,228 +540,28 @@ export default function WarehouseInbound() {
           );
         },
       },
-      {
-        key: "products",
-        label: "Product",
-        width: 200,
-        wrap: true,
-        searchValue: (r) =>
-          r.products
-            .map((p) => `${p.name ?? ""} ${p.sku ?? ""}`)
-            .concat(r.units.map((u) => u.code))
-            .join(" "),
-        accessor: (r) =>
-          r.products.length === 0 ? (
-            <span>Products not recorded</span>
-          ) : (
-            /* EVERY product is listed — `+N more` stays forbidden. Only how
-               many lines ONE name may take is capped, and the expansion (whose
-               one job is product detail) carries the untruncated identity. */
-            <div className="space-y-1 py-0.5 leading-[18px]">
-              {r.products.map((p) => (
-                <div key={p.sku ?? "no-sku"} className="flex gap-2">
-                  <span className="min-w-0 flex-1">
-                    {p.name ?? p.sku ?? "Product not recorded"}
-                    {p.category && <span className="block text-meta text-base-500">{p.category}</span>}
-                    {p.name && p.sku ? (
-                      <span className="text-base-500"> · {p.sku}</span>
-                    ) : null}
-                  </span>
-                  {/* Pinned — clamping ate the `× 1` first. */}
-                  <span className="shrink-0 tabular-nums">× {p.qty}</span>
-                </div>
-              ))}
-            </div>
-          ),
-      },
-      {
-        key: "progress",
-        /* THE FOUR GOVERNED QUANTITIES, EACH PRINTING ITS OWN NUMBER. They
-           were four columns at 450px, which is how the Receive button ended
-           up offscreen. The operator still never subtracts, and each figure
-           keeps its own sortable/filterable column in the chooser. */
-        label: "Receiving progress",
-        headerLines: ["Receiving", "progress"] as const,
-        width: 165,
-        wrap: true,
-        filterable: false,
-        searchValue: (r) =>
-          r.quantities.known
-            ? `Order Qty ${r.quantities.orderQty} Received Qty ${r.quantities.receivedQty} Pending Delivery Qty ${r.quantities.pendingDeliveryQty}`
-            : "Not recorded",
-        exportValue: (r) =>
-          r.quantities.known
-            ? `Order Qty ${r.quantities.orderQty} · Received Qty ${r.quantities.receivedQty} · Pending Delivery Qty ${r.quantities.pendingDeliveryQty}`
-            : "Not recorded",
-        accessor: (r) => {
-          if (!r.quantities.known)
-            return <div className="text-base-600"><div>Not recorded</div><div>{inboundStatusWordOf(r)}</div></div>;
-          const q = r.quantities;
-          return (
-            <div className="space-y-0.5 py-0.5 tabular-nums leading-[18px]">
-              <div>{inboundStatusWordOf(r)}</div>
-              <div>Order Qty {q.orderQty}</div>
-              <div>Received Qty {q.receivedQty}</div>
-              <div>Physical arrived Qty {q.arrivedQty}</div>
-              <div>Pending Delivery Qty {q.pendingDeliveryQty}</div>
-              {/* Damaged and wrong goods are present, unavailable, and never
-                  reduce Pending Delivery Qty. */}
-              {q.damagedQty > 0 && <div>Damaged Qty {q.damagedQty}</div>}
-              {q.wrongItemQty > 0 && <div>Wrong Item Qty {q.wrongItemQty}</div>}
-              {inboundExceptionLines(r, today, fmtDate).map((line) => <div key={line} className="text-meta text-base-600">{line}</div>)}
-            </div>
-          );
-        },
-      },
-      {
-        key: "supplier",
-        defaultHidden: true,
-        /* ONE CELL FOR THE PARTY AND ITS PAPER. A delivery note belongs to the
-           supplier that wrote it, so the association is read in one place
-           instead of across two columns a screen apart. */
-        label: "Supplier & DO No",
-        headerLines: ["Supplier &", "DO No"] as const,
-        width: 145,
-        wrap: true,
-        searchValue: (r) =>
-          [r.from, ...r.sessions.map((s) => s.doNumber ?? s.grnNo ?? "")].join(" "),
-        filterValue: (r) => r.from,
-        accessor: (r) => (
-          <div className="space-y-0.5 py-0.5 leading-[18px]">
-            <div>{r.from}</div>
-            {r.sessions.map((s) => (
-              <div key={s.id}>
-                <Link
-                  className="font-mono text-kit-blue-11 hover:underline"
-                  onClick={(event) => event.stopPropagation()}
-                  to={`/operation?${new URLSearchParams({ tab: "receiving", session: s.id })}`}
-                  data-testid={`inbound-receipt-${s.id}`}
-                >
-                  {s.doNumber ?? s.grnNo ?? "Receipt"}
-                </Link>
-                <span className="text-base-600">
-                  {" · "}
-                  {s.receivedAt ? fmtDate(s.receivedAt) : "Date not recorded"}
-                </span>
-              </div>
-            ))}
-          </div>
-        ),
-      },
-      {
-        key: "poDeliveryDate",
-        defaultHidden: true,
-        label: "PO Delivery Date",
-        /* THE HEADER WAS SETTING THE WIDTH. Declared 95px, it rendered 143 —
-           a single-line governed header plus its sort and filter controls
-           cannot be narrower than its own text, and those 48 stolen pixels
-           are part of why the Receive button sat off the right edge. The
-           grid's own two-line header keeps the governed words exactly. */
-        headerLines: ["PO", "Delivery Date"] as const,
-        width: 95,
-        wrap: true,
-        filterType: "date",
-        dateValue: (r) => r.poDeliveryDate,
-        searchValue: (r) => r.poDeliveryDate ?? "",
-        accessor: (r) =>
-          r.poDeliveryDate
-            ? fmtDate(r.poDeliveryDate)
-            : r.sourceType === "supplier-delivery"
-              ? "Date not recorded"
-              : r.date
-                ? fmtDate(r.date)
-                : "Date not recorded",
-      },
-      {
-        key: "supplierDeliveryDate",
-        defaultHidden: true,
-        label: "Supplier Delivery Date",
-        headerLines: ["Supplier", "Delivery Date"] as const,
-        width: 110,
-        wrap: true,
-        filterType: "date",
-        dateValue: (r) => r.supplierDeliveryDate,
-        searchValue: supplierDeliveryWord,
-        filterValue: supplierDeliveryWord,
-        accessor: supplierDeliveryWord,
-      },
-      {
-        key: "status",
-        defaultHidden: true,
-        label: "Status",
-        width: 95,
-        wrap: true,
-        searchValue: (r) => inboundStatusWordOf(r),
-        accessor: (r) => inboundStatusWordOf(r),
-      },
-      {
-        key: "exceptions",
-        defaultHidden: true,
-        label: "Exceptions",
-        width: 200,
-        wrap: true,
-        searchValue: (r) => inboundExceptionLines(r, today, fmtDate).join(" "),
-        accessor: (r) => {
-          const lines = inboundExceptionLines(r, today, fmtDate);
-          return lines.length === 0 ? (
-            ""
-          ) : (
-            <div className="space-y-0.5 py-0.5 leading-[18px]">
-              {lines.map((line) => (
-                <div key={line}>{line}</div>
-              ))}
-            </div>
-          );
-        },
-      },
-      {
-        key: "site",
-        /* THE DESTINATION DOES NOT REPEAT INSIDE ITS OWN TAB. Forty-eight rows
-           reading `Carres Klang Warehouse` under the Carres Klang tab told the
-           operator nothing and cost 130px. On the `Destinations without a
-           Site` tab every row differs, so it comes back automatically. */
-        label: "To",
-        width: 130,
-        wrap: true,
-        defaultHidden: activeSite !== INBOUND_UNMAPPED_SITE,
-        searchValue: (r) => r.site,
-        accessor: (r) => r.site,
-      },
-      {
-        key: "receivedOn",
-        label: "Goods received on",
-        defaultHidden: true,
-        width: 130,
-        wrap: true,
-        filterType: "date",
-        dateValue: (r) => r.sessions.at(-1)?.receivedAt ?? null,
-        searchValue: (r) => r.sessions.map((s) => s.receivedAt ?? "").join(" "),
-        accessor: (r) => {
-          const last = r.sessions.at(-1)?.receivedAt;
-          return last ? fmtDate(last) : "";
-        },
-      },
-      /* Each governed quantity keeps its OWN column for sorting and
-         number-range filtering — hidden by default, never removed. */
+      /* ── One click away in Columns ────────────────────────────────────── */
       ...(
         [
-          ["orderQty", "Order Qty"],
-          ["receivedQty", "Received Qty"],
-          ["pendingDeliveryQty", "Pending Delivery Qty"],
-          ["damagedQty", "Damaged Qty"],
-          ["wrongItemQty", "Wrong Item Qty"],
+          ["damagedQty", "Damaged Qty", ["Damaged", "Qty"]],
+          ["wrongItemQty", "Wrong Item Qty", ["Wrong Item", "Qty"]],
         ] as const
-      ).map(([key, label]) => ({
+      ).map(([key, label, lines]) => ({
         key,
         label,
+        headerLines: lines as readonly [string, string],
         defaultHidden: true,
-        width: key === "pendingDeliveryQty" ? 120 : 95,
+        width: REGISTER_FIELD_WIDTH.receiptQty,
         align: "right" as const,
+        sortable: true,
         filterType: "number" as const,
+        chooserGroup: "Goods",
         numberValue: (r: InboundArrival) =>
           r.quantities.known ? r.quantities[key] : null,
         searchValue: (r: InboundArrival) =>
           r.quantities.known ? String(r.quantities[key]) : "Not recorded",
+        exportValue: (r: InboundArrival) =>
+          r.quantities.known ? r.quantities[key] : "Not recorded",
         accessor: (r: InboundArrival) => (
           <span className="tabular-nums">
             {r.quantities.known ? r.quantities[key] : "Not recorded"}
@@ -585,17 +572,66 @@ export default function WarehouseInbound() {
         key: "poIssued",
         label: "PO Issued",
         defaultHidden: true,
-        width: 110,
+        width: REGISTER_FIELD_WIDTH.date,
+        sortable: true,
         filterType: "date",
+        chooserGroup: "Dates",
         dateValue: (r) => r.poIssued,
-        accessor: (r) => (r.poIssued ? fmtDate(r.poIssued) : ""),
+        exportValue: (r) => r.poIssued ?? "",
+        accessor: (r) => (r.poIssued ? fmtDate(r.poIssued) : <Blank />),
       },
       {
         key: "so",
         label: "SO No",
         defaultHidden: true,
-        width: 100,
-        accessor: (r) => r.so ?? "",
+        width: REGISTER_FIELD_WIDTH.soNo,
+        sortable: true,
+        chooserGroup: "Documents",
+        searchValue: (r) => (r.so == null ? "" : String(r.so)),
+        exportValue: (r) => r.so ?? "",
+        accessor: (r) => (r.so == null ? <Blank /> : <span className="font-mono">{r.so}</span>),
+      },
+      {
+        key: "site",
+        /* THE DESTINATION DOES NOT REPEAT INSIDE ITS OWN TAB. On the
+           `Destinations without a Site` tab every row differs, so it comes
+           back automatically. */
+        label: "To",
+        width: REGISTER_FIELD_WIDTH.placeWord,
+        sortable: true,
+        chooserGroup: "Documents",
+        defaultHidden: activeSite !== INBOUND_UNMAPPED_SITE,
+        searchValue: (r) => r.site,
+        exportValue: (r) => r.site,
+        overflowText: (r) => r.site,
+        accessor: (r) => r.site,
+      },
+      {
+        key: "status",
+        defaultHidden: true,
+        label: "Status",
+        width: REGISTER_FIELD_WIDTH.status,
+        sortable: true,
+        filterType: "enum",
+        chooserGroup: "Goods",
+        searchValue: (r) => inboundStatusWordOf(r),
+        filterValue: (r) => inboundStatusWordOf(r),
+        exportValue: (r) => inboundStatusWordOf(r),
+        accessor: (r) => inboundStatusWordOf(r),
+      },
+      {
+        key: "exceptions",
+        defaultHidden: true,
+        label: "Exceptions",
+        width: REGISTER_FIELD_WIDTH.address,
+        chooserGroup: "Goods",
+        searchValue: (r) => inboundExceptionLines(r, today, fmtDate).join(" "),
+        exportValue: (r) => inboundExceptionLines(r, today, fmtDate).join(" · "),
+        overflowText: (r) => inboundExceptionLines(r, today, fmtDate).join(" · "),
+        accessor: (r) => {
+          const lines = inboundExceptionLines(r, today, fmtDate);
+          return lines.length === 0 ? <Blank /> : <span>{lines.join(" · ")}</span>;
+        },
       },
     ],
     [today, dutyAllowed, dutyKnown, openReceiving, activeSite],
@@ -892,7 +928,7 @@ export default function WarehouseInbound() {
             </div>
           ) : (
             <DataGrid<InboundArrival>
-              stickyIdentity={{ columnKey: "document" }}
+              stickyIdentity={{ columnKey: "poNo" }}
               key={params.get("q") === null ? "clear" : "search"}
               appearance="reference"
               wrapToolbar
@@ -900,7 +936,9 @@ export default function WarehouseInbound() {
               columns={columns}
               rowKey={(r) => r.id}
               rowTestId={(r) => `inbound-row-${r.id}`}
-              storageKey="carres.inbound.register.v5"
+              storageKey="carres.inbound.register.v6"
+              rowHeight={40}
+              chooserGroupOrder={["Dates", "Documents", "Goods"]}
               exportName="Inbound"
               searchPlaceholder="Document, product, supplier or Unit ID…"
               initialSearch={params.get("q") ?? ""}
@@ -943,7 +981,7 @@ export default function WarehouseInbound() {
               }
               expandTitle="Show every product and Unit"
               expandable={{
-                trigger: { columnKey: "products" },
+                trigger: { columnKey: "item" },
                 testId: (r) => `inbound-expand-${r.id}`,
                 renderExpansion: (r) => <InboundExpansion row={r} />,
               }}
@@ -1009,6 +1047,27 @@ function InboundExpansion({ row: r }: { row: InboundArrival }) {
               <span className="tabular-nums">
                 Order Qty {p.qty} · Received Qty {p.received}
               </span>
+            </div>
+          ))}
+        </div>
+      )}
+      {r.sessions.length > 0 && (
+        <div>
+          <div className="mb-1 text-label font-semibold uppercase tracking-wide text-base-600">
+            Receipts
+          </div>
+          {/* Every posted receipt with its own supplier DO number, GRN number
+              and actual date — the trucks behind `{n} receipt dates`. */}
+          {r.sessions.map((s) => (
+            <div key={s.id} className="flex flex-wrap gap-3" data-testid={`inbound-expansion-receipt-${s.id}`}>
+              <Link
+                className="font-mono text-kit-blue-11 hover:underline"
+                to={`/operation?${new URLSearchParams({ tab: "receiving", session: s.id })}`}
+              >
+                {s.doNumber ?? s.grnNo ?? "Receipt"}
+              </Link>
+              {s.grnNo && s.doNumber ? <span className="font-mono text-base-600">{s.grnNo}</span> : null}
+              <span>Goods Received Date {s.receivedAt ? fmtDate(s.receivedAt) : "Date not recorded"}</span>
             </div>
           ))}
         </div>

@@ -115,6 +115,11 @@ vi.mock("./components/rail/CalendarPanel", () => ({
 vi.mock("./components/OperationRightRail", () => ({
   default: () => <div data-testid="right-rail-stub">rail</div>,
 }));
+// The first-entry `Pending work` reminder self-fetches the same Work feed as
+// the rail (Tasks, 2026-10-06) — stubbed for the same reason as the rail.
+vi.mock("./tasks/PendingWorkReminder", () => ({
+  default: () => null,
+}));
 // The global top bar self-fetches (orders/tasks for Alerts) — stub it too.
 vi.mock("./components/GlobalTopBar", () => ({
   default: () => <div data-testid="global-topbar-stub">topbar</div>,

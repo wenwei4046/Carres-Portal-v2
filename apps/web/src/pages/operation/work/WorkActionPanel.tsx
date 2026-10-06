@@ -118,11 +118,11 @@ export default function WorkActionPanel({
       className="shrink-0 rounded-work border border-work-line bg-white px-3 py-3 min-[768px]:px-4"
       data-testid="work-detail-header"
     >
-      <div className="flex items-start gap-3">
+      <div className="flex flex-wrap items-start gap-3">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-kit-slate-3 text-kit-slate-11" aria-hidden="true">
           <Icon name={communication ? "message" : MODULE_ICON[item.module]} size={16} />
         </span>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex min-w-[200px] flex-1 basis-[200px] flex-col gap-1">
           <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
             <h2 className="text-[15px] font-semibold leading-5 text-kit-slate-12" data-testid="work-detail-title">{item.action}</h2>
             {timingLine ? (
@@ -158,7 +158,7 @@ export default function WorkActionPanel({
             </div>
           ) : null}
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2" data-testid="work-detail-open-row">
+        <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2" data-testid="work-detail-open-row">
           {communication?.href && template ? (
             <a
               href={communication.href}

@@ -761,7 +761,7 @@ to this order` over `Manager assigns in Settings → Staff & Duties` (owner ruli
 overwrites the 2026-09-16 `Assign it in Sales Orders → Team` door: the system deals every order, an
 unassigned order is a system error, and only a manager adds a person or assigns the order; the
 Team door does not exist on the current register; the Monitor row's short word is `Not assigned`;
-code still prints the 2026-09-16 words, Delivery MASTER §15.1). `Payment Duty` is RETIRED: no caller remained,
+built PR #1950: the Collection owner section and the Monitor chip print the two lines and open `/operation/settings/staff-duties`). `Payment Duty` is RETIRED: no caller remained,
 so the catalogue no longer offers it. There is no universal Sales Order Owner.
 
 My Work omits self avatar; Team Work groups by owner. Cover preserves normal owner, today's cover

@@ -3,7 +3,7 @@
  * opened it before (owner follow-up 2026-09-16 — SO Batch + Manual Purchase).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { useRef, useState } from "react";
 import {
   FilterRail,
@@ -53,6 +53,30 @@ describe("useFilterRailOpen (S3)", () => {
     atWidth(1200);
     render(<Probe />);
     expect(screen.getByTestId("canvas")).toHaveTextContent("hidden");
+  });
+
+  /* Production acceptance 2026-10-06: opening the right-hand Tasks area shrank
+     the canvas under 896px AFTER load, and the still-open rail floated over the
+     checkboxes, expand buttons and toolbar. */
+  it("a canvas that BECOMES narrow hides the rail without forgetting the choice, and wide brings it back", () => {
+    let notify: () => void = () => {};
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(cb: () => void) { notify = cb; }
+      observe() {}
+      disconnect() {}
+    });
+    localStorage.setItem(KEY, "1");
+    atWidth(1200);
+    render(<Probe />);
+    expect(screen.getByTestId("canvas")).toHaveTextContent("open");
+    atWidth(700);
+    act(() => notify());
+    expect(screen.getByTestId("canvas")).toHaveTextContent("hidden");
+    expect(localStorage.getItem(KEY)).toBe("1");
+    atWidth(1200);
+    act(() => notify());
+    expect(screen.getByTestId("canvas")).toHaveTextContent("open");
+    vi.unstubAllGlobals();
   });
 });
 

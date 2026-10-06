@@ -2505,6 +2505,8 @@ export {
   compareSoBatchPlanning,
   type SoBatchRegisterGroup,
   soBatchPurchaseResponseSchema,
+  SO_BATCH_PANEL_WORDS,
+  SO_BATCH_TASK_WORDS,
   type SoBatchOrderStatus,
   type SoBatchOrderPoFact,
   type SoBatchOrderLineFact,
