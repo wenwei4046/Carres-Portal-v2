@@ -15,18 +15,23 @@ export const COLLECTION_OWNER_DUTY_KEY = "delivery_duty";
 export const COLLECTION_OWNER_DUTY_WORD = "Delivery Duty";
 /**
  * ⭐ NOBODY ASSIGNED — the governed failure when no collection owner resolves
- * (owner instruction 2026-09-16, clearing the stale `Nobody holds Delivery
- * Duty.` hint). Since 0504 the owner is the individual the Sales Order was
- * dealt to, so an unresolved owner means nobody is assigned to THIS order and
- * the one door that fixes it is the Sales Orders Team (a manager assigns).
- * Staff & Duties cannot fix it and is no longer named here. The short word on
- * a fixed 72px row is `Not assigned`; its accessible name is the sentence and
- * the door together.
+ * (owner ruling 2026-09-26; COPY-STANDARD "An order nobody is assigned to",
+ * Payment MASTER §3, Delivery MASTER §13.1). Since 0504 the owner is the
+ * individual the Sales Order was dealt to. The system deals every order to a
+ * person, so an unassigned order is a system error that only a manager fixes:
+ * line 1 `Nobody assigned to this order` over line 2 `Manager assigns in
+ * Settings → Staff & Duties`, and line 2 opens that Settings page
+ * (`/operation/settings/staff-duties`: App `/operation/*` → OperationApp
+ * `settings/*` → SettingsWorkspace `staff-duties`). The line names the
+ * manager's door, never a Duty to fill, so no `?duty=` is carried. The
+ * 2026-09-16 `Nobody is assigned to this order.` / `Assign it in Sales Orders
+ * → Team` words and their `/operation/orders` door are retired. The short word
+ * on a fixed row is `Not assigned`.
  */
 export const COLLECTION_NOT_ASSIGNED = "Not assigned";
-export const NOBODY_ASSIGNED_TO_ORDER = "Nobody is assigned to this order.";
-export const ASSIGN_IN_SALES_ORDERS = "Assign it in Sales Orders → Team";
-export const ASSIGN_IN_SALES_ORDERS_HREF = "/operation/orders";
+export const NOBODY_ASSIGNED_TO_ORDER = "Nobody assigned to this order";
+export const MANAGER_ASSIGNS_IN_STAFF_DUTIES = "Manager assigns in Settings → Staff & Duties";
+export const MANAGER_ASSIGNS_IN_STAFF_DUTIES_HREF = "/operation/settings/staff-duties";
 
 export interface CollectionOwnerHistoryRow {
   id: string;

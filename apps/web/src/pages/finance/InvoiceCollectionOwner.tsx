@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
-  ASSIGN_IN_SALES_ORDERS,
-  ASSIGN_IN_SALES_ORDERS_HREF,
+  MANAGER_ASSIGNS_IN_STAFF_DUTIES,
+  MANAGER_ASSIGNS_IN_STAFF_DUTIES_HREF,
   NOBODY_ASSIGNED_TO_ORDER,
   type CollectionOwnerContextRow,
 } from "@carres/shared/payment-collection-owner";
@@ -21,7 +21,9 @@ import { toast } from "sonner";
  * principal or manager) the one formal `Hand over collection` door. Cover is
  * never written here: leave and buddy cover live in Staff & Duties. The owner
  * itself is the individual the Sales Order was dealt to (0504), so the
- * unresolved case points at the assignment, not at a duty holder.
+ * unresolved case is a system error a manager fixes: `Nobody assigned to this
+ * order` over `Manager assigns in Settings → Staff & Duties` (owner ruling
+ * 2026-09-26), never a duty holder to fill.
  */
 export default function InvoiceCollectionOwner({ orderId, canRead }: {
   orderId: string;
@@ -43,7 +45,8 @@ export default function InvoiceCollectionOwner({ orderId, canRead }: {
       : !owner ? <>
           <p className="text-kit-red-11" data-testid="collection-owner-none">{NOBODY_ASSIGNED_TO_ORDER}</p>
           <p className="text-label font-normal">
-            <Link to={ASSIGN_IN_SALES_ORDERS_HREF} className="underline underline-offset-2">{ASSIGN_IN_SALES_ORDERS}</Link>
+            <Link to={MANAGER_ASSIGNS_IN_STAFF_DUTIES_HREF} className="underline underline-offset-2"
+              data-testid="collection-owner-none-door">{MANAGER_ASSIGNS_IN_STAFF_DUTIES}</Link>
           </p>
         </>
       : <OwnerFacts owner={owner} />}

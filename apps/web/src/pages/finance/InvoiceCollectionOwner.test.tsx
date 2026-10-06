@@ -71,12 +71,12 @@ describe("Collection owner", () => {
     expect(screen.getByTestId("collection-owner-facts")).not.toHaveTextContent(/cover|Completed by/i);
   });
 
-  it("nobody established → nobody is assigned to this order, with the Sales Orders door — never Delivery Duty, never a blank", async () => {
+  it("nobody established → nobody assigned to this order, with the manager's Staff & Duties door — never Delivery Duty, never a blank", async () => {
     state.owner = null;
     show();
-    expect(await screen.findByTestId("collection-owner-none")).toHaveTextContent("Nobody is assigned to this order.");
-    expect(screen.getByRole("link", { name: "Assign it in Sales Orders → Team" })).toHaveAttribute("href", "/operation/orders");
-    expect(screen.queryByText(/Delivery Duty|Staff & Duties/)).not.toBeInTheDocument();
+    expect(await screen.findByTestId("collection-owner-none")).toHaveTextContent("Nobody assigned to this order");
+    expect(screen.getByRole("link", { name: "Manager assigns in Settings → Staff & Duties" })).toHaveAttribute("href", "/operation/settings/staff-duties");
+    expect(screen.queryByText(/Delivery Duty|Nobody holds/)).not.toBeInTheDocument();
   });
 
   it("REGRESSION 2026-09-26 ruling: nobody established prints line 1 over line 2, and line 2 opens Settings → Staff & Duties", async () => {

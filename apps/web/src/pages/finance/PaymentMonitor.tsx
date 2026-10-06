@@ -19,10 +19,10 @@ import type { OperationWorkItem } from "@carres/shared/operation-work";
 import { myHolidayName, myHolidaySet } from "@carres/shared/my-holidays";
 import { inOrderScope, orderScopeOf } from "@carres/shared/payment-register-scope";
 import {
-  ASSIGN_IN_SALES_ORDERS,
-  ASSIGN_IN_SALES_ORDERS_HREF,
   COLLECTION_NOT_ASSIGNED as NOT_ASSIGNED,
-  NOBODY_ASSIGNED_TO_ORDER as NOBODY_ASSIGNED,
+  MANAGER_ASSIGNS_IN_STAFF_DUTIES,
+  MANAGER_ASSIGNS_IN_STAFF_DUTIES_HREF,
+  NOBODY_ASSIGNED_TO_ORDER,
 } from "@carres/shared/payment-collection-owner";
 import { ChevronLeft, ChevronRight, PanelLeftOpen } from "lucide-react";
 import ListPageShell from "@/components/ListPageShell";
@@ -162,13 +162,14 @@ type MonitorRow = PaymentMonitorRow & {
 function OwnerChip({ owner }: { owner: OperationWorkItem["owner"] }) {
   const person = owner.acting;
   if (!person?.userId) {
-    /* ⭐ 0504 (owner instruction 2026-09-16 — the stale `Nobody holds Delivery
-       Duty.` hint is cleared): the collection owner is the individual the Sales
-       Order was dealt to, so an unresolved owner means nobody is assigned to
-       THIS order. The word stays short on the fixed row; the full sentence and
-       the one door that fixes it are the link's own name. */
-    return <Link to={ASSIGN_IN_SALES_ORDERS_HREF} className="shrink-0 font-semibold text-kit-red-11 underline underline-offset-2"
-      aria-label={`${NOBODY_ASSIGNED} ${ASSIGN_IN_SALES_ORDERS}`} title={`${NOBODY_ASSIGNED} ${ASSIGN_IN_SALES_ORDERS}`}
+    /* ⭐ 0504 + owner ruling 2026-09-26: the collection owner is the individual
+       the Sales Order was dealt to, so an unresolved owner is a system error a
+       manager fixes. The word stays short on the fixed row (`Not assigned`);
+       the link's own name is the two governed lines in the sheet's one-line
+       spelling, and it opens Settings → Staff & Duties. */
+    const named = joinLines(NOBODY_ASSIGNED_TO_ORDER, MANAGER_ASSIGNS_IN_STAFF_DUTIES);
+    return <Link to={MANAGER_ASSIGNS_IN_STAFF_DUTIES_HREF} className="shrink-0 font-semibold text-kit-red-11 underline underline-offset-2"
+      aria-label={named} title={named}
       onClick={(event) => event.stopPropagation()}
       data-testid="monitor-owner-unassigned">{NOT_ASSIGNED}</Link>;
   }
