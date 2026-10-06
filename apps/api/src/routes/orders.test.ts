@@ -1028,6 +1028,37 @@ describe("GET /api/orders/:id/sales-order-data", () => {
     return (await res.json()) as any;
   }
 
+  it("Proceed Date is the actual handoff (proceeded_at), never the planned proceed_date (owner 2026-09-21)", async () => {
+    const body = await fetchPayload(
+      buildSb({ one: makeJoinedRow({ proceeded_at: "2026-05-13T02:00:00Z", proceed_date: "2026-06-20" }) }),
+    );
+    expect(body.proceed_date).toBe("2026-05-13T02:00:00Z");
+  });
+
+  it("Issued by names the person whose write created the order, never the salesperson", async () => {
+    const sb = buildSb({
+      one: makeJoinedRow(),
+      byTable: {
+        order_history: [
+          { by_user_id: "user-creator", occurred_at: "2026-05-12T10:00:00Z" },
+          { by_user_id: "user-later", occurred_at: "2026-05-13T10:00:00Z" },
+        ],
+        salespersons: [],
+      },
+    });
+    sb.rpc = async (_name: string, args: { p_ids: string[] }) => ({
+      data: args.p_ids.map((id) => ({ id, name: id === "user-creator" ? "Shasha" : "Someone else" })),
+      error: null,
+    });
+    const body = await fetchPayload(sb);
+    expect(body.issued_by).toBe("Shasha");
+  });
+
+  it("Issued by is null (the template's absence) when no creating write is recorded", async () => {
+    const body = await fetchPayload(buildSb({ one: makeJoinedRow() }));
+    expect(body.issued_by).toBeNull();
+  });
+
   it("resolves line description to the product name (model name + variant)", async () => {
     const body = await fetchPayload(
       buildSb({
