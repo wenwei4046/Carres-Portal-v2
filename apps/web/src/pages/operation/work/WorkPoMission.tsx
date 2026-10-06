@@ -30,6 +30,7 @@ import { useNavigate } from "react-router-dom";
 import { SupplierAnswerForm, useRefreshWork, WorkDocumentSheet, type WorkDocument } from "./WorkActForms";
 import type { WorkOrderIndex } from "./work-orders";
 import type { WorkAct } from "./work-stops";
+import { receiveButtonOf, type WorkReceiveTarget } from "./WorkReceivingView";
 
 export const PO_VIEW_COPY = {
   poDeliveryDate: (date: string) => `PO Delivery Date ${date}`,
@@ -53,6 +54,7 @@ export default function WorkPoMission({
   index,
   onOpenOrder,
   onPickAct,
+  onReceive,
 }: {
   poId: string;
   acts: readonly WorkAct[];
@@ -60,6 +62,8 @@ export default function WorkPoMission({
   index: WorkOrderIndex;
   onOpenOrder: (orderId: string) => void;
   onPickAct: (act: WorkAct) => void;
+  /** Opens Receiving's own full-width view inside Workspace (§5.10). */
+  onReceive?: (target: WorkReceiveTarget) => void;
 }) {
   const refresh = useRefreshWork();
   const navigate = useNavigate();
@@ -120,7 +124,11 @@ export default function WorkPoMission({
                 why={act.why ? { text: act.why, tone: act.missed ? "missed" : "due" } : null}
                 headerSlot={
                   act.kind === "other" && item ? (
-                    <Button size="touch" onClick={() => navigate(item.destination)}>{`Open ${item.source.object.label}`}</Button>
+                    receiveButtonOf(item.destination) && onReceive ? (
+                      <Button size="touch" onClick={() => onReceive(receiveButtonOf(item.destination)!.target)} data-testid={`work-act-${act.key}`}>{receiveButtonOf(item.destination)!.label}</Button>
+                    ) : (
+                      <Button size="touch" onClick={() => navigate(item.destination)}>{`Open ${item.source.object.label}`}</Button>
+                    )
                   ) : act.kind === "supplier_answer" && !formOpen ? (
                     <Button size="touch" onClick={() => { setOpenForm(act.key); onPickAct(act); }} data-testid={`work-act-${act.key}`}>
                       {act.button}

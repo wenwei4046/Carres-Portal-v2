@@ -3,44 +3,19 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fmtMoney } from "@carres/shared";
-import { ApiError, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
+import { answered, ChoiceGrid, currentAction, FailureMessage, IssueResultFields, NOT_CONFIRMED, permissionFailure, saveSignal, useIssueResult, type Choice, type Failure, type IssueRow } from "./issue-tracker/issue-result";
 import { fmtDate } from "@/lib/fmt-date";
 import Button from "@/components/kit/Button";
-import Icon from "@/components/kit/Icon";
 import Input from "@/components/kit/Input";
 import Modal from "@/components/kit/Modal";
 import PageShell from "@/components/kit/PageShell";
 import StatusPill from "@/components/kit/StatusPill";
 
-type IssueAction = { id: string; status: string; trigger: string; owner_rule: "issue_triage_duty" | "issue_review_approver"; action: string; recipient: string; required_result: string; due_on: string };
-type IssueRow = { id: string; issue_no: string; observed_on: string; official_english: string; status: string; issue_actions: IssueAction[]; issue_links: Array<{ object_label: string }>; issue_fault_owners: Array<{ owner_name: string }>; issue_money_links: Array<{ track: string; amount: number }> };
-const currentAction = (row: IssueRow | null | undefined) => row?.issue_actions.find((action) => action.status === "open") ?? null;
-type Choice = { value: string; label: string };
 const OBJECTS: Choice[] = [{ value: "item", label: "Item" }, { value: "delivery", label: "Delivery" }, { value: "document", label: "Document" }, { value: "payment", label: "Payment" }, { value: "customer_information", label: "Customer information" }, { value: "staff_work", label: "Staff work" }, { value: "other", label: "Something else" }];
 const PROBLEMS: Choice[] = [{ value: "wrong_item", label: "Wrong item" }, { value: "damaged", label: "Damaged" }, { value: "missing", label: "Missing" }, { value: "wrong_quantity", label: "Wrong quantity" }, { value: "late", label: "Late" }, { value: "no_reply", label: "No reply" }, { value: "wrong_information", label: "Wrong information" }, { value: "work_not_done", label: "Required work was not done" }, { value: "not_sure", label: "I am not sure" }];
 const VIEWS: Choice[] = [{ value: "all", label: "All Issues" }, { value: "needs_triage", label: "Needs triage" }, { value: "wednesday", label: "Wednesday review" }, { value: "internal", label: "Internal issues" }, { value: "waiting_response", label: "Waiting staff response" }, { value: "waiting_review", label: "Waiting reviewer finding" }, { value: "closed", label: "Closed" }, { value: "voided", label: "Voided" }];
 const moneyOf = (row: IssueRow, track: string) => row.issue_money_links.filter((m) => m.track === track).reduce((s, m) => s + Number(m.amount), 0);
-
-/* ── HF-2 · A save never fails silently (owner ruling 2026-09-17) ───────────────
- * One sentence per outcome. `warn` marks an answer the operator must re-check.
- *   stale action (404)            ⚠ Action changed · Review again
- *   validation (400 / 422)        the governed sentence of the first wrong step
- *   permission (403)              Only {acting person} can record this. / no access
- *   the server answered an error  Issue / Result not recorded · Try again
- *   no answer (network, timeout)  ⚠ Not confirmed · Try again — never "not recorded" */
-type Failure = { text: string; warn: boolean; step?: number };
-const NOT_CONFIRMED: Failure = { text: "Not confirmed · Try again", warn: true };
-const SAVE_TIMEOUT_MS = 30_000;
-const saveSignal = () => (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(SAVE_TIMEOUT_MS) : undefined);
-
-function permissionFailure(error: ApiError): Failure {
-  const acting = (error.body as { actingPerson?: unknown } | null)?.actingPerson;
-  return typeof acting === "string" && acting.trim()
-    ? { text: `Only ${acting.trim()} can record this.`, warn: false }
-    : { text: "You do not have access to record this result.", warn: false };
-}
-/** A gateway that timed out or could not reach the Worker did not say whether the write happened. */
-const answered = (error: unknown): error is ApiError => error instanceof ApiError && error.status !== 502 && error.status !== 504;
 
 type IntakeForm = Record<string, string>;
 const INTAKE_CHECKS: Array<{ step: number; path: string; text: string; ok: (f: IntakeForm) => boolean }> = [
@@ -63,24 +38,6 @@ function createFailure(error: unknown, form: IntakeForm): Failure {
   return { text: "Issue not recorded · Try again", warn: false };
 }
 
-function resultFailure(error: unknown, resultCode: string): Failure {
-  if (!answered(error)) return NOT_CONFIRMED;
-  if (error.status === 404) return { text: "Action changed · Review again", warn: true };
-  if (error.status === 403) return permissionFailure(error);
-  if (error.status === 400 || error.status === 422) {
-    return resultCode ? { text: "Add the evidence needed for this result.", warn: false } : { text: "Choose what happened.", warn: false };
-  }
-  return { text: "Result not recorded · Try again", warn: false };
-}
-
-/** The failure sentence inside the open dialog. It takes focus when it appears. */
-function FailureMessage({ failure }: { failure: Failure | null }) {
-  const ref = useRef<HTMLParagraphElement>(null);
-  useEffect(() => { if (failure) ref.current?.focus(); }, [failure]);
-  if (!failure) return null;
-  return <p ref={ref} role="alert" tabIndex={-1} className={`mb-3 flex items-center gap-2 text-label outline-none ${failure.warn ? "text-kit-amber-11" : "text-kit-red-11"}`}>{failure.warn && <Icon name="late" size={14} />}{failure.text}</p>;
-}
-
 export default function OperationIssueTracker() {
   const navigate = useNavigate();
   const [search, setSearch] = useSearchParams();
@@ -100,7 +57,6 @@ export default function OperationIssueTracker() {
   </PageShell>;
 }
 
-function ChoiceGrid({ choices, selected, onChoose }: { choices: Choice[]; selected?: string; onChoose: (value: string) => void }) { return <div className="grid grid-cols-2 gap-2">{choices.map((choice) => <Button key={choice.value} variant={selected === choice.value ? "primary" : "neutral"} onClick={() => onChoose(choice.value)}>{choice.label}</Button>)}</div>; }
 
 function RecordIssueModal({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const qc = useQueryClient(); const [step, setStep] = useState(0); const [form, setForm] = useState<IntakeForm>({});
@@ -139,18 +95,10 @@ function RecordIssueModal({ open, onOpenChange }: { open: boolean; onOpenChange:
 }
 
 function IssueWorkspace({ row, onClose }: { row: IssueRow | null; onClose: () => void }) {
-  const qc = useQueryClient(); const action = currentAction(row); const [recording, setRecording] = useState(false); const [resultCode, setResultCode] = useState(""); const [result, setResult] = useState("");
-  const [failure, setFailure] = useState<Failure | null>(null); const inFlight = useRef(false);
-  // A different Issue starts clean: no earlier sentence or half-recorded result carries over.
-  useEffect(() => { setFailure(null); setRecording(false); setResultCode(""); setResult(""); }, [row?.id]);
-  const saveResult = useMutation({
-    mutationFn: () => apiFetch(`/api/ops/issues/${row?.id}/actions/${action?.id}/result`, { method: "POST", body: JSON.stringify({ resultCode, result }), signal: saveSignal() }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["issues"] }); setFailure(null); setRecording(false); onClose(); },
-    onError: (error) => setFailure(resultFailure(error, resultCode)),
-    onSettled: () => { inFlight.current = false; },
-  });
-  const submit = () => { if (inFlight.current) return; inFlight.current = true; setFailure(null); saveResult.mutate(); };
-  const resultChoices = [{ value: "accepted", label: "Accepted" }, { value: "rejected", label: "Rejected" }, { value: "proof_added", label: "Proof added" }, { value: "correction_confirmed", label: "Correction confirmed" }, { value: "repair_confirmed", label: "Repair confirmed" }, { value: "replacement_confirmed", label: "Replacement confirmed" }, { value: "answer_recorded", label: "Answer recorded" }];
+  const [recording, setRecording] = useState(false);
+  const state = useIssueResult(row, () => { setRecording(false); onClose(); });
+  // A different Issue starts clean: no half-recorded result carries over.
+  useEffect(() => { setRecording(false); }, [row?.id]);
   const money = row && row.issue_money_links.length > 0 ? [{ label: "Cost incurred", track: "incurred" }, { label: "Amount recoverable", track: "recoverable" }, { label: "Amount recovered", track: "recovered" }].filter((m) => row.issue_money_links.some((link) => link.track === m.track)) : [];
-  return <Modal open={Boolean(row)} onOpenChange={(value) => !value && onClose()} title={row?.issue_no ?? "Issue"} width="wide" footer={<div className="flex gap-2"><Button variant="neutral" onClick={onClose}>Close</Button>{action && !recording && <Button variant="primary" onClick={() => setRecording(true)}>Record result</Button>}{recording && <Button variant="primary" disabled={!resultCode || result.trim().length < 3} loading={saveResult.isPending} onClick={submit}>Record result</Button>}</div>}><div className="grid gap-4"><section><h3 className="text-section">What is true</h3><p className="mt-1 text-body">{row?.official_english}</p></section><section className="rounded-card border border-kit-blue-9 bg-kit-blue-2 p-4"><div className="flex items-center justify-between gap-3"><h3 className="text-section">Current Action</h3>{action && <StatusPill tone="info">{action.owner_rule === "issue_review_approver" ? "Issue Review Approver" : "Issue Triage Duty"}</StatusPill>}</div><p className="mt-2 font-medium">{action?.trigger ?? "No current action"}</p>{action && <div className="mt-1 text-body"><p>{action.action}</p><p className="text-kit-slate-11">{action.recipient} · {action.required_result} · {fmtDate(action.due_on)}</p></div>}</section>{recording && <section className="grid gap-3"><FailureMessage failure={failure} /><h3 className="text-section">What was the result?</h3><ChoiceGrid choices={resultChoices} selected={resultCode} onChoose={setResultCode}/><Input id="action-result" label="Result evidence" value={result} onChange={(event) => setResult(event.target.value)}/></section>}<div className="grid grid-cols-2 gap-3"><section><h3 className="text-section">Fault Owners</h3><p>{row?.issue_fault_owners.map((x) => x.owner_name).join(", ") || "Waiting reviewer finding"}</p></section>{row && money.length > 0 && <section><h3 className="text-section">Money</h3><dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 text-body">{money.map((m) => <div key={m.track} className="contents"><dt className="text-kit-slate-11">{m.label}</dt><dd className="tabular-nums">{fmtMoney(moneyOf(row, m.track))}</dd></div>)}</dl></section>}</div></div></Modal>;
+  return <Modal open={Boolean(row)} onOpenChange={(value) => !value && onClose()} title={row?.issue_no ?? "Issue"} width="wide" footer={<div className="flex gap-2"><Button variant="neutral" onClick={onClose}>Close</Button>{state.action && !recording && <Button variant="primary" onClick={() => setRecording(true)}>Record result</Button>}{recording && <Button variant="primary" disabled={!state.canSave} loading={state.pending} onClick={state.submit}>Record result</Button>}</div>}><div className="grid gap-4"><section><h3 className="text-section">What is true</h3><p className="mt-1 text-body">{row?.official_english}</p></section><section className="rounded-card border border-kit-blue-9 bg-kit-blue-2 p-4"><div className="flex items-center justify-between gap-3"><h3 className="text-section">Current Action</h3>{state.action && <StatusPill tone="info">{state.action.owner_rule === "issue_review_approver" ? "Issue Review Approver" : "Issue Triage Duty"}</StatusPill>}</div><p className="mt-2 font-medium">{state.action?.trigger ?? "No current action"}</p>{state.action && <div className="mt-1 text-body"><p>{state.action.action}</p><p className="text-kit-slate-11">{state.action.recipient} · {state.action.required_result} · {fmtDate(state.action.due_on)}</p></div>}</section>{recording && <IssueResultFields state={state} />}<div className="grid grid-cols-2 gap-3"><section><h3 className="text-section">Fault Owners</h3><p>{row?.issue_fault_owners.map((x) => x.owner_name).join(", ") || "Waiting reviewer finding"}</p></section>{row && money.length > 0 && <section><h3 className="text-section">Money</h3><dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 text-body">{money.map((m) => <div key={m.track} className="contents"><dt className="text-kit-slate-11">{m.label}</dt><dd className="tabular-nums">{fmtMoney(moneyOf(row, m.track))}</dd></div>)}</dl></section>}</div></div></Modal>;
 }
