@@ -32,7 +32,13 @@ const CITIES: Array<[string, string]> = [
    real name, so the one-line cell's ellipsis and its open-whole door are walked. */
 const SALESPEOPLE = ["Khoo Aik Yean", "Mayson", "Alvin", "Nur Syafiqah Binti Mohd Zulkifli", "tan qu qu"];
 
-const orders = Array.from({ length: 72 }, (_, n) => {
+/* `?rows=600` seeds a population past one 500-order page (SO A3-3), so the
+   Register's page-by-page read is walked and measured; 72 by default. */
+const previewParams = new URLSearchParams(window.location.search);
+const ROWS = Math.min(5000, Math.max(1, Number(previewParams.get("rows")) || 72));
+/* `?latency=400` holds every list page that long, as a network would. */
+const PAGE_LATENCY_MS = Math.max(0, Number(previewParams.get("latency")) || 0);
+const orders = Array.from({ length: ROWS }, (_, n) => {
   const i = n + 1;
   const [city, state] = CITIES[i % CITIES.length]!;
   return {
@@ -187,6 +193,22 @@ window.fetch = async (input, init) => {
   if (detail && path.endsWith("/revisions")) return json({ revisions: [] });
   if (path.endsWith("/workspace-duties")) return json({ duties: [] });
   if (path.endsWith("/customer-type")) return json({ existing: false, matches: 0 });
+  /* The server's paged contract (`paged=1`): 500 per page, placed_at desc then
+     id desc, `nextCursor` = the page's last row, the total on page one only. */
+  if (/\/api\/operation\/orders(\?|$)/.test(url) && new URL(url, window.location.href).searchParams.get("paged") === "1") {
+    const after = new URL(url, window.location.href).searchParams.get("after");
+    const population = scenario === "empty" ? [] : [...orders].sort((a, b) =>
+      b.placed_at.localeCompare(a.placed_at) || b.id.localeCompare(a.id));
+    const keyOf = (o: (typeof orders)[number]) => `${o.placed_at}|${o.id}`;
+    const start = after ? population.findIndex((o) => keyOf(o) === after) + 1 : 0;
+    const page = population.slice(start, start + 500);
+    if (PAGE_LATENCY_MS) await new Promise((resolve) => setTimeout(resolve, PAGE_LATENCY_MS));
+    return json({
+      orders: page,
+      ...(after ? {} : { salesOrderTotal: population.length }),
+      nextCursor: page.length === 500 ? keyOf(page[page.length - 1]!) : null,
+    });
+  }
   const body = /\/api\/operation\/orders(\?|$)/.test(url)
     ? { orders: scenario === "empty" ? [] : orders, salesOrderTotal: scenario === "empty" ? 0 : orders.length }
     : order

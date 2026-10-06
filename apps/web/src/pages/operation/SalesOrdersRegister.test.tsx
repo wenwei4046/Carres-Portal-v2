@@ -99,6 +99,13 @@ vi.mock("@/lib/queries", async () => {
   return {
     ...actual,
     useOperationOrders: (...args: unknown[]) => useOperationOrdersSpy(...args),
+    /* The Register's own list reads EVERY page (SO A3-3) through this hook,
+       with the same filters; the one spy answers both, so every assertion
+       below about the filters the Register asks with still holds. The
+       whole-population behaviour itself is held by
+       SalesOrdersRegister.population.test.tsx and
+       lib/sales-order-register-pages.test.tsx. */
+    useSalesOrderRegisterOrders: (...args: unknown[]) => useOperationOrdersSpy(...args),
     useSalesOrderExpansion: (...args: unknown[]) => useSalesOrderExpansionSpy(...args),
     useCatalog: (...args: unknown[]) => useCatalogSpy(...args),
     useDeliveryOrdersRegister: (...args: unknown[]) => useDeliveryOrdersRegisterSpy(...args),

@@ -36,8 +36,10 @@ import StatusPill from "@/components/kit/StatusPill";
  *             response, never merely hidden here.
  * ```
  *
- * SEARCH IS STILL CLIENT-SIDE, AND IT IS STILL ONE DEBT WITH THE 200-ROW CAP.
- * See `docs/MIGRATION-MAP.md` D-A · D-B.
+ * THE WHOLE POPULATION (SO A3-3, 2026-10-06): the list reads every permitted
+ * order page by page (`useSalesOrderRegisterOrders`) and shows nothing until
+ * the last page is in, so the rail summary, the footer, the groups, Cards and
+ * Export all count the same complete list — never a 500-order sample.
  */
 // design-standard: not-a-list-page — this page runs THE REGISTER ENGINE
 // (components/register/DataGrid, 2990's grid copied per the standing COPY-2990
@@ -84,7 +86,7 @@ import {
   useCatalog,
   useMonthlyDemandFacts,
   useSalesOrderRegisterFacts,
-  useOperationOrders,
+  useSalesOrderRegisterOrders,
   useSalesOrderExpansion,
 } from "@/lib/queries";
 import DestinationHeader from "./DestinationHeader";
@@ -907,8 +909,10 @@ export default function SalesOrdersRegister() {
 
   /* ⭐ POPULATION — owner ruling 2026-09-21: only orders Sales has handed to
      Operation. A `Placed` order is not on this Register, so the server is
-     asked for the `proceeded` stage and counts its total the same way. */
-  const { data, isLoading, isError, error, refetch } = useOperationOrders(
+     asked for the `proceeded` stage and counts its total the same way.
+     EVERY page of it (SO A3-3): `isLoading` holds until the last page is in,
+     so a partial list never prints a count, a total or a group as complete. */
+  const { data, isLoading, isError, error, refetch } = useSalesOrderRegisterOrders(
     serverSearch ? { stage: "proceeded", search: serverSearch } : { stage: "proceeded" },
   );
   /* The product NAME behind a SKU — the same catalog read the expansion makes
@@ -1191,7 +1195,7 @@ export default function SalesOrdersRegister() {
       ) : (
         <>
           <FilterRailGroup title="Order summary" icon="money" defaultOpen>
-            <dl className="space-y-2 px-2 py-2" data-testid="sales-orders-summary" title={population != null && population > all.length ? "Loaded orders only" : undefined}>
+            <dl className="space-y-2 px-2 py-2" data-testid="sales-orders-summary">
               <div className="grid grid-cols-[1fr_auto] items-center gap-x-2"><dt className="text-meta text-kit-slate-11">Sales orders</dt><dd className="text-strong text-right tabular-nums">{isLoading ? "Loading" : isError ? "Unavailable" : summaryRows.length}</dd></div>
               {(["total", "paid", "balance"] as const).map((key, index) => {
                 const missing = summaryRows.filter(row => row[key].kind !== "amount" && row[key].kind !== "settled").length;
