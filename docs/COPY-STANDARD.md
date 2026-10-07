@@ -5262,6 +5262,20 @@ These words are on screen in the branch and are not approved yet. `Net result` i
 | States | `Loading the forecast…` · `The forecast could not be loaded. Try again.` · `No income or expense account is in the chart.` |
 | Refusals | `Only Finance plans a forecast.` · `Choose the month.` · `The plan could not be read.` · `Account {code} cannot be planned: it is not an income or expense account.` · `{code} {name}: plan an amount or a share, not both.` · `{code} {name}: the amount is not a number.` · `{code} {name}: type the amount in ringgit and sen.` · `{code} {name}: an income account is planned as an amount.` · `{code} {name}: the share is not a number.` · `{code} {name}: a share is 0% or more, to two decimals.` · `Someone else saved this month after you opened it. Open it again to see their plan.` · `The forecast could not be saved. Try again.` |
 
+### PROPOSAL — PENDING CHEW · Chart of accounts: AutoCount numbers and the import (0654, 0655)
+
+The chart's own account names follow Chew's AutoCount chart, in capitals as AutoCount prints them (`CASH AT BANK`, `TRADE CREDITORS`, `MERCHANT - PBB` …); the top headings read `ASSETS` · `LIABILITIES` · `EQUITY` · `INCOME` · `COST OF GOODS SOLD` · `EXPENSES` · `TAX`. A test account the new chart has no place for, and which still carries test lines, ends its name with `(TEST ONLY)`; the card account still in use until each machine has its method reads `CARD - MACHINE NOT KNOWN`.
+
+| Where | Words |
+|---|---|
+| Chart of accounts | Button `Import from AutoCount`, beside `Add account` |
+| Modal | Title `Import from AutoCount`. One line under it: `AutoCount's printed chart of accounts, as a PDF.` Button `Choose the PDF`, then `Reading…`, then `Choose another PDF`. Footer `Cancel` and the primary button, which names its state: `Import: choose the PDF` · `Nothing new to import` · `Import {n} account(s)` |
+| Answer | Summary `{n} new · {n} already in the chart · {n} not imported`. Table `Accounts in the PDF`: `Account` (`{code} {name}`) · `Under` (the number it goes under) · `What happens`: `New` · `Already in the chart` · the reason it is not imported. Rows not imported come first |
+| Reasons (the database's) | `{code} is not an account number.` · `{code} is listed twice.` · `{code} has no name.` · `{code} {name} is longer than 60 characters.` · `{code} {name} is under {section}, a section the chart does not know.` · `{code} {name} is a bank or cash account. Add it in Money accounts.` · `{code} {name} is a debtor or creditor control account, which the system sets up.` · `{code} {name} is a stock or retained earnings account, which the system sets up.` · `{code} {name} is under {parent}, which is not imported.` · `{code} {name} is under {parent}, which is another kind of account.` · `{code} {name} is under {parent}, an account the ledger posts to. Accounts can only go under a heading.` · `{code} {name} is under {parent}, which is not in the chart.` · `{code} {name} is under {parent}, which is retired.` · `{code}: an account named {name} is already in the chart ({code}).` |
+| Reading the PDF | `{code} is printed before any section line.` · `{code} is printed twice.` · `No account was found in this PDF. Choose AutoCount's chart of accounts.` · `This PDF could not be read. Choose AutoCount's chart of accounts.` |
+| Done | Toast `{n} account(s) added to the chart.` |
+| Refusals | `Only Finance changes the chart of accounts.` · `There is no account to import. Pick AutoCount's chart of accounts.` · `A chart of more than 2,000 accounts is not imported in one go.` |
+
 **SO compact file preview — owner approved 2026-10-04:** `Sales order PDF · {actual SO number}` · `Download` · accessible name/tooltip `Close PDF` for the file × and `Close order` for the dark order Header ×. File close returns to Info; order close returns to the Register.
 
 ### Receiving and shared Calendar — owner-approved target, 2026-10-04
