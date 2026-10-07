@@ -12,6 +12,7 @@
  */
 import { z } from "zod";
 import { collectionClock, type CollectionClock, type CollectionTiming, type OwnerCalendar } from "./collection-clock";
+import { customerLegDeliveryOf } from "./delivery-calendar";
 import { orderMoney } from "./order-money";
 import { paymentCollectionReadiness } from "./payment-collection";
 import type { WorkingDayOptions } from "./working-days";
@@ -282,24 +283,30 @@ export function invoiceConfirmedDelivery(row: InvoiceRegisterRow): {
   dateIso: string | null;
   time: string | null;
 } {
+  /* Delivery's ONE delivery-day reader for an order-level surface
+     (`customerLegDeliveryOf`) — the Work feed and the rail Calendar ask it
+     too. An older read that did not select `booking_stage` keeps its
+     confirmed reading. */
   const order = row.orders;
-  const docs = (order?.ops_delivery_orders ?? []).filter((d) => !d.voided_at);
-  const arrangements = order?.ops_delivery_arrangements ?? [];
-  const leg = Math.max(0, ...docs.map((d) => d.leg ?? 0), ...arrangements.map((a) => a.leg ?? 0));
-  const doc = docs
-    .filter((d) => (d.leg ?? 0) === leg && d.delivery_date && ISO_DATE.test(d.delivery_date.slice(0, 10)))
-    .sort((a, b) => (b.issued_at ?? "").localeCompare(a.issued_at ?? ""))[0];
-  if (doc) return { dateIso: doc.delivery_date!.slice(0, 10), time: doc.time_slot ?? null };
-  const arrangement = arrangements.find((a) => (a.leg ?? 0) === leg);
-  const arranged = arrangement?.confirmed_date?.slice(0, 10) ?? null;
-  if (arranged && ISO_DATE.test(arranged)) return { dateIso: arranged, time: arrangement!.confirmed_time ?? null };
   const ctrl = ctrlOf(row);
-  const booked = ctrl?.confirmed_date?.slice(0, 10) ?? null;
-  const stageAllows = ctrl?.booking_stage === undefined || ctrl.booking_stage === "confirmed";
-  if (booked && ISO_DATE.test(booked) && stageAllows) {
-    return { dateIso: booked, time: ctrl?.confirmed_time_slot ?? null };
-  }
-  return { dateIso: null, time: null };
+  const day = customerLegDeliveryOf({
+    documents: (order?.ops_delivery_orders ?? [])
+      .filter((d) => !d.voided_at)
+      .map((d) => ({ leg: d.leg, deliveryDate: d.delivery_date, timeSlot: d.time_slot, issuedAt: d.issued_at })),
+    arrangements: (order?.ops_delivery_arrangements ?? []).map((a) => ({
+      leg: a.leg,
+      confirmedDate: a.confirmed_date,
+      confirmedTime: a.confirmed_time,
+    })),
+    booking: ctrl
+      ? {
+          stage: ctrl.booking_stage === undefined ? "confirmed" : (ctrl.booking_stage as "confirmed" | null),
+          confirmedDate: ctrl.confirmed_date ?? null,
+          confirmedSlot: ctrl.confirmed_time_slot ?? null,
+        }
+      : null,
+  });
+  return { dateIso: day.iso, time: day.time };
 }
 
 /** The Customer Delivery cell fact: the customer-confirmed day, else the

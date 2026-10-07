@@ -676,7 +676,7 @@ export default function PrincipalNewOrder() {
             />
           </Field>
           <Field
-            label="Proceed date · production start"
+            label="Planned production start"
             hint="Optional. Saved only when a delivery date is set."
           >
             <input

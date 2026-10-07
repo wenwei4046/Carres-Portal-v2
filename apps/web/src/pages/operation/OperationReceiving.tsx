@@ -23,7 +23,10 @@ import {
   type WarehouseReceiptQueueRow,
 } from "@/lib/queries";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
-import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
+import { DataGrid, type DataGridColumn, type DataGridContextMenuItem } from "@/components/register/DataGrid";
+import { documentRowMenu } from "@/components/register/row-menu";
+import { toast } from "sonner";
+import { printGrn, receivingHasGrn } from "./record-print";
 import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import {
   FilterRail,
@@ -797,6 +800,17 @@ export default function OperationReceiving() {
     next.set("session", id);
     setParams(next);
   }
+  /* ONE ROW MENU (owner ruling 2026-10-05): `View · Print`. View opens the
+     receipt's read-first page (Amend stays a button there); Print is the GRN
+     paper, so a receipt not yet posted as a GRN has no Print. Click keeps the
+     quick card. */
+  const rowMenu = (r: WarehouseReceiptQueueRow): DataGridContextMenuItem[] =>
+    documentRowMenu({
+      view: () => openSession(r.id),
+      print: receivingHasGrn(r.status)
+        ? () => void printGrn(r.id).catch(() => toast.error("The GRN could not be opened"))
+        : undefined,
+    });
   function closeObject() {
     const next = new URLSearchParams(params);
     next.delete("arrival");
@@ -954,6 +968,7 @@ export default function OperationReceiving() {
                 ),
               }}
               onRowClick={setQuickReceipt}
+              contextMenu={rowMenu}
               toolbarStart={<>
                 <button
                   type="button"

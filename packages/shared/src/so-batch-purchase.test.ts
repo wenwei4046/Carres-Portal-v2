@@ -191,14 +191,16 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
       "Proceed Date",
       "SO No",
       "PO Safety Days",
-      "Customer Requested Delivery Date",
+      "Customer’s original requested delivery",
       "Customer Delivery Location",
       "Customer",
       "Items",
       "Supplier",
       "Supplier Deliver To",
       "PO No",
-      "PO Default Delivery Date",
+      /* Owner correction 2026-09-22: `PO Default Delivery Date` is retired
+         portal-wide; the PO's own date is `PO Delivery Date`. */
+      "PO Delivery Date",
     ]);
   });
 
@@ -231,12 +233,16 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
        check is on the WHOLE head, not on a substring: the replacements say the
        same fact with the owner in front of it, so `Customer Delivery Location`
        legitimately contains the retired spelling. */
-    for (const gone of ["PO Delivery Date", "Delivery Location", "Requested Delivery Date", "Deliver To"]) {
+    for (const gone of ["PO Default Delivery Date", "Delivery Location", "Requested Delivery Date", "Deliver To"]) {
       expect(Object.values(W), gone).not.toContain(gone);
     }
     expect(W).not.toHaveProperty("buy");
     expect(W).not.toHaveProperty("colWork");
     expect(W).not.toHaveProperty("goodsMustArrive");
+    /* ⛔ No second PO table under the row or in the Quick View (Jess,
+       2026-10-06): the PO facts are on the row listing. */
+    expect(W).not.toHaveProperty("poDetails");
+    expect(Object.values(W), "Purchase order details").not.toContain("Purchase order details");
   });
 
   it("no banned or retired Purchasing word is spelt anywhere in the dictionary or the rail", () => {

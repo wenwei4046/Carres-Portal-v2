@@ -13,7 +13,7 @@
  *
  *     Work to do (DEFAULT)   the standard selectable work list over one
  *                            WORK TO DO queue — the landing
- *     Confirmed deliveries   Day · Week · Month; only rows a customer has
+ *     Delivery schedule      Day · Week · Month; only rows a customer has
  *                            actually agreed a day for
  *
  * ⭐ THE VIEW IS A NAMED TAB, NEVER A SIDE EFFECT OF A FILTER (owner ruling
@@ -45,6 +45,9 @@ import {
   DELIVERY_WORK_STATUS_KINDS,
   ARRIVAL_COPY,
   deliveryArrivalStateOf,
+  deliveryFailed,
+  deliveryGoodsMoved,
+  deliveryResultRecorded,
   deliveryStockReadinessOf,
   deliveryWorkStatusLabelOf,
   goodsCategoryWordOf,
@@ -73,7 +76,7 @@ import {
   type MissingDeliveryProof,
 } from "./delivery-orders-register";
 import { lineName, moneyOfOrder } from "./sales-order-facts";
-import { fmtMoney, paymentApprovalOpensGate } from "@carres/shared";
+import { financeHoldLineOf, fmtMoney, paymentApprovalOpensGate } from "@carres/shared";
 
 /**
  * ⭐ EVERY VISIBLE WORD, IN ONE PLACE (COPY-STANDARD, Delivery section).
@@ -103,16 +106,14 @@ export const MONITOR_COPY = {
   allDeliveryWork: "All delivery work",
   noLogistics: "Logistics not assigned",
   /**
-   * ⭐ THE CONTACT-WORK QUEUE (owner ruling 2026-09-10).
+   * ⭐ THE CONTACT-WORK QUEUE (owner ruling 2026-09-10, re-worded 2026-09-25).
    *
-   * The rows are unchanged — a delivery nobody has agreed a day for — but the
-   * queue is named after the JOB rather than after the hole, because the job
-   * has a DEADLINE: Logistics contacts the customer at least three working
-   * days before the requested delivery date, whether or not the goods are in.
-   * `No confirmed date` stays the CELL's absence word (it is the fact) and
-   * the retired `?view=no_confirmed_date` still opens this queue.
+   * The rows are unchanged — a delivery with a company but no Scheduled
+   * delivery — and the queue is named after the JOB: get the delivery date.
+   * Its URL key stays `no_confirmed_date`, and every older spelling of the
+   * queue still opens it.
    */
-  callCustomer: "Call customer",
+  getDeliveryDate: "Get delivery date",
   noConfirmedDate: "No confirmed date",
   /**
    * ⭐ TWO DIFFERENT OVERDUE POPULATIONS, TWO DIFFERENT WORDS (owner ruling
@@ -133,10 +134,14 @@ export const MONITOR_COPY = {
   checkProof: "Check delivery proof",
   noDeliveryOrder: "No delivery order yet",
   noDeliveryOrderShort: "DO",
-  paymentBlocked: "Payment blocked",
-  stockRisk: "Stock risk",
-  logisticsIncomplete: "Logistics details incomplete",
-  doNotReleased: "DO not released",
+  /* ── LINE 2 OF THE SCHEDULE CARD — readiness or blocker (§8.4, owner ruling
+     2026-09-14/09-25). Precedence when more than one applies: Hold delivery →
+     Goods not ready → Driver and vehicle not recorded → Ready. A card with no
+     DO number prints the REASON, never the absence. */
+  ready: "Ready",
+  holdDelivery: "Hold delivery",
+  goodsNotReady: "Goods not ready",
+  driverVehicleMissing: "Driver and vehicle not recorded",
   noPrice: "No price yet",
   openDo: "Open DO",
   receivedQty: "Received Qty",
@@ -148,9 +153,12 @@ export const MONITOR_COPY = {
   confirmed: "Scheduled",
   notConfirmed: "Not scheduled",
   paid: "Paid",
-  doNotDeliver: "Do not deliver",
-  stillToCollect: (amount: string) => `${amount} still to collect`,
-  financeHolding: "Finance is holding this delivery",
+  /* Owner ruling 2026-09-25 (§3): `Hold delivery` over the party's own second
+     line. `{amount}` arrives spelled by `fmtMoney` (`RM 1,200.00`), so the
+     word adds no marker of its own. The three older payment words are retired
+     (COPY "Hold delivery"; `hold-delivery-words.test.ts` keeps them out); the
+     Finance line is the shared `financeHoldLineOf`. */
+  unpaid: (amount: string) => `${amount} unpaid`,
   collect: (amount: string) => `Collect ${amount}`,
   cashOnDelivery: "Cash on delivery",
   ofPieces: (have: number, total: number) => `${have} of ${total}`,
@@ -203,8 +211,10 @@ export const MONITOR_COPY = {
   services: "Services",
   accessories: "Accessories",
   /* ── THE IN-PANEL WRITES (owner ruling 2026-09-13, MASTER §8.6) ────────── */
-  confirmedDateField: "Confirmed date",
-  confirmedTimeField: "Confirmed time",
+  /* The Delivery Dates edit fields (§8.6, COPY: `Confirmed date` /
+     `Confirmed time` retired as field words, owner ruling 2026-09-24/26). */
+  confirmedDateField: "Scheduled date",
+  confirmedTimeField: "Scheduled time (optional)",
   informationReceivedFrom: "Information received from",
   customerWord: "Customer",
   operationOnBehalfOf: (partner: string) => `Operation on behalf of ${partner}`,
@@ -247,10 +257,6 @@ export const MONITOR_COPY = {
   previousMonth: "Previous month",
   nextMonth: "Next month",
   clearFilters: "Clear filters",
-  /** The empty calendar's door into the contact queue. It names the QUEUE it
-   *  opens (owner ruling 2026-09-10), so the button and the rail row it lands
-   *  on cannot read as two different places. */
-  openNoConfirmedDate: "Open Call customer",
   calendarViews: "Calendar view",
   day: "Day",
   week: "Work week",
@@ -294,9 +300,8 @@ export const MONITOR_COPY = {
   /**
    * ⭐ THE COMPACT DEADLINE IS A GLYPH AND A DATE (owner ruling 2026-09-11,
    * re-ruled 2026-09-14). `Call by` and `Late — was due` repeated the same
-   * two phrases down an entire column — and once the status word above the
-   * date became `Call customer`, `Call by` was the verb printed twice on one
-   * row. The kit's glyph and its colour carry the state; the WORDS do not
+   * two phrases down an entire column, and the verb was printed twice on one
+   * row under the act above it. The kit's glyph and its colour carry the state; the WORDS do not
    * disappear, they move into the tooltip, the accessible name, Search and
    * the Excel export, where a hover, a screen reader and a manager all find
    * them.
@@ -476,8 +481,8 @@ export const DEFAULT_CALENDAR_VIEW: MonitorCalendarView = "week";
  * into "Delivery Schedule" and "Needs Checking"), in the ruled order (owner
  * correction 2026-09-07). `no_logistics` sits here as a PRIMARY work queue —
  * the bulk-assignment journey's entry — and never appears a second time under
- * LOGISTICS PARTNER. `Calendar` and `Waiting for warehouse` are NOT queues:
- * one is a view, the other a DELIVERY STATUS filter.
+ * LOGISTICS. `Calendar` is a view and a status word is a DELIVERY STATUS
+ * filter; neither is a queue.
  */
 export type MonitorWorkView =
   | "all"
@@ -514,7 +519,7 @@ export const MONITOR_VIEW_LABEL: Record<MonitorWorkView, string> = {
   no_logistics: MONITOR_COPY.noLogistics,
   /** The rows are unchanged; the NAME is the job, and the job has a deadline
    *  (owner ruling 2026-09-10). `No confirmed date` remains the CELL's word. */
-  no_confirmed_date: MONITOR_COPY.callCustomer,
+  no_confirmed_date: MONITOR_COPY.getDeliveryDate,
   overdue: MONITOR_COPY.overdue,
   failed: MONITOR_COPY.failed,
   upload_proof: MONITOR_COPY.uploadProof,
@@ -528,7 +533,7 @@ export const MONITOR_VIEW_LABEL: Record<MonitorWorkView, string> = {
  *
  * ```
  * work       what must be DONE — the selectable work list. THE LANDING.
- * calendar   Confirmed deliveries — the Mon–Sat week, Day and Month
+ * calendar   Delivery schedule — the Mon–Sat week, Day and Month
  * ```
  *
  * The old rule made the projection a SIDE EFFECT of the rail: picking a state
@@ -553,32 +558,40 @@ export const DEFAULT_WORK_VIEW: MonitorWorkView = "all";
 
 /**
  * The DELIVERY STATUS group — a kit dropdown over the Monitor status words
- * (Delivery MASTER §8.4, owner ruling 2026-09-13): the same actor-first
- * dictionary the column prints, in the ladder's own order. Not actions, not
- * document statuses, and never a WORK TO DO queue. The option words carry the
- * role word where the column would carry the partner's name.
+ * (Delivery MASTER §8.4): the same dictionary the column prints, from the ONE
+ * label function, in the ladder's own order. Not actions, not document
+ * statuses, and never a WORK TO DO queue. An option word carries the role word
+ * (`logistics` · `warehouse`) where the column carries the real name.
  */
 export type MonitorDeliveryStatus = DeliveryWorkStatusKind;
 export const MONITOR_STATUS_LABEL: Record<MonitorDeliveryStatus, string> = Object.fromEntries(
-  DELIVERY_WORK_STATUS_KINDS.map((kind) => [kind, deliveryWorkStatusLabelOf(kind, null)]),
+  DELIVERY_WORK_STATUS_KINDS.map((kind) => [kind, deliveryWorkStatusLabelOf(kind)]),
 ) as Record<MonitorDeliveryStatus, string>;
 /**
- * ⭐ ONE OPTION PER PRINTED WORD (owner ruling 2026-09-14).
- *
- * The dropdown filters what the column SAYS, so two rungs that now say the
- * same thing are one option: since the status word became `Call customer`,
- * `partner_must_contact` and `operation_must_call` are the same sentence to
- * the operator and differ only in which Delivery Settings rule owns the call.
- * Two identically-worded options would be a menu asking the reader to pick
- * between two spellings of one word. The FIRST kind in the ladder wins the
- * option, and `matchesMonitorFilters` narrows by the LABEL rather than the
- * key, so picking it keeps every row that prints it.
+ * ⭐ ONE OPTION PER PRINTED WORD (owner ruling 2026-09-14). The dropdown
+ * filters what the column SAYS: since 2026-09-25 the two contact rungs print
+ * two sentences (from the partner · from the customer) and
+ * are two options, and each journey ladder's words are their own options.
+ * Should two rungs ever print one word again, the FIRST kind in the ladder
+ * wins the option and `matchesMonitorFilters` keeps every row that prints it.
  */
 export const MONITOR_STATUS_FILTERS: readonly MonitorDeliveryStatus[] =
   DELIVERY_WORK_STATUS_KINDS.filter(
     (kind, i, all) =>
       all.findIndex((other) => MONITOR_STATUS_LABEL[other] === MONITOR_STATUS_LABEL[kind]) === i,
   );
+
+/**
+ * A stored `?status=` that names a retired rung still resolves (the URL law):
+ * `confirm_time` retired with the 2026-09-24 ruling (a day without a time is a
+ * complete arrangement), so it opens `Scheduled`.
+ */
+export function monitorStatusParamOf(value: string | null): MonitorDeliveryStatus | null {
+  if (value === "confirm_time") return "confirmed";
+  return (DELIVERY_WORK_STATUS_KINDS as readonly string[]).includes(value ?? "")
+    ? (value as MonitorDeliveryStatus)
+    : null;
+}
 
 /** One calendar card / work-list row — a read-only mapping of recorded facts. */
 export interface DeliveryMonitorCard {
@@ -685,17 +698,19 @@ export interface MonitorStock {
  * ⭐ `Payment` ARITHMETIC (Delivery MASTER §8.3): `orderMoney.outstanding`
  * through the one money rule and the OPEN Finance exception — the same
  * predicate the DO gate asks. `Paid` when nothing is outstanding and no
- * exception holds; `Do not deliver` over `RM {amount} still to collect` while
- * money is owed, or over `Finance is holding this delivery` while an exception
- * is open; `Collect RM {amount}` over `Cash on delivery` only when an approval
- * opened the gate. Monitor adds no payment door.
+ * exception holds; `Hold delivery` over `RM {amount} unpaid` while money is
+ * owed, or over `Finance hold · {reason}` while an exception is open (owner
+ * ruling 2026-09-25, §3); `Collect RM {amount}` over `Cash on delivery` only
+ * when an approval granted before the 2026-09-01 closure opened the gate.
+ * The register cell, its Search/Export/filter values and the schedule card's
+ * readiness line all read THIS function. Monitor adds no payment door.
  */
 export function monitorPaymentOf(o: DeliveryScopeRow["o"]): MonitorPayment {
   const money = moneyOfOrder(o);
-  const financeHolds = (o.order_finance_exceptions ?? []).some((e) => e.status === "open");
+  const financeLine = financeHoldLineOf(o.order_finance_exceptions ?? []);
   const owed = money.known ? money.outstanding : 0;
-  if (financeHolds) {
-    return { line1: MONITOR_COPY.doNotDeliver, line2: MONITOR_COPY.financeHolding, tone: "red" };
+  if (financeLine !== null) {
+    return { line1: MONITOR_COPY.holdDelivery, line2: financeLine, tone: "red" };
   }
   if (!money.known) return { line1: MONITOR_COPY.noPrice, line2: null, tone: "none" };
   if (owed <= 0) return { line1: MONITOR_COPY.paid, line2: null, tone: "green" };
@@ -710,8 +725,8 @@ export function monitorPaymentOf(o: DeliveryScopeRow["o"]): MonitorPayment {
     };
   }
   return {
-    line1: MONITOR_COPY.doNotDeliver,
-    line2: MONITOR_COPY.stillToCollect(fmtMoney(owed)),
+    line1: MONITOR_COPY.holdDelivery,
+    line2: MONITOR_COPY.unpaid(fmtMoney(owed)),
     tone: "red",
   };
 }
@@ -806,7 +821,7 @@ export interface DeliveryMonitorFilters {
   search: string;
   /**
    * ⭐ THE CONTACT-WEEK PICK (owner ruling 2026-09-10) — ONE contact deadline,
-   * or null for every date. It narrows only the `Call customer` queue, because
+   * or null for every date. It narrows only the `Get delivery date` queue, because
    * it is a question only that queue asks; anywhere else it would be a hidden
    * second narrowing of a list that looks complete.
    */
@@ -885,10 +900,10 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
        there is nothing left to agree with the customer on this trip, and its
        remaining work is proof or a rebooking, which are the
        `Upload delivery proof` and `Failed Delivery` queues' own rows. A
-       delivered trip sitting in `Call customer` because nobody recorded a
+       delivered trip sitting in the contact queue because nobody recorded a
        time window sends an operator to phone a customer whose furniture is
        already in the house. */
-    const settled = row.status.kind === "delivered" || row.status.kind === "arrived" || row.status.kind === "failed";
+    const settled = deliveryResultRecorded(row.status.kind);
     return {
       scopeId: row.key,
       orderId: row.orderId,
@@ -1129,6 +1144,44 @@ export function missingProofLabels(card: DeliveryMonitorCard): string[] {
 }
 
 /**
+ * ⭐ WHERE THE CONTACT DEADLINE IS STATED ON THIS ROW — once, and only where
+ * the §8.4 table puts it (owner rulings 2026-09-14 / 2026-09-25):
+ *
+ * ```
+ * line2   the two `Get delivery date …` rungs: the kit glyph and the day
+ * title   `Order details incomplete`: line two prints the MISSING FACT, and
+ *         the deadline moves to the cell's title, accessible name, Search
+ *         and Export — nothing is lost, the at-a-glance reason is back
+ * null    every other row: no conversation is owed, or the row says
+ *         something else on line two (`Asked {date}`)
+ * ```
+ *
+ * A row whose customer named no day owes no deadline: a step with no anchor
+ * can never be late.
+ */
+export type ContactDeadlinePlacement = "line2" | "title" | null;
+
+export function contactDeadlinePlacementOf(
+  card: Pick<DeliveryMonitorCard, "statusKey" | "contactDueIso" | "booked" | "settled">,
+): ContactDeadlinePlacement {
+  if (card.contactDueIso === null || card.booked || card.settled) return null;
+  if (card.statusKey === "partner_must_contact" || card.statusKey === "operation_must_call") return "line2";
+  if (card.statusKey === "details_incomplete") return "title";
+  return null;
+}
+
+/** The deadline as WORDS — the tooltip, the accessible name, Search and the
+ *  Excel export. Null when the row owes none. */
+export function contactDeadlineSentenceOf(
+  card: Pick<DeliveryMonitorCard, "statusKey" | "contactDueIso" | "booked" | "settled" | "contactOverdue">,
+  fmt: (iso: string) => string,
+): string | null {
+  if (contactDeadlinePlacementOf(card) === null || card.contactDueIso === null) return null;
+  const date = fmt(card.contactDueIso);
+  return card.contactOverdue ? MONITOR_COPY.contactLateSentence(date) : MONITOR_COPY.contactDueSentence(date);
+}
+
+/**
  * The one href arithmetic. An issued DO opens the formal Delivery Order; a
  * row without one opens its Monitor row, brief unfolded — Monitor never
  * issues the document.
@@ -1195,7 +1248,7 @@ export function monitorRowAction(card: DeliveryMonitorCard): MonitorRowAction {
      2026-09-11). `Call {partner} — confirm delivery date` is about arranging
      a delivery that has not happened. A DELIVERED trip whose time window was
      never written down is `booked: false` and used to print that line — the
-     same mistake the `Call customer` queue made, in the one cell that tells
+     same mistake the contact queue made, in the one cell that tells
      the operator what to DO. A recorded result outranks it, exactly as it
      already outranks an unassigned partner. */
   if (!card.booked && !card.settled) {
@@ -1254,7 +1307,9 @@ function matchesView(card: DeliveryMonitorCard, view: MonitorWorkView, todayIso:
          exception count and the work order cannot disagree (Law D). */
       return isOverdueDelivery(card, todayIso);
     case "failed":
-      return card.statusKey === "failed";
+      /* A failure on either ladder — the customer leg's or the transfer's —
+         is the same act owed: arrange the next step. */
+      return deliveryFailed(card.statusKey);
     case "upload_proof":
       return needsProof(card);
     case "check_proof":
@@ -1290,9 +1345,8 @@ function matchesLogisticsPartner(
 }
 
 /* The pick narrows by the PRINTED WORD, not the internal key: the dropdown
-   carries one option per word (MONITOR_STATUS_FILTERS above), so picking
-   `Call customer` must keep every row that prints `Call customer` whichever
-   rung produced it. */
+   carries one option per word (MONITOR_STATUS_FILTERS above), so a pick keeps
+   every row whose rung prints that word. */
 function matchesStatus(card: DeliveryMonitorCard, picked: MonitorDeliveryStatus | null): boolean {
   return picked === null || MONITOR_STATUS_LABEL[card.statusKey] === MONITOR_STATUS_LABEL[picked];
 }
@@ -1324,7 +1378,7 @@ function matchesSearch(card: DeliveryMonitorCard, search: string): boolean {
 }
 
 /**
- * The Confirmed deliveries calendar's cards: a CONFIRMED date inside the
+ * The Delivery schedule's cards: a SCHEDULED date inside the
  * visible window, narrowed by the same STATE / LOGISTICS PARTNER / DELIVERY
  * STATUS picks the work list uses (owner ruling 2026-09-10 — a narrowing now
  * applies to whichever view is open instead of switching the view).
@@ -1376,7 +1430,7 @@ export function filterMonitorListRows(
         c.contactDueIso === filters.contactDue) &&
       matchesSearch(c, filters.search),
   );
-  /* `Call customer` keeps its own governed order (earliest requested date
+  /* `Get delivery date` keeps its own governed order (earliest requested date
      first). Every other queue — `All delivery work` above all — answers the
      morning question, so it leads with what is late (owner ruling
      2026-09-14). Before this, no queue applied any sort and the list fell out
@@ -1578,28 +1632,40 @@ export function monthDaySentence(dateLabel: string, counts: MonthDayCounts | und
   return `${dateLabel}: ${parts.join(" · ")}`;
 }
 
-/** Presentation of the existing stock/payment facts, not a permission to
- * issue or dispatch. Once goods moved, show the recorded ETA/result/proof
- * instead of diagnosing a pre-departure shortage against consumed stock. */
+/**
+ * ⭐ THE SCHEDULE CARD — TWO FACTS ON TWO LINES (§8.4, owner ruling
+ * 2026-09-14). Line one is the journey progress from the ONE status function
+ * (data-gap and clock overlays removed); line two is readiness or the blocker.
+ * Presentation of existing stock, payment and crew facts — never a permission
+ * to issue or dispatch. Once the goods have moved, line two keeps the recorded
+ * ETA, collection time, result or proof owed instead of re-testing a
+ * pre-departure shortage against goods that already left.
+ *
+ * Readiness precedence (owner ruling 2026-09-25): `Hold delivery` → `Goods
+ * not ready` → `Driver and vehicle not recorded` → `Ready`. Unpriced or
+ * incomplete Sales facts never produce `Ready`. A card without a DO prints the
+ * reason; the three vague 2026-09-13 blocker words
+ * are retired, and a missing time or ETA is never a blocker (both optional).
+ */
 export function monitorScheduleStatusOf(card: DeliveryMonitorCard): {
   progress: DeliveryScopeRow["progress"];
   supporting: string | null;
   tone: DeliveryWorkStatusTone;
 } {
   const progress = card.scope.progress;
-  if (["collected", "delivering", "arrived", "delivered", "failed"].includes(progress.kind)) {
+  if (deliveryGoodsMoved(progress.kind)) {
     return { progress, supporting: progress.second, tone: progress.secondTone ?? "none" };
   }
-  if (card.payment.tone === "red") return { progress, supporting: MONITOR_COPY.paymentBlocked, tone: "orange" as const };
-  if (!moneyOfOrder(card.scope.o).known) return { progress, supporting: "Order details incomplete", tone: "orange" as const };
-  if (!card.readiness.ready) return { progress, supporting: MONITOR_COPY.stockRisk, tone: "orange" as const };
+  const blocker = (supporting: string, tone: DeliveryWorkStatusTone = "orange") => ({ progress, supporting, tone });
+  if (card.payment.tone === "red") return blocker(MONITOR_COPY.holdDelivery, "red");
+  if (!moneyOfOrder(card.scope.o).known) return blocker(MONITOR_COPY.detailsIncomplete);
+  if (!card.readiness.ready) return blocker(MONITOR_COPY.goodsNotReady);
   const arrangement = card.scope.arrangement;
-  if (!card.logisticsPartnerId || !card.confirmedTime || !arrangement?.driver_name?.trim() || !arrangement.vehicle?.trim() || !arrangement.expected_arrival?.trim()) {
-    return { progress, supporting: MONITOR_COPY.logisticsIncomplete, tone: "orange" as const };
+  if (!card.logisticsPartnerId || !arrangement?.driver_name?.trim() || !arrangement.vehicle?.trim()) {
+    return blocker(MONITOR_COPY.driverVehicleMissing);
   }
-  if (card.scope.missingFacts.length) return { progress, supporting: "Order details incomplete", tone: "orange" as const };
-  if (!card.deliveryOrderId) return { progress, supporting: MONITOR_COPY.doNotReleased, tone: "orange" as const };
-  return { progress, supporting: "Ready", tone: "green" as const };
+  if (card.scope.missingFacts.length) return blocker(MONITOR_COPY.detailsIncomplete);
+  return { progress, supporting: MONITOR_COPY.ready, tone: "green" };
 }
 
 /** The selected schedule scope, not the all-dates work population. */
@@ -1618,25 +1684,21 @@ export function scheduleSplitSentence(count: { deliveries: number; transfers: nu
 /* ── The calendar's empty range — ONE spanning sentence, never six copies ── */
 
 /**
- * The whole visible range holding nothing prints one spanning state (owner
- * correction 2026-09-06), never the same absence repeated in every column.
- * The caller supplies the printed date strings — `fmt-date.ts` owns spelling.
+ * The whole visible range holding nothing prints one spanning state in two
+ * lines (owner ruling 2026-09-25): this sentence, and beneath it the real
+ * count as the door itself (`ordersNeedDateSentence`). The window names
+ * itself by its own word, never by a pair of dates.
  */
-export function emptyRangeSentence(
-  visibleDays: readonly string[],
-  fmt: (iso: string) => string,
-): string {
-  const first = visibleDays[0];
-  const last = visibleDays[visibleDays.length - 1];
-  if (!first || !last) return "No deliveries are scheduled.";
-  return `No deliveries are scheduled from ${fmt(first)} to ${fmt(last)}.`;
+export function emptyRangeSentence(view: MonitorCalendarView, dayLabel: string | null): string {
+  if (view === "month") return "No delivery scheduled this month.";
+  if (view === "day" && dayLabel) return `No delivery scheduled on ${dayLabel}.`;
+  return "No delivery scheduled this week.";
 }
 
-/** `86 deliveries need a confirmed date.` — printed only from the REAL count. */
-export function needConfirmedDateSentence(n: number): string {
-  return n === 1
-    ? "1 delivery needs a confirmed date."
-    : `${n} deliveries need a confirmed date.`;
+/** `{n} orders still need a delivery date.` — printed only from the REAL count
+ *  of the `Get delivery date` queue, and it is the link into that queue. */
+export function ordersNeedDateSentence(n: number): string {
+  return n === 1 ? "1 order still needs a delivery date." : `${n} orders still need a delivery date.`;
 }
 
 /** The work list's footer — it counts deliveries (a Journey leg is its own

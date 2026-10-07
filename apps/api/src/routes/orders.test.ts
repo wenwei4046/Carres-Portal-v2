@@ -2614,6 +2614,23 @@ describe("POST /api/orders/:id/unproceed", () => {
     expect(body.code).toBe("wrong_stage");
   });
 
+  it("422 proceed_date_passed answers in the planned production start's words (owner ruling 2026-10-06)", async () => {
+    const sb = buildSbForProceed({
+      rpcError: { code: "22023", message: "The proceed date has passed", details: "proceed_date_passed" },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(unproceedUrl, { method: "POST", headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string | null; error?: string; message?: string };
+    expect(body.error).toBe("unproceed_blocked");
+    expect(body.code).toBe("proceed_date_passed");
+    expect(body.message).toBe("The planned production start has passed");
+  });
+
   it("403 for a role outside the order-writing list (supplier)", async () => {
     const sb = buildSbForProceed({});
     vi.mocked(userClient).mockReturnValue(sb);
@@ -4209,6 +4226,27 @@ describe("PATCH /api/orders/:id", () => {
     const body = (await res.json()) as { code?: string | null; error?: string };
     expect(body.code).toBe("wrong_status");
     expect(body.error).toBe("update_order_blocked");
+  });
+
+  it("422 proceed_after_delivery answers in the planned production start's words (owner ruling 2026-10-06)", async () => {
+    const sb = buildSbForProceed({
+      rpcError: { code: "22023", message: "proceed date must be on or before delivery date", details: "proceed_after_delivery" },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    const res = await app.fetch(
+      new Request(editUrl, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ customer: { name: "Updated Name" } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code?: string | null; error?: string; message?: string };
+    expect(body.error).toBe("update_order_blocked");
+    expect(body.code).toBe("proceed_after_delivery");
+    expect(body.message).toBe("Planned production start: must be on or before the delivery date");
   });
 
   it("400 when neither customer nor delivery is provided", async () => {

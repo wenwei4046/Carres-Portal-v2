@@ -48,6 +48,12 @@ import {
 } from "@carres/shared";
 import { collectionOwnerResolution, type CollectionOwnerContextRow } from "@carres/shared";
 import {
+  assignedLogisticsIdOf,
+  customerLegDeliveryOf,
+  type CustomerLegArrangementRead,
+  type CustomerLegDocumentRead,
+} from "@carres/shared";
+import {
   WORK_CHANNELS,
   WORK_CONTACT_KINDS,
   workLifecycleOf,
@@ -225,10 +231,14 @@ export function projectSalesOrdersFromModuleFacts(input: {
   /** §6.1 (0489) — the proof reviews and attempt evidence per document
    *  number, read once. Absent ⇒ no review work is composed. */
   proofFacts?: ProofFactsByDo | null;
-  /** Delivery's arrangement per order (leg 0) — THE booking fact (owner
-   *  decision 2026-09-25, Workspace §5.9 gap 6). Absent ⇒ the legacy booking
-   *  signal (a caller that has not read Delivery, e.g. an older test). */
-  arrangements?: ReadonlyMap<string, { confirmedDate: string | null; partnerId?: string | null }> | null;
+  /** Delivery's arrangements per order, every leg — the SAME arrangement
+   *  facts Monitor reads (owner decision 2026-09-25, Workspace §5.9 gaps 6
+   *  and 9). Absent ⇒ the legacy booking signal alone (a caller that has not
+   *  read Delivery, e.g. an older test). */
+  arrangements?: ReadonlyMap<string, ReadonlyArray<CustomerLegArrangementRead>> | null;
+  /** The order's LIVE Delivery Orders — the document's day outranks the
+   *  arrangement in the one delivery-day reader. */
+  deliveryOrders?: ReadonlyMap<string, ReadonlyArray<CustomerLegDocumentRead>> | null;
 }): OperationWorkItem[] {
   const availableBySku = Object.fromEntries(
     input.stock.map((row) => [row.sku, row.available]),
@@ -248,13 +258,32 @@ export function projectSalesOrdersFromModuleFacts(input: {
           0,
         )
       : null;
-    /* ONE booking truth: Delivery's arrangement when the feed read it —
-       a Scheduled date there IS the booking; no legacy `booking_stage`. */
-    const arrangement = input.arrangements ? input.arrangements.get(row.id) ?? null : undefined;
+    /* ⭐ ONE DELIVERY-DAY READER (Delivery MASTER §15.1, Workspace §5.9 gap
+       9): the customer leg's live document, then Delivery's arrangement, then
+       a CONFIRMED legacy booking — `customerLegDeliveryOf`, the answer Monitor
+       and the rail Calendar read. A Scheduled day there IS the booking. */
+    const delivery = input.arrangements
+      ? customerLegDeliveryOf({
+          documents: input.deliveryOrders?.get(row.id) ?? [],
+          arrangements: input.arrangements.get(row.id) ?? [],
+          booking: {
+            stage: (control?.booking_stage ?? null) as "none" | "provisional" | "confirmed" | null,
+            confirmedDate: control?.confirmed_date ?? null,
+          },
+        })
+      : null;
     const booking =
-      arrangement === undefined
+      delivery === null
         ? { stage: control?.booking_stage ?? null, confirmedDate: control?.confirmed_date ?? null }
-        : { stage: arrangement?.confirmedDate ? "confirmed" : null, confirmedDate: arrangement?.confirmedDate ?? null };
+        : { stage: delivery.iso ? "confirmed" : null, confirmedDate: delivery.iso };
+    /* ⭐ ONE ASSIGNMENT READER: Delivery's arrangement for the customer leg
+       wins, the order row's columns are the fallback — Monitor's own rule, so
+       `Assign logistics` and `Call {company}` cannot disagree with it. */
+    const partnerId = assignedLogisticsIdOf({
+      arrangementPartnerId: delivery?.arrangement?.partnerId,
+      orderPartnerId: row.delivery_partner_id,
+      triagePartnerId: row.ops_assigned_logistic,
+    });
     const hold = storageHold({
       storageFrom: control?.storage_from ?? null,
       override: control?.storage_fee_override ?? null,
@@ -289,7 +318,7 @@ export function projectSalesOrdersFromModuleFacts(input: {
          its leg-0 record names is assigned, as the Order Route reads it —
          the order row's legacy columns alone raised `Assign logistics` on an
          order the Route showed as assigned (SO-1333, 2026-09-28). */
-      logisticsAssigned: Boolean(arrangement?.partnerId || row.delivery_partner_id || row.ops_assigned_logistic),
+      logisticsAssigned: partnerId !== null,
       bookingStage: booking.stage,
       confirmedDate: booking.confirmedDate,
       deliveryOrderNumber: row.do_number,
@@ -345,8 +374,7 @@ export function projectSalesOrdersFromModuleFacts(input: {
         ...proofReviewFlagsOf(row, control, input.proofFacts ?? null),
       },
       customer: row.customer_name,
-      logistics:
-        input.partnerNameById?.get(row.delivery_partner_id ?? row.ops_assigned_logistic ?? "") ?? null,
+      logistics: partnerId ? input.partnerNameById?.get(partnerId) ?? null : null,
       deliveryOrderNumber: row.do_number ?? null,
       today: input.today,
     });
@@ -1474,25 +1502,57 @@ async function readProofFacts(c: Context<AppEnv>): Promise<ProofFactsByDo> {
   return { reviews, evidenceAt };
 }
 
-/** Delivery's arrangement (leg 0) per feed order — the Scheduled date is the
- *  booking (Delivery MASTER §5). Read for the feed's own orders only, 100 at a
- *  time. A failed read fails the Delivery facts loudly rather than silently
- *  falling back to the legacy booking. */
+/** Delivery's arrangements (every leg) per feed order — the same rows
+ *  Monitor reads; the customer leg's Scheduled date is the booking (Delivery
+ *  MASTER §5). Read for the feed's own orders only, 100 at a time. A failed
+ *  read fails the Delivery facts loudly rather than silently falling back to
+ *  the legacy booking. */
 async function readArrangements(
   c: Context<AppEnv>,
   orderIds: readonly string[],
-): Promise<Map<string, { confirmedDate: string | null; partnerId: string | null }>> {
+): Promise<Map<string, CustomerLegArrangementRead[]>> {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const out = new Map<string, { confirmedDate: string | null; partnerId: string | null }>();
+  const out = new Map<string, CustomerLegArrangementRead[]>();
   for (const batch of chunk([...orderIds], 100)) {
     const { data, error } = await sb
       .from("ops_delivery_arrangements")
-      .select("order_id, confirmed_date, partner_id")
-      .eq("leg", 0)
+      .select("order_id, leg, confirmed_date, confirmed_time, partner_id")
       .in("order_id", batch);
     if (error) throw new Error("Workspace delivery-arrangement source could not be read");
-    for (const row of (data ?? []) as Array<{ order_id: string; confirmed_date: string | null; partner_id: string | null }>) {
-      out.set(row.order_id, { confirmedDate: row.confirmed_date, partnerId: row.partner_id });
+    for (const row of (data ?? []) as Array<{
+      order_id: string; leg: number | null; confirmed_date: string | null; confirmed_time: string | null; partner_id: string | null;
+    }>) {
+      out.set(row.order_id, [
+        ...(out.get(row.order_id) ?? []),
+        { leg: row.leg, confirmedDate: row.confirmed_date, confirmedTime: row.confirmed_time, partnerId: row.partner_id },
+      ]);
+    }
+  }
+  return out;
+}
+
+/** The feed orders' LIVE Delivery Orders — the document's own day is the
+ *  first answer of the one delivery-day reader, as on Monitor. */
+async function readDeliveryOrderDays(
+  c: Context<AppEnv>,
+  orderIds: readonly string[],
+): Promise<Map<string, CustomerLegDocumentRead[]>> {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const out = new Map<string, CustomerLegDocumentRead[]>();
+  for (const batch of chunk([...orderIds], 100)) {
+    const { data, error } = await sb
+      .from("ops_delivery_orders")
+      .select("order_id, leg, delivery_date, time_slot, issued_at")
+      .is("voided_at", null)
+      .in("order_id", batch);
+    if (error) throw new Error("Workspace delivery-order source could not be read");
+    for (const row of (data ?? []) as Array<{
+      order_id: string; leg: number | null; delivery_date: string | null; time_slot: string | null; issued_at: string | null;
+    }>) {
+      out.set(row.order_id, [
+        ...(out.get(row.order_id) ?? []),
+        { leg: row.leg, deliveryDate: row.delivery_date, timeSlot: row.time_slot, issuedAt: row.issued_at },
+      ]);
     }
   }
   return out;
@@ -1613,7 +1673,11 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       readCollectionTimingRules(c),
       readProofFacts(c),
     ]);
-  const arrangements = await readArrangements(c, orders.orders.map((row) => row.id));
+  const orderIds = orders.orders.map((row) => row.id);
+  const [arrangements, deliveryOrders] = await Promise.all([
+    readArrangements(c, orderIds),
+    readDeliveryOrderDays(c, orderIds),
+  ]);
   const today = manual.todayIso ?? todayIsoMYT();
   const poDuty = dutyResolution(duties, "po_duty", today);
   const grnDuty = dutyResolution(duties, "grn_duty", today);
@@ -1660,6 +1724,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     timingRules,
     proofFacts,
     arrangements,
+    deliveryOrders,
   };
   // Owner ruling 2026-09-17 — routine Delivery work is the order's responsible
   // Operation person. A probe pass per order learns which orders carry a

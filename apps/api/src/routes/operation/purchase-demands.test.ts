@@ -1257,6 +1257,17 @@ const registerRow = (body: SoBatchPurchaseResponse, orderId: string) =>
   body.registerRows.find((r) => r.orderId === orderId);
 
 describe("Card 02-B · one permanent row per proceeded Sales Order", () => {
+  it("displays revision 1 separately without changing purchasing's current request", async () => {
+    const tables = registerTables();
+    const order = (tables.orders.data as Record<string, unknown>[]).find(row => row.id === "o1")!;
+    order.original_request = [{ revision: 2, snapshot: { header: { delivery_date: "2026-12-01" } } },
+      { revision: 1, snapshot: { header: { delivery_date: "2026-08-01", delivery_date_tbd: false } } }];
+    const { body } = await rowsOf(tables);
+    expect(registerRow(body, "o1")).toMatchObject({ originalRequestedDeliveryDate: "2026-08-01", requestedDeliveryDate: order.delivery_date });
+    expect(registerRow(body, "o2")!.originalRequestedDeliveryDate).toBeNull();
+    expect(body.rows.find(row => row.orderId === "o1")!.customerDelivery).toBe(order.delivery_date);
+  });
+
   it("only `proceed_order` orders get a row — `place` does not, Service-only does not", async () => {
     const { body } = await rowsOf(registerTables());
     const ids = body.registerRows.map((r) => r.orderId);

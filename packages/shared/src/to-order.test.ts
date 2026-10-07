@@ -1427,7 +1427,7 @@ describe("P18 · proceedWaitedDays", () => {
 
 describe("P18 · the label", () => {
   it("is the four-place live spelling, and not the STATE word `Proceed`", () => {
-    expect(TO_ORDER_WORDS.proceedDate).toBe("Proceed date");
+    expect(TO_ORDER_WORDS.proceedDate).toBe("Planned production start");
     // COPY-STANDARD owns bare `Proceed` as an ORDER STATE (customer confirmed,
     // ready for PO). The date is a different fact and may not wear its word.
     expect(TO_ORDER_WORDS.proceedDate).not.toBe("Proceed");

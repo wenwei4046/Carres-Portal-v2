@@ -1905,7 +1905,7 @@ describe("orders export", () => {
     const csv = buildOrdersCsv(rows, new Map());
     const lines = csv.split("\n");
     expect(lines[0]).toBe(
-      "SO,Customer,Phone,Address,Units,Items,Deadline,Proceed,Location,Logistics,Status",
+      "SO,Customer,Phone,Address,Units,Items,Deadline,Planned production start,Location,Logistics,Status",
     );
     expect(lines).toHaveLength(2);
     expect(lines[1]).toContain("SO-1001");

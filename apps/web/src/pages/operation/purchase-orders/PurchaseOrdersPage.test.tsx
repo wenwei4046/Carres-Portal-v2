@@ -4,6 +4,14 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 let useRealRegisterGrid = false;
+/* The stub grid keeps the page's last props so the row menu can be read for
+   rows the real grid draws collapsed (the Cancelled group). */
+let lastGridProps: any = null;
+const printPurchaseOrderSpy = vi.hoisted(() => vi.fn(async (_poId: string) => {}));
+vi.mock("../record-print", async () => {
+  const actual = await vi.importActual<typeof import("../record-print")>("../record-print");
+  return { ...actual, printPurchaseOrder: printPurchaseOrderSpy };
+});
 const navigate = vi.fn();
 /* The page's own doors are asserted, not React Router's: `useNavigate` is the
    one thing stubbed so a click can be read as the destination it asks for. */
@@ -151,6 +159,7 @@ const queryData = {
 vi.mock("@/components/register/DataGrid", async () => {
   const { DataGrid: RealDataGrid } = await vi.importActual<typeof import("@/components/register/DataGrid")>("@/components/register/DataGrid");
   return { DataGrid: (props: any) => {
+    lastGridProps = props;
     if (useRealRegisterGrid) return <RealDataGrid {...props} />;
     const { rows, columns, onRowDoubleClick, statusSummary, fixedGroups, leadingColumns, personalLayouts, activeConditions, expandable, toolbarEnd, renderResults, selectable, selectionPrimary, onFacetRowsChange } = props;
     useEffect(() => { onFacetRowsChange?.([...rows]); });
@@ -261,6 +270,11 @@ vi.mock("../components/PoIssueEvidence", () => ({
 }));
 
 vi.mock("@/lib/api", () => ({ apiFetch: vi.fn().mockResolvedValue({}) }));
+/* The embedded Sales Order tab is proven in its own test; here only its input. */
+vi.mock("../components/EmbeddedSalesOrders", async () => ({
+  ...(await vi.importActual<typeof import("../components/EmbeddedSalesOrders")>("../components/EmbeddedSalesOrders")),
+  default: ({ orderIds }: { orderIds: readonly string[] }) => <div data-testid="embedded-sales-orders-stub">{orderIds.join(",")}</div>,
+}));
 vi.mock("@/lib/purchasing/po-bundle", () => ({ prepareSelectedPoDocuments: vi.fn(), zipPoBundle: vi.fn() }));
 import { prepareSelectedPoDocuments, zipPoBundle } from "@/lib/purchasing/po-bundle";
 vi.mock("@/lib/pdf/render", () => ({ renderPoPdf: vi.fn() }));
@@ -327,12 +341,57 @@ beforeEach(() => {
 /* ⭐ Purchasing MASTER §9.3 (Jess, 2026-09-17): nine columns, four groups,
    the SUPPLIER REPLY / RECEIVING / SUPPLIER / DELIVER TO rail and an ordered-goods category footer. */
 describe("Purchase Orders Register", () => {
+  /* ONE ROW MENU — owner ruling 2026-10-05: `View · Print`. */
+  it("the row menu reads View · Print; View opens the read-first PO page", async () => {
+    useRealRegisterGrid = true;
+    renderPage();
+    fireEvent.contextMenu(await screen.findByTestId("grid-row-PO-20260828-4827"));
+    const menu = screen.getByRole("menu", { name: "Row actions" });
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["View", "Print"]);
+    expect(within(menu).queryByRole("menuitem", { name: "Download official PDF" })).not.toBeInTheDocument();
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "View" }));
+    expect(await screen.findByTestId("purchase-order-object")).toBeInTheDocument();
+    expect(screen.getByTestId("po-document-panes")).toHaveAttribute("data-layout", "50-50");
+    /* Read first: opening never enters a revise/issue edit. */
+    expect(screen.queryByTestId("po-document-split")).not.toBeInTheDocument();
+  });
+  it("Print opens the official PDF and records nothing", async () => {
+    useRealRegisterGrid = true;
+    printPurchaseOrderSpy.mockClear();
+    renderPage();
+    fireEvent.contextMenu(await screen.findByTestId("grid-row-PO-20260828-4827"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Print" }));
+    expect(printPurchaseOrderSpy).toHaveBeenCalledWith("PO-20260828-4827");
+    expect(screen.queryByTestId("purchase-order-object")).not.toBeInTheDocument();
+  });
+  /* The strip under a failed row Print names the door that exists. The menu
+     word is `Print` since the one row menu (2026-10-05); the retired
+     `Download official PDF` must not be offered as the retry. */
+  it("a failed row Print says the PO preview's own retry sentence, never the retired door", async () => {
+    useRealRegisterGrid = true;
+    printPurchaseOrderSpy.mockClear();
+    printPurchaseOrderSpy.mockRejectedValueOnce(new Error("read failed"));
+    renderPage();
+    fireEvent.contextMenu(await screen.findByTestId("grid-row-PO-20260828-4827"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Print" }));
+    const strip = await screen.findByText("The official PDF could not be opened");
+    const box = strip.parentElement!;
+    expect(box).toHaveTextContent("Try again. If it still fails, ask the system owner to check the PO document.");
+    expect(box).not.toHaveTextContent("Download official PDF");
+    expect(screen.getByTestId("po-register-content")).not.toHaveTextContent("Download official PDF");
+  });
+  it("a cancelled PO has no paper, so its row menu offers View only", () => {
+    renderPage();
+    const cancelled = lastGridProps.rows.find((r: any) => r.id === "PO-LEGACY");
+    expect(cancelled).toBeTruthy();
+    expect(lastGridProps.contextMenu(cancelled).map((i: any) => i.label)).toEqual(["View"]);
+  });
   it("real shared grid settles facet membership and opens an actual PO object", async () => {
     useRealRegisterGrid = true;
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       renderPage();
-      fireEvent.click(await screen.findByRole("button", { name: /^PO-20260828-4827$/ }));
+      fireEvent.click(await screen.findByRole("button", { name: /^PO-260828-4827-V2$/ }));
       expect(await screen.findByTestId("purchase-order-object")).toBeInTheDocument();
       expect(screen.getByTestId("po-document-panes")).toHaveAttribute("data-layout", "50-50");
       expect(errors.mock.calls.flat().join(" ")).not.toContain("Maximum update depth");
@@ -364,7 +423,7 @@ describe("Purchase Orders Register", () => {
     renderPage();
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Cards" }), { button: 0, ctrlKey: false });
     const cards = screen.getByTestId("purchase-orders-cards");
-    expect(cards).toHaveTextContent("PO-20260828-4827");
+    expect(cards).toHaveTextContent("PO-260828-4827-V2");
     const choice = within(cards).getByRole("checkbox", { name: "Select PO-20260828-4827" });
     fireEvent.click(choice);
     expect(choice).toBeChecked();
@@ -606,13 +665,28 @@ describe("Purchase Orders Register", () => {
     delete po.grns;
   });
 
+  it("PO No prints the shortened identity with its version and stays findable by the stored number", () => {
+    renderPage();
+    expect(screen.getByRole("button", { name: /^PO-260828-4827-V2$/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^PO-20260828-4827$/ })).not.toBeInTheDocument();
+    const column = lastGridProps.columns.find((c: any) => c.key === "po");
+    const row = lastGridProps.rows.find((r: any) => r.id === "PO-20260828-4827");
+    expect(column.searchValue(row)).toContain("PO-20260828-4827");
+    expect(column.searchValue(row)).toContain("PO-260828-4827-V2");
+    expect(column.filterValue(row)).toBe("PO-260828-4827-V2");
+    expect(column.exportValue(row)).toBe("PO-260828-4827-V2");
+    const legacy = lastGridProps.rows.find((r: any) => r.id === "PO-LEGACY");
+    expect(column.exportValue(legacy)).toBe(`PO-LEGACY-V${legacy.facts.version}`);
+  });
+
   it("PO Version reads the CURRENT version and its sent mark only", () => {
     renderPage();
-    expect(screen.getByTestId("po-version-PO-20260828-4827")).toHaveTextContent("PO V2Sending not confirmed");
-    expect(screen.getByTestId("po-version-PO-20260828-4827")).not.toHaveTextContent("PO V1");
+    expect(screen.getByTestId("po-version-PO-20260828-4827")).toHaveTextContent("Sending not confirmed");
+    expect(screen.getByTestId("po-version-PO-20260828-4827")).not.toHaveTextContent("PO V");
     queryData.pos[0]!.sends[0]!.po_version = 2;
     const marked = renderPage();
-    expect(screen.getAllByTestId("po-version-PO-20260828-4827").at(-1)).toHaveTextContent("PO V2PO sent to supplier · WhatsApp · Thu, 27 Aug");
+    expect(screen.getAllByTestId("po-version-PO-20260828-4827").at(-1)).toHaveTextContent("PO sent to supplier · WhatsApp · Thu, 27 Aug");
+    expect(screen.getAllByTestId("po-version-PO-20260828-4827").at(-1)).not.toHaveTextContent("PO V2");
     marked.unmount();
   });
 
@@ -754,7 +828,7 @@ describe("Purchase Orders Register", () => {
 
   it("opens an object from the live register without changing the page's Hook order", () => {
     renderPage();
-    fireEvent.click(screen.getByRole("button", { name: "PO-20260828-4827" }));
+    fireEvent.click(screen.getByRole("button", { name: "PO-260828-4827-V2" }));
     expect(screen.getByTestId("purchase-order-object")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /PO-260828-4827-V2/ })).toBeInTheDocument();
   });
@@ -924,6 +998,25 @@ describe("Purchase Order object", () => {
     expect(within(screen.getByTestId("po-line-units-line-1")).getByText("U1-000-001")).toBeInTheDocument();
     expect(screen.getByText("DO-SUP-9")).toBeInTheDocument();
     expect(screen.getByText("SC-1001")).toBeInTheDocument();
+  });
+
+  it("shows the Sales Order view only when the PO links a Sales Order, with the linked order ids", () => {
+    /* The fixture's SO source carries no order id: no linked SO, so no empty tab. */
+    renderPage("/operation/procurement?po=PO-20260828-4827&view=Sales%20Order");
+    expect(screen.queryByRole("button", { name: "Sales Order" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("embedded-sales-orders-stub")).not.toBeInTheDocument();
+  });
+
+  it("opens the embedded Sales Order view for every linked Sales Order", () => {
+    const source = queryData.pos[0]!.sources[0] as { order_id?: string | null };
+    source.order_id = "order-1";
+    try {
+      renderPage("/operation/procurement?po=PO-20260828-4827");
+      fireEvent.click(screen.getByRole("button", { name: "Sales Order" }));
+      expect(screen.getByTestId("embedded-sales-orders-stub").textContent).toBe("order-1");
+    } finally {
+      delete source.order_id;
+    }
   });
 
   it("shows each goods line's effective Deliver To from the destination registry", () => {

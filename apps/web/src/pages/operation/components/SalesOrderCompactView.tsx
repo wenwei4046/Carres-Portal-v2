@@ -1,22 +1,22 @@
 /** Real register quick view. Presentation only; Delivery's existing forms own writes. */
 import type { ReactNode } from "react";
-import { LIFT_OPTIONS } from "@carres/shared";
 import CompactModuleCard, { CardChecklist, type CardFact } from "@/components/kit/CompactModuleCard";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { renderPaymentTemplate, type PaymentTemplateRow } from "@carres/shared/payment-templates";
 import { useAuth } from "@/lib/auth";
 import { useDeliveryPartners, useDeliverySettings, useOrderTimeline } from "@/lib/queries";
-import { appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { useDeliveryScopeCard } from "../delivery-scope-card";
 import { describeActivity } from "./activity-display";
 import { DeliveryDatesEdit, LogisticsDetailsEdit } from "./DeliveryBrief";
-import SalesOrderCardDocument from "./SalesOrderCardDocument";
+import { salesOrderCardHeader, salesOrderMoneySummary } from "./sales-order-card";
 import { buildCustomerReminder, buildCustomerChase, salutationOf } from "@/lib/wa-templates";
 import { chaseMessageFor } from "../delivery-chase";
 import { useGoodsName } from "../work/goods-name";
 import type { RegisterRow } from "../sales-order-columns";
 
+export { originalRequestDays } from "./sales-order-card";
 export default function SalesOrderCompactView({ row, salesLocation, items, onOpen, onClose }: {
   row: RegisterRow; salesLocation: string; items: ReactNode; onOpen: () => void; onClose: () => void;
 }) {
@@ -37,10 +37,10 @@ export default function SalesOrderCompactView({ row, salesLocation, items, onOpe
   const card = delivery.failed || delivery.loading || (delivery.card && (delivery.card.leg ?? 0) !== leg) ? null : delivery.card;
   const mayEdit = (role === "operation" || role === "principal") && !!card && !card.settled && row.o.status !== "cancelled" && row.o.status !== "delivered" && !row.o.delivered_at;
   const unavailable = delivery.failed ? "Unavailable" : delivery.loading ? "Loading…" : "Not recorded";
-  const money = (fact: RegisterRow["total"]) => fact.kind === "amount" ? new Intl.NumberFormat("en-MY", { style: "currency", currency: "MYR", maximumFractionDigits: 2 }).format(fact.value) : fact.kind === "settled" ? "Paid in full" : "No price yet";
   const goods = card ? [...card.items, ...card.extras.filter(item => item.kind === "accessory")].reduce((sum, item) => sum + item.qty, 0) : 0;
   const stock: CardFact = { key: "stock", label: "Stock", value: card && goods ? `${Math.max(0, goods - card.readiness.shortQty)}/${goods}` : unavailable, status: card && goods && card.readiness.ready ? "Ready" : undefined, opensItems: true };
-  const customer: CardFact = { key: "customer", label: "Customer", value: card ? card.confirmedDate ? `${new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${card.confirmedDate.slice(0, 10)}T00:00:00Z`))}${card.confirmedTime ? ` · ${card.confirmedTime}` : ""}` : "Date not confirmed" : unavailable, status: card?.confirmedDate ? "Date confirmed" : undefined, editable: mayEdit, editor: mayEdit && card ? close => <DeliveryDatesEdit card={card} compact layout="grid" onDone={close} /> : undefined };
+  // `30 Sep`, from the portal's fixed month names: the browser's en-GB short month prints `30 Sept`.
+  const customer: CardFact = { key: "customer", label: "Customer", value: card ? card.confirmedDate ? `${fmtDateShort(card.confirmedDate.slice(0, 10))}${card.confirmedTime ? ` · ${card.confirmedTime}` : ""}` : "Date not confirmed" : unavailable, status: card?.confirmedDate ? "Date confirmed" : undefined, editable: mayEdit, editor: mayEdit && card ? close => <DeliveryDatesEdit card={card} compact layout="grid" onDone={close} /> : undefined };
   const logistics: CardFact = { key: "logistics", label: "Logistics", value: card ? card.logisticsPartnerName ?? "Not assigned" : unavailable, editable: mayEdit, editor: mayEdit && card ? close => <LogisticsDetailsEdit card={card} compact onDone={close} /> : undefined };
   const doFact: CardFact = { key: "do", label: "DO", value: card ? card.doNumber ?? "No DO yet" : unavailable, editor: () => card ? <CardChecklist label="Delivery Order" items={[
     { text: "Stock ready", done: card.readiness.ready },
@@ -64,19 +64,10 @@ export default function SalesOrderCompactView({ row, salesLocation, items, onOpe
   const detailsTemplate = { key: "details", label: "Delivery details", body: chaseMessageFor({ reference, customer: row.customer, address: row.o.customer_address || null, building: row.o.building_type || null, goods: goodsLines.map(line => `${line.qty}× ${line.sku}`), requestedDate: row.customerDelivery ? fmtDate(row.customerDelivery) : null }) };
   const deliveryCommunication = card?.logisticsPartnerId && card.logisticsPartnerName ? { recipients: [{ value: card.logisticsPartnerName, label: card.logisticsPartnerName, whatsappUrl: partner?.whatsapp_group_url || undefined }], templates: deliveryTemplates.length ? deliveryTemplates : [detailsTemplate] } : null;
   return <div data-testid="sales-order-quick-view"><CompactModuleCard
-    key={row.id} name={row.customer} reference={`SO-${row.so}`} phone={row.phone}
-    document={{ label: `Sales Order SO-${row.so}`, preview: (onClose) => <SalesOrderCardDocument orderId={row.id} reference={`SO-${row.so}`} onClose={onClose} /> }}
-    sales={{ orderDate: fmtDate(row.ordered), proceedDate: row.o.proceed_date ? fmtDate(row.o.proceed_date) : "Not recorded", salesLocation, salesperson: row.o.salespersons?.name ?? "Not recorded" }}
-    address={{ area: row.deliveryLocation || "Not recorded", full: row.o.customer_address || "Not recorded", facts: [
-      { kind: "building", label: "Building type", value: row.o.building_type || "Building type: Not recorded" },
-      { kind: "building", label: "Floor", value: row.o.delivery_floor == null ? "Floor: Not recorded" : `Floor ${row.o.delivery_floor}` },
-      { kind: "access", label: "Lift", value: row.o.delivery_has_lift == null ? "Lift: Not recorded" : LIFT_OPTIONS[row.o.delivery_has_lift ? 1 : 0] },
-      { kind: "access", label: "Items needing stair carry", value: `Items needing stair carry: ${row.o.delivery_stair_items ?? "Not recorded"}` },
-    ] }}
-    target={row.customerDelivery ? { date: fmtDateShort(row.customerDelivery), badge: `${Math.round((Date.parse(row.customerDelivery.slice(0, 10)) - Date.parse(appTodayIso())) / 86400000)}d` } : undefined}
+    key={row.id} {...salesOrderCardHeader(row, salesLocation)}
     closeLabel="Close order" openLabel="Open full page" onOpen={onOpen} onClose={onClose}
     initialModule="info" modules={[
-      { key: "info", label: "Info", opensHeaderDetails: true, summary: [{ key: "total", label: "Total payable", value: money(row.total) }, { key: "paid", label: "Paid to date", value: money(row.paid) }, { key: "outstanding", label: "Balance due", value: money(row.balance) }], items },
+      { key: "info", label: "Info", opensHeaderDetails: true, summary: salesOrderMoneySummary(row), items },
       { key: "delivery", label: "Delivery", summary: [stock, logistics, customer, doFact], items, communication: deliveryCommunication },
     ]}
     communication={{ recipients: [{ value: row.phone, label: row.customer, phone: row.phone }], templates: customerTemplates }}

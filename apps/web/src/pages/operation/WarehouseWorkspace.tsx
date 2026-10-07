@@ -441,8 +441,12 @@ function DateHeading({
       {/* `min-w-0` so a long month abbreviation wraps inside its own stack
           rather than pushing the number out of a 240px column. */}
       <div className="min-w-0">
+        {/* The weekday ALWAYS prints (COPY-STANDARD: actual days, never
+            `Today`); today is found by its blue ink and underline, and a
+            screen reader still hears that this column is today. */}
         <div className={`text-label ${isToday ? "text-kit-blue-11" : "text-kit-slate-11"}`}>
-          {isToday ? "Today" : weekday}
+          {weekday}
+          {isToday ? <span className="sr-only"> · Today</span> : null}
         </div>
         <div className={`text-label ${isToday ? "text-kit-blue-11" : "text-kit-slate-11"}`}>
           {month}

@@ -214,7 +214,7 @@ function unproceedErrorCopy(e: unknown): string {
   if (code === "wrong_stage")
     return "HQ operation has already started on this order. It can't be moved back.";
   if (code === "proceed_date_passed")
-    return "The proceed date has passed. This order can't be moved back.";
+    return "The planned production start has passed. This order can't be moved back.";
   if (code === "wrong_status") return "Order is no longer in Proceed. Refresh and retry.";
   return e instanceof Error ? e.message : "Request failed.";
 }
@@ -1439,7 +1439,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 />
               </label>
               <label className="os-field">
-                <span>Proceed date</span>
+                <span>Planned production start</span>
                 <input
                   type="date"
                   value={edited.proceedDate}
@@ -1451,7 +1451,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 />
                 {scope.editablePlaced && !paidOk && (
                   <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500 }}>
-                    Set the proceed date once ≥50% of the total is paid.
+                    Set the planned production start once ≥50% of the total is paid.
                   </span>
                 )}
               </label>
@@ -1668,7 +1668,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
               <ChecklistChip ok={addressOk} label="Delivery address" />
               <ChecklistChip ok={dateOk} label="Delivery date" />
               <ChecklistChip ok={paidOk} label="≥ 50% paid" />
-              <ChecklistChip ok={proceedDateOk} label="Proceed date" />
+              <ChecklistChip ok={proceedDateOk} label="Planned production start" />
             </div>
             {saveErr && <div className="os-detail__err">Save failed: {saveErr}</div>}
             {proceedErr && <div className="os-detail__err">Proceed failed: {proceedErr}</div>}
@@ -1708,7 +1708,7 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
               <div className="os-detail__cta">
                 {scope.canUnproceed && (
                   <span className="os-detail__hint">
-                    Move back to edit · only before the proceed date
+                    Move back to edit · only before the planned production start
                   </span>
                 )}
                 <button

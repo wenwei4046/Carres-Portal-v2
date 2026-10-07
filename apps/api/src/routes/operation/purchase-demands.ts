@@ -337,6 +337,7 @@ async function loadRegisterRows(
       status: soBatchOrderStatusOf({ buyingRequiredQty, sentCoveredQty }),
       proceededAt: fact.proceededAt,
       requestedDeliveryDate: fact.delivery,
+      originalRequestedDeliveryDate: fact.originalRequestedDelivery ?? null,
       deliveryCity: fact.city,
       deliveryState: fact.state,
       pos,

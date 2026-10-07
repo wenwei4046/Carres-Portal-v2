@@ -1,5 +1,20 @@
 # PURCHASING — MASTER
 
+**SO blueprint direct dependency — APPROVED TARGET / NOT BUILT, Jess 2026-10-01.**
+Orders MASTER §0.0 requires PO revision and `po_line_sources` coverage to remain consistent,
+including shared lines and receipts. Purchasing owns the fix and supplier commitment; SO reads
+and links. Acceptance: no duplicated or understated SO procurement coverage after PO revision;
+unknown legacy lineage is not fabricated. This is a bounded dependency, not full module redesign.
+
+**SO amendment supplier confirmation — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.**
+An issued PO covering the changed SO line requires PO Duty to record the supplier answer that
+the change can be made before the amendment takes effect. No reply or an unknown supplier date
+means waiting, never default application. This replaces a purely after-effectiveness supplier
+follow-up for those changes; it is not blanket commercial approval for PO Duty. The original PO
+is never automatically rewritten: Purchasing settles its own change with the supplier. Ordinary
+SO changes without issued-PO coverage do not acquire this supplier gate. See Orders MASTER
+§ Staff amendments and Sales Approver for evidence, exception approval and undecided scopes.
+
 **All listing appearance — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED (approved Jess, 2026-09-17):** follow
 [UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--built-2026-09-17-slice-1--authenticated-walk-owed).
 This is the shared default, not a PO visual pilot. Preserve this module's filter content,
@@ -180,6 +195,38 @@ message sent; do not promote that report to a full live issue-to-send journey.
 
 ### SO Batch complete delivery boundary — owner-approved 2026-10-04
 
+**Bounded presentation correction — owner confirmed 2026-10-05; PRODUCTION-VERIFIED 2026-10-06 at
+`6a5734d2a`.** Measured on the official page (erp.carresofficial.com; web deploy proof and API
+`/health` both report `6a5734d2a`): 32px single-line rows, Search before Table/Cards, the approved
+columns `PO Status · Proceed Date · SO No · PO Safety Days · Customer’s original requested delivery ·
+Customer Delivery Location · Customer · Items · Supplier · Supplier Deliver To · PO No · PO Delivery
+Date`, rail `Listing` / `Report` with `Order time` (11:00 AM · 4:00 PM) and `PO Safety Days`.
+SO Batch adopts the confirmed SO-derived shared listing recipe: 32px desktop baseline rows,
+12px body/18px line height, natural growth for complete wrapped facts; 40px desktop toolbar with
+responsive wrapping. Table/Cards belongs after Search in the existing right tools cluster; all
+labels and supported controls remain reachable. This adoption is scoped to SO Batch; no shared
+component behaviour or other module changes are commissioned. Listing/disabled Report stays;
+Match Ready Stock remains in its existing toolbar cluster pending the separate owner discussion.
+
+The listing heading is `Customer’s original requested delivery`, in two lines `Customer’s original`
+/ `requested delivery`, using the preserved revision-1 SO request for display, date filtering,
+sorting and export. Missing/TBD original evidence remains absent; never substitute a later request.
+The existing current-request field remains separate and still supplies purchasing planning
+arithmetic. Measured 2026-10-06: the Settings priority (0650, §11) now decides the order and Match is
+refused when it is unreadable, but `customer_delivery` still sorts by the current-request field
+(`requestedDeliveryDate` in `packages/shared/src/so-batch-stock-match.ts`); the owner-approved
+ordering below (Customer’s original requested delivery, then Proceed Date) remains APPROVED
+TARGET / NOT BUILT. This presentation correction does not change cutoffs, carryover, counts,
+completion/sending, Safety Days, stock eligibility/reservation or multi-PO interaction. The independent
+field-width delivery retains registry ownership. No live issue, supplier send, reservation or settings
+write is authorised for acceptance.
+
+**Measured local whole-shell evidence — 2026-10-05:** at1063×694,825×694 and390×694,
+the real OperationApp/SoBatchRegister fixture shows all toolbar controls within the listing,
+Search before Table/Cards, the right Page tools control and contained table scrolling. A single-line
+desktop row is32px; complete two-line facts naturally grow. The responsive rail retains its existing
+overlay/hide/show contract. This is seeded local evidence, not authenticated production acceptance.
+
 This BUILD mission is the complete approved SO Batch operating journey, not only its rail preview.
 The approved owner rulings carried by the Purchasing page-content review are persisted here for
 execution. Missing implementation does not reopen these decisions.
@@ -194,14 +241,52 @@ execution. Missing implementation does not reopen these decisions.
 - **Optional whole-round Ready Stock.** Customer demand defaults to purchasing. A manual action
   computes non-overlapping suggestions for the selected buying scope in the same Listing.
   Location is selectable, defaults to Carres Klang, and changes candidate stock scope only.
-  Default allocation priority is earliest Customer Requested Delivery Date, then earliest Proceed
-  Date, with undated demand after dated demand; priority is configurable in Purchasing Settings.
+  **Owner ruling 2026-10-05 — APPROVED / LOCKED:** this is an optional, manually invoked old-stock consumption
+  mode, never a mandatory step in every PO round. On invocation, show matching Sales Orders
+  ordered by earliest Customer’s original requested delivery, then earliest Proceed Date;
+  undated original requests follow dated requests. Do not substitute a later planned Delivery
+  date. The original-request priority is the owner-approved behaviour; existing configurable
+  priority is implementation evidence, not permission to override this ruling.
   FIFO selects otherwise eligible exact Units. Matching preserves goods compatibility, ownership,
   availability and existing reservations. Suggestions show quantity/location and appear first;
   browsing, matching and ticking reserve nothing. Bulk selection and Proceed accept chosen offers
   through the existing Sales Order-owned reservation door, with fresh eligibility/remainder checks.
   Only successfully saved exact reservations reduce purchase quantity; unmatched quantity continues
   to purchase. Keep the individual customer/item Unit chooser, including location choice, available.
+**OWNER RULING — 2026-10-05, APPROVED / LOCKED: no parent Ready Stock column.**
+Remove the `Ready Stock` column from the SO Batch parent Register, including the dynamically
+added matching-mode column. Repeated `0 available` on completed or non-matching SOs creates
+confusion without an action. Preserve optional Match Ready Stock, its applied-mode summary and
+matching-only results; exact availability, Units, selection and save remain at expanded item level.
+This removes parent presentation only, not stock eligibility, reservation or matching capability.
+
+**Ready Stock placement — RECOMMENDED DESIGN / PROPOSAL, NOT LAW (2026-10-05).**
+Use the existing actionable `FilterRailRow` at the top of the rail for `Match Ready Stock`,
+with its governed active styling and `aria-pressed`, rather than a newly styled toggle/pill.
+The control is an action rendered with the rail grammar, not a passive status badge. Show the
+existing Stock Location Select below it only while matching; use one existing Cancel action
+for exit. Do not duplicate exit in an invented close-icon composite. A compact applied-mode
+summary above the grid names the source buying scope, location, matching SO count and original
+requested-delivery sort. Current round filters are preserved: matching does not silently widen
+into other dated rounds. Exiting restores prior listing state. Suggestions are manually selected;
+only confirmed saved reservations change purchase remainder. Mission counts remain sourced from
+procurement/send facts and are never recalculated from matching-only results.
+
+Current-source finding: the allocation helper sorts by the current-request field
+(`orders.delivery_date`) then Proceed, not yet the preserved original request, and
+`SoBatchRegister` currently puts offers first without excluding unmatched records and uses
+its normal comparator for displayed SO order. The recommended presentation must align displayed
+order with the approved matching priority and clearly distinguish no matches from unreadable stock.
+Use existing loading, error/Try again, Select, rail and selection/save components. If source scope
+or stock location changes with unsaved choices, preserve no hidden selections: discard draft picks
+and recompute, without releasing confirmed reservations. Narrow layout uses the existing rail
+show/hide mechanism; the applied-mode summary remains visible when the rail is hidden.
+
+Falsifier: local acceptance fails if staff cannot identify matching mode, its scope/location,
+priority, selected exact Units and whether reservation has actually saved, or if normal round
+navigation silently carries stale matching picks. Placement remains unapproved until the owner
+reviews the actual local page; this paragraph authorises no application build or deployment.
+
 - **Inspection and placement.** Listing selection opens the governed right-side Quick View for
   source facts, evidence and authorised source-bound actions. Ordinary SO Batch introduces no
   extra information-review gate or Jess approval round. Issue the prepared eligible scope through
@@ -215,9 +300,12 @@ execution. Missing implementation does not reopen these decisions.
   scope. Do not substitute a supplier summary or PDF Modal for the complete PO object.
 - **Supplier sending.** The issued result remains available in the right-side task panel by
   supplier, numbered PO and version. Its complete approved document/channel rules are in §8.2.
-  Sending is separate from issuing and receiving; preparation never records sending. Real Email
-  remains unavailable until actual sender/provider configuration and dispatch capability are
-  verified. WhatsApp sends remain an external human action with source/version-bound confirmation.
+  Sending is separate from issuing and receiving; preparation never records sending. Every
+  supplier supports both Email and WhatsApp; the default channel is the supplier's saved preferred
+  channel in Settings and staff can switch; a missing contact blocks only that one channel (§8.2,
+  owner correction 2026-10-05, APPROVED / LOCKED). Portal provider dispatch is a separate
+  verification boundary and never means a supplier cannot use Email. WhatsApp sends remain an
+  external human action with source/version-bound confirmation.
 - **Delivery acceptance.** Verify actual authenticated production rail, retained Register,
   Table/Cards/grouping, whole-round and individual stock choice, Quick View issue/partial retry,
   formal PO information/PDF view and supplier preparation/evidence recovery. Preserve the exact
@@ -281,7 +369,9 @@ when present and keeps chosen/saved Units from other locations visible; location
 nothing. 44 picker tests pass, including a saved Unit outside the default location. These stock
 changes are local build facts, not production proof.
 
-**Ready Stock priority Settings — LOCAL BUILD, production proof pending.** The approved default
+**Ready Stock priority Settings — PRODUCTION-VERIFIED 2026-10-06.** `Settings → Purchasing` shows
+the `Ready Stock` block on the official page and `purchasing_settings.ready_stock_priority` reads
+`customer_delivery` (0650 applied); SO Batch receives the value through the purchase-demand read. The approved default
 Customer Requested Delivery Date priority and optional Proceed Date priority now share one
 persisted `purchasing_settings.ready_stock_priority` value. Migration 0650 adds the default and
 the existing manager-gated, row-locked, audited Settings write door. The Settings page preserves
@@ -340,7 +430,8 @@ The actual Register now opens the kit compact-card Drawer from SO No, row double
 Its CompactModuleCard header reads exact Sales-owned SO facts; neighbouring search results,
 failed reads and placeholder data cannot supply another customer's phone, address or sales facts.
 Missing reads remain explicit with retry. Goods and stock selection use the existing item
-expansion; PO lineage remains separate in Order details. The panel issues only its own prepared
+expansion; the Quick View carries no `Purchase order details` table (owner ruling 2026-10-06 —
+the PO facts are on the row listing). The panel issues only its own prepared
 SO scope, retaining other selected SOs, and recovers only its exact deduplicated existing POs.
 The explicit full-page door retains the source SO destination. Table and Cards share one DataGrid
 filter/sort scope, selection and footer; URL presentation/group parameters preserve cutoff/deep-link
@@ -409,7 +500,8 @@ separately; selecting only `PO-20260903-7907` produced
 `PO-20260903-7907-V1.pdf` (31,165 bytes). Its timestamp, archive CRC, PDF header and EOF passed.
 Evidence: `/tmp/so-batch-live-supplier-address-refusal.png`. No destination address, issuance,
 reservation or supplier transmission was changed for this verification. Missing source addresses
-and actual sender/provider verification remain operational gaps, not successful transmissions.
+remain operational gaps for these measured sources. This verification did not test provider
+dispatch; it does not narrow the §8.2 channel rule (every supplier supports Email and WhatsApp).
 
 **Supplier preparation return and Batch document display — PRODUCTION-VERIFIED bounded scope,
 2026-10-05.** PR1900 exact head `81ea80c66766bf415dfbf697637ff5a290f5c48e` passed complete
@@ -428,7 +520,9 @@ after current PO/version/context evidence completed. Closing the panel retained 
 Table, Supplier grouping, `time=11:00`, and the same 12-of-32 population. Evidence:
 `/tmp/so-batch-live-return-retained-draft.png`, `/tmp/so-batch-live-return-email-draft.png` and
 `/tmp/so-batch-live-return-formal-po.png`. No live issue, reservation or supplier transmission was
-performed. Send Email remained disabled because actual provider/sender availability is unverified.
+performed. Portal Send Email stayed disabled in this acceptance because provider dispatch was
+unverified; that is a portal verification boundary, not a supplier channel restriction. Under
+§8.2 every supplier supports both Email and WhatsApp.
 
 Returned presentation state supplies no issue/send authority. Today refreshes current membership
 and drops removed selections without replacement. A restored undated Round refreshes each exact
@@ -1019,6 +1113,40 @@ set is `Carres Klang` · `AL Sungai Buloh` · `HOUZS` · `Ohana`; an authorised 
 add a future destination, record its address, make it the default or stop offering it for new POs.
 Historical POs keep the destination name and address saved on their issued version.
 
+**WHO MOVES THE GOODS — OWNER RULING (Jess, 2026-10-06), APPROVED / LOCKED.** Jess: *"all supplier
+send by the own supplier transport, except Nice Future we pick up."* Every supplier delivers its own
+goods to the PO's `Deliver To` (`suppliers.kind = own_logistics`). The single exception today is
+Nice Future, which Carres collects (`factory_pickup`: NETS collects, goods go to Carres Klang).
+`kind` is Supplier Master data and is the only fact that decides this; it is never inferred from a
+supplier's location, product category or address. A supplier Carres collects from is registered as
+`factory_pickup` with its collector and fixed destination in `Settings → Purchasing → Supplier
+collection`. A supplier that delivers has NO collector row; the issue routes pass
+`procurement_partner_id = null` and the `purchase_orders` guard refuses a PO carrying a collector
+(`pickup_partner_not_allowed`). The PO paper prints `Delivery method` from the same fact —
+`Supplier delivers` for `own_logistics`, `We collect` for `factory_pickup` — and a KEPT version
+reprints exactly what the supplier received.
+
+EU is a Delivery second-leg partner, never a supplier collector (Jess, 2026-10-06: Carres moves
+stock KL → JB by any logistics, EU receives in JB and delivers to Singapore). That leg chain belongs
+to Delivery's multi-leg model (`../delivery/MASTER.md`), not to Purchasing.
+
+**MEASURED 2026-10-06 — PRODUCTION NOT CHANGED; PER-SUPPLIER CORRECTION PENDING OWNER
+CONFIRMATION.** Supplier Master still records all 11 suppliers as `factory_pickup`. Ohana
+(EU → `Ohana`) and Hookka Industries (NETS → `HOUZS`) carry collector rows saved 2026-09-03 that
+contradict the ruling; the 14 open Ohana POs issued 2026-09-03/06 carry EU and the `Ohana`
+destination, were never sent (no `po_sends`) and received nothing. The rule above is locked; which
+supplier rows actually change is confirmed by the owner per supplier from one list of current
+value · proposed value · real basis (Jess, 2026-10-06: a rehearsal proves the mechanism, not that
+every supplier's business arrangement changes). Until that confirmation nothing in production
+moves; Production Days, the supplier work week and historical POs are outside the correction in
+any case. Replay rehearsal reported by the coordinator chat, 2026-10-06: clearing a collector
+through `purchasing_set_supplier_collection(supplier, null, null)` keeps the row, its work week and
+`transit_days` and writes history; an `own_logistics` supplier's PO issues with no collector
+(replay PO261006-9588); a collector forced onto an `own_logistics` PO is refused
+`pickup_partner_not_allowed`; Nice Future's path is unchanged. Nothing in Orders, Stock, Delivery,
+Payment or Receiving reads these rows; the guard fires only when a PO is inserted or its supplier,
+destination or collector changes.
+
 Every active destination also resolves the receiving station/party, applicable arrival calendar,
 whether it links to a Carres warehouse or is external/no-Stock, and whether Unit scan and signed-DO
 evidence are required. A warehouse-linked destination derives its address and Stock consequence
@@ -1169,6 +1297,10 @@ Production Days       one required value for every selected category
 Supplier work week
 Add Supplier
 ```
+
+`Delivery Method` defaults to `Supplier delivers`; `We collect` is chosen only for a supplier Carres
+actually collects from (today Nice Future) and then requires the collector and fixed destination
+(§5.4, owner ruling 2026-10-06).
 
 `Product Categories` is a multi-select of the governed Purchasing production categories:
 `Mattress` · `Bedframe` · `Sofa`. MP/protectors and pillows follow the warehouse-stock
@@ -1348,12 +1480,15 @@ facts, the one send area and the completion fact below.
   transaction. A missing or changed Catalog cost must not block ordinary issue under the 2026-10-01 ruling above. Commercial
   exceptions are approved and maintained in their governed Catalog/approval flow, never typed into
   SO Batch or Manual Purchase Issue review.
-- **SUPPLIER COLLECTION IS MASTER DATA.** A factory-pickup supplier's collector and optional fixed
-  destination come from `purchasing_supplier_settings`. SO Batch Purchase, Manual Purchase, the API
-  and the `purchase_orders` database guard all use that same rule. Review neither repeats the
-  collection arrangement nor asks the operator to choose a collector for one PO. Managers maintain
-  both fields in `Settings → Purchasing → Supplier collection`; future factory-pickup suppliers appear from master
-  data and future destinations continue to come from the adjacent `Supplier Deliver To` setting.
+- **SUPPLIER TRANSPORT IS MASTER DATA.** `suppliers.kind` decides who moves the goods (§5.4, owner
+  ruling 2026-10-06). For a `factory_pickup` supplier the collector and optional fixed destination
+  come from `purchasing_supplier_settings`; for an `own_logistics` supplier there is no collector
+  and the issue route passes `procurement_partner_id = null`. SO Batch Purchase, Manual Purchase,
+  the API and the `purchase_orders` database guard all use that same rule. Review neither repeats
+  the collection arrangement nor asks the operator to choose a collector for one PO. Managers
+  maintain the collector and fixed destination in `Settings → Purchasing → Supplier collection` for
+  collected suppliers only; destinations continue to come from the adjacent `Supplier Deliver To`
+  setting.
 - **COMMERCIAL APPROVAL — EXISTING IMPLEMENTATION, NOT AN OPERATIONAL PRICE GATE.** A hand-entered cost and a Free of Charge each
   require an open, unexpired `po_cost_approvals` record. `purchasing_approve_po_cost` admits only
   `principal` or `finance`, and refuses a manager who is also today's PO actor: one person cannot be
@@ -2145,11 +2280,30 @@ PO/CO carries the official Deliver To and original PO Delivery Date
   on a quantity line count the pieces — Receiving verifies, it never creates an ID
 → finish physical receiving; Carres creates the numbered GRN
 ├─ valid received goods → Stock receives custody/location
+│    → accepted usable goods bought for an explicit SO line (`po_line_sources`) are reserved to
+│      that original line automatically, through Stock's reservation door (rule below)
 ├─ damaged/wrong/extra → no available stock and no reduction of Pending Delivery Qty
 │    → record affected lines/Units, quantity, condition and proof
 │    → report source-linked Supplier Claim to Purchasing; no Service Case required
 └─ problem found later → Stock/receipt source → Purchasing Supplier Claim
 ```
+
+**Receipt reserves goods bought for a Sales Order line — owner ruling (Jess) 2026-10-05 · APPROVED /
+NOT BUILT.** Goods bought for an explicit Sales Order goods line (`po_line_sources` lineage) are
+reserved automatically to that original SO line when Receiving posts them; staff do not allocate them
+again. Only the accepted, usable received quantity is reserved. When several SOs share one PO line,
+allocation follows the existing source rows (lineage), never a guess. Damaged, wrong-item and
+over-received quantities are never auto-reserved. If the original SO is cancelled, its requirement has
+fallen, or the source is unclear, nothing is forced: the exception is kept and shown for handling.
+Ordinary warehouse stock is still reserved only when staff choose `Reserve stock`; Match Ready Stock
+stays an optional, user-started mode. Receiving posts the receipt; the reservation is written through
+Stock's existing reservation door (Stock MASTER §4). Manual `Reserve stock` reserves only a line's
+uncovered quantity and never releases or replaces a PO; using stock instead of a PO means changing or
+cancelling the PO through Purchasing's existing route first (owner ruling 2026-10-05). SO Batch demand
+and the SO list read one coverage fact (`so_line_remaining_requirement`), so received-and-reserved
+goods are never bought again. Open for the build: today `Amend Receiving`
+refuses an outcome change on a reserved Unit — how it treats a reservation this posting made must be
+settled with this rule, as `Use this PO` arrivals already are (§9.4).
 
 **Receiving claim boundary — OWNER-CONFIRMED 2026-09-14.** Receiving records what actually
 arrived and reports supplier-goods problems to Purchasing from that receipt. Reporting the Claim
@@ -2305,12 +2459,14 @@ bulk download; it never merges the PDFs. A per-PO PDF action remains. Purchase O
 supports finding/re-downloading selected POs through supplier/date filters using the same capability.
 SO Batch gives immediate access without requiring a second trip to that register.
 
-Every supplier supports both Email and WhatsApp in the approved communication target. The panel
-provides a channel selector, initially using the supplier's saved preferred channel, and permits
-switching without restricting either channel by supplier identity. Ohana currently preferring Email
-is an operating example, not an Email-only rule; other suppliers may also use Email. Contact details
-for each channel come from supplier authority. This ruling does not silently overwrite production
-supplier settings. Email panel shows saved recipient, editable prepared subject/message listing
+**Supplier channel rule — owner correction 2026-10-05, APPROVED / LOCKED.** Every supplier
+supports both Email and WhatsApp. The panel's channel selector defaults to the supplier's saved
+preferred channel in Settings, and staff can switch channel. A missing contact blocks only that one
+channel for that supplier: no saved Email makes Email unavailable; no saved WhatsApp contact makes
+WhatsApp unavailable; the other channel stays available. No supplier identity restricts or grants a
+channel. Ohana preferring Email is one example of a saved default, not an Ohana-only or Email-only
+rule. Contact details for each channel come from supplier authority. This ruling does not silently
+overwrite production supplier settings. Email panel shows saved recipient, editable prepared subject/message listing
 selected PO numbers/versions, and each independent selected PDF as an attachment. Send Email is
 an approved target; expose it as executable only when the actual email/attachment capability is
 verified. Its result records actual dispatch evidence/failure, never supplier receipt by inference.
@@ -2364,7 +2520,7 @@ It does not approve legacy PR #1859 or completion of the Workspace Working Panel
 - **Implementation and readback, 2026-09-24 — DEPLOYED #1573 (`913ef00897e5da27bd4aa7be819a7e1f871dad3a`).** Shared review paints actual PDF pages with the Sales Order renderer, zoom/fit and decode retry; issuance waits for painting, and the final action names the whole batch. Both lanes carry server-projected provisional dates and supplier/destination facts. SO split draft quantities reuse the allocated-part quantity helper used by `composeDocumentLines`: an 11-item 10/1 allocation previews 10/1 rather than 11/11. Loading no longer asserts missing destinations; selection names Sales Orders, items, units and POs. Full CI `35961742802` passed on `d97ab18f3` (12,596 tests passed, 100 existing skips), as did deployment `35962708358`; all five canonical SHA endpoints converged. Negative controls caught a dropped PDF page and the old split quantities. Bundle fingerprints prove the old draft iframe disappeared, provisional-date copy appeared and preview/Back controls survived.
 - **Authenticated SO read-only proof.** Operation selected SO-1365 + SO-1363: 2 Sales Orders, 3 items, 3 units, 3 POs. All three draft selections changed their document facts and actual paper. At 1074px the two panes were 481px each; 150% paper measured 674px inside a 449px independently scrolling pane. At 390px the page stayed 390px wide and stacked 278px panes; Back retained both selections and the summary plus all actions remained visible. Server destination addresses and supplier-specific delivery dates were shown; missing supplier addresses linked to Suppliers, never invented. The temporary selection was cleared afterward. No final Issue, sending, upload, receiving or stock write occurred.
 - **DELIVERY FACT — 2026-10-05; VERIFIED BOUNDED PRODUCTION FLOWS, COMPLETE TARGET STILL OPEN.** The current deployment and authenticated acceptance proofs in §2 replace earlier local-only status: two configured cutoff aggregates; retained Listing/Table/Cards/Supplier grouping; own-source Quick View/PDF/issue preparation; supplier-selected current-version PDF ZIP; exact full-PO return preserving supplier, subset, channel and editable draft; and the mandatory-rollback Ready Stock save probe. The complete acceptance boundary remains §2. No live PO issue or supplier transmission was performed merely for testing. Issue retry/concurrency and permissions have controlled API/component/SQL evidence in §9.1; this is distinct from an authenticated production final-issue act.
-  Supplier composition preserves individual PO/version selection, same-set message and independent PDFs, current-round Work projection and Malaysia-date Today scope. Real Email is unavailable until actual sender/provider configuration and dispatch capability are verified. The implemented route validates authority, saved recipient, supplier/current-version membership and previous sending. Migration 0649 is applied (tracker `20261004110741`); its server-only attempt RPC reserves the exact document/version set and payload digest before dispatch, retains unknown outcomes and recovers known provider success without resending. Both tables have RLS; browser INSERT/RPC execution is denied and service-role execution allowed. Applied bodies match committed MD5s `da24f4aeda80e18fc6bb9061f7005352` / `77747b78bd6c05605b00d885796e1dee`, with seven isolated PostgreSQL cases. Per-PO evidence failure retries the evidence write only. Unknown transport outcome blocks silent resend; explicit Send again is deliberate for known dispatch. No PDF bytes or credentials enter browser attempt storage. Actual configured sender and external production email dispatch remain unverified, and are not represented as completed by the delivered preparation flow.
+  Supplier composition preserves individual PO/version selection, same-set message and independent PDFs, current-round Work projection and Malaysia-date Today scope. Under the §8.2 channel rule (owner correction 2026-10-05, APPROVED / LOCKED) every supplier supports both Email and WhatsApp; this bounded portal-provider verification does not narrow that rule. The implemented route validates authority, saved recipient, supplier/current-version membership and previous sending. Migration 0649 is applied (tracker `20261004110741`); its server-only attempt RPC reserves the exact document/version set and payload digest before dispatch, retains unknown outcomes and recovers known provider success without resending. Both tables have RLS; browser INSERT/RPC execution is denied and service-role execution allowed. Applied bodies match committed MD5s `da24f4aeda80e18fc6bb9061f7005352` / `77747b78bd6c05605b00d885796e1dee`, with seven isolated PostgreSQL cases. Per-PO evidence failure retries the evidence write only. Unknown transport outcome blocks silent resend; explicit Send again is deliberate for known dispatch. No PDF bytes or credentials enter browser attempt storage. Actual configured sender and external production email dispatch remain unverified, and are not represented as completed by the delivered preparation flow.
 - **Verification boundary.** The authenticated MPR register has `Need PO 0`, so its issue walk was not manufactured; 189 full-page SO/MPR journey tests cover selection, refusals and preview readiness. No test or read-only view proves real issuance/receiving/sending. The exact-source versus generic PO-pool coverage discrepancy, remaining MPR composition/requester check, database-dependent work and the rest of the module remain open.
 
 - **ONE COMMUNICATION AREA PER DOCUMENT.** The doors out of the Portal (`Copy message`,
@@ -2515,7 +2671,9 @@ PO Status remains governed by the actual remaining quantity, not this optional o
   returns the quantity to the PO's free balance. The operator may ignore it and tick the row to
   issue a new PO instead; the second line never blocks buying.
 - When that PO's goods are received, the reserved quantity belongs to this order without a
-  second choice.
+  second choice. Goods bought for an explicit SO line need no `Use this PO`: they are reserved to
+  their original line on receipt (§7.3, owner ruling 2026-10-05, APPROVED / NOT BUILT). `Use this
+  PO` remains for goods on a PO that no order holds.
 - Every `{PO No}` and quantity is read from the real PO; nothing is guessed. A PO whose free
   quantity cannot be read prints the existing `Coverage not checked` instead of a number.
 - Law A: the reservation is the SAME exact-Unit reservation Ready Stock uses, owned by Stock.
@@ -2615,6 +2773,33 @@ Fixture-walked in the real portal shell; the authenticated production walk is re
   registry, the registry names the convergence it owes; closing it is this page's own round.
   Customer, Supplier, Delivery Location and Deliver To never ellipsise: a long value takes an inline
   second line, so the full value is readable by keyboard and touch with no hover title.
+  **Width convergence — owner-approved 2026-10-05; DEPLOYED #1914,
+  bounded authenticated width verification complete.** SO Batch parent definitions now reference the existing
+  `REGISTER_FIELD_WIDTH` entries for Proceed Date, SO No, PO Safety Days, Customer Requested
+  Delivery Date, Customer Delivery Location, Customer, Items, Supplier, Supplier Deliver To,
+  PO No and PO Delivery Date. Existing header minimums, wrapping, facts, export readers and
+  `carres.soBatchPurchase.register.v7` remain unchanged; valid saved personal widths still win,
+  and Reset columns restores registry defaults. Registry values and shared behavior are unchanged.
+  PR head `4647cb3c8a142eb49a79e7ea581b60c8dffabb86` passed complete CI
+  `37255018325` (including 141 SO Batch tests and 10 group-header tests), merged as
+  `7d0fa709cfb4a03b7d970d00792f89b5eb3bdc68`; deployment `37266274278` completed
+  successfully with exact-SHA convergence, rechecked from the host on all five canonical
+  endpoints. Authenticated post-release 825×694 and 390×694 DOM measurements both found
+  Proceed Date / SO No / PO Safety Days / requested date / delivery location / Customer /
+  Items / Supplier / Deliver To / PO No / PO date at 120 / 90 / 110 / 180 / 176 / 150 /
+  208 / 140 / 150 / 170 / 150px. Header buttons had equal client/scroll widths at 825;
+  full `PO-260903-8059-V1` and `PO-260903-7907-V1` were readable in the right-scrolled view.
+  Page scroll width equalled viewport width at both sizes; table overflow stayed inside
+  its own 1812px scroll region (685px canvas at 825, 374px at 390). SO-1203 was fully visible
+  on the phone first screen and held at x88 after horizontal scrolling (x148 at 825).
+  An existing 96px PO Status personal width and SO ascending sort survived reload; neither
+  was reset. Width-only diff preserves all export readers, wrapping and facts. Actual export
+  file readback was not completed, and no new export acceptance is claimed. Whole-page toolbar
+  wrapping/clipping at 825/390 remains a separate listing-correction lane, not closed here.
+  Screenshots: `/tmp/so-batch-width-live-825.jpg`, `/tmp/so-batch-width-live-825-right.jpg`,
+  `/tmp/so-batch-width-live-390.jpg`. Browser control was temporarily unavailable; the checks
+  above ran after it recovered. No production PO, stock or communication write was performed.
+  This closes only width-reference drift; destination and Safety Days drafts remain unreleased.
 - **R8 · Issue workspace.** `Back to buying` returns to the SAME Register — it stays mounted and
   hidden behind the workspace, keeping search, rail filters, open groups, ticks and scroll offset,
   and the list is re-read so a line bought meanwhile drops its tick. `Esc` closes only transient
@@ -2625,7 +2810,7 @@ below 768px canvas, issue layout governed by §8.2, truthful no-match and true-e
 states, clearable SO deep-link Search over the full Register, singular footer, unified
 `Production days not set`, kit panel-toggle icons and 32px Buttons, explicit issue-permission
 copy, two-line headers, token-based blocker panel and the retired Purchase Demands redirect.
-Existing sidebar, rail sections, summaries, read-only PO details, Ready Stock, stale-selection
+Existing sidebar, rail sections, summaries, Ready Stock, stale-selection
 removal, coverage refusal, sticky identity and replacement selection toolbar remain intact.
 Unreserve/Reassign restores item-line demand through current reservation truth; append-only
 usage remains History, never a released-before purchasing badge or a second coverage table.
@@ -2798,7 +2983,7 @@ only rows satisfying both, never a widening OR.
 **Columns — OWNER RULING (Jess, 2026-09-18) · BUILT 2026-09-18, exactly in this order:**
 
 ```text
-PO Status · Proceed Date · SO No · PO Safety Days · Customer Requested Delivery Date ·
+PO Status · Proceed Date · SO No · PO Safety Days · Customer’s original requested delivery ·
 Customer Delivery Location · Customer · Items · Supplier · Supplier Deliver To · PO No ·
 PO Delivery Date
 ```
@@ -2831,14 +3016,29 @@ shell with the rail open during the build.
   guard is kept because it is the only thing standing between a future unevidenced original and a
   cell that would silently read as *nothing ordered* — but it is currently unreachable here, and
   this MASTER does not claim otherwise.
-- **⭐ A PARENT SUMMARY SAYS ONE THING, AND NEVER EDITS — owner correction 2026-09-11.** One
-  value prints itself; several print `2 POs` · `2 suppliers` · `Multiple`, with the exact
-  item-to-PO/supplier/destination/date mapping in the expansion. **The measured
-  first-value-plus-`+N more` presentation is retired**: it measured its own text against its own
-  width, so the visible text, the exported text and the accessible name were three different
-  answers and a narrower window silently changed what the screen said. `2 POs` opens the row's
-  own expansion, where every number is a door beside the item line it covers; a single PO still
-  links straight to Purchase Orders.
+- **⭐ A PARENT SUMMARY SAYS ONE THING, AND NEVER EDITS — owner correction 2026-09-11.** For
+  `Supplier`, `Supplier Deliver To` and `PO Delivery Date`, one value prints itself; several print
+  `2 suppliers` · `Multiple`. Each goods line in the expansion states its own Supplier and
+  Supplier Deliver To; each document's own date and detail are on its PO page, which the row's
+  `PO No` opens. **The measured first-value-plus-`+N more` presentation is retired**: it measured its
+  own text against its own width, so the visible text, the exported text and the accessible name
+  were three different answers and a narrower window silently changed what the screen said.
+- **⭐ `PO No` LISTS EVERY LINKED PO NUMBER — OWNER RULING 2026-10-05 · APPROVED / LOCKED.** The
+  parent `PO No` cell prints ALL the real PO numbers linked to the Sales Order, from the row's
+  `po_line_sources` lineage only, on ONE line separated by `, `. Each PO prints once even when
+  several item lines link to it, ordered by stored PO number ascending, in the shared display form
+  with its actual version (`documentDisplayNumber`, e.g. `PO-260903-7907-V1`); stored numbers,
+  historical PDFs and lineage are unchanged. Each number is its own link in the shared
+  document-link style (the Sales Orders register's PO link) and opens that exact PO
+  (`/operation/procurement?po={stored PO No}`) without selecting, ticking or expanding the row;
+  the commas are plain text. Returning keeps the Register's list state through the shared grid
+  session. The column keeps its registry default width and the standard row height: no wrapping;
+  a longer list is clipped inside the cell and staff drag the column wider or scroll the grid. No
+  `2 POs` count, no popover, no small window. A row with no PO keeps `Not ordered yet`. Search
+  (stored `PO-20260903-7907` and display `PO-260903-7907-V1` forms), the column filter and Export
+  all carry the complete comma-separated list. The row expansion names no PO and no Unit (see
+  **No `Purchase order details` table** below); the withdrawn merged-expansion-table proposal is
+  not built.
 - **`Supplier Deliver To` on the parent is READ-ONLY for every row, and it states the ISSUED document's
   destination.** It used to BE the arrangement control — one eligible demand drew the full
   editor, several drew a `<select>` whose own text was made transparent so a summary could be
@@ -2916,107 +3116,33 @@ change procurement quantities: save or cancel before Issue PO. No per-Unit Undo/
 Saving must atomically validate additions AND releases against current stock/line state and downstream
 locks; all or none, no second stock writer. A failure retains the draft and explains the refusal.
 These editing controls are approved targets, not a claim that current production supports replacement.
-An all-stock SO must be savable without creating a PO. Read-only Purchase order details remain separate.
+An all-stock SO must be savable without creating a PO.
 
 Shared appearance and connector geometry are governed only by UI MASTER §6.8–6.9; words by COPY.
 The HTML quantity dialog is NOT approved as the Issue PO workspace. §8.2 still governs formal draft
 review (approved desktop split in §8.2); that preview remains unfinished in this design review.
 
-**THE READ-ONLY RECORD — `Purchase order details`, its own heading, its own table.**
-
-```text
-PO No              Unit ID              SKU       Item              Qty  Deliver To    Supplier  PO Delivery Date
-PO-20260820-4827   U1-000-078           L1201S-K  Laveo · King       1   Carres Klang  Nice F…   Thu, 17 Sep
-PO-20260820-4827   U1-000-079           L1201S-K  Laveo · King       1   Carres Klang  Nice F…   Thu, 17 Sep
-                   Item line not recorded
-PO-20260904-4665   Not allocated        JAGER-SS  Jager · SS         1   Carres Klang  Ohana     Not recorded
-```
-
-- **ONE ROW PER DOCUMENT *LINE*, NOT PER DOCUMENT.** A purchase order may carry one SKU to two
-  destinations through two lines and source both to the same customer item line (the governed
-  `Supplier Deliver To` split). Keyed by `po_id` alone the two collapsed and only the PARENT document's
-  destination was left to print — **a parent summary standing in for a line's own recorded fact**,
-  which is exactly what this correction removed from the row above. `po_line_sources.po_line_id`
-  now rides through, and each entry carries **the LINE's `destination_id`, falling back to the
-  document's ONLY where the line records none** — the same rule the Sales Order expansion door uses,
-  and the only case in which a parent summary may speak for a line.
-- **`PO No`, not `Covered by` and not `ON PO`**, and `PO No` and `Unit ID` are NEIGHBOURS: they are
-  the two identifiers a person copies, and a reader who must look across four columns to pair a
-  document with its goods pairs them wrongly. Both print in FULL and stay selectable.
-  Stored PO identity remains unchanged. Where the current official version is presented,
-  apply §9.3's approved two-digit-year `PO Version` display and resolve it to the same source PO;
-  do not restore the retired blanket prohibition on removing `20`. Never invent a version for
-  a source link whose version is unknown.
-- **Ordinary readable rows, no control, no grey block.** A record cannot be bought again, so it
-  carries no checkbox and no destination editor; what makes it read-only is the ABSENCE of controls,
-  not a disabled-looking wash over the module's own audit evidence.
-- **Columns that would only ever print a dash here are absent** — `Ready Stock`, `To buy`,
-  `Category` and the tick column.
-- **Every `po_line_sources` unit gets a row.** Units the read can evidence for that document are
-  named one per row; the quantity the document carries beyond them is stated as a remainder. A Unit
-  naming a document this line's lineage does not carry is **still printed** — a disagreement between
-  two authoritative reads is what an audit register exists to show. A Unit with no document behind it
-  is Ready Stock's answer and stays out of this table.
-- The section renders only when the order has lineage; an order with no purchase order says
-  `Not ordered yet` once, on the item table, and has no details section at all.
-
-**⭐ A UNIT'S ITEM LINE IS READ FROM THE RECORD, NOT INFERRED FROM ITS SKU — owner correction
-2026-09-11.** The Sales Order expansion door grouped every reserved/sold Unit of an order by
-NORMALIZED SKU, so a Sales Order with two item lines of one SKU — SO-1251, SO-1207 and SO-1246 carry
-exactly that — printed the SAME Unit IDs under BOTH lines. `ops_stock_items.reserved_order_line_id`
-has answered that question since 0471 and the read simply did not ask it. It asks now:
-
-- a Unit bound to a line appears under THAT line and nowhere else;
-- a Unit incoming on a purchase-order line sourced EXCLUSIVELY to one SO item line is exact by the
-  document, exactly as before;
-- a Unit that carries NO binding (a pre-0471 reservation), or one bound to another line, keeps the
-  SKU reading — evidence is never dropped to tidy a screen — and the row says
-  **`Item line matched by SKU`**, so an INFERENCE stays inspectable and can never be read as
-  evidence.
-- a read that carries no binding for that Unit at all says **`Item line unknown`**. A gap in
-  the READ is not a gap in the RECORD, and it may not borrow the other sentence: that one would be a
-  claim about this browser wearing the clothes of a fact about the goods.
-- **⭐ ABSENCE PROVES NOTHING — owner correction 2026-09-11.** A Unit MISSING from the binding map
-  was read as EXACT, on the true-but-fragile ground that only incoming goods are absent and those
-  are evidenced by a purchase-order line sourced exclusively to the item line. That let a gap in the
-  DATA prove a fact about the GOODS: any later read that stopped populating the map, or populated it
-  partially, would silently begin certifying inferences. **The server now WRITES the
-  incoming-exclusive binding into the map**, so the fact is declared rather than inferred from its
-  own absence, and absence means `unresolved` — never exact. A purchase-order line SHARED with
-  another Sales Order evidences nothing and names no line, exactly as before.
-- **⭐ AN INFERENCE IS NEVER COUNTED AS COVERAGE.** The same physical Unit is offered by the SKU
-  reading to EVERY item line of that SKU on the order, so an inferred Unit row carries **no
-  quantity** and does **not** draw the document line's remainder down. Only an exact Unit does.
-  Without that rule one Unit accounted for two item lines' quantities at once and the section's own
-  numbers stopped adding up; with it, `Σ(exact rows) + remainder = the document line's quantity`.
-  **The section renders no total row at all**, so no footer can silently sum a `—`, and the table
-  feeds no export: the Register above exports the ORDER's own columns, none of which is a per-Unit
-  quantity.
-- **⭐ A COUNTED ROW IS NOT A UNIT (0453).** `identity_scope` rides the wire as `unitScopes`, and
-  every Unit ID on this table is resolved through the ONE shared rule (`unitIdOf`), which answers
-  `null` for counted goods and keeps its `QTY-` shape backstop. Such a row prints
-  **`Counted stock`** — there is no Unit ID and there never will be — and its quantity is still
-  stated. The technical key never reaches a `Unit ID` heading.
-- The response carries the stored value verbatim as `unitLines`; it is optional, so a browser on
-  this build against an older Worker reads it as absent and says the association is unknown rather
-  than inventing one. The field is ADDITIVE — Sales Orders and Delivery are unaffected.
-
-**⭐ FIVE ANSWERS FOR AN EMPTY UNIT CELL, AND NONE OF THEM IS A SPARE.** `Loading…` while the Unit
-read is in flight · `Could not be loaded` when it failed (with the existing retry) ·
-**`Not checked`** when the read answered for the ORDER and carried no entry for THIS item line —
-Carres did not look here, which is not the same as looking and finding nothing · **`Counted stock`**
-when the goods are counted rather than individually tracked · and `Not allocated` ONLY when the read
-answered for this line and no Unit is tied to the quantity. Printing any of the first four as the last is how a reader
-concludes goods do not exist because a request was slow.
+**⭐ NO `Purchase order details` TABLE — OWNER RULING 2026-10-06 · APPROVED / LOCKED.** Jess,
+after seeing the table: *"it should show at row listing, why we need another table?"* → *"yes"*.
+She never approved it; it was added by build `acd0666c7` (2026-09-11) and wrongly written here as a
+rule. The SO Batch **row listing** carries the PO facts: `PO No` (every number, comma-separated,
+each a link to its exact PO), `Supplier`, `Supplier Deliver To`, `PO Delivery Date` and
+`PO Status`. There is **no second `Purchase order details` table** in the row expansion or in the
+Quick View: the expansion is the goods table only, and the PO page holds each document's own
+detail (lines, quantities, Units, state, original date). **Unit ID is a Warehouse/PO-page fact,
+not shown on SO Batch** for ordered goods, so expanding a row makes no Unit read; the only Unit IDs
+on this page are the shelf Units the Ready Stock picker (above) offers for choosing. Add no new
+table or column for these facts; moving per-PO facts into the goods rows is the withdrawn design.
 
 **Coverage safeguards remain independent of the new display.** Exact `po_line_sources` records
 are historical lineage; the open-PO pool is effective remaining supply. Do not equate them, count
 received quantities twice, invent a third arithmetic, or change grouping/coverage allocation in this
 UI change. `fullyOnPo` must explicitly be false to authorize the pool gate; true or unknown is not
 buyable. The issue API independently recomputes and rejects already-covered quantities before any
-PO is created. Preserve existing lineage guards as well. Read-only PO details retain document
-states (`Completed`, `Waiting for goods from supplier`, `Sending not confirmed`); raw `Open` is not
-operator copy. Remaining purchasing quantities belong in selection/review, not removed goods columns.
+PO is created. Preserve existing lineage guards as well. Each document's own state
+(`Completed`, `Waiting for goods from supplier`, `Sending not confirmed`) is the PO page's; raw
+`Open` is not operator copy. Remaining purchasing quantities belong in selection/review, not removed
+goods columns.
 
 **Footer — owner correction 2026-09-11, ruling R6 2026-09-16.** The footer answers SCOPE with ONE
 total: `{n} of {total} Sales Orders`, the bare total when nothing is filtered, and `1 Sales Order`
@@ -4014,7 +4140,10 @@ PO**, and a decorative arrow concatenated into a document number makes one targe
   actual receipt in Receiving. `Received Qty` is the shared `warehouseReceiptTotals` reader, so the
   count beside a GRN here and the count on the GRN itself cannot drift (Law D); damaged and
   wrong-item units are not received, which is that same arithmetic, not a second one.
-- **PO Version display — owner ruling 2026-10-01 / APPROVED TARGET, NOT BUILT:**
+- **PO Version display — owner ruling 2026-10-01 / PARTLY BUILT, measured 2026-10-06:** the row
+  preview and full detail print `documentDisplayNumber` (`PO-260903-4389-V1`); the register's
+  `PO No` column still prints `PO-20260903-4316` and a separate `PO Version` column still prints
+  `PO V1`. That remaining deviation is the open fix. The rule:
   display dated PO numbers as `PO-YYMMDD-RRRR-V{n}`, for example
   `PO-260903-4389-V1` (owner correction: remove the leading `20` from the displayed year).
   Apply the same displayed identity to the register, preview, full detail, revision labels and
@@ -4067,7 +4196,8 @@ current group's header is sticky inside its own group and stops at its boundary.
 number on desktop, number only on narrow screens. **UI MASTER §6.10 owns this**, once, for every
 grouped listing page; this section neither restates its mechanics nor varies them.
 
-**Rail — owner-approved 2026-10-01 / APPROVED TARGET, NOT BUILT.** Preserve the
+**Rail — owner-approved 2026-10-01 / BUILT, PRODUCTION-VERIFIED 2026-10-06 except the rows named
+below.** Preserve the
 supplier-follow-up purpose and adopt the confirmed shared template. **Owner correction 2026-10-02:**
 remove the visible `Filters` heading and follow the annotated deployed Sales Order vertical
 navigation with both **`Listing`** and **`Monthly demand`**, including its shared icons,
@@ -4075,7 +4205,13 @@ spacing and selected-tab presentation. Listing retains the approved PO monitor c
 The local Monthly demand preview reuses the existing Sales Order monthly-demand reader and
 presentation with explicitly fictional source demand; this is not production integration proof.
 Preserve source-owned demand and SO Batch to-buy facts rather than deriving customer demand
-from issued PO quantities. Full production adoption and source connections remain unbuilt. The complete monitor rail is:
+from issued PO quantities. Measured on the official page 2026-10-06 at `6a5734d2a`: `Listing` /
+`Monthly demand` tabs; groups `Sending` (Confirm PO sent to supplier), `Supplier reply` (Confirm
+tomorrow's supplier delivery · Supplier Confirmed Delivery Date changed · Supplier delivery date
+passed), `Receiving` (Partly received), `Supplier`, `Supplier Deliver To`. Not yet present: `Balance
+delivery date not confirmed` and the `Exceptions` group (Supplier cannot supply · Waiting for
+supplier to agree · Open supplier claims); Monthly demand's production source connection is
+unverified. The complete monitor rail is:
 
 | Group | Filters |
 |---|---|
@@ -4692,7 +4828,7 @@ Invalid scope → preserve report and show blocker; no false GRN or Inventory po
   its received pieces as bulk register rows (`identity_scope = quantity`, 0218's model) that carry
   a technical register key and are never shown as Unit IDs. Missing, foreign, duplicated,
   wrong-line (a Unit of another line of the same SKU) and already-received Units refuse by name;
-  a Unit is looked up by its line binding, never by `(PO, SKU)`. Receiving never allocates: the
+  a Unit is looked up by its line binding, never by `(PO, SKU)`. Receiving never allocates a Unit ID: the
   0426/0427 shortfall mint (`gen_unit_code()` at receipt or amendment) is gone, and the allocators
   are unreachable from every client role. The external Warehouse count uses the same outcomes:
   `warehouse_incoming_pos()` lists each line's mode and the expected Units with their line, the
@@ -4703,8 +4839,10 @@ Invalid scope → preserve report and show blocker; no false GRN or Inventory po
 - **Stock posts by the register only (0366 unit authority).** The receive engine flips the
   named Units of an exact-unit line and posts a quantity line's count as bulk register rows — it
   mints no identity; `stock_balances` is DERIVED by the rollup triggers and is never written
-  directly, and the pre-0366 aggregate-reserve write is gone — reservation is the Sales Order's
-  exact-Unit binding, owned by the Stock reserve door.
+  directly, and the pre-0366 aggregate-reserve write is gone — reservation is the exact-Unit binding
+  written only through the Stock reserve door: by the Sales Order's choice, on a `Use this PO`
+  arrival, or automatically on posting for accepted usable goods bought for an explicit SO line
+  (§7.3, owner ruling 2026-10-05, APPROVED / NOT BUILT).
 - **CO / consignment receiving runs through the SAME engine.** `purchase_orders.is_consignment`
   marks the source; received Units enter Inventory as `supplier_consignment` with the supplier
   named, and the posting creates no AP consequence — supplier ownership is preserved, never
@@ -7681,10 +7819,12 @@ and Ohana use `hookka.manufacturing@gmail.com` and default to Email; Nice Future
 by the authenticated shared `principal` account, not Jess personally. Existing groups, historical
 recipients and supplier access were not changed. No email or WhatsApp message was sent.
 
-Hookka's fixed Deliver To is the existing HOUZS destination, with NETS collection and a populated
-warehouse address. Its supplier factory address is not a substitute destination. Ohana's actual
-fixed destination still has no address and correctly remains a named issue blocker; no address was
-invented or copied from Hookka.
+Under the 2026-10-06 transport ruling (§5.4) a supplier that delivers its own goods has no
+Supplier collection row. Hookka Industries (NETS → HOUZS) and Ohana (EU → Ohana, both saved
+2026-09-03) still carry one; whether and when each row changes is confirmed per supplier by the
+owner (§5.4), and their supplier work week and Production Days stay in any case. Ohana's supplier
+address is still blank and remains a named Settings gap; no address is invented or copied from
+Hookka.
 
 **PRODUCTION-DAY VALUES — OWNER CONFIRMED 2026-10-01, APPROVED / LOCKED.** Mattress: **7 working
 days**; Bedframe: **7 working days**; Sofa: **14 working days**. Apply these values to missing
@@ -7792,10 +7932,20 @@ No Purchasing object has one universal owner. Each action resolves owner and cov
 Hookka Industries and Ohana receive PO email at **hookka.manufacturing@gmail.com**.
 Keep their separate Supplier identities; sharing a recipient never merges their POs or history.
 Default both to the existing `Open email` action. Hookka currently receives all POs by email.
+**OWNER CORRECTION 2026-10-05 — APPROVED / LOCKED:** the §8.2 channel rule applies here.
+Every supplier, including Hookka Industries, Ohana and Nice Future, supports both Email and
+WhatsApp; the default is the supplier's saved preferred channel in Settings and staff can switch; a
+missing contact blocks only that one channel. Ohana's Email default is one example of a saved
+default, not an Ohana-only Email capability. Do not re-plan this as missing or ask the owner to
+confirm it again. It confirms the operating rule, not an unmeasured portal-provider test.
 Nice Future's confirmed contact email is **farithazelam@gmail.com**; retain its current channel
 and access arrangements. A possible end to Nice Future supply after Subscription launches is
 future context, not a present cutover instruction. Historical recipients remain as recorded.
 Opening email is never sent evidence; the current-version confirmation remains required.
+
+**TRANSPORT BOUNDARY (owner ruling 2026-10-06, §5.4).** Every supplier delivers its own goods except
+Nice Future, which Carres collects. A Delivery second-leg partner (EU for JB → Singapore) is never a
+supplier collector; supplier collection exists only for `factory_pickup` suppliers.
 
 A future Hookka/Ohana API must use canonical PO, supplier and evidence records and needs separate
 owner authorisation. No API replacement, external contact or supplier login/access change is

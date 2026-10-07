@@ -1,34 +1,37 @@
 /**
- * DELIVERY WORK STATUS — what an operator needs to DO about a scope, spoken
- * as WHO must act and WHAT has happened (Delivery MASTER §8.4, owner ruling
- * 2026-09-13).
+ * DELIVERY WORK STATUS — the OPERATION's progress on one delivery, in the
+ * words of Delivery MASTER §8.4 (owner rulings 2026-09-13 · 2026-09-14 ·
+ * 2026-09-24 · 2026-09-25).
+ *
+ * ⭐ ONE FUNCTION PRINTS THE WORDS (owner ruling 2026-09-25, Delivery segment
+ * 1). The Monitor register column, the `DELIVERY STATUS` dropdown, the
+ * schedule card, the phone card, the Order Route's DELIVER node and every
+ * report read `deliveryWorkStatusOf` and its ONE label function
+ * `deliveryWorkStatusLabelOf`. A second label function is a Law D defect, not
+ * a variation: on 2026-09-25 the register printed one spelling while the card
+ * printed another, through two functions over the same facts.
  *
  * The DOCUMENT and the OPERATION keep two separate vocabularies, and neither
  * borrows the other's words:
  *
  * ```
- * Delivery Orders Register   the DOCUMENT's own life
- *                            Created · Out for delivery · Delivered ·
- *                            Delivery exception · Cancelled
+ * Delivery Orders register   the DOCUMENT's own life (delivery-order-status.ts)
+ * Monitor · Delivery Status  the OPERATION's progress (this file)
  *
- * Monitor · Delivery Status  the OPERATION's progress, naming the actor
- *                            Operation must assign logistics ·
- *                            {partner} must contact the customer ·
- *                            Operation must call the customer ·
- *                            Waiting for customer reply ·
- *                            Confirmed for {weekday, date} ·
- *                            Waiting for {partner} pickup ·
- *                            Goods collected by {partner} ·
- *                            {partner} is delivering to the customer ·
- *                            Overdue · Delivered · Failed Delivery ·
- *                            Order details incomplete
+ *   before the arrangement     Assign logistics · Get delivery date from {partner} ·
+ *                              Get delivery date from customer · Waiting for customer reply
+ *   customer leg               Scheduled · Waiting for {partner} pickup · Collected by {partner} ·
+ *                              On the way to customer · Delivered to customer · Failed Delivery
+ *   transfer leg               Transfer scheduled · Waiting for {partner} pickup ·
+ *                              Collected for transfer · In transit to {stop} ·
+ *                              Arrived at {stop} · Transfer failed
+ *   across both                Overdue · Order details incomplete
  * ```
  *
- * ⛔ RETIRED on Monitor, never to return: `Waiting for customer date` ·
- * `Delivery confirmed` · `Waiting for warehouse` · `Ready for handover` ·
- * `Out for delivery` · `Created` · any bare `Waiting` that does not name who
- * must act. `Ready for handover` and `Received by logistics` survive only as
- * the recorded handover EVENT words on the DO object page.
+ * The two journey ladders share no word: a warehouse leg can never reach
+ * `Delivered to customer`, and `Arrived at {stop}` never claims a customer
+ * received anything. `Arrived at customer` does not exist (no such fact is
+ * recorded) and may not be inferred.
  *
  * ── THE LADDER READS DOWNWARDS, AND THE LATEST REAL FACT WINS ───────────────
  *
@@ -37,22 +40,22 @@
  * when the caller hands in the day (`todayIso`); the arithmetic keeps no clock.
  *
  * ```
- * a recorded delivery                       → Delivered
- * a recorded failure or partial             → Failed Delivery
+ * a recorded result                         → Delivered to customer · Arrived at {stop}
+ *                                              · Failed Delivery · Transfer failed
  * a required Sales fact missing on the row  → Order details incomplete
- * confirmed day passed, no result           → Overdue
- * the partner's receipt + a departure/ETA   → {partner} is delivering to the customer
- * the partner's receipt is recorded         → Goods collected by {partner}
+ * scheduled day passed, no result           → Overdue
+ * the partner's receipt + a departure/ETA   → On the way to customer · In transit to {stop}
+ * the partner's receipt is recorded         → Collected by {partner} · Collected for transfer
  * a live document exists                    → Waiting for {partner} pickup
- * a day AND a window are recorded           → Confirmed for {weekday, date}
- * no partner on the scope                   → Operation must assign logistics
+ * a scheduled date (time optional)          → Scheduled · Transfer scheduled
+ * no partner on the scope                   → Assign logistics
  * latest contact is waiting for a reply     → Waiting for customer reply
- * the partner contacts the customer         → {partner} must contact the customer
- * Carres contacts the customer              → Operation must call the customer
+ * the partner contacts the customer         → Get delivery date from {partner}
+ * Carres contacts the customer              → Get delivery date from customer
  * ```
  *
- * A cancelled document drops the scope off the workspace entirely, so there is
- * no operational word for it.
+ * A day without a time is a COMPLETE arrangement (owner ruling 2026-09-24):
+ * no rung asks for a time.
  *
  * ── THE ENGINE SPELLS NO DATES ──────────────────────────────────────────────
  *
@@ -70,49 +73,55 @@ import type { ProofReviewState } from "./delivery-proof";
 
 export type DeliveryWorkStatusKind =
   | "assign_logistics"
+  /* `Get delivery date from {partner}` — the partner contacts the customer. */
   | "partner_must_contact"
+  /* `Get delivery date from customer` — the one Carres-contacts case. */
   | "operation_must_call"
-  /* The DAY is agreed and the WINDOW is not: a different call with a
-     different question, and the row says which one (owner ruling
-     2026-09-14). */
-  | "confirm_time"
   | "waiting_customer_reply"
+  /* `Scheduled` — the customer leg. The key keeps its 2026-09-14 spelling so
+     a stored `?status=confirmed` URL still resolves; the screen never prints
+     a key. */
   | "confirmed"
+  | "transfer_scheduled"
   | "waiting_pickup"
   | "collected"
+  | "collected_for_transfer"
   | "delivering"
+  | "in_transit"
   | "overdue"
   | "arrived"
   | "delivered"
   | "failed"
+  | "transfer_failed"
   | "details_incomplete";
 
-/** The ladder's own order — the `DELIVERY STATUS` dropdown lists it as is.
- *  `arrived` (【DELIVERY】 CARD 20): an intermediate Journey leg whose goods
- *  reached the named partner warehouse — never the customer's `Delivered`. */
+/** The ladder's own order — the `DELIVERY STATUS` dropdown lists it as is,
+ *  one option per printed word. `arrived` sits before `delivered`. */
 export const DELIVERY_WORK_STATUS_KINDS: readonly DeliveryWorkStatusKind[] = [
   "assign_logistics",
   "partner_must_contact",
   "operation_must_call",
   "waiting_customer_reply",
-  /* AFTER the wait, because a window is asked for only once a day is
-     agreed — the ladder is the order the work actually happens in. */
-  "confirm_time",
   "confirmed",
+  "transfer_scheduled",
   "waiting_pickup",
   "collected",
+  "collected_for_transfer",
   "delivering",
+  "in_transit",
   "overdue",
   "arrived",
   "delivered",
   "failed",
+  "transfer_failed",
   "details_incomplete",
 ];
 
 /**
  * Text colour, never an icon (owner ruling 2026-09-13): green for a settled
  * good fact, orange for a specific fact that needs an act and is not yet late,
- * red for `Overdue` and `Failed Delivery`, none for the goods moving normally.
+ * red for `Overdue` and a failure, none for the goods moving normally and for
+ * a transfer's schedule (a transfer is never a customer appointment).
  */
 export type DeliveryWorkStatusTone = "green" | "orange" | "red" | "none";
 
@@ -120,72 +129,109 @@ export const DELIVERY_WORK_STATUS_TONE: Record<DeliveryWorkStatusKind, DeliveryW
   assign_logistics: "orange",
   partner_must_contact: "orange",
   operation_must_call: "orange",
-  confirm_time: "orange",
   waiting_customer_reply: "orange",
   confirmed: "green",
+  transfer_scheduled: "none",
   waiting_pickup: "none",
   collected: "none",
+  collected_for_transfer: "none",
   delivering: "none",
+  in_transit: "none",
   overdue: "red",
   arrived: "green",
   delivered: "green",
   failed: "red",
+  transfer_failed: "red",
   details_incomplete: "orange",
 };
 
-/** The role word where the data names no partner — the same fallback the
- *  action lines use (`Call logistics`), never an empty gap. */
+/** The role word where the data names no partner — never an empty gap. */
 export const LOGISTICS_ROLE_WORD = "logistics";
+/** The role word where an intermediate leg names no stop. An intermediate leg
+ *  ends at a partner warehouse by definition (Delivery MASTER §8.4, Card 20);
+ *  the customer's town is never substituted for it. */
+export const TRANSFER_STOP_ROLE_WORD = "warehouse";
+
+/** The real names the words carry. Absent → the role words above. */
+export interface DeliveryStatusWords {
+  partner?: string | null;
+  stop?: string | null;
+}
 
 /**
- * ⭐ THE ONLY SPELLINGS of line one. COPY-STANDARD owns these words; nothing
- * may print a synonym beside them. The partner's real name comes from the
- * data; the role word stands in only where no name exists.
+ * ⭐ THE ONLY SPELLINGS of line one (COPY-STANDARD, Delivery MASTER §8.4).
+ * Nothing else may print a synonym beside them. The partner's real name and
+ * the transfer's stop come from the data; the role words stand in only where
+ * no name exists (the `DELIVERY STATUS` dropdown's options are exactly that).
  */
 export function deliveryWorkStatusLabelOf(
   kind: DeliveryWorkStatusKind,
-  partnerName: string | null | undefined,
-  confirmedDay?: string | null,
+  words: DeliveryStatusWords = {},
 ): string {
-  const partner = (partnerName ?? "").trim() || LOGISTICS_ROLE_WORD;
-  const cap = partner === LOGISTICS_ROLE_WORD ? "Logistics" : partner;
+  const partner = (words.partner ?? "").trim() || LOGISTICS_ROLE_WORD;
+  const stop = (words.stop ?? "").trim() || TRANSFER_STOP_ROLE_WORD;
   switch (kind) {
     case "assign_logistics":
-      return "Operation must assign logistics";
-    /* ⭐ THE ACT, NOT THE ACTOR (owner ruling 2026-09-14). `NETS must contact
-       the customer` spent the whole column naming a party the `Logistics`
-       column already carries, and buried the one word that says what to do.
-       Who calls is a Delivery Settings fact and stays in its own field; the
-       status says the JOB. Both contact rungs print the same act because the
-       operator's job is the same act — the rungs differ only in who owns it. */
+      return "Assign logistics";
     case "partner_must_contact":
+      return `Get delivery date from ${partner}`;
     case "operation_must_call":
-      return "Call customer";
-    /* The day is agreed; only the window is missing. Sending the operator to
-       `Call customer` re-opens a question the customer already answered. */
-    case "confirm_time":
-      return "Confirm delivery time";
+      return "Get delivery date from customer";
     case "waiting_customer_reply":
       return "Waiting for customer reply";
     case "confirmed":
-      return confirmedDay ? `Scheduled for ${confirmedDay}` : "Scheduled";
+      return "Scheduled";
+    case "transfer_scheduled":
+      return "Transfer scheduled";
     case "waiting_pickup":
       return `Waiting for ${partner} pickup`;
     case "collected":
-      return `Goods collected by ${partner}`;
+      return `Collected by ${partner}`;
+    case "collected_for_transfer":
+      return "Collected for transfer";
     case "delivering":
-      return `${cap} is delivering to the customer`;
+      return "On the way to customer";
+    case "in_transit":
+      return `In transit to ${stop}`;
     case "overdue":
       return "Overdue";
     case "arrived":
-      return "Arrived";
+      return `Arrived at ${stop}`;
     case "delivered":
-      return "Delivered";
+      return "Delivered to customer";
     case "failed":
       return "Failed Delivery";
+    case "transfer_failed":
+      return "Transfer failed";
     case "details_incomplete":
       return "Order details incomplete";
   }
+}
+
+/** `Ask {partner} for the result` — line two of `Overdue`. */
+export function askForResultLine(partnerName: string | null | undefined): string {
+  return `Ask ${(partnerName ?? "").trim() || LOGISTICS_ROLE_WORD} for the result`;
+}
+
+/** A recorded result: the trip has run, nothing is left to arrange. */
+export function deliveryResultRecorded(kind: DeliveryWorkStatusKind): boolean {
+  return kind === "arrived" || kind === "delivered" || kind === "failed" || kind === "transfer_failed";
+}
+
+/** A recorded failure on either ladder — the `Failed Delivery` queue. */
+export function deliveryFailed(kind: DeliveryWorkStatusKind): boolean {
+  return kind === "failed" || kind === "transfer_failed";
+}
+
+/** The goods have left the warehouse (the partner's receipt, or a result). */
+export function deliveryGoodsMoved(kind: DeliveryWorkStatusKind): boolean {
+  return (
+    kind === "collected" ||
+    kind === "collected_for_transfer" ||
+    kind === "delivering" ||
+    kind === "in_transit" ||
+    deliveryResultRecorded(kind)
+  );
 }
 
 /** The caller's spelling of a day, a window and a timestamp — the web hands
@@ -201,21 +247,21 @@ export interface DeliveryStatusSpell {
 
 export interface DeliveryWorkStatus {
   kind: DeliveryWorkStatusKind;
-  /** Line one — the actor and the fact. */
+  /** Line one — the act or the fact. */
   label: string;
   tone: DeliveryWorkStatusTone;
-  /** Line two — the date, window, deadline, ETA, proof state or reason; null
-   *  when the fact needs no second line. */
+  /** Line two — the time, ETA, proof state, reason or missing fact; null when
+   *  the fact needs no second line. A contact deadline is never here: the
+   *  surface draws it from the row's own `contactDueIso`, once. */
   second: string | null;
-  /** Line two spends a colour only for a proof gap (orange) or a contact
-   *  deadline that has passed (red). */
+  /** Line two spends a colour only for a proof gap (orange). */
   secondTone: "orange" | "red" | null;
   /** A failure's ONE reason, in the reason library's own words. */
   reasonLabel: string | null;
 }
 
 export interface DeliveryWorkStatusInput {
-  /** The scope's Logistics Partner, by name. null = nobody carries it yet. */
+  /** The scope's Logistics company, by name. null = nobody carries it yet. */
   partnerName: string | null;
   /** Who arranges the day with the customer. The partner unless the record
    *  says Carres does (Delivery Settings, Card 12). */
@@ -223,9 +269,9 @@ export interface DeliveryWorkStatusInput {
   /** The latest customer-contact record on the scope (Card 11); null until one
    *  exists. */
   latestContact?: { result: "waiting_customer_reply" | "answered"; recordedOn: string } | null;
-  /** Delivery's own agreed operational date for this scope. */
+  /** Delivery's scheduled operational date for this scope. */
   confirmedDate: string | null;
-  /** The agreed window. A day without one is still contact work. */
+  /** The scheduled time, optional — it prints when recorded. */
   confirmedTime?: string | null;
   /** Whether a live (non-void) Delivery Order exists for this scope. */
   hasDeliveryOrder: boolean;
@@ -242,7 +288,7 @@ export interface DeliveryWorkStatusInput {
   todayIso?: string | null;
   /** The proof a delivered result carries — the register's own arithmetic,
    *  and Operation's review of it (§6.1, 0489). `Proof Accepted` is the ONE
-   *  fact that turns `Delivered` green; until then the word stays orange. */
+   *  fact that turns `Delivered to customer` green; until then it is orange. */
   proof?: {
     photoUploaded: boolean | null;
     signedDoUploaded: boolean | null;
@@ -251,19 +297,20 @@ export interface DeliveryWorkStatusInput {
   } | null;
   /** Required Sales facts this row lacks, in the operator's words. */
   missingFacts?: ReadonlyArray<string>;
-  /** 0491 — this scope is a Journey leg BEFORE the last one: its `delivered`
-   *  result is an ARRIVAL at the named partner warehouse (`Arrived`), the
-   *  customer leg still owes its own result, and no delivery proof is owed
-   *  here. Absent = a whole-order scope or the customer leg. */
+  /** 0491 — this scope is a Journey leg BEFORE the last one: a TRANSFER. Its
+   *  words are the transfer ladder's, its `delivered` result is an ARRIVAL at
+   *  the named partner warehouse, and no delivery proof is owed here. Absent =
+   *  a whole-order scope or the customer leg. */
   intermediateLeg?: boolean;
-  /** The intermediate leg's named stop — line two of `Arrived`. */
+  /** The intermediate leg's named stop — `In transit to` / `Arrived at`. */
   legStop?: string | null;
 }
 
 /**
  * ONE arithmetic (Architecture Law D). The column, the rail dropdown, the
- * calendar card and every report call this — a second copy is how two
- * surfaces start disagreeing about whether a truck went out.
+ * calendar card, the phone card, the Order Route and every report call this —
+ * a second copy is how two surfaces start disagreeing about whether a truck
+ * went out.
  */
 export function deliveryWorkStatusOf(
   input: DeliveryWorkStatusInput,
@@ -271,18 +318,19 @@ export function deliveryWorkStatusOf(
 ): DeliveryWorkStatus {
   const time = spell.time ?? ((v: string) => v);
   const partner = input.partnerName;
+  const transfer = Boolean(input.intermediateLeg);
+  const words: DeliveryStatusWords = { partner, stop: input.legStop };
   const say = (
     kind: DeliveryWorkStatusKind,
     second: string | null = null,
     extra: {
       secondTone?: "orange" | "red" | null;
       reasonLabel?: string | null;
-      day?: string | null;
       tone?: DeliveryWorkStatusTone;
     } = {},
   ): DeliveryWorkStatus => ({
     kind,
-    label: deliveryWorkStatusLabelOf(kind, partner, extra.day ?? null),
+    label: deliveryWorkStatusLabelOf(kind, words),
     tone: extra.tone ?? DELIVERY_WORK_STATUS_TONE[kind],
     second,
     secondTone: extra.secondTone ?? null,
@@ -297,12 +345,12 @@ export function deliveryWorkStatusOf(
   if (latest) {
     if (latest.result === "delivered") {
       /* An intermediate leg's success is the goods reaching the named partner
-         warehouse — `Arrived` over the stop, green, no proof owed here; the
-         customer leg carries `Delivered` and its proof (Card 20). */
-      if (input.intermediateLeg) return say("arrived", input.legStop?.trim() || null);
+         warehouse — `Arrived at {stop}`, green, no proof owed here; the stop
+         is already on line one. The customer leg carries its proof (Card 20). */
+      if (transfer) return say("arrived");
       const proof = input.proof;
       const review = proof?.review ?? null;
-      /* `Proof Accepted` is the fact that turns `Delivered` green everywhere
+      /* `Proof Accepted` is the fact that turns the result green everywhere
          (§6.1). Every other delivered row is orange: a specific act is owed. */
       if (proof?.acceptedOn) return say("delivered", `Proof accepted ${spell.date(proof.acceptedOn)}`);
       const owed = { tone: "orange" as const, secondTone: "orange" as const };
@@ -319,33 +367,38 @@ export function deliveryWorkStatusOf(
       if (review?.state === "pending") return say("delivered", "Check delivery proof", owed);
       return say("delivered", null, { tone: "orange" });
     }
-    /* `partial` and `failed` are both ONE Failed Delivery carrying ONE reason
-       (§7's rule) — never a family of failure words. */
+    /* `partial` and `failed` are both ONE failure carrying ONE reason (§7's
+       rule) — never a family of failure words. A transfer fails as a transfer. */
     const reason = deliveryReasonByKey(latest.reasonKey)?.label ?? null;
-    return say("failed", reason, { reasonLabel: reason });
+    return say(transfer ? "transfer_failed" : "failed", reason, { reasonLabel: reason });
   }
 
   /* A row Sales left incomplete is a DATA problem, and the row says so before
-     it says anything about the trip (§8.3: `Open Sales Order to change`). */
+     it says anything about the trip. Line two names the MISSING FACT (owner
+     ruling 2026-09-25); the contact deadline, when owed, is the cell's title
+     and accessible name, never this line. */
   const missing = input.missingFacts ?? [];
   if (missing.length > 0) return say("details_incomplete", missing[0] ?? null);
 
-  /* The one rung about today: a confirmed day behind us with nothing recorded.
+  /* The one rung about today: a scheduled day behind us with nothing recorded.
      It outranks the transit rungs — goods still on the road past the agreed
      day are exactly what the operator must ask about. */
   if (input.todayIso && input.confirmedDate && input.confirmedDate < input.todayIso) {
-    const who = (partner ?? "").trim() || "Logistics";
-    return say("overdue", `${who} must record the result`);
+    return say("overdue", askForResultLine(partner));
   }
 
-  const events = input.handoverEvents;
-  const receipt = events.find((e) => e.kind === "received_by_logistics");
+  const receipt = input.handoverEvents.find((e) => e.kind === "received_by_logistics");
   /* Only the LOGISTICS RECEIPT takes goods out of the warehouse (0363 slice
      1). Handed Over without a receipt is the warehouse's half of a handshake
      nobody has answered, so the scope is still waiting for the pickup. */
   if (receipt) {
-    if (input.expectedArrival) return say("delivering", `ETA ${time(input.expectedArrival)}`);
-    return say("collected", receipt.recordedAt ? `Collected ${spell.dateTime(receipt.recordedAt)}` : null);
+    if (input.expectedArrival) {
+      return say(transfer ? "in_transit" : "delivering", `ETA ${time(input.expectedArrival)}`);
+    }
+    return say(
+      transfer ? "collected_for_transfer" : "collected",
+      receipt.recordedAt ? `Collected ${spell.dateTime(receipt.recordedAt)}` : null,
+    );
   }
 
   /* The document exists and the partner has not collected: the job is the
@@ -357,67 +410,34 @@ export function deliveryWorkStatusOf(
     );
   }
 
-  /* A SCHEDULED DATE COMPLETES THE ARRANGEMENT (owner ruling 2026-09-24,
-     overwriting 2026-09-11's day-AND-window rule). The time is optional: it
-     prints when recorded, and its absence is never contact work. */
+  /* A SCHEDULED DATE COMPLETES THE ARRANGEMENT (owner ruling 2026-09-24). The
+     time is optional: it prints when recorded, and its absence is never
+     contact work. The day itself is the `Scheduled delivery` column's. */
   if (input.confirmedDate) {
-    return say("confirmed", input.confirmedTime ? time(input.confirmedTime) : null, { day: spell.date(input.confirmedDate) });
+    return say(transfer ? "transfer_scheduled" : "confirmed", input.confirmedTime ? time(input.confirmedTime) : null);
   }
 
-  if (!partner) return say("assign_logistics");
+  if (!partner?.trim()) return say("assign_logistics");
 
   if (input.latestContact?.result === "waiting_customer_reply") {
     return say("waiting_customer_reply", `Asked ${spell.date(input.latestContact.recordedOn)}`);
   }
 
-  /* ⭐ THE CONTACT DEADLINE IS NO LONGER A SENTENCE ON LINE TWO (owner ruling
-     2026-09-14). `Call by {date}` repeated the verb the status word above it
-     has just said. The DAY is the fact; the surface draws it with the kit's
-     phone glyph, or the kit's late glyph in red once it has passed, and the
-     whole sentence lives in the tooltip and the accessible name. The status
-     therefore returns NO second line here: `contactDueIso` on the row is the
-     one place the deadline is read from, and it is read ONCE. */
+  /* ⭐ THE CONTACT DEADLINE IS NOT A SENTENCE ON LINE TWO (owner ruling
+     2026-09-14). The DAY is the fact; the surface draws it with the kit's
+     phone glyph, or the kit's late glyph in red once it has passed, from the
+     row's own `contactDueIso` — read ONCE. */
   if (input.contactBy === "operation") return say("operation_must_call");
   return say("partner_must_contact");
 }
 
-/** The same recorded ladder, without data gaps or the clock replacing the
- * journey fact. Work queues still use deliveryWorkStatusOf unchanged. */
+/** The same recorded ladder with the two overlays — a data gap and the clock
+ *  — removed, so a calendar card keeps the journey fact (`Collected by NETS`)
+ *  while the Work queues keep `Order details incomplete` and `Overdue`. ONE
+ *  function, ONE label function: this only changes what is handed in. */
 export function deliveryJourneyProgressOf(
   input: DeliveryWorkStatusInput,
   spell: DeliveryStatusSpell,
 ): DeliveryWorkStatus {
-  return deliveryJourneyProgressFromStatus(
-    deliveryWorkStatusOf({ ...input, missingFacts: [], todayIso: null }, spell),
-    input,
-  );
-}
-
-/** Shared copy for a recorded journey rung, including legacy stop records.
- * This translates a fact; it never infers movement from a planned date. */
-export function deliveryJourneyProgressFromStatus(
-  status: DeliveryWorkStatus,
-  context: Pick<DeliveryWorkStatusInput, "partnerName" | "intermediateLeg" | "legStop">,
-): DeliveryWorkStatus {
-  const transfer = Boolean(context.intermediateLeg);
-  const stop = context.legStop?.trim();
-  const partner = context.partnerName?.trim() || LOGISTICS_ROLE_WORD;
-  let label = status.label;
-  switch (status.kind) {
-    case "confirmed": label = transfer ? "Transfer confirmed" : "Confirmed"; break;
-    case "collected": label = transfer ? "Collected for transfer" : `Collected by ${partner}`; break;
-    // With no named stop, retain the recorded collection fact instead of
-    // inventing a destination. The recorded ETA remains in supporting detail.
-    case "delivering": label = transfer ? (stop ? `In transit to ${stop}` : "Collected for transfer") : "On the way to customer"; break;
-    case "arrived": label = stop ? `Arrived at ${stop}` : "Arrived"; break;
-    case "delivered": label = transfer ? (stop ? `Arrived at ${stop}` : "Arrived") : "Delivered to customer"; break;
-    case "failed": label = transfer ? "Transfer failed" : "Failed Delivery"; break;
-  }
-  return {
-    ...status,
-    label,
-    tone: transfer && status.kind === "confirmed" ? "none" : status.tone,
-    // The stop is already in the progress label and route; it is not a blocker.
-    second: status.kind === "arrived" ? null : status.second,
-  };
+  return deliveryWorkStatusOf({ ...input, missingFacts: [], todayIso: null }, spell);
 }

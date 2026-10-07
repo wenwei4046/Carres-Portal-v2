@@ -165,6 +165,8 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   /* The probe behind the customer-type chip and its orders door. */
   if (url.includes("/api/orders/customer-type"))
     return json({ existing: STATE !== "newcustomer", matches: STATE !== "newcustomer" ? 4 : 0 });
+  /* The door's own number: the Register's read for that phone, counted. */
+  if (url.includes("/api/operation/orders?") && url.includes("count=only")) return json({ count: 2 });
   if (url.includes("/api/outlets")) return json({ outlets: [{ id: "o1", name: "PJ Showroom" }] });
   if (url.includes("/api/operation/dealers")) return json({ dealers: [{ id: "d1", name: "Carres HQ" }] });
   if (url.includes("/api/operation/staff") || url.includes("salespersons"))

@@ -78,7 +78,13 @@ describe("Sales Order object template contract", () => {
     expect(workspace).not.toContain('next.set("edit", "1")');
     expect(workspace).toContain('if (!params.get("edit")) return');
     expect(workspace).toContain('next.delete("edit")');
-    expect(workspace).toContain('type Mode = "object" | "create" | "oldrev"');
+    expect(workspace).toContain('type Mode = "object" | "oldrev"');
+    /* The office create door is RETIRED (owner ruling 2026-09-27): `/so/new`
+       lands on the Register and `POST /api/operation/orders` answers 410, so
+       the page carries no create mode, no create writer and no create words. */
+    for (const dead of ['endsWith("/so/new")', "useCreateSalesOrder", "Create order", "New Sales Order", "isNew"]) {
+      expect(workspace, `${dead} outlived the retired create door`).not.toContain(dead);
+    }
   });
 
   it("gives edit mode ONE commit button, chosen by the SERVER, and refuses to lose a draft", () => {
@@ -241,8 +247,8 @@ describe("Sales Order object template contract", () => {
     /* The banned word is gone from the surface entirely. */
     expect(workspace).not.toContain("Journey");
     /* ONE promised-date FACT, under the one governed label. `Customer
-       Delivery` still appears twice — the create picker and the object-mode
-       Fact, which are the same field in two modes. `Customer promise` was a
+       Delivery` still appears twice — the Edit picker and the View Fact,
+       which are the same field in two states. `Customer promise` was a
        SECOND label for that same date on a card that is now gone. */
     expect(workspace).not.toContain('label="Customer promise"');
     /* The tab that inherited the work is still reachable and still exists. */
@@ -414,10 +420,11 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain('data-testid="so-stair-working"');
     expect(workspace).toContain("floorSurchargeRaw(");
     expect(workspace).toContain('from "@/lib/order-totals"');
-    /* The rate and the free floors are READ from config, never retyped. */
-    expect(workspace).toContain("cfg.freeUpToFloor");
-    expect(workspace).toContain("cfg.perFloorPerItem");
+    /* The rate and the free floors are READ from config, never retyped: the
+       whole config goes to the one imported arithmetic. */
+    expect(workspace).toContain("floorSurchargeRaw(draft.delivery_floor, draft.delivery_has_lift, items, cfg)");
     expect(workspace).not.toMatch(/freeUpToFloor\s*[:=]\s*\d/);
+    expect(workspace).not.toMatch(/perFloorPerItem\s*[:=]\s*\d/);
   });
 
   /* ⭐ A SAVED ORDER READS ITS OWN CHARGE, NEVER TODAY'S RATE (YH, 2026-09-01).
@@ -427,8 +434,8 @@ describe("Sales Order object template contract", () => {
      kept the fee that was actually stamped. An old revision was worse — it
      mixed the snapshot's floor with the CURRENT order's line count.
 
-     ⛔ The live rate may reach this sentence on a CREATE and nowhere else,
-     because a create is the one state with no stamped row to read. */
+     ⛔ The live rate never reaches this sentence: the one state with no
+     stamped row to read was the office create door, retired 2026-09-27. */
   it("prices the working-out from the stamped row once the order exists", () => {
     expect(workspace).toContain("const stairWorking = useMemo");
     /* The saved branch reads the stamped STAIR_CARRY row — the same row MONEY
@@ -442,7 +449,7 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain("<Money value={stairWorking.fee} />");
     expect(
       workspace,
-      "the live rate must not be rendered directly — it is create-only, via stairWorking",
+      "the live rate must not be rendered directly",
     ).not.toContain("<Money value={stair.cfg.perFloorPerItem} />");
     expect(workspace).not.toContain("<Money value={stair.fee} />");
   });
@@ -468,8 +475,12 @@ describe("Sales Order object template contract", () => {
       workspace.indexOf('data-pos-field="proceedDate"'),
       workspace.search(/<Block[^>]*title="Delivery">/),
     );
-    /* A recorded date is a photograph, on every mode that is not create. */
-    expect(field).toContain('<Fact label="Proceed Date"');
+    /* A recorded date is a photograph. Its name is `Planned production start`
+       (two dates, two names, owner ruling 2026-10-06); `Proceed Date` is only
+       the actual hand-off and is never this field's label. */
+    expect(field).toContain('<Fact label="Planned production start"');
+    expect(field).toContain('<DatePicker id="so-proceed" label="Planned production start"');
+    expect(field).not.toMatch(/label="Proceed Date"/);
     expect(field).toContain('<DatePicker id="so-proceed"');
     /* The correction door, and the one thing that makes it safe: the test is
        the SAVED value. Reading `draft` would lock the control the instant a
@@ -484,35 +495,18 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain('id="so-proceed"');
   });
 
-  /* ⭐ THE OFFICE DOOR NAMES THE PRODUCTION START (YH, 2026-08-28).
-     The POS has refused an order without one since Phase 11.1; this door did
-     not, so it could mint the one order nobody could then repair. Pinned as
-     INTENT — the refusal exists and uses the ruled words — not as a line. */
-  /* ⭐ THE QUOTE INCLUDES THE CARRY, BEFORE IT IS SAVED (YH, 2026-08-28).
-     On `/so/new` there is no persisted STAIR_CARRY addon to read — 0393 stamps
-     it at birth — so the create branch adds the fee from the same memo that
-     prints the working-out. The DOUBLE-COUNT is the trap this pins: in
-     `object` mode the row IS in the addons, so adding it again there would
-     charge the carry twice on every upstairs order. */
-  it("puts the stair fee in the quote on create, and never twice on a saved order", () => {
+  /* ⭐ NEVER TWICE ON A SAVED ORDER (YH, 2026-08-28). 0393 stamps the
+     STAIR_CARRY addon at birth, so a saved order's money reads it from the
+     persisted addons; adding the memo's fee again would charge the carry twice
+     on every upstairs order. (The create quote that added it before the row
+     existed left with the office create door, 2026-09-27.) */
+  it("never adds the stair fee twice to a saved order's money", () => {
     const money = workspace.slice(
       workspace.indexOf("const money = useMemo"),
       workspace.indexOf("const cancelledLines"),
     );
-    const createBranch = money.slice(
-      money.indexOf('if (mode === "create")'),
-      money.indexOf("const lines = detailQ.data?.lines"),
-    );
-    expect(createBranch).toContain("stair?.fee");
-    /* The object branch reads the persisted addons and adds nothing. Sliced to
-       the BODY, stopping before the dependency array — `stair?.fee` legitimately
-       appears there, and letting the slice run on would assert against the memo's
-       own deps rather than its arithmetic. */
-    const objectBranch = money.slice(
-      money.indexOf("const lines = detailQ.data?.lines"),
-      money.indexOf("  }, [mode,"),
-    );
-    expect(objectBranch).not.toContain("stair?.fee");
+    expect(money).toContain("const lines = detailQ.data?.lines");
+    expect(money).not.toContain("stair?.fee");
     /* ONE arithmetic: the quote and its explanation read the same memo, never
        a second copy of `floorSurchargeRaw` inside the money block. */
     expect(money).not.toContain("floorSurchargeRaw(");
@@ -538,13 +532,6 @@ describe("Sales Order object template contract", () => {
     /* And it feeds the same subtotal every other addon feeds, so the paper's
        BALANCE DUE cannot drift from the card again. */
     expect(fn).toContain("addons.reduce((s, a) => s + a.line_total, 0)");
-  });
-
-  it("refuses to create an office order with no proceed date", () => {
-    expect(workspace).toContain("needDealer && !draft.proceed_date");
-    /* COPY-STANDARD:1447 governs the words; a second spelling is how the POS
-       ended up with two of them. */
-    expect(workspace).toContain("Proceed date: pick the day production should start");
   });
 
   it("puts no toolbar on or above the paper", () => {
@@ -649,14 +636,14 @@ describe("Sales Order object template contract", () => {
 
   it("keeps goods, price and Requested Delivery Date out of the direct writer", () => {
     expect(workspace).toContain('<Fact label="Customer Requested Delivery Date"');
-    /* One promised-date picker exists, and it is CREATE's — an existing
-       order's promise moves by amendment only. */
+    /* One promised-date picker exists, inside the whole-page Edit — the
+       draft the server classifies, never the direct writer. */
     expect(workspace.match(/id="so-promised"/g)).toHaveLength(1);
-    expect(workspace).toContain('mode === "create" ? (');
     const payload = workspace.slice(
       workspace.indexOf("const safeCorrectionPayload"),
-      workspace.indexOf("const createHeaderPayload"),
+      workspace.indexOf("const earliestPromise"),
     );
+    expect(payload).not.toBe("");
     for (const forbidden of ["delivery_date", "salesperson_id", "outlet_id", "dealer_id", "lines"]) {
       expect(payload, `${forbidden} must not ride the direct writer`).not.toContain(`${forbidden}:`);
     }
@@ -818,20 +805,6 @@ describe("Sales Order object template contract", () => {
     for (const gone of ["Category", "Unit ID", "Deliver To"]) {
       expect(workspace).not.toContain(`>${gone}</th>`);
     }
-  });
-
-  /* THE NEW-ORDER GOODS ROW ALIGNS AT THE TOP (YH, 2026-08-29 — reported from
-     `/operation/orders/so/new`). `items-end` bottom-aligned every cell, and
-     only SKU and Unit price carry a hint line — so Qty dropped a whole row to
-     bring its short box level with their hints, and the three labels sat at
-     three heights.
-
-     This is a SOURCE SCAN because jsdom computes no layout: a render test
-     cannot see that two boxes sit on different lines. It pins the one class
-     that decides it, which is what a later edit would flip back. */
-  it("aligns the create-mode goods row on its labels, not on its hints", () => {
-    expect(workspace).toContain("grid-cols-[1fr_84px_120px_32px] items-start");
-    expect(workspace).not.toContain("grid-cols-[1fr_84px_120px_32px] items-end");
   });
 
   /* ── ACTIONS ───────────────────────────────────────────────────────────── */
@@ -1244,7 +1217,7 @@ describe("Sales Order object page — one form grammar", () => {
       return i;
     };
     const ruled = [
-      "SO Doc Date", "Proceed Date", "Customer Requested Delivery Date",
+      "SO Doc Date", "Planned production start", "Customer Requested Delivery Date",
       "Sales Location", "Salesperson", "Dealer",
     ];
     const seen = ruled.map(at);
@@ -1255,7 +1228,10 @@ describe("Sales Order object page — one form grammar", () => {
        SALES ORDER INFO block is read here too and must carry the same order. */
     const rows = pdfTemplate.indexOf("const orderDetailRows");
     const info = pdfTemplate.slice(rows, pdfTemplate.indexOf("];", rows));
-    const paper = ["SO Doc Date", "Proceed Date", "Customer Requested", "Sales Location", "Salesperson"];
+    const paper = ["SO Doc Date", "Planned production start", "Customer Requested", "Sales Location", "Salesperson"];
+    /* Two dates, two names (owner ruling 2026-10-06): the planned date never
+       prints under the hand-off's name. */
+    expect(info).not.toContain('"Proceed Date"');
     const onPaper = paper.map((w) => {
       const i = info.indexOf(w);
       expect(i, `${w} is on the document`).toBeGreaterThan(-1);
@@ -1642,8 +1618,8 @@ describe("Sales Order page — kit sizes, one gap, one table grammar", () => {
 /* ⭐ SCOPE A — owner rulings 2026-09-25 / 2026-09-26 (Orders MASTER §0.0). */
 describe("Order Route reads its owners only when it is open", () => {
   it("fires the route fan-in only with ?route=1, never on every opened order", () => {
-    expect(workspace).toMatch(/useSalesOrderRouteFacts\(\s*isNew \? null : \(orderId \?\? null\),\s*showRoute,/);
-    expect(workspace).not.toMatch(/useSalesOrderRouteFacts\(\s*isNew \? null : \(orderId \?\? null\),\s*!isNew && Boolean\(orderId\),/);
+    expect(workspace).toMatch(/useSalesOrderRouteFacts\(\s*orderId \?\? null,\s*showRoute,/);
+    expect(workspace).not.toMatch(/useSalesOrderRouteFacts\(\s*orderId \?\? null,\s*Boolean\(orderId\),/);
   });
 
   it("hands the resolver the failed reads and the waiting change request", () => {
@@ -1658,7 +1634,7 @@ describe("Order Route reads its owners only when it is open", () => {
 
 /* ⭐ THE LOCKED STATE — OWNER RULING 2026-09-26 (Jess), `docs/orders/MASTER.md`
    § THE LOCKED STATE rules 1 to 5. View and a historical version are ONE locked
-   presentation; Edit and Create are the only states that draw controls. */
+   presentation; Edit is the only state that draws controls. */
 describe("the locked state (owner ruling 2026-09-26)", () => {
   const table = workspace.slice(
     workspace.indexOf("const editItemsTable = ("),
@@ -1696,11 +1672,11 @@ describe("the locked state (owner ruling 2026-09-26)", () => {
     expect(form).not.toContain('label="Delivery date to be confirmed"');
     /* The governed refusal (COPY-STANDARD § The Sales Order entry-gate words). */
     expect(workspace).toContain(
-      'if (!needDealer && !draft.delivery_date) return "Delivery date is required. Ask the customer for the date before you save the order.";',
+      'if (!draft.delivery_date) return "Delivery date is required. Ask the customer for the date before you save the order.";',
     );
     /* Picking a date in Edit ends the legacy TBD state in the same draft. */
     expect(workspace).toContain(
-      "setDraft((d) => ({ ...d, delivery_date: iso, delivery_date_tbd: mode === \"create\" ? d.delivery_date_tbd : false }))",
+      "setDraft((d) => ({ ...d, delivery_date: iso, delivery_date_tbd: false }))",
     );
     /* A legacy order keeps its amber note in View. */
     expect(form).toContain(">No delivery date</span>");
@@ -1720,12 +1696,12 @@ describe("the locked state (owner ruling 2026-09-26)", () => {
     expect(form).not.toMatch(/hint=\{!draft\.customer_address_(state|city) \?/);
     expect(form).toContain("!formLocked && !draft.customer_address_unknown && !draft.building_type");
     /* The never-recorded proceed date reads as a Fact until Edit opens it. */
-    expect(form).toContain('{mode === "create" || (mode === "object" && editing) ? (');
+    expect(form).toContain('{mode === "object" && editing ? (');
     /* The fieldsets stay as the backstop. */
     expect(form.match(/<fieldset disabled=\{formLocked\} className="contents">/g)).toHaveLength(4);
   });
 
-  it("rule 5 — the required star belongs to Edit and Create only", () => {
+  it("rule 5 — the required star belongs to Edit only", () => {
     const gates = [...workspace.matchAll(/\brequired=\{([^}]*)\}/g)].map((m) => m[1]);
     expect(gates.length).toBeGreaterThan(0);
     for (const g of gates) expect(g).toMatch(/^!(formLocked|locked)( && |$)/);

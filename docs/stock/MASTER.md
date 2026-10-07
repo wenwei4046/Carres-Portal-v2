@@ -1,7 +1,7 @@
 # STOCK / WAREHOUSE — MASTER
 
 **Shared-template adoption — owner acceptance2026-10-01 / Warehouse adoption not verified:**
-follow UI MASTER **“Confirmed shared template — owner acceptance2026-10-01”**, integrated by
+follow UI MASTER **§6.0 (the accepted SO-derived listing template, owner acceptance 2026-10-01)**, integrated by
 [PR1838](https://github.com/wenwei4046/Carres-Portal-v2/pull/1838), main `c926e3f76`. Read the current
 canonical UI MASTER; its accepted composition is resolved owner truth. The one canonical UI MASTER owns the visual
 contract; this module does not duplicate its dimensions or create another kit.
@@ -202,8 +202,9 @@ page or integration maintains another available quantity.
 |---|---|
 | received, inspected, complete, unreserved and uncontrolled | Available |
 | bound by Sales Order | Reserved / sold |
-| ordered but not received | Incoming |
-| ordered, not received, and bound to a Sales Order line by `Use this PO` (owner ruling 2026-09-28, Purchasing §9.1; BUILT on branch build/purchasing-use-this-po, migration 0600 not yet applied) | Incoming with its SO No until Receiving posts it, then Reserved for that line; the binding sets only `reserved_ref` + `reserved_order_line_id` and never changes status before receipt |
+| ordered for no Sales Order line, not received | Incoming; after receipt Available, and reserved only when staff choose `Reserve stock` |
+| ordered for an explicit Sales Order goods line (`po_line_sources` lineage), not received (owner ruling 2026-10-05, APPROVED / NOT BUILT) | Incoming with its source SO line; when Receiving posts it, the accepted usable quantity becomes Reserved for that original line automatically (rule below) |
+| ordered, not received, and bound to a Sales Order line by `Use this PO` (owner ruling 2026-09-28, Purchasing §9.1; MERGED #1723, migration 0600 APPLIED 2026-09-28) | Incoming with its SO No until Receiving posts it, then Reserved for that line; the binding sets only `reserved_ref` + `reserved_order_line_id` and never changes status before receipt |
 | between confirmed handovers | In transit |
 | issue, inspection, repair, missing component or other control | Not available |
 | customer accepted or lifecycle ended | Delivered / history |
@@ -220,8 +221,9 @@ or automatic Ready Stock qualification. Unknown evidence is not zero supply. Eac
 checks existing coverage before additional procurement; enough quantity arriving late is a timing
 risk, not an automatic new purchase. Preserve the eligibility and exact-Unit authority below.
 
-Sales Order owns choosing, binding, changing and releasing the exact promised Unit. Stock validates
-eligibility and reflects the result. Warehouse may report a problem but cannot silently release or
+Sales Order owns choosing, binding, changing and releasing the exact promised Unit; the one
+automatic binding is goods bought for that SO line, reserved on receipt (rule below). Stock
+validates eligibility and reflects the result. Warehouse may report a problem but cannot silently release or
 substitute a reserved Unit.
 
 **A RESERVATION NAMES THE ITEM LINE, NOT JUST THE ORDER — BUILT AND PRODUCTION-VERIFIED
@@ -237,8 +239,25 @@ returns as something to buy. Both register views expose it.
 locked row: the line belongs to that Sales Order, the goods match by `stock_match_key`, the Unit is
 an exact Unit and never a counted row (§3 · 0368), it is `available` by `unit_availability`, and the
 line still has a remaining requirement of ordered quantity less bound Ready Stock less
-non-cancelled purchase-order lineage. There is no override. A caller that names no line has one
+non-cancelled purchase-order lineage. There is no override. That remaining requirement is the
+line's uncovered quantity and the limit of the manual `Reserve stock` action (owner ruling 2026-10-05:
+partly covered lines may reserve the rest; fully covered lines show no action; reserving never releases
+or replaces a PO, which changes only through Purchasing's change or cancel route; Orders MASTER
+"Stock Status"). A caller that names no line has one
 RESOLVED — a single candidate, or a refusal by name; the door never picks out of several.
+
+**RECEIPT RESERVES GOODS BOUGHT FOR A SALES ORDER LINE — owner ruling (Jess) 2026-10-05 · APPROVED /
+NOT BUILT.** Goods bought for an explicit Sales Order goods line (`po_line_sources` lineage) are
+reserved automatically to that original SO line when Receiving posts them; staff do not allocate them
+again. Only the accepted, usable received quantity is reserved. When several SOs share one PO line,
+allocation follows the existing source rows (lineage), never a guess. Damaged, wrong-item and
+over-received quantities are never auto-reserved. If the original SO is cancelled, its requirement has
+fallen, or the source is unclear, nothing is forced: the exception is kept and shown for handling.
+Ordinary warehouse stock is still reserved only when staff choose `Reserve stock`; Match Ready Stock
+stays an optional, user-started mode. Each module keeps its own write responsibility: Receiving posts
+the receipt (Purchasing §7.3); the reservation is written through Stock's existing reservation door
+above, with the same validation and one remaining-requirement arithmetic, so a piece is never counted
+both as bound Ready Stock and as open PO lineage. `Use this PO` is unchanged.
 
 Ready stock contains only exact Units satisfying every eligibility rule; every total drills to IDs.
 A customer shortage separates available Units from remaining demand: Warehouse receives dated
@@ -252,7 +271,8 @@ NETS Warehouse scans each actual ID, checks product, visible condition, required
 packages and label, supplies governed evidence, and records one outcome per Unit: Check in,
 check in with issue, reject, or not delivered. A bulk total cannot replace Unit results. Partial
 receipt preserves received Units and leaves the remainder Incoming. Unexpected Units are
-investigated, never added through a shortcut.
+investigated, never added through a shortcut. Accepted usable goods bought for an explicit Sales
+Order line are reserved to that line when the receipt posts (§4, APPROVED / NOT BUILT).
 
 Showrooms are formal Sites. Staff scan arrival and departure, report observations and perform dated
 counts. A reserved display Unit remains at its Site but leaves Ready stock. Display start and last
@@ -671,9 +691,21 @@ rather than hiding the row. After a successful save the affected row, its quanti
 counts and the receipt records are re-read; a failed save preserves what the operator typed.
 Inbound still owns no write path and carries no Work column or duty avatar.
 
-**INBOUND REGISTER — owner ruling 2026-09-25, APPROVED TARGET / NOT BUILT (overwrites the
-2026-09-15 four-group composite cells above as design; that card's Site tabs, three filters,
-on-row `Receive`, full-width Receiving Workspace and `Destinations without a Site` tab stay).**
+**INBOUND REGISTER — owner ruling 2026-09-25, BUILT 2026-10-06 under the owner's two-line
+directive (approved UI delivered on the shared template; branch `build/warehouse-approved-ui-fixes`;
+production walk owed) (overwrites the 2026-09-15 four-group composite cells above as design; that
+card's Site tabs, three filters, on-row `Receive`, full-width Receiving Workspace and
+`Destinations without a Site` tab stay).** Measured on the rendered harness at 1440 with the
+production chrome: eleven registry-width columns total 1,494px on an 892px grid (date 120 ·
+date 123 · 140 · 170 · 140 · 150 · 208 · 112 · 112 · 123 · 96), rows 40px, header 36px; six heads
+stand in view at rest and `Receive` — the owner's last column — is reached by the grid's own
+scroll. 🟡 A trailing pinned action column is a KIT GAP raised to the UI controller 2026-10-06; until
+the kit admits it, the owner's order stands as ruled. `Goods Received Date` prints one receipt's
+own date, or the registry's `{n} receipt dates` when several trucks posted; each date stands beside
+its own DO number in the expansion. `Supplier DO No` lists every DO number on one line, each its own
+link. The `Item` cell prints the goods, `{n} items ▸` for several, `Expected {date} · not received`
+as its first line for an overdue arrangement and the governed status word (`Records incomplete`) for
+an unreadable receipt; `Status` and `Exceptions` stay in Columns.
 One row is one arrangement, 40px, one fact per cell, dates first, in the owner's order:
 
 ```
@@ -982,7 +1014,9 @@ Unit; they do not require permanent rail rows. `Needs checking` states the exact
 Unit, recorded holder/Site, finding, resolved owner/avatar, actual date and concrete action. It never
 uses a vague `Attention` label. Ready Stock groups eligible Units by Catalog product and Site and
 expands to exact IDs. Sales uses `Choose Ready Unit`; Operations uses `Make available for sale` only
-after the Unit passes eligibility. Stock owns neither reservation nor release from an SO.
+after the Unit passes eligibility. Stock decides no reservation or release on its own: every
+reservation is written through its one reserve door, on the Sales Order's choice, on a `Use this PO`
+arrival, or automatically when a receipt posts goods bought for that SO line (§4).
 
 `Make available for sale` is permitted only for an existing Unit whose current Site and `Who has
 it` are confirmed, condition and required components/packages are acceptable, ownership permits
@@ -1053,9 +1087,15 @@ The default includes outstanding loading, missing evidence and unmatched driver 
 Not loaded yet, Awaiting driver confirmation, Loaded and Evidence not submitted remain specific
 filters. Loading completion never claims the driver's act. Counts, rows and exports use one scope.
 
-**OUTBOUND REGISTER — owner ruling 2026-09-25, APPROVED TARGET / NOT BUILT (overwrites the
+**OUTBOUND REGISTER — owner ruling 2026-09-25, BUILT 2026-10-06 under the owner's two-line
+directive (branch `build/warehouse-approved-ui-fixes`; production walk owed) (overwrites the
 composite `Document` / `Units` cells above as design; the Pickup status rail, the on-row `Loading`
 door, the full-width Loading workspace and the separate `Loaded` / `Driver confirmed` facts stay).**
+Measured on the rendered harness at 1440 with the production chrome: eleven registry-width columns
+total 1,554px on an 892px grid (120 · 120 · 170 · 90 · 150 · 240 · 208 · 120 · 120 · 120 · 96), rows
+40px; `Scheduled handover` keeps the approved 11px second line (`Driver pickup {time}` or `Time not
+provided`); the `Assigned Driver` line moved into the Loading work surface and stays a Columns
+option; exception sentences (`Loaded, not confirmed by {company}`) print in the row's expansion.
 One row is one DO + Site scope, 40px, one fact per cell, in the owner's order:
 
 ```
@@ -2187,10 +2227,11 @@ are separate milestones. No Warehouse surface is frozen into the UI Kit by this 
 | Capability | Existing owner and implementation | Current limit / delivery evidence |
 |---|---|---|
 | Unit identity and availability | 0366 authority, 0371 condition correction, 0453 quantity identity separation; stock_unit_register_v is the listing | Quantity records have no displayable Unit ID; no negative or manually adjusted total |
-| Inbound | warehouse-inbound shared projection; actual Receiving Site, formal source, full products and receipt outcomes | Awaiting receipt / Fully received / All arrivals; accepted, physical arrived and pending quantities remain distinct |
+| Inbound | warehouse-inbound shared projection; actual Receiving Site, formal source, full products and receipt outcomes; `WarehouseInbound.tsx` prints the owner's eleven columns (BUILT 2026-10-06) | Awaiting receipt / Fully received / All arrivals; accepted, physical arrived and pending quantities remain distinct; `Receive` is the last column and scrolls off an 892px grid until the kit admits a trailing pinned column (KIT GAP) |
 | Receiving | ReceivingWorkspace and existing receipt writer; posted GRN and receiving_unit_results | Same-page work, stable retry identity, source evidence and actual goods receipt date; no second Stock Add |
-| Outbound | 0424 exact DO Unit scope, prep and two-sided handover; explicit Loading workspace | Loading does not confirm for the driver; loaded with zero driver confirmations remains open |
-| Inventory | WarehouseStockRegister and WarehouseUnitDetail read the Unit authority; `inventory-words.ts` (shared) is the one arithmetic for `Inventory Status` and `Stock Condition`; `stock-register-context.ts` reads the physical facts | Eleven single-line 40px columns in the owner's order, rail `STOCK · CATEGORY · OWNERSHIP · CONTROL`, footer `{n} still to arrive · see Inbound`; the PGlite contract test executes the physical-fact reads against committed column names. PO issue dates never stand in for actual receipts. Unit Detail `⋮` actions not built |
+| Outbound | 0424 exact DO Unit scope, prep and two-sided handover; explicit Loading workspace; `WarehouseOutboundWork.tsx` prints the owner's eleven columns with `Done` only when loaded AND driver-confirmed (BUILT 2026-10-06) | Loading does not confirm for the driver; loaded with zero driver confirmations remains open |
+| Inventory | WarehouseStockRegister and WarehouseUnitDetail read the Unit authority; `inventory-words.ts` (shared) is the one arithmetic for `Inventory Status` and `Stock Condition`; `stock-register-context.ts` reads the physical facts | Eleven single-line 40px columns in the owner's order, rail `STOCK · CATEGORY · OWNERSHIP · CONTROL`, footer `{n} still to arrive · see Inbound`; the PGlite contract test executes the physical-fact reads against committed column names. PO issue dates never stand in for actual receipts. 2026-10-06: the rail follows the shared 896px available-canvas rule (`useFilterRailOpen`) so a phone opens on the grid with `Show filters`; `Request Transfer` is the toolbar create pill, no longer a control in the Shell header row. The narrow-screen open overlay/backdrop/Escape composition stays a KIT GAP. Unit Detail `⋮` actions BUILT 2026-09-26 |
+| Schedule date heading | `WarehouseWorkspace.tsx` `DateHeading` | 2026-10-06: the weekday always prints (COPY: never `Today` as a date word); today keeps its blue ink, 2px underline and `data-today`, and a screen reader still hears `Today` |
 | Physical Site visits | Posted receiving_unit_results + warehouse_receipts.actual_site_id / goods_received_at; arrival_source_events.collected with source.from_site_id | Only unambiguous same-Unit, same-Site evidence pairs. Every later receipt opens another visit. Missing or overlapping evidence remains visibly unpaired |
 | Historical DO departures | delivery_handover_event_units warehouse side + handed_over event | These old events have no historical Site field. Preserve the departure independently; do not infer Site from the Unit's current warehouse, rewrite history or fabricate a backfill |
 | Arrival Schedule / Pickup Schedule | WarehouseWorkspace, warehouse-schedule projection and Site operating dates | Separate pages; normal white cards and quiet date provenance badges, overdue work highlighted, undated/delayed work reachable, including older overdue and dated non-working-day entries without changing their dates. Pickup opens exact Loading scope |

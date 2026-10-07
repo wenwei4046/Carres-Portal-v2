@@ -125,7 +125,7 @@ export const SO_BATCH_PURCHASE_WORDS = {
    * destination INSTRUCTED TO THE SUPPLIER.
    */
   colDeliveryLocation: "Customer Delivery Location",
-  colRequestedDelivery: "Customer Requested Delivery Date",
+  colRequestedDelivery: "Customer’s original requested delivery",
   colSupplier: "Supplier",
   /** The goods summary: `{first item} + {n} more`, every item in expansion. */
   colItems: "Items",
@@ -134,7 +134,7 @@ export const SO_BATCH_PURCHASE_WORDS = {
    * The ORIGINAL supplier-facing date stamped at the document's birth (§5.7).
    * `PO Delivery Date` is retired for this fact on all four reviewed pages.
    */
-  colPoDeliveryDate: "PO Default Delivery Date",
+  colPoDeliveryDate: "PO Delivery Date",
 
   /**
    * ⭐ STATUS IS THE NEW-PO NEED, NOT A PROGRESS BADGE — owner ruling
@@ -181,18 +181,6 @@ export const SO_BATCH_PURCHASE_WORDS = {
    * left BLANK keeps its own separate meaning: nothing has been ordered.
    */
   poDeliveryDateUnknown: "Not recorded",
-
-  /**
-   * ⭐ THE READ-ONLY SECTION'S OWN HEADING (owner correction 2026-09-11).
-   *
-   * `Purchase order details` — the section under the expanded row that holds
-   * every document covering the Sales Order, each with its own Unit, quantity,
-   * destination, supplier and original date. Deliberately NOT `Covered by`
-   * (retired: one heading for three questions) and NOT `ON PO` (that is the
-   * goods table's QUANTITY column, and a heading that repeats a column name
-   * makes the number and the section read as the same thing).
-   */
-  poDetails: "Purchase order details",
 
   /**
    * ⭐ WHAT `To buy` MEANS WHEN IT IS NOT A REMAINDER (owner correction
@@ -803,6 +791,8 @@ export interface SoBatchOrderRow {
   proceededAt: string | null;
   /** `orders.delivery_date` — the customer's current request. */
   requestedDeliveryDate: IsoDate | null;
+  /** Preserved revision 1 request; display/filter/export only. */
+  originalRequestedDeliveryDate?: IsoDate | null;
   /** The customer's delivery locality, formatted by the shared web rule. */
   deliveryCity: string | null;
   deliveryState: string | null;
@@ -820,6 +810,7 @@ export const soBatchOrderRowSchema = z.object({
   status: z.enum(["blank", "partial", "ordered"]),
   proceededAt: z.string().nullable(),
   requestedDeliveryDate: z.string().nullable(),
+  originalRequestedDeliveryDate: z.string().nullable().optional(),
   deliveryCity: z.string().nullable(),
   deliveryState: z.string().nullable(),
   pos: z.array(
@@ -1921,3 +1912,70 @@ export function soBatchLineReservedWhy(line: SoBatchOrderLineFact): SoBatchStatu
   const reserved = soBatchPoReservedSentences(line);
   return reserved.length > 0 ? { text: reserved.join(" "), door: null } : null;
 }
+
+/* ── The Tasks working panel's words (SO Batch Purchase, 2026-10-06) ─────── */
+
+/** Words the Tasks `BatchPanel` and the shared supplier send operations use.
+ *  Never `round` or `PO window` in a task-facing line. */
+export const SO_BATCH_PANEL_WORDS = {
+  missed: "Missed",
+  info: "Info",
+  /* The panel's module tab is the page's own name (owner ruling 2026-10-05);
+     `Purchasing` is never a page's main tab. */
+  purchasing: "SO Batch Purchase",
+  salesOrder: "Sales Order",
+  allSalesOrders: "All Sales Orders",
+  /** A missing Supplier Deliver To address blocks ONLY these PDFs — never the supplier. */
+  deliverToAddressMissing: (destination: string) => `Supplier Deliver To ${destination} has no address. Add it in Purchasing Settings.`,
+} as const;
+
+/** One supplier's part of one batch, as a task. */
+export const SO_BATCH_TASK_WORDS = {
+  sendMany: (n: number, supplier: string) => `Send ${n} POs to ${supplier}`,
+  sendOne: (supplier: string) => `Send PO to ${supplier}`,
+  issue: (supplier: string) => `Issue PO to ${supplier}`,
+  itemsToBuy: (n: number) => `${n} ${n === 1 ? "item" : "items"} to buy`,
+  salesOrders: (n: number) => `${n} ${n === 1 ? "Sales Order" : "Sales Orders"}`,
+  items: (n: number) => `${n} ${n === 1 ? "item" : "items"}`,
+  toSend: (n: number) => `${n} ${n === 1 ? "PO" : "POs"} to send · Sending not confirmed`,
+  unknownPos: (n: number) => `${n} ${n === 1 ? "PO" : "POs"} · Sending not confirmed`,
+  notRecordedYet: (n: number) => `${n} ${n === 1 ? "PO" : "POs"} not recorded yet`,
+  nothingIssued: "Nothing issued yet · buy first",
+  issueOpens: "opens the approved 50/50 review",
+  selectAll: (ticked: number, total: number) => `Select all · ${ticked} of ${total} ticked`,
+  sent: (channel: string, time: string) => `Sent · ${channel} · ${time}`,
+  toGroup: (supplier: string) => `To ${supplier} WhatsApp group`,
+  defaultNotSet: "default not set",
+  set: "Set",
+  downloadPdfs: (n: number) => `Download PDFs (${n})`,
+  copyMessage: "Copy message",
+  openGroup: "Open WhatsApp group",
+  /* Owner correction 2026-10-05: one neutral sentence in every state. */
+  sendHint: "Send the PDF, then press PO sent to supplier.",
+  recordSent: (n: number) => `PO sent to supplier (${n})`,
+  confirmTitle: "Record as sent by WhatsApp?",
+  notTicked: "Not ticked: stays in this task.",
+  recordN: (n: number) => `Record ${n} ${n === 1 ? "PO" : "POs"}`,
+  attached: "Attached",
+  emailSent: (n: number, time: string) => `Email sent · ${n} ${n === 1 ? "PDF" : "PDFs"} · ${time}`,
+  notConfirmedTryAgain: "Not confirmed · Try again",
+  saveN: (n: number) => `Save (${n})`,
+  saveHint: "Saves only the missing record. No second email is sent.",
+  unknownBody: "Sending not confirmed. We do not know if the email left. Check the send record before sending again.",
+  unknownLock: "Send Email stays locked until the record is checked, so the supplier never gets the same POs twice.",
+  openSendRecord: "Open send record",
+  /* Info */
+  thisTask: "This task",
+  wholeBatch: "Whole batch",
+  thisTaskDoneWhen: "This task is done when",
+  batchDoneWhen: "The whole batch is done when",
+  batchDoneRule: "Nothing is left to buy and every PO of every supplier is sent",
+  taskDoneRule: (n: number, supplier: string) => n <= 1 ? `The ${supplier} PO is recorded as sent` : n === 2 ? `Both ${supplier} POs are recorded as sent` : `All ${n} ${supplier} POs are recorded as sent`,
+  taskDoneIssueRule: (supplier: string) => `The ${supplier} PO is issued and recorded as sent`,
+  posToSupplier: (n: number, supplier: string) => `${n} ${n === 1 ? "PO" : "POs"} to ${supplier}`,
+  wholeBatchLine: (pos: number, suppliers: string[], toBuy: number) =>
+    `${pos} ${pos === 1 ? "PO" : "POs"} · ${suppliers.length} ${suppliers.length === 1 ? "supplier" : "suppliers"}${suppliers.length ? ` (${suppliers.join(", ")})` : ""} · ${toBuy} SO still to buy`,
+  /* Sales Order */
+  sosOnPos: (n: number) => `${n} Sales Orders on these POs`,
+  pickOne: "Pick one to see it here",
+} as const;

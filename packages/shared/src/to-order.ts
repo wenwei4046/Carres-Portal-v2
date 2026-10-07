@@ -40,6 +40,7 @@ import {
   type NetRequirementsSupply,
 } from "./net-requirements";
 import type { IsoDate } from "./working-days";
+import { PLANNED_PRODUCTION_START } from "./sales-order-form";
 
 // ── The words ───────────────────────────────────────────────────────────────
 
@@ -169,10 +170,11 @@ export const TO_ORDER_WORDS = {
   /**
    * P18 — the label on the group header's SECOND date (Loo, 2026-08-05).
    *
-   * NOT invented: `orders.proceed_date` is already spelt this way in four live
-   * places — the Sales form's `PROCEED DATE · PRODUCTION START`, the order-entry
-   * field config (`Proceed date · production start`), the Sales Order
-   * Maintenance column (`Proceed Date`) and the ops CSV header (`Proceed`).
+   * `orders.proceed_date` is Sales' PLANNED production start, and since the
+   * owner ruling of 2026-10-06 (two dates, two names) it is called
+   * `Planned production start` on every surface; `Proceed Date` names only the
+   * actual hand-off (`orders.proceeded_at`). The shared word is
+   * `PLANNED_PRODUCTION_START` (sales-order-form.ts).
    *
    * It is LABELLED and the delivery date beside it is not, and that asymmetry
    * is the point: the header already carried one bare date, so a second bare
@@ -180,7 +182,7 @@ export const TO_ORDER_WORDS = {
    * them apart. The word is also deliberately NOT the bare `Proceed`, which
    * COPY-STANDARD owns as an order STATE — a different fact.
    */
-  proceedDate: "Proceed date",
+  proceedDate: PLANNED_PRODUCTION_START,
   /**
    * T1.1 (Loo, 2026-08-06) — the READY STOCK column's header.
    *
@@ -1097,7 +1099,7 @@ export interface ToOrderLine extends DemandLine {
   customerName: string | null;
   /**
    * P18 — `orders.proceed_date`, the planned PRODUCTION START date Sales keys
-   * on the New Sales Order form (`PROCEED DATE · PRODUCTION START`).
+   * on the New Sales Order form (`Planned production start`).
    *
    * An ORDER fact, so it is repeated on every line of the order and the engine
    * reads it off the first one — exactly like `so` and `customerName`. It is

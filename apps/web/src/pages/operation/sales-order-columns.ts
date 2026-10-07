@@ -42,6 +42,7 @@
 import { parseEmergencyContact, REGISTER_DELIVERY_CONDITIONS, registerDeliveryConditionOf } from "@carres/shared";
 
 import { REGISTER_FIELD_WIDTH as W } from "@/components/register/register-field-widths";
+import { poNumberLinks, poNumberLinksText } from "@/components/register/po-number-links";
 import { fmtDate } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
 import type { DeliveryOrderRow, operationOrderListRow } from "@/lib/queries";
@@ -126,6 +127,12 @@ export function requestedDeliveryOf(o: {
 }): { iso: string | null; tbd: boolean } {
   const tbd = Boolean(o.delivery_date_tbd);
   return { iso: tbd ? null : o.delivery_date ?? null, tbd };
+}
+
+/** Original request only: current delivery_date can change after issue. */
+export function originalRequestedDeliveryOf(o: Pick<operationOrderListRow, "original_request">): string | null {
+  const first = o.original_request?.find(r => r.revision === 1)?.snapshot.header;
+  return first ? requestedDeliveryOf(first).iso : null;
 }
 
 /**
@@ -225,7 +232,7 @@ export function buildRegisterRow(
     items: registerItemsSummary(o, itemNameOf),
     proceeded: o.proceeded_at ?? null,
     ordered: o.placed_at,
-    customerDelivery: requestedDeliveryOf(o).iso,
+    customerDelivery: originalRequestedDeliveryOf(o),
     /* A required fact (2026-09-21): an empty locality prints nothing, never
        the locality helper's `Not recorded`. */
     deliveryLocation:
@@ -332,7 +339,7 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
   { key: "salesperson", label: "Salesperson", width: W.salesperson, group: "Sales ownership", on: true,
     text: (r) => r.o.salespersons?.name ?? "" },
   /* A required fact: a date, never `To be confirmed` / `No delivery date`. */
-  { key: "customer_delivery", label: "Customer Requested Delivery Date", width: W.customerRequestedDeliveryDate,
+  { key: "customer_delivery", label: "Customer’s original requested delivery", width: W.customerRequestedDeliveryDate,
     group: "Dates", on: true,
     text: (r) => (r.customerDelivery ? fmtDate(r.customerDelivery) : ""),
     sortBy: (r) => r.customerDelivery ?? "",
@@ -344,8 +351,11 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
     text: (r) => r.customer, sortBy: (r) => r.customer },
   { key: "items", label: "Items", width: W.items, group: "Items", on: true,
     text: (r) => r.items },
+  /* ⭐ EVERY LINKED PO, ON ONE LINE — owner ruling 2026-10-06 (Jess): every
+     number, comma-separated, in the shared short form; the same text the cell
+     prints (`po-number-links.ts`), so the filter and Export agree with it. */
   { key: "po_number", label: "PO No", width: W.documentNo, group: "Document", on: true,
-    text: (r) => r.poNumbers.join(" · ") || NO_PO_YET },
+    text: (r) => poNumberLinksText(poNumberLinks(r.poNumbers.map((poId) => ({ poId })))) || NO_PO_YET },
   { key: "do_number", label: "DO No", width: W.documentNo, group: "Document", on: true,
     text: (r) =>
       r.deliveryOrders.length === 0
@@ -491,7 +501,7 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
     kind: "number", num: (r) => r.o.installment_months ?? null },
 
   /* ── DATES — every stamp, whatever act produced it ──────────────────────── */
-  { key: "proceed_date", label: "Proceed date", width: W.date, group: "Dates",
+  { key: "proceed_date", label: "Planned production start", width: W.date, group: "Dates",
     text: (r) => date(r.o.proceed_date, NOT_RECORDED), sortBy: (r) => r.o.proceed_date ?? "",
     kind: "date", iso: (r) => r.o.proceed_date ?? null },
   { key: "dispatched", label: "Dispatched", width: W.date, group: "Dates",

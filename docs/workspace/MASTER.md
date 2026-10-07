@@ -62,6 +62,14 @@ Carres has one cross-module Work coordination surface. Module Registers, queues 
 may show the same obligation, but never become separate Work Engines. One obligation retains one
 identity, owner rule, due rule, completion fact and deep link everywhere.
 
+**Customer enquiries — shared contract, 2026-10-06.** Read
+[`Customer Service MASTER`](../customer-service/MASTER.md) §§4, 13–16 before building its projection.
+The approved target reuses the same Tasks/working panel and Staff & Duties, including enquiries
+without an SO. Customer Service owns its first-response rule and handling evidence; Case response
+and results remain Service-owned. Conversation discovery inside Workspace is a supported
+recommendation awaiting owner/shared-UI consolidation, not approval of another page or task engine.
+No enquiry projection, connected message history or rollout is claimed by this pointer.
+
 ## 2 · Action admission contract
 
 An action enters Work only when its owning module supplies:
@@ -267,8 +275,9 @@ order enters Operations, `ops_order_control.assigned_staff` names the one normal
 order, customer, delivery and ordinary collection work. The Work Engine routes today's action to
 the current work assignment, initially that PIC and subsequently any recorded §4.4 assignment movement. The Sales Order PIC remains a separate source fact. Delivery
 Duty is not the routine customer-order owner. For customer-order work it is the explicit fallback
-when a Sales Order has no PIC; that exception stays visible under `Delivery Duty` and prints `Nobody holds Delivery Duty.`
-and `Set the holder in Settings → Staff & Duties`. Delivery Settings never holds a roster or a
+when a Sales Order has no PIC; that exception stays visible under `Delivery Duty` and prints `Nobody assigned to this order`
+over `Manager assigns in Settings → Staff & Duties` (owner ruling 2026-09-26: an unassigned order is a system error and
+only a manager can add a person or assign the order; `Manage staff` opens People). Delivery Settings never holds a roster or a
 second owner list (`../delivery/MASTER.md` §13.1).
 
 **SHOWROOM ASSIGNMENTS — APPROVED TARGET / NOT BUILT; Jess, 2026-09-28.** For display
@@ -301,6 +310,48 @@ may not assign), so 0533 assigned Jess once from 2026-09-18 with `assigned_by` N
 — owner ruling 2026-09-18 (no second Principal person)` and an audit row naming the migration. It
 runs only when the Duty has no assignment history; it created no cover. Until a second Principal
 person exists, Jess has no eligible cover: her approvals wait while she is away.
+
+**Sales Approver — OWNER-APPROVED 2026-10-01 / TARGET NOT BUILT.** Orders MASTER
+§ “Staff amendments and Sales Approver” replaces the earlier all-amendments approval ruling and
+withdrawn matrix. Ordinary SO amendments need no owner approval. Sales Approver is required before
+price decreases, customer refunds and whole-SO cancellation after Proceed take effect. Holder and
+any cover must be active Principal people, assigned only through Settings → Staff & Duties and
+resolved through the shared mechanism; no hard-coded person, local roster or expanded role rights.
+A required approval cannot pass when its eligible assignment is unresolved. The catalogue and
+live assignments are unchanged by this PLAN. This Duty is NOT BUILT.
+
+For an ordinary amendment whose changed line is covered by an issued PO, PO Duty records the
+supplier's confirmation that the change can be made before it takes effect. No supplier answer or
+an unknown supplier date means waiting, not automatic effectiveness. This does not make PO Duty
+a general commercial approver. Purchasing still owns the PO change. No issued PO covering that
+line means ordinary application on submission with the required customer evidence. The accepted
+trade-off is no second-person check on ordinary product changes; retain the actual submitter and
+confirmation actors. Linked changes remain one effective outcome.
+
+**SO submission — owner-approved A, 2026-10-01; PIC notification TARGET NOT BUILT.** Any
+Operation staff member with existing order access may submit; it is not PIC-only. Principal
+submission remains permitted, while Salespeople/Dealers continue to request changes through
+Operation. Automatically notify the order PIC via the shared notification/activity mechanism,
+retaining the actual submitter and Before/After evidence. Notification does not transfer PIC
+ownership, misattribute the act, grant approval rights or add a PIC approval gate. A waiting
+amendment must not be presented as already effective. See Orders MASTER for the full ruling.
+Do not infer notification delivery from the existing submission door; it remains unverified.
+
+Requested Delivery Date routing is settled in Orders/Delivery MASTER: evidenced customer
+earlier-date amendments require ready stock, otherwise refuse; evidenced later-date amendments
+apply; neither date change needs PO Duty or supplier confirmation. Carres-initiated early
+arrangements leave the SO date unchanged. This adds no new staff or approval assignment.
+System-priced delivery-charge changes have no manual approval lane: staff cannot override the
+computed price (Orders MASTER, owner-confirmed 2026-10-01 / TARGET NOT BUILT). Do not assign a
+new SO charge-waiver task to Delivery Charge Approver; that Duty remains for its other governed
+uses. Customer refunds still route to Sales Approver. Non-delivery service exceptions, 0329
+attribution changes/consolidation remain undecided. **Sales Approver self-approval — owner-approved
+2026-10-01 / TARGET NOT BUILT:** the currently resolved eligible Principal holder or dated cover
+may decide their own SO exception request, retaining reason, customer evidence, actual submitter,
+approver and times. This does not allow another Principal to bypass duty resolution or change
+Finance/refund execution controls or other Duties' own-request rules. Do not copy Purchasing
+Approver's own-request prohibition or bootstrap into this Duty as an assumed decision.
+The existing PIC-first ordinary Delivery ownership remains unchanged.
 
 **`Finance Approver` (`finance_approver`) takes Finance users only.** Its holder and cover pickers
 list active Finance users. The API reads them through the definer function `workspace_duty_staff`,
@@ -1713,8 +1764,8 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
    - **BUILD SHEET — exact values (every number is a token; measured on the prototype 2026-09-28,
      BUILT 2026-09-28).** Reference files: `docs/workspace/work-reference/` (evidence, not authority).
      Built deviations, each for a kit or document law: the card and the quiet row use the kit CARD
-     radius (10px), not the prototype's 6 (token values are locked); the header's `Proceed Date` is
-     the Sales Order document's own Proceed Date (A7), not the hand-off time the prototype printed;
+     radius (10px), not the prototype's 6 (token values are locked); the header's `Planned production start` is
+     the Sales Order document's own planned date (A7), not the hand-off time the prototype printed;
      the Communication tabs are the kit `Tabs` (its selected tab carries the kit's blue indicator);
      the calendar is the Work rail's existing Monday-to-Saturday month grid with each day's count.
 
@@ -1723,7 +1774,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      | Page columns | `PageShell` + `grid-layout` | ≥1340: rail 280 · Mission ≥460 · Communication 340; 1100–1339: 240 · ≥460 · 300; 900–1099: 220 · ≥400 · 280; never scales; below 900 = phone round |
      | Column title rows | `SectionHeader` | 64px tall, 15/600 slate-12, one bottom line shared by all three columns |
      | Rail | `FilterRail` style C (`workspace-rail.tsx`) + `MonthCalendar` | group title = kit `Icon` 16px + 13/600 slate-12; rows 14/400 + right count, no row icon; ONE blue in the rail (Jess 2026-09-28: "why force to select all module with blue? confusing like select 2"): only the chosen ORDER row is blue-3 + 3px blue edge; a chosen filter (Attention, Module, the day) is the grey chip with bold text like the `My Task` · `Team Work` switch; the month grid prints each day's count UNDER its number (13 over 11/500, 36px rows), today a dark ring |
-     | Order header | `DetailShell` header slots | three blocks of two lines: `SO No` link 15/600 over customer 13/400 · `Proceed Date` 11/500 over date 13 · `Customer Requested Delivery Date` 11/500 over date 13 |
+     | Order header | `DetailShell` header slots | three blocks of two lines: `SO No` link 15/600 over customer 13/400 · `Planned production start` 11/500 over date 13 · `Customer Requested Delivery Date` 11/500 over date 13 |
      | Act card | `Block` (SalesOrderWorkspace; ONE KIT LAW) | white, 1px slate-5, radius 6, padding 12/16, gap 12 between cards; title 15/600 black; second line 13/400 red (missed) / amber (due) / slate-11; hairline, then checklist |
      | Card button | `Button` secondary | 36px, top right of the card; opens the owning form in the card |
      | Form in card | `FieldFrame` + `field-recipe` + `Select` / `DatePicker` | three fields per row, gap 12, label 11/500 slate-11 over a 32px field; white; only `Save` is `Button` primary (the one blue) |
@@ -1850,7 +1901,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
     never closes it.
   - *Status:* Delivery does not raise this act today — build after this page, in Delivery.
 
-**C · Not in this build.** The right-rail Calendar/Customers/Activity; `{n} of {m} done` and
+**C · Not in this build.** The right-rail Calendar/Tasks/Activity; `{n} of {m} done` and
 auto-advance (need closure receipts, §5.2.1); the `3 new actions` banner; B4 and B5.
 
 **Acceptance (the builder checks, Jess only confirms).** 1440 / 1180 / 820 / 390; one difficult
@@ -2051,9 +2102,10 @@ WhatsApp never completes anything. Facts remain owned by Sales Orders (customer/
 delay planning and phone), Delivery (partner contact result, scheduled/delivered and arrangement
 decision), and their source communication evidence.
 
-**Relation to the right rail's Customers door (owner-confirmed 2026-09-26, UI MASTER §5):** this card is
-one mission's customer-facing exception; the rail door starts from the customer and lists all their orders
-and recorded history. Both read the same Sales Orders / Delivery / Payment records; neither stores a copy.
+**Relation to customer information in the right rail (UI MASTER §5):** this card is one mission's
+customer-facing exception; the linked customer's information is reached through the `Sales Order` tab
+inside Tasks (owner ruling 2026-10-05), and the customer-lookup capability (all their orders and recorded
+history, approved 2026-09-26) keeps its approval with its placement open (UI MASTER §5). Both read the same Sales Orders / Delivery / Payment records; neither stores a copy.
 
 #### Supplier card
 
@@ -2133,8 +2185,16 @@ separate governed outstation-release rule.
 #### Payment, Warehouse, loan and after-sales boundaries
 
 Payment is a Route/party exception only when it materially affects delivery; it is not another
-calendar card. Use the Payment MASTER's governed collection/approval action and do not invent
-`Blocked`. A permitted post-delivery clock starts from Delivered. PO/supplier delay belongs to
+calendar card. **Owner ruling 2026-09-25 (APPROVED / NOT BUILT; `../payment/MASTER.md` "Payment
+inside Work"):** a collection Work item's object is the **Sales Order** (never an Invoice, so the
+Route and party cards always draw); the middle card prints `Balance due RM {x}` over `Ask customer
+to pay`; the Summary carries the money and the one blue `Ask customer to pay`; the Route exception
+line is `Payment due {day}` (`to collect by` is retired); the Customer card keeps Delivery's collapsed
+line and gains an expanded **Payment** section whose doors (`Ask customer to pay` · `Record the
+result` · `Record payment`) open Payment's own compositions in place. That section is ONE shared
+component with the Payment Monitor's row expansion (owner approval 2026-09-25: same function, two
+frames). One fact, one place. Do not
+invent `Blocked`. A permitted post-delivery clock starts from Delivered. PO/supplier delay belongs to
 Purchasing; GRN/received quantity belongs to Warehouse. Loan is its optional independent point.
 After-sales starts a separate mission after delivery unless its own MASTER explicitly connects it.
 
@@ -2175,7 +2235,7 @@ These close the questions §5.10 leaves to the owning modules; they change no ap
   record (0487). Each act opens its owner's door and writes nothing in Work. `Waiting` is not
   derived for the customer; the Waiting tab lists only a source-recorded waiting state (§5.2.1
   `communication.replyState`) and is empty until a module records one.
-- **Payment exception line** beneath the Route: `Payment · Hold delivery · RM {amount} unpaid · by {date}` (amber
+- **Payment exception line** beneath the Route: `Payment due {day}` (owner reconciliation 2026-09-25; amber
   once the deadline is reached) or `Payment · Hold delivery · Finance hold · {reason}`; the deadline is
   `paymentDeadlineOf` — the one the Logistics day-before check reads (2 working days before the
   delivery date, 3 outstation; the effective-dated Payment rule row is not readable by Operation —
@@ -2293,7 +2353,7 @@ are fixtures, and production keeps the current page until each admitted projecti
 
 | Owning module · action identity | Why it exists / required result | Owner rule | Due law | What closes it / next |
 |---|---|---|---|---|
-| Sales Orders · `ask_delivery_date` | Requested delivery date absent · obtain the customer's date or `not yet` answer | Responsible Salesperson | `No date` for admitted legacy rows | Requested Delivery Date or governed no-date answer exists · order planning continues |
+| Sales Orders · `ask_delivery_date` | Requested delivery date absent · obtain the customer's date or `not yet` answer | Responsible Salesperson · **reminded on that order in the Sales Portal (showroom/dealer login); never routed to an Operation person** (owner ruling Jess 2026-10-06: salespersons have no personal login; Operation Work is Operation-only) · APPROVED / Sales Portal reminder NOT BUILT | `No date` for admitted legacy rows | Requested Delivery Date or governed no-date answer exists · order planning continues |
 | Sales Orders · `delay_planning` | Supplier date breaks the customer commitment · record the customer-plan decision for that exact date | Responsible Delivery Operation for the customer commitment | 2 Office working days from detection | Decision and decided ETA recorded · Delivery opens the governed next booking act when required |
 | Purchasing · `manual_purchase.approve` | Manual Purchase awaits a decision · approval/refusal recorded | Purchasing Approver | Request Order By date, Office calendar | Decision stored · approved demand may require PO issue |
 | Purchasing · `manual_purchase.issue_po` | Approved demand/current PO version has not reached supplier · sent evidence | PO Duty | Request Order By date, Office calendar | Current version has confirmed-send evidence · normal state becomes Waiting for goods; no immediate reply task |
@@ -2371,10 +2431,11 @@ Batch's `?window=` scope read that stamp. Workspace decides the composition (han
 
 ## 7 · Right Rail and Notifications
 
-**OWNER-APPROVED TARGET / NOT BUILT — 2026-09-24.** Remove the Right Rail My Work slot
-and replace it with the customer-search/record door governed by UI MASTER §5. Formal Work,
+**OWNER-APPROVED TARGET / NOT BUILT — 2026-09-24.** The Right Rail My Work slot
+becomes `Tasks` (UI MASTER §5); customer information is reached through the `Sales Order` tab inside
+Tasks (owner ruling 2026-10-05). Formal Work,
 My Work and Team Work retain their current scope, counts, action projection and existing navigation.
-The customer door has no Work badge or task-completion control. The existing My Work rail code is
+The existing My Work rail code is
 implementation awaiting replacement, not a second current target. No mobile mini-queue is added.
 
 Notifications are event receipts—assigned, cover activated, became missed, unblocked, source failed
@@ -2391,7 +2452,8 @@ remains legacy debt and may not be presented as this contract.
 
 ### 7.1 · Right Rail and notification acceptance contract
 
-- The right rail follows UI MASTER §5's Calendar/customer/Activity target; it does not duplicate Work.
+- The right rail follows UI MASTER §5's Calendar/Tasks/Activity target (customer information is reached
+  through the `Sales Order` tab inside Tasks, owner ruling 2026-10-05); it does not duplicate Work.
 - Formal Work remains directly reachable from existing Workspace navigation on desktop and narrow widths.
 - Removal of the rail shortcut changes no Work identity, count, owner, deadline or completion fact.
 - No rail or Bell control assigns, covers, completes or dismisses Work or records a module result.
@@ -2525,7 +2587,7 @@ unreviewed annotation · `Upcoming` · `Take it` · `Release`.
   health, recent changes. No horizontal pipeline, compressed five-column board or sideways KPI strip.
 - Counts and amounts never truncate. Long measure explanations wrap; object doors remain keyboard and
   touch accessible. Hover-only source/threshold evidence also opens by focus/tap.
-- The right rail (Calendar · Customers · Activity, UI MASTER §5) stays beside Dashboard on supported
+- The right rail (Calendar · Tasks · Activity, UI MASTER §5) stays beside Dashboard on supported
   desktop widths; it is not folded into Dashboard. Work is reached from its own navigation door.
 
 ### 8.5 · Current → proposed gap audit — 2026-09-07

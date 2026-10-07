@@ -44,6 +44,12 @@ let hookState: {
 
 const useDeliveryOrdersRegisterSpy = vi.fn((..._args: unknown[]) => hookState);
 
+const printDeliveryOrderSpy = vi.hoisted(() => vi.fn(async (_orderId: string, _doNumber: string) => {}));
+vi.mock("./record-print", async () => {
+  const actual = await vi.importActual<typeof import("./record-print")>("./record-print");
+  return { ...actual, printDeliveryOrder: printDeliveryOrderSpy };
+});
+
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return {
@@ -130,6 +136,25 @@ beforeEach(() => {
 });
 
 describe("DeliveryOrdersRegister", () => {
+  /* ONE ROW MENU — owner ruling 2026-10-05: `View · Print`, then this
+     register's own doors after one divider. */
+  it("the row menu reads View · Print · ─ Open SO-n · Open Order Route", () => {
+    printDeliveryOrderSpy.mockClear();
+    const { locations } = mount([doRow()]);
+    const row = screen.getAllByText("DO-180826-3035")[0]!.closest("tr")!;
+    fireEvent.contextMenu(row);
+    const menu = screen.getByRole("menu", { name: "Row actions" });
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent)).toEqual([
+      "View", "Print", "Open SO-1322", "Open Order Route",
+    ]);
+    expect(within(menu).getAllByRole("separator")).toHaveLength(1);
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Print" }));
+    expect(printDeliveryOrderSpy).toHaveBeenCalledWith("00000000-0000-0000-0000-0000000a0001", "DO-180826-3035");
+    fireEvent.contextMenu(row);
+    fireEvent.click(screen.getByRole("menuitem", { name: "View" }));
+    expect(locations.at(-1)).toBe("/operation/delivery-orders/DO-180826-3035");
+  });
+
   it.each([false, true])("an intermediate arrival owes no customer proof and preserves recorded photos (%s)", (hasPhoto) => {
     const row = doRow({ leg: 1, orders: { ...doRow().orders,
       do_number: "DO-FINAL", do_file_path: "final-signed.pdf",

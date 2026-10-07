@@ -145,7 +145,7 @@ describe("the Work feed — Delivery's own arrangement names the company (Worksp
       responsibleOperationFor: (orderId) => collectionOwnerResolution(contextRow(orderId, YUJUN), TODAY),
       today: TODAY,
       safetyDays: 3,
-      arrangements: new Map([["order-yj", { confirmedDate: null, partnerId: "partner-nets" }]]),
+      arrangements: new Map([["order-yj", [{ leg: 0, confirmedDate: null, partnerId: "partner-nets" }]]]),
     });
     expect(assignOf(items, "order-yj")).toBeUndefined();
   });
@@ -159,8 +159,97 @@ describe("the Work feed — Delivery's own arrangement names the company (Worksp
       responsibleOperationFor: (orderId) => collectionOwnerResolution(contextRow(orderId, YUJUN), TODAY),
       today: TODAY,
       safetyDays: 3,
-      arrangements: new Map([["order-yj", { confirmedDate: null, partnerId: null }]]),
+      arrangements: new Map([["order-yj", [{ leg: 0, confirmedDate: null, partnerId: null }]]]),
     });
     expect(assignOf(items, "order-yj")).toBeDefined();
+  });
+});
+
+/* ⭐ THE WORK FEED READS THE SAME FACTS MONITOR READS (Delivery MASTER §15.1,
+   measured 2026-09-25; Workspace §5.9 gap 9). The company is the arrangement's,
+   and the scheduled day is the ONE delivery-day reader's: the live document,
+   then the arrangement, then a confirmed legacy booking. Each case below
+   failed before the feed read through `customerLegDeliveryOf` /
+   `assignedLogisticsIdOf`. */
+describe("the Work feed — one delivery-day reader and one assignment reader", () => {
+  const feed = (over: Partial<Parameters<typeof projectSalesOrdersFromModuleFacts>[0]> & { row?: Record<string, unknown> }) =>
+    projectSalesOrdersFromModuleFacts({
+      orders: [{ ...order("order-yj", 1401, YUJUN.userId), ...(over.row ?? {}) }],
+      stock: [{ sku: "SOFA-1", available: 1 }],
+      staff: [{ user_id: YUJUN.userId, name: YUJUN.name, email: "yujun@carres.test" }],
+      dutyResolutions: {},
+      responsibleOperationFor: (orderId) => collectionOwnerResolution(contextRow(orderId, YUJUN), TODAY),
+      partnerNameById: new Map([["partner-nets", "NETS"], ["partner-al", "AL"]]),
+      today: TODAY,
+      safetyDays: 3,
+      ...over,
+    });
+  const confirmOf = (items: ReturnType<typeof projectSalesOrdersFromModuleFacts>) =>
+    items.find((i) => i.ruleKey === "confirm_delivery_date" && i.object.id === "order-yj");
+  const words = (item: ReturnType<typeof confirmOf>) => [item?.action, item?.recipient, item?.requiredResult].filter(Boolean).join(" ");
+
+  it("the company named on the arrangement is the one the act names — never the order row's stale column", () => {
+    const items = feed({
+      row: { delivery_partner_id: "partner-al" },
+      arrangements: new Map([["order-yj", [{ leg: 0, confirmedDate: null, partnerId: "partner-nets" }]]]),
+    });
+    const confirm = confirmOf(items);
+    expect(confirm).toBeDefined();
+    expect(words(confirm)).toContain("NETS");
+    expect(words(confirm)).not.toContain("AL");
+  });
+
+  it("an arrangement with no company falls back to the order row, as Monitor does", () => {
+    const items = feed({
+      row: { delivery_partner_id: "partner-al" },
+      arrangements: new Map([["order-yj", [{ leg: 0, confirmedDate: null, partnerId: null }]]]),
+    });
+    expect(words(confirmOf(items))).toContain("AL");
+  });
+
+  it("a live Delivery Order's day is THE scheduled day — the feed owes the delivery on it", () => {
+    const items = feed({
+      row: { delivery_partner_id: "partner-nets", do_number: "DO-0001" },
+      arrangements: new Map([["order-yj", [{ leg: 0, confirmedDate: null, partnerId: "partner-nets" }]]]),
+      deliveryOrders: new Map([["order-yj", [{ leg: 0, deliveryDate: TODAY, timeSlot: null, issuedAt: "2026-09-16T02:00:00Z" }]]]),
+    });
+    expect(confirmOf(items)).toBeUndefined();
+    expect(items.map((i) => i.ruleKey)).toContain("deliver_today");
+  });
+
+  it("a CONFIRMED legacy booking is a scheduled day too — the reader Monitor runs", () => {
+    const items = feed({
+      row: {
+        delivery_partner_id: "partner-nets",
+        ops_order_control: {
+          assigned_staff: YUJUN.userId, booking_stage: "confirmed", confirmed_date: "2026-09-25",
+          delivery_photos: [], line_etas: null, line_stock_status: { "SOFA-1": "ready" },
+        },
+      },
+      arrangements: new Map(),
+    });
+    expect(confirmOf(items)).toBeUndefined();
+  });
+
+  it("control: a company and no scheduled day anywhere — the act stays open", () => {
+    const items = feed({
+      row: { delivery_partner_id: "partner-nets" },
+      arrangements: new Map(),
+      deliveryOrders: new Map(),
+    });
+    expect(confirmOf(items)).toBeDefined();
+  });
+
+  it("a Journey reads its CUSTOMER leg — the highest leg Delivery recorded", () => {
+    const items = feed({
+      row: { delivery_partner_id: null },
+      arrangements: new Map([["order-yj", [
+        { leg: 1, confirmedDate: "2026-09-20", partnerId: "partner-al" },
+        { leg: 2, confirmedDate: null, partnerId: "partner-nets" },
+      ]]]),
+    });
+    const confirm = confirmOf(items);
+    expect(confirm).toBeDefined();
+    expect(words(confirm)).toContain("NETS");
   });
 });

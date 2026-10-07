@@ -2,7 +2,7 @@
  * THE MISSION — the Work page's middle column (Workspace MASTER §5.10,
  * APPROVED / LOCKED 2026-09-28).
  *
- *   order header   SO No (opens its PDF) over the customer · Proceed Date ·
+ *   order header   SO No (opens its PDF) over the customer · Planned production start ·
  *                  Customer Requested Delivery Date
  *   route stops    one stop per Order Route node; stops holding an act first,
  *                  each act a white card (title = what to do, second line =
@@ -29,7 +29,7 @@ import { useWorkOrderRoute } from "./use-work-data";
 import { workStopsOf, type WorkAct, type WorkPoFact, type WorkStopCard } from "./work-stops";
 
 export const MISSION_COPY = {
-  proceedDate: "Proceed Date",
+  proceedDate: "Planned production start",
   requested: "Customer Requested Delivery Date",
   notRecorded: "Not recorded",
   loading: "Loading…",
@@ -94,7 +94,8 @@ export default function WorkMission({
   if (loading && !route) return <p className="p-6 text-body text-kit-slate-11" role="status">{MISSION_COPY.loading}</p>;
   if (!route || !detail) return <p className="p-6 text-body text-kit-slate-11" role="status">{failed ? MISSION_COPY.failed : MISSION_COPY.loading}</p>;
 
-  /* The Sales Order document's own Proceed Date (A7: the document's words and values). */
+  /* The Sales Order document's own planned date, `Planned production start` (A7: the
+     document's words and values; two dates, two names, owner ruling 2026-10-06). */
   const order = detail.order as typeof detail.order & { proceed_date?: string | null };
   const soNo = `SO-${order.so}`;
   const itemOf = (act: WorkAct) => items.find((i) => i.id === act.occurrenceId) ?? null;

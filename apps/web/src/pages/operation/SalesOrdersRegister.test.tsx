@@ -88,11 +88,24 @@ const useDeliveryOrdersRegisterSpy = vi.fn((..._args: unknown[]) => ({
   refetch: vi.fn(),
 }));
 
+const printSalesOrdersSpy = vi.hoisted(() => vi.fn(async (_rows: ReadonlyArray<{ id: string }>) => {}));
+vi.mock("./record-print", async () => {
+  const actual = await vi.importActual<typeof import("./record-print")>("./record-print");
+  return { ...actual, printSalesOrdersOrSay: printSalesOrdersSpy };
+});
+
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return {
     ...actual,
     useOperationOrders: (...args: unknown[]) => useOperationOrdersSpy(...args),
+    /* The Register's own list reads EVERY page (SO A3-3) through this hook,
+       with the same filters; the one spy answers both, so every assertion
+       below about the filters the Register asks with still holds. The
+       whole-population behaviour itself is held by
+       SalesOrdersRegister.population.test.tsx and
+       lib/sales-order-register-pages.test.tsx. */
+    useSalesOrderRegisterOrders: (...args: unknown[]) => useOperationOrdersSpy(...args),
     useSalesOrderExpansion: (...args: unknown[]) => useSalesOrderExpansionSpy(...args),
     useCatalog: (...args: unknown[]) => useCatalogSpy(...args),
     useDeliveryOrdersRegister: (...args: unknown[]) => useDeliveryOrdersRegisterSpy(...args),
@@ -130,6 +143,7 @@ const order = (over: Partial<operationOrderListRow>): operationOrderListRow =>
     paid: 1250,
     order_lines: [{ sku: "B1201S-K", qty: 1, unit_price: 2499, label: "B1201S · King" }],
     order_addons: [],
+    original_request: [{ revision: 1, snapshot: { header: { delivery_date: "delivery_date" in over ? over.delivery_date : "2026-08-30", delivery_date_tbd: over.delivery_date_tbd ?? false } } }],
     ...over,
   }) as operationOrderListRow;
 
@@ -181,6 +195,45 @@ describe("FIX 1 · the register asks the SERVER", () => {
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "missing-order" } });
     await waitFor(() => expect(screen.getByText("No sales orders match these filters")).toBeInTheDocument());
     expect(screen.queryByText("No sales orders yet")).not.toBeInTheDocument();
+  });
+
+  /* The rail narrows the rows BEFORE the grid sees them, so the grid alone
+     cannot tell "nothing exists" from "nothing matches this choice". */
+  it.each([
+    ["the server's total", 1],
+    ["the unsearched load when the total is unknown", undefined],
+  ])("a rail choice that leaves nothing says the filters do, judged by %s", (_by, total) => {
+    listHookState.data = { orders: [order({ customer_address_state: "Selangor" })], ...(total === undefined ? {} : { salesOrderTotal: total }) };
+    mount("/operation/orders?state=Johor");
+    expect(screen.getByText("No sales orders match these filters")).toBeInTheDocument();
+    expect(screen.queryByText("No sales orders yet")).not.toBeInTheDocument();
+  });
+
+  it("says No sales orders yet only when the permitted population itself is empty", () => {
+    listHookState.data = { orders: [], salesOrderTotal: 0 };
+    mount("/operation/orders?state=Johor");
+    expect(screen.getByText("No sales orders yet")).toBeInTheDocument();
+    expect(screen.queryByText("No sales orders match these filters")).not.toBeInTheDocument();
+  });
+
+  it("a search answered with nothing, over a population that exists, says the filters do", async () => {
+    listHookState.data = { orders: [], salesOrderTotal: 24 };
+    mount("/operation/orders?search=0123456789");
+    await waitFor(() => expect(screen.getByText("No sales orders match these filters")).toBeInTheDocument());
+    expect(screen.queryByText("No sales orders yet")).not.toBeInTheDocument();
+  });
+
+  it("names phone in what the search box covers — the server now matches it", () => {
+    mount();
+    const box = screen.getByRole("searchbox");
+    const scope = "Search sales orders by SO number, customer, phone, imported reference or linked document number";
+    expect(box).toHaveAttribute("title", scope);
+    expect(box).toHaveAttribute("aria-description", scope);
+  });
+
+  it("asks the server with the phone exactly as the Existing customer link carries it", () => {
+    mount(`/operation/orders?search=${encodeURIComponent("019-83372393")}`);
+    expect(useOperationOrdersSpy).toHaveBeenCalledWith({ stage: "proceeded", search: "019-83372393" });
   });
 
   it.each(["loading", "error"])("never calls %s expansion data Not allocated", (state) => {
@@ -339,7 +392,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
      Requested Delivery Date is mandatory at order entry, so an empty one is a
      system error fixed at its source: no `To be confirmed`, no amber
      `No delivery date`, no action sentence and no hover guidance. */
-  it("prints no absence word, warning or guidance for a missing Customer Requested Delivery Date", () => {
+  it("prints no absence word, warning or guidance for a missing Customer’s original requested delivery", () => {
     listHookState.data = { orders: [
       order({ id: "a", so: 1, delivery_date: null, delivery_date_tbd: true, salespersons: { name: "Shasha" } }),
       order({ id: "b", so: 2, delivery_date: null, delivery_date_tbd: false, salespersons: { name: "Shasha" }, outlets: null }),
@@ -678,7 +731,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       "Stock Status",
       "Sales Location",
       "Salesperson",
-      "Customer Requested Delivery Date",
+      "Customer’s original requested delivery",
       "Customer",
       "Items",
       "PO No",
@@ -790,6 +843,22 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.getByRole("button", { name: "DO-200826-1234" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "DO-210826-5678" }));
     expect(screen.getByTestId("location")).toHaveTextContent("/operation/delivery-orders/DO-210826-5678");
+  });
+
+  /* ⭐ EVERY LINKED PO, ON ONE LINE — owner ruling 2026-10-06 (Jess): every
+     number, comma-separated, each its own link; no count, no popover. */
+  it("prints every PO number on one line, comma-separated, each its own link", () => {
+    listHookState.data = {
+      orders: [order({ po_numbers: ["PO-20260911-5002", "PO-20260910-4001"], do_number: null })],
+    };
+    mount();
+    const cell = screen.getByRole("button", { name: "PO-260910-4001" }).parentElement!;
+    expect(cell.textContent).toBe("PO-260910-4001, PO-260911-5002");
+    expect(cell).toHaveClass("block", "truncate");
+    expect(within(cell).getAllByRole("button")).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "2 Purchase Orders" })).toBeNull();
+    fireEvent.click(within(cell).getByRole("button", { name: "PO-260911-5002" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/operation/procurement?po=PO-20260911-5002");
   });
 
   it.each(["RC-SECOND", "INV-SECOND", "DO-SECOND"])("searches hidden linked number %s", async (term) => {
@@ -1064,10 +1133,43 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
  * a new test — not the quiet return of this one.
  */
 describe("order view before editing", () => {
-  it("does not open a row actions menu", () => {
+  /* ONE ROW MENU — owner ruling 2026-10-05: `View · Print · ─ Cancel SO`.
+   * Edit is reached through View (a button on the read-first page). */
+  it("opens the one row menu: View · Print · ─ Cancel SO", () => {
     mount();
     fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
-    expect(screen.queryByRole("menu", {name:"Row actions"})).not.toBeInTheDocument();
+    const menu = screen.getByRole("menu", { name: "Row actions" });
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["View", "Print", "Cancel SO"]);
+    expect(within(menu).getAllByRole("separator")).toHaveLength(1);
+    expect(within(menu).queryByRole("menuitem", { name: "Edit" })).not.toBeInTheDocument();
+  });
+  it("View opens the full read-first page, never the quick card", () => {
+    mount();
+    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "View" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/operation/orders/so/00000000-0000-0000-0000-00000000cafe");
+    expect(screen.queryByTestId("sales-order-quick-view")).not.toBeInTheDocument();
+  });
+  it("Print runs the governed SO paper for that one order", () => {
+    printSalesOrdersSpy.mockClear();
+    mount();
+    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Print" }));
+    expect(printSalesOrdersSpy).toHaveBeenCalledTimes(1);
+    expect(printSalesOrdersSpy.mock.calls[0]?.[0]).toEqual([expect.objectContaining({ id: "00000000-0000-0000-0000-00000000cafe" })]);
+    expect(screen.getByTestId("location")).toHaveTextContent(/^\/operation\/orders$/);
+  });
+  it("Cancel SO opens the one governed cancellation door", () => {
+    mount();
+    fireEvent.contextMenu(screen.getByTestId("grid-parent-row"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Cancel SO" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent(/^\/operation\/orders$/);
+  });
+  it("the Menu key opens the same menu from the keyboard", () => {
+    mount();
+    fireEvent.keyDown(screen.getByTestId("grid-parent-row"), { key: "F10", shiftKey: true });
+    expect(screen.getByRole("menu", { name: "Row actions" })).toBeInTheDocument();
   });
   it("opens a read-only summary from the order number, then offers the full page", () => {
     mount();
@@ -1086,11 +1188,11 @@ describe("order view before editing", () => {
 describe("Sales Orders table correction", () => {
   it("keeps the full date label on its sort and filter doors", () => {
     mount();
-    const sort = within(screen.getByTestId("register-column")).getByRole("button", { name: "Customer Requested Delivery Date" });
+    const sort = within(screen.getByTestId("register-column")).getByRole("button", { name: "Customer’s original requested delivery" });
     expect(sort.querySelector("br")).not.toBeNull();
     fireEvent.click(sort);
-    expect(within(screen.getByTestId("register-column")).getByRole("button", { name: "Customer Requested Delivery Date" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Filter Customer Requested Delivery Date" }));
+    expect(within(screen.getByTestId("register-column")).getByRole("button", { name: "Customer’s original requested delivery" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Filter Customer’s original requested delivery" }));
     expect(outsideRail("Today")).toHaveLength(1);
   });
 
@@ -1109,7 +1211,7 @@ describe("Sales Orders table correction", () => {
     const business = [...screen.getByTestId("grid-header").querySelectorAll("th")].map((th) => th.getAttribute("title")).filter(Boolean);
     expect(business.slice(0, 4)).toEqual(["Proceed Date", "SO Doc Date", "SO No", "Customer"]);
     expect(screen.getByRole("button", { name: "Customer" }).closest("th")).toHaveStyle({width: "288px"});
-    expect(within(screen.getByTestId("register-column")).getByRole("button", { name: "Customer Requested Delivery Date" }).closest("th")).toHaveStyle({width: "240px"});
+    expect(within(screen.getByTestId("register-column")).getByRole("button", { name: "Customer’s original requested delivery" }).closest("th")).toHaveStyle({width: "240px"});
     expect(screen.getByRole("button", { name: "Filter Phone" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
     expect(screen.getAllByTestId(/^grid-expansion-gutter-/).map((e) => e.dataset.testid)).toEqual([
@@ -1325,7 +1427,7 @@ describe("the Sales Orders rail and its two views", () => {
     expect(within(grid).getByText("SO-1401")).toBeInTheDocument();
     expect(within(grid).queryByText("SO-1402")).not.toBeInTheDocument();
     expect(within(grid).queryByText("SO-1403")).not.toBeInTheDocument();
-    expect(grid).toHaveTextContent("Customer Requested Delivery Date: Oct 2026");
+    expect(grid).toHaveTextContent("Customer’s original requested delivery: Oct 2026");
   });
 
   it("a Before door narrows to everything owed before the window", () => {
@@ -1418,7 +1520,7 @@ describe("the Order list rail: read-only fact filters (owner approved 2026-09-22
   it("the Order list carries Sales Location, Customer Delivery Location and Delivery, no Date group and no Clear filters", () => {
     mount();
     const rail = screen.getByTestId("sales-orders-rail");
-    for (const group of ["Customer Requested Delivery Date", "Order summary"]) {
+    for (const group of ["Customer’s original requested delivery", "Order summary"]) {
       expect(within(rail).getByText(group)).toBeInTheDocument();
     }
     /* A date is narrowed on its own column's ▽ (Jess, 2026-09-28). */
@@ -1451,11 +1553,63 @@ describe("the Order list rail: read-only fact filters (owner approved 2026-09-22
       order({ id: "b", so: 1502, delivery_date: "2026-11-10" }),
       order({ id: "c", so: 1503, delivery_date: "2026-12-10" }),
     ];
-    mount();
-    fireEvent.change(screen.getByLabelText("Requested delivery month"), { target: { value: "2026-11" } });
-    expect(shown()).toEqual([1502]);
-    fireEvent.click(screen.getByTestId("requested-all"));
-    expect(shown()).toEqual([1501, 1502, 1503]);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-06T04:00:00Z"));
+    try {
+      mount();
+      fireEvent.change(screen.getByRole("combobox", { name: "Select month" }), { target: { value: "2026-11" } });
+      expect(shown()).toEqual([1502]);
+      fireEvent.click(screen.getByTestId("requested-all"));
+      expect(shown()).toEqual([1501, 1502, 1503]);
+      fireEvent.change(screen.getByRole("combobox", { name: "Select month" }), { target: { value: "2026-12" } });
+      expect(shown()).toEqual([1503]);
+      /* The empty option clears the month, exactly as `All dates` does. */
+      fireEvent.change(screen.getByRole("combobox", { name: "Select month" }), { target: { value: "" } });
+      expect(shown()).toEqual([1501, 1502, 1503]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("Select month is the rail's own select: no month input, its empty option reads its label, never a dash", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-06T04:00:00Z"));
+    try {
+      mount();
+      const rail = screen.getByTestId("sales-orders-rail");
+      /* A native month input printed `--------- ----` when empty. */
+      expect(rail.querySelector('input[type="month"]')).toBeNull();
+      const select = within(rail).getByRole("combobox", { name: "Select month" }) as HTMLSelectElement;
+      expect(select.tagName).toBe("SELECT");
+      expect(select.value).toBe("");
+      expect(select.options[0]!.textContent).toBe("Select month");
+      const labels = [...select.options].map((option) => option.textContent ?? "");
+      /* The span `Starting month` lists: twelve back, this month, eleven ahead. */
+      expect(labels.slice(1, 2)).toEqual(["Oct 2025"]);
+      expect(labels).toContain("Oct 2026");
+      expect(labels.at(-1)).toBe("Sep 2027");
+      for (const label of labels) expect(label).not.toMatch(/[-–—]/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a linked month outside the listed span stays chosen in Select month", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-06T04:00:00Z"));
+    try {
+      listHookState.data!.orders = [
+        order({ id: "a", so: 1501, delivery_date: "2024-02-10" }),
+        order({ id: "b", so: 1502, delivery_date: "2026-11-10" }),
+      ];
+      mount("/operation/orders?requested=2024-02");
+      expect(shown()).toEqual([1501]);
+      const select = screen.getByRole("combobox", { name: "Select month" }) as HTMLSelectElement;
+      expect(select.value).toBe("2024-02");
+      expect(select.selectedOptions[0]!.textContent).toBe("Feb 2024");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("requested range includes both ends and excludes adjacent dates", () => {
@@ -1555,6 +1709,9 @@ describe("the Order list rail: Obligations and Service Cases are the server's fa
 
 describe("the isolated shared-template pilot", () => {
   it("keeps active filters before tools in both Table and Cards", () => {
+    /* The order is IN the chosen state: a rail choice that left nothing would
+       show the empty state's own `Clear filters` instead of `Clear all`. */
+    listHookState.data = { orders: [order({ customer_address_state: "Selangor" })] };
     mount("/operation/orders?state=Selangor");
     const conditions=screen.getByTestId("active-conditions");
     const tools=screen.getByTestId("work-toolbar");

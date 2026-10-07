@@ -15,6 +15,11 @@
  * `opened` is posted from the RENDERED page, never from the GET a chat app
  * makes to draw its preview, so "the company has the details" is a fact the
  * portal actually observed.
+ *
+ * `Hold delivery` (owner ruling 2026-09-25, §3/§5.5): while a Scheduled
+ * delivery exists and the DO money gate holds, the page prints those two words
+ * alone — no amount, no reason, no door — from the server's `holdDelivery`.
+ * The three answers keep working.
  */
 // design-standard: not-a-list-page — a phone-first public answer page, outside the portal shell.
 import { useEffect, useState } from "react";
@@ -110,6 +115,12 @@ export default function DeliveryLinkPage() {
         });
         setDone(LINK_COPY.savedCannot);
       }
+      /* Read the delivery again, quietly: a date just saved is now the
+         Scheduled delivery, and the moment one exists `Hold delivery` must
+         show if the gate holds (owner ruling 2026-09-25, §3). */
+      void apiFetch<ExternalDeliveryLinkView>(base)
+        .then(setView)
+        .catch(() => undefined);
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) setState("dead");
       else setError(err instanceof Error ? err.message : LINK_COPY.loadFailed);
@@ -169,6 +180,11 @@ export default function DeliveryLinkPage() {
             <Row label="Scheduled delivery">
               {[fmtDate(view.scheduledDate), view.scheduledTime].filter(Boolean).join(" · ")}
             </Row>
+          ) : null}
+          {view.holdDelivery ? (
+            <p className="py-1.5 text-body font-semibold text-kit-red-11" data-testid="delivery-link-hold">
+              {LINK_COPY.holdDelivery}
+            </p>
           ) : null}
         </section>
 

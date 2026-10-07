@@ -56,11 +56,12 @@ const order = (over: Partial<operationOrderListRow> = {}): operationOrderListRow
     paid: 500,
     order_lines: [{ sku: "M1401F-K", qty: 1, unit_price: 2500, label: "Jager · King" }],
     order_addons: [],
+    original_request: [{ revision: 1, snapshot: { header: { delivery_date: "delivery_date" in over ? over.delivery_date : "2026-08-29", delivery_date_tbd: over.delivery_date_tbd ?? false } } }],
     ...over,
   }) as operationOrderListRow;
 
 describe("the default row is the owner's ELEVEN, in the owner's order (2026-09-21)", () => {
-  it("Proceed Date · SO Doc Date · SO No · Sales Location · Salesperson · Customer Requested Delivery Date · Customer Delivery Location · Customer · Items · PO No · DO No", () => {
+  it("Proceed Date · SO Doc Date · SO No · Sales Location · Salesperson · Customer’s original requested delivery · Customer Delivery Location · Customer · Items · PO No · DO No", () => {
     expect(DEFAULT_COLUMNS).toEqual([
       "proceeded",
       "ordered",
@@ -80,7 +81,7 @@ describe("the default row is the owner's ELEVEN, in the owner's order (2026-09-2
       "SO No",
       "Sales Location",
       "Salesperson",
-      "Customer Requested Delivery Date",
+      "Customer’s original requested delivery",
       "Customer Delivery Location",
       "Customer",
       "Items",
@@ -141,6 +142,11 @@ describe("the default row is the owner's ELEVEN, in the owner's order (2026-09-2
     const row = buildRegisterRow(order({ po_numbers: [] }), []);
     expect(REGISTER_FIELDS.find((f) => f.key === "po_number")!.text(row)).toBe(NO_PO_YET);
     expect(REGISTER_FIELDS.find((f) => f.key === "do_number")!.text(row)).toBe(NO_DO_YET);
+  });
+
+  it("PO No is every linked number, comma-separated, in the shared short form", () => {
+    const row = buildRegisterRow(order({ po_numbers: ["PO-20260911-5002", "PO-20260910-4001"] }), []);
+    expect(REGISTER_FIELDS.find((f) => f.key === "po_number")!.text(row)).toBe("PO-260910-4001, PO-260911-5002");
   });
 
   it("Items is {first item} + {n} more, named by the catalog, never the SKU when it is known", () => {
@@ -454,5 +460,14 @@ describe("linked document identity", () => {
     expect(text("receipt_no", { receipt_documents: [{ id: "p1", receipt_no: "RC-1" }], allocated_receipts: [{ order_payments: { id: "p1", receipt_no: "RC-1" } }, { order_payments: { id: "p2", receipt_no: "RC-2" } }] })).toBe("RC-1 · RC-2");
     expect(text("receipt_no", { receipt_documents: [] })).toBe("Receipt not recorded");
     expect(text("receipt_no", {})).toBe("Unavailable");
+  });
+});
+
+describe("original request register source", () => {
+  it("keeps version 1 when the current date or later versions change", () => {
+    const source = order({ delivery_date: "2026-12-31", original_request: [{ revision: 2, snapshot: { header: { delivery_date: "2026-12-31" } } }, { revision: 1, snapshot: { header: { delivery_date: "2026-10-31" } } }] });
+    expect(buildRegisterRow(source).customerDelivery).toBe("2026-10-31");
+    expect(buildRegisterRow(order({ original_request: [] })).customerDelivery).toBeNull();
+    expect(buildRegisterRow(order({ original_request: [{ revision: 1, snapshot: { header: { delivery_date: "2026-10-31", delivery_date_tbd: true } } }] })).customerDelivery).toBeNull();
   });
 });

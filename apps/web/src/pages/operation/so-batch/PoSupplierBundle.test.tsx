@@ -77,7 +77,8 @@ describe("issued supplier bundle", () => {
       : path.endsWith("/sends") ? { sends: [] }
       : (() => { throw new ApiError(422, "No address", { code: "destination_address_missing" }); })());
     render(<PoSupplierBundle pos={[pos[0]]} onPreview={() => {}} />);
-    expect(await screen.findByRole("alert")).toHaveTextContent("PO-001 · Address not recorded. Check Purchasing Settings.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("PO-001 · Supplier Deliver To Klang has no address. Add it in Purchasing Settings.");
+    expect(screen.queryByText(/cannot use|cannot send/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Download PDFs" })).toBeDisabled();
   });
   it.each([

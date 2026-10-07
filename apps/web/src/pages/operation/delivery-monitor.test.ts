@@ -28,7 +28,7 @@
 import { NO_PROOF_REVIEW } from "./delivery-orders-register";
 import { describe, it, expect } from "vitest";
 import type { DeliveryOrderRow, DeliveryProofReviewRow, operationOrderListRow } from "@/lib/queries";
-import { orderActionLines, type DeliveryArrangementRow } from "@carres/shared";
+import { deliveryMoneyHolds, orderActionLines, type DeliveryArrangementRow } from "@carres/shared";
 import type { DeliveryScopeRow } from "./delivery-work";
 import {
   operatingDaysFrom,
@@ -43,7 +43,10 @@ import {
   buildMonitorRails,
   monitorCardHref,
   emptyRangeSentence,
-  needConfirmedDateSentence,
+  ordersNeedDateSentence,
+  contactDeadlinePlacementOf,
+  contactDeadlineSentenceOf,
+  monitorStatusParamOf,
   activeFilterLabels,
   monthDaysOf,
   monthStepStart,
@@ -54,6 +57,7 @@ import {
   missingProofLabels,
   monitorRowAction,
   monitorScheduleStatusOf,
+  monitorPaymentOf,
   monitorRowActionText,
   sortByRequestedDeliveryDate,
   needsProof,
@@ -94,25 +98,110 @@ describe("schedule progress and departure blockers", () => {
         expected_arrival: "11:00", ...arranged })]]),
     })[0]!;
   }
-  it("preserves Confirmed while naming payment, stock and Logistics blockers in priority order", () => {
+  it("keeps Scheduled on line one and names the readiness blocker in the ruled precedence (§8.4, 2026-09-25)", () => {
+    /* Hold delivery → Goods not ready → Driver and vehicle not recorded → Ready. */
     const unpaid = monitorScheduleStatusOf(subject({ paid: 0, allocated_units: [] }, { driver_name: null }));
-    expect(unpaid.progress.label).toBe("Confirmed");
-    expect(unpaid.supporting).toBe("Payment blocked");
-    expect(monitorScheduleStatusOf(subject({ allocated_units: [] }, { driver_name: null })).supporting).toBe("Stock risk");
-    expect(monitorScheduleStatusOf(subject({}, { driver_name: null })).supporting).toBe("Logistics details incomplete");
-    expect(monitorScheduleStatusOf(subject()).supporting).toBe("DO not released");
+    expect(unpaid.progress.label).toBe("Scheduled");
+    expect(unpaid.supporting).toBe("Hold delivery");
+    expect(unpaid.tone).toBe("red");
+    expect(monitorScheduleStatusOf(subject({ allocated_units: [] }, { driver_name: null })).supporting).toBe("Goods not ready");
+    expect(monitorScheduleStatusOf(subject({}, { driver_name: null })).supporting).toBe("Driver and vehicle not recorded");
+    expect(monitorScheduleStatusOf(subject({}, { vehicle: null })).supporting).toBe("Driver and vehicle not recorded");
+    /* No DO yet is not a blocker word: the card prints the reason, never the
+       absence — with nothing in the way the line reads Ready. */
+    const ready = monitorScheduleStatusOf(subject());
+    expect(ready.supporting).toBe("Ready");
+    expect(ready.tone).toBe("green");
+    /* The time and the ETA are optional: neither one can block readiness. */
+    expect(monitorScheduleStatusOf(subject({}, { confirmed_time: null, expected_arrival: null })).supporting).toBe("Ready");
+    for (const retired of ["Payment blocked", "Stock risk", "Logistics details incomplete", "DO not released"]) {
+      expect(Object.values(MONITOR_COPY)).not.toContain(retired);
+    }
   });
-  it("does not let missing Sales facts replace the confirmed journey", () => {
+  it("a transfer card reads the transfer ladder on line one", () => {
+    const transfer = buildDeliveryMonitorCards({
+      orders: [order({ id: "t", so: 1402, paid: 100, delivery_stops: [
+        { leg: 1, partner_id: "nets", partner_name: "NETS", from_loc: "Klang WH", to_loc: "JB transit warehouse", scheduled_at: "2026-09-04T02:00:00Z", status: "pending" },
+        { leg: 2, partner_id: "al", partner_name: "AL", from_loc: "JB transit warehouse", to_loc: "Customer", scheduled_at: null, status: "pending" },
+      ] as never })],
+      deliveryOrders: [], attempts: [], handoverEvents: [], partnerNameById: new Map(), todayIso: TODAY,
+    });
+    expect(monitorScheduleStatusOf(transfer[0]!).progress.label).toBe("Transfer scheduled");
+    expect(transfer[0]!.statusLabel).toBe("Transfer scheduled");
+    expect(transfer[1]!.statusLabel).toBe("Get delivery date from AL");
+  });
+  it("does not let missing Sales facts replace the scheduled journey", () => {
     const card = subject({ building_type: null });
     expect(card.statusKey).toBe("details_incomplete");
     const status = monitorScheduleStatusOf(card);
-    expect(status.progress.label).toBe("Confirmed");
+    expect(status.progress.label).toBe("Scheduled");
     expect(status.supporting).toBe("Order details incomplete");
   });
   it("does not claim Paid or Ready from an unpriced order", () => {
     const card = subject({ order_lines: [{ id: "one", sku: "mattress:M1401F-K", qty: 1 }] });
     expect(monitorScheduleStatusOf(card).supporting).toBe("Order details incomplete");
     expect(card.payment.line1).toBe("No price yet");
+  });
+});
+
+describe("the Payment column says Hold delivery (owner ruling 2026-09-25, §3 · §8.3)", () => {
+  /* RM 1,200.00 of goods; `paid` decides what is owed. */
+  const priced = (over: Partial<operationOrderListRow> = {}) =>
+    order({ id: "pay", so: 1500, paid: 0, order_lines: [{ id: "l", sku: "mattress:M1401F-K", qty: 1, unit_price: 1200 }], ...over });
+  const open = (reason: string | null = "Cheque bounced") => ({ status: "open" as const, reason });
+  const cleared = { status: "cleared" as const, reason: "Old hold" };
+
+  it.each([
+    ["money owed, no approval", priced(), { line1: "Hold delivery", line2: "RM 1,200.00 unpaid", tone: "red" }],
+    ["a pending approval keeps the hold", priced({ order_delivery_payment_approvals: [{ status: "pending" }] }), { line1: "Hold delivery", line2: "RM 1,200.00 unpaid", tone: "red" }],
+    ["a refused approval keeps the hold", priced({ order_delivery_payment_approvals: [{ status: "refused" }] }), { line1: "Hold delivery", line2: "RM 1,200.00 unpaid", tone: "red" }],
+    ["part paid prints what is left", priced({ paid: 450.5 }), { line1: "Hold delivery", line2: "RM 749.50 unpaid", tone: "red" }],
+    ["one open Finance exception", priced({ paid: 1200, order_finance_exceptions: [open()] }), { line1: "Hold delivery", line2: "Finance hold · Cheque bounced", tone: "red" }],
+    ["several open — the Order Route's count", priced({ paid: 1200, order_finance_exceptions: [open(), open("Duplicate payment")] }), { line1: "Hold delivery", line2: "Finance hold · 2 reasons", tone: "red" }],
+    ["an open exception read without its reason", priced({ paid: 1200, order_finance_exceptions: [{ status: "open" }] }), { line1: "Hold delivery", line2: "Finance hold", tone: "red" }],
+    ["Finance wins over money owed", priced({ order_finance_exceptions: [open()] }), { line1: "Hold delivery", line2: "Finance hold · Cheque bounced", tone: "red" }],
+    ["an approval never clears a Finance hold", priced({ order_finance_exceptions: [open()], order_delivery_payment_approvals: [{ status: "approved" }] }), { line1: "Hold delivery", line2: "Finance hold · Cheque bounced", tone: "red" }],
+    ["paid in full", priced({ paid: 1200 }), { line1: "Paid", line2: null, tone: "green" }],
+    ["a cleared exception holds nothing", priced({ paid: 1200, order_finance_exceptions: [cleared] }), { line1: "Paid", line2: null, tone: "green" }],
+    ["an approval granted before the closure", priced({ order_delivery_payment_approvals: [{ status: "approved" }] }), { line1: "Collect RM 1,200.00", line2: "Cash on delivery", tone: "none" }],
+    ["an unpriced order", order({ id: "np", so: 1501, paid: 0 }), { line1: "No price yet", line2: null, tone: "none" }],
+  ] as const)("%s", (_name, row, expected) => {
+    expect(monitorPaymentOf(row)).toEqual(expected);
+  });
+
+  it("is red exactly when the DO money gate holds — one predicate (Law D)", () => {
+    for (const paid of [0, 600, 1200]) {
+      for (const approvals of [[], [{ status: "pending" }], [{ status: "approved" }]]) {
+        for (const exceptions of [[], [open()], [cleared]]) {
+          const row = priced({ paid, order_delivery_payment_approvals: approvals, order_finance_exceptions: exceptions });
+          expect(monitorPaymentOf(row).tone === "red").toBe(
+            deliveryMoneyHolds({ outstanding: 1200 - paid, paymentApprovals: approvals as never, financeExceptions: exceptions }),
+          );
+        }
+      }
+    }
+  });
+
+  it("never prints a retired word, never a doubled marker, and the retired keys are gone", () => {
+    const words = [priced(), priced({ order_finance_exceptions: [open()] })].flatMap((r) => {
+      const p = monitorPaymentOf(r);
+      return [p.line1, p.line2 ?? ""];
+    });
+    for (const w of words) {
+      expect(w).not.toMatch(/Do not deliver|still to collect|Finance is holding|RM RM/);
+    }
+    for (const key of ["doNotDeliver", "stillToCollect", "financeHolding"]) {
+      expect(MONITOR_COPY).not.toHaveProperty(key);
+    }
+  });
+
+  it("the schedule card's readiness line reads the same function", () => {
+    const card = buildDeliveryMonitorCards({
+      orders: [priced({ order_finance_exceptions: [open()], paid: 1200 })],
+      deliveryOrders: [], attempts: [], handoverEvents: [], partnerNameById: new Map(), todayIso: TODAY,
+    })[0]!;
+    expect(card.payment).toEqual({ line1: "Hold delivery", line2: "Finance hold · Cheque bounced", tone: "red" });
+    expect(monitorScheduleStatusOf(card).supporting).toBe("Hold delivery");
   });
 });
 const WINDOW = [
@@ -402,7 +491,8 @@ describe("buildDeliveryMonitorCards", () => {
       },
     );
     expect(out[0]!.statusKey).toBe("confirmed");
-    expect(out[0]!.statusLabel).toBe("Scheduled for Fri, 4 Sep");
+    /* The day is column 8's; the status never repeats it (owner ruling 2026-09-25). */
+    expect(out[0]!.statusLabel).toBe("Scheduled");
     expect(out[0]!.statusTone).toBe("green");
     expect(out[0]!.statusSecond).toBe("09:00–11:00");
     /* A SCHEDULED DATE alone completes the arrangement — the time is
@@ -412,7 +502,7 @@ describe("buildDeliveryMonitorCards", () => {
       { arrangements: [arrangement({ order_id: "a", partner_id: "p-nets", partner_name: "NETS", confirmed_date: "2026-09-04" })] },
     );
     expect(dayOnly[0]!.statusKey).toBe("confirmed");
-    expect(dayOnly[0]!.statusLabel).toBe("Scheduled for Fri, 4 Sep");
+    expect(dayOnly[0]!.statusLabel).toBe("Scheduled");
     expect(dayOnly[0]!.statusSecond).toBeNull();
   });
 
@@ -431,8 +521,8 @@ describe("buildDeliveryMonitorCards", () => {
     it("a recorded delivery with an empty photo ledger and no signed DO is owed BOTH files", () => {
       const c = delivered({ ops_order_control: { delivery_photos: [] } });
       expect(c.statusKey).toBe("delivered");
-      /* The result stays `Delivered` — the evidence is a separate fact. */
-      expect(c.statusLabel).toBe("Delivered");
+      /* The result stays `Delivered to customer` — the evidence is a separate fact. */
+      expect(c.statusLabel).toBe("Delivered to customer");
       expect(c.missingProof).toEqual({ photo: true, signedDo: true });
       expect(needsProof(c)).toBe(true);
       expect(missingProofLabels(c)).toEqual(["Upload delivery photo", "Upload signed Delivery Order"]);
@@ -627,7 +717,7 @@ describe("expired planned time", () => {
     expect(out[0]!.statusKey).toBe("overdue");
     expect(out[0]!.statusLabel).toBe("Overdue");
     expect(out[0]!.statusTone).toBe("red");
-    expect(out[0]!.statusSecond).toBe("NETS must record the result");
+    expect(out[0]!.statusSecond).toBe("Ask NETS for the result");
     expect(out[0]!.missingProof).toEqual(NO_PROOF_MISSING);
   });
 });
@@ -923,7 +1013,7 @@ describe("the schedule separates customer deliveries from transfers", () => {
   it("keeps an intermediate completion as an arrival even without a DO", () => {
     const set = journey();
     expect(set.map(card => card.eventType)).toEqual(["transfer", "transfer", "delivery"]);
-    expect(set[0]).toMatchObject({ statusKey: "arrived", statusSecond: "Ipoh WH", settled: true, contactOverdue: false });
+    expect(set[0]).toMatchObject({ statusKey: "arrived", statusLabel: "Arrived at Ipoh WH", statusSecond: null, settled: true, contactOverdue: false });
     expect(set[0]!.missingProof).toEqual({ photo: false, signedDo: false });
   });
 
@@ -939,16 +1029,16 @@ describe("the schedule separates customer deliveries from transfers", () => {
   });
 });
 
-describe("the spanning empty range", () => {
-  it("prints ONE sentence for the whole empty window", () => {
-    expect(emptyRangeSentence(["2026-09-05", "2026-09-11"], (iso) => iso)).toBe(
-      "No deliveries are scheduled from 2026-09-05 to 2026-09-11.",
-    );
+describe("the spanning empty range (owner ruling 2026-09-25)", () => {
+  it("names the window by its own word, never by a pair of dates", () => {
+    expect(emptyRangeSentence("week", null)).toBe("No delivery scheduled this week.");
+    expect(emptyRangeSentence("day", "Sat, 5 Sep")).toBe("No delivery scheduled on Sat, 5 Sep.");
+    expect(emptyRangeSentence("month", null)).toBe("No delivery scheduled this month.");
   });
 
-  it("counts the confirmed-date need truthfully, singular included", () => {
-    expect(needConfirmedDateSentence(86)).toBe("86 deliveries need a confirmed date.");
-    expect(needConfirmedDateSentence(1)).toBe("1 delivery needs a confirmed date.");
+  it("counts the orders still needing a date truthfully, singular included", () => {
+    expect(ordersNeedDateSentence(86)).toBe("86 orders still need a delivery date.");
+    expect(ordersNeedDateSentence(1)).toBe("1 order still needs a delivery date.");
   });
 });
 
@@ -991,7 +1081,7 @@ describe("activeFilterLabels", () => {
     ).toEqual([
       /* The QUEUE is named after the job (owner ruling 2026-09-10); the
          summary names the queue the operator clicked, not the cell word. */
-      MONITOR_COPY.callCustomer,
+      "Get delivery date",
       MONITOR_COPY.noLogistics,
       MONITOR_STATUS_LABEL.waiting_pickup,
     ]);
@@ -1057,7 +1147,8 @@ describe("buildMonitorRails", () => {
   it("DELIVERY STATUS counts every rung of the shared dictionary, zero printed", () => {
     const rails = buildMonitorRails(set, noFilters, partners);
     expect(rails.status).toMatchObject({ waiting_pickup: 1, collected: 1, delivering: 1, assign_logistics: 0 });
-    expect(Object.keys(rails.status)).toHaveLength(13);
+    /* One option per printed word: every §8.4 rung of both ladders. */
+    expect(Object.keys(rails.status)).toHaveLength(17);
     /* Card 20 — the intermediate leg's own word is a rung of its own. */
     expect(rails.status).toHaveProperty("arrived", 0);
     const narrowed = buildMonitorRails(set, { ...noFilters, region: "Selangor" }, partners);
@@ -1149,25 +1240,32 @@ describe("the ruled rail groups (owner correction 2026-09-07)", () => {
   });
 
   it("DELIVERY STATUS is the shared actor-first dictionary in ladder order (§8.4)", () => {
-    /* ⭐ ONE OPTION PER PRINTED WORD (owner ruling 2026-09-14). Both contact
-       rungs print `Call customer`, so the menu offers it ONCE —
-       `operation_must_call` is not a second option spelling the same word. */
+    /* ⭐ ONE OPTION PER PRINTED WORD (owner rulings 2026-09-14 / 2026-09-25).
+       The two contact rungs print two sentences, so they are two options;
+       the time-only rung is gone (a day without a time is complete). */
     expect(MONITOR_STATUS_FILTERS).toEqual([
-      "assign_logistics", "partner_must_contact", "waiting_customer_reply", "confirm_time",
-      "confirmed", "waiting_pickup", "collected", "delivering", "overdue", "arrived", "delivered", "failed",
+      "assign_logistics", "partner_must_contact", "operation_must_call", "waiting_customer_reply",
+      "confirmed", "transfer_scheduled", "waiting_pickup", "collected", "collected_for_transfer",
+      "delivering", "in_transit", "overdue", "arrived", "delivered", "failed", "transfer_failed",
       "details_incomplete",
     ]);
-    expect(MONITOR_STATUS_LABEL.partner_must_contact).toBe("Call customer");
-    expect(MONITOR_STATUS_LABEL.operation_must_call).toBe("Call customer");
-    expect(MONITOR_STATUS_LABEL.confirm_time).toBe("Confirm delivery time");
-    /* No option names a party or joins its clauses with a dash. */
+    /* The option words are the column's words with the role word where the
+       column prints the real name. */
+    expect(MONITOR_STATUS_LABEL.assign_logistics).toBe("Assign logistics");
+    expect(MONITOR_STATUS_LABEL.partner_must_contact).toBe("Get delivery date from logistics");
+    expect(MONITOR_STATUS_LABEL.operation_must_call).toBe("Get delivery date from customer");
+    expect(MONITOR_STATUS_LABEL.confirmed).toBe("Scheduled");
+    expect(MONITOR_STATUS_LABEL.transfer_scheduled).toBe("Transfer scheduled");
+    expect(MONITOR_STATUS_LABEL.waiting_pickup).toBe("Waiting for logistics pickup");
+    expect(MONITOR_STATUS_LABEL.collected).toBe("Collected by logistics");
+    expect(MONITOR_STATUS_LABEL.delivering).toBe("On the way to customer");
+    expect(MONITOR_STATUS_LABEL.delivered).toBe("Delivered to customer");
+    expect(MONITOR_STATUS_LABEL.failed).toBe("Failed Delivery");
+    expect(MONITOR_STATUS_LABEL.transfer_failed).toBe("Transfer failed");
+    expect(MONITOR_STATUS_LABEL.details_incomplete).toBe("Order details incomplete");
     for (const key of MONITOR_STATUS_FILTERS) {
       expect(MONITOR_STATUS_LABEL[key]).not.toMatch(/[—–]/);
     }
-    expect(MONITOR_STATUS_LABEL.assign_logistics).toBe("Operation must assign logistics");
-    expect(MONITOR_STATUS_LABEL.waiting_pickup).toBe("Waiting for logistics pickup");
-    expect(MONITOR_STATUS_LABEL.delivering).toBe("Logistics is delivering to the customer");
-    expect(MONITOR_STATUS_LABEL.details_incomplete).toBe("Order details incomplete");
     for (const retired of ["Waiting for warehouse", "Ready for handover", "Out for delivery", "Delivery confirmed", "Waiting for customer date"]) {
       expect(Object.values(MONITOR_STATUS_LABEL)).not.toContain(retired);
     }
@@ -1620,8 +1718,35 @@ describe("the contact deadline — three working days, counted once", () => {
   });
 
   it("the queue is named after the JOB and the cell keeps the FACT", () => {
-    expect(MONITOR_VIEW_LABEL.no_confirmed_date).toBe("Call customer");
+    expect(MONITOR_VIEW_LABEL.no_confirmed_date).toBe("Get delivery date");
     expect(MONITOR_COPY.noConfirmedDate).toBe("No confirmed date");
+  });
+
+  it("⭐ the contact deadline is stated once, where the §8.4 table puts it (owner ruling 2026-09-25)", () => {
+    const base = datedCard({ scopeId: "x", confirmedDate: null, booked: false, contactDueIso: "2026-09-08" });
+    const fmt = (iso: string) => `D(${iso})`;
+    /* Under the two contact rungs: line two, the glyph and the day. */
+    expect(contactDeadlinePlacementOf({ ...base, statusKey: "partner_must_contact" })).toBe("line2");
+    expect(contactDeadlinePlacementOf({ ...base, statusKey: "operation_must_call" })).toBe("line2");
+    /* Under `Order details incomplete`: the missing fact keeps line two and the
+       deadline moves to the cell's title, accessible name, Search and Export. */
+    expect(contactDeadlinePlacementOf({ ...base, statusKey: "details_incomplete" })).toBe("title");
+    expect(contactDeadlineSentenceOf({ ...base, statusKey: "details_incomplete" }, fmt)).toBe("Contact deadline D(2026-09-08)");
+    expect(contactDeadlineSentenceOf({ ...base, statusKey: "details_incomplete", contactOverdue: true }, fmt)).toBe(
+      "Contact deadline D(2026-09-08) · overdue, the deadline does not move",
+    );
+    /* Anywhere else no deadline is drawn — `Asked {date}` keeps its line. */
+    expect(contactDeadlinePlacementOf({ ...base, statusKey: "waiting_customer_reply" })).toBeNull();
+    expect(contactDeadlinePlacementOf({ ...base, statusKey: "assign_logistics" })).toBeNull();
+    /* A row whose customer named no day owes none. */
+    expect(contactDeadlinePlacementOf({ ...base, statusKey: "partner_must_contact", contactDueIso: null })).toBeNull();
+  });
+
+  it("a stored link still resolves: the retired time-only rung opens Scheduled", () => {
+    expect(monitorStatusParamOf("confirm_time")).toBe("confirmed");
+    expect(monitorStatusParamOf("transfer_failed")).toBe("transfer_failed");
+    expect(monitorStatusParamOf("nonsense")).toBeNull();
+    expect(monitorStatusParamOf(null)).toBeNull();
   });
 });
 

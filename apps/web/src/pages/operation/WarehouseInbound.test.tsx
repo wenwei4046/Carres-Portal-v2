@@ -285,48 +285,40 @@ describe("Inbound · the three filters", () => {
 });
 
 describe("Inbound · the governed quantities", () => {
-  it("prints each governed quantity with its own word, in ONE column", async () => {
-    mount("&site=w");
-    const row = await screen.findByTestId("inbound-row-PO-1");
-    const cells = within(row);
-    /* Order 10 · Received 6 · Pending 4 — the operator never subtracts, and
-       the two damaged pieces never settled the supplier's debt. Four columns
-       became one cell so the Receive button could stay on screen. */
-    expect(cells.getByText("Order Qty 10")).toBeInTheDocument();
-    expect(cells.getByText("Received Qty 6")).toBeInTheDocument();
-    expect(cells.getByText("Pending Delivery Qty 4")).toBeInTheDocument();
-    expect(cells.getByText("Damaged Qty 2")).toBeInTheDocument();
-    expect(cells.getByText("Part received")).toBeInTheDocument();
-  });
-
-  it("keeps every quantity available on its own sortable column", async () => {
+  it("prints the three governed quantities as three numbers in three columns (owner 2026-09-25)", async () => {
     mount("&site=w");
     await screen.findByTestId("inbound-row-PO-1");
-    /* Hidden by default, never deleted — the Columns chooser still offers
-       each one, so per-column sort and number-range filtering survive. */
-    for (const label of [
-      "Order Qty",
-      "Received Qty",
-      "Pending Delivery Qty",
-      "Damaged Qty",
-      "Wrong Item Qty",
-    ])
-      expect(
-        screen.queryByRole("button", { name: label }),
-      ).not.toBeInTheDocument();
+    /* Order 10 · Received 6 · Pending 4 — the operator never subtracts, and
+       the two damaged pieces never settled the supplier's debt. */
+    expect(screen.getByTestId("inbound-qty-orderQty-PO-1")).toHaveTextContent("10");
+    expect(screen.getByTestId("inbound-qty-receivedQty-PO-1")).toHaveTextContent("6");
+    expect(screen.getByTestId("inbound-qty-pendingDeliveryQty-PO-1")).toHaveTextContent("4");
+    /* Damaged and Wrong Item stay one click away in Columns; the status word
+       is not a default column either. */
+    expect(screen.queryByRole("button", { name: "Damaged Qty" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Wrong Item Qty" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Status" })).not.toBeInTheDocument();
   });
 
-  it("an unreadable receipt reads Not recorded, never zero", async () => {
+  it("the three default quantities keep their own sortable, number-filterable columns", async () => {
+    mount("&site=w");
+    await screen.findByTestId("inbound-row-PO-1");
+    for (const label of ["Order Qty", "Received Qty", "Pending Delivery Qty"])
+      expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+  });
+
+  it("an unreadable receipt reads Not recorded, never zero, and the Item cell says why", async () => {
     rows = inboundArrivals({ ...base, results: [] });
     mount("&site=w");
-    const row = await screen.findByTestId("inbound-row-PO-1");
-    expect(within(row).getAllByText("Not recorded").length).toBeGreaterThan(0);
-    expect(within(row).getByText("Records incomplete")).toBeInTheDocument();
+    await screen.findByTestId("inbound-row-PO-1");
+    for (const key of ["orderQty", "receivedQty", "pendingDeliveryQty"])
+      expect(screen.getByTestId(`inbound-qty-${key}-PO-1`)).toHaveTextContent("Not recorded");
+    expect(screen.getByTestId("inbound-item-first-PO-1")).toHaveTextContent("Records incomplete");
   });
 });
 
 describe("Inbound · the row's own facts", () => {
-  it("the Document number opens the document, with PO Issued beneath", async () => {
+  it("the PO No opens the document; PO Issued is one click away in Columns, not on the row", async () => {
     mount("&site=w");
     await waitFor(() =>
       expect(screen.getByTestId("inbound-document-PO-1")).toHaveAttribute(
@@ -334,20 +326,22 @@ describe("Inbound · the row's own facts", () => {
         "/operation/procurement?po=PO-1",
       ),
     );
-    expect(
-      screen.getByText(`PO Issued ${fmtDate("2026-08-01")}`),
-    ).toBeInTheDocument();
+    expect(screen.queryByText(`PO Issued ${fmtDate("2026-08-01")}`)).toBeNull();
+    expect(screen.queryByRole("button", { name: "PO Issued" })).toBeNull();
   });
 
-  it("keeps PO Delivery Date, Supplier Delivery Date and receipt dates apart", async () => {
+  it("keeps PO Delivery Date, Supplier Delivery Date and Goods Received Date apart, one fact per cell", async () => {
     mount("&site=w");
-    const row = await screen.findByTestId("inbound-row-PO-1");
+    await screen.findByTestId("inbound-row-PO-1");
     /* The PO's own official date — not the supplier's answer, which has
        never been given. */
-    expect(within(row).getByText(`PO Delivery Date: ${fmtDate("2026-09-01")}`)).toBeInTheDocument();
+    expect(screen.getByTestId("inbound-po-date-PO-1")).toHaveTextContent(fmtDate("2026-09-01"));
     /* No evidenced supplier reply exists, so the supplier column says so
        rather than repeating Carres's own plan back as a promise. */
-    expect(within(row).getByText("Supplier Delivery Date: Not confirmed")).toBeInTheDocument();
+    expect(screen.getByTestId("inbound-supplier-date-PO-1")).toHaveTextContent("Not confirmed");
+    /* Two trucks: the cell prints the registry's count, never only the latest
+       date; each date stands beside its own DO number in the expansion. */
+    expect(screen.getByTestId("inbound-received-PO-1")).toHaveTextContent("2 receipt dates");
   });
 
   it("each delivery note links to its own receipt and actual date", async () => {
@@ -375,6 +369,16 @@ describe("Inbound · the row's own facts", () => {
     );
     expect(screen.queryByText("Receiving records")).toBeNull();
     expect(screen.getByTestId("inbound-receipt-r1")).toHaveTextContent("DO-8821");
+    /* Every posted receipt with its own DO number and actual date. */
+    expect(screen.getByTestId("inbound-expansion-receipt-r1")).toHaveTextContent(
+      `DO-8821`,
+    );
+    expect(screen.getByTestId("inbound-expansion-receipt-r1")).toHaveTextContent(
+      `Goods Received Date ${fmtDate("2026-09-01")}`,
+    );
+    expect(screen.getByTestId("inbound-expansion-receipt-r2")).toHaveTextContent(
+      `Goods Received Date ${fmtDate("2026-09-04")}`,
+    );
     /* The link-away door is gone — receiving happens on this page. */
     expect(
       screen.queryByRole("link", { name: "Open Receiving Session" }),
@@ -466,7 +470,7 @@ describe("Inbound · the list itself", () => {
     h.loading = true;
     mount("&site=w");
     expect(
-      await screen.findByRole("button", { name: "Receiving progress" }),
+      await screen.findByRole("button", { name: "Pending Delivery Qty" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "PO-1" })).toBeNull();
   });
@@ -480,33 +484,68 @@ describe("Inbound · the list itself", () => {
   });
 });
 
-describe("Inbound · the listing fits the screen", () => {
-  /** The default set, in order. Nine columns, not fourteen — the first cut
-   *  declared 2,130px of them inside ~1,010px of grid and pushed every date,
-   *  every quantity and the Receive button off the right edge. */
-  /** In operational priority order. The grid's width is not ours to choose —
-   *  production gives it 826px at a 1,366px viewport, because the portal nav
-   *  and the filter rail take 480px before it starts — so ORDER is what keeps
-   *  the important things on screen. */
-  const DEFAULT_COLUMNS = ["Document", "Receiving", "Product", "Receiving progress"];
+describe("Inbound · the owner's eleven columns (2026-09-25)", () => {
+  /** One row is one arrangement, one fact per cell, in the owner's order:
+   *  the three dates first (planned · supplier-confirmed · actual), then the
+   *  two documents and the supplier, then the goods and the three
+   *  quantities, `Receive` last. */
+  const DEFAULT_COLUMNS = [
+    "PO Delivery Date",
+    "Supplier Delivery Date",
+    "Goods Received Date",
+    "PO No",
+    "Supplier",
+    "Supplier DO No",
+    "Item",
+    "Order Qty",
+    "Received Qty",
+    "Pending Delivery Qty",
+  ];
 
-  it("keeps the action beside the identity, ahead of every other column", async () => {
+  it("prints the ten sortable heads in the owner's order and Receive as the last cell", async () => {
     mount("&site=w");
     await screen.findByTestId("inbound-row-PO-1");
     for (const name of DEFAULT_COLUMNS)
       expect(screen.getByRole("button", { name })).toBeInTheDocument();
     const headers = screen
       .getAllByRole("button")
-      .map((b) => b.textContent?.trim() ?? "")
+      .map((b) => b.getAttribute("aria-label") ?? b.textContent?.trim() ?? "")
       .filter((t) => DEFAULT_COLUMNS.includes(t));
-    /* THE ACTION IS SECOND. Anything that pushes it rightward puts it off a
-       826px grid, which is what production actually gives this page. */
-    expect(headers.slice(0, 4)).toEqual([
-      "Document",
-      "Receiving",
-      "Product",
-      "Receiving progress",
-    ]);
+    expect(headers).toEqual(DEFAULT_COLUMNS);
+    expect(screen.getByTestId("inbound-receive-PO-1")).toHaveTextContent("Receive");
+    /* The retired composite heads never come back. */
+    for (const retired of ["Document", "Receiving progress", "Product", "Supplier & DO No"])
+      expect(screen.queryByRole("button", { name: retired })).toBeNull();
+  });
+
+  it("several goods print `{n} items` with the expansion; one good prints its name", async () => {
+    rows = inboundArrivals({
+      ...base,
+      skuNames: [...(base.skuNames ?? []), { sku: "BED-K", name: "Oak Bedframe King" }],
+      lines: [
+        ...(base.lines ?? []),
+        { po_id: "PO-1", qty: 2, destination_id: null, sku: "BED-K", identity_mode: "exact_unit", received_qty: 0 },
+      ],
+    });
+    mount("&site=w");
+    await screen.findByTestId("inbound-row-PO-1");
+    expect(screen.getByTestId("inbound-item-PO-1")).toHaveTextContent("2 items");
+    fireEvent.click(screen.getByTestId("inbound-expand-PO-1"));
+    expect(screen.getByText("Oak Bedframe King")).toBeInTheDocument();
+  });
+
+  it("an arrangement past its date with no receipt says so on the Item cell's first line, never a colour", async () => {
+    rows = inboundArrivals({
+      ...base,
+      lines: (base.lines ?? []).map((l) => (l.po_id === "PO-1" ? { ...l, received_qty: 0, damaged_qty: 0 } : l)),
+      receipts: [],
+      results: [],
+    });
+    mount("&site=w");
+    await screen.findByTestId("inbound-row-PO-1");
+    expect(screen.getByTestId("inbound-item-first-PO-1")).toHaveTextContent(
+      `Expected ${fmtDate("2026-09-01")} · not received`,
+    );
   });
 
   it("does not repeat the Site name on every row inside its own tab", async () => {
@@ -533,12 +572,16 @@ describe("Inbound · the listing fits the screen", () => {
     expect(screen.getByLabelText("Arrival date to")).toBeInTheDocument();
   });
 
-  it("keeps the supplier and its delivery notes in one association", async () => {
+  it("the supplier and its delivery notes are two cells; two trucks list two DO numbers, each its own link", async () => {
     mount("&site=w");
-    const row = await screen.findByTestId("inbound-row-PO-1");
-    const cell = within(row);
-    expect(cell.getByText("Factory")).toBeInTheDocument();
-    expect(cell.getByTestId("inbound-receipt-r1")).toHaveTextContent("DO-8821");
-    expect(cell.getByTestId("inbound-receipt-r2")).toHaveTextContent("DO-8930");
+    await screen.findByTestId("inbound-row-PO-1");
+    expect(screen.getByTestId("inbound-supplier-PO-1")).toHaveTextContent("Factory");
+    const doCell = screen.getByTestId("inbound-do-PO-1");
+    expect(within(doCell).getByTestId("inbound-receipt-r1")).toHaveTextContent("DO-8821");
+    expect(within(doCell).getByTestId("inbound-receipt-r2")).toHaveTextContent("DO-8930");
+    expect(within(doCell).getByTestId("inbound-receipt-r2")).toHaveAttribute(
+      "href",
+      "/operation?tab=receiving&session=r2",
+    );
   });
 });

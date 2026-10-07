@@ -2695,6 +2695,8 @@ export interface operationOrderThreadRow {
  *  compat (print-DO and other legacy callers) — but the kanban now reads from
  *  threads to honor multi-supplier scenarios. */
 export interface operationOrderListRow {
+  /** Immutable first request, embedded from revision 1; missing is not current-date fallback. */
+  original_request?: Array<{ revision: number; snapshot: { header: { delivery_date?: string | null; delivery_date_tbd?: boolean | null } } }>;
   id: string;
   so: number;
   /**
@@ -2914,7 +2916,10 @@ export interface operationOrderListRow {
    *  Finance exception (0355) and a loan still out (0209/0217). Optional so an
    *  older Worker that does not select them raises nothing (UNKNOWN never
    *  accuses). */
-  order_finance_exceptions?: { status: "open" | "cleared" }[];
+  /** `reason` rides the read since 2026-10-06 so Monitor's `Payment` cell can
+   *  print `Finance hold · {reason}` (Delivery MASTER §3). Optional: an older
+   *  Worker without it prints `Finance hold`. */
+  order_finance_exceptions?: { status: "open" | "cleared"; reason?: string | null }[];
   /** 0362 — the delivery payment approvals; Monitor's `Payment` cell reads
    *  `paymentApprovalOpensGate` over them for the authoritative COD line
    *  (Delivery MASTER §8.3). Optional: absent = no approval carried. */
@@ -3021,7 +3026,7 @@ export interface opsRemarkEmbed {
    *  column (Jess 2026-06-25); operation fills it from the drawer or the cell. */
   logistic_eta?: string | null;
   /** Payment + storage overlay (C2 Next-action, 2026-07-08) — the Orders list now
-   *  also reads these so the "Collect $" payment-hold + "Call customer" lamps can
+   *  also reads these so the "Collect $" payment-hold + customer-call lamps can
    *  compute. All optional so pre-C2 fixtures keep typechecking. */
   balance?: number | string | null;
   payment_status?: string | null;
@@ -3094,8 +3099,15 @@ export interface operationOrdersListResponse {
    * rentals excluded, search NOT applied — counted by the server. `null` when
    * the count could not be read; absent from an older Worker. Never derive it
    * from `orders.length` (the list stops at 500 and a search replaces it).
+   * A paged read carries it on its first page only.
    */
   salesOrderTotal?: number | null;
+  /**
+   * `paged=1` only: the cursor of the next page, `null` on the last page.
+   * Absent from an unpaged read and from an older Worker that ignores
+   * `paged` — either way there is no next page to ask for.
+   */
+  nextCursor?: string | null;
 }
 
 /** GET /api/operation/orders/:id — composed drawer payload (orders.ts §97). */
@@ -5834,6 +5846,87 @@ export function useOperationOrders(
   });
 }
 
+/**
+ * ⭐ EVERY PAGE OF THE SALES ORDERS REGISTER, OR NONE (SO A3-3, 2026-10-06 ·
+ * Orders MASTER §0.0 "Register, filters, reports and exports").
+ *
+ * Follows `nextCursor` from the first page to the last and answers ONE list:
+ * every order the caller may read in this scope, once each, in the server's
+ * order, with the first page's `salesOrderTotal`. Nothing is answered until
+ * the last page is in, so no count, total, group or export can be built from
+ * part of the population; a page that fails fails the whole read. A cursor
+ * that does not move on is an error, never a loop.
+ */
+export async function fetchEverySalesOrderPage(
+  readPage: (after: string | null) => Promise<operationOrdersListResponse>,
+): Promise<operationOrdersListResponse> {
+  const byId = new Map<string, operationOrderListRow>();
+  const asked = new Set<string>();
+  let salesOrderTotal: number | null | undefined;
+  let after: string | null = null;
+  for (;;) {
+    const page = await readPage(after);
+    if (after === null) salesOrderTotal = page.salesOrderTotal;
+    for (const order of page.orders ?? []) if (!byId.has(order.id)) byId.set(order.id, order);
+    const next = page.nextCursor ?? null;
+    if (next === null) break;
+    if (asked.has(next)) throw new Error("Sales orders could not be loaded.");
+    asked.add(next);
+    after = next;
+  }
+  return {
+    orders: [...byId.values()],
+    ...(salesOrderTotal === undefined ? {} : { salesOrderTotal }),
+  };
+}
+
+/**
+ * The Sales Orders Register's list: the WHOLE permitted population for these
+ * filters (`stage=proceeded`, optional search), read page by page through
+ * `paged=1` and answered once complete. Paging changes how it loads, never
+ * what it holds — the rail summary, the footer, the groups, Cards and Export
+ * all read the same complete list. Keyed under `["operation","orders"]`, so
+ * an order write's blunt invalidation refreshes it with every other list.
+ */
+export function useSalesOrderRegisterOrders(filters: operationOrderFilters) {
+  return useQuery({
+    queryKey: [...qk.operation.orders(filters), "every-page"],
+    queryFn: ({ signal }) =>
+      fetchEverySalesOrderPage((after) => {
+        const params = new URLSearchParams(operationOrdersSearch(filters).slice(1));
+        params.set("paged", "1");
+        if (after) params.set("after", after);
+        return apiFetch<operationOrdersListResponse>(`/api/operation/orders?${params}`, { signal });
+      }),
+    staleTime: 30_000,
+    /* Same reason as `useOperationOrders`: a new search keeps the last
+       complete list on screen instead of unmounting the grid mid-keystroke. */
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * How many Sales Orders the Sales Orders Register answers for this search —
+ * the Register's own read (`stage=proceeded` + `search`), counted on the
+ * server (`count=only`) through the same population, the same search and the
+ * same caller. The Sales Order page's `· {n} orders ›` reads this, so the
+ * number is what its door opens (Law D). Keyed under `["operation","orders"]`
+ * so an order write's blunt invalidation refreshes it with the Register.
+ */
+export function useSalesOrderRegisterSearchCount(search: string, enabled = true) {
+  const trimmed = search.trim();
+  const filters: operationOrderFilters = { stage: "proceeded", search: trimmed };
+  return useQuery<{ count: number }>({
+    queryKey: [...qk.operation.orders(filters), "count"],
+    queryFn: () =>
+      apiFetch<{ count: number }>(
+        "/api/operation/orders" + operationOrdersSearch(filters) + "&count=only",
+      ),
+    enabled: enabled && trimmed !== "",
+    staleTime: 30_000,
+  });
+}
+
 /** Drawer detail. `null` id disables the query (mirror of usePrincipalDealer). */
 /**
  * 【DELIVERY】 CARD 19 — the operator's document word (`SO-1362`) resolved to
@@ -6793,35 +6886,6 @@ export function useSaveSalesOrderRevision(
         qc.invalidateQueries({ queryKey: qk.operation.order(orderId) }),
         qc.invalidateQueries({ queryKey: ["operation", "orders"] }),
       ]);
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
-/** POST / — the office birth door. Returns the new order id + SO number. */
-export function useCreateSalesOrder(
-  opts?: Partial<
-    UseMutationOptions<
-      { id: string; so: number; revision: number },
-      ApiError,
-      { header: Record<string, unknown>; lines: Omit<SaveRevisionLineInput, "id">[] }
-    >
-  >,
-) {
-  const qc = useQueryClient();
-  return useMutation<
-    { id: string; so: number; revision: number },
-    ApiError,
-    { header: Record<string, unknown>; lines: Omit<SaveRevisionLineInput, "id">[] }
-  >({
-    mutationFn: (input) =>
-      apiFetch<{ id: string; so: number; revision: number }>("/api/operation/orders", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });

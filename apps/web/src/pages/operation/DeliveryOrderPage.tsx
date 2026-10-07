@@ -10,6 +10,7 @@ import {
   signedDeliveryDocumentOf,
   deliveryReasonLabel,
   deliveryScopeSentence,
+  financeHoldLineOf,
   orderDeliveryGroups,
   type DeliveryGroupKey,
   type OrderActionTone,
@@ -26,6 +27,7 @@ import { useDeliveryOrder, useDeliveryPhotos } from "@/lib/queries";
 import { personInitials, avatarColor } from "@/lib/staff-avatar";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { useOpenWorkSet, type WorkRow } from "./use-open-work";
+import { printDeliveryOrder } from "./record-print";
 import WarehouseHandoverBlock from "./components/WarehouseHandoverBlock";
 import DeliveryResultAction from "./components/DeliveryResultAction";
 import DeliveryEvidencePanel from "./components/DeliveryEvidencePanel";
@@ -212,13 +214,7 @@ export default function DeliveryOrderPage() {
   const openPdf = async () => {
     if (!d || !order) return;
     try {
-      const payload = await apiFetch<DoTemplateData>(
-        `/api/operation/orders/${order.id}/print-do-data?do_number=${encodeURIComponent(d.do_number)}`,
-      );
-      const blob = await renderDoPdf(payload);
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      await printDeliveryOrder(order.id, d.do_number);
     } catch (e) {
       toast.error(
         e instanceof ApiError ? e.message : `Delivery Order ${d.do_number} PDF failed`,
@@ -629,7 +625,9 @@ export default function DeliveryOrderPage() {
                 ))}
                 {openFinance.map((e) => (
                   <li key={e.id} className="flex flex-col">
-                    <span className="text-body text-base-900">Finance is holding this delivery: {e.reason}</span>
+                    {/* COPY (Card 16, re-worded 2026-09-25): `Hold delivery · Finance hold · {reason}`,
+                        one line per open exception, through the shared spelling. */}
+                    <span className="text-body text-base-900">Hold delivery · {financeHoldLineOf([e])}</span>
                     <span className="text-label text-base-600">{e.opened_at ? fmtDate(e.opened_at) : "Open"}</span>
                   </li>
                 ))}

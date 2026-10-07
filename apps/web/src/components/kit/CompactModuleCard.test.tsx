@@ -93,6 +93,22 @@ describe("CompactModuleCard — shared header", () => {
     expect(screen.getByText("{full address}")).toBeTruthy();
   });
 
+  /* TWO DATES, TWO NAMES (owner ruling 2026-10-06; UI Master approved the kit
+     word). The planned date is `Planned production start` on the card and in
+     its day-count tooltip; `Proceed Date` is only the actual hand-off. The words
+     are written out, not read from CARD_WORDS, so the old name cannot return
+     through the constant. */
+  it("names the planned date `Planned production start`, in the sales facts and the day-count tooltip", () => {
+    card({
+      sales: { orderDate: "{order date}", proceedDate: "{planned date}", salesLocation: "{location}", salesperson: "{salesperson}" },
+      target: { date: "{original date}", badge: "{n}d", label: "Customer’s original requested delivery", labelLines: ["Customer’s original", "requested delivery"] },
+    });
+    const label = screen.getByText("Planned production start");
+    expect(label.nextElementSibling?.textContent).toBe("{planned date}");
+    expect(screen.getByText("{n}d").getAttribute("title")).toBe("Calendar days from Planned production start to customer’s original requested delivery");
+    expect(document.body.innerHTML).not.toMatch(/Proceed date/i);
+  });
+
   it("another module starts with sales facts and address closed", () => {
     card({ initialModule: "delivery" });
     expect(screen.queryByText("{location}")).toBeNull();
@@ -245,5 +261,74 @@ describe("CompactModuleCard — document entry", () => {
     expect(screen.queryByText("Saved document")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "View Sales Order" }));
     expect(screen.getByText("Saved document")).toBeInTheDocument();
+  });
+});
+
+describe("CompactModuleCard — a record with no full page", () => {
+  it("draws no ↗ when no onOpen is given, and keeps the shared close", () => {
+    card({ onOpen: undefined, onClose: () => {} });
+    expect(screen.queryByRole("button", { name: "Open order" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Close panel" })).toBeInTheDocument();
+  });
+  it("still draws ↗ for every record that has one", () => {
+    card({ onOpen: () => {} });
+    expect(screen.getByRole("button", { name: "Open order" })).toBeInTheDocument();
+  });
+});
+
+describe("CompactModuleCard — embedded presentation (owner 2026-10-05)", () => {
+  const document = { label: "View Sales Order", preview: (onClose: () => void) => <div>Saved document<button onClick={onClose}>Close PDF</button></div> };
+  const embedded = (extra: Partial<Parameters<typeof CompactModuleCard>[0]> = {}) =>
+    card({ presentation: "embedded", initialModule: "delivery", document, onOpen: () => {}, ...extra });
+
+  it("draws no Close, no module tabs and no disclosure toggles; the ↗ door stays", () => {
+    const { container } = embedded();
+    expect(screen.queryByRole("button", { name: "Close panel" })).toBeNull();
+    expect(screen.queryByRole("navigation")).toBeNull();
+    expect(screen.queryByRole("button", { name: CARD_WORDS.orderDetails })).toBeNull();
+    expect(screen.queryByRole("button", { name: CARD_WORDS.address })).toBeNull();
+    expect(screen.queryByRole("button", { name: CARD_WORDS.items })).toBeNull();
+    expect(screen.getByRole("button", { name: "Open order" })).toBeInTheDocument();
+    expect(container.querySelector("[data-presentation='embedded']")).not.toBeNull();
+  });
+
+  it("address, sales facts and items are open by default, whatever the module's own default", () => {
+    embedded();
+    expect(screen.getByText("{full address}")).toBeTruthy();
+    expect(screen.getByText("{location}")).toBeTruthy();
+    expect(screen.getByText("{delivery items}")).toBeTruthy();
+  });
+
+  it("closing the PDF keeps address and sales facts open and returns focus to the SO No", () => {
+    embedded();
+    fireEvent.click(screen.getByRole("button", { name: "View Sales Order" }));
+    fireEvent.click(within(screen.getByRole("region", { name: "View Sales Order" })).getByRole("button", { name: "Close PDF" }));
+    expect(screen.getByRole("button", { name: "View Sales Order" })).toHaveFocus();
+    expect(screen.queryByText("Saved document")).toBeNull();
+    expect(screen.getByText("{full address}")).toBeTruthy();
+    expect(screen.getByText("{location}")).toBeTruthy();
+    expect(screen.getByText("{delivery items}")).toBeTruthy();
+  });
+
+  it("standalone is unchanged: items stay closed and Close is drawn", () => {
+    card({ initialModule: "delivery", onOpen: () => {} });
+    expect(screen.queryByText("{delivery items}")).toBeNull();
+    expect(screen.getByRole("button", { name: "Close panel" })).toBeInTheDocument();
+    expect(screen.getByRole("navigation")).toBeInTheDocument();
+  });
+});
+
+describe("CompactModuleCard — module content", () => {
+  it("a module that is only content draws its composition with no body inset of its own", () => {
+    const { container } = card({ modules: [{ key: "so", label: "Sales Order", content: <div data-testid="host-content">{"{embedded}"}</div> }], initialModule: "so" });
+    const content = screen.getByTestId("host-content");
+    expect(content.parentElement?.tagName).toBe("ARTICLE");
+    expect(container.querySelector("article")?.children).toHaveLength(1);
+  });
+  it("content follows the module's own facts when it has them", () => {
+    card({ modules: [{ ...MODULES[0], content: <div data-testid="after">{"{after}"}</div> }] });
+    const article = screen.getByTestId("after").parentElement as HTMLElement;
+    expect(article.tagName).toBe("ARTICLE");
+    expect(within(article).getByText("{total}")).toBeTruthy();
   });
 });

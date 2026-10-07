@@ -26,17 +26,20 @@ import StatusPill from "@/components/kit/StatusPill";
  *             orders), the column catalog, the scope, and where a row opens.
  * ▸ EXPAND    ships (2990's register expands; SO-1's "never expands" came
  *             from a docs-only commit). ONE job: the order's own lines.
- * ROW OPENS   double-click → the WORKSPACE ROUTE, a full page — the panel is
- *             superseded (closed ruling). Right-click: Edit · View ·
- *             Print · ─ Cancel SO — nothing else, and nothing of Delivery's.
+ * ROW OPENS   click → the quick card; double-click → the WORKSPACE ROUTE, a
+ *             full page. Right-click (one row menu, owner 2026-10-05):
+ *             View · Print · ─ Cancel SO — Edit is reached through View,
+ *             and nothing of Delivery's.
  * ROLES       Operations opens with money hidden (openable); Finance /
  *             Principal open with money visible. defaultHidden is NOT
  *             permission — a restricted fact is removed from the API
  *             response, never merely hidden here.
  * ```
  *
- * SEARCH IS STILL CLIENT-SIDE, AND IT IS STILL ONE DEBT WITH THE 200-ROW CAP.
- * See `docs/MIGRATION-MAP.md` D-A · D-B.
+ * THE WHOLE POPULATION (SO A3-3, 2026-10-06): the list reads every permitted
+ * order page by page (`useSalesOrderRegisterOrders`) and shows nothing until
+ * the last page is in, so the rail summary, the footer, the groups, Cards and
+ * Export all count the same complete list — never a 500-order sample.
  */
 // design-standard: not-a-list-page — this page runs THE REGISTER ENGINE
 // (components/register/DataGrid, 2990's grid copied per the standing COPY-2990
@@ -63,7 +66,11 @@ import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   DataGrid,
   type DataGridColumn,
+  type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
+import { documentRowMenu } from "@/components/register/row-menu";
+import PoNumberLinks from "@/components/register/PoNumberLinks";
+import { poNumberLinks, poNumberLinksSearch, poObjectPath } from "@/components/register/po-number-links";
 import Drawer from "@/components/kit/Drawer";
 import Block from "@/components/kit/Block";
 import Checkbox from "@/components/kit/Checkbox";
@@ -72,17 +79,16 @@ import Money from "@/components/Money";
 import Button from "@/components/kit/Button";
 import Tabs from "@/components/kit/Tabs";
 import SalesOrderReadFailure from "./SalesOrderReadFailure";
+import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
+import { printSalesOrdersOrSay } from "./record-print";
 import Popover from "@/components/kit/Popover";
-import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { renderCombinedSalesOrderPdf } from "@/lib/pdf/render";
-import type { SalesOrderTemplateData } from "@/lib/pdf/types";
 import { appTodayIso, fmtMonth } from "@/lib/fmt-date";
 import {
   useCatalog,
   useMonthlyDemandFacts,
   useSalesOrderRegisterFacts,
-  useOperationOrders,
+  useSalesOrderRegisterOrders,
   useSalesOrderExpansion,
 } from "@/lib/queries";
 import DestinationHeader from "./DestinationHeader";
@@ -121,7 +127,7 @@ import {
  * the column's accessible, filter and export name.
  */
 const HEADER_LINES: Partial<Record<string, readonly [string, string]>> = {
-  customer_delivery: ["Customer Requested", "Delivery Date"],
+  customer_delivery: ["Customer’s original", "requested delivery"],
   delivery_location: ["Customer Delivery", "Location"],
 };
 
@@ -236,35 +242,22 @@ function toGridColumn(
     };
   }
   if (f.key === "po_number") {
+    /* ⭐ EVERY LINKED PO, ON ONE LINE — owner ruling 2026-10-06 (Jess),
+       replacing the `{n} Purchase Orders` popover: every number,
+       comma-separated, each its own link, at the registry width (the operator
+       drags the column wider). The same shared cell as SO Batch's `PO No`. */
+    const numbersOf = (r: RegisterRow) => poNumberLinks(r.poNumbers.map((poId) => ({ poId })));
     return {
       ...base,
-      accessor: (r) =>
-        r.poNumbers.length === 0 ? (
-          absenceAware(NO_PO_YET)
-        ) : r.poNumbers.length === 1 ? (
-          <button type="button" className="font-medium text-kit-blue-11 underline-offset-2 hover:underline" onClick={(event) => {
-            event.stopPropagation();
-            navigate(`/operation/procurement?po=${encodeURIComponent(r.poNumbers[0]!)}`);
-          }}>{r.poNumbers[0]}</button>
-        ) : (
-          <Popover label="Purchase Orders" trigger={<Button variant="ghost" size="sm" onClick={event => event.stopPropagation()}>{r.poNumbers.length} Purchase Orders</Button>}>
-          <div className="flex flex-col gap-2">
-            {r.poNumbers.map((po) => (
-              <button
-                key={po}
-                type="button"
-                className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  navigate(`/operation/procurement?po=${encodeURIComponent(po)}`);
-                }}
-              >
-                {po}
-              </button>
-            ))}
-          </div>
-          </Popover>
-        ),
+      accessor: (r) => (
+        <PoNumberLinks
+          numbers={numbersOf(r)}
+          onOpen={(poId) => navigate(poObjectPath(poId))}
+          empty={absenceAware(NO_PO_YET)}
+        />
+      ),
+      /* Both forms of every number, so the stored and the printed one find the row. */
+      searchValue: (r) => poNumberLinksSearch(numbersOf(r)),
     };
   }
   if (f.key === "receipt_no" || f.key === "invoice_no") {
@@ -701,41 +694,6 @@ function ExpandedLines({ row, inspection = false, compact = false }: { row: Regi
   );
 }
 
-/**
- * Print PDF — the SAME renderer output as the workspace's right pane
- * (`renderSalesOrderPdf`, DONE-WHEN's own clause). Data is assembled
- * server-side (`/sales-order-data`, RLS-scoped); the browser renders and
- * opens the blob. READ-ONLY: nothing is written anywhere.
- */
-/**
- * The batch behind `Print N sales orders` — the 2990 shape, in Carres terms:
- * the operator ticks rows and gets the REAL documents, not a picture of the
- * list. Each order's data is assembled server-side under RLS exactly as the
- * single-order print does, so a row the user may not read cannot enter the
- * file; the browser then renders one PDF carrying one governed page per order.
- * READ-ONLY.
- */
-async function printSalesOrders(rows: Array<{ id: string; so: number }>): Promise<void> {
-  if (rows.length === 0) return;
-  try {
-    const bundles: SalesOrderTemplateData[] = [];
-    for (const r of rows) {
-      bundles.push(
-        await apiFetch<SalesOrderTemplateData>(`/api/orders/${r.id}/sales-order-data`),
-      );
-    }
-    const blob = await renderCombinedSalesOrderPdf(bundles);
-    const url = URL.createObjectURL(blob);
-    window.open(url, "_blank");
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  } catch (error) {
-    const message = error instanceof ApiError ? error.message : String(error);
-    toast.error(`Printing ${rows.length} sales orders failed: ${message}`);
-  }
-}
-
-
-
 function GoodsSummary({ row, onOpen, compact = false }: { row: RegisterRow; onOpen: (row: RegisterRow) => void; compact?: boolean }) {
   const extra = Math.max(0, (row.o.order_lines?.length ?? 0) - 1);
   const suffix = extra ? ` + ${extra} more` : "";
@@ -877,6 +835,15 @@ export default function SalesOrdersRegister() {
     [navigate, dealer, deliveryState, deliveryCity, category],
   );
   const requested = view === "list" ? requestedNarrowingOf(urlParams.get("requested")) : null;
+  /* `Select month` lists the span `Starting month` lists (twelve months back,
+     this month, eleven ahead). A linked month outside it is still listed, so
+     the select never hides a filter that is on. */
+  const requestedMonth = requested?.kind === "month" ? requested.month : null;
+  const requestedMonthChoices = useMemo(() => {
+    const months = Array.from({ length: 24 }, (_, i) => shiftMonth(currentMonth, i - 12));
+    if (requestedMonth && !months.includes(requestedMonth)) months.push(requestedMonth);
+    return months.sort().map((month) => ({ value: month, label: fmtMonth(month) }));
+  }, [currentMonth, requestedMonth]);
   const [requestedRange, setRequestedRange] = useState<[string, string]>(["", ""]);
   /* The Order list's rail facts, read only in that view. */
   const listDealer = useMemo(() => monthly ? [] : urlParams.getAll("dealer"), [monthly, urlParams]);
@@ -926,12 +893,15 @@ export default function SalesOrdersRegister() {
   /* The register still writes nothing itself. `Cancel SO` opens the ONE
      governed cancellation door and that door owns the act — the row is only
      naming which Sales Order the dialog is about. */
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; so: number } | null>(null);
 
 
   /* ⭐ POPULATION — owner ruling 2026-09-21: only orders Sales has handed to
      Operation. A `Placed` order is not on this Register, so the server is
-     asked for the `proceeded` stage and counts its total the same way. */
-  const { data, isLoading, isError, error, refetch } = useOperationOrders(
+     asked for the `proceeded` stage and counts its total the same way.
+     EVERY page of it (SO A3-3): `isLoading` holds until the last page is in,
+     so a partial list never prints a count, a total or a group as complete. */
+  const { data, isLoading, isError, error, refetch } = useSalesOrderRegisterOrders(
     serverSearch ? { stage: "proceeded", search: serverSearch } : { stage: "proceeded" },
   );
   /* The product NAME behind a SKU — the same catalog read the expansion makes
@@ -1010,7 +980,7 @@ export default function SalesOrdersRegister() {
       listPayment && { key: "payment", label: `Payment Status: ${PAYMENT_STATUSES.find(p => p.key === listPayment)!.label}`, onClear: () => setParam("payment", null) },
       requested && {
         key: "requested",
-        label: `Customer Requested Delivery Date: ${requestedNarrowingWord(requested)}`,
+        label: `Customer’s original requested delivery: ${requestedNarrowingWord(requested)}`,
         onClear: () => setParam("requested", null),
       },
       listDealer.length > 0 && { key: "dealer", label: `Sales Location: ${listDealer.join(", ")}`, onClear: () => setParam("dealer", null) },
@@ -1040,13 +1010,24 @@ export default function SalesOrdersRegister() {
      so a search answered before any unsearched load still has it and a created
      or cancelled order moves it on the next read. Unknown → `null` → no `of`. */
   const population = typeof data?.salesOrderTotal === "number" ? data.salesOrderTotal : null;
+  /* `No sales orders yet` is a claim about the POPULATION, never about what a
+     rail choice or a search left on screen: the rail narrows `rows` before
+     the grid sees them, so an empty `rows` alone cannot tell the two apart.
+     The server's count says it; unknown, the unsearched load does. */
+  const populationEmpty = population !== null ? population === 0 : all.length === 0 && !serverSearch;
 
   /* Role decides the FIRST PAINT only (money hidden for Operations, visible
      for Finance/Principal); the chooser opens every column either way.
      Memoized per role so the engine's memo actually hits; the layout store is
      per-role so one machine's Finance login does not restyle Operations'. */
   const [filteredSummaryRows, setFilteredSummaryRows] = useState<RegisterRow[] | null>(null);
-  const receiveSummaryRows = useCallback((next: RegisterRow[]) => setFilteredSummaryRows(previous => previous && previous.length === next.length && previous.every((row, index) => row.id === next[index].id && JSON.stringify([row.total, row.paid, row.balance]) === JSON.stringify([next[index].total, next[index].paid, next[index].balance])) ? previous : next), []);
+  /* While the pages load the grid holds no rows and reports an empty result;
+     kept, that empty result printed `0` and `RM 0` in the frame the complete
+     list arrived (measured at 1440, SO A3-3). It is not a result, so it is
+     not kept: the first frame after loading sums the complete list itself. */
+  const listLoading = useRef(isLoading);
+  listLoading.current = isLoading;
+  const receiveSummaryRows = useCallback((next: RegisterRow[]) => listLoading.current ? undefined : setFilteredSummaryRows(previous => previous && previous.length === next.length && previous.every((row, index) => row.id === next[index].id && JSON.stringify([row.total, row.paid, row.balance]) === JSON.stringify([next[index].total, next[index].paid, next[index].balance])) ? previous : next), []);
   const summaryRows = filteredSummaryRows ?? rows;
   const [quickOrderSnapshot, setQuickOrder] = useState<RegisterRow | null>(null);
   const quickOrder = quickOrderSnapshot ? all.find(row => row.id === quickOrderSnapshot.id) ?? quickOrderSnapshot : null;
@@ -1098,9 +1079,19 @@ export default function SalesOrdersRegister() {
     [navigate],
   );
   const onRowDoubleClick = useCallback((r: RegisterRow) => openWorkspace(r), [openWorkspace]);
+  /* ONE ROW MENU (owner ruling 2026-10-05): `View · Print · ─ Cancel SO`.
+     View opens the full read-first Sales Order page — Edit is a button there,
+     pressed on purpose; Print is the same governed SO paper the page prints. */
+  const contextMenu = useCallback(
+    (r: RegisterRow): DataGridContextMenuItem[] =>
+      documentRowMenu({
+        view: () => openWorkspace(r),
+        print: () => void printSalesOrdersOrSay([r]),
+        more: [{ label: "Cancel SO", danger: true, onClick: () => setCancelTarget({ id: r.id, so: r.so }) }],
+      }),
+    [openWorkspace],
+  );
 
-  /* Right-click document actions. Copy opens the authoritative create form as
-     a draft; the register still writes nothing. */
 
   const expandable = useMemo(
     () => ({
@@ -1199,7 +1190,7 @@ export default function SalesOrdersRegister() {
       ) : (
         <>
           <FilterRailGroup title="Order summary" icon="money" defaultOpen>
-            <dl className="space-y-2 px-2 py-2" data-testid="sales-orders-summary" title={population != null && population > all.length ? "Loaded orders only" : undefined}>
+            <dl className="space-y-2 px-2 py-2" data-testid="sales-orders-summary">
               <div className="grid grid-cols-[1fr_auto] items-center gap-x-2"><dt className="text-meta text-kit-slate-11">Sales orders</dt><dd className="text-strong text-right tabular-nums">{isLoading ? "Loading" : isError ? "Unavailable" : summaryRows.length}</dd></div>
               {(["total", "paid", "balance"] as const).map((key, index) => {
                 const missing = summaryRows.filter(row => row[key].kind !== "amount" && row[key].kind !== "settled").length;
@@ -1208,12 +1199,20 @@ export default function SalesOrdersRegister() {
               })}
             </dl>
           </FilterRailGroup>
-          <FilterRailGroup title="Customer Requested Delivery Date" icon="date" defaultOpen>
+          <FilterRailGroup title="Customer’s original requested delivery" icon="date" defaultOpen>
             <FilterRailRow testId="requested-all" label="All dates" resets active={!requested} onClick={() => setParam("requested", null)} />
             {requestedPresets().map(option => <FilterRailRow key={option.label} testId={`requested-${option.label}`} label={option.label} active={urlParams.get("requested") === option.value} onClick={() => toggleParam("requested", option.value)} />)}
-            <label className="block px-2 pt-2 text-meta text-kit-slate-11">Select month
-              <input aria-label="Requested delivery month" type="month" className="mt-1 h-8 w-full rounded-md border border-kit-slate-6 bg-white px-2 text-body text-kit-slate-12" value={requested?.kind === "month" ? requested.month : ""} onChange={event => setParam("requested", event.target.value || null)} />
-            </label>
+            {/* The rail's own select, as `Starting month` is: a native month
+                input printed `--------- ----` when empty, and no dash may reach
+                a screen. Its empty option reads the control's label. */}
+            <FilterRailSelect
+              label="Select month"
+              value={requestedMonth}
+              options={requestedMonthChoices}
+              onChange={(next) => setParam("requested", next)}
+              testId="requested-month"
+              allLabel="Select month"
+            />
             <details className="px-2 py-2 text-meta text-kit-slate-11"><summary className="cursor-pointer">Custom range</summary>
               {(["From", "To"] as const).map((label, i) => <label key={label} className="mt-1 block">{label}<input aria-label={`Requested delivery ${label.toLowerCase()}`} type="date" className="mt-1 h-8 w-full rounded-md border border-kit-slate-6 bg-white px-2 text-body text-kit-slate-12" value={requestedRange[i]} onChange={event => { const values: [string, string] = [...requestedRange]; values[i] = event.target.value; setRequestedRange(values); if (values[0] && values[1] && values[0] <= values[1]) setParam("requested", `range:${values[0]}:${values[1]}`); }} /></label>)}
             </details>
@@ -1232,6 +1231,15 @@ export default function SalesOrdersRegister() {
       {quickOrder && <Drawer variant="compact-card" open onOpenChange={(open) => { if (!open) setQuickOrder(null); }} title={`SO-${quickOrder.so} · ${quickOrder.customer}`}>
         <SalesOrderCompactView row={quickOrder} salesLocation={salesLocationOf(quickOrder.o)} items={<div className="min-w-0 overflow-x-auto"><ExpandedLines row={quickOrder} compact /></div>} onOpen={() => openWorkspace(quickOrder)} onClose={() => setQuickOrder(null)} />
       </Drawer>}
+      {cancelTarget && (
+        <CancelSalesOrderDialog
+          orderId={cancelTarget.id}
+          so={cancelTarget.so}
+          open
+          onOpenChange={(open) => { if (!open) setCancelTarget(null); }}
+          onCancelled={() => void refetch()}
+        />
+      )}
       {goodsTarget && <Drawer open onOpenChange={(open) => { if (!open) setGoodsTarget(null); }} title={`SO-${goodsTarget.so} · Items`}>
         <div className="min-w-0 max-w-full overflow-x-auto"><ExpandedLines row={goodsTarget} inspection /></div>
       </Drawer>}
@@ -1283,7 +1291,7 @@ export default function SalesOrdersRegister() {
             } : urlParams.get("group") === "payment" ? {
               groups: PAYMENT_STATUSES.map(c => ({ key: c.key, label: c.label })), groupOf: paymentStatusOf,
             } : undefined}
-            searchScope="Search sales orders by SO number, customer, imported reference or linked document number"
+            searchScope="Search sales orders by SO number, customer, phone, imported reference or linked document number"
             presentationKey={cards ? "cards" : "table"}
             toolbarEnd={<Tabs variant="segmented" label="Sales Orders view" value={cards ? "cards" : "table"}
               onValueChange={(next) => setParam("view", next === "cards" ? "cards" : null)}
@@ -1303,7 +1311,7 @@ export default function SalesOrdersRegister() {
                     </div>}>
                       <dl className="grid min-w-0 grid-cols-2 gap-3 text-body">
                         <div className="col-span-2"><dt className="text-label text-kit-slate-11">Customer</dt><dd className="break-words">{row.customer}</dd></div>
-                        <div><dt className="text-label text-kit-slate-11">Customer Requested Delivery Date</dt><dd>{row.customerDelivery ? fmtDate(row.customerDelivery) : ""}</dd></div>
+                        <div><dt className="text-label text-kit-slate-11">Customer’s original requested delivery</dt><dd>{row.customerDelivery ? fmtDate(row.customerDelivery) : ""}</dd></div>
                         <div className="col-span-2 order-last"><dt className="text-label text-kit-slate-11">Items</dt><dd className="min-w-0"><GoodsSummary row={row} onOpen={setGoodsTarget} /></dd></div>
                         <div><dt className="text-label text-kit-slate-11">Delivery</dt><dd>{REGISTER_DELIVERY_CONDITIONS.find(condition => condition.key === registerDeliveryConditionOf(row.o.order_lines ?? [], row.o.allocated_units ?? []))?.label ?? "Not recorded"}</dd></div>
                         <div><dt className="text-label text-kit-slate-11">Total payable</dt><dd>{moneyCell(row.total)}</dd></div>
@@ -1352,7 +1360,7 @@ export default function SalesOrdersRegister() {
             initialSearch={seededSearch}
             searchPlaceholder="Search orders…"
             isLoading={isLoading}
-            emptyMessage={rows.length === 0 && !serverSearch ? "No sales orders yet" : "No sales orders match these filters"}
+            emptyMessage={populationEmpty ? "No sales orders yet" : "No sales orders match these filters"}
             noMatchMessage="No sales orders match these filters"
             groupBanner={false}
             /* Accepted shared template:32px desktop row,12/18 text; generic defaults stay scoped. */
@@ -1381,19 +1389,19 @@ export default function SalesOrdersRegister() {
             onRowClick={setQuickOrder}
             onRowDoubleClick={onRowDoubleClick}
             onSearchChange={searchChanged}
-            contextMenu={undefined}
+            contextMenu={contextMenu}
             expandable={expandable}
             selectable={{
               selectedKeys: selected,
               onToggle: toggleRow,
               onToggleAll: toggleAll,
             }}
-            outputActions={[{ label: "Print sales orders", onClick: () => { const picked = rows.filter(row => selected.has(row.id)); if (!picked.length) { toast.error("Select sales orders to print"); return; } void printSalesOrders(picked); } }]}
+            outputActions={[{ label: "Print sales orders", onClick: () => { const picked = rows.filter(row => selected.has(row.id)); if (!picked.length) { toast.error("Select sales orders to print"); return; } void printSalesOrdersOrSay(picked); } }]}
             selectionActions={[
               {
                 label: (n) => `Print ${n} sales order${n === 1 ? "" : "s"}`,
                 onClick: (picked) => {
-                  void printSalesOrders(picked as unknown as RegisterRow[]);
+                  void printSalesOrdersOrSay(picked as unknown as RegisterRow[]);
                 },
               },
             ]}

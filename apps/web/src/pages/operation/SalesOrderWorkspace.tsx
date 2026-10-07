@@ -46,7 +46,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./purchase-orders/purchase-order-detail.css";
 import "./sales-order-detail-theme.css";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import * as pdfjs from "pdfjs-dist";
@@ -79,6 +79,7 @@ import {
   salesOrderNumberWord,
   salesOrderParamOf,
   mytDayOf,
+  PLANNED_PRODUCTION_START_REFUSALS,
   type CustomField,
   type OrderEntryTab,
   type SalesOrderRouteMap as SalesOrderRouteModel,
@@ -110,8 +111,8 @@ import { renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
 import {
   useCatalog,
-  useCreateSalesOrder,
   useCustomerTypeProbe,
+  useSalesOrderRegisterSearchCount,
   useOperationDealersRef,
   useOperationOrder,
   useWorkspaceDuties,
@@ -1029,7 +1030,7 @@ function CustomFields({
   );
 }
 
-type Mode = "object" | "create" | "oldrev";
+type Mode = "object" | "oldrev";
 const OBJECT_VIEWS = ["Order", "Revisions", "History", "Order Route"] as const;
 type ObjectView = (typeof OBJECT_VIEWS)[number];
 
@@ -1043,17 +1044,18 @@ type ObjectView = (typeof OBJECT_VIEWS)[number];
  * A number is resolved ONCE through the by-number door and the page re-enters
  * by the id with the same search (`?route=1` survives), so every fan-in read
  * still happens by the canonical id — one resolver, no second fan-in (Law C).
- * `new` stays the create door. Anything else is an absence, never a 500.
+ * `new` is no door: the office create door is retired (owner ruling
+ * 2026-09-27) and its route lands on the Register. Anything else is an
+ * absence, never a 500.
  */
 export default function SalesOrderWorkspace() {
   const { orderId } = useParams<{ orderId: string }>();
   const location = useLocation();
-  const isNew = location.pathname.endsWith("/so/new");
-  const ident = isNew ? null : salesOrderParamOf(orderId);
-  if (ident && ident.kind === "number") {
+  const ident = salesOrderParamOf(orderId);
+  if (ident.kind === "number") {
     return <SalesOrderNumberDoor so={ident.so} search={location.search} />;
   }
-  if (ident && ident.kind === "invalid") {
+  if (ident.kind === "invalid") {
     return <SalesOrderAbsence />;
   }
   return <SalesOrderWorkspaceBody />;
@@ -1091,8 +1093,7 @@ function SalesOrderWorkspaceBody() {
   const location = useLocation();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const isNew = location.pathname.endsWith("/so/new");
-  const showRoute = params.get("route") === "1" && !isNew;
+  const showRoute = params.get("route") === "1";
   const [viewRev, setViewRev] = useState<number | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [problemOpen, setProblemOpen] = useState(false);
@@ -1117,7 +1118,7 @@ function SalesOrderWorkspaceBody() {
     );
   }, [params, setParams, location.state]);
 
-  const detailQ = useOperationOrder(isNew ? null : (orderId ?? null));
+  const detailQ = useOperationOrder(orderId ?? null);
   /* ── THE CREATE DOOR ASKS THE CATALOG (2026-08-21) ───────────────────────
    * Until now this door took a SKU as free text: a typo produced a line no
    * stock, PO or readiness engine could recognise, and creation still
@@ -1168,18 +1169,18 @@ function SalesOrderWorkspaceBody() {
     () => new Map((catalogQ.data?.addons ?? []).flatMap((a) => (a.serviceSku ? [[a.key, a.serviceSku] as const] : []))),
     [catalogQ.data],
   );
-  const revisionsQ = useSalesOrderRevisions(isNew ? null : (orderId ?? null));
-  const goodsTruthQ = useSalesOrderExpansion(isNew ? "" : (orderId ?? ""));
-  const amendmentQ = useSalesOrderAmendment(isNew ? null : (orderId ?? null));
+  const revisionsQ = useSalesOrderRevisions(orderId ?? null);
+  const goodsTruthQ = useSalesOrderExpansion(orderId ?? "");
+  const amendmentQ = useSalesOrderAmendment(orderId ?? null);
   /* 3.4 · what this sales order's changes have raised for other modules. The
    * workspace SHOWS it and cannot close it — the module that raised the work
    * does not tick it off. */
-  const correctionWorkQ = useOrderCorrectionWork(isNew ? null : (orderId ?? null));
+  const correctionWorkQ = useOrderCorrectionWork(orderId ?? null);
   /* ⭐ ROUTE FACTS LOAD ONLY WHEN THE ROUTE IS OPEN (owner ruling 2026-09-26).
      Measured: the fan-in fired on every opened order — eleven requests the
      Order tab never reads. */
   const routeFactsQ = useSalesOrderRouteFacts(
-    isNew ? null : (orderId ?? null),
+    orderId ?? null,
     showRoute,
     (detailQ.data?.pos ?? []).map((po) => po.id),
   );
@@ -1191,14 +1192,14 @@ function SalesOrderWorkspaceBody() {
   const routePartnerQ = useLogisticsCardFacts(showRoute ? (orderId ?? null) : null, routeCustomerLeg);
   /* LINKED PROBLEMS needs the case's own translated status word, and Service
      owns that translation. The route facts carry only open/closed. */
-  const serviceCasesQ = useOrderServiceCases(isNew ? "" : (orderId ?? ""), {
-    enabled: !isNew && Boolean(orderId),
+  const serviceCasesQ = useOrderServiceCases(orderId ?? "", {
+    enabled: Boolean(orderId),
   });
   const baseQ = useQuery({
-    queryKey: ["orders", "sales-order-data", orderId ?? "new"],
+    queryKey: ["orders", "sales-order-data", orderId ?? null],
     queryFn: () =>
       apiFetch<SalesOrderTemplateData>(`/api/orders/${orderId}/sales-order-data`),
-    enabled: !isNew && !!orderId,
+    enabled: !!orderId,
   });
 
   const salespersonsQ = useSalespersons();
@@ -1230,25 +1231,13 @@ function SalesOrderWorkspaceBody() {
   const viewedRevision: SalesOrderRevisionRow | null =
     viewRev != null ? (revisions.find((r) => r.revision === viewRev) ?? null) : null;
 
-  /* ── The draft — seeded from the order, empty for CREATE. ─────────────── */
+  /* ── The draft — seeded from the order. ─────────────────────────────── */
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [baseline, setBaseline] = useState<Draft>(EMPTY_DRAFT);
   const [draftSeed, setDraftSeed] = useState<string>("");
   const order = detailQ.data?.order;
   const detailLines = detailQ.data?.lines ?? [];
   useEffect(() => {
-    if (isNew) {
-      if (draftSeed !== "new") {
-        const next = {
-          ...EMPTY_DRAFT,
-          lines: [{ key: nextKey(), sku: "", qty: 1, unit_price: 0 }],
-        };
-        setDraft(next);
-        setBaseline(next);
-        setDraftSeed("new");
-      }
-      return;
-    }
     /* AN OLD REVISION IS A PHOTOGRAPH. The same fields render, filled from
        THAT snapshot and locked — never the current row's values wearing a
        "read-only" pill, which is how a historical view starts lying. */
@@ -1333,7 +1322,6 @@ function SalesOrderWorkspaceBody() {
     setDraftSeed(seed);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    isNew,
     order,
     orderId,
     detailLines,
@@ -1343,7 +1331,7 @@ function SalesOrderWorkspaceBody() {
     viewedRevision,
   ]);
 
-  const mode: Mode = isNew ? "create" : viewRev != null ? "oldrev" : "object";
+  const mode: Mode = viewRev != null ? "oldrev" : "object";
 
   /* ── WHAT CHANGED — the save bar counts fields, never keystrokes. ─────── */
   const changedFields = useMemo(() => {
@@ -1387,7 +1375,7 @@ function SalesOrderWorkspaceBody() {
   const [replaceAmendmentId, setReplaceAmendmentId] = useState<string | null>(null);
   const role = useAuth((st) => st.role);
   /** THE LOCKED STATE (owner ruling 2026-09-26): View and a historical version
-   *  are ONE locked presentation; Edit and Create alone draw controls. */
+   *  are ONE locked presentation; Edit alone draws controls. */
   const formLocked = (mode === "object" && !editing) || mode === "oldrev";
   /** Locked and absent prints `Not recorded`, because a `Select` or `Pick a date` placeholder is a question. */
   const lockedFact = (label: string, present: unknown, control: React.ReactNode) =>
@@ -1428,27 +1416,18 @@ function SalesOrderWorkspaceBody() {
   const stair = useMemo(() => {
     const cfg = catalogQ.data?.floorConfig;
     if (!cfg) return null;
-    const itemsTotal =
-      mode === "create"
-        ? draft.lines.reduce((n, l) => n + l.qty, 0)
-        : (detailQ.data?.lines ?? []).reduce((n, l) => n + l.qty, 0);
+    const itemsTotal = (detailQ.data?.lines ?? []).reduce((n, l) => n + l.qty, 0);
     /* ⭐ UNSET MEANS NONE — owner ruling 2026-08-27 (YH). It used to mean
        EVERY item (0104's column comment), so an order nobody was asked about
        carried the maximum fee. The same rule now runs in `order-totals.ts` and
        in the POS panel, so all three agree. */
     const items = stairCarryCount(itemsTotal, draft.delivery_stair_items);
-    const floors = Math.max(0, draft.delivery_floor - cfg.freeUpToFloor);
     return {
-      cfg,
       itemsTotal,
-      items,
-      floors,
       fee: floorSurchargeRaw(draft.delivery_floor, draft.delivery_has_lift, items, cfg),
     };
   }, [
     catalogQ.data?.floorConfig,
-    mode,
-    draft.lines,
     draft.delivery_stair_items,
     draft.delivery_floor,
     draft.delivery_has_lift,
@@ -1470,15 +1449,11 @@ function SalesOrderWorkspaceBody() {
    * for `itemsTotal` while the floor and the count come from the snapshot, so a
    * photograph of Rev 3 mixed two revisions and today's rate in one sentence.
    *
-   * ⭐ SO THE SENTENCE CHANGES SHAPE WITH THE MODE, because what is KNOWN
-   * changes with the mode:
-   *
-   *   · CREATE — nothing is stamped yet, so the live rate IS the quote and the
-   *     whole multiplication is exactly what the operator needs. Unchanged.
-   *
-   *   · OBJECT / OLDREV — the fee is the stamped `STAIR_CARRY` row, the same
-   *     one MONEY reads, and the counts are the ones that produced it: the
-   *     snapshot's for a revision, the order's own otherwise.
+   * ⭐ SO THE SENTENCE STATES THE STAMPED CHARGE. The fee is the stamped
+   * `STAIR_CARRY` row, the same one MONEY reads, and the counts are the ones
+   * that produced it: the snapshot's for a revision, the order's own otherwise.
+   * (The live-rate multiplication belonged to the office create door, retired
+   * 2026-09-27.)
    *
    * ⛔ IT STOPS SHORT OF THE MULTIPLICATION ON A SAVED ORDER, and that is the
    * point rather than a shortcut. Recovering `× RM rate above NF` from a
@@ -1491,18 +1466,6 @@ function SalesOrderWorkspaceBody() {
    * arithmetic for one number"), so there is nowhere honest to read it from.
    */
   const stairWorking = useMemo(() => {
-    if (mode === "create") {
-      if (!stair || stair.fee <= 0) return null;
-      return {
-        quoted: true as const,
-        items: stair.items,
-        itemsTotal: stair.itemsTotal,
-        floors: stair.floors,
-        freeUpToFloor: stair.cfg.freeUpToFloor,
-        perFloorPerItem: stair.cfg.perFloorPerItem,
-        fee: stair.fee,
-      };
-    }
     /* A REVISION IS A PHOTOGRAPH — its own lines and its own addons, never the
        order's current ones. MONEY already reads it this way; this is the same
        source, so the two cannot disagree on one page. */
@@ -1518,7 +1481,6 @@ function SalesOrderWorkspaceBody() {
     if (fee <= 0) return null;
     const itemsTotal = lines.reduce((n, l) => n + Number(l.qty ?? 0), 0);
     return {
-      quoted: false as const,
       items: stairCarryCount(itemsTotal, draft.delivery_stair_items),
       itemsTotal,
       floor: draft.delivery_floor,
@@ -1526,7 +1488,6 @@ function SalesOrderWorkspaceBody() {
     };
   }, [
     mode,
-    stair,
     viewedRevision,
     detailQ.data,
     draft.delivery_stair_items,
@@ -1556,7 +1517,7 @@ function SalesOrderWorkspaceBody() {
     ro.observe(el);
     return () => ro.disconnect();
     /* Re-attached when the node the split lives in can have changed. */
-  }, [mode, objectView, showRoute, isNew, order?.id]);
+  }, [mode, objectView, showRoute, order?.id]);
   /* ── ONE template-data value per mode; the draft path debounces 300ms. ── */
   const base = baseQ.data ?? null;
   const liveDraftData = useMemo(
@@ -1641,13 +1602,6 @@ function SalesOrderWorkspaceBody() {
   /* ── Writes — ONE commit, and the SERVER chooses it (0562). The direct
      `POST /save` door is gone from this page: `POST /changes` classifies the
      whole draft and either saves the correction or submits the request. ── */
-  const createMut = useCreateSalesOrder({
-    onSuccess: (r) => {
-      toast.success(`SO-${r.so}(1) created`);
-      navigate(`/operation/orders/so/${r.id}`, { replace: true });
-    },
-    onError: (e) => toast.error(e.message),
-  });
 
   const entryFieldsPayloadOf = (d: Draft): Record<string, string | null> => {
     const out: Record<string, string | null> = {
@@ -1688,12 +1642,6 @@ function SalesOrderWorkspaceBody() {
   });
   const safeCorrectionPayload = (): Record<string, unknown> => headerPayloadOf(draft);
 
-  const createHeaderPayload = (): Record<string, unknown> => ({
-    ...safeCorrectionPayload(),
-    delivery_date: draft.delivery_date,
-    delivery_date_tbd: draft.delivery_date_tbd,
-  });
-
   /* The cart's floor, from the CATALOG's categories — recomputed as lines
    * change, exactly as the POS wizard does it. */
   const earliestPromise = useMemo(
@@ -1705,33 +1653,13 @@ function SalesOrderWorkspaceBody() {
     [draft.lines, catalogBySku, catalogQ.data?.earliestSellDays],
   );
 
-  const draftLinesPayload = () =>
-    draft.lines
-      .filter((l) => l.sku.trim().length > 0)
-      .map((l) => ({
-        ...(l.id ? { id: l.id } : {}),
-        sku: l.sku.trim(),
-        qty: l.qty,
-        unit_price: l.unit_price,
-        /* 0374 — a line born here MAY carry its configuration. Nothing on this
-           form authors attrs yet, so today this only survives a COPY: copying a
-           configured order used to silently strip the fabric, colour and gap
-           off every line and hand Purchasing a PO it could not autofill. */
-        ...(l.attrs ? { attrs: l.attrs } : {}),
-      }));
-
-  const validateDraft = (needDealer: boolean): string | null => {
+  const validateDraft = (): string | null => {
     if (!draft.customer_name.trim()) return "Customer name is required";
     // Preserve unrelated legacy delivery facts when correcting contact details.
-    // Create and any mixed delivery/commercial edit still use the full checks.
-    if (!needDealer && isContactOnlyCorrection(changedFields)) return null;
-    if (needDealer && !draft.dealer_id) return "A dealer is required";
-    /* orders_salesperson_required (0296): every portal-born order names who
-     * sold it. */
-    if (needDealer && !draft.salesperson_id) return "A salesperson is required";
-    if (needDealer && draftLinesPayload().length === 0) return "An order needs at least one item";
+    // Any mixed delivery/commercial edit still uses the full checks.
+    if (isContactOnlyCorrection(changedFields)) return null;
     /* Edit cannot return an order to no date, so a legacy TBD order picks one before it commits (owner ruling 2026-09-26). */
-    if (!needDealer && !draft.delivery_date) return "Delivery date is required. Ask the customer for the date before you save the order.";
+    if (!draft.delivery_date) return "Delivery date is required. Ask the customer for the date before you save the order.";
     /* The delivery date is a PROMISE (orders/MASTER — THE THREE DELIVERY
      * DATES). A date inside the production lead is a promise the factory
      * cannot keep, and the POS has refused it since 2026-05-22 — this door
@@ -1739,16 +1667,10 @@ function SalesOrderWorkspaceBody() {
     if (draft.delivery_date && earliestPromise && draft.delivery_date < earliestPromise) {
       return `Delivery is too soon. The earliest this cart can be promised is ${fmtDate(earliestPromise)}`;
     }
-    /* ⭐ THE OFFICE DOOR NAMES THE PRODUCTION START (YH, 2026-08-28).
-       The POS has refused an order without one since Phase 11.1; this door did
-       not, so it could mint the one thing nobody can then repair — an order
-       whose Proceed date renders read-only as `Not recorded` forever.
-       `createOrderInput` and `sales_order_create` (0391) refuse it again. */
-    if (needDealer && !draft.proceed_date) {
-      return "Proceed date: pick the day production should start";
-    }
     if (draft.proceed_date && draft.delivery_date && draft.proceed_date > draft.delivery_date) {
-      return "The proceed date is after the delivery date";
+      /* One refusal, one wording, every door (COPY-STANDARD); the planned date
+         is `Planned production start` since the owner ruling of 2026-10-06. */
+      return PLANNED_PRODUCTION_START_REFUSALS.afterDelivery;
     }
     /* Building type is DELIVERY's fact — stairs, lift access, van parking all
      * hang off it (Jess, 2026-08-21: it must be filled, delivery needs it).
@@ -1759,7 +1681,7 @@ function SalesOrderWorkspaceBody() {
     for (const a of draft.addons.filter((row) => !row.removed)) {
       if (SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addon_key)) continue;
       const original = baseline.addons.find((row) => row.key === a.key);
-      const changed = needDealer || a.added || !original || a.qty !== original.qty || JSON.stringify(a.attrs) !== JSON.stringify(original.attrs);
+      const changed = a.added || !original || a.qty !== original.qty || JSON.stringify(a.attrs) !== JSON.stringify(original.attrs);
       const pos = serviceSizeDraft(a, catalogQ.data?.addons.find((x) => x.key === a.addon_key)?.sizeOptions);
       if (changed && addonSizeOptions(pos).length && disposalUnitSizes(pos).some((size) => !size))
         return `Size for ${addonNameByKey.get(a.addon_key) ?? a.addon_key}`;
@@ -1767,20 +1689,6 @@ function SalesOrderWorkspaceBody() {
     return null;
   };
 
-  const onCreate = () => {
-    const err = validateDraft(true);
-    if (err) return void toast.error(err);
-    /* A BIRTH names the parties — only the correction door lost them to 0329. */
-    createMut.mutate({
-      header: {
-        ...createHeaderPayload(),
-        dealer_id: draft.dealer_id,
-        salesperson_id: draft.salesperson_id,
-        outlet_id: draft.outlet_id,
-      },
-      lines: draftLinesPayload(),
-    });
-  };
 
   /* ══ 0562 · THE WHOLE-PAGE EDIT ════════════════════════════════════════════
    * The SERVER chooses Save or Submit amendment request (POST /changes runs the
@@ -1840,7 +1748,7 @@ function SalesOrderWorkspaceBody() {
 
   /* What the draft starts elsewhere — read from facts this page already holds;
      never a second arithmetic for money it cannot verify. */
-  const orderPaymentsQ = useOrderPayments(isNew ? null : (orderId ?? null));
+  const orderPaymentsQ = useOrderPayments(orderId ?? null);
   const nameOfSku = useCallback((sku: string) => catalogBySku.get(sku)?.label || sku, [catalogBySku]);
   const nameOfAddon = useCallback((key: string) => addonNameByKey.get(key) ?? key, [addonNameByKey]);
   /** Delivery owns service input; Items and the document read the same draft. */
@@ -1870,7 +1778,7 @@ function SalesOrderWorkspaceBody() {
     if (after.lines.some((l) => l.removed && !protectedLine(l)) && after.lines.some((l) => protectedLine(l) && !l.removed))
       out.push("Free item: check it is still allowed without the cancelled item");
     if (after.header["proceed_date"] !== undefined && after.header["proceed_date"] !== (order?.proceed_date ?? null))
-      out.push("Proceed Date: Purchasing's release timing moves");
+      out.push("Planned production start: Purchasing's release timing moves");
     if (after.header["delivery_date"] !== undefined && after.header["delivery_date"] !== (order?.delivery_date ?? null))
       out.push("Requested Delivery Date: Delivery and Purchasing plan to the new date");
     const before = baseline.lines.filter((l) => !l.removed).reduce((n, l) => n + l.qty * l.unit_price, 0)
@@ -1896,7 +1804,7 @@ function SalesOrderWorkspaceBody() {
     customer_address_state: "State", customer_address_postcode: "Postcode", customer_address_unknown: "Address not given yet",
     customer_emergency: "Emergency contact", customer_billing: "Billing address", customer_billing_same: "Billing address same as delivery",
     entry_fields: "Other details", delivery_floor: "Floor", delivery_has_lift: "Lift available?",
-    delivery_stair_items: "Items needing stair carry", proceed_date: "Proceed Date",
+    delivery_stair_items: "Items needing stair carry", proceed_date: "Planned production start",
     delivery_date: "Requested Delivery Date", delivery_date_tbd: "Delivery date to be confirmed",
   };
   const factWord = (k: string, v: unknown): string => {
@@ -2005,7 +1913,7 @@ function SalesOrderWorkspaceBody() {
   });
   const onCommit = () => {
     if (!changeClass || changeClass.action === "none") return;
-    const err = validateDraft(false);
+    const err = validateDraft();
     if (err) return void toast.error(err);
     if (!changeReason.trim()) return void toast.error("Reason for change");
     changesMut.mutate({
@@ -2155,18 +2063,8 @@ function SalesOrderWorkspaceBody() {
     setDraft((d) => ({ ...d, [k]: v }));
   const setCustom = (key: string, value: string) =>
     setDraft((d) => ({ ...d, custom: { ...d.custom, [key]: value } }));
-  const setLine = (key: string, patch: Partial<DraftLine>) =>
-    setDraft((d) => ({
-      ...d,
-      lines: d.lines.map((l) => (l.key === key ? { ...l, ...patch } : l)),
-    }));
 
   const confirmDiscard = () => !dirty || window.confirm("Discard unsaved changes?");
-  const discard = () => {
-    if (!confirmDiscard()) return;
-    if (isNew) return navigate("/operation/orders");
-    setDraft(baseline);
-  };
 
   useEffect(() => {
     if (!dirty) return;
@@ -2211,31 +2109,7 @@ function SalesOrderWorkspaceBody() {
       );
       return { ...orderMoney({ lineSum, addonSum, paid: base?.paid ?? 0, controlBalance: null }), goods: lineSum, services: addonSum };
     }
-    if (mode === "create") {
-      const lineSum = draft.lines.reduce(
-        (s, l) => s + (l.sku.trim() ? l.qty * l.unit_price : 0),
-        0,
-      );
-      /* ⭐ THE QUOTE INCLUDES THE CARRY, BEFORE IT IS SAVED (YH, 2026-08-28).
-         Stair carry is money the customer owes (MASTER § STAIR CARRY IS MONEY
-         THE CUSTOMER OWES), and 0393 makes it a real `STAIR_CARRY` addon row —
-         but that row does not exist until the order does. So on `/so/new` this
-         card printed a Total the operator could see was wrong: the ORDER INFO
-         block three cards down was narrating `× RM 50 = RM 300` while MONEY
-         showed lines only.
 
-         CREATE ONLY. In `object` and `oldrev` the fee is already IN the addons
-         — 0393 stamps the row at birth and re-stamps it whenever the floor,
-         the lift or the count moves — so adding it here too would count it
-         twice. This branch exists precisely because it is the one state with
-         no persisted row to read.
-
-         The number is `stair.fee`, the same memo the working-out line prints,
-         so the quote and its explanation cannot disagree (Law D). */
-      const addonSum =
-        (base?.addons ?? []).reduce((s, a) => s + a.line_total, 0) + (stair?.fee ?? 0);
-      return { ...orderMoney({ lineSum, addonSum, paid: base?.paid ?? 0, controlBalance: null }), goods: lineSum, services: addonSum };
-    }
     const lines = detailQ.data?.lines ?? [];
     const addons = detailQ.data?.addons ?? [];
     /* ⭐ THE BREAKDOWN IS THE SAME TWO SUMS, NAMED. The approved Payment totals
@@ -2250,7 +2124,7 @@ function SalesOrderWorkspaceBody() {
       goods: lineSum,
       services: addonSum,
     };
-  }, [mode, draft.lines, base, viewedRevision, detailQ.data, order, stair?.fee]);
+  }, [mode, base, viewedRevision, detailQ.data, order]);
 
   /* A line the current commitment no longer carries, but an earlier Revision
      did, was CANCELLED — and the Route states its outcome instead of letting
@@ -2369,14 +2243,6 @@ function SalesOrderWorkspaceBody() {
     () => (outletsQ.data?.outlets ?? []).map((o) => ({ value: o.id, label: o.name })),
     [outletsQ.data],
   );
-  const spOptions = useMemo(
-    () => [{ value: "none", label: "Not recorded" }, ...realSpOptions],
-    [realSpOptions],
-  );
-  const outletOptions = useMemo(
-    () => [{ value: "none", label: "Not recorded" }, ...realOutletOptions],
-    [realOutletOptions],
-  );
   const dealerOptions = useMemo(
     () => (dealersQ.data?.dealers ?? []).map((d) => ({ value: d.id, label: d.name })),
     [dealersQ.data],
@@ -2394,6 +2260,17 @@ function SalesOrderWorkspaceBody() {
         : typeProbe.data?.existing
           ? "Existing customer"
           : "New customer";
+  /* ⭐ `{n}` COUNTS WHAT THE DOOR OPENS (SO BUILD-1c, 2026-10-06 · Law D).
+     The probe above answers New/Existing from an EXACT phone over every
+     status; the door opens the Sales Orders Register, whose population is
+     handed-over, non-cancelled, non-rental orders and whose server search
+     matches the phone by digits. So `n` is the Register's own read for the
+     SAME phone the door carries, counted on the server — never the probe's
+     `matches`. Read only for an existing customer; a failed read, or one that
+     answers no number, shows no count and no door. */
+  const ordersDoorQ = useSalesOrderRegisterSearchCount(probedPhone, customerTypeWord === "Existing customer");
+  const ordersDoorCount =
+    ordersDoorQ.isSuccess && typeof ordersDoorQ.data?.count === "number" ? ordersDoorQ.data.count : 0;
 
   const liveBlocksCommercial =
     Boolean(liveAmendment && !liveAmendment.stale) && changeClass?.action === "submit" && !replaceAmendmentId;
@@ -2417,7 +2294,7 @@ function SalesOrderWorkspaceBody() {
               loading={changesMut.isPending}
               disabled={liveBlocksCommercial}
               onClick={() => {
-                const err = validateDraft(false);
+                const err = validateDraft();
                 if (err) return void toast.error(err);
                 setReviewOpen(true);
               }}
@@ -2426,22 +2303,6 @@ function SalesOrderWorkspaceBody() {
               {commitWord}
             </Button>
           )}
-        </>
-      )}
-      {mode === "create" && (
-        <>
-          <Button size="sm" variant="ghost" onClick={discard} data-testid="workspace-cancel">
-            <X size={14} /> Discard
-          </Button>
-          <Button
-            size="sm"
-            variant="primary"
-            loading={createMut.isPending}
-            onClick={onCreate}
-            data-testid="workspace-save"
-          >
-            Create order
-          </Button>
         </>
       )}
       {mode === "oldrev" && (
@@ -2501,7 +2362,7 @@ function SalesOrderWorkspaceBody() {
     </span>
   );
 
-  const soWord = isNew ? "New Sales Order" : order ? `SO-${order.so}` : "Sales Order";
+  const soWord = order ? `SO-${order.so}` : "Sales Order";
 
   const customerBuiltins = tab("customer").builtins;
   const emergencyEnabled = tab("emergency").builtins["emergency"]?.enabled !== false;
@@ -2859,7 +2720,12 @@ function SalesOrderWorkspaceBody() {
       <fieldset disabled={formLocked} className="contents">
       <Block title="SO info">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Fact own={false} label="SO Doc Date" value={isNew ? fmtDate(appTodayIso()) : fmtDate(order?.placed_at ?? null)} />
+          <Fact own={false} label="SO Doc Date" value={fmtDate(order?.placed_at ?? null)} />
+          {/* TWO DATES, TWO NAMES (owner ruling 2026-10-06): this field is
+              `orders.proceed_date`, the PLANNED production start, and reads
+              `Planned production start` here and on the PDF; `Proceed Date`
+              names only the actual hand-off (`orders.proceeded_at`). The
+              notes below predate the rename and say `Proceed Date` for it. */}
           {/* ⭐ THE RULED ORDER IS `SO Doc Date · Proceed Date · Customer
               Requested Delivery Date` (CARD ORDER AND NAMES, Jess 2026-09-21).
               It was built with the last two swapped, and the SALES ORDER PDF
@@ -2873,9 +2739,7 @@ function SalesOrderWorkspaceBody() {
               the production start as a REQUIRED question at the point of sale
               (`Proceed date · production start *`), so on an existing order it
               is a recorded answer, not a field — and an office edit that moved
-              it silently moved when the factory may start.
-              CREATE still owns the picker: `createOrderInput` refuses an order
-              without one, so keying a new SO here must still be able to set it. */}
+              it silently moved when the factory may start. */}
           {/* ⭐ A DATE THAT WAS NEVER RECORDED IS NOT A DATE THAT IS LOCKED
               (YH, 2026-08-28). Jess's ruling stands untouched — a proceed date
               that EXISTS is a recorded answer and stays a `Fact`, because
@@ -2897,10 +2761,10 @@ function SalesOrderWorkspaceBody() {
               This control is the door, not the lock. */}
           <div data-pos-field="proceedDate">
             {/* A never-recorded date reads `Not recorded` while locked; Edit opens the picker. */}
-            {mode === "create" || (mode === "object" && editing) ? (
-              <DatePicker id="so-proceed" label="Proceed Date" value={draft.proceed_date}
+            {mode === "object" && editing ? (
+              <DatePicker id="so-proceed" label="Planned production start" value={draft.proceed_date}
                 hint={
-                  mode === "object" && !baseline.proceed_date
+                  !baseline.proceed_date
                     ? "Never recorded. Fill it in once, then it locks"
                     : undefined
                 }
@@ -2912,11 +2776,11 @@ function SalesOrderWorkspaceBody() {
                 onChange={(iso) => setField("proceed_date", iso)} />
             ) : (
               <span id="so-proceed">
-                <Fact label="Proceed Date" value={fmtDate(draft.proceed_date) || "Not recorded"} />
+                <Fact label="Planned production start" value={fmtDate(draft.proceed_date) || "Not recorded"} />
               </span>
             )}
           </div>
-          {mode === "create" || (!formLocked && editing) ? (
+          {!formLocked && editing ? (
             <div data-pos-field="deliveryDate">
               <DatePicker id="so-promised" label="Customer Requested Delivery Date" value={draft.delivery_date}
                 hint={earliestPromise ? `Earliest ${fmtDate(earliestPromise)} (production lead)` : undefined}
@@ -2927,7 +2791,7 @@ function SalesOrderWorkspaceBody() {
                 }
                 /* A date changes only into another date: picking one in Edit ends a legacy TBD (owner ruling 2026-09-26). */
                 onChange={(iso) =>
-                  setDraft((d) => ({ ...d, delivery_date: iso, delivery_date_tbd: mode === "create" ? d.delivery_date_tbd : false }))
+                  setDraft((d) => ({ ...d, delivery_date: iso, delivery_date_tbd: false }))
                 } />
             </div>
           ) : (
@@ -2981,30 +2845,6 @@ function SalesOrderWorkspaceBody() {
             2026-09-11 "who sold it is part of who bought it" placement.
             `SalesOrderAttribution` keeps its own permission checks and its
             approve/reject lane exactly as they were. */}
-        {mode === "create" ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {/* ⭐ AND DEALER READS LAST — the ruled order is `… Sales Location ·
-                Salesperson · Dealer`. It was built Dealer-first, which put the
-                least-used fact in the reader's first cell. */}
-            <div data-pos-field="outlet">
-              <Select id="so-outlet" label="Sales Location"
-                value={draft.outlet_id ?? "none"}
-                onValueChange={(v) => setField("outlet_id", v === "none" ? null : v)}
-                options={outletOptions} />
-            </div>
-            <div data-pos-field="salesperson">
-              <Select id="so-salesperson" label="Salesperson"
-                value={draft.salesperson_id ?? "none"}
-                onValueChange={(v) => setField("salesperson_id", v === "none" ? null : v)}
-                options={spOptions} />
-            </div>
-            <Select id="so-dealer" label="Dealer"
-              value={draft.dealer_id ?? ""}
-              onValueChange={(v) => setField("dealer_id", v || null)}
-              options={dealerOptions} placeholder="Pick a dealer" />
-          </div>
-        ) : (
-          <>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div data-pos-field="outlet">
                 <Fact label="Sales Location" value={sourceName(mode, viewedRevision, order, "outlet") || "Not recorded"} />
@@ -3059,8 +2899,6 @@ function SalesOrderWorkspaceBody() {
                 }}
               />
             )}
-          </>
-        )}
 
       </Block>
       </fieldset>
@@ -3075,7 +2913,7 @@ function SalesOrderWorkspaceBody() {
       <Block
         title="Customer"
         headerSlot={
-          !isNew && customerBuiltins["customerType"]?.enabled !== false ? (
+          customerBuiltins["customerType"]?.enabled !== false ? (
             <span
               className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-base-700"
               data-pos-field="customerType"
@@ -3084,20 +2922,20 @@ function SalesOrderWorkspaceBody() {
               {customerTypeWord}
               {/* ⭐ AN EXISTING CUSTOMER CARRIES HOW MANY ORDERS, AND A DOOR TO
                   THEM — OWNER RULING (Jess, 2026-09-21). `n` is this phone's
-                  Sales Orders the reader may see: the SAME `matches` the
-                  customer-type probe already answers with, so no second read
-                  and no new arithmetic. The link opens the Sales Orders
-                  Register searched by that phone — no new customer page and no
-                  new writer (Law C: a door, never a duplicate). */}
-              {customerTypeWord === "Existing customer" && (typeProbe.data?.matches ?? 0) > 0 && (
+                  Sales Orders the reader may see, counted by the Register's
+                  own read (`ordersDoorCount` above), and the link opens that
+                  Register searched by the SAME phone — no new customer page
+                  and no new writer (Law C: a door, never a duplicate). Zero,
+                  or no number, prints no `0 orders` and no door. */}
+              {customerTypeWord === "Existing customer" && ordersDoorCount > 0 && (
                 <>
                   {" · "}
                   <Link
-                    to={`/operation/orders?search=${encodeURIComponent(draft.customer_phone.trim())}`}
+                    to={`/operation/orders?search=${encodeURIComponent(probedPhone)}`}
                     className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
                     data-testid="customer-orders-door"
                   >
-                    {typeProbe.data?.matches === 1 ? "1 order" : `${typeProbe.data?.matches} orders`} ›
+                    {ordersDoorCount === 1 ? "1 order" : `${ordersDoorCount} orders`} ›
                   </Link>
                 </>
               )}
@@ -3508,20 +3346,9 @@ function SalesOrderWorkspaceBody() {
               line that only repeats them back is the noise Jess asked to cut. */}
           {stairWorking && (
             <p className="text-meta text-base-500" data-testid="so-stair-working">
-              {stairWorking.quoted ? (
-                <>
-                  {stairWorking.items} of {stairWorking.itemsTotal} item
-                  {stairWorking.itemsTotal === 1 ? "" : "s"} × {stairWorking.floors} floor
-                  {stairWorking.floors === 1 ? "" : "s"} above {stairWorking.freeUpToFloor}F ×{" "}
-                  <Money value={stairWorking.perFloorPerItem} /> ={" "}
-                </>
-              ) : (
-                <>
-                  {stairWorking.items} of {stairWorking.itemsTotal} item
-                  {stairWorking.itemsTotal === 1 ? "" : "s"} carried to floor {stairWorking.floor},
-                  charged{" "}
-                </>
-              )}
+              {stairWorking.items} of {stairWorking.itemsTotal} item
+              {stairWorking.itemsTotal === 1 ? "" : "s"} carried to floor {stairWorking.floor},
+              charged{" "}
               <span className="font-semibold text-base-900">
                 <Money value={stairWorking.fee} />
               </span>
@@ -3554,76 +3381,7 @@ function SalesOrderWorkspaceBody() {
             no control behind it — so the page passed a completeness test it
             did not meet, and the office still had to ring the shop to add a
             disposal service. The attribute now rides the real door. */}
-        {mode === "create" ? (
-          <div className="flex flex-col gap-2">
-            {/* Every SKU the catalog holds, offered as a typeahead. A `datalist`
-                SUGGESTS without refusing: the office must still be able to
-                write a line for an AutoCount import or a not-yet-catalogued
-                product (975 live units are in that bucket), so an unlisted SKU
-                stays typeable — it simply stops being the silent default. */}
-            <datalist id="so-sku-catalog">
-              {[...catalogBySku.entries()].map(([sku, info]) => (
-                <option key={sku} value={sku}>{info.label}</option>
-              ))}
-            </datalist>
-            {draft.lines.map((l) => {
-              const known = catalogBySku.get(l.sku.trim());
-              const priceHint = catalogPriceHint(known, l.unit_price);
-              return (
-              /* ⭐ THE ROW ALIGNS AT THE TOP (YH, 2026-08-29 — measured on
-                 `/operation/orders/so/new`). It was `items-end`, so every cell
-                 aligned on its BOTTOM. SKU and Unit price each carry a hint
-                 line (`Cody · Super King`, `Catalog RM 1090.00`) and Qty does
-                 not — so Qty was pushed a whole row down to bring its short box
-                 level with their hints, and the three labels sat at three
-                 heights. `FieldFrame` gives every field the same 18px above its
-                 control (an 11px/14px label plus `gap-1`), so aligning at the
-                 START lines up all three labels AND all three inputs, and lets
-                 the hints hang below where they belong. */
-              <div key={l.key} className="grid grid-cols-[1fr_84px_120px_32px] items-start gap-2">
-                <Input id={`so-sku-${l.key}`} label="SKU" value={l.sku}
-                  list="so-sku-catalog"
-                  hint={known ? known.label : l.sku.trim() ? "Not in catalog" : undefined}
-                  onChange={(e) => {
-                    const sku = e.target.value;
-                    const hit = catalogBySku.get(sku.trim());
-                    setLine(l.key, skuEditPatch(sku, hit, l.unit_price));
-                  }} />
-                <Input id={`so-qty-${l.key}`} label="Qty" type="number" min={1}
-                  value={String(l.qty)}
-                  onChange={(e) => setLine(l.key, { qty: Math.max(1, Number(e.target.value) || 1) })} />
-                <Input id={`so-price-${l.key}`} label="Unit price (RM)" type="number" min={0}
-                  value={String(l.unit_price)}
-                  hint={priceHint}
-                  onChange={(e) => setLine(l.key, { unit_price: Math.max(0, Number(e.target.value) || 0) })} />
-                {/* The button has no label of its own, so it would ride up to
-                    the label row. It borrows `FieldFrame`’s own shape — a
-                    `gap-1` column under a label-height spacer — rather than a
-                    hard-coded 18px offset, so it still lands on the inputs if
-                    the label token ever changes. */}
-                <div className="flex flex-col gap-1">
-                  <span className="text-label" aria-hidden="true">&nbsp;</span>
-                  <button
-                    type="button"
-                    aria-label="Remove"
-                    className="grid h-8 w-8 place-items-center rounded-control text-base-500 hover:bg-hovertint hover:text-base-900"
-                    onClick={() => setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-              );
-            })}
-            <div>
-              <Button size="sm" variant="neutral"
-                onClick={() => setDraft((d) => ({ ...d, lines: [...d.lines, { key: nextKey(), sku: "", qty: 1, unit_price: 0 }] }))}>
-                <Plus size={14} /> Add line
-              </Button>
-            </div>
-          </div>
-        ) : (
-          /* ⭐ ONE COMMERCIAL TABLE IN BOTH MODES — OWNER RULING (Jess,
+        {/* ⭐ ONE COMMERCIAL TABLE IN BOTH MODES — OWNER RULING (Jess,
              2026-09-21/22, `docs/orders/MASTER.md` § ITEMS). View used to draw a
              different table from Edit — Category · Unit ID · SKU · Qty · Item ·
              Deliver To · Unit price · Line total — so the reader checked the page
@@ -3635,9 +3393,8 @@ function SalesOrderWorkspaceBody() {
              ⛔ THE CROSS-MODULE FACTS ARE NOT DELETED, THEY ARE WHERE THEY BELONG.
              Unit ID is Stock's and `Deliver To` is Purchasing's; both are read on
              `Order Route`, which already draws them from the route facts. This
-             page stops printing a second copy (Law C: a door, never a duplicate). */
-          editItemsTable
-        )}
+             page stops printing a second copy (Law C: a door, never a duplicate). */}
+        {editItemsTable}
         {/* An OLD revision is a photograph and a draft has no order to write
             to — the door belongs to the live object only.
             ⭐ THE ATTRIBUTE STILL RIDES A REAL CONTROL. It was once a hidden
@@ -3664,7 +3421,7 @@ function SalesOrderWorkspaceBody() {
       <Block
         title="Payment"
         headerSlot={
-          !isNew && order ? (
+          order ? (
             <button
               type="button"
               data-testid="workspace-open-payments"
@@ -3678,7 +3435,7 @@ function SalesOrderWorkspaceBody() {
           ) : undefined
         }
       >
-        <PaymentLedger orderId={isNew ? null : (orderId ?? null)} saved={{
+        <PaymentLedger orderId={orderId ?? null} saved={{
           paid: Number(order?.paid ?? 0), method: order?.payment_method,
           months: order?.installment_months, reference: order?.approval_code,
           slip: order?.payment_slip_url,
@@ -3754,7 +3511,7 @@ function SalesOrderWorkspaceBody() {
       {/* ⑨ WHAT THIS CHANGE STARTED ELSEWHERE — 3.4. Shown only when there IS
           work: a section that says "nothing" on every order is a section the
           operator learns to skip. */}
-      {!isNew && mode !== "oldrev" && (correctionWorkQ.data?.work ?? []).length > 0 && (
+      {mode !== "oldrev" && (correctionWorkQ.data?.work ?? []).length > 0 && (
         <Block title="What this change started elsewhere">
           <CorrectionWorkList
             work={correctionWorkQ.data?.work ?? []}
@@ -3803,9 +3560,9 @@ function SalesOrderWorkspaceBody() {
         onBack={(event) => {
           if (!confirmDiscard()) event.preventDefault();
         }}
-        docTitle={isNew ? "New Sales Order · Carres" : order ? `SO-${order.so} · Carres` : undefined}
+        docTitle={order ? `SO-${order.so} · Carres` : undefined}
         right={headerRight}
-        navigation={!isNew ? (
+        navigation={(
           <nav aria-label="Sales Order views" className="flex h-full items-stretch gap-1">
             {OBJECT_VIEWS.map((view) => {
               const active = objectView === view;
@@ -3822,7 +3579,7 @@ function SalesOrderWorkspaceBody() {
               );
             })}
           </nav>
-        ) : null}
+        )}
       />
 
       {order && (
@@ -3953,7 +3710,7 @@ function SalesOrderWorkspaceBody() {
            its own and the PAGE does not; below 1024px they stack, form first,
            and the page scrolls normally. */
         <div ref={splitHostRef} className={`min-h-0 flex-1 bg-kit-slate-3 ${split === "stack" ? "overflow-auto" : "overflow-hidden"}`}>
-          {!isNew && detailQ.isLoading && (
+          {detailQ.isLoading && (
             /* Loading holds the two panes' final geometry: the same split the
                form and the paper will fill, so the page does not jump. */
             <div
@@ -3971,7 +3728,7 @@ function SalesOrderWorkspaceBody() {
               </div>
             </div>
           )}
-          {!isNew && !detailQ.isLoading && detailQ.isError && (
+          {!detailQ.isLoading && detailQ.isError && (
             <div className="px-4 py-4">
               <div className="rounded-card border border-kit-slate-5 bg-white">
                 <SalesOrderReadFailure
@@ -3983,7 +3740,7 @@ function SalesOrderWorkspaceBody() {
             </div>
           )}
 
-          {(isNew || order) && (
+          {order && (
             <div
               className={split === "stack" ? "flex flex-col" : "grid h-full min-h-0"}
               style={split === "stack" ? undefined : { gridTemplateColumns: split === "half" ? "minmax(0,1fr) minmax(0,1fr)" : `${FORM_MIN_WIDTH}px minmax(${MIN_PDF_WIDTH}px, 1fr)` }}
@@ -4202,44 +3959,6 @@ export interface CatalogSkuFact {
   /** `product_models.category` — the CATALOG's answer (D9), and the input the
    *  lead-time floor is computed from. `null` = the catalog holds no row. */
   category?: string | null;
-}
-
-/**
- * The price hint under a create-mode line — SHOWN, never enforced.
- *
- * `product_skus.price` is the CATALOG's number and only the principal may set
- * it (0175). `order_lines.unit_price` is the ORDER's number, and an order may
- * legitimately sell at a different figure — a discount, a bundle, a goodwill
- * price. So a difference is worth SAYING and never worth refusing: this
- * returns hint text, never an error, because a red field reads as a refusal
- * and red has one job (late / act now).
- *
- * `undefined` = the catalog has no row for this SKU, so there is nothing to
- * compare against and the field stays quiet.
- */
-export function catalogPriceHint(
-  known: CatalogSkuFact | undefined,
-  unitPrice: number,
-): string | undefined {
-  if (!known) return undefined;
-  const shown = `Catalog RM ${known.price.toFixed(2)}`;
-  return known.price === unitPrice ? shown : `${shown}, this line differs`;
-}
-
-/**
- * What changes on the line when the operator edits the SKU field.
- *
- * Fills a BLANK price from the catalog; never overwrites one already typed.
- * `0` is this field's empty state — a fresh line starts there — not a decision
- * to sell for nothing, so filling it is completion rather than correction. Once
- * a real number is in, the catalog stops touching it.
- */
-export function skuEditPatch(
-  sku: string,
-  known: CatalogSkuFact | undefined,
-  currentUnitPrice: number,
-): { sku: string; unit_price?: number } {
-  return known && currentUnitPrice === 0 ? { sku, unit_price: known.price } : { sku };
 }
 
 /**
