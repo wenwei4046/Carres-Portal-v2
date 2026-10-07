@@ -1,313 +1,360 @@
 /**
- * Finance Settings → Chart of accounts (migrations 0539, 0550, 0557).
+ * Finance Settings → Chart of accounts (0539, 0550, 0570, 0577, 0580, 0608, 0656).
  *
- * Every account in the chart as a tree: each account under its parent,
- * indented by depth. A heading account (`is_header`, stored since 0580, so a
- * heading with nothing under it is still one) is bold; the ledger never posts
- * to it. A row click opens the account's name
- * and its number. Since 0550 the number can change: every key that names the
- * chart cascades, so posted lines follow the account to its new number rather
- * than being left pointing at nothing.
+ * THE CHART READS LIKE AUTOCOUNT'S (Chew 2026-10-07, docs/finance/MASTER.md §0
+ * "The Chart of accounts screen reads like AutoCount's"). Accounts are grouped
+ * by AutoCount's section, in AutoCount's order; inside a section each account
+ * sits under its heading, and every heading reads by number. Three columns:
+ * Code, Name (with AutoCount's special type, and `Heading` on a heading) and
+ * Type, then the row's edit and retire icons. A section folds, and so does a
+ * heading.
  *
- * Since 0570 an account named on a document that has left Draft renumbers
- * too: each frozen document's trigger lets the new number through and nothing
- * else, so the owner can renumber the whole chart from this screen.
+ * WHICH SECTION AN ACCOUNT READS IN. The section is kept on the account
+ * directly under a top heading; an account under a heading reads in that
+ * account's section. The top headings (0000 ASSETS to 7000 TAX) are the
+ * reports' roots and are not shown here. A top account with no section yet
+ * reads under `No section yet` until the import or the edit window gives it one.
  *
- * A row DRAG moves the account (0557) — a separate act from the modal above.
+ * ONE ACT, ONE DOOR. The edit icon, or a row click, opens the account: its
+ * name, number, section, the heading it sits under, and Retire or Bring back.
+ * Saving is one call to gl_account_edit, which moves, sets the section and
+ * renames in one transaction through the doors that already guard the chart;
+ * retiring is one call to gl_account_set_active. Every refusal is the
+ * database's sentence.
  *
- * THE ORDER IS NOT THE NUMBER (0557). The chart carries its own display order
- * — one integer per account, ordered within its heading, ties broken on the
- * code — and moving an account changes only that. A move never writes the
- * number: the two are separate acts, and the number changes only by hand, in
- * the modal above.
+ * THE ICONS IN THE ROW are Chew's ruling for this Finance page (2026-10-07,
+ * 「直接做，这个是我finance 的使用方式」), a Finance-only exception to the
+ * shared listing rule that keeps buttons out of rows (UI MASTER §6.0 rule 10,
+ * Jess's); Jess has been sent the request. No other page copies it.
  *
- * WHICH IS WHY EVERY COLUMN IS `sortable: false`, AND STAYS THAT WAY. This
- * grid prints a TREE, not a list. Sorting a column would lift children away
- * from the parent they are indented under, and would silently replace the
- * order Finance chose with one the column picked. The order on this screen is
- * the chart's own order, and the only thing that may change it is a move.
- *
- * THE MOVE IS A REAL DRAG. The kit had a drag affordance for COLUMN HEADERS
- * only, so `rowDrag` was added to `DataGrid` for this screen — the browser's
- * own drag and drop, no new dependency, opt-in, and every other grid passes no
- * `rowDrag` and is unchanged. Alt + up/down does the same move from the
- * keyboard, because a drag-only control locks out anyone not using a mouse.
- * There are no move buttons.
- *
- * A DROP ON A HEADING PUTS THE ACCOUNT UNDER IT (0570), a sibling heading
- * included. The number and name stay; the parent changes, so the P&L and
- * Balance Sheet print it under the new heading on their next read. The screen
- * offers only what `gl_account_move` takes (0580), so it never offers a move
- * the database would refuse: a heading of the same kind, not the one it is
- * under, not itself or a heading inside it, never into or out of a heading
- * `rule_headings` names or one inside it, and nothing but bank and cash
- * accounts (`money_accounts`) into the money accounts heading or a heading
- * inside it. The last account may leave its heading; the heading stays bold
- * and still takes a drop. Two headings side by side reorder on a drop; a
- * heading goes under another through the row menu. A drop on an account
- * beside it reorders (0557). Alt + up/down only reorders (`canStep`,
- * `onStep`), so a sibling heading can still be stepped past; the keyboard way
- * under another heading is the row menu (Shift+F10, the Menu key or a
- * right-click).
- *
- * THE ORDER IT READ AND THE ORDER IT WANTS BOTH GO UP. `was` is built from the
- * chart as it stands on screen, `now` from the move; they are never the same
- * array. If they were, `gl_accounts_reorder`'s staleness check would pass every
- * time and two people dragging at once would silently overwrite each other.
- * When it refuses, the screen prints the database's sentence and re-reads the
- * chart — the move is not swallowed, and the optimistic order is thrown away
- * rather than left on screen as a lie.
+ * Accounts read by number (0656), so there is no drag and no column sort: a
+ * sort would lift accounts away from the heading they are indented under.
  */
-import { useEffect, useMemo, useState } from "react";
-import { chartTree, ledgerKindWord, LEDGER_ACCOUNT_CODE_MESSAGE, LEDGER_KIND_WORDS, type LedgerAccount } from "@carres/shared/finance-ledger";
-import { ledgerAccountCodeInput, type LedgerAccountAddInput } from "@carres/shared/schemas/finance";
+import { useMemo, useState } from "react";
+import { ledgerKindWord, LEDGER_ACCOUNT_CODE_MESSAGE, type LedgerAccount, type LedgerSection } from "@carres/shared/finance-ledger";
+import { ledgerAccountCodeInput } from "@carres/shared/schemas/finance";
 import Button from "@/components/kit/Button";
+import Checkbox from "@/components/kit/Checkbox";
 import Input from "@/components/kit/Input";
 import Modal from "@/components/kit/Modal";
+import Select from "@/components/kit/Select";
 import { FieldError } from "@/components/kit/FieldFrame";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { useLedgerChart } from "../ledger/ledger-queries";
 import { LoadFailed } from "../other-money-in/parts";
-import Checkbox from "@/components/kit/Checkbox";
-import Select from "@/components/kit/Select";
-import { useAddAccount, useMoveAccount, useReorderAccounts, useSaveAccount } from "./api";
+import { useAddAccountInSection, useEditAccount, useSetAccountActive } from "./api";
 import { useSaveKey } from "../save-key";
 import ChartImport from "./ChartImport";
 
-type Row = LedgerAccount & { depth: number };
+/** The group of a top account that has no section yet. */
+export const NO_SECTION = "__no_section__";
 
-/** The chart's own order: the order Finance set, then the number. */
-const byOrder = (x: LedgerAccount, y: LedgerAccount) => x.sort_order - y.sort_order || x.code.localeCompare(y.code);
+export interface ChartRow {
+  account: LedgerAccount;
+  /** 0 for the account directly under a top heading, 1 under it, and so on. */
+  depth: number;
+  /** The section the row reads in, or NO_SECTION. */
+  group: string;
+  /** An account it holds is on screen, or folded away. */
+  hasChildren: boolean;
+}
+
+const byCode = (x: LedgerAccount, y: LedgerAccount) => x.code.localeCompare(y.code);
+
+/**
+ * The chart as AutoCount prints it: section by section, each top account
+ * followed by the accounts under it, every heading by number. Retired accounts
+ * are left out unless asked for; a folded heading keeps its row and hides
+ * what is under it.
+ */
+export function chartBySection(
+  accounts: readonly LedgerAccount[],
+  sections: readonly LedgerSection[],
+  opts: { showRetired: boolean; folded: ReadonlySet<string> },
+): ChartRow[] {
+  const known = new Set(sections.map((s) => s.section));
+  const codes = new Map(accounts.map((a) => [a.code, a]));
+  const under = new Map<string, LedgerAccount[]>();
+  for (const a of accounts) {
+    if (!a.parent_code) continue;
+    const list = under.get(a.parent_code) ?? [];
+    list.push(a);
+    under.set(a.parent_code, list);
+  }
+  for (const list of under.values()) list.sort(byCode);
+  const shown = (a: LedgerAccount) => opts.showRetired || a.is_active;
+
+  const walk = (a: LedgerAccount, depth: number, group: string): ChartRow[] => {
+    if (!shown(a)) return [];
+    const kids = (under.get(a.code) ?? []).filter(shown);
+    const row: ChartRow = { account: a, depth, group, hasChildren: kids.length > 0 };
+    if (opts.folded.has(a.code)) return [row];
+    return [row, ...kids.flatMap((k) => walk(k, depth + 1, group))];
+  };
+
+  // The top accounts: those whose parent is a top heading (a heading with no
+  // parent). A parent the chart does not hold counts as the top too.
+  const tops = accounts.filter((a) => {
+    if (!a.parent_code) return false;
+    const p = codes.get(a.parent_code);
+    return !p || p.parent_code === null;
+  });
+
+  const order = new Map(sections.map((s) => [s.section, s.sort_order]));
+  const groupOf = (a: LedgerAccount) => (a.section && known.has(a.section) ? a.section : NO_SECTION);
+  const rank = (g: string) => (g === NO_SECTION ? Number.MAX_SAFE_INTEGER : order.get(g) ?? Number.MAX_SAFE_INTEGER);
+  return [...tops]
+    .sort((x, y) => rank(groupOf(x)) - rank(groupOf(y)) || byCode(x, y))
+    .flatMap((t) => walk(t, 0, groupOf(t)));
+}
+
+/** The section an account reads in, from the chart on screen: its own at the
+ *  top of a section, else that of the top account above it. */
+export function sectionOf(code: string, accounts: readonly LedgerAccount[]): string | null {
+  const codes = new Map(accounts.map((a) => [a.code, a]));
+  let a = codes.get(code);
+  for (let i = 0; a && i < 50; i++) {
+    const p = a.parent_code ? codes.get(a.parent_code) : undefined;
+    if (!p) return null;
+    if (p.parent_code === null) return a.section ?? null;
+    a = p;
+  }
+  return null;
+}
+
+// PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0656).
+const NO_SECTION_LABEL = "No section yet";
+const TOP_OF_SECTION = "top";
+
+/** A click inside the row's own controls must not also open the row. */
+const keepInCell = {
+  onClick: (e: { stopPropagation: () => void }) => e.stopPropagation(),
+  onKeyDown: (e: { stopPropagation: () => void }) => e.stopPropagation(),
+};
 
 export default function ChartOfAccounts() {
   const query = useLedgerChart();
-  const reorder = useReorderAccounts();
-  const moveUnder = useMoveAccount();
-  /* No second move while one is in flight: it would send a `was` the server
-     has not stored yet. */
-  const busy = reorder.isPending || moveUnder.isPending;
-  /* The order a drag put on screen, before the server has answered. Held whole
-     rather than as a diff so `chartTree` keeps reading one list. */
-  const [moved, setMoved] = useState<LedgerAccount[] | null>(null);
-  const [refusal, setRefusal] = useState<string | null>(null);
-  const served = query.data?.accounts;
-  /* Every fresh read wins over an optimistic order — including the re-read a
-     refusal triggers, which is how a refused move leaves the screen. */
-  useEffect(() => setMoved(null), [query.dataUpdatedAt]);
-  const accounts = useMemo(() => moved ?? served ?? [], [moved, served]);
-  const rows = useMemo(() => chartTree(accounts), [accounts]);
-  const [editing, setEditing] = useState<Row | null>(null);
+  const [showRetired, setShowRetired] = useState(false);
+  const [folded, setFolded] = useState<Set<string>>(() => new Set());
+  const [editing, setEditing] = useState<{ account: LedgerAccount; retire: boolean } | null>(null);
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
 
-  /** The codes under one heading in the order the screen is reading them —
-      exactly what a `was` has to be. */
-  const childrenOf = (parent: string | null) =>
-    accounts.filter((a) => a.parent_code === parent).sort(byOrder).map((a) => a.code);
-
-  /** A refusal is printed as the database wrote it, and the chart is read
-      again so the optimistic order leaves the screen. */
-  const refused = (e: Error) => {
-    setRefusal(e.message);
-    setMoved(null);
-    void query.refetch();
-  };
-
-  const ruleHeadings = useMemo(() => new Set(query.data?.rule_headings ?? []), [query.data]);
-  /** Bank and cash accounts are added in Money accounts, so the Add account
-      form never offers this heading or one inside it (0577). */
+  const accounts = useMemo(() => query.data?.accounts ?? [], [query.data]);
+  const sections = useMemo(() => query.data?.sections ?? [], [query.data]);
   const moneyHeading = query.data?.roles?.MONEY_ACCOUNTS_HEADING;
   const moneyAccounts = useMemo(() => new Set(query.data?.money_accounts ?? []), [query.data]);
+  const rows = useMemo(
+    () => chartBySection(accounts, sections, { showRetired, folded }),
+    [accounts, sections, showRetired, folded],
+  );
 
-  /** `code` and every heading above it, nearest first. */
-  const upFrom = (code: string | null) => {
-    const parentOf = new Map(accounts.map((x) => [x.code, x.parent_code]));
-    const chain: string[] = [];
-    for (let c: string | null | undefined = code; c; c = parentOf.get(c)) chain.push(c);
-    return chain;
-  };
-  /** True when `h` is `a` or sits anywhere under it (0577: a heading never
-      goes under a heading inside it). */
-  const isInside = (h: LedgerAccount, a: LedgerAccount) => upFrom(h.code).includes(a.code);
-  const inMoneyHeading = (code: string) => !!moneyHeading && upFrom(code).includes(moneyHeading);
-  const underRuleHeading = (code: string | null) => upFrom(code).some((c) => ruleHeadings.has(c));
+  const fold = (code: string) =>
+    setFolded((f) => {
+      const next = new Set(f);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
 
-  /** A heading account `a` may go under — gl_account_move's own refusals, so
-      the screen never offers one: `h` is a heading of the same kind and not
-      the one `a` is under, not `a` itself or inside it (a heading moves too
-      since 0577), no heading that decides how money may be recorded sits at
-      or above either end, and inside the money accounts heading `a` and
-      everything under it is a bank or cash account or a heading (0580). An
-      empty heading counts, and the last account may leave its heading. */
-  const canGoUnder = (a: LedgerAccount, h: LedgerAccount) =>
-    h.is_header &&
-    !isInside(h, a) &&
-    h.kind === a.kind &&
-    h.code !== a.parent_code &&
-    !underRuleHeading(h.code) &&
-    !underRuleHeading(a.parent_code) &&
-    !(inMoneyHeading(h.code) && accounts.some((x) => !x.is_header && !moneyAccounts.has(x.code) && isInside(x, a)));
+  const groups = useMemo(() => {
+    const used = new Set(rows.map((r) => r.group));
+    const list = sections
+      .filter((s) => used.has(s.section))
+      .map((s) => ({ key: s.section, label: `${s.section} · ${ledgerKindWord(s.kind)}` }));
+    return used.has(NO_SECTION) ? [...list, { key: NO_SECTION, label: NO_SECTION_LABEL }] : list;
+  }, [rows, sections]);
 
-  const move = (dragged: Row, target: Row) => {
-    const was = childrenOf(dragged.parent_code);
-    const from = was.indexOf(dragged.code);
-    const to = was.indexOf(target.code);
-    if (from < 0 || to < 0 || from === to) return;
-    const now = [...was];
-    now.splice(from, 1);
-    now.splice(to, 0, dragged.code);
-    setRefusal(null);
-    /* 1..n is exactly what gl_accounts_reorder writes, so the optimistic chart
-       and the stored chart agree without waiting for the read. Every other
-       field is carried across untouched: a move never writes an account
-       number. */
-    setMoved(
-      accounts.map((a) => {
-        const i = now.indexOf(a.code);
-        return i < 0 ? a : { ...a, sort_order: i + 1 };
-      }),
-    );
-    reorder.mutate({ parentCode: dragged.parent_code, was, now }, { onError: refused });
-  };
-
-  /** The heading an account row sits under, when `a` may go there. A drop on
-      an account under another heading puts `a` beside it (0577): before, only
-      a drop on the heading row itself was offered, so a drag onto the accounts
-      of another heading did nothing. */
-  const headingToJoin = (a: LedgerAccount, b: LedgerAccount) => {
-    // Two headings side by side: a drop only changes the place, as before
-    // 0577. A heading goes under one beside it through the row menu.
-    if (a.is_header && b.is_header && a.parent_code === b.parent_code) return null;
-    if (b.is_header) return canGoUnder(a, b) ? { heading: b, at: undefined } : null;
-    const h = accounts.find((x) => x.code === b.parent_code);
-    return h && b.parent_code !== a.parent_code && canGoUnder(a, h) ? { heading: h, at: b.code } : null;
-  };
-
-  /** Put `dragged` under another heading (0570), at the end or just before
-      the account `at`. Two before/after pairs go up, one per heading; the
-      number and the name are not sent. */
-  const putUnder = (dragged: LedgerAccount, heading: LedgerAccount, at?: string) => {
-    const fromWas = childrenOf(dragged.parent_code);
-    const fromNow = fromWas.filter((c) => c !== dragged.code);
-    const toWas = childrenOf(heading.code);
-    const toNow = [...toWas];
-    const at0 = at ? toNow.indexOf(at) : -1;
-    toNow.splice(at0 < 0 ? toNow.length : at0, 0, dragged.code);
-    setRefusal(null);
-    setMoved(
-      accounts.map((a) => {
-        if (a.code === dragged.code) return { ...a, parent_code: heading.code, sort_order: toNow.indexOf(a.code) + 1 };
-        const i = fromNow.indexOf(a.code);
-        if (i >= 0) return { ...a, sort_order: i + 1 };
-        const j = toNow.indexOf(a.code);
-        return j < 0 ? a : { ...a, sort_order: j + 1 };
-      }),
-    );
-    moveUnder.mutate(
-      { code: dragged.code, toParentCode: heading.code, from: { was: fromWas, now: fromNow }, to: { was: toWas, now: toNow } },
-      { onError: refused },
-    );
-  };
-
-  const columns = useMemo<DataGridColumn<Row>[]>(
+  const columns = useMemo<DataGridColumn<ChartRow>[]>(
     () => [
       {
-        key: "account",
-        label: "Account",
-        width: 360,
+        key: "code",
+        label: "Code",
+        width: 150,
         sortable: false,
+        filterable: false,
         accessor: (r) => (
-          <span style={{ paddingLeft: r.depth * 20 }} className={r.is_header ? "font-semibold" : undefined}>
-            {r.code} {r.name}
+          <span className="inline-flex items-center gap-1" style={{ paddingLeft: r.depth * 16 }}>
+            {r.hasChildren ? (
+              <span {...keepInCell}>
+                <Button
+                  iconOnly
+                  variant="ghost"
+                  icon={folded.has(r.account.code) ? "forward" : "expand"}
+                  aria-expanded={!folded.has(r.account.code)}
+                  // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0656).
+                  aria-label={`${folded.has(r.account.code) ? "Open" : "Fold"} ${r.account.code} ${r.account.name}`}
+                  data-testid={`chart-fold-${r.account.code}`}
+                  onClick={() => fold(r.account.code)}
+                />
+              </span>
+            ) : null}
+            <span className={r.account.is_header ? "font-semibold" : undefined}>{r.account.code}</span>
           </span>
         ),
-        searchValue: (r) => `${r.code} ${r.name}`,
-        filterable: false,
+        searchValue: (r) => r.account.code,
+        exportValue: (r) => r.account.code,
       },
-      { key: "kind", label: "Kind", width: 140, sortable: false, accessor: (r) => ledgerKindWord(r.kind), filterType: "enum" },
-      { key: "status", label: "Status", width: 120, sortable: false, accessor: (r) => (r.is_active ? "Active" : "Not active"), filterType: "enum" },
+      {
+        key: "name",
+        label: "Name",
+        width: 440,
+        sortable: false,
+        filterable: false,
+        accessor: (r) => (
+          <span style={{ paddingLeft: r.depth * 16 }} className="inline-flex items-baseline gap-2">
+            <span className={r.account.is_header ? "font-semibold" : undefined}>
+              {r.depth > 0 ? "└ " : ""}
+              {r.account.name}
+            </span>
+            {r.account.special ? <span className="text-label text-kit-slate-11">{r.account.special}</span> : null}
+            {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0656). */}
+            {r.account.is_header ? <span className="text-label text-kit-slate-11">Heading</span> : null}
+            {!r.account.is_active ? <span className="text-label text-kit-slate-11">Retired</span> : null}
+          </span>
+        ),
+        searchValue: (r) => `${r.account.name} ${r.account.special ?? ""}`,
+        exportValue: (r) => r.account.name,
+      },
+      {
+        key: "type",
+        label: "Type",
+        width: 140,
+        sortable: false,
+        accessor: (r) => ledgerKindWord(r.account.kind),
+        filterType: "enum",
+      },
+      {
+        key: "actions",
+        label: "",
+        width: 96,
+        sortable: false,
+        filterable: false,
+        accessor: (r) => (
+          <span className="inline-flex items-center gap-1" {...keepInCell}>
+            <Button
+              iconOnly
+              variant="ghost"
+              icon="edit"
+              // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0656).
+              aria-label={`Edit ${r.account.code} ${r.account.name}`}
+              data-testid={`chart-edit-${r.account.code}`}
+              onClick={() => setEditing({ account: r.account, retire: false })}
+            />
+            {r.account.is_active ? (
+              <Button
+                iconOnly
+                variant="ghost"
+                icon="delete"
+                aria-label={`Retire ${r.account.code} ${r.account.name}`}
+                data-testid={`chart-retire-${r.account.code}`}
+                onClick={() => setEditing({ account: r.account, retire: true })}
+              />
+            ) : null}
+          </span>
+        ),
+        exportValue: () => "",
+      },
     ],
-    [],
+    [folded],
   );
 
   if (query.isError) return <LoadFailed what="The chart of accounts" onRetry={() => void query.refetch()} />;
   return (
     <ListPageShell register>
-      {/* Approved by YH, 23 Sep 2026 (docs/COPY-STANDARD.md, 0570). */}
-      <p className="text-body text-kit-slate-11">
-        Drag an account onto a heading to move it, or onto another account to reorder. Keyboard: Alt+Up/Down reorders, Shift+F10 moves.
-      </p>
-      {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, 0577). */}
-      <div className="flex gap-2">
-        <Button variant="neutral" onClick={() => setAdding(true)} disabled={!query.isSuccess}>
-          Add account
-        </Button>
-        {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0655). */}
-        <Button variant="neutral" data-testid="chart-import-open" onClick={() => setImporting(true)} disabled={!query.isSuccess}>
-          Import from AutoCount
-        </Button>
-      </div>
-      {refusal && (
-        <p role="alert" data-testid="chart-refusal" className="text-body text-kit-red-11">
-          {refusal}
-        </p>
-      )}
       <DataGrid
         rows={rows}
         columns={columns}
-        rowKey={(r) => r.code}
-        storageKey="carres.finance.chart-of-accounts.v1"
+        rowKey={(r) => r.account.code}
+        storageKey="carres.finance.chart-of-accounts.v2"
         appearance="reference"
         groupBanner={false}
+        allowColumnGrouping={false}
+        fixedGroups={{ groups, groupOf: (r) => r.group, revealMatches: true }}
         stickyIdentity
         isLoading={!query.isSuccess}
-        onRowClick={(r) => setEditing(r)}
-        rowDrag={{
-          /* A drop on a heading the account may go under puts it there, a
-             sibling heading included; any other drop on a sibling reorders.
-             Nothing while a move is in flight. */
-          canDrop: (a, b) => !busy && a.code !== b.code && (a.parent_code === b.parent_code || headingToJoin(a, b) !== null),
-          onMove: (a, b) => {
-            const j = headingToJoin(a, b);
-            if (j) putUnder(a, j.heading, j.at);
-            else move(a, b);
-          },
-          /* Alt + up/down only reorders among siblings, headings included. */
-          canStep: (a, b) => !busy && a.code !== b.code && a.parent_code === b.parent_code,
-          onStep: move,
-        }}
-        /* The keyboard way under another heading (Shift+F10 or the Menu key),
-           and the same list on a right-click. */
-        contextMenu={(r) =>
-          busy
-            ? []
-            : rows.filter((h) => canGoUnder(r, h)).map((h) => ({
-                // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, 0570).
-                label: `Move under ${h.code} ${h.name}`,
-                onClick: () => putUnder(r, h),
-              }))
+        onRowClick={(r) => setEditing({ account: r.account, retire: false })}
+        toolbarEnd={
+          <div className="flex flex-wrap items-center gap-2">
+            {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0656). */}
+            <Checkbox
+              id="chart-show-retired"
+              label="Show retired accounts"
+              checked={showRetired}
+              onCheckedChange={(on) => setShowRetired(on === true)}
+            />
+            <Button variant="neutral" onClick={() => setAdding(true)} disabled={!query.isSuccess}>
+              Add account
+            </Button>
+            {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0655). */}
+            <Button variant="neutral" data-testid="chart-import-open" onClick={() => setImporting(true)} disabled={!query.isSuccess}>
+              Import from AutoCount
+            </Button>
+          </div>
         }
       />
-      {editing && <AccountModal key={editing.code} account={editing} onClose={() => setEditing(null)} />}
+      {editing && (
+        <AccountModal
+          key={editing.account.code}
+          account={editing.account}
+          startWithRetire={editing.retire}
+          accounts={accounts}
+          sections={sections}
+          moneyHeading={moneyHeading}
+          moneyAccounts={moneyAccounts}
+          onClose={() => setEditing(null)}
+        />
+      )}
       {importing && <ChartImport onClose={() => setImporting(false)} />}
       {adding && (
-        <AddAccountModal
-          /* gl_account_add's own refusals (0580): nothing under a heading inside
-             a rule heading, and no heading under the rule heading itself. */
-          headings={rows.filter((r) => r.is_header && !inMoneyHeading(r.code) && !underRuleHeading(r.parent_code))}
-          ruleHeadings={ruleHeadings}
-          onClose={() => setAdding(false)}
-        />
+        <AddAccountModal accounts={accounts} sections={sections} moneyHeading={moneyHeading} onClose={() => setAdding(false)} />
       )}
     </ListPageShell>
   );
 }
 
+/** `code` and every account above it, nearest first. */
+function upFrom(code: string | null, accounts: readonly LedgerAccount[]): string[] {
+  const parentOf = new Map(accounts.map((x) => [x.code, x.parent_code]));
+  const chain: string[] = [];
+  for (let c: string | null | undefined = code; c && chain.length < 50; c = parentOf.get(c)) chain.push(c);
+  return chain;
+}
+
+/**
+ * The headings an account may sit under in `section`: headings in use of that
+ * section, never the account itself or a heading inside it (gl_account_move),
+ * and inside the bank and cash heading only when the account and everything
+ * under it are bank and cash accounts (0580). `account` null = a new account,
+ * which never goes there: bank and cash accounts are added in Money accounts.
+ */
+export function headingsIn(
+  section: string,
+  account: LedgerAccount | null,
+  accounts: readonly LedgerAccount[],
+  money: { heading: string | undefined; accounts: ReadonlySet<string> },
+): LedgerAccount[] {
+  const inside = (h: LedgerAccount) => !!account && upFrom(h.code, accounts).includes(account.code);
+  const inMoney = (code: string) => !!money.heading && upFrom(code, accounts).includes(money.heading);
+  const subtree = account ? accounts.filter((x) => upFrom(x.code, accounts).includes(account.code)) : [];
+  const allMoney = subtree.length > 0 && subtree.every((x) => x.is_header || money.accounts.has(x.code));
+  return accounts
+    .filter(
+      (h) =>
+        h.is_header &&
+        h.is_active &&
+        h.parent_code !== null &&
+        sectionOf(h.code, accounts) === section &&
+        !inside(h) &&
+        (!inMoney(h.code) || (account !== null && allMoney)),
+    )
+    .sort(byCode);
+}
+
 /**
  * Which field a refusal is about. The sentence shown is always the door's own
- * (0550 raises it, the API forwards it) — the `code` tag only says where to put
- * it, so the copy lives in one place instead of two.
+ * — the `code` tag only says where to put it.
  */
 function refusalOf(error: unknown): { field: "name" | "code" | null; message: string } {
   const body = (error as { body?: unknown } | null)?.body;
@@ -319,123 +366,202 @@ function refusalOf(error: unknown): { field: "name" | "code" | null; message: st
   return { field, message: (error as Error).message };
 }
 
-function AccountModal({ account, onClose }: { account: Row; onClose: () => void }) {
-  const save = useSaveAccount();
+/** The Receiving button law (COPY-STANDARD): a disabled Save names the FIRST
+ *  missing field, top to bottom. null = nothing missing, Save is live. */
+export function accountSaveGap(f: { section: string | undefined; code: string; name: string; isHeading?: boolean }): string | null {
+  if (!f.section) return "Save: pick the section";
+  if (!f.code.trim()) return f.isHeading ? "Save: type the heading number" : "Save: type the number";
+  if (!f.name.trim()) return f.isHeading ? "Save: type the heading name" : "Save: type the name";
+  return null;
+}
+
+function AccountModal({
+  account,
+  startWithRetire,
+  accounts,
+  sections,
+  moneyHeading,
+  moneyAccounts,
+  onClose,
+}: {
+  account: LedgerAccount;
+  startWithRetire: boolean;
+  accounts: readonly LedgerAccount[];
+  sections: readonly LedgerSection[];
+  moneyHeading: string | undefined;
+  moneyAccounts: ReadonlySet<string>;
+  onClose: () => void;
+}) {
+  const edit = useEditAccount();
+  const setActive = useSetAccountActive();
+  const parent = accounts.find((a) => a.code === account.parent_code);
+  const atTop = !parent || parent.parent_code === null;
   const [name, setName] = useState(account.name);
   const [code, setCode] = useState(account.code);
+  const [section, setSection] = useState<string | undefined>(sectionOf(account.code, accounts) ?? undefined);
+  const [under, setUnder] = useState<string>(atTop || !parent ? TOP_OF_SECTION : parent.code);
+  const [confirmRetire, setConfirmRetire] = useState(startWithRetire && account.is_active);
   const [refusal, setRefusal] = useState<{ field: "name" | "code" | null; message: string } | null>(null);
-  const trimmed = name.trim();
-  const trimmedCode = code.trim();
-  // The Receiving button law: the disabled Save names the first gap, top to bottom.
-  const renameGap = !trimmed ? "Save: type the name" : !trimmedCode ? "Save: type the number" : null;
+
+  const sectionOptions = sections
+    .filter((s) => s.kind === account.kind)
+    .map((s) => ({ value: s.section, label: s.section }));
+  const headings = section ? headingsIn(section, account, accounts, { heading: moneyHeading, accounts: moneyAccounts }) : [];
+  const underOptions = [
+    // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0656).
+    { value: TOP_OF_SECTION, label: "Top of the section" },
+    ...headings.map((h) => ({ value: h.code, label: `${h.code} ${h.name}` })),
+  ];
+  const gap = accountSaveGap({ section, code, name, isHeading: account.is_header });
+
   const submit = () => {
     setRefusal(null);
-    // 0570's shape, checked here too so the sentence sits under the Number
-    // field; a lower-case letter (900-a001) goes up in capitals, as stored.
-    const shaped = ledgerAccountCodeInput.safeParse(trimmedCode);
+    const shaped = ledgerAccountCodeInput.safeParse(code);
     if (!shaped.success) {
       setRefusal({ field: "code", message: LEDGER_ACCOUNT_CODE_MESSAGE });
       return;
     }
-    save.mutate(
-      { code: account.code, name: trimmed, newCode: shaped.data },
+    if (!section) return;
+    edit.mutate(
+      {
+        code: account.code,
+        input: { name: name.trim(), code: shaped.data, section, under: under === TOP_OF_SECTION ? null : under },
+      },
       { onSuccess: onClose, onError: (e) => setRefusal(refusalOf(e)) },
     );
   };
+  useSaveKey(submit, gap === null && !edit.isPending && account.is_active && !confirmRetire);
+
+  const flip = (active: boolean) => {
+    setRefusal(null);
+    setActive.mutate(
+      { code: account.code, active },
+      {
+        onSuccess: onClose,
+        onError: (e) => {
+          setConfirmRetire(false);
+          setRefusal({ field: null, message: e.message });
+        },
+      },
+    );
+  };
+
+  if (confirmRetire) {
+    return (
+      <Modal
+        open
+        onOpenChange={(o) => {
+          if (!o) onClose();
+        }}
+        // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0656).
+        title="Retire account"
+        description={`${account.code} ${account.name}`}
+        footer={
+          <>
+            <Button variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button variant="primary" data-testid="account-retire-confirm" loading={setActive.isPending} onClick={() => flip(false)}>
+              Retire
+            </Button>
+          </>
+        }
+      >
+        <p className="text-body" data-testid="account-retire-form">
+          A retired account leaves the chart and can no longer be picked. An account the ledger has posted to stays.
+        </p>
+      </Modal>
+    );
+  }
+
   return (
     <Modal
       open
       onOpenChange={(o) => {
         if (!o) onClose();
       }}
-      title="Account"
+      title={account.is_header ? "Heading" : "Account"}
       description={`${account.code} · ${ledgerKindWord(account.kind)}`}
       footer={
         <>
+          {account.is_active ? (
+            // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0656).
+            <Button variant="neutral" data-testid="account-retire" onClick={() => setConfirmRetire(true)}>
+              Retire account
+            </Button>
+          ) : (
+            <Button variant="neutral" data-testid="account-bring-back" loading={setActive.isPending} onClick={() => flip(true)}>
+              Bring back
+            </Button>
+          )}
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" loading={save.isPending} disabled={renameGap !== null} onClick={submit}>
-            {renameGap ?? "Save"}
+          <Button variant="primary" loading={edit.isPending} disabled={gap !== null || !account.is_active} onClick={submit}>
+            {gap ?? "Save"}
           </Button>
         </>
       }
     >
-      <div className="flex flex-col gap-3" data-testid="account-rename-form">
+      <div className="flex flex-col gap-3" data-testid="account-edit-form">
         <Input id="account-name" label="Name" required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
         {refusal?.field === "name" && <FieldError>{refusal.message}</FieldError>}
         <Input id="account-code" label="Number" required maxLength={8} value={code} onChange={(e) => setCode(e.target.value)} />
         {refusal?.field === "code" && <FieldError>{refusal.message}</FieldError>}
+        <Select
+          id="account-section"
+          label="Section"
+          required
+          value={section ?? ""}
+          onValueChange={(v) => {
+            setSection(v);
+            setUnder(TOP_OF_SECTION);
+          }}
+          options={sectionOptions}
+        />
+        <Select id="account-under" label="Under" required value={under} onValueChange={setUnder} options={underOptions} />
         {refusal && refusal.field === null && <FieldError>{refusal.message}</FieldError>}
       </div>
     </Modal>
   );
 }
 
-/** Under's value for a heading with no heading above it. Account numbers are
- *  digits, so it never collides with one. */
-const TOP = "top";
-
-/** The Receiving button law (COPY-STANDARD): a disabled Save names the FIRST
- *  missing field, top to bottom. null = nothing missing, Save is live. */
-export function addAccountSaveGap(f: {
-  parent: string | undefined;
-  kind?: string | undefined;
-  code: string;
-  name: string;
-  isHeading: boolean;
-}): string | null {
-  if (!f.parent) return "Save: pick Under";
-  if (f.parent === TOP && !f.kind) return "Save: pick the kind";
-  if (!f.code.trim()) return f.isHeading ? "Save: type the heading number" : "Save: type the number";
-  if (!f.name.trim()) return f.isHeading ? "Save: type the heading name" : "Save: type the name";
-  return null;
-}
-
 /**
- * Add an account under a heading, or a heading (0577). The kind follows the
- * heading, so it is not asked. A heading is a stored flag since 0580, so
- * "It is a heading" adds it empty (0608): Number and Name are the heading's,
- * and its accounts are added under it afterwards. Only a heading may go at the
- * top of the chart (Under: "Top of the chart", 0608); there is no heading to
- * take the kind from, so Kind is asked then. The refusals are
- * gl_account_update's sentences, shown as the database wrote them.
+ * Add an account, or a heading, in one of AutoCount's sections (0656): at the
+ * top of the section or under one of its headings. The kind follows the
+ * section. Bank and cash accounts are added in Money accounts, so the bank
+ * and cash heading is never offered.
  */
-function AddAccountModal({ headings, ruleHeadings, onClose }: { headings: Row[]; ruleHeadings: Set<string>; onClose: () => void }) {
-  const add = useAddAccount();
-  const [parent, setParent] = useState<string | undefined>(undefined);
+function AddAccountModal({
+  accounts,
+  sections,
+  moneyHeading,
+  onClose,
+}: {
+  accounts: readonly LedgerAccount[];
+  sections: readonly LedgerSection[];
+  moneyHeading: string | undefined;
+  onClose: () => void;
+}) {
+  const add = useAddAccountInSection();
+  const [section, setSection] = useState<string | undefined>(undefined);
+  const [under, setUnder] = useState<string>(TOP_OF_SECTION);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
-  const [kind, setKind] = useState<string | undefined>(undefined);
   const [isHeading, setIsHeading] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
-  const top = parent === TOP;
-  const gap = addAccountSaveGap({ parent, kind, code, name, isHeading });
-  const under = isHeading
-    ? [{ value: TOP, label: "Top of the chart" }, ...headings.filter((h) => !ruleHeadings.has(h.code)).map((h) => ({ value: h.code, label: `${h.code} ${h.name}` }))]
-    : headings.map((h) => ({ value: h.code, label: `${h.code} ${h.name}` }));
-  /* Ticking "It is a heading" drops a rule heading from Under, and unticking
-     it drops the top of the chart, so a pick of either is cleared and Save
-     says "Save: pick Under" again. */
-  const tickHeading = (on: boolean) => {
-    setIsHeading(on);
-    if (on ? parent !== undefined && ruleHeadings.has(parent) : top) setParent(undefined);
-  };
+  const headings = section ? headingsIn(section, null, accounts, { heading: moneyHeading, accounts: new Set() }) : [];
+  const gap = accountSaveGap({ section, code, name, isHeading });
+
   const submit = () => {
     setRefusal(null);
     const shaped = ledgerAccountCodeInput.safeParse(code);
-    if (!parent || !shaped.success) {
+    if (!section || !shaped.success) {
       setRefusal(LEDGER_ACCOUNT_CODE_MESSAGE);
       return;
     }
     add.mutate(
-      {
-        parentCode: top ? null : parent,
-        code: shaped.data,
-        name: name.trim(),
-        ...(isHeading ? { isHeading: true } : {}),
-        ...(top ? { kind: kind as LedgerAccountAddInput["kind"] } : {}),
-      },
+      { section, parentCode: under === TOP_OF_SECTION ? null : under, code: shaped.data, name: name.trim(), isHeading },
       { onSuccess: onClose, onError: (e) => setRefusal(e.message) },
     );
   };
@@ -459,25 +585,29 @@ function AddAccountModal({ headings, ruleHeadings, onClose }: { headings: Row[];
       }
     >
       <div className="flex flex-col gap-3" data-testid="account-add-form">
-        <Checkbox id="account-add-heading" label="It is a heading" checked={isHeading} onCheckedChange={tickHeading} />
+        <Checkbox id="account-add-heading" label="It is a heading" checked={isHeading} onCheckedChange={(on) => setIsHeading(on === true)} />
+        <Select
+          id="account-add-section"
+          label="Section"
+          required
+          value={section ?? ""}
+          onValueChange={(v) => {
+            setSection(v);
+            setUnder(TOP_OF_SECTION);
+          }}
+          options={sections.map((s) => ({ value: s.section, label: s.section }))}
+        />
         <Select
           id="account-add-under"
           label="Under"
           required
-          value={parent ?? ""}
-          onValueChange={setParent}
-          options={under}
+          value={under}
+          onValueChange={setUnder}
+          options={[
+            { value: TOP_OF_SECTION, label: "Top of the section" },
+            ...headings.map((h) => ({ value: h.code, label: `${h.code} ${h.name}` })),
+          ]}
         />
-        {top && (
-          <Select
-            id="account-add-kind"
-            label="Kind"
-            required
-            value={kind ?? ""}
-            onValueChange={setKind}
-            options={Object.entries(LEDGER_KIND_WORDS).map(([value, label]) => ({ value, label }))}
-          />
-        )}
         <Input id="account-add-code" label={isHeading ? "Heading number" : "Number"} required maxLength={8} value={code} onChange={(e) => setCode(e.target.value)} />
         <Input id="account-add-name" label={isHeading ? "Heading name" : "Name"} required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
         {refusal && <FieldError>{refusal}</FieldError>}

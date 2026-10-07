@@ -83,11 +83,27 @@ export interface LedgerAccount {
    *  Ties break on code, so 0 everywhere reads exactly as by-code order. It is
    *  the order, never the account number. */
   sort_order: number;
+  /** 0656: AutoCount's section (CAPITAL ... TAXATION). The Chart of accounts
+   *  groups an account by the section of the account above it that sits
+   *  directly under a top heading. Absent before 0656. */
+  section?: string | null;
+  /** 0656: AutoCount's special account type (SFA, SAD, SBK ...), shown beside
+   *  the name. Absent before 0656. */
+  special?: string | null;
+}
+
+/** 0656: one of AutoCount's sections, in AutoCount's order. */
+export interface LedgerSection {
+  section: string;
+  kind: string;
+  sort_order: number;
 }
 
 export interface LedgerChart {
   go_live_on: string | null;
   accounts: LedgerAccount[];
+  /** 0656: AutoCount's sections, in order. Sent by GET /accounts only. */
+  sections?: LedgerSection[];
   /** The headings no account moves into or out of, because their accounts
    *  decide how money may be recorded (0570 `gl_rule_headings`). Sent by
    *  GET /accounts only; absent elsewhere. */

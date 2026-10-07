@@ -4489,8 +4489,6 @@ Every sentence below is NEW and NOT APPROVED.
 
 | Group | Word | Meaning |
 |---|---|---|
-| APPROVED 2026-09-23 (YH) | `Drag an account onto a heading to move it, or onto another account to reorder. Keyboard: Alt+Up/Down reorders, Shift+F10 moves.` | The one line above the chart. YH asked for it shorter on 23 Sep and approved this wording ("ok"). It replaces the two-sentence proposal. A drop on a heading the account may go under puts it there; a drop on an account under the same heading reorders; Alt+Up/Down only reorders; Shift+F10 opens the row menu. |
-| APPROVED 2026-09-23 (YH) | `Move under {code} {name}` | One item per heading in the row menu (Shift+F10, the Menu key or a right-click). Only headings the account may go under are listed: the account is a posting account and not the last one under its heading; the heading is the same kind, not the one it is under now, and neither heading is one whose accounts decide how money may be recorded. A heading's row menu lists none. |
 | APPROVED 2026-09-23 (YH) — refusals (database, 0570 — the number) | `A number is four digits, like 1210, or AutoCount's form, like 100-0001 or 900-A001.` · `An account numbered {code} is already in the chart.` | The number's shape, and a number another account has. The shape is four digits, or three digits, a dash, a digit or capital letter, and three digits (AutoCount's form); ASCII only, and a lower-case letter is stored in capitals. The first sentence replaces the earlier one with an EM DASH, which is no longer on the screen. Both are shown under `Number` on the account form, for an account and a heading alike; the form checks the shape itself, with the same sentence. |
 | PROPOSAL - PENDING APPROVAL: refusals (database, 0570: a new money account's number) | `There is no free number left under {code} {name}.` · `A new account is numbered from its heading, and {code} {name} does not end in 00 or -0000.` | Adding a bank or holding account on Finance Settings. The number is the smallest free one under the money-accounts heading: NNN-K000 under NNN-0000, HH01..HH99 under HH00. The first says every such number is taken; the second says the heading's own number has neither form, so no number can be made from it. |
 | PROPOSAL - PENDING APPROVAL: the usual account (0570) | `{code} {name} (usual)` · `The usual account` | The blank choice on a bill's Payables account and on a GRN line's account. The account is the chart's role (trade or other payables, cost of goods sold), named from the chart. `The usual account` shows only while the chart loads or when it could not be read. |
@@ -4921,9 +4919,8 @@ is the proposal. No new sentence is added.
 
 Screen words (Finance Settings):
 - Button: `Add account`. Modal title: `Add account`.
-- Fields: checkbox `It is a heading`, `Under`, `Number`, `Name`. With `It is a heading` ticked, `Number` and `Name` read `Heading number` and `Heading name` (0608: a heading is added on its own; its accounts are added under it afterwards), and `Under` also offers `Top of the chart` (only a heading goes there). With `Top of the chart` picked, one more field, `Kind`, with the chart's kind words `Asset` · `Liability` · `Equity` · `Income` · `Expense`.
+- Fields and the Save gaps of Add account: since 0656 in "Chart of accounts in AutoCount's sections (0656)" under Finance (Chew), with `Section` first.
 - Money account add, field `Number`, hint `Leave blank to use the next free number.`
-- The disabled `Save` NAMES its gap (the Receiving button law; first gap wins, top to bottom). Add account: `Save: pick Under` · `Save: pick the kind` (only with `Top of the chart`) · `Save: type the number` · `Save: type the name`; with `It is a heading` ticked, `Save: type the heading number` · `Save: type the heading name`. The Account (rename) modal reuses `Save: type the name` · `Save: type the number`.
 
 Database sentences (shown as written):
 - `<code> <name> is not a heading. Add the account under a heading.`
@@ -4932,8 +4929,6 @@ Database sentences (shown as written):
 - `Type a number for the new account. <code> <name> does not end in 00 or -0000, so no number is picked for you.`
 - `<code> <name> holds the bank and cash accounts. Add a bank or cash account in Money accounts.`
 - `<code> <name> decides how money may be recorded. A heading cannot go under it.`
-- `Only a heading goes at the top of the chart. Pick the heading this account goes under.` (0608)
-- `Choose the kind of the new heading.` (0608)
 
 
 ### Sales Order existing-reference revisions and delivery Activity
@@ -4963,10 +4958,6 @@ Retired by 0580 (never raised again, so never on screen):
 
 Same words, new meaning:
 
-- `Move under {code} {name}`: the row menu now also lists a heading with nothing under it, and no longer
-  leaves out the heading when the account is the last one under its own heading. It lists the money
-  accounts heading, or a heading inside it, only for a bank or cash account, or for a heading that holds
-  nothing else.
 - `{code} {name} is not a heading. Move the account under a heading.` and
   `{code} {name} is not a heading. Add the account under a heading.`: "a heading" is now the stored flag,
   so a heading whose last account left is still a heading and takes a move or an add.
@@ -5269,12 +5260,27 @@ The chart's own account names follow Chew's AutoCount chart, in capitals as Auto
 | Where | Words |
 |---|---|
 | Chart of accounts | Button `Import from AutoCount`, beside `Add account` |
-| Modal | Title `Import from AutoCount`. One line under it: `AutoCount's printed chart of accounts, as a PDF.` Button `Choose the PDF`, then `Reading…`, then `Choose another PDF`. Footer `Cancel` and the primary button, which names its state: `Import: choose the PDF` · `Nothing new to import` · `Import {n} account(s)` |
-| Answer | Summary `{n} new · {n} already in the chart · {n} not imported`. Table `Accounts in the PDF`: `Account` (`{code} {name}`) · `Under` (the number it goes under) · `What happens`: `New` · `Already in the chart` · the reason it is not imported. Rows not imported come first |
+| Modal | Title `Import from AutoCount`. One line under it: `AutoCount's printed chart of accounts, as a PDF.` Button `Choose the PDF`, then `Reading…`, then `Choose another PDF`. Footer `Cancel` and the primary button, which names its state: `Import: choose the PDF` · `Nothing new to import` · `Import {n} account(s)` · `Fill in {n} section(s)` (0656: nothing new, but sections to fill) |
+| Answer | Summary `{n} new · {n} already in the chart · {n} not imported`, and since 0656 ` · {n} section(s) filled in` when there are any. Table `Accounts in the PDF`: `Account` (`{code} {name}`) · `Under` (the number it goes under) · `What happens`: `New` · `Already in the chart` · `Already in the chart · section filled in` (0656) · the reason it is not imported. Rows not imported come first |
 | Reasons (the database's) | `{code} is not an account number.` · `{code} is listed twice.` · `{code} has no name.` · `{code} {name} is longer than 60 characters.` · `{code} {name} is under {section}, a section the chart does not know.` · `{code} {name} is a bank or cash account. Add it in Money accounts.` · `{code} {name} is a debtor or creditor control account, which the system sets up.` · `{code} {name} is a stock or retained earnings account, which the system sets up.` · `{code} {name} is under {parent}, which is not imported.` · `{code} {name} is under {parent}, which is another kind of account.` · `{code} {name} is under {parent}, an account the ledger posts to. Accounts can only go under a heading.` · `{code} {name} is under {parent}, which is not in the chart.` · `{code} {name} is under {parent}, which is retired.` · `{code}: an account named {name} is already in the chart ({code}).` |
 | Reading the PDF | `{code} is printed before any section line.` · `{code} is printed twice.` · `No account was found in this PDF. Choose AutoCount's chart of accounts.` · `This PDF could not be read. Choose AutoCount's chart of accounts.` |
-| Done | Toast `{n} account(s) added to the chart.` |
+| Done | Toast `{n} account(s) added to the chart.` · `{n} section(s) filled in.` · `{n} account(s) added to the chart, {n} section(s) filled in.` |
 | Refusals | `Only Finance changes the chart of accounts.` · `There is no account to import. Pick AutoCount's chart of accounts.` · `A chart of more than 2,000 accounts is not imported in one go.` |
+
+### PROPOSAL — PENDING CHEW · Chart of accounts in AutoCount's sections (0656)
+
+Chew approved the layout (「可以」, 2026-10-07) and the row icons (「直接做，这个是我finance 的使用方式」); the words below are proposed with it. AutoCount's section names (`CAPITAL` … `TAXATION`) and special types (`SFA`, `SAD`, `SRE` …) are AutoCount's own and print as AutoCount prints them.
+
+| Where | Words |
+|---|---|
+| The chart | Groups `{SECTION} · {Kind}` with the count beside, in AutoCount's order (`CAPITAL · Equity`, `FIXED ASSETS · Asset` …); a top account with no section yet groups under `No section yet`. Columns `Code` · `Name` · `Type`. After a name, its special type, `Heading` on a heading, `Retired` on a retired account. An account under a heading starts `└ `. A heading's fold control is named `Fold {code} {name}`, then `Open {code} {name}`. Each row ends with two icons named `Edit {code} {name}` and `Retire {code} {name}` (a retired row has only the first) |
+| Toolbar | Checkbox `Show retired accounts` · `Add account` · `Import from AutoCount` |
+| The account window | Title `Account` (or `Heading`), the number and kind under it. Fields `Name` · `Number` · `Section` (only the sections of the account's kind) · `Under` (`Top of the section`, then the section's headings). Footer `Retire account` (or `Bring back` on a retired account) · `Cancel` · `Save`, which names its gap: `Save: pick the section` · `Save: type the number` · `Save: type the name` (`Save: type the heading number` · `Save: type the heading name` for a heading) |
+| Retiring | Title `Retire account`, the number and name under it. `A retired account leaves the chart and can no longer be picked. An account the ledger has posted to stays.` Footer `Cancel` · `Retire` |
+| Add account | Title `Add account`. Fields `It is a heading` · `Section` · `Under` (`Top of the section`, then the section's headings; never the bank and cash heading) · `Number` (`Heading number`) · `Name` (`Heading name`). Save names its gap as above |
+| Refusals (the database's) | `Choose the section.` · `That heading is in another section.` · `{SECTION} is not a section for an account of this kind.` · `A top heading is not changed here.` · `A top heading is not retired.` · `{code} {name} has accounts under it. Retire them first.` · `{code} {name} has postings, so it stays. A used account is never retired.` · `{code} {name} is a bank, cash or card account. Stop using it in Money accounts.` · `{code} {name} is an account the system posts to, so it stays.` · `{code} {name} is under {code} {name}, which is retired. Bring that heading back first.` · reused: `That account is not in the chart.` · `Only Finance changes the chart of accounts.` and the 0570, 0577 and 0580 sentences a move or an add can still raise |
+
+Retired by 0656 (no longer on any screen): the line above the chart `Drag an account onto a heading to move it, or onto another account to reorder. Keyboard: Alt+Up/Down reorders, Shift+F10 moves.`; the row menu's `Move under {code} {name}`; Add account's `Top of the chart`, `Kind`, `Save: pick Under` and `Save: pick the kind`; and the two 0608 sentences about a heading at the top of the chart. The chart reads by number, a move is the `Under` field, and a new top account goes at the top of its section.
 
 **SO compact file preview — owner approved 2026-10-04:** `Sales order PDF · {actual SO number}` · `Download` · accessible name/tooltip `Close PDF` for the file × and `Close order` for the dark order Header ×. File close returns to Info; order close returns to the Register.
 

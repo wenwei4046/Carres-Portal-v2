@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import ChartImport, { chartImportSummary } from "./ChartImport";
+import ChartImport, { chartImportButton, chartImportDone, chartImportSummary } from "./ChartImport";
 
 /** What the fake PDF reader returns: a made-up AutoCount printout. */
 const pdf = vi.hoisted(() => ({
@@ -124,5 +124,21 @@ describe("ChartImport (0655)", () => {
 
   it("words the summary from the database's counts", () => {
     expect(chartImportSummary({ created: 214, existing: 37, problems: 0 })).toBe("214 new · 37 already in the chart · 0 not imported");
+  });
+
+  it("0656: the same PDF again fills the sections: the summary, the button and the toast say so", () => {
+    expect(chartImportSummary({ created: 0, existing: 251, problems: 0, filled: 251 })).toBe(
+      "0 new · 251 already in the chart · 0 not imported · 251 sections filled in",
+    );
+    expect(chartImportSummary({ created: 0, existing: 1, problems: 0, filled: 1 })).toBe(
+      "0 new · 1 already in the chart · 0 not imported · 1 section filled in",
+    );
+    expect(chartImportButton(null)).toBe("Import: choose the PDF");
+    expect(chartImportButton({ created: 2, filled: 5 })).toBe("Import 2 accounts");
+    expect(chartImportButton({ created: 0, filled: 251 })).toBe("Fill in 251 sections");
+    expect(chartImportButton({ created: 0, filled: 0 })).toBe("Nothing new to import");
+    expect(chartImportDone({ created: 0, filled: 251 })).toBe("251 sections filled in.");
+    expect(chartImportDone({ created: 1, filled: 3 })).toBe("1 account added to the chart, 3 sections filled in.");
+    expect(chartImportDone({ created: 210, filled: 0 })).toBe("210 accounts added to the chart.");
   });
 });

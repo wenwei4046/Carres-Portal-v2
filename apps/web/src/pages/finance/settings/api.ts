@@ -16,9 +16,8 @@ import type {
   MoneyAccountUpdateInput,
 } from "@carres/shared/money-accounts";
 import type {
-  LedgerAccountAddInput,
-  LedgerAccountMoveInput,
-  LedgerAccountReorderInput,
+  LedgerAccountAddInSectionInput,
+  LedgerAccountEditInput,
   LedgerBooksClosed,
   LedgerChartImportInput,
   LedgerChartImportResult,
@@ -84,43 +83,35 @@ export function useSaveAccount() {
   });
 }
 
-/**
- * Move accounts inside one heading (0557). The account NUMBER is untouched —
- * this writes display order only.
- *
- * BOTH ORDERS GO UP: `was` is what the screen read, `now` is what it wants. The
- * database refuses with 409 when `was` is no longer the stored order, which is
- * the only thing standing between two draggers and last-write-wins. Passing
- * `now` as `was` would disable that check without any error to show for it.
- */
-export function useReorderAccounts() {
+/** 0656 — add an account or heading in one of AutoCount's sections. The drag
+ *  that reordered and moved accounts (0557, 0570) is gone from the screen:
+ *  the chart reads by number, and the heading an account sits under is
+ *  changed in its edit window (useEditAccount). */
+export function useAddAccountInSection() {
   const qc = useQueryClient();
-  return useMutation<{ moved: number }, Error, LedgerAccountReorderInput>({
-    mutationFn: (v) =>
-      apiFetch("/api/finance/ledger/accounts/reorder", { method: "POST", body: JSON.stringify(v) }),
+  return useMutation<{ code: string }, Error, LedgerAccountAddInSectionInput>({
+    mutationFn: (v) => apiFetch("/api/finance/ledger/accounts/in-section", { method: "POST", body: JSON.stringify(v) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] }),
   });
 }
 
-/**
- * Put one account under another heading (0570). The number and name stay; the
- * parent and the order under both headings change. Both headings' `was` go up,
- * and the database refuses with 409 when either is no longer the stored order.
- */
-export function useMoveAccount() {
+/** 0656 — edit one account in one act: name, number, section and the heading
+ *  it sits under. A new number is carried everywhere, so the whole ["finance"]
+ *  tree is read again. */
+export function useEditAccount() {
   const qc = useQueryClient();
-  return useMutation<{ code: string }, Error, LedgerAccountMoveInput>({
-    mutationFn: (v) =>
-      apiFetch("/api/finance/ledger/accounts/move", { method: "POST", body: JSON.stringify(v) }),
+  return useMutation<{ code: string }, Error, { code: string; input: LedgerAccountEditInput }>({
+    mutationFn: (v) => apiFetch(`/api/finance/ledger/accounts/${v.code}`, { method: "PUT", body: JSON.stringify(v.input) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] }),
   });
 }
 
-/** Add an account under a heading, or a heading with its first account (0577). */
-export function useAddAccount() {
+/** 0656 — retire an account the ledger never posted to, or bring one back. */
+export function useSetAccountActive() {
   const qc = useQueryClient();
-  return useMutation<{ code: string }, Error, LedgerAccountAddInput>({
-    mutationFn: (v) => apiFetch("/api/finance/ledger/accounts", { method: "POST", body: JSON.stringify(v) }),
+  return useMutation<{ code: string; active: boolean }, Error, { code: string; active: boolean }>({
+    mutationFn: (v) =>
+      apiFetch(`/api/finance/ledger/accounts/${v.code}/active`, { method: "POST", body: JSON.stringify({ active: v.active }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] }),
   });
 }

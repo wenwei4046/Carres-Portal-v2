@@ -3,13 +3,12 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import FinanceSettings from "./FinanceSettings";
-import { addAccountSaveGap } from "./ChartOfAccounts";
 
 type Code = { code: string };
 const net = vi.hoisted(() => ({
   rows: [] as Array<{ code: string }>,
   routes: [] as Array<{ holding_code: string; channel: string; bank_code: string }>,
-  chart: [] as Array<{ code: string; parent_code: string | null; kind: string }>,
+  chart: [] as Array<{ code: string; parent_code: string | null; kind: string; section?: string }>,
   failList: false,
   refuse: null as string | null,
   /** One write refused: its key, the sentence, and the door's tag (sent up as `code`). */
@@ -23,7 +22,9 @@ vi.mock("@/lib/api", () => ({
     const key = `${init?.method ?? "GET"} ${path.replace("/api/finance/ledger/money-accounts", "") || "/"}`;
     const body = init?.body ? JSON.parse(String(init.body)) : undefined;
     net.calls.push({ key, body });
-    if (key === "GET /api/finance/ledger/accounts") return { go_live_on: "2026-09-10", accounts: net.chart };
+    if (key === "GET /api/finance/ledger/accounts") {
+      return { go_live_on: "2026-09-10", accounts: net.chart, sections: [{ section: "CURRENT LIABILITIES", kind: "LIABILITY", sort_order: 60 }] };
+    }
     if (key === "GET /") {
       if (net.failList) throw new Error("boom");
       return net.rows;
@@ -183,7 +184,8 @@ describe("Finance Settings — a money account's number, changed on its own form
     // The chart is read first and kept, so only a refresh after the save can
     // put the new number on it.
     show("/finance/settings?tab=chart");
-    expect(await screen.findByText("1121 Public Bank")).toBeInTheDocument();
+    const chartRow = (code: string) => document.querySelector(`tr[data-row-key="${code}"]`);
+    await waitFor(() => expect(chartRow("1121")).toHaveTextContent("Public Bank"));
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Money accounts" }), { button: 0, ctrlKey: false });
 
     const dialog = await openPublicBank();
@@ -202,8 +204,8 @@ describe("Finance Settings — a money account's number, changed on its own form
       expect(screen.getByTestId("card-route-1131-dealer")).toHaveTextContent("1131 · GHL · Dealer → 310-A000 · Public Bank"),
     );
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Chart of accounts" }), { button: 0, ctrlKey: false });
-    expect(await screen.findByText("310-A000 Public Bank")).toBeInTheDocument();
-    expect(screen.queryByText("1121 Public Bank")).not.toBeInTheDocument();
+    await waitFor(() => expect(chartRow("310-A000")).toHaveTextContent("Public Bank"));
+    expect(chartRow("1121")).toBeNull();
   });
 
   it("a number another account has: the database's sentence under the Number field, and the form stays open", async () => {
@@ -359,119 +361,21 @@ describe("Finance Settings — card payout banks (0541)", () => {
 });
 
 describe("Finance Settings — the chart of accounts", () => {
-  it("lists the chart as a tree, headings in bold, and renames an account by its code", async () => {
+  /* The chart screen itself is ChartOfAccounts.test.tsx. Here: the tab opens
+     it, grouped by AutoCount's section (0656), and a row opens the account. */
+  it("opens the chart grouped by section, and a row click opens the account", async () => {
+    net.chart = [
+      acc("2000", "Liabilities", null, true),
+      { ...acc("2100", "Payables", "2000", true), section: "CURRENT LIABILITIES" },
+      { ...acc("2130", "Accrued expenses", "2100"), section: "CURRENT LIABILITIES" },
+    ];
     show("/finance/settings?tab=chart");
-    const accrued = await screen.findByText("2130 Accrued expenses");
-    expect(screen.getByText("2000 Liabilities")).toHaveClass("font-semibold");
-    expect(accrued).not.toHaveClass("font-semibold");
+    const accrued = await screen.findByText(/Accrued expenses/);
+    expect(screen.getByTestId("grid-group-toggle-CURRENT LIABILITIES")).toHaveTextContent("CURRENT LIABILITIES · Liability");
+    expect(screen.queryByText("Liabilities")).toBeNull();
     fireEvent.click(accrued);
     const dialog = await screen.findByRole("dialog");
-    fireEvent.change(within(dialog).getByLabelText(/Name/), { target: { value: " Accruals " } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(writes()).toHaveLength(1));
-    expect(writes()[0]).toEqual({ key: "PATCH /api/finance/ledger/accounts/2130", body: { name: "Accruals" } });
-  });
-
-  it("Add account: a disabled Save names the first field still missing (YH, 25 Sep)", async () => {
-    show("/finance/settings?tab=chart");
-    await screen.findByText("2130 Accrued expenses");
-    fireEvent.click(screen.getByRole("button", { name: "Add account" }));
-    const dialog = await screen.findByRole("dialog");
-    fireEvent.click(within(dialog).getByLabelText("It is a heading"));
-    expect(within(dialog).getByRole("button", { name: "Save: pick Under" })).toBeDisabled();
-
-    const f = { parent: "2000", code: "2140", name: "Deposits held", isHeading: true };
-    expect(addAccountSaveGap({ ...f, code: " " })).toBe("Save: type the heading number");
-    expect(addAccountSaveGap({ ...f, name: "" })).toBe("Save: type the heading name");
-    expect(addAccountSaveGap({ ...f, isHeading: false, code: " " })).toBe("Save: type the number");
-    expect(addAccountSaveGap({ ...f, isHeading: false, name: "" })).toBe("Save: type the name");
-    expect(addAccountSaveGap(f)).toBeNull();
-    expect(addAccountSaveGap({ ...f, parent: "top" })).toBe("Save: pick the kind");
-    expect(addAccountSaveGap({ ...f, parent: "top", kind: "INCOME" })).toBeNull();
-  });
-
-  it("Add account: a heading goes at the top of the chart with the kind Finance picks; an account never does (0608)", async () => {
-    show("/finance/settings?tab=chart");
-    await screen.findByText("2130 Accrued expenses");
-    fireEvent.click(screen.getByRole("button", { name: "Add account" }));
-    const dialog = await screen.findByRole("dialog");
-    const openUnder = () => fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Under/ }), { key: "Enter" });
-
-    // An account: no top of the chart, and no Kind.
-    openUnder();
-    await screen.findByRole("option", { name: "2000 Liabilities" });
-    expect(screen.queryByRole("option", { name: "Top of the chart" })).toBeNull();
-    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
-    expect(within(dialog).queryByRole("combobox", { name: /Kind/ })).toBeNull();
-
-    fireEvent.click(within(dialog).getByLabelText("It is a heading"));
-    openUnder();
-    fireEvent.click(await screen.findByRole("option", { name: "Top of the chart" }));
-    expect(within(dialog).getByRole("button", { name: "Save: pick the kind" })).toBeDisabled();
-    fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Kind/ }), { key: "Enter" });
-    fireEvent.click(await screen.findByRole("option", { name: "Income" }));
-    fireEvent.change(within(dialog).getByLabelText(/^Heading number/), { target: { value: "8000" } });
-    fireEvent.change(within(dialog).getByLabelText(/^Heading name/), { target: { value: "Other income" } });
-
-    // Unticking takes the top of the chart away again; ticking brings the choice back.
-    fireEvent.click(within(dialog).getByLabelText("It is a heading"));
-    expect(within(dialog).getByRole("button", { name: "Save: pick Under" })).toBeDisabled();
-    fireEvent.click(within(dialog).getByLabelText("It is a heading"));
-    openUnder();
-    fireEvent.click(await screen.findByRole("option", { name: "Top of the chart" }));
-
-    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(writes()).toHaveLength(1));
-    expect(writes()[0]).toEqual({
-      key: "POST /api/finance/ledger/accounts",
-      body: { parentCode: null, code: "8000", name: "Other income", isHeading: true, kind: "INCOME" },
-    });
-    expect(await screen.findByText("8000 Other income")).toBeInTheDocument();
-  });
-
-  it("Add account: a heading is added on its own, with no first account, and is offered under Under at once (0608)", async () => {
-    show("/finance/settings?tab=chart");
-    await screen.findByText("2130 Accrued expenses");
-    fireEvent.click(screen.getByRole("button", { name: "Add account" }));
-    let dialog = await screen.findByRole("dialog");
-    fireEvent.click(within(dialog).getByLabelText("It is a heading"));
-    expect(within(dialog).queryByLabelText(/First account/)).toBeNull();
-    fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Under/ }), { key: "Enter" });
-    fireEvent.click(await screen.findByRole("option", { name: "2000 Liabilities" }));
-    fireEvent.change(within(dialog).getByLabelText(/^Heading number/), { target: { value: "2800" } });
-    fireEvent.change(within(dialog).getByLabelText(/^Heading name/), { target: { value: "testhead" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(writes()).toHaveLength(1));
-    expect(writes()[0]).toEqual({
-      key: "POST /api/finance/ledger/accounts",
-      body: { parentCode: "2000", code: "2800", name: "testhead", isHeading: true },
-    });
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-
-    // The chart is read again, and the new empty heading is one to add under.
-    fireEvent.click(await screen.findByRole("button", { name: "Add account" }));
-    dialog = await screen.findByRole("dialog");
-    fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Under/ }), { key: "Enter" });
-    expect(await screen.findByRole("option", { name: "2800 testhead" })).toBeInTheDocument();
-  });
-
-  it("Add account: F3 or Ctrl+S saves, and does nothing while Save names a gap", async () => {
-    show("/finance/settings?tab=chart");
-    await screen.findByText("2130 Accrued expenses");
-    fireEvent.click(screen.getByRole("button", { name: "Add account" }));
-    const dialog = await screen.findByRole("dialog");
-    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
-    fireEvent.keyDown(window, { key: "F3" });
-    expect(within(dialog).getByRole("button", { name: "Save: pick Under" })).toBeDisabled();
-    expect(writes()).toHaveLength(0);
-
-    fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Under/ }), { key: "Enter" });
-    fireEvent.click(await screen.findByRole("option", { name: "2100 Payables" }));
-    fireEvent.change(within(dialog).getByLabelText(/^Number/), { target: { value: "2140" } });
-    fireEvent.change(within(dialog).getByLabelText(/^Name/), { target: { value: "Deposits held" } });
-    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
-    await waitFor(() => expect(writes()).toHaveLength(1));
-    expect(writes()[0]).toEqual({ key: "POST /api/finance/ledger/accounts", body: { parentCode: "2100", code: "2140", name: "Deposits held" } });
+    expect(within(dialog).getByLabelText(/^Name/)).toHaveValue("Accrued expenses");
   });
 });
 
