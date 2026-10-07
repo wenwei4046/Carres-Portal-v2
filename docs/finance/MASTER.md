@@ -27,11 +27,75 @@
 >
 > **Whose decisions these are.** Every decision here was made by **Chew** (Finance) in chat on 2026-10-03 and written down at Chew's request. They are **not** Jess's owner rulings.
 >
-> **Conflicts.** Where a line here meets a Jess ruling (CLAUDE.md or another module MASTER), **the Jess ruling wins** and the question goes back to Chew.
+> **Conflicts.** Where a line here meets a Jess ruling (CLAUDE.md or another module MASTER), **the Jess ruling wins** and the question goes back to Chew. Subscription and Dealer are the exception: they are Chew's since 2026-10-07 (§1, "Subscription and Dealer are Chew's too"), so inside them an earlier Jess ruling gives way to Chew's once the conflict has been shown to Chew.
 >
 > **Reference.** The Houzs Finance Specification V5 (2026-10-02) is **evidence, not specification**. Per the CLAUDE.md Decision Gate, external systems are evidence. The spec's own instruction to "follow its rules" does not apply here. Chew keeps the spec locally. It is **not** in this public repository, because it holds another company's internal figures.
 
-## 1 · Boundary: Finance only
+## 0 · The business, as Finance records it (Chew 2026-10-06)
+
+Carres buys and sells furniture through three channels (「我们的生意是买卖家私，只是渠道不一样」):
+
+1. **Showroom:** Carres staff sell directly.
+2. **Dealer:** a dealer sells; the customer pays HQ; the dealer earns commission, the renovation rebate and the KPI allowance.
+3. **Subscription:** the customer pays monthly; part of each month goes to the supplier (Diglant) and part to commission.
+
+Finance must show clearly where each sum of money comes in and goes out, channel by channel (「我finance 这里记录需要分的很清楚这笔钱是从哪里进哪里出」). Measured: since 0540 every income and expense line carries a department. A department is a showroom outlet, a dealer, Subscription, or Office; Office carries costs only. Sales invoices, customer payments and rental collections take their department from the order. The four hand-made documents (supplier bill, payment voucher, other debtor invoice, other receipt) are set line by line. The P&L and other reports filter by department. Chew's rulings, 2026-10-06:
+1. Cash flow is split by channel (「现金留要能分起来」).
+2. A supplier bill's channel comes from the order its goods were bought for, never typed by hand (「不应该经过人手，而是根据订单决定」).
+3. Office costs stay in Office.
+4. The channel follows the debtor account (「根据debtor account 来决定」); Chew provides the chart of accounts.
+5. Transport is recorded as a cost of each order even though customers pay nothing for it and Carres bears it (「虽然是我们出，但是还是要记录运输费用啊，根据订单」). The logistics partner's bill is split by the delivery orders it lists; a bill with only a total is split equally (「如果一个总数就平除」).
+6. Debtors follow the channel in two levels for dealers (「Dealer 一个overall 母账，然后每个dealer under 这个母账 … 就是两层了」): Dealer Debtors, then each dealer, then that dealer's customers or orders. Showroom and Subscription each have one control account with their customers under it.
+7. Open (Chew 2026-10-06): goods bought without an order would leave money paid to suppliers outside every channel in Receipts & Payments (「这样我看receipt & payment 就不太对了」); how such a payment is placed is still to decide.
+
+**Chart of accounts (Chew's, AutoCount, dated 22 Sep 2026; kept by Chew, not in this repository).** It has one debtor control (Trade Debtors) and one Other Debtor control, so dealer and subscription customers are not separated (「本身里面没有分dealer customer 和 subscription customer」). Measured: the ledger already accepts its code shape (`ledgerAccountCodeShape`, for example 300-0000 and 900-A001). Customers sit under a control account as parties on each line (`gl_entry_lines.party_type` / `party_id`), not as accounts, so a control account holds any number of customers.
+
+Chew's answers on the chart, 2026-10-06:
+- **Debtor controls as proposed:** 300-1000 Showroom Debtors, 300-2000 Dealer Debtors with one control per dealer under it, 300-3000 Subscription Debtors, all under 300-0000 Trade Debtors.
+- **500-2000** is subscription rental income.
+- **560-0000 "Agents Subscription Fees"** is small fees Carres pays agents. It stays under Other Incomes: its normal side is credit, and a debit larger than the credits shows as a negative figure there, as AutoCount does (Chew 2026-10-06).
+- **Diglant's subscription share** is a cost of goods sold account, not opened yet.
+- **What Carres owes Diglant for subscription** stays out of 400-0000 Trade Creditors, which is for buying goods (「这个是我和supplier 买货的，不要参」).
+- **Dealer commission** is accrued (see Dealer commission rules).
+- **The renovation rebate is accrued the same way** (「装修回扣这样记可以」): at month end Dr a new Commission - Dealer Renovation Rebate expense (proposed 900-C008), Cr a new Accruals - Dealer Renovation Rebate (proposed 410-0064). The monthly payment voucher clears it. It never mixes with Carres's own renovation (200-4000, 340-0001). The KPI allowance follows the same pattern (900-C009 / 410-0065), confirmed below.
+
+**Account mapping, Chew's answers 2026-10-06** (the mapping table is being confirmed line by line):
+- Banks are Maybank, Hong Leong, RHB and Alliance Bank only. The test chart's "Bank — current account" and Public Bank go.
+- Every way of receiving money that waits before reaching the bank gets its own clearing account (「card & online clearing是每个收钱途径都要」): the Public Bank, GHL, Hong Leong and Maybank card machines, AhaPay (rarely used now, but kept as a card merchant) and Stripe. DuitNow QR and FPX go straight into the bank, so they have none.
+- A card instalment plan needs nothing of its own: the card company pays the full amount at once, less a higher fee.
+- Service charges (disposal, no-lift), storage charges and the 15-year guarantee are each their own income account. After-sales and warranty cost is its own expense account.
+- The 15-year guarantee is income in full when it is sold, not spread over the years (「15年保固费不需要慢慢转一部分进收入」).
+- No supplier claims account. A claim is settled by a supplier credit note on that supplier's own account.
+- No Deposit - suppliers account. A payment made before the bill stays on that supplier's own account, as in AutoCount (「照理也是扣在供应商的户口」). The Balance Sheet's separate asset line for suppliers paid ahead (0507, YH 2026-09-14) goes when the Balance Sheet is next changed.
+- An opening-balance account is opened for go-live only. Once every balance is in, it is zero, so it should never appear (「可以，但我认为不应该会出现」).
+- Chew, 2026-10-07: a bill that is not for goods goes to `405-0000` Others Creditors, and `460-0000` stays for the ESH injection only (「是」). Transport on purchases goes to `630-0000`; `615-0000` is not used (「630-0000」). `500-1000` Cash Sales is normally not used (「正常不会使用」). Subscription customers transfer into Hong Leong Bank, kept as a setting Chew can change (「HLBB 但要能maintain」).
+
+**The account mapping — approved by Chew 2026-10-07 (「可以」); APPROVED / NOT BUILT.** New accounts are marked new; the rest are in Chew's AutoCount chart.
+
+| Kind | Accounts |
+|---|---|
+| Money | Cash `320-0000`. Banks `310-1000` Alliance, `310-2000` Hong Leong, `310-3000` RHB, `310-4000` Maybank. New `315-0000` Card & online clearing: `315-1000` Public Bank card machine, `315-2000` GHL, `315-3000` Hong Leong card machine, `315-4000` Maybank card machine, `315-5000` Stripe, `315-6000` AhaPay. |
+| Customers | `300-0000` Trade debtors, with new `300-1000` Showroom, `300-2000` Dealer (one per dealer, `300-2001` and on, its customers under it) and `300-3000` Subscription (one per customer). Other debtors `305-0000`. Related companies `350-00xx`. Stock `330-0000`. |
+| Owed | Suppliers `400-0000` (advances stay here). Non-goods bills `405-0000`. ESH injection only `460-0000`. New `401-0000` Subscription creditors (Diglant's share). Accruals `410-0063`. Commission accrued: dealer `410-0061`, agent `410-0060`; new renovation rebate `410-0064`, KPI `410-0065`. Deposits received `440-0000`. Sales tax `430-0000`. Directors `450-00xx`, `470-0000`. |
+| Equity | Capital `100-0000`. Retained earnings `150-0000`. New `160-0000` Opening balance, used at go-live only and zero after. |
+| Income | Sales `500-0000`, also a returned mattress sold again. New `500-2000` Subscription (monthly fees and the RM 1 sale), `500-3000` Service charges, `500-4000` Storage charges, `500-5000` 15-year guarantee. Interest `530-0000`. Additional income `580-0000`, including termination and loss compensation. Agents' small fees `560-0000` on the debit side. `500-1000` Cash sales normally unused. |
+| Cost | Purchases `610-00xx` by item group. New `604-0000` Cost of service (service and guarantee items). Purchase returns and supplier credit notes `612-0000`. Purchase transport `630-0000` (`615-0000` unused). New `610-0090` Diglant's share. |
+| Expense | Delivery transport `900-T002`. Commission: dealer `900-C007`, agent `900-C004`, showroom `900-C006`. New renovation rebate `900-C008`, KPI `900-C009`, warranty and after-sales `900-W005`, bad debts `900-B002`. Bank and card charges `902-0000`. Other expenses: the `900-xxxx` account chosen on the bill. |
+
+Two Finance Settings pages keep the mapping in Chew's hands (「其他的收入，费用同理」, 「可以」):
+- **Automatic posting accounts.** Every kind of posting the system makes, and the account it goes to. Chew can change the account; the new one must be of the same type (income for income, expense for expense). A change applies to postings from then on; earlier ones stay, and a journal moves them if needed. Each change records who, when, and from which account to which.
+- **Item groups**, as in the 2990 reference Chew showed (「就是这个item group 绑定什么account 也需要有」). Each group binds a Purchase, Sales, Sales Return and Purchase Return account; Chew can change the accounts, add groups and turn a group off, and a change applies to postings from then on. Confirmed by Chew 2026-10-07 (「1 可以 2 可以 3 开新的，cost of service」):
+  - Each product starts in the group of its catalog category (mattress, bedframe, sofa, accessory, service, guarantee). Finance may add its own groups and move a product into one; the catalog is not changed.
+  - A bill for an unbound group cannot be confirmed until the group is bound. A sale is never held back: it posts to `500-0000` and the page lists it for binding.
+  - The starting groups: MATTRESS `610-0020`, SOFA `610-0030`, BEDFRAME `610-0040`, MATTRESS PROTECTOR `610-0050`, PILLOW `610-0070` and OTHERS `610-0000` for purchases, each selling to `500-0000`; SERVICE sells to `500-3000` and GUARANTEE to `500-5000`, and both cost to a new `604-0000` Cost of service. Every group returns to `510-0000` (sales) and `612-0000` (purchases). Curtain (`610-0060`), footrest (`610-0080`) and storage (`500-4000`) get a group when such a product exists. The existing accessories are placed for Chew to check: one protector, three pillows.
+  - A guarantee claim's replacement cost stays `900-W005`.
+
+**A purchase without an order** takes its channel from the Manual Purchase Request's required purpose (Purchasing §5.2), so nothing extra is marked on the PO. Confirmed by Chew 2026-10-06 (「1 对，2 对，3 可以」):
+- Showroom Display → that showroom; Ready Stock → stock not yet in a channel; Service Case → the case's order; Internal Staff Purchase and Other Purchase → Office; Subsidiary Purchase → the amount due from that related company (350-00xx). The approved Diglant advance PO, when built → Subscription; a dealer display request, when built → that dealer.
+- When Purchasing allocates such stock or PO quantity to a Sales Order, the goods take that order's channel. Allocated before the supplier is paid: the bill and the payment carry the order's channel. Allocated after: that month's Receipts & Payments keeps it under stock and does not change, and the cost reaches the order's channel when the goods are sold. A PO split between orders is split unit by unit.
+- The KPI allowance is accrued like the renovation rebate (900-C009 / 410-0065).
+
+## 1 · Boundary: Finance, Subscription and Dealer
 
 Chew, 2026-10-03: 「总之jess 的功能，ui 等等都别动到。我只专做我的finance 模块，我其他的资料也只是链接过来罢了」.
 
@@ -45,9 +109,12 @@ Chew, 2026-10-03: 「总之jess 的功能，ui 等等都别动到。我只专做
 - customer payments, receipts and invoices (Payment);
 - Sales Orders (Orders);
 - POs and GRNs (Purchasing);
-- Units and month-end stock (Stock);
-- the dealer master;
-- rental collections (Rental).
+- Units and month-end stock (Stock).
+
+**Subscription and Dealer are Chew's too** (Chew 2026-10-07: 「subscription 现在归我负责」, 「dealer 也是归我做，只是下单和operation归她」).
+- Subscription: Rental's agreements, plans, billing schedule, collections and agreement wording, from signing on. Signing a subscription at the POS is order placement, which stays Jess's.
+- Dealer: dealer records, commission, renovation rebate, KPI and statements, including the dealer's own statement page.
+- Order placement and Operation stay Jess's. HR and Catalog are treated as Jess's until Chew says otherwise.
 
 **What Finance never touches:**
 - Jess's modules and their UI;
@@ -112,17 +179,78 @@ Deposit invoice rules:
 
 Dealer commission rules:
 - Each month a **draft** payment voucher is raised automatically.
-- There is **no monthly accrual**, because CLAUDE.md §7 says there is no HQ→dealer debt. The commission posts to the ledger when the voucher is approved.
+- **Commission is accrued at month end** (Chew 2026-10-06, 「dealer 佣金对」): Dr 900-C007 Commission - Dealer, Cr 410-0061 Accruals - Commission Dealer. The payment voucher clears it: Dr 410-0061, Cr bank. This replaces the 2026-10-03 rule of no accrual. Chew reads CLAUDE.md §7's "no HQ→dealer credit or debt" as goods money, not commission Carres owes a dealer.
 - The calculation itself is checked with Chew step by step before anything about commission changes, including the automatic draft voucher (Chew 2026-10-03).
+
+**Dealer commission rules — confirmed by Chew and management (2026-10-07); APPROVED / NOT BUILT.**
+- **Which orders count.** Dealer-channel orders only, never Showroom's. A month's report reads the orders placed before that month ends, by the Malaysian day (Chew 2026-10-05).
+- **The rules come from Carres memos.** The memos of 22 July 2026 ("Revised Pricing Structure", §12 promotion items; "KPI Allowance — Additional 15-Year Guarantee") are kept by Chew. They are not in this public repository, and neither are their rates or amounts. The rates live in Finance's settings, where Chew keeps them.
+- **What Chew maintains himself (Chew 2026-10-05).** The rate for each dealer and for each product, with the rule (memo) each comes from and the date a new rate starts; the renovation rebate (its total and how it runs down); how a cancelled order and a refund take commission back.
+- **Measured 2026-10-05.** Today there is one default rate plus optional rates per product: no rate per dealer, no start date, and no record of the memo. Changing a rate changes every past month. A cancelled order drops out of every month, including months already paid. A refund is taken off in the month it is paid out. Orders carry no discount field and no negative line, so a bundle price is only seen as the line prices typed. The renovation rebate exists: total, rate, start date, running down as money is collected. The 15-year guarantee is the catalog item `GRT-MATTRESS-15Y`; its catalog price differs from the memo's (Catalog's to correct, not Finance's).
+- **Chew's answers, 2026-10-05** (his words, then the reading, since confirmed):
+  1. 「新的% 要可以决定几时开始，然后是根据订单的日期决定」. Every rate has a start date; an order uses the rate in force on its order date.
+  2. 「25% 变20%」. A promotion item's rate is the normal rate less 5 points.
+  3. 「这个只是可能，暂时没有说每个dealer 不一样」. A rate per dealer can be kept; today no dealer differs.
+  4. 「我是根据收到的钱给佣金，如果取消单没有退也要扣，但要做能toggle 决定」. Commission follows money received. A cancelled order's commission is taken back even when its money is not refunded, behind a switch Finance can turn.
+  5. 「收到的钱的%」, then 「1是a」 (2026-10-05): confirmed. The renovation rebate is money Carres pays the dealer on top of commission: the rebate rate times the money collected since its start date, until the total is reached; the total left runs down by itself. The total can be filled in later; until then the rebate is still worked out, uncapped. Once the total is entered, what is left is the total less every rebate already worked out (Chew's example: August receipts RM 9,855 at 5% give RM 492.75; a total of RM 10,000 entered in September leaves RM 9,507.25). A total smaller than what was already given takes nothing back, and no more rebate is given (「对，总额少过已给的就不再给」, Chew 2026-10-05).
+  6. 「每个月重新数，根据订单」 (2026-10-05). The 15-year guarantee KPI counts from orders, and the count restarts each month (management, 2026-10-07: 「by month 算」). The period stays a setting.
+  7. 「这个确定，是根据订单的mattress 决定的」, then 「是a」 (2026-10-05): commission is worked on the price after the bundle discount, so Carres and the dealer share it. The bundle discount belongs to the whole bundle and is shared equally by the order's mattresses, piece by piece: 「3张就500 除3， 4张就500 除4」 (Chew 2026-10-05). Each mattress's commission is its rate on its price less its share. A line of quantity 2 counts as two mattresses, and only mattresses share the discount (「可以」, Chew 2026-10-05). When Carres ends a bundle promotion, orders placed after it carry no bundle discount and earn on full prices; orders placed during it keep their discount and commission. There is no switch, because the spread only acts on an order that records a bundle discount (「对，不用开关」, Chew 2026-10-05). A product moving between rates (20% back to 25%) is a new rate with a start date, decided by the order date. The order must say it carries a bundle discount; today no order field holds one, and order entry is Jess's.
+- **Ready to build.** The whole calculation is confirmed: management checked the rules (「dealer 的确定了」, Chew 2026-10-07). Every dealer's statement follows the same rules and the format of Chew's workbook (「其他的dealer statement 同个规则和格式」).
+- **Paying commission out (Chew 2026-10-05).** 「佣金可以先算，但我给佣金是根据收到的钱，然后收的第一笔低过50% 是不出的, 知道clear 完才出 / 八月收一半就出一半的commission, 收60% 就出60%，尾款10月收就10月才出」. An order's whole commission is worked out at once; it is paid out as its money arrives. If the first money is at least half the order, the commission for what came in is paid that month and the rest when the rest comes in. If the first money is under half, nothing is paid until the order reaches half (next point).
+- **Cancelled orders (Chew 2026-10-05).** 「照理我是根据收到的钱出commission, 所以取消的单就不再有[还没收的佣金]，所以已付的没有影响不是」, then 「可以」. A cancelled order has nothing still to collect. Commission already paid on money Carres kept stays paid; each cancelled order carries a switch, off by default, that Finance turns on to take it back. Money refunded is taken back in the month it is refunded.
+- **Reaching half later (Chew 2026-10-05).** 「9月收超过50%就补回给他」. An order whose first money was under half starts paying in the month its money received reaches half: that month pays the commission on everything received so far, and later money pays as it comes in.
+- **Confirmed by Chew, 2026-10-06** (rule numbers of the final-check page): sofas earn commission (3.2). Guarantee, transport and disposal come off the first money like service (5.7). The half-paid rule is measured on the whole order total, service included (5.8). The renovation rebate follows the half-paid rule: nothing counts until the order reaches half, then it counts (7.4). One payment per dealer per month: commission, rebate and KPI allowance, less what is taken back (9.1). Rate precedence: a product's own rate, else the dealer's, else the standard; a promotion item takes 5 points off the rate that applies (2.5, 「顺序对」). Each dealer's renovation rebate (total, rate, start date) is Finance's to fill in, without management (「这个有填就给 … 那天开始是我决定的」). Commission is paid on the 15th of the following month (「付佣金的日子15号」).
+- **Management's answers on dealers (brought by Chew, 2026-10-07).** The questions were on one private page Chew shares: https://claude.ai/artifact/4SYoi1Qut1VzcpRcMhS6cU.
+  - D1: accessories earn 25%, behind a switch with a start date (the workbook rulings below).
+  - D2: the KPI count restarts each month (answer 6 above).
+  - D3: each dealer logs in and sees its own statement (「dealer 要能看自己的statement」). Emailing the statement is not built for now (「email 可以不用做先」). Dealer is Chew's, so the page is Finance's to build; the dealer's order screens stay Jess's.
+  - D4: when Carres keeps a cancelled order's money, commission already paid stays paid by default, and Finance takes it back order by order ("Cancelled orders" above).
+- **Further rulings (Chew, 2026-10-06 and 2026-10-07):**
+  - Card payments: commission is worked on the amount the customer paid, before the card fee (「照1000 算」, Chew 2026-10-06).
+  - An amended order is worked out again, and the difference is adjusted in the month of the amendment (「改单的话能重新算 … 就是几时改单的月份调」, Chew 2026-10-06). The recalculation uses the rates of the original order date (「甲，用原本下单那天的%」).
+  - A self-billed e-invoice for paying dealers is not needed (「d5 不需要」, Chew 2026-10-06); it is off the management page.
+  - Go-live: only once every module works without problems (「全部模块没有问题了才上线」, Chew 2026-10-07). There is no date yet, and opening balances from AutoCount stay parked (Chew 2026-10-03).
+- **Final check done.** Management checked the whole list (2026-10-07). It stays on a private page Chew shares: https://claude.ai/artifact/6tEBVSvjxQyvfextAHPUai.
+- **Service comes off first (Chew 2026-10-05).** 「service 要扣掉哦，当第一次算和出时就要扣了」 and 「我算的commission 是不包括service 哦」. Commission never includes service. Confirmed 「1 是乙」: the first money received pays for the items that earn nothing before any of it earns commission, rather than spreading them over every payment. Example: goods RM 3,000 at 25% plus service RM 300; RM 1,650 received first earns (1,650 − 300) × 25% = RM 337.50, and the RM 1,650 balance earns RM 412.50. Guarantee, transport and disposal come off first in the same way (5.7 above).
+- **Dealer statement (Chew 2026-10-05).** 「要每个月如何算commission, 其中包括当月每个新的订单， 当月收的尾款，当月的deduct。同时还需要一个比较普通类似supplier statement 这样的格式，我欠他多少，几时付他这样。实时update 的」. Two views, both live: the month's commission, order by order, covering that month's new orders, the balances collected that month and that month's deductions; and a statement of account like a supplier's: what Carres owes the dealer and when it was paid (the payment voucher). It also shows the commission still waiting on orders whose balance is not in yet. Chew checks and Finance imitates his existing statements.
+- **Chew's existing statement workbook, read 2026-10-05.** One dealer's August 2026 workbook, kept by Chew (not in this repository). Its sheets: Summary, the month's claim, Statement of Account (running balance of commission and bonus charged, payments credited), line detail with each line's rate and why, an order ledger (commission if fully paid, earned, still to earn), and the AR, unclaimed and new-collection sheets that reconcile the source files. It agrees with the rules above: commission is earned on receipts, in proportion; refunds earn nothing; an order below the minimum deposit is held; a bundle discount is spread equally over the mattress pieces. Settled with Chew the same day:
+  - **Accessories earn commission** at the standard rate (pillows, mattress protectors), overturning the code's "accessories earn nothing" (YH, 30 Sep 2026). It may stop later, so whether a kind of product earns commission is a switch with a start date (「配件也是25%。但到时可能会取消，所以要做可以toggle 的」). Management confirmed 25% on 2026-10-07 (D1).
+  - **The workbook's bonus on receipts is the renovation rebate** (「是装修回扣」).
+  - **A receipt counts in the month the system records it.** The workbook let a claim sheet move a receipt between months only because nothing was systematic yet (「到时就是根据每个月的真实收款」).
+  - **The system's own records are the source.** The workbook's corrections to hand-made source files do not carry over (「到时就是根据系统的记录来算了」).
+- **Subscription is not dealer commission (Chew 2026-10-05).** 「subscription 是subscription， dealer 是dealer, 不是一样的东西」. Subscription commission stays in Rental. The dealer report, statement and payout leave it out.
+- **Subscription's rules are in the Rental MASTER §0** (Subscription is Chew's since 2026-10-07): billing, invoices, late interest, paying off, default, termination, bad debt, commission, Diglant and the agreement. Below is only how Finance books them.
+- **Subscription in Finance's books, confirmed by Chew 2026-10-06.**
+  - An invoice is income when it is issued: Dr the customer's subscription debtor, Cr subscription income. Money received: Dr bank, Cr the customer's debtor, knocking off the invoice (「我开单时就是我的income … 我收到钱就是银行增加，knock off invoice」). This replaces "income when collected".
+  - The parent account holds subscription customers only.
+  - The parent is a debtor control account. Each customer is its sub-account (debtor code), and every invoice and receipt posts to that customer's sub-account; the control account shows their total (「母账是debtor control account，所以每个顾客都应该是子账」, Chew 2026-10-06).
+  - The invoice shows the customer's details. Its description names the agreement number, which instalment and the amount; the rest follows the standard invoice.
+  - Invoices are made automatically each month. Chew looks them over, then sends them from accounts@carresofficial.com.
+  - Late interest is invoiced too.
+  - Bad debt: the agreements Chew ticks on the bad-debt list post Dr bad debts, Cr the customer's debtor, once each.
+  - The subscription invoice is Finance's (「invoice 那边算我这里」). Rental keeps the agreement and its billing schedule.
+- **Still Jess's, for dealer commission:** an order recording its bundle discount (order placement); the 15-year guarantee's catalog price (Catalog).
+- **Noted for later (Chew 2026-10-05).** A list's search box opens already typed-into, not behind a click. To change together with other UI items; first check whether it is the shared kit search.
 
 **Supplier credit notes approach — PROPOSAL / NOT LAW, built for Chew's test (0642).**
 - Payables → Credit Notes. The supplier's own credit note is entered once, with lines, as a bill is: draft → confirmed → cancelled. Confirming posts on the credit note's date: Dr the payables account with the supplier as the party, Cr each line. An expense or asset line takes a cost back; an income line records a rebate. The stored number is `SCN-YYYYMMDD-RRRR`, drawn like a bill's; display uses `SCN-YYMMDD-RRRR` under Jess's system-wide 2026-10-04 COPY-STANDARD ruling (approved target, adoption not verified).
+- The prefix becomes `PCN`, so subscription credit notes keep `SCN` (Chew 2026-10-07, 「可以」). Not built yet.
 - Its credit is knocked off that supplier's confirmed bills on the same payables account, as an advance is (0485). A knock-off posts nothing and can be taken off with a reason. A bill counts it as paid from the later of the credit note's date and the knock-off's day. A voucher cannot pay what a credit note already took off, and a bill with a credit note on it cannot be cancelled.
 - AP · Payables gains `Credit Left`, and its last money column subtracts it (`Unpaid After Advance and Credit`), so it still equals the books. AP Aging and the Self-check read the same arithmetic. A test walks a bill, a credit note, a knock-off, a voucher refused over what is left, a take-off and a cancel through the real doors.
 - A supplier debit note is not entered as a bill: it is its own document (the table above, Chew 2026-10-03), not built yet.
 - Not built: a PDF.
 - 0647 fixes a fault 0642 shipped with: a credit note's two account columns did not follow a renumbered account (0570 says every key that names the chart must), so renumbering an account a credit note used was refused. Both now follow, and the file refuses to apply while any key onto the chart still does not. A test renumbers an account under a confirmed credit note.
 - Falsifier: in Chew's test, a supplier's `Unpaid After Advance and Credit` differs from its balance in the books, or a bill shows a credit note Chew did not knock off.
+
+**Credit and debit notes to follow up — Chew 2026-10-06 and 2026-10-07; APPROVED / NOT BUILT except where marked.**
+- Chew needs one list of the credit and debit notes suppliers still owe, so he can follow each one up (「我需要有一个listing 关于supplier 那边要follow up 的cn」). It is a reminder only and posts nothing, because there is no supplier claims account (Chew 2026-10-06).
+- Where one starts (「就是我转grn 去pi 时会对比我的po price， 然后提醒我，我会remark pending supplier cn or dn / 同时也有可能是开了pi, 然后要purchase return， 就要让他pending cn」):
+  - when a bill is made from its GRN, each line is compared with its PO price and a difference is pointed out; Chew marks it pending a supplier credit note or debit note, with a remark;
+  - a purchase return on goods already billed makes a pending credit note. Purchasing's return record is read, never changed.
+- One record per note owed: supplier, credit or debit, the bill, GRN, PO or return it belongs to, the amount, the date it was noted, each follow-up (the date and what the supplier said) and the next follow-up date.
+- It closes when the supplier's note arrives: entering the credit note (or, once built, the debit note) offers that supplier's open ones to settle, and a part leaves the rest open. It can also be closed with a reason, for example the supplier refused or replaced the goods.
+- PROPOSAL / NOT LAW, asked on 2026-10-07 and not answered: the reasons are "Price differs from PO", "Purchase return" and "Other", and preparing a voucher for a supplier shows the notes it still owes.
+- Falsifier: in Chew's test, a note he is waiting for is not on the list, or one the supplier already sent still shows as owed.
 
 **Bill scanning approach — PROPOSAL / NOT LAW, built for Chew's test (no migration).**
 - `Read the bill` on the bill form and `Read the credit note` on the credit note form. The person picks the pages (PDF or photos, up to 8, 10 MB each); they go once to Anthropic's Claude model (`claude-sonnet-5-5`, changeable with the `BILL_READER_MODEL` setting), which answers the supplier's name, the paper's number, date, due date, currency, total and lines.
