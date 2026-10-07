@@ -764,6 +764,85 @@ describe("POST /accounts/import (0655)", () => {
   });
 });
 
+describe("The chart in AutoCount's sections (0656)", () => {
+  const send = async (method: string, path: string, body: unknown, role = "finance") =>
+    app.fetch(new Request(`http://t/api/finance/ledger${path}`, {
+      method,
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+  const EDIT = { name: "ALLIANCE BANK", code: "310-1000", section: "CURRENT ASSETS", under: "310-0000" };
+
+  it("edits one account in one call: name, number, section and heading", async () => {
+    const { sb } = fakeClient(() => ok("310-1000"));
+    const res = await send("PUT", "/accounts/310-1000", EDIT);
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ code: "310-1000" });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_edit", {
+      p_code: "310-1000", p_name: "ALLIANCE BANK", p_new_code: "310-1000", p_section: "CURRENT ASSETS", p_under: "310-0000",
+    });
+  });
+
+  it("sends no heading for the top of the section, and the number in capitals", async () => {
+    const { sb } = fakeClient(() => ok("900-A010"));
+    await send("PUT", "/accounts/900-A001", { name: "ADVERTISING", code: "900-a010", section: "EXPENSES", under: null });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_edit", {
+      p_code: "900-A001", p_name: "ADVERTISING", p_new_code: "900-A010", p_section: "EXPENSES", p_under: null,
+    });
+  });
+
+  it("refuses operation, a path that is not an account, and a body it cannot read before the database", async () => {
+    const { sb } = fakeClient(() => ok("x"));
+    expect((await send("PUT", "/accounts/310-1000", EDIT, "operation")).status).toBe(403);
+    expect((await send("PUT", "/accounts/12", EDIT)).status).toBe(404);
+    expect((await send("PUT", "/accounts/310-1000", { ...EDIT, section: "" })).status).toBe(422);
+    expect((await send("PUT", "/accounts/310-1000", { ...EDIT, extra: 1 })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("retires an account and brings one back", async () => {
+    const { sb } = fakeClient(() => ok("900-E001"));
+    const res = await send("POST", "/accounts/900-E001/active", { active: false });
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ code: "900-E001", active: false });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_set_active", { p_code: "900-E001", p_active: false });
+    await send("POST", "/accounts/900-E001/active", { active: true });
+    expect(sb.rpc).toHaveBeenLastCalledWith("gl_account_set_active", { p_code: "900-E001", p_active: true });
+  });
+
+  it("forwards the database's sentence when a used account stays", async () => {
+    fakeClient(() => refuse("22023", "gl_account_has_posted_history", "6200 RENT AND UTILITIES (TEST ONLY) has postings, so it stays. A used account is never retired."));
+    const res = await send("POST", "/accounts/6200/active", { active: false });
+    expect(res.status).toBe(422);
+    const body = await json(res);
+    expect(body.code).toBe("gl_account_has_posted_history");
+    expect(body.message).toBe("6200 RENT AND UTILITIES (TEST ONLY) has postings, so it stays. A used account is never retired.");
+  });
+
+  it("adds an account in a section, under a heading or at its top", async () => {
+    const { sb } = fakeClient(() => ok("900-C010"));
+    const res = await send("POST", "/accounts/in-section", {
+      section: "EXPENSES", parentCode: "900-C001", code: "900-c010", name: "COMMISSION - EVENTS", isHeading: false,
+    });
+    expect(res.status).toBe(201);
+    expect(await json(res)).toEqual({ code: "900-C010" });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_account_add_in_section", {
+      p_section: "EXPENSES", p_parent_code: "900-C001", p_code: "900-C010", p_name: "COMMISSION - EVENTS", p_is_heading: false,
+    });
+    await send("POST", "/accounts/in-section", { section: "FIXED ASSETS", parentCode: null, code: "201-0000", name: "FURNITURE", isHeading: true });
+    expect(sb.rpc).toHaveBeenLastCalledWith("gl_account_add_in_section", {
+      p_section: "FIXED ASSETS", p_parent_code: null, p_code: "201-0000", p_name: "FURNITURE", p_is_heading: true,
+    });
+  });
+
+  it("refuses an add with no section before the database", async () => {
+    const { sb } = fakeClient(() => ok("x"));
+    const res = await send("POST", "/accounts/in-section", { section: "", parentCode: null, code: "900-C010", name: "X", isHeading: false });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+});
+
 describe("POST /accounts/move and /accounts/reorder", () => {
   const post = async (path: string, body: unknown, role = "finance") =>
     app.fetch(new Request(`http://t/api/finance/ledger${path}`, {

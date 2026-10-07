@@ -386,6 +386,38 @@ export const ledgerAccountAddInput = z.object({
 }).strict();
 export type LedgerAccountAddInput = z.infer<typeof ledgerAccountAddInput>;
 
+const accountName = z.string().trim().min(1, 'Type the account name.').max(60, 'Keep the name to 60 characters.');
+const sectionName = z.string().trim().min(1, 'Choose the section.').max(40, 'Choose the section.');
+const headingCode = z.string().trim().regex(ledgerAccountCodeShape, 'That account is not in the chart.');
+
+/** Edit one account on Finance Settings → Chart of accounts (0656,
+ *  gl_account_edit): its name and number, its section, and the heading it sits
+ *  under. `under: null` puts it at the top of its section. Which heading and
+ *  section fit is the database's to judge. */
+export const ledgerAccountEditInput = z.object({
+  name: accountName,
+  code: ledgerAccountCodeInput,
+  section: sectionName,
+  under: headingCode.nullable(),
+}).strict();
+export type LedgerAccountEditInput = z.infer<typeof ledgerAccountEditInput>;
+
+/** Add an account or a heading in one of AutoCount's sections (0656,
+ *  gl_account_add_in_section). `parentCode: null` puts it at the top of the
+ *  section; otherwise it goes under that heading, which must be in the section. */
+export const ledgerAccountAddInSectionInput = z.object({
+  section: sectionName,
+  parentCode: headingCode.nullable(),
+  code: ledgerAccountCodeInput,
+  name: accountName,
+  isHeading: z.boolean(),
+}).strict();
+export type LedgerAccountAddInSectionInput = z.infer<typeof ledgerAccountAddInSectionInput>;
+
+/** Retire an account, or bring one back (0656, gl_account_set_active). */
+export const ledgerAccountActiveInput = z.object({ active: z.boolean() }).strict();
+export type LedgerAccountActiveInput = z.infer<typeof ledgerAccountActiveInput>;
+
 /**
  * Import AutoCount's printed chart (0655). The rows are what
  * `readAutocountChart` read, in AutoCount's order; the database checks every
@@ -408,7 +440,8 @@ export type LedgerChartImportInput = z.infer<typeof ledgerChartImportInput>;
 
 /** One row of gl_chart_import's answer. `parentCode` is where a new account
  *  goes, or where an existing one already sits; `chartName` is the name the
- *  chart already holds for an existing number. */
+ *  chart already holds for an existing number. `fills` (0656): an account
+ *  already in the chart whose empty section or special type the import fills. */
 export interface LedgerChartImportRow {
   code: string;
   name: string;
@@ -416,12 +449,15 @@ export interface LedgerChartImportRow {
   status: 'create' | 'exists' | 'problem';
   reason: string | null;
   chartName: string | null;
+  fills?: boolean;
 }
 
 export interface LedgerChartImportResult {
   applied: boolean;
   created: number;
   existing: number;
+  /** 0656: accounts already in the chart whose section or special type is filled. */
+  filled?: number;
   problems: number;
   rows: LedgerChartImportRow[];
 }

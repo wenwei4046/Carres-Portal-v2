@@ -2,8 +2,11 @@ import { Hono, type Context, type MiddlewareHandler } from "hono";
 import type { ZodError } from "zod";
 import {
   departmentRpcArgs,
+  ledgerAccountActiveInput,
   ledgerAccountAddInput,
+  ledgerAccountAddInSectionInput,
   ledgerAccountCodeShape,
+  ledgerAccountEditInput,
   ledgerAccountLedgerQuery,
   ledgerAccountMoveInput,
   ledgerAccountReorderInput,
@@ -83,6 +86,13 @@ import financeMoneyAccountsRouter from "./money-accounts";
  *   POST  /accounts/import  AutoCount's printed chart, read on the screen (gl_chart_import, 0655):
  *                           apply false answers what it would do, row by row; true makes the new
  *                           accounts. It never renames, moves or retires an account already there.
+ *                           Since 0656 it keeps each account's section and special type, and fills
+ *                           them on an account already there when they are empty.
+ *   POST  /accounts/in-section  add an account or heading in an AutoCount section (0656)
+ *   PUT   /accounts/:code   edit one account: the heading it sits under, its section, its name and
+ *                           number, in one act (gl_account_edit, 0656)
+ *   POST  /accounts/:code/active  retire an account the ledger never posted to, or bring one back
+ *                           (gl_account_set_active, 0656)
  *   GET /trial-balance      every account as it stood at the end of a day, and every
  *                           heading's own subtotal at every depth, in the chart's order
  *   GET /account-ledger     one account, line by line
@@ -373,6 +383,9 @@ async function readChart(sb: Sb): Promise<{ chart: LedgerChart } | { error: PgEr
         is_active: r.is_active === true,
         is_header: typeof r.is_heading === "boolean" ? r.is_heading : parents.has(String(r.code)),
         sort_order: Number(r.sort_order ?? 0),
+        // 0656: AutoCount's section and special type. Null before 0656 is applied.
+        section: typeof r.section === "string" ? r.section : null,
+        special: typeof r.special === "string" ? r.special : null,
       })),
     },
   };
@@ -388,11 +401,14 @@ financeLedgerRouter.get("/departments", requireFinance, async (c) => {
 
 financeLedgerRouter.get("/accounts", requireFinance, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const [read, rules, roles, money] = await Promise.all([
+  const [read, rules, roles, money, sections] = await Promise.all([
     readChart(sb),
     sb.rpc("gl_rule_headings"),
     sb.rpc("gl_account_roles_read"),
     sb.from("gl_money_accounts").select("account_code"),
+    // 0656: AutoCount's sections, in order. Before 0656 the table is not
+    // there; the read fails and the chart loads with no sections.
+    sb.from("gl_sections").select("section,kind,sort_order").order("sort_order"),
   ]);
   if ("error" in read) return ledgerError(c, read.error, "The chart of accounts");
   // 0570: the headings no account moves into or out of, so the chart screen
@@ -409,7 +425,10 @@ financeLedgerRouter.get("/accounts", requireFinance, async (c) => {
   const moneyAccounts = !money.error && Array.isArray(money.data)
     ? (money.data as Json[]).map((r) => String(r.account_code))
     : [];
-  return c.json({ ...read.chart, rule_headings: ruleHeadings, roles: roleMap, money_accounts: moneyAccounts });
+  const sectionRows = !sections.error && Array.isArray(sections.data)
+    ? (sections.data as Json[]).map((r) => ({ section: String(r.section), kind: String(r.kind), sort_order: Number(r.sort_order) }))
+    : [];
+  return c.json({ ...read.chart, rule_headings: ruleHeadings, roles: roleMap, money_accounts: moneyAccounts, sections: sectionRows });
 });
 
 /**
@@ -528,6 +547,61 @@ financeLedgerRouter.post("/accounts", requireFinance, async (c) => {
   });
   if (error) return accountError(c, error);
   return c.json({ code: String(data) }, 201);
+});
+
+// ── 0656: the chart in AutoCount's sections ──────────────────────────────────
+/** Add an account or a heading in a section, under one of its headings or at
+ *  its top (gl_account_add_in_section, which writes through gl_account_add). */
+financeLedgerRouter.post("/accounts/in-section", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, ledgerAccountAddInSectionInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_account_add_in_section", {
+    p_section: body.data.section,
+    p_parent_code: body.data.parentCode,
+    p_code: body.data.code,
+    p_name: body.data.name,
+    p_is_heading: body.data.isHeading,
+  });
+  if (error) return accountError(c, error);
+  return c.json({ code: String(data) }, 201);
+});
+
+/** Edit one account in one act: the heading it sits under, its section, then
+ *  its name and number (gl_account_edit). The number answered is the one the
+ *  account has now. */
+financeLedgerRouter.put("/accounts/:code", requireFinance, async (c) => {
+  const code = c.req.param("code");
+  if (!ledgerAccountCodeShape.test(code)) {
+    return c.json({ error: "not_found", code: "not_found", message: "That account is not in the chart." }, 404);
+  }
+  const body = await parseJsonBody(c, ledgerAccountEditInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_account_edit", {
+    p_code: code,
+    p_name: body.data.name,
+    p_new_code: body.data.code,
+    p_section: body.data.section,
+    p_under: body.data.under,
+  });
+  if (error) return accountError(c, error);
+  return c.json({ code: String(data) });
+});
+
+/** Retire an account the ledger never posted to, or bring one back
+ *  (gl_account_set_active). Every refusal is the database's sentence. */
+financeLedgerRouter.post("/accounts/:code/active", requireFinance, async (c) => {
+  const code = c.req.param("code");
+  if (!ledgerAccountCodeShape.test(code)) {
+    return c.json({ error: "not_found", code: "not_found", message: "That account is not in the chart." }, 404);
+  }
+  const body = await parseJsonBody(c, ledgerAccountActiveInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_account_set_active", { p_code: code, p_active: body.data.active });
+  if (error) return accountError(c, error);
+  return c.json({ code: String(data), active: body.data.active });
 });
 
 /** 0655: the answer is the database's, row by row. A refused row is a row with

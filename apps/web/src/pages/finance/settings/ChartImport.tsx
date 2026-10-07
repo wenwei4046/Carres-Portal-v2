@@ -15,7 +15,10 @@
  * says where an account goes.
  *
  * An account already in the chart is never renamed, moved or retired here;
- * the chart screen does that, one account at a time.
+ * the chart screen does that, one account at a time. Since 0656 the import
+ * keeps AutoCount's section and special type, and fills them on an account
+ * already in the chart when they are empty: importing the same PDF again is
+ * how the accounts made before 0656 get theirs.
  */
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -57,14 +60,43 @@ const WHAT_HAPPENS: Record<LedgerChartImportRow["status"], string> = {
 
 type ShownRow = LedgerChartImportRow & { at: number };
 
+// PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0656).
+const FILLS = "Already in the chart · section filled in";
+
 const COLUMNS: readonly Column<ShownRow>[] = [
   { key: "account", label: "Account", width: "45%", cell: (r) => `${r.code} ${r.chartName ?? r.name}` },
   { key: "under", label: "Under", width: "15%", cell: (r) => r.parentCode ?? "" },
-  { key: "what", label: "What happens", width: "40%", cell: (r) => (r.status === "problem" && r.reason ? r.reason : WHAT_HAPPENS[r.status]) },
+  {
+    key: "what",
+    label: "What happens",
+    width: "40%",
+    cell: (r) => (r.status === "problem" && r.reason ? r.reason : r.status === "exists" && r.fills ? FILLS : WHAT_HAPPENS[r.status]),
+  },
 ];
 
-export function chartImportSummary(a: Pick<LedgerChartImportResult, "created" | "existing" | "problems">): string {
-  return `${a.created} new · ${a.existing} already in the chart · ${a.problems} not imported`;
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+export function chartImportSummary(a: Pick<LedgerChartImportResult, "created" | "existing" | "problems" | "filled">): string {
+  const base = `${a.created} new · ${a.existing} already in the chart · ${a.problems} not imported`;
+  // 0656: an account already in the chart whose section or special type is filled.
+  return a.filled ? `${base} · ${plural(a.filled, "section filled in", "sections filled in")}` : base;
+}
+
+/** The primary button names what it will do (the Receiving button law). */
+export function chartImportButton(a: Pick<LedgerChartImportResult, "created" | "filled"> | null): string {
+  if (!a) return "Import: choose the PDF";
+  if (a.created > 0) return `Import ${plural(a.created, "account", "accounts")}`;
+  if (a.filled) return `Fill in ${plural(a.filled, "section", "sections")}`;
+  return "Nothing new to import";
+}
+
+/** What the toast says once the import is done. */
+export function chartImportDone(a: Pick<LedgerChartImportResult, "created" | "filled">): string {
+  const made = `${plural(a.created, "account", "accounts")} added to the chart`;
+  const filled = a.filled ? plural(a.filled, "section filled in", "sections filled in") : null;
+  if (a.created > 0 && filled) return `${made}, ${filled}.`;
+  if (filled) return `${filled[0]!.toUpperCase()}${filled.slice(1)}.`;
+  return `${made}.`;
 }
 
 export default function ChartImport({ onClose }: { onClose: () => void }) {
@@ -115,7 +147,7 @@ export default function ChartImport({ onClose }: { onClose: () => void }) {
       { rows, apply: true },
       {
         onSuccess: (done) => {
-          toast.success(`${done.created} ${done.created === 1 ? "account" : "accounts"} added to the chart.`);
+          toast.success(chartImportDone(done));
           onClose();
         },
         onError: (e) => setRefusal(e.message),
@@ -123,7 +155,7 @@ export default function ChartImport({ onClose }: { onClose: () => void }) {
     );
   };
 
-  const toMake = preview?.created ?? 0;
+  const toMake = (preview?.created ?? 0) + (preview?.filled ?? 0);
   const shown: ShownRow[] = preview
     ? preview.rows.map((r, at) => ({ ...r, at })).sort((a, b) => ORDER[a.status] - ORDER[b.status] || a.at - b.at)
     : [];
@@ -149,7 +181,7 @@ export default function ChartImport({ onClose }: { onClose: () => void }) {
             disabled={!preview || toMake === 0 || reading}
             onClick={apply}
           >
-            {!preview ? "Import: choose the PDF" : toMake === 0 ? "Nothing new to import" : `Import ${toMake} ${toMake === 1 ? "account" : "accounts"}`}
+            {chartImportButton(preview)}
           </Button>
         </>
       }
