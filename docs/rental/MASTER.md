@@ -27,6 +27,107 @@ format/ownership gaps are governed by the complete approved table in Orders MAST
 numbering privacy. Financial formats retain accounting/e-invoice validation before live use.
 Manual Purchase Request is the approved screen name; `SMPR260924-4827` (`SMPRYYMMDD-NNNN`, own daily 10,000 pool) is the approved format.
 
+# §0 · Subscription rules — Chew, 2026-10-07
+
+**Owner.** Subscription is Chew's from 2026-10-07 (「subscription 现在归我负责」): the agreement
+after signing, plans, the billing schedule, collections, the money rules and the agreement's
+wording. Signing at the POS is order placement and stays Jess's, as do Operation (§§4–5: supply
+from Diglant, logistics, storage, cleaning visits), HR and Catalog. Where a later line in this
+file conflicts with §0, §0 wins; each conflict was shown to Chew on 2026-10-07. How Finance books
+subscription money is in `docs/finance/MASTER.md`.
+
+**One set of rules** covers the older rent-to-own (bed frames and sofas too) and the new mattress
+subscription (「同一套」). Everything in §0 is **APPROVED / NOT BUILT** unless a line says otherwise.
+
+**Billing and invoices**
+- The first instalment falls due on the 7th of the month after the customer receives the goods,
+  then on the 7th of each month; nothing is charged at signing. Management confirmed it on
+  2026-10-07.
+- Card customers pay through Stripe: the card is registered at signing and the first charge is the
+  first instalment (「第一期是送货后，然后还是经过stripe」). Stripe reports each payment live
+  through its API, because Diglant is paid every 10 days. Stripe's own invoices are not sent to
+  customers; the customer's document is Finance's invoice.
+- Transfers go into Hong Leong Bank, a setting Chew can change (「HLBB 但要能maintain」).
+- Finance issues every customer invoice, numbered as SINV: the monthly invoice, late interest,
+  the RM 1 sale, termination and loss. They are made automatically; Chew looks them over and sends
+  them from accounts@carresofficial.com, until the agreement ends or is paid off. Rental builds no
+  second invoice.
+- Recording a payment asks for the day it was received, today by default. A payment pays the
+  oldest unpaid month first.
+
+**Late interest**
+- 8% a month, simple, counted by the day, as the agreement says (「利息这个先remain 8% per
+  month」). Management had answered 8% a year on daily rest.
+- It starts the day after the month of the due date ends unpaid (「过了月底」). A month that
+  Carres records late is not charged.
+- The rate is Chew's setting: the rate, per month or per year, and the day it starts. Each
+  agreement uses the rate in force on the day it was signed (「可以」).
+- It is not shared with Diglant for now (「暂时不分先」).
+- Finance invoices it; it may be collected with the next Stripe charge.
+
+**Paying off**
+- At any time the customer may pay the balance: the months still to pay plus interest already
+  charged, with no discount (management, 2026-10-07).
+- When the last instalment is paid, at the end or early, the system makes an invoice that sells
+  the goods to the customer for RM 1; the amount is a setting. Once it is paid, the goods are the
+  customer's (「付清后我们会另外开一张invoice 可能1块钱给顾客」).
+
+**Default, termination and taking the goods back**
+- Six consecutive unpaid instalments allow the agreement to be ended, on written notice, as the
+  agreement says. Because a payment pays the oldest month first, this is six unpaid instalments,
+  even for a customer who pays a little every few months. The agreement also allows ending it for
+  a material breach or bankruptcy.
+- On termination Finance issues one invoice for every remaining month and the compensation,
+  including the cost of collecting the goods; the unpaid months and their interest are already
+  invoiced (「只是要开一张for 剩下所有月份的费用和赔偿的」). The cost is linked to its
+  subscription, and Finance raises the invoice with one button.
+- Goods lost, stolen or destroyed through the customer's negligence: Finance invoices every
+  remaining month the same way.
+- A returned mattress is thrown away, repacked and sold, sold second-hand, or repacked and rented
+  again (「也可能repack 出租」). The trip that collects it is Delivery's.
+- Bad debt: a list shows each agreement's amount still owed; Chew ticks several and moves them to
+  bad debt at once (「我要有一个list 看每一个agreement 的坏账，办法bulk tick transfer as bad debt」).
+
+**Commission and Diglant**
+- Dealers do not sell subscriptions. The commission goes to whoever submitted the subscription,
+  and HR pays it with salary, for staff and agents alike, for now (「agent 也默认给hr 先」).
+  Finance raises no voucher for it.
+- Each plan names its supplier from a short list with one default. For now the only supplier is
+  Diglant (「供应商暂时就diglant」).
+- Diglant's share of each month collected, on rent only, is settled on the 10th, the 20th and the
+  last day of each month, each with an automatic draft payment voucher. The days are a setting,
+  because Chew will renegotiate with Diglant.
+- A subscription PO to Diglant (SPO) raises no bill and no payment: Diglant is paid only its share.
+- The mattress belongs to Carres once the customer's first payment is made (management), but it is
+  not an asset in Carres's books: there is no cost price, and its cost is what Carres pays Diglant
+  and the agent.
+
+**The agreement**
+- The active agreement is "Rental Agreement — Terms and Conditions (v5)", effective 2026-07-26, in
+  Loo's wording. Chew's Word copy of 2026-10-07 has the same clauses; only its signature block
+  differs.
+- Chew approved two changes, to be read by a lawyer first (「这个没有问题」): the Commencement
+  Date becomes the 7th of the month after delivery, and a new clause lets the customer pay off the
+  balance at any time and then buy the goods for RM 1. Caution, not checked: goods that may pass to
+  the customer can make the agreement a hire purchase agreement.
+- Interest from month end needs no change: the agreement's non-waiver clause keeps the right to
+  charge from the due date.
+- Suppliers and whoever earns the commission should see their subscriptions' status; external
+  logins need the owner authorisation of ERP-ARCHITECTURE §6.4–6.5.
+
+**Measured 2026-10-05 to 2026-10-07 (evidence, not rules)**
+- Today month 1 falls due on the signing day, and Stripe charges a signup line item, then uses a
+  trial to reach the 7th. `Record transfer` records the day it is pressed and can be pressed on
+  any month. A month is late until it is recorded. Late interest is charged by hand at a fixed 8% a
+  month from the due date (0300). Settlement exists: remaining rent plus interest charged, no
+  discount. Default, buyout and repossession are statuses with no function. The supplier's share
+  is on rent only (0300).
+- Each plan carries a commission rate, copied onto the agreement at signing. Each collected month
+  records commission = payment × rate beside the supplier's share. It has no payout and does not
+  name the person. A subscription's sales order is priced at RM 0.
+- Every subscription agreement reaches a customer email address (test data). Email goes out
+  through Resend; purchase orders use it.
+
 # §1 · Overview
 
 ### MISSION
@@ -69,18 +170,20 @@ therefore proved by test and by rolled-back production transactions, **not by da
   before approval with zero API changes.
 
 ### THE MONEY
-- **The calendar is the signup payment plus the 7th of every month**, N payments for an N-month
-  term, and **approve REFUSES a schedule that does not sum to the contract value.**
+- **The calendar is the 7th of the month after delivery, then the 7th of every month** (§0; not
+  built: today it is a signup payment plus the 7th). N payments for an N-month term, and
+  **approve REFUSES a schedule that does not sum to the contract value.**
 - **`rental_billings` has exactly ONE writer.** A collected month is undeletable.
-- **Stripe cannot express the rule directly** — so the signup month is a one-time line item, a
-  trial carries the gap, trial end BECOMES the anchor, and the schedule runs term − 1.
+- **Stripe's first charge is the first instalment** (§0; not built). Today Stripe charges the
+  signup month as a one-time line item, a trial carries the gap, trial end becomes the anchor,
+  and the schedule runs term − 1.
 - **A bounced card is recorded as an EVENT, never as a second writer** of the billing row, and
   it is idempotent **on Stripe's EVENT id** — Smart Retries fire a genuinely new event per
   attempt, so three refusals are three rows while one event delivered thrice is one.
 - **Late interest: ACCRUED is derived, CHARGED is stored.** Interest grows daily, so a stored
   figure is wrong tomorrow.
-- **A discounted settlement is REFUSED with the real figure**, never allocated by guess — 49% of
-  a customer's penalty belongs to the supplier.
+- **Paying off has no discount** (§0), so a discounted settlement stays REFUSED. The supplier's
+  share is on rent only; late interest is not shared for now (§0).
 - **Settlement goes THROUGH the payment RPC per month**, so the split and the one-writer law
   both hold and each month genuinely was paid.
 
@@ -125,12 +228,9 @@ The future Subscription has its own Claim policy and does not inherit the curren
 
 | What | Why it is not built |
 |---|---|
-| **The dunning ladder (Day 3 / 7 / 21)** | **BLOCKED with a named cause: no message-sending integration exists anywhere in the API.** The rungs cannot be built until one does. |
-| **Pushing the penalty onto a Stripe invoice** | Ledger half shipped. Blocked: 0 of 1 agreements has a subscription, so the invoice-item path is unverifiable. Key it to the event so a retry cannot double-bill. |
-| **A discount policy for early settlement** | Undecided how it spreads across N months and two payees. **A guess would short the supplier.** |
+| **Reminders after a missed payment (Day 3 / 7 / 21)** | Not decided by Chew. The old block is gone: email now goes out through Resend. |
+| **Collecting interest with the next Stripe charge** | §0: Finance invoices the interest and Stripe may collect it. Ledger half shipped; the Stripe half is unverified, as no agreement has a live subscription. Key it to the event so a retry cannot double-bill. |
 | **The archived signed PDF** | The signature is captured; the rendered agreement PDF has no writer yet. |
-| **Store-side reading of agreements** | Needs a dealer-scoped RLS read. |
-| **Interest as "per month or part thereof"** | The harsher reading is a one-line change in BOTH the shared function and its SQL mirror. Now that a button exists, it is worth an explicit ruling. |
 
 
 ---
@@ -163,8 +263,8 @@ Source: Jess's 2026-09-22 Subscription Module Blueprint PLAN instruction.
   with rationale/version, PDF for manual sending, and forecast/sold/picked-up comparison.
   This is authority to PLAN, not to enable scheduling, place orders or contact Diglant.
   PDF generation/download and opening WhatsApp are not evidence of sending.
-- Finance is outside this planning mission. §§1–3's existing Rental law remains untouched;
-  its rent-to-own commercial terms do not automatically govern the new mattress programme.
+- Finance was outside this planning mission. The commercial terms of both the older rent-to-own
+  and the new mattress programme are now §0 (Chew, 2026-10-07: 「同一套」).
 - **OWNER-APPROVED TARGET / NOT BUILT — Jess, 2026-09-23:** service starts only after the
   customer's actual receipt and acceptance of its proof; pickup and intermediate arrival do not
   start it. Subscription centrally shows contract, Unit, delivery progress, cleaning credits and
@@ -200,8 +300,8 @@ worktree/branch are unapproved context only; this file is the sole Rental/Subscr
 
 **2026-09-22 · PLAN · 待 Jess 审阅 · NOT BUILT。** 本节是完整的业务建议，不是执行许可。
 除 §4 明确列出的 owner facts 和下列既有 authority 外，本节所有规则、计算、日期、页面、
-字段和操作均为 **RECOMMENDATION / PROPOSAL / NOT LAW**。不修改 §§1–3 的既有 Rental
-商业规则，不把旧 rent-to-own 的期限、转拥有权、买断或收费条款移植到新计划。
+字段和操作均为 **RECOMMENDATION / PROPOSAL / NOT LAW**。商业条款（收费、利息、付清、
+转拥有权、违约、收回）以 §0 为准（Chew 2026-10-07，新旧计划同一套）。
 Finance 不在此次讨论范围内。没有应用代码、Card、部署、生产数据或外部发送。
 
 ## 5.1 · Authority audit 与本次决策边界
@@ -599,13 +699,13 @@ h1 会造成同一件事两个词，比现在的接缝更糟。**改名的时机
 
 升级需接受变更、旧 Unit 回收和新 Unit 交付各自有证据，保留两个实体历史；只完成一段
 就显示未完义务。地址变更通过 SO，不能由订阅页改运输事实；跨西/东马重新核算路线。
-取消、暂停、续期、到期处理、回收责任及允许条件须由新计划明确条款控制，未设置不得
-推断允许或自动续期/转拥有权。这里只留能力和记录边界，不拟定旧商业条款的替代版本。
+提早付清、RM 1 转拥有权、违约终止和收回以 §0 为准。取消、暂停、续期仍须由明确条款
+控制，未设置不得推断允许或自动续期。这里只留能力和记录边界。
 
 终止申请不等于资产收回；服务停止、回收中、实际回收和闭合异常分别可见。回收后按
 真实接收/检查判定可否再用，不自动成 Ready Stock。丢失、污染、破损、无人接收按事实
 开所属异常，不从下拉状态捏造回收、销毁或客户同意。已提交对象不破坏性删除；改单留
-接受版本和所有下游影响。新计划条款未批准时，不允许以本蓝图直接开始销售。
+接受版本和所有下游影响。新计划的商业条款已由 §0 定下；合约文字照 §0 修改，律师先看。
 
 ## 5.10 · 页面、员工一天与权限
 
@@ -698,8 +798,8 @@ Settings 只存经批准的计划版本、范围/单位、固定报告日、业�
 🟡 **新员工易混淆：** forecast/KPI/PO/提货/收到五种事实。修复为分栏、带月份、可追源。
 🔴 **不能照当前能力直接执行：** 工厂起点收货/DO、时间口径与未来供应关联。修复为保留
 真实来源、未知日期和禁止虚构收货；未来执行前需在 owning authority 收口。
-🟡 **业务仍未定：** 新计划条款、Klang Valley 以外伙伴和留货执行条件；初期 Diglant 留货已确定。
-不把其他政策空白伪装成免费取消、默认拥有权或可立即售卖。
+🟡 **业务仍未定：** Klang Valley 以外伙伴和留货执行条件；新计划商业条款见 §0；初期 Diglant
+留货已确定。取消、暂停、续期仍未定，不伪装成免费取消。
 
 **CURRENT MISSION — 2026-09-23 consolidated review:** 已批准的留厂/NETS、按真实区域量
 谈物流、提前 PO 与后到 SO、五种供应处理、接收后服务/清洁/回收边界均不重问。
@@ -718,8 +818,8 @@ Settings 只存经批准的计划版本、范围/单位、固定报告日、业�
    月报对照原定 forecast/actual sold/actual picked up/customer received，保留地区与批次口径。
 
 **明确依赖，不交给 owner 猜：** 45 天日历/起算、厂家留货执行条件及伙伴报价应取得
-供应/物流事实；无证据保持未知。新计划合同条款须有独立有效批准，禁止从旧 Rental
-推定。未具备这些事实，不宣称能够对所有地区承诺交期或直接销售上线。
+供应/物流事实；无证据保持未知。新计划合同条款见 §0（Chew 2026-10-07）。未具备这些
+事实，不宣称能够对所有地区承诺交期。
 **明确排除：** Finance 设计、租仓承诺、外部联络/保量承诺、自动发送/自动下单、实时
 自动化、应用建设、Card、部署和生产数据更改；本次不触碰 SO 页面或 MPR/PO 表单模板。
 
