@@ -27,7 +27,7 @@
 >
 > **Whose decisions these are.** Every decision here was made by **Chew** (Finance) in chat on 2026-10-03 and written down at Chew's request. They are **not** Jess's owner rulings.
 >
-> **Conflicts.** Where a line here meets a Jess ruling (CLAUDE.md or another module MASTER), **the Jess ruling wins** and the question goes back to Chew. Subscription is the exception: it is Chew's since 2026-10-07 (「subscription 现在归我负责」), so inside it an earlier Jess ruling gives way to Chew's once the conflict has been shown to Chew.
+> **Conflicts.** Where a line here meets a Jess ruling (CLAUDE.md or another module MASTER), **the Jess ruling wins** and the question goes back to Chew. Subscription and Dealer are the exception: they are Chew's since 2026-10-07 (§1, "Subscription and Dealer are Chew's too"), so inside them an earlier Jess ruling gives way to Chew's once the conflict has been shown to Chew.
 >
 > **Reference.** The Houzs Finance Specification V5 (2026-10-02) is **evidence, not specification**. Per the CLAUDE.md Decision Gate, external systems are evidence. The spec's own instruction to "follow its rules" does not apply here. Chew keeps the spec locally. It is **not** in this public repository, because it holds another company's internal figures.
 
@@ -74,7 +74,7 @@ Chew's answers on the chart, 2026-10-06:
 - When Purchasing allocates such stock or PO quantity to a Sales Order, the goods take that order's channel. Allocated before the supplier is paid: the bill and the payment carry the order's channel. Allocated after: that month's Receipts & Payments keeps it under stock and does not change, and the cost reaches the order's channel when the goods are sold. A PO split between orders is split unit by unit.
 - The KPI allowance is accrued like the renovation rebate (900-C009 / 410-0065).
 
-## 1 · Boundary: Finance only
+## 1 · Boundary: Finance, Subscription and Dealer
 
 Chew, 2026-10-03: 「总之jess 的功能，ui 等等都别动到。我只专做我的finance 模块，我其他的资料也只是链接过来罢了」.
 
@@ -88,10 +88,12 @@ Chew, 2026-10-03: 「总之jess 的功能，ui 等等都别动到。我只专做
 - customer payments, receipts and invoices (Payment);
 - Sales Orders (Orders);
 - POs and GRNs (Purchasing);
-- Units and month-end stock (Stock);
-- the dealer master.
+- Units and month-end stock (Stock).
 
-**Subscription is Chew's too** (Chew 2026-10-07). Rental's agreements, plans, billing schedule, collections and agreement wording are Chew's to change, under the subscription rules in this document.
+**Subscription and Dealer are Chew's too** (Chew 2026-10-07: 「subscription 现在归我负责」, 「dealer 也是归我做，只是下单和operation归她」).
+- Subscription: Rental's agreements, plans, billing schedule, collections and agreement wording, from signing on. Signing a subscription at the POS is order placement, which stays Jess's.
+- Dealer: dealer records, commission, renovation rebate, KPI and statements, including the dealer's own statement page.
+- Order placement and Operation stay Jess's. HR and Catalog are treated as Jess's until Chew says otherwise.
 
 **What Finance never touches:**
 - Jess's modules and their UI;
@@ -180,7 +182,7 @@ Dealer commission rules:
 - **Management's answers on dealers (brought by Chew, 2026-10-07).** The questions were on one private page Chew shares: https://claude.ai/artifact/4SYoi1Qut1VzcpRcMhS6cU.
   - D1: accessories earn 25%, behind a switch with a start date (the workbook rulings below).
   - D2: the KPI count restarts each month (answer 6 above).
-  - D3: each dealer logs in and sees its own statement (「dealer 要能看自己的statement」). Emailing the statement is not built for now (「email 可以不用做先」). The dealer's screens are Jess's, so the page needs her agreement.
+  - D3: each dealer logs in and sees its own statement (「dealer 要能看自己的statement」). Emailing the statement is not built for now (「email 可以不用做先」). Dealer is Chew's, so the page is Finance's to build; the dealer's order screens stay Jess's.
   - D4: when Carres keeps a cancelled order's money, commission already paid stays paid by default, and Finance takes it back order by order ("Cancelled orders" above).
 - **Further questions found on review, 2026-10-06** (PROPOSAL to raise, not law):
   - Card payments: commission is worked on the amount the customer paid, before the card fee (「照1000 算」, Chew 2026-10-06).
@@ -250,7 +252,7 @@ Dealer commission rules:
   - Finance issuing the invoice, interest included, so Rental builds no second one (its SINV target), and Finance working out interest from Chew's setting instead of Rental's fixed 8%;
   - ending an agreement after six consecutive unpaid instalments, and taking the mattress back, with the cost linked to its subscription;
   - the agreement's wording: the RM 1 sale, the first instalment, and interest starting after month end.
-- **Still Jess's, outside Subscription:** a page in the dealer's screens for the dealer's own commission statement; an order recording its bundle discount; the 15-year guarantee's catalog price; HR paying subscription commission with pay; the trip that collects a mattress back (Delivery).
+- **Still Jess's (order placement, Operation, and HR and Catalog for now):** an order recording its bundle discount; the 15-year guarantee's catalog price; HR paying subscription commission with pay; the trip that collects a mattress back (Delivery).
 - **Subscription, measured 2026-10-05.** Subscription commission is a separate mechanism inside Rental. Each plan carries its own commission rate, set in Rental's plan settings. The rate is copied onto the agreement when it is signed. Each collected month records commission = the month's payment × that rate, beside the supplier's share. It is not in the dealer commission report and has no payout. It shows only on Rental's collection screen, and it does not say whether it is the dealer's or a salesperson's. A subscription's sales order is priced at RM 0, so it earns nothing in the dealer report and is not counted twice.
 - **Noted for later (Chew 2026-10-05).** A list's search box opens already typed-into, not behind a click. To change together with other UI items; first check whether it is the shared kit search.
 
