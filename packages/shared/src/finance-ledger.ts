@@ -104,6 +104,10 @@ export interface LedgerChart {
   accounts: LedgerAccount[];
   /** 0656: AutoCount's sections, in order. Sent by GET /accounts only. */
   sections?: LedgerSection[];
+  /** 0656: every account an income or payment map row posts to. With the
+   *  roles and the money accounts, the accounts the retire door always
+   *  refuses. Sent by GET /accounts only. */
+  system_accounts?: string[];
   /** The headings no account moves into or out of, because their accounts
    *  decide how money may be recorded (0570 `gl_rule_headings`). Sent by
    *  GET /accounts only; absent elsewhere. */

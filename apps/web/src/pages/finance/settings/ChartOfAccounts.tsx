@@ -158,6 +158,25 @@ export default function ChartOfAccounts() {
       return next;
     });
 
+  /** Accounts the retire door always refuses, so their row has no retire icon:
+   *  an account the system posts to (a role, an income or payment map row), a
+   *  bank, cash or card account (stopped in Money accounts), a control
+   *  account, and a heading with accounts in use under it. An account the
+   *  ledger has posted to keeps the icon; the database's sentence says why it
+   *  stays. */
+  const kept = useMemo(() => {
+    const set = new Set<string>([
+      ...Object.values(query.data?.roles ?? {}),
+      ...(query.data?.money_accounts ?? []),
+      ...(query.data?.system_accounts ?? []),
+    ]);
+    for (const a of accounts) {
+      if (a.is_control) set.add(a.code);
+      if (a.is_active && a.parent_code) set.add(a.parent_code);
+    }
+    return set;
+  }, [accounts, query.data]);
+
   const groups = useMemo(() => {
     const used = new Set(rows.map((r) => r.group));
     const list = sections
@@ -242,7 +261,7 @@ export default function ChartOfAccounts() {
               data-testid={`chart-edit-${r.account.code}`}
               onClick={() => setEditing({ account: r.account, retire: false })}
             />
-            {r.account.is_active ? (
+            {r.account.is_active && !kept.has(r.account.code) ? (
               <Button
                 iconOnly
                 variant="ghost"
@@ -257,7 +276,7 @@ export default function ChartOfAccounts() {
         exportValue: () => "",
       },
     ],
-    [folded],
+    [folded, kept],
   );
 
   if (query.isError) return <LoadFailed what="The chart of accounts" onRetry={() => void query.refetch()} />;
