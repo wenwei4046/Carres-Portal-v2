@@ -86,6 +86,7 @@ Chew's answers on the chart, 2026-10-06:
 - A new sales order records the goods, then the payment. The payment method is Online, Cash or Merchant; choosing Merchant asks which machine: `Merchant - PBB`, `Merchant - GHL`, `Merchant - HLBB`, `Merchant - MBB`.
 - A balance is recorded by Operation against its sales order, with the same methods.
 - Each merchant posts to its own clearing account (`315-1000` PBB, `315-2000` GHL, `315-3000` HLBB, `315-4000` MBB, `315-6000` AhaPay — 「ahapay 也要放去进去」); Online goes straight into the bank; Cash to `320-0000`; cheques are still taken and go into the bank (「有收支票」). Today the system records only "card", so the machine is not known (measured 2026-10-07).
+- The method is chosen in two steps (「付款方式应该是online, cash, cheque, merchant。 我选了merchant 才会跳merchant选项」): Online, Cash, Cheque or Merchant first; Merchant then asks for PBB, GHL, HLBB, MBB or AhaPay. Order entry already asks a second question after a method (as card asks for the bank), so it needs only settings; Operation's balance form needs a second picker on Jess's screen, which Chew will tell her about.
 - Order entry and Operation's recording are Jess's. Chew authorises Finance to change their payment settings directly (「直接改」, 2026-10-07); her screens' code is not changed without him. Both record the same facts as Chew's 2990 example: date, method, amount, approval code, slip and who collected; the account follows from the method.
 
 Two Finance Settings pages keep the mapping in Chew's hands (「其他的收入，费用同理」, 「可以」):
