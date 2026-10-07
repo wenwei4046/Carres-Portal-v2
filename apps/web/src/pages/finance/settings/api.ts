@@ -21,6 +21,8 @@ import type {
   LedgerBooksClosed,
   LedgerChartImportInput,
   LedgerChartImportResult,
+  LedgerPostingAccountSetInput,
+  LedgerPostingAccounts,
 } from "@carres/shared";
 
 import { apiFetch } from "@/lib/api";
@@ -113,6 +115,26 @@ export function useSetAccountActive() {
     mutationFn: (v) =>
       apiFetch(`/api/finance/ledger/accounts/${v.code}/active`, { method: "POST", body: JSON.stringify({ active: v.active }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] }),
+  });
+}
+
+/** 0657 — the account each posting the system makes goes to, and the latest changes. */
+export function usePostingAccounts() {
+  return useQuery({
+    queryKey: ["finance", "posting-accounts"] as const,
+    queryFn: () => apiFetch<LedgerPostingAccounts>("/api/finance/ledger/posting-accounts"),
+  });
+}
+
+/** 0657 — change the account one posting goes to. `was` is the account the
+ *  screen showed; the database refuses with 409 when someone changed it
+ *  since. Everything under ["finance"] is read again: a report or picker that
+ *  reads a role must see the new account at once. */
+export function useSetPostingAccount() {
+  const qc = useQueryClient();
+  return useMutation<{ changed: boolean }, Error, LedgerPostingAccountSetInput>({
+    mutationFn: (v) => apiFetch("/api/finance/ledger/posting-accounts", { method: "PUT", body: JSON.stringify(v) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["finance"] }),
   });
 }
 

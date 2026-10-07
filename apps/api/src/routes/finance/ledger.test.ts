@@ -843,6 +843,50 @@ describe("The chart in AutoCount's sections (0656)", () => {
   });
 });
 
+describe("Posting accounts (0657)", () => {
+  const call = async (method: string, body?: unknown, role = "finance") =>
+    app.fetch(new Request("http://t/api/finance/ledger/posting-accounts", {
+      method,
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    }), env);
+  const READ = { income: [], roles: [], changes: [] };
+
+  it("reads the postings through gl_posting_accounts", async () => {
+    const { sb } = fakeClient(() => ok(READ));
+    const res = await call("GET");
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(READ);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_posting_accounts");
+  });
+
+  it("changes one posting, sending the account the screen showed", async () => {
+    const { sb } = fakeClient(() => ok({ what: "ROLE", key: "OTHER_INCOME", accountCode: "530-0000", changed: true }));
+    const res = await call("PUT", { what: "ROLE", key: "OTHER_INCOME", accountCode: "530-0000", was: "580-0000" });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_posting_account_set", {
+      p_what: "ROLE", p_key: "OTHER_INCOME", p_account_code: "530-0000", p_was: "580-0000",
+    });
+  });
+
+  it("forwards a change someone made meanwhile as 409 with the database's sentence", async () => {
+    fakeClient(() => refuse("40001", "posting_changed", "Someone else changed this posting after you opened it. Open it again to see their change."));
+    const res = await call("PUT", { what: "INCOME", key: "GOODS/*", accountCode: "500-0000", was: "580-0000" });
+    expect(res.status).toBe(409);
+    const body = await json(res);
+    expect(body.code).toBe("posting_changed");
+    expect(body.message).toBe("Someone else changed this posting after you opened it. Open it again to see their change.");
+  });
+
+  it("refuses operation and a body it cannot read before the database", async () => {
+    const { sb } = fakeClient(() => ok(READ));
+    expect((await call("GET", undefined, "operation")).status).toBe(403);
+    expect((await call("PUT", { what: "MONEY", key: "x", accountCode: "500-0000", was: null })).status).toBe(422);
+    expect((await call("PUT", { what: "ROLE", key: "OTHER_INCOME", accountCode: "5", was: null })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+});
+
 describe("POST /accounts/move and /accounts/reorder", () => {
   const post = async (path: string, body: unknown, role = "finance") =>
     app.fetch(new Request(`http://t/api/finance/ledger${path}`, {

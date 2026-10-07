@@ -14,6 +14,7 @@ import {
   ledgerAsOfQuery,
   ledgerBooksClosedInput,
   ledgerChartImportInput,
+  ledgerPostingAccountSetInput,
   ledgerEntriesQuery,
   ledgerEntryRef,
   ledgerPeriodQuery,
@@ -93,6 +94,10 @@ import financeMoneyAccountsRouter from "./money-accounts";
  *                           number, in one act (gl_account_edit, 0656)
  *   POST  /accounts/:code/active  retire an account the ledger never posted to, or bring one back
  *                           (gl_account_set_active, 0656)
+ *   GET /posting-accounts   the account each posting goes to: the income map with every add-on,
+ *                           the posting roles, and the latest changes (gl_posting_accounts, 0657)
+ *   PUT /posting-accounts   change one of them (gl_posting_account_set, 0657); refused with 409
+ *                           when someone changed it after the screen read it
  *   GET /trial-balance      every account as it stood at the end of a day, and every
  *                           heading's own subtotal at every depth, in the chart's order
  *   GET /account-ledger     one account, line by line
@@ -631,6 +636,30 @@ financeLedgerRouter.post("/accounts/import", requireFinance, async (c) => {
   });
   if (error) return accountError(c, error);
   return c.json(data, body.data.apply ? 201 : 200);
+});
+
+// ── the posting accounts (0657) ──────────────────────────────────────────────
+financeLedgerRouter.get("/posting-accounts", requireFinance, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_posting_accounts");
+  if (error) return ledgerError(c, error, "The posting accounts");
+  return c.json(data);
+});
+
+/** 0657: which account fits, and whether the screen's `was` is still the
+ *  account, are the database's to judge; its sentence comes back as it is. */
+financeLedgerRouter.put("/posting-accounts", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, ledgerPostingAccountSetInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_posting_account_set", {
+    p_what: body.data.what,
+    p_key: body.data.key,
+    p_account_code: body.data.accountCode,
+    p_was: body.data.was,
+  });
+  if (error) return accountError(c, error);
+  return c.json(data);
 });
 
 // ── the closed months (0622) ─────────────────────────────────────────────────
