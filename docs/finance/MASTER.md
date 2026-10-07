@@ -82,6 +82,11 @@ Chew's answers on the chart, 2026-10-06:
 | Cost | Purchases `610-00xx` by item group. New `604-0000` Cost of service (service and guarantee items). Purchase returns and supplier credit notes `612-0000`. Purchase transport `630-0000` (`615-0000` unused). New `610-0090` Diglant's share. |
 | Expense | Delivery transport `900-T002`. Commission: dealer `900-C007`, agent `900-C004`, showroom `900-C006`. New renovation rebate `900-C008`, KPI `900-C009`, warranty and after-sales `900-W005`, bad debts `900-B002`. Bank and card charges `902-0000`. Other expenses: the `900-xxxx` account chosen on the bill. |
 
+**How money is recorded, Chew 2026-10-07.** 「每张so 记录收款，当开新的so 时就会填顾客下的货，然后填付款，填付款时就会选付款方式，online, cash, merchant, 选了merchant 就会跳卡机出现 / 然后尾款就是operation记录收的钱然后 会link回哪种sales order, 付款方式同理」:
+- A new sales order records the goods, then the payment. The payment method is Online, Cash or Merchant; choosing Merchant asks which machine: `Merchant - PBB`, `Merchant - GHL`, `Merchant - HLBB`, `Merchant - MBB`.
+- A balance is recorded by Operation against its sales order, with the same methods.
+- Each merchant posts to its own clearing account (`315-1000` PBB, `315-2000` GHL, `315-3000` HLBB, `315-4000` MBB); Online goes straight into the bank; Cash to `320-0000`. Today the system records only "card", so the machine is not known (measured 2026-10-07). Order entry and Operation's recording are Jess's; how far Finance changes their settings waits for Chew.
+
 Two Finance Settings pages keep the mapping in Chew's hands (「其他的收入，费用同理」, 「可以」):
 - **Automatic posting accounts.** Every kind of posting the system makes, and the account it goes to. Chew can change the account; the new one must be of the same type (income for income, expense for expense). A change applies to postings from then on; earlier ones stay, and a journal moves them if needed. Each change records who, when, and from which account to which.
 - **Item groups**, as in the 2990 reference Chew showed (「就是这个item group 绑定什么account 也需要有」). Each group binds a Purchase, Sales, Sales Return and Purchase Return account; Chew can change the accounts, add groups and turn a group off, and a change applies to postings from then on. Confirmed by Chew 2026-10-07 (「1 可以 2 可以 3 开新的，cost of service」):
