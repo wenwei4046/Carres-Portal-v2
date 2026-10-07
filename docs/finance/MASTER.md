@@ -70,7 +70,7 @@ Chew's answers on the chart, 2026-10-06:
 - An opening-balance account is opened for go-live only. Once every balance is in, it is zero, so it should never appear (「可以，但我认为不应该会出现」).
 - Chew, 2026-10-07: a bill that is not for goods goes to `405-0000` Others Creditors, and `460-0000` stays for the ESH injection only (「是」). Transport on purchases goes to `630-0000`; `615-0000` is not used (「630-0000」). `500-1000` Cash Sales is normally not used (「正常不会使用」). Subscription customers transfer into Hong Leong Bank, kept as a setting Chew can change (「HLBB 但要能maintain」).
 
-**The account mapping — approved by Chew 2026-10-07 (「可以」); APPROVED / NOT BUILT.** New accounts are marked new; the rest are in Chew's AutoCount chart.
+**The account mapping — approved by Chew 2026-10-07 (「可以」); the chart is BUILT ON BRANCH (0654, 0655, NOT APPLIED), the postings by item group and merchant are NOT BUILT.** New accounts are marked new; the rest are in Chew's AutoCount chart.
 
 | Kind | Accounts |
 |---|---|
@@ -81,6 +81,23 @@ Chew's answers on the chart, 2026-10-06:
 | Income | Sales `500-0000`, also a returned mattress sold again. New `500-2000` Subscription (monthly fees and the RM 1 sale), `500-3000` Service charges, `500-4000` Storage charges, `500-5000` 15-year guarantee. Interest `530-0000`. Additional income `580-0000`, including termination and loss compensation. Agents' small fees `560-0000` on the debit side. `500-1000` Cash sales normally unused. |
 | Cost | Purchases `610-00xx` by item group. New `604-0000` Cost of service (service and guarantee items). Purchase returns and supplier credit notes `612-0000`. Purchase transport `630-0000` (`615-0000` unused). New `610-0090` Diglant's share. |
 | Expense | Delivery transport `900-T002`. Commission: dealer `900-C007`, agent `900-C004`, showroom `900-C006`. New renovation rebate `900-C008`, KPI `900-C009`, warranty and after-sales `900-W005`, bad debts `900-B002`. Bank and card charges `902-0000`. Other expenses: the `900-xxxx` account chosen on the bill. |
+
+**How the chart is loaded — built on branch `finance-coa` 2026-10-07; 0654 and 0655 NOT APPLIED.** Chew asked for his AutoCount PDF to be used (「pdf 不能用？」), then 「可以，直接做」.
+- 0654 gives every account the system posts to its AutoCount number and name (for example `1100` becomes `310-0000` CASH AT BANK, `2110` becomes `400-0000` TRADE CREDITORS, `4100` becomes `500-0000` SALES). It adds the new accounts in the table above and the headings they sit under. A number change carries to every row that names the account, posted lines included.
+- The top headings keep plain numbers: `0000` ASSETS, `2000` LIABILITIES, `3000` EQUITY, `4000` INCOME, `5000` COST OF GOODS SOLD, `6000` EXPENSES, `7000` TAX. Under them, accounts read in number order, as in AutoCount.
+- Bank transfers, cheques, FPX and DuitNow post to `310-2000` Hong Leong Bank, and Stripe to `315-5000`. Card payments still post to the one old card account, renamed `CARD - MACHINE NOT KNOWN`, until each merchant machine is its own method (the two-step methods above).
+- A test account the new chart has no place for is retired. One that still carries test postings cannot be, so its name ends `(TEST ONLY)` until go-live starts clean (CLAUDE.md §6). On production today that is the old current account and rent and utilities.
+- The rest of Chew's chart, about 250 accounts, names directors, staff and related companies, so it is never written into this public repository. Chew loads it himself: Chart of accounts → `Import from AutoCount`, choosing AutoCount's printed chart as a PDF. The PDF is read in the browser and never sent. The database first answers what each account would do: new, already in the chart, or not imported and why. Only `Import` makes the new accounts, under the account AutoCount prints them under, or under their section's top heading.
+- The import never renames, moves or retires an account already in the chart, and never makes a bank, cash or control account: a bank or cash account is made in Money accounts, and a control account is the system's.
+- Measured: Chew's PDF, read on this computer, gives 251 accounts with none unreadable. Both migrations ran on production inside a transaction that was then rolled back: every role, map and money check passed, and an import of a test listing made the expected accounts in the expected places, with no two accounts sharing a name. Nothing was kept.
+- Falsifier: after the import, an account Chew knows is in AutoCount is missing or sits under another heading, or a payment posts to an account Chew did not expect.
+
+**How money is recorded, Chew 2026-10-07.** 「每张so 记录收款，当开新的so 时就会填顾客下的货，然后填付款，填付款时就会选付款方式，online, cash, merchant, 选了merchant 就会跳卡机出现 / 然后尾款就是operation记录收的钱然后 会link回哪种sales order, 付款方式同理」:
+- A new sales order records the goods, then the payment. The payment method is Online, Cash or Merchant; choosing Merchant asks which machine: `Merchant - PBB`, `Merchant - GHL`, `Merchant - HLBB`, `Merchant - MBB`.
+- A balance is recorded by Operation against its sales order, with the same methods.
+- Each merchant posts to its own clearing account (`315-1000` PBB, `315-2000` GHL, `315-3000` HLBB, `315-4000` MBB, `315-6000` AhaPay — 「ahapay 也要放去进去」); Online goes straight into the bank; Cash to `320-0000`; cheques are still taken and go into the bank (「有收支票」). Today the system records only "card", so the machine is not known (measured 2026-10-07).
+- The method is chosen in two steps (「付款方式应该是online, cash, cheque, merchant。 我选了merchant 才会跳merchant选项」): Online, Cash, Cheque or Merchant first; Merchant then asks for PBB, GHL, HLBB, MBB or AhaPay. Order entry already asks a second question after a method (as card asks for the bank), so it needs only settings; Operation's balance form needs a second picker on Jess's screen, which Chew will tell her about.
+- Order entry and Operation's recording are Jess's. Chew authorises Finance to change their payment settings directly (「直接改」, 2026-10-07); her screens' code is not changed without him. Both record the same facts as Chew's 2990 example: date, method, amount, approval code, slip and who collected; the account follows from the method.
 
 Two Finance Settings pages keep the mapping in Chew's hands (「其他的收入，费用同理」, 「可以」):
 - **Automatic posting accounts.** Every kind of posting the system makes, and the account it goes to. Chew can change the account; the new one must be of the same type (income for income, expense for expense). A change applies to postings from then on; earlier ones stay, and a journal moves them if needed. Each change records who, when, and from which account to which.
@@ -119,10 +136,16 @@ Chew, 2026-10-03: 「总之jess 的功能，ui 等等都别动到。我只专做
 **What Finance never touches:**
 - Jess's modules and their UI;
 - the shared UI kit;
-- `CLAUDE.md` and `AGENTS.md`;
+- `CLAUDE.md` and `AGENTS.md`, except the authority map's rows for Chew's modules;
 - every other module MASTER.
 
-**Exceptions.** If a Finance feature needs even a small change on Jess's side, stop and take it back to Chew first. The only such change Chew has approved is the staff entry for Payment Requests (§3.3).
+**Exceptions.** If a Finance feature needs even a small change on Jess's side, stop and take it back to Chew first. Chew has approved these, and tells Jess himself:
+- the staff entry for Payment Requests (§3.3) and the folding menu area (§4.1);
+- the payment method settings of order entry and Payment (「直接改」, 2026-10-07, §0);
+- the item group field on the catalog's new model and SKU forms (「jess 那边我会通知他，你直接做」, 2026-10-07, §0);
+- the machine picker after `Merchant` on Operation's balance form (「要做，直接做」, 2026-10-07, §0).
+
+Each changes only what Finance needs on that screen; nothing else on Jess's screens moves (Chew: 「别碰到其他的view哦」).
 
 **Pointers.** Short `CLAUDE.md` pointers inside the Finance code folders point to this document, so a chat that opens Finance code reads it first.
 

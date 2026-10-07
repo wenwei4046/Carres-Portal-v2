@@ -714,6 +714,56 @@ describe("POST /accounts (0577)", () => {
   });
 });
 
+describe("POST /accounts/import (0655)", () => {
+  const post = async (body: unknown, role = "finance") =>
+    app.fetch(new Request("http://t/api/finance/ledger/accounts/import", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+  const row = { code: "900-A001", name: "ADVERTISMENT", parentCode: null, section: "EXPENSES", special: null };
+  const answer = { applied: false, created: 1, existing: 0, problems: 0, rows: [{ ...row, status: "create", reason: null, chartName: null }] };
+
+  it("asks the database what the import would do, and passes its answer through", async () => {
+    const { sb } = fakeClient(() => ok(answer));
+    const res = await post({ rows: [row], apply: false });
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(answer);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_chart_import", { p_rows: [row], p_apply: false });
+  });
+
+  it("makes the accounts when told to apply", async () => {
+    const { sb } = fakeClient(() => ok({ ...answer, applied: true }));
+    const res = await post({ rows: [row], apply: true });
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_chart_import", { p_rows: [row], p_apply: true });
+  });
+
+  it("leaves the number's shape to the database, so a bad row comes back as a row", async () => {
+    const { sb } = fakeClient(() => ok(answer));
+    await post({ rows: [{ ...row, code: "12" }], apply: false });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_chart_import", { p_rows: [{ ...row, code: "12" }], p_apply: false });
+  });
+
+  it("refuses operation, no rows, and a body it cannot read before the database", async () => {
+    expect((await post({ rows: [row], apply: false }, "operation")).status).toBe(403);
+    const { sb } = fakeClient(() => ok(answer));
+    expect((await post({ rows: [], apply: false })).status).toBe(422);
+    expect((await post({ rows: [row] })).status).toBe(422);
+    expect((await post({ rows: [{ ...row, extra: 1 }], apply: false })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("forwards a refused call with the door's sentence", async () => {
+    fakeClient(() => refuse("22023", "rows_too_many", "A chart of more than 2,000 accounts is not imported in one go."));
+    const res = await post({ rows: [row], apply: true });
+    expect(res.status).toBe(422);
+    const body = await json(res);
+    expect(body.code).toBe("rows_too_many");
+    expect(body.message).toBe("A chart of more than 2,000 accounts is not imported in one go.");
+  });
+});
+
 describe("POST /accounts/move and /accounts/reorder", () => {
   const post = async (path: string, body: unknown, role = "finance") =>
     app.fetch(new Request(`http://t/api/finance/ledger${path}`, {

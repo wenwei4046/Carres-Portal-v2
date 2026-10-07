@@ -73,6 +73,7 @@ import Checkbox from "@/components/kit/Checkbox";
 import Select from "@/components/kit/Select";
 import { useAddAccount, useMoveAccount, useReorderAccounts, useSaveAccount } from "./api";
 import { useSaveKey } from "../save-key";
+import ChartImport from "./ChartImport";
 
 type Row = LedgerAccount & { depth: number };
 
@@ -98,6 +99,7 @@ export default function ChartOfAccounts() {
   const rows = useMemo(() => chartTree(accounts), [accounts]);
   const [editing, setEditing] = useState<Row | null>(null);
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   /** The codes under one heading in the order the screen is reading them —
       exactly what a `was` has to be. */
@@ -237,9 +239,13 @@ export default function ChartOfAccounts() {
         Drag an account onto a heading to move it, or onto another account to reorder. Keyboard: Alt+Up/Down reorders, Shift+F10 moves.
       </p>
       {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, 0577). */}
-      <div>
+      <div className="flex gap-2">
         <Button variant="neutral" onClick={() => setAdding(true)} disabled={!query.isSuccess}>
           Add account
+        </Button>
+        {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0655). */}
+        <Button variant="neutral" data-testid="chart-import-open" onClick={() => setImporting(true)} disabled={!query.isSuccess}>
+          Import from AutoCount
         </Button>
       </div>
       {refusal && (
@@ -284,6 +290,7 @@ export default function ChartOfAccounts() {
         }
       />
       {editing && <AccountModal key={editing.code} account={editing} onClose={() => setEditing(null)} />}
+      {importing && <ChartImport onClose={() => setImporting(false)} />}
       {adding && (
         <AddAccountModal
           /* gl_account_add's own refusals (0580): nothing under a heading inside

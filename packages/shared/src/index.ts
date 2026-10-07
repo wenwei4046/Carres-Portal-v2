@@ -645,6 +645,7 @@ export {
   ledgerAsOfQuery, ledgerPeriodQuery, ledgerAccountLedgerQuery, ledgerAccountUpdateInput, ledgerAccountReorderInput,
   ledgerAccountCodeShape, LEDGER_ACCOUNT_CODE_MESSAGE, ledgerAccountCodeInput, ledgerAccountMoveInput, ledgerAccountAddInput,
   ledgerBooksClosedInput, type LedgerBooksClosed,
+  ledgerChartImportInput, type LedgerChartImportInput, type LedgerChartImportRow, type LedgerChartImportResult,
   type LedgerAccountReorderInput, type LedgerAccountMoveInput, type LedgerAccountAddInput,
   type LedgerEntriesQuery, type LedgerAsOfQuery, type LedgerPeriodQuery, type LedgerAccountLedgerQuery,
 } from "./schemas/finance";

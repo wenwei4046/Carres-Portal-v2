@@ -10,6 +10,7 @@ import {
   ledgerAccountUpdateInput,
   ledgerAsOfQuery,
   ledgerBooksClosedInput,
+  ledgerChartImportInput,
   ledgerEntriesQuery,
   ledgerEntryRef,
   ledgerPeriodQuery,
@@ -79,6 +80,9 @@ import financeMoneyAccountsRouter from "./money-accounts";
  *   POST  /accounts         add an account under a heading, or a heading on its own or with
  *                           its first account (gl_account_add, 0577, 0608). The kind follows the heading;
  *                           a heading at the top of the chart (parentCode null) carries its own kind.
+ *   POST  /accounts/import  AutoCount's printed chart, read on the screen (gl_chart_import, 0655):
+ *                           apply false answers what it would do, row by row; true makes the new
+ *                           accounts. It never renames, moves or retires an account already there.
  *   GET /trial-balance      every account as it stood at the end of a day, and every
  *                           heading's own subtotal at every depth, in the chart's order
  *   GET /account-ledger     one account, line by line
@@ -524,6 +528,21 @@ financeLedgerRouter.post("/accounts", requireFinance, async (c) => {
   });
   if (error) return accountError(c, error);
   return c.json({ code: String(data) }, 201);
+});
+
+/** 0655: the answer is the database's, row by row. A refused row is a row with
+ *  its reason, not an error; only a refused CALL (no Finance role, nothing to
+ *  import, too many rows) comes back as an error with the door's sentence. */
+financeLedgerRouter.post("/accounts/import", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, ledgerChartImportInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_chart_import", {
+    p_rows: body.data.rows,
+    p_apply: body.data.apply,
+  });
+  if (error) return accountError(c, error);
+  return c.json(data, body.data.apply ? 201 : 200);
 });
 
 // ── the closed months (0622) ─────────────────────────────────────────────────

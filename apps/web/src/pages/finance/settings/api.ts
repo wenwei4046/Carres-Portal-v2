@@ -15,7 +15,14 @@ import type {
   MoneyAccountRow,
   MoneyAccountUpdateInput,
 } from "@carres/shared/money-accounts";
-import type { LedgerAccountAddInput, LedgerAccountMoveInput, LedgerAccountReorderInput, LedgerBooksClosed } from "@carres/shared";
+import type {
+  LedgerAccountAddInput,
+  LedgerAccountMoveInput,
+  LedgerAccountReorderInput,
+  LedgerBooksClosed,
+  LedgerChartImportInput,
+  LedgerChartImportResult,
+} from "@carres/shared";
 
 import { apiFetch } from "@/lib/api";
 
@@ -115,6 +122,19 @@ export function useAddAccount() {
   return useMutation<{ code: string }, Error, LedgerAccountAddInput>({
     mutationFn: (v) => apiFetch("/api/finance/ledger/accounts", { method: "POST", body: JSON.stringify(v) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["finance"] }),
+  });
+}
+
+/** 0655 — AutoCount's printed chart. `apply: false` only asks what the import
+ *  would do, so nothing is refreshed; `apply: true` makes accounts, and the
+ *  whole ["finance"] tree is read again, as after any chart change. */
+export function useImportChart() {
+  const qc = useQueryClient();
+  return useMutation<LedgerChartImportResult, Error, LedgerChartImportInput>({
+    mutationFn: (v) => apiFetch("/api/finance/ledger/accounts/import", { method: "POST", body: JSON.stringify(v) }),
+    onSuccess: (_d, v) => {
+      if (v.apply) void qc.invalidateQueries({ queryKey: ["finance"] });
+    },
   });
 }
 

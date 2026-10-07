@@ -387,6 +387,46 @@ export const ledgerAccountAddInput = z.object({
 export type LedgerAccountAddInput = z.infer<typeof ledgerAccountAddInput>;
 
 /**
+ * Import AutoCount's printed chart (0655). The rows are what
+ * `readAutocountChart` read, in AutoCount's order; the database checks every
+ * one. The shape here only keeps a body the database could not read from
+ * reaching it: the number's shape, a name and a section are its to judge, so a
+ * bad row comes back as a row the screen can print rather than a 422.
+ * `apply: false` asks what the import would do; `true` makes the accounts.
+ */
+export const ledgerChartImportInput = z.object({
+  rows: z.array(z.object({
+    code: z.string().max(20),
+    name: z.string().max(200),
+    parentCode: z.string().max(20).nullable(),
+    section: z.string().max(80),
+    special: z.string().max(10).nullable(),
+  }).strict()).min(1, 'There is no account to import. Pick AutoCount\'s chart of accounts.').max(2000, 'A chart of more than 2,000 accounts is not imported in one go.'),
+  apply: z.boolean(),
+}).strict();
+export type LedgerChartImportInput = z.infer<typeof ledgerChartImportInput>;
+
+/** One row of gl_chart_import's answer. `parentCode` is where a new account
+ *  goes, or where an existing one already sits; `chartName` is the name the
+ *  chart already holds for an existing number. */
+export interface LedgerChartImportRow {
+  code: string;
+  name: string;
+  parentCode: string | null;
+  status: 'create' | 'exists' | 'problem';
+  reason: string | null;
+  chartName: string | null;
+}
+
+export interface LedgerChartImportResult {
+  applied: boolean;
+  created: number;
+  existing: number;
+  problems: number;
+  rows: LedgerChartImportRow[];
+}
+
+/**
  * Move accounts within ONE heading on Finance Settings → Chart of accounts (0557).
  *
  * BOTH ORDERS TRAVEL. `was` is the order the screen READ, `now` is the order it
