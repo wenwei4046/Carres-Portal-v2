@@ -27,7 +27,7 @@
 >
 > **Whose decisions these are.** Every decision here was made by **Chew** (Finance) in chat on 2026-10-03 and written down at Chew's request. They are **not** Jess's owner rulings.
 >
-> **Conflicts.** Where a line here meets a Jess ruling (CLAUDE.md or another module MASTER), **the Jess ruling wins** and the question goes back to Chew.
+> **Conflicts.** Where a line here meets a Jess ruling (CLAUDE.md or another module MASTER), **the Jess ruling wins** and the question goes back to Chew. Subscription is the exception: it is Chew's since 2026-10-07 (「subscription 现在归我负责」), so inside it an earlier Jess ruling gives way to Chew's once the conflict has been shown to Chew.
 >
 > **Reference.** The Houzs Finance Specification V5 (2026-10-02) is **evidence, not specification**. Per the CLAUDE.md Decision Gate, external systems are evidence. The spec's own instruction to "follow its rules" does not apply here. Chew keeps the spec locally. It is **not** in this public repository, because it holds another company's internal figures.
 
@@ -89,8 +89,9 @@ Chew, 2026-10-03: 「总之jess 的功能，ui 等等都别动到。我只专做
 - Sales Orders (Orders);
 - POs and GRNs (Purchasing);
 - Units and month-end stock (Stock);
-- the dealer master;
-- rental collections (Rental).
+- the dealer master.
+
+**Subscription is Chew's too** (Chew 2026-10-07). Rental's agreements, plans, billing schedule, collections and agreement wording are Chew's to change, under the subscription rules in this document.
 
 **What Finance never touches:**
 - Jess's modules and their UI;
@@ -195,9 +196,9 @@ Dealer commission rules:
   - **The workbook's bonus on receipts is the renovation rebate** (「是装修回扣」).
   - **A receipt counts in the month the system records it.** The workbook let a claim sheet move a receipt between months only because nothing was systematic yet (「到时就是根据每个月的真实收款」).
   - **The system's own records are the source.** The workbook's corrections to hand-made source files do not carry over (「到时就是根据系统的记录来算了」).
-- **Subscription is not dealer commission (Chew 2026-10-05).** 「subscription 是subscription， dealer 是dealer, 不是一样的东西」. Subscription commission stays in Rental, Jess's module. The dealer report, statement and payout leave it out.
-- **Subscription, Chew's review (2026-10-06).** Rental is Jess's module, so these are Chew's positions to take to Jess, except the ledger, which is Finance's:
-  - Billing should start when the goods reach the customer, not at signing. Today month 1 falls due on the signing day. Jess's 2026-09-23 target starts *service* at the customer's receipt and says it does not change billing timing (Rental MASTER §5.6, §5.9), so this is a new rule for Jess.
+- **Subscription is not dealer commission (Chew 2026-10-05).** 「subscription 是subscription， dealer 是dealer, 不是一样的东西」. Subscription commission stays in Rental. The dealer report, statement and payout leave it out.
+- **Subscription, Chew's review (2026-10-06).** Chew's positions on Subscription:
+  - Billing should start when the goods reach the customer, not at signing. Today month 1 falls due on the signing day. Jess's 2026-09-23 target starts *service* at the customer's receipt and says it does not change billing timing (Rental MASTER §5.6, §5.9), so this replaces that billing timing.
   - A transfer is recorded on the day it arrives. Today the `Record transfer` button records the day it is pressed: the API takes a received date, but the screen does not ask for one.
   - Lateness must not come from Carres recording late. Today a month is late until it is recorded, counted from its due date to today, and late interest (charged by hand) uses the same count.
   - Early settlement, buyout, default and repossession: decided with management on 2026-10-07 (below). Today Rental has settlement (remaining rent plus interest charged, no discount); the others are statuses with no function.
@@ -205,13 +206,13 @@ Dealer commission rules:
   - The commission goes to whoever submitted the subscription (below). Rental's screens call it "store" or "sales" and do not name that person.
   - Finance's own part: how a collected month enters the books is to be confirmed. Today it posts the whole month as rental income (Dr bank, cash or card; Cr 4200), with no supplier payable, commission payable or interest.
 - **Chew's answers on subscription (2026-10-06).**
-  - Billing starts the month after the customer receives the goods (「收到货的下个月开始算」). For Jess.
-  - Recording a payment must let Finance choose the day it was received, because customers do not always say (「一个有得选我几时收到」). For Jess.
+  - Billing starts the month after the customer receives the goods (「收到货的下个月开始算」).
+  - Recording a payment must let Finance choose the day it was received, because customers do not always say (「一个有得选我几时收到」).
   - Late interest: a month Carres records late is never charged interest as long as nobody pressed `Charge interest` before it was recorded; a recorded month cannot be charged (measured: interest is refused on a month that is not owing).
   - The 22 July memo is for dealers only; subscription ignores it (「那个memo是给dealer 罢了，所以subscription不理」).
   - **What Finance wants in its books** (Finance's own, except where noted):
     1. One group per customer: each customer's subscriptions, bills, paid and unpaid.
-    2. A bill each month, made and emailed to the customer automatically. The bill document (SINV) is Rental's approved target, and emailing customers is a new outside channel, so both need Jess.
+    2. A bill each month, made and emailed to the customer automatically. The bill document is the SINV in Rental's approved numbering; emailing customers is a new outside channel.
     3. Money received knocks off its bill.
     4. Diglant's share is settled on the 10th, the 20th and the last day of each month, and HR pays the commission (management's answers below).
 - **Confirmed by Chew, 2026-10-06.**
@@ -243,14 +244,14 @@ Dealer commission rules:
   - **The mattress is not an asset in Carres's books.** It belongs to Carres once the customer's first payment is made (S7), but Carres has no cost price for it: its cost is what Carres pays Diglant and the agent (「我不可能进我的asset 的啊？我也是没有成本价钱，我的成本价钱就是给diglant 和agent」).
   - **The first instalment** falls in the month after delivery, confirmed with management (Chew 2026-10-07), as ruled on 2026-10-06.
 - **The agreement, measured 2026-10-07.** Rental → Agreements holds one active agreement, "Rental Agreement — Terms and Conditions (v5)", effective 2026-07-26, in Loo's wording. It says: the first rental on the Commencement Date, then by the 7th of each month; late interest of 8% a month from the due date until paid; termination after six consecutive unpaid months, on written notice; repossession on prior written notice, keeping the right to recover what is owed; the goods stay the Company's during the rental. It has no clause for the RM 1 sale, and its first payment and interest start differ from the rules above. Caution raised with Chew, not checked: an agreement whose goods may pass to the customer can be treated as hire purchase, whose late interest is 8% a year counted daily; a lawyer should read it before it changes.
-- **To agree with Jess (Rental is hers), as of 2026-10-07:**
+- **Subscription work, Chew's own since 2026-10-07** (「不需要给jess, 因为subscription 现在归我负责」):
   - billing starting the month after delivery;
   - recording a payment with the day it was received, and paying the oldest unpaid month first;
   - Finance issuing the invoice, interest included, so Rental builds no second one (its SINV target), and Finance working out interest from Chew's setting instead of Rental's fixed 8%;
   - ending an agreement after six consecutive unpaid instalments, and taking the mattress back, with the cost linked to its subscription;
-  - the agreement's wording: the RM 1 sale, the first instalment, and interest starting after month end;
-  - a page in the dealer's screens for the dealer's own commission statement.
-- **Subscription, measured 2026-10-05.** Subscription commission is a separate mechanism inside Rental (Jess's module). Each plan carries its own commission rate, set in Rental's plan settings. The rate is copied onto the agreement when it is signed. Each collected month records commission = the month's payment × that rate, beside the supplier's share. It is not in the dealer commission report and has no payout. It shows only on Rental's collection screen, and it does not say whether it is the dealer's or a salesperson's. A subscription's sales order is priced at RM 0, so it earns nothing in the dealer report and is not counted twice.
+  - the agreement's wording: the RM 1 sale, the first instalment, and interest starting after month end.
+- **Still Jess's, outside Subscription:** a page in the dealer's screens for the dealer's own commission statement; an order recording its bundle discount; the 15-year guarantee's catalog price; HR paying subscription commission with pay; the trip that collects a mattress back (Delivery).
+- **Subscription, measured 2026-10-05.** Subscription commission is a separate mechanism inside Rental. Each plan carries its own commission rate, set in Rental's plan settings. The rate is copied onto the agreement when it is signed. Each collected month records commission = the month's payment × that rate, beside the supplier's share. It is not in the dealer commission report and has no payout. It shows only on Rental's collection screen, and it does not say whether it is the dealer's or a salesperson's. A subscription's sales order is priced at RM 0, so it earns nothing in the dealer report and is not counted twice.
 - **Noted for later (Chew 2026-10-05).** A list's search box opens already typed-into, not behind a click. To change together with other UI items; first check whether it is the shared kit search.
 
 **Supplier credit notes approach — PROPOSAL / NOT LAW, built for Chew's test (0642).**
