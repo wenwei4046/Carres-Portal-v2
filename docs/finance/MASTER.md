@@ -68,6 +68,7 @@ Chew's answers on the chart, 2026-10-06:
 - No supplier claims account. A claim is settled by a supplier credit note on that supplier's own account.
 - No Deposit - suppliers account. A payment made before the bill stays on that supplier's own account, as in AutoCount (「照理也是扣在供应商的户口」). The Balance Sheet's separate asset line for suppliers paid ahead (0507, YH 2026-09-14) goes when the Balance Sheet is next changed.
 - An opening-balance account is opened for go-live only. Once every balance is in, it is zero, so it should never appear (「可以，但我认为不应该会出现」).
+- Chew, 2026-10-07: a bill that is not for goods goes to `405-0000` Others Creditors, and `460-0000` stays for the ESH injection only (「是」). Transport on purchases goes to `630-0000`; `615-0000` is not used (「630-0000」). `500-1000` Cash Sales is normally not used (「正常不会使用」). Subscription customers transfer into Hong Leong Bank, kept as a setting Chew can change (「HLBB 但要能maintain」).
 
 **A purchase without an order** takes its channel from the Manual Purchase Request's required purpose (Purchasing §5.2), so nothing extra is marked on the PO. Confirmed by Chew 2026-10-06 (「1 对，2 对，3 可以」):
 - Showroom Display → that showroom; Ready Stock → stock not yet in a channel; Service Case → the case's order; Internal Staff Purchase and Other Purchase → Office; Subsidiary Purchase → the amount due from that related company (350-00xx). The approved Diglant advance PO, when built → Subscription; a dealer display request, when built → that dealer.
