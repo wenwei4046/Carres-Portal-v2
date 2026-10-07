@@ -401,7 +401,7 @@ financeLedgerRouter.get("/departments", requireFinance, async (c) => {
 
 financeLedgerRouter.get("/accounts", requireFinance, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const [read, rules, roles, money, sections] = await Promise.all([
+  const [read, rules, roles, money, sections, incomeMap, paymentMap] = await Promise.all([
     readChart(sb),
     sb.rpc("gl_rule_headings"),
     sb.rpc("gl_account_roles_read"),
@@ -409,6 +409,10 @@ financeLedgerRouter.get("/accounts", requireFinance, async (c) => {
     // 0656: AutoCount's sections, in order. Before 0656 the table is not
     // there; the read fails and the chart loads with no sections.
     sb.from("gl_sections").select("section,kind,sort_order").order("sort_order"),
+    // 0656: the accounts an invoice or a customer payment posts to, which the
+    // retire door refuses. A failed read only shows a retire icon too many.
+    sb.from("gl_income_account_map").select("account_code"),
+    sb.from("gl_payment_account_map").select("account_code"),
   ]);
   if ("error" in read) return ledgerError(c, read.error, "The chart of accounts");
   // 0570: the headings no account moves into or out of, so the chart screen
@@ -428,7 +432,17 @@ financeLedgerRouter.get("/accounts", requireFinance, async (c) => {
   const sectionRows = !sections.error && Array.isArray(sections.data)
     ? (sections.data as Json[]).map((r) => ({ section: String(r.section), kind: String(r.kind), sort_order: Number(r.sort_order) }))
     : [];
-  return c.json({ ...read.chart, rule_headings: ruleHeadings, roles: roleMap, money_accounts: moneyAccounts, sections: sectionRows });
+  const mapped = (res: { error: unknown; data: unknown }) =>
+    !res.error && Array.isArray(res.data) ? (res.data as Json[]).map((r) => String(r.account_code)) : [];
+  const systemAccounts = [...new Set([...mapped(incomeMap), ...mapped(paymentMap)])];
+  return c.json({
+    ...read.chart,
+    rule_headings: ruleHeadings,
+    roles: roleMap,
+    money_accounts: moneyAccounts,
+    sections: sectionRows,
+    system_accounts: systemAccounts,
+  });
 });
 
 /**

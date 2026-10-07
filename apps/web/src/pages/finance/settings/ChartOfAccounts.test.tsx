@@ -44,6 +44,7 @@ vi.mock("@/lib/api", () => ({
         sections: SECTIONS,
         roles: { MONEY_ACCOUNTS_HEADING: "310-0000" },
         money_accounts: ["310-1000", "310-2000"],
+        system_accounts: ["410-0063"],
         rule_headings: [],
       };
     }
@@ -227,6 +228,20 @@ describe("Chart of accounts — edit and retire from the row (0656)", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(net.calls).toHaveLength(1));
     expect(net.calls[0]!.body).toMatchObject({ section: "OTHER ASSETS", under: null });
+  });
+
+  it("shows no retire icon where the database always refuses: system, money and heading-with-accounts rows", async () => {
+    show();
+    await ready();
+    // A money account, the money heading (a role, and it holds accounts), a
+    // heading with an account in use, and an account the system posts to.
+    for (const code of ["310-1000", "310-0000", "900-C001", "410-0063"]) {
+      expect(screen.queryByTestId(`chart-retire-${code}`)).toBeNull();
+      expect(screen.getByTestId(`chart-edit-${code}`)).toBeInTheDocument();
+    }
+    // An ordinary account keeps it; whether it was ever posted to is the database's to say.
+    expect(screen.getByTestId("chart-retire-900-E001")).toBeInTheDocument();
+    expect(screen.getByTestId("chart-retire-200-2000")).toBeInTheDocument();
   });
 
   it("the retire icon asks first, then retires", async () => {
