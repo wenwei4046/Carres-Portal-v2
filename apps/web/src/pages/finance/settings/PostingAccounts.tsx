@@ -14,8 +14,9 @@
  *                         its invoices cannot be issued until it has one.
  *   Purchases and charges three roles Finance may change (0657).
  *   Customer money        the money account each way of being paid lands in.
- *                         Payment settings owns it (0431, 0541); it is shown
- *                         here and changed there.
+ *                         Payment settings owns the method; Finance sets this
+ *                         one setting here (0658, Chew 2026-10-07), through a
+ *                         door that writes Payment settings' own record.
  *   Kept by the system    the payables, customer deposits, stock and equity
  *                         accounts: shown, and renamed or renumbered on Chart
  *                         of accounts, never swapped for another here.
@@ -43,7 +44,7 @@ import { usePostingAccounts, useSetPostingAccount } from "./api";
 export const POSTING_GROUPS = [
   { key: "sales", label: "Sales" },
   { key: "costs", label: "Purchases and charges" },
-  { key: "money", label: "Customer money · set in Payment settings" },
+  { key: "money", label: "Customer money" },
   { key: "system", label: "Kept by the system · renamed in Chart of accounts" },
 ] as const;
 type GroupKey = (typeof POSTING_GROUPS)[number]["key"];
@@ -80,7 +81,7 @@ export interface PostingRow {
   group: GroupKey;
   word: string;
   /** For a row Finance changes here: the door's `what` and `key`, and the kind of account it takes. */
-  change: { what: "INCOME" | "ROLE"; key: string; kind: "INCOME" | "EXPENSE" } | null;
+  change: { what: "INCOME" | "ROLE" | "PAYMENT"; key: string; kind: "INCOME" | "EXPENSE" | "MONEY" } | null;
   accountCode: string | null;
   accountName: string | null;
   changedAt: string | null;
@@ -90,7 +91,14 @@ export interface PostingRow {
 export function postingRows(
   income: readonly LedgerIncomePosting[],
   roles: readonly LedgerRolePosting[],
-  payments: ReadonlyArray<{ id: string; word: string; accountCode: string | null; accountName: string | null }>,
+  payments: ReadonlyArray<{
+    key: string;
+    word: string;
+    accountCode: string | null;
+    accountName: string | null;
+    changedAt?: string | null;
+    changedBy?: string | null;
+  }>,
 ): PostingRow[] {
   const sales = income.map((p): PostingRow => ({
     id: `INCOME/${p.type}/${p.key}`,
@@ -114,14 +122,14 @@ export function postingRows(
     changedBy: r.changedBy,
   }));
   const money = payments.map((m): PostingRow => ({
-    id: `PAYMENT/${m.id}`,
+    id: `PAYMENT/${m.key}`,
     group: "money",
     word: m.word,
-    change: null,
+    change: { what: "PAYMENT", key: m.key, kind: "MONEY" },
     accountCode: m.accountCode,
     accountName: m.accountName,
-    changedAt: null,
-    changedBy: null,
+    changedAt: m.changedAt ?? null,
+    changedBy: m.changedBy ?? null,
   }));
   return [...sales, ...roleRows.filter((r) => r.group === "costs"), ...money, ...roleRows.filter((r) => r.group === "system")];
 }
@@ -144,21 +152,22 @@ export default function PostingAccounts() {
   const rows = useMemo(() => {
     if (!query.data) return [];
     const names = new Map((chart.data?.accounts ?? []).map((a) => [a.code, a.name]));
+    const last = new Map((query.data.payments ?? []).map((p) => [p.key, p]));
     const methods = registry.data?.methods ?? [];
     const payments = [
       ...methods.map((m) => ({
-        id: `${m.method}/*`,
+        key: `${m.method}/*`,
         word: methodLabel(m.method, methods) + (m.active ? "" : " · Not active"),
         accountCode: m.account_code,
         accountName: m.account_name,
       })),
       ...(registry.data?.system_rows ?? []).map((s) => ({
-        id: `${s.method}/${s.source_channel}`,
+        key: `${s.method}/${s.source_channel}`,
         word: systemMethodWord(s.method, s.source_channel),
         accountCode: s.account_code,
         accountName: names.get(s.account_code) ?? null,
       })),
-    ];
+    ].map((p) => ({ ...p, changedAt: last.get(p.key)?.changedAt ?? null, changedBy: last.get(p.key)?.changedBy ?? null }));
     return postingRows(query.data.income, query.data.roles, payments);
   }, [query.data, chart.data, registry.data]);
 
@@ -204,7 +213,14 @@ export default function PostingAccounts() {
       />
       <PostingChanges changes={query.data?.changes ?? []} />
       {open && open.change && (
-        <PostingModal key={open.id} row={open} accounts={chart.data?.accounts ?? []} moneyAccounts={chart.data?.money_accounts ?? []} onClose={() => setOpen(null)} />
+        <PostingModal
+          key={open.id}
+          row={open}
+          accounts={chart.data?.accounts ?? []}
+          moneyAccounts={chart.data?.money_accounts ?? []}
+          moneyChoices={registry.data?.money_accounts ?? []}
+          onClose={() => setOpen(null)}
+        />
       )}
     </ListPageShell>
   );
@@ -228,18 +244,24 @@ function PostingModal({
   row,
   accounts,
   moneyAccounts,
+  moneyChoices,
   onClose,
 }: {
   row: PostingRow;
   accounts: readonly LedgerAccount[];
   moneyAccounts: readonly string[];
+  /** The money accounts in use a way of being paid may land in (payment_method_money_accounts). */
+  moneyChoices: ReadonlyArray<{ code: string; name: string }>;
   onClose: () => void;
 }) {
   const save = useSetPostingAccount();
   const change = row.change!;
   const [account, setAccount] = useState<string | undefined>(row.accountCode ?? undefined);
   const [refusal, setRefusal] = useState<string | null>(null);
-  const options = postingAccountOptions(change.kind, accounts, moneyAccounts).map((a) => ({ value: a.code, label: `${a.code} ${a.name}` }));
+  const options =
+    change.kind === "MONEY"
+      ? moneyChoices.map((a) => ({ value: a.code, label: `${a.code} ${a.name}` }))
+      : postingAccountOptions(change.kind, accounts, moneyAccounts).map((a) => ({ value: a.code, label: `${a.code} ${a.name}` }));
   // The Receiving button law: the disabled Save names its gap.
   const gap = !account ? "Save: pick the account" : account === row.accountCode ? "Save: pick another account" : null;
   return (
@@ -277,7 +299,7 @@ function PostingModal({
       <div className="flex flex-col gap-3" data-testid="posting-account-form">
         <Select
           id="posting-account"
-          label={`Account (${ledgerKindWord(change.kind)})`}
+          label={change.kind === "MONEY" ? "Money account" : `Account (${ledgerKindWord(change.kind)})`}
           required
           value={account ?? ""}
           onValueChange={setAccount}
@@ -299,7 +321,9 @@ const CHANGE_COLUMNS: readonly Column<LedgerPostingChange>[] = [
     cell: (c) =>
       c.what === "ROLE"
         ? ROLE_WORD[c.key] ?? c.key
-        : incomeWord({ type: c.key.split("/")[0] as LedgerIncomePosting["type"], key: c.key.split("/").slice(1).join("/"), name: c.name }),
+        : c.what === "PAYMENT"
+          ? c.name ?? systemMethodWord(c.key.split("/")[0]!, c.key.split("/").slice(1).join("/"))
+          : incomeWord({ type: c.key.split("/")[0] as LedgerIncomePosting["type"], key: c.key.split("/").slice(1).join("/"), name: c.name }),
   },
   { key: "from", label: "From", width: "25%", cell: (c) => (c.fromCode ? `${c.fromCode} ${c.fromName ?? ""}` : "No account yet") },
   { key: "to", label: "To", width: "25%", cell: (c) => `${c.toCode} ${c.toName ?? ""}` },
@@ -315,7 +339,7 @@ function PostingChanges({ changes }: { changes: readonly LedgerPostingChange[] }
         testId="posting-changes-table"
         rows={[...changes]}
         columns={CHANGE_COLUMNS}
-        rowId={(c) => String(c.id)}
+        rowId={(c) => c.id}
         empty="No posting account has been changed yet."
       />
     </section>

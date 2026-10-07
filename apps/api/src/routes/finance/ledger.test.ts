@@ -878,6 +878,31 @@ describe("Posting accounts (0657)", () => {
     expect(body.message).toBe("Someone else changed this posting after you opened it. Open it again to see their change.");
   });
 
+  it("sends a way of being paid to payment_method_account_set, split at the first slash (0658)", async () => {
+    const { sb } = fakeClient(() => ok({ method: "cash", sourceChannel: "*", accountCode: "300-1000", changed: true }));
+    const res = await call("PUT", { what: "PAYMENT", key: "cash/*", accountCode: "300-1000", was: "320-0000" });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("payment_method_account_set", {
+      p_method: "cash", p_source_channel: "*", p_account_code: "300-1000", p_was: "320-0000",
+    });
+    expect(sb.rpc).not.toHaveBeenCalledWith("gl_posting_account_set", expect.anything());
+
+    const online = fakeClient(() => ok({ method: "online", sourceChannel: "stripe_checkout", accountCode: "310-2000", changed: true }));
+    await call("PUT", { what: "PAYMENT", key: "online/stripe_checkout", accountCode: "310-2000", was: "310-1000" });
+    expect(online.sb.rpc).toHaveBeenCalledWith("payment_method_account_set", {
+      p_method: "online", p_source_channel: "stripe_checkout", p_account_code: "310-2000", p_was: "310-1000",
+    });
+  });
+
+  it("forwards the database's refusal of an account that is not money as 422 with its tag (0658)", async () => {
+    fakeClient(() => refuse("22023", "account_not_money", "Account 500-0000 is not a bank, cash or card account in use. Choose one from Money accounts."));
+    const res = await call("PUT", { what: "PAYMENT", key: "cash/*", accountCode: "500-0000", was: "320-0000" });
+    expect(res.status).toBe(422);
+    const body = await json(res);
+    expect(body.code).toBe("account_not_money");
+    expect(body.message).toBe("Account 500-0000 is not a bank, cash or card account in use. Choose one from Money accounts.");
+  });
+
   it("refuses operation and a body it cannot read before the database", async () => {
     const { sb } = fakeClient(() => ok(READ));
     expect((await call("GET", undefined, "operation")).status).toBe(403);

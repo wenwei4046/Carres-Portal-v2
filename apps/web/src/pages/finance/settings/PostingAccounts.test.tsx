@@ -1,15 +1,17 @@
 /**
- * Finance Settings → Posting accounts (0657).
+ * Finance Settings → Posting accounts (0657, 0658).
  *
  * What the page must get right:
  *   · every posting in one of four groups, in words, with its account;
  *   · an add-on with no account says so;
- *   · a Sales row or a changeable role opens its window; customer money and
- *     the accounts the system keeps never do;
+ *   · a Sales row, a changeable role or a way of being paid (0658) opens its
+ *     window; the accounts the system keeps never do;
  *   · the window offers only accounts of the posting's kind that the door
- *     takes, and sends the account it showed as `was`;
+ *     takes (a way of being paid: the money accounts Payment settings offers),
+ *     and sends the account it showed as `was`;
  *   · a refusal (someone changed it meanwhile) is the database's sentence;
- *   · the changes are listed, newest first, in words.
+ *   · the changes are listed, newest first, in words, a way of being paid's
+ *     included, and its row says when it last changed.
  */
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -40,8 +42,14 @@ const POSTINGS = {
     { role: "OTHER_INCOME", changeable: true, accountCode: "580-0000", accountName: "ADDITIONAL INCOME", changedAt: null, changedBy: null },
   ],
   changes: [
-    { id: 2, what: "INCOME", key: "ADDON/DELIVERY", name: "Delivery fee", fromCode: "500-0000", fromName: "SALES", toCode: "500-3000", toName: "SERVICE CHARGES", changedAt: "2026-10-07T09:00:00Z", changedBy: "Chew" },
-    { id: 1, what: "ROLE", key: "OTHER_INCOME", name: null, fromCode: "4900", fromName: "Other income", toCode: "580-0000", toName: "ADDITIONAL INCOME", changedAt: "2026-10-06T09:00:00Z", changedBy: "Chew" },
+    { id: "P8", what: "PAYMENT", key: "bank/*", name: "Bank transfer", fromCode: "310-1000", fromName: "PUBLIC BANK", toCode: "310-2000", toName: "HONG LEONG BANK", changedAt: "2026-10-07T10:00:00Z", changedBy: "Chew" },
+    { id: "2", what: "INCOME", key: "ADDON/DELIVERY", name: "Delivery fee", fromCode: "500-0000", fromName: "SALES", toCode: "500-3000", toName: "SERVICE CHARGES", changedAt: "2026-10-07T09:00:00Z", changedBy: "Chew" },
+    { id: "1", what: "ROLE", key: "OTHER_INCOME", name: null, fromCode: "4900", fromName: "Other income", toCode: "580-0000", toName: "ADDITIONAL INCOME", changedAt: "2026-10-06T09:00:00Z", changedBy: "Chew" },
+    { id: "P3", what: "PAYMENT", key: "online/stripe_checkout", name: null, fromCode: "310-2000", fromName: "HONG LEONG BANK", toCode: "315-5000", toName: "STRIPE", changedAt: "2026-10-05T09:00:00Z", changedBy: "Jess" },
+  ],
+  payments: [
+    { key: "bank/*", changedAt: "2026-10-07T10:00:00Z", changedBy: "Chew" },
+    { key: "online/stripe_checkout", changedAt: "2026-10-05T09:00:00Z", changedBy: "Jess" },
   ],
 };
 
@@ -67,7 +75,10 @@ vi.mock("@/lib/api", () => ({
       if (path === "/api/finance/payment-settings/methods") {
         return {
           methods: [{ method: "bank", label: "Bank transfer", account_code: "310-2000", account_name: "HONG LEONG BANK", active: true, sort: 1 }],
-          money_accounts: [],
+          money_accounts: [
+            { code: "310-2000", name: "HONG LEONG BANK" },
+            { code: "320-0000", name: "CASH IN HAND" },
+          ],
           system_rows: [{ method: "online", source_channel: "stripe_checkout", account_code: "315-5000" }],
         };
       }
@@ -171,10 +182,47 @@ describe("Posting accounts (0657)", () => {
     expect(net.calls[0]!.body).toEqual({ what: "ROLE", key: "COST_OF_GOODS_SOLD", accountCode: "610-0020", was: "610-0000" });
   });
 
-  it("never opens customer money or an account the system keeps", async () => {
+  it("opens a way of being paid, offering only the money accounts, and sends it as PAYMENT (0658)", async () => {
     show();
     await ready();
+    expect(screen.getByTestId("grid-group-toggle-money")).toHaveTextContent("Customer money");
     fireEvent.click(within(row("PAYMENT/bank/*")).getByText("Bank transfer"));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: "Save: pick another account" })).toBeDisabled();
+    fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Money account/ }), { key: "Enter" });
+    expect(screen.queryByRole("option", { name: "500-0000 SALES" })).toBeNull();
+    fireEvent.click(screen.getByRole("option", { name: "320-0000 CASH IN HAND" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(net.calls).toHaveLength(1));
+    expect(net.calls[0]).toEqual({
+      method: "PUT",
+      path: "/api/finance/ledger/posting-accounts",
+      body: { what: "PAYMENT", key: "bank/*", accountCode: "320-0000", was: "310-2000" },
+    });
+  });
+
+  it("sends the POS card and Online payment rows with their channel (0658)", async () => {
+    show();
+    await ready();
+    fireEvent.click(within(row("PAYMENT/online/stripe_checkout")).getByText("Online payment · Stripe checkout"));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Money account/ }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("option", { name: "310-2000 HONG LEONG BANK" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(net.calls).toHaveLength(1));
+    expect(net.calls[0]!.body).toEqual({ what: "PAYMENT", key: "online/stripe_checkout", accountCode: "310-2000", was: "315-5000" });
+  });
+
+  it("says when a way of being paid last changed its account (0658)", async () => {
+    show();
+    await ready();
+    expect(row("PAYMENT/bank/*")).toHaveTextContent("Chew");
+    expect(row("PAYMENT/online/stripe_checkout")).toHaveTextContent("Jess");
+  });
+
+  it("never opens an account the system keeps", async () => {
+    show();
+    await ready();
     fireEvent.click(within(row("ROLE/TRADE_PAYABLE")).getByText("Suppliers owed for goods"));
     await new Promise((r) => setTimeout(r, 20));
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -184,10 +232,14 @@ describe("Posting accounts (0657)", () => {
     show();
     await ready();
     const rows = within(screen.getByTestId("posting-changes-table")).getAllByRole("row").map((r) => r.textContent ?? "");
-    expect(rows[1]).toContain("Delivery fee");
-    expect(rows[1]).toContain("500-0000 SALES");
-    expect(rows[1]).toContain("500-3000 SERVICE CHARGES");
-    expect(rows[2]).toContain("Money the bank pays in");
+    expect(rows[1]).toContain("Bank transfer");
+    expect(rows[1]).toContain("310-1000 PUBLIC BANK");
+    expect(rows[1]).toContain("310-2000 HONG LEONG BANK");
+    expect(rows[2]).toContain("Delivery fee");
+    expect(rows[2]).toContain("500-0000 SALES");
+    expect(rows[2]).toContain("500-3000 SERVICE CHARGES");
+    expect(rows[3]).toContain("Money the bank pays in");
+    expect(rows[4]).toContain("Online payment · Stripe checkout");
   });
 });
 

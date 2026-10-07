@@ -95,9 +95,11 @@ import financeMoneyAccountsRouter from "./money-accounts";
  *   POST  /accounts/:code/active  retire an account the ledger never posted to, or bring one back
  *                           (gl_account_set_active, 0656)
  *   GET /posting-accounts   the account each posting goes to: the income map with every add-on,
- *                           the posting roles, and the latest changes (gl_posting_accounts, 0657)
- *   PUT /posting-accounts   change one of them (gl_posting_account_set, 0657); refused with 409
- *                           when someone changed it after the screen read it
+ *                           the posting roles, and the latest changes (gl_posting_accounts, 0657;
+ *                           since 0658 a way of being paid's money account changes too)
+ *   PUT /posting-accounts   change one of them (gl_posting_account_set, 0657; a way of being paid
+ *                           through payment_method_account_set, 0658); refused with 409 when
+ *                           someone changed it after the screen read it
  *   GET /trial-balance      every account as it stood at the end of a day, and every
  *                           heading's own subtotal at every depth, in the chart's order
  *   GET /account-ledger     one account, line by line
@@ -652,6 +654,19 @@ financeLedgerRouter.put("/posting-accounts", requireFinance, async (c) => {
   const body = await parseJsonBody(c, ledgerPostingAccountSetInput);
   if (!body.ok) return c.json(body.body, body.status);
   const sb = userClient(c.env, c.var.auth.jwt);
+  // 0658: a way of being paid goes through Payment settings' record, keyed
+  // `{method}/{source channel}`; every other posting through the ledger's door.
+  if (body.data.what === "PAYMENT") {
+    const at = body.data.key.indexOf("/");
+    const { data, error } = await sb.rpc("payment_method_account_set", {
+      p_method: at < 0 ? body.data.key : body.data.key.slice(0, at),
+      p_source_channel: at < 0 ? "*" : body.data.key.slice(at + 1),
+      p_account_code: body.data.accountCode,
+      p_was: body.data.was,
+    });
+    if (error) return accountError(c, error);
+    return c.json(data);
+  }
   const { data, error } = await sb.rpc("gl_posting_account_set", {
     p_what: body.data.what,
     p_key: body.data.key,
