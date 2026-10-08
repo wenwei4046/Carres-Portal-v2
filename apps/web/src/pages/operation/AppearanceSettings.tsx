@@ -14,8 +14,7 @@
  *
  * A choice applies at once and is saved to the person's own profile.
  */
-import { useState } from "react";
-import { toast } from "sonner";
+import { useEffect, useRef, useState } from "react";
 import {
   FOCUS_CHOICES,
   THEMES,
@@ -27,24 +26,37 @@ import {
 import { useAuth } from "@/lib/auth";
 
 export default function AppearanceSettings() {
+  const userId = useAuth((s) => s.session?.user?.id ?? null);
   const meta = useAuth((s) => (s.session?.user?.user_metadata as { appearance?: unknown } | undefined)?.appearance);
-  const [current, setCurrent] = useState<Appearance>(() => readAppearance(meta));
-  const [saving, setSaving] = useState(false);
+  /* The picker shows the profile's saved choice, live; while a click is being
+     saved it shows that click. Nothing is copied at mount. */
+  const [pending, setPending] = useState<Appearance | null>(null);
+  const [message, setMessage] = useState<{ kind: "saved" | "failed"; text: string } | null>(null);
+  const latest = useRef(0);
+  const current = pending ?? readAppearance(meta);
+
+  // A different person signed in: their profile, no leftover message.
+  useEffect(() => {
+    setPending(null);
+    setMessage(null);
+  }, [userId]);
 
   const choose = async (next: Appearance) => {
-    const before = current;
-    setCurrent(next);
-    setSaving(true);
+    const mine = ++latest.current;
+    setPending(next);
+    setMessage(null);
     try {
-      await saveAppearance(next);
+      const result = await saveAppearance(next);
+      if (mine !== latest.current || result === "superseded") return;
+      setMessage({ kind: "saved", text: "Saved to your profile." });
     } catch {
-      setCurrent(before);
-      await saveAppearance(before).catch(() => undefined);
-      toast.error("Your appearance could not be saved. Try again.");
+      if (mine !== latest.current) return;
+      setMessage({ kind: "failed", text: "Could not save. Your saved colours are back. Try again." });
     } finally {
-      setSaving(false);
+      if (mine === latest.current) setPending(null);
     }
   };
+  const saving = pending !== null;
 
   return (
     <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-3 px-6 py-5" data-testid="appearance-settings">
@@ -121,6 +133,14 @@ export default function AppearanceSettings() {
           </div>
         </div>
       </div>
+      {message && (
+        <p
+          role={message.kind === "failed" ? "alert" : "status"}
+          className={`text-[13px] ${message.kind === "failed" ? "text-c-warn-fg" : "text-c-secondary"}`}
+        >
+          {message.text}
+        </p>
+      )}
     </div>
   );
 }

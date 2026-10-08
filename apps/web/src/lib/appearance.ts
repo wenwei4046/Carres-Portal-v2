@@ -1,6 +1,7 @@
 /**
  * Appearance — each person's own theme and focus outline (owner-confirmed
- * handoff v4, UI Kit §9, Jess 2026-10-08: "每人自己选 theme，存在个人资料").
+ * handoff v4, UI Kit "Settings → Appearance", Jess 2026-10-08: "每人自己选
+ * theme，存在个人资料").
  *
  * A theme changes only three things — page ground, selected background,
  * selected text (and the checkbox accent, which reads the selected text). Ink,
@@ -8,12 +9,21 @@
  * in `styles/carres-tokens.css` under `[data-theme]` / `[data-focus]`; this
  * file only chooses which attribute `<html>` carries.
  *
- * Saved on the person's own login profile (Supabase `user_metadata.appearance`,
- * written by `auth.updateUser` for the signed-in person only), so it follows
- * them to every computer. A copy in this browser paints the first frame before
- * the session is read.
+ * ONE home for the choice: the signed-in person's own login profile
+ * (`user_metadata.appearance`, written by `auth.updateUser` for that person
+ * only). There is no second browser copy, so a shared computer never paints
+ * one person's colours for the next:
+ *
+ *   first frame   the profile inside the login session this browser keeps for
+ *                 the person (Supabase's own persisted session) — else Carres
+ *   signed in     the session's profile, re-applied whenever it changes
+ *   signed out    Carres (default), at once
+ *   a save fails  the profile's saved choice comes back; nothing else is sent
+ *   two clicks    only the newest choice's answer may change the screen; an
+ *                 answer for a person who has since signed out is ignored
  */
 import { useEffect } from "react";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import { useAuth } from "./auth";
 
@@ -26,7 +36,7 @@ export type Appearance = { theme: ThemeKey; focus: FocusKey };
 export const DEFAULT_APPEARANCE: Appearance = { theme: "carres", focus: "soft" };
 
 /** The picker's words. Each theme's identity dot is the CSS variable
- *  `--theme-dot-{key}` in `index.css` (UI Kit §9 table). */
+ *  `--theme-dot-{key}` in `index.css` (UI Kit theme table). */
 export const THEMES: { key: ThemeKey; name: string; group: "Brand" | "Cool" | "Warm" }[] = [
   { key: "carres", name: "Carres", group: "Brand" },
   { key: "slate", name: "Cool Slate", group: "Cool" },
@@ -49,8 +59,6 @@ export const FOCUS_CHOICES: { key: FocusKey; name: string; note: string }[] = [
   { key: "strong", name: "Strong", note: "Easy to see" },
 ];
 
-const LOCAL_KEY = "carres-appearance";
-
 /** Anything unrecognised falls back to the default, never to a guess. */
 export function readAppearance(raw: unknown): Appearance {
   const v = (raw ?? {}) as { theme?: unknown; focus?: unknown };
@@ -60,42 +68,117 @@ export function readAppearance(raw: unknown): Appearance {
   };
 }
 
-/** Put the choice on `<html>` and remember it in this browser. */
+/** Put the choice on `<html>`. Nothing is stored here. */
 export function applyAppearance(a: Appearance) {
   const root = document.documentElement;
   root.dataset.theme = a.theme;
   root.dataset.focus = a.focus;
+}
+
+/** The persisted login session's key — Supabase's own default
+ *  (`sb-{first host label}-auth-token`, supabase-js `SupabaseClient`). */
+function sessionStorageKey(): string | null {
+  const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  if (!url) return null;
   try {
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(a));
+    return `sb-${new URL(url).hostname.split(".")[0]}-auth-token`;
   } catch {
-    /* a blocked storage only loses the first-frame copy */
+    return null;
   }
 }
 
-/** The first frame: this browser's copy, else the default. */
+/** The appearance inside the login session this browser keeps — the
+ *  signed-in person's own profile, or null when nobody is signed in. */
+export function persistedProfileAppearance(): unknown {
+  const key = sessionStorageKey();
+  if (!key) return null;
+  try {
+    const raw = JSON.parse(localStorage.getItem(key) ?? "null") as
+      | { user?: { user_metadata?: { appearance?: unknown } } }
+      | null;
+    return raw?.user?.user_metadata?.appearance ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** The first frame, before the session is read: the person's own profile. */
 export function applyStoredAppearance() {
-  let stored: unknown = null;
+  // The 2026-10-08 build kept one shared browser copy; it is not read again.
   try {
-    stored = JSON.parse(localStorage.getItem(LOCAL_KEY) ?? "null");
+    localStorage.removeItem("carres-appearance");
   } catch {
-    stored = null;
+    /* blocked storage: nothing to remove */
   }
-  applyAppearance(readAppearance(stored));
+  applyAppearance(readAppearance(persistedProfileAppearance()));
 }
 
-/** The signed-in person's saved choice, applied whenever the session changes. */
+const profileAppearanceNow = () =>
+  readAppearance((useAuth.getState().session?.user?.user_metadata as { appearance?: unknown } | undefined)?.appearance);
+
+/* Only the newest save may change the screen (two quick clicks). */
+let saveSeq = 0;
+let saving = false;
+
+/** The signed-in person's saved choice, applied whenever the session changes;
+ *  the default the moment nobody is signed in. */
 export function useProfileAppearance() {
+  const hydrated = useAuth((s) => s.hydrated);
+  const userId = useAuth((s) => s.session?.user?.id ?? null);
   const meta = useAuth((s) => (s.session?.user?.user_metadata as { appearance?: unknown } | undefined)?.appearance);
-  const signedIn = useAuth((s) => Boolean(s.session));
+  const theme = readAppearance(meta).theme;
+  const focus = readAppearance(meta).focus;
   useEffect(() => {
-    if (!signedIn) return;
-    applyAppearance(readAppearance(meta));
-  }, [meta, signedIn]);
+    if (!hydrated) return; // the first frame already shows the persisted profile
+    if (!userId) {
+      applyAppearance(DEFAULT_APPEARANCE);
+      return;
+    }
+    // While a choice is being saved, the screen shows that choice.
+    if (saving) return;
+    applyAppearance({ theme, focus });
+  }, [hydrated, userId, theme, focus]);
 }
 
-/** Save to the person's own profile; the page changes at once. */
-export async function saveAppearance(a: Appearance): Promise<void> {
+export type SaveResult = "saved" | "superseded";
+
+/**
+ * Save to the signed-in person's own profile; the page changes at once.
+ * On failure the profile's saved choice comes back and the error is thrown —
+ * no second request is sent. A newer click, or a different person signing in
+ * meanwhile, makes this answer `superseded`: it changes nothing.
+ */
+export async function saveAppearance(a: Appearance): Promise<SaveResult> {
+  const userId = useAuth.getState().session?.user?.id ?? null;
+  if (!userId) throw new Error("Sign in to save your appearance.");
+  const mine = ++saveSeq;
+  saving = true;
   applyAppearance(a);
-  const { error } = await supabase.auth.updateUser({ data: { appearance: a } });
-  if (error) throw error;
+  let error: unknown = null;
+  let saved: User | null = null;
+  try {
+    const res = await supabase.auth.updateUser({ data: { appearance: readAppearance(a) } });
+    saved = res.data?.user ?? null;
+    error = res.error ?? (saved ? null : new Error("Your appearance could not be saved."));
+  } catch (e) {
+    error = e;
+  }
+  if (mine !== saveSeq) return "superseded";
+  saving = false;
+  const sameUser = (useAuth.getState().session?.user?.id ?? null) === userId;
+  if (!sameUser) {
+    // Another person (or nobody) is signed in now: show their colours, not ours.
+    applyAppearance(useAuth.getState().session ? profileAppearanceNow() : DEFAULT_APPEARANCE);
+    return "superseded";
+  }
+  if (error) {
+    applyAppearance(profileAppearanceNow());
+    throw error;
+  }
+  // The profile now holds the choice; the session the screen reads says so too.
+  if (saved) {
+    const user = saved;
+    useAuth.setState((s) => (s.session ? { session: { ...s.session, user }, user } : {}));
+  }
+  return "saved";
 }
