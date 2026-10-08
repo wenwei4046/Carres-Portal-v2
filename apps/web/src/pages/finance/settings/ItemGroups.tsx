@@ -109,27 +109,32 @@ export default function ItemGroups() {
   if (query.isError) return <LoadFailed what="The item groups" onRetry={() => void query.refetch()} />;
   return (
     <ListPageShell register>
-      <DataGrid
-        rows={groups}
-        columns={columns}
-        rowKey={(g) => g.id}
-        storageKey="carres.finance.item-groups.v1"
-        appearance="reference"
-        groupBanner={false}
-        allowColumnGrouping={false}
-        stickyIdentity
-        isLoading={!query.isSuccess}
-        onRowClick={(g) => setOpen(g)}
-        toolbarEnd={
-          // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0659).
-          <Button variant="neutral" onClick={() => setOpen("new")} disabled={!query.isSuccess}>
-            Add item group
-          </Button>
-        }
-      />
-      <ProductList products={query.data?.products ?? []} groupName={groupName} onOpen={setMoving} />
-      {(query.data?.unbound.length ?? 0) > 0 && <UnboundSales rows={query.data!.unbound} groupName={groupName} />}
-      <ItemGroupChanges changes={query.data?.changes ?? []} />
+      {/* One scrolling area: the groups take the rows they have, and the lists
+          below never squeeze them out of sight, as a register filling the
+          shell's height would let them. */}
+      <div className="min-h-0 flex-1 overflow-y-auto" data-testid="item-groups-page">
+        <DataGrid
+          rows={groups}
+          columns={columns}
+          rowKey={(g) => g.id}
+          storageKey="carres.finance.item-groups.v1"
+          appearance="reference"
+          groupBanner={false}
+          allowColumnGrouping={false}
+          stickyIdentity
+          isLoading={!query.isSuccess}
+          onRowClick={(g) => setOpen(g)}
+          toolbarEnd={
+            // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0659).
+            <Button variant="neutral" onClick={() => setOpen("new")} disabled={!query.isSuccess}>
+              Add item group
+            </Button>
+          }
+        />
+        <ProductList products={query.data?.products ?? []} groupName={groupName} onOpen={setMoving} loading={!query.isSuccess} />
+        {(query.data?.unbound.length ?? 0) > 0 && <UnboundSales rows={query.data!.unbound} groupName={groupName} />}
+        <ItemGroupChanges changes={query.data?.changes ?? []} loading={!query.isSuccess} />
+      </div>
       {open && (
         <ItemGroupModal
           key={open === "new" ? "new" : open.id}
@@ -304,10 +309,12 @@ function ProductList({
   products,
   groupName,
   onOpen,
+  loading,
 }: {
   products: readonly LedgerItemGroupProduct[];
   groupName: ReadonlyMap<string, string>;
   onOpen: (p: LedgerItemGroupProduct) => void;
+  loading: boolean;
 }) {
   const rows = productRows(products, groupName);
   const columns: readonly Column<(typeof rows)[number]>[] = [
@@ -328,6 +335,7 @@ function ProductList({
         rowId={(p) => p.modelId}
         onRowOpen={(p) => onOpen(p)}
         empty="No product is in the catalog yet."
+        loading={loading}
       />
     </section>
   );
@@ -402,7 +410,7 @@ const CHANGE_COLUMNS: readonly Column<LedgerItemGroupChange>[] = [
   { key: "to", label: "To", width: "22%", cell: (c) => changeWords(c).to },
 ];
 
-function ItemGroupChanges({ changes }: { changes: readonly LedgerItemGroupChange[] }) {
+function ItemGroupChanges({ changes, loading }: { changes: readonly LedgerItemGroupChange[]; loading: boolean }) {
   return (
     <section className="flex flex-col gap-2 pt-4" data-testid="item-group-changes">
       <h2 className="text-section">Changes</h2>
@@ -414,6 +422,7 @@ function ItemGroupChanges({ changes }: { changes: readonly LedgerItemGroupChange
         rowId={(c) => c.id}
         // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0659).
         empty="No item group has been changed yet."
+        loading={loading}
       />
     </section>
   );
