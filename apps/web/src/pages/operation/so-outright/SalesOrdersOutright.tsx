@@ -445,7 +445,7 @@ export default function SalesOrdersOutright() {
                       onClick={(e) => open(r, e)}
                       title="Open order · Ctrl/⌘-click opens a new tab"
                       data-testid={`outright-row-${r.so}`}
-                      className={`mx-1.5 grid min-h-[54px] cursor-pointer items-center gap-2.5 rounded-[10px] border-b border-c-row-line px-3.5 py-1.5 text-[13px] outline outline-1 -outline-offset-2 outline-transparent hover:outline-c-head-line ${
+                      className={`mx-1.5 grid min-h-[54px] cursor-pointer items-center gap-2.5 rounded-[10px] border-b border-c-row-line px-3.5 py-1.5 text-[13px] -outline-offset-2 hover:[outline:var(--c-focus)] ${
                         selected.has(r.id) ? "bg-c-select-bg" : "bg-c-card hover:bg-c-search-bg"
                       }`}
                       style={{ gridTemplateColumns: gcols }}
@@ -468,7 +468,7 @@ export default function SalesOrdersOutright() {
               </div>
             )}
           </div>
-          <div className="flex items-center gap-3 border-t border-c-row-line px-3.5 text-[13px] text-c-secondary" data-testid="outright-footer">
+          <div className="flex items-center gap-3 border-t border-c-footer-line px-3.5 text-[13px] text-c-secondary" data-testid="outright-footer">
             <span className="whitespace-nowrap">{isLoading ? "Loading orders" : `${list.length} orders`}</span>
             {!isLoading && qtyLine && (
               <span className="min-w-0 truncate" title={qtyLine}>{qtyLine}</span>

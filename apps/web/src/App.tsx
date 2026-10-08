@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useWorkActivity } from "@/lib/use-work-activity";
+import { useProfileAppearance } from "@/lib/appearance";
 import { RequireRole } from "@/lib/require-role";
 import { loginState } from "@/lib/return-to";
 import { roleAllowedOnPortal } from "@/lib/portal";
@@ -83,6 +84,8 @@ function RequireAuth({ children }: { children: ReactNode }) {
 
 export default function App() {
   useWorkActivity();
+  /* Each person's own theme and focus outline (handoff v4, UI Kit §9). */
+  useProfileAppearance();
   const hydrate = useAuth((s) => s.hydrate);
   const location = useLocation();
   useEffect(() => {

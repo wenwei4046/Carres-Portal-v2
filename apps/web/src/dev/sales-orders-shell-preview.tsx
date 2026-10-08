@@ -18,6 +18,11 @@ import OperationApp from "@/pages/operation/OperationApp";
 import type { SoBatchPurchaseResponse } from "@carres/shared";
 import { appTodayIso } from "@/lib/fmt-date";
 import "@/index.css";
+import { supabase } from "@/lib/supabase";
+
+/* DEV ONLY: Appearance saves to the person's profile; the preview has no real
+   session, so the save is answered here and only the page changes. */
+supabase.auth.updateUser = (async () => ({ data: { user: null }, error: null })) as never;
 
 const CUSTOMERS = [
   "Kimmy", "LIM KUAN YANG", "Nurul Aisyah binti Abdul Rahman", "PETER", "ANNE", "Tan Ah Kow",
@@ -258,7 +263,7 @@ const client = new QueryClient({ defaultOptions: { queries: { retry: false } } }
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[`/operation/orders${window.location.search}`]}>
+      <MemoryRouter initialEntries={[previewParams.get("path") ?? `/operation/orders${window.location.search}`]}>
         <Routes>
           <Route path="/operation/*" element={<OperationApp />} />
         </Routes>

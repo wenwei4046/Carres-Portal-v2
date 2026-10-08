@@ -772,7 +772,7 @@ export default function PortalSidebar({ drawer = false }: {
       </nav>
 
       {/* Bottom — Settings ⚙ and the person (Layout Standard §2). */}
-      <div className="flex shrink-0 flex-col gap-0.5 border-t border-c-row-line pt-2">
+      <div className="flex shrink-0 flex-col gap-0.5 border-t border-c-footer-line pt-2">
         {settingsHref && (
           <Link
             to={settingsHref}

@@ -36,7 +36,7 @@ import SalesOrdersOutright from "./so-outright/SalesOrdersOutright";
 import DeliveryOrderPage from "./DeliveryOrderPage";
 import DeliveryOrdersRegister from "./DeliveryOrdersRegister";
 import SalesOrderWorkspace from "./SalesOrderWorkspace";
-import SettingsWorkspace from "./SettingsWorkspace";
+import SettingsWorkspace, { settingsSectionLabel } from "./SettingsWorkspace";
 // T11 (2026-07-27) — the Delivery module: the ONE new sidebar item in the
 // build plan. Tab-state driven like Payments / Stock (only orders and
 // procurement are path-driven), so `?tab=delivery` deep-links it.
@@ -335,7 +335,9 @@ export default function OperationApp() {
    * canvas. The page itself never scrolls; its panels do. A page names itself
    * through `ModuleHeader`, which renders into the header's slot; a page that
    * does not is named by its menu item. */
-  const navTitle = activeNavTitle(location.pathname, location.search);
+  const navTitle = isSettingsUrl
+    ? { crumb: "Settings", title: settingsSectionLabel(location.pathname) ?? "Settings" }
+    : activeNavTitle(location.pathname, location.search);
   return (
     <div
       className="grid h-screen bg-background text-c-body"

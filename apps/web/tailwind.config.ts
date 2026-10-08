@@ -19,7 +19,9 @@ export default {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
+        /* The page ground follows the person's Appearance theme (handoff v4,
+         * UI Kit §9): `--c-ground` is set per `data-theme` on <html>. */
+        background: "var(--c-ground)",
         foreground: "hsl(var(--foreground))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
@@ -115,6 +117,7 @@ export default {
           "btn-border": "var(--c-btn-border)",
           "head-line": "var(--c-head-line)",
           "row-line": "var(--c-row-line)",
+          "footer-line": "var(--c-footer-line)",
           "section-line": "var(--c-section-line)",
           "input-border": "var(--c-input-border)",
           "search-bg": "var(--c-search-bg)",
@@ -159,7 +162,7 @@ export default {
            * greys per page, maximum. Copy Linear: the chrome greys sit so
            * close to white the data always outweighs them. Runs on Purchase
            * Orders first; flows back portal-wide after she reviews it live. */
-          canvas: "hsl(var(--background))", // THE one canvas token = #F7F8FA (Jess 2026-08-02; UI MASTER §6.7 2026-09-17) — body and every page read the same variable
+          canvas: "var(--c-ground)", // the theme ground (handoff v4, 2026-10-08) — formerly = #F7F8FA (Jess 2026-08-02; UI MASTER §6.7 2026-09-17) — body and every page read the same variable
           // `strip` retired the same day (Jess's polish: too many greys were
           // competing) — the header strip sits on the canvas, no grey of its own.
           slate: {

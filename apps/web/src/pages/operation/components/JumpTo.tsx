@@ -347,7 +347,7 @@ export default function JumpTo({ pill = false }: {
               with eyes. */}
           <SearchInput
             id="jump-to-query"
-            placeholder="Destination or document number"
+            placeholder="Search SO, PO, supplier, customer"
             aria-label="Jump to"
             role="combobox"
             aria-expanded
