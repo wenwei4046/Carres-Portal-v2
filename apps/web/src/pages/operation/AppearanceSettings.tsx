@@ -131,8 +131,9 @@ export default function AppearanceSettings() {
                      own data-focus, so its outline is that choice's --c-focus. */
                   data-focus={f.key}
                   onClick={() => pick({ ...current, focus: f.key })}
-                  className={`flex min-w-[150px] flex-col gap-0.5 rounded-lg border bg-white px-3 py-2 text-left disabled:opacity-60 ${
-                    on ? "border-c-ink" : "border-c-footer-line"
+                  /* The outline is the sample; the chosen card is the select wash. */
+                  className={`flex min-w-[150px] flex-col gap-0.5 rounded-lg border px-3 py-2 text-left disabled:opacity-60 ${
+                    on ? "border-c-select-fg bg-c-select-bg" : "border-c-footer-line bg-white"
                   }`}
                   style={{ outline: "var(--c-focus)", outlineOffset: -2 }}
                 >

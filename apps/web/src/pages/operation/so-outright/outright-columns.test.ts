@@ -3,7 +3,7 @@ import type { OutrightOrderFacts } from "@carres/shared";
 import type { PaymentMonitorRow } from "@carres/shared/payment-monitor";
 import { ApiError } from "@/lib/api";
 import type { RegisterRow } from "../sales-order-columns";
-import { COLUMNS, type CellContext, type OwnedRead, type PayByRead } from "./outright-columns";
+import { COLUMNS, timeWords, type CellContext, type OwnedRead, type PayByRead } from "./outright-columns";
 import { readStateOf } from "./pay-by";
 
 const row = (over: Partial<RegisterRow["o"]> = {}) =>
@@ -43,7 +43,7 @@ describe("Outright list cells read each owner and keep three states apart", () =
     expect(t("grnNo", ctx).t).toBe("GRN-11");
     expect(t("logi", ctx).t).toBe("NETS");
     expect(t("appt", ctx)).toMatchObject({ t: "Scheduled", sub: "2 PM to 5 PM" });
-    expect(t("delivery", ctx)).toMatchObject({ t: "20 Oct 26", sub: "Tue · 2 PM to 5 PM" });
+    expect(t("delivery", ctx)).toMatchObject({ t: "20 Oct 26", sub: "Tue" });
     expect(t("load", ctx).t).toBe("Handed over");
     expect(t("loc", ctx).t).toBe("Carres Klang");
     expect(t("hold", ctx).t).toBe("No Finance hold");
@@ -104,6 +104,15 @@ describe("Outright list cells read each owner and keep three states apart", () =
 
   it("an unreadable Service read is Could not read for Problems", () => {
     expect(t("problems", ctxOf({ state: "ok", facts: facts(), cases: null, failed: { cases: true } })).t).toBe("Could not read");
+  });
+});
+
+describe("timeWords", () => {
+  it("prints a stored window without a dash", () => {
+    expect(timeWords("Morning (9am\u201312pm)")).toBe("Morning (9am to 12pm)");
+    expect(timeWords("2pm-5pm")).toBe("2pm to 5pm");
+    expect(timeWords("Morning (9am to 12pm)")).toBe("Morning (9am to 12pm)");
+    expect(timeWords("")).toBeUndefined();
   });
 });
 

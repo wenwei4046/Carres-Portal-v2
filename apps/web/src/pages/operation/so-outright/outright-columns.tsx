@@ -37,6 +37,8 @@ export type Cell = {
   pop?: boolean;
   /** The full sentence behind a short state word (hover). */
   title?: string;
+  /** The sub-line is an essential fact: it wraps instead of being cut. */
+  subWrap?: boolean;
 };
 
 export type LayoutKey = "so" | "general" | "payment" | "stock" | "warehouse" | "delivery";
@@ -149,6 +151,14 @@ function fromOwner(
   return fn(read.facts);
 }
 
+/** A stored time window in the governed spelling (`9am to 12pm`): no dash on
+ *  screen, even when an older row was saved as `9am–12pm`. */
+export function timeWords(t: string | null | undefined): string | undefined {
+  const v = (t ?? "").trim();
+  if (!v) return undefined;
+  return v.replace(/\s*[\u2013\u2014]\s*/g, " to ").replace(/(\d(?:\s?[ap]m)?)\s*-\s*(\d)/gi, "$1 to $2");
+}
+
 const HANDOVER_WORD: Record<NonNullable<OutrightOrderFacts["loading"]["kind"]>, string> = {
   ready_for_handover: "Ready for handover",
   handed_over: "Handed over",
@@ -228,9 +238,10 @@ export const COLUMNS: Record<string, Column> = {
       }
       /* Delivery's own ladder (DO → arrangement → confirmed booking). */
       return fromOwner(r, ctx, "delivery", "Delivery", "nothing is arranged", (f) => {
+        /* The day only: its time is printed once, under Appointment. */
         const c = dayCell(f.delivery.dateIso, 400);
         if (!c) return { t: "Not scheduled", fg: "muted" };
-        return { t: c.t, fg: "ink", sub: f.delivery.time ? `${c.sub} · ${f.delivery.time}` : c.sub, subTone: "muted" };
+        return { t: c.t, fg: "ink", sub: c.sub, subTone: "muted" };
       });
     },
   },
@@ -301,11 +312,11 @@ export const COLUMNS: Record<string, Column> = {
     },
   },
   hold: {
-    key: "hold", label: "Finance hold", width: "110px", filterable: true,
+    key: "hold", label: "Finance hold", width: "170px", filterable: true,
     /* An OPEN `order_finance_exceptions` row (0355). Unknown is never no hold. */
     cell: (r, ctx) => fromOwner(r, ctx, "finance", "Finance", "there is no Finance hold", (f) =>
       f.financeHold
-        ? { t: "Hold delivery", pill: true, tone: "warn", sub: f.financeHold.reason ? `Finance hold · ${f.financeHold.reason}` : "Finance hold", subTone: "warn" }
+        ? { t: "Hold delivery", pill: true, tone: "warn", sub: f.financeHold.reason ? `Finance hold · ${f.financeHold.reason}` : "Finance hold", subTone: "warn", subWrap: true }
         : { t: "No Finance hold", fg: "muted" }),
   },
   po: {
@@ -360,13 +371,15 @@ export const COLUMNS: Record<string, Column> = {
     cell: (r) => (r.o.customer_address_city?.trim() ? { t: r.o.customer_address_city.trim() } : NOT_RECORDED),
   },
   appt: {
-    key: "appt", label: "Appointment", width: "110px", filterable: true,
+    /* 160px, not v8's 110: the governed slot words (`Afternoon (12pm to 3pm)`)
+       must read whole — content decides the width. */
+    key: "appt", label: "Appointment", width: "160px", filterable: true,
     /* COPY "Scheduled delivery": `Scheduled` · `Not scheduled`, then the time. */
     cell: (r, ctx) => {
       if (isDelivered(r)) return { t: "Delivered", pill: true, tone: "ok" };
       return fromOwner(r, ctx, "delivery", "Delivery", "nothing is arranged", (f) =>
         f.delivery.dateIso
-          ? { t: "Scheduled", pill: true, tone: "ok", sub: f.delivery.time ?? undefined, subTone: "muted" }
+          ? { t: "Scheduled", pill: true, tone: "ok", sub: timeWords(f.delivery.time), subTone: "muted" }
           : { t: "Not scheduled", pill: true, tone: "none" });
     },
   },

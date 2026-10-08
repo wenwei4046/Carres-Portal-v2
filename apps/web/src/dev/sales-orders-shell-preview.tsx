@@ -22,7 +22,11 @@ import { supabase } from "@/lib/supabase";
 
 /* DEV ONLY: Appearance saves to the person's profile; the preview has no real
    session, so the save is answered here and only the page changes. */
-supabase.auth.updateUser = (async () => ({ data: { user: null }, error: null })) as never;
+/* Like Supabase: the signed-in user comes back with the merged metadata. */
+supabase.auth.updateUser = (async (attrs: { data?: Record<string, unknown> }) => ({
+  data: { user: { id: "u-op", email: "preview@carres.local", user_metadata: { ...(attrs.data ?? {}) } } },
+  error: null,
+})) as never;
 
 const CUSTOMERS = [
   "Kimmy", "LIM KUAN YANG", "Nurul Aisyah binti Abdul Rahman", "PETER", "ANNE", "Tan Ah Kow",
@@ -56,6 +60,9 @@ const orders = Array.from({ length: ROWS }, (_, n) => {
     customer_phone: `01${i % 10}-34789${String(10 + i).slice(-2)}`,
     customer_address_city: city,
     customer_address_state: state,
+    // The register read embeds receipts; every fourth order has one.
+    receipt_documents: i % 4 === 0 ? [{ id: `rc${i}`, receipt_no: `OR-26${String(i).padStart(4, "0")}` }] : [],
+    allocated_receipts: [],
     // One order from an earlier year: the widest date the column must hold.
     placed_at: i === 7 ? "2025-05-28T02:00:00Z" : `2026-09-${String(1 + (i % 16)).padStart(2, "0")}T02:00:00Z`,
     proceeded_at: i === 7 ? "2025-06-02T02:00:00Z" : `2026-09-${String(2 + (i % 16)).padStart(2, "0")}T06:00:00Z`,
@@ -167,11 +174,33 @@ window.fetch = async (input, init) => {
   }
   /* The Order list's server facts: a spread so every rail value has rows. */
   if (/\/api\/operation\/orders\/register-facts/.test(url)) {
+    /* Owner facts shaped on real test orders (SO-1362 · SO-1358 · SO-1333,
+       read-only SQL 2026-10-09); `?fail=finance,delivery` fails those reads. */
+    const fail = new Set((new URLSearchParams(window.location.search).get("fail") ?? "").split(",").filter(Boolean));
+    const noDelivery = { dateIso: null, time: null, source: null, partnerId: null, partnerName: null };
+    const ownedOf = (i: number) => {
+      const k = i % 6;
+      return {
+        pic: k === 3 ? null : { userId: `u${k}`, name: k === 2 ? null : k === 1 ? "Yu Jun" : "Shasha" },
+        poCount: k === 0 ? 2 : 0,
+        supplierDos: [], grns: [],
+        delivery: k === 0 ? { dateIso: "2026-09-29", time: "Afternoon (12pm to 3pm)", source: "arrangement", partnerId: "p1", partnerName: "NETS" }
+          : k === 1 ? { dateIso: "2026-09-30", time: "Morning (9am\u201312pm)", source: "arrangement", partnerId: "p1", partnerName: "NETS" }
+          : k === 4 ? { dateIso: "2026-10-17", time: "2 PM to 5 PM", source: "document", partnerId: "p2", partnerName: "AL" }
+          : noDelivery,
+        loading: k === 4 ? { hasDo: true, kind: "handed_over", at: "2026-10-16T03:00:00Z" } : { hasDo: false, kind: null, at: null },
+        locations: [],
+        financeHold: k === 5 ? { reason: "Cheque not cleared" } : null,
+      };
+    };
     const facts = Object.fromEntries(orders.map((o, i) => [o.id, {
       obligations: i % 3 === 0 ? "none" : "outstanding",
       cases: i % 5 === 0 ? "open" : i % 7 === 0 ? "closed" : "none",
+      owned: ownedOf(i),
     }]));
-    return new Response(JSON.stringify({ facts, failed: { obligations: false, cases: false } }), { status: 200, headers: { "content-type": "application/json" } });
+    const failed = { obligations: false, cases: false, pic: fail.has("pic"), purchasing: fail.has("purchasing"), delivery: fail.has("delivery"),
+      loading: fail.has("delivery"), location: fail.has("location"), finance: fail.has("finance") };
+    return new Response(JSON.stringify({ facts, failed }), { status: 200, headers: { "content-type": "application/json" } });
   }
   if (/\/api\/operation\/purchase\/demands/.test(url)) {
     return new Response(JSON.stringify(demandPurchase), { status: 200, headers: { "content-type": "application/json" } });
@@ -190,12 +219,18 @@ window.fetch = async (input, init) => {
   const detail = orders.find(o => o.id === detailId);
   const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
   if (detail && path.endsWith(detail.id)) return json({ order: detail, lines: detail.order_lines, addons: [], total: 2499, warehouse: null, stockBalances: [], freeUnits: [], pos: [], threads: [],
+    picRead: "ok", pic: { userId: "u0", name: "Shasha" },
     history: [
       { text: "Sales Order created at Sales Portal", occurred_at: detail.placed_at, actor_kind: "system" },
       { text: "Operations received the order", occurred_at: detail.proceeded_at, actor_kind: "system" },
       { text: "Delivery date checked with TEST Logistics", occurred_at: "2026-10-06T06:30:00Z", actor: "TEST · Staff D", actor_kind: "human" },
     ] });
   if (path === "/api/ops/service-cases") return json({ items: [], total: 0 });
+  /* Payments' four reads for `Pay by` (no invoices recorded in this preview). */
+  if (path === "/api/finance/invoices/register") return json({ rows: [], total: 0 });
+  if (path === "/api/finance/payment-storage") return json({ cases: [] });
+  if (path === "/api/finance/payment-storage/later-delivery-requests") return json({ requests: [] });
+  if (path === "/api/finance/payment-settings") return json({ bank_accounts: [], manual_methods: [], rules: [], collection_timing: [], changes: [] });
   if (detail && path.endsWith("/refunds")) return json({ refunds: [] });
   if (detail && path.endsWith("/payments")) return json({ payments: [] });
   if (detail && path.endsWith("/amendment")) return json({ amendment: null });

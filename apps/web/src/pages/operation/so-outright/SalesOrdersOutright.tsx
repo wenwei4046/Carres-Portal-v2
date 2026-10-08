@@ -290,7 +290,16 @@ export default function SalesOrdersOutright() {
     ...Object.entries(filters).map(([k, v]) => ({ key: k, label: `${COLUMNS[k]!.label}: ${v}`, clear: () => setParam(`f.${k}`, null) })),
   ];
   const gcols = `24px ${layout.columns.map((k) => COLUMNS[k]!.width).join(" ")}`;
-  const minWidth = layout.columns.length <= 6 ? 600 : 760;
+  /* The table is as wide as its columns' own minimums — checkbox 24, each
+     track's px floor, a 10px gap between tracks, 14px padding each side and
+     the 6px row margins — so a row's line spans every column when the table
+     scrolls sideways. */
+  const minWidth =
+    24 +
+    layout.columns.reduce((sum, k) => sum + (Number(/(\d+)px/.exec(COLUMNS[k]!.width)?.[1]) || 0), 0) +
+    10 * layout.columns.length +
+    28 +
+    12;
 
   /* Footer: `n orders` · `Qty: Mattress 7 · Bed frame 4 …` (most first). */
   const qty = useMemo(() => {
@@ -596,7 +605,11 @@ function BodyCell({
           {cell.t}
         </span>
       )}
-      {cell.sub && <span className={`max-w-full truncate text-[12px] ${subFg}`}>{cell.sub}</span>}
+      {cell.sub && (
+        <span className={`max-w-full text-[12px] ${cell.subWrap ? "break-words" : "truncate"} ${subFg}`} title={cell.sub}>
+          {cell.sub}
+        </span>
+      )}
     </span>
   );
 }
