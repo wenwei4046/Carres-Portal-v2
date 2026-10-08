@@ -393,7 +393,7 @@ export default function OperationApp() {
             title={navTitle?.title ?? "Carres"}
           />
         )}
-        <div className={`flex min-h-0 min-w-0 flex-1 ${phone ? "" : "gap-3 px-3 pb-3"}`}>
+        <div className={`flex min-h-0 min-w-0 flex-1 ${phone ? "" : "gap-3 p-3"}`}>
         <main
           className={`flex min-h-0 min-w-0 flex-1 flex-col ${
             isSalesOrdersRegisterUrl || isDeliveryOrdersRegisterUrl ? "overflow-hidden" : "overflow-auto"
