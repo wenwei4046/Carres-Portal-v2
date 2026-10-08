@@ -58,8 +58,8 @@ describe("the Sales Order payment ledger", () => {
     expect(screen.queryByText("RM 2,500")).toBeNull();
     expect(screen.getByText("RM 500.00")).toBeTruthy();
 
-    /* The method WORD, not the database value. */
-    expect(screen.getByText("Bank transfer")).toBeTruthy();
+    /* The method WORD, not the database value (0660 names `bank` Online transfer). */
+    expect(screen.getByText("Online transfer")).toBeTruthy();
     expect(screen.getByText("DuitNow QR")).toBeTruthy();
 
     /* A deposit and a storage collection are different debts and say so. */

@@ -10,7 +10,7 @@ import { useRecordReceipt } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
 import { fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
-import { useManualMethods } from "@/lib/payment-methods";
+import { MERCHANT_STEP, machineWord, useManualMethods, useMethodChoice } from "@/lib/payment-methods";
 import { requiredPaymentReference } from "@carres/shared";
 import { parseTypedAmount } from "@carres/shared/other-money-in";
 import type { CustomerOwingRow } from "./money-owed";
@@ -52,12 +52,12 @@ export default function ARDrawer({
   const [recPanelOpen, setRecPanelOpen] = useState(startRecording);
   const [recAmt, setRecAmt]             = useState(String(balance.outstanding || ""));
   const [recRef, setRecRef]             = useState("");
-  const [chosenMethod, setRecMethod]    = useState<string>("bank");
   const role = useAuth((s) => s.role);
   const { methods, label: methodLabel } = useManualMethods();
-  const recMethod = methods.some((m) => m.value === chosenMethod)
-    ? chosenMethod : methods[0]?.value ?? chosenMethod;
-  const refWord = requiredPaymentReference(recMethod); // §16 (0535)
+  // 0660 (Chew 2026-10-07): Online transfer · Cash · Cheque · Merchant first;
+  // Merchant then asks which card machine, and the machine is the method.
+  const { steps, first, setFirst: setRecMethod, machine, setMachine, method: recMethod } = useMethodChoice(methods);
+  const refWord = requiredPaymentReference(recMethod ?? first); // §16 (0535)
   const soWord = balance.so !== null ? `SO-${balance.so}` : "SO not available";
   const amount = readAmount(recAmt);
 
@@ -80,7 +80,7 @@ export default function ARDrawer({
   });
 
   function submitReceipt() {
-    if (amount.value === null) return;
+    if (amount.value === null || recMethod === null) return;
     if (refWord && !recRef.trim()) {
       toast.error(`Enter the ${refWord.toLowerCase()}`);
       return;
@@ -144,13 +144,25 @@ export default function ARDrawer({
                 </label>
                 <label className="block">
                   <span className="text-label">Method</span>
-                  <select aria-label="Method" value={recMethod}
+                  <select aria-label="Method" value={first}
                     onChange={(e) => setRecMethod(e.target.value)} className={fieldCls}>
-                    {methods.map((m) => (
+                    {steps.first.map((m) => (
                       <option key={m.value} value={m.value}>{m.label}</option>
                     ))}
                   </select>
                 </label>
+                {first === MERCHANT_STEP && (
+                  <label className="block">
+                    <span className="text-label">Card machine</span>
+                    <select aria-label="Card machine" value={machine}
+                      onChange={(e) => setMachine(e.target.value)} className={fieldCls}>
+                      <option value="">Card machine</option>
+                      {steps.machines.map((m) => (
+                        <option key={m.value} value={m.value}>{machineWord(m.label)}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <label className="block">
                   <span className="text-label">{refWord ?? "Reference"}</span>
                   <input aria-label="Reference" value={recRef}
@@ -159,7 +171,7 @@ export default function ARDrawer({
                 </label>
                 <div className="flex gap-2">
                   <Button variant="primary" onClick={submitReceipt} loading={recordReceipt.isPending}
-                    disabled={amount.value === null}>
+                    disabled={amount.value === null || recMethod === null}>
                     {recordReceipt.isPending ? "Recording…" : "Confirm"}
                   </Button>
                   <Button variant="ghost" onClick={() => { receiptKey.current = null; setRecPanelOpen(false); }}>Cancel</Button>

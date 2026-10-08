@@ -5311,6 +5311,19 @@ Chew approved item groups and their starting accounts (MASTER §0 "Item groups",
 | Supplier bill | A goods line's empty account reads `The item group's account (usual)`. Confirm refusal: `These item groups have no purchase account yet: {groups}. Give them one in Finance Settings → Item groups, then confirm this bill.` |
 | Refusals (the database's) | `Only Finance changes the item groups.` · `Give the item group a name.` · `Keep the name to 40 characters.` · `Another item group is already called {name}.` · `Someone else changed this item group after you opened it. Open it again to see their change.` · `An item group keeps an account once it has one. Pick another account instead.` · `New products of a catalog category start in {group}, so it stays in use.` · `{group} still has products. Move them to another item group first.` · `That item group is not in the list.` · `That product is not in the catalog.` · `{group} is not in use. Choose an item group in use.` · `Someone else moved this product after you opened it. Open it again to see their change.` · `The item group of a product already in the catalog is changed by Finance.` · `A recorded change to an item group cannot be altered.` · reused from 0657: `Account {code} is not in the chart.` · `Account {code} {name} is retired.` · `Account {code} {name} is a group heading. Pick an account under it.` · `Account {code} {name} is kept by its own documents and cannot be picked here.` · `Account {code} {name} is not an income account.` · `Account {code} {name} is not an expense account.` · reused from 0656, now also for an item group's account: `{code} {name} is an account the system posts to, so it stays.` |
 
+### PROPOSAL — PENDING CHEW · Payment methods in two steps (0660)
+
+Chew ruled the methods and the two steps (Finance MASTER §0 "How money is recorded", 「付款方式应该是online, cash, cheque, merchant。 我选了merchant 才会跳merchant选项」) and the build (「你直接做完先」, 2026-10-08); the words below are proposed with them.
+
+| Where | Words |
+|---|---|
+| Settings → Payment → Payment methods | `Online transfer` (the method named `Bank transfer` before; order entry's word) · `Merchant · PBB` · `Merchant · GHL` · `Merchant · HLBB` · `Merchant · MBB` · `Merchant · AhaPay`. Chew wrote `Merchant - PBB`; a screen shows no dash, so ` · ` joins them |
+| The first picker (`Method`) | `Online transfer` · `Cash` · `Cheque` · `Merchant` |
+| The second picker, after `Merchant` | Label `Card machine`; empty choice `Card machine`; choices `PBB` · `GHL` · `HLBB` · `MBB` · `AhaPay` |
+| A machine payment | Reference `Approval code` · proof `Card terminal receipt` (the §16 card words) |
+| Order entry (Sales Portal settings) | `Online transfer` (`FPX / DuitNow`) · `Cash` (`Paid in store`) · `Cheque` · `Merchant` (`Card machine`); Merchant asks `Card machine` with the five choices |
+| Refusal (the database's) | Reused: `a card payment needs its approval code` |
+
 **SO compact file preview — owner approved 2026-10-04:** `Sales order PDF · {actual SO number}` · `Download` · accessible name/tooltip `Close PDF` for the file × and `Close order` for the dark order Header ×. File close returns to Info; order close returns to the Register.
 
 ### Receiving and shared Calendar — owner-approved target, 2026-10-04

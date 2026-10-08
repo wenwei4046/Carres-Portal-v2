@@ -157,7 +157,9 @@ describe("Record payment (§16)", () => {
     const options = Array.from(screen.getByLabelText("Payment method").querySelectorAll("option"))
       .map((o) => o.getAttribute("value"));
     expect(options).not.toContain("online");
-    expect(options).toEqual(["bank", "duitnow_qr", "cheque", "cash", "credit_card", "debit_card"]);
+    // 0660 — while the list loads, Chew's methods stand in (lib/payment-methods).
+    expect(options).toEqual(["bank", "cash", "cheque", "merchant_pbb", "merchant_ghl", "merchant_hlbb",
+      "merchant_mbb", "merchant_ahapay"]);
   });
 });
 
