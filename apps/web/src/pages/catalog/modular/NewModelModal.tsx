@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { useCreateCatalogModel, useGenerateSkus } from "@/lib/queries";
 import { INPUT_CLS, Modal, ModalActions } from "@/pages/operation/components/Modal";
 import { CATEGORY_LABEL } from "../components/atoms";
+import { ItemGroupField, useItemGroupPick } from "../components/ItemGroupField";
 
 /**
  * + New Model (Modular tab, 2990s Products parity Phase 2) — create a whole
@@ -26,6 +27,8 @@ export default function NewModelModal({ onClose }: { onClose: () => void }) {
   const generateSkus = useGenerateSkus();
 
   const [category, setCategory] = useState<ProductCategory>("mattress");
+  // 0659 — the Finance item group the new product starts in (Finance MASTER §1).
+  const itemGroup = useItemGroupPick(category);
   const [name, setName] = useState("");
   const [sizesRaw, setSizesRaw] = useState("");
   const [price, setPrice] = useState("");
@@ -73,8 +76,10 @@ export default function NewModelModal({ onClose }: { onClose: () => void }) {
           modelKey,
           name: name.trim(),
           allowedOptions: sizes.length > 0 ? { sizes } : undefined,
+          itemGroupId: itemGroup.itemGroupId,
         });
         modelId = res.model.id;
+        if (res.itemGroupRefused) toast.error(res.itemGroupRefused);
         setCreatedModelId(modelId); // lock identity; a retry only re-generates
       }
       let generated = 0;
@@ -130,6 +135,7 @@ export default function NewModelModal({ onClose }: { onClose: () => void }) {
             ))}
           </select>
         </label>
+        <ItemGroupField pick={itemGroup} disabled={createdModelId !== null} id="new-model-item-group" />
 
         <label className="block">
           <span className="label block mb-1">Product name</span>

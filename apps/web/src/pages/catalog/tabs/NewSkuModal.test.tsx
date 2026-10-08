@@ -83,6 +83,13 @@ vi.mock("@/lib/queries", () => ({
   }),
 }));
 
+// 0659 — the Finance item groups a new product can start in.
+const itemGroups = vi.hoisted(() => ({
+  groups: [{ id: "g-sofa", name: "SOFA" }, { id: "g-grt", name: "GUARANTEE" }, { id: "g-mat", name: "MATTRESS" }, { id: "g-oth", name: "OTHERS" }],
+  starts: { sofa: "g-sofa", mattress: "g-mat", guarantee: "g-grt", accessory: "g-oth" } as Record<string, string>,
+}));
+vi.mock("@/lib/item-group-queries", () => ({ useItemGroupChoices: () => ({ data: itemGroups }) }));
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -203,6 +210,25 @@ describe("NewSkuModal — sofa compartment picker", () => {
       stockIdentityMode: "exact_unit",
     });
     expect(mockCreateSkuMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("0659: sends the item group picked for the new sofa model", async () => {
+    const onClose = vi.fn();
+    render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={onClose} />);
+    openSofa();
+    expect(screen.getByRole("combobox", { name: /Item group/ })).toHaveTextContent("SOFA");
+    fireEvent.keyDown(screen.getByRole("combobox", { name: /Item group/ }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("option", { name: "OTHERS" }));
+    fireEvent.change(screen.getByTestId("new-sku-name"), { target: { value: "Angsa" } });
+    fireEvent.click(screen.getByText("Create Sofa model + 2 SKUs"));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(mockCreateModelMutateAsync.mock.calls[0][0]).toMatchObject({ category: "sofa", itemGroupId: "g-oth" });
+  });
+
+  it("0659: a guarantee has no item group to pick", () => {
+    render(<NewSkuModal models={MODELS} sofaCompartments={POOL} onClose={vi.fn()} />);
+    fireEvent.change(screen.getByTestId("new-sku-category"), { target: { value: "guarantee" } });
+    expect(screen.queryByRole("combobox", { name: /Item group/ })).toBeNull();
   });
 
   it("unticking a chip excludes it from the offers", async () => {

@@ -6,7 +6,7 @@ import {
   DB,
   catalogResponseSchema,
   parseOrderEntryConfigRow,
-  productModelCreateInput,
+  productModelCreateBody,
   productModelPatchInput,
   productSkuCreateInput,
   productSkuPatchInput,
@@ -576,7 +576,7 @@ catalogRouter.get("/", async (c) => {
 // ----- Models -----
 
 catalogRouter.post("/models", async (c) => {
-  const parsed = await parseJsonBody(c, productModelCreateInput);
+  const parsed = await parseJsonBody(c, productModelCreateBody);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb
@@ -594,10 +594,29 @@ catalogRouter.post("/models", async (c) => {
     .select("*")
     .single();
   if (error) return fail(c, error);
-  return c.json(
-    { model: Adapters.productModelFromRow(data as DB.ProductModelRow) },
-    201,
-  );
+  const model = Adapters.productModelFromRow(data as DB.ProductModelRow);
+  // 0659 — the Finance item group the new product starts in, when the form
+  // chose one (Chew 2026-10-07). A refusal leaves the product in its
+  // category's group and says why; the product itself is made either way.
+  if (parsed.data.itemGroupId) {
+    const started = await sb.rpc("gl_item_group_start", {
+      p_model_id: (data as DB.ProductModelRow).id,
+      p_group_id: parsed.data.itemGroupId,
+    });
+    if (started.error) {
+      return c.json({ model, itemGroupRefused: mapPgError(started.error).body.message }, 201);
+    }
+  }
+  return c.json({ model }, 201);
+});
+
+// 0659 — the Finance item groups a new product can start in, and the one each
+// category starts in (gl_item_group_choices: internal users).
+catalogRouter.get("/item-groups", async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_item_group_choices");
+  if (error) return fail(c, error);
+  return c.json(data);
 });
 
 catalogRouter.patch("/models/:id", async (c) => {
