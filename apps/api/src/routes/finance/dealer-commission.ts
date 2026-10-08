@@ -1,22 +1,26 @@
 import { Hono } from "hono";
-import { dcProductRateInput, dcQuotaInput, dcSettingsInput } from "@carres/shared/dealer-commission";
+import { dcQuotaInput, dcRuleAddInput } from "@carres/shared/dealer-commission";
 import { requireFinance } from "../../lib/auth-guards";
 import { fail, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 /**
- * FINANCE · DEALER COMMISSION AND RENOVATION REBATE (migration 0544).
+ * FINANCE · DEALER COMMISSION AND RENOVATION REBATE (migrations 0544, 0661).
  * Rates Finance keeps and one read for the report. Nothing here is owed or
  * posted (CLAUDE.md §7); the arithmetic is packages/shared/src/dealer-commission.ts.
  *
  *   GET    /?month=YYYY-MM     dealer_commission_source for that month
- *   PUT    /settings           the default commission rate
- *   PUT    /rates/:modelId     a product's own rate
- *   DELETE /rates/:modelId     the product goes back to the default rate
+ *   GET    /rules              dealer_commission_rules_read: the dated rates and switches
+ *   POST   /rules              dealer_commission_rule_add: a rate or switch from a day
+ *   DELETE /rules/:id          dealer_commission_rule_remove: one added by mistake
  *   PUT    /quotas/:dealerId   a dealer's renovation quota, rebate rate, start date
  *
- * Finance and principal twice: `requireFinance` here, and RLS (gl_may_read) in the database.
+ * 0661: a rate has a start day, so the one default rate and the per-product
+ * rates (PUT /settings, PUT and DELETE /rates) are gone; their values are the
+ * first rules. The doors decide who may change a rate and what is valid.
+ *
+ * Finance and principal twice: `requireFinance` here, and the database.
  */
 const r = new Hono<AppEnv>();
 const UUID = /^[0-9a-f-]{36}$/i;
@@ -29,33 +33,37 @@ r.get("/", requireFinance, async (c) => {
   return c.json(data);
 });
 
-r.put("/settings", requireFinance, async (c) => {
-  const body = await parseJsonBody(c, dcSettingsInput);
-  if (!body.ok) return c.json(body.body, body.status);
-  const { error } = await userClient(c.env, c.var.auth.jwt)
-    .from("dealer_commission_settings").update({ default_rate: body.data.defaultRate }).eq("id", true);
+r.get("/rules", requireFinance, async (c) => {
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("dealer_commission_rules_read");
   if (error) return fail(c, error);
-  return c.json({ ok: true });
+  return c.json(data);
 });
 
-r.put("/rates/:modelId", requireFinance, async (c) => {
-  const modelId = c.req.param("modelId");
-  if (!UUID.test(modelId)) return c.json({ error: "not_found", message: "That product is not on the list." }, 404);
-  const body = await parseJsonBody(c, dcProductRateInput);
+r.post("/rules", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, dcRuleAddInput);
   if (!body.ok) return c.json(body.body, body.status);
-  const { error } = await userClient(c.env, c.var.auth.jwt)
-    .from("dealer_commission_rates").upsert({ model_id: modelId, rate: body.data.rate });
+  const b = body.data;
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("dealer_commission_rule_add", {
+    p_kind: b.kind,
+    p_dealer_id: b.kind === "dealer" ? b.dealerId : null,
+    p_model_id: b.kind === "product" || b.kind === "promotion" ? b.modelId : null,
+    p_category: b.kind === "category" ? b.category : null,
+    // A promotion item's points off ride in the rate; a switch has none.
+    p_rate: b.kind === "promotion" ? (b.isOn ? b.points ?? null : null) : b.kind === "category" ? null : b.rate,
+    p_is_on: b.kind === "promotion" || b.kind === "category" ? b.isOn : null,
+    p_starts_on: b.startsOn,
+    p_memo: b.memo ?? null,
+  });
   if (error) return fail(c, error);
-  return c.json({ ok: true });
+  return c.json(data, 201);
 });
 
-r.delete("/rates/:modelId", requireFinance, async (c) => {
-  const modelId = c.req.param("modelId");
-  if (!UUID.test(modelId)) return c.json({ error: "not_found", message: "That product is not on the list." }, 404);
-  const { error } = await userClient(c.env, c.var.auth.jwt)
-    .from("dealer_commission_rates").delete().eq("model_id", modelId);
+r.delete("/rules/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID.test(id)) return c.json({ error: "not_found", message: "That rate is not on the list." }, 404);
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("dealer_commission_rule_remove", { p_id: id });
   if (error) return fail(c, error);
-  return c.json({ ok: true });
+  return c.json(data);
 });
 
 r.put("/quotas/:dealerId", requireFinance, async (c) => {

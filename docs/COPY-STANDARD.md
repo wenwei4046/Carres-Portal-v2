@@ -5324,6 +5324,19 @@ Chew ruled the methods and the two steps (Finance MASTER §0 "How money is recor
 | Order entry (Sales Portal settings) | `Online transfer` (`FPX / DuitNow`) · `Cash` (`Paid in store`) · `Cheque` · `Merchant` (`Card machine`); Merchant asks `Card machine` with the five choices |
 | Refusal (the database's) | Reused: `a card payment needs its approval code` |
 
+### PROPOSAL — PENDING CHEW · Commission rates with start dates (0661)
+
+Chew and management confirmed the rates rules (Finance MASTER §3.2 "Dealer commission rules", 2026-10-05 to 2026-10-07) and the build (「可以，从第1步开始做」, 2026-10-08); the words below are proposed with them.
+
+| Where | Words |
+|---|---|
+| Reports → Dealer commission | The switch keeps `Commission rates` |
+| The list | Groups `Standard rate` · `Dealer rates` · `Product rates` · `Promotion items` · `Kinds of product`; an empty group reads `No dealer has its own rate` · `No product has its own rate` · `No promotion item`. Columns `Applies to` (`Every product`, a dealer, a product, a kind: `Mattress` · `Bedframe` · `Sofa` · `Accessory`) · `Rate` (`{n}%` · `{n} points off` · `Not a promotion item` · `Earns commission` · `Earns nothing`) · `From` (`From the start` or the day) · `Status` (`In use` · `Replaced` · `Starts later`) · `Memo` (`No memo`) · `Added` (`{day} · {who}`). Footer `{n} of {m} rows · An order takes the rates in force on its order day.` Toolbar `Add a rate` |
+| The add window | Title `Add a rate`. Fields `For` (`Standard rate` · `A dealer's rate` · `A product's rate` · `A promotion item` · `A kind of product`) · `Dealer` · `Product` (`{product} · {kind}`) · `Kind of product` · `Commission` · `Rate (%)` · `Promotion` (`Promotion item` · `Not a promotion item`) · `Points off` · `Starts on` · `Memo`, hint `The rule it comes from, like the memo's name and date.` A picker reads `Choose`. `Orders placed from this day take it. Earlier orders keep what they had.` Save names its gap: `Save: pick what the rate is for` · `Save: pick the dealer` · `Save: pick the product` · `Save: pick the kind of product` · `Save: type the rate` · `Save: type the points off` · `Save: pick the day it starts` |
+| A row's window | Title `Commission rate`, what it applies to under it. `Rate:` · `From:` · `Status:` · `Memo:` · `Added:`. A row from a day: `Removing it gives the orders from {day} the one before it.`, footer `Cancel` · `Remove`. A row from the start: `A rate from the start stays. Add a new one from a day instead.`, footer `Close` |
+| First rows' memos | `The rate before rates had a start date` · `Sofas earn commission (Chew 2026-10-06)` · `Accessories earn commission (Chew 2026-10-05, management 2026-10-07)` |
+| Refusals (the database's) | `Only Finance changes the commission rates.` · `Only Finance sees the commission rates.` · `Choose what the rate is for.` · `Choose the day the rate starts.` · `Keep the memo to 200 characters.` · `Choose a dealer.` · `Choose a product that earns commission.` · `Choose a kind of product.` · `The rate is a percentage from 0 to 100, with at most two decimals.` · `Say whether this kind of product earns commission.` · `Say whether the product is a promotion item.` · `Type the points a promotion item takes off, more than 0 and at most 100.` · `There is already one for this from {day}. Remove it first.` · `That rate is not on the list.` · `A rate from the start stays. Add a new one from a day instead.` |
+
 **SO compact file preview — owner approved 2026-10-04:** `Sales order PDF · {actual SO number}` · `Download` · accessible name/tooltip `Close PDF` for the file × and `Close order` for the dark order Header ×. File close returns to Info; order close returns to the Register.
 
 ### Receiving and shared Calendar — owner-approved target, 2026-10-04

@@ -6,10 +6,12 @@
  *
  * Commission, per order:
  *   1. A cashback is spread over the lines by value (RM500 on 1499+999+999 → 2997).
- *   2. Each line's rate: a product rate if Finance set one, else the default.
- *      Service, guarantee and accessory lines earn nothing; transport and
- *      disposal are add-ons. All of them are part of the bill but earn nothing
- *      (accessories: YH for finance, 30 Sep 2026).
+ *   2. Each line's rate is the database's (0661, `dealer_commission_rate`): the
+ *      rate in force on the order's day, from Finance's dated rules — the
+ *      product's own rate, else the dealer's, else the standard, less a
+ *      promotion item's points. Service, the guarantee and a kind of product
+ *      switched off come with rate 0; transport and disposal are add-ons. All
+ *      of them are part of the bill but earn nothing.
  *   3. Only collected money earns: each line earns rate × its share of what was
  *      collected, shared by value. The rest is "still to collect".
  *   Collected is payments less refunds HQ has paid out, up to the cut off, never
@@ -23,21 +25,13 @@
  */
 import { z } from "zod";
 
-/**
- * In the bill, earning nothing.
- *
- * "unmatched" is a line whose SKU has left product_skus, so it cannot be rated
- * at all. Nothing sends that word yet: only migration 0555 would, and 0555 is
- * written but NOT APPLIED, because taking earnings away from a dealer is the
- * owner's ruling, not a bug fix. This entry is inert until that ruling lands —
- * today such a line still arrives with a null category and still takes the
- * default rate, exactly as it did before.
- */
-export const NO_COMMISSION_CATEGORIES = ["service", "guarantee", "accessory", "unmatched"];
-
-export interface DcLine { modelId: string | null; category: string | null; value: number }
+/** One order line. `rate` is the percentage it earns on the order's day
+ *  (0661); 0 = in the bill, earning nothing. */
+export interface DcLine { modelId: string | null; category: string | null; value: number; rate: number | null }
 export interface DcOrder {
   orderId: string; so: number | null; dealerId: string; outletId: string | null;
+  /** The order's day in Malaysia, whose rates its lines take (0661). */
+  orderedOn?: string;
   addons: number; cashback?: number;
   lines: DcLine[];
   payments: { paidOn: string; amount: number }[] | null;
@@ -45,6 +39,8 @@ export interface DcOrder {
   refunds?: { paidOn: string; amount: number }[] | null;
 }
 export interface DcSource {
+  /** Today's standard rate and product rates (0661: read from the dated
+   *  rules). The report reads each line's own rate instead. */
   settings: { defaultRate: number };
   rates: { modelId: string; modelName: string; rate: number }[];
   quotas: { dealerId: string; quota: number; rebateRate: number; startsOn: string }[];
@@ -81,15 +77,16 @@ function keptByDay(o: DcOrder, from: string): [string, number][] {
 }
 
 /** Commission an order earns on `collected`, and what it would earn when paid in full. */
-export function orderCommission(order: DcOrder, rateOf: (modelId: string | null) => number, collected: number) {
+export function orderCommission(order: DcOrder, collected: number) {
   const gross = order.lines.reduce((s, l) => s + Number(l.value), 0);
   const cashback = Number(order.cashback ?? 0);
   const bill = gross - cashback + Number(order.addons);
   let full = 0;
   for (const l of order.lines) {
-    if (NO_COMMISSION_CATEGORIES.includes(l.category ?? "")) continue;
+    const rate = Number(l.rate ?? 0);
+    if (!(rate > 0)) continue;
     const net = gross > 0 ? Number(l.value) - (cashback * Number(l.value)) / gross : 0;
-    full += (net * rateOf(l.modelId)) / 100;
+    full += (net * rate) / 100;
   }
   const share = bill > 0 ? Math.min(1, collected / bill) : 0;
   return { earned: full * share, full };
@@ -120,8 +117,6 @@ export interface DcReportRow {
 
 /** One row per dealer for `month` (YYYY-MM). `outletId` narrows commission; the rebate stays the dealer's. */
 export function dealerCommissionReport(src: DcSource, month: string, filter: { dealerId?: string; outletId?: string } = {}): DcReportRow[] {
-  const special = new Map(src.rates.map((r) => [r.modelId, Number(r.rate)]));
-  const rateOf = (id: string | null) => (id && special.has(id) ? special.get(id)! : Number(src.settings.defaultRate));
   const rows = new Map<string, DcReportRow>();
   for (const d of src.dealers) {
     if (filter.dealerId && d.id !== filter.dealerId) continue;
@@ -133,8 +128,8 @@ export function dealerCommissionReport(src: DcSource, month: string, filter: { d
     const before = kept(o, (d) => d.slice(0, 7) < month);
     const through = kept(o, (d) => d.slice(0, 7) <= month);
     if (filter.outletId && o.outletId !== filter.outletId) continue;
-    const now = orderCommission(o, rateOf, through);
-    row.earned += now.earned - orderCommission(o, rateOf, before).earned;
+    const now = orderCommission(o, through);
+    row.earned += now.earned - orderCommission(o, before).earned;
     row.stillToCollect += now.full - now.earned;
   }
   for (const q of src.quotas) {
@@ -157,8 +152,63 @@ export function dealerCommissionReport(src: DcSource, month: string, filter: { d
 }
 
 const rate = z.number().min(0).max(100);
-export const dcSettingsInput = z.object({ defaultRate: rate });
-export const dcProductRateInput = z.object({ rate });
+
+/**
+ * 0661 — Finance's dated commission rules (docs/finance/MASTER.md §3.2,
+ * Chew 2026-10-05 to 2026-10-07). Each is a rate or a switch from a day; a
+ * row is never changed: a new rate is a new row, a mistake is removed.
+ *   standard   the rate every product takes
+ *   dealer     a dealer's own rate
+ *   product    a product's own rate
+ *   promotion  a product is a promotion item, taking `rate` points off, or is not
+ *   category   a kind of product earns commission, or does not
+ * Order: the product's rate, else the dealer's, else the standard; then a
+ * promotion item's points off. The database decides; these are its shapes.
+ */
+export const DC_RULE_KINDS = ["standard", "dealer", "product", "promotion", "category"] as const;
+export type DcRuleKind = (typeof DC_RULE_KINDS)[number];
+
+export interface DcRule {
+  id: string;
+  kind: DcRuleKind;
+  dealerId: string | null; dealerName: string | null;
+  modelId: string | null; modelName: string | null;
+  category: string | null;
+  /** standard, dealer, product: the percentage. promotion (on): the points off. */
+  rate: number | null;
+  /** category: earns commission. promotion: is a promotion item. */
+  isOn: boolean | null;
+  /** null: from the start. */
+  startsOn: string | null;
+  memo: string | null;
+  createdAt: string; createdBy: string | null;
+  /** in_use: the one in force today · replaced: an earlier one · later: starts after today. */
+  state: "in_use" | "replaced" | "later";
+}
+
+export interface DcRulesRead {
+  today: string;
+  rules: DcRule[];
+  dealers: { id: string; name: string }[];
+  models: { id: string; name: string; category: string }[];
+  /** The kinds of product a switch may name (service and the guarantee never earn). */
+  categories: string[];
+}
+
+const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose the day the rate starts.");
+const memo = z.string().trim().max(200, "Keep the memo to 200 characters.").nullish();
+export const dcRuleAddInput = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("standard"), rate, startsOn: day, memo }).strict(),
+  z.object({ kind: z.literal("dealer"), dealerId: z.string().uuid(), rate, startsOn: day, memo }).strict(),
+  z.object({ kind: z.literal("product"), modelId: z.string().uuid(), rate, startsOn: day, memo }).strict(),
+  z.object({
+    kind: z.literal("promotion"), modelId: z.string().uuid(), isOn: z.boolean(),
+    points: z.number().gt(0).max(100).nullish(), startsOn: day, memo,
+  }).strict(),
+  z.object({ kind: z.literal("category"), category: z.string().min(1).max(40), isOn: z.boolean(), startsOn: day, memo }).strict(),
+]);
+export type DcRuleAddInput = z.infer<typeof dcRuleAddInput>;
+
 export const dcQuotaInput = z.object({
   quota: z.number().min(0).max(9_999_999_999.99),
   rebateRate: rate,

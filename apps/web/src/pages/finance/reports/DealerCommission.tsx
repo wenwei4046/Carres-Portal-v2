@@ -3,11 +3,12 @@
  * owed or posted (CLAUDE.md §7); a payout still goes through a payment voucher.
  *
  * One read of `dealer_commission_source(month)`; every figure is the shared
- * `dealerCommissionReport` (Law D). Finance keeps the rates on two sibling
- * views of the same page, picked from the toolbar switch: `?view=rates` (the
- * default commission rate and products with their own rate) and
- * `?view=quotas` (each dealer's renovation quota). A dealer with no quota
- * opens the quota form, on the quotas view, from its own `Quota left` cell.
+ * `dealerCommissionReport` (Law D), each line at the rate the database read
+ * for its order day (0661). Finance keeps the rates on two sibling views of
+ * the same page, picked from the toolbar switch: `?view=rates` (the dated
+ * rates and switches, CommissionRates.tsx) and `?view=quotas` (each dealer's
+ * renovation quota). A dealer with no quota opens the quota form, on the
+ * quotas view, from its own `Quota left` cell.
  *
  * Frame: `ModuleHeader` + `<ListPageShell register>` + the Register engine, the
  * shape every other Finance register draws (Trial Balance, Unpaid by Supplier,
@@ -34,6 +35,7 @@ import { apiFetch } from "@/lib/api";
 import { fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import { LoadFailed } from "../other-money-in/parts";
+import CommissionRates from "./CommissionRates";
 
 const BASE = "/api/finance/dealer-commission";
 const ALL = "all";
@@ -87,9 +89,10 @@ export default function DealerCommission() {
 
   return <div className="flex h-full min-h-0 flex-col" data-testid="dealer-commission">
     <ModuleHeader destinationHeader testId="dealer-commission-header" word="Dealer commission" docTitle="Dealer commission · Carres" />
-    {q.isError ? <LoadFailed what="The report" onRetry={() => void q.refetch()} /> :
-    view !== "report" ? <ListPageShell register toolbar={<Views current={view} />}>
-      {src && <div className="min-h-0 overflow-y-auto"><Settings view={view} src={src} quota={quota} setQuota={setQuota} /></div>}
+    {view === "rates" ? <CommissionRates toolbarStart={<Views current="rates" />} /> :
+    q.isError ? <LoadFailed what="The report" onRetry={() => void q.refetch()} /> :
+    view === "quotas" ? <ListPageShell register toolbar={<Views current={view} />}>
+      {src && <div className="min-h-0 overflow-y-auto"><Quotas src={src} quota={quota} setQuota={setQuota} /></div>}
     </ListPageShell> :
     <ListPageShell register>
       <DataGrid rows={rows} columns={columns} rowKey={(r) => r.dealerId} storageKey="carres.finance.dealer-commission.v1"
@@ -122,43 +125,25 @@ function Views({ current }: { current: View }) {
   return <SegmentedLinks options={views} value={current} ariaLabel="Dealer commission" testId="dealer-commission-switch" />;
 }
 
-/** One settings card per view; the two modals and the one save are shared. */
-function Settings({ view, src, quota, setQuota }: { view: "rates" | "quotas"; src: DcSource; quota: QuotaDraft | null; setQuota: (q: QuotaDraft | null) => void }) {
+/** The renovation quotas view: one card, and the quota form. */
+function Quotas({ src, quota, setQuota }: { src: DcSource; quota: QuotaDraft | null; setQuota: (q: QuotaDraft | null) => void }) {
   const qc = useQueryClient();
   const save = useMutation({
-    mutationFn: (v: { path: string; method: "PUT" | "DELETE"; body?: unknown }) =>
-      apiFetch(`${BASE}${v.path}`, { method: v.method, body: v.body === undefined ? undefined : JSON.stringify(v.body) }),
+    mutationFn: (v: { path: string; body: unknown }) =>
+      apiFetch(`${BASE}${v.path}`, { method: "PUT", body: JSON.stringify(v.body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["finance", "dealer-commission"] }),
   });
-  const [rate, setRate] = useState(String(src.settings.defaultRate));
-  const [product, setProduct] = useState<{ modelId: string; rate: string } | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const months = useMemo(lastMonths, []);
   const dealerName = (id: string) => src.dealers.find((d) => d.id === id)?.name ?? "Dealer not available";
-  const send = (path: string, method: "PUT" | "DELETE", body?: unknown, done?: () => void) => {
+  const send = (path: string, body: unknown, done?: () => void) => {
     setRefusal(null);
-    save.mutate({ path, method, body }, { onSuccess: done, onError: (e) => setRefusal(e.message) });
+    save.mutate({ path, body }, { onSuccess: done, onError: (e) => setRefusal(e.message) });
   };
-  const close = () => { setProduct(null); setQuota(null); setRefusal(null); };
+  const close = () => { setQuota(null); setRefusal(null); };
 
   return <>
-    {view === "rates" && <SectionCard><div className="p-3 flex flex-col gap-3">
-      <h2 className="text-strong">Commission rates</h2>
-      <div className="flex items-end gap-2">
-        <div className="w-[180px]"><Input id="dc-default-rate" type="number" label="Default rate (%)" min={0} max={100}
-          value={rate} onChange={(e) => setRate(e.target.value)} /></div>
-        <Button variant="primary" loading={save.isPending} onClick={() => send("/settings", "PUT", { defaultRate: Number(rate) })}>Save</Button>
-      </div>
-      {src.rates.map((r) => <div key={r.modelId} className="flex items-center justify-between gap-3 border-b border-base-200 py-1">
-        <span className="text-body">{r.modelName}</span>
-        <span className="flex items-center gap-2"><span className="tabular-nums">{r.rate}%</span>
-          <Button size="sm" onClick={() => setProduct({ modelId: r.modelId, rate: String(r.rate) })}>Edit</Button>
-          <Button size="sm" variant="ghost" onClick={() => send(`/rates/${r.modelId}`, "DELETE")}>Remove</Button></span>
-      </div>)}
-      <div><Button size="sm" icon="add" onClick={() => setProduct({ modelId: "", rate: "20" })}>Add a product rate</Button></div>
-    </div></SectionCard>}
-
-    {view === "quotas" && <SectionCard><div className="p-3 flex flex-col gap-3">
+    <SectionCard><div className="p-3 flex flex-col gap-3">
       <h2 className="text-strong">Renovation quotas</h2>
       {src.quotas.map((q) => <div key={q.dealerId} className="flex items-center justify-between gap-3 border-b border-base-200 py-1">
         <span className="text-body">{dealerName(q.dealerId)}</span>
@@ -166,25 +151,12 @@ function Settings({ view, src, quota, setQuota }: { view: "rates" | "quotas"; sr
           <Button size="sm" onClick={() => setQuota({ dealerId: q.dealerId, quota: String(q.quota), rebateRate: String(q.rebateRate), startsOn: q.startsOn.slice(0, 7) })}>Edit</Button></span>
       </div>)}
       <div><Button size="sm" icon="add" onClick={() => setQuota({ dealerId: "", quota: "", rebateRate: "5", startsOn: months[0] })}>Add a renovation quota</Button></div>
-    </div></SectionCard>}
-
-    {product && <Modal open onOpenChange={(o) => { if (!o) close(); }} title="Product rate"
-      footer={<><Button variant="ghost" onClick={close}>Cancel</Button>
-        <Button variant="primary" loading={save.isPending} disabled={!product.modelId || product.rate === ""}
-          onClick={() => send(`/rates/${product.modelId}`, "PUT", { rate: Number(product.rate) }, close)}>Save</Button></>}>
-      <div className="flex flex-col gap-3">
-        <Select id="dc-product" label="Product" value={product.modelId || undefined} onValueChange={(v) => setProduct({ ...product, modelId: v })}
-          options={src.models.map((m) => ({ value: m.id, label: m.name }))} />
-        <Input id="dc-product-rate" type="number" label="Rate (%)" min={0} max={100} value={product.rate}
-          onChange={(e) => setProduct({ ...product, rate: e.target.value })} />
-        {refusal && <FieldError>{refusal}</FieldError>}
-      </div>
-    </Modal>}
+    </div></SectionCard>
 
     {quota && <Modal open onOpenChange={(o) => { if (!o) close(); }} title="Renovation quota"
       footer={<><Button variant="ghost" onClick={close}>Cancel</Button>
         <Button variant="primary" loading={save.isPending} disabled={!quota.dealerId || quota.quota === "" || quota.rebateRate === ""}
-          onClick={() => send(`/quotas/${quota.dealerId}`, "PUT",
+          onClick={() => send(`/quotas/${quota.dealerId}`,
             { quota: Number(quota.quota), rebateRate: Number(quota.rebateRate), startsOn: `${quota.startsOn}-01` }, close)}>Save</Button></>}>
       <div className="flex flex-col gap-3">
         <Select id="dc-quota-dealer" label="Dealer" value={quota.dealerId || undefined} onValueChange={(v) => setQuota({ ...quota, dealerId: v })}
@@ -197,6 +169,6 @@ function Settings({ view, src, quota, setQuota }: { view: "rates" | "quotas"; sr
         {refusal && <FieldError>{refusal}</FieldError>}
       </div>
     </Modal>}
-    {!product && !quota && refusal && <FieldError>{refusal}</FieldError>}
+    {!quota && refusal && <FieldError>{refusal}</FieldError>}
   </>;
 }
