@@ -3373,6 +3373,14 @@ export {
   INITIAL_WORKSPACE_ACTIVITY_SETTINGS,
   workspaceActivityWindow,
   type WorkspaceActivitySettings,
+  TEAM_ONLINE_MINUTES,
+  teamMemberStateSchema,
+  type TeamMemberState,
+  teamTodayMemberSchema,
+  type TeamTodayMember,
+  teamTodayResponseSchema,
+  type TeamTodayResponse,
+  teamMemberState,
 } from "./workspace-activity";
 
 export { evaluateWorkspaceActivityCheck, type WorkspaceActivityEvidence, type WorkspaceActivityCheck } from "./workspace-activity-check";

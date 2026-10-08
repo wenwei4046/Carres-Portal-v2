@@ -1,16 +1,9 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type Ref } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Settings } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useNavCapabilities } from "./nav-capabilities";
-import CarresLockup from "@/components/CarresLockup";
 import NavBadge from "@/components/NavBadge";
-import {
-  ConnectorElbow,
-  ConnectorTrunk,
-  CONNECTOR_ELBOW_W,
-  CONNECTOR_ROW_GAP,
-} from "@/components/tree-connector";
 import {
   useOperationBadges,
   useMarkOperationBadgeSeen,
@@ -20,6 +13,7 @@ import {
   visibleGroups,
   visibleItems,
   navBlocks,
+  menuGroups,
   navItemHref,
   areaDefaultHref,
   type NavBlock,
@@ -50,67 +44,8 @@ const COLLAPSE_KEY = "ops-sidebar-collapsed";
    from 1280px, where they fit beside two Work panels. */
 const NARROW_DESKTOP_QUERY = "(max-width: 1279px)";
 
-/* ⭐ THE MEASURED RAIL (CARD-2026-08-19-sidebar-expandable-modules §3).
- *
- * One place for the numbers, because the elbow has to LAND on the icon it
- * hangs from and a second copy of 14 or 16 is how that drifts apart.
- *
- *   module row   36px — text-body (13/18) + 9px above and below
- *   child row    32px — text-body (13/18) + 7px above and below
- *   elbow        drops from the module ICON'S CENTRE and turns into the row
- */
-const ROW_PAD_X = 14; // px-3.5 — the rail's shipped row padding
-const MODULE_ICON = 16;
-/** x of the trunk = the module icon's centre. The RULE, not a copied number:
- *  the card measured ≈18px against a narrower padding, and an elbow that
- *  misses the icon it hangs from is the one defect this drawing cannot have. */
-const ELBOW_X = ROW_PAD_X + MODULE_ICON / 2;
-/* ⭐ THE DRAWING ITSELF NOW LIVES IN `components/tree-connector` (2026-09-11),
-   because the owner asked for THIS line between the sections of an expanded
-   SO Batch Purchase row — the same subtle curve, not a second one that starts
-   identical and drifts. The geometry the rail MEASURES stays here; the two
-   spans that paint it do not. */
-const ELBOW_W = CONNECTOR_ELBOW_W;
-/** child text = parent text + 4px (the card's own alignment rule). */
-const CHILD_PAD_L = ROW_PAD_X + MODULE_ICON + 11 + 4;
-/** the flex `gap-0.5` the trunk has to bridge to look continuous. */
-const ROW_GAP = CONNECTOR_ROW_GAP;
-/** module row bottom → icon bottom, so the first elbow reaches the icon. */
-const ICON_TO_ROW_BOTTOM = (36 - MODULE_ICON) / 2;
-/** a `dividerAbove` hairline: 2px gap + 4px margin + 1px rule + 4px + 2px. */
-const DIVIDER_GAP = 13;
-
-/* ── ONE NESTED LEVEL, DERIVED — NEVER MEASURED AGAIN
- * (CARD-2026-08-22-purchasing-01-final-sidebar-listing).
- *
- * A Purchasing GROUP is a row sitting at the module's own child indent, so its
- * children repeat the same drawing one level down. Every number below comes
- * out of the shipped constants above; guessing a second set of x positions is
- * how two levels of the same tree drift apart. */
-const GROUP_ROW_H = 28; // text-label (11/14) + 7px above and below
-/** the module's elbow turns into the group row at the group WORD's middle. */
-const GROUP_TRUNK_TO_ROW_BOTTOM = GROUP_ROW_H / 2;
-/** the nested trunk hangs from the group word's own left edge... */
-const GROUP_ELBOW_X = CHILD_PAD_L;
-/** ...and its children clear the elbow by the same 4px the module level uses. */
-const GROUP_CHILD_PAD_L = CHILD_PAD_L + ELBOW_W + 4;
-
-/** Where one level of children hangs: the trunk's x, the text's indent, and
- *  how far the FIRST child has to reach up to touch what it hangs from. */
-type ChildGeom = { elbowX: number; padL: number; firstGap: number };
-/** children of a MODULE — the trunk drops from the module icon's centre. */
-const MODULE_GEOM: ChildGeom = {
-  elbowX: ELBOW_X,
-  padL: CHILD_PAD_L,
-  firstGap: ROW_GAP + ICON_TO_ROW_BOTTOM,
-};
-/** children of a GROUP — the trunk starts at the group row's BOTTOM, so the
- *  line never runs through the word it hangs from. */
-const GROUP_GEOM: ChildGeom = {
-  elbowX: GROUP_ELBOW_X,
-  padL: GROUP_CHILD_PAD_L,
-  firstGap: ROW_GAP,
-};
+/** The module / plain-row icon (Layout Standard §4.4: 16–20px). */
+const MODULE_ICON = 20;
 
 const PURCHASING: PortalSection = "Purchasing";
 const WAREHOUSE: PortalSection = "Warehouse";
@@ -340,7 +275,6 @@ export default function PortalSidebar({ drawer = false }: {
     return current === (item.tab ?? item.key);
   }
 
-  const roleLabel = role ? role.charAt(0).toUpperCase() + role.slice(1) : "";
   const homeHref = groups[0] ? areaDefaultHref(groups[0]) : "/";
   const activeGroup = groups.find((g) => g.area === activeArea) ?? groups[0];
 
@@ -554,239 +488,121 @@ export default function PortalSidebar({ drawer = false }: {
     );
   }
 
+  /* ── THE DRAWING — Carres Layout Standard §2 (owner-confirmed template, Jess
+   * 2026-10-08). Items 14px/500 in the menu grey; selected = theme light wash
+   * + theme dark ink at 600; sub-items carry one thin grey tree line on their
+   * left edge; deep Purchasing pages are 13px. Every class below is a token. */
+  const ITEM =
+    "relative flex w-full items-center gap-2.5 rounded-control px-2.5 py-[7px] text-left text-control font-medium";
+  const ITEM_REST = "text-c-menu hover:bg-c-line";
+  const ITEM_ON = "bg-c-select-bg text-c-select-fg font-semibold";
+  /** The thin grey tree line of a sub-item: 19px in, a 1px line, the row
+   *  rounded only on its right. */
+  const SUB = "ml-[19px] rounded-l-none shadow-[inset_1px_0_0_var(--c-line)]";
+
   /**
-   * ONE CHILD PAGE, HANGING OFF ITS OWN ELBOW.
-   *
-   * Every child draws its own connector: the trunk drops from the module
-   * icon's centre to this row's middle, then turns right on a 9px radius into
-   * the row. Because each elbow stops at its own row, the line is structurally
-   * ABSENT below the last child — there is no single straight bar running past
-   * the group, which is the defect the drawing exists to avoid.
+   * ONE CHILD PAGE under its module, on the tree line.
    *
    * A `soon` child is deliberately NOT A LINK (`03-page-patterns.md:149` bans
-   * a control that opens nothing; there is no arrow here to be dead). It is a
-   * span with no href, out of the tab order, `aria-disabled`, and it says WHY
-   * on screen — `Coming soon`, on its OWN LINE under the name, because beside
-   * the tag every unbuilt name truncated (measured 2026-08-19,
-   * `COPY-STANDARD.md`). It carries no count either, not even zero: a number
-   * would claim work exists on a page that does not.
+   * a control that opens nothing). It is a span with no href, out of the tab
+   * order, `aria-disabled`, and it says WHY on screen — `Coming soon`, on its
+   * OWN LINE under the name. It carries no count either, not even zero.
    */
-  function renderChild(
-    group: PortalNavGroup,
-    child: PortalNavItem,
-    index: number,
-    isLast: boolean,
-    geom: ChildGeom = MODULE_GEOM,
-  ) {
-    const gapAbove = child.dividerAbove
-      ? DIVIDER_GAP
-      : index === 0
-        ? geom.firstGap
-        : ROW_GAP;
-
-    const elbow = (
-      <>
-        {/* The corner: down the trunk, then the turn into the row — at the
-         * row's MIDDLE, which is what a one-line row's `connectAt` is. */}
-        <ConnectorElbow
-          left={geom.elbowX}
-          gapAbove={gapAbove}
-          connectAt="50%"
-          testId={`nav-elbow-${child.key}`}
-        />
-        {/* The trunk carrying on to the NEXT child — absent on the last one,
-         * which is what makes the line END at the last elbow instead of
-         * running past the group as one straight bar. Drawn per child rather
-         * than measured once, so a two-line `Coming soon` row cannot knock the
-         * arithmetic out. */}
-        {!isLast && (
-          <ConnectorTrunk
-            left={geom.elbowX}
-            from="50%"
-            gapBelow={ROW_GAP}
-            testId={`nav-trunk-${child.key}`}
-          />
-        )}
-      </>
-    );
-
-    const row =
-      "relative w-full text-left pr-3.5 py-[7px] rounded-control text-body flex";
-
+  function renderChild(group: PortalNavGroup, child: PortalNavItem, deep = false) {
+    const size = deep ? "text-body" : "";
+    const pad = deep ? "pl-7" : "pl-4";
     if (child.soon) {
       return (
-        <Fragment key={child.key}>
-          {child.dividerAbove && (
-            <div className="mr-3.5 my-1 border-t border-base-100" style={{ marginLeft: geom.padL }} />
-          )}
-          <div className="relative">
-            {elbow}
-            <span
-              data-testid={`nav-child-${child.key}`}
-              data-soon="1"
-              aria-disabled="true"
-              tabIndex={-1}
-              className={`${row} flex-col items-start text-base-400 font-normal cursor-default select-none`}
-              style={{ paddingLeft: geom.padL }}
-            >
-              <span className="min-w-0 w-full truncate">{child.label}</span>
-              <span className="text-label text-base-400">Coming soon</span>
-            </span>
-          </div>
-        </Fragment>
+        <span
+          key={child.key}
+          data-testid={`nav-child-${child.key}`}
+          data-soon="1"
+          aria-disabled="true"
+          tabIndex={-1}
+          className={`${ITEM} ${SUB} ${pad} ${size} cursor-default select-none flex-col items-start gap-0 text-c-muted`}
+        >
+          <span className="w-full min-w-0 truncate">{child.label}</span>
+          <span className="text-label font-normal text-c-muted">Coming soon</span>
+        </span>
       );
     }
-
     const active = isItemActive(group, child);
     return (
-      <Fragment key={child.key}>
-        {child.dividerAbove && (
-          <div className="mr-3.5 my-1 border-t border-base-100" style={{ marginLeft: geom.padL }} />
-        )}
-        <div className="relative">
-          {elbow}
-          <Link
-            to={navItemHref(group, child)}
-            onClick={() => fireMarkSeen(child.badge)}
-            data-testid={`nav-child-${child.key}`}
-            ref={active ? (activeRowRef as Ref<HTMLAnchorElement>) : undefined}
-            className={
-              active
-                ? `${row} items-center gap-2 bg-kit-blue-3 text-base-900 font-medium`
-                : `${row} items-center gap-2 text-base-600 font-normal hover:bg-hovertint`
-            }
-            style={{ paddingLeft: geom.padL }}
-          >
-            {active && (
-              <span
-                className="absolute left-0 top-[6px] bottom-[6px] bg-kit-blue-9 rounded-r-sm"
-                style={{ width: 3 }}
-              />
-            )}
-            <span className="flex-1 truncate">{child.label}</span>
-            {child.badge && (
-              <NavBadge count={badgeCount[child.badge] ?? 0} label={child.label} />
-            )}
-          </Link>
-        </div>
-      </Fragment>
+      <Link
+        key={child.key}
+        to={navItemHref(group, child)}
+        onClick={() => fireMarkSeen(child.badge)}
+        data-testid={`nav-child-${child.key}`}
+        aria-current={active ? "page" : undefined}
+        ref={active ? (activeRowRef as Ref<HTMLAnchorElement>) : undefined}
+        title={child.label}
+        className={`${ITEM} ${SUB} ${pad} ${size} ${active ? ITEM_ON : ITEM_REST}`}
+      >
+        <span className="min-w-0 flex-1 truncate">{child.label}</span>
+        {child.badge && <NavBadge count={badgeCount[child.badge] ?? 0} label={child.label} />}
+      </Link>
     );
   }
 
   /**
-   * A DRAWER — one named group of Purchasing pages
-   * (CARD-2026-08-22-purchasing-01-final-sidebar-listing).
-   *
-   * It hangs off the module's trunk exactly as a page does, and then repeats
-   * the drawing one level down for its own children. THE WORD IS A LABEL RANK,
-   * NOT A DESTINATION: 11px semibold uppercase, quiet grey, no wash — because
-   * the only blue row in this rail is the exact page you are on.
-   *
-   * Each drawer opens and shuts alone: opening BUY does not shut PROBLEMS. A
-   * buyer works out of two drawers all day, and a rail that keeps closing one
-   * of them behind their back is a rail that gets fought.
-   *
-   * The drawer holding the current page is FORCED open and refuses to shut —
-   * `aria-disabled` says so rather than leaving a handle that silently does
-   * nothing. Hiding the row you are standing on is the one thing §4.2 refuses.
+   * A DRAWER — one named group of Purchasing pages (Buy · Receive · Problems ·
+   * Showroom). THE WORD IS A LABEL RANK, NOT A DESTINATION: small uppercase
+   * grey on the tree line. Each drawer opens and shuts alone; the drawer
+   * holding the current page is FORCED open and says so with `aria-disabled`.
    */
   function renderPurchasingGroup(
     group: PortalNavGroup,
     block: Extract<PurchasingChildBlock, { kind: "group" }>,
-    index: number,
-    isLastBlock: boolean,
   ) {
     const open = isGroupOpen(block.group.key);
     const forced = forcedGroup === block.group.key;
-    const gapAbove = index === 0 ? MODULE_GEOM.firstGap : ROW_GAP;
     return (
-      <div key={block.group.key} className="relative">
-        {/* The MODULE's elbow, turning into this group's word. */}
-        <ConnectorElbow
-          left={ELBOW_X}
-          gapAbove={gapAbove}
-          connectAt={`${GROUP_TRUNK_TO_ROW_BOTTOM}px`}
-          testId={`nav-elbow-${block.group.key}`}
-        />
-        {/* The module's trunk carrying on PAST this whole drawer — children
-         * and all — to reach the next row at the module's level. */}
-        {!isLastBlock && (
-          <ConnectorTrunk
-            left={ELBOW_X}
-            from={`${GROUP_TRUNK_TO_ROW_BOTTOM}px`}
-            gapBelow={ROW_GAP}
-            testId={`nav-trunk-${block.group.key}`}
-          />
-        )}
+      <div key={block.group.key} className="flex flex-col gap-0.5">
         <button
           type="button"
           data-testid={`nav-group-${block.group.key}`}
           aria-expanded={open}
           aria-disabled={forced || undefined}
           onClick={() => togglePurchasingGroup(block.group.key)}
-          className={`relative w-full text-left pr-3.5 py-[7px] rounded-control text-label font-semibold uppercase tracking-[0.16em] flex items-center gap-1.5 ${
-            forced ? "text-base-500 cursor-default" : "text-base-500 hover:text-base-700"
+          className={`${SUB} flex items-center gap-1.5 rounded-r-control pb-0.5 pl-4 pr-2.5 pt-2.5 text-left text-label font-semibold uppercase tracking-[0.12em] text-c-muted ${
+            forced ? "cursor-default" : "hover:text-c-body"
           }`}
-          style={{ paddingLeft: CHILD_PAD_L }}
         >
           <span className="flex-1 truncate">{block.group.label}</span>
           <ChevronDown
-            size={11}
+            size={12}
             aria-hidden="true"
-            className={`shrink-0 text-base-400 transition-transform ${open ? "" : "-rotate-90"}`}
+            className={`shrink-0 transition-transform ${open ? "" : "-rotate-90"}`}
           />
         </button>
-
         {open && (
-          <div
-            data-testid={`nav-group-children-${block.group.key}`}
-            className="flex flex-col gap-0.5 mt-0.5"
-          >
-            {block.pages.map((child, i) =>
-              renderChild(group, child, i, i === block.pages.length - 1, GROUP_GEOM),
-            )}
+          <div data-testid={`nav-group-children-${block.group.key}`} className="flex flex-col gap-0.5">
+            {block.pages.map((child) => renderChild(group, child, true))}
           </div>
         )}
       </div>
     );
   }
 
-  /** A page with no module — Dashboard · Work · Issue Tracker · Payments. */
+  /** A page with no module — Dashboard · Workspace · Issue Tracker · Catalog. */
   function renderPlain(group: PortalNavGroup, item: PortalNavItem) {
     const active = isItemActive(group, item);
-    const base =
-      "relative w-full text-left px-3.5 py-[9px] rounded-control text-body font-medium flex items-center gap-[11px]";
     return (
       <Link
         key={item.key}
         to={navItemHref(group, item)}
         onClick={() => fireMarkSeen(item.badge)}
         data-testid={`nav-child-${item.key}`}
+        aria-current={active ? "page" : undefined}
         ref={active ? (activeRowRef as Ref<HTMLAnchorElement>) : undefined}
-        className={
-          active
-            ? `${base} bg-kit-blue-3 text-base-900`
-            : `${base} text-base-600 hover:bg-hovertint`
-        }
+        title={item.label}
+        className={`${ITEM} ${active ? ITEM_ON : ITEM_REST}`}
       >
-        {active && (
-          <span
-            className="absolute left-0 top-[7px] bottom-[7px] bg-kit-blue-9 rounded-r-sm"
-            style={{ width: 3 }}
-          />
-        )}
-        <item.icon
-          size={MODULE_ICON}
-          strokeWidth={2}
-          className={`shrink-0 ${active ? "text-kit-blue-9" : "text-base-400"}`}
-        />
-        <span className="flex-1 truncate">{item.label}</span>
+        <item.icon size={MODULE_ICON} strokeWidth={1.75} aria-hidden className="shrink-0" />
+        <span className="min-w-0 flex-1 truncate">{item.label}</span>
         {item.badge && <NavBadge count={badgeCount[item.badge] ?? 0} label={item.label} />}
         {item.pendingPill && pendingCount > 0 && (
-          <span
-            className="font-mono bg-primary text-primary-foreground rounded-full px-[7px] py-px text-label font-semibold text-center"
-            style={{ minWidth: 16 }}
-          >
+          <span className="min-w-[16px] rounded-full bg-c-ink px-[7px] py-px text-center text-label font-semibold tabular-nums text-white">
             {pendingCount}
           </span>
         )}
@@ -794,143 +610,120 @@ export default function PortalSidebar({ drawer = false }: {
     );
   }
 
-  /** A MODULE: icon + name + chevron, its pages on elbows beneath it. */
-  function renderModule(
-    group: PortalNavGroup,
-    block: Extract<NavBlock, { kind: "module" }>,
-  ) {
+  /** A MODULE: icon + name + chevron, its pages on the tree line beneath it. */
+  function renderModule(group: PortalNavGroup, block: Extract<NavBlock, { kind: "module" }>) {
     const { module, pages } = block;
     const expanded = openSection === module.section;
     const holdsActive = pages.some((p) => isItemActive(group, p));
-    // A COLLAPSED module carries the work waiting inside it, so nothing hides
-    // behind a chevron; EXPANDED it carries none — the children say it
-    // themselves, and the same number twice reads as two queues. Zero prints
-    // nothing (NavBadge), because a zero badge is a daily invitation to check
-    // a page with nothing on it.
+    // A COLLAPSED module carries the work waiting inside it; EXPANDED it
+    // carries none — the children say it themselves.
     const sum = expanded ? 0 : moduleBadgeSum(block);
     const isPurchasing = module.section === PURCHASING;
-    /* ⭐ ALWAYS EXACTLY ONE VISIBLE ACTIVE INDICATION (owner review, 2026-08-20
-     * — amending this Card's first draft, which let the Purchasing parent stay
-     * neutral while its tree was shut and so left the rail saying NOTHING about
-     * where you were standing).
-     *
-     *   tree OPEN   → only the exact child row is blue; parent and group neutral
-     *   tree SHUT   → the parent row is blue, because it has swallowed your page
-     *   60px rail   → the module icon is blue
-     *
-     * Purchasing is NOT an exception to this: one rule, every module. */
+    /* ALWAYS EXACTLY ONE VISIBLE SELECTED ROW: tree open → the exact child;
+     * tree shut → the module row, because it has swallowed your page. */
     const lit = holdsActive && !expanded;
-    const base =
-      "relative w-full text-left px-3.5 py-[9px] rounded-control text-body font-medium flex items-center gap-[11px]";
+    const slug = module.section.toLowerCase().replace(/\s+/g, "-");
     return (
-      // 8px between module blocks (2px flex gap + 6px) — the pages inside a
-      // module sit 2px apart, so the module is the thing the eye counts.
-      <div key={module.section} className="mt-1.5">
+      <div key={module.section} className="flex flex-col gap-0.5">
         <button
           type="button"
-          data-testid={`nav-module-${module.section.toLowerCase().replace(/\s+/g, "-")}`}
+          data-testid={`nav-module-${slug}`}
           aria-expanded={expanded}
+          title={module.label}
           onClick={() => toggleModule(group, block)}
-          className={
-            lit
-              ? `${base} bg-kit-blue-3 text-base-900`
-              : `${base} text-base-600 hover:bg-hovertint`
-          }
+          className={`${ITEM} ${lit ? ITEM_ON : ITEM_REST}`}
         >
-          {lit && (
-            <span
-              className="absolute left-0 top-[7px] bottom-[7px] bg-kit-blue-9 rounded-r-sm"
-              style={{ width: 3 }}
-            />
-          )}
-          <module.icon
-            size={MODULE_ICON}
-            strokeWidth={2}
-            className={`shrink-0 ${lit ? "text-kit-blue-9" : "text-base-400"}`}
-          />
-          <span className="flex-1 truncate">{module.label}</span>
+          <module.icon size={MODULE_ICON} strokeWidth={1.75} aria-hidden className="shrink-0" />
+          <span className="min-w-0 flex-1 truncate">{module.label}</span>
           {sum > 0 && <NavBadge count={sum} label={module.label} />}
-          <ChevronDown
-            size={13}
+          <ChevronRight
+            size={16}
             aria-hidden="true"
-            className={`shrink-0 text-base-400 transition-transform ${expanded ? "" : "-rotate-90"}`}
+            className={`shrink-0 text-c-muted transition-transform ${expanded ? "rotate-90" : ""}`}
           />
         </button>
-
         {expanded && (
-          <div
-            data-testid={`nav-children-${module.section.toLowerCase().replace(/\s+/g, "-")}`}
-            className="flex flex-col gap-0.5 mt-0.5"
-          >
+          <div data-testid={`nav-children-${slug}`} className="flex flex-col gap-0.5">
             {isPurchasing
-              ? purchasingChildBlocks(pages).map((block_, i, blocks) =>
-                  block_.kind === "page"
-                    ? renderChild(group, block_.item, i, i === blocks.length - 1)
-                    : renderPurchasingGroup(group, block_, i, i === blocks.length - 1),
+              ? purchasingChildBlocks(pages).map((b) =>
+                  b.kind === "page" ? renderChild(group, b.item) : renderPurchasingGroup(group, b),
                 )
-              : pages.map((child, i) =>
-                  renderChild(group, child, i, i === pages.length - 1),
-                )}
+              : pages.map((child) => renderChild(group, child))}
           </div>
         )}
       </div>
     );
   }
 
+  /** The small uppercase group word — OVERVIEW · SALES LOCATIONS · … */
+  const groupHead = (label: string, key: string) => (
+    <span
+      key={`head-${key}`}
+      data-testid={`nav-group-head-${key}`}
+      className="px-2.5 pb-1 pt-3.5 text-label font-semibold uppercase tracking-[0.12em] text-c-muted"
+    >
+      {label}
+    </span>
+  );
+
+  /* Settings — the ONE Settings entry sits at the bottom of the menu (Layout
+   * Standard §2). Finance keeps its own Settings page; People has none. */
+  const settingsHref = location.pathname.startsWith("/finance")
+    ? "/finance/settings"
+    : role === "operation" || role === "principal"
+      ? "/operation/settings"
+      : role === "finance"
+        ? "/finance/settings"
+        : null;
+  const onSettings =
+    location.pathname.startsWith("/operation/settings") || location.pathname.startsWith("/finance/settings");
+  const roleWord: Record<string, string> = {
+    operation: "Operations",
+    principal: "Principal",
+    finance: "Finance",
+    hr: "People",
+  };
+
   return (
     <aside
-      className="bg-white border-r border-base-200 py-5 flex flex-col h-screen sticky top-0 overflow-hidden"
-      style={{ width: collapsed ? 60 : 232, transition: "width 0.18s ease" }}
+      data-testid="portal-sidebar"
+      data-collapsed={collapsed || undefined}
+      className="sticky top-0 flex h-screen flex-col gap-0.5 overflow-hidden bg-background px-2.5 py-3 text-c-body"
+      style={{ width: collapsed ? 64 : 220, transition: "width 0.18s ease" }}
     >
-      {/* Header — brand + collapse toggle. */}
-      {collapsed ? (
-        <div className="px-2 pb-[18px] flex flex-col items-center gap-2.5">
-          <Link to={homeHref} title="Carres home" className="grid place-items-center">
-            <img
-              src="/carres-logo.png"
-              alt="Carres"
-              width={28}
-              height={28}
-              className="block object-contain"
-            />
-          </Link>
-          <button
-            onClick={toggleCollapse}
-            title="Show menu"
-            aria-label="Show menu"
-            className="grid place-items-center w-8 h-8 rounded-md text-base-400 hover:bg-hovertint hover:text-base-700"
-          >
-            <PanelLeftOpen size={18} />
-          </button>
-        </div>
-      ) : (
-        <div className="px-[22px] pb-[18px] flex items-center justify-between gap-2">
-          <Link to={homeHref} title="Home" className="block text-left min-w-0">
-            <CarresLockup showPortal={false} size={36} />
-          </Link>
-          <button
-            onClick={toggleCollapse}
-            title="Hide menu"
-            aria-label="Hide menu"
-            className="shrink-0 grid place-items-center w-8 h-8 rounded-md text-base-400 hover:bg-hovertint hover:text-base-700"
-          >
-            <PanelLeftClose size={18} />
-          </button>
-        </div>
-      )}
-
-      <nav
-        className={`flex-1 ${collapsed ? "px-2" : "px-3"} pt-3 pb-1 flex flex-col gap-2 overflow-auto`}
+      {/* Logo row — wordmark open, heart mark closed, the collapse button on
+          the right (Layout Standard §2). The logo files are never recoloured. */}
+      <div
+        className={`mb-3 flex min-h-[44px] items-center gap-2.5 ${
+          collapsed ? "flex-col justify-center px-0" : "pl-2.5 pr-1.5"
+        }`}
       >
+        <Link to={homeHref} title="Carres home" className="block shrink-0">
+          {collapsed ? (
+            <img src="/carres-mark.png" alt="Carres" width={34} height={34} className="block h-[34px] w-[34px] object-contain" />
+          ) : (
+            <img src="/carres-wordmark-shell.png" alt="Carres" className="block h-5 w-auto" />
+          )}
+        </Link>
+        {!drawer && (
+          <button
+            type="button"
+            onClick={toggleCollapse}
+            title={collapsed ? "Expand menu" : "Collapse menu"}
+            aria-label={collapsed ? "Expand menu" : "Collapse menu"}
+            className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-c-muted hover:bg-c-line ${collapsed ? "" : "ml-auto"}`}
+          >
+            {collapsed ? <ChevronsRight size={16} aria-hidden /> : <ChevronsLeft size={16} aria-hidden />}
+          </button>
+        )}
+      </div>
+
+      <nav aria-label="Modules" className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-auto [scrollbar-width:thin]">
         {collapsed
-          ? // Icon rail — the active area only. Collapsed, the children
-            // disappear and the MODULE's one icon remains (`ui/MASTER.md`
-            // §4.2): an icon rail is for table room, not for navigating
-            // thirteen pages by guessing thirteen icons.
+          ? // Icon rail — the active area only. A module's icon opens its
+            // landing page; the page you are on keeps its selected wash.
             (activeGroup ? navBlocks(activeGroup, role, caps) : []).map((block) => {
-              const target =
-                block.kind === "plain" ? block.item : moduleLandingPage(block);
-              // An unbuilt page is not a control and gets no icon.
+              const target = block.kind === "plain" ? block.item : moduleLandingPage(block);
               if (!target) return null;
               const label = block.kind === "plain" ? block.item.label : block.module.label;
               const Icon = block.kind === "plain" ? block.item.icon : block.module.icon;
@@ -949,95 +742,88 @@ export default function PortalSidebar({ drawer = false }: {
                   to={navItemHref(activeGroup, target)}
                   onClick={() => fireMarkSeen(target.badge)}
                   title={label}
-                  className={`relative w-full px-0 py-[9px] rounded-control flex items-center justify-center ${
-                    active ? "bg-kit-blue-3" : "hover:bg-hovertint"
+                  aria-label={label}
+                  aria-current={active ? "page" : undefined}
+                  className={`relative flex h-9 w-full items-center justify-center rounded-control ${
+                    active ? "bg-c-select-bg text-c-select-fg" : "text-c-menu hover:bg-c-line"
                   }`}
                 >
-                  {active && (
-                    <span
-                      className="absolute left-0 top-[7px] bottom-[7px] bg-kit-blue-9 rounded-r-sm"
-                      style={{ width: 3 }}
-                    />
-                  )}
-                  <Icon
-                    size={18}
-                    strokeWidth={2}
-                    className={`shrink-0 ${active ? "text-kit-blue-9" : "text-base-400"}`}
-                  />
-                  {dot && (
-                    <span className="absolute top-1 right-1.5 w-1.5 h-1.5 rounded-full bg-primary" />
-                  )}
+                  <Icon size={20} strokeWidth={1.75} aria-hidden className="shrink-0" />
+                  {dot && <span className="absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full bg-c-select-fg" />}
                 </Link>
               );
             })
           : groups.map((group) => {
               const open = isOpen(group.area);
-              const multi = groups.length > 1; // area headers only for principal
+              /* For the boss, the Operations area draws its six groups with no
+                 area word (no group is called "Operations"); every other area
+                 she can see keeps its own word as a fold. */
+              const areaHead = groups.length > 1 && group.area !== "operation";
               return (
-                <div key={group.area}>
-                  {multi && (
-                    /* A folded area has hidden the page you are on, so its
-                       title is the one blue mark the rail keeps (the module
-                       rule above: tree shut → the parent is lit). */
+                <div key={group.area} className="flex flex-col gap-0.5">
+                  {areaHead && (
                     <button
                       type="button"
                       data-testid={`nav-area-${group.area}`}
                       aria-expanded={open}
                       onClick={() => toggleGroup(group)}
-                      className={`w-full flex items-center justify-between px-3.5 pb-1.5 pt-1 text-label uppercase tracking-[0.16em] font-semibold cursor-pointer ${
-                        group.area !== activeArea
-                          ? "text-base-500 hover:text-base-700"
-                          : open
-                            ? "text-base-700"
-                            : "text-kit-blue-9"
+                      className={`flex w-full items-center justify-between px-2.5 pb-1 pt-3.5 text-label font-semibold uppercase tracking-[0.12em] ${
+                        group.area === activeArea && !open ? "text-c-select-fg" : "text-c-muted hover:text-c-body"
                       }`}
                     >
                       <span>{group.label}</span>
-                      <ChevronDown
-                        size={12}
-                        aria-hidden="true"
-                        className={`transition-transform ${open ? "" : "-rotate-90"}`}
-                      />
+                      <ChevronDown size={12} aria-hidden="true" className={`transition-transform ${open ? "" : "-rotate-90"}`} />
                     </button>
                   )}
-
-                  {open && (
-                    <div className="flex flex-col gap-0.5">
-                      {navBlocks(group, role, caps).map((block) =>
-                        block.kind === "plain"
-                          ? renderPlain(group, block.item)
-                          : renderModule(group, block),
-                      )}
-                    </div>
-                  )}
+                  {open &&
+                    menuGroups(group, role, caps).map((mg, i) => (
+                      <Fragment key={mg.label ?? `rest-${i}`}>
+                        {mg.label && groupHead(mg.label, mg.label.toLowerCase().replace(/\s+/g, "-"))}
+                        {mg.blocks.map((block) =>
+                          block.kind === "plain" ? renderPlain(group, block.item) : renderModule(group, block),
+                        )}
+                      </Fragment>
+                    ))}
                 </div>
               );
             })}
       </nav>
 
-      <Link
-        to="/me"
-        title="Profile · Sign out"
-        className={`border-t border-base-100 flex items-center hover:bg-hovertint transition-colors ${
-          collapsed
-            ? "px-2 py-4 justify-center"
-            : "px-[22px] py-4 gap-2.5"
-        }`}
-      >
-        <div className="w-[34px] h-[34px] shrink-0 rounded-full bg-base-900 text-white grid place-items-center text-label font-semibold">
-          {initials}
-        </div>
-        {!collapsed && (
-          <div className="min-w-0 flex-1">
-            <div className="text-meta font-semibold text-base-900 truncate">
-              {displayName}
-            </div>
-            <div className="text-label text-base-500 uppercase tracking-[0.1em] mt-px">
-              {roleLabel}
-            </div>
-          </div>
+      {/* Bottom — Settings ⚙ and the person (Layout Standard §2). */}
+      <div className="flex shrink-0 flex-col gap-0.5 border-t border-c-line pt-2">
+        {settingsHref && (
+          <Link
+            to={settingsHref}
+            data-testid="nav-settings"
+            title="Settings"
+            aria-label={collapsed ? "Settings" : undefined}
+            aria-current={onSettings ? "page" : undefined}
+            className={`${ITEM} py-[9px] ${collapsed ? "justify-center px-0" : ""} ${onSettings ? ITEM_ON : ITEM_REST}`}
+          >
+            <Settings size={MODULE_ICON} strokeWidth={1.75} aria-hidden className="shrink-0" />
+            {!collapsed && <span>Settings</span>}
+          </Link>
         )}
-      </Link>
+        <Link
+          to="/me"
+          title={`${displayName} · Profile · Sign out`}
+          aria-label={`${displayName} · Profile · Sign out`}
+          className={`flex items-center gap-2.5 rounded-control px-1.5 py-2 hover:bg-c-line ${collapsed ? "justify-center" : ""}`}
+        >
+          <span className="relative grid h-8 w-8 shrink-0 place-items-center rounded-full bg-c-ink text-meta font-semibold text-white">
+            {initials}
+            <span className="absolute -bottom-px -right-px h-2.5 w-2.5 rounded-full border-2 border-white bg-c-ok-fg" aria-hidden />
+          </span>
+          {!collapsed && (
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate text-body font-semibold text-c-ink">{displayName}</span>
+              <span className="truncate text-label font-normal text-c-muted">
+                {(role && roleWord[role]) ?? ""} · online
+              </span>
+            </span>
+          )}
+        </Link>
+      </div>
     </aside>
   );
 }

@@ -98,6 +98,34 @@ export default {
           // is the only piece proto adds on top.
           soft: "hsl(var(--error-soft))",
         },
+        /* THE CARRES TOKENS (owner-confirmed handoff 2026-10-08,
+         * `src/styles/carres-tokens.css`). Every colour of the shell and of a
+         * restyled page is one of these; nothing else. */
+        c: {
+          ink: "var(--c-ink)",
+          body: "var(--c-body)",
+          secondary: "var(--c-secondary)",
+          muted: "var(--c-muted)",
+          menu: "var(--c-menu)",
+          ground: "var(--c-ground)",
+          card: "var(--c-card)",
+          border: "var(--c-border)",
+          line: "var(--c-line)",
+          "row-line": "var(--c-row-line)",
+          "input-border": "var(--c-input-border)",
+          "table-head": "var(--c-table-head)",
+          "select-bg": "var(--c-select-bg)",
+          "select-fg": "var(--c-select-fg)",
+          "ok-bg": "var(--c-ok-bg)",
+          "ok-fg": "var(--c-ok-fg)",
+          "warn-bg": "var(--c-warn-bg)",
+          "warn-fg": "var(--c-warn-fg)",
+          "err-bg": "var(--c-err-bg)",
+          "err-fg": "var(--c-err-fg)",
+          "info-bg": "var(--c-info-bg)",
+          "info-fg": "var(--c-info-fg)",
+          "btn-main": "var(--btn-main-bg)",
+        },
         /* The Work page's own ladder (Work middle-card kit, 2026-09-24).
          * Values live in index.css; only Work reads these names. */
         work: {

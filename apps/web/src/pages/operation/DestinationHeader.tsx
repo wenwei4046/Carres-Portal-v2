@@ -13,7 +13,8 @@ export default function DestinationHeader({ right }: { right?: ReactNode }) {
   return (
     <ModuleHeader
       testId="sales-orders-destination-header"
-      word="Sales Orders"
+      word="Sales Order"
+      page="Outright"
       docTitle="Sales Orders · Carres"
       destinationHeader
       right={right}

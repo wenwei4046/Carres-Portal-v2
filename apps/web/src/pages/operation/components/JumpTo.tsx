@@ -173,7 +173,12 @@ type Row =
   | { kind: "destination"; destination: JumpDestination }
   | { kind: "document"; document: JumpDocumentResult };
 
-export default function JumpTo() {
+export default function JumpTo({ pill = false }: {
+  /** The shell header's search pill (Carres Layout Standard §1, owner-confirmed
+   *  2026-10-08): the same surface, opened from a 34px grey pill that names
+   *  what it finds. */
+  pill?: boolean;
+} = {}) {
   const navigate = useNavigate();
   const role = useAuth((s) => s.role);
   const [open, setOpen] = useState(false);
@@ -306,17 +311,33 @@ export default function JumpTo() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Jump to"
-        title={`Jump to… (${hint})`}
-        aria-keyshortcuts="Meta+K Control+K"
-        data-testid="jump-to-trigger"
-        className="flex items-center justify-center h-10 w-10 min-[768px]:h-8 min-[768px]:w-8 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
-      >
-        <Icon name="jump" size={16} />
-      </button>
+      {pill ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Search everything"
+          title={`Search SO, PO, GRN, INV (${hint})`}
+          aria-keyshortcuts="Meta+K Control+K"
+          data-testid="jump-to-trigger"
+          className="flex h-[34px] min-w-[140px] max-w-[300px] flex-[0_1_300px] items-center gap-2 rounded-full bg-c-info-bg px-3 text-left text-body text-c-muted hover:brightness-[0.98]"
+        >
+          <Icon name="search" size={18} />
+          <span className="min-w-0 flex-1 truncate">Search SO, PO, GRN, INV</span>
+          <span className="hidden shrink-0 text-meta text-c-muted min-[1100px]:inline">{hint}</span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Jump to"
+          title={`Jump to… (${hint})`}
+          aria-keyshortcuts="Meta+K Control+K"
+          data-testid="jump-to-trigger"
+          className="flex items-center justify-center h-10 w-10 min-[768px]:h-8 min-[768px]:w-8 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
+        >
+          <Icon name="jump" size={16} />
+        </button>
+      )}
 
       <Modal open={open} onOpenChange={(o) => (o ? setOpen(true) : close())} title="Jump to…">
         <div onKeyDown={onKeyDown} data-testid="jump-to-surface">

@@ -2,10 +2,9 @@
  * Button — UI-KIT §6 Box Dictionary, card D0.5a.
  *
  * THREE variants, and the ladder is a colour law, not a taste:
- *   primary  — `blue-9` filled. Blue is §3.3's ONE job "action · clickable",
- *              and §3.4 bans two blue actions in one block, so a block gets
- *              exactly one of these.
- *   neutral  — white surface + `slate-5` hairline. Every other action.
+ *   primary  — charcoal filled (owner-confirmed template 2026-10-08). One
+ *              per area, so a block gets exactly one of these.
+ *   neutral  — white surface + the grey input edge. Every other action.
  *   ghost    — no box at all. Tertiary (cancel, + add …).
  *
  * There is NO danger variant. §3.3 gives red one job — "late · act now" — and
@@ -28,9 +27,12 @@ import Loading from "./Loading";
 type Variant = "primary" | "neutral" | "ghost";
 type Size = "md" | "sm" | "touch";
 
+/* The main button is CHARCOAL (Carres Layout Standard §4.1, owner-confirmed
+ * template 2026-10-08): one per area, white text. A normal button is white
+ * with the grey input edge. */
 const VARIANT: Record<Variant, string> = {
-  primary: "bg-kit-blue-9 text-white border border-kit-blue-9 hover:brightness-95",
-  neutral: "bg-white text-kit-slate-12 border border-kit-slate-5 hover:bg-kit-slate-3",
+  primary: "bg-c-ink text-white border border-c-ink hover:brightness-125",
+  neutral: "bg-white text-c-ink border border-c-input-border hover:bg-c-info-bg",
   ghost: "bg-transparent text-kit-slate-11 border border-transparent hover:bg-kit-slate-3",
 };
 

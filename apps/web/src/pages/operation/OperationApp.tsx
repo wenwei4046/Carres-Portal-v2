@@ -1,8 +1,5 @@
 import { useEffect, useState } from "react";
 import { Menu } from "lucide-react";
-import Button from "@/components/kit/Button";
-import Drawer from "@/components/kit/Drawer";
-import CalendarPanel from "./components/rail/CalendarPanel";
 import PhoneTasksDoor from "./components/rail/PhoneTasksDoor";
 import PendingWorkReminder from "./tasks/PendingWorkReminder";
 import {
@@ -101,8 +98,9 @@ import OperationIssueTracker from "./OperationIssueTracker";
 import IssueRelatedPartyReport from "./IssueRelatedPartyReport";
 import OperationGuarantees from "./OperationGuarantees";
 // Gmail-style right rail — Calendar (deliveries/day) · Keep notes · Tasks board.
-import OperationRightRail from "./components/OperationRightRail";
-import GlobalTopBar from "./components/GlobalTopBar";
+import ShellHeader, { ShellHeaderContext, useShellHeaderHost } from "./components/ShellHeader";
+import ShellTasks from "./components/ShellTasks";
+import { activeNavTitle } from "@/pages/portal/portal-nav";
 import type { MovementsFilters } from "@/lib/queries";
 
 /**
@@ -127,12 +125,8 @@ import type { MovementsFilters } from "@/lib/queries";
 export default function OperationApp() {
   const location = useLocation();
   const phone = usePhone();
+  const shellHost = useShellHeaderHost();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [calendarOpen, setCalendarOpen] = useState(false);
-  const calendarDestination = new URLSearchParams(location.search);
-  for (const key of ["calendarModule", "calendarLocation", "calendarDay", "calendarRange"]) calendarDestination.delete(key);
-  const calendarDestinationKey = calendarDestination.toString();
-  useEffect(() => { setCalendarOpen(false); }, [location.pathname, calendarDestinationKey]);
   /* A chosen page closes the drawer. */
   useEffect(() => {
     setMenuOpen(false);
@@ -335,16 +329,17 @@ export default function OperationApp() {
     }
   }
 
+  /* ⭐ THE SHELL (Carres Layout Standard §1, owner-confirmed template, Jess
+   * 2026-10-08): menu · one 56px header over the page AND the Tasks panel ·
+   * the page and the 320px Tasks card side by side, 12px apart, on the cream
+   * canvas. The page itself never scrolls; its panels do. A page names itself
+   * through `ModuleHeader`, which renders into the header's slot; a page that
+   * does not is named by its menu item. */
+  const navTitle = activeNavTitle(location.pathname, location.search);
   return (
     <div
-      className="h-screen text-base-900 grid"
-      style={{
-        // PortalSidebar owns its own collapse state + intrinsic width (232px
-        // expanded ⇄ icon rail collapsed), so the grid column just follows it.
-        // On a phone (owner review 2026-09-25) the page has the whole width:
-        // the rail is a drawer behind `Menu`, and the right rail is not drawn.
-        gridTemplateColumns: phone ? "minmax(0, 1fr)" : "auto minmax(0, 1fr) auto",
-      }}
+      className="grid h-screen bg-background text-c-body"
+      style={{ gridTemplateColumns: phone ? "minmax(0, 1fr)" : "auto minmax(0, 1fr)" }}
     >
       {phone ? (
         <>
@@ -368,115 +363,39 @@ export default function OperationApp() {
       ) : (
         <PortalSidebar />
       )}
-      <main className="min-w-0 bg-base-50 flex flex-col overflow-hidden">
+      <ShellHeaderContext.Provider value={shellHost.value}>
+      <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
         {phone ? (
-          <div className="flex h-11 shrink-0 items-center border-b border-base-200 bg-white px-2">
+          <div className="flex h-11 shrink-0 items-center border-b border-c-line bg-white px-2">
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
               aria-expanded={menuOpen}
               data-testid="phone-menu-button"
-              className="inline-flex h-9 items-center gap-2 rounded-control px-2 text-control text-base-900 hover:bg-hovertint"
+              className="inline-flex h-9 items-center gap-2 rounded-control px-2 text-control text-c-ink hover:bg-c-line"
             >
               <Menu size={18} />
               Menu
             </button>
             <div className="ml-auto flex items-center gap-1">
-              <Button variant="ghost" icon="date" onClick={() => setCalendarOpen(true)} aria-expanded={calendarOpen}>Calendar</Button>
-              {/* The phone shell has no Quick Rail, so `Tasks` sits beside
-                  `Calendar` in the same form and opens the same Tasks area in
-                  a Drawer (owner direction 2026-10-05). */}
+              {/* The phone shell has no Tasks card; `Tasks` opens the same
+                  Tasks list in a Drawer. */}
               <PhoneTasksDoor />
             </div>
-            <Drawer open={calendarOpen} onOpenChange={setCalendarOpen} title="Calendar">
-              {calendarOpen && <CalendarPanel onOpenRecord={() => setCalendarOpen(false)} />}
-            </Drawer>
           </div>
-        ) : null}
-        {/* Site-wide utility bar (Alerts · Help · Settings) — pinned above the
-            routed page on every operation screen. The Orders list is the ONE
-            exception: its own white header surface embeds <TopBarIcons />, so
-            the slim bar would duplicate them there. */}
-        {/* Hide the slim top bar on pages that render TopBarIcons in their own
-            header surface (Orders list) or that sit under a module tab bar with
-            its own right cluster (Purchasing: To Order / Purchase Orders /
-            Receiving — Jess 2026-07-22, Q9 Option B — one clean top row, not
-            two, so the module tab bar is the only chrome). */}
-        {!isOrdersUrl &&
-          location.pathname !== "/operation/settings/staff-duties" &&
-          !isDeliveryOrdersUrl &&
-          !isEditDeliveryUrl &&
-          !isOldOrdersUrl &&
-          !isProcurementUrl &&
-          !isToOrderUrl &&
-          /* CARD-2026-08-22-purchasing-02 — SO Batch Purchase draws the
-             Purchasing Destination Header itself, so the slim global bar would
-             be a second top row. */
-          tab !== "purchase" &&
-          /* CARD-2026-08-21-delivery-02 — the SAME defect Manual Purchase
-             shipped with, caught on the production walk: Delivery Work draws
-             its own 50px Destination Header (which embeds TopBarIcons), so the
-             slim bar put a second Jump to, a second bell reading 59, a second
-             Help and a second gear on one screen. `Delivery Orders` never had
-             it because it is a real route and is suppressed above. */
-          tab !== "delivery" &&
-          tab !== "manual-purchase" &&
-          tab !== "receiving" &&
-          tab !== "claims" &&
-          /* §9.6 Purchase Returns — the SIXTH page to ship this exact defect.
-             It draws PurchasingTabs, which is a ModuleHeader and embeds
-             TopBarIcons, so the slim bar put a second Jump to, a second bell,
-             a second Help and a second gear on one screen. Found on the
-             production walk, like every one before it; the test below now
-             catches the whole CLASS instead of waiting for the next walk. */
-          tab !== "purchase-returns" &&
-          /* §9.7 Repair Orders draws PurchasingTabs (its own ModuleHeader). */
-          tab !== "repair-orders" &&
-          /* The SEVENTH, and nobody was looking for it: `Supplier items` is a
-             live rail destination that draws its own ModuleHeader and has been
-             showing two top rows. The class test above found it the minute it
-             existed, which is the whole reason that test is a rule and not a
-             list of six names. */
-          tab !== "supplier-items" &&
-          tab !== "purchasing-report" &&
-          tab !== "purchasing-settings" &&
-          /* 【RECEIVING】 CARD 01 — Receiving & Inbound and Staff & Duties draw
-             their own Destination Header; the slim bar would be a second top
-             row (the same defect the Warehouse walks caught, found live on
-             this card's production walk). */
-          tab !== "receiving-report" &&
-          /* 【DELIVERY】 CARD 17 — Reports → Delivery draws the Delivery
-             destination header (ModuleHeader embeds TopBarIcons). */
-          tab !== "delivery-report" &&
-          tab !== "staff-duties" &&
-          /* 【WAREHOUSE】 CARD 02 — the Inventory Register, the two
-             de-navigated legacy Stock pages and Unit Detail all draw their own
-             50px Destination Header (ModuleHeader embeds TopBarIcons), so the
-             slim bar was a second Jump to, a second bell, a second gear on one
-             screen — the same defect Manual Purchase and Delivery Work each
-             shipped with, measured live on the CARD 01 walk. */
-          tab !== "stock-onhand" &&
-          tab !== "showroom" &&
-          tab !== "stock-plan" &&
-          tab !== "movements" &&
-          /* WAREHOUSE — Monitor, Inbound and Outbound draw their own
-             Destination Header; the slim bar would be a second top row. */
-          tab !== "warehouse-arrival-schedule" &&
-          tab !== "warehouse-pickup-schedule" &&
-          tab !== "warehouse-inbound" &&
-          tab !== "warehouse-outbound" &&
-          tab !== "arrival-source" &&
-          /* WORK — its one-row workspace header carries TopBarIcons (density
-             ruling 2026-09-25); the slim bar was a second 44px top row that
-             pushed the 743×704 detail below the fold. */
-          tab !== "work" &&
-          !isStockUnitUrl && <GlobalTopBar />}
-        <div
-          className={`flex-1 min-h-0 ${
-            isSalesOrdersRegisterUrl || isDeliveryOrdersRegisterUrl
-              ? "overflow-hidden"
-              : "overflow-auto"
-          }`}
+        ) : (
+          <ShellHeader
+            slotRef={shellHost.slotRef}
+            claimed={shellHost.claimed}
+            crumb={navTitle?.crumb}
+            title={navTitle?.title ?? "Carres"}
+          />
+        )}
+        <div className={`flex min-h-0 min-w-0 flex-1 ${phone ? "" : "gap-3 px-3 pb-3"}`}>
+        <main
+          className={`flex min-h-0 min-w-0 flex-1 flex-col ${
+            isSalesOrdersRegisterUrl || isDeliveryOrdersRegisterUrl ? "overflow-hidden" : "overflow-auto"
+          } ${phone ? "" : "rounded-lg"}`}
           data-testid={isSalesOrdersRegisterUrl ? "sales-orders-work-surface" : undefined}
         >
         {isUrlDriven ? (
@@ -721,13 +640,11 @@ export default function OperationApp() {
             {tab === "guarantees" && <OperationGuarantees />}
           </>
         )}
+        </main>
+        {phone ? null : <ShellTasks />}
         </div>
-      </main>
-      {/* STAGE 2 MODULE SHELL (owner, 2026-08-09) — the rail is RESTORED on
-          the Sales Orders routes, same as every other operation page. This
-          supersedes SO-1's "rail not mounted" ruling — later owner statement
-          wins (BUILD-QUEUE governance). */}
-      {phone ? null : <OperationRightRail />}
+      </div>
+      </ShellHeaderContext.Provider>
       {/* The first-entry `Pending work` reminder (owner direction 2026-10-05). */}
       <PendingWorkReminder />
     </div>

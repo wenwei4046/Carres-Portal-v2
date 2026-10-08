@@ -28,6 +28,8 @@ import { apiFetch } from "@/lib/api";
 import { buildInfo, checkForUpdate, shortCommit, type UpdateCheck } from "@/lib/build-info";
 import { TASKS_KEY } from "./rail/TasksPanel";
 import JumpTo from "./JumpTo";
+import TeamButton from "./TeamButton";
+import { useShellHeader } from "./shell-header-context";
 import type { OpsTasksListResponse } from "@carres/shared";
 
 /** ops_order_control is sometimes an array (embed) — normalise to the row. */
@@ -100,7 +102,20 @@ function moduleSettingsFor(
 /** The Bell / HelpCircle / Settings cluster (Lucide, no emoji) with popovers —
  *  reusable: sits in the slim bar on most pages, and inline in the Orders
  *  header's right cluster. */
-export function TopBarIcons() {
+export function TopBarIcons({ inShell = false }: {
+  /** Drawn by the Operations shell header (Carres Layout Standard §1, owner-
+   *  confirmed 2026-10-08): search pill · Team · Bell, nothing else — Settings
+   *  lives at the bottom of the side menu. */
+  inShell?: boolean;
+} = {}) {
+  const shell = useShellHeader();
+  /* Inside the shell the header is drawn ONCE, by the shell; a page that
+     still embeds this cluster draws nothing here. */
+  if (shell && !inShell) return null;
+  return <TopBarIconsBody inShell={inShell} />;
+}
+
+function TopBarIconsBody({ inShell }: { inShell: boolean }) {
   const navigate = useNavigate();
   const location = useLocation();
   const moduleSettings = moduleSettingsFor(location.pathname, location.search);
@@ -156,13 +171,14 @@ export function TopBarIcons() {
   };
 
   return (
-    <div ref={barRef} className="flex items-center gap-1">
+    <div ref={barRef} className={`flex items-center ${inShell ? "gap-2.5" : "gap-1"}`}>
       {/* Jump to… — the ONE global command surface, and the first utility in
           the locked Page Header order. It owns its own overlay and its own ⌘K
           listener, so it needs nothing from this bar's popover state: the
           three menus below are mutually exclusive with each other, never with
           a surface that takes the screen. */}
-      <JumpTo />
+      {inShell ? <JumpTo pill /> : <JumpTo />}
+      {inShell && <TeamButton />}
 
       {/* Bell · Alerts — real counts from the order book + tasks feed. */}
       <div className="relative">
@@ -173,11 +189,14 @@ export function TopBarIcons() {
           title="Alerts"
           aria-haspopup="menu"
           aria-expanded={open === "alerts"}
-          className="relative flex items-center justify-center h-10 w-10 min-[768px]:h-8 min-[768px]:w-8 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
+          className={inShell
+            ? "relative grid h-[34px] w-[34px] place-items-center rounded-full border border-c-input-border bg-white text-c-ink hover:bg-c-info-bg"
+            : "relative flex items-center justify-center h-10 w-10 min-[768px]:h-8 min-[768px]:w-8 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"}
         >
-          <Bell size={16} aria-hidden />
+          <Bell size={inShell ? 18 : 16} strokeWidth={inShell ? 1.75 : 2} aria-hidden />
           {alerts.total > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full bg-danger text-white text-label font-semibold leading-[16px] text-center">
+            /* Bell = charcoal: it needs action (Layout Standard §4.1). */
+            <span className={`absolute min-w-[16px] h-[16px] px-1 rounded-full text-white text-label font-semibold leading-[16px] text-center tabular-nums ${inShell ? "-top-[3px] -right-[3px] bg-c-ink" : "-top-0.5 -right-0.5 bg-danger"}`}>
               {alerts.total > 99 ? "99+" : alerts.total}
             </span>
           )}
@@ -227,6 +246,7 @@ export function TopBarIcons() {
         )}
       </div>
 
+      {!inShell && (<>
       {/* HelpCircle — a two-item menu: Help · Training / SOP (both placeholders;
           the SOP library fills in later). */}
       <div className="relative">
@@ -368,6 +388,7 @@ export function TopBarIcons() {
           </div>
         )}
       </div>
+      </>)}
     </div>
   );
 }

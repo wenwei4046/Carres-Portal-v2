@@ -1,3 +1,10 @@
+/* Carres design tokens (owner-confirmed handoff 2026-10-08) — the ONE colour,
+ * font, size and radius source for the shell and every restyled page. The file
+ * is copied verbatim from the handoff; never edit it here. */
+@import "./styles/carres-tokens.css";
+/* Material Symbols Rounded, outline, weight 300 (handoff Design tokens). */
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&display=block");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -16,7 +23,7 @@
     --dial-red: #e24b4a;    --dial-red-soft: #fcebeb;
     --dial-green: #639922;  --dial-green-soft: #eaf3de;
     --dial-check: #3b6d11;
-    --background: 220 23% 97.5%;       /* #F7F8FA — the ONE canvas (UI MASTER §6.7, Jess 2026-09-17); #F3F4F6 retired */
+    --background: 36 20% 95%;          /* #F5F3F0 — the ONE canvas, Carres cream (Layout Standard §4.0, Jess 2026-10-08); #F7F8FA retired */
     /* ===== WORK MIDDLE-CARD KIT (owner-approved Work kit 2026-09-24,
      * docs/workspace/MASTER.md §5.5) — the Work page's section
      * edge, card ink ladder and date-status fills. Read ONLY through the

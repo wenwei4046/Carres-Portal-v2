@@ -1,5 +1,11 @@
 import { Hono } from "hono";
-import { workspaceActivitySettingsInput, workspaceActivitySettingsResponseSchema } from "@carres/shared";
+import {
+  TEAM_ONLINE_MINUTES,
+  teamMemberState,
+  teamTodayResponseSchema,
+  workspaceActivitySettingsInput,
+  workspaceActivitySettingsResponseSchema,
+} from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -42,6 +48,35 @@ router.put("/settings", requireOperation, async (c) => {
     return c.json(mapped.body, mapped.status);
   }
   return c.json(settings(data as Record<string, unknown>, true));
+});
+/* GET /team-today — the page header's Team list (owner ruling 2026-10-08).
+ * The definer function returns each person's last minute today; the state is
+ * decided here against the Worker's clock with the one shared rule. */
+router.get("/team-today", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("workspace_team_today");
+  if (error) {
+    const mapped = mapPgError(error);
+    return c.json(mapped.body, mapped.status);
+  }
+  const now = new Date();
+  const rows = (data ?? []) as Array<{
+    user_id: string; name: string; role: string; last_active_at: string | null; available: boolean;
+  }>;
+  return c.json(teamTodayResponseSchema.parse({
+    asOf: now.toISOString(),
+    onlineMinutes: TEAM_ONLINE_MINUTES,
+    members: rows.map((r) => {
+      const lastActiveAt = r.last_active_at ? new Date(r.last_active_at).toISOString() : null;
+      return {
+        userId: r.user_id,
+        name: r.name,
+        role: r.role,
+        lastActiveAt,
+        ...teamMemberState(lastActiveAt, r.available, now),
+      };
+    }),
+  }));
 });
 router.post("/", requireOperation, async (c) => {
   // The body never supplies identity or an occurrence time. Postgres uses

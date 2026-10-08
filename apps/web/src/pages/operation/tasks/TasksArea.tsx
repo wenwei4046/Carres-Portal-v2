@@ -84,7 +84,12 @@ function usePoWindowFacts(enabled: boolean): Map<string, PoWindowFacts> {
 
 type Result = { text: string; taskId: string; stay: boolean };
 
-export default function TasksArea({ onClose, fill = false }: { onClose: () => void; fill?: boolean }) {
+export default function TasksArea({ onClose, fill = false, bare = false }: {
+  onClose: () => void;
+  fill?: boolean;
+  /** Inside the shell's Tasks card, which draws the title row itself. */
+  bare?: boolean;
+}) {
   const work = useOpenWorkSet();
   const { items, myUserId, hasData, error, refreshFailed, lastUpdatedAt, unhealthySources, generatedOn, retry } = work;
   const today = generatedOn;
@@ -110,6 +115,11 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
   const live = taskId ? items.find((r) => r.id === taskId) ?? null : null;
   if (live) snapshot.current = live;
   const task = taskId ? live ?? snapshot.current : null;
+  const setTaskOpen = useTasksHost((s) => s.setTaskOpen);
+  useEffect(() => {
+    setTaskOpen(Boolean(task));
+    return () => setTaskOpen(false);
+  }, [task, setTaskOpen]);
   const [result, setResult] = useState<Result | null>(null);
   const [review, setReview] = useState<((close: () => void) => ReactNode) | null>(null);
   const setDirty = useTasksHost((s) => s.setDirty);
@@ -349,7 +359,7 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
 
   const listView = (
     <div className={`${task ? "hidden" : "flex"} min-h-0 flex-1 flex-col`} hidden={Boolean(task)} data-testid="tasks-list">
-      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-kit-slate-4 px-3">
+      <div className={`${bare ? "hidden" : "flex"} h-12 shrink-0 items-center gap-2 border-b border-kit-slate-4 px-3`}>
         <ListTodo size={18} aria-hidden className="text-kit-slate-11" />
         <h2 className="flex-1 text-strong text-kit-slate-12">{T.title}</h2>
         <button type="button" onClick={() => guard(onClose)} className="rounded p-1 text-kit-slate-11 hover:bg-kit-slate-3" aria-label="Close panel" data-testid="tasks-close">
