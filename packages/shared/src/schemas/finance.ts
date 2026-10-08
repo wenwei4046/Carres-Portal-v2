@@ -534,6 +534,109 @@ export interface LedgerPostingAccounts {
 }
 
 /**
+ * 0659 — Finance Settings → Item groups (Chew 2026-10-07, MASTER §0).
+ *
+ * Each catalog product is in an item group; each group binds four accounts.
+ * An empty account means that posting is not bound yet: a bill of such a
+ * group is not confirmed, a sale goes to the goods account and is listed.
+ * `was` is the group as the screen showed it; a change made since is refused.
+ */
+const itemGroupAccount = z.string().trim().regex(ledgerAccountCodeShape, 'That account is not in the chart.').nullable();
+const itemGroupState = z.object({
+  name: z.string(),
+  purchaseAccount: z.string().nullable(),
+  salesAccount: z.string().nullable(),
+  salesReturnAccount: z.string().nullable(),
+  purchaseReturnAccount: z.string().nullable(),
+  active: z.boolean(),
+}).strict();
+export const ledgerItemGroupSaveInput = z.object({
+  name: z.string().trim().min(1, 'Give the item group a name.').max(40, 'Keep the name to 40 characters.'),
+  purchaseAccount: itemGroupAccount,
+  salesAccount: itemGroupAccount,
+  salesReturnAccount: itemGroupAccount,
+  purchaseReturnAccount: itemGroupAccount,
+  active: z.boolean(),
+  was: itemGroupState.nullable(),
+}).strict();
+export type LedgerItemGroupSaveInput = z.infer<typeof ledgerItemGroupSaveInput>;
+
+/** Move a product into an item group; `was` is the group the screen showed. */
+export const ledgerItemGroupPlaceInput = z.object({
+  modelId: z.string().uuid(),
+  groupId: z.string().uuid(),
+  was: z.string().uuid().nullable(),
+}).strict();
+export type LedgerItemGroupPlaceInput = z.infer<typeof ledgerItemGroupPlaceInput>;
+
+export interface LedgerItemGroup {
+  id: string;
+  name: string;
+  active: boolean;
+  purchaseAccount: string | null;
+  purchaseName: string | null;
+  salesAccount: string | null;
+  salesName: string | null;
+  salesReturnAccount: string | null;
+  salesReturnName: string | null;
+  purchaseReturnAccount: string | null;
+  purchaseReturnName: string | null;
+  /** The catalog categories whose products start in this group. */
+  categories: string[];
+  /** Products in the group now, not counting discontinued ones. */
+  products: number;
+}
+
+export interface LedgerItemGroupProduct {
+  modelId: string;
+  name: string;
+  category: string;
+  skus: number;
+  groupId: string | null;
+  /** Finance moved it here; otherwise it is in its category's group. */
+  placed: boolean;
+  discontinued: boolean;
+}
+
+/** An invoice's goods that went to the goods account (0659). `groupId` null:
+ *  the SKU is not in the catalog. */
+export interface LedgerItemGroupUnboundSale {
+  id: number;
+  invoiceNo: string;
+  so: number | null;
+  issuedAt: string | null;
+  groupId: string | null;
+  skus: string[];
+  amount: number | string;
+  accountCode: string;
+  accountName: string | null;
+}
+
+export interface LedgerItemGroupChange {
+  id: string;
+  what: 'ADDED' | 'NAME' | 'ACTIVE' | 'PURCHASE' | 'SALES' | 'SALES_RETURN' | 'PURCHASE_RETURN' | 'PRODUCT';
+  groupId: string;
+  groupName: string;
+  modelName: string | null;
+  fromGroupName: string | null;
+  fromCode: string | null;
+  fromName: string | null;
+  toCode: string | null;
+  toName: string | null;
+  fromText: string | null;
+  toText: string | null;
+  changedAt: string;
+  changedBy: string | null;
+}
+
+export interface LedgerItemGroups {
+  groups: LedgerItemGroup[];
+  products: LedgerItemGroupProduct[];
+  unbound: LedgerItemGroupUnboundSale[];
+  changes: LedgerItemGroupChange[];
+}
+
+/**
  * Move accounts within ONE heading on Finance Settings → Chart of accounts (0557).
  *
  * BOTH ORDERS TRAVEL. `was` is the order the screen READ, `now` is the order it

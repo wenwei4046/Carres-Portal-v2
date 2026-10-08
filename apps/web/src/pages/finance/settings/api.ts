@@ -21,6 +21,9 @@ import type {
   LedgerBooksClosed,
   LedgerChartImportInput,
   LedgerChartImportResult,
+  LedgerItemGroupPlaceInput,
+  LedgerItemGroupSaveInput,
+  LedgerItemGroups,
   LedgerPostingAccountSetInput,
   LedgerPostingAccounts,
 } from "@carres/shared";
@@ -119,6 +122,38 @@ export function useSetAccountActive() {
 }
 
 /** 0657 — the account each posting the system makes goes to, and the latest changes. */
+/** 0659 — Finance Settings → Item groups: the groups and their accounts, every
+ *  product and its group, the sales that went to the goods account, the changes. */
+export function useItemGroups() {
+  return useQuery({
+    queryKey: ["finance", "item-groups"] as const,
+    queryFn: () => apiFetch<LedgerItemGroups>("/api/finance/ledger/item-groups"),
+  });
+}
+
+/** 0659 — add an item group (no id) or change one. `was` is the group the
+ *  screen showed; the database refuses with 409 when someone changed it since. */
+export function useSaveItemGroup() {
+  const qc = useQueryClient();
+  return useMutation<{ id: string; changed: boolean }, Error, { id: string | null } & LedgerItemGroupSaveInput>({
+    mutationFn: ({ id, ...v }) =>
+      apiFetch(id ? `/api/finance/ledger/item-groups/${id}` : "/api/finance/ledger/item-groups", {
+        method: id ? "PUT" : "POST",
+        body: JSON.stringify(v),
+      }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["finance"] }),
+  });
+}
+
+/** 0659 — move a product into another item group. */
+export function usePlaceProduct() {
+  const qc = useQueryClient();
+  return useMutation<{ changed: boolean }, Error, LedgerItemGroupPlaceInput>({
+    mutationFn: (v) => apiFetch("/api/finance/ledger/item-groups/place", { method: "POST", body: JSON.stringify(v) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["finance"] }),
+  });
+}
+
 export function usePostingAccounts() {
   return useQuery({
     queryKey: ["finance", "posting-accounts"] as const,
