@@ -75,8 +75,8 @@ import {
 
 /* Forced states — the same declarations the components carry, applied without
  * a pointer so CI can photograph them. Pinned by the test file. */
-const FORCED_HOVER_PRIMARY = "[&>button]:brightness-95";
-const FORCED_HOVER_NEUTRAL = "[&>button]:bg-kit-blue-3";
+const FORCED_HOVER_PRIMARY = "[&>button]:brightness-125";
+const FORCED_HOVER_NEUTRAL = "[&>button]:bg-c-info-bg";
 const FORCED_FOCUS_BUTTON = "[&>button]:ring-2 [&>button]:ring-kit-blue-9 [&>button]:ring-offset-1";
 const FORCED_FOCUS_INPUT = "[&_input]:ring-2 [&_input]:ring-kit-blue-9 [&_input]:border-kit-blue-9";
 

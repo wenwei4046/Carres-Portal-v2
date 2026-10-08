@@ -13,7 +13,7 @@ import {
  * COPY-STANDARD table "Sales Orders navigation").
  *
  *     Sales Orders
- *     ├─ Outright Sales
+ *     ├─ Outright        (was `Outright Sales`; owner 2026-10-08)
  *     └─ Subscription
  *
  * This file guards the MODEL — the words, the addresses and the one-place rule
@@ -37,7 +37,7 @@ describe("the approved Sales Orders navigation", () => {
     );
     expect(block?.kind).toBe("module");
     const pages = block!.kind === "module" ? block!.pages : [];
-    expect(pages.map((p) => p.label)).toEqual(["Outright Sales", "Subscription"]);
+    expect(pages.map((p) => p.label)).toEqual(["Outright", "Subscription"]);
   });
 
   /* NEITHER ADDRESS MOVED. "Menu removal does not delete orders, history,
@@ -95,7 +95,10 @@ describe("the approved Sales Orders navigation", () => {
      once, and both rows address `/operation/orders`. */
   it("the Admin jump to the same register says the same word", () => {
     const admin = ADMIN.items.find((i) => i.path === "/operation/orders");
-    expect(admin?.label).toBe("Outright Sales");
+    const ops = OPERATIONS.items.find((i) => i.path === "/operation/orders");
+    // The word is `Outright` since 2026-10-08; both rows must say it.
+    expect(ops?.label).toBe("Outright");
+    expect(admin?.label).toBe(ops?.label);
   });
 
   /* The shared parent is NAVIGATION ONLY. Purchasing keeps its own module, and

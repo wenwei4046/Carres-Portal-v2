@@ -158,7 +158,15 @@ function BranchCard({ branch, nodes, owners, route }: { branch: Branch; nodes: R
   const pill = steps.length > 0 && steps.every((n) => n.mark === "complete") ? MARK_WORD.complete : MARK_WORD[mark];
   /* A blocked step is charcoal `Blocked`; a step that could not be read is amber. */
   const owner = current?.action ? ownerOf(owners, current.action.ownerKey) : null;
-  const sentence = spell((current ?? last)?.lines.slice(0, 2).join(". ") ?? "");
+  /* One plain sentence from the step's first two lines: a line that already
+     ends a sentence, or one that carries on in lower case, is never given a
+     second full stop ("Could not read Delivery for this order."). */
+  const sentence = spell(
+    ((current ?? last)?.lines.slice(0, 2) ?? []).reduce(
+      (acc, line) => (!acc ? line : /[.!?]$/.test(acc) || /^[a-z]/.test(line) ? `${acc} ${line}` : `${acc}. ${line}`),
+      "",
+    ),
+  );
   const facts: Array<{ k: string; v: React.ReactNode; muted?: boolean }> = [
     { k: "Now at", v: current ? titleCase(current.title) : "Done" },
     { k: "Next", v: current?.action ? current.action.label : "Not set", muted: !current?.action },
@@ -187,7 +195,7 @@ function BranchCard({ branch, nodes, owners, route }: { branch: Branch; nodes: R
           <span className="min-w-0 truncate text-[12px] text-c-secondary">Waiting for {OWNER_WORD[current.action.ownerKey]}</span>
         </div>
       )}
-      {sentence && <p className="text-[13px] leading-[1.45] text-c-body">{sentence}.</p>}
+      {sentence && <p className="text-[13px] leading-[1.45] text-c-body">{sentence}{/[.!?]$/.test(sentence) ? "" : "."}</p>}
       <div className="flex flex-col border-t border-c-section-line pt-1.5">
         {facts.map((f) => (
           <div key={f.k} className="grid grid-cols-[72px_minmax(0,1fr)] gap-2 py-[3px] text-[12px]">

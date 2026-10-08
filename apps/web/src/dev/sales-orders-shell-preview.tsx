@@ -189,14 +189,29 @@ window.fetch = async (input, init) => {
   const detailId = /\/api\/operation\/orders\/([^/?]+)/.exec(path)?.[1];
   const detail = orders.find(o => o.id === detailId);
   const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
-  if (detail && path.endsWith(detail.id)) return json({ order: detail, lines: detail.order_lines, addons: [], total: 2499, warehouse: null, stockBalances: [], freeUnits: [], pos: [], history: [], threads: [] });
+  if (detail && path.endsWith(detail.id)) return json({ order: detail, lines: detail.order_lines, addons: [], total: 2499, warehouse: null, stockBalances: [], freeUnits: [], pos: [], threads: [],
+    history: [
+      { text: "Sales Order created at Sales Portal", occurred_at: detail.placed_at, actor_kind: "system" },
+      { text: "Operations received the order", occurred_at: detail.proceeded_at, actor_kind: "system" },
+      { text: "Delivery date checked with TEST Logistics", occurred_at: "2026-10-06T06:30:00Z", actor: "TEST · Staff D", actor_kind: "human" },
+    ] });
   if (path === "/api/ops/service-cases") return json({ items: [], total: 0 });
   if (detail && path.endsWith("/refunds")) return json({ refunds: [] });
   if (detail && path.endsWith("/payments")) return json({ payments: [] });
   if (detail && path.endsWith("/amendment")) return json({ amendment: null });
   if (detail && path.endsWith("/correction-work")) return json({ work: [] });
   if (detail && path.endsWith("/service-cases")) return json({ items: [] });
-  if (detail && path.endsWith("/revisions")) return json({ revisions: [] });
+  /* DEV ONLY · TEST facts so Order Route and Timeline draw (screenshots 3–4). */
+  if (detail && path.endsWith("/revisions")) return json({ revisions: [{
+    revision: 1, created_at: detail.placed_at, created_by: null, actor_kind: "system",
+    snapshot: { header: { delivery_date: detail.delivery_date, delivery_date_tbd: false, customer_name: detail.customer_name }, lines: detail.order_lines, addons: [] },
+  }] });
+  if (detail && path.endsWith("/allocation")) return json({ allocation: { orderId: detail.id, soRef: `SO-${detail.so}`, lines: [], unmatchedUnits: [],
+    totals: { committedQty: detail.order_lines.reduce((n, l) => n + l.qty, 0), reservedQty: 0, soldQty: 0, outstandingQty: detail.order_lines.reduce((n, l) => n + l.qty, 0) } } });
+  if (detail && path.endsWith("/loans")) return json({ loans: [] });
+  if (detail && path.endsWith("/loan-offers")) return json({ offers: [] });
+  if (path === "/api/operation/supplier-claims") return json({ claims: [] });
+
   if (path.endsWith("/workspace-duties")) return json({ duties: [] });
   if (path.endsWith("/customer-type")) return json({ existing: false, matches: 0 });
   /* The server's paged contract (`paged=1`): 500 per page, placed_at desc then

@@ -220,6 +220,9 @@ export interface PortalNavItem {
   icon: LucideIcon;
   /** Material Symbols name for a plain Operations row (handoff 2026-10-08). */
   mIcon?: string;
+  /** The page header's crumb when it differs from the module word
+   *  (`Sales Order / Outright`, handoff 2026-10-08). */
+  crumb?: string;
   /** operation only: a path-driven section reached by pathname, not `?tab=`. */
   path?: string;
   /** operation only: the `?tab=` value this item links to when it differs from
@@ -323,6 +326,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         // governed amendment journey.
         key: "orders",
         label: "Outright",
+        crumb: "Sales Order",
         icon: ClipboardList,
         path: "/operation/orders",
         badge: "orders",
@@ -595,9 +599,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       /* REPORTS — the DATA group's own menu item (Layout Standard §2, owner-
        * confirmed 2026-10-08). The three report pages already exist; until the
        * one Reports page is built they hang under it as its pages. */
-      { key: "purchasing-report", label: "Purchasing", icon: BarChart3, section: "Reports" },
-      { key: "receiving-report", label: "Receiving & Inbound", icon: BarChart3, section: "Reports" },
-      { key: "delivery-report", label: "Delivery", icon: BarChart3, section: "Reports" },
+      { key: "purchasing-report", label: "Purchasing report", icon: BarChart3, section: "Reports" },
+      { key: "receiving-report", label: "Receiving report", icon: BarChart3, section: "Reports" },
+      { key: "delivery-report", label: "Delivery report", icon: BarChart3, section: "Reports" },
       /* The roster stays exactly the page it was; `?tab=suppliers` is
          unchanged, so every bookmark and deep link still lands. */
       { key: "suppliers", label: "Suppliers", icon: Truck, section: "Suppliers" },
@@ -813,9 +817,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // in Operations AND Admin at once, so this row and the Operations child
       // above point at the same page and light together. Two different words on
       // two rows for one register is the duplicate the ruling names; the
-      // dictionary word for that register is now `Outright Sales`. The address
+      // word for that register is `Outright` (template 2026-10-08). The address
       // is unchanged, so the principal's bookmark still lands.
-      { key: "orders", label: "Outright Sales", icon: ClipboardList, path: "/operation/orders" },
+      { key: "orders", label: "Outright", icon: ClipboardList, path: "/operation/orders" },
       // YH, 2026-08-24 — the lead-time floor (earliest a store may sell) is a
       // principal-level decision, but its only editor lived under Operations
       // Settings. `role === "principal"` already grants edit there (checkDuty
@@ -1012,7 +1016,7 @@ export function activeNavTitle(
   const moduleRow = PORTAL_MODULES.find((m) => m.section === item.section);
   const siblings = group.items.filter((it) => it.section === item.section).length;
   return {
-    crumb: moduleRow && siblings > 1 && moduleRow.label !== item.label ? moduleRow.label : null,
+    crumb: item.crumb ?? (moduleRow && siblings > 1 && moduleRow.label !== item.label ? moduleRow.label : null),
     title: item.label,
   };
 }

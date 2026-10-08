@@ -736,10 +736,11 @@ export default function PortalSidebar({ drawer = false }: {
               );
             })
           : groups.map((group) => {
-              const open = isOpen(group.area);
               /* For the boss, the Operations area draws its six groups with no
-                 area word (no group is called "Operations"); every other area
-                 she can see keeps its own word as a fold. */
+                 area word (no group is called "Operations"), so it has nothing
+                 to fold or open it with: it is always drawn, on every page.
+                 Every other area she can see keeps its own word as a fold. */
+              const open = group.area === "operation" || isOpen(group.area);
               const areaHead = groups.length > 1 && group.area !== "operation";
               return (
                 <div key={group.area} className="flex flex-col gap-0.5">
