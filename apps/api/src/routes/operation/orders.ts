@@ -1243,7 +1243,7 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     // payload is a field a Save could try to write.
     sb
       .from("ops_order_control")
-      .select("delivery_photos")
+      .select("delivery_photos, assigned_staff")
       .eq("order_id", id)
       .maybeSingle(),
   ]);
@@ -1251,6 +1251,18 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   if (addonsRes.error) { const m = mapPgError(addonsRes.error); return c.json(m.body, m.status); }
   if (historyRes.error) { const m = mapPgError(historyRes.error); return c.json(m.body, m.status); }
   if (threadsRes.error) { const m = mapPgError(threadsRes.error); return c.json(m.body, m.status); }
+
+  const assignedStaff = controlRes.error
+    ? undefined
+    : ((controlRes.data as { assigned_staff?: string | null } | null)?.assigned_staff ?? null);
+  let picOf: { picRead: "ok" | "failed"; pic: { userId: string; name: string | null } | null } =
+    assignedStaff === undefined ? { picRead: "failed", pic: null } : { picRead: "ok", pic: null };
+  if (assignedStaff) {
+    const who = await sb.from("app_users").select("id, name").eq("id", assignedStaff).maybeSingle();
+    picOf = who.error
+      ? { picRead: "failed", pic: null }
+      : { picRead: "ok", pic: { userId: assignedStaff, name: ((who.data as { name?: string | null } | null)?.name ?? "").trim() || null } };
+  }
 
   const rawLines = linesRes.data ?? [];
   const addons = addonsRes.data ?? [];
@@ -1488,6 +1500,12 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     /* An absent overlay row is UNKNOWN, not "no photo": the Route says
        `No delivery photo yet` only on an explicit empty ledger. */
     control: controlRes.error ? null : (controlRes.data ?? null),
+    /* The SO PIC — `ops_order_control.assigned_staff` (Workspace MASTER
+       2026-09-17: a separate source fact from today's work owner), named
+       from People under the caller's token. `picRead: "failed"` = not read;
+       `name: null` = a PIC this caller may not see (operation reads only
+       operation colleagues). */
+    ...picOf,
   });
 });
 

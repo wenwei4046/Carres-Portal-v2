@@ -3340,7 +3340,13 @@ export interface operationOrderDetailResponse {
    *  seeds its draft from that object. `null` = no overlay row (UNKNOWN). */
   control?: {
     delivery_photos?: DeliveryLedgerEntry[] | null;
+    assigned_staff?: string | null;
   } | null;
+  /** The SO PIC (`ops_order_control.assigned_staff`, named from People).
+   *  `picRead: "failed"` = not read; `name: null` = this caller may not see
+   *  the person. Absent on an older Worker = not read. */
+  pic?: { userId: string; name: string | null } | null;
+  picRead?: "ok" | "failed";
 }
 
 /** Row in GET /api/operation/pos. `purchase_order_lines(...)` is the embedded

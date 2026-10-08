@@ -82,6 +82,7 @@ import {
   type CustomField,
   type OrderEntryTab,
   type SalesOrderRouteMap as SalesOrderRouteModel,
+  customerLegDeliveryOf,
 } from "@carres/shared";
 import { getCities, getPostcodes, MY_STATES } from "@/data/malaysia-postcodes";
 import FieldFrame from "@/components/kit/FieldFrame";
@@ -1104,6 +1105,25 @@ function SalesOrderWorkspaceBody() {
     return stops.length >= 2 ? Math.max(...stops.map((stop) => Number(stop.leg) || 0)) : 0;
   }, [detailQ.data]);
   const routePartnerQ = useLogisticsCardFacts(showRoute ? (orderId ?? null) : null, routeCustomerLeg);
+  /* The customer leg's scheduled day by Delivery's own ladder — live DO, then
+     Delivery's arrangement, then a confirmed booking (`customerLegDeliveryOf`,
+     Delivery MASTER §8.8). An unread Delivery is `failed`, never "not scheduled". */
+  const routeScheduled = useMemo((): { state: "ok" | "failed" | "loading"; iso: string | null } => {
+    const d = routeFactsQ.data;
+    if (!d) return { state: routeFactsQ.isError ? "failed" : "loading", iso: null };
+    if (d.failed.delivery || !d.delivery) return { state: "failed", iso: null };
+    const appointment = d.brief?.appointment ?? null;
+    const day = customerLegDeliveryOf({
+      documents: d.delivery.deliveryOrders
+        .filter((o) => !o.voided_at && (!o.order_id || o.order_id === orderId))
+        .map((o) => ({ leg: o.leg, deliveryDate: o.delivery_date, timeSlot: o.time_slot, issuedAt: o.issued_at })),
+      arrangements: d.delivery.arrangements
+        .filter((a) => a.order_id === orderId)
+        .map((a) => ({ leg: a.leg, confirmedDate: a.confirmed_date, confirmedTime: a.confirmed_time, partnerId: a.partner_id })),
+      booking: appointment ? { stage: "confirmed", confirmedDate: appointment.dateIso, confirmedSlot: appointment.slot } : null,
+    });
+    return { state: "ok", iso: day.iso };
+  }, [routeFactsQ.data, routeFactsQ.isError, orderId]);
   /* LINKED PROBLEMS needs the case's own translated status word, and Service
      owns that translation. The route facts carry only open/closed. */
   const serviceCasesQ = useOrderServiceCases(orderId ?? "", {
@@ -2311,13 +2331,17 @@ function SalesOrderWorkspaceBody() {
       }
       out.push({ userId: p.userId, name: p.name, email: p.email ?? "", roles: [role] });
     };
-    add(routeOrderOwner, "PIC");
+    /* `PIC` is the SO PIC — `ops_order_control.assigned_staff` (Workspace
+       MASTER 2026-09-17), a separate fact from today's work owner. A PIC whose
+       name this person may not see is shown as `No access`. */
+    const pic = detailQ.data?.pic ?? null;
+    if (pic) add({ userId: pic.userId, name: pic.name ?? "No access" }, "PIC");
     add(routeOwners.purchasing, "PO Duty");
     add(routeOwners.receiving, "GRN Duty");
     add(routeOwners.delivery, "Delivery");
     add(routeOwners.payment, "Payments");
     return out;
-  }, [routeOrderOwner, routeOwners]);
+  }, [detailQ.data?.pic, routeOwners]);
 
   const statusPill = !order
     ? null
@@ -2407,7 +2431,6 @@ function SalesOrderWorkspaceBody() {
     });
 
   /* ── SALES (set by the Sales Portal) ─────────────────────────────────── */
-  const proceededAt = (bag(order)["proceeded_at"] as string | null | undefined) ?? null;
   const salesFact = (k: string, v: { value: string; muted: boolean }) => (
     <>
       <span className="text-[12px] text-c-secondary">{k}</span>
@@ -2419,24 +2442,32 @@ function SalesOrderWorkspaceBody() {
     <Card label="Sales" testId="so-card-sales">
       <CardTitle note={mode === "object" && editing ? "Set by Sales Portal" : undefined}>Sales</CardTitle>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-x-4 gap-y-2 border-t border-c-section-line pt-2">
+        {/* SO info order — Orders MASTER (2026-09-21 · 2026-10-05 · 2026-10-06):
+            SO Doc Date · Planned production start · Sales Location · Salesperson,
+            then Dealer. `Proceed Date` (the actual hand-off) is the Register's
+            column, not this card's. */}
         <span className={FACT} data-testid="so-fact-so-doc-date">{salesFact("SO Doc Date", dateFact(order?.placed_at))}</span>
-        <span className={FACT} data-testid="so-fact-proceed-date">{salesFact("Proceed Date", dateFact(mode === "oldrev" ? null : proceededAt))}</span>
-        <span className={FACT} data-testid="so-fact-dealer">{salesFact("Dealer", factOf(sourceName(mode, viewedRevision, order, "dealer")))}</span>
-        <span className={FACT} data-testid="so-fact-sales-location" data-pos-field="outlet">{salesFact("Sales Location", factOf(sourceName(mode, viewedRevision, order, "outlet")))}</span>
-        <span className={FACT} data-testid="so-fact-salesperson" data-pos-field="salesperson">{salesFact("Salesperson", factOf(sourceName(mode, viewedRevision, order, "salesperson")))}</span>
-        {/* `Planned production start` (owner ruling 2026-10-06) is asked in the
-            amendment only: a recorded date is the factory's start and the
-            server refuses to move it; a never-recorded one may be filled once. */}
-        {mode === "object" && editing && (
+        {/* `Planned production start` (`proceed_date`) is always shown. In Edit a
+            never-recorded date may be filled once; a recorded one is locked on
+            this door (0391/0415; COPY "Never recorded. Fill it in once, then it
+            locks"), so it stays plain text — never a box the server refuses. */}
+        {mode === "object" && editing && !baseline.proceed_date ? (
           <span className="flex min-w-0 flex-col gap-0.5" data-pos-field="proceedDate">
             <span className="text-[12px] text-c-secondary">Planned production start</span>
             <CDate id="so-proceed" label="Planned production start" value={draft.proceed_date} onChange={(iso) => setField("proceed_date", iso)} />
-            {!baseline.proceed_date && <span className="text-[12px] text-c-muted">Never recorded. Fill it in once, then it locks</span>}
+            <span className="text-[12px] text-c-muted">Never recorded. Fill it in once, then it locks</span>
             {draft.proceed_date && draft.delivery_date && draft.proceed_date > draft.delivery_date && (
               <span className="text-[12px] text-c-warn-fg">After the delivery date</span>
             )}
           </span>
+        ) : (
+          <span className={FACT} data-testid="so-fact-planned-production-start">
+            {salesFact("Planned production start", dateFact(draft.proceed_date))}
+          </span>
         )}
+        <span className={FACT} data-testid="so-fact-sales-location" data-pos-field="outlet">{salesFact("Sales Location", factOf(sourceName(mode, viewedRevision, order, "outlet")))}</span>
+        <span className={FACT} data-testid="so-fact-salesperson" data-pos-field="salesperson">{salesFact("Salesperson", factOf(sourceName(mode, viewedRevision, order, "salesperson")))}</span>
+        <span className={FACT} data-testid="so-fact-dealer">{salesFact("Dealer", factOf(sourceName(mode, viewedRevision, order, "dealer")))}</span>
         {customRowsAsFacts(tab("target").custom)}
       </div>
     </Card>
@@ -3157,7 +3188,8 @@ function SalesOrderWorkspaceBody() {
               onRetry={retryRouteRead}
               originalDate={originalDate}
               currentDate={order?.delivery_date_tbd ? null : (order?.delivery_date ?? null)}
-              confirmedDate={routeFactsQ.data?.brief?.appointment?.dateIso ?? null}
+              confirmedDate={routeScheduled.iso}
+              confirmedRead={routeScheduled.state}
               deliveredDate={order?.delivered_at ?? null}
               todayIso={appTodayIso()}
             />
@@ -3343,10 +3375,6 @@ type Orderish =
       salespersons?: { name: string } | null;
     }
   | undefined;
-
-function bag(order: Orderish): Record<string, unknown> {
-  return (order ?? {}) as unknown as Record<string, unknown>;
-}
 
 function sourceName(
   mode: Mode,

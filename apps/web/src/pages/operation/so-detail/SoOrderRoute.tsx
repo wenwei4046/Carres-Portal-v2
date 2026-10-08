@@ -253,6 +253,7 @@ export default function SoOrderRoute({
   originalDate,
   currentDate,
   confirmedDate,
+  confirmedRead = "ok",
   deliveredDate,
   todayIso,
 }: {
@@ -265,6 +266,8 @@ export default function SoOrderRoute({
   currentDate: string | null;
   /** Delivery's confirmed booking (logistics and customer both agreed). */
   confirmedDate: string | null;
+  /** Delivery's read: a failed one prints `Could not read`, never `Not scheduled`. */
+  confirmedRead?: "ok" | "failed" | "loading";
   deliveredDate: string | null;
   todayIso: string;
 }) {
@@ -347,7 +350,19 @@ export default function SoOrderRoute({
           ) : (
             <div className="flex min-w-[160px] flex-col gap-0.5 border-l border-c-section-line pl-3">
               <span className="text-[12px] font-medium text-c-secondary">Customer confirmed delivery date</span>
-              <span className="text-[14px] font-medium text-c-muted" data-testid="route-confirmed-date">Not confirmed yet</span>
+              {confirmedRead === "failed" ? (
+                <span
+                  className="text-[14px] font-medium text-c-warn-fg"
+                  data-testid="route-confirmed-date"
+                  title="Could not read Delivery for this order. This does not mean nothing is arranged."
+                >
+                  Could not read
+                </span>
+              ) : (
+                <span className="text-[14px] font-medium text-c-muted" data-testid="route-confirmed-date">
+                  {confirmedRead === "loading" ? "Loading" : "Not scheduled"}
+                </span>
+              )}
             </div>
           )}
           {daysPill && <CPill tone={daysPill.tone} strong>{daysPill.word}</CPill>}

@@ -275,7 +275,7 @@ describe("Sales Order object template contract", () => {
       "so-stair-items",
       "so-lift",
       "so-floor",
-      "so-proceed",
+      "so-proceed", // shown as a control only while never recorded (0391 · COPY)
     ]) {
       expect(workspace, `no control with id="${id}"`).toContain(`id="${id}"`);
     }
@@ -834,7 +834,12 @@ describe("Sales Order detail — owner-confirmed handoff 2026-10-08", () => {
     expect(words).toContain("Customer original delivery date");
     expect(words).toContain("Customer new delivery date");
     expect(soRoute).toContain("Customer confirmed delivery date");
-    expect(soRoute).toContain("Not confirmed yet");
+    // COPY retired `Not confirmed yet` (2026-09-16); Delivery's word is `Not scheduled`,
+    // and an unread Delivery says `Could not read`, never that nothing is arranged.
+    expect(soRoute).not.toContain("Not confirmed yet");
+    expect(soRoute).toContain("Not scheduled");
+    expect(soRoute).toContain("Could not read Delivery for this order. This does not mean nothing is arranged.");
+    expect(workspace).toContain("customerLegDeliveryOf({");
     for (const src of detail) {
       expect(src).not.toMatch(/"(?:Planned|Agreed date|ETA)"/);
     }
