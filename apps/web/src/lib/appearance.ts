@@ -12,15 +12,16 @@
  * ONE home for the choice: the signed-in person's own login profile
  * (`user_metadata.appearance`, written by `auth.updateUser` for that person
  * only). There is no second browser copy, so a shared computer never paints
- * one person's colours for the next:
+ * one person's colours for the next (01 §9 · UI MASTER Settings pattern):
  *
  *   first frame   the profile inside the login session this browser keeps for
  *                 the person (Supabase's own persisted session) — else Carres
  *   signed in     the session's profile, re-applied whenever it changes
  *   signed out    Carres (default), at once
- *   a save fails  the profile's saved choice comes back; nothing else is sent
- *   two clicks    only the newest choice's answer may change the screen; an
- *                 answer for a person who has since signed out is ignored
+ *   Save changes  the page changes only once the profile holds the choice
+ *   a save fails  nothing changes on screen and nothing else is sent; the
+ *                 picker keeps the choice so `Save changes` retries it
+ *   a switch      an answer for a person who has since signed out is ignored
  */
 import { useEffect } from "react";
 import type { User } from "@supabase/supabase-js";
@@ -113,13 +114,6 @@ export function applyStoredAppearance() {
   applyAppearance(readAppearance(persistedProfileAppearance()));
 }
 
-const profileAppearanceNow = () =>
-  readAppearance((useAuth.getState().session?.user?.user_metadata as { appearance?: unknown } | undefined)?.appearance);
-
-/* Only the newest save may change the screen (two quick clicks). */
-let saveSeq = 0;
-let saving = false;
-
 /** The signed-in person's saved choice, applied whenever the session changes;
  *  the default the moment nobody is signed in. */
 export function useProfileAppearance() {
@@ -134,8 +128,6 @@ export function useProfileAppearance() {
       applyAppearance(DEFAULT_APPEARANCE);
       return;
     }
-    // While a choice is being saved, the screen shows that choice.
-    if (saving) return;
     applyAppearance({ theme, focus });
   }, [hydrated, userId, theme, focus]);
 }
@@ -143,42 +135,21 @@ export function useProfileAppearance() {
 export type SaveResult = "saved" | "superseded";
 
 /**
- * Save to the signed-in person's own profile; the page changes at once.
- * On failure the profile's saved choice comes back and the error is thrown —
- * no second request is sent. A newer click, or a different person signing in
- * meanwhile, makes this answer `superseded`: it changes nothing.
+ * Save to the signed-in person's own profile. Only a saved choice reaches the
+ * screen. A failure throws and changes nothing — no second request is sent. An
+ * answer that arrives after a different person (or nobody) signed in is
+ * `superseded`: it changes nothing for the person now at the computer.
  */
 export async function saveAppearance(a: Appearance): Promise<SaveResult> {
   const userId = useAuth.getState().session?.user?.id ?? null;
   if (!userId) throw new Error("Sign in to save your appearance.");
-  const mine = ++saveSeq;
-  saving = true;
-  applyAppearance(a);
-  let error: unknown = null;
-  let saved: User | null = null;
-  try {
-    const res = await supabase.auth.updateUser({ data: { appearance: readAppearance(a) } });
-    saved = res.data?.user ?? null;
-    error = res.error ?? (saved ? null : new Error("Your appearance could not be saved."));
-  } catch (e) {
-    error = e;
-  }
-  if (mine !== saveSeq) return "superseded";
-  saving = false;
-  const sameUser = (useAuth.getState().session?.user?.id ?? null) === userId;
-  if (!sameUser) {
-    // Another person (or nobody) is signed in now: show their colours, not ours.
-    applyAppearance(useAuth.getState().session ? profileAppearanceNow() : DEFAULT_APPEARANCE);
-    return "superseded";
-  }
-  if (error) {
-    applyAppearance(profileAppearanceNow());
-    throw error;
-  }
+  const res = await supabase.auth.updateUser({ data: { appearance: readAppearance(a) } });
+  if ((useAuth.getState().session?.user?.id ?? null) !== userId) return "superseded";
+  if (res.error) throw res.error;
+  const saved: User | null = res.data?.user ?? null;
+  if (!saved) throw new Error("Your appearance could not be saved.");
   // The profile now holds the choice; the session the screen reads says so too.
-  if (saved) {
-    const user = saved;
-    useAuth.setState((s) => (s.session ? { session: { ...s.session, user }, user } : {}));
-  }
+  useAuth.setState((s) => (s.session ? { session: { ...s.session, user: saved }, user: saved } : {}));
+  applyAppearance(readAppearance((saved.user_metadata as { appearance?: unknown } | undefined)?.appearance));
   return "saved";
 }

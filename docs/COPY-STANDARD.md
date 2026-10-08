@@ -5386,3 +5386,15 @@ Receiving placement; UI MASTER owns Calendar. No posting/permission change is im
 ### Shared register export failure
 
 `The list could not be exported. Try again.` — A failed full-population read or file render produces no partial export. Retry remains the same Export action. Technical error details never replace this operator sentence.
+
+## Personal Appearance · owner v4 instruction 9 Oct 2026
+
+| Situation | Exact words | Source |
+|---|---|---|
+| Personal Settings destination | Personal · Appearance | Current v4 UI Kit §9 |
+| Theme groups | Brand · Recommended · Cool · Calm and crisp · Warm · Soft and homely | Current v4 UI Kit §9 |
+| Theme choices | Carres · Cool Slate · Blue · Teal · Violet · Warm Honey · Olive · Rose · Latte | Current v4 UI Kit §9 |
+| Focus setting / choices | Focus outline · Soft grey · Theme colour · Strong, each with its note `Quiet. Default.` · `Thin line in your theme` · `Easy to see` | Current v4 UI Kit §9 · v8 |
+| Personal scope explanation | Choose how your portal looks. This changes only your profile. | Implementation explanatory copy |
+| Fixed status explanation | Theme changes the page background and selection. Status colours stay the same. | Current v4 UI Kit §9 meaning |
+| Save / result / failure | Save changes · Saved · Could not save. Try again. | Existing save/retry grammar |

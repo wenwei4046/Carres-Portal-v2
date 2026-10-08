@@ -52,9 +52,9 @@ import { DELIVERY_SETTINGS_SECTIONS } from "@carres/shared";
  * but the navigation between them.
  */
 const SECTIONS = [
-  /* Appearance — each person's own theme and focus outline (handoff v4,
-     UI Kit §9, Jess 2026-10-08). */
-  { group: "Appearance", items: [{ slug: "appearance", label: "Appearance" }] },
+  /* Personal · Appearance — each person's own theme and focus outline (01 §9,
+     COPY "Personal Appearance"). */
+  { group: "Personal", items: [{ slug: "appearance", label: "Appearance" }] },
   { group: "Staff & Duties", items: [{ slug: "staff-duties", label: "Staff & Duties" }] },
   { group: "Sales Orders", items: [{ slug: "sales-orders", label: "Sales Order Settings" }] },
   { group: "Purchasing", items: [{ slug: "purchasing", label: "Purchasing Settings" }] },

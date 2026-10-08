@@ -1,5 +1,7 @@
 # Compact module card — contract
 
+**8 Oct visual migration:** retain the source-owned facts, host identity and action behaviour below. All appearance and dimensions now come from current 01; the old reference HTML and parity measurements are historical behaviour/build evidence, not a second visual target.
+
 The one card contract for the right Working Panel (owner rules 2026-10-03 / 10-04 / 10-05): one shared
 card structure and style for every module, with the owner's Stock and Customer corrections. **The outer
 identity belongs to the host module with the shared structure and style; an embedded SO uses the same
@@ -47,11 +49,7 @@ start closed.
   the sales facts (no `Order info` words); the address with its own toggle (▴ while open); the target
   date; Open (↗, only when the page passes `onOpen`) and Close (×). The phone glyph and number form one wrapping unit. The Header grows
   with a long name; nothing overlaps.
-- **Shared Header colour — owner approved 2026-10-04:** existing Radix slate-12 background, white
-  primary text and day count, slate-4 contact text, slate-11 dividers/hover; the day count uses the
-  label token (11/500/14) with no pale badge fill; focus is visibly white inside the dark Header. Only
-  the identity Header is dark; address, tabs, summary and body stay light. Every consumer inherits it;
-  no per-module copy. This does not decide the remaining card palette, font or radius.
+- **Shared Header appearance:** use current 01; preserve the identity and focus semantics.
 - **SO Header composition — owner approved 2026-10-05:** no separate area cell (the full address stays
   below the Header). The requested-date label is two small lines, with date and day count together
   beneath.

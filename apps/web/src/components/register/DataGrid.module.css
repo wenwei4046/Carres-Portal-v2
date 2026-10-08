@@ -1543,3 +1543,49 @@ div:first-child > .columnsMenuGroup {
   flex-shrink: 0;
   white-space: nowrap;
 }
+
+/* ── THE ONE KIT · v4 table (owner 2026-10-08/09; 01 §5): every DataGrid
+   listing draws the template's lines, header and selection. Header bottom
+   `--c-head-line`, body rows `--c-row-line`, footer top `--c-footer-line`, no
+   vertical cell lines; the hovered row carries the person's focus outline;
+   a selected row is the theme's select wash. Token variables only — the
+   values live in styles/carres-tokens.css. Placed last so it wins over the
+   pre-template recipe above. ── */
+.root .thead,
+.root .th,
+.root .thead .stickyCell {
+  background: var(--c-card);
+}
+.root .th {
+  color: var(--c-muted);
+  font-size: var(--fs-12);
+  font-weight: 500;
+  border-bottom-color: var(--c-head-line);
+  border-right: 0;
+}
+.root .td {
+  border-right: 0;
+}
+.root .tr {
+  border-bottom-color: var(--c-row-line);
+}
+.root .tr:hover,
+.root .tr:hover .stickyCell {
+  background: var(--c-card);
+}
+.root .tr:hover {
+  outline: var(--c-focus);
+  outline-offset: -2px;
+}
+.root .trSelected,
+.root .trSelected .stickyCell,
+.root .trSelected:hover .stickyCell {
+  background: var(--c-select-bg) !important;
+}
+.root .statusLine {
+  border-top-color: var(--c-footer-line);
+}
+.root .tfootTd {
+  border-top: 1px solid var(--c-footer-line);
+  border-right: 0;
+}
