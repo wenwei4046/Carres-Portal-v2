@@ -13,6 +13,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import MIcon from "@/components/carres/MIcon";
+import CPopover from "@/components/carres/CPopover";
 import CPill, { type CPillTone } from "@/components/carres/CPill";
 import { TasksPill } from "../components/ShellTasks";
 import { Avatar, CBtn, PopMenu, type MenuItem, type Person } from "./ui";
@@ -26,7 +27,6 @@ export default function SoHeader({
   onOpenRevisions,
   backTo,
   onBack,
-  onLogContact,
   onRequestAmendment,
   amendDisabled,
   amendTitle,
@@ -42,7 +42,6 @@ export default function SoHeader({
   onOpenRevisions: () => void;
   backTo: string;
   onBack: (event: React.MouseEvent<HTMLAnchorElement>) => void;
-  onLogContact: () => void;
   onRequestAmendment: () => void;
   amendDisabled: boolean;
   amendTitle?: string;
@@ -110,9 +109,25 @@ export default function SoHeader({
           </button>
         )}
       <div className="ml-auto flex flex-wrap items-center justify-end gap-2" data-testid="object-header-actions">
-        <CBtn kind="header" icon="add_call" onClick={onLogContact} data-testid="so-log-contact">
-          Log contact
-        </CBtn>
+        {/* The call / WhatsApp log form (template §3.3) is not built yet, so
+            the button says so instead of pretending to record anything. */}
+        <CPopover
+          label="Log contact"
+          align="end"
+          width={260}
+          trigger={
+            <span className="inline-flex">
+              <CBtn kind="header" icon="add_call" data-testid="so-log-contact">
+                Log contact
+              </CBtn>
+            </span>
+          }
+        >
+          <div className="px-2.5 py-2 text-[13px]" data-testid="so-log-contact-soon">
+            <div className="font-semibold text-c-ink">Log a call or WhatsApp</div>
+            <div className="text-c-secondary">Coming soon</div>
+          </div>
+        </CPopover>
         <CBtn
           kind="main"
           onClick={onRequestAmendment}

@@ -141,7 +141,6 @@ import { salesOrderRouteInputOf, type RouteOrderDetail } from "./sales-order-rou
 import MIcon from "@/components/carres/MIcon";
 import { atSalePaymentWord, viewSlip } from "@/lib/payment-display";
 import { useShellTasks } from "./components/ShellTasks";
-import { useTasksHost } from "./tasks/tasks-host";
 import { AgreementForm } from "./customer-agreement";
 import { ChangeReview, WaitingAmendment, WithdrawForm } from "./so-detail/AmendmentPanels";
 import SoHeader from "./so-detail/SoHeader";
@@ -3072,10 +3071,6 @@ function SalesOrderWorkspaceBody() {
         backTo={backTo}
         onBack={(event) => {
           if (!confirmDiscard()) event.preventDefault();
-        }}
-        onLogContact={() => {
-          useShellTasks.getState().setOpen(true);
-          useTasksHost.getState().requestTasks();
         }}
         onRequestAmendment={() => {
           if (objectView !== "Sales Order") openObjectView("Sales Order");
