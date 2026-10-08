@@ -29,8 +29,15 @@ vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () =>
 
 const now = new Date();
 const MONTH = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+const before = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+const PREV = `${before.getFullYear()}-${String(before.getMonth() + 1).padStart(2, "0")}`;
 
-/** RM250 collected on a RM1,000 order at a 20% line rate: RM50 earned, RM150 still to collect. */
+/**
+ * SO-2054: RM600 paid on a RM1,000 order at a 20% line rate this month (more
+ * than half): RM120 earned, RM80 still to collect. SO-2050: paid RM600 last
+ * month, cancelled this month: it keeps last month's commission, has nothing
+ * still to collect, and shows under `Cancelled this month`.
+ */
 const SOURCE: DcSource = {
   settings: { defaultRate: 25 },
   rates: [],
@@ -38,11 +45,20 @@ const SOURCE: DcSource = {
   models: [{ id: "m1", name: "Sofa" }],
   dealers: [{ id: "d1", name: "Ace Furniture" }],
   outlets: [{ id: "o1", name: "Ace KL", dealerId: "d1" }],
-  orders: [{
-    orderId: "ord1", so: 2054, dealerId: "d1", outletId: "o1", addons: 0, orderedOn: `${MONTH}-02`,
-    lines: [{ modelId: "m1", category: "sofa", value: 1000, rate: 20 }],
-    payments: [{ paidOn: `${MONTH}-05`, amount: 250 }],
-  }],
+  orders: [
+    {
+      orderId: "ord1", so: 2054, dealerId: "d1", outletId: "o1", addons: 0, orderedOn: `${MONTH}-02`,
+      customer: "Probe Customer One",
+      lines: [{ modelId: "m1", category: "sofa", value: 1000, rate: 20, qty: 1 }],
+      payments: [{ paidOn: `${MONTH}-05`, amount: 600 }],
+    },
+    {
+      orderId: "ord2", so: 2050, dealerId: "d1", outletId: "o1", addons: 0, orderedOn: `${PREV}-03`,
+      customer: "Probe Customer Two", cancelledOn: `${MONTH}-04`,
+      lines: [{ modelId: "m1", category: "sofa", value: 1000, rate: 20, qty: 1 }],
+      payments: [{ paidOn: `${PREV}-05`, amount: 600 }],
+    },
+  ],
 };
 
 const RULES_URL = "/api/finance/dealer-commission/rules";
@@ -70,6 +86,7 @@ beforeEach(() => {
     [`GET ${RULES_URL}`]: RULES,
     [`POST ${RULES_URL}`]: { id: "new" },
     [`DELETE ${RULES_URL}/r-prod`]: { id: "r-prod", already: false },
+    [`PUT /api/finance/dealer-commission/orders/ord2/take-back`]: { orderId: "ord2", takenBackOn: `${MONTH}-08`, already: false },
   };
   net.calls = [];
   net.bodies = {};
@@ -96,8 +113,10 @@ describe("Dealer commission", () => {
     renderAt();
 
     await screen.findByText("Ace Furniture");
-    expect(screen.getByText("RM 50.00")).toBeTruthy();
-    expect(screen.getByText("RM 150.00")).toBeTruthy();
+    // The row and the totals row under it.
+    expect(screen.getAllByText("RM 120.00")).toHaveLength(2);
+    expect(screen.getAllByText("RM 80.00")).toHaveLength(2);
+    expect(screen.getByTestId("footer-totals")).toHaveTextContent("RM 120.00");
     // The register's own 32px footer carries the count and the note.
     expect(screen.getByTestId("dealer-commission-summary")).toHaveTextContent(
       "1 of 1 rows · Commission is earned only on money collected.",
@@ -109,6 +128,49 @@ describe("Dealer commission", () => {
     expect(screen.getByTestId("dealer-commission-switch")).toBeTruthy();
     expect(screen.queryByTestId("commission-rates-page")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Renovation quotas" })).toBeNull();
+  });
+
+  it("a dealer's row opens its orders for the same month, in their groups", async () => {
+    renderAt();
+    await screen.findByText("Ace Furniture");
+    fireEvent.click(screen.getByText("Ace Furniture"));
+    expect(await screen.findByText("SO-2054")).toBeTruthy();
+    expect(screen.getByText("New orders this month")).toBeTruthy();
+    expect(screen.getByText("Cancelled this month")).toBeTruthy();
+    expect(screen.getByText("SO-2050")).toBeTruthy();
+    expect(screen.getByText("Probe Customer One")).toBeTruthy();
+    // Paid more than half: the note says the balance is still to come.
+    expect(screen.getByText("Waiting for the balance")).toBeTruthy();
+    expect(screen.getByText("Cancelled")).toBeTruthy();
+    expect(screen.getByTestId("commission-orders-summary")).toHaveTextContent(
+      "2 of 2 orders · What earns nothing is paid first. Nothing is earned before half the order is paid.",
+    );
+    // The month's commission adds up to the dealer's.
+    expect(screen.getByTestId("footer-totals")).toHaveTextContent("RM 120.00");
+  });
+
+  it("an order's window says how its commission is made up", async () => {
+    renderAt("/?view=orders");
+    fireEvent.click(await screen.findByText("SO-2054"));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("Probe Customer One · Ace Furniture");
+    expect(dialog).toHaveTextContent("Order total: RM 1,000.00");
+    expect(dialog).toHaveTextContent("Earns nothing, paid first: RM 0.00");
+    expect(dialog).toHaveTextContent("Commission in full: RM 200.00");
+    expect(dialog).toHaveTextContent("Commission this month: RM 120.00");
+    expect(dialog).toHaveTextContent("Still to earn: RM 80.00");
+    // Not cancelled: nothing to take back.
+    expect(within(dialog).queryByRole("button", { name: "Take commission back" })).toBeNull();
+  });
+
+  it("a cancelled order's commission is taken back from its window", async () => {
+    renderAt("/?view=orders");
+    fireEvent.click(await screen.findByText("SO-2050"));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("What it earned on money Carres kept stays. Taking it back counts in the month you do it.");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Take commission back" }));
+    await waitFor(() => expect(net.calls).toContain("PUT /api/finance/dealer-commission/orders/ord2/take-back"));
+    expect(net.bodies["PUT /api/finance/dealer-commission/orders/ord2/take-back"]).toEqual({ takeBack: true });
   });
 
   it("shows one settings view at a time", async () => {

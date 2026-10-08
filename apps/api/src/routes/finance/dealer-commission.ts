@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { dcQuotaInput, dcRuleAddInput } from "@carres/shared/dealer-commission";
+import { dcQuotaInput, dcRuleAddInput, dcTakeBackInput } from "@carres/shared/dealer-commission";
 import { requireFinance } from "../../lib/auth-guards";
 import { fail, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -14,6 +14,8 @@ import type { AppEnv } from "../../types";
  *   GET    /rules              dealer_commission_rules_read: the dated rates and switches
  *   POST   /rules              dealer_commission_rule_add: a rate or switch from a day
  *   DELETE /rules/:id          dealer_commission_rule_remove: one added by mistake
+ *   PUT    /orders/:orderId/take-back   dealer_commission_take_back (0662): a
+ *                              cancelled order's commission taken back, or kept again
  *   PUT    /quotas/:dealerId   a dealer's renovation quota, rebate rate, start date
  *
  * 0661: a rate has a start day, so the one default rate and the per-product
@@ -62,6 +64,18 @@ r.delete("/rules/:id", requireFinance, async (c) => {
   const id = c.req.param("id");
   if (!UUID.test(id)) return c.json({ error: "not_found", message: "That rate is not on the list." }, 404);
   const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("dealer_commission_rule_remove", { p_id: id });
+  if (error) return fail(c, error);
+  return c.json(data);
+});
+
+r.put("/orders/:orderId/take-back", requireFinance, async (c) => {
+  const orderId = c.req.param("orderId");
+  if (!UUID.test(orderId)) return c.json({ error: "not_found", message: "That dealer order is not on the list." }, 404);
+  const body = await parseJsonBody(c, dcTakeBackInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("dealer_commission_take_back", {
+    p_order_id: orderId, p_take_back: body.data.takeBack,
+  });
   if (error) return fail(c, error);
   return c.json(data);
 });
