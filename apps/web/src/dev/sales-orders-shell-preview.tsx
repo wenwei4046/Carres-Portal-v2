@@ -226,6 +226,15 @@ window.fetch = async (input, init) => {
       { text: "Delivery date checked with TEST Logistics", occurred_at: "2026-10-06T06:30:00Z", actor: "TEST · Staff D", actor_kind: "human" },
     ] });
   if (path === "/api/ops/service-cases") return json({ items: [], total: 0 });
+  /* Delivery's reads for the Order Route (shaped on SO-1333: NETS, 29 Sep). */
+  if (detail && path.endsWith("/booking-brief")) return json({ brief: null });
+  if (detail && path.endsWith("/delivery-attempts")) return json({ attempts: [] });
+  if (path.startsWith("/api/finance/exceptions/") || path.startsWith("/api/operation/payment-approvals/")) return json([]);
+  if (path === "/api/operation/delivery-arrangements") {
+    const orderId = new URL(url, window.location.href).searchParams.get("order");
+    return json({ arrangements: [{ id: "a1", order_id: orderId, leg: 0, partner_id: "p1", confirmed_date: "2026-09-29", confirmed_time: "Afternoon (12pm to 3pm)" }] });
+  }
+  if (path === "/api/operation/delivery-orders") return json({ deliveryOrders: [], attempts: [], handoverEvents: [] });
   /* Payments' four reads for `Pay by` (no invoices recorded in this preview). */
   if (path === "/api/finance/invoices/register") return json({ rows: [], total: 0 });
   if (path === "/api/finance/payment-storage") return json({ cases: [] });
