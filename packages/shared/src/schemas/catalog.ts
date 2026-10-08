@@ -1118,6 +1118,14 @@ export const productModelCreateInput = z
   .strict();
 export type ProductModelCreateInput = z.infer<typeof productModelCreateInput>;
 
+/** 0659 — the create body may also name the Finance item group the new product
+ *  starts in (Chew 2026-10-07, Finance MASTER §1). It is not a field of the
+ *  model, so PATCH (built from productModelCreateInput) does not take it. */
+export const productModelCreateBody = productModelCreateInput
+  .extend({ itemGroupId: z.string().uuid().optional() })
+  .strict();
+export type ProductModelCreateBody = z.infer<typeof productModelCreateBody>;
+
 export const productModelPatchInput = productModelCreateInput
   .partial()
   .extend({

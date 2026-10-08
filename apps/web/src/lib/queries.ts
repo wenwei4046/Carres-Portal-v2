@@ -32,7 +32,7 @@ import {
   type JumpSearchResponse,
   type ProductModelDto,
   type ProductSkuDto,
-  type ProductModelCreateInput,
+  type ProductModelCreateBody,
   type ProductModelPatchInput,
   type ProductSkuCreateInput,
   type ProductSkuPatchInput,
@@ -10058,8 +10058,10 @@ function catalogJson(method: "POST" | "PATCH" | "PUT" | "DELETE", body?: unknown
 export function useCreateCatalogModel() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: ProductModelCreateInput) =>
-      apiFetch<{ model: ProductModelDto }>("/api/catalog/models", catalogJson("POST", input)),
+    // 0659: the body may name the Finance item group the product starts in;
+    // `itemGroupRefused` says why it did not (the product is made either way).
+    mutationFn: (input: ProductModelCreateBody) =>
+      apiFetch<{ model: ProductModelDto; itemGroupRefused?: string }>("/api/catalog/models", catalogJson("POST", input)),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["catalog"] }),
   });
 }

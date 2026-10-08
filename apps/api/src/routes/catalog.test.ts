@@ -477,6 +477,89 @@ describe("Catalog admin — POST /api/catalog/models", () => {
     expect(recorded[0]?.op).toBe("insert");
   });
 
+  it("0659: starts the new product in the item group the form chose, through gl_item_group_start", async () => {
+    const recorded: AdminCall[] = [];
+    const rpc = vi.fn(async () => ({ data: { changed: true }, error: null }));
+    vi.mocked(userClient).mockReturnValue({
+      ...buildWriteSb({ recorded, writeReturn: { id: MODEL_ID_LIVE, category: "accessory", model_key: "neck-pillow", name: "Neck Pillow",
+        blurb: null, colors: null, gaps: null, sofa_mode: null, discontinued_at: null } }),
+      rpc,
+    } as never);
+    const GROUP = "aaaaaaaa-0000-4000-8000-0000000000a1";
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/models", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ category: "accessory", modelKey: "neck-pillow", name: "Neck Pillow", itemGroupId: GROUP }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("gl_item_group_start", { p_model_id: MODEL_ID_LIVE, p_group_id: GROUP });
+    // The group is not a column of the model: the insert never carries it.
+    expect(JSON.stringify(recorded[0]?.payload)).not.toContain("item");
+    const body = (await res.json()) as { itemGroupRefused?: string };
+    expect(body.itemGroupRefused).toBeUndefined();
+  });
+
+  it("0659: still makes the product when the group is refused, and says why", async () => {
+    const rpc = vi.fn(async () => ({ data: null, error: { code: "22023", message: "PILLOW is not in use. Choose an item group in use.", details: "item_group_off" } }));
+    vi.mocked(userClient).mockReturnValue({
+      ...buildWriteSb({ writeReturn: { id: MODEL_ID_LIVE, category: "accessory", model_key: "neck-pillow", name: "Neck Pillow",
+        blurb: null, colors: null, gaps: null, sofa_mode: null, discontinued_at: null } }),
+      rpc,
+    } as never);
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/models", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ category: "accessory", modelKey: "neck-pillow", name: "Neck Pillow", itemGroupId: "aaaaaaaa-0000-4000-8000-0000000000a1" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { model: { modelKey: string }; itemGroupRefused?: string };
+    expect(body.model.modelKey).toBe("neck-pillow");
+    expect(body.itemGroupRefused).toBe("PILLOW is not in use. Choose an item group in use.");
+  });
+
+  it("0659: sends no item group when the form chose none, and refuses a malformed one before the database", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue({
+      ...buildWriteSb({ writeReturn: { id: MODEL_ID_LIVE, category: "mattress", model_key: "carres-hybrid", name: "Carres Hybrid",
+        blurb: null, colors: null, gaps: null, sofa_mode: null, discontinued_at: null } }),
+      rpc,
+    } as never);
+    const jwt = await makeJwt("operation", null);
+    const post = (body: unknown) => app.fetch(
+      new Request("http://t/api/catalog/models", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+    expect((await post({ category: "mattress", modelKey: "carres-hybrid", name: "Carres Hybrid" })).status).toBe(201);
+    expect((await post({ category: "mattress", modelKey: "carres-hybrid", name: "Carres Hybrid", itemGroupId: "x" })).status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("0659: reads the item groups a new product can start in", async () => {
+    const choices = { groups: [{ id: "g1", name: "MATTRESS" }], starts: { mattress: "g1" } };
+    const rpc = vi.fn(async () => ({ data: choices, error: null }));
+    vi.mocked(userClient).mockReturnValue({ ...buildWriteSb({}), rpc } as never);
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request("http://t/api/catalog/item-groups", { headers: { Authorization: `Bearer ${jwt}` } }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(choices);
+    expect(rpc).toHaveBeenCalledWith("gl_item_group_choices");
+  });
+
   it("422s on invalid modelKey (not kebab-case)", async () => {
     const jwt = await makeJwt("operation", null);
     const res = await app.fetch(
