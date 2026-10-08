@@ -477,7 +477,7 @@ describe("Revisions are clear complete-version doors", () => {
     );
     const record = screen.getByTestId("revision-record-1");
     expect(record.tagName).toBe("BUTTON");
-    expect(record.className).toContain("focus-visible:ring-2");
+    expect(record.className).toContain("focus-visible:[outline:var(--c-focus)]");
     /* Current state is stated in TEXT, and marked for assistive tech. */
     expect(screen.getByTestId("revision-record-2").getAttribute("aria-current")).toBe("true");
   });

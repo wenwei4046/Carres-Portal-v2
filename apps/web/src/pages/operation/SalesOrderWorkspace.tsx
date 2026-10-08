@@ -46,7 +46,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./purchase-orders/purchase-order-detail.css";
 import "./sales-order-detail-theme.css";
-import { Plus } from "lucide-react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import * as pdfjs from "pdfjs-dist";
@@ -84,24 +83,13 @@ import {
   type OrderEntryTab,
   type SalesOrderRouteMap as SalesOrderRouteModel,
 } from "@carres/shared";
-import Button from "@/components/kit/Button";
-import Icon from "@/components/kit/Icon";
-import Checkbox from "@/components/kit/Checkbox";
-import DatePicker from "@/components/kit/DatePicker";
 import { getCities, getPostcodes, MY_STATES } from "@/data/malaysia-postcodes";
-import EmptyState from "@/components/kit/EmptyState";
 import FieldFrame from "@/components/kit/FieldFrame";
 import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe";
-import Modal from "@/components/kit/Modal";
 import { addonSizeOptions, disposalUnitSizes } from "../dealer/new-order/draft";
 import { offerableAddons } from "../dealer/pos/AddonsPanel";
-import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
-import PaymentLedger from "./components/SalesOrderPaymentLedger";
-import { SO_HEAD_ROW, SO_TABLE, SO_TH } from "./components/so-document-table";
 import { serviceCodeWord } from "@/lib/service-code";
-import Select from "@/components/kit/Select";
-import Money from "@/components/Money";
 import { apiFetch, ApiError } from "@/lib/api";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
@@ -134,6 +122,7 @@ import {
   useIssuedSalesOrderDocument,
   storeIssuedSalesOrderDocument,
   useSubmitSalesOrderChanges,
+  useWithdrawSalesOrderAmendment,
   type SalesOrderRevisionRow,
   type SalesOrderSnapshot,
 } from "@/lib/queries";
@@ -141,16 +130,27 @@ import { routeActionOwnersOf } from "./workspace-duty-owner";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CorrectionWorkList from "./CorrectionWorkList";
-import { DraftReview, WaitingRequest } from "./SalesOrderChangePanels";
 import type { RecordedAgreement } from "./customer-agreement";
-import { configWords, diffRows, serviceSizeDraft, resizeService, sizeServiceUnit, NOT_IN_CATALOG, servicesWords, type EditAddon, type EditLine } from "./sales-order-change";
+import { configWords, diffRows, serviceSizeDraft, resizeService, sizeServiceUnit, NOT_IN_CATALOG, type EditAddon, type EditLine } from "./sales-order-change";
 import { useAuth } from "@/lib/auth";
 import SalesOrderAttribution, { useCanChangeSalesOwnership } from "./SalesOrderAttribution";
-import SalesOrderLedger from "./SalesOrderLedger";
+import SalesOrderLedger, { type HistoryEvent } from "./SalesOrderLedger";
 import SalesOrderReadFailure from "./SalesOrderReadFailure";
-import SalesOrderRoute, { RouteLoadingFrame, type RouteRetryOwner } from "./SalesOrderRoute";
+import { RouteLoadingFrame, type RouteRetryOwner } from "./SalesOrderRoute";
 import { salesOrderRouteInputOf, type RouteOrderDetail } from "./sales-order-route-input";
-import SalesOrderTabs from "./SalesOrderTabs";
+import MIcon from "@/components/carres/MIcon";
+import { atSalePaymentWord, viewSlip } from "@/lib/payment-display";
+import { useShellTasks } from "./components/ShellTasks";
+import { useTasksHost } from "./tasks/tasks-host";
+import { AgreementForm } from "./customer-agreement";
+import { ChangeReview, WaitingAmendment, WithdrawForm } from "./so-detail/AmendmentPanels";
+import SoHeader from "./so-detail/SoHeader";
+import SoOrderRoute from "./so-detail/SoOrderRoute";
+import SoTimeline, { timelineEntriesOf } from "./so-detail/SoTimeline";
+import {
+  Card, CardTitle, CBtn, CDate, CIconBtn, CInput, CSelect, Dialog, Drawer, KvRow, PillTabs,
+  factOf, NOT_RECORDED, type MenuItem, type Person,
+} from "./so-detail/ui";
 import { lineName } from "./sales-order-facts";
 
 /* pdf.js worker ships inside the package — nothing fetched from a CDN. */
@@ -326,9 +326,6 @@ export function contentWidthOf(node: HTMLElement): number {
 
 /** A sales order below this is unreadable; it scrolls in the pane instead. */
 const MIN_PDF_WIDTH = 320;
-/** 0562 — the form pane never gets narrower than the editable Items table
- *  (# · Item Code · Description · Qty · Unit · Disc · Amount) plus its chrome. */
-const FORM_MIN_WIDTH = 660;
 
 function usePdfCanvases(data: SalesOrderTemplateData | null) {
   const [pdfError, setPdfError] = useState<string | null>(null);
@@ -811,27 +808,6 @@ export { Block };
  * (measured 15px/600, 2026-09-23). No margins: the section body's one 12px
  * gap spaces it, and the 1px rule above it marks the group.
  */
-/** The 1px rule over `Total payable` and `Balance due` in the Payment totals.
- *  The label cell carries the 24px between the columns as its own padding, so
- *  the rule runs unbroken under both cells. */
-const TOTAL_RULE = "border-t border-kit-slate-5 pt-1";
-
-function SubHead({ children, note }: { children: React.ReactNode; note?: string }) {
-  return (
-    <p
-      className="flex flex-wrap items-baseline gap-x-2 text-body font-semibold text-kit-slate-11"
-      data-testid={`subhead-${String(children).replace(/\s+/g, "-").toLowerCase()}`}
-    >
-      {children}
-      {/* The card-level `note` slot, one level down. `creates a Revision ·
-          needs approval` is governed copy that used to ride a Block title; the
-          merge moved the heading, so it moves with it rather than being
-          reworded or dropped. */}
-      {note && <span className="font-normal text-base-500">{note}</span>}
-    </p>
-  );
-}
-
 /* ⛔ THE DELIVERY PAYMENT APPROVAL DOOR IS REMOVED — owner instruction,
    2026-09-01, and it changes what the business does rather than how a card
    looks. Recorded here rather than deleted in silence.
@@ -967,71 +943,8 @@ export function Fact({
   return wide ? <div className="col-span-full">{field}</div> : field;
 }
 
-/** The 0219 custom fields of one tab, rendered from the SAME contract the POS
- *  renders from. An operator who adds a field in Settings gets it on both
- *  surfaces or on neither. */
-function CustomFields({
-  fields,
-  values,
-  onChange,
-  locked,
-}: {
-  fields: CustomField[];
-  values: Record<string, string>;
-  onChange: (key: string, value: string) => void;
-  /** The page's one lock: a locked field carries no star and no placeholder. */
-  locked: boolean;
-}) {
-  return (
-    <>
-      {fields.map((f) => {
-        const id = `so-custom-${f.key}`;
-        const value = values[f.key] ?? "";
-        /* Locked and absent reads `Not recorded`, the same as every built-in field. */
-        if (locked && !value) return <Fact key={f.key} label={f.label} value="Not recorded" />;
-        if (f.type === "select") {
-          return (
-            <Select
-              key={f.key}
-              id={id}
-              label={f.label}
-              required={!locked && f.required}
-              value={value || undefined}
-              onValueChange={(v) => onChange(f.key, v)}
-              options={f.options.map((o) => ({ value: o, label: o }))}
-            />
-          );
-        }
-        if (f.type === "date") {
-          return (
-            <DatePicker
-              key={f.key}
-              id={id}
-              label={f.label}
-              required={!locked && f.required}
-              value={value || null}
-              onChange={(iso) => onChange(f.key, iso ?? "")}
-            />
-          );
-        }
-        return (
-          <Input
-            key={f.key}
-            id={id}
-            label={f.label}
-            required={!locked && f.required}
-            type={f.type === "number" ? "number" : "text"}
-            value={value}
-            onChange={(e) => onChange(f.key, e.target.value)}
-          />
-        );
-      })}
-    </>
-  );
-}
-
 type Mode = "object" | "oldrev";
-const OBJECT_VIEWS = ["Order", "Revisions", "History", "Order Route"] as const;
+const OBJECT_VIEWS = ["Sales Order", "Order Route", "Timeline"] as const;
 type ObjectView = (typeof OBJECT_VIEWS)[number];
 
 /**
@@ -1101,7 +1014,9 @@ function SalesOrderWorkspaceBody() {
      modal behind it lives in `SalesOrderAttribution`. Bumping this opens it. */
   const [attributionSignal, setAttributionSignal] = useState(0);
   const canChangeSalesOwnership = useCanChangeSalesOwnership();
-  const [objectView, setObjectView] = useState<ObjectView>(showRoute ? "Order Route" : "Order");
+  const [objectView, setObjectView] = useState<ObjectView>(showRoute ? "Order Route" : "Sales Order");
+  /* The SO document opens in a drawer from `⋮`; it is painted only while open. */
+  const [pdfOpen, setPdfOpen] = useState(false);
 
   /* ⛔ `?edit=1` IS RETIRED — owner ruling 2026-08-15. A bookmark, a browser
      history entry or a stale tab still carries it; it is stripped rather than
@@ -1377,12 +1292,6 @@ function SalesOrderWorkspaceBody() {
   /** THE LOCKED STATE (owner ruling 2026-09-26): View and a historical version
    *  are ONE locked presentation; Edit alone draws controls. */
   const formLocked = (mode === "object" && !editing) || mode === "oldrev";
-  /** Locked and absent prints `Not recorded`, because a `Select` or `Pick a date` placeholder is a question. */
-  const lockedFact = (label: string, present: unknown, control: React.ReactNode) =>
-    formLocked && !present ? <Fact label={label} value="Not recorded" /> : control;
-  /** `Disc (RM)` is zero unless the line really carries a numeric discount (SO-PDF-STANDARD §10). */
-  const discountOf = (row: object) =>
-    typeof (row as { discount?: unknown }).discount === "number" ? (row as { discount: number }).discount : 0;
   const draftRef = useRef(draft);
   draftRef.current = draft;
 
@@ -1498,26 +1407,6 @@ function SalesOrderWorkspaceBody() {
      Portal captures it at birth, so it is Rev 1's; a later version is unsigned
      and says so instead of borrowing it (orders/MASTER § Old versions and
      signatures). */
-  /* 0562 · THE FORM IS NEVER SQUEEZED BY THE DOCUMENT (Jess, 2026-09-23). The
-     approved 50/50 holds whenever each half can carry the Items table; with
-     less room the form keeps its minimum and the document takes the rest down to
-     MIN_PDF_WIDTH; with less than both they stack, form first. Measured on the
-     page's own box inside the Portal shell, never the window. */
-  const splitHostRef = useRef<HTMLDivElement | null>(null);
-  const [split, setSplit] = useState<"half" | "form-first" | "stack">("half");
-  useEffect(() => {
-    const el = splitHostRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const read = () => {
-      const w = el.clientWidth;
-      setSplit(w >= FORM_MIN_WIDTH * 2 ? "half" : w >= FORM_MIN_WIDTH + MIN_PDF_WIDTH ? "form-first" : "stack");
-    };
-    read();
-    const ro = new ResizeObserver(read);
-    ro.observe(el);
-    return () => ro.disconnect();
-    /* Re-attached when the node the split lives in can have changed. */
-  }, [mode, objectView, showRoute, order?.id]);
   /* ── ONE template-data value per mode; the draft path debounces 300ms. ── */
   const base = baseQ.data ?? null;
   const liveDraftData = useMemo(
@@ -1552,7 +1441,7 @@ function SalesOrderWorkspaceBody() {
     return debouncedDraftData;
   }, [mode, viewedRevision, base, debouncedDraftData, addonNameByKey]);
 
-  const { setPane } = usePdfCanvases(templateData);
+  const { setPane, pdfError } = usePdfCanvases(pdfOpen ? templateData : null);
 
   /* ⭐ PRINT IS THE SAVED TRUTH — owner ruling 2026-08-15.
      Preview-equals-Print is asserted in the SAVED state only. While the form is
@@ -1844,13 +1733,15 @@ function SalesOrderWorkspaceBody() {
     setChangeAgreement(null);
     setReplaceAmendmentId(replaceId ?? null);
     setEditing(true);
-    setObjectView("Order");
-  };
-  const cancelEdit = () => {
-    if (!confirmDiscard()) return;
-    setDraft(baseline);
-    setEditing(false);
-    setReplaceAmendmentId(null);
+    setObjectView("Sales Order");
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("route");
+        return next;
+      },
+      { replace: true, state: location.state },
+    );
   };
   /* ⭐ 0565 · AN ISSUED VERSION KEEPS ITS DOCUMENT — owner ruling 2026-09-23:
      "Newly issued versions after this release: preserve their original issued
@@ -2077,8 +1968,11 @@ function SalesOrderWorkspaceBody() {
   }, [dirty]);
 
   const openObjectView = (view: ObjectView) => {
-    if (view !== "Order" && !confirmDiscard()) return;
-    if (view !== "Order" && dirty) setDraft(baseline);
+    if (view !== "Sales Order" && !confirmDiscard()) return;
+    if (view !== "Sales Order" && editing) {
+      setDraft(baseline);
+      setEditing(false);
+    }
     setObjectView(view);
     setParams(
       (prev) => {
@@ -2089,12 +1983,7 @@ function SalesOrderWorkspaceBody() {
       },
       { replace: true, state: location.state },
     );
-    if (view === "Order Route") return;
-    if (view === "Order") {
-      window.setTimeout(() => document.getElementById("sales-order-workspace")?.scrollIntoView(), 0);
-    }
   };
-
 
   /* ── The money the left side states (same arithmetic as the register). ── */
   const money = useMemo(() => {
@@ -2220,7 +2109,8 @@ function SalesOrderWorkspaceBody() {
   /* The Route hands out the action-engine line; the ROSTER names the person.
      One duty read, the same one the Team board and the PO chips use. */
   const dutyQ = useWorkspaceDuties();
-  const orderOwnerQ = useCollectionOwner(orderId ?? null, showRoute);
+  /* The PIC heads the header's Team, so the owner is read on every tab. */
+  const orderOwnerQ = useCollectionOwner(orderId ?? null, true);
   const routeOrderOwner = useMemo(() => {
     const owner = orderOwnerQ.data?.owner ?? null;
     const userId = owner?.acting_user_id ?? owner?.normal_user_id ?? null;
@@ -2274,93 +2164,7 @@ function SalesOrderWorkspaceBody() {
 
   const liveBlocksCommercial =
     Boolean(liveAmendment && !liveAmendment.stale) && changeClass?.action === "submit" && !replaceAmendmentId;
-  const canEditOrder = mode === "object" && objectView === "Order" && !showRoute && Boolean(order) && order?.status !== "cancelled";
-  const headerRight = (
-    <span className="flex items-center gap-2">
-      {canEditOrder && editing && (
-        <>
-          {changeCount > 0 && (
-            <span className="text-body text-base-600" data-testid="change-count">
-              {changeCount} {changeCount === 1 ? "change" : "changes"}
-            </span>
-          )}
-          <Button size="sm" variant="neutral" onClick={cancelEdit} data-testid="workspace-cancel">
-            Cancel
-          </Button>
-          {changeCount > 0 && (
-            <Button
-              size="sm"
-              variant="primary"
-              loading={changesMut.isPending}
-              disabled={liveBlocksCommercial}
-              onClick={() => {
-                const err = validateDraft();
-                if (err) return void toast.error(err);
-                setReviewOpen(true);
-              }}
-              data-testid="workspace-save"
-            >
-              {commitWord}
-            </Button>
-          )}
-        </>
-      )}
-      {mode === "oldrev" && (
-        <Button
-          size="sm"
-          variant="neutral"
-          onClick={() => {
-            setViewRev(null);
-            setParams((prev) => {
-              const next = new URLSearchParams(prev);
-              next.delete("revision");
-              return next;
-            }, { replace: true, state: location.state });
-          }}
-          data-testid="workspace-back-to-current"
-        >
-          Return to current
-        </Button>
-      )}
-      {!editing && (
-        <Button
-          size="md"
-          icon="print"
-          variant="ghost"
-          disabled={!printData}
-          onClick={() => void openPrint()}
-          data-testid="workspace-print"
-          aria-label={mode === "oldrev" ? "Print this version" : "Print"}
-        >
-          <span>{mode === "oldrev" ? "Print this version" : "Print ▾"}</span>
-        </Button>
-      )}
-      {canEditOrder && !editing && (
-        <Button size="md" icon="edit" variant="primary" onClick={() => startEdit(baseline)} data-testid="workspace-edit">
-          Edit
-        </Button>
-      )}
-      {canEditOrder && !editing && (
-        <details className="relative">
-          {/* `⋮` LAST, ICON ONLY — owner ruling (Jess, 2026-09-21); its accessible
-              name and tooltip are `More actions`. The retired `Propose a change to
-              the customer` door is gone: the whole-page Edit carries that change. */}
-          <summary className="btn-ghost cursor-pointer list-none px-2 text-body max-md:inline-grid max-md:h-10 max-md:w-10 max-md:place-items-center max-md:px-0" aria-label="More actions" title="More actions"><Icon name="overflow" /></summary>
-          <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-control border border-kit-slate-5 bg-white p-1 shadow-lg">
-            <button
-              type="button"
-              onClick={() => setProblemOpen(true)}
-              data-testid="workspace-report-problem"
-              className="w-full rounded-control px-2 py-1.5 text-left text-meta text-base-700 hover:bg-hovertint"
-            >
-              Report a problem
-            </button>
-            <button type="button" onClick={() => setCancelOpen(true)} data-testid="workspace-cancel-so" className="w-full rounded-control px-2 py-1.5 text-left text-meta text-danger hover:bg-hovertint">Cancel SO</button>
-          </div>
-        </details>
-      )}
-    </span>
-  );
+  const canEditOrder = mode === "object" && Boolean(order) && order?.status !== "cancelled";
 
   const soWord = order ? `SO-${order.so}` : "Sales Order";
 
@@ -2380,13 +2184,7 @@ function SalesOrderWorkspaceBody() {
     !draft.customer_address_postcode &&
     !(order?.customer_address ?? "").trim();
 
-
-  /* ── 0562 · THE ITEMS TABLE WHILE EDITING — the document's own columns
-     (orders/MASTER § ITEMS: # · Item Code · Description · Qty · Unit (RM) ·
-     Disc (RM) · Amount (RM) · TOTAL PAYABLE). A removed row is struck and
-     restorable until commit; nothing leaves the order before the change takes
-     effect. Minimum widths keep every money column readable; the form pane is
-     never narrower than this table (see the split below). */
+  /* ── The catalogue, as the editable Items rows read it. ─────────────────── */
   const catalogModel = useMemo(() => {
     const bundle = catalogQ.data;
     const bySku = new Map<string, { modelId: string; variant: string; price: number }>();
@@ -2403,28 +2201,6 @@ function SalesOrderWorkspaceBody() {
     return { bySku, byModel };
   }, [catalogQ.data]);
   const [configOpen, setConfigOpen] = useState<Set<string>>(new Set());
-  const itemsScrollRef = useRef<HTMLDivElement | null>(null);
-  const [itemsOverflow, setItemsOverflow] = useState({ over: false, right: false });
-  useEffect(() => {
-    const el = itemsScrollRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    /* ⛔ SET ONLY WHEN IT CHANGED. A new object every pass, from an effect with
-       no dependency list, is an infinite render loop — measured: the page test
-       run never finished. */
-    const read = () => {
-      const over = el.scrollWidth - el.clientWidth > 1;
-      const right = over && el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
-      setItemsOverflow((prev) => (prev.over === over && prev.right === right ? prev : { over, right }));
-    };
-    read();
-    el.addEventListener("scroll", read, { passive: true });
-    const ro = new ResizeObserver(read);
-    ro.observe(el);
-    return () => {
-      el.removeEventListener("scroll", read);
-      ro.disconnect();
-    };
-  }, [editing, mode, objectView, draft.lines.length, draft.addons.length]);
   const [addSku, setAddSku] = useState("");
   const setDraftLine = (key: string, patch: Partial<DraftLine>) =>
     setDraft((d) => ({ ...d, lines: d.lines.map((l) => (l.key === key ? { ...l, ...patch } : l)) }));
@@ -2439,837 +2215,375 @@ function SalesOrderWorkspaceBody() {
    *  the draft; cancelling its PARENT shows the gift consequence instead. */
   const protectedLine = (l: DraftLine) =>
     ["free_gift", "free_item", "pwp", "bundle_group", "combo_key"].some((k) => (l.attrs ?? {})[k] !== undefined);
-  const th = `whitespace-nowrap ${SO_TH}`;
-  const editItemsTable = (
-    <div data-testid="edit-items" className="relative">
-      {/* On a screen too narrow for the document's own columns the table scrolls
-          inside its box — never the page — and says so with the DataGrid's
-          grammar: the money columns slide under a fade, and one kit button
-          steps to them. */}
-      <div ref={itemsScrollRef} className="overflow-x-auto" role="region" tabIndex={itemsOverflow.over ? 0 : undefined}
-        aria-label={itemsOverflow.over ? "Items — scroll sideways for more columns" : "Items"}>
-        <table className={SO_TABLE} data-testid="edit-goods">
-          <thead>
-            <tr className={SO_HEAD_ROW}>
-              <th className={`${th} text-left`} style={{ minWidth: 180 }}>Item</th>
-              <th className={`${th} text-center`}>Qty</th>
-              <th className={`${th} text-right`}>Unit (RM)</th>
-              <th className={`${th} text-right`}>Disc (RM)</th>
-              <th className={`${th} text-right`}>Amount (RM)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {draft.lines.filter((l) => l.sku.trim()).map((l, i) => {
-              const known = catalogModel.bySku.get(l.sku);
-              const model = known ? catalogModel.byModel.get(known.modelId) : undefined;
-              const canConfig = !l.removed && model && (model.skus.length > 1 || model.gaps.length > 0);
-              const strike = l.removed ? "line-through text-base-500" : "";
-              const open = configOpen.has(l.key);
-              return [
-                <tr key={l.key} className={`${open ? "" : "border-b border-kit-slate-5"} align-top`} data-testid={`edit-line-${i + 1}`}>
-                  <td className="px-2 py-2">
-                    <div className={`font-medium ${strike}`}>{nameOfSku(l.sku)}</div>
-                    <div className={`break-words text-meta text-base-600 ${strike}`}>{l.sku}</div>
-                    {configWords(l.attrs) && <div className={`text-meta text-base-600 ${strike}`}>{configWords(l.attrs)}</div>}
-                    {!known && <div className="text-meta text-kit-amber-11">{NOT_IN_CATALOG}</div>}
-                    {l.added && <div className="text-meta text-kit-blue-11">New line</div>}
-                    {l.removed && <div className="text-meta text-danger">Cancelled when approved · Restore to keep it</div>}
-                    {protectedLine(l) && <div className="text-meta text-base-600">Free item. It follows the item it came with</div>}
-                    {/* ⭐ ONE COMPOSITION, NOT ONE SET OF DOORS (finding 9). The
-                        seven-column table is now the document in BOTH states,
-                        which is the ruling — but a door that WRITES is an Edit
-                        affordance, and leaving `Configure` / `Remove` live on a
-                        locked order would hand a reader controls the page has
-                        just told them they do not have. Measured in the shell
-                        preview: the row buttons were clickable while the header
-                        still offered `Edit`. */}
-                    <span className={formLocked ? "hidden" : "mt-1 inline-flex flex-wrap gap-x-4 text-meta"}>
-                      {!formLocked && canConfig && !protectedLine(l) && (
-                        <button type="button" className="text-kit-blue-11 hover:underline" aria-expanded={open}
-                          aria-label={`Configure ${nameOfSku(l.sku)}`}
-                          onClick={() => setConfigOpen((st) => { const n = new Set(st); if (n.has(l.key)) n.delete(l.key); else n.add(l.key); return n; })}>
-                          {open ? "Close configuration" : "Configure"}
-                        </button>
-                      )}
-                      {formLocked || protectedLine(l) ? null : l.removed ? (
-                        <button type="button" className="text-kit-blue-11 hover:underline" aria-label={`Restore ${nameOfSku(l.sku)}`}
-                          onClick={() => setDraftLine(l.key, { removed: false })}>Restore</button>
-                      ) : (
-                        <button type="button" className="text-danger hover:underline" aria-label={`Remove ${nameOfSku(l.sku)}`}
-                          onClick={() => (l.added
-                            ? setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))
-                            : setDraftLine(l.key, { removed: true }))}>Remove</button>
-                      )}
-                    </span>
-                  </td>
-                  <td className="px-2 py-2 text-center">
-                    {/* A locked line prints text: no number box exists in View or a historical version. */}
-                    {formLocked || l.removed || protectedLine(l) ? <span className={strike}>{l.qty}</span> : (
-                      <div className="min-w-[56px]">
-                        <Input id={`so-edit-qty-${l.key}`} aria-label={`Qty ${nameOfSku(l.sku)}`} type="number" min={1} value={String(l.qty)}
-                          onChange={(e) => setDraftLine(l.key, { qty: Math.max(1, Number(e.target.value) || 1) })} />
-                      </div>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap px-2 py-2 text-right">
-                    {formLocked || l.removed || protectedLine(l) ? <span className={`tabular-nums ${strike}`}>{fmtMoney(l.unit_price).replace(/^RM\s*/, "")}</span> : (
-                      <div className="min-w-[80px]">
-                        <Input id={`so-edit-price-${l.key}`} aria-label={`Unit price ${nameOfSku(l.sku)}`} type="number" min={0} step="0.01"
-                          value={String(l.unit_price)}
-                          onChange={(e) => setDraftLine(l.key, { unit_price: Math.max(0, Number(e.target.value) || 0) })} />
-                      </div>
-                    )}
-                  </td>
-                  {/* Zero is the fact, the dash was the banned absent-value glyph. */}
-                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(discountOf(l)).replace(/^RM\s*/, "")}</td>
-                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(l.qty * l.unit_price).replace(/^RM\s*/, "")}</td>
-                </tr>,
-                open && canConfig ? (
-                  <tr key={`${l.key}-config`} className="border-b border-kit-slate-5 bg-kit-slate-2">
-                    <td colSpan={5} className="px-2 py-3">
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        {model!.skus.length > 1 && (
-                          <Select id={`so-edit-size-${l.key}`} label="Size" value={l.sku}
-                            onValueChange={(sku) => {
-                              const hit = model!.skus.find((x) => x.sku === sku);
-                              if (!hit) return;
-                              setDraftLine(l.key, { sku, unit_price: hit.price + surchargeOf(l.attrs) });
-                            }}
-                            options={model!.skus.map((x) => ({ value: x.sku, label: x.variant || x.sku }))} />
-                        )}
-                        {model!.gaps.length > 0 && (
-                          <Select id={`so-edit-gap-${l.key}`} label="Mattress gap"
-                            value={String((l.attrs as { gap?: string } | undefined)?.gap ?? "KIV")}
-                            onValueChange={(gap) => setDraftLine(l.key, { attrs: { ...(l.attrs ?? {}), gap } })}
-                            options={[{ value: "KIV", label: "Confirm later" }, ...model!.gaps.map((g) => ({ value: g, label: g }))]} />
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ) : null,
-              ];
-            })}
-            {draft.addons.map((a) => {
-              const strike = a.removed ? "line-through text-base-500" : "";
-              return (
-                <tr key={a.key} className="border-b border-kit-slate-5 align-top" data-testid={`edit-service-${a.addon_key}`}>
-                  <td className="px-2 py-2">
-                    <div className={`font-medium ${strike}`}>{nameOfAddon(a.addon_key)}</div>
-                    <div className={`break-words text-meta text-base-600 ${strike}`}>{serviceCodeWord(a.addon_key, addonSkuByKey.get(a.addon_key))}</div>
-                    {typeof a.attrs?.["size"] === "string" && <div className={`text-meta text-base-600 ${strike}`}>{String(a.attrs["size"])}</div>}
-                    {a.added && <div className="text-meta text-kit-blue-11">New line</div>}
-                  </td>
-                  <td className={`px-2 py-2 text-center ${strike}`}>{a.qty}</td>
-                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(a.unit_price).replace(/^RM\s*/, "")}</td>
-                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(discountOf(a)).replace(/^RM\s*/, "")}</td>
-                  <td className={`whitespace-nowrap px-2 py-2 text-right tabular-nums ${strike}`}>{fmtMoney(a.qty * a.unit_price).replace(/^RM\s*/, "")}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot>
-            <tr className="font-semibold text-base-900">
-              <td colSpan={4} className="whitespace-nowrap px-2 py-2 text-right">TOTAL PAYABLE</td>
-              <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums" data-testid="edit-total">
-                {fmtMoney(
-                  draft.lines.filter((l) => !l.removed && l.sku.trim()).reduce((n, l) => n + l.qty * l.unit_price, 0) +
-                  draft.addons.filter((a) => !a.removed).reduce((n, a) => n + a.qty * a.unit_price, 0),
-                )}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-      {itemsOverflow.right && (
-        <div aria-hidden="true" data-testid="items-more-columns" className="pointer-events-none absolute inset-x-0 top-0 h-[2.5rem] bg-gradient-to-l from-kit-slate-6/60 to-transparent" style={{ left: "auto", width: 32 }} />
-      )}
-      {itemsOverflow.over && (
-        <span className="absolute right-1 top-1 z-10">
-          <Button size="sm" variant="neutral" aria-label={itemsOverflow.right ? "Show more Items columns" : "Back to the first Items columns"}
-            data-testid="items-columns-step"
-            onClick={() => {
-              const el = itemsScrollRef.current;
-              if (el) el.scrollBy({ left: (itemsOverflow.right ? 1 : -1) * Math.max(160, el.clientWidth * 0.7), behavior: "smooth" });
-            }}>
-            {itemsOverflow.right ? "›" : "‹"}
-          </Button>
-        </span>
-      )}
-      {/* ⭐ THE DOORS BELONG TO EDIT, THE TABLE BELONGS TO BOTH. The same
-          commercial composition now stands in View (owner ruling 2026-09-21),
-          and a page that reads until `Edit` is pressed cannot offer `Add item`
-          or `Add service` while it is reading. The lock is asked first, so a
-          historical version can never draw the door. */}
-      {!formLocked && editing && (
-      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <Input id="so-add-item" label="Add item" list="so-sku-catalog" value={addSku}
-              hint={addSku.trim() ? (catalogBySku.get(addSku.trim())?.label ?? NOT_IN_CATALOG) : undefined}
-              onChange={(e) => setAddSku(e.target.value)} />
-            <datalist id="so-sku-catalog">
-              {[...catalogBySku.entries()].map(([sku, info]) => (
-                <option key={sku} value={sku}>{info.label}</option>
-              ))}
-            </datalist>
-          </div>
-          <Button size="sm" variant="neutral" disabled={!catalogBySku.has(addSku.trim())} data-testid="add-item"
-            onClick={() => {
-              const sku = addSku.trim();
-              const hit = catalogBySku.get(sku);
-              if (!hit) return;
-              const key = nextKey();
-              setDraft((d) => ({ ...d, lines: [...d.lines, { key, sku, qty: 1, unit_price: Number(hit.price ?? 0), added: true }] }));
-              setAddSku("");
-            }}>
-            <Plus size={14} /> Add item
-          </Button>
-        </div>
-      </div>
-      )}
-    </div>
+
+  /* ══ THE DETAIL — owner-confirmed handoff 2026-10-08 (Layout Standard §3.2):
+     object header on the canvas · Sales Order · Order Route · Timeline. The
+     amendment keeps the 0562 business flow: the SERVER chooses Save or
+     Submit, the reason is required, the customer agreement gates approval. */
+  const [menuPdf, setMenuPdf] = [pdfOpen, setPdfOpen];
+  const [revOpen, setRevOpen] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [withdrawReason, setWithdrawReason] = useState("");
+  const [whyOpen, setWhyOpen] = useState(false);
+  const [proofOpen, setProofOpen] = useState(false);
+  const [discardAsk, setDiscardAsk] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [openFields, setOpenFields] = useState<Set<string>>(new Set());
+  const openField = (id: string) => setOpenFields((s) => new Set(s).add(id));
+  useEffect(() => {
+    if (!editing) {
+      setOpenFields(new Set());
+      setEditError(null);
+      setDiscardAsk(false);
+      setWhyOpen(false);
+      setProofOpen(false);
+    }
+  }, [editing]);
+
+  const withdrawMut = useWithdrawSalesOrderAmendment(orderId ?? "", {
+    onSuccess: () => {
+      toast.success("Amendment withdrawn. The order is unchanged.");
+      setWithdrawOpen(false);
+      setWithdrawReason("");
+      void amendmentQ.refetch();
+      void detailQ.refetch();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const discardEdit = () => {
+    setDraft(baseline);
+    setEditing(false);
+    setReplaceAmendmentId(null);
+    setDiscardAsk(false);
+  };
+  const tryCommit = () => {
+    setEditError(null);
+    if (changeCount === 0) return setEditError("Nothing changed yet. Click the pencil next to a detail to change it.");
+    const err = validateDraft();
+    if (err) return setEditError(err);
+    if (!changeReason.trim()) {
+      setWhyOpen(true);
+      return setEditError("Write why first. Reason for change is required.");
+    }
+    setWhyOpen(false);
+    setProofOpen(false);
+    setReviewOpen(true);
+  };
+
+  const downloadPdf = async () => {
+    if (storedDocumentUrl) {
+      window.open(storedDocumentUrl, "_blank");
+      return;
+    }
+    if (!printData) return;
+    const blob = await renderSalesOrderPdf(printData);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${soWord}${mode === "oldrev" && viewRev ? `(${viewRev})` : ""}.pdf`;
+    a.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
+  const copy = (text: string, what: string) => {
+    void navigator.clipboard?.writeText(text).then(
+      () => toast.success(`${what} copied`),
+      () => toast.error(`${what} could not be copied`),
+    );
+  };
+  const backToCurrent = () => {
+    setViewRev(null);
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("revision");
+      return next;
+    }, { replace: true, state: location.state });
+  };
+
+  /* ── WHO: the PIC first, then the duty holders the route already names. ── */
+  const team = useMemo((): Person[] => {
+    const out: Person[] = [];
+    const add = (p: { userId: string; name: string | null; email?: string } | null | undefined, role: string) => {
+      if (!p?.userId) return;
+      const hit = out.find((x) => x.userId === p.userId);
+      if (hit) {
+        if (!hit.roles?.includes(role)) hit.roles = [...(hit.roles ?? []), role];
+        return;
+      }
+      out.push({ userId: p.userId, name: p.name, email: p.email ?? "", roles: [role] });
+    };
+    add(routeOrderOwner, "PIC");
+    add(routeOwners.purchasing, "PO Duty");
+    add(routeOwners.receiving, "GRN Duty");
+    add(routeOwners.delivery, "Delivery");
+    add(routeOwners.payment, "Payments");
+    return out;
+  }, [routeOrderOwner, routeOwners]);
+
+  const statusPill = !order
+    ? null
+    : order.status === "cancelled"
+      ? { word: "Cancelled", tone: "info" as const }
+      : order.status === "delivered" || order.delivered_at
+        ? { word: "Delivered", tone: "ok" as const }
+        : order.status === "place"
+          ? { word: "Placed", tone: "info" as const }
+          : { word: "Open", tone: "info" as const };
+
+  /* ── THE THREE DELIVERY DATE WORDS (Ops Rules §5). The original is revision
+     1's own requested date — never the mutable order date (Orders MASTER). ── */
+  const rev1 = revisions.find((r) => r.revision === 1) ?? null;
+  const originalDate: string | null =
+    rev1 && !rev1.snapshot.header?.["delivery_date_tbd"] && rev1.snapshot.header?.["delivery_date"]
+      ? String(rev1.snapshot.header["delivery_date"]).slice(0, 10)
+      : null;
+  const shownDelivery = draft.delivery_date_tbd ? null : draft.delivery_date;
+  const dateChanges = useMemo(() => {
+    let n = 0;
+    for (let i = 1; i < revisions.length; i++) {
+      const a = revisions[i - 1]!.snapshot.header?.["delivery_date"] ?? null;
+      const b = revisions[i]!.snapshot.header?.["delivery_date"] ?? null;
+      if (String(a ?? "") !== String(b ?? "")) n++;
+    }
+    return n;
+  }, [revisions]);
+  const ordinal = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th"}`;
+  const postponed = Boolean(originalDate && shownDelivery && shownDelivery.slice(0, 10) !== originalDate);
+
+  /* ── One row of a detail card: value, pencil while amending, the input once
+     opened or changed, `Was:` under a changed value. ─────────────────────── */
+  const isChanged = (keys: ReadonlyArray<keyof Draft>) =>
+    mode === "object" && editing && keys.some((k) => JSON.stringify(draft[k]) !== JSON.stringify(baseline[k]));
+  const row = (
+    id: string,
+    label: string,
+    shown: { value: React.ReactNode; muted: boolean },
+    keys: ReadonlyArray<keyof Draft>,
+    editor: React.ReactNode | null,
+    was?: string,
+  ) => (
+    <KvRow
+      key={id}
+      testId={`so-row-${id}`}
+      label={label}
+      value={shown.value}
+      muted={shown.muted}
+      editing={!formLocked && Boolean(editor)}
+      editor={editor}
+      open={openFields.has(id)}
+      onOpen={() => openField(id)}
+      changed={isChanged(keys)}
+      was={was}
+    />
   );
-
-  /* ── THE LEFT PANE ─────────────────────────────────────────────────────── */
-  const form = (
-    /* A `fieldset` because the browser's own disabled-descendants rule is the
-       only lock that cannot be forgotten one control at a time. `contents`
-       keeps it out of the layout. */
-    <fieldset
-      disabled={mode === "oldrev"}
-      className="so-detail-style contents"
-      data-testid="sales-order-workspace"
-      id="sales-order-workspace"
-    >
-    {/* §3 of the token table names 24px "between blocks · card padding" and 12px
-        "standard gap". The left pane stacked eight sections at the standard gap,
-        so neighbouring cards sat as close as two fields inside one card — the
-        second half of why the sections did not separate. */}
-    <div className="flex flex-col gap-6">
-      {mode === "oldrev" && viewedRevision && (
-        <div className="px-1" data-testid="oldrev-notice">
-          <span className="rounded-full bg-base-900 px-2 py-0.5 text-label font-semibold text-white">
-            Viewing ({viewedRevision.revision}) · read-only
-          </span>
-          {/* ⭐ TWO CASES, AND ONLY ONE OF THEM IS A RECONSTRUCTION — owner
-              ruling 2026-09-23: "Legacy PDFs that were never stored: use the
-              approved reconstructed-copy notice. Newly issued versions after
-              this release: preserve their original issued PDFs as required. A
-              warning does not replace this capability."
-
-              So a version issued since `0565` shows THE FILE IT WAS ISSUED AS,
-              and says so. Only a version that never had one is rebuilt, and it
-              carries the approved notice — verbatim, the same sentence the
-              rebuilt sheet itself prints, so screen and paper agree. */}
-          {storedDocumentUrl && (
-            <p className="mt-2 text-meta text-kit-slate-11" data-testid="oldrev-issued-document">
-              The document this version was issued as.
-            </p>
-          )}
-          {isReconstruction && (
-            <p className="mt-2 text-meta text-kit-slate-11" data-testid="oldrev-rebuilt">
-              Reconstructed copy. The original issued document is unavailable.
-            </p>
-          )}
-          {/* A SIGNATURE IS UNKNOWN HERE, NOT ABSENT. The evidence itself is
-              untouched: it stays on the order and still prints on the current
-              document. */}
-          {isReconstruction && base?.signature_url && (
-            <p className="mt-1 text-meta text-kit-slate-11" data-testid="oldrev-signature-unknown">
-              Signature version not recorded.
-            </p>
-          )}
-          {isReconstruction && (base?.payments ?? []).some((pm) => !pm.date) && (
-            <p className="mt-1 text-meta text-kit-slate-11" data-testid="oldrev-undated-payment">
-              One payment has no date, so it is not counted in this version.
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* 0562 · the supplier-commitment notice (owner ruling 2026-09-21), in both states. */}
-      {mode === "object" && (detailQ.data?.pos ?? []).length > 0 && (
-        <p className="rounded-card border border-kit-slate-5 bg-white px-4 py-3 text-body text-kit-slate-12" data-testid="supplier-commitment-notice">
-          This SO is already ordered from the supplier. Your change goes for approval first; the order changes only after it is approved.
-        </p>
-      )}
-      {mode === "object" && !editing && liveAmendment && requestView && (
-        <WaitingRequest
-          amendment={liveAmendment}
-          rows={requestView.rows}
-          consequences={requestView.consequences}
-          canDecide={role === "principal"}
-          busy={decideMut.isPending || agreementMut.isPending}
-          onRecordAgreement={(a) => agreementMut.mutate({ amendmentId: liveAmendment.id, ...a })}
-          onDecide={(decision, note) => decideMut.mutate({ amendmentId: liveAmendment.id, decision, note })}
-          onProposeAgain={() => startEdit(withProposal(baseline, proposalOf(liveAmendment)), liveAmendment.id)}
+  const dateFact = (iso: string | null | undefined) => factOf(iso ? fmtDate(iso) : "");
+  const customRows = (fields: CustomField[]) =>
+    fields.map((f) => {
+      const value = draft.custom[f.key] ?? "";
+      const editor =
+        f.type === "select" ? (
+          <CSelect id={`so-custom-${f.key}`} label={f.label} value={value} onChange={(v) => setCustom(f.key, v)}
+            options={f.options.map((o) => ({ value: o, label: o }))} />
+        ) : f.type === "date" ? (
+          <CDate id={`so-custom-${f.key}`} label={f.label} value={value || null} onChange={(iso) => setCustom(f.key, iso ?? "")} />
+        ) : (
+          <CInput id={`so-custom-${f.key}`} label={f.label} type={f.type === "number" ? "number" : "text"} value={value}
+            onChange={(e) => setCustom(f.key, e.target.value)} />
+        );
+      return (
+        <KvRow
+          key={f.key}
+          testId={`so-row-custom-${f.key}`}
+          label={f.label}
+          value={f.type === "date" && value ? fmtDate(value) : value || NOT_RECORDED}
+          muted={!value}
+          editing={mode === "object" && editing}
+          editor={editor}
+          open={openFields.has(`custom-${f.key}`)}
+          onOpen={() => openField(`custom-${f.key}`)}
+          changed={mode === "object" && editing && (draft.custom[f.key] ?? "") !== (baseline.custom[f.key] ?? "")}
+          was={baseline.custom[f.key] ?? ""}
         />
-      )}
+      );
+    });
 
-      {/* ⭐ CARD ORDER — OWNER RULING (Jess, 2026-09-21): `SO info` comes FIRST,
-          before `Customer`. The page reads WHEN (which order) · WHO · WHERE ·
-          WHAT · PAYMENT, so the reader meets the order it is, then the person
-          it is for. This overwrites the 2026-08-26 order that put the customer
-          first. */}
-      {/* ② ORDER INFO */}
-      {/* No subtitle (YH, 2026-08-26). The 2026-08-24 teaching line explained
-          what `Proceed date` meant while it was an editable box the office had
-          to reason about. It is a recorded fact now, and a sentence explaining
-          a read-only date is the "reduce descriptions" Jess asked for. */}
-      {/* 0562 · VIEW FIRST: a saved order reads until `Edit` is pressed. */}
-      <fieldset disabled={formLocked} className="contents">
-      <Block title="SO info">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Fact own={false} label="SO Doc Date" value={fmtDate(order?.placed_at ?? null)} />
-          {/* TWO DATES, TWO NAMES (owner ruling 2026-10-06): this field is
-              `orders.proceed_date`, the PLANNED production start, and reads
-              `Planned production start` here and on the PDF; `Proceed Date`
-              names only the actual hand-off (`orders.proceeded_at`). The
-              notes below predate the rename and say `Proceed Date` for it. */}
-          {/* ⭐ THE RULED ORDER IS `SO Doc Date · Proceed Date · Customer
-              Requested Delivery Date` (CARD ORDER AND NAMES, Jess 2026-09-21).
-              It was built with the last two swapped, and the SALES ORDER PDF
-              printed the ruled order — so the page and the paper beside it
-              disagreed, which is the one thing that section forbids: "the left
-              pane and the Sales Order PDF must tally". Proceed Date is also the
-              earlier fact of the two, so it reads first. */}
-          {/* ⭐ PROCEED DATE IS READ-ONLY ONCE THE ORDER EXISTS (Jess,
-              2026-08-26). This OVERWRITES `docs/orders/MASTER.md` §725-728,
-              which gave Operations a direct writer here. The portal asks for
-              the production start as a REQUIRED question at the point of sale
-              (`Proceed date · production start *`), so on an existing order it
-              is a recorded answer, not a field — and an office edit that moved
-              it silently moved when the factory may start. */}
-          {/* ⭐ A DATE THAT WAS NEVER RECORDED IS NOT A DATE THAT IS LOCKED
-              (YH, 2026-08-28). Jess's ruling stands untouched — a proceed date
-              that EXISTS is a recorded answer and stays a `Fact`, because
-              moving it moves when the factory may start. But an order that
-              never carried one is not a locked answer, it is a MISSING one,
-              and locking a blank is how the office door's own orphans became
-              unfixable. So the picker returns for exactly that case.
-
-              THE TEST IS `baseline`, NEVER `draft`. `baseline` is what the
-              database holds; `draft` is what is on screen. Reading `draft`
-              would swap the field back to a `Fact` the instant a date was
-              picked — the operator would watch their own answer lock before
-              they had saved it, with no way to correct a mis-click. Reading
-              the saved value keeps the control open for the whole edit and
-              locks on the next load, which is when the answer is real.
-
-              `sales_order_save_revision` (0391) enforces the same rule: a
-              blank may be filled, a recorded date may not be moved or cleared.
-              This control is the door, not the lock. */}
-          <div data-pos-field="proceedDate">
-            {/* A never-recorded date reads `Not recorded` while locked; Edit opens the picker. */}
-            {mode === "object" && editing ? (
-              <DatePicker id="so-proceed" label="Planned production start" value={draft.proceed_date}
-                hint={
-                  !baseline.proceed_date
-                    ? "Never recorded. Fill it in once, then it locks"
-                    : undefined
-                }
-                error={
-                  draft.proceed_date && draft.delivery_date && draft.proceed_date > draft.delivery_date
-                    ? "After the delivery date"
-                    : undefined
-                }
-                onChange={(iso) => setField("proceed_date", iso)} />
-            ) : (
-              <span id="so-proceed">
-                <Fact label="Planned production start" value={fmtDate(draft.proceed_date) || "Not recorded"} />
-              </span>
+  /* ── SALES (set by the Sales Portal) ─────────────────────────────────── */
+  const proceededAt = (bag(order)["proceeded_at"] as string | null | undefined) ?? null;
+  const salesFact = (k: string, v: { value: string; muted: boolean }) => (
+    <>
+      <span className="text-[12px] text-c-secondary">{k}</span>
+      <span className={`break-words text-[13px] font-medium ${v.muted ? "text-c-muted" : "text-c-ink"}`}>{v.value}</span>
+    </>
+  );
+  const FACT = "flex min-w-0 flex-col gap-0.5";
+  const salesCard = (
+    <Card label="Sales" testId="so-card-sales">
+      <CardTitle note={mode === "object" && editing ? "Set by Sales Portal" : undefined}>Sales</CardTitle>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-x-4 gap-y-2 border-t border-c-section-line pt-2">
+        <span className={FACT} data-testid="so-fact-so-doc-date">{salesFact("SO Doc Date", dateFact(order?.placed_at))}</span>
+        <span className={FACT} data-testid="so-fact-proceed-date">{salesFact("Proceed Date", dateFact(mode === "oldrev" ? null : proceededAt))}</span>
+        <span className={FACT} data-testid="so-fact-dealer">{salesFact("Dealer", factOf(sourceName(mode, viewedRevision, order, "dealer")))}</span>
+        <span className={FACT} data-testid="so-fact-sales-location" data-pos-field="outlet">{salesFact("Sales Location", factOf(sourceName(mode, viewedRevision, order, "outlet")))}</span>
+        <span className={FACT} data-testid="so-fact-salesperson" data-pos-field="salesperson">{salesFact("Salesperson", factOf(sourceName(mode, viewedRevision, order, "salesperson")))}</span>
+        {/* `Planned production start` (owner ruling 2026-10-06) is asked in the
+            amendment only: a recorded date is the factory's start and the
+            server refuses to move it; a never-recorded one may be filled once. */}
+        {mode === "object" && editing && (
+          <span className="flex min-w-0 flex-col gap-0.5" data-pos-field="proceedDate">
+            <span className="text-[12px] text-c-secondary">Planned production start</span>
+            <CDate id="so-proceed" label="Planned production start" value={draft.proceed_date} onChange={(iso) => setField("proceed_date", iso)} />
+            {!baseline.proceed_date && <span className="text-[12px] text-c-muted">Never recorded. Fill it in once, then it locks</span>}
+            {draft.proceed_date && draft.delivery_date && draft.proceed_date > draft.delivery_date && (
+              <span className="text-[12px] text-c-warn-fg">After the delivery date</span>
             )}
-          </div>
-          {!formLocked && editing ? (
-            <div data-pos-field="deliveryDate">
-              <DatePicker id="so-promised" label="Customer Requested Delivery Date" value={draft.delivery_date}
-                hint={earliestPromise ? `Earliest ${fmtDate(earliestPromise)} (production lead)` : undefined}
-                error={
-                  draft.delivery_date && earliestPromise && draft.delivery_date < earliestPromise
-                    ? `Too soon. Earliest is ${fmtDate(earliestPromise)}`
-                    : undefined
-                }
-                /* A date changes only into another date: picking one in Edit ends a legacy TBD (owner ruling 2026-09-26). */
-                onChange={(iso) =>
-                  setDraft((d) => ({ ...d, delivery_date: iso, delivery_date_tbd: false }))
-                } />
-            </div>
-          ) : (
-            <div data-pos-field="deliveryDate">
-              <Fact label="Customer Requested Delivery Date" value={
-                promisedWord(mode, viewedRevision, order) === "No delivery date" ? (
-                  <span data-attention="warning" className="inline-flex rounded-control bg-kit-amber-3 px-1.5 py-0.5 font-medium text-kit-amber-11">No delivery date</span>
-                ) : promisedWord(mode, viewedRevision, order)
-              } />
-              {/* ⭐ THE DOOR SITS BESIDE THE DATE IT MOVES (YH, 2026-08-27).
-                  The three amend fields were a whole section — first a card,
-                  then a merged subsection — standing open on every order for an
-                  act that happens rarely. They are a MODAL now, opened from the
-                  fact they change, which is where somebody looking at a wrong
-                  date already has their eye.
-                  A LIVE proposal is truth and is NOT hidden behind the modal:
-                  it prints here, under the date it is waiting to move. */}
-              {/* 0562 · the date moves inside the whole-page Edit; a live request
-                  shows once, at the top of the form, never as a second door here. */}
-            </div>
-          )}
-          {/* ⛔ `Customer reference` IS REMOVED FROM THE PAGE — OWNER RULING
-              (Jess, 2026-09-21), `docs/orders/MASTER.md` § "Order view" → CARD
-              ORDER AND NAMES. `orders.source_ref` is untouched and the importer
-              remains its only writer; the SO page simply stops printing it. */}
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <CustomFields fields={tab("target").custom} values={draft.custom} onChange={setCustom} locked={formLocked} />
-        </div>
-        {/* THE ONE DOOR for goods, price and the promised date — opened from
-            `More actions` since 2026-08-26. The component still MOUNTS here
-            because a LIVE proposal is truth and belongs on the card, and
-            because the modal it owns has to exist to be opened at all. The
-            rule + padding therefore appear only when there is a live panel to
-            separate; with nothing pending this renders an empty, invisible
-            div rather than a bordered strip with no content in it. */}
-        {!formLocked && editing && (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Select id="so-instalment" label="Instalment months"
-              value={draft.installment_months == null ? "none" : String(draft.installment_months)}
-              onValueChange={(v) => setField("installment_months", v === "none" ? null : Number(v))}
-              options={[{ value: "none", label: "None" }, ...INSTALMENT_MONTHS.map((m) => ({ value: String(m), label: String(m) }))]} />
-          </div>
+          </span>
         )}
-        {/* ⭐ DEALER · SALES LOCATION · SALESPERSON LIVE IN `SO info` — OWNER
-            RULING (Jess, 2026-09-21), and the `Sales ownership` heading is
-            RETIRED with the move (COPY-STANDARD § Its section names). They are
-            facts about the ORDER — which showroom opened it and who sold it —
-            not about the person who bought it, and the Register already reads
-            `Sales Location · Salesperson` beside `SO No`. This overwrites the
-            2026-09-11 "who sold it is part of who bought it" placement.
-            `SalesOrderAttribution` keeps its own permission checks and its
-            approve/reject lane exactly as they were. */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div data-pos-field="outlet">
-                <Fact label="Sales Location" value={sourceName(mode, viewedRevision, order, "outlet") || "Not recorded"} />
-              </div>
-              {/* ⭐ THE DOOR SITS BESIDE THE NAME IT MOVES (YH, 2026-09-01).
-                  `Change salesperson` had a rule and a right-aligned row of its
-                  own under this grid — a separator, 12px of padding and a full
-                  row, introducing ONE button. It reads as a section, so the eye
-                  stops at it, and it separated the verb from the fact the verb
-                  acts on.
-                  It is the same shape `Change delivery date` already uses under
-                  `Requested Delivery Date`: a quiet text door under the answer
-                  it changes, which is where somebody looking at the wrong
-                  salesperson already has their eye. `useCanChangeSalesOwnership`
-                  is GATE 3's rule, imported rather than re-typed. */}
-              <div data-pos-field="salesperson">
-                <Fact label="Salesperson" value={sourceName(mode, viewedRevision, order, "salesperson") || "Not recorded"} />
-                {mode !== "oldrev" && orderId && order && canChangeSalesOwnership && (
-                  <button
-                    type="button"
-                    onClick={() => setAttributionSignal((n) => n + 1)}
-                    data-testid="attribution-open"
-                    className="mt-1 text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-                  >
-                    Change salesperson
-                  </button>
-                )}
-              </div>
-            {/* ⭐ AND DEALER READS LAST — the ruled order is `… Sales Location ·
-                Salesperson · Dealer`. It was built Dealer-first, which put the
-                least-used fact in the reader's first cell. */}
-              <Fact label="Dealer" value={sourceName(mode, viewedRevision, order, "dealer") || "Not recorded"} />
-            </div>
-            {/* An OLD revision is a photograph — it carries no lane. */}
-            {mode !== "oldrev" && orderId && order && (
-              <SalesOrderAttribution
-                orderId={orderId}
-                current={{
-                  salesperson_id: order.salesperson_id ?? null,
-                  outlet_id: order.outlet_id ?? null,
-                  dealer_id: order.dealer_id ?? null,
-                }}
-                salespersonOptions={realSpOptions}
-                outletOptions={realOutletOptions}
-                dealerOptions={dealerOptions}
-                inlineTrigger={false}
-                openSignal={attributionSignal}
-                onApplied={() => {
-                  void revisionsQ.refetch();
-                  void baseQ.refetch();
-                  void detailQ.refetch();
-                }}
-              />
-            )}
-
-      </Block>
-      </fieldset>
-
-      {/* ① CUSTOMER — now the whole customer, address included (Jess,
-          2026-08-26). `Delivery address` was its own card between `Emergency
-          contact` and `Money`; a reader looking up "where does this go" had to
-          pass two unrelated sections to find it. It is the same party's fact,
-          so it is the same card, under its own locked name. */}
-      {/* 0562 · VIEW FIRST: a saved order reads until `Edit` is pressed. */}
-      <fieldset disabled={formLocked} className="contents">
-      <Block
-        title="Customer"
-        headerSlot={
-          customerBuiltins["customerType"]?.enabled !== false ? (
-            <span
-              className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-base-700"
-              data-pos-field="customerType"
-              data-testid="customer-type-chip"
-            >
-              {customerTypeWord}
-              {/* ⭐ AN EXISTING CUSTOMER CARRIES HOW MANY ORDERS, AND A DOOR TO
-                  THEM — OWNER RULING (Jess, 2026-09-21). `n` is this phone's
-                  Sales Orders the reader may see, counted by the Register's
-                  own read (`ordersDoorCount` above), and the link opens that
-                  Register searched by the SAME phone — no new customer page
-                  and no new writer (Law C: a door, never a duplicate). Zero,
-                  or no number, prints no `0 orders` and no door. */}
-              {customerTypeWord === "Existing customer" && ordersDoorCount > 0 && (
-                <>
-                  {" · "}
-                  <Link
-                    to={`/operation/orders?search=${encodeURIComponent(probedPhone)}`}
-                    className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-                    data-testid="customer-orders-door"
-                  >
-                    {ordersDoorCount === 1 ? "1 order" : `${ordersDoorCount} orders`} ›
-                  </Link>
-                </>
-              )}
+        {customRowsAsFacts(tab("target").custom)}
+      </div>
+    </Card>
+  );
+  function customRowsAsFacts(fields: CustomField[]) {
+    return fields.map((f) => {
+      const value = draft.custom[f.key] ?? "";
+      return (
+        <span key={f.key} className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-[12px] text-c-secondary">{f.label}</span>
+          {mode === "object" && editing ? (
+            <CInput id={`so-custom-${f.key}`} label={f.label} value={value} onChange={(e) => setCustom(f.key, e.target.value)} />
+          ) : (
+            <span className={`break-words text-[13px] font-medium ${value ? "text-c-ink" : "text-c-muted"}`}>
+              {f.type === "date" && value ? fmtDate(value) : value || NOT_RECORDED}
             </span>
-          ) : undefined
-        }
-      >
-        {/* ⭐ THREE ACROSS (YH, 2026-08-27) — the six identity fields were two
-            per row, which made the card six rows tall for facts that are one
-            line each. At three they land as exactly two rows: who they are,
-            then who they are demographically. */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div data-pos-field="name">
-            {/* A locked field is not a question, so the star belongs to Edit and Create. */}
-            <Input id="so-name" label="Full name" required={!formLocked} value={draft.customer_name}
-              onChange={(e) => setField("customer_name", e.target.value)} />
-          </div>
-          <div data-pos-field="phone">
-            <Input id="so-phone" label="Phone" value={draft.customer_phone}
-              onChange={(e) => setField("customer_phone", e.target.value)} />
-          </div>
-          {customerBuiltins["email"]?.enabled !== false && (
-            <div data-pos-field="email">
-              <Input id="so-email" label="Email" required={!formLocked && customerBuiltins["email"]?.required}
-                value={draft.customer_email}
-                onChange={(e) => setField("customer_email", e.target.value)} />
-            </div>
           )}
-          {customerBuiltins["race"]?.enabled !== false && (
-            <div data-pos-field="race">
-              {lockedFact("Race", draft.customer_race,
-              <Select id="so-race" label="Race" required={!formLocked && customerBuiltins["race"]?.required}
-                value={draft.customer_race || undefined}
-                onValueChange={(v) => setField("customer_race", v)}
-                options={CUSTOMER_RACE_OPTIONS.map((r) => ({ value: r, label: r }))} />)}
-            </div>
-          )}
-          {customerBuiltins["gender"]?.enabled !== false && (
-            <div data-pos-field="gender">
-              {lockedFact("Gender", draft.customer_gender,
-              <Select id="so-gender" label="Gender" required={!formLocked && customerBuiltins["gender"]?.required}
-                value={draft.customer_gender || undefined}
-                onValueChange={(v) => setField("customer_gender", v)}
-                options={CUSTOMER_GENDER_OPTIONS.map((g) => ({ value: g, label: g }))} />)}
-            </div>
-          )}
-          {customerBuiltins["birthday"]?.enabled !== false && (
-            <div data-pos-field="birthday">
-              {lockedFact("Birthday", draft.customer_birthday,
-              <DatePicker id="so-birthday" label="Birthday" required={!formLocked && customerBuiltins["birthday"]?.required}
-                value={draft.customer_birthday}
-                onChange={(iso) => setField("customer_birthday", iso)} />)}
-            </div>
-          )}
-          <CustomFields fields={tab("customer").custom} values={draft.custom} onChange={setCustom} locked={formLocked} />
-        </div>
-        {/* ⭐ Merged from the retired `Emergency contact` card (YH,
-            2026-08-27). It is the same person's fact, so it is the same
-            card — the customer, everywhere their goods go, and who to ring
-            if nobody answers on the day. It loses its fold with its border:
-            three fields do not need hiding, and a collapsed card cannot
-            show an unsaved change without the force-open machinery that
-            existed only because it was collapsible. */}
-        {emergencyEnabled && (
-          <>
-            <div className="border-t border-kit-slate-5 pt-3">
-              <SubHead>Emergency contact</SubHead>
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-pos-field="emergency">
-              <Input id="so-emergency-name" label="Name" value={draft.emergency_name}
-                onChange={(e) => setField("emergency_name", e.target.value)} />
-              <Input id="so-emergency-phone" label="Phone" value={draft.emergency_phone}
-                onChange={(e) => setField("emergency_phone", e.target.value)} />
-              {/* The relationship is a picker with a free-text escape: an
-                  imported or hand-typed word that is not on the list must survive
-                  being looked at, so it stays in the text box. */}
-              <Input id="so-emergency-relationship" label="Relationship"
-                list="so-emergency-relationships"
-                value={draft.emergency_relationship}
+        </span>
+      );
+    });
+  }
+
+  /* ── CUSTOMER + EMERGENCY CONTACT ─────────────────────────────────────── */
+  const customerTypeValue = (
+    <span data-pos-field="customerType" data-testid="customer-type-chip">
+      {customerTypeWord}
+      {customerTypeWord === "Existing customer" && ordersDoorCount > 0 && (
+        <>
+          {" · "}
+          <Link
+            to={`/operation/orders?search=${encodeURIComponent(probedPhone)}`}
+            className="font-semibold text-c-ink underline-offset-2 hover:underline"
+            data-testid="customer-orders-door"
+          >
+            {ordersDoorCount === 1 ? "1 order" : `${ordersDoorCount} orders`} ›
+          </Link>
+        </>
+      )}
+    </span>
+  );
+  const customerCard = (
+    <Card label="Customer and emergency contact" testId="so-card-customer" className="gap-[18px]">
+      <section className="flex flex-col" data-pos-field="name">
+        <CardTitle>Customer</CardTitle>
+        {row("name", "Full name", factOf(draft.customer_name), ["customer_name"],
+          <CInput id="so-name" label="Full name" value={draft.customer_name} onChange={(e) => setField("customer_name", e.target.value)} />, baseline.customer_name)}
+        <span data-pos-field="phone" className="contents">
+          {row("phone", "Phone", factOf(draft.customer_phone), ["customer_phone"],
+            <CInput id="so-phone" label="Phone" value={draft.customer_phone} onChange={(e) => setField("customer_phone", e.target.value)} />, baseline.customer_phone)}
+        </span>
+        {customerBuiltins["email"]?.enabled !== false && (
+          <span data-pos-field="email" className="contents">
+            {row("email", "Email", factOf(draft.customer_email), ["customer_email"],
+              <CInput id="so-email" label="Email" type="email" value={draft.customer_email} onChange={(e) => setField("customer_email", e.target.value)} />, baseline.customer_email)}
+          </span>
+        )}
+        {customerBuiltins["customerType"]?.enabled !== false &&
+          row("customer-type", "Customer type", { value: customerTypeValue, muted: customerTypeWord === "Not known yet" }, [], null)}
+        {customerBuiltins["race"]?.enabled !== false && (
+          <span data-pos-field="race" className="contents">
+            {row("race", "Race", factOf(draft.customer_race), ["customer_race"],
+              <CSelect id="so-race" label="Race" value={draft.customer_race} onChange={(v) => setField("customer_race", v)}
+                options={CUSTOMER_RACE_OPTIONS.map((r) => ({ value: r, label: r }))} />, baseline.customer_race)}
+          </span>
+        )}
+        {customerBuiltins["gender"]?.enabled !== false && (
+          <span data-pos-field="gender" className="contents">
+            {row("gender", "Gender", factOf(draft.customer_gender), ["customer_gender"],
+              <CSelect id="so-gender" label="Gender" value={draft.customer_gender} onChange={(v) => setField("customer_gender", v)}
+                options={CUSTOMER_GENDER_OPTIONS.map((g) => ({ value: g, label: g }))} />, baseline.customer_gender)}
+          </span>
+        )}
+        {customerBuiltins["birthday"]?.enabled !== false && (
+          <span data-pos-field="birthday" className="contents">
+            {row("birthday", "Birthday", dateFact(draft.customer_birthday), ["customer_birthday"],
+              <CDate id="so-birthday" label="Birthday" value={draft.customer_birthday} onChange={(iso) => setField("customer_birthday", iso)} />,
+              baseline.customer_birthday ? fmtDate(baseline.customer_birthday) : "")}
+          </span>
+        )}
+        {customRows(tab("customer").custom)}
+      </section>
+      {emergencyEnabled && (
+        <section className="flex flex-col" data-pos-field="emergency">
+          <CardTitle>Emergency contact</CardTitle>
+          {row("emergency-name", "Contact name", factOf(draft.emergency_name), ["emergency_name"],
+            <CInput id="so-emergency-name" label="Contact name" value={draft.emergency_name} onChange={(e) => setField("emergency_name", e.target.value)} />, baseline.emergency_name)}
+          {row("emergency-relationship", "Relationship", factOf(draft.emergency_relationship), ["emergency_relationship"],
+            <>
+              <CInput id="so-emergency-relationship" label="Relationship" list="so-emergency-relationships" value={draft.emergency_relationship}
                 onChange={(e) => setField("emergency_relationship", e.target.value)} />
               <datalist id="so-emergency-relationships">
                 {EMERGENCY_RELATIONSHIPS.map((r) => <option key={r} value={r} />)}
               </datalist>
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <CustomFields fields={tab("emergency").custom} values={draft.custom} onChange={setCustom} locked={formLocked} />
-            </div>
-          </>
-        )}
-        {/* ⭐ BILLING BELONGS TO `Customer` — OWNER RULING (Jess, 2026-09-21).
-            `Delivery` answers ONE question — can we deliver it and how is it
-            carried — and who pays is not that question. The in-card label is
-            `Billing` (COPY-STANDARD § Its section names). Every field keeps its
-            id, its POS-parity tag and its codec. */}
-        <div className="border-t border-kit-slate-5 pt-3">
-          <SubHead>Billing</SubHead>
-        </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4" data-pos-field="billing">
-            <div className="sm:col-span-4">
-              <Checkbox id="so-billing-same" label="Billing address same as delivery"
-                checked={draft.customer_billing_same}
-                onCheckedChange={(v) => setField("customer_billing_same", v)} />
-            </div>
-            {!draft.customer_billing_same && (
-              <div className="sm:col-span-4">
-                <Input id="so-billing" label="Billing address" value={draft.customer_billing}
-                  onChange={(e) => setField("customer_billing", e.target.value)} />
-              </div>
-            )}
-            <CustomFields fields={tab("address").custom} values={draft.custom} onChange={setCustom} locked={formLocked} />
-          </div>
-      </Block>
-      </fieldset>
+            </>, baseline.emergency_relationship)}
+          {row("emergency-phone", "Phone", factOf(draft.emergency_phone), ["emergency_phone"],
+            <CInput id="so-emergency-phone" label="Emergency phone" value={draft.emergency_phone} onChange={(e) => setField("emergency_phone", e.target.value)} />, baseline.emergency_phone)}
+          {customRows(tab("emergency").custom)}
+        </section>
+      )}
+    </Card>
+  );
 
-      {/* ⑥ MONEY — read-only forever (ownership Law B). */}
-
-
-      {/* ③ DELIVERY — where the goods go, and what the lorry meets there
-          (approved Sales Order detail organisation, 2026-09-11).
-          The address, the billing relationship and the access conditions were
-          spread across two cards: the address sat inside CUSTOMER and the
-          floor/lift/stair answers sat on ORDER INFO. They are ONE question —
-          "can we deliver this, and what will it cost to carry" — so they are
-          one card. Every field keeps its id, its clamp and its POS-parity
-          tag; nothing here is recomputed and no second fee is derived. The
-          stair charge is the STAMPED `STAIR_CARRY` addon, stated once here as
-          a working line and charged once in GOODS. */}
-      {/* 0562 · VIEW FIRST: a saved order reads until `Edit` is pressed. */}
-      <fieldset disabled={formLocked} className="contents">
-      <Block title="Delivery">
-          {/* Merged from the retired `Delivery address` card (Jess,
-              2026-08-26). Same fields, same ids, same one-address fact — it
-              simply stopped being a separate card two sections away from the
-              customer it belongs to. */}
-          {/* ⭐ ONE GROUP, NO IN-CARD HEADINGS — OWNER RULING (Jess,
-              2026-09-21): the address and the access conditions are one
-              question, so `Delivery address` and `Delivery access` are retired
-              as headings (COPY-STANDARD § Its section names). */}
-          {/* Delivery uses the same two field tracks throughout, including access and services. */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" data-pos-field="address">
-            {/* ⭐ THE ESCAPE HATCH ONLY APPEARS WHEN IT IS NEEDED (YH,
-                2026-08-26). `Address not given yet` is the answer to a MISSING
-                address; on an order that already carries one it is a permanent
-                tickbox whose only power is to throw that address away. It shows
-                while the address is blank, and while it is already ticked (so it
-                can be unticked) — and disappears once there is an address to
-                read. The FIELD is untouched: `customer_address_unknown` still
-                round-trips, and the POS still asks the same question. */}
-            {(addressIsBlank || draft.customer_address_unknown) && (
-              <div className="sm:col-span-2">
-                <Checkbox id="so-address-unknown" label="Address not given yet"
-                  checked={draft.customer_address_unknown}
-                  onCheckedChange={(v) => setField("customer_address_unknown", v)} />
-              </div>
-            )}
-            <div>
-              <Input id="so-line1" label="Address line 1" value={draft.customer_address_line1}
-                disabled={draft.customer_address_unknown}
-                onChange={(e) => setField("customer_address_line1", e.target.value)} />
-            </div>
-            <div>
-              <Input id="so-line2" label="Address line 2" value={draft.customer_address_line2}
-                disabled={draft.customer_address_unknown}
-                onChange={(e) => setField("customer_address_line2", e.target.value)} />
-            </div>
-            {/* THE MALAYSIA CASCADE — state picks city picks postcode, the same
-                three questions in the same order the POS asks them.
-                (`@/data/malaysia-postcodes`, one dataset, no second copy.)
-
-                Before this, all three were free text here while the POS could
-                only ever write a listed value — so the office could produce an
-                address the shop floor was incapable of producing, and a postcode
-                that belongs to no city in its own state.
-
-                STRICT, and that is measured rather than assumed: NO importer
-                writes `customer_address_state` — the only writers are this door
-                and the POS create/update path, and AutoCount rows carry null in
-                all three columns (their address arrives as ONE composed string).
-                So a picker cannot orphan legacy data; there is nothing in the
-                column to preserve. An address the list cannot express still has
-                two homes — the free-text lines above, and `Address not given
-                yet` for the genuinely unknown. */}
-            {/* THE LOCKED STATE (owner ruling 2026-09-26): an absent answer reads
-                `Not recorded`, and the hints belong to Edit and Create. */}
-            {lockedFact("State", draft.customer_address_state,
-            <Select id="so-state" label="State"
-              value={draft.customer_address_state || undefined}
-              disabled={draft.customer_address_unknown}
-              onValueChange={(v) =>
-                setDraft((d) => ({ ...d, ...addressCascadePatch("state", v) }))
-              }
-              options={MY_STATES.map((st) => ({ value: st, label: st }))} />)}
-            {lockedFact("City", draft.customer_address_city,
-            <Select id="so-city" label="City"
-              value={draft.customer_address_city || undefined}
-              disabled={draft.customer_address_unknown || !draft.customer_address_state}
-              hint={!formLocked && !draft.customer_address_state ? "Pick a state first" : undefined}
-              onValueChange={(v) =>
-                setDraft((d) => ({ ...d, ...addressCascadePatch("city", v) }))
-              }
-              options={getCities(draft.customer_address_state || null).map((c) => ({ value: c, label: c }))} />)}
-            {lockedFact("Postcode", draft.customer_address_postcode,
-            <Select id="so-postcode" label="Postcode"
-              value={draft.customer_address_postcode || undefined}
-              disabled={draft.customer_address_unknown || !draft.customer_address_city}
-              hint={!formLocked && !draft.customer_address_city ? "Pick a city first" : undefined}
-              onValueChange={(v) => setField("customer_address_postcode", v)}
-              options={getPostcodes(
-                draft.customer_address_state || null,
-                draft.customer_address_city || null,
-              ).map((pc) => ({ value: pc, label: pc }))} />)}
-            {lockedFact("Building type", draft.building_type,
-            <Select id="so-building-type" label="Building type" required={!formLocked}
-              error={
-                !formLocked && !draft.customer_address_unknown && !draft.building_type
-                  ? "Fill in the building type first. A condominium can only take a half-day delivery."
-                  : undefined
-              }
-              value={draft.building_type || undefined}
-              onValueChange={(v) => setField("building_type", v)}
-              options={BUILDING_TYPE_OPTIONS.map((b) => ({ value: b, label: b }))} />)}
-          </div>
-          {/* ⭐ DELIVERY ACCESS SITS WITH THE ADDRESS IT DESCRIBES
-              (approved Sales Order detail composition, 2026-09-10). Floor,
-              lift and stair carry answer "what happens when the lorry
-              reaches THIS address" — they stood on `Order info`, a card away
-              from the address they qualify, so a reader checking a
-              condominium delivery held the address in their head while they
-              went to find the floor. Nothing about the fields changed: the
-              same clamps, the same `stairCarry` POS-parity tag, the same
-              working line, moved whole. */}
-          {/* (same group — no second heading) */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {/* ⭐ THE TAG COVERS THE FIELD IT NAMES (YH, 2026-09-01).
-                  `data-pos-field="stairCarry"` wrapped the FLOOR box alone. The
-                  registry field it stands for is "Delivery access (floor / lift /
-                  stair carry)" — three questions — and the other two sat outside
-                  the tag entirely.
-                  That is not cosmetic. The POS-parity contract test walks
-                  `POS_FORM_BUILTINS` and asserts each key's attribute appears in
-                  this file; it cannot see WHAT the attribute wraps. So the test
-                  reported "stair carry is covered" while checking one box of
-                  three, and deleting `Lift available?` tomorrow would still pass.
-                  THIS IS THE SECOND TIME. `orderAddons` carried the same attribute
-                  on a hidden `<span>` with no control behind it, and the page
-                  passed a completeness test it did not meet while the office rang
-                  the shop to add a disposal service. The lesson was written into
-                  the comment above that door and the same defect was live twelve
-                  lines away.
-                  A NESTED GRID, not a wrapper div: the three fields still sit on
-                  the parent's two tracks (`sm:col-span-2 sm:grid-cols-2`),
-                  so the fields align with the address and read as the one topic
-                  they are. */}
-              <div
-                data-pos-field="stairCarry"
-                className="grid grid-cols-1 gap-3 sm:col-span-2 sm:grid-cols-2"
-              >
-                {/* Carres does not stair-carry above floor 3 (MAX_DELIVERY_FLOOR).
-                    The POS has clamped this since the wizard was written; this door
-                    accepted any number, so an office-keyed order could promise a
-                    carry nobody performs. */}
-                {/* The ceiling rides the LABEL (YH, 2026-08-26) — it was a hint
-                    under the box, which reads as advice rather than as the limit
-                    the input actually enforces. One statement, in the field's own
-                    name, and the separate hint line goes with it. */}
-                {/* Locked prints the number as text: a number box is an Edit control. */}
-                {formLocked ? <Fact label={`Floor (Max is ${MAX_DELIVERY_FLOOR}rd Floor)`} value={String(draft.delivery_floor)} /> :
-                <Input id="so-floor" label={`Floor (Max is ${MAX_DELIVERY_FLOOR}rd Floor)`}
-                  type="number" min={1} max={MAX_DELIVERY_FLOOR}
-                  value={String(draft.delivery_floor)}
-                  onChange={(e) =>
-                    setField(
-                      "delivery_floor",
-                      /* ⭐ THE SAME 1-TO-3 THE POS CLAMPS TO (YH, 2026-09-01 —
-                         "office follow POS"). The floor was 0 here while the POS
-                         stepper starts at 1; the form already shows a missing
-                         floor as 1 (`?? 1`, four places), so the zero was a value
-                         only this box could type and nothing could mean. */
-                      Math.min(MAX_DELIVERY_FLOOR, Math.max(1, Number(e.target.value) || 1)),
-                    )
-                  } />}
-              {/* ⭐ THE CELL ALWAYS CARRIES A NUMBER (YH, 2026-08-27) — "no ask
-                  then put a default value, rather than leaving it blank". The
-                  STORED value stays null until somebody types; this shows the
-                  derived default and never writes one.
-
-                  ⚠️ THE TWO COMMENTS THAT STOOD HERE UNTIL 2026-09-01 DESCRIBED A
-                  FIELD THAT NO LONGER EXISTED. They said an untouched box reads
-                  `All 5 items` and that 0104's NULL means EVERY item, and warned
-                  at length against defaulting to zero. Both were true when typed
-                  on 2026-08-26/27 and were overturned HOURS later by YH's own
-                  ruling that an unset count means NONE — which `stairCarryCount`
-                  has implemented ever since, and which is why the box renders `0`.
-                  A governance record that no longer describes its field is not
-                  harmless: the next reader trusts it, and this one warned them off
-                  the behaviour the code already had. Kept as a correction rather
-                  than deleted, because the ruling it lost to is the point.
-
-                  ⭐ AND THE CEILING IS ENFORCED, NOT JUST STATED (YH, 2026-09-01).
-                  The hint has said `0 to 5` since it was written and the box
-                  accepted 99. The POS cannot produce that number — its stepper
-                  stops at the item count — so an office-keyed order could hold a
-                  count no shop floor could have quoted, while the working line
-                  directly below priced the CLAMPED five. One card, two answers to
-                  "how many items", and the saved one was the wrong one.
-                  `stairCarryCount` is the same clamp the fee already runs and the
-                  same one the server stamps with, imported rather than re-typed —
-                  a second copy of a ceiling is how the two surfaces drifted in the
-                  first place. `max` rides the input too, so the spinner and the
-                  keyboard agree.
-                  ⛔ NO CEILING WITHOUT A COUNT. Until the catalog answers, `stair`
-                  is null and the item total is unknown — so the upper clamp is
-                  simply not applied and the floor at zero still is. A guess at the
-                  ceiling would be worse than no ceiling: it would silently cut a
-                  number the operator typed correctly. Degrade, never abort. */}
-              {/* ⭐ FLOOR → LIFT → ITEMS NEEDING STAIR CARRY — OWNER RULING
-                  (Jess, 2026-09-21). The lift answer is what decides whether
-                  anything is carried at all, so it is asked before the count it
-                  governs; the page previously asked the count first. */}
-              {/* ⭐ THE SAME QUESTION, ASKED THE SAME WAY ON BOTH SIDES (Jess,
-                  2026-08-26). The POS asks `Lift available?` and offers two named
-                  answers — `No lift` / `Has lift` (`pos/StairCarryFields.tsx`).
-                  Operations asked the same fact as a bare tickbox, so an unticked
-                  box meant BOTH "no lift" and "nobody said", and the two surfaces
-                  did not tally. Two named options, the POS's exact words, and a
-                  blank that still reads as a blank. */}
-              <Select id="so-lift" label="Lift available?"
-                value={draft.delivery_has_lift ? "Has lift" : "No lift"}
-                onValueChange={(v) => setField("delivery_has_lift", v === "Has lift")}
-                options={LIFT_OPTIONS.map((o) => ({ value: o, label: o }))} />
-              {formLocked ? <Fact label="Items needing stair carry" value={draft.delivery_stair_items == null ? "Not recorded" : String(draft.delivery_stair_items)} /> :
-              <Input id="so-stair-items" label="Items needing stair carry" type="number" min={0}
-                max={stair?.itemsTotal}
-                hint={stair ? `0 to ${stair.itemsTotal}` : undefined}
+  /* ── DELIVERY + ADDRESS ───────────────────────────────────────────────── */
+  const fullAddressFallback = addressIsBlank ? "" : !draft.customer_address_line1.trim() && !draft.customer_address_city ? draft.customer_address : "";
+  const deliveryCard = (
+    <Card label="Delivery and address" testId="so-card-delivery" className="gap-[18px]">
+      <section className="flex flex-col" data-pos-field="deliveryDate">
+        <CardTitle>Delivery</CardTitle>
+        {row("original-date", "Customer original delivery date", dateFact(originalDate), [], null)}
+        {(postponed || draft.delivery_date_tbd || (mode === "object" && editing)) &&
+          row(
+            "new-date",
+            "Customer new delivery date",
+            draft.delivery_date_tbd
+              ? { value: <span data-attention="warning" className="rounded-lg bg-c-warn-bg px-1.5 py-0.5 text-c-warn-fg">No delivery date</span>, muted: false }
+              : postponed && shownDelivery
+                ? { value: `${fmtDate(shownDelivery)}${dateChanges > 0 ? ` (${ordinal(dateChanges)} change)` : ""}`, muted: false }
+                : { value: "Not yet", muted: true },
+            ["delivery_date", "delivery_date_tbd"],
+            <span className="flex flex-col gap-0.5">
+              <CDate id="so-promised" label="Customer new delivery date" value={draft.delivery_date} min={earliestPromise ?? undefined}
+                /* A date changes only into another date: picking one ends a legacy TBD (owner ruling 2026-09-26). */
+                onChange={(iso) => setDraft((d) => ({ ...d, delivery_date: iso, delivery_date_tbd: false }))} />
+              {earliestPromise && (
+                <span className={`text-[12px] ${draft.delivery_date && draft.delivery_date < earliestPromise ? "text-c-warn-fg" : "text-c-muted"}`}>
+                  {draft.delivery_date && draft.delivery_date < earliestPromise ? `Too soon. Earliest is ${fmtDate(earliestPromise)}` : `Earliest ${fmtDate(earliestPromise)} (production lead)`}
+                </span>
+              )}
+            </span>,
+            baseline.delivery_date ? fmtDate(baseline.delivery_date) : "",
+          )}
+        <span data-pos-field="stairCarry" className="contents">
+          {row("floor", "Floor", { value: String(draft.delivery_floor), muted: false }, ["delivery_floor"],
+            <CInput id="so-floor" label={`Floor (Max is ${MAX_DELIVERY_FLOOR}rd Floor)`} type="number" min={1} max={MAX_DELIVERY_FLOOR}
+              value={String(draft.delivery_floor)}
+              onChange={(e) => setField("delivery_floor", Math.min(MAX_DELIVERY_FLOOR, Math.max(1, Number(e.target.value) || 1)))} />,
+            String(baseline.delivery_floor))}
+          {row("lift", "Lift", { value: draft.delivery_has_lift ? "Has lift" : "No lift", muted: false }, ["delivery_has_lift"],
+            <CSelect id="so-lift" label="Lift available?" value={draft.delivery_has_lift ? "Has lift" : "No lift"}
+              onChange={(v) => setField("delivery_has_lift", v === "Has lift")}
+              options={LIFT_OPTIONS.map((o) => ({ value: o, label: o }))} />,
+            baseline.delivery_has_lift ? "Has lift" : "No lift")}
+          {mode === "object" && editing &&
+            row("stair-items", "Items needing stair carry",
+              factOf(draft.delivery_stair_items == null ? "" : String(draft.delivery_stair_items)), ["delivery_stair_items"],
+              <CInput id="so-stair-items" label="Items needing stair carry" type="number" min={0} max={stair?.itemsTotal}
                 value={draft.delivery_stair_items == null ? "" : String(draft.delivery_stair_items)}
                 onChange={(e) =>
                   setField(
@@ -3280,318 +2594,508 @@ function SalesOrderWorkspaceBody() {
                         ? stairCarryCount(stair.itemsTotal, Number(e.target.value) || 0)
                         : Math.max(0, Number(e.target.value) || 0),
                   )
-                } />}
-          {/* One service editor in Delivery; the Items rows are its charge projection. */}
-          {/* The service editor asks the lock first, so a historical version only reads. */}
-          {(draft.addons.some((a) => !a.removed) || (!formLocked && editing)) && (
-            <div className={`flex min-w-0 flex-col gap-3${!formLocked && editing ? " sm:col-span-2" : ""}`} data-testid="delivery-services" data-pos-field="orderAddons">
-              {!formLocked && editing ? (
-                <FieldFrame id="so-services-editor">
-                  <div id="so-services-editor" role="group" aria-label="Services" className="flex flex-col gap-3">
-                    {draft.addons.map((a) => {
-                      const owned = SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addon_key);
-                      const pos = serviceSizeDraft(a, catalogQ.data?.addons.find((x) => x.key === a.addon_key)?.sizeOptions);
-                      const sizes = disposalUnitSizes(pos);
-                      const options = addonSizeOptions(pos);
-                      return (
-                        <div key={a.key} className="border-b border-kit-slate-5 pb-3" data-testid={`delivery-service-${a.addon_key}`}>
-                          <div className="flex items-center justify-between gap-3">
-                            <span className={`text-body${a.removed ? " line-through text-base-500" : ""}`}>{nameOfAddon(a.addon_key)}{owned ? ` ×${a.qty}` : ""}</span>
-                            {!owned && <Button size="sm" variant="neutral" aria-label={`${a.removed ? "Restore" : "Remove"} ${nameOfAddon(a.addon_key)}`}
-                              onClick={() => a.removed ? setDraftAddon(a.key, { removed: false }) : a.added
-                                ? setDraft((d) => ({ ...d, addons: d.addons.filter((x) => x.key !== a.key) }))
-                                : setDraftAddon(a.key, { removed: true })}>{a.removed ? "Restore" : "Remove"}</Button>}
-                          </div>
-                          {!a.removed && !owned && (
-                            <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                              <Input id={`so-edit-service-qty-${a.key}`} label="Qty" aria-label={`Qty ${nameOfAddon(a.addon_key)}`}
-                                type="number" min={1} step={1} value={String(a.qty)}
-                                onChange={(e) => setDraftAddon(a.key, resizeService(a, Number(e.target.value), pos.sizeOptions))} />
-                              {options.length > 0 && sizes.map((size, i) => (
-                                <Select key={i} id={`so-service-size-${a.key}-${i}`} label={a.qty > 1 ? `Size ${i + 1}` : "Size"}
-                                  value={size} onValueChange={(value) => setDraftAddon(a.key, sizeServiceUnit(a, i, value))}
-                                  options={[...new Set([...options, ...(size ? [size] : [])])].map((value) => ({ value, label: value }))} />
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {!draft.addons.length && <span className="text-body">None</span>}
-                  </div>
-                </FieldFrame>
-              ) : <Fact label="Services" own={false} framed value={
-                <div className="flex flex-col gap-1">
-                  {draft.addons.filter((a) => !a.removed).map((a) => (
-                    <div key={a.key}>{servicesWords([a], nameOfAddon)}</div>
-                  ))}
-                </div>
-              } />}
-              {!formLocked && editing && serviceOptions.length > 0 && (
-                <Select id="so-add-delivery-service" label="Add service" value=""
-                  onValueChange={addServiceToDraft}
-                  options={serviceOptions.map((x) => ({ value: x.key, label: `${x.name} · ${fmtMoney(Number(x.price))}` }))} />
+                } />,
+              baseline.delivery_stair_items == null ? "" : String(baseline.delivery_stair_items))}
+          {row("stair-fee", "Stair carry fee", { value: <span data-testid="so-stair-working" className="tabular-nums">{fmtMoney(stairWorking?.fee ?? 0)}</span>, muted: false }, [], null)}
+        </span>
+      </section>
+      <section className="flex flex-col" data-pos-field="address">
+        <CardTitle>Address</CardTitle>
+        {mode === "object" && editing && (addressIsBlank || draft.customer_address_unknown) &&
+          row("address-unknown", "Address not given yet", { value: draft.customer_address_unknown ? "Yes" : "No", muted: false }, ["customer_address_unknown"],
+            <CSelect id="so-address-unknown" label="Address not given yet" value={draft.customer_address_unknown ? "yes" : "no"}
+              onChange={(v) => setField("customer_address_unknown", v === "yes")}
+              options={[{ value: "no", label: "No" }, { value: "yes", label: "Yes" }]} />)}
+        {row("line1", "Address line 1",
+          draft.customer_address_unknown ? { value: "Address not given yet", muted: true } : factOf(draft.customer_address_line1 || fullAddressFallback),
+          ["customer_address_line1"],
+          <CInput id="so-line1" label="Address line 1" value={draft.customer_address_line1} disabled={draft.customer_address_unknown}
+            onChange={(e) => setField("customer_address_line1", e.target.value)} />, baseline.customer_address_line1)}
+        {row("line2", "Address line 2", factOf(draft.customer_address_line2), ["customer_address_line2"],
+          <CInput id="so-line2" label="Address line 2" value={draft.customer_address_line2} disabled={draft.customer_address_unknown}
+            onChange={(e) => setField("customer_address_line2", e.target.value)} />, baseline.customer_address_line2)}
+        {row("city-state", "City / state",
+          factOf([draft.customer_address_city, draft.customer_address_state].filter(Boolean).join(", ")),
+          ["customer_address_city", "customer_address_state"],
+          <span className="grid grid-cols-2 gap-1.5">
+            <CSelect id="so-state" label="State" placeholder="State" value={draft.customer_address_state} disabled={draft.customer_address_unknown}
+              onChange={(v) => setDraft((d) => ({ ...d, ...addressCascadePatch("state", v) }))}
+              options={MY_STATES.map((st) => ({ value: st, label: st }))} />
+            <CSelect id="so-city" label="City" placeholder={draft.customer_address_state ? "City" : "Pick a state first"} value={draft.customer_address_city}
+              disabled={draft.customer_address_unknown || !draft.customer_address_state}
+              onChange={(v) => setDraft((d) => ({ ...d, ...addressCascadePatch("city", v) }))}
+              options={getCities(draft.customer_address_state || null).map((c) => ({ value: c, label: c }))} />
+          </span>,
+          [baseline.customer_address_city, baseline.customer_address_state].filter(Boolean).join(", "))}
+        {row("postcode", "Postcode", factOf(draft.customer_address_postcode), ["customer_address_postcode"],
+          <CSelect id="so-postcode" label="Postcode" placeholder={draft.customer_address_city ? "Postcode" : "Pick a city first"}
+            value={draft.customer_address_postcode} disabled={draft.customer_address_unknown || !draft.customer_address_city}
+            onChange={(v) => setField("customer_address_postcode", v)}
+            options={getPostcodes(draft.customer_address_state || null, draft.customer_address_city || null).map((pc) => ({ value: pc, label: pc }))} />,
+          baseline.customer_address_postcode)}
+        {row("building-type", "Building type", factOf(draft.building_type), ["building_type"],
+          <span className="flex flex-col gap-0.5">
+            <CSelect id="so-building-type" label="Building type" value={draft.building_type} onChange={(v) => setField("building_type", v)}
+              options={BUILDING_TYPE_OPTIONS.map((b) => ({ value: b, label: b }))} />
+            {!draft.customer_address_unknown && !draft.building_type && (
+              <span className="text-[12px] text-c-warn-fg">Fill in the building type first. A condominium can only take a half-day delivery.</span>
+            )}
+          </span>, baseline.building_type)}
+        <span data-pos-field="billing" className="contents">
+          {row("billing", "Billing address",
+            draft.customer_billing_same ? { value: "Same as delivery", muted: false } : factOf(draft.customer_billing),
+            ["customer_billing_same", "customer_billing"],
+            <span className="flex flex-col gap-1.5">
+              <CSelect id="so-billing-same" label="Billing address same as delivery" value={draft.customer_billing_same ? "same" : "other"}
+                onChange={(v) => setField("customer_billing_same", v === "same")}
+                options={[{ value: "same", label: "Same as delivery" }, { value: "other", label: "Different address" }]} />
+              {!draft.customer_billing_same && (
+                <CInput id="so-billing" label="Billing address" value={draft.customer_billing} onChange={(e) => setField("customer_billing", e.target.value)} />
               )}
-            </div>
-          )}
-              </div>
+            </span>,
+            baseline.customer_billing_same ? "Same as delivery" : baseline.customer_billing)}
+        </span>
+        {customRows(tab("address").custom)}
+      </section>
+    </Card>
+  );
+
+  /* ── ITEMS + PAYMENT (Law D: every figure from the `money` memo) ──────── */
+  const editTotal =
+    draft.lines.filter((l) => !l.removed && l.sku.trim()).reduce((n, l) => n + l.qty * l.unit_price, 0) +
+    draft.addons.filter((a) => !a.removed).reduce((n, a) => n + a.qty * a.unit_price, 0);
+  const qtyTotal = draft.lines.filter((l) => !l.removed && l.sku.trim()).reduce((n, l) => n + l.qty, 0);
+  /* THE LOCKED STATE (owner ruling 2026-09-26): View and a historical version
+     are ONE locked presentation; the amendment alone draws controls. */
+  const amending = !formLocked;
+  const ITEM_COLS = "grid grid-cols-[24px_minmax(0,1fr)_56px_110px_110px] gap-3";
+  const paymentWord = atSalePaymentWord(order?.payment_method, order?.installment_months ?? null);
+  const slip = order?.payment_slip_url ?? null;
+  const itemsCard = (
+    <Card label="Items and payment" testId="so-card-items">
+      <CardTitle note={amending ? undefined : undefined}>Items</CardTitle>
+      <div className="overflow-x-auto" data-testid="edit-items">
+        <div role="table" aria-label="Items" className="min-w-[520px] text-[13px] tabular-nums" data-testid="edit-goods">
+          <div role="row" className={`${ITEM_COLS} border-b border-t border-b-c-head-line border-t-c-row-line py-[7px] text-[12px] text-c-muted`}>
+            <span>#</span><span>Item</span><span className="text-right">Qty</span><span className="text-right">Unit price</span><span className="text-right">Amount</span>
           </div>
-          {/* The three fields above, added up out loud — the POS's own sentence
-              (`pos/StairCarryFields.tsx`), so the office reads the number the
-              salesperson quoted instead of re-deriving it.
-              ⭐ ONLY WHEN THERE IS A CHARGE (YH, 2026-08-26). It used to narrate
-              the zero too — "No stair carry — floor 1 is within the free 2F" —
-              which is a sentence saying nothing happened, printed on the majority
-              of orders. The fields above already state the floor and the lift; a
-              line that only repeats them back is the noise Jess asked to cut. */}
-          {stairWorking && (
-            <p className="text-meta text-base-500" data-testid="so-stair-working">
-              {stairWorking.items} of {stairWorking.itemsTotal} item
-              {stairWorking.itemsTotal === 1 ? "" : "s"} carried to floor {stairWorking.floor},
-              charged{" "}
-              <span className="font-semibold text-base-900">
-                <Money value={stairWorking.fee} />
-              </span>
-            </p>
-          )}
-
-      </Block>
-      </fieldset>
-
-
-
-
-
-
-
-
-      {/* ⑧ GOODS — the six-column truth §0.1 locks. It is not a form: Unit ID
-          and Deliver To are Stock's and Purchasing's facts, and the document
-          preview beside it never prints them. */}
-      {/* ⭐ 0562 · VIEW FIRST APPLIES HERE TOO. Finding 9 put the document's own
-          table in BOTH states, so the Qty and price boxes now render on a
-          locked order as well — and a grey box on this page means "this can be
-          changed with Edit", never "type here now". The same `fieldset` the
-          other cards use is what keeps that promise; without it the boxes on a
-          locked order accepted keystrokes. */}
-      <fieldset disabled={formLocked} className="contents">
-      <Block title="Items">
-        {/* ⭐ `orderAddons` USED TO BE A HIDDEN SPAN. It carried the
-            `data-pos-field` the POS-parity contract test string-matches, with
-            no control behind it — so the page passed a completeness test it
-            did not meet, and the office still had to ring the shop to add a
-            disposal service. The attribute now rides the real door. */}
-        {/* ⭐ ONE COMMERCIAL TABLE IN BOTH MODES — OWNER RULING (Jess,
-             2026-09-21/22, `docs/orders/MASTER.md` § ITEMS). View used to draw a
-             different table from Edit — Category · Unit ID · SKU · Qty · Item ·
-             Deliver To · Unit price · Line total — so the reader checked the page
-             against the paper column by column and the columns did not match, and
-             pressing `Edit` changed the composition under them.
-             The document's own columns now stand in both: `#` · `Item Code` ·
-             `Description` · `Qty` · `Unit (RM)` · `Disc (RM)` · `Amount (RM)` ·
-             closing `TOTAL PAYABLE`, with no category rows.
-             ⛔ THE CROSS-MODULE FACTS ARE NOT DELETED, THEY ARE WHERE THEY BELONG.
-             Unit ID is Stock's and `Deliver To` is Purchasing's; both are read on
-             `Order Route`, which already draws them from the route facts. This
-             page stops printing a second copy (Law C: a door, never a duplicate). */}
-        {editItemsTable}
-        {/* An OLD revision is a photograph and a draft has no order to write
-            to — the door belongs to the live object only.
-            ⭐ THE ATTRIBUTE STILL RIDES A REAL CONTROL. It was once a hidden
-            `<span>` carrying this exact string with nothing behind it, so the
-            page passed a POS-parity completeness test it did not meet while the
-            office rang the shop to add a disposal service. What is left in
-            `SalesOrderAddons` is the one act the table cannot perform — adding
-            a service that is not there yet — and the attribute rides that. */}
-        {/* The `Add service` door now lives inside the whole-page Edit (0562):
-            a service is part of what was bought, so it moves with the draft
-            through the governed lane instead of a direct write. */}
-      </Block>
-      </fieldset>
-
-      {/* ⭐ THE DOOR RIDES THE TITLE (YH, 2026-09-01). `Open this order in
-          Payments` had a hairline and a row of its own at the foot of the
-          card — a separator introducing one link, on a card whose entire
-          content is three numbers, and it left the fields staring at empty
-          space where the row used to be. The door now sits in the header bar
-          itself, beside the card's own name. The word is locked
-          (COPY-STANDARD:1595) and unchanged. It still writes nothing: it
-          navigates to the desk that owns collection, already scoped to this
-          order, which is the one thing Law C lets a summary add. */}
-      <Block
-        title="Payment"
-        headerSlot={
-          order ? (
-            <button
-              type="button"
-              data-testid="workspace-open-payments"
-              className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-              /* The canonical Register, scoped to this order (payment
-                 MASTER §16; entry-point correction 2026-09-09). */
-              onClick={() => navigate(`/finance/payments?order=${order.so}`)}
-            >
-              Open this order in Payments
-            </button>
-          ) : undefined
-        }
-      >
-        <PaymentLedger orderId={orderId ?? null} saved={{
-          paid: Number(order?.paid ?? 0), method: order?.payment_method,
-          months: order?.installment_months, reference: order?.approval_code,
-          slip: order?.payment_slip_url,
-        }} />
-        {/* ⭐ THE TWO COLLECTION FACTS SIT UNDER THE LEDGER THEY SUM, ON THE
-            RIGHT EDGE ITS AMOUNTS ALREADY USE (approved composition,
-            2026-09-10). `Total` is NOT repeated here — it is stated once,
-            under the Goods table that produces it. What this card answers is
-            the collections question: how much came in, how much is still out.
-            ⭐ AND THEY ARE THE CANONICAL FIGURES, NOT A RE-SUM OF THE ROWS.
-            `money.paid` is `orders.paid` through `orderMoney` — the number
-            every gate reads. Adding the rows up here instead would be a SECOND
-            arithmetic for one fact (Law D), and it would disagree the moment a
-            row is a history mirror (`counted_in_paid: false`) or a storage
-            collection, neither of which is goods money. */}
-        {/* ⭐ THE APPROVED PAYMENT TOTALS — OWNER APPROVAL (Jess, 2026-09-22),
-            `docs/orders/MASTER.md` § "Order view" → PAYMENT: goods amount ·
-            service amount · `Total payable` · `Paid to date` · `Balance due`.
-            This replaces the 2026-09-10 `Paid` / `Outstanding` pair, and the
-            page now repeats `Total payable` because the PDF does.
-
-            ⭐ ONE ARITHMETIC (Law D). Every figure comes from the `money` memo —
-            `orderMoney` plus the two sums it already made — never a re-sum of
-            the printed rows, and never a second total for the same fact. A
-            history mirror (`counted_in_paid: false`) or a storage collection is
-            not goods money and is not added here.
-            ⭐ `Outstanding` REMAINS RED WHILE OWED (owner ruling 2026-08-15);
-            `Total payable` and `Balance due` are the bold lines (kit-sizes card,
-            2026-09-23), and money amounts never borrow the heading size.
-            ⚠️ The `Goods` and `Services` row WORDS are pending COPY review, as
-            the ruling itself records; a combined total is never `Goods total`. */}
-        {/* ⭐ ONE SIZE, TWO WEIGHTS (SO page kit-sizes card, 2026-09-23).
-            Every label and amount is `text-body` 13/18 — measured before this,
-            the amounts carried no size class and rendered at the browser's
-            16px, the labels at 12px and `Balance due` at the 15px heading
-            size. `Total payable` and `Balance due` are the two answers the
-            reader came for, so they alone take weight 600, each under a 1px
-            rule. No KPI treatment: nothing here is larger than a table cell.
-            The full-width bordered two-column summary has one rule per row,
-            matching the ledger insets instead of floating in unused space. */}
-        <div className="w-full">
-          <div className="grid w-full grid-cols-[1fr_auto] overflow-hidden rounded-control border border-kit-slate-5 text-body [&>span]:px-2 [&>span]:py-2 [&>span:nth-child(n+3)]:border-t [&>span:nth-child(n+3)]:border-kit-slate-5"
-            data-testid="payment-totals">
-            <span className="pr-6 text-base-500">Goods</span>
-            <span className="text-right tabular-nums text-base-900" data-testid="money-goods">
-              {money.known ? fmtMoney(money.goods) : "No price yet"}
+          {draft.lines.filter((l) => l.sku.trim()).map((l, i) => {
+            const known = catalogModel.bySku.get(l.sku);
+            const model = known ? catalogModel.byModel.get(known.modelId) : undefined;
+            const canConfig = !l.removed && model && (model.skus.length > 1 || model.gaps.length > 0);
+            const strike = l.removed ? "line-through text-c-muted" : "";
+            const open = configOpen.has(l.key);
+            const locked = !amending || l.removed || protectedLine(l);
+            return (
+              <div key={l.key} data-testid={`edit-line-${i + 1}`}>
+                <div role="row" className={`${ITEM_COLS} items-baseline border-b border-c-row-line py-2`}>
+                  <span className="text-c-muted">{i + 1}</span>
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className={`break-words ${strike}`}>
+                      <span className="font-medium text-c-ink">{nameOfSku(l.sku)}</span>{" "}
+                      <span className="text-c-muted">· {l.sku}</span>
+                    </span>
+                    {configWords(l.attrs) && <span className={`text-[12px] text-c-secondary ${strike}`}>{configWords(l.attrs)}</span>}
+                    {!known && catalogQ.data && <span className="text-[12px] text-c-warn-fg">{NOT_IN_CATALOG}</span>}
+                    {l.added && <span className="text-[12px] font-semibold text-c-ok-fg">New line</span>}
+                    {l.removed && <span className="text-[12px] text-c-warn-fg">Cancelled when approved · Restore to keep it</span>}
+                    {protectedLine(l) && <span className="text-[12px] text-c-secondary">Free item. It follows the item it came with</span>}
+                    {amending && !protectedLine(l) && (
+                      <span className="flex flex-wrap gap-x-4 text-[12px] font-semibold">
+                        {canConfig && (
+                          <button type="button" className="text-c-ink hover:underline" aria-expanded={open} aria-label={`Configure ${nameOfSku(l.sku)}`}
+                            onClick={() => setConfigOpen((st) => { const n = new Set(st); if (n.has(l.key)) n.delete(l.key); else n.add(l.key); return n; })}>
+                            {open ? "Close configuration" : "Configure"}
+                          </button>
+                        )}
+                        {l.removed ? (
+                          <button type="button" className="text-c-ink hover:underline" aria-label={`Restore ${nameOfSku(l.sku)}`}
+                            onClick={() => setDraftLine(l.key, { removed: false })}>Restore</button>
+                        ) : (
+                          <button type="button" className="text-c-warn-fg hover:underline" aria-label={`Remove ${nameOfSku(l.sku)}`}
+                            onClick={() => (l.added
+                              ? setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))
+                              : setDraftLine(l.key, { removed: true }))}>Remove</button>
+                        )}
+                      </span>
+                    )}
+                  </span>
+                  <span className={`text-right text-c-ink ${strike}`}>
+                    {locked ? l.qty : (
+                      <CInput id={`so-edit-qty-${l.key}`} label={`Qty ${nameOfSku(l.sku)}`} type="number" min={1} value={String(l.qty)} className="text-right"
+                        onChange={(e) => setDraftLine(l.key, { qty: Math.max(1, Number(e.target.value) || 1) })} />
+                    )}
+                  </span>
+                  <span className={`text-right text-c-secondary ${strike}`}>
+                    {locked ? fmtMoney(l.unit_price) : (
+                      <CInput id={`so-edit-price-${l.key}`} label={`Unit price ${nameOfSku(l.sku)}`} type="number" min={0} step="0.01" value={String(l.unit_price)} className="text-right"
+                        onChange={(e) => setDraftLine(l.key, { unit_price: Math.max(0, Number(e.target.value) || 0) })} />
+                    )}
+                  </span>
+                  <span className={`text-right text-c-ink ${strike}`}>{fmtMoney(l.qty * l.unit_price)}</span>
+                </div>
+                {amending && open && canConfig && (
+                  <div className="grid grid-cols-1 gap-2 border-b border-c-row-line bg-c-ground px-2 py-2 sm:grid-cols-3">
+                    {model!.skus.length > 1 && (
+                      <CSelect id={`so-edit-size-${l.key}`} label="Size" value={l.sku}
+                        onChange={(sku) => {
+                          const hit = model!.skus.find((x) => x.sku === sku);
+                          if (!hit) return;
+                          setDraftLine(l.key, { sku, unit_price: hit.price + surchargeOf(l.attrs) });
+                        }}
+                        options={model!.skus.map((x) => ({ value: x.sku, label: x.variant || x.sku }))} />
+                    )}
+                    {model!.gaps.length > 0 && (
+                      <CSelect id={`so-edit-gap-${l.key}`} label="Mattress gap"
+                        value={String((l.attrs as { gap?: string } | undefined)?.gap ?? "KIV")}
+                        onChange={(gap) => setDraftLine(l.key, { attrs: { ...(l.attrs ?? {}), gap } })}
+                        options={[{ value: "KIV", label: "Confirm later" }, ...model!.gaps.map((g) => ({ value: g, label: g }))]} />
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {draft.addons.map((a, j) => {
+            const strike = a.removed ? "line-through text-c-muted" : "";
+            const owned = SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addon_key);
+            const pos = serviceSizeDraft(a, catalogQ.data?.addons.find((x) => x.key === a.addon_key)?.sizeOptions);
+            const sizes = disposalUnitSizes(pos);
+            const options = addonSizeOptions(pos);
+            const n = draft.lines.filter((l) => l.sku.trim()).length + j + 1;
+            return (
+              <div key={a.key} data-testid={`edit-service-${a.addon_key}`} data-pos-field="orderAddons">
+                <div role="row" className={`${ITEM_COLS} items-baseline border-b border-c-row-line py-2`}>
+                  <span className="text-c-muted">{n}</span>
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className={`break-words ${strike}`}>
+                      <span className="font-medium text-c-ink">{nameOfAddon(a.addon_key)}</span>{" "}
+                      <span className="text-c-muted">· {serviceCodeWord(a.addon_key, addonSkuByKey.get(a.addon_key))}</span>
+                    </span>
+                    {typeof a.attrs?.["size"] === "string" && <span className={`text-[12px] text-c-secondary ${strike}`}>{String(a.attrs["size"])}</span>}
+                    {a.added && <span className="text-[12px] font-semibold text-c-ok-fg">New line</span>}
+                    {amending && !owned && (
+                      <span className="flex gap-4 text-[12px] font-semibold">
+                        <button type="button" className={a.removed ? "text-c-ink hover:underline" : "text-c-warn-fg hover:underline"}
+                          aria-label={`${a.removed ? "Restore" : "Remove"} ${nameOfAddon(a.addon_key)}`}
+                          onClick={() => a.removed ? setDraftAddon(a.key, { removed: false }) : a.added
+                            ? setDraft((d) => ({ ...d, addons: d.addons.filter((x) => x.key !== a.key) }))
+                            : setDraftAddon(a.key, { removed: true })}>{a.removed ? "Restore" : "Remove"}</button>
+                      </span>
+                    )}
+                  </span>
+                  <span className={`text-right text-c-ink ${strike}`}>
+                    {amending && !owned && !a.removed ? (
+                      <CInput id={`so-edit-service-qty-${a.key}`} label={`Qty ${nameOfAddon(a.addon_key)}`} type="number" min={1} step={1} value={String(a.qty)} className="text-right"
+                        onChange={(e) => setDraftAddon(a.key, resizeService(a, Number(e.target.value), pos.sizeOptions))} />
+                    ) : a.qty}
+                  </span>
+                  <span className={`text-right text-c-secondary ${strike}`}>{fmtMoney(a.unit_price)}</span>
+                  <span className={`text-right text-c-ink ${strike}`}>{fmtMoney(a.qty * a.unit_price)}</span>
+                </div>
+                {amending && !owned && !a.removed && options.length > 0 && (
+                  <div className="grid grid-cols-1 gap-2 border-b border-c-row-line bg-c-ground px-2 py-2 sm:grid-cols-3">
+                    {sizes.map((size, i) => (
+                      <CSelect key={i} id={`so-service-size-${a.key}-${i}`} label={a.qty > 1 ? `Size ${i + 1}` : "Size"} placeholder={a.qty > 1 ? `Size ${i + 1}` : "Size"}
+                        value={size} onChange={(value) => setDraftAddon(a.key, sizeServiceUnit(a, i, value))}
+                        options={[...new Set([...options, ...(size ? [size] : [])])].map((value) => ({ value, label: value }))} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <div role="row" className={`${ITEM_COLS} border-b border-c-footer-line py-[7px]`}>
+            <span /><span className="font-semibold text-c-secondary">Total</span>
+            <span className="text-right text-c-ink">{qtyTotal}</span><span />
+            <span className="text-right font-semibold text-c-ink" data-testid="money-total-payable">
+              {amending ? fmtMoney(editTotal) : money.known && money.total != null ? fmtMoney(money.total) : "No price yet"}
             </span>
-            <span className="pr-6 text-base-500">Services</span>
-            <span className="text-right tabular-nums text-base-900" data-testid="money-services">
-              {money.known ? fmtMoney(money.services) : ""}
-            </span>
-            <span className={`${TOTAL_RULE} pr-6 font-semibold text-base-900`}>Total payable</span>
-            <span className={`${TOTAL_RULE} text-right font-semibold tabular-nums text-base-900`} data-testid="money-total-payable">
-              {money.known && money.total != null ? fmtMoney(money.total) : "No price yet"}
-            </span>
-            <span className="pr-6 text-base-500">Paid to date</span>
-            <span className="text-right tabular-nums text-base-900" data-testid="money-paid">
-              {fmtMoney(money.paid)}
-            </span>
-            <span className={`${TOTAL_RULE} pr-6 font-semibold text-base-900`}>Balance due</span>
-            <span
-              className={`${TOTAL_RULE} text-right font-semibold tabular-nums ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
-              data-testid="money-outstanding"
-            >
-              {!money.known ? "No price yet" : money.outstanding > 0 ? fmtMoney(money.outstanding) : "Paid in full"}
+          </div>
+          <div role="row" className={`${ITEM_COLS} border-b border-c-footer-line py-[7px]`}>
+            <span /><span className="text-c-secondary">Received</span><span /><span />
+            <span className="text-right text-c-ink" data-testid="money-paid">{fmtMoney(money.paid)}</span>
+          </div>
+          <div role="row" className={`${ITEM_COLS} border-b border-c-footer-line py-[7px] ${money.known && money.outstanding > 0 ? "bg-c-warn-bg" : ""}`}>
+            <span /><span className="font-semibold text-c-secondary">Balance due</span><span /><span />
+            <span className={`text-right font-semibold ${money.known && money.outstanding > 0 ? "text-c-warn-fg" : "text-c-ink"}`} data-testid="money-outstanding">
+              {!money.known ? "No price yet" : fmtMoney(Math.max(0, money.outstanding))}
             </span>
           </div>
         </div>
-      </Block>
-
-
-
-      {/* ⑨ WHAT THIS CHANGE STARTED ELSEWHERE — 3.4. Shown only when there IS
-          work: a section that says "nothing" on every order is a section the
-          operator learns to skip. */}
-      {mode !== "oldrev" && (correctionWorkQ.data?.work ?? []).length > 0 && (
-        <Block title="What this change started elsewhere">
-          <CorrectionWorkList
-            work={correctionWorkQ.data?.work ?? []}
-            canClose={false}
-            emptyWord=""
-          />
-        </Block>
+      </div>
+      {amending && (
+        <div className="grid grid-cols-1 gap-2 pt-3 sm:grid-cols-3">
+          <span className="flex items-end gap-2 sm:col-span-2">
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <CInput id="so-add-item" label="Add item" placeholder="Add item: type the item code" list="so-sku-catalog" value={addSku} onChange={(e) => setAddSku(e.target.value)} />
+              {addSku.trim() && <span className="text-[12px] text-c-muted">{catalogBySku.get(addSku.trim())?.label ?? NOT_IN_CATALOG}</span>}
+              <datalist id="so-sku-catalog">
+                {[...catalogBySku.entries()].map(([sku, info]) => (
+                  <option key={sku} value={sku}>{info.label}</option>
+                ))}
+              </datalist>
+            </span>
+            <CBtn kind="normal" icon="add" disabled={!catalogBySku.has(addSku.trim())} data-testid="add-item"
+              onClick={() => {
+                const sku = addSku.trim();
+                const hit = catalogBySku.get(sku);
+                if (!hit) return;
+                setDraft((d) => ({ ...d, lines: [...d.lines, { key: nextKey(), sku, qty: 1, unit_price: Number(hit.price ?? 0), added: true }] }));
+                setAddSku("");
+              }}>
+              Add item
+            </CBtn>
+          </span>
+          {serviceOptions.length > 0 && (
+            <CSelect id="so-add-delivery-service" label="Add service" placeholder="Add service" value="" onChange={addServiceToDraft}
+              options={serviceOptions.map((x) => ({ value: x.key, label: `${x.name} · ${fmtMoney(Number(x.price))}` }))} />
+          )}
+        </div>
       )}
-    </div>
-    </fieldset>
+      <span className="pb-1 pt-3.5 text-[13px] font-medium text-c-ink">Payment</span>
+      {amending ? (
+        row("instalment", "Instalment months", factOf(draft.installment_months == null ? "None" : String(draft.installment_months)), ["installment_months"],
+          <CSelect id="so-instalment" label="Instalment months" value={draft.installment_months == null ? "none" : String(draft.installment_months)}
+            onChange={(v) => setField("installment_months", v === "none" ? null : Number(v))}
+            options={[{ value: "none", label: "None" }, ...INSTALMENT_MONTHS.map((m) => ({ value: String(m), label: String(m) }))]} />,
+          baseline.installment_months == null ? "None" : String(baseline.installment_months))
+      ) : (
+        <KvRow label="Method" value={<span data-testid="money-instalment">{paymentWord || NOT_RECORDED}</span>} muted={!paymentWord} />
+      )}
+      <KvRow label="Bank reference" value={order?.approval_code || NOT_RECORDED} muted={!order?.approval_code} />
+      <KvRow
+        label="Bank slip"
+        muted={!slip}
+        value={slip ? (
+          <button type="button" className="font-semibold text-c-ink hover:underline" onClick={() => void viewSlip({ receipt_url: slip })}>
+            {slip.split("/").pop()}
+          </button>
+        ) : NOT_RECORDED}
+      />
+    </Card>
   );
 
-  return (
-    <div className="flex h-full min-h-0 flex-col" data-so-theme="trial">
-      {mode === "object" && editing && (
-        <Modal open={reviewOpen} onOpenChange={(open) => { if (!changesMut.isPending) setReviewOpen(open); }}
-          title="Your changes" width="wide"
-          footer={<>
-            <Button variant="neutral" disabled={changesMut.isPending} onClick={() => setReviewOpen(false)}>Cancel</Button>
-            <Button variant="primary" loading={changesMut.isPending}
-              disabled={!changeReason.trim() || liveBlocksCommercial || changeCount === 0}
-              onClick={onCommit} data-testid="workspace-confirm-save">{commitWord}</Button>
-          </>}>
-        <DraftReview
-          rows={draftRows}
-          consequences={consequencesFor({ lines: draft.lines, addons: draft.addons, header: draftHeader() })}
-          commercial={changeClass?.action === "submit"}
-          blocked={liveBlocksCommercial ? "An earlier change is still waiting for management." : null}
-          reason={changeReason}
-          onReason={setChangeReason}
-          askedOn={changeAskedOn}
-          onAskedOn={setChangeAskedOn}
-          agreement={changeAgreement}
-          onAgreement={setChangeAgreement}
-        />
-        </Modal>
+  /* ── THE AMENDMENT BAR — sticky at the top of the tab while amending. ─── */
+  const commercial = changeClass?.action === "submit";
+  const amendmentBar = amending && (
+    <div className="sticky top-0 z-[6] flex flex-col gap-2 rounded-lg border border-c-btn-border bg-c-card px-3 py-2.5" style={{ boxShadow: "var(--shadow-menu)" }} data-testid="amendment-bar">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="flex items-center gap-1.5 text-[13px] font-semibold text-c-ink" data-testid="change-count">
+          <MIcon name="edit_note" size={18} />
+          Amendment · {changeCount} {changeCount === 1 ? "change" : "changes"}
+        </span>
+        <span className="inline-flex items-center gap-1 text-[12px] text-c-secondary">
+          Click <MIcon name="edit" size={16} /> next to a detail to change it.
+        </span>
+        <span className="flex-1" />
+        <span className="relative flex">
+          <CBtn kind="normal" onClick={() => { setWhyOpen((v) => !v); setProofOpen(false); }} aria-expanded={whyOpen} data-testid="amendment-why">
+            {changeReason.trim() ? "Why: written" : "Why?"}
+            <MIcon name="expand_more" size={18} className="text-c-muted" />
+          </CBtn>
+          {whyOpen && (
+            <div role="dialog" aria-label="Why" className="absolute right-0 top-10 z-[80] flex w-[min(380px,80vw)] flex-col gap-2 rounded-lg border border-c-btn-border bg-c-card p-3" style={{ boxShadow: "var(--shadow-menu)" }}>
+              <label htmlFor="so-change-reason" className="flex flex-col gap-1 text-[12px] font-semibold text-c-secondary">
+                Reason for change
+                <textarea id="so-change-reason" rows={2} value={changeReason} onChange={(e) => setChangeReason(e.target.value)}
+                  className="rounded-lg border border-c-input-border bg-c-card px-2.5 py-1.5 text-[13px] font-normal text-c-ink outline-none focus:border-c-select-fg" />
+              </label>
+              <label htmlFor="so-change-asked" className="flex flex-col gap-1 text-[12px] font-semibold text-c-secondary">
+                Requested date (from customer)
+                <CDate id="so-change-asked" label="Requested date (from customer)" value={changeAskedOn} onChange={setChangeAskedOn} />
+              </label>
+              <CBtn kind="main" className="!h-[30px] self-end !text-[12px]" onClick={() => setWhyOpen(false)}>Done</CBtn>
+            </div>
+          )}
+        </span>
+        {commercial && (
+          <span className="relative flex">
+            <CBtn kind="normal" icon={changeAgreement ? "check_circle" : "attach_file"} onClick={() => { setProofOpen((v) => !v); setWhyOpen(false); }}
+              aria-expanded={proofOpen} data-testid="amendment-proof" className="border-dashed">
+              {changeAgreement ? "Proof added" : "Add proof"}
+            </CBtn>
+            {proofOpen && (
+              <div role="dialog" aria-label="Customer agreement" className="absolute right-0 top-10 z-[80] flex w-[min(420px,85vw)] flex-col gap-2 rounded-lg border border-c-btn-border bg-c-card p-3" style={{ boxShadow: "var(--shadow-menu)" }}>
+                <p className="text-[12px] font-semibold text-c-secondary">Customer agreement</p>
+                <p className="text-[12px] text-c-secondary">You can send the request without it, but management cannot approve until it is recorded.</p>
+                <AgreementForm idPrefix="so-change-agreement" value={changeAgreement} onChange={setChangeAgreement} />
+                <CBtn kind="main" className="!h-[30px] self-end !text-[12px]" onClick={() => setProofOpen(false)}>Done</CBtn>
+              </div>
+            )}
+          </span>
+        )}
+        <CBtn kind="quiet" onClick={() => (changeCount > 0 ? setDiscardAsk(true) : discardEdit())} data-testid="workspace-cancel">
+          Cancel
+        </CBtn>
+        <CBtn kind="main" className="!h-8 !px-4" disabled={changesMut.isPending || liveBlocksCommercial} onClick={tryCommit} data-testid="workspace-save">
+          {commitWord}
+        </CBtn>
+      </div>
+      {(detailQ.data?.pos ?? []).length > 0 && (
+        <span className="text-[12px] text-c-secondary" data-testid="supplier-commitment-notice">
+          This SO is already ordered from the supplier. Your change goes for approval first; the order changes only after it is approved.
+        </span>
       )}
+      {liveBlocksCommercial && (
+        <span role="alert" className="rounded-md bg-c-warn-bg px-2.5 py-1.5 text-[12px] text-c-warn-fg">An earlier change is still waiting for management.</span>
+      )}
+      {editError && <span role="alert" className="rounded-md bg-c-warn-bg px-2.5 py-1.5 text-[12px] text-c-warn-fg" data-testid="amendment-error">{editError}</span>}
+      {discardAsk && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-c-warn-bg px-2.5 py-2">
+          <span className="flex-1 text-[13px] font-medium text-c-warn-fg">Discard {changeCount} {changeCount === 1 ? "change" : "changes"}?</span>
+          <CBtn kind="normal" className="!h-[30px] !text-[12px] !font-semibold" onClick={() => setDiscardAsk(false)}>Keep editing</CBtn>
+          <CBtn kind="main" className="!h-[30px] !text-[12px]" onClick={discardEdit} data-testid="amendment-discard">Discard</CBtn>
+        </div>
+      )}
+    </div>
+  );
 
-      <SalesOrderTabs
-        backTo={typeof location.state?.salesOrderRegisterReturn === "string" && /^\/operation\/orders(?:\?|$)/.test(location.state.salesOrderRegisterReturn) ? location.state.salesOrderRegisterReturn : undefined}
+  /* ── An OLD version is a photograph: amber read-only bar. ─────────────── */
+  const oldRevBar = mode === "oldrev" && viewedRevision && (
+    <div className="flex flex-col gap-1 rounded-lg bg-c-warn-bg px-3 py-2 text-c-warn-fg" data-testid="oldrev-notice">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <span className="flex-1 text-[13px] font-medium">
+          Viewing Rev {viewedRevision.revision}. Read only. This is not the current Sales Order.
+        </span>
+        <CBtn kind="normal" className="!h-7 !border-0 !text-[12px] !font-semibold !text-c-warn-fg" onClick={backToCurrent} data-testid="workspace-back-to-current">
+          Back to current
+        </CBtn>
+      </div>
+      {storedDocumentUrl && <p className="text-[12px]" data-testid="oldrev-issued-document">The document this version was issued as.</p>}
+      {isReconstruction && <p className="text-[12px]" data-testid="oldrev-rebuilt">Reconstructed copy. The original issued document is unavailable.</p>}
+      {isReconstruction && base?.signature_url && <p className="text-[12px]" data-testid="oldrev-signature-unknown">Signature version not recorded.</p>}
+      {isReconstruction && (base?.payments ?? []).some((pm) => !pm.date) && (
+        <p className="text-[12px]" data-testid="oldrev-undated-payment">One payment has no date, so it is not counted in this version.</p>
+      )}
+    </div>
+  );
+
+  const salesOrderTab = (
+    <div className="flex flex-col gap-3" data-testid="sales-order-workspace" id="sales-order-workspace">
+      {oldRevBar}
+      {mode === "object" && !editing && liveAmendment && requestView && (
+        <WaitingAmendment
+          amendment={liveAmendment}
+          rows={requestView.rows}
+          consequences={requestView.consequences}
+          canDecide={role === "principal"}
+          busy={decideMut.isPending || agreementMut.isPending}
+          onRecordAgreement={(a) => agreementMut.mutate({ amendmentId: liveAmendment.id, ...a })}
+          onDecide={(decision, note) => decideMut.mutate({ amendmentId: liveAmendment.id, decision, note })}
+          onProposeAgain={() => startEdit(withProposal(baseline, proposalOf(liveAmendment)), liveAmendment.id)}
+          onWithdraw={() => setWithdrawOpen(true)}
+        />
+      )}
+      {amendmentBar}
+      {salesCard}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] items-stretch gap-3">
+        {customerCard}
+        {deliveryCard}
+      </div>
+      {itemsCard}
+      {mode !== "oldrev" && (correctionWorkQ.data?.work ?? []).length > 0 && (
+        <Card label="What this change started elsewhere">
+          <CardTitle>What this change started elsewhere</CardTitle>
+          <CorrectionWorkList work={correctionWorkQ.data?.work ?? []} canClose={false} emptyWord="" />
+        </Card>
+      )}
+    </div>
+  );
+
+  const timelineEntries = useMemo(
+    () =>
+      timelineEntriesOf({
+        history: (detailQ.data?.history ?? []) as HistoryEvent[],
+        revisions,
+        amendment: liveAmendment,
+        onOpenRevisions: () => setRevOpen(true),
+      }),
+    [detailQ.data?.history, revisions, liveAmendment],
+  );
+
+  const menuGroups: Array<{ heading: string; items: MenuItem[] }> = [
+    {
+      heading: "SALES ORDER",
+      items: [
+        { label: mode === "oldrev" ? "Preview this version" : "Preview SO PDF", icon: "picture_as_pdf", onSelect: () => setMenuPdf(true), testId: "workspace-preview" },
+        { label: mode === "oldrev" ? "Print this version" : "Print SO", icon: "print", onSelect: () => void openPrint(), disabled: !printData && !storedDocumentUrl, testId: "workspace-print" },
+        { label: "Download PDF", icon: "download", onSelect: () => void downloadPdf(), disabled: !printData && !storedDocumentUrl, testId: "workspace-download" },
+      ],
+    },
+    {
+      heading: "COPY",
+      items: [
+        ...(order ? [{ label: "SO No.", icon: "content_copy", onSelect: () => copy(soWord, "SO No."), testId: "workspace-copy-so" }] : []),
+        ...(order?.customer_phone ? [{ label: "Customer phone", icon: "call", onSelect: () => copy(order.customer_phone!, "Customer phone"), testId: "workspace-copy-phone" }] : []),
+      ],
+    },
+    {
+      heading: "OTHER",
+      items: [
+        ...(order ? [{ label: "Open in Payments", icon: "payments", onSelect: () => navigate(`/finance/payments?order=${order.so}`), testId: "workspace-open-payments" }] : []),
+        ...(mode !== "oldrev" && order && canChangeSalesOwnership
+          ? [{ label: "Change salesperson", icon: "person", onSelect: () => setAttributionSignal((n) => n + 1), testId: "attribution-open" }]
+          : []),
+        ...(liveAmendment && liveAmendment.status === "submitted" && !liveAmendment.stale
+          ? [{ label: "Withdraw amendment", icon: "undo", onSelect: () => setWithdrawOpen(true), testId: "workspace-withdraw-amendment" }]
+          : []),
+        ...(canEditOrder && !editing
+          ? [
+              { label: "Report a problem", icon: "support_agent", onSelect: () => setProblemOpen(true), testId: "workspace-report-problem" },
+              { label: "Cancel Sales Order", icon: "cancel", onSelect: () => setCancelOpen(true), testId: "workspace-cancel-so" },
+            ]
+          : []),
+      ],
+    },
+  ];
+
+  /* Drawers open to the LEFT of an open Tasks panel (320px + the 12px gap). */
+  const tasksOpen = useShellTasks((s) => s.open);
+  const drawerRight = tasksOpen ? 344 : 12;
+
+  const backTo =
+    typeof location.state?.salesOrderRegisterReturn === "string" && /^\/operation\/orders(?:\?|$)/.test(location.state.salesOrderRegisterReturn)
+      ? location.state.salesOrderRegisterReturn
+      : "/operation/orders";
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3" data-so-theme="carres" data-testid="so-detail">
+      <SoHeader
         identity={soWord}
-        /* Capitalize up — owner ruling 2026-08-15. Display only; the
-           `Full name` INPUT below stays on the raw draft value, because a
-           cased edit field would write the casing back to the record. */
-        customer={displayCustomerName(order?.customer_name)}
+        /* Capitalize up — owner ruling 2026-08-15. Display only. */
+        customer={displayCustomerName(order?.customer_name) || null}
+        status={statusPill}
+        team={team}
+        revLabel={currentRev && currentRev > 1 ? `Rev ${currentRev}` : null}
+        onOpenRevisions={() => setRevOpen(true)}
+        backTo={backTo}
         onBack={(event) => {
           if (!confirmDiscard()) event.preventDefault();
         }}
-        docTitle={order ? `SO-${order.so} · Carres` : undefined}
-        right={headerRight}
-        navigation={(
-          <nav aria-label="Sales Order views" className="flex h-full items-stretch gap-1">
-            {OBJECT_VIEWS.map((view) => {
-              const active = objectView === view;
-              return (
-                <button
-                  key={view}
-                  type="button"
-                  onClick={() => openObjectView(view)}
-                  aria-current={active ? "page" : undefined}
-                  className={`relative px-3 text-body ${active ? "font-semibold text-base-900 after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-kit-blue-9" : "text-base-600 hover:text-base-900"}`}
-                >
-                  {view}
-                </button>
-              );
-            })}
-          </nav>
-        )}
+        onLogContact={() => {
+          useShellTasks.getState().setOpen(true);
+          useTasksHost.getState().requestTasks();
+        }}
+        onRequestAmendment={() => {
+          if (objectView !== "Sales Order") openObjectView("Sales Order");
+          startEdit(baseline);
+        }}
+        amendDisabled={!canEditOrder || editing}
+        amendTitle={!canEditOrder ? (mode === "oldrev" ? "Go back to the current version first" : "This order cannot be changed") : undefined}
+        menu={menuGroups}
+        docTitle={order ? `SO-${order.so} · Carres` : "Carres"}
+      />
+      <PillTabs
+        label="Sales Order views"
+        value={objectView}
+        onChange={openObjectView}
+        tabs={OBJECT_VIEWS.map((v) => ({ key: v, label: v }))}
       />
 
       {order && (
-        <CancelSalesOrderDialog
-          orderId={order.id}
-          so={order.so}
-          open={cancelOpen}
-          onOpenChange={setCancelOpen}
-          onCancelled={() => void detailQ.refetch()}
-        />
+        <CancelSalesOrderDialog orderId={order.id} so={order.so} open={cancelOpen} onOpenChange={setCancelOpen} onCancelled={() => void detailQ.refetch()} />
       )}
-
       {problemOpen && order && (
         <ServiceCaseWizard
           initialOrder={{
@@ -3618,195 +3122,217 @@ function SalesOrderWorkspaceBody() {
           }}
         />
       )}
+      {/* An OLD revision is a photograph — it carries no lane. The modal is
+          opened from `⋮ Change salesperson`. */}
+      {mode !== "oldrev" && orderId && order && (
+        <span className="hidden">
+          <SalesOrderAttribution
+            orderId={orderId}
+            current={{ salesperson_id: order.salesperson_id ?? null, outlet_id: order.outlet_id ?? null, dealer_id: order.dealer_id ?? null }}
+            salespersonOptions={realSpOptions}
+            outletOptions={realOutletOptions}
+            dealerOptions={dealerOptions}
+            inlineTrigger={false}
+            openSignal={attributionSignal}
+            onApplied={() => {
+              void revisionsQ.refetch();
+              void baseQ.refetch();
+              void detailQ.refetch();
+            }}
+          />
+        </span>
+      )}
 
-      {showRoute ? (
-        <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 px-4 py-4">
-          {routeFactsQ.isLoading || detailQ.isLoading || revisionsQ.isLoading ? (
+      <div className="min-h-0 flex-1 overflow-auto" data-testid="so-tab-body">
+        {objectView === "Order Route" ? (
+          routeFactsQ.isLoading || detailQ.isLoading || revisionsQ.isLoading ? (
             <RouteLoadingFrame />
           ) : routeFactsQ.isError || detailQ.isError || revisionsQ.isError ? (
-            <div className="rounded-card border border-kit-slate-5 bg-white">
+            <Card>
               <SalesOrderReadFailure
                 error={detailQ.error ?? revisionsQ.error ?? routeFactsQ.error}
                 surface="order-route"
                 onRetry={() => { void detailQ.refetch(); void revisionsQ.refetch(); void routeFactsQ.refetch(); }}
               />
-            </div>
+            </Card>
           ) : orderRoute ? (
-            <SalesOrderRoute route={orderRoute} owners={routeOwners} onRetry={retryRouteRead} />
+            <SoOrderRoute
+              route={orderRoute}
+              owners={routeOwners}
+              onRetry={retryRouteRead}
+              originalDate={originalDate}
+              currentDate={order?.delivery_date_tbd ? null : (order?.delivery_date ?? null)}
+              confirmedDate={routeFactsQ.data?.brief?.appointment?.dateIso ?? null}
+              deliveredDate={order?.delivered_at ?? null}
+              todayIso={appTodayIso()}
+            />
           ) : (
-            <div className="rounded-card border border-kit-slate-5 bg-white">
-              <EmptyState title="No route facts were found for this sales order" />
-            </div>
-          )}
-        </div>
-      ) : (objectView === "Revisions" && mode !== "oldrev") || objectView === "History" ? (
-        <div className="min-h-0 flex-1 overflow-auto bg-kit-slate-3 px-4 py-4">
-          {/* ⭐ THE SAME SECTION GRAMMAR AS THE ORDER TAB (kit-sizes card,
-              2026-09-23). This card was `p-5` — 20px, off the spacing scale —
-              under a 20px `text-title`, beside an Order tab whose every section
-              is a 15px blue title over a 1px rule. It is now that same `Block`,
-              so padding, title and gap come from one place. */}
-          <div className="mx-auto max-w-5xl">
-          <Block title={objectView}>
-            {/* ⭐ R-7 — A FAILED READ IS NOT AN EMPTY LEDGER. Without these two
-                guards a 403 or a 500 falls straight through to the ledger's
-                governed EMPTY sentences (`No revisions recorded` / `No history
-                recorded`), which tell the reader the order HAS no revisions —
-                a statement the screen cannot know. The Order Route branch above
-                has carried both guards all along; this one never did, so a
-                permission refusal rendered here as a fact about the order. */}
-            {detailQ.isLoading || revisionsQ.isLoading ? (
-              <Loading label={objectView === "History" ? "Opening the history" : "Opening the revisions"} />
-            ) : detailQ.isError || revisionsQ.isError ? (
+            <Card>
+              <p className="py-2 text-[13px] text-c-muted">No route facts were found for this sales order</p>
+            </Card>
+          )
+        ) : objectView === "Timeline" ? (
+          detailQ.isLoading || revisionsQ.isLoading ? (
+            <Card><p className="py-2 text-[13px] text-c-muted">Opening the timeline</p></Card>
+          ) : detailQ.isError || revisionsQ.isError ? (
+            <Card>
               <SalesOrderReadFailure
                 error={detailQ.error ?? revisionsQ.error}
-                surface={objectView === "History" ? "history" : "revisions"}
+                surface="history"
                 onRetry={() => { void detailQ.refetch(); void revisionsQ.refetch(); }}
               />
-            ) : (
-            <SalesOrderLedger
-              orderReference={order ? `SO-${order.so}` : ""}
-              revisions={revisions}
-              history={detailQ.data?.history ?? []}
-              currentRevision={currentRev}
-              viewedRevision={mode === "oldrev" ? viewRev : null}
-              view={objectView.toLowerCase() as "revisions" | "history"}
-              showViewTabs={false}
-              onViewRevision={setViewRev}
-              onProposeRevision={(revision) => {
-                /* PROPOSE THIS VERSION AGAIN — rollback is a new governed change
-                   (orders/MASTER § Detail, edit, amendment): the complete old
-                   version becomes the draft, on top of today's line identity. */
-                const old = draftFromSnapshot(revision.snapshot);
-                const currentIds = new Map((detailQ.data?.lines ?? []).map((line) => [line.sku, line.id]));
-                const addonIds = new Map((detailQ.data?.addons ?? []).map((a) => [a.addon_key, a.id]));
-                const oldSkus = new Set(old.lines.map((l) => l.sku));
-                const oldKeys = new Set(old.addons.map((a) => a.addon_key));
-                startEdit({
-                  ...old,
-                  lines: [
-                    ...old.lines.map((l) => {
-                      const id = currentIds.get(l.sku);
-                      return id ? { ...l, id } : { ...l, id: undefined, added: true };
-                    }),
-                    ...baseline.lines.filter((l) => !oldSkus.has(l.sku)).map((l) => ({ ...l, removed: true })),
-                  ],
-                  addons: [
-                    ...old.addons.map((a) => {
-                      const id = addonIds.get(a.addon_key);
-                      return id ? { ...a, id } : { ...a, added: true };
-                    }),
-                    ...baseline.addons.filter((a) => !oldKeys.has(a.addon_key)).map((a) => ({ ...a, removed: true })),
-                  ],
-                });
-              }}
-            />
-            )}
-          </Block>
+            </Card>
+          ) : (
+            <SoTimeline entries={timelineEntries} />
+          )
+        ) : detailQ.isLoading ? (
+          <Card testId="so-loading"><p className="py-2 text-[13px] text-c-muted">Opening the sales order</p></Card>
+        ) : detailQ.isError ? (
+          <Card>
+            <SalesOrderReadFailure error={detailQ.error} surface="sales-order" onRetry={() => void detailQ.refetch()} />
+          </Card>
+        ) : order ? (
+          salesOrderTab
+        ) : null}
+      </div>
+
+      {/* ── Revision history: newest first, each a door to the full version. ── */}
+      <Drawer open={revOpen} title="Revision history" onClose={() => setRevOpen(false)} testId="revision-drawer" right={drawerRight}>
+        <SalesOrderLedger
+          orderReference={order ? `SO-${order.so}` : ""}
+          revisions={revisions}
+          history={detailQ.data?.history ?? []}
+          currentRevision={currentRev}
+          viewedRevision={mode === "oldrev" ? viewRev : null}
+          view="revisions"
+          showViewTabs={false}
+          onViewRevision={(r) => {
+            setViewRev(r);
+            setRevOpen(false);
+            if (objectView !== "Sales Order") openObjectView("Sales Order");
+          }}
+          onProposeRevision={(revision) => {
+            /* PROPOSE THIS VERSION AGAIN — rollback is a new governed change
+               (orders/MASTER § Detail, edit, amendment): the complete old
+               version becomes the draft, on top of today's line identity. */
+            const old = draftFromSnapshot(revision.snapshot);
+            const currentIds = new Map((detailQ.data?.lines ?? []).map((line) => [line.sku, line.id]));
+            const addonIds = new Map((detailQ.data?.addons ?? []).map((a) => [a.addon_key, a.id]));
+            const oldSkus = new Set(old.lines.map((l) => l.sku));
+            const oldKeys = new Set(old.addons.map((a) => a.addon_key));
+            setRevOpen(false);
+            startEdit({
+              ...old,
+              lines: [
+                ...old.lines.map((l) => {
+                  const id = currentIds.get(l.sku);
+                  return id ? { ...l, id } : { ...l, id: undefined, added: true };
+                }),
+                ...baseline.lines.filter((l) => !oldSkus.has(l.sku)).map((l) => ({ ...l, removed: true })),
+              ],
+              addons: [
+                ...old.addons.map((a) => {
+                  const id = addonIds.get(a.addon_key);
+                  return id ? { ...a, id } : { ...a, added: true };
+                }),
+                ...baseline.addons.filter((a) => !oldKeys.has(a.addon_key)).map((a) => ({ ...a, removed: true })),
+              ],
+            });
+          }}
+        />
+      </Drawer>
+
+      {/* ── The SO document: the SAME template Print renders, never a lookalike. ── */}
+      <Drawer
+        open={menuPdf}
+        title={mode === "oldrev" && viewedRevision ? `${soWord} · Rev ${viewedRevision.revision}` : `${soWord} · Sales Order`}
+        onClose={() => setMenuPdf(false)}
+        width={560}
+        right={drawerRight}
+        testId="pdf-drawer"
+        actions={
+          <>
+            <CIconBtn icon="print" label="Print" size={34} onClick={() => void openPrint()} />
+            <CIconBtn icon="download" label="Download PDF" size={34} onClick={() => void downloadPdf()} />
+          </>
+        }
+      >
+        {liveAmendment && !liveAmendment.stale && (
+          <div className="mb-3 rounded-lg bg-c-warn-bg px-3 py-2 text-[13px] font-medium text-c-warn-fg" data-testid="pending-amendment-banner">
+            Amendment pending approval{pendingDeliveryDate ? `: delivery date → ${fmtDate(pendingDeliveryDate)}` : ""}. The document shows the order as it is now.
           </div>
-        </div>
-      ) : (
-        /* ⭐ TWO PANES, 50 / 50 — owner ruling 2026-08-15. Each pane scrolls on
-           its own and the PAGE does not; below 1024px they stack, form first,
-           and the page scrolls normally. */
-        <div ref={splitHostRef} className={`min-h-0 flex-1 bg-kit-slate-3 ${split === "stack" ? "overflow-auto" : "overflow-hidden"}`}>
-          {detailQ.isLoading && (
-            /* Loading holds the two panes' final geometry: the same split the
-               form and the paper will fill, so the page does not jump. */
-            <div
-              data-testid="so-loading"
-              className={split === "stack" ? "flex flex-col" : "grid h-full min-h-0"}
-              style={split === "stack" ? undefined : { gridTemplateColumns: split === "half" ? "minmax(0,1fr) minmax(0,1fr)" : `${FORM_MIN_WIDTH}px minmax(${MIN_PDF_WIDTH}px, 1fr)` }}
-            >
-              <div className="min-w-0 px-4 py-4">
-                <div className="rounded-card border border-kit-slate-5 bg-white p-4">
-                  <Loading variant="skeleton" lines={6} label="Opening the sales order" />
-                </div>
-              </div>
-              <div className={`min-w-0 bg-kit-slate-3 px-4 py-4 ${split === "stack" ? "border-t border-kit-slate-5" : "border-l border-kit-slate-5"}`}>
-                <div className="mx-auto aspect-[210/297] max-w-[700px] rounded-card border border-kit-slate-5 bg-white" />
-              </div>
-            </div>
+        )}
+        <div className="relative" aria-label="Sales Order document">
+          {storedDocumentUrl ? (
+            <object
+              data={storedDocumentUrl}
+              type="application/pdf"
+              data-testid="issued-document-pane"
+              aria-label={`The document (${viewedRevision?.revision ?? ""}) was issued as`}
+              className="h-[760px] w-full rounded-lg border border-c-card-border bg-c-card"
+            />
+          ) : (
+            <>
+              {pdfError && <p className="pb-2 text-[13px] text-c-warn-fg" data-testid="pdf-error">The document could not be drawn. {pdfError}</p>}
+              <div ref={setPane} data-testid="pdf-pane" />
+            </>
           )}
-          {!detailQ.isLoading && detailQ.isError && (
-            <div className="px-4 py-4">
-              <div className="rounded-card border border-kit-slate-5 bg-white">
-                <SalesOrderReadFailure
-                  error={detailQ.error}
-                  surface="sales-order"
-                  onRetry={() => void detailQ.refetch()}
-                />
-              </div>
-            </div>
-          )}
-
-          {order && (
-            <div
-              className={split === "stack" ? "flex flex-col" : "grid h-full min-h-0"}
-              style={split === "stack" ? undefined : { gridTemplateColumns: split === "half" ? "minmax(0,1fr) minmax(0,1fr)" : `${FORM_MIN_WIDTH}px minmax(${MIN_PDF_WIDTH}px, 1fr)` }}
-              data-testid="object-two-panes"
-              data-split={split}
-            >
-              <div className={`flex min-w-0 flex-col ${split === "stack" ? "" : "min-h-0 overflow-hidden"}`}>
-                <div className={`min-h-0 flex-1 px-4 py-4 ${split === "stack" ? "" : "overflow-auto"}`}>{form}</div>
-              </div>
-
-              <aside
-                /* ⭐ THE PANE SCROLLS AT EVERY WIDTH, not only at `lg`. It
-                   carried `lg:overflow-auto`, so below the split breakpoint the
-                   pane clipped nothing and a page wider than it — which is
-                   exactly what `MIN_PDF_WIDTH` guarantees on a narrow screen —
-                   pushed the PAGE sideways instead of scrolling inside its own
-                   box. Same rule as the tables: the container scrolls, the page
-                   never does. */
-                className={`min-h-0 min-w-0 overflow-auto bg-kit-slate-3 px-4 py-4 ${split === "stack" ? "border-t border-kit-slate-5" : "border-l border-kit-slate-5"}`}
-                aria-label="Sales Order document"
-              >
-                {/* A PENDING AMENDMENT IS A BANNER, NEVER THE DOCUMENT BODY. */}
-                {liveAmendment && !liveAmendment.stale && (
-                  <div
-                    className="mx-auto mb-3 max-w-[700px] rounded-control border border-kit-slate-5 bg-kit-amber-3 px-3 py-2 text-body font-medium text-kit-amber-11"
-                    data-testid="pending-amendment-banner"
-                  >
-                    ⚠ Amendment pending approval{pendingDeliveryDate ? `: delivery date → ${fmtDate(pendingDeliveryDate)}` : ""}. The document shows the order as it is now.
-                  </div>
-                )}
-                <div className="relative mx-auto max-w-[700px]">
-                  {/* ⭐ 0565 · THE STORED FILE IS SHOWN AS ITSELF. Not
-                      re-rendered, not re-typeset: the bytes the customer was
-                      issued, in the browser's own viewer. Nothing rebuilt can
-                      appear in this branch, which is the point of it. */}
-                  {storedDocumentUrl ? (
-                    <object
-                      data={storedDocumentUrl}
-                      type="application/pdf"
-                      data-testid="issued-document-pane"
-                      aria-label={`The document (${viewedRevision?.revision ?? ""}) was issued as`}
-                      className="h-[860px] w-full rounded-card border border-kit-slate-5 bg-white"
-                    />
-                  ) : (
-                    <div ref={setPane} data-testid="pdf-pane" />
-                  )}
-                  {/* The watermark is PREVIEW chrome, painted over the paper and
-                      never into it — Print must produce the document, not a
-                      picture of this screen. */}
-                  {dirty && (
-                    <div
-                      aria-hidden="true"
-                      data-testid="unsaved-watermark"
-                      className="pointer-events-none absolute inset-0 grid select-none place-items-center overflow-hidden"
-                    >
-                      <span className="rotate-[-24deg] scale-[2.4] text-page tracking-[0.3em] text-base-900/10">
-                        UNSAVED
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </aside>
+          {dirty && (
+            <div aria-hidden="true" data-testid="unsaved-watermark" className="pointer-events-none absolute inset-0 grid select-none place-items-center overflow-hidden">
+              <span className="rotate-[-24deg] scale-[2.4] text-[20px] tracking-[0.3em] text-c-ink/10">UNSAVED</span>
             </div>
           )}
         </div>
-      )}
+      </Drawer>
+
+      {/* ── The confirmation before the commit — Before / After and what it starts. ── */}
+      <Dialog
+        open={amending && reviewOpen}
+        title="Your changes"
+        onClose={() => { if (!changesMut.isPending) setReviewOpen(false); }}
+        testId="change-review"
+        footer={
+          <>
+            <CBtn kind="normal" disabled={changesMut.isPending} onClick={() => setReviewOpen(false)}>Back to editing</CBtn>
+            <CBtn kind="main" className="!h-8" disabled={changesMut.isPending || !changeReason.trim() || liveBlocksCommercial || changeCount === 0}
+              onClick={onCommit} data-testid="workspace-confirm-save">
+              {changesMut.isPending ? "Sending…" : commitWord}
+            </CBtn>
+          </>
+        }
+      >
+        <ChangeReview
+          rows={draftRows}
+          consequences={consequencesFor({ lines: draft.lines, addons: draft.addons, header: draftHeader() })}
+          commercial={commercial}
+          blocked={liveBlocksCommercial ? "An earlier change is still waiting for management." : null}
+          reason={changeReason}
+          askedOn={changeAskedOn}
+          agreement={changeAgreement}
+        />
+      </Dialog>
+
+      {/* ── Withdraw needs a reason (the server refuses an empty one). ── */}
+      <Dialog
+        open={withdrawOpen}
+        title="Withdraw amendment"
+        onClose={() => { if (!withdrawMut.isPending) setWithdrawOpen(false); }}
+        width={480}
+        testId="withdraw-dialog"
+        footer={
+          <>
+            <CBtn kind="normal" disabled={withdrawMut.isPending} onClick={() => setWithdrawOpen(false)}>Keep it</CBtn>
+            <CBtn kind="main" className="!h-8" disabled={withdrawMut.isPending || !withdrawReason.trim() || !liveAmendment}
+              onClick={() => liveAmendment && withdrawMut.mutate({ amendmentId: liveAmendment.id, reason: withdrawReason.trim() })}
+              data-testid="withdraw-confirm">
+              Withdraw
+            </CBtn>
+          </>
+        }
+      >
+        <p className="pb-2 text-[13px] text-c-body">The order stays as it is. To change it later, send a new amendment.</p>
+        <WithdrawForm value={withdrawReason} onChange={setWithdrawReason} />
+      </Dialog>
     </div>
   );
 }
@@ -3827,20 +3353,6 @@ function bag(order: Orderish): Record<string, unknown> {
   return (order ?? {}) as unknown as Record<string, unknown>;
 }
 
-function displayHeader(
-  mode: Mode,
-  rev: SalesOrderRevisionRow | null,
-  order: Orderish,
-  key: string,
-): string | null {
-  if (mode === "oldrev" && rev) {
-    const v = rev.snapshot.header?.[key];
-    return v == null ? null : String(v);
-  }
-  const v = bag(order)[key];
-  return v == null ? null : String(v);
-}
-
 function sourceName(
   mode: Mode,
   rev: SalesOrderRevisionRow | null,
@@ -3854,16 +3366,6 @@ function sourceName(
   if (which === "dealer") return order?.dealers?.name ?? null;
   if (which === "outlet") return order?.outlets?.name ?? null;
   return order?.salespersons?.name ?? null;
-}
-
-function promisedWord(mode: Mode, rev: SalesOrderRevisionRow | null, order: Orderish): string {
-  const tbd =
-    mode === "oldrev" && rev
-      ? Boolean(rev.snapshot.header?.["delivery_date_tbd"])
-      : Boolean(bag(order)["delivery_date_tbd"]);
-  if (tbd) return "No delivery date";
-  const d = displayHeader(mode, rev, order, "delivery_date");
-  return d ? fmtDate(d) : "No delivery date";
 }
 
 /** The goods rows a Sales Order prints, with the money each line carries.
