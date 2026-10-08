@@ -95,6 +95,20 @@ describe("/api/finance/dealer-commission", () => {
     expect((await send("/rules/not-an-id", "DELETE")).status).toBe(404);
   });
 
+  // 0662 — a cancelled order's commission, taken back or kept again.
+  it("takes a cancelled order's commission back through its door, and keeps it again", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: { orderId: MODEL, takenBackOn: "2026-10-08", already: false }, error: null }) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    expect((await send(`/orders/${MODEL}/take-back`, "PUT", { takeBack: true })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("dealer_commission_take_back", { p_order_id: MODEL, p_take_back: true });
+    expect((await send(`/orders/${MODEL}/take-back`, "PUT", { takeBack: false })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenLastCalledWith("dealer_commission_take_back", { p_order_id: MODEL, p_take_back: false });
+    expect((await send(`/orders/${MODEL}/take-back`, "PUT", { takeBack: "yes" })).status).toBe(422);
+    expect((await send("/orders/not-an-id/take-back", "PUT", { takeBack: true })).status).toBe(404);
+    expect((await send(`/orders/${MODEL}/take-back`, "PUT", { takeBack: true }, "operation")).status).toBe(403);
+  });
+
   it("the undated rate doors are gone", async () => {
     expect((await send("/settings", "PUT", { defaultRate: 30 })).status).toBe(404);
     expect((await send(`/rates/${MODEL}`, "PUT", { rate: 20 })).status).toBe(404);

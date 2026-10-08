@@ -3,12 +3,16 @@
  * owed or posted (CLAUDE.md §7); a payout still goes through a payment voucher.
  *
  * One read of `dealer_commission_source(month)`; every figure is the shared
- * `dealerCommissionReport` (Law D), each line at the rate the database read
- * for its order day (0661). Finance keeps the rates on two sibling views of
- * the same page, picked from the toolbar switch: `?view=rates` (the dated
- * rates and switches, CommissionRates.tsx) and `?view=quotas` (each dealer's
- * renovation quota). A dealer with no quota opens the quota form, on the
- * quotas view, from its own `Quota left` cell.
+ * arithmetic (Law D), each line at the rate the database read for its order
+ * day (0661). Four views on the toolbar switch:
+ *   By dealer          `dealerCommissionReport`: one row per dealer; a row
+ *                      opens that dealer's orders
+ *   `?view=orders`     By order (CommissionOrders.tsx, step 2): the month order
+ *                      by order, and taking a cancelled order's commission back
+ *   `?view=rates`      the dated rates and switches (CommissionRates.tsx)
+ *   `?view=quotas`     each dealer's renovation quota. A dealer with no quota
+ *                      opens the quota form from its own `Quota left` cell.
+ * The month, dealer and showroom chosen stay the same on both report views.
  *
  * Frame: `ModuleHeader` + `<ListPageShell register>` + the Register engine, the
  * shape every other Finance register draws (Trial Balance, Unpaid by Supplier,
@@ -35,12 +39,13 @@ import { apiFetch } from "@/lib/api";
 import { fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import { LoadFailed } from "../other-money-in/parts";
+import CommissionOrders from "./CommissionOrders";
 import CommissionRates from "./CommissionRates";
 
 const BASE = "/api/finance/dealer-commission";
 const ALL = "all";
 type QuotaDraft = { dealerId: string; quota: string; rebateRate: string; startsOn: string };
-type View = "report" | "rates" | "quotas";
+type View = "report" | "orders" | "rates" | "quotas";
 
 /** This month and the 23 before it, newest first (YYYY-MM). */
 function lastMonths(): string[] {
@@ -55,7 +60,7 @@ export default function DealerCommission() {
   const months = useMemo(lastMonths, []);
   const [params, setParams] = useSearchParams();
   const v = params.get("view");
-  const view: View = v === "rates" || v === "quotas" ? v : "report";
+  const view: View = v === "orders" || v === "rates" || v === "quotas" ? v : "report";
   const [month, setMonth] = useState(months[0]);
   const [dealerId, setDealerId] = useState(ALL);
   const [outletId, setOutletId] = useState(ALL);
@@ -75,17 +80,32 @@ export default function DealerCommission() {
 
   const columns = useMemo<DataGridColumn<DcReportRow>[]>(() => [
     { key: "dealer", label: "Dealer", width: 240, accessor: (r) => r.dealer, searchValue: (r) => r.dealer },
-    { key: "earned", label: "Commission on collected", width: 200, align: "right", accessor: (r) => rm(r.earned), numberValue: (r) => r.earned, exportValue: (r) => r.earned },
-    { key: "still", label: "Commission still to collect", width: 220, align: "right", accessor: (r) => rm(r.stillToCollect), numberValue: (r) => r.stillToCollect, exportValue: (r) => r.stillToCollect },
+    { key: "earned", label: "Commission this month", width: 200, align: "right", accessor: (r) => rm(r.earned), numberValue: (r) => r.earned, exportValue: (r) => r.earned,
+      footerTotal: (rs) => rm(rs.reduce((s, r) => s + r.earned, 0)) },
+    { key: "still", label: "Commission still to collect", width: 220, align: "right", accessor: (r) => rm(r.stillToCollect), numberValue: (r) => r.stillToCollect, exportValue: (r) => r.stillToCollect,
+      footerTotal: (rs) => rm(rs.reduce((s, r) => s + r.stillToCollect, 0)) },
     { key: "rebate", label: "Rebate this month", width: 170, align: "right", accessor: (r) => (r.rebate === null ? "No quota" : rm(r.rebate)), numberValue: (r) => r.rebate ?? 0, exportValue: (r) => r.rebate ?? "" },
     { key: "left", label: "Quota left", width: 160, align: "right", numberValue: (r) => r.quotaLeft ?? 0, exportValue: (r) => r.quotaLeft ?? "",
       searchValue: (r) => (r.quotaLeft === null ? "No quota" : rm(r.quotaLeft)),
-      // No quota yet: the words open the quota form with this dealer chosen.
+      // No quota yet: the words open the quota form with this dealer chosen
+      // (and not the row's own door to its orders).
       accessor: (r) => (r.quotaLeft === null
         ? <button type="button" className="hover:underline"
-            onClick={() => { setQuota({ dealerId: r.dealerId, quota: "", rebateRate: "5", startsOn: months[0] }); setParams({ view: "quotas" }); }}>No quota</button>
+            onClick={(e) => { e.stopPropagation(); setQuota({ dealerId: r.dealerId, quota: "", rebateRate: "5", startsOn: months[0] }); setParams({ view: "quotas" }); }}>No quota</button>
         : rm(r.quotaLeft)) },
   ], [months, setParams]);
+
+  /** The month, dealer and showroom, the same on both report views. */
+  const scope = (current: View) => <div className="flex flex-wrap items-end gap-2">
+    <Views current={current} />
+    <div className="w-[180px]"><Select id="dc-month" label="Month" value={month} onValueChange={setMonth}
+      options={months.map((m) => ({ value: m, label: fmtMonth(m) }))} /></div>
+    <div className="w-[220px]"><Select id="dc-dealer" label="Dealer" value={dealerId}
+      onValueChange={(v) => { setDealerId(v); setOutletId(ALL); }}
+      options={[{ value: ALL, label: "All" }, ...(src?.dealers ?? []).map((d) => ({ value: d.id, label: d.name }))]} /></div>
+    <div className="w-[220px]"><Select id="dc-outlet" label="Showroom" value={outletId} onValueChange={setOutletId}
+      options={[{ value: ALL, label: "All" }, ...outlets.map((o) => ({ value: o.id, label: o.name }))]} /></div>
+  </div>;
 
   return <div className="flex h-full min-h-0 flex-col" data-testid="dealer-commission">
     <ModuleHeader destinationHeader testId="dealer-commission-header" word="Dealer commission" docTitle="Dealer commission · Carres" />
@@ -94,20 +114,16 @@ export default function DealerCommission() {
     view === "quotas" ? <ListPageShell register toolbar={<Views current={view} />}>
       {src && <div className="min-h-0 overflow-y-auto"><Quotas src={src} quota={quota} setQuota={setQuota} /></div>}
     </ListPageShell> :
+    view === "orders" ? <CommissionOrders src={src} loading={!q.isSuccess} month={month}
+      filter={{ dealerId: dealerId === ALL ? undefined : dealerId, outletId: outletId === ALL ? undefined : outletId }}
+      toolbarStart={scope("orders")} /> :
     <ListPageShell register>
       <DataGrid rows={rows} columns={columns} rowKey={(r) => r.dealerId} storageKey="carres.finance.dealer-commission.v1"
         appearance="reference" exportName={`Dealer commission ${month}`} groupBanner={false} stickyIdentity
         isLoading={!q.isSuccess} wrapToolbar
-        toolbarStart={<div className="flex flex-wrap items-end gap-2">
-          <Views current="report" />
-          <div className="w-[180px]"><Select id="dc-month" label="Month" value={month} onValueChange={setMonth}
-            options={months.map((m) => ({ value: m, label: fmtMonth(m) }))} /></div>
-          <div className="w-[220px]"><Select id="dc-dealer" label="Dealer" value={dealerId}
-            onValueChange={(v) => { setDealerId(v); setOutletId(ALL); }}
-            options={[{ value: ALL, label: "All" }, ...(src?.dealers ?? []).map((d) => ({ value: d.id, label: d.name }))]} /></div>
-          <div className="w-[220px]"><Select id="dc-outlet" label="Showroom" value={outletId} onValueChange={setOutletId}
-            options={[{ value: ALL, label: "All" }, ...outlets.map((o) => ({ value: o.id, label: o.name }))]} /></div>
-        </div>}
+        // A dealer's row opens its orders for the same month.
+        onRowClick={(r) => { setDealerId(r.dealerId); setOutletId(ALL); setParams({ view: "orders" }); }}
+        toolbarStart={scope("report")}
         statusSummary={(visible) => <span data-testid="dealer-commission-summary">
           {visible.length} of {rows.length} rows · Commission is earned only on money collected. The rebate is the dealer's whole collections, whatever showroom is picked.
         </span>} />
@@ -115,10 +131,12 @@ export default function DealerCommission() {
   </div>;
 }
 
-/** The report and its two settings views, on the app's one segmented link switch. */
+/** The two report views and the two settings views, on the app's one segmented link switch. */
 function Views({ current }: { current: View }) {
+  // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), dealer commission step 2).
   const views = [
-    { value: "report", to: "/finance/reports/dealer-commission", label: "Dealer commission" },
+    { value: "report", to: "/finance/reports/dealer-commission", label: "By dealer" },
+    { value: "orders", to: "/finance/reports/dealer-commission?view=orders", label: "By order" },
     { value: "rates", to: "/finance/reports/dealer-commission?view=rates", label: "Commission rates" },
     { value: "quotas", to: "/finance/reports/dealer-commission?view=quotas", label: "Renovation quotas" },
   ] as const;

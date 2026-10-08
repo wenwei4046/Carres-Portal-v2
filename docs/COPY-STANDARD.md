@@ -5337,6 +5337,18 @@ Chew and management confirmed the rates rules (Finance MASTER §3.2 "Dealer comm
 | First rows' memos | `The rate before rates had a start date` · `Sofas earn commission (Chew 2026-10-06)` · `Accessories earn commission (Chew 2026-10-05, management 2026-10-07)` |
 | Refusals (the database's) | `Only Finance changes the commission rates.` · `Only Finance sees the commission rates.` · `Choose what the rate is for.` · `Choose the day the rate starts.` · `Keep the memo to 200 characters.` · `Choose a dealer.` · `Choose a product that earns commission.` · `Choose a kind of product.` · `The rate is a percentage from 0 to 100, with at most two decimals.` · `Say whether this kind of product earns commission.` · `Say whether the product is a promotion item.` · `Type the points a promotion item takes off, more than 0 and at most 100.` · `There is already one for this from {day}. Remove it first.` · `That rate is not on the list.` · `A rate from the start stays. Add a new one from a day instead.` |
 
+### PROPOSAL — PENDING CHEW · Dealer commission by order (step 2, 0662)
+
+Chew and management confirmed the calculation (Finance MASTER §3.2) and Chew the build (「可以，开始做第2步」, 2026-10-08); the words below are proposed with them.
+
+| Where | Words |
+|---|---|
+| The switch | `By dealer` · `By order` · `Commission rates` · `Renovation quotas` |
+| By dealer | `Commission on collected` becomes `Commission this month`; a totals row under the money columns |
+| By order | Groups `New orders this month` · `Balances this month` · `Cancelled this month` · `Taken back this month` · `Still waiting for money`. Columns `SO` · `Dealer` · `Customer` (`Customer not recorded`) · `Order day` (`Day not recorded`) · `Order total` · `Commission in full` · `Paid by month end` · `Commission this month` · `Still to earn` · `Note` (`Commission taken back` · `Cancelled` · `Earns nothing` · `Paid in full` · `Under half paid` · `Waiting for the balance`). Footer `{n} of {m} orders · What earns nothing is paid first. Nothing is earned before half the order is paid.` |
+| An order's window | Title `SO-{n}`, `{customer} · {dealer}` under it. `Order day:` · `Order total:` · `Earns nothing, paid first:` · `Earns commission:` · `Commission in full:` · `Half paid on:` (`Not yet`) · `Paid by the end of {month}:` · `Commission by the end of {month}:` · `Commission this month:` · `Still to earn:` · `Cancelled on:` · `Commission taken back on:`. A cancelled order: `What it earned on money Carres kept stays. Taking it back counts in the month you do it.` or `Keeping it gives the commission back in the month you do it.`; footer `Cancel` · `Take commission back` or `Keep commission`. Any other order: `Close` |
+| Refusals (the database's) | `Only Finance takes commission back.` · `Say whether to take the commission back.` · `That dealer order is not on the list.` · `Only a cancelled order's commission is taken back.` |
+
 **SO compact file preview — owner approved 2026-10-04:** `Sales order PDF · {actual SO number}` · `Download` · accessible name/tooltip `Close PDF` for the file × and `Close order` for the dark order Header ×. File close returns to Info; order close returns to the Register.
 
 ### Receiving and shared Calendar — owner-approved target, 2026-10-04
