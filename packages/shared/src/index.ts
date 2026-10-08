@@ -3384,6 +3384,7 @@ export {
 } from "./workspace-activity";
 
 export { evaluateWorkspaceActivityCheck, type WorkspaceActivityEvidence, type WorkspaceActivityCheck } from "./workspace-activity-check";
+export type { OutrightOrderFacts, OutrightFactsFailed } from "./outright-order-facts";
 
 export { decideWorkspaceReassignment, type WorkspaceCheckpointIdentity, type WorkspaceReassignmentDecision } from "./workspace-reassignment";
 

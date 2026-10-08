@@ -36,6 +36,7 @@ import {
   type CellContext,
   type LayoutKey,
 } from "./outright-columns";
+import { readStateOf, usePayBy } from "./pay-by";
 
 type Tab = "open" | "delivered" | "all";
 const TABS: { key: Tab; label: string }[] = [
@@ -113,9 +114,25 @@ export default function SalesOrdersOutright() {
         .sort((a, b) => (b.proceeded ?? "").localeCompare(a.proceeded ?? "")),
     [data, catalogNames, facts],
   );
+  /* Each owner's read keeps its own state: loading · refused · failed · answered. */
+  const factsState = readStateOf([factsQ]);
+  const factsFailed = factsQ.data?.failed;
+  const payBy = usePayBy();
   const ctx: CellContext = useMemo(
-    () => ({ payment: paymentStatusOf, cases: (r) => facts?.[r.id]?.cases ?? null }),
-    [facts],
+    () => ({
+      payment: paymentStatusOf,
+      owned: (r) =>
+        factsState !== "ok"
+          ? { state: factsState }
+          : {
+              state: "ok",
+              facts: facts?.[r.id]?.owned ?? null,
+              cases: facts?.[r.id]?.cases ?? null,
+              failed: { ...(factsFailed ?? {}), cases: factsFailed?.cases ?? false },
+            },
+      payBy: (r) => payBy(r.id),
+    }),
+    [facts, factsFailed, factsState, payBy],
   );
 
   /* ── list state: tab · column view · header filters, in the URL ── */
@@ -297,6 +314,7 @@ export default function SalesOrdersOutright() {
         <SummaryPanel
           rows={all}
           facts={facts}
+          casesState={factsState === "ok" && factsFailed?.cases ? "failed" : factsState}
           month={month}
           canNext={month < thisMonth}
           onPrev={() => setMonth((m) => shiftMonth(m, -1))}
@@ -574,7 +592,7 @@ function BodyCell({
           <CPill tone={cell.tone ?? "info"}>{cell.t}</CPill>
         )
       ) : (
-        <span className={`max-w-full truncate tabular-nums ${fw} ${fg}`} title={cell.t}>
+        <span className={`max-w-full truncate tabular-nums ${fw} ${fg}`} title={cell.title ?? cell.t}>
           {cell.t}
         </span>
       )}
@@ -669,6 +687,7 @@ function RowsMenu({ size, onSize }: { size: number; onSize: (n: number) => void 
 function SummaryPanel({
   rows,
   facts,
+  casesState,
   month,
   canNext,
   onPrev,
@@ -678,6 +697,8 @@ function SummaryPanel({
 }: {
   rows: RegisterRow[];
   facts: Record<string, { cases?: string | null }> | null;
+  /** Service's read state — a failed read is never "0 problems". */
+  casesState: "ok" | "loading" | "failed" | "denied";
   month: string;
   canNext: boolean;
   onPrev: () => void;
@@ -742,7 +763,10 @@ function SummaryPanel({
           <div className="flex flex-col">
             {row("Delivered", `${delivered.length} of ${inMonth.length}`)}
             {row("Avg days to deliver", avg)}
-            {row("Problems open", facts ? String(problems) : "Not set")}
+            {row(
+              "Problems open",
+              casesState === "ok" ? String(problems) : casesState === "loading" ? "Loading" : casesState === "denied" ? "No access" : "Could not read",
+            )}
           </div>
         </>
       )}

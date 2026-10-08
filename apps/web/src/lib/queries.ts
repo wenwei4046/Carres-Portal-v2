@@ -1,3 +1,4 @@
+import type { OutrightFactsFailed, OutrightOrderFacts } from "@carres/shared";
 import { workspaceActivitySettingsResponseSchema, type WorkspaceActivitySettingsResponse } from "@carres/shared";
 import { supabase } from "@/lib/supabase";
 import {
@@ -6299,8 +6300,15 @@ export function useMonthlyDemandFacts(enabled: boolean) {
  *  obligations through the object page's completion, cases from Service. A
  *  fact the server could not establish is `null` and matches no filter. */
 export interface SalesOrderRegisterFacts {
-  facts: Record<string, { obligations: "outstanding" | "none" | null; cases: "open" | "closed" | "none" | null; stock?: Record<string, string> }>;
-  failed: { obligations: boolean; cases: boolean };
+  facts: Record<string, {
+    obligations: "outstanding" | "none" | null;
+    cases: "open" | "closed" | "none" | null;
+    stock?: Record<string, string>;
+    /** The Outright list's owner facts (PIC, Supplier DO, GRN, delivery day,
+     *  loading, location, Finance hold); absent on an older server. */
+    owned?: OutrightOrderFacts;
+  }>;
+  failed: { obligations: boolean; cases: boolean } & Partial<OutrightFactsFailed>;
 }
 
 export function useSalesOrderRegisterFacts(enabled: boolean) {
