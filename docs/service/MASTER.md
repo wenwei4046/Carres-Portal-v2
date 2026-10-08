@@ -14,7 +14,7 @@
 
 ---
 
-**RESUME HERE — 2026-10-06, Service PLAN / final review.** Read §7.30 (the final review pack: what is resolved from authority and the five owner decisions still open) → §7.25 (approval scope) → §7.27 (complete operator workflow, Excel mapping and business acceptance) → §7.28–§7.29 (cross-module review evidence). The approved rulings below are in force; the entire Blueprint is not yet approved. Code baseline is main `678c27346`; this documentation branch contains subsequent scoped owner rulings, not proof of delivery. The old Oct-03 HTML is historical review evidence, not the current shared UI acceptance.
+**RESUME HERE — 2026-10-06, Service PLAN / final review.** Read §7.30 (the complete final recommendation, including corrected exception journeys and review boundaries) → §7.25 (approval scope) → §7.27 (complete operator workflow, Excel mapping and business acceptance) → §7.28–§7.29 (cross-module review evidence). The approved rulings below are in force; the entire Blueprint is not yet approved. Code baseline is main `678c27346`; this documentation branch contains subsequent scoped owner rulings, not proof of delivery. The old Oct-03 HTML is historical review evidence, not the current shared UI acceptance.
 
 **APPROVED IN THIS CHAT — one current scope:** Operation shares routine service work with one per-Case owner and helpers (§7.9); every Case receives a substantive first response within two Office working days (§7.2); the scoped internal processing deadlines are §7.9; every formal repair/replacement/charge/customer-movement decision goes through Service Case Approver (§7.4), with no repeat approval for unchanged approved-scope follow-up. Original Case clock, source-module permissions and actual completion facts remain.
 
@@ -679,7 +679,7 @@ named (entitlement result block · document checklist row with a state word · s
 | Paid-policy cutover | 2026-08-01 (code constant) | Service Settings | NOT BUILT |
 | Mattress threshold | `> 2 cm` (code) | read-only display | NOT BUILT |
 | Trial length / transport minimum | 100 days / RM 250 (code) | Service Settings | NOT BUILT |
-| First response · finish · day-10 call | 2 Office working days · 14 working days · day 10 (owner-approved rules, code constants) | **read-only display only** in central Settings; no edit control. RESOLVED 2026-10-06 by reduction (§7.30 item 4): an editable value would need an existing-Case snapshot that conflicts with §4's calendar-derived rule, and the owner approved the numbers, not their editability. A future edit control is a new ruling. | engine BUILT for 14 · day 10; first response NOT BUILT |
+| First response · finish · day-10 call | 2 Office working days · 14 working days · day 10 (owner-approved rules, code constants) | **read-only display only** in central Settings; no edit control. Planner recommendation (§7.30.7), not an owner ruling on Settings: the owner approved the timing values, not arbitrary editing. A future edit control needs explicit existing-Case applicability; calendar corrections continue to follow §4. No editable capability is approved by this row. | engine BUILT for 14 · day 10; first response NOT BUILT |
 | Delay reasons · condition refusal reasons | code constants (shared with Delivery) | read-only display | BUILT |
 
 ## 7.17 · Reports and export
@@ -709,21 +709,61 @@ only its missing-data words (§7.20).
 | Intake questions | `Who told us?` · `Which item?` · `What is wrong?` · `Can the customer still use it?` · `What does the customer ask for?` · `Take the photos` | Who found it? · Case Type |
 | Doors | `Report a problem` (RESOLVED) · `New Case` · `Add to {Case No}` · `Publish progress` · `Mark public escalation` · `Record customer confirmed` | Raise case · Log complaint · Close case (as a button) |
 
-## 7.21 · Reference-to-Carres capability matrix (object-level mining, 2026-10-06)
+## 7.21 · Reference-to-Carres完整能力矩阵 — PROPOSAL / NOT LAW
 
-| Reference capability | Carres current / owner | Verdict | Why | Dependency |
-|---|---|---|---|---|
-| Zendesk: ticket status derived by workflow, SLA badge with "first reply" and "resolution" clocks | 14-day clock BUILT; no first-reply clock; dropdown status | ADAPT | two clocks, both derived; status as who+action+object (owner ruling) | §7.2, §7.6 |
-| Zendesk macros: approved reply wording one click away | none | BUILD | First-day law: staff never improvise policy promises | §7.7, COPY |
-| Shopify Returns: return → exchange/refund options come from policy; restock only after condition check | Guarantee policy engine (terms text); condition-gated collection RESOLVED | ADAPT | engine offers only allowed remedies; refund stays exceptional | §7.4 |
-| Linear: status is a workflow fact; properties in a side rail; keyboard first | shared compact card + DataGrid | KEEP (kit) | adopts the shared template as published | UI master |
-| Intercom: conversation timeline + customer context beside it | Timeline tab + embedded SO in Info | KEEP (kit) | §5.2 three-rank history; no second customer store | UI master |
-| Houzs Service Case detail hierarchy (owner-selected reference 2026-10-01) | — | ADAPT (hierarchy only) | sections: result → decision → arrangements → evidence → history | UI master |
-| AutoCount: sortable headers, per-column filters, footer totals | DataGrid supports | KEEP | copy the power, not the 17 columns | UI master |
-| Zendesk/Intercom: assignee per ticket with round-robin | Operation sharing / per-Case owner rule approved; implementation not verified | ADAPT | Service Duty on the shared resolver, helpers retain owner | §7.9 |
-| Shopify: customer-visible order/return status page | Dealer request view (Purchasing §9.8) | ADAPT | published progress events, never raw status | §7.7 |
-| Any helpdesk: canned "closed" by agent | Carres closes only on customer confirmation (BUILT) | KEEP | the module's own law | §7.2 |
-| Any helpdesk: free-text ticket body | five guided questions (BUILT) | KEEP | staff cannot fill free text | §7.3 |
+本节持久化此前研究记录中的对象级证据，替换原泛用产品类比表；不是本次重新运行测试。引用固定Houzs `main` commit `07cd742c001107a2bc3df7ce2b6d533f2f7ac8e1`，非当前2990运行证明。以下C编号是当时研究来源目录，批准法律以本MASTER及当前owning MASTER为准；旧研究中routine owner未决定等判断已由§7.9覆盖，不再询问。
+
+| 来源键 | 路径与研究范围 |
+|---|---|
+| H1 | `docs/modules/service-case.md`：documented intent，阶段、权限、重复检查、supplier rounds、表单与DO/PO关系 |
+| H2 | `backend/src/services/assr.ts`：number228、create345、transition823–940、PATCH_FIELDS976、list1782、export2098；代码检查 |
+| H3 | `backend/src/routes/assr.ts`：summary638、list868、bulk1123–1158、export1208、SO search1288、history1627、create1672、duplicate1726、patch1866、token1976、PO2690、approve2749、transition2804–2868、timeline2893–2951、items3036、logistics3262 |
+| H4 | `backend/src/services/assrSupplierReturns.ts` 1–180；`assrReopen.ts`、`assrVisibility.ts`、`assrStages.ts`、`assrSla.ts`、`assrPortal.ts`；PG supplier returns migration `20260921T2300_assr_supplier_returns.sql`31–54；supplier reference migration `20260924T2300_assr_supplier_return_ref_no.sql`28–31 |
+| H5 | `frontend/src/pages/ServiceCases.tsx`、`ServiceSettings.tsx`；`backend/src/routes/assr_print.ts`1–140；共享DataTable/DetailLayout/Panel调用 |
+| H6 | `backend/tests/assrReopen.test.ts`、`assrSupplierReturns.test.ts`、`assrCompanyScope.test.ts`、`assrVisibilityRule.test.ts`；测试范围见下文 |
+| H7 | `backend/src/services/caseTracking.ts`1–140；`backend/src/routes/portal.ts`172–258；客户验证/可撤销bearer、评论、附件、rate limit代码；全部访问隔离和端到端提交未验证 |
+| C1 / C9 | 本Service MASTER§§1–6、§7批准范围；原检查`apps/api/src/routes/ops/service-cases.ts`create410、evidence449、number466、patch537、close570、evidence688、progress764、sla865；`packages/shared/src/service-case-plan.ts`；`apps/web/src/pages/operation/OperationServiceCases.tsx`；migrations0210/0285/0289/0293/0298。原代码行是研究基线，非当前行号保证 |
+| C2 / C3 / C4 | `docs/guarantee/MASTER.md`政策/claim lifecycle；`docs/purchasing/MASTER.md`§§9.5–9.7；`docs/stock/MASTER.md`Unit/Receiving/holder/history及当前Customer Return law；不以旧§12.8覆盖新§5 |
+| C5 / C6 | `docs/delivery/MASTER.md`DO/Proof/分程；`docs/payment/MASTER.md`唯一客户钱/特殊退款；`docs/orders/MASTER.md`商品、商业修订、历史文件；`docs/rental/MASTER.md`§5.9；`docs/issue-tracker/MASTER.md`客户Case/内部Issue边界 |
+| C7 / C8 | 当前Workspace权威，历史研究用其MASTER projection/Work段；`docs/ui/MASTER.md`Shell/Register/Object Detail、共享组件；`docs/COPY-STANDARD.md`；`docs/03-page-patterns.md`；`docs/01-design-tokens.md`及portal导航。当前共享UI组合审阅优先于旧layout类比 |
+
+**测试证据（此前实际执行记录）：**Carres五套shared纯函数134项通过：intake22、evidence22、plan23、sla42、numbers25；只证明当时纯函数，不证明当前生产闭环。Houzs使用Vitest2.1.9探索运行四套51项通过：Reopen7、SupplierReturns12、CompanyScope8、VisibilityRule24；部分为源码断言。声明的Vitest4环境未完整重建；`assrSlaHoursOverride`及`assrSupplierReturnRefNo`缺`cloudflare:test`，加载失败、0项执行，不称全绿。本次没有重跑。全部移动、权限、并发、附件及跨模块生产结果未因此获验证。
+
+**复用权及口径：**当时未找到足以确认源码复用许可的LICENSE/COPYING/NOTICE。COPY REQUIRED须另有适合Carres语义、模型、权限、UI、依赖及授权的完整证据；当前无此判定。READY只限注明的窄能力；未证明连接为UNVERIFIED。ENGINE GAP只表示本次所检证据没找到适合解法，不表示全球无人解决。下表处置是推荐，完整目标不因其中窄能力READY而自动ready。
+
+| 能力 | Houzs证据 | Carres authority / current | 处置 | 员工收益 / 依赖与冲突 | 实现复用 |
+|---|---|---|---|---|---|
+| SO/DO/钱款来源开Case | H3 search/relatedSO | C1已有目标，入口不完整 | BUILD | 不重填订单/客户；各源owner保留 | UNVERIFIED：完整Carres接线未证明 |
+| 手工无来源Case | H1/H3可无items | C1允许稍后链接，旧intake存在 | KEEP+IMPROVE | 不伪造订单；证据要求按报告人可满足 | READY：现有manual intake；完整target未ready |
+| 所有intake同一校验 | H1可自由创建 | C1/C9共享函数+server gate | KEEP | 缺资料明确说明；不能照抄Houzs弱gate | READY：已有校验函数134测试范围 |
+| 原始客户证据与structured summary | H3 attachments/timeline | C1/C9部分保存，正式声明未知 | IMPROVE | 一份原文件给各owner；避免员工代签 | READY：已有附件基础；完整声明UNVERIFIED |
+| 新编号/legacyreference | H2计数ASSR | C1 CS/SCS随机decimal规则 | BUILD | 找得到旧SC，subscription不混类 | ENGINE GAP：Houzs语义不同 |
+| 重复客户问题匹配 | H3 sameitem/docopen409 | C1打开/链接同一Case | ADAPT | 提示sameorder/Unit/problem；允许同Unit不同新问题 | UNVERIFIED：Houzs仅部分模型，权限/rights未齐 |
+| Registersearch/filter/sort/columns | H3/H5/runtime | C8sharedDataGrid；旧rawtable | ADAPT | 直接找客户/Case/订单/截止事实；全scope统一 | READY：Carreskit基础；Serviceadoption未ready |
+| 批量 | H3archive/reassign | C8权限与sourceversion | ADAPT | 可同批export/assignment；不可批量批准/收货/close | UNVERIFIED：Service动作合同不足 |
+| Board/Calendar | H5runtime | C7Calendar仅有日期动作 | RELOCATE/REJECT部分 | 用sharedCalendar的真实visit，免第二调度板 | READY：sharedCalendar基础；Service未准入 |
+| 对象详情/产品summary | H5DetailLayout | C8objecttemplate/miniGoods | ADAPT | 一页看问题、资格、决定、结果、文件 | READY：sharedkit基础，Servicecomposition未build |
+| 日常负责人/审批 | H1namedaccess/subtree | §7.4 Approver + §7.9已批准Operation owner | BUILD | 已批准per-Case负责人和helpers，实际执行人留证 | UNVERIFIED：裁定已批准，完整接入未证明 |
+| Permission / access | H3/H4companyscope | C9Operation/Principal较粗 | ADAPT | Sales只能适当来源/沟通，Logistics只见所需 | UNVERIFIED：全endpoint未runtime验证 |
+| 政策/entitlement判断 | H1resolutionlookup | C2/C6ownersalreadydefined | KEEP+IMPROVE | 显示政策版本/依据；不复制Guarantee逻辑 | UNVERIFIED：全Case解释路径未demonstrated |
+| 处理安排四选项 | H1stagepickupsubsteps | C1Sept18四安排已批准 | BUILD | 分清旧货收回、新货送出；部分结果不丢 | ENGINE GAP：不能用一个stage承载 |
+| Approve outcome | H3approve | C1sharedServiceApprover | ADAPT | 决定与记录分离；actualactor/cover留证 | READY：SharedDutyResolver基础；casecomplete未ready |
+| Supplierassessment | H1verification | C1suppliervisit/noCarresonsite | ADAPT | 报告supplierassessment，不派Carresinspect | UNVERIFIED：上门完整隔离未查证 |
+| Customercollectioncondition | H1pickupdates | C1twogates+C4/C5 | KEEP+BUILD | 不污染stock；doorstep、receipt分别留证 | ENGINE GAP：Houzs未示同等gate |
+| 每一次supplier往返 | H4独立roundrows | C3RO+C4custody | ADAPT/RELOCATE | 用每份RO/return/GRN追原Unit；Case只读汇总 | READY：CarresROmodel窄能力；闭环待验证 |
+| CasePO / 修复采购 | H3generate-po | C3ownPO/manualrequestServiceCasepurpose | RELOCATE | 缺货发到现有Purchasing，不另造CasePO | READY：现有采购对象；接线未ready |
+| 客户料金/差价/退款 | H3customer_amount | C5canonicalmoney,C6SO | RELOCATE/REJECT部分 | Case显示授权/应收/实收；无普通refundqueue | READY：现有moneyfunctions；Casebridge未ready |
+| SLA/延时/通知 | H4priorityhours/profiles | C1office14/4warning/oncebounded | KEEP | 显示剩余/迟到工作日；不新建priorityclock | READY：sharedsla42tested；Case Work接入未验证 |
+| Closed / newproblem / reopen | H4reopenoverwritesissue | C1confirmbusinessdate/C8sealed | IMPROVE | 同未解决问题重开；新问题新Case关联 | UNVERIFIED：完整revision/closuregate未证明 |
+| 日志/更正/并发 | H3timelinecorrection,H4roundwrite | C9JSONRMWrisk | ADAPT+BUILD | 看谁何时录什么；旧记录保留、冲突需重新确认 | UNVERIFIED：可靠跨模块事务未证明 |
+| Visual Service Note / snapshots | H5threeprintvariants | C1documentchecklist+C6historicaldocs | ADAPT | 带图/QR工作纸，不能代替custodyreceipt | UNVERIFIED：rights/versions/rolefiles |
+| customer/supplierportal | H7permanentbearer | C1first-day/help,noexistingcustomeruploadlink | DEFER | 内部先闭环；未来最小scope/撤销/期限独立review | UNVERIFIED，外部cutover另获授权 |
+| import / scan | H3SOlookup+externalintake | C1staffintake,C4Unit/C6SOsearch | REJECT批量开Case/ADAPTreadscan | 可读Unit/SO再开同intake；导入不补造证据 | UNVERIFIED，非本轮必要能力 |
+| settings/policyversions | H5lookups/assigneeprofiles | C1rulefunctions,C2policy,C7Staff&Duties | RELOCATE/IMPROVE | 不另建名单，政策版本与有效日期由owner管 | UNVERIFIED：完整versionedpolicyregistry未证明 |
+| reporting / export | H2/H3sharedfilters/runtimecounts | C1coverageworkingdays+C7sourcehealth | KEEP+IMPROVE | scope一致，未知不当零；不虚报已完成 | READY：旧numbers25tested；完整linkedreports未ready |
+| 公关/内部问题/Subscription | H3notes/urgent | C1publicescalation,C6Issue/Rental | KEEP+BUILD | 社交升级不改资格；例行cleaning不塞Case | UNVERIFIED：exactWork/admission未完整 |
+
+完整最终业务流程、异常修正及取舍见§7.30；外部参考不移转Carres owner，不产生外国政策或界面准入。
 
 ## 7.22 · Cross-module consequences and the alignment list (on approval)
 
@@ -1073,94 +1113,138 @@ Jess 在本 Service chat 明确授权向 UI、Workspace、Sales Orders、Deliver
 
 **尚欠核实而非owner重问：**hold解除的正式权限/证据模型、有效取消receipt的排除、客户refund适用原门、Case到各腿的真实关系、跨源action去重。未证实前不得将这些行标READY或VERIFIED。以上是完整业务完成要求，不是迁移/测试文件/工程执行方案。
 
-## 7.30 · 最终审阅包 — remaining owner decisions with recommendations (PROPOSAL / NOT LAW, 2026-10-06)
+## 7.30 · 完整最终推荐与审阅入口 — PROPOSAL / NOT LAW，2026-10-06
 
-**Lane: PLAN.** Read at main `848ad3268`. This section closes every open row of §7.25 that can be
-closed from authority, and states one recommendation for each genuine business choice that remains.
-Items 1–3, 5b and 5c need the owner's single review; nothing here is LAW until she approves it, and
-no BUILD, Card or READY scope follows from this section. Already approved rulings (§7.2 first
-response, §7.4 decision approval, §7.9 ownership and processing timing, §7.25 processing chain) are
-not reopened.
+**Lane: PLAN。** 本节取代原五项审阅包，结合§7.1–§7.29形成一份完整推荐，不另建Blueprint或执行队列。核对版本：main `b65905c05`，包含PR #1964。已经批准的负责人、首次回复、内部处理期限和正式决定审批不再询问；以下新异常规则、整体布局及完整Blueprint仍待审阅。文中的界面称呼用于解释业务，正式屏幕文字必须先通过COPY准入。本节不是实施Card，也不证明功能已建成。
 
-### 1 · `Closed · No remedy` — PROPOSAL
+### 7.30.1 · 目的、边界和证据等级
 
-- **When:** the policy result is `Not eligible` and the customer declines paid service, or the
-  Approver declines the request (a formal decision, already routed to Service Case Approver by §7.4).
-- **What must exist:** the Approver's recorded decision with its policy reason; an `outcome_sent`
-  event (channel · who · time · evidence of the message) telling the customer the result in approved
-  wording; every already-started leg finished or cancelled in its owning module.
-- **Customer confirmation:** not required, because a customer may disagree. In its place the close
-  needs the outcome message plus either the customer's reply or **5 Office working days** with no reply
-  after the outcome was sent. The Case keeps the customer's disagreement as a recorded fact.
-- **Who closes:** the assigned Case owner, after the Approver decision. The server and the database
-  trigger accept this close reason only with those facts present.
-- **Falsifier:** the owner wants every close, including a refusal, to wait for the customer's own reply.
+**推荐目标：**员工记录一次客户问题，由一个Case负责人协调，页面直接说明谁对哪件货做什么、何时到期、欠什么证据；执行仍发生在原拥有模块。客户不需要知道内部文件名称，员工不用靠记忆串Excel、订单和仓库记录。
 
-### 2 · `Closed · Withdrawn` and `Closed · Entered in error` — PROPOSAL
+| 事实分类 | 本案结论与出处 |
+|---|---|
+| RESOLVED FROM AUTHORITY | §1、§7.4、§7.9、§7.25：Operation共享案件工作，每案一位负责人，helper保留实际执行身份；正式维修、更换、收费及收换决定由Service Case Approver批准。Guarantee管资格政策，Payment管客户钱，Delivery管收送，Stock/Receiving管货与收货，Purchasing管供应商Claim/RO，Issue Tracker管内部问题。 |
+| APPROVED TARGET / NOT BUILT | 两Office工作日实质首回、§7.9处理期限、who + action + object当前义务、CS/SCS新编号等已批准目标；当前缺实现不能再问老板是否需要。跨模块完整接口未证明已连接。 |
+| BUILT / VERIFIED | §7.29及§7.27.6记录代码/只读快照的实际检查范围。SC2607-01存在原投诉及处理文字，但缺SO、结构化Unit/数量、照片与客户确认；旧Resolved值不证明全程完成。未测试、未运行或未生产核实的能力不称已验证。 |
+| REAL GAP / CONTRADICTION | 非解决关案、有效重开周期、多SO范围和未来客户表单的新增语义；UI组合尚未获统一审阅，COPY尚未准入。原§7.30的“客户任何回复即可关”“保修过期必新案”“第一张SO当Case身份”已删除，替换为以下推荐。 |
 
-- **Withdrawn:** the customer says the problem no longer needs help. Requires the customer's own words
-  as evidence (message screenshot or call note with time). No approval needed unless a charge was
-  accepted or goods have moved; then those legs finish or are cancelled through their owners first.
-- **Entered in error:** a duplicate, a test or a wrong key-in (Excel SN/2601-05 "wrongly key in").
-  Copies the Issue Tracker void pattern (Issue Tracker MASTER §3: actor, date, reason, surviving link):
-  the reason is required, a duplicate names the surviving Case, the record stays readable, and the
-  Numbers report excludes it from counts. Approval: Service Case Approver, because it removes a case
-  from the promise measurement.
-- **Falsifier:** the owner wants wrong key-ins deleted rather than kept as voided records.
+Houzs研究基线为`main`，commit `07cd742c001107a2bc3df7ce2b6d533f2f7ac8e1`（完整证据及范围见§7.21）。文件存在、文档承诺、代码行为、实际测试、运行及生产验证分别陈述；不把Houzs推定为当前2990。现有证据未确认适用复用授权，不能宣称可直接复制代码。Excel本次复核版本及缺口见§7.27.11，不宣称重读未取得的(5)/(4)版本。
 
-### 3 · Reopen — PROPOSAL
+### 7.30.2 · 正常工作流：入口 → 人 → 操作 → 完成 → 下一步
 
-- **Trigger:** the customer reports that the **same problem on the same item** is not solved after the
-  Case closed as Solved (Excel: TCF0197 three times, TCF0124 twice). A different problem, or a
-  different item, opens a new Case linked to the old one (§7.27.2).
-- **Window:** while the item's policy cover still runs; outside cover it is a new Case whose policy
-  result is computed fresh.
-- **What happens:** the same Case number reopens with a recorded reason and the reporter; the earlier
-  closure, confirmation and evidence stay unchanged in history. A new cycle starts from the reopen
-  date: first response within 2 Office working days (§7.2) and a new 14-working-day period (§4). The
-  earlier period's on-time result is never rewritten. The remedy decision goes to the Approver again
-  (§7.4 already requires approval for a changed remedy). The reopen raises an Issue candidate
-  (Issue Tracker MASTER §5 lists "reopened Service Case" as a candidate source).
-- **Who reopens:** any Operation person recording the customer's report; the Case returns to its
-  original owner if still eligible, otherwise round robin (§7.9).
-- **Falsifier:** the owner wants a reopened problem counted only against the original deadline.
+| 步骤 | 谁与入口 | 怎么操作 | 什么才完成／下一步 | 异常处理 |
+|---|---|---|---|---|
+| 接到客户问题 | 接报员工；订单、现有沟通或Service入口 | 保留客户原话、实际报告日期、客户及受影响商品；先查同一未完成问题；有来源选真实来源，无来源明确标缺口 | 保存一宗Case与范围，指派一个Operation负责人；进入首回 | 不凭同名/Reference猜SO；读失败不是无来源；重复提交不生成两宗案。§7.27.2 |
+| 首次实质回复 | Case负责人或helper；Tasks直达该Case | 核对已有证据，说明评估、明确补证或处理安排；记录实际联系人、内容、发生时间与证据 | 两Office工作日内实质回复；缺资料仍继续补证 | “收到”、复制消息或打开WhatsApp不算回复；等客户不暂停原完成期限。§7.27.3 |
+| 核证据与资格 | Case负责人；同一对象 | 逐件核对原交付、政策版本、照片/视频、受影响范围；读Guarantee唯一政策 | 足够事实产生可解释的政策结果；准备正式决定 | 缺事实显示具体缺口，不自动不合格；Service不另算资格。§7.27.4 |
+| 正式决定 | Operation准备，Service Case Approver审批 | 记录维修/更换/收费/收换范围、费用与payer、理由及执行顺序；变化重新审批 | 有批准事实才进入对应执行安排 | 审批不等于客户接受报价、付款或货移动；政策绝对禁止项不可绕过。§7.4 |
+| 执行每条腿 | 原模块执行人员；从Case深链到原对象 | Delivery收送，Stock/Receiving实际收货检查，Purchasing供应商Claim/RO，Payment收费/退款；Case读取来源结果 | 每件受影响货、每条必需腿有原模块实际结果 | 承诺日期不等于完成；部分完成、拒收、失败、借货及未归还分别保留。§7.27.5 |
+| 告知结果与客户确认 | Case负责人；同一沟通历史 | 告知真实已完成结果，请客户确认；保留客户实际意思及时间 | 原执行条件齐全且客户确认问题解决，才能按现行已批准规则结束 | 员工说“修好”、供应商说“做好”、旧Resolved值或打印单据均不替代客户确认。§7.27.6 |
 
-### 4 · Settings — RESOLVED by reduction (planner decision, recorded)
+四种已批准movement沿用§7.5；系统带出所需顺序与前提，不要求新员工先选Claim/Return/Refund文件类型。部分商品完成不会关闭整案。Case不写第二份付款、库存、供应商维修或Delivery状态。
 
-The approved numbers stay code constants and Settings shows them read-only (§7.16). An editable value
-would need a snapshot rule for existing Cases that conflicts with §4. The owner approved the numbers,
-not their editability. A future edit control is a new ruling.
+### 7.30.3 · 晨间、白天、交接与收工
 
-### 5 · Excel extensions A1–A9 — checked against authority
+**早上：**员工在共享Tasks看自己的新案、首回、补证、待决定、待客户确认及到期事项；一键打开准确Case。Approver看到已具备审阅事实的决定，不代替普通负责人追客户。经理看无人负责、逾期、失败及长期等待。
 
-| Item | Verdict | Authority |
+**白天：**按7.30.2处理；新消息追加原案，不重开任务/期限；需要仓库、物流、采购、付款时进入原对象，完成后原事实回到Case。客户来电时同一对象能读原话、决定和最新实际结果。
+
+**交接：**请假、覆盖或改派使用共享人员安排，留下原负责人、接手人、原因和时间；实际帮助者不自动成为负责人。接手人看到下一动作、缺口和原期限，不重新开案。
+
+**收工：**等待外部回复的义务仍开放；没有完成证据不能勾Done。实际预约显示在原Calendar，原动作仍在Tasks。14工作日完成期、期限前四工作日联系及一次有界延期沿用§4；Office首回/内部处理日历与原Case完成日历分别说明，不混算。
+
+### 7.30.4 · 异常结局：行政关案不冒充解决 — PROPOSAL / NOT LAW
+
+现行已批准的解决关案仍要求实际执行与客户确认；本小节是新增业务推荐，不可直接用于当前关案。
+
+| 结局 | 进入条件与操作 | 完成与负责人 | 报表／禁止事项 |
+|---|---|---|---|
+| 无补救方案 | 政策不合格且客户拒绝允许的收费服务，或Approver拒绝正式请求；记录政策、决定理由，并实际通知正确客户 | 推荐由Approver确认行政结局；已启动的货物、费用、借货及执行承诺须由原模块妥善完成或取消后，Case负责人才能行政关案 | 保留“未解决／无补救”事实，不算Solved或客户确认；不能只因客户发了一条回复就关 |
+| 客户不同意 | 客户明确反对结果，保留原话；交Approver复核政策/证据/原批准范围，再向客户解释实际决定 | 不能走“有回复即可关”；推荐只有复核决定已通知、原模块义务已处理，且Approver明确批准行政结局时，才可行政关案并保留dispute标记 | 报表单列争议结局；客户不同意不能变为“接受”或“解决”；新事实可重新审阅 |
+| 客户未回复 | 已有可证明的实际结果通知及正确收件人，无未处理争议、无未完成原模块义务 | 推荐通知后5个Office工作日无回复，由Approver确认、负责人行政关案；未发送成功或仅打开渠道不启动此等待期 | 五日是新增推荐，未获批准；无回复不等于同意或解决。仍可查原案与后来回复 |
+| 客户撤回 | 有客户自己的撤回意思及可追溯证据；电话记录注明实际人、时间与原话摘要 | 推荐Approver确认行政结局；原货物/钱/借货/承诺先由拥有模块处理，负责人再结束 | 不删除；单列Withdrawn，保留已发生延误；不能用员工推断代替客户撤回 |
+| 开错、测试或重复 | 必须说明错误原因；重复案关联保留的正确Case；错误来源不得覆盖真实投诉 | 推荐Approver批准Entered in error；保留编号、记录、演员、日期、原因及关联 | 仅确实不是独立案件的记录排除服务履约分母，并单列排除数量；真实逾期不能借此隐藏，原案期限不重算 |
+
+**权衡：**行政关案避免无限挂案，也承认客户可能不同意；增加一次明确复核，防止把未解决案件清成漂亮KPI。**可推翻证据：**实际运营证明五日过短，或行政复核导致重大排队，应调整等待期/授权边界；仍不能取消争议和原义务的可见性。所有屏幕结局词经COPY统一后才能使用。
+
+### 7.30.5 · 重开与重复投诉 — PROPOSAL / NOT LAW
+
+1. 同一商品、同一问题追加到仍开放的Case：继续原周期、原期限和原义务，不能以新消息洗掉逾期。
+2. 原案确实完成并有有效客户确认，后来同一问题再次发生：推荐保留同一Case号，记录新周期的报告、原因和事实；新周期采用两Office工作日首回及14工作日完成期。原周期的报告、期限、延期、确认与准时结果全部保留，不回写。
+3. 原来是错误或提前关案、缺必需完成事实：恢复原未完成义务及原期限；不能当有效解决后新周期来重新计时。历史错误结局保留审计更正。
+4. 不同问题或不同商品：新Case关联以前案件；不把同一客户全部投诉混在一起。
+5. 资格由Guarantee依据原投诉日期、原政策版本和新事实判断。现在已过保不自动抹除当初及时申报而未解决的问题，也不自动授予新保修；资格不确定明确交政策拥有方处理。
+6. 正式改变处理仍经过Approver。原负责人合资格时优先接回，否则按批准的指派规则分配；实际报告人保留。重复故障可以产生Issue候选，由Issue reviewer确认，不能自动定责或自动成为正式Issue。
+
+**权衡：**有效新周期方便继续服务，但报表必须同时显示首次结局、重开次数、各周期准时情况及端到端持续时间。**可推翻证据：**真实案例证明同一编号使不同问题混淆，应改成关联新案；无论编号怎样选择，原失败记录不许消失。周期新增计时不是§4当前已实现能力。
+
+### 7.30.6 · 多商品、多SO与借货 — PROPOSAL / NOT LAW
+
+推荐同一客户的一次共同问题可以关联多张SO；**Case号与客户是主身份，第一张SO不是Case身份。** 每件商品分别保留来源SO/line/Unit（若已确认）、实际交付、政策版本/结果、证据、决定、费用和执行腿。不同客户不混；同电话/名字不能当客户关系证明。商品来源不同或政策不同并不自动共享资格。
+
+操作者先明确共同问题及受影响范围，再逐件处理；主对象显示真实关联摘要并可打开每个来源。单件完成不关闭其余商品；新增商品、费用或处理范围重新审批。若实际上是互不相关的问题，拆成关联Case，减少错误承诺。**权衡：**一个沟通窗口减少客户重复说明，但不能用一个状态掩盖逐件未完成；真实案例若主要为独立问题，将推翻共同Case推荐。
+
+部件依据ERP-ARCHITECTURE的Unit边界：独立可销售/更换模块用自己的Unit身份；脚、螺丝等非Unit部件用准确部件描述，不制造库存身份。借货由Orders的loan offer/Loan Note和原Delivery/Stock流程拥有，Service仅关联、协调及读完成事实；借出不是送回修好的原货，借货未处理不能静默结束其义务。
+
+### 7.30.7 · 页面、文件、搜索与设置
+
+| 位置 | 推荐员工用途与内容 | 共享约束／批准状态 |
 |---|---|---|
-| A1 Case with a non-customer fault owner candidates a linked Issue | **RESOLVED FROM AUTHORITY** | Issue Tracker MASTER §2 ("the system may record/candidate an Issue") and §5 candidate sources; the reviewer still confirms or rejects |
-| A2 a leg may name part of an item | **RESOLVED FROM AUTHORITY**, narrowed | ERP-ARCHITECTURE §3.1: independently saleable or replaceable modules are their own Units, so a seater or headboard is named by its Unit ID; only a non-Unit part (legs, screws) is a component word on the leg |
-| A3 loan while repaired | **RESOLVED FROM AUTHORITY** | Orders owns the loan offer and Loan Note; the Case links it read-only; collection is Delivery's action |
-| A4 repeat complaint | **RESOLVED FROM AUTHORITY** | §7.4 sends every formal decision to the Approver; the Case shows "Earlier cases on this item" as a fact; reopen rule is item 3 |
-| A5 one Case linked to several Sales Orders | **5b · OWNER DECISION** | no authority; Sales Order review (§7.29) asks for a clear multi-item scope first |
-| A6 charged leg waits for Payment | **RESOLVED FROM AUTHORITY** | Payment owns money; Delivery's hold gate; the Case cannot mark Paid (§7.27.4) |
-| A7 failed or refused leg reopens the decision on the same Case | **RESOLVED FROM AUTHORITY** | §1 condition-gated collection: refusal returns to Operation for a formal outcome on the same Case |
-| A8 approved wording library from the Template sheet | **RESOLVED FROM AUTHORITY** | §1 First-day law ("approved call/WhatsApp wording beside the action"); each script still goes through COPY; balance-payment scripts belong to Payment |
-| A9 replace the four Google Forms with an ERP customer form | **5c · OWNER DECISION** | an external channel change; CLAUDE.md PLAN AUTHORITY BOUNDARY forbids cutover without explicit owner authorisation |
+| Service Register | 一案一行，Case身份、客户/来源摘要、当前谁做什么、负责人、期限、异常；按编号/客户/来源搜索，按负责人与实际义务、逾期、争议及缺证据筛选 | Shared DataGrid/CompactModuleCard、共同Columns与权限；精确默认列与组合待UI controller，不新增Service kit |
+| Working Panel / full object | 同一事实：原投诉→范围/来源→资格与决定→执行腿→沟通→文档/历史；下一允许动作带人、证据和期限 | 相同状态/权限来源；Panel做当前工作、full page读全貌；不假造SO，组合及COPY待统一审阅 |
+| Tasks / Quick Rail | 找到准确Case动作并深链；显示原owner/due/完成条件和实际helper | 使用共享Work Engine，不建Service任务池；Quick Rail是到达入口，不是第二个任务/状态引擎 |
+| Calendar | 查真实收送/维修安排及来源日期 | 原模块修改与权限；拖动不能偷偷改Case或Delivery承诺 |
+| Documents / history | Visual Service Note照片/QR辅助；链接原DO、Claim、RO、Payment/退款记录；可打开采用过的政策及历史客户文件版本 | 打印/生成不构成收货、送达、付款或解决；历史签署文件不覆盖 |
+| Reports | 开放义务、首回、原完成期、各周期与端到端耗时、重开、争议、行政结局、缺证据覆盖率；导出保留真实范围与权限 | 行政结局分列，排除项可追溯；不得把历史Done自动转客户确认，数字口径未批准不作已建成声明 |
+| Settings | 按共享People/角色维护合法指派与覆盖，展示已批准期限/政策来源 | 数字未获可编辑授权，推荐只读；不复制Guarantee政策或Payment收费表。新增可编辑规则需明确旧Case适用语义，不问老板选控件 |
 
-**5b recommendation — several Sales Orders on one Case:** allow it only when one customer reports one
-problem that spans goods from several orders (Excel SN with CR0963 + CR0198 + TCF0308). Each affected
-item keeps its own order, line, policy result and legs; the first linked order is the header identity;
-a Case never mixes two customers. Falsifier: the owner wants one Case per Sales Order.
+修改/更正保留实际人、原因和时间；改变商业范围复核并重新审批；原报告日不可普通编辑隐藏延误。复制只作为新案草稿，不复制审批、客户确认、付款、收货或已完成腿。扫码/导入帮助找来源，不根据文本猜事实。批量查看及导出服从共享权限；批量关案、审批、延期、退款和库存动作不纳入当前推荐。并发修改时保留草稿并明确要求重读新事实，重复提交不产生两次收费或移动。完整异常与验收见§7.27.9–§7.27.11。
 
-**5c recommendation — customer claim form:** build the capability later on the existing external-link
-pattern (Delivery §5.5), but keep the Google Forms running until the owner separately authorises the
-switch. Approving the capability is not approving the cutover.
+### 7.30.8 · 参考教训、复用分类与取舍
 
-### 6 · What still blocks PLAN MISSION COMPLETE
+本表是§7.21完整能力矩阵的最终推荐摘要；文件/段落级证据在该节和§7.29，不能以此摘要扩大已核实范围。
 
-1. The owner's review of items 1, 2, 3, 5b and 5c.
-2. The UI controller's combined review of the Service Register / Working Panel / Object / Tasks row
-   (sent 2026-10-06, §7.28; not acknowledged as aligned).
-3. COPY admission of the §7.20 words plus the close-reason words above.
+| 能力 | Houzs／参考证据 | Carres当前／权威 | 取舍 | 员工收益与依赖 | 复用判定 |
+|---|---|---|---|---|---|
+| 来源开案及原关系 | §7.21 intake与关系检查；文件存在不代表全程运行 | §2、§7.3、§7.29 source归属仍有缺口 | ADAPT | 少重填，准确找到货；必须核来源权限 | UNVERIFIED完整多来源；现有单来源只按已核证范围 |
+| 一案协调、多执行腿 | §7.21工作流与当前Excel物流/供应商/仓库段 | §7.5、§7.27.5原模块owner | ADAPT / BUILD连接 | 不漏收货/归还/部分结果；依赖真实Delivery/Stock/Purchasing事实 | UNVERIFIED整条连接，不称copy-ready |
+| 政策及收费 | §7.21规则检查不能照搬Houzs商业假设 | Guarantee / Payment MASTER唯一权威 | KEEP / REJECT外国规则 | 一个资格和钱来源；不重复计算 | READY仅限各拥有模块已证明的本地能力；Case整体接线未证明 |
+| 任务、步骤及沟通 | §7.21实现与测试范围；Excel连续跟进事实 | §7.9、共享Work与UI，Case Tasks尚未完整接入 | ADAPT / BUILD | 直接知道谁做什么；不建第二个任务引擎 | UNVERIFIED适配及复用授权 |
+| 文件与版本 | §7.21文档证据、§7.27.8原文件边界 | 原模块文件，加Service工作辅助 | KEEP / ADAPT | 一处找到正确文件，不用打印代替完成 | UNVERIFIED历史版本全链 |
+| 行政结局/重开/多SO | §7.26–27实际场景；§7.30明确差异 | 当前规则未完整解决新增语义 | BUILD仅在批准后 | 不隐藏争议/逾期，多件不漏 | ENGINE GAP：本次证据未找到符合本推荐全套语义的现成解法，并非声称全球没人解决 |
+| 外部客户提交 | Houzs/Delivery链接模式只作模式参考 | §7.15、外部切换需另授权 | ADAPT未来能力；DEFER切换 | 少重录证据；需身份/范围/附件权限与沟通连续性 | UNVERIFIED；不能因链接存在就宣称可复制 |
 
-When 1–3 are done, the approved parts overwrite §1–§6 and this section, READY scopes are derived
-(§7.25 order), and the BUILD lane starts from a new chat. No code, Card or deployment before that.
+**COPY REQUIRED目前不成立：**只有演示合适实现，并核业务语义、模型、权限、UI、依赖和复用权利后才能判定；本次没有这份完整证据。READY不表示本模块端到端已完成。UNVERIFIED必须保持可见，不能为了派工改叫ENGINE GAP。
 
+**拒绝／不需要：**Houzs/其他系统的角色、政策、术语与状态直接照抄；Service自行管supplier stock claim；第二份钱/库存/供应商维修/Tasks状态；强迫员工先选内部文件；Carres上门检查；批量危险业务动作；删除错误Case；把消息发送、预约、收货或旧Done当解决。这些增加错误承诺或双重owner，缺乏当前操作收益。
+
+### 7.30.9 · 跨模块和外部边界
+
+- Sales Orders提供原客户/商品/历史及Loan Note；Case不改订单商业事实。多SO、新来源修正和已改单历史须真实可追溯。
+- Guarantee提供唯一资格、覆盖与条款；Service保存本案引用证据，不建立政策分叉。
+- Delivery提供收送安排、失败/拒收/condition proof；Payment提供实际收费/退款；批准不绕过其放行、金额和权限门。
+- Stock/Receiving提供实际Unit、收到人/时间及检查；到仓不等于修好。Purchasing提供独立supplier Claim/RO，Stock问题不需要客户Case作为先决条件。
+- Issue Tracker仅接候选及证据，由reviewer判定；Case反复或第三方失误不自动定责。Workspace接原owner/due/动作，不复制事实。
+- Customer Service的新沟通和原消息可关联Case；Enquiry的一COVERED小时首回与Case两Office工作日是不同义务，不能互相重算或抹去。
+- 推荐未来安全客户提交能力，先保存投诉及附件，再由员工核来源/资格；系统不直接承诺补救。现有四个Google Forms/WhatsApp继续使用。能力批准、外部账号、真实链接投放及渠道切换是不同授权，PLAN不执行。
+
+不需要等所有模块宣布完成才完成本Blueprint；需要每个依赖的owner、事实及失败边界明确。接口未建是批准目标缺口，跨模块规则真正冲突才阻塞相关能力；这里不启动BUILD、不发送外部联系。
+
+### 7.30.10 · 挑战与可推翻条件
+
+| 当前 → 问题 | 更好设计 → 权衡 → 推荐 | 会推翻推荐的证据 |
+|---|---|---|
+| 旧状态选择/Excel Done → 人不同理解，未完成可被隐藏 | 当前义务从事实导出；增加证据要求，减少猜测；保留已批准who/action/object | 实际操作证明关键动作无法由事实表达，需先补事实边界，不恢复任意状态选择 |
+| 消息/仓库/供应商备注各处 → 客户联系与货物结果混在一起 | Case协调、原模块执行；依赖真实连接；保持一个owner一个writer | 权威ownership出现真实变更；不能因接线未建就转移ownership |
+| 原五项提案用任意客户回复关案 → 争议被算解决 | 行政结局独立并经复核；增加一次审阅；不虚构确认 | 正式owner选择永不行政关案，接受持续挂案成本 |
+| 重开重置单一时钟 → 逾期记录可洗掉 | 合法新周期独立，提前关案恢复原钟；报表更复杂；保存端到端史 | 实际复发界定无法稳定区分新周期，应用关联新Case但仍保留原履约 |
+| 多SO第一单当身份 → 其余来源/政策被遮蔽 | Case/customer为主，每件独立来源；范围核对更多；减少漏项 | 真实场景证明没有共同问题或运营必须按单分别负责，则拆关联案件 |
+| 直接“复制Houzs UI” → 带入外来规则并分裂kit | 复制有用交互，使用Carres共同模板、COPY和token；等待组合审阅；收益必须可说明 | UI统一审阅及操作者测量证明另一合规组合明显更快，替换组合，不分裂kit |
+
+### 7.30.11 · 最终审阅与停止边界
+
+本次提交完整推荐供一次整体审阅，不把正常流程变成老板连续回答的小问题。已经批准部分保持有效；新增行政结局（含五Office工作日等待）、重开周期、多SO范围、未来客户提交能力及整体Blueprint只在明确审阅批准的范围内成为规则。未回复不是批准，复制其他chat回复不是批准。
+
+尚欠三种不同证据：**owner对完整推荐的审阅；UI controller对共同组合的审阅；COPY准入。** UI尚未完成时，不冒称画面已获批准；本节已说明业务承载，不用假HTML替代审阅，也不把未决UI推给BUILD猜。
+
+明确批准后，在同一MASTER删除过时或相反正文，将批准业务写成唯一当前规则并提交可取得的Git版本。只在完整Blueprint已审阅批准并持久化后声明PLAN MISSION COMPLETE；随后仅列有充分业务/UI/依赖和验收边界的未编号READY FOR CARD范围。后续实施需独立明确BUILD commission；本chat不因规划批准自动转BUILD、不创建Card、不部署、不改真实数据。
