@@ -463,6 +463,77 @@ export interface LedgerChartImportResult {
 }
 
 /**
+ * Finance Settings → Posting accounts (0657): change the account one posting
+ * goes to. `what` INCOME keys an income map row as `GOODS/*`, `ADDON/<key>` or
+ * `STORAGE/*`; ROLE keys a role; PAYMENT (0658) keys a way of being paid as
+ * `{method}/{source channel}` (`bank/*`, `online/stripe_checkout`) and takes a
+ * money account. `was` is the account the screen showed (null
+ * for an add-on with no account yet): the database refuses with 409 when
+ * someone has changed it since. Which accounts fit is the database's to judge.
+ */
+export const ledgerPostingAccountSetInput = z.object({
+  what: z.enum(['INCOME', 'ROLE', 'PAYMENT']),
+  key: z.string().trim().min(1).max(120),
+  accountCode: z.string().trim().regex(ledgerAccountCodeShape, 'That account is not in the chart.'),
+  was: z.string().trim().max(20).nullable(),
+}).strict();
+export type LedgerPostingAccountSetInput = z.infer<typeof ledgerPostingAccountSetInput>;
+
+/** One income posting: an invoice component and the income account it credits.
+ *  An add-on's `name` is the add-on list's own; `accountCode` is null when an
+ *  add-on has no account yet (its invoices cannot be issued). */
+export interface LedgerIncomePosting {
+  type: 'GOODS' | 'ADDON' | 'STORAGE';
+  key: string;
+  name: string | null;
+  active: boolean | null;
+  accountCode: string | null;
+  accountName: string | null;
+  changedAt: string | null;
+  changedBy: string | null;
+}
+
+/** One role posting. `changeable` is false for the accounts the system keeps. */
+export interface LedgerRolePosting {
+  role: string;
+  changeable: boolean;
+  accountCode: string;
+  accountName: string;
+  changedAt: string | null;
+  changedBy: string | null;
+}
+
+export interface LedgerPostingChange {
+  /** A posting change's number, or `P` and Payment settings' record number (0658). */
+  id: string;
+  what: 'INCOME' | 'ROLE' | 'PAYMENT';
+  key: string;
+  name: string | null;
+  fromCode: string | null;
+  fromName: string | null;
+  toCode: string;
+  toName: string | null;
+  changedAt: string;
+  changedBy: string | null;
+}
+
+/** When a way of being paid last changed its money account (0658). `key` is
+ *  `method/*` for a manual method, `method/channel` for POS card and Online. */
+export interface LedgerPaymentPostingChanged {
+  key: string;
+  changedAt: string;
+  changedBy: string | null;
+}
+
+export interface LedgerPostingAccounts {
+  income: LedgerIncomePosting[];
+  roles: LedgerRolePosting[];
+  changes: LedgerPostingChange[];
+  /** Absent until 0658 is applied. */
+  payments?: LedgerPaymentPostingChanged[];
+}
+
+/**
  * Move accounts within ONE heading on Finance Settings → Chart of accounts (0557).
  *
  * BOTH ORDERS TRAVEL. `was` is the order the screen READ, `now` is the order it

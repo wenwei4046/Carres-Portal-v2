@@ -648,6 +648,8 @@ export {
   ledgerChartImportInput, type LedgerChartImportInput, type LedgerChartImportRow, type LedgerChartImportResult,
   ledgerAccountEditInput, type LedgerAccountEditInput, ledgerAccountAddInSectionInput, type LedgerAccountAddInSectionInput,
   ledgerAccountActiveInput, type LedgerAccountActiveInput,
+  ledgerPostingAccountSetInput, type LedgerPostingAccountSetInput, type LedgerIncomePosting, type LedgerRolePosting,
+  type LedgerPostingChange, type LedgerPostingAccounts, type LedgerPaymentPostingChanged,
   type LedgerAccountReorderInput, type LedgerAccountMoveInput, type LedgerAccountAddInput,
   type LedgerEntriesQuery, type LedgerAsOfQuery, type LedgerPeriodQuery, type LedgerAccountLedgerQuery,
 } from "./schemas/finance";
