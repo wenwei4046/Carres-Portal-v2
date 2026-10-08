@@ -112,9 +112,16 @@ describe("GET /api/operation/orders/register-facts", () => {
     mockSb({
       orders: [
         order(1, { ops_order_control: { assigned_staff: pic }, delivery_partner_id: "p-order" }),
-        order(2, { ops_order_control: { assigned_staff: "33333333-3333-3333-3333-000000000002" } }),
+        order(2, {
+        ops_order_control: { assigned_staff: "33333333-3333-3333-3333-000000000002" },
+        order_lines: [{ id: "ol2", sku: "MS12", qty: 1, unit_price: 100 }],
+      }),
       ],
-      ops_stock_items: [{ ...unit(3, "reserved", 1), warehouse_id: "w1" }],
+      // Order 1's Unit by its SO ref; order 2's by its order line (0471).
+      ops_stock_items: [
+        { ...unit(3, "reserved", 1), warehouse_id: "w1" },
+        { ...unit(4, "reserved", 9), reserved_ref: null, reserved_order_line_id: "ol2", warehouse_id: "w2" },
+      ],
       app_users: [{ id: pic, name: "Shasha" }], // order 2's PIC is not readable to this caller
       po_line_sources: [
         { id: "s1", order_id: id(1), po_id: "po1", po_line_id: "pl1" },
@@ -132,7 +139,7 @@ describe("GET /api/operation/orders/register-facts", () => {
         { id: "h2", delivery_order_id: "do1", kind: "handed_over", recorded_at: "2026-10-02T03:00:00Z" },
       ],
       delivery_partners: [{ id: "p-arr", name: "NETS" }],
-      warehouses: [{ id: "w1", name: "Klang" }],
+      warehouses: [{ id: "w1", name: "Klang" }, { id: "w2", name: "PJ Showroom" }],
       order_finance_exceptions: [
         { id: "f1", order_id: id(1), status: "open", reason: "Cheque not cleared", opened_at: "2026-10-01T00:00:00Z" },
         { id: "f2", order_id: id(1), status: "open", reason: "Refund under review", opened_at: "2026-10-03T00:00:00Z" },
@@ -157,6 +164,7 @@ describe("GET /api/operation/orders/register-facts", () => {
       grns: [],
       delivery: { dateIso: null, source: null, partnerId: null },
       loading: { hasDo: false, kind: null },
+      locations: ["PJ Showroom"],
       financeHold: null,
     });
     expect(body.failed).toEqual({

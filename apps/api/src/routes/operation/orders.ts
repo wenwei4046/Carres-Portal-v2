@@ -971,7 +971,7 @@ operationOrdersRouter.get("/register-facts", requireOperation, async (c) => {
       sb
         .from("orders")
         .select(
-          "id, so, status, paid, delivery_date, delivery_partner_id, ops_assigned_logistic, order_lines(sku, qty, unit_price), order_addons(qty, unit_price), ops_order_control(balance, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status, extension_original_date, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot)",
+          "id, so, status, paid, delivery_date, delivery_partner_id, ops_assigned_logistic, order_lines(id, sku, qty, unit_price), order_addons(qty, unit_price), ops_order_control(balance, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status, extension_original_date, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot)",
         ),
     )
       .order("id", { ascending: true })

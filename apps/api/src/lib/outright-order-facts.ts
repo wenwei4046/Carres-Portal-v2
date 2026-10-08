@@ -23,7 +23,8 @@
  *   Loading       the newest handover record on the customer leg's live DO
  *                 (`Ready for handover` · `Handed over` · `Received by
  *                 logistics`, Delivery MASTER §4).
- *   Location      the warehouses holding the order's reserved Units.
+ *   Location      the warehouses holding the order's reserved Units — bound to
+ *                 its lines (`reserved_order_line_id`, 0471) or by its SO ref.
  *   Finance hold  an OPEN order_finance_exceptions row (0355). Unknown is never
  *                 "no hold".
  */
@@ -40,6 +41,7 @@ export type { OutrightFactsFailed, OutrightOrderFacts };
 
 export type OutrightOrderInput = {
   id: string;
+  order_lines?: Array<{ id?: string | null }> | null;
   delivery_partner_id?: string | null;
   ops_assigned_logistic?: string | null;
   ops_order_control?: OrderControl | OrderControl[] | null;
@@ -94,7 +96,8 @@ export async function outrightOrderFacts(
   const ids = orders.map((o) => o.id);
   const staffIds = orders.map((o) => ctrlOf(o)?.assigned_staff ?? "").filter(Boolean);
 
-  const [sources, staff, arrangements, documents, holds] = await Promise.all([
+  const lineIds = orders.flatMap((o) => (o.order_lines ?? []).map((l) => l.id ?? "")).filter(Boolean);
+  const [sources, staff, arrangements, documents, holds, lineUnits] = await Promise.all([
     readIn<{ order_id: string; po_id: string; po_line_id: string | null }>(sb, "po_line_sources", "id, order_id, po_id, po_line_id", "order_id", ids),
     readIn<{ id: string; name: string | null }>(sb, "app_users", "id, name", "id", staffIds),
     readIn<{ order_id: string; leg: number | null; partner_id: string | null; confirmed_date: string | null; confirmed_time: string | null }>(
@@ -103,6 +106,8 @@ export async function outrightOrderFacts(
       sb, "ops_delivery_orders", "id, order_id, leg, delivery_date, time_slot, issued_at, voided_at", "order_id", ids),
     readIn<{ order_id: string; status: string; reason: string | null; opened_at: string | null }>(
       sb, "order_finance_exceptions", "id, order_id, status, reason, opened_at", "order_id", ids, (q) => q.eq("status", "open")),
+    readIn<{ warehouse_id: string | null; reserved_order_line_id: string | null }>(
+      sb, "ops_stock_items", "id, warehouse_id, reserved_order_line_id", "reserved_order_line_id", lineIds, (q) => q.eq("status", "reserved")),
   ]);
 
   const poIds = [...new Set((sources ?? []).map((s) => s.po_id).filter(Boolean))];
@@ -111,7 +116,7 @@ export async function outrightOrderFacts(
     ...(arrangements ?? []).map((a) => a.partner_id ?? ""),
     ...orders.flatMap((o) => [o.delivery_partner_id ?? "", o.ops_assigned_logistic ?? ""]),
   ].filter(Boolean);
-  const warehouseIds = (reservedUnits ?? []).map((u) => u.warehouse_id ?? "").filter(Boolean);
+  const warehouseIds = [...(reservedUnits ?? []), ...(lineUnits ?? [])].map((u) => u.warehouse_id ?? "").filter(Boolean);
 
   const [pos, receipts, handovers, partners, warehouses] = await Promise.all([
     sources ? readIn<{ id: string; do_number: string | null }>(sb, "purchase_orders", "id, do_number", "id", poIds) : Promise.resolve(null),
@@ -130,7 +135,7 @@ export async function outrightOrderFacts(
     purchasing: sources === null || pos === null || receipts === null,
     delivery: arrangements === null || documents === null || partners === null,
     loading: documents === null || handovers === null,
-    location: reservedUnits === null || warehouses === null,
+    location: reservedUnits === null || lineUnits === null || warehouses === null,
     finance: holds === null,
   };
 
@@ -180,8 +185,12 @@ export async function outrightOrderFacts(
       .filter((h) => legDocs.includes(h.delivery_order_id))
       .sort((a, b) => (b.recorded_at ?? "").localeCompare(a.recorded_at ?? ""))[0] ?? null;
     const soRef = soRefOf(o.id);
-    const locations = [...new Set((reservedUnits ?? [])
-      .filter((u) => u.reserved_ref === soRef && u.warehouse_id)
+    const myLines = new Set((o.order_lines ?? []).map((l) => l.id ?? "").filter(Boolean));
+    const locations = [...new Set([
+      ...(reservedUnits ?? []).filter((u) => u.reserved_ref === soRef),
+      ...(lineUnits ?? []).filter((u) => u.reserved_order_line_id && myLines.has(u.reserved_order_line_id)),
+    ]
+      .filter((u) => u.warehouse_id)
       .map((u) => nameOfWarehouse.get(u.warehouse_id!) ?? "")
       .filter(Boolean))];
     const assigned = ctrl?.assigned_staff ?? null;
