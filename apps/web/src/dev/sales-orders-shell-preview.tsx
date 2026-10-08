@@ -58,6 +58,7 @@ const orders = Array.from({ length: ROWS }, (_, n) => {
     salespersons: { name: SALESPEOPLE[i % SALESPEOPLE.length] },
     delivery_date: `2026-10-${String(1 + (i % 27)).padStart(2, "0")}`,
     delivery_date_tbd: false,
+    original_request: [{ revision: 1, snapshot: { header: { delivery_date: `2026-10-${String(1 + (i % 27)).padStart(2, "0")}`, delivery_date_tbd: false } } }],
     delivery_partner_id: null,
     request_for_delivery_at: null,
     partner_accepted_at: null,
@@ -211,6 +212,20 @@ window.fetch = async (input, init) => {
       ...(after ? {} : { salesOrderTotal: population.length }),
       nextCursor: page.length === 500 ? keyOf(page[page.length - 1]!) : null,
     });
+  }
+  /* The header's Team list (0663). TEST people, never real staff. */
+  if (path === "/api/operation/work-activity/team-today") {
+    const now = Date.now();
+    const at = (min: number) => new Date(now - min * 60_000).toISOString();
+    const member = (n: string, state: string, idle: number | null) => ({
+      userId: `00000000-0000-4000-9000-${String(n.charCodeAt(0)).padStart(12, "0")}`,
+      name: `TEST · Staff ${n}`, role: "operation", state,
+      lastActiveAt: idle == null ? null : at(idle), idleMinutes: idle,
+    });
+    return json({ asOf: new Date(now).toISOString(), onlineMinutes: 15, members: [
+      member("A", "online", 0), member("B", "off", null), member("C", "away", 34), member("D", "online", 2),
+      member("E", "not_seen", null), member("F", "online", 1), member("G", "online", 5), member("H", "away", 12),
+    ] });
   }
   const body = /\/api\/operation\/orders(\?|$)/.test(url)
     ? { orders: scenario === "empty" ? [] : orders, salesOrderTotal: scenario === "empty" ? 0 : orders.length }

@@ -13,6 +13,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { teamTodayResponseSchema, type TeamMemberState, type TeamTodayResponse } from "@carres/shared";
 import Icon from "@/components/kit/Icon";
+import MIcon from "@/components/carres/MIcon";
 import Popover from "@/components/kit/Popover";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
@@ -75,14 +76,14 @@ export default function TeamButton() {
           title={name}
           aria-expanded={open}
           data-testid="team-button"
-          className="relative grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full border border-c-input-border bg-white text-c-ink hover:bg-c-info-bg"
+          className="relative grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full border border-c-head-line bg-white text-c-ink hover:bg-c-search-bg"
         >
-          <Icon name="people" size={18} />
+          <MIcon name="group" size={20} />
           <span
             className="absolute -right-[3px] -top-[3px] flex items-center gap-[3px] rounded-full border border-c-line bg-white pl-1 pr-[5px] text-label font-semibold leading-[14px] tabular-nums text-c-ink"
             data-testid="team-online-count"
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-c-ok-fg" aria-hidden />
+            <span className="h-1.5 w-1.5 rounded-full bg-c-online" aria-hidden />
             {online}
           </span>
         </button>
@@ -119,7 +120,7 @@ export default function TeamButton() {
                     <span className="relative grid h-7 w-7 shrink-0 place-items-center rounded-full bg-c-ink text-label font-semibold text-white">
                       {initials(p.name)}
                       {p.state === "online" && (
-                        <span className="absolute -bottom-px -right-px h-2.5 w-2.5 rounded-full border-2 border-white bg-c-ok-fg" aria-hidden />
+                        <span className="absolute -bottom-px -right-px h-2.5 w-2.5 rounded-full border-2 border-white bg-c-online" aria-hidden />
                       )}
                     </span>
                     <span className="min-w-0 flex-1 truncate text-body text-c-ink">{p.name}</span>

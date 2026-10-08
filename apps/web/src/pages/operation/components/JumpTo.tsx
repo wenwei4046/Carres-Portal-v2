@@ -43,6 +43,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import MIcon from "@/components/carres/MIcon";
 import Icon from "@/components/kit/Icon";
 import { JUMP_DOC_LABEL, type JumpDocumentResult } from "@carres/shared";
 import Modal from "@/components/kit/Modal";
@@ -316,14 +317,13 @@ export default function JumpTo({ pill = false }: {
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Search everything"
-          title={`Search SO, PO, GRN, INV (${hint})`}
+          title={`Search SO, PO, supplier, customer (${hint})`}
           aria-keyshortcuts="Meta+K Control+K"
           data-testid="jump-to-trigger"
-          className="flex h-[34px] min-w-[140px] max-w-[300px] flex-[0_1_300px] items-center gap-2 rounded-full bg-c-info-bg px-3 text-left text-body text-c-muted hover:brightness-[0.98]"
+          className="flex h-[34px] w-[300px] min-w-[140px] shrink items-center gap-2 rounded-full bg-c-search-bg px-3 text-left text-[13px] text-c-muted"
         >
-          <Icon name="search" size={18} />
-          <span className="min-w-0 flex-1 truncate">Search SO, PO, GRN, INV</span>
-          <span className="hidden shrink-0 text-meta text-c-muted min-[1100px]:inline">{hint}</span>
+          <MIcon name="search" size={18} />
+          <span className="min-w-0 flex-1 truncate">Search SO, PO, supplier, customer</span>
         </button>
       ) : (
         <button

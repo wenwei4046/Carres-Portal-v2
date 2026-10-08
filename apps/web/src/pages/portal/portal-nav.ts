@@ -162,6 +162,8 @@ export interface PortalModule {
   section: PortalSection;
   label: string;
   icon: LucideIcon;
+  /** Material Symbols name — the Operations menu draws these (handoff 2026-10-08). */
+  mIcon?: string;
 }
 
 /** WHERE THE COLLAPSED WAREHOUSE ICON GOES — a NAMED destination, never "the
@@ -183,21 +185,21 @@ export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
    * customer-order parent and its two destinations are `Outright Sales` and
    * `Subscription`. It is a NAVIGATION ruling: no contract, transaction,
    * permission or calculation is merged by the shared parent. */
-  { section: "Sales", label: "Sales Orders", icon: ReceiptText },
-  { section: "Purchasing", label: "Purchasing", icon: ShoppingCart },
-  { section: "Showroom", label: "Showroom", icon: Store },
+  { section: "Sales", label: "Sales Orders", icon: ReceiptText, mIcon: "receipt_long" },
+  { section: "Purchasing", label: "Purchasing", icon: ShoppingCart, mIcon: "shopping_cart" },
+  { section: "Showroom", label: "Showroom", icon: Store, mIcon: "storefront" },
   /* THE FOUR-PAGE MAP (CARD-2026-09-04-delivery-01): Monitor → Delivery
    * Orders → Delivery Order → Edit Delivery. The first two are navigation,
    * so Delivery is a module again; the object and the writer stay doors on
    * cards and rows. This overwrites the 2026-08-21 one-page ruling. */
-  { section: "Delivery", label: "Delivery", icon: Truck },
-  { section: "Warehouse", label: "Warehouse", icon: Warehouse },
-  { section: "Payments", label: "Payments", icon: Banknote },
-  { section: "Customer Care", label: "Service Case", icon: Headset },
+  { section: "Delivery", label: "Delivery", icon: Truck, mIcon: "local_shipping" },
+  { section: "Warehouse", label: "Warehouse", icon: Warehouse, mIcon: "warehouse" },
+  { section: "Payments", label: "Payments", icon: Banknote, mIcon: "payments" },
+  { section: "Customer Care", label: "Service Case", icon: Headset, mIcon: "support_agent" },
   /* Suppliers left Master Data on 2026-08-21 (YH's placement ruling): it is a
      PARTY the business deals with, not a reference list — the same kind of
      thing Customer Care is. The page itself did not move; only its door. */
-  { section: "Suppliers", label: "Suppliers", icon: Factory },
+  { section: "Suppliers", label: "Suppliers", icon: Factory, mIcon: "factory" },
   { section: "Master Data", label: "Master Data", icon: Library },
   /* THE FINANCE MODULES (Chew, 2026-10-03; docs/finance/MASTER.md §4). Each
    * module wears its flagship page's face, the same law as above. Reports
@@ -206,7 +208,7 @@ export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
   { section: "Receivables", label: "Receivables", icon: ArrowDownLeft },
   { section: "Bank & Cards", label: "Bank & Cards", icon: CreditCard },
   { section: "Ledger", label: "Ledger", icon: BookOpen },
-  { section: "Reports", label: "Reports", icon: BarChart3 },
+  { section: "Reports", label: "Reports", icon: BarChart3, mIcon: "bar_chart" },
 ];
 
 export interface PortalNavItem {
@@ -216,6 +218,8 @@ export interface PortalNavItem {
   key: string;
   label: string;
   icon: LucideIcon;
+  /** Material Symbols name for a plain Operations row (handoff 2026-10-08). */
+  mIcon?: string;
   /** operation only: a path-driven section reached by pathname, not `?tab=`. */
   path?: string;
   /** operation only: the `?tab=` value this item links to when it differs from
@@ -301,7 +305,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
     roles: ["operation", "principal"],
     defaultTab: "dashboard",
     items: [
-      { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, section: "Workspace" },
+      { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, mIcon: "dashboard", section: "Workspace" },
       {
         // SO-5 (Loo, 2026-08-09) — the page is Sales Orders and the door says so.
         // ⭐ PRODUCTION CUTOVER (owner, 2026-08-10) — this door is the NEW
@@ -344,12 +348,12 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // *what to do today, with the number, the party and the date already
       // worked out*. The page writes nothing; a row opens the owning module's
       // workspace.
-      { key: "work", label: "Workspace", icon: Home, section: "Workspace" },
+      { key: "work", label: "Workspace", icon: Home, mIcon: "home", section: "Workspace" },
       /* `Workspace → Staff & Duties` — the ONE company-wide duty assignment
        * door (workspace/MASTER.md, LOCKED 2026-09-03; built with the
        * Receiving & GRN card). Modules reference duties; they never keep a
        * second person list. */
-      { key: "issue-tracker", label: "Issue Tracker", icon: ClipboardX, path: "/operation/issues", section: "Issue Tracker" },
+      { key: "issue-tracker", label: "Issue Tracker", icon: ClipboardX, mIcon: "assignment_late", path: "/operation/issues", section: "Issue Tracker" },
       /* 0645 — Chew 2026-10-03 (Finance MASTER §3.3), the ONE shared-menu entry
        * Chew approved: staff Finance or the boss allows ask Finance to pay a bill. Shown
        * only to them (`needs`); the page lives in Finance. */
@@ -587,7 +591,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // door: the 0226 Operation Catalog (SKU Master / Modular / Fabric; the
       // money there is buying cost, isolated from POS selling). The selling
       // Product & Maintenance lives in the Admin area below.
-      { key: "op-catalog", label: "Catalog", icon: BookOpen, section: "Master Data" },
+      { key: "op-catalog", label: "Catalog", icon: BookOpen, mIcon: "menu_book", section: "Master Data" },
       /* REPORTS — the DATA group's own menu item (Layout Standard §2, owner-
        * confirmed 2026-10-08). The three report pages already exist; until the
        * one Reports page is built they hang under it as its pages. */

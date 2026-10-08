@@ -32,7 +32,7 @@ import OperationDashboard from "./OperationDashboard";
 // ROLLBACK is no longer an identifier swap. It is the deployment rollback
 // named in the cutover card — revert + redeploy the previous Pages build.
 import OperationOrdersControl from "./OperationOrdersControl";
-import SalesOrdersRegister from "./SalesOrdersRegister";
+import SalesOrdersOutright from "./so-outright/SalesOrdersOutright";
 import DeliveryOrderPage from "./DeliveryOrderPage";
 import DeliveryOrdersRegister from "./DeliveryOrdersRegister";
 import SalesOrderWorkspace from "./SalesOrderWorkspace";
@@ -372,7 +372,7 @@ export default function OperationApp() {
               onClick={() => setMenuOpen(true)}
               aria-expanded={menuOpen}
               data-testid="phone-menu-button"
-              className="inline-flex h-9 items-center gap-2 rounded-control px-2 text-control text-c-ink hover:bg-c-line"
+              className="inline-flex h-9 items-center gap-2 rounded-control px-2 text-control text-c-ink hover:bg-c-hover"
             >
               <Menu size={18} />
               Menu
@@ -435,7 +435,7 @@ export default function OperationApp() {
               path="procurement/:slug"
               element={<TabbedProcurementShell />}
             />
-            <Route path="orders" element={<SalesOrdersRegister />} />
+            <Route path="orders" element={<SalesOrdersOutright />} />
             {/* The Delivery Orders register + the DO object page (blueprint
                 card 2026-08-16). The register address is a real destination
                 again (CARD-2026-09-04-delivery-01 four-page map) — the
@@ -473,7 +473,7 @@ export default function OperationApp() {
                 lands on the Register. */}
             <Route path="orders/so/new" element={<Navigate to="/operation/orders" replace />} />
             <Route path="orders/so/:orderId" element={<SalesOrderWorkspace />} />
-            <Route path="orders/:stage" element={<SalesOrdersRegister />} />
+            <Route path="orders/:stage" element={<SalesOrdersOutright />} />
             {/* ⭐ THE TEMPORARY DOOR — the old control table, on its own route.
                 `:stage` is carried across unchanged so every hand-typed kanban
                 slug the old page still understands keeps landing on the same

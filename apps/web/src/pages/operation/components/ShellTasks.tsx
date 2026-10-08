@@ -25,7 +25,9 @@ const KEY = "shell-tasks-open";
 
 function readOpen(): boolean {
   try {
-    return localStorage.getItem(KEY) !== "0";
+    /* Open on a wide screen unless the person hid it (v8: Tasks from 1100px). */
+    const stored = localStorage.getItem(KEY);
+    return stored ? stored === "1" : window.innerWidth >= 1100;
   } catch {
     return true;
   }
@@ -129,7 +131,7 @@ export default function ShellTasks() {
           onClick={() => guard(() => setOpen(false))}
           aria-label="Hide tasks"
           title="Hide tasks"
-          className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-c-muted hover:bg-c-line"
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-c-muted hover:bg-c-hover"
         >
           <MIcon name="chevron_right" size={20} />
         </button>

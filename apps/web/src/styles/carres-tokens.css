@@ -1,15 +1,19 @@
-/* Carres design tokens — copy this file into the app and use these variables. Do not use the UI library's default colours, radius or fonts. */
+/* Carres design tokens. Every value copied from Sales Order Outright Layout v8 (line numbers in UI Kit.md). Use only these; never the UI library's defaults. */
 :root{
-  --c-ink:#221F20; --c-body:#3A3F47; --c-secondary:#6B7178; --c-muted:#8A9099; --c-menu:#5C6168;
-  --c-ground:#F5F3F0; --c-card:#FFFFFF; --c-border:#E9EBEE; --c-line:#EEECE8; --c-row-line:#F0F1F3; --c-input-border:#E1E4E8; --c-table-head:#FAFAF9;
+  --c-ink:#221F20; --c-body:#3A3F47; --c-tab:#4A4F57; --c-secondary:#6B7178; --c-muted:#8A9099; --c-menu:#5C6168;
+  --c-ground:#F5F3F0; --c-card:#FFFFFF; --c-hover:#EFECE8;
+  --c-card-border:#E9EBEE; --c-btn-border:#E4E1DC; --c-head-line:#E1E4E8; --c-row-line:#EEF0F2; --c-section-line:#EEECE8; --c-input-border:#E1E4E8; --c-search-bg:#F0F1F3;
   --c-select-bg:#FBE6DB; --c-select-fg:#A33A14;
-  --c-ok-bg:#E7F6EC; --c-ok-fg:#1E7A40; --c-warn-bg:#FBF0D6; --c-warn-fg:#7A5A00; --c-err-bg:#FDECEC; --c-err-fg:#B42318; --c-info-bg:#F0F1F3; --c-info-fg:#3A3F47;
-  --btn-main-bg:#221F20; --btn-main-fg:#FFFFFF;
+  --c-ok-bg:#E7F6EC; --c-ok-fg:#1E7A40; --c-warn-bg:#FBF0D6; --c-warn-fg:#7A5A00; --c-err-bg:#FDECEC; --c-err-fg:#B42318; --c-info-bg:#F0F1F3; --c-info-fg:#3A3F47; --c-hold-bg:#221F20; --c-hold-fg:#FFFFFF; --c-online:#1E8A47;
   --font:'Inter',system-ui,sans-serif;
-  --fs-page:20px; --fs-card:15px; --fs-body:13px; --fs-label:12px; --fs-badge:11px;
-  --fw-page:500; --fw-card:600; --fw-body:400; --fw-strong:600;
-  --radius:8px; --radius-pill:999px;
-  --gap-zone:12px; --pad-card:14px; --row-min:32px; --table-row-min:54px; --btn-h:32px; --btn-h-sm:28px;
-  --menu-w:220px; --menu-w-closed:64px; --tasks-w:320px; --header-h:56px;
+  --fs-page:20px; --fs-crumb:14px; --fs-menu:14px; --fs-card:15px; --fs-body:13px; --fs-label:12px; --fs-small:11px; --fs-group:10px;
+  --radius:8px; --radius-round:999px;
+  --btn-h-header:34px; --btn-h:32px; --btn-pad-header:0 14px; --btn-pad:0 12px; --icon-btn:36px; --icon-btn-header:34px;
+  --input-h:32px; --input-h-row:30px; --search-h:34px;
+  --tab-pad:5px 12px; --switch-pad:4px 10px; --pill-pad:3px 10px; --chip-pad:4px 10px;
+  --table-head-h:40px; --table-row-h:54px; --table-row-pad:6px 14px; --table-gap:10px; --table-foot-h:44px;
+  --card-pad:14px 16px; --menu-item-pad:7px 10px;
+  --menu-w:220px; --menu-w-closed:64px; --tasks-w:320px; --header-h:56px; --drawer-w:400px;
+  --shadow-drawer:0 12px 40px rgba(34,31,32,.18); --shadow-menu:0 8px 28px rgba(22,24,29,.1); --backdrop:rgba(34,31,32,.18);
 }
 body{font-family:var(--font);font-variant-numeric:tabular-nums;background:var(--c-ground);color:var(--c-ink)}

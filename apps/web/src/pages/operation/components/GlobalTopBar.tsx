@@ -29,6 +29,7 @@ import { buildInfo, checkForUpdate, shortCommit, type UpdateCheck } from "@/lib/
 import { TASKS_KEY } from "./rail/TasksPanel";
 import JumpTo from "./JumpTo";
 import TeamButton from "./TeamButton";
+import MIcon from "@/components/carres/MIcon";
 import { useShellHeader } from "./shell-header-context";
 import type { OpsTasksListResponse } from "@carres/shared";
 
@@ -171,7 +172,7 @@ function TopBarIconsBody({ inShell }: { inShell: boolean }) {
   };
 
   return (
-    <div ref={barRef} className={`flex items-center ${inShell ? "gap-2.5" : "gap-1"}`}>
+    <div ref={barRef} className={`flex items-center ${inShell ? "ml-auto min-w-0 gap-3.5" : "gap-1"}`}>
       {/* Jump to… — the ONE global command surface, and the first utility in
           the locked Page Header order. It owns its own overlay and its own ⌘K
           listener, so it needs nothing from this bar's popover state: the
@@ -190,13 +191,13 @@ function TopBarIconsBody({ inShell }: { inShell: boolean }) {
           aria-haspopup="menu"
           aria-expanded={open === "alerts"}
           className={inShell
-            ? "relative grid h-[34px] w-[34px] place-items-center rounded-full border border-c-input-border bg-white text-c-ink hover:bg-c-info-bg"
+            ? "relative grid h-[34px] w-[34px] place-items-center rounded-full border border-c-head-line bg-white text-c-ink hover:bg-c-search-bg"
             : "relative flex items-center justify-center h-10 w-10 min-[768px]:h-8 min-[768px]:w-8 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"}
         >
-          <Bell size={inShell ? 18 : 16} strokeWidth={inShell ? 1.75 : 2} aria-hidden />
+          {inShell ? <MIcon name="notifications" size={20} /> : <Bell size={16} aria-hidden />}
           {alerts.total > 0 && (
             /* Bell = charcoal: it needs action (Layout Standard §4.1). */
-            <span className={`absolute min-w-[16px] h-[16px] px-1 rounded-full text-white text-label font-semibold leading-[16px] text-center tabular-nums ${inShell ? "-top-[3px] -right-[3px] bg-c-ink" : "-top-0.5 -right-0.5 bg-danger"}`}>
+            <span className={`absolute min-w-[16px] h-[16px] px-1 rounded-full text-white text-label font-semibold leading-[16px] text-center tabular-nums ${inShell ? "-top-[3px] -right-[3px] bg-c-ink !font-bold !leading-4 !min-w-0 !h-auto px-[5px]" : "-top-0.5 -right-0.5 bg-danger"}`}>
               {alerts.total > 99 ? "99+" : alerts.total}
             </span>
           )}

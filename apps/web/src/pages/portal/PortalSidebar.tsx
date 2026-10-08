@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type Ref } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Settings } from "lucide-react";
+import MIcon from "@/components/carres/MIcon";
 import { useAuth } from "@/lib/auth";
 import { useNavCapabilities } from "./nav-capabilities";
 import NavBadge from "@/components/NavBadge";
@@ -37,12 +37,10 @@ import {
   type PurchasingSidebarStateV2,
 } from "./purchasing-sidebar";
 
-const COLLAPSE_KEY = "ops-sidebar-collapsed";
-/* Below 1280px the rail starts as icons: the 232px named rail would push the
-   Work area under 768px and hand a 941px window the phone layout — measured on
-   production 2026-09-25 right after item 9 shipped. Names by default apply
-   from 1280px, where they fit beside two Work panels. */
-const NARROW_DESKTOP_QUERY = "(max-width: 1279px)";
+/* The menu OPENS at 220px with words and group labels (handoff 2026-10-08,
+   "Do NOT" 2). Only the person's own « click closes it, and that choice is
+   remembered under a new key so an older auto-collapse never carries over. */
+const COLLAPSE_KEY = "carres-menu-collapsed";
 
 /** The module / plain-row icon (Layout Standard §4.4: 16–20px). */
 const MODULE_ICON = 20;
@@ -125,28 +123,14 @@ export default function PortalSidebar({ drawer = false }: {
 
   const searchTab = new URLSearchParams(location.search).get("tab");
 
-  // Collapse — self-owned, persisted. Icon rail = more room for wide tables.
-  /* Names by default from 1280px (owner review 2026-09-25 item 9); a narrower
-     window starts as icons so Work keeps its two panels. */
+  // Collapse — self-owned, persisted; open unless the person closed it.
   const [storedCollapsed, setCollapsed] = useState<boolean>(() => {
     try {
-      return (
-        localStorage.getItem(COLLAPSE_KEY) === "1" ||
-        window.matchMedia?.(NARROW_DESKTOP_QUERY).matches === true
-      );
+      return localStorage.getItem(COLLAPSE_KEY) === "1";
     } catch {
       return false;
     }
   });
-  useEffect(() => {
-    const media = window.matchMedia?.(NARROW_DESKTOP_QUERY);
-    if (!media) return;
-    const collapseAtNarrowDesktop = (event: MediaQueryListEvent) => {
-      if (event.matches) setCollapsed(true);
-    };
-    media.addEventListener("change", collapseAtNarrowDesktop);
-    return () => media.removeEventListener("change", collapseAtNarrowDesktop);
-  }, []);
   /* A drawer is always the named rail. */
   const collapsed = drawer ? false : storedCollapsed;
   const toggleCollapse = () =>
@@ -488,28 +472,37 @@ export default function PortalSidebar({ drawer = false }: {
     );
   }
 
-  /* ── THE DRAWING — Carres Layout Standard §2 (owner-confirmed template, Jess
-   * 2026-10-08). Items 14px/500 in the menu grey; selected = theme light wash
-   * + theme dark ink at 600; sub-items carry one thin grey tree line on their
-   * left edge; deep Purchasing pages are 13px. Every class below is a token. */
+  /* ── THE DRAWING — Carres UI Kit "Side menu" (owner-confirmed handoff, Jess
+   * 2026-10-08; every number from v8 L20–35). Width 220 open / 64 closed ·
+   * item pad 7 10 · gap 10 · radius 8 · 14/500 menu grey · icon 20 · selected
+   * 600 in the theme select colours · hover #EFECE8 · group label 10/600/.12em.
+   * Sub-items hang 19px in on one thin grey tree line, text 16px from it;
+   * Purchasing's pages are 13px, 28px in. */
   const ITEM =
-    "relative flex w-full items-center gap-2.5 rounded-control px-2.5 py-[7px] text-left text-control font-medium";
-  const ITEM_REST = "text-c-menu hover:bg-c-line";
+    "relative flex shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-left text-[14px] leading-[18px] font-medium";
+  const ITEM_REST = "text-c-menu hover:bg-c-hover";
   const ITEM_ON = "bg-c-select-bg text-c-select-fg font-semibold";
-  /** The thin grey tree line of a sub-item: 19px in, a 1px line, the row
-   *  rounded only on its right. */
-  const SUB = "ml-[19px] rounded-l-none shadow-[inset_1px_0_0_var(--c-line)]";
+  const SUB = "ml-[19px] rounded-l-none shadow-[inset_1px_0_0_var(--c-btn-border)]";
+  const GROUP_LABEL = "text-[10px] font-semibold uppercase leading-[13px] tracking-[0.12em] text-c-muted";
+
+  /** The row icon: the Material Symbol when the menu row has one, else the
+   *  area's own icon (Finance · People · Admin rows). */
+  const rowIcon = (mIcon: string | undefined, Lucide: PortalNavItem["icon"]) =>
+    mIcon ? (
+      <MIcon name={mIcon} size={MODULE_ICON} />
+    ) : (
+      <Lucide size={MODULE_ICON} strokeWidth={1.5} aria-hidden className="shrink-0" />
+    );
 
   /**
    * ONE CHILD PAGE under its module, on the tree line.
    *
    * A `soon` child is deliberately NOT A LINK (`03-page-patterns.md:149` bans
-   * a control that opens nothing). It is a span with no href, out of the tab
-   * order, `aria-disabled`, and it says WHY on screen — `Coming soon`, on its
-   * OWN LINE under the name. It carries no count either, not even zero.
+   * a control that opens nothing): a span out of the tab order, `aria-disabled`,
+   * saying `Coming soon` on its own line. It carries no count.
    */
   function renderChild(group: PortalNavGroup, child: PortalNavItem, deep = false) {
-    const size = deep ? "text-body" : "";
+    const size = deep ? "text-[13px]" : "";
     const pad = deep ? "pl-7" : "pl-4";
     if (child.soon) {
       return (
@@ -522,7 +515,7 @@ export default function PortalSidebar({ drawer = false }: {
           className={`${ITEM} ${SUB} ${pad} ${size} cursor-default select-none flex-col items-start gap-0 text-c-muted`}
         >
           <span className="w-full min-w-0 truncate">{child.label}</span>
-          <span className="text-label font-normal text-c-muted">Coming soon</span>
+          <span className="text-[11px] font-normal leading-[14px] text-c-muted">Coming soon</span>
         </span>
       );
     }
@@ -546,9 +539,9 @@ export default function PortalSidebar({ drawer = false }: {
 
   /**
    * A DRAWER — one named group of Purchasing pages (Buy · Receive · Problems ·
-   * Showroom). THE WORD IS A LABEL RANK, NOT A DESTINATION: small uppercase
-   * grey on the tree line. Each drawer opens and shuts alone; the drawer
-   * holding the current page is FORCED open and says so with `aria-disabled`.
+   * Showroom): a small uppercase word on the tree line, never a destination.
+   * Each opens and shuts alone; the one holding the current page is forced
+   * open and says so with `aria-disabled`.
    */
   function renderPurchasingGroup(
     group: PortalNavGroup,
@@ -564,16 +557,12 @@ export default function PortalSidebar({ drawer = false }: {
           aria-expanded={open}
           aria-disabled={forced || undefined}
           onClick={() => togglePurchasingGroup(block.group.key)}
-          className={`${SUB} flex items-center gap-1.5 rounded-r-control pb-0.5 pl-4 pr-2.5 pt-2.5 text-left text-label font-semibold uppercase tracking-[0.12em] text-c-muted ${
+          className={`${SUB} flex items-center gap-1.5 pb-0.5 pl-4 pr-2.5 pt-2.5 text-left ${GROUP_LABEL} ${
             forced ? "cursor-default" : "hover:text-c-body"
           }`}
         >
           <span className="flex-1 truncate">{block.group.label}</span>
-          <ChevronDown
-            size={12}
-            aria-hidden="true"
-            className={`shrink-0 transition-transform ${open ? "" : "-rotate-90"}`}
-          />
+          <MIcon name={open ? "expand_more" : "chevron_right"} size={16} className="text-c-muted" />
         </button>
         {open && (
           <div data-testid={`nav-group-children-${block.group.key}`} className="flex flex-col gap-0.5">
@@ -598,11 +587,11 @@ export default function PortalSidebar({ drawer = false }: {
         title={item.label}
         className={`${ITEM} ${active ? ITEM_ON : ITEM_REST}`}
       >
-        <item.icon size={MODULE_ICON} strokeWidth={1.75} aria-hidden className="shrink-0" />
+        {rowIcon(item.mIcon, item.icon)}
         <span className="min-w-0 flex-1 truncate">{item.label}</span>
         {item.badge && <NavBadge count={badgeCount[item.badge] ?? 0} label={item.label} />}
         {item.pendingPill && pendingCount > 0 && (
-          <span className="min-w-[16px] rounded-full bg-c-ink px-[7px] py-px text-center text-label font-semibold tabular-nums text-white">
+          <span className="min-w-[16px] rounded-full bg-c-ink px-[7px] py-px text-center text-[11px] font-semibold tabular-nums text-white">
             {pendingCount}
           </span>
         )}
@@ -610,7 +599,7 @@ export default function PortalSidebar({ drawer = false }: {
     );
   }
 
-  /** A MODULE: icon + name + chevron, its pages on the tree line beneath it. */
+  /** A MODULE: icon + name + caret, its pages on the tree line beneath it. */
   function renderModule(group: PortalNavGroup, block: Extract<NavBlock, { kind: "module" }>) {
     const { module, pages } = block;
     const expanded = openSection === module.section;
@@ -633,14 +622,10 @@ export default function PortalSidebar({ drawer = false }: {
           onClick={() => toggleModule(group, block)}
           className={`${ITEM} ${lit ? ITEM_ON : ITEM_REST}`}
         >
-          <module.icon size={MODULE_ICON} strokeWidth={1.75} aria-hidden className="shrink-0" />
+          {rowIcon(module.mIcon, module.icon)}
           <span className="min-w-0 flex-1 truncate">{module.label}</span>
           {sum > 0 && <NavBadge count={sum} label={module.label} />}
-          <ChevronRight
-            size={16}
-            aria-hidden="true"
-            className={`shrink-0 text-c-muted transition-transform ${expanded ? "rotate-90" : ""}`}
-          />
+          <MIcon name={expanded ? "expand_more" : "chevron_right"} size={18} className="text-c-muted" />
         </button>
         {expanded && (
           <div data-testid={`nav-children-${slug}`} className="flex flex-col gap-0.5">
@@ -657,11 +642,7 @@ export default function PortalSidebar({ drawer = false }: {
 
   /** The small uppercase group word — OVERVIEW · SALES LOCATIONS · … */
   const groupHead = (label: string, key: string) => (
-    <span
-      key={`head-${key}`}
-      data-testid={`nav-group-head-${key}`}
-      className="px-2.5 pb-1 pt-3.5 text-label font-semibold uppercase tracking-[0.12em] text-c-muted"
-    >
+    <span key={`head-${key}`} data-testid={`nav-group-head-${key}`} className={`px-2.5 pb-1 pt-3.5 ${GROUP_LABEL}`}>
       {label}
     </span>
   );
@@ -688,14 +669,14 @@ export default function PortalSidebar({ drawer = false }: {
     <aside
       data-testid="portal-sidebar"
       data-collapsed={collapsed || undefined}
-      className="sticky top-0 flex h-screen flex-col gap-0.5 overflow-hidden bg-background px-2.5 py-3 text-c-body"
+      className="sticky top-0 flex h-screen flex-col gap-0.5 overflow-hidden bg-c-ground px-2.5 py-3 text-c-body"
       style={{ width: collapsed ? 64 : 220, transition: "width 0.18s ease" }}
     >
-      {/* Logo row — wordmark open, heart mark closed, the collapse button on
-          the right (Layout Standard §2). The logo files are never recoloured. */}
+      {/* Logo row — wordmark 20px open, heart mark 34px closed, the « / »
+          button at the right (Layout Standard §2). Never recoloured. */}
       <div
-        className={`mb-3 flex min-h-[44px] items-center gap-2.5 ${
-          collapsed ? "flex-col justify-center px-0" : "pl-2.5 pr-1.5"
+        className={`mb-3 flex min-h-[44px] shrink-0 items-center gap-2.5 ${
+          collapsed ? "flex-col justify-center" : "pl-2.5 pr-1.5"
         }`}
       >
         <Link to={homeHref} title="Carres home" className="block shrink-0">
@@ -711,14 +692,14 @@ export default function PortalSidebar({ drawer = false }: {
             onClick={toggleCollapse}
             title={collapsed ? "Expand menu" : "Collapse menu"}
             aria-label={collapsed ? "Expand menu" : "Collapse menu"}
-            className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-c-muted hover:bg-c-line ${collapsed ? "" : "ml-auto"}`}
+            className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[16px] text-c-muted hover:bg-c-hover ${collapsed ? "" : "ml-auto"}`}
           >
-            {collapsed ? <ChevronsRight size={16} aria-hidden /> : <ChevronsLeft size={16} aria-hidden />}
+            {collapsed ? "»" : "«"}
           </button>
         )}
       </div>
 
-      <nav aria-label="Modules" className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-auto [scrollbar-width:thin]">
+      <nav aria-label="Modules" className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden [scrollbar-width:thin]">
         {collapsed
           ? // Icon rail — the active area only. A module's icon opens its
             // landing page; the page you are on keeps its selected wash.
@@ -726,7 +707,8 @@ export default function PortalSidebar({ drawer = false }: {
               const target = block.kind === "plain" ? block.item : moduleLandingPage(block);
               if (!target) return null;
               const label = block.kind === "plain" ? block.item.label : block.module.label;
-              const Icon = block.kind === "plain" ? block.item.icon : block.module.icon;
+              const mIcon = block.kind === "plain" ? block.item.mIcon : block.module.mIcon;
+              const Lucide = block.kind === "plain" ? block.item.icon : block.module.icon;
               const active =
                 block.kind === "plain"
                   ? isItemActive(activeGroup, block.item)
@@ -744,11 +726,11 @@ export default function PortalSidebar({ drawer = false }: {
                   title={label}
                   aria-label={label}
                   aria-current={active ? "page" : undefined}
-                  className={`relative flex h-9 w-full items-center justify-center rounded-control ${
-                    active ? "bg-c-select-bg text-c-select-fg" : "text-c-menu hover:bg-c-line"
+                  className={`relative flex h-[34px] w-full shrink-0 items-center justify-center rounded-lg ${
+                    active ? "bg-c-select-bg text-c-select-fg" : "text-c-menu hover:bg-c-hover"
                   }`}
                 >
-                  <Icon size={20} strokeWidth={1.75} aria-hidden className="shrink-0" />
+                  {rowIcon(mIcon, Lucide)}
                   {dot && <span className="absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full bg-c-select-fg" />}
                 </Link>
               );
@@ -767,12 +749,12 @@ export default function PortalSidebar({ drawer = false }: {
                       data-testid={`nav-area-${group.area}`}
                       aria-expanded={open}
                       onClick={() => toggleGroup(group)}
-                      className={`flex w-full items-center justify-between px-2.5 pb-1 pt-3.5 text-label font-semibold uppercase tracking-[0.12em] ${
-                        group.area === activeArea && !open ? "text-c-select-fg" : "text-c-muted hover:text-c-body"
+                      className={`flex w-full items-center justify-between px-2.5 pb-1 pt-3.5 ${GROUP_LABEL} ${
+                        group.area === activeArea && !open ? "!text-c-select-fg" : "hover:text-c-body"
                       }`}
                     >
                       <span>{group.label}</span>
-                      <ChevronDown size={12} aria-hidden="true" className={`transition-transform ${open ? "" : "-rotate-90"}`} />
+                      <MIcon name={open ? "expand_more" : "chevron_right"} size={16} />
                     </button>
                   )}
                   {open &&
@@ -790,7 +772,7 @@ export default function PortalSidebar({ drawer = false }: {
       </nav>
 
       {/* Bottom — Settings ⚙ and the person (Layout Standard §2). */}
-      <div className="flex shrink-0 flex-col gap-0.5 border-t border-c-line pt-2">
+      <div className="flex shrink-0 flex-col gap-0.5 border-t border-c-row-line pt-2">
         {settingsHref && (
           <Link
             to={settingsHref}
@@ -798,9 +780,11 @@ export default function PortalSidebar({ drawer = false }: {
             title="Settings"
             aria-label={collapsed ? "Settings" : undefined}
             aria-current={onSettings ? "page" : undefined}
-            className={`${ITEM} py-[9px] ${collapsed ? "justify-center px-0" : ""} ${onSettings ? ITEM_ON : ITEM_REST}`}
+            className={`flex items-center gap-2.5 rounded-[10px] px-2.5 py-[9px] text-[14px] ${
+              collapsed ? "justify-center" : ""
+            } ${onSettings ? "bg-c-select-bg font-semibold text-c-select-fg" : "font-medium text-c-ink hover:bg-c-info-bg"}`}
           >
-            <Settings size={MODULE_ICON} strokeWidth={1.75} aria-hidden className="shrink-0" />
+            <MIcon name="settings" size={20} />
             {!collapsed && <span>Settings</span>}
           </Link>
         )}
@@ -808,18 +792,16 @@ export default function PortalSidebar({ drawer = false }: {
           to="/me"
           title={`${displayName} · Profile · Sign out`}
           aria-label={`${displayName} · Profile · Sign out`}
-          className={`flex items-center gap-2.5 rounded-control px-1.5 py-2 hover:bg-c-line ${collapsed ? "justify-center" : ""}`}
+          className={`flex items-center gap-2.5 rounded-lg px-1.5 py-2 hover:bg-c-hover ${collapsed ? "justify-center" : ""}`}
         >
-          <span className="relative grid h-8 w-8 shrink-0 place-items-center rounded-full bg-c-ink text-meta font-semibold text-white">
+          <span className="relative grid h-8 w-8 shrink-0 place-items-center rounded-full bg-c-ink text-[12px] font-semibold text-white">
             {initials}
-            <span className="absolute -bottom-px -right-px h-2.5 w-2.5 rounded-full border-2 border-white bg-c-ok-fg" aria-hidden />
+            <span className="absolute -bottom-px -right-px h-2.5 w-2.5 rounded-full border-2 border-white bg-c-online" aria-hidden />
           </span>
           {!collapsed && (
-            <span className="flex min-w-0 flex-col">
-              <span className="truncate text-body font-semibold text-c-ink">{displayName}</span>
-              <span className="truncate text-label font-normal text-c-muted">
-                {(role && roleWord[role]) ?? ""} · online
-              </span>
+            <span className="flex min-w-0 flex-col leading-[1.25]">
+              <span className="truncate text-[13px] font-semibold text-c-ink">{displayName}</span>
+              <span className="truncate text-[11px] text-c-muted">{(role && roleWord[role]) ?? ""} · online</span>
             </span>
           )}
         </Link>

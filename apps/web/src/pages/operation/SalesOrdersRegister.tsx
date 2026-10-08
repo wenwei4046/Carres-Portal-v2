@@ -350,7 +350,7 @@ function toGridColumn(
  * 2026-08-15: a register selects nothing).
  */
 /** One SKU spelling for a catalog lookup — trimmed, case-folded. */
-function skuKey(sku: string): string {
+export function skuKey(sku: string): string {
   return sku.trim().toUpperCase();
 }
 
@@ -360,7 +360,7 @@ function skuKey(sku: string): string {
  * both read it, so a product is named once and never by its code when the
  * catalog knows it (orders MASTER, 2026-09-21: `Cody` / `Super King`).
  */
-function useCatalogNames(): Map<string, { name: string; variant: string }> {
+export function useCatalogNames(): Map<string, { name: string; variant: string }> {
   const catalogQ = useCatalog();
   return useMemo(() => {
     const modelName = new Map((catalogQ.data?.models ?? []).map((m) => [m.id, m.name]));
@@ -422,7 +422,7 @@ const STOCK_STATUSES = [
   { key: "issue", label: "Received with issue" },
   { key: "unknown", label: "Receipt unconfirmed" },
 ] as const;
-function stockStatusOf(row: RegisterRow, sku?: string): string {
+export function stockStatusOf(row: RegisterRow, sku?: string): string {
   const facts = row.stockFacts;
   const keys = [...new Set((row.o.order_lines ?? []).filter(line => !sku || line.sku === sku).map(line => line.sku))];
   const values = keys.map(key => facts?.[key] ?? "unknown");
@@ -440,7 +440,7 @@ const PAYMENT_STATUSES = [
   { key: "paid", label: "Paid in full" },
   { key: "unknown", label: "Amount unconfirmed" },
 ] as const;
-function paymentStatusOf(row: RegisterRow): string {
+export function paymentStatusOf(row: RegisterRow): string {
   if (row.balance.kind === "settled") return "paid";
   if (row.balance.kind !== "amount" || row.total.kind !== "amount") return "unknown";
   if (row.balance.value <= 0) return "paid";
