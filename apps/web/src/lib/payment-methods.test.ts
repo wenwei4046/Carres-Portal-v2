@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
+import { act, renderHook } from "@testing-library/react";
 import type { PaymentMethodRegistryRow } from "@carres/shared";
 import { requiredPaymentReference } from "@carres/shared";
-import { activeManualMethods, manualMethodSpec } from "./payment-methods";
+import {
+  MERCHANT_STEP,
+  activeManualMethods,
+  machineWord,
+  manualMethodSpec,
+  methodSteps,
+  useMethodChoice,
+} from "./payment-methods";
 
 /**
  * 0551 — THE AGREEMENT TABLE. One row per method key the writer can be handed,
@@ -29,6 +37,10 @@ const TABLE: { key: string; want: string | null }[] = [
   { key: "bank_transfer", want: "Reference number" },
   { key: "credit",        want: "Approval code" },
   { key: "installment",   want: "Approval code" },
+  // 0660 — Merchant and each card machine are card payments.
+  { key: "merchant",        want: "Approval code" },
+  { key: "merchant_pbb",    want: "Approval code" },
+  { key: "merchant_ahapay", want: "Approval code" },
   // A method a manager adds in Settings → Payment. The writer has no branch
   // for it, so the form must not invent one.
   { key: "probe_wallet",  want: null },
@@ -67,16 +79,86 @@ describe("form and database ask for the same reference (0551)", () => {
       .toEqual({ label: "Reference number", required: true });
   });
 
-  it("the governed six fall back with the same requirements when the registry read fails", () => {
+  it("Chew's methods fall back with the same requirements when the registry read fails (0660)", () => {
     const fallback = activeManualMethods(undefined);
-    expect(fallback.map((m) => [m.value, m.reference?.label ?? null, m.reference?.required ?? false]))
+    expect(fallback.map((m) => [m.value, m.label, m.reference?.label ?? null, m.reference?.required ?? false]))
       .toEqual([
-        ["bank", "Reference number", true],
-        ["duitnow_qr", "Reference number", true],
-        ["cheque", "Cheque number", true],
-        ["cash", null, false],
-        ["credit_card", "Approval code", true],
-        ["debit_card", "Approval code", true],
+        ["bank", "Online transfer", "Reference number", true],
+        ["cash", "Cash", null, false],
+        ["cheque", "Cheque", "Cheque number", true],
+        ["merchant_pbb", "Merchant · PBB", "Approval code", true],
+        ["merchant_ghl", "Merchant · GHL", "Approval code", true],
+        ["merchant_hlbb", "Merchant · HLBB", "Approval code", true],
+        ["merchant_mbb", "Merchant · MBB", "Approval code", true],
+        ["merchant_ahapay", "Merchant · AhaPay", "Approval code", true],
       ]);
+  });
+
+  it("a card machine asks for the card terminal receipt, even under a name a manager gave it", () => {
+    expect(manualMethodSpec("merchant_ghl", [row("merchant_ghl", "GHL machine")]).evidence)
+      .toBe("Card terminal receipt");
+    expect(manualMethodSpec("probe_wallet", [row("probe_wallet", "Probe Wallet")]).evidence)
+      .toBe("Payment proof");
+  });
+});
+
+/** The registry as 0660 leaves it, in Chew's order. */
+const RULED: PaymentMethodRegistryRow[] = [
+  row("bank", "Online transfer"),
+  row("cash", "Cash"),
+  row("cheque", "Cheque"),
+  row("merchant_pbb", "Merchant · PBB"),
+  row("merchant_ghl", "Merchant · GHL"),
+  row("merchant_ahapay", "Merchant · AhaPay"),
+];
+
+describe("two steps: the method, then the card machine (0660)", () => {
+  it("offers Merchant once, in the place of the first machine, and the machines second", () => {
+    const steps = methodSteps(activeManualMethods(RULED));
+    expect(steps.first).toEqual([
+      { value: "bank", label: "Online transfer" },
+      { value: "cash", label: "Cash" },
+      { value: "cheque", label: "Cheque" },
+      { value: MERCHANT_STEP, label: "Merchant" },
+    ]);
+    expect(steps.machines.map((m) => [m.value, machineWord(m.label)])).toEqual([
+      ["merchant_pbb", "PBB"], ["merchant_ghl", "GHL"], ["merchant_ahapay", "AhaPay"],
+    ]);
+  });
+
+  it("with no Active machine there is no Merchant to choose", () => {
+    const steps = methodSteps(activeManualMethods([row("bank", "Online transfer"), row("cash", "Cash")]));
+    expect(steps.first.map((s) => s.value)).toEqual(["bank", "cash"]);
+    expect(steps.machines).toEqual([]);
+  });
+
+  it("a machine's word drops only the Merchant start", () => {
+    expect(machineWord("Merchant · HLBB")).toBe("HLBB");
+    expect(machineWord("GHL machine")).toBe("GHL machine");
+  });
+
+  it("records the first step itself, or the chosen machine; Merchant alone records nothing", () => {
+    const methods = activeManualMethods(RULED);
+    const { result } = renderHook(() => useMethodChoice(methods));
+    expect(result.current.method).toBe("bank");
+    act(() => result.current.setFirst(MERCHANT_STEP));
+    expect(result.current.first).toBe(MERCHANT_STEP);
+    expect(result.current.method).toBeNull();
+    act(() => result.current.setMachine("merchant_ghl"));
+    expect(result.current.method).toBe("merchant_ghl");
+    act(() => result.current.setFirst("cash"));
+    expect(result.current.method).toBe("cash");
+    // Back to Merchant: the machine chosen before is still chosen.
+    act(() => result.current.setFirst(MERCHANT_STEP));
+    expect(result.current.method).toBe("merchant_ghl");
+  });
+
+  it("a first step switched off since the form opened falls back to the first one offered", () => {
+    const { result, rerender } = renderHook(({ rows }) => useMethodChoice(activeManualMethods(rows)),
+      { initialProps: { rows: RULED } });
+    act(() => result.current.setFirst("cheque"));
+    rerender({ rows: RULED.filter((r) => r.method !== "cheque") });
+    expect(result.current.first).toBe("bank");
+    expect(result.current.method).toBe("bank");
   });
 });

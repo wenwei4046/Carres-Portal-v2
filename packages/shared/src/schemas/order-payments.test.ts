@@ -126,6 +126,12 @@ describe("requiredPaymentReference (§16, mirrors 0535 + 0551)", () => {
       expect(requiredPaymentReference(k)).toBe("Approval code");
     }
   });
+  it("0660 — Merchant and every card machine carry the approval code", () => {
+    for (const k of ["merchant", "Merchant", "merchant_pbb", "merchant_ahapay", "Merchant PBB"]) {
+      expect(requiredPaymentReference(k)).toBe("Approval code");
+    }
+    expect(requiredPaymentReference("merchantx")).toBeNull();
+  });
   it("0551 — a bank transfer and a DuitNow QR payment carry a reference number", () => {
     for (const k of ["bank", "bank_transfer", "Bank Transfer", "duitnow_qr", "duitnow-qr"]) {
       expect(requiredPaymentReference(k)).toBe("Reference number");

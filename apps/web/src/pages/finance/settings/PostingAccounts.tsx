@@ -211,7 +211,9 @@ export default function PostingAccounts() {
           groupBanner={false}
           allowColumnGrouping={false}
           fixedGroups={{ groups: POSTING_GROUPS.map((g) => ({ key: g.key, label: g.label })), groupOf: (r) => r.group, revealMatches: true }}
-          isLoading={!query.isSuccess}
+          // The Customer money rows come from the payment methods; wait for them
+          // too, so the group never appears a moment after the others.
+          isLoading={!query.isSuccess || registry.isLoading}
           onRowClick={(r) => {
             if (r.change) setOpen(r);
           }}

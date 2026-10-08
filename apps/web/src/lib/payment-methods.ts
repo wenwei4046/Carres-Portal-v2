@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { PaymentMethodRegistryRow, PaymentMoneyAccount } from "@carres/shared";
 import { requiredPaymentReference } from "@carres/shared";
@@ -57,9 +57,9 @@ function referenceField(key: string): { label: string; required: boolean } {
 /** The §16 evidence words for the six governed methods. A method a manager
  *  adds asks for `Payment proof` and, unless the writer names a reference for
  *  its key, an optional Reference. Cash alone shows no reference box at all —
- *  there is no number on a banknote. */
+ *  there is no number on a banknote. 0660 names `bank` Online transfer. */
 const GOVERNED: ManualMethodSpec[] = [
-  { value: "bank", label: "Bank transfer", evidence: "Transfer slip",
+  { value: "bank", label: "Online transfer", evidence: "Transfer slip",
     reference: referenceField("bank") },
   { value: "duitnow_qr", label: "DuitNow QR", evidence: "Payment screenshot",
     reference: referenceField("duitnow_qr") },
@@ -72,9 +72,40 @@ const GOVERNED: ManualMethodSpec[] = [
   { value: "debit_card", label: "Debit card", evidence: "Card terminal receipt",
     reference: referenceField("debit_card") },
 ];
-const GOVERNED_BY_KEY = new Map(GOVERNED.map((m) => [m.value, m]));
 
-export const GOVERNED_MANUAL_METHODS: readonly ManualMethodSpec[] = GOVERNED;
+/**
+ * 0660 — Chew 2026-10-07 (Finance MASTER §0): a customer pays by Online
+ * transfer, Cash, Cheque or Merchant, and Merchant then asks which card
+ * machine took the card. Each machine is its own method, `merchant_<machine>`,
+ * whose money lands in that machine's clearing account; a card machine is a
+ * card, so it asks for the terminal receipt and the approval code.
+ */
+export const MERCHANT_STEP = "merchant";
+const CARD_EVIDENCE = "Card terminal receipt";
+
+/** Whether a method key is one card machine (`merchant_pbb` …). */
+export function isMachineMethod(key: string | null | undefined): boolean {
+  return (key ?? "").startsWith("merchant_");
+}
+
+const MACHINES: ManualMethodSpec[] = ([
+  ["merchant_pbb", "Merchant · PBB"],
+  ["merchant_ghl", "Merchant · GHL"],
+  ["merchant_hlbb", "Merchant · HLBB"],
+  ["merchant_mbb", "Merchant · MBB"],
+  ["merchant_ahapay", "Merchant · AhaPay"],
+] as const).map(([value, label]) => ({ value, label, evidence: CARD_EVIDENCE, reference: referenceField(value) }));
+
+const GOVERNED_BY_KEY = new Map([...GOVERNED, ...MACHINES].map((m) => [m.value, m]));
+
+/** What a form offers while the list loads, if the read fails, or if every
+ *  row is off: the methods Chew ruled (0660), in his order. */
+const FALLBACK: ManualMethodSpec[] = [
+  ...(["bank", "cash", "cheque"] as const).map((k) => GOVERNED_BY_KEY.get(k)!),
+  ...MACHINES,
+];
+
+export const GOVERNED_MANUAL_METHODS: readonly ManualMethodSpec[] = FALLBACK;
 
 /** Names of the words the system records itself — never a manual choice, but
  *  they appear on receipts, so a receipt row can still be read. */
@@ -88,15 +119,63 @@ function specFor(row: PaymentMethodRegistryRow): ManualMethodSpec {
   const governed = GOVERNED_BY_KEY.get(row.method);
   return governed
     ? { ...governed, label: row.label }
-    : { value: row.method, label: row.label, evidence: "Payment proof",
+    : { value: row.method, label: row.label,
+        evidence: isMachineMethod(row.method) ? CARD_EVIDENCE : "Payment proof",
         reference: referenceField(row.method) };
 }
 
 /** The Active methods a form may offer, in the manager's order. Falls back to
- *  the governed six while loading, on a failed read, or if every row is off. */
+ *  Chew's list (0660) while loading, on a failed read, or if every row is off. */
 export function activeManualMethods(rows: PaymentMethodRegistryRow[] | undefined): ManualMethodSpec[] {
   const active = (rows ?? []).filter((r) => r.active).map(specFor);
-  return active.length ? active : GOVERNED;
+  return active.length ? active : FALLBACK;
+}
+
+/** A card machine's own word on the second picker: `Merchant · PBB` → `PBB`.
+ *  A name a manager gave without the `Merchant · ` start reads whole. */
+export function machineWord(label: string): string {
+  const m = /^merchant · (.+)$/i.exec(label.trim());
+  return m ? m[1] : label;
+}
+
+/** The two pickers of a form that records money (0660): the first offers
+ *  every method that is not a card machine, with `Merchant` in the place of
+ *  the first machine; the second offers the machines. With no Active machine
+ *  there is no `Merchant` and no second picker. */
+export interface MethodSteps {
+  first: { value: string; label: string }[];
+  machines: ManualMethodSpec[];
+}
+
+export function methodSteps(methods: readonly ManualMethodSpec[]): MethodSteps {
+  const first: MethodSteps["first"] = [];
+  const machines: ManualMethodSpec[] = [];
+  for (const m of methods) {
+    if (!isMachineMethod(m.value)) {
+      first.push({ value: m.value, label: m.label });
+      continue;
+    }
+    if (machines.length === 0) first.push({ value: MERCHANT_STEP, label: "Merchant" });
+    machines.push(m);
+  }
+  return { first, machines };
+}
+
+/** One form's two-step choice. `method` is the key the payment records: the
+ *  first step itself, or the chosen machine once Merchant has one (null until
+ *  then, so the form cannot save). A method switched off since the form
+ *  opened falls back to the first one offered, so the picker and the posted
+ *  value never disagree. */
+export function useMethodChoice(methods: readonly ManualMethodSpec[], initial = "bank") {
+  const steps = useMemo(() => methodSteps(methods), [methods]);
+  const [chosenFirst, setFirst] = useState(initial);
+  const [chosenMachine, setMachine] = useState("");
+  const first = steps.first.some((s) => s.value === chosenFirst)
+    ? chosenFirst : steps.first[0]?.value ?? chosenFirst;
+  const machine = first === MERCHANT_STEP && steps.machines.some((m) => m.value === chosenMachine)
+    ? chosenMachine : "";
+  const method: string | null = first === MERCHANT_STEP ? machine || null : first;
+  return { steps, first, setFirst, machine, setMachine, method };
 }
 
 /** The spec for a key, whether or not it is Active today. */

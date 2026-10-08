@@ -110,7 +110,13 @@ import {
   type operationOrderDetailLine,
   type operationOrderDetailPo,
 } from "@/lib/queries";
-import { methodLabel, useManualMethods } from "@/lib/payment-methods";
+import {
+  MERCHANT_STEP,
+  machineWord,
+  methodLabel,
+  useManualMethods,
+  useMethodChoice,
+} from "@/lib/payment-methods";
 import { cjkClassName } from "@/lib/cjk";
 import { appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
@@ -5597,12 +5603,11 @@ function PaymentForm({
   const [amount, setAmount] = useState("");
   const [paidOn, setPaidOn] = useState(appTodayIso());
   // 0476 — the methods are the Settings → Payment list; a method switched off
-  // there disappears here. Bank transfer is the default when it is Active.
+  // there disappears here. Online transfer is the default when it is Active.
+  // 0660 (Chew 2026-10-07): Online transfer · Cash · Cheque · Merchant first;
+  // Merchant then asks which card machine, and the machine is the method.
   const { methods } = useManualMethods();
-  const [chosenMethod, setMethod] = useState<string>("bank");
-  const method = methods.some((m) => m.value === chosenMethod)
-    ? chosenMethod
-    : methods[0].value;
+  const { steps, first, setFirst: setMethod, machine, setMachine, method } = useMethodChoice(methods);
   const [bank, setBank] = useState("");
   const [refNo, setRefNo] = useState("");
   const [note, setNote] = useState("");
@@ -5614,9 +5619,9 @@ function PaymentForm({
   });
   const amt = Number(amount);
   // §16 (0535) — a cheque needs its number, a card its approval code.
-  const refWord = requiredPaymentReference(method);
+  const refWord = requiredPaymentReference(method ?? first);
   const amtOk = amount.trim() !== "" && Number.isFinite(amt) && amt > 0
-    && (!refWord || refNo.trim() !== "");
+    && method !== null && (!refWord || refNo.trim() !== "");
   const cell = `mt-0.5 ${fieldCls}`; // THE one input recipe (components/Field)
 
   const acceptFile = (f: File | undefined | null) => {
@@ -5633,7 +5638,7 @@ function PaymentForm({
   };
 
   async function save() {
-    if (!amtOk || saving || record.isPending) return;
+    if (!amtOk || method === null || saving || record.isPending) return;
     setSaving(true);
     // 1. Upload the customer's proof first. A failed upload blocks the save
     //    so a slip is never silently dropped; remove the file to record
@@ -5708,19 +5713,36 @@ function PaymentForm({
         <label className="block">
           <span className="t4-label">Method</span>
           <select
-            value={method}
+            value={first}
             onChange={(e) => setMethod(e.target.value)}
             aria-label="Payment method"
             className={cell}
           >
-            {methods.map((m) => (
+            {steps.first.map((m) => (
               <option key={m.value} value={m.value}>
                 {m.label}
               </option>
             ))}
           </select>
         </label>
-        {method === "bank" ? (
+        {first === MERCHANT_STEP ? (
+          <label className="block">
+            <span className="t4-label">Card machine</span>
+            <select
+              value={machine}
+              onChange={(e) => setMachine(e.target.value)}
+              aria-label="Card machine"
+              className={cell}
+            >
+              <option value="">Card machine</option>
+              {steps.machines.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {machineWord(m.label)}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : method === "bank" ? (
           <label className="block">
             <span className="t4-label">Bank</span>
             <select
@@ -5751,14 +5773,19 @@ function PaymentForm({
           </label>
         )}
       </div>
-      {method === "bank" && (
+      {(method === "bank" || first === MERCHANT_STEP) && (
         <label className="block">
-          <span className="t4-label">Ref no (optional)</span>
+          {/* 0660 — under Merchant this is the card's approval code. */}
+          <span className="t4-label">
+            {first === MERCHANT_STEP ? refWord : "Ref no (optional)"}
+          </span>
           <input
             type="text"
             value={refNo}
             onChange={(e) => setRefNo(e.target.value)}
-            placeholder="e.g. transaction / cheque no"
+            placeholder={
+              first === MERCHANT_STEP ? "e.g. transaction no" : "e.g. transaction / cheque no"
+            }
             aria-label="Payment reference number"
             className={cell}
           />
