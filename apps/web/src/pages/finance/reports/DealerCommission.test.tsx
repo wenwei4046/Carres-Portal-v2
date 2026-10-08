@@ -4,18 +4,23 @@
  * engine's `N of M rows` only exist on that path, so asserting them is what
  * fails if the page goes back to hand-rolled chrome.
  */
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { DcSource } from "@carres/shared/dealer-commission";
+import type { DcRulesRead, DcSource } from "@carres/shared/dealer-commission";
 import DealerCommission from "./DealerCommission";
 
-const net = vi.hoisted(() => ({ routes: {} as Record<string, unknown>, calls: [] as string[] }));
+const net = vi.hoisted(() => ({
+  routes: {} as Record<string, unknown>,
+  calls: [] as string[],
+  bodies: {} as Record<string, unknown>,
+}));
 vi.mock("@/lib/api", () => ({
   apiFetch: vi.fn(async (path: string, init?: RequestInit) => {
     const key = `${init?.method ?? "GET"} ${path}`;
     net.calls.push(key);
+    if (init?.body) net.bodies[key] = JSON.parse(String(init.body));
     if (key in net.routes) return net.routes[key];
     throw new Error(`unmocked ${key}`);
   }),
@@ -25,24 +30,49 @@ vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () =>
 const now = new Date();
 const MONTH = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-/** RM250 collected on a RM1,000 order at the 20% default rate: RM50 earned, RM150 still to collect. */
+/** RM250 collected on a RM1,000 order at a 20% line rate: RM50 earned, RM150 still to collect. */
 const SOURCE: DcSource = {
-  settings: { defaultRate: 20 },
+  settings: { defaultRate: 25 },
   rates: [],
   quotas: [],
   models: [{ id: "m1", name: "Sofa" }],
   dealers: [{ id: "d1", name: "Ace Furniture" }],
   outlets: [{ id: "o1", name: "Ace KL", dealerId: "d1" }],
   orders: [{
-    orderId: "ord1", so: 2054, dealerId: "d1", outletId: "o1", addons: 0,
-    lines: [{ modelId: "m1", category: "furniture", value: 1000 }],
+    orderId: "ord1", so: 2054, dealerId: "d1", outletId: "o1", addons: 0, orderedOn: `${MONTH}-02`,
+    lines: [{ modelId: "m1", category: "sofa", value: 1000, rate: 20 }],
     payments: [{ paidOn: `${MONTH}-05`, amount: 250 }],
   }],
 };
 
+const RULES_URL = "/api/finance/dealer-commission/rules";
+const rule = (over: Partial<DcRulesRead["rules"][number]>): DcRulesRead["rules"][number] => ({
+  id: "r", kind: "standard", dealerId: null, dealerName: null, modelId: null, modelName: null,
+  category: null, rate: 25, isOn: null, startsOn: null, memo: null,
+  createdAt: "2026-10-08T01:00:00Z", createdBy: null, state: "in_use", ...over,
+});
+const RULES: DcRulesRead = {
+  today: "2026-10-08",
+  rules: [
+    rule({ id: "r-std", memo: "The rate before rates had a start date" }),
+    rule({ id: "r-std2", rate: 22, startsOn: "2026-12-01", memo: "Memo 1 Dec", createdBy: "Chew", state: "later" }),
+    rule({ id: "r-prod", kind: "product", modelId: "m1", modelName: "Sofa One", rate: 20, startsOn: "2026-10-01" }),
+    rule({ id: "r-acc", kind: "category", category: "accessory", rate: null, isOn: true, memo: "Accessories earn commission" }),
+  ],
+  dealers: [{ id: "d1", name: "Ace Furniture" }],
+  models: [{ id: "m1", name: "Sofa One", category: "sofa" }, { id: "m2", name: "Mattress One", category: "mattress" }],
+  categories: ["mattress", "bedframe", "sofa", "accessory"],
+};
+
 beforeEach(() => {
-  net.routes = { [`GET /api/finance/dealer-commission?month=${MONTH}`]: SOURCE };
+  net.routes = {
+    [`GET /api/finance/dealer-commission?month=${MONTH}`]: SOURCE,
+    [`GET ${RULES_URL}`]: RULES,
+    [`POST ${RULES_URL}`]: { id: "new" },
+    [`DELETE ${RULES_URL}/r-prod`]: { id: "r-prod", already: false },
+  };
   net.calls = [];
+  net.bodies = {};
   localStorage.clear();
 });
 
@@ -52,6 +82,13 @@ function renderAt(url = "/") {
       <MemoryRouter initialEntries={[url]}><DealerCommission /></MemoryRouter>
     </QueryClientProvider>,
   );
+}
+
+/** The kit Select: open with Enter, pick by the option's words. A required
+ *  field's name ends in its asterisk. */
+function pick(name: string, option: string) {
+  fireEvent.keyDown(screen.getByRole("combobox", { name: new RegExp(`^${name}`) }), { key: "Enter" });
+  fireEvent.click(screen.getByRole("option", { name: option }));
 }
 
 describe("Dealer commission", () => {
@@ -68,22 +105,23 @@ describe("Dealer commission", () => {
     // The scope sits in the register's toolbar, so it is inside the grid frame.
     expect(screen.getByTestId("grid-footer")).toBeTruthy();
     expect(screen.getByText("Showroom")).toBeTruthy();
-    // The settings live on their own views: no settings card under the report.
+    // The settings live on their own views: none of them under the report.
     expect(screen.getByTestId("dealer-commission-switch")).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "Commission rates" })).toBeNull();
+    expect(screen.queryByTestId("commission-rates-page")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Renovation quotas" })).toBeNull();
   });
 
-  it("shows one settings card per view", async () => {
+  it("shows one settings view at a time", async () => {
     renderAt("/?view=rates");
-    await screen.findByRole("heading", { name: "Commission rates" });
+    await screen.findByTestId("commission-rates-page");
     expect(screen.queryByRole("heading", { name: "Renovation quotas" })).toBeNull();
     expect(screen.queryByTestId("dealer-commission-summary")).toBeNull();
+    expect(screen.getByTestId("dealer-commission-switch")).toBeTruthy();
     cleanup();
 
     renderAt("/?view=quotas");
     await screen.findByRole("heading", { name: "Renovation quotas" });
-    expect(screen.queryByRole("heading", { name: "Commission rates" })).toBeNull();
+    expect(screen.queryByTestId("commission-rates-page")).toBeNull();
   });
 
   it("opens the quota form on the quotas view for the dealer whose Quota left reads No quota", async () => {
@@ -98,5 +136,86 @@ describe("Dealer commission", () => {
     // The page moved to the quotas view underneath the form (hidden while the form is open).
     expect(screen.getByRole("heading", { name: "Renovation quotas", hidden: true })).toBeTruthy();
     expect(screen.queryByTestId("dealer-commission-summary")).toBeNull();
+  });
+});
+
+describe("Commission rates (0661)", () => {
+  it("lists every rate from its day, in five groups, the empty ones named", async () => {
+    renderAt("/?view=rates");
+    const page = await screen.findByTestId("commission-rates-page");
+    await within(page).findByText("Sofa One");
+    for (const g of ["Standard rate", "Dealer rates", "Product rates", "Promotion items", "Kinds of product"]) {
+      expect(within(page).getByText(g)).toBeTruthy();
+    }
+    expect(within(page).getByText("No dealer has its own rate")).toBeTruthy();
+    expect(within(page).getByText("No promotion item")).toBeTruthy();
+    // The standard rate from the start, and the one that starts later.
+    expect(within(page).getAllByText("Every product")).toHaveLength(2);
+    expect(within(page).getAllByText("From the start").length).toBeGreaterThan(0);
+    expect(within(page).getByText("22%")).toBeTruthy();
+    expect(within(page).getByText("Starts later")).toBeTruthy();
+    // A switch reads as words, a kind by its name.
+    expect(within(page).getByText("Accessory")).toBeTruthy();
+    expect(within(page).getByText("Earns commission")).toBeTruthy();
+    expect(screen.getByTestId("commission-rates-summary")).toHaveTextContent(
+      "4 of 4 rows · An order takes the rates in force on its order day.",
+    );
+  });
+
+  it("adds a product's rate from a day; Save names what is missing until then", async () => {
+    renderAt("/?view=rates");
+    await screen.findByText("Sofa One");
+    fireEvent.click(screen.getByRole("button", { name: "Add a rate" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: "Save: pick what the rate is for" })).toBeDisabled();
+
+    pick("For", "A product's rate");
+    expect(within(dialog).getByRole("button", { name: "Save: pick the product" })).toBeDisabled();
+    pick("Product", "Mattress One · Mattress");
+    expect(within(dialog).getByRole("button", { name: "Save: type the rate" })).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText("Rate (%)", { exact: false }), { target: { value: "20" } });
+    expect(within(dialog).getByRole("button", { name: "Save: pick the day it starts" })).toBeDisabled();
+    fireEvent.click(within(dialog).getByRole("button", { name: /Starts on/ }));
+    fireEvent.click(screen.getByText("15"));
+    fireEvent.change(within(dialog).getByLabelText("Memo", { exact: false }), { target: { value: "Memo 22 Jul §12" } });
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(net.calls).toContain(`POST ${RULES_URL}`));
+    expect(net.bodies[`POST ${RULES_URL}`]).toEqual({
+      kind: "product", modelId: "m2", rate: 20, startsOn: `${MONTH}-15`, memo: "Memo 22 Jul §12",
+    });
+  });
+
+  it("a promotion item takes its points off, five unless changed", async () => {
+    renderAt("/?view=rates");
+    await screen.findByText("Sofa One");
+    fireEvent.click(screen.getByRole("button", { name: "Add a rate" }));
+    const dialog = await screen.findByRole("dialog");
+    pick("For", "A promotion item");
+    pick("Product", "Sofa One · Sofa");
+    expect(within(dialog).getByLabelText("Points off", { exact: false })).toHaveValue(5);
+    fireEvent.click(within(dialog).getByRole("button", { name: /Starts on/ }));
+    fireEvent.click(screen.getByText("15"));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(net.calls).toContain(`POST ${RULES_URL}`));
+    expect(net.bodies[`POST ${RULES_URL}`]).toEqual({
+      kind: "promotion", modelId: "m1", isOn: true, points: 5, startsOn: `${MONTH}-15`, memo: null,
+    });
+  });
+
+  it("removes a rate added from a day; a rate from the start stays", async () => {
+    renderAt("/?view=rates");
+    await screen.findByText("Sofa One");
+    fireEvent.click(screen.getByText("Sofa One"));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("Removing it gives the orders from");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(net.calls).toContain(`DELETE ${RULES_URL}/r-prod`));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.click(screen.getByText("Accessory"));
+    const start = await screen.findByRole("dialog");
+    expect(start).toHaveTextContent("A rate from the start stays. Add a new one from a day instead.");
+    expect(within(start).queryByRole("button", { name: "Remove" })).toBeNull();
   });
 });
