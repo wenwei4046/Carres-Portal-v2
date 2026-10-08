@@ -25,17 +25,18 @@ export type Appearance = { theme: ThemeKey; focus: FocusKey };
 
 export const DEFAULT_APPEARANCE: Appearance = { theme: "carres", focus: "soft" };
 
-/** The picker's words and identity dots — UI Kit §9 table. */
-export const THEMES: { key: ThemeKey; name: string; group: "Brand" | "Cool" | "Warm"; dot: string }[] = [
-  { key: "carres", name: "Carres", group: "Brand", dot: "#D64F20" },
-  { key: "slate", name: "Cool Slate", group: "Cool", dot: "#64748B" },
-  { key: "blue", name: "Blue", group: "Cool", dot: "#3B6FE0" },
-  { key: "teal", name: "Teal", group: "Cool", dot: "#14857C" },
-  { key: "violet", name: "Violet", group: "Cool", dot: "#6E58C4" },
-  { key: "honey", name: "Warm Honey", group: "Warm", dot: "#D9A21B" },
-  { key: "olive", name: "Olive", group: "Warm", dot: "#6E8A3E" },
-  { key: "rose", name: "Rose", group: "Warm", dot: "#C2546A" },
-  { key: "latte", name: "Latte", group: "Warm", dot: "#8B6B4A" },
+/** The picker's words. Each theme's identity dot is the CSS variable
+ *  `--theme-dot-{key}` in `index.css` (UI Kit §9 table). */
+export const THEMES: { key: ThemeKey; name: string; group: "Brand" | "Cool" | "Warm" }[] = [
+  { key: "carres", name: "Carres", group: "Brand" },
+  { key: "slate", name: "Cool Slate", group: "Cool" },
+  { key: "blue", name: "Blue", group: "Cool" },
+  { key: "teal", name: "Teal", group: "Cool" },
+  { key: "violet", name: "Violet", group: "Cool" },
+  { key: "honey", name: "Warm Honey", group: "Warm" },
+  { key: "olive", name: "Olive", group: "Warm" },
+  { key: "rose", name: "Rose", group: "Warm" },
+  { key: "latte", name: "Latte", group: "Warm" },
 ];
 export const THEME_GROUPS: { group: "Brand" | "Cool" | "Warm"; sub: string }[] = [
   { group: "Brand", sub: "Recommended" },

@@ -79,7 +79,7 @@ export default function AppearanceSettings() {
                           on ? "border-c-ink ring-1 ring-c-ink" : "border-c-input-border"
                         }`}
                       >
-                        <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: t.dot }} aria-hidden />
+                        <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: `var(--theme-dot-${t.key})` }} aria-hidden />
                         {t.name}
                       </button>
                     );
@@ -97,8 +97,6 @@ export default function AppearanceSettings() {
           <div className="flex flex-wrap gap-2.5" role="radiogroup" aria-label="Focus outline">
             {FOCUS_CHOICES.map((f) => {
               const on = current.focus === f.key;
-              const sample =
-                f.key === "soft" ? "1px solid #C9CED6" : f.key === "theme" ? "1.5px solid var(--c-select-fg)" : "2px solid #221F20";
               return (
                 <button
                   key={f.key}
@@ -106,11 +104,14 @@ export default function AppearanceSettings() {
                   role="radio"
                   aria-checked={on}
                   data-testid={`focus-${f.key}`}
+                  /* The sample IS the token rule: this card carries the choice's
+                     own data-focus, so its outline is that choice's --c-focus. */
+                  data-focus={f.key}
                   onClick={() => void choose({ ...current, focus: f.key })}
                   className={`flex min-w-[150px] flex-col gap-0.5 rounded-lg border bg-white px-3 py-2 text-left ${
                     on ? "border-c-ink" : "border-c-footer-line"
                   }`}
-                  style={{ outline: sample, outlineOffset: -2 }}
+                  style={{ outline: "var(--c-focus)", outlineOffset: -2 }}
                 >
                   <span className="text-[12px] font-semibold text-c-ink">{f.name}</span>
                   <span className="text-[12px] text-c-secondary">{f.note}</span>

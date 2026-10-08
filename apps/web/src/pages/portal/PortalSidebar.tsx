@@ -475,7 +475,7 @@ export default function PortalSidebar({ drawer = false }: {
   /* ── THE DRAWING — Carres UI Kit "Side menu" (owner-confirmed handoff, Jess
    * 2026-10-08; every number from v8 L20–35). Width 220 open / 64 closed ·
    * item pad 7 10 · gap 10 · radius 8 · 14/500 menu grey · icon 20 · selected
-   * 600 in the theme select colours · hover #EFECE8 · group label 10/600/.12em.
+   * 600 in the theme select colours · hover c-hover · group label 10/600/.12em.
    * Sub-items hang 19px in on one thin grey tree line, text 16px from it;
    * Purchasing's pages are 13px, 28px in. */
   const ITEM =

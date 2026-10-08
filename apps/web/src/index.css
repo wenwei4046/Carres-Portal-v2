@@ -5,6 +5,14 @@
 /* Material Symbols Rounded, outline, weight 300 (handoff Design tokens). */
 @import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&display=block");
 
+/* Appearance picker: each theme's identity dot (UI Kit §9 table). Only the
+   picker reads these; the theme itself lives in carres-tokens.css. */
+:root {
+  --theme-dot-carres: #d64f20; --theme-dot-slate: #64748b; --theme-dot-blue: #3b6fe0;
+  --theme-dot-teal: #14857c; --theme-dot-violet: #6e58c4; --theme-dot-honey: #d9a21b;
+  --theme-dot-olive: #6e8a3e; --theme-dot-rose: #c2546a; --theme-dot-latte: #8b6b4a;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

@@ -22,7 +22,7 @@ export type Cell = {
   subTone?: "muted" | "ok" | "warn";
   /** 400 · 500 · 600. */
   fw?: 400 | 500 | 600;
-  /** Text colour: ink (default body grey `#4A4F57` → c-tab), muted, warn. */
+  /** Text colour: ink (default: the unselected-tab grey, c-tab), muted, warn. */
   fg?: "ink" | "muted" | "warn";
   pill?: boolean;
   tone?: CellTone;
