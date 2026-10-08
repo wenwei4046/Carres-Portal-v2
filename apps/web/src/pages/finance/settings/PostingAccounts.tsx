@@ -199,21 +199,25 @@ export default function PostingAccounts() {
   if (query.isError) return <LoadFailed what="The posting accounts" onRetry={() => void query.refetch()} />;
   return (
     <ListPageShell register>
-      <DataGrid
-        rows={rows}
-        columns={columns}
-        rowKey={(r) => r.id}
-        storageKey="carres.finance.posting-accounts.v1"
-        appearance="reference"
-        groupBanner={false}
-        allowColumnGrouping={false}
-        fixedGroups={{ groups: POSTING_GROUPS.map((g) => ({ key: g.key, label: g.label })), groupOf: (r) => r.group, revealMatches: true }}
-        isLoading={!query.isSuccess}
-        onRowClick={(r) => {
-          if (r.change) setOpen(r);
-        }}
-      />
-      <PostingChanges changes={query.data?.changes ?? []} />
+      {/* One scrolling area: the postings take the rows they have, and a long
+          list of changes never squeezes them out of sight. */}
+      <div className="min-h-0 flex-1 overflow-y-auto" data-testid="posting-accounts-page">
+        <DataGrid
+          rows={rows}
+          columns={columns}
+          rowKey={(r) => r.id}
+          storageKey="carres.finance.posting-accounts.v1"
+          appearance="reference"
+          groupBanner={false}
+          allowColumnGrouping={false}
+          fixedGroups={{ groups: POSTING_GROUPS.map((g) => ({ key: g.key, label: g.label })), groupOf: (r) => r.group, revealMatches: true }}
+          isLoading={!query.isSuccess}
+          onRowClick={(r) => {
+            if (r.change) setOpen(r);
+          }}
+        />
+        <PostingChanges changes={query.data?.changes ?? []} loading={!query.isSuccess} />
+      </div>
       {open && open.change && (
         <PostingModal
           key={open.id}
@@ -331,7 +335,7 @@ const CHANGE_COLUMNS: readonly Column<LedgerPostingChange>[] = [
   { key: "to", label: "To", width: "25%", cell: (c) => `${c.toCode} ${c.toName ?? ""}` },
 ];
 
-function PostingChanges({ changes }: { changes: readonly LedgerPostingChange[] }) {
+function PostingChanges({ changes, loading }: { changes: readonly LedgerPostingChange[]; loading: boolean }) {
   return (
     <section className="flex flex-col gap-2 pt-4" data-testid="posting-changes">
       {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0657). */}
@@ -343,6 +347,7 @@ function PostingChanges({ changes }: { changes: readonly LedgerPostingChange[] }
         columns={CHANGE_COLUMNS}
         rowId={(c) => c.id}
         empty="No posting account has been changed yet."
+        loading={loading}
       />
     </section>
   );

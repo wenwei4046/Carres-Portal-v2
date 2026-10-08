@@ -11,7 +11,8 @@
  * other-debtors · other-debtor-parties · other-receipts · daily-bank ·
  * journal · general-ledger · trial-balance · reports · profit-and-loss ·
  * balance-sheet · cash-flow · ap-aging · credit-notes · credit-note ·
- * credit-note-new · forecast (last month, so the actual is a whole month).
+ * credit-note-new · forecast (last month, so the actual is a whole month) ·
+ * posting-accounts · item-groups (long lists under their tables, 0657–0659).
  * `?role=principal` draws the area titles, to see an area fold.
  * Every listing carries at least one 60+ character party name so wrapping and
  * truncation are visible. Fixture evidence is not production evidence.
@@ -606,6 +607,91 @@ function forecastPl(from: string, to: string) {
   return { rows: rows.map((r, i) => ({ ...common, ordinal: i + 1, ...r })) };
 }
 
+// ── Finance Settings → Posting accounts (0657, 0658) and Item groups (0659) ──
+// Long lists on purpose: the page must keep its table in sight below them.
+const ACCOUNT_NAME: Record<string, string> = {
+  "500-0000": "SALES", "500-2000": "SUBSCRIPTION", "500-3000": "SERVICE CHARGES", "500-4000": "STORAGE CHARGES",
+  "500-5000": "GUARANTEE - 15 YEARS", "510-0000": "RETURN INWARDS", "580-0000": "ADDITIONAL INCOME",
+  "604-0000": "COST OF SERVICE", "610-0000": "PURCHASES", "610-0020": "PURCHASE - MATTRESS", "610-0030": "PURCHASE - SOFA",
+  "610-0040": "PURCHASE - BEDFRAME", "610-0050": "PURCHASE - MATTRESS PROTECTOR", "610-0070": "PURCHASE - PILLOW",
+  "612-0000": "PURCHASES RETURN", "902-0000": "BANK CHARGES", "400-0000": "TRADE CREDITORS", "405-0000": "OTHERS CREDITORS",
+  "440-0000": "DEPOSIT RECEIVED", "330-0000": "STOCK", "150-0000": "RETAINED EARNING", "160-0000": "OPENING BALANCE",
+  "310-2000": "HONG LEONG BANK", "320-0000": "CASH IN HAND", "315-5000": "STRIPE", "1130": "CARD - MACHINE NOT KNOWN",
+};
+const named = (code: string | null) => (code ? ACCOUNT_NAME[code] ?? null : null);
+const itemGroup = (id: string, name: string, p: string | null, s: string | null, products: number, categories: string[] = []) => ({
+  id, name, active: true, categories, products,
+  purchaseAccount: p, purchaseName: named(p), salesAccount: s, salesName: named(s),
+  salesReturnAccount: "510-0000", salesReturnName: named("510-0000"),
+  purchaseReturnAccount: "612-0000", purchaseReturnName: named("612-0000"),
+});
+const ITEM_GROUP_ROWS = [
+  itemGroup("g-bed", "BEDFRAME", "610-0040", "500-0000", 11, ["bedframe"]),
+  itemGroup("g-cur", "CURTAIN", null, null, 0),
+  itemGroup("g-grt", "GUARANTEE", "604-0000", "500-5000", 1, ["guarantee"]),
+  itemGroup("g-mat", "MATTRESS", "610-0020", "500-0000", 17, ["mattress"]),
+  itemGroup("g-mp", "MATTRESS PROTECTOR", "610-0050", "500-0000", 1),
+  itemGroup("g-oth", "OTHERS", "610-0000", "500-0000", 0, ["accessory"]),
+  itemGroup("g-pil", "PILLOW", "610-0070", "500-0000", 3),
+  itemGroup("g-svc", "SERVICE", "604-0000", "500-3000", 1, ["service"]),
+  itemGroup("g-sofa", "SOFA", "610-0030", "500-0000", 23, ["sofa"]),
+];
+const products = (n: number, category: string, groupId: string, stem: string) =>
+  Array.from({ length: n }, (_, i) => ({
+    modelId: `${groupId}-${i}`, name: i === 0 ? `${stem} ${LONG_PARTY.slice(0, 44)}` : `${stem} ${100 + i}`,
+    category, skus: 1 + (i % 6), groupId, placed: false, discontinued: false,
+  }));
+const ITEM_GROUPS = {
+  groups: ITEM_GROUP_ROWS,
+  products: [
+    ...products(11, "bedframe", "g-bed", "Bedframe"),
+    ...products(17, "mattress", "g-mat", "Mattress"),
+    ...products(23, "sofa", "g-sofa", "Sofa"),
+    { modelId: "p-mp", name: "Mattress Protector", category: "accessory", skus: 3, groupId: "g-mp", placed: true, discontinued: false },
+    { modelId: "p-pil", name: "Memory Foam Pillow", category: "accessory", skus: 1, groupId: "g-pil", placed: true, discontinued: false },
+    { modelId: "p-grt", name: "Mattress Guarantee", category: "guarantee", skus: 1, groupId: "g-grt", placed: false, discontinued: false },
+  ],
+  unbound: [
+    { id: 1, invoiceNo: "INV-2026-001388", so: 1388, issuedAt: soon(-2), groupId: null, skus: ["OLD-SOFA-3S"],
+      amount: "1890.00", accountCode: "500-0000", accountName: "SALES" },
+  ],
+  changes: [
+    { id: "2", what: "PRODUCT", groupId: "g-pil", groupName: "PILLOW", modelName: "Memory Foam Pillow", fromGroupName: "OTHERS",
+      fromCode: null, fromName: null, toCode: null, toName: null, fromText: null, toText: null, changedAt: at(-1), changedBy: "Chew" },
+    { id: "1", what: "ADDED", groupId: "g-cur", groupName: "CURTAIN", modelName: null, fromGroupName: null,
+      fromCode: null, fromName: null, toCode: null, toName: null, fromText: null, toText: "CURTAIN", changedAt: at(-2), changedBy: "Chew" },
+  ],
+};
+const posting = (type: string, key: string, account: string, name: string | null = null) => ({
+  type, key, name, active: type === "ADDON" ? true : null, accountCode: account, accountName: named(account), changedAt: null, changedBy: null,
+});
+const POSTINGS = {
+  income: [
+    posting("GOODS", "*", "500-0000"), posting("GOODS", "rental", "500-2000"), posting("STORAGE", "*", "500-4000"),
+    ...["Additional delivery fee", "Cross-category delivery fee", "Delivery fee", "Dispose old bed frame", "Dispose old mattress",
+      "Dispose old sofa (big size)", "Dispose old sofa (small size)", "Stair carry"].map((n, i) => posting("ADDON", `a${i}`, "500-3000", n)),
+  ],
+  roles: [
+    ["COST_OF_GOODS_SOLD", true, "610-0000"], ["BANK_AND_PAYMENT_CHARGES", true, "902-0000"], ["OTHER_INCOME", true, "580-0000"],
+    ["TRADE_PAYABLE", false, "400-0000"], ["OTHER_PAYABLE", false, "405-0000"], ["CUSTOMER_DEPOSITS_HELD", false, "440-0000"],
+    ["STOCK", false, "330-0000"], ["RETAINED_EARNINGS", false, "150-0000"], ["OPENING_BALANCE_EQUITY", false, "160-0000"],
+  ].map(([role, changeable, code]) => ({ role, changeable, accountCode: code, accountName: named(code as string), changedAt: null, changedBy: null })),
+  changes: Array.from({ length: 30 }, (_, i) => ({
+    id: String(30 - i), what: "ROLE", key: "OTHER_INCOME", name: null, fromCode: i % 2 ? "580-0000" : "500-0000",
+    fromName: named(i % 2 ? "580-0000" : "500-0000"), toCode: i % 2 ? "500-0000" : "580-0000",
+    toName: named(i % 2 ? "500-0000" : "580-0000"), changedAt: at(-i), changedBy: "Chew",
+  })),
+  payments: [],
+};
+const PAYMENT_METHODS = {
+  methods: [
+    { method: "bank", label: "Bank transfer", account_code: "310-2000", account_name: named("310-2000"), active: true, sort: 1 },
+    { method: "cash", label: "Cash", account_code: "320-0000", account_name: named("320-0000"), active: true, sort: 2 },
+  ],
+  money_accounts: [{ code: "310-2000", name: named("310-2000") }, { code: "320-0000", name: named("320-0000") }],
+  system_rows: [{ method: "card", source_channel: "*", account_code: "1130" }, { method: "online", source_channel: "stripe_checkout", account_code: "315-5000" }],
+};
+
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -648,6 +734,9 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/finance/other-money-in/accounts")) return json([]);
   if (url.includes("/api/finance/ledger/entries/")) return json({ entry: ENTRIES[0], lines: [], related: [] });
   if (url.includes("/api/finance/ledger/entries")) return json({ rows: ENTRIES, total: ENTRIES.length });
+  if (url.includes("/api/finance/ledger/item-groups")) return json(ITEM_GROUPS);
+  if (url.includes("/api/finance/ledger/posting-accounts")) return json(POSTINGS);
+  if (url.includes("/api/finance/payment-settings/methods")) return json(PAYMENT_METHODS);
   if (url.includes("/api/finance/ledger/accounts"))
     return json({ go_live_on: GO_LIVE, accounts: ACCOUNTS.map(([code, name, kind]) => ({ code, name, kind, parent_code: null,
       is_control: code === "1200" || code === "2100", control_for: null, is_active: true, is_header: false })) });
@@ -693,6 +782,8 @@ const ROUTES: Record<string, string> = {
   "payment-request": "/finance/payment-requests/prq-0",
   "payment-request-new": "/finance/payment-requests/new",
   "request-access": "/finance/settings?tab=requests",
+  "posting-accounts": "/finance/settings?tab=posting",
+  "item-groups": "/finance/settings?tab=groups",
   forecast: `/finance/reports/forecast?month=${monthBefore(TODAY.slice(0, 7))}`,
 };
 window.history.replaceState(null, "", ROUTES[PAGE] ?? ROUTES.ar);
