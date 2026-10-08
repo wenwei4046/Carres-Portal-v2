@@ -4812,16 +4812,36 @@ which the NO RELATIVE DATE WORDS rule permits; a printed date is still `fmtDate`
 | Meaning | Approved wording | Do not use for this entry |
 |---|---|---|
 | Shared portal navigation parent | `Sales Orders` | A duplicate standalone Sales Orders destination |
-| Ordinary outright customer sales | `Outright Sales` | `Purchase` |
+| Ordinary outright customer sales | `Outright` (menu item under `Sales Orders`; page title `Sales Order / Outright` — owner-confirmed template 2026-10-08) | `Purchase` · `Outright Sales` (retired 2026-10-08) |
 | Subscription-owned customer journey | `Subscription` | `Purchase` |
 
 The label does not rename the Sales Order document, its SO number, or the separate Purchasing
 module. Subscription reporting stays separate. Removing old navigation entries does not delete
 historical orders or documents.
 
-`Outright Sales` is also the Admin area's word for the same register, and the word ⌘K prints for
-it: one destination never carries two words. The approved `Monthly overview` composition is not
-part of this entry and is not built.
+`Outright` is also the Admin area's word for the same register, and the word the header search
+prints for it: one destination never carries two words. `Monthly demand` is removed from this
+page (owner ruling 2026-10-08).
+
+## Sales Order Outright list — the cell words (owner instruction 2026-10-09)
+
+Every column reads the module that owns its fact. Three states are never merged: a record that
+was read and holds nothing, a read that failed, and a record this person may not see.
+
+| Meaning | Approved wording | Do not use for this entry |
+|---|---|---|
+| The owner's record was read and holds nothing | **`Not recorded`** (grey) | `Not set` (retired here 2026-10-09: it meant a read the list did not do yet) · None · a blank · a dash |
+| The owner's read failed | **`Could not read`** (amber); on hover the governed sentence **`Could not read {owner} for this order.`** + **`This does not mean {the empty fact}.`** (`Purchasing` · `Receiving` · `Delivery` · `Stock` · `Payments` · `Finance` · `Service Cases` · `the SO PIC`) | `Not recorded` · `Not yet` · `No Finance hold` · `0` from a failed read |
+| The record exists but this person may not see it | **`No access`** (grey); hover **`You may not see this record.`** / for the PIC **`A PIC is recorded, but you may not see this person's name.`** | `Not recorded` · `Unknown` |
+| A read still running | **`Loading`** | a blank · a spinner alone |
+| A document that does not exist yet (Supplier DO · GRN · Receipt · DO · Loading) | **`Not yet`** | `Not recorded` (a document not issued is not a missing record) |
+| Customer confirmed delivery date | the day (`20 Oct 26` over `Tue · {time}`), **`Delivered`** under the delivered day, else **`Not scheduled`** | `To confirm` · TBC |
+| Appointment | **`Scheduled`** (green, time below when recorded) · **`Not scheduled`** · **`Delivered`** | `Confirmed` · `To confirm` · `Done` (v8 mock words, not dictionary) |
+| Logistics | the company name · **`Not assigned`** | `Logistics not assigned` (the Work card's sentence, too long for a cell) |
+| Loading | **`Ready for handover`** · **`Handed over`** · **`Received by logistics`** (Delivery §4 record words) · `Not yet` | Loaded · Shipped |
+| Location | the Stock Location site name · **`Fully delivered`** once every piece is delivered · `Not yet` while no Unit is reserved | Customer · With customer |
+| Pay by | Payments' deadline day (amber when late) · **`Paid`** · Payments' own fact when it has no day (`No delivery date`) | a second arithmetic · `Overdue` |
+| Finance hold | **`Hold delivery`** over **`Finance hold · {reason}`** · **`No Finance hold`** | `On hold` (Stock's word) · `None` · `No Finance hold` from a failed read |
 
 
 ## An old version's own sentences — owner ruling 2026-09-23

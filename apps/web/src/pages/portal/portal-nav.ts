@@ -182,8 +182,8 @@ export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
   /* ⭐ SALES ORDERS — ONE PARENT, TWO CHILDREN (Jess, owner ruling 2026-09-23;
    * `docs/orders/MASTER.md` "Portal navigation", `docs/ui/MASTER.md` and the
    * COPY-STANDARD table "Sales Orders navigation"). The module row is the
-   * customer-order parent and its two destinations are `Outright Sales` and
-   * `Subscription`. It is a NAVIGATION ruling: no contract, transaction,
+   * customer-order parent and its two destinations are `Outright` and
+   * `Subscription` (`Outright Sales` until the 2026-10-08 template). It is a NAVIGATION ruling: no contract, transaction,
    * permission or calculation is merged by the shared parent. */
   { section: "Sales", label: "Sales Orders", icon: ReceiptText, mIcon: "receipt_long" },
   { section: "Purchasing", label: "Purchasing", icon: ShoppingCart, mIcon: "shopping_cart" },
@@ -316,7 +316,8 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         // customer-order entry. The old control table kept a temporary door
         // beside it until the 2026-09-23 ruling took that row off the rail.
         //
-        // ⭐ THE WORD IS `Outright Sales` (Jess, owner ruling 2026-09-23). The
+        // ⭐ THE WORD IS `Outright` (owner-confirmed template 2026-10-08; it was
+        // `Outright Sales` from the 2026-09-23 ruling). The
         // module row above now carries `Sales Orders`, so the child says which
         // KIND of customer order it opens: the ordinary outright sale, as
         // against `Subscription` beside it. `Purchase` is rejected by name in
