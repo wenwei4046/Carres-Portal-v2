@@ -120,11 +120,11 @@ describe("Posting accounts (0657)", () => {
     show();
     await ready();
     expect(screen.getByTestId("grid-group-toggle-sales")).toHaveTextContent("Sales");
-    expect(within(row("INCOME/GOODS/*")).getByText("Goods sold")).toBeInTheDocument();
+    expect(within(row("INCOME/GOODS/*")).getByText("Goods sold, when the item group has no sales account")).toBeInTheDocument();
     expect(row("INCOME/GOODS/*")).toHaveTextContent("500-0000 SALES");
     expect(within(row("INCOME/GOODS/rental")).getByText("Subscription fees")).toBeInTheDocument();
     expect(within(row("INCOME/ADDON/DELIVERY")).getByText("Delivery fee")).toBeInTheDocument();
-    expect(row("ROLE/COST_OF_GOODS_SOLD")).toHaveTextContent("Goods bought on a supplier bill");
+    expect(row("ROLE/COST_OF_GOODS_SOLD")).toHaveTextContent("Goods bought that are not in the catalog");
     expect(row("ROLE/TRADE_PAYABLE")).toHaveTextContent("Suppliers owed for goods");
     expect(row("PAYMENT/bank/*")).toHaveTextContent("Bank transfer");
     expect(row("PAYMENT/online/stripe_checkout")).toHaveTextContent("Online payment · Stripe checkout");
@@ -172,7 +172,7 @@ describe("Posting accounts (0657)", () => {
     net.refuse = "Someone else changed this posting after you opened it. Open it again to see their change.";
     show();
     await ready();
-    fireEvent.click(within(row("ROLE/COST_OF_GOODS_SOLD")).getByText("Goods bought on a supplier bill"));
+    fireEvent.click(within(row("ROLE/COST_OF_GOODS_SOLD")).getByText("Goods bought that are not in the catalog"));
     const dialog = await screen.findByRole("dialog");
     fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Account/ }), { key: "Enter" });
     expect(screen.queryByRole("option", { name: "500-0000 SALES" })).toBeNull();
@@ -245,7 +245,7 @@ describe("Posting accounts (0657)", () => {
 
 describe("posting words and options", () => {
   it("names the income postings", () => {
-    expect(incomeWord({ type: "GOODS", key: "*", name: null })).toBe("Goods sold");
+    expect(incomeWord({ type: "GOODS", key: "*", name: null })).toBe("Goods sold, when the item group has no sales account");
     expect(incomeWord({ type: "GOODS", key: "rental", name: null })).toBe("Subscription fees");
     expect(incomeWord({ type: "STORAGE", key: "*", name: null })).toBe("Storage charges");
     expect(incomeWord({ type: "ADDON", key: "STAIR_CARRY", name: "Stair carry" })).toBe("Stair carry");

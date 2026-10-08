@@ -51,7 +51,9 @@ type GroupKey = (typeof POSTING_GROUPS)[number]["key"];
 
 /** What each role posts, in the words the page prints. */
 export const ROLE_WORD: Record<string, string> = {
-  COST_OF_GOODS_SOLD: "Goods bought on a supplier bill",
+  // 0659: a goods line takes its item group's purchase account; this role is
+  // left for goods whose SKU is not in the catalog.
+  COST_OF_GOODS_SOLD: "Goods bought that are not in the catalog",
   BANK_AND_PAYMENT_CHARGES: "Bank and card charges",
   OTHER_INCOME: "Money the bank pays in",
   TRADE_PAYABLE: "Suppliers owed for goods",
@@ -72,7 +74,7 @@ const ROLE_KIND: Record<string, "INCOME" | "EXPENSE"> = {
 
 export function incomeWord(p: Pick<LedgerIncomePosting, "type" | "key" | "name">): string {
   if (p.type === "STORAGE") return "Storage charges";
-  if (p.type === "GOODS") return p.key === "rental" ? "Subscription fees" : p.key === "*" ? "Goods sold" : `Goods sold (${p.key})`;
+  if (p.type === "GOODS") return p.key === "rental" ? "Subscription fees" : p.key === "*" ? "Goods sold, when the item group has no sales account" : `Goods sold (${p.key})`;
   return p.name ?? p.key;
 }
 

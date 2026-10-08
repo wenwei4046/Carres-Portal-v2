@@ -341,6 +341,9 @@ export interface SupplierBillDocument {
     price_diff: ApMoney | null;
     /** 0540 */
     department_type?: string | null; department_id?: string | null;
+    /** 0659: a person chose this line's account. A goods line nobody chose an
+     *  account for takes its item group's purchase account when confirmed. */
+    account_chosen?: boolean;
   }>;
   /** A voucher that pays the bill, (0485) an advance knocked off it, or
    *  (0642) a supplier credit note knocked off it. For a credit note,

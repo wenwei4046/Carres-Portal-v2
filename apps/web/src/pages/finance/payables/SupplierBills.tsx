@@ -578,7 +578,9 @@ function BillForm() {
       grnNo: l.grn_no,
       sku: l.sku ?? "",
       description: l.description ?? "",
-      accountCode: l.account_code,
+      // 0659: a goods line nobody chose an account for stays on its item
+      // group's account, so it is sent back empty, not as a choice.
+      accountCode: l.po_line_id && l.account_chosen === false ? "" : l.account_code,
       qty: l.qty == null ? "" : String(l.qty),
       unitPrice: l.unit_price == null ? "" : String(l.unit_price),
       amount: String(l.amount),
@@ -755,7 +757,7 @@ function BillForm() {
                     <tbody>
                       {lines.map((l, i) => (
                         <BillLineRow key={l.key} line={l} index={i} accounts={lineAccounts}
-                          usualGoods={usualLabel(roleAccount(chart.data, "COST_OF_GOODS_SOLD"))}
+                          usualGoods={ITEM_GROUP_USUAL}
                           onChange={(patch) => setLine(l.key, patch)}
                           onRemove={() => setLines((b) => b.filter((x) => x.key !== l.key))} />
                       ))}
@@ -804,6 +806,11 @@ function CreditorOptions({ rows }: { rows: ApCreditor[] }) {
    from the chart, never a number written here. Until the chart is read the
    row says only that the usual account is used.
    PROPOSAL - PENDING APPROVAL: "The usual account". */
+/* 0659: a goods line's usual account is its item group's purchase account,
+   which differs line by line (Finance Settings → Item groups).
+   PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0659). */
+const ITEM_GROUP_USUAL = "The item group's account (usual)";
+
 function usualLabel(a: LedgerAccount | undefined): string {
   return a ? `${a.code} ${a.name} (usual)` : "The usual account";
 }

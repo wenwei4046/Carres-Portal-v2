@@ -16,9 +16,10 @@
  * kind words Cash · Bank account · Card and online holding). A row
  * click opens it; the only new phrases are the page word and the add button.
  *
- * Three more tabs sit beside it: `?tab=chart` holds the chart of accounts
- * (ChartOfAccounts.tsx), `?tab=card` the card payout banks (0541) and
- * `?tab=closed` the last closed day (0622).
+ * More tabs sit beside it: `?tab=chart` holds the chart of accounts
+ * (ChartOfAccounts.tsx), `?tab=posting` the posting accounts (0657),
+ * `?tab=groups` the item groups (0659), `?tab=card` the card payout banks
+ * (0541) and `?tab=closed` the last closed day (0622).
  *
  * An opened account's number changes here too (YH, 24 Sep 2026), through the
  * chart's own door: the same request the Chart of accounts form sends
@@ -53,6 +54,7 @@ import { useAuth } from "@/lib/auth";
 import { fmtDate } from "@/lib/fmt-date";
 import { FieldError } from "@/components/kit/FieldFrame";
 import ChartOfAccounts from "./ChartOfAccounts";
+import ItemGroups from "./ItemGroups";
 import PostingAccounts from "./PostingAccounts";
 import RequestAccess from "./RequestAccess";
 
@@ -61,6 +63,8 @@ const TABS = [
   { value: "chart", label: "Chart of accounts" },
   // 0657 (Chew 2026-10-07): the account each posting the system makes goes to.
   { value: "posting", label: "Posting accounts" },
+  // 0659 (Chew 2026-10-07): each product's item group and the four accounts it binds.
+  { value: "groups", label: "Item groups" },
   { value: "card", label: "Card payout banks" },
   { value: "closed", label: "Closed months" },
   // 0645 (Chew 2026-10-03): which Operation staff may ask Finance to pay.
@@ -86,7 +90,7 @@ export default function FinanceSettings() {
         <Tabs tabs={TABS} value={tab} label="Finance Settings" onValueChange={(v) => setParams(v === "money" ? {} : { tab: v })} />
       </div>
       <div className="min-h-0 flex-1">
-        {tab === "chart" ? <ChartOfAccounts /> : tab === "posting" ? <PostingAccounts /> : tab === "card" ? <CardRoutes /> : tab === "closed" ? <ClosedMonths />
+        {tab === "chart" ? <ChartOfAccounts /> : tab === "posting" ? <PostingAccounts /> : tab === "groups" ? <ItemGroups /> : tab === "card" ? <CardRoutes /> : tab === "closed" ? <ClosedMonths />
           : tab === "requests" ? <RequestAccess /> : <MoneyAccounts />}
       </div>
     </div>

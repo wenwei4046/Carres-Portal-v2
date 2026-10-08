@@ -912,6 +912,91 @@ describe("Posting accounts (0657)", () => {
   });
 });
 
+describe("Item groups (0659)", () => {
+  const call = async (method: string, path = "", body?: unknown, role = "finance") =>
+    app.fetch(new Request(`http://t/api/finance/ledger/item-groups${path}`, {
+      method,
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    }), env);
+  const READ = { groups: [], products: [], unbound: [], changes: [] };
+  const GROUP = "aaaaaaaa-0000-4000-8000-0000000000a1";
+  const MODEL = "bbbbbbbb-0000-4000-8000-0000000000b1";
+  const SAVE = {
+    name: "CURTAIN", purchaseAccount: "610-0060", salesAccount: "500-0000",
+    salesReturnAccount: "510-0000", purchaseReturnAccount: "612-0000", active: true,
+  };
+  const WAS = { ...SAVE, name: "CURTAINS" };
+
+  it("reads the item groups through gl_item_groups_read", async () => {
+    const { sb } = fakeClient(() => ok(READ));
+    const res = await call("GET");
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(READ);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_item_groups_read");
+  });
+
+  it("adds a group with no id and changes one by its id, sending the group the screen showed", async () => {
+    const { sb } = fakeClient(() => ok({ id: GROUP, changed: true }));
+    const added = await call("POST", "", { ...SAVE, was: null });
+    expect(added.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_item_group_save", {
+      p_id: null, p_name: "CURTAIN", p_purchase_account: "610-0060", p_sales_account: "500-0000",
+      p_sales_return_account: "510-0000", p_purchase_return_account: "612-0000", p_active: true, p_was: null,
+    });
+    const changed = await call("PUT", `/${GROUP}`, { ...SAVE, was: WAS });
+    expect(changed.status).toBe(200);
+    expect(sb.rpc).toHaveBeenLastCalledWith("gl_item_group_save", expect.objectContaining({ p_id: GROUP, p_was: WAS }));
+  });
+
+  it("leaves an account empty when the group is not bound for it", async () => {
+    const { sb } = fakeClient(() => ok({ id: GROUP, changed: true }));
+    await call("POST", "", { ...SAVE, purchaseAccount: null, was: null });
+    expect(sb.rpc).toHaveBeenCalledWith("gl_item_group_save", expect.objectContaining({ p_purchase_account: null }));
+  });
+
+  it("moves a product, sending the group the screen showed", async () => {
+    const { sb } = fakeClient(() => ok({ modelId: MODEL, groupId: GROUP, changed: true }));
+    const res = await call("POST", "/place", { modelId: MODEL, groupId: GROUP, was: null });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("gl_item_group_place", { p_model_id: MODEL, p_group_id: GROUP, p_was: null });
+  });
+
+  it("forwards a change made meanwhile as 409, and a refused account as 422, in the database's words", async () => {
+    fakeClient(() => refuse("40001", "item_group_changed", "Someone else changed this item group after you opened it. Open it again to see their change."));
+    const stale = await call("PUT", `/${GROUP}`, { ...SAVE, was: WAS });
+    expect(stale.status).toBe(409);
+    expect((await json(stale)).code).toBe("item_group_changed");
+
+    fakeClient(() => refuse("22023", "account_wrong_kind", "Account 610-0000 PURCHASES is not an income account."));
+    const wrong = await call("POST", "", { ...SAVE, salesAccount: "610-0000", was: null });
+    expect(wrong.status).toBe(422);
+    const body = await json(wrong);
+    expect(body.code).toBe("account_wrong_kind");
+    expect(body.message).toBe("Account 610-0000 PURCHASES is not an income account.");
+  });
+
+  it("refuses operation, a bad id and a body it cannot read before the database", async () => {
+    const { sb } = fakeClient(() => ok(READ));
+    expect((await call("GET", "", undefined, "operation")).status).toBe(403);
+    expect((await call("PUT", "/not-a-uuid", { ...SAVE, was: WAS })).status).toBe(404);
+    expect((await call("POST", "", { ...SAVE, name: " ", was: null })).status).toBe(422);
+    expect((await call("POST", "", { ...SAVE, salesAccount: "5", was: null })).status).toBe(422);
+    expect((await call("POST", "/place", { modelId: "x", groupId: GROUP, was: null })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("names an item group's accounts among the ones the system posts to, for the chart's retire icon", async () => {
+    const answer = chartAnswer(ok([]));
+    fakeClient((c) => (c.name === "gl_item_groups"
+      ? ok([{ purchase_account: "610-0020", sales_account: "500-0000", sales_return_account: null, purchase_return_account: "612-0000" }])
+      : answer(c)));
+    const body = await json(await get("/accounts"));
+    expect(body.system_accounts).toEqual(expect.arrayContaining(["610-0020", "500-0000", "612-0000"]));
+    expect(body.system_accounts).not.toContain(null);
+  });
+});
+
 describe("POST /accounts/move and /accounts/reorder", () => {
   const post = async (path: string, body: unknown, role = "finance") =>
     app.fetch(new Request(`http://t/api/finance/ledger${path}`, {

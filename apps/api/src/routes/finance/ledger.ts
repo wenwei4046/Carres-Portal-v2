@@ -15,6 +15,8 @@ import {
   ledgerBooksClosedInput,
   ledgerChartImportInput,
   ledgerPostingAccountSetInput,
+  ledgerItemGroupPlaceInput,
+  ledgerItemGroupSaveInput,
   ledgerEntriesQuery,
   ledgerEntryRef,
   ledgerPeriodQuery,
@@ -100,6 +102,11 @@ import financeMoneyAccountsRouter from "./money-accounts";
  *   PUT /posting-accounts   change one of them (gl_posting_account_set, 0657; a way of being paid
  *                           through payment_method_account_set, 0658); refused with 409 when
  *                           someone changed it after the screen read it
+ *   GET /item-groups        the item groups and their four accounts, every product and its group,
+ *                           the sales that went to the goods account, the changes (0659)
+ *   POST /item-groups       add an item group; PUT /item-groups/:id changes one (gl_item_group_save)
+ *   POST /item-groups/place move a product into another item group (gl_item_group_place); 409
+ *                           when someone changed the group or moved the product meanwhile
  *   GET /trial-balance      every account as it stood at the end of a day, and every
  *                           heading's own subtotal at every depth, in the chart's order
  *   GET /account-ledger     one account, line by line
@@ -408,7 +415,7 @@ financeLedgerRouter.get("/departments", requireFinance, async (c) => {
 
 financeLedgerRouter.get("/accounts", requireFinance, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const [read, rules, roles, money, sections, incomeMap, paymentMap] = await Promise.all([
+  const [read, rules, roles, money, sections, incomeMap, paymentMap, itemGroups] = await Promise.all([
     readChart(sb),
     sb.rpc("gl_rule_headings"),
     sb.rpc("gl_account_roles_read"),
@@ -420,6 +427,9 @@ financeLedgerRouter.get("/accounts", requireFinance, async (c) => {
     // retire door refuses. A failed read only shows a retire icon too many.
     sb.from("gl_income_account_map").select("account_code"),
     sb.from("gl_payment_account_map").select("account_code"),
+    // 0659: an item group's four accounts, which the retire door refuses too.
+    // Before 0659 the table is not there and the read fails like the others.
+    sb.from("gl_item_groups").select("purchase_account,sales_account,sales_return_account,purchase_return_account"),
   ]);
   if ("error" in read) return ledgerError(c, read.error, "The chart of accounts");
   // 0570: the headings no account moves into or out of, so the chart screen
@@ -441,7 +451,12 @@ financeLedgerRouter.get("/accounts", requireFinance, async (c) => {
     : [];
   const mapped = (res: { error: unknown; data: unknown }) =>
     !res.error && Array.isArray(res.data) ? (res.data as Json[]).map((r) => String(r.account_code)) : [];
-  const systemAccounts = [...new Set([...mapped(incomeMap), ...mapped(paymentMap)])];
+  const groupAccounts = !itemGroups.error && Array.isArray(itemGroups.data)
+    ? (itemGroups.data as Json[]).flatMap((r) =>
+        [r.purchase_account, r.sales_account, r.sales_return_account, r.purchase_return_account]
+          .filter((v): v is string => typeof v === "string" && v !== ""))
+    : [];
+  const systemAccounts = [...new Set([...mapped(incomeMap), ...mapped(paymentMap), ...groupAccounts])];
   return c.json({
     ...read.chart,
     rule_headings: ruleHeadings,
@@ -671,6 +686,63 @@ financeLedgerRouter.put("/posting-accounts", requireFinance, async (c) => {
     p_what: body.data.what,
     p_key: body.data.key,
     p_account_code: body.data.accountCode,
+    p_was: body.data.was,
+  });
+  if (error) return accountError(c, error);
+  return c.json(data);
+});
+
+// ── the item groups (0659) ───────────────────────────────────────────────────
+financeLedgerRouter.get("/item-groups", requireFinance, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_item_groups_read");
+  if (error) return ledgerError(c, error, "The item groups");
+  return c.json(data);
+});
+
+/** 0659: which account fits, and whether the screen's `was` is still the
+ *  group, are the database's to judge; its sentence comes back as it is. */
+const itemGroupArgs = (id: string | null, d: { name: string; purchaseAccount: string | null; salesAccount: string | null;
+  salesReturnAccount: string | null; purchaseReturnAccount: string | null; active: boolean; was: unknown }) => ({
+  p_id: id,
+  p_name: d.name,
+  p_purchase_account: d.purchaseAccount,
+  p_sales_account: d.salesAccount,
+  p_sales_return_account: d.salesReturnAccount,
+  p_purchase_return_account: d.purchaseReturnAccount,
+  p_active: d.active,
+  p_was: d.was,
+});
+
+financeLedgerRouter.post("/item-groups", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, ledgerItemGroupSaveInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_item_group_save", itemGroupArgs(null, body.data));
+  if (error) return accountError(c, error);
+  return c.json(data, 201);
+});
+
+financeLedgerRouter.put("/item-groups/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) {
+    return c.json({ error: "not_found", code: "not_found", message: "That item group is not in the list." }, 404);
+  }
+  const body = await parseJsonBody(c, ledgerItemGroupSaveInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_item_group_save", itemGroupArgs(id, body.data));
+  if (error) return accountError(c, error);
+  return c.json(data);
+});
+
+financeLedgerRouter.post("/item-groups/place", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, ledgerItemGroupPlaceInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("gl_item_group_place", {
+    p_model_id: body.data.modelId,
+    p_group_id: body.data.groupId,
     p_was: body.data.was,
   });
   if (error) return accountError(c, error);

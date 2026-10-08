@@ -284,8 +284,9 @@ describe("Bill form — Convert GRN to bill", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Use this GRN" }));
 
     await waitFor(() => expect(screen.getByLabelText("Line 1 qty")).toHaveValue("1"));
-    // The usual accounts are named from the chart's roles, never a number the page knows.
-    await waitFor(() => expect(screen.getByLabelText("Line 1 account").querySelector("option")).toHaveTextContent("610-0000 PURCHASES (usual)"));
+    // The usual accounts are named from the chart's roles, never a number the page knows;
+    // a goods line's usual account is its item group's (0659), which differs line by line.
+    await waitFor(() => expect(screen.getByLabelText("Line 1 account").querySelector("option")).toHaveTextContent("The item group's account (usual)"));
     expect(screen.getByLabelText("Payables account").querySelector("option")).toHaveTextContent("400-0000 TRADE CREDITORS (usual)");
     expect(screen.getByLabelText("Line 1 unit price")).toHaveValue("520.00");
     expect(screen.getByLabelText("Line 2 qty")).toHaveValue("2");
@@ -419,6 +420,37 @@ describe("Bill form — Convert GRN to bill", () => {
     const row = within(await screen.findByTestId("bill-lines")).getAllByRole("row")[1]!;
     expect(row).toHaveTextContent("August rent");
     expect(row.textContent).not.toMatch(/[—–]/);
+  });
+
+  it("0659: a reopened draft sends a goods line nobody chose an account for back empty, and keeps a chosen one", async () => {
+    api.routes[`${B}/bills/${BILL1}`] = {
+      bill: { id: BILL1, bill_no: null, status: "draft", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
+        supplier_kind: "supplier", supplier_invoice_no: "LSW-901", bill_date: "2026-09-10", due_date: null, po_id: "PO-3001",
+        ap_account_code: "2110", ap_account_name: "Trade payables", total_amount: "1020.00", narration: null,
+        cancel_reason: null, created_at: "2026-09-10T01:00:00Z", created_by_name: "Aina", confirmed_at: null,
+        confirmed_by_name: null, cancelled_at: null, cancelled_by_name: null, entry_no: null, reversal_entry_no: null },
+      lines: [
+        { line_no: 1, warehouse_receipt_id: GRN, po_line_id: POL1, grn_no: "GRN-A1", grn_po_id: "PO-3001", sku: "SOFA-1",
+          description: "SOFA-1", account_code: "610-0030", account_name: "PURCHASE - SOFA", account_chosen: false, qty: "1.00",
+          unit_price: "520.00", amount: "520.00", po_unit_cost: "520.00", price_diff: "0.00", department_type: "OFFICE", department_id: null },
+        { line_no: 2, warehouse_receipt_id: GRN, po_line_id: POL2, grn_no: "GRN-A1", grn_po_id: "PO-3001", sku: "SOFA-2",
+          description: "SOFA-2", account_code: "5100", account_name: "Cost of goods sold", account_chosen: true, qty: "2.00",
+          unit_price: "250.00", amount: "500.00", po_unit_cost: "250.00", price_diff: "0.00", department_type: "OFFICE", department_id: null },
+      ],
+      payments: [], files: [], events: [], paid_total: "0.00", allocated_total: "0.00", unpaid: null, left_to_pay: null,
+      advance_open: null, go_live_on: "2026-09-10",
+      can: { edit: true, confirm: true, cancel: true, add_file: false, apply_advance: false, take_advance_off: false },
+    };
+    show(`/finance/bills/${BILL1}/edit`);
+    await waitFor(() => expect(screen.getByLabelText("Supplier invoice No")).toHaveValue("LSW-901"));
+    await waitFor(() => expect(screen.getByLabelText("Line 2 account")).toHaveValue("5100"));
+    expect(screen.getByLabelText("Line 1 account")).toHaveValue("");
+    expect(screen.getByLabelText("Line 1 account").querySelector("option")).toHaveTextContent("The item group's account (usual)");
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]!.body).toMatchObject({
+      lines: [{ poLineId: POL1, accountCode: null }, { poLineId: POL2, accountCode: "5100" }],
+    });
   });
 
   it("leaves the due date empty when no terms are set (0530)", async () => {
