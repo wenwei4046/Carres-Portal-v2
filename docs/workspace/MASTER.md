@@ -638,7 +638,7 @@ effective departures. Operational cover is separate from evidence review and pay
 Keep normal responsibility, effective assignment and actual helper as distinct recorded facts,
 using the existing single `Assigned to` presentation. Return does not silently bounce work back.
 
-**Saturday support is separate.** Staff & Duties governs rotating Saturday customer/driver/
+**Saturday on-call coverage is separate.** Staff & Duties governs rotating Saturday customer/driver/
 Warehouse/Delivery contact support, default **9:00 AM–6:00 PM**, authorised-editable, with qualified
 cover. Record issues and their next accountable work. This does not make Saturday an ordinary
 Office workday, override source calendars, transfer all Delivery work, or grant money/approval
@@ -3015,3 +3015,5 @@ artifact's implementation.
 **Owner correction 2026-09-28 — actionable work first (local prototype):** show admitted unfinished cards above the collapsed Order Route, missed before due. Render each actionable card once; route rows link back to it. Supplier before send confirmation shows `Sending not confirmed`; expanding reveals read-only facts without empty completion boxes or a progress ratio. Recipient is a recorded supplier contact/group, never free text; multiple recorded destinations permit selection, missing contact data must not be invented. Production integration remains owed.
 
 Review fixes (owner approved 2026-09-28): communication tabs wrap within their panel at medium widths. Time reminders are facts without checkbox or progress weight. DELIVERY ORDER has one requirements ratio, no second done ratio. Unavailable messages cannot be copied; disconnected prototype messaging controls remain disabled.
+
+**Saturday on-call boundary — owner confirmed 9 October 2026:** rotating contact coverage, default 9:00 AM–6:00 PM and editable. Answer customer, driver and warehouse calls/WhatsApp and record any required follow-up. It is not normal Saturday office attendance, PO Duty or GRN Duty, and does not automatically transfer all routine Tasks to the on-call person. Any follow-up retains its source-owned permission, normal owner and qualified cover rules. Rotation frequency remains unspecified; implementation unverified.

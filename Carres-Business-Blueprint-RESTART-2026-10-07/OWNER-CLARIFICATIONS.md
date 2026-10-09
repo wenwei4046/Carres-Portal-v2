@@ -202,3 +202,5 @@ GRN Duty rotates once per calendar month, like PO Duty. Keep one coordinating ho
 ### Separate PO and GRN holders · confirmed 9 Oct 2026
 
 Normal monthly rota assigns PO Duty and GRN Duty to different people. Each duty has one coordinating holder; other staff can help and actual actors remain recorded. This normal scheduling rule does not settle exceptional cover when only one eligible working person remains.
+
+**Saturday on-call boundary — owner confirmed 9 October 2026:** rotating contact coverage, default 9:00 AM–6:00 PM and editable. Answer customer, driver and warehouse calls/WhatsApp and record any required follow-up. It is not normal Saturday office attendance, PO Duty or GRN Duty, and does not automatically transfer all routine Tasks to the on-call person. Any follow-up retains its source-owned permission, normal owner and qualified cover rules. Rotation frequency remains unspecified; implementation unverified.

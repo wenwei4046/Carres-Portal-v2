@@ -171,3 +171,5 @@ against a real session.
 | **Effective dating on the other four config tables** | Approved. Today only rates carry it, so editing model rates, tiers, milestones or the scheme method rewrites live figures. Harmless for CLOSED months **because the run freezes the lines** — which is exactly why closed months must be read, never recomputed. |
 | **Pro-rating salary by join date** | Approved; blocked because `join_date` is filled for 0 of 9. |
 | **Bonus tiers** | Skipped on purpose: zero commission rates exist, and the model-tier table already has the semantics. Wire attainment-pays through the adjustment slot, **never a parallel engine.** |
+
+**Saturday on-call boundary — owner confirmed 9 October 2026:** rotating contact coverage, default 9:00 AM–6:00 PM and editable. Answer customer, driver and warehouse calls/WhatsApp and record any required follow-up. It is not normal Saturday office attendance, PO Duty or GRN Duty, and does not automatically transfer all routine Tasks to the on-call person. Any follow-up retains its source-owned permission, normal owner and qualified cover rules. Rotation frequency remains unspecified; implementation unverified.
