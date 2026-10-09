@@ -99,8 +99,6 @@ export function leaveRefusalSentence(act: "submit" | "cancel", error: unknown): 
   switch (leaveRefusalCode(error)) {
     case "leave_overlap":
       return "You already have leave on these dates.";
-    case "proof_required":
-      return "Upload the MC proof.";
     case "invalid_proof":
       return "Upload the MC proof again.";
     case "reason_required":

@@ -19,9 +19,19 @@ import {
   type OfficeCalendar,
   type OfficeCalendarValues,
   type OfficeHolidaysSaveInput,
+  type SettingsChange,
   type SettingsEditorSection,
 } from "@carres/shared";
 import { apiFetch } from "./api";
+
+/** The change record of a Settings section without its own history (SET-01). */
+export function useSettingsChanges(section: "sales_orders" | "issue_tracker") {
+  return useQuery({
+    queryKey: ["settings", "changes", section] as const,
+    queryFn: async () => (await apiFetch<{ changes: SettingsChange[] }>(`/api/operation/settings/changes/${section}`)).changes,
+    staleTime: 30_000,
+  });
+}
 
 /** May the signed-in person change this Settings section? (TEAM-02) —
  *  false while loading, so no Edit flashes for a reader. */

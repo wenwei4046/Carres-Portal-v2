@@ -25,12 +25,13 @@
 -- ── The one change record for the Settings sections this migration adds ──
 create table if not exists public.settings_changes (
   id          bigint generated always as identity primary key,
-  section     text not null check (section in ('company', 'office', 'sales_orders')),
+  section     text not null check (section in ('company', 'office', 'sales_orders', 'issue_tracker')),
   what        text not null,
   old_value   jsonb,
   new_value   jsonb,
   reason      text,
-  actor_id    uuid not null references public.app_users(id),
+  -- null only for a change made by the system itself (no signed-in person)
+  actor_id    uuid references public.app_users(id),
   changed_at  timestamptz not null default now()
 );
 create index if not exists settings_changes_section_time

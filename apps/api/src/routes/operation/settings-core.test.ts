@@ -112,6 +112,16 @@ describe("Settings → Office", () => {
   });
 });
 
+describe("The change record of Sales Order entry and Issue Tracker (SET-01)", () => {
+  it("returns who · when · old → new for the two sections without their own history, refuses others", async () => {
+    tables.settings_changes = { data: [{ id: 7, what: "related_party:NETS", old_value: null, new_value: { name: "NETS", kind: "logistics" },
+      reason: null, changed_at: "2026-10-09T08:00:00Z", actor: { name: "Jess" } }], error: null };
+    const body = (await (await app("operation").request("/settings/changes/issue_tracker")).json()) as { changes: { what: string; actorName: string }[] };
+    expect(body.changes).toEqual([expect.objectContaining({ what: "related_party:NETS", actorName: "Jess" })]);
+    expect((await app().request("/settings/changes/payment")).status).toBe(422);
+  });
+});
+
 describe("May I edit this section?", () => {
   it("answers the database gate for a known section, refuses an unknown one", async () => {
     rpc.mockResolvedValue({ data: false, error: null });

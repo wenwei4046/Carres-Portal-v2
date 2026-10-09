@@ -181,7 +181,7 @@ Staff submission of MC covering today immediately starts qualified available cov
 
 ### Owner clarification · 9 Oct 2026 · MC submission entry
 
-Confirmed entry: Workspace → Leave. Employee selects MC, chooses absence dates, uploads MC proof and presses Submit. Do not create a standalone MC Report page. Today’s MC submission starts operational cover immediately; HR review is separate. This is an approved blueprint entry, not a build claim.
+Confirmed entry: Workspace → Leave. Employee selects MC, chooses absence dates and presses Submit; uploading MC proof is optional and never required (owner rule confirmed 9 Oct 2026). Do not create a standalone MC Report page. Today’s MC submission starts operational cover immediately; HR review is separate. This is an approved blueprint entry, not a build claim.
 
 ### Leave types · owner update 9 Oct 2026
 

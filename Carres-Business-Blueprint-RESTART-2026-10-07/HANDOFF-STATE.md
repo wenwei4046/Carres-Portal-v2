@@ -50,7 +50,7 @@ Current kit implementation boundary · 9 October 2026: v4 replaces the previous 
 
 ### 9 Oct owner update · MC submission
 
-Workspace → Leave is the confirmed MC submission entry: select MC, dates, upload proof, Submit. No standalone MC Report page. Submission covering today immediately starts qualified available cover without waiting for HR approval. See WS-11 and OWNER-CLARIFICATIONS; implementation not verified.
+Workspace → Leave is the confirmed MC submission entry: select MC, dates, Submit (proof upload optional, never required). No standalone MC Report page. Submission covering today immediately starts qualified available cover without waiting for HR approval. See WS-11 and OWNER-CLARIFICATIONS; implementation not verified.
 
 ### Leave types · owner update 9 Oct 2026
 

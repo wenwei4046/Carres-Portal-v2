@@ -60,7 +60,7 @@ function profileOf(row: Record<string, unknown> | null): CompanyProfileValues {
   return out;
 }
 
-async function changesOf(sb: SupabaseClient, section: "company" | "office"): Promise<SettingsChange[]> {
+async function changesOf(sb: SupabaseClient, section: "company" | "office" | "sales_orders" | "issue_tracker"): Promise<SettingsChange[]> {
   const { data, error } = await sb
     .from("settings_changes")
     .select("id, what, old_value, new_value, reason, changed_at, actor:app_users!settings_changes_actor_id_fkey(name)")
@@ -182,6 +182,16 @@ router.put("/office/holidays", requireSettingsEditor("office"), async (c) => {
     return c.json(f.body, f.status);
   }
   return c.json({ ok: true });
+});
+
+// ── The change record of a section without its own history (SET-01) ───────
+router.get("/changes/:section", requireOperationOrPrincipal, async (c) => {
+  const section = c.req.param("section");
+  if (section !== "sales_orders" && section !== "issue_tracker") {
+    return c.json({ error: "invalid_section", code: "invalid_param", message: "Unknown Settings section." }, 422);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  return c.json({ changes: await changesOf(sb, section) });
 });
 
 // ── May I edit this section? (TEAM-02) — for pages without their own flag ──
