@@ -11,7 +11,8 @@
  * other-debtors · other-debtor-parties · other-receipts · daily-bank ·
  * journal · general-ledger · trial-balance · reports · profit-and-loss ·
  * balance-sheet · cash-flow · ap-aging · credit-notes · credit-note ·
- * credit-note-new · forecast (last month, so the actual is a whole month) ·
+ * credit-note-new · debit-notes · debit-note · debit-note-new ·
+ * voucher-pays-debit-note (0681) · forecast (last month, so the actual is a whole month) ·
  * posting-accounts · item-groups (long lists under their tables, 0657–0659) ·
  * dealer-commission · dealer-statement (one made-up dealer, 0664; pick it on
  * the Statement view) · notes-to-follow-up · note-to-follow-up (0676).
@@ -490,6 +491,43 @@ const CREDIT_NOTE = {
   applied_total: "1000.00", credit_open: "650.00", go_live_on: GO_LIVE,
   can: { edit: false, confirm: false, cancel: false, add_file: true, apply: true, take_off: true },
 };
+// ── Payables → Debit Notes (0681) ───────────────────────────────────────────
+const DEBIT_NOTES = [
+  { id: "dn-1", note_no: "PDN-20261005-3381", status: "confirmed", supplier_id: "s-1", supplier_name: LONG_SUPPLIER,
+    supplier_kind: "supplier", supplier_note_no: "OH-DN-118", note_date: soon(-5), due_date: soon(25), ap_account_code: "2110",
+    total_amount: "780.00", paid_total: "500.00", held_total: "500.00", debit_open: "280.00", file_count: 1, created_at: at(-5) },
+  { id: "dn-2", note_no: "PDN-20260929-0417", status: "confirmed", supplier_id: "s-5", supplier_name: "Dorsettloft",
+    supplier_kind: "supplier", supplier_note_no: "DL-DN-7", note_date: soon(-11), due_date: null, ap_account_code: "2110",
+    total_amount: "60.00", paid_total: "60.00", held_total: "60.00", debit_open: "0.00", file_count: 0, created_at: at(-11) },
+  { id: "dn-3", note_no: null, status: "draft", supplier_id: "s-3", supplier_name: "Nice Future",
+    supplier_kind: "supplier", supplier_note_no: "NF-DN-1002", note_date: soon(-1), due_date: soon(29), ap_account_code: "2110",
+    total_amount: "150.00", paid_total: null, held_total: null, debit_open: null, file_count: 0, created_at: at(-1) },
+];
+const DEBIT_NOTE = {
+  note: { id: "dn-1", note_no: "PDN-20261005-3381", status: "confirmed", supplier_id: "s-1", supplier_name: LONG_SUPPLIER,
+    supplier_kind: "supplier", supplier_note_no: "OH-DN-118", note_date: soon(-5), due_date: soon(25), ap_account_code: "2110",
+    ap_account_name: "Trade payables", total_amount: "780.00", narration: "Price raised on the October sofas, and the delivery charge",
+    cancel_reason: null, created_at: at(-5), created_by_name: "Chew", confirmed_at: at(-5), confirmed_by_name: "Chew",
+    cancelled_at: null, cancelled_by_name: null, entry_no: "JE-2610-0062", reversal_entry_no: null },
+  lines: [
+    { line_no: 1, account_code: "5100", account_name: "Cost of goods sold", description: "Two 3 seater sofas billed RM 300.00 below the new price",
+      amount: "600.00", department_type: "OFFICE", department_id: null },
+    { line_no: 2, account_code: "5100", account_name: "Cost of goods sold", description: "Delivery to the showroom",
+      amount: "180.00", department_type: "OFFICE", department_id: null },
+  ],
+  payments: [
+    { voucher_id: "pv-1", voucher_no: "PV-20261007-2210", voucher_status: "approved", voucher_date: soon(-3),
+      amount_applied: "500.00", created_at: at(-3) },
+  ],
+  files: [{ id: "f-2", file_name: "OH-DN-118.pdf", mime_type: "application/pdf", size_bytes: 120000,
+    storage_path: "SUPPLIER_DEBIT_NOTE/dn-1/OH-DN-118.pdf", uploaded_at: at(-5), uploaded_by_name: "Chew" }],
+  events: [
+    { action: "created", note: null, at: at(-5), actor_name: "Chew" },
+    { action: "confirmed", note: "PDN-20261005-3381", at: at(-5), actor_name: "Chew" },
+  ],
+  paid_total: "500.00", held_total: "500.00", debit_open: "280.00", go_live_on: GO_LIVE,
+  can: { edit: false, confirm: false, cancel: false, add_file: true },
+};
 const AP_ACCOUNT_CHOICES = [
   { code: "2110", name: "Trade payables", kind: "LIABILITY", parent_code: "2100", is_control: true, control_for: "SUPPLIER",
     for_bill_line: false, for_voucher_line: false, for_ap: true, for_pay_from: false, for_credit_line: false },
@@ -770,6 +808,10 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     return json({ settled: "50.00", left_to_settle: "1600.00", settlements: [], owed: NOTES.rows.slice(0, 1) });
   if (url.includes("/api/finance/payables/credit-notes/cn-1")) return json(CREDIT_NOTE);
   if (url.includes("/api/finance/payables/credit-notes")) return json({ rows: CREDIT_NOTES });
+  if (url.includes("/api/finance/payables/debit-notes/dn-1/notes-to-follow-up"))
+    return json({ settled: "0.00", left_to_settle: "780.00", settlements: [], owed: [] });
+  if (url.includes("/api/finance/payables/debit-notes/dn-1")) return json(DEBIT_NOTE);
+  if (url.includes("/api/finance/payables/debit-notes")) return json({ rows: DEBIT_NOTES });
   if (url.includes("/api/finance/payables/accounts")) return json({ rows: AP_ACCOUNT_CHOICES });
   if (url.includes("/api/finance/ledger/departments"))
     return json({ rows: [{ department_type: "SUBSCRIPTION", department_id: null, name: "Subscription" },
@@ -838,6 +880,10 @@ const ROUTES: Record<string, string> = {
   "credit-notes": "/finance/credit-notes",
   "credit-note": "/finance/credit-notes/cn-1",
   "credit-note-new": "/finance/credit-notes/new",
+  "debit-notes": "/finance/debit-notes",
+  "debit-note": "/finance/debit-notes/dn-1",
+  "debit-note-new": "/finance/debit-notes/new",
+  "voucher-pays-debit-note": "/finance/payment-vouchers/new?supplier=s-1&debitNote=dn-1",
   "notes-to-follow-up": "/finance/notes-to-follow-up",
   "note-to-follow-up": "/finance/notes-to-follow-up/nf-1",
   "stock-value": "/finance/reports/stock-value",

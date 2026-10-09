@@ -342,6 +342,137 @@ describe("supplier credit notes (0642, Chew 2026-10-03)", () => {
   });
 });
 
+describe("supplier debit notes (0681, Chew 2026-10-03)", () => {
+  const NOTE_ID = "98989898-0000-4000-8000-000000000098";
+  const goodNote = {
+    supplierId: SUPPLIER_ID,
+    supplierNoteNo: "DN-12",
+    noteDate: "2026-10-09",
+    dueDate: "2026-11-08",
+    lines: [{ accountCode: "630-0000", description: "Delivery charge", amount: 120.5, departmentType: "OFFICE" }],
+  };
+
+  it("GET /debit-notes reads the register", async () => {
+    const sb = mockRpc({ data: [{ id: NOTE_ID }], error: null });
+    const res = await call("/debit-notes");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_debit_note_register");
+    expect(await res.json()).toEqual({ rows: [{ id: NOTE_ID }] });
+  });
+
+  it("GET /debit-notes/:id reads the document; a bad id is refused, a missing one is 404", async () => {
+    const sb = mockRpc({ data: { note: { id: NOTE_ID } }, error: null });
+    expect((await call(`/debit-notes/${NOTE_ID}`)).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_debit_note_document", { p_note_id: NOTE_ID });
+    expect((await call("/debit-notes/nope")).status).toBe(422);
+    mockRpc({ data: null, error: null });
+    expect((await call(`/debit-notes/${NOTE_ID}`)).status).toBe(404);
+  });
+
+  it("POST /debit-notes sends the draft, its due date and snake_case lines", async () => {
+    const sb = mockRpc({ data: NOTE_ID, error: null });
+    const res = await call("/debit-notes", { method: "POST", body: goodNote });
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_debit_note_save_draft", {
+      p_note_id: null,
+      p_supplier_id: SUPPLIER_ID,
+      p_supplier_note_no: "DN-12",
+      p_note_date: "2026-10-09",
+      p_lines: [{ account_code: "630-0000", description: "Delivery charge", amount: 120.5, department_type: "OFFICE", department_id: null }],
+      p_due_date: "2026-11-08",
+      p_ap_account_code: null,
+      p_narration: null,
+    });
+  });
+
+  it("PUT /debit-notes/:id rewrites a draft; no due date is sent as null", async () => {
+    const sb = mockRpc({ data: NOTE_ID, error: null });
+    const { dueDate: _due, ...noDue } = goodNote;
+    expect((await call(`/debit-notes/${NOTE_ID}`, { method: "PUT", body: noDue })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_debit_note_save_draft", expect.objectContaining({ p_note_id: NOTE_ID, p_due_date: null }));
+  });
+
+  it("refuses a note with no line, a line of RM 0.00 or a line with no description, before the database", async () => {
+    const sb = mockRpc({ data: NOTE_ID, error: null });
+    expect((await call("/debit-notes", { method: "POST", body: { ...goodNote, lines: [] } })).status).toBe(422);
+    expect((await call("/debit-notes", { method: "POST", body: { ...goodNote, lines: [{ ...goodNote.lines[0], amount: 0 }] } })).status).toBe(422);
+    expect((await call("/debit-notes", { method: "POST", body: { ...goodNote, lines: [{ ...goodNote.lines[0], description: " " }] } })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("confirm and cancel call their doors; a cancel needs a reason", async () => {
+    let sb = mockRpc({ data: null, error: null });
+    expect((await call(`/debit-notes/${NOTE_ID}/confirm`, { method: "POST" })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_debit_note_confirm", { p_note_id: NOTE_ID });
+    sb = mockRpc({ data: null, error: null });
+    expect((await call(`/debit-notes/${NOTE_ID}/cancel`, { method: "POST", body: { reason: "Entered twice" } })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_debit_note_cancel", { p_note_id: NOTE_ID, p_reason: "Entered twice" });
+    sb = mockRpc({ data: null, error: null });
+    expect((await call(`/debit-notes/${NOTE_ID}/cancel`, { method: "POST", body: { reason: " " } })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("a debit note on a voucher cannot be cancelled: the refusal comes back as it is", async () => {
+    mockRpc({ data: null, error: { code: "P0001", message: "RM 100.00 of this debit note is on payment vouchers. Cancel those vouchers first.", details: "note_on_voucher" } });
+    const res = await call(`/debit-notes/${NOTE_ID}/cancel`, { method: "POST", body: { reason: "Entered twice" } });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(JSON.stringify(await res.json())).toContain("Cancel those vouchers first");
+  });
+
+  it("a debit note takes files like a bill", async () => {
+    const sb = mockRpc({ data: FILE_UUID, error: null });
+    const path = `SUPPLIER_DEBIT_NOTE/${NOTE_ID}/${FILE_UUID}.pdf`;
+    const res = await call(`/debit-notes/${NOTE_ID}/files`, {
+      method: "POST", body: { path, fileName: "dn.pdf", mimeType: "application/pdf", sizeBytes: 1000 },
+    });
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("ap_document_file_add", expect.objectContaining({ p_document_type: "SUPPLIER_DEBIT_NOTE", p_document_id: NOTE_ID }));
+  });
+
+  it("its notes owed, and a debit note settling one", async () => {
+    const FOLLOWUP_ID = "12121212-0000-4000-8000-000000000012";
+    let sb = mockRpc({ data: { settled: 0, left_to_settle: 120.5, settlements: [], owed: [] }, error: null });
+    expect((await call(`/debit-notes/${NOTE_ID}/notes-to-follow-up`)).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_note_followups_of_debit_note", { p_note_id: NOTE_ID });
+    mockRpc({ data: null, error: null });
+    expect((await call(`/debit-notes/${NOTE_ID}/notes-to-follow-up`)).status).toBe(404);
+    sb = mockRpc({ data: "settlement-1", error: null });
+    expect((await call(`/notes-to-follow-up/${FOLLOWUP_ID}/settlements`, {
+      method: "POST", body: { debitNoteId: NOTE_ID, amount: 30 },
+    })).status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_note_followup_settle_by_debit_note", { p_id: FOLLOWUP_ID, p_debit_note_id: NOTE_ID, p_amount: 30 });
+    sb = mockRpc({ data: "settlement-1", error: null });
+    expect((await call(`/notes-to-follow-up/${FOLLOWUP_ID}/settlements`, {
+      method: "POST", body: { debitNoteId: NOTE_ID, creditNoteId: NOTE_ID, amount: 30 },
+    })).status).toBe(422);
+    expect((await call(`/notes-to-follow-up/${FOLLOWUP_ID}/settlements`, { method: "POST", body: { amount: 30 } })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("a voucher pays a debit note beside a bill", async () => {
+    const sb = mockRpc({ data: VOUCHER_ID, error: null });
+    const res = await call("/vouchers", {
+      method: "POST",
+      body: { ...goodVoucher, lines: [], allocations: [{ billId: BILL_ID, amount: 50 }, { debitNoteId: NOTE_ID, amount: 100 }] },
+    });
+    expect(res.status).toBe(201);
+    expect(sb.rpc.mock.calls[0]?.[1]).toMatchObject({
+      p_allocations: [{ bill_id: BILL_ID, amount: 50 }, { debit_note_id: NOTE_ID, amount: 100 }],
+    });
+  });
+
+  it("a voucher line that names both a bill and a debit note, or neither, is refused before the database", async () => {
+    const sb = mockRpc({ data: VOUCHER_ID, error: null });
+    expect((await call("/vouchers", { method: "POST", body: { ...goodVoucher, allocations: [{ billId: BILL_ID, debitNoteId: NOTE_ID, amount: 5 }] } })).status).toBe(422);
+    expect((await call("/vouchers", { method: "POST", body: { ...goodVoucher, allocations: [{ amount: 5 }] } })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses operation (finance and principal only)", async () => {
+    expect((await call("/debit-notes", { role: "operation" })).status).toBe(403);
+  });
+});
+
 describe("credit and debit notes to follow up (0676, Chew 2026-10-09)", () => {
   const NOTE_ID = "99999999-0000-4000-8000-000000000009";
   const FOLLOWUP_ID = "12121212-0000-4000-8000-000000000012";

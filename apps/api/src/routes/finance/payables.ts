@@ -10,6 +10,7 @@ import {
   paymentVoucherDraftInput,
   supplierBillDraftInput,
   supplierCreditNoteDraftInput,
+  supplierDebitNoteDraftInput,
   supplierFinanceInput,
   supplierNoteContactInput,
   supplierNoteFollowupAddInput,
@@ -17,6 +18,7 @@ import {
   type PaymentVoucherDraftInput,
   type SupplierBillDraftInput,
   type SupplierCreditNoteDraftInput,
+  type SupplierDebitNoteDraftInput,
 } from "@carres/shared/schemas/finance-ap";
 import { apAgingQuery, apAgingReport, type ApAgingAnswer } from "@carres/shared/ap-aging";
 import { billReadInput, matchSupplier, type BillReadAnswer } from "@carres/shared/bill-reading";
@@ -82,6 +84,15 @@ import type { AppEnv } from "../../types";
  *     POST /credit-notes/:id/applications       supplier_credit_note_apply — knock it off a bill; posts nothing
  *     POST /credit-note-applications/:id/cancel supplier_credit_note_application_cancel — take it off again
  *
+ *   Supplier debit notes (0681: the supplier charges more; a voucher pays them)
+ *     GET  /debit-notes                 supplier_debit_note_register
+ *     GET  /debit-notes/:id             supplier_debit_note_document
+ *     POST /debit-notes                 supplier_debit_note_save_draft (new draft)
+ *     PUT  /debit-notes/:id             supplier_debit_note_save_draft (rewrite a draft)
+ *     POST /debit-notes/:id/confirm     supplier_debit_note_confirm — posts it
+ *     POST /debit-notes/:id/cancel      supplier_debit_note_cancel — reverses it if confirmed
+ *     GET  /debit-notes/:id/notes-to-follow-up   supplier_note_followups_of_debit_note
+ *
  *   Credit and debit notes to follow up (0676: what suppliers still owe; posts nothing)
  *     GET  /notes-to-follow-up          supplier_note_followups_read (adds the purchase returns' own first)
  *     GET  /notes-to-follow-up/owed?supplierId=   supplier_note_followups_owed — the voucher's reminder
@@ -89,14 +100,15 @@ import type { AppEnv } from "../../types";
  *     POST /notes-to-follow-up          supplier_note_followup_add — from a bill line, or by hand
  *     POST /notes-to-follow-up/:id/contacts      supplier_note_followup_contact_add
  *     POST /notes-to-follow-up/:id/close         supplier_note_followup_close
- *     POST /notes-to-follow-up/:id/settlements   supplier_note_followup_settle — a confirmed credit note settles it
+ *     POST /notes-to-follow-up/:id/settlements   supplier_note_followup_settle — a confirmed credit note settles it;
+ *                                       supplier_note_followup_settle_by_debit_note — a confirmed debit note (0681)
  *     POST /note-settlements/:id/take-off        supplier_note_followup_settlement_take_off
  *     GET  /bills/:id/notes-to-follow-up         supplier_note_followups_of_bill
  *     GET  /credit-notes/:id/notes-to-follow-up  supplier_note_followups_of_credit_note
  *
- *   Files (supplier invoices, receipts, bank slips, credit notes)
- *     POST /bills/:id/files/sign  · POST /vouchers/:id/files/sign · POST /credit-notes/:id/files/sign
- *     POST /bills/:id/files       · POST /vouchers/:id/files      · POST /credit-notes/:id/files
+ *   Files (supplier invoices, receipts, bank slips, credit and debit notes)
+ *     POST /bills/:id/files/sign  · POST /vouchers/:id/files/sign · POST /credit-notes/:id/files/sign · POST /debit-notes/:id/files/sign
+ *     POST /bills/:id/files       · POST /vouchers/:id/files      · POST /credit-notes/:id/files      · POST /debit-notes/:id/files
  *     GET  /files/url?path=                                          short-lived read URL
  *
  * Every call runs as the SIGNED-IN USER (userClient). The database functions
@@ -108,7 +120,7 @@ const payablesRouter = new Hono<AppEnv>();
 const AP_BUCKET = "ap-documents";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type DocType = "SUPPLIER_BILL" | "PAYMENT_VOUCHER" | "SUPPLIER_CREDIT_NOTE";
+type DocType = "SUPPLIER_BILL" | "PAYMENT_VOUCHER" | "SUPPLIER_CREDIT_NOTE" | "SUPPLIER_DEBIT_NOTE";
 
 /** mapPgError, but a 403 keeps the database's reason code (not_finance_approver,
  *  voucher_cancelled …) so the page can say which rule refused. */
@@ -181,7 +193,9 @@ function voucherArgs(voucherId: string | null, d: PaymentVoucherDraftInput) {
       department_type: l.departmentType ?? null,
       department_id: l.departmentId ?? null,
     })),
-    p_allocations: d.allocations.map((a) => ({ bill_id: a.billId, amount: a.amount })),
+    // 0681: an allocation pays a bill or a supplier debit note.
+    p_allocations: d.allocations.map((a) =>
+      a.debitNoteId ? { debit_note_id: a.debitNoteId, amount: a.amount } : { bill_id: a.billId, amount: a.amount }),
     p_pay_method: d.payMethod,
     p_pay_reference: d.payReference ?? null,
     p_narration: d.narration ?? null,
@@ -627,6 +641,89 @@ payablesRouter.post("/credit-note-applications/:id/cancel", requireFinance, asyn
   return c.json({ id });
 });
 
+// ── supplier debit notes (0681; Chew 2026-10-03) ────────────────────────────
+// The supplier's debit note, entered once. Confirming posts Dr each line / Cr
+// the payables account (party = the supplier); a voucher pays it like a bill.
+
+function debitNoteArgs(noteId: string | null, d: SupplierDebitNoteDraftInput) {
+  return {
+    p_note_id: noteId,
+    p_supplier_id: d.supplierId,
+    p_supplier_note_no: d.supplierNoteNo,
+    p_note_date: d.noteDate,
+    p_lines: d.lines.map((l) => ({
+      account_code: l.accountCode,
+      description: l.description,
+      amount: l.amount,
+      department_type: l.departmentType ?? null,
+      department_id: l.departmentId ?? null,
+    })),
+    p_due_date: d.dueDate ?? null,
+    p_ap_account_code: d.apAccountCode ?? null,
+    p_narration: d.narration ?? null,
+  };
+}
+
+payablesRouter.get("/debit-notes", requireFinance, async (c) => {
+  const { data, error } = await sb(c).rpc("supplier_debit_note_register");
+  if (error) return pgFail(c, error);
+  return c.json({ rows: data ?? [] });
+});
+
+payablesRouter.get("/debit-notes/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "debit note");
+  const { data, error } = await sb(c).rpc("supplier_debit_note_document", { p_note_id: id });
+  if (error) return pgFail(c, error);
+  if (!data) return c.json({ error: "not_found", code: "note_missing", message: "That debit note does not exist." }, 404);
+  return c.json(data);
+});
+
+payablesRouter.post("/debit-notes", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, supplierDebitNoteDraftInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("supplier_debit_note_save_draft", debitNoteArgs(null, body.data));
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string }, 201);
+});
+
+payablesRouter.put("/debit-notes/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "debit note");
+  const body = await parseJsonBody(c, supplierDebitNoteDraftInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("supplier_debit_note_save_draft", debitNoteArgs(id, body.data));
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string });
+});
+
+payablesRouter.post("/debit-notes/:id/confirm", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "debit note");
+  const { error } = await sb(c).rpc("supplier_debit_note_confirm", { p_note_id: id });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
+payablesRouter.post("/debit-notes/:id/cancel", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "debit note");
+  const body = await parseJsonBody(c, apReasonInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { error } = await sb(c).rpc("supplier_debit_note_cancel", { p_note_id: id, p_reason: body.data.reason });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
+payablesRouter.get("/debit-notes/:id/notes-to-follow-up", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "debit note");
+  const { data, error } = await sb(c).rpc("supplier_note_followups_of_debit_note", { p_note_id: id });
+  if (error) return pgFail(c, error);
+  if (!data) return c.json({ error: "not_found", code: "note_missing", message: "That debit note does not exist." }, 404);
+  return c.json(data);
+});
+
 // ── credit and debit notes to follow up (0676) ──────────────────────────────
 payablesRouter.get("/notes-to-follow-up", requireFinance, async (c) => {
   const { data, error } = await sb(c).rpc("supplier_note_followups_read");
@@ -699,11 +796,18 @@ payablesRouter.post("/notes-to-follow-up/:id/settlements", requireFinance, async
   if (!UUID_RE.test(id)) return badId(c, "note to follow up");
   const body = await parseJsonBody(c, supplierNoteSettleInput);
   if (!body.ok) return c.json(body.body, body.status);
-  const { data, error } = await sb(c).rpc("supplier_note_followup_settle", {
-    p_id: id,
-    p_credit_note_id: body.data.creditNoteId,
-    p_amount: body.data.amount,
-  });
+  // 0681: a debit note settles a debit note owed through its own door.
+  const { data, error } = body.data.debitNoteId
+    ? await sb(c).rpc("supplier_note_followup_settle_by_debit_note", {
+        p_id: id,
+        p_debit_note_id: body.data.debitNoteId,
+        p_amount: body.data.amount,
+      })
+    : await sb(c).rpc("supplier_note_followup_settle", {
+        p_id: id,
+        p_credit_note_id: body.data.creditNoteId,
+        p_amount: body.data.amount,
+      });
   if (error) return pgFail(c, error);
   return c.json({ id: data as string }, 201);
 });
@@ -783,6 +887,7 @@ const DOC_ROUTES: ReadonlyArray<{ prefix: string; type: DocType; what: string }>
   { prefix: "/bills", type: "SUPPLIER_BILL", what: "bill" },
   { prefix: "/vouchers", type: "PAYMENT_VOUCHER", what: "payment voucher" },
   { prefix: "/credit-notes", type: "SUPPLIER_CREDIT_NOTE", what: "credit note" },
+  { prefix: "/debit-notes", type: "SUPPLIER_DEBIT_NOTE", what: "debit note" },
 ];
 
 for (const { prefix, type, what } of DOC_ROUTES) {
@@ -825,7 +930,7 @@ for (const { prefix, type, what } of DOC_ROUTES) {
 const filePathQuery = z
   .string()
   .max(400)
-  .regex(/^(SUPPLIER_BILL|PAYMENT_VOUCHER|SUPPLIER_CREDIT_NOTE)\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(pdf|jpg|png|webp)$/i);
+  .regex(/^(SUPPLIER_BILL|PAYMENT_VOUCHER|SUPPLIER_CREDIT_NOTE|SUPPLIER_DEBIT_NOTE)\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(pdf|jpg|png|webp)$/i);
 
 payablesRouter.get("/files/url", requireFinance, async (c) => {
   const parsed = filePathQuery.safeParse(c.req.query("path") ?? "");

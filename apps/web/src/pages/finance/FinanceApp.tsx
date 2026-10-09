@@ -37,6 +37,7 @@ import Forecast from "./reports/Forecast";
 import ApOutstanding from "./payables/ApOutstanding";
 import SupplierFinancePage from "./payables/SupplierFinancePage";
 import SupplierCreditNotes from "./payables/SupplierCreditNotes";
+import SupplierDebitNotes from "./payables/SupplierDebitNotes";
 import NotesToFollowUp from "./payables/NotesToFollowUp";
 import PaymentRequests from "./payment-requests/PaymentRequests";
 
@@ -108,6 +109,7 @@ export default function FinanceApp() {
           <Route path="payment-requests/*" element={<PaymentRequests />} />
           {/* 0642 — a supplier's credit note takes money off what Carres owes (Chew 2026-10-03). */}
           <Route path="credit-notes/*"     element={financeOnly(<SupplierCreditNotes />)} />
+          <Route path="debit-notes/*"      element={financeOnly(<SupplierDebitNotes />)} />
           {/* 0676: the credit and debit notes suppliers still owe. */}
           <Route path="notes-to-follow-up/*" element={financeOnly(<NotesToFollowUp />)} />
           {/* 0636 — Finance's own tax and bank details per supplier (Chew 2026-10-03). */}
