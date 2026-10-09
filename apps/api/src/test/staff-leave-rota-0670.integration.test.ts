@@ -311,10 +311,12 @@ describe.skipIf(!URL)("leave feeds cover, PO/GRN rotate monthly, Saturday on-cal
     });
   });
 
-  it("the owner default 10:00 AM morning check is storable; 9:59 AM is not", async () => {
+  // 0676: the floor is the stored Office start (9:00 AM by default), no longer
+  // a fixed 10:00 AM, so the refused probe is a minute before Office start.
+  it("the owner default 10:00 AM morning check is storable; before Office start is not", async () => {
     await scoped(async () => {
       const rev = (await one("select revision from workspace_activity_settings where id = 1")).revision;
-      expect(await attempt("select public.workspace_set_activity_times('09:59', '14:01', $1)", [rev])).toBe("invalid_check_times");
+      expect(await attempt("select public.workspace_set_activity_times('08:59', '14:01', $1)", [rev])).toBe("invalid_check_times");
       const saved = (await one("select public.workspace_set_activity_times('10:00', '14:01', $1) as r", [rev])).r as J;
       expect(saved.morning).toBe("10:00:00");
       expect(saved.afternoon).toBe("14:01:00");
