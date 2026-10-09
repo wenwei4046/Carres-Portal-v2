@@ -740,6 +740,23 @@ database's or the network's own text.
 Client validation may guide early, but the server returns the same business refusal and remains
 authoritative. No message says `Invalid`, `Error` or `Something went wrong` without the repair.
 
+### 4.4.9 · Settings editors, Company and Office — BUILT ON BRANCH 2026-10-09 (`build/settings-completion`; 0669 · 0674 not applied, not deployed)
+
+Owner rules TEAM-02 · SET-01 · COM · OFF (Carres Settings List, 9 Oct 2026). **Who edits Settings:**
+the owner (principal) edits every section; she names a person per section in Settings → Team and
+access → `Settings editors` (`settings_section_editors`, 0668 — applied to production by another
+session 9 Oct). Every Settings write asks the one gate `settings_can_edit(section)` in the API
+(`requireSettingsEditor`) and in SQL (0674 rewrites the Purchasing, Payment, Delivery, Warehouse and
+Staff & Duties gates and the Sales Order entry door; Warehouse keeps its own manage-settings
+capability). A named editor gets configuration editing only — never a money approval, a Duty or
+ordinary-work rights. Measured 9 Oct: the only active `ops_manager` holder is the owner, so moving
+the gates removes nobody's live right. Pages show read-only to anyone not named. **Company**
+(COM-01/02) and **Office** (OFF-01…05) are stored singletons with who · when · old → new · optional
+reason (`settings_changes`, 0669); the Office calendar (Monday to Friday, Kuala Lumpur holidays
+recorded one year at a time, built-in list per unrecorded year) is the ONE calendar Office deadlines
+read (`readOfficeCalendar` / `useOfficeCalendar`). Saturday on-call never makes Saturday an Office
+day. Remaining gaps are listed in Carres Settings List "Build state".
+
 ### 4.5 · Access, states and responsive behaviour
 
 | State | Required presentation and behaviour |
