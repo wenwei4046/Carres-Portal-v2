@@ -40,6 +40,9 @@ const POSTINGS = {
     { role: "TRADE_PAYABLE", changeable: false, accountCode: "400-0000", accountName: "TRADE CREDITORS", changedAt: null, changedBy: null },
     { role: "COST_OF_GOODS_SOLD", changeable: true, accountCode: "610-0000", accountName: "PURCHASES", changedAt: null, changedBy: null },
     { role: "OTHER_INCOME", changeable: true, accountCode: "580-0000", accountName: "ADDITIONAL INCOME", changedAt: null, changedBy: null },
+    // 0675: the dealer commission month close's accounts.
+    { role: "DEALER_COMMISSION", changeable: true, accountCode: "900-C007", accountName: "COMMISSION - DEALER", changedAt: null, changedBy: null },
+    { role: "DEALER_COMMISSION_ACCRUED", changeable: true, accountCode: "410-0061", accountName: "ACCRUALS - COMMISSION DEALER", changedAt: null, changedBy: null },
   ],
   changes: [
     { id: "P8", what: "PAYMENT", key: "bank/*", name: "Bank transfer", fromCode: "310-1000", fromName: "PUBLIC BANK", toCode: "310-2000", toName: "HONG LEONG BANK", changedAt: "2026-10-07T10:00:00Z", changedBy: "Chew" },
@@ -64,6 +67,10 @@ const CHART = [
   acc("610-0000", "PURCHASES", "EXPENSE", { parent_code: "5000" }),
   acc("610-0020", "PURCHASE - MATTRESS", "EXPENSE", { parent_code: "5000" }),
   acc("310-2000", "HONG LEONG BANK", "ASSET", { parent_code: "310-0000" }),
+  acc("900-C007", "COMMISSION - DEALER", "EXPENSE", { parent_code: "900-C001" }),
+  acc("400-0000", "TRADE CREDITORS", "LIABILITY", { parent_code: "400", is_control: true, control_for: "SUPPLIER" }),
+  acc("410-0061", "ACCRUALS - COMMISSION DEALER", "LIABILITY", { parent_code: "410-0000" }),
+  acc("410-0099", "ACCRUALS - OTHER", "LIABILITY", { parent_code: "410-0000" }),
 ];
 
 vi.mock("@/lib/api", () => ({
@@ -220,6 +227,23 @@ describe("Posting accounts (0657)", () => {
     expect(row("PAYMENT/online/stripe_checkout")).toHaveTextContent("Jess");
   });
 
+  it("lists the dealer commission accounts under Dealers; what is owed takes a liability (0675)", async () => {
+    show();
+    await ready();
+    expect(screen.getByTestId("grid-group-toggle-dealer")).toHaveTextContent("Dealers");
+    expect(row("ROLE/DEALER_COMMISSION")).toHaveTextContent("Dealer commission900-C007 COMMISSION - DEALER");
+    fireEvent.click(within(row("ROLE/DEALER_COMMISSION_ACCRUED")).getByText("Dealer commission owed"));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Account \(Liability\)/ }), { key: "Enter" });
+    // Never a control account, nor an expense.
+    expect(screen.queryByRole("option", { name: "400-0000 TRADE CREDITORS" })).toBeNull();
+    expect(screen.queryByRole("option", { name: "900-C007 COMMISSION - DEALER" })).toBeNull();
+    fireEvent.click(screen.getByRole("option", { name: "410-0099 ACCRUALS - OTHER" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(net.calls).toHaveLength(1));
+    expect(net.calls[0]!.body).toEqual({ what: "ROLE", key: "DEALER_COMMISSION_ACCRUED", accountCode: "410-0099", was: "410-0061" });
+  });
+
   it("never opens an account the system keeps", async () => {
     show();
     await ready();
@@ -254,5 +278,7 @@ describe("posting words and options", () => {
   it("offers only accounts in use of the posting's kind, never a heading or a money account", () => {
     const codes = postingAccountOptions("INCOME", CHART as never, ["310-2000"]).map((a) => a.code);
     expect(codes).toEqual(["500-0000", "500-2000", "500-3000", "500-4000", "580-0000"]);
+    // 0675: a liability, never a control account.
+    expect(postingAccountOptions("LIABILITY", CHART as never, ["310-2000"]).map((a) => a.code)).toEqual(["410-0061", "410-0099"]);
   });
 });

@@ -8,11 +8,15 @@
  * to postings made after it: earlier ones keep their accounts. Each change is
  * kept (who, when, from which account to which) and listed under the postings.
  *
- * FOUR GROUPS, ONE DOOR EACH.
+ * FIVE GROUPS, ONE DOOR EACH.
  *   Sales                 an invoice's goods, add-ons and storage: the income
  *                         map (0466). An add-on with no account yet says so:
  *                         its invoices cannot be issued until it has one.
  *   Purchases and charges three roles Finance may change (0657).
+ *   Dealers               the dealer commission month close's six accounts
+ *                         (0666): each expense and what is owed for it until
+ *                         the dealer is paid, a liability (0675, Chew
+ *                         2026-10-09).
  *   Customer money        the money account each way of being paid lands in.
  *                         Payment settings owns the method; Finance sets this
  *                         one setting here (0658, Chew 2026-10-07), through a
@@ -44,6 +48,8 @@ import { usePostingAccounts, useSetPostingAccount } from "./api";
 export const POSTING_GROUPS = [
   { key: "sales", label: "Sales" },
   { key: "costs", label: "Purchases and charges" },
+  // 0675: PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew)).
+  { key: "dealer", label: "Dealers" },
   { key: "money", label: "Customer money" },
   { key: "system", label: "Kept by the system · renamed in Chart of accounts" },
 ] as const;
@@ -56,6 +62,13 @@ export const ROLE_WORD: Record<string, string> = {
   COST_OF_GOODS_SOLD: "Goods bought that are not in the catalog",
   BANK_AND_PAYMENT_CHARGES: "Bank and card charges",
   OTHER_INCOME: "Money the bank pays in",
+  // 0675: the dealer commission month close (0666).
+  DEALER_COMMISSION: "Dealer commission",
+  DEALER_COMMISSION_ACCRUED: "Dealer commission owed",
+  RENOVATION_REBATE: "Renovation rebate",
+  RENOVATION_REBATE_ACCRUED: "Renovation rebate owed",
+  KPI_ALLOWANCE: "KPI allowance",
+  KPI_ALLOWANCE_ACCRUED: "KPI allowance owed",
   TRADE_PAYABLE: "Suppliers owed for goods",
   OTHER_PAYABLE: "Suppliers owed for other bills",
   CUSTOMER_DEPOSITS_HELD: "Customer deposits",
@@ -65,12 +78,27 @@ export const ROLE_WORD: Record<string, string> = {
 };
 const ROLE_ORDER = Object.keys(ROLE_WORD);
 
+type PostingKind = "INCOME" | "EXPENSE" | "LIABILITY";
+
 /** The kind of account each changeable posting takes. */
-const ROLE_KIND: Record<string, "INCOME" | "EXPENSE"> = {
+const ROLE_KIND: Record<string, PostingKind> = {
   COST_OF_GOODS_SOLD: "EXPENSE",
   BANK_AND_PAYMENT_CHARGES: "EXPENSE",
   OTHER_INCOME: "INCOME",
+  // 0675: what a dealer is owed is a liability until it is paid.
+  DEALER_COMMISSION: "EXPENSE",
+  DEALER_COMMISSION_ACCRUED: "LIABILITY",
+  RENOVATION_REBATE: "EXPENSE",
+  RENOVATION_REBATE_ACCRUED: "LIABILITY",
+  KPI_ALLOWANCE: "EXPENSE",
+  KPI_ALLOWANCE_ACCRUED: "LIABILITY",
 };
+
+/** The roles under Dealers (0675). */
+const DEALER_ROLES = new Set([
+  "DEALER_COMMISSION", "DEALER_COMMISSION_ACCRUED", "RENOVATION_REBATE",
+  "RENOVATION_REBATE_ACCRUED", "KPI_ALLOWANCE", "KPI_ALLOWANCE_ACCRUED",
+]);
 
 export function incomeWord(p: Pick<LedgerIncomePosting, "type" | "key" | "name">): string {
   if (p.type === "STORAGE") return "Storage charges";
@@ -83,7 +111,7 @@ export interface PostingRow {
   group: GroupKey;
   word: string;
   /** For a row Finance changes here: the door's `what` and `key`, and the kind of account it takes. */
-  change: { what: "INCOME" | "ROLE" | "PAYMENT"; key: string; kind: "INCOME" | "EXPENSE" | "MONEY" } | null;
+  change: { what: "INCOME" | "ROLE" | "PAYMENT"; key: string; kind: PostingKind | "MONEY" } | null;
   accountCode: string | null;
   accountName: string | null;
   changedAt: string | null;
@@ -115,7 +143,7 @@ export function postingRows(
   const byRole = [...roles].sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role));
   const roleRows = byRole.map((r): PostingRow => ({
     id: `ROLE/${r.role}`,
-    group: r.changeable ? "costs" : "system",
+    group: !r.changeable ? "system" : DEALER_ROLES.has(r.role) ? "dealer" : "costs",
     word: ROLE_WORD[r.role] ?? r.role,
     change: r.changeable && ROLE_KIND[r.role] ? { what: "ROLE", key: r.role, kind: ROLE_KIND[r.role]! } : null,
     accountCode: r.accountCode,
@@ -133,7 +161,8 @@ export function postingRows(
     changedAt: m.changedAt ?? null,
     changedBy: m.changedBy ?? null,
   }));
-  return [...sales, ...roleRows.filter((r) => r.group === "costs"), ...money, ...roleRows.filter((r) => r.group === "system")];
+  const of = (g: GroupKey) => roleRows.filter((r) => r.group === g);
+  return [...sales, ...of("costs"), ...of("dealer"), ...money, ...of("system")];
 }
 
 /** The POS card and Online payment rows, which have no method row (0541). */
@@ -238,7 +267,7 @@ export default function PostingAccounts() {
  *  account, and the kind the posting takes (_gl_posting_account_write's own
  *  checks, so the window never offers one the database refuses). */
 export function postingAccountOptions(
-  kind: "INCOME" | "EXPENSE",
+  kind: PostingKind,
   accounts: readonly LedgerAccount[],
   moneyAccounts: readonly string[],
 ): LedgerAccount[] {
