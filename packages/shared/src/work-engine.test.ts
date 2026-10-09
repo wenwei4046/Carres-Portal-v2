@@ -511,7 +511,7 @@ describe("workItemsForOrder — WHO + ACTION + actual working day", () => {
 });
 
 describe("the stored leads and calendars reach the order's Work (9 Oct 2026)", () => {
-  const assignOf = (over: Partial<typeof ctx> & Record<string, unknown>, leads?: { chase: number; assign?: number }) =>
+  const assignOf = (over: Partial<import("./work-engine").OrderWorkContext>, leads?: { chase: number; assign?: number }) =>
     workItemsForOrder(openOrderActions(baseSignals), { ...ctx, ...over }, "2026-08-11", HOLS, leads)
       .find((i) => i.ruleKey === "assign_logistics")!;
 
