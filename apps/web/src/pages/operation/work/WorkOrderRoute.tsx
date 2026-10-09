@@ -15,18 +15,19 @@
  * other models already gave — the Logistics card's `2 working days before`
  * check (Contact), `supplierCardModel` (PO · GRN), the Sales Order's loan
  * offer (`loanOfferStateOf`) and loan Unit, and Payment's one deadline
- * (`paymentDeadlineOf`). It stores nothing and writes nothing. Each point is a
+ * (`paymentDeadlineOf`, over the stored Collection timing and the Office
+ * holidays). It stores nothing and writes nothing. Each point is a
  * keyboard button that opens ONE compact detail row with its owner's door.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   MISSION_ROUTE_COPY as R,
+  isOutstation,
   loanOfferStateOf,
   missionRouteModel,
   moneyAffectsDelivery,
   mytDayOf,
-  myHolidaySet,
   paymentDeadlineOf,
   type MissionRoutePoint,
   type RoutePointKey,
@@ -75,11 +76,14 @@ export function useMissionRoute(orderId: string) {
        without it (PO · GRN `Unavailable`), never a wiped line. */
     if (!supplier && !factsQ.isError) return null;
     const today = appTodayIso();
-    const holidays = myHolidaySet();
+    /* Payment's own clock (Law D): the stored Collection timing for this
+       order and the Office holidays — the one stored holiday list. */
+    const holidays = lm.officeDays.holidays;
+    const timing = lm.collectionTiming;
     const money = moneyOfOrder(o);
     const owed = money.known ? money.outstanding : 0;
     const anchor = card.confirmedDate ?? card.scope.customerDeliveryIso ?? null;
-    const outstation = lm.facts?.partner ? !lm.facts.partner.kvDefault : false;
+    const outstation = isOutstation(lm.facts?.partner);
     const loanUnits = o.ops_sofa_loans ?? [];
     const offer = loanOfferStateOf(loansQ.data?.offers ?? []);
     const loan = loanUnits.length
@@ -102,13 +106,13 @@ export function useMissionRoute(orderId: string) {
       deliveredIso: o.delivered_at ? mytDayOf(o.delivered_at) : null,
       payment: {
         owedText: owed > 0 ? `RM ${RM.format(owed)}` : null,
-        deadlineIso: paymentDeadlineOf({ anchorIso: anchor, outstation, holidays }),
-        affects: moneyAffectsDelivery({ owed, anchorIso: anchor, todayIso: today, outstation, holidays }),
+        deadlineIso: paymentDeadlineOf({ anchorIso: anchor, outstation, holidays, timing }),
+        affects: moneyAffectsDelivery({ owed, anchorIso: anchor, todayIso: today, outstation, holidays, timing }),
         financeHold: (o.order_finance_exceptions ?? []).some((e) => e.status === "open"),
       },
       spell,
     });
-  }, [card, o, lm.model, lm.facts, supplier, factsQ.isError, loansQ.data]);
+  }, [card, o, lm.model, lm.facts, lm.officeDays, lm.collectionTiming, supplier, factsQ.isError, loansQ.data]);
   return { route, lm, supplier, customer, factsQ, loading: lm.scope.loading || factsQ.isLoading, failed: lm.scope.failed };
 }
 

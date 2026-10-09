@@ -7623,6 +7623,15 @@ export interface DeliverySettingsResponse {
   partnerAccounts: Array<{ id: string; name: string | null; email: string; partner_id: string | null; status: string }>;
   canEdit: boolean;
   contactLeadWorkingDays: number | null;
+  /** 0673 · Delivery Rules → `Assign logistics by` (DEL-04). `stored: false`
+   *  = not installed: the default answers and Edit is not offered. Absent on
+   *  an older API. */
+  rules?: {
+    assignmentLeadWorkingDays: number;
+    revision: number | null;
+    stored: boolean;
+    canEdit: boolean;
+  };
 }
 export const DELIVERY_SETTINGS_QUERY_KEY = ["operation", "delivery-settings"] as const;
 export function useDeliverySettings() {
@@ -9141,6 +9150,8 @@ export interface PaymentSettingsPayload {
   /** 0486 — newest effective first; the head is the current rule. */
   collection_timing: Array<{
     id: string; ask_days_before: number; deadline_days_before: number;
+    /** 0672 — the outstation pair; absent on a row read before 0672. */
+    outstation_ask_days_before?: number | null; outstation_deadline_days_before?: number | null;
     effective_from: string; reason: string | null; created_at: string;
   }>;
   setting_changes: Array<{

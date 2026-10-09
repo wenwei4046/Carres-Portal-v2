@@ -21,6 +21,7 @@ import { workspaceDutyActor } from "./workspace-duty-owner";
 import { useActiveOrder } from "@/lib/active-order";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { useDeliveryLeads, useOfficeDays } from "@/lib/deadline-queries";
 import { orderStatusPill } from "@/lib/status-pill";
 import { cjkClassName } from "@/lib/cjk";
 import { areaForAddress, detectState, locationForAddress } from "@/lib/region";
@@ -687,7 +688,10 @@ export function deliveryStepAnchor(
   step: DeliveryQueueKey,
 ): string | null {
   switch (step) {
+    // DEL-04: `Assign logistics by` counts back from the Scheduled delivery,
+    // else the Requested one (`assignLogisticsDueIso`'s anchor).
     case "assign":
+      return ovlOf(o)?.confirmed_date ?? (o.delivery_date_tbd ? null : o.delivery_date);
     case "chase":
       return o.delivery_date_tbd ? null : o.delivery_date;
     case "deliver_today":
@@ -2652,10 +2656,12 @@ export default function OperationOrdersControl({ onImport }: Props) {
     () => liveScope.filter(isSupplierLate).length,
     [liveScope],
   );
-  // ONE holiday set for the page — every deadline on this screen skips the same
-  // Malaysian public holidays (Law 2A: the calendars differ in their WEEK, never
-  // in their holidays).
+  // The Delivery week's holidays — the delivery queues are Delivery facts.
   const officeHolidays = useMemo(() => myHolidaySet(), []);
+  /* The two delay clocks are OFFICE work: they count on the stored Office
+     calendar (Settings → Office, 9 Oct 2026) — its holidays and its week. */
+  const officeDays = useOfficeDays();
+  const deliveryLeads = useDeliveryLeads();
   // C8b · THE TWO DELAY CLOCKS (Loo 2026-07-28, `ORDERS-WORKING-FLOW` §3).
   // Delay planning gets 2 working days from the day the supplier's date first
   // overshot the promise; the logistics call gets the SAME working day from the
@@ -2677,7 +2683,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
           a.key,
           delayActionAnchor(o, a.key),
           today,
-          officeHolidays,
+          officeDays.holidays,
+          officeDays.offDays,
         )
       )
         cur.late += 1;
@@ -2685,7 +2692,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
     }
     return stat;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveScope, availableBySku, officeHolidays]);
+  }, [liveScope, availableBySku, officeDays]);
   // T7 · DELIVERY queues + auto-overdue (Jess 2026-07-27). Each of the four
   // delivery steps carries its own deadline (shared `delivery-queue.ts`), so a
   // queue item turns LATE by itself — nobody has to watch it. Counts still come
@@ -2695,9 +2702,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
   const holidayOpts = useMemo(() => ({ holidays: officeHolidays }), [officeHolidays]);
   // P1 — the working days of notice on `Confirm delivery date` (Jess may set
   // 5). Undefined until the settings land, which leaves the step on its seed.
+  // DEL-04 — `Assign logistics by` reads Delivery Rules (0673) through the
+  // same helper, so the list and Work count the one stored lead.
   const queueLeads = useMemo(
-    () => (purchasingSettings ? deliveryQueueLeads(purchasingSettings) : undefined),
-    [purchasingSettings],
+    () => (purchasingSettings
+      ? deliveryQueueLeads({ ...purchasingSettings, assignmentLeadWorkingDays: deliveryLeads.assignmentLeadWorkingDays })
+      : undefined),
+    [purchasingSettings, deliveryLeads.assignmentLeadWorkingDays],
   );
   const deliveryQueueStats = useMemo(() => {
     const today = todayIso();

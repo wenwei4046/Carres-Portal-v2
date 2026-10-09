@@ -33,11 +33,11 @@
  * week + Malaysian holidays). The customer-contact ACTION is scheduled on the
  * resolved action owner's governed working days: when a fact day is not one
  * the owner works, the action moves to the owner's previous working day. The
- * fact itself never moves — a deadline may stand on a Saturday; an Operation
- * action may not, because Operation does not work on Saturday. That is a
- * property of the OWNER's calendar (`OWNER_CALENDAR.offDays`), not a global
- * rule: a future collection owner who works Saturdays keeps a Saturday
- * action.
+ * fact itself never moves — a deadline may stand on a Saturday; an Office
+ * action may not while the stored Office calendar (Settings → Office, Mon–Fri
+ * by default) does not work Saturday. That is a property of the OWNER's
+ * calendar (`officeOwnerCalendar`), not a global rule: an Office calendar
+ * that works Saturdays keeps a Saturday action.
  *
  * The ANCHOR is the customer's confirmed delivery date when one exists —
  * that is the day a truck moves — otherwise the promised date: collection
