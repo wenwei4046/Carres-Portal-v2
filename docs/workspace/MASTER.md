@@ -221,7 +221,7 @@ admission makes the person available for the governed rotation; it does not mean
 must be the PO holder on that first day. Existing approval capability and receiving-posting rules
 remain separate.
 
-**MONTHLY ROTATION ORDER — OWNER-APPROVED 2026-09-29 / BUILT ON BRANCH 2026-10-09 (0671, `build/settings-people`; not applied, not deployed — see §4.4 "Leave, rota and Saturday on-call build").**
+**MONTHLY ROTATION ORDER — OWNER-APPROVED 2026-09-29 / BUILT ON BRANCH 2026-10-09 (0671, `build/settings-completion`; not applied, not deployed — see §4.4 "Leave, rota and Saturday on-call build").**
 Maintain a stable cyclic order of eligible routine Operation staff. Each month one person owns PO
 Duty and the next person in that order owns GRN Duty; advance the PO position by one each month.
 For three eligible people A/B/C, the cycle is PO A / GRN B → PO B / GRN C → PO C / GRN A.
@@ -652,7 +652,7 @@ responsibility. Subsequent cover changes are recorded; no silent task ping-pong.
 cover or unreadable evidence stays a visible exception, never fabricated assignment. Approver
 qualifications do not inherit ordinary-work help rights.
 
-**Leave, rota and Saturday on-call build — BUILT ON BRANCH 2026-10-09 (`build/settings-people`,
+**Leave, rota and Saturday on-call build — BUILT ON BRANCH 2026-10-09 (`build/settings-completion`,
 migrations 0670/0671 NOT APPLIED, NOT DEPLOYED; owner walk owed).** Measured implementation, not a
 production claim:
 - *Leave (0670).* `staff_leave` (People-owned dated absence; one row per submission; cancel stamps
@@ -1574,7 +1574,7 @@ keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll
      deadline by which the **Scheduled delivery must be recorded** — Work's `confirm_delivery_date`,
      the Route's `Contact` point and the Logistics card show it as that deadline.
    A surface that shows either day names which one it is; neither is relabelled as the other.
-   **9 Oct 2026 (BUILT ON BRANCH `build/settings-deadlines`):** the first check counts the stored
+   **9 Oct 2026 (BUILT ON BRANCH `build/settings-completion`):** the first check counts the stored
    Contact lead (`logistics_call_working_days`, DEL-05) and prints its number (`{n} working days
    before`, the ruled `3 working days before` at the default); `2` and `1` stay fixed, and
    `confirm_delivery_date` stays on the fixed 2-day check. `Assign logistics` is due by Delivery

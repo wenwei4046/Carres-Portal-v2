@@ -303,7 +303,7 @@ until the complete authorised source is healthy.
 
 Authority: `Carres Settings List.md` WS-05, WS-11, WS-12 and the 9 Oct "Leave types", "Leave approval
 policy" and "Saturday on-call boundary" rulings; Workspace MASTER §4.4. One leave entry; no type needs
-approval; Saturday on-call is contact coverage, never a Duty. Built on `build/settings-people`, not
+approval; Saturday on-call is contact coverage, never a Duty. Built on `build/settings-completion`, not
 deployed; owner walk owed.
 
 | Meaning | Use exactly | Do NOT use |
@@ -834,7 +834,7 @@ the `ETA` field in the Logistics Details edit state.
 |---|---|
 | Settings rail row and page | `Logistics` (never `Logistics Partners`; `Partner` is banned) · sections `Company details` · `Coverage` · `Schedule` · `Transit points` · `Drivers and Vehicles` · `Services & charges` · `Portal access` · one `Save changes` per page · `Not configured` |
 | Delivery Rules | `Logistics contacts the customer` (fixed) · `Carres contacts the customer only for: a known delay · another date requested · customer refused · wrong phone number` · `Contact lead days` (reads the shared `chase` setting) · `Evidence required by result` |
-| Logistics assignment timing (owner-approved 2026-09-29 · confirmed 9 Oct 2026 · BUILT ON BRANCH `build/settings-deadlines`, 0673 not applied) | `Assign logistics` remains the action. Its date comes from Delivery MASTER §2.1's configured assignment deadline, not the action's opening day or a hardcoded three-day label. Preserve the governed date format and separate assignment metadata. The Settings row and the Route fact that name the deadline are in § "Stored deadline settings words" below. |
+| Logistics assignment timing (owner-approved 2026-09-29 · confirmed 9 Oct 2026 · BUILT ON BRANCH `build/settings-completion`, 0673 not applied) | `Assign logistics` remains the action. Its date comes from Delivery MASTER §2.1's configured assignment deadline, not the action's opening day or a hardcoded three-day label. Preserve the governed date format and separate assignment metadata. The Settings row and the Route fact that name the deadline are in § "Stored deadline settings words" below. |
 | NETS arrange page | `Delivery dates` · facts `Reference` · `Customer` · `Area` · `Goods` · `Requested delivery` · fields `Scheduled date` · `Scheduled time (optional)` · `ETA (optional)` · `Result` · `Note` · `Reply screenshot` · acts `Save delivery date` · `Cannot deliver` (`Confirmed date`, `Time window`, `Save Delivery Arrangement` retired) · `Hold delivery` alone while the gate holds. **BUILT 2026-10-06 (PR #1947):** `Scheduled date` · `Scheduled time (optional)` · `ETA (optional)` · `Save delivery date` · `Hold delivery`; NOT BUILT: the facts `Reference` · `Area` · `Requested delivery` (the page still says `Customer asked`), `Result`, `Reply screenshot`, and `Cannot deliver` casing (the page says `Cannot Deliver`) |
 
 ### Reports → Delivery words — 【DELIVERY】 CARD 17 (Delivery MASTER §12, 2026-09-13)

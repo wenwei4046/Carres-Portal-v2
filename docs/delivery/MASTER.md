@@ -157,7 +157,7 @@ goods may be arranged
 
 ### 2.1 · Logistics assignment timing
 
-**OWNER-APPROVED / LOCKED 2026-09-29 · BUILT ON BRANCH `build/settings-deadlines` 9 Oct 2026 (0673
+**OWNER-APPROVED / LOCKED 2026-09-29 · BUILT ON BRANCH `build/settings-completion` 9 Oct 2026 (0673
 not applied):** Delivery Rules row `Assign logistics by` (1–30, default 3, Settings editor gate, change
 record with reason) and the one `assignLogisticsDueIso` read by Work, the Logistics card, the Orders list
 and the Order Route. A partner's own booking lead is not yet read: no company is assigned while this
