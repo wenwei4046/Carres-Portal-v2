@@ -45,7 +45,7 @@ import { SegmentedLinks } from "@/components/Segmented";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { apiFetch } from "@/lib/api";
-import { fmtMonth } from "@/lib/fmt-date";
+import { fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import { LoadFailed } from "../other-money-in/parts";
 import CommissionOrders from "./CommissionOrders";
@@ -95,6 +95,8 @@ export default function DealerCommission() {
     }) : []),
     [src, month, dealerId, outletId]);
   const outlets = (src?.outlets ?? []).filter((o) => dealerId === ALL || o.dealerId === dealerId);
+  // 0666: the day the month closed, when it has.
+  const closedOn = src?.closes?.find((c) => c.month === month)?.closedOn ?? null;
   // A statement month older than the list still shows as itself.
   const monthChoices = months.includes(month) ? months : [...months, month];
 
@@ -163,7 +165,10 @@ export default function DealerCommission() {
         onRowClick={(r) => { setDealerId(r.dealerId); setOutletId(ALL); setParams({ view: "orders" }); }}
         toolbarStart={scope("report")}
         statusSummary={(visible) => <span data-testid="dealer-commission-summary">
-          {visible.length} of {rows.length} rows · Commission is earned only on money collected. The rebate and the KPI allowance are the dealer's whole, whatever showroom is picked.
+          {visible.length} of {rows.length} rows · {closedOn
+            // 0666: a closed month shows what was charged; it never changes again.
+            ? `${fmtMonth(month)} closed on ${fmtDate(closedOn)}: these are the amounts charged. A later change lands in the month still open.`
+            : "Commission is earned only on money collected. The rebate and the KPI allowance are the dealer's whole, whatever showroom is picked."}
         </span>} />
     </ListPageShell>}
   </div>;

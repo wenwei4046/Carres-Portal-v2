@@ -51,7 +51,9 @@ export function HistoryCard({ events }: { events: ApEvent[] }) {
         ? <p>No history yet.</p>
         : events.map((e, i) => (
           <p key={i}>
-            {word(EVENT_WORD, e.action)} · {fmtDate(e.at, { time: true })} · {e.actor_name ?? "Name not available"}
+            {word(EVENT_WORD, e.action)} · {fmtDate(e.at, { time: true })}
+            {/* 0666: the month close raised it, so there is no name to show. */}
+            {e.action === "month_close" ? "" : ` · ${e.actor_name ?? "Name not available"}`}
             {e.note ? ` · ${e.note}` : ""}
           </p>
         ))}

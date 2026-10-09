@@ -343,6 +343,8 @@ export const LEDGER_SOURCE_WORDS: Readonly<Record<string, string>> = {
   BANK_CHARGE: "Bank charge",
   BANK_CREDIT: "Bank credit",
   MANUAL: "Manual journal",
+  // The month close's accrual (migration 0666).
+  DEALER_COMMISSION: "Dealer commission",
 };
 
 export function isReversalSource(sourceType: string): boolean {

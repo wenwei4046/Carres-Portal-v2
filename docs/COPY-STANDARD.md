@@ -5379,6 +5379,18 @@ Chew and management ruled the KPI allowance and the rebate's rules (Finance MAST
 | Refusals (the database's) | `Only Finance changes the KPI allowance.` · `Only Finance sees the KPI allowance.` · `Choose the day it starts.` · `Choose the guarantee the allowance counts.` · `Type the amount per guarantee in ringgit and sen, like 10.00.` · `Choose whether the count starts again each month or each year.` · `Keep the memo to 200 characters.` · `The tiers are not readable.` · `A tier starts at a whole number of guarantees, 1 or more.` · `Type a tier's bonus in ringgit and sen, like 100.00.` · `Two tiers start at {n} guarantees.` · `There is already a KPI allowance from {day}. Remove it first.` · `That KPI allowance is not on the list.` |
 | Refusals (the API's) | `Type the amount in ringgit and sen, like 10.00.` · `Choose the day it starts.` · `That KPI allowance is not on the list.` |
 
+### PROPOSAL — PENDING CHEW · Closing a month (step 4b, 0666)
+
+Chew and management ruled the month end (Finance MASTER §3.2, the final-check rules 2.7, 6.4, 9.1 and 9.2), Chew the accrual accounts (2026-10-06, 2026-10-09) and the draft with no bank (「到时我才manual set」, 2026-10-09); the words below are proposed with them.
+
+| Where | Words |
+|---|---|
+| By dealer, a closed month | Footer `{n} of {m} rows · {Month YYYY} closed on {day}: these are the amounts charged. A later change lands in the month still open.` |
+| Payment vouchers, a draft with no bank | `Paid From` and the voucher's `Paid from` read `Not chosen yet`. History `Raised by the month close`, with no name |
+| The draft the month close raises | Payee: the dealer's name. Narration and history note `Dealer commission {Month YYYY}`. Lines `Commission {Month YYYY}` · `Renovation rebate {Month YYYY}` · `KPI allowance {Month YYYY}` |
+| The ledger | Source `Dealer commission`, document `DC-{YYYY-MM}`, narration `Dealer commission {Month YYYY}`; each line `{Commission · Renovation rebate · KPI allowance} {Month YYYY} · {dealer}` |
+| Refusals (the database's, met only by the daily run) | `Choose the month to close.` · `{Month YYYY} cannot close: close {Month YYYY} first.` · `{Month YYYY} cannot close: no month is due to close.` · `The figures to keep are not readable.` · `Only dealers earn dealer commission.` |
+
 **SO compact file preview — owner approved 2026-10-04:** `Sales order PDF · {actual SO number}` · `Download` · accessible name/tooltip `Close PDF` for the file × and `Close order` for the dark order Header ×. File close returns to Info; order close returns to the Register.
 
 ### Receiving and shared Calendar — owner-approved target, 2026-10-04

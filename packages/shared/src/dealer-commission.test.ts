@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  closeFigures,
   dcPaymentLinkInput,
   dcRuleAddInput,
   dcTakeBackInput,
@@ -11,6 +12,7 @@ import {
   orderTerms,
   rebateByMonth,
   statementAsSource,
+  type DcClose,
   type DcKpiRule,
   type DcLine,
   type DcOrder,
@@ -303,6 +305,89 @@ describe("the KPI allowance (0665)", () => {
     });
     expect(s.lines.map((l) => [l.kind, l.month, l.owed, l.due])).toEqual([["kpi", "2026-09", 20, "2026-10-15"]]);
     expect(s.owedNow).toBe(20);
+  });
+});
+
+describe("closed months (0666)", () => {
+  // Chew's example order: RM 1,650 in September earns RM 337.50, the balance in October RM 412.50.
+  const o1 = goodsAndService({ payments: [paid("2026-09-05", 1650), paid("2026-10-07", 1650)] });
+  const sepClose = (over: Partial<DcClose> = {}): DcClose => ({
+    month: "2026-09", closedOn: "2026-10-01",
+    dealers: [{ dealerId: "d1", commission: 337.5, rebate: 0, kpi: 0, kpiUnits: 0 }],
+    orders: [{ orderId: "o1", earnedThrough: 337.5 }], ...over,
+  });
+
+  it("closing keeps each dealer's charges and each order's commission by the month's end", () => {
+    expect(closeFigures(source([o1]), "2026-09")).toEqual({
+      dealers: [{ dealerId: "d1", commission: 337.5, rebate: 0, kpi: 0, kpiUnits: 0 }],
+      orders: [{ orderId: "o1", dealerId: "d1", earnedThrough: 337.5 }],
+    });
+  });
+
+  it("a closed month never changes; an amendment lands in the first month still open (2.7, 6.4)", () => {
+    // After September closed the goods became RM 4,000: today September would earn nothing (under half).
+    const amended = { ...o1, lines: [line("mattress", 4000), line("service", 300, 0)] };
+    const src = source([amended], { closes: [sepClose()] });
+    expect(dealerCommissionReport(source([amended]), "2026-09")[0].earned).toBe(0);
+    expect(dealerCommissionReport(src, "2026-09")[0].earned).toBe(337.5);
+    // October: RM 750 earned in all, less the RM 337.50 September kept.
+    expect(dealerCommissionReport(src, "2026-10")[0].earned).toBe(412.5);
+    expect(dealerCommissionOrders(src, "2026-10")[0]).toMatchObject({ earned: 412.5 });
+    // Closing October then keeps RM 412.50 and the order's RM 750.
+    expect(closeFigures(src, "2026-10")).toMatchObject({
+      dealers: [{ commission: 412.5 }], orders: [{ orderId: "o1", earnedThrough: 750 }],
+    });
+  });
+
+  it("a refund recorded after the close takes back in the first month still open", () => {
+    const refunded = goodsAndService({ payments: [paid("2026-09-05", 1650)], refunds: [paid("2026-09-20", 500)] });
+    const src = source([refunded], { closes: [sepClose()] });
+    expect(dealerCommissionReport(src, "2026-09")[0].earned).toBe(337.5);
+    expect(dealerCommissionReport(src, "2026-10")[0].earned).toBe(-125);
+  });
+
+  it("guarantees of an order cancelled after its month closed are taken back only with its commission (8.4)", () => {
+    const rule: DcKpiRule = { id: "k1", startsOn: "2026-01-01", modelId: "m-grt", perUnit: 10, tiers: [], period: "month" };
+    const sold = order({
+      orderedOn: "2026-09-03", cancelledOn: "2026-10-04",
+      lines: [line("mattress", 1000), { modelId: "m-grt", category: "guarantee", value: 150, rate: 0, qty: 2 }],
+    });
+    const closes: DcClose[] = [{ month: "2026-09", closedOn: "2026-10-01", orders: [],
+      dealers: [{ dealerId: "d1", commission: 0, rebate: 0, kpi: 20, kpiUnits: 2 }] }];
+    expect(dealerCommissionReport(source([sold], { kpi: [rule], closes }), "2026-09")[0]).toMatchObject({ kpi: 20, kpiUnits: 2 });
+    expect(dealerCommissionReport(source([sold], { kpi: [rule], closes }), "2026-10")[0]).toMatchObject({ kpi: 0 });
+    const back = { ...sold, takeBackOn: "2026-10-06" };
+    expect(dealerCommissionReport(source([back], { kpi: [rule], closes }), "2026-10")[0]).toMatchObject({ kpi: -20 });
+  });
+
+  it("a closed month with no KPI rule reads as an open one; with a rule, what was charged", () => {
+    const rule: DcKpiRule = { id: "k1", startsOn: "2026-01-01", modelId: "m-grt", perUnit: 10, tiers: [], period: "month" };
+    expect(dealerCommissionReport(source([o1], { closes: [sepClose()] }), "2026-09")[0].kpi).toBeNull();
+    expect(dealerCommissionReport(source([o1], { kpi: [rule], closes: [sepClose()] }), "2026-09")[0].kpi).toBe(0);
+    // A dealer added after the close has no row in it.
+    expect(dealerCommissionReport(source([o1], { kpi: [rule], closes: [sepClose({ dealers: [] })] }), "2026-09")[0])
+      .toMatchObject({ earned: 0, kpi: 0, kpiUnits: 0 });
+  });
+
+  it("a rebate total cut below what was already given takes nothing back (7.3a)", () => {
+    const quotas = [{ dealerId: "d1", quota: 30, rebateRate: 5, startsOn: "2026-01-01" }];
+    const paidOrder = order({ lines: [line("sofa", 1000)], payments: [paid("2026-09-03", 1000)] });
+    const closes: DcClose[] = [{ month: "2026-09", closedOn: "2026-10-01",
+      dealers: [{ dealerId: "d1", commission: 250, rebate: 50, kpi: 0, kpiUnits: 0 }], orders: [{ orderId: "o1", earnedThrough: 250 }] }];
+    const src = source([paidOrder], { quotas, closes });
+    expect(dealerCommissionReport(src, "2026-09")[0]).toMatchObject({ rebate: 50, quotaLeft: 0 });
+    expect(dealerCommissionReport(src, "2026-10")[0]).toMatchObject({ rebate: 0, quotaLeft: 0 });
+  });
+
+  it("the statement shows what each closed month charged; the read brings only the last close's orders", () => {
+    const amended = { ...o1, lines: [line("mattress", 4000), line("service", 300, 0)] };
+    const augClose: DcClose = { month: "2026-08", closedOn: "2026-09-01", orders: null,
+      dealers: [{ dealerId: "d1", commission: 0, rebate: 0, kpi: 0, kpiUnits: 0 }] };
+    const s = dealerStatement({
+      today: "2026-11-02", dealer: { id: "d1", name: "Dealer" }, quotas: [], payments: [],
+      orders: [amended], closes: [augClose, sepClose()],
+    });
+    expect(s.lines.map((l) => [l.month, l.owed])).toEqual([["2026-09", 337.5], ["2026-10", 412.5]]);
   });
 });
 
