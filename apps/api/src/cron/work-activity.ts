@@ -1,4 +1,5 @@
 import {
+  isWorkingDay,
   decideWorkspaceReassignment,
   evaluateWorkspaceActivityCheck,
   officeWorkingDayOptions,
@@ -9,6 +10,7 @@ import {
 } from "@carres/shared";
 import { z } from "zod";
 import { readOfficeCalendar } from "../lib/office-calendar";
+import { todayIsoMYT } from "../lib/today";
 import { adminClient } from "../lib/supabase";
 import type { Bindings } from "../types";
 
@@ -47,7 +49,7 @@ const snapshotWindows = z.object({
  * Each scope is evaluated on its ASSIGNED person's own window (Office hours
  * and that person's lunch, 0676): it is not due until that person's cutoff
  * has passed, so no work moves while they are at lunch. */
-export async function runWorkActivityCron(env: Bindings): Promise<void> {
+export async function runWorkActivityCron(env: Bindings, today: string = todayIsoMYT()): Promise<void> {
   const sb = adminClient(env);
   /* The stored Office calendar (Settings → Office), read ONCE per run: its
      working weekdays decide whether a period is checked at all, and its
@@ -57,6 +59,10 @@ export async function runWorkActivityCron(env: Bindings): Promise<void> {
      working weekdays and recorded holidays itself, so the two agree. */
   const office = officeWorkingDayOptions((await readOfficeCalendar(sb)).calendar);
   const officeHolidays = office.holidays as ReadonlySet<string>;
+  /* The trigger runs every day (wrangler `* 0-12 * * *`); the stored Office
+     calendar — not the trigger's weekday field — decides whether today is a
+     working day. A day off does nothing at all (read-time cover answers it). */
+  if (!isWorkingDay(today, { holidays: officeHolidays, offDays: office.offDays })) return;
   const unavailable = await sb.rpc("workspace_process_recorded_unavailability");
   if (unavailable.error) throw new Error(`Recorded availability check failed: ${unavailable.error.message}`);
   for (const period of ["morning", "afternoon"] as const) {

@@ -371,7 +371,9 @@ export default {
   scheduled: (_event: ScheduledController, env: Bindings, ctx: ExecutionContext) => {
     ctx.waitUntil(
       (async () => {
-        if (_event.cron === "* 1-10 * * 1-5") {
+        /* The activity check runs every minute 08:00–20:59 MYT every day; the
+           stored Office calendar decides which days and hours count. */
+        if (_event.cron === "* 0-12 * * *") {
           await runWorkActivityCron(env);
           return;
         }
