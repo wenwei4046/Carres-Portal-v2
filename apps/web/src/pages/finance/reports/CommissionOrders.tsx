@@ -29,6 +29,7 @@ import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { apiFetch } from "@/lib/api";
 import { fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
+import { customerWord, noteWord, soWord } from "./commission-words";
 
 const BASE = "/api/finance/dealer-commission";
 
@@ -43,18 +44,8 @@ export const ORDER_GROUPS: readonly { key: DcOrderGroup; label: string }[] = [
   { key: "waiting", label: "Still waiting for money" },
 ];
 
-const soWord = (r: OrderRow) => (r.order.so !== null ? `SO-${r.order.so}` : "SO not available");
-const customerWord = (r: OrderRow) => r.order.customer?.trim() || "Customer not recorded";
-
-/** The one word that says where an order stands. */
-export function noteWord(r: Pick<DcOrderMonth, "takenBack" | "cancelled" | "terms" | "stillToEarn" | "halfReachedOn">): string {
-  if (r.takenBack) return "Commission taken back";
-  if (r.cancelled) return "Cancelled";
-  if (!(r.terms.full > 0)) return "Earns nothing";
-  if (r.stillToEarn <= 0) return "Paid in full";
-  if (!r.halfReachedOn) return "Under half paid";
-  return "Waiting for the balance";
-}
+const soOf = (r: OrderRow) => soWord(r.order);
+const customerOf = (r: OrderRow) => customerWord(r.order);
 
 const sum = (rows: OrderRow[], f: (r: OrderRow) => number) => rm(rows.reduce((s, r) => s + f(r), 0));
 
@@ -77,9 +68,9 @@ export default function CommissionOrders({
   const [open, setOpen] = useState<OrderRow | null>(null);
 
   const columns = useMemo<DataGridColumn<OrderRow>[]>(() => [
-    { key: "so", label: "SO", width: 110, accessor: soWord, searchValue: soWord },
+    { key: "so", label: "SO", width: 110, accessor: soOf, searchValue: soOf },
     { key: "dealer", label: "Dealer", width: 200, accessor: (r) => r.dealer, searchValue: (r) => r.dealer },
-    { key: "customer", label: "Customer", width: 200, accessor: customerWord, searchValue: customerWord },
+    { key: "customer", label: "Customer", width: 200, accessor: customerOf, searchValue: customerOf },
     { key: "ordered", label: "Order day", width: 120, accessor: (r) => (r.order.orderedOn ? fmtDate(r.order.orderedOn) : "Day not recorded"),
       exportValue: (r) => r.order.orderedOn ?? "" },
     { key: "total", label: "Order total", width: 140, align: "right", accessor: (r) => rm(r.terms.total),
@@ -146,8 +137,8 @@ function OrderWindow({ row, month, onClose }: { row: OrderRow; month: string; on
         if (!v) onClose();
       }}
       // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), dealer commission step 2).
-      title={soWord(row)}
-      description={`${customerWord(row)} · ${row.dealer}`}
+      title={soOf(row)}
+      description={`${customerOf(row)} · ${row.dealer}`}
       footer={
         o.cancelledOn ? (
           <>

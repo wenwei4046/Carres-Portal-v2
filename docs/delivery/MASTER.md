@@ -1840,6 +1840,16 @@ Routine customer Delivery ownership reads the Sales Order PIC; `delivery_duty` s
 explicit no-PIC fallback and no-Sales-Order display transport coordination (§13.1), through
 `Settings → Staff & Duties`.
 
+### 11.0 · Confirmed Settings and work reconciliation — 9 Oct 2026
+
+This update consolidates existing owner rulings, not a new action/approval model. §2.1's assignment opening and its three-Delivery-working-day deadline remain different facts. Logistics owns customer scheduling (§5.2); authorised Operations may record evidenced replies or act in the defined exceptions. There is no new routine D−1 customer call or third-chase Jess escalation. Payment owns collection admission/lead days, its formal responsibility ledger → effective personal SO PIC → unassigned resolver, and its independently blocking Finance hold. Delivery's PIC rule owns routine Delivery work, not every money action.
+
+Workspace owns current qualified assignment, lunch, leave, checks and monthly PO/GRN coordination. Ordinary authorised helpers record the actual actor without claiming work first or replacing its accountable owner. Warehouse working hours/receiving/collection/holidays are Warehouse-owned, not Office defaults. System DO issue, Warehouse handover, Logistics receipt, customer result and proof acceptance remain separate facts; none closes remaining quantities or unresolved proof automatically.
+
+**Courier accessories — owner 8 Oct, approved default; runtime unverified:** pillows and mattress protectors sent separately go to Warehouse. Warehouse packs and hands quantities to courier; the order's Operation owner arranges and follows up. Default dispatch target is three working days after Warehouse confirms received, checked and packable; exact dispatch calendar remains to verify. The authorised setting can change later under its effective-rule contract. Record each batch's quantity, tracking and evidence, leaving all undispatched quantities open. Warehouse workload is not a silently extended deadline or a made-up daily capacity. Full dispatch completes the dispatch obligation; customer receipt is a separate outcome. This policy does not force every accessory to use courier instead of its ordered delivery route.
+
+**Authenticated 9 Oct observation, not approval/build proof:** twelve logistics companies were listed; 64 of 72 company subpages were inspected. TSDD services/access and all six TT subpages remained unverified after the browser failed. Unconfigured customer-facing numbers, coverage, schedules or templates are not proof that related database records are absent. Do not invent them or replace the approved assignment target with an unconfigured screen. The confirmed company/source facts and scope1 status/date readers in §15.1 retain their narrow build evidence; no full end-to-end completion is implied.
+
 ### 11.1 · Settings convergence and customer-period rules
 
 **RESOLVED FROM AUTHORITY / APPROVED TARGET, NOT VERIFIED BUILT — 2026-09-30.** Keep the

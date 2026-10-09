@@ -97,7 +97,7 @@ import financeReconciliationRouter from "./routes/finance/reconciliation";
 import financeOtherMoneyInRouter from "./routes/finance/other-money-in";
 // The read-only Finance Ledger — Journal, Trial Balance, Self-check.
 import financeLedgerRouter from "./routes/finance/ledger";
-import financeDealerCommissionRouter from "./routes/finance/dealer-commission";
+import financeDealerCommissionRouter, { dealerStatementRouter } from "./routes/finance/dealer-commission";
 // The manual journal door — the principal's one write to the ledger (0462).
 import financeManualJournalsRouter from "./routes/finance/manual-journals";
 import financeMoneyMovesRouter from "./routes/finance/money-moves";
@@ -304,6 +304,8 @@ api.route("/finance/exceptions", financeExceptionsRouter);
 api.route("/finance/ledger", financeLedgerRouter);
 // Dealer commission and renovation rebate rates and report (0544). Before the catch-all.
 api.route("/finance/dealer-commission", financeDealerCommissionRouter);
+// 0664 — a dealer's own commission statement (its store owner).
+api.route("/dealer-commission", dealerStatementRouter);
 // The manual journal (principal only). Before the catch-all as well.
 api.route("/finance/manual-journals", financeManualJournalsRouter);
 // Bank transfers and card payouts (0529). Before the catch-all as well.

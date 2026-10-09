@@ -1130,22 +1130,25 @@ EU is a Delivery second-leg partner, never a supplier collector (Jess, 2026-10-0
 stock KL → JB by any logistics, EU receives in JB and delivers to Singapore). That leg chain belongs
 to Delivery's multi-leg model (`../delivery/MASTER.md`), not to Purchasing.
 
-**MEASURED 2026-10-06 — PRODUCTION NOT CHANGED; PER-SUPPLIER CORRECTION PENDING OWNER
-CONFIRMATION.** Supplier Master still records all 11 suppliers as `factory_pickup`. Ohana
-(EU → `Ohana`) and Hookka Industries (NETS → `HOUZS`) carry collector rows saved 2026-09-03 that
-contradict the ruling; the 14 open Ohana POs issued 2026-09-03/06 carry EU and the `Ohana`
-destination, were never sent (no `po_sends`) and received nothing. The rule above is locked; which
-supplier rows actually change is confirmed by the owner per supplier from one list of current
-value · proposed value · real basis (Jess, 2026-10-06: a rehearsal proves the mechanism, not that
-every supplier's business arrangement changes). Until that confirmation nothing in production
-moves; Production Days, the supplier work week and historical POs are outside the correction in
-any case. Replay rehearsal reported by the coordinator chat, 2026-10-06: clearing a collector
-through `purchasing_set_supplier_collection(supplier, null, null)` keeps the row, its work week and
-`transit_days` and writes history; an `own_logistics` supplier's PO issues with no collector
-(replay PO261006-9588); a collector forced onto an `own_logistics` PO is refused
-`pickup_partner_not_allowed`; Nice Future's path is unchanged. Nothing in Orders, Stock, Delivery,
-Payment or Receiving reads these rows; the guard fires only when a PO is inserted or its supplier,
-destination or collector changes.
+**CURRENT PAGE OBSERVATION — 2026-10-09, READ-ONLY / NOT END-TO-END VERIFIED.**
+The authenticated Settings audit in `../../Carres Settings List.md` shows only Nice Future in
+Supplier collection: NETS → Carres Klang. This supersedes the 6 October audit as the current
+page observation. It does not prove every Supplier Master `kind`, stored collection row, issue
+permission or historical PO was corrected; no save or PO issue was performed in this audit.
+
+**HISTORICAL EVIDENCE — 2026-10-06, NOT CURRENT CONFIGURATION.** That dated database audit
+recorded all eleven suppliers as `factory_pickup`, with Hookka NETS → HOUZS and Ohana EU → Ohana
+rows saved 3 September, and fourteen unsent/unreceived Ohana POs carrying EU. Preserve those
+historical facts without presenting them as today's unresolved collection list. The coordinator's
+6 October replay reported that `purchasing_set_supplier_collection(supplier, null, null)` preserves
+the settings row and calendar fields, writes history and allows an `own_logistics` PO without a
+collector; forced pickup was refused. This is bounded replay evidence, not live business execution
+or authority to delete settings rows. Any remaining database discrepancy needs a read-only
+per-supplier check before a separately authorised correction; historical POs remain unchanged.
+
+**SUPPLIER IDENTITY — OWNER 2026-10-07, APPROVED / DATA RECONCILIATION UNVERIFIED.** Ohana is
+Hookka. Preserve existing document identities and references; this clarification commissions no
+database merge, copied address, contact replacement or automatic remapping.
 
 Every active destination also resolves the receiving station/party, applicable arrival calendar,
 whether it links to a Carres warehouse or is external/no-Stock, and whether Unit scan and signed-DO
@@ -1375,10 +1378,20 @@ revision capability is not added to the separately commissioned PO-placement unb
 
 SO demand is accumulated for batch review; PO Duty does not issue one PO action per Sales Order.
 Purchasing Settings owns an editable first standard window, initially `11:30 AM` Malaysia time,
-and one optional editable second standard window, initially `4:00 PM`. The second window may be
-switched off. Demand admitted before a window belongs to that next valid window; demand after the
-last enabled window belongs to the next Purchasing working day's first window. A supplier's
+and a second editable standard window, initially `4:00 PM`. **Owner correction 7 October 2026 —
+APPROVED; implementation alignment UNVERIFIED:** there are two PO placement windows per configured
+PO working day. This supersedes the older optional-second-window rule; the existing on/off control
+is implementation evidence, not authority to disable the approved second window. Demand admitted
+before a window belongs to that next valid window; demand after the last window belongs to the next
+Purchasing working day's first window. A supplier's
 governed earlier cut-off always wins and may never be placed in a later invalid window.
+
+**DEFAULT VERSUS LIVE OBSERVATION — 2026-10-09.** Source defaults remain `11:30 AM` / `4:00 PM`;
+the authenticated read-only Settings audit displays `11:00 AM` / `4:00 PM`, second enabled,
+PO Days Mon–Fri. Editable configuration explains why a live time may differ from the default;
+the audit does not establish its author, approval history or runtime occurrence behavior. Do not
+silently rewrite the default to 11:00 or reset the live setting to 11:30. Keep the difference visible
+until the existing settings history and shared window reader are verified. No configuration was saved.
 
 Workspace projects one actionable window occurrence over the exact eligible demand, never one card
 per SO. Opening it preserves that demand scope in SO Batch Purchase. Review groups lines by
@@ -1400,7 +1413,7 @@ panel belong to Workspace (handed off to the Workspace lane the same day); Purch
 facts, the one send area and the completion fact below.
 
 - **Settings.** `Settings → Purchasing → PO windows` carries `PO Days` (day ticks), `First PO
-  window` (default `11:30 AM`), `Second PO window` with an on/off switch (default `4:00 PM`).
+  window` (default `11:30 AM`), `Second PO window` (default `4:00 PM`; two windows required by the 7 October correction).
   Every change records actor, time, old value, new value and effective date; it never rewrites an
   issued PO. **BUILT 2026-09-28:** one `PO windows` card at the top of Purchasing Settings holds
   `PO Days`, `First PO window` and `Second PO window` with its switch. It reads through the same
@@ -7819,12 +7832,29 @@ and Ohana use `hookka.manufacturing@gmail.com` and default to Email; Nice Future
 by the authenticated shared `principal` account, not Jess personally. Existing groups, historical
 recipients and supplier access were not changed. No email or WhatsApp message was sent.
 
-Under the 2026-10-06 transport ruling (§5.4) a supplier that delivers its own goods has no
-Supplier collection row. Hookka Industries (NETS → HOUZS) and Ohana (EU → Ohana, both saved
-2026-09-03) still carry one; whether and when each row changes is confirmed per supplier by the
-owner (§5.4), and their supplier work week and Production Days stay in any case. Ohana's supplier
-address is still blank and remains a named Settings gap; no address is invented or copied from
-Hookka.
+Under the 2026-10-06 transport ruling (§5.4), only Nice Future uses supplier collection.
+The 9 October authenticated page shows that single collection entry; the older Hookka/Ohana rows
+are historical audit evidence, not the current visible list. Backend rows and issuance remain
+unverified by this page scan. Ohana's Supplier address field is still blank although the Ohana
+Deliver To destination has an address. These are separate identities: do not copy either address
+into the other automatically, including after the owner's “Ohana is Hookka” clarification.
+
+**STAFF & DUTIES — OWNER 8–9 OCTOBER, APPROVED / IMPLEMENTATION UNVERIFIED.** PO Duty and
+GRN Duty each rotate monthly through Workspace's stable cyclic order (§4, Monthly rotation order).
+Normally they have different coordinating holders; one qualified available person may coordinate
+both when only one remains. Authorised helpers retain separate actual-actor evidence. Joining-month
+exclusion applies only to formal PO Duty, with eligibility from the next calendar month. Purchasing
+reads the shared resolver and never stores its own monthly rota or cover algorithm.
+
+**SETTINGS OBSERVATIONS — 9 OCTOBER, DISPLAY VERIFIED ONLY.** The same page audit displays
+Ready Stock priority Customer Requested Delivery Date; safety days 14 working days; earliest date
+store may sell 30 days; Manual Purchase earliest lead 0 days; Confirm delivery date 3 working days;
+repair target 14 working days; Claim response/escalation 2/2 Office working days. Supplier Payment
+terms fields are blank. Nice Future's workweek is Mon–Fri, other displayed suppliers Mon–Sat;
+five Deliver To destinations include Hookka. These are observed settings, not newly approved
+parameters or proof of save permissions, calculations, Tasks or end-to-end issue/receipt behavior.
+Missing payment terms and supplier address remain named gaps; no values are invented. Full
+receiving-party/calendar/scan/Stock-consequence coverage remains the approved target described above.
 
 **PRODUCTION-DAY VALUES — OWNER CONFIRMED 2026-10-01, APPROVED / LOCKED.** Mattress: **7 working
 days**; Bedframe: **7 working days**; Sofa: **14 working days**. Apply these values to missing

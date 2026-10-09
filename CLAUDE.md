@@ -46,7 +46,7 @@ On a conflict, Business wins.
 
 - **The current page is Version N, never automatically final.** Studying it, finding it wrong
   and proposing better is your DUTY. Building before approval is the only thing forbidden.
-- **Current kit adoption — owner 9 Oct 2026 · v4:** `Sales Order (3).zip` is the shared visual target, consolidated into the existing 01/02/03 and UI MASTER. The previous visual values are removed. `apps/web/src/styles/carres-tokens.css` is the one token file (wired through `index.css` and Tailwind `c-*`); the shared menu, shell header, Tasks panel, Sales Orders → Outright list and detail and Settings → Personal → Appearance use it (PR #1988, not deployed); other pages' component internals still owe migration. Imported HTML under `docs/ui-reference/carres-template-2026-10-08/` is a specimen only. Do not import its mock business rules or clone its page CSS.
+- **Current kit adoption — owner 9 Oct 2026 · supplied v8:** `Sales Order.zip` is the shared visual target, consolidated into the existing 01/02/03 and UI MASTER. The previous visual values are removed; runtime migration and complete-page verification are still owed. `docs/ui/carres-tokens.css` mirrors the target; imported HTML under `docs/ui-reference/sales-order-design/` is a specimen only. Do not import its mock business rules or clone its page CSS.
 - **Token VALUES are locked** — spacing, colour, typography, icons live in
   `docs/01-design-tokens.md` and are not design opinions. **Composition is yours.**
 - **A component that does not exist: STOP and ask for it to join the kit.** Never draw one
@@ -63,7 +63,7 @@ On a conflict, Business wins.
   (`UI-KIT-NEW-CHAT`, `archive/UI-KIT-*`, the `carres-design` skill, the old `ui-reference/` mocks);
   do not recreate them. `docs/ui-reference/` holds the current Sales Order visual specimen plus compact-card behaviour evidence, and `components/retired-components.test.ts` blocks new use of
   the retired `Btn`, `Field` and `PageHeader`. Portal-wide standards ruled the same day: **no dash anywhere on a screen** ·
-  **card titles are black bold `text-strong`, never blue** · **table separators follow current 01** · **rail = icon + title only; every group closed until clicked, its chosen value on the header; two views are a tab bar (owner ruling 2026-09-28; SO representative pilot owner correction 2026-10-01 stacks the two views and opens Delivery first, see Orders MASTER)** · **header filter icons on hover only**.
+  **card titles use current 01 typography and ink** · **table separators follow current 01** · **contextual Summary/Tasks and module views follow current 03/UI MASTER; do not revive the superseded SO rail composition** · **header filter icons on hover only**.
 - **Content decides column width**, never the table width. **Expand has exactly one job.**
   **An inline second line is the only exception.**
 - **Copy the POWER of the tools the team already uses, never their ASSUMPTIONS.** AutoCount's

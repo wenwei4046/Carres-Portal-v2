@@ -1,6 +1,6 @@
 # Compact module card — contract
 
-**8 Oct visual migration:** retain the source-owned facts, host identity and action behaviour below. All appearance and dimensions now come from current 01; the old reference HTML and parity measurements are historical behaviour/build evidence, not a second visual target.
+**9 Oct visual adoption:** retain the source-owned facts, host identity and action behaviour below. All appearance and dimensions now come from current 01; the old reference HTML and parity measurements are historical behaviour/build evidence, not a second visual target.
 
 The one card contract for the right Working Panel (owner rules 2026-10-03 / 10-04 / 10-05): one shared
 card structure and style for every module, with the owner's Stock and Customer corrections. **The outer
@@ -14,9 +14,9 @@ the adoption status per module are in UI MASTER §4.3. **Numbers** live in
 inside the kit `Drawer variant="compact-card"` (live on `/ui#compact-card` with Info and Delivery,
 including the long-address state). The reference page `module-card-reference.html` (SHA-256
 `98c1ae5396a53143…`, published at `/ui-kit/module-card`; the retired `/ui-kit/delivery-card` and
-`/ui-kit/delivery-card.html` answer with a 301 that keeps the query string) is the proof target.
+`/ui-kit/delivery-card.html` answer with a 301 that keeps the query string) is historical behaviour evidence, not the current visual target.
 `node scripts/compact-card-states.mjs <dev url>` drives both through 25 states at five widths,
-compares geometry, text and styles, and must report **no unexplained difference**.
+compares behaviour states; old geometry/colour parity is not a current acceptance target. Current appearance is checked against 01 and the supplied Sales Order specimen.
 `module-card-measurements.json` holds the historical 25-state × 5-width parity heights — evidence of
 that run, never fixed heights for the current card.
 
@@ -26,7 +26,7 @@ module has customer or SO fields.
 
 ## Rules
 
-**Owner-confirmed SO template — 2026-10-05:** shared dark Header → address → sales facts → module
+**Owner-confirmed SO template — 2026-10-05:** shared identity Header → address → sales facts → module
 tabs → module summary. In Info the address is visible by default: the full wrapping address left,
 access facts right (200px column, 12px gap), grouped as `Condo · Floor 1` and
 `No lift · Stair carry: 4 items`; omit stair carry when empty, not recorded or zero; at card widths

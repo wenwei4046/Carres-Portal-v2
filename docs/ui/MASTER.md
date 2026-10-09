@@ -20,7 +20,22 @@
 | Reference research (FACT, binds nobody) | [`../research/houzs-ui-reference.md`](../research/houzs-ui-reference.md) · [`../research/grid-findings.md`](../research/grid-findings.md) |
 | Shared page flow, shared contracts, exceptions and the status of every shared capability | **this MASTER** |
 
-**Current visual adoption — Jess, 9 Oct 2026 (v4):** `Sales Order (3).zip` replaces the previous visual kit through the existing 01 / 02 / 03 files. `apps/web/src/styles/carres-tokens.css` is the one wired token file; `docs/ui-reference/carres-template-2026-10-08/` is a nonbinding specimen. The shell, Outright list and detail and Appearance use it on PR #1988 (not deployed); other pages' runtime migration and whole-page checks remain owed. Only visual presentation is adopted: imported Ops Rules, mock actions and sample permissions are not business authority. This MASTER keeps shared interaction and ownership contracts; all appearance and geometry come from 01, including where historic implementation evidence below differs.
+**Current shared UI target — Jess, 9 Oct 2026:** `Sales Order.zip` (SHA-256
+`bafd9111a239c2c8f0ca7b54bf5622321b04a4739b64a267c07610ea4b2e388f`) replaces
+superseded visual values through the existing 01 / 02 / 03 and this MASTER. Source specimens live
+at `docs/ui-reference/sales-order-design/`; tokens mirror at `docs/ui/carres-tokens.css`.
+Read `UI Kit.md` + `Carres UI Kit.dc.html` for source component fidelity, then source screenshots,
+CSS and the v8 HTML; the canonical resolved values are in 01, not another kit document.
+The embedded README/Ops Rules are supplied material, not independent approval of business law.
+The shared visual target covers shell/menu, tables, controls, object facts, Tasks, Route, Timeline
+and density. Modules supply their own identities, columns, authorised actions and source facts.
+
+**Current work split — owner 9 Oct 2026:** Claude Code owns application implementation, tests and
+deployment. This UI owner updates governance documents only. Neither this document update nor a
+component specimen proves application adoption, deployment or production acceptance. Later pages,
+including SO Batch Purchasing, are supplied and reviewed one at a time against this same kit.
+The latest approved page delta replaces only superseded rules; unresolved proposals keep their label.
+No second MASTER, page-local kit or versioned standard is created.
 
 **Law order:** Business Rules → Information Architecture → Design System → Implementation; on a
 conflict Business wins. Current target token values are defined in 01; existing component internals require migration to that target. Composition inside the
@@ -39,14 +54,14 @@ not built; built is not verified; one page verified is not every page adopted.
 
 # §0 · Current kit index — read this first
 
-**Implementation inventory:** Built/deployed entries below describe the existing components before visual migration. Their existence is not proof that the 8 Oct target has been adopted. Appearance always comes from current 01.
+**Implementation inventory:** Built/deployed entries below describe the existing components before visual migration. Their existence is not proof that the current target has been adopted. Appearance always comes from current 01.
 
 **One row per thing on screen; one current source per row.** If something is not in this table it is
 not a current pattern: do not copy it from a neighbouring page. Live examples are on `/ui`.
 
 | Area | Use this | Source | Status |
 |---|---|---|---|
-| Tokens: type · colour · radius · icons · layers | `styles/carres-tokens.css` (Tailwind `c-*`) for the shell and every template page · `MIcon` (Material Symbols, weight 300) · `CPill` · `CPopover`; older kit tokens (`Icon`, Radix steps) remain only in pages not yet migrated — migration owed, never a second standard | `styles/carres-tokens.css`, `components/carres/*`, `tailwind.config.ts`, `01-design-tokens.md` | template 2026-10-08 · built on branch |
+| Tokens: type · colour · radius · icons · layers | Tailwind token classes; `Icon`; `overlay-layer` | `01-design-tokens.md`, `tailwind.config.ts`, `components/kit/Icon.tsx` | Existing component built; current visual migration owed |
 | Page frame | `ListPageShell` today; kit `PageShell` is the target | `components/ListPageShell.tsx` · `components/kit/PageShell.tsx` | Moving a page onto `PageShell` re-lays it out: owner preview first |
 | Page header + global utilities | `ShellHeader` (shell-drawn; `ModuleHeader` names the page into it) · search pill · `TeamButton` · bell | `pages/operation/components/` | §4 · template 2026-10-08 · built on branch |
 | Portal navigation | `PortalSidebar` + `portal-nav` (six groups, one shared menu) | `pages/portal/` | §4.2 · template 2026-10-08 · built on branch |
@@ -64,34 +79,13 @@ not a current pattern: do not copy it from a neighbouring page. Live examples ar
 | Orders list / drawer band | `SectionPanel` (cream band) — that surface only, not a general card | `components/SectionPanel.tsx` | Not a `Block` duplicate |
 | Work right-panel Communication | `WorkCommunication` — recorded channels only | `pages/operation/work/WorkCommunication.tsx` | Built; differs from the card's editable `To` (§7.2) |
 | Record history | §5.2 three-rank grammar | this MASTER | LOCKED · no shared component; each page draws it |
-| Right Tasks panel | `ShellTasks` (hosts `TasksArea`) · `TasksPill` | `pages/operation/components/ShellTasks.tsx` | §5 · owner ruling 2026-10-08 (Tasks only; Calendar and Activity retired) · built on branch |
+| Tasks and quick reference | Existing Work/Tasks host; `OperationRightRail` for existing quick capabilities | `pages/operation/work/` · `pages/operation/components/OperationRightRail.tsx` | §5 · supplied target has a collapsible Tasks region; Calendar/Activity capability retained, unresolved placement stays explicit; runtime adoption not verified |
 
 **Retired — do not import; a test blocks new use** (`components/retired-components.test.ts`): `Btn`
 (→ `Button`), `Field` (→ kit inputs / `field-recipe`), `PageHeader` (→ `PageShell`). Their remaining
 pages move only after the owner approves a before/after preview, because each swap changes what the
 operator sees. The `carres-design` skill, the old `ui-reference/` mocks and the Delivery-only card
 reference are deleted; `docs/ui-reference/` holds behaviour evidence for the compact card and the current imported Sales Order specimen. Neither is a second standard.
-
-## §0.4 · The Carres template — owner-confirmed 2026-10-08 (Jess) · BUILT ON BRANCH, NOT DEPLOYED
-
-Jess confirmed the **Sales Orders → Outright** design (list + order detail + Tasks panel) as **the
-template every module copies** — same shell, list, detail, density and colours. The handoff is kept in
-[`../ui-reference/carres-template-2026-10-08/`](../ui-reference/carres-template-2026-10-08/README.md).
-Visual truth, in this order: `UI-KIT.md` (+ `Carres UI Kit.dc.html`) → `screenshots/` →
-`apps/web/src/styles/carres-tokens.css` → the v8 HTML. `LAYOUT-STANDARD.md` §1–§4 are binding for the
-shell, list, detail and Tasks. `OPS-RULES-designer-summary.md` is the designer's summary of business
-rules; where it differs from a module MASTER, the module MASTER governs until Jess rules.
-
-Owner rulings recorded with it (2026-10-08): every real page stays reachable as a menu sub-item;
-the right side is the Tasks panel only (Calendar and Activity leave the shell); the header Team
-button is built now with real data (online = active in the last 15 minutes); the new colours apply to
-every page through the shared kit; every v8 column keeps its place and reads its fact from the module
-that owns it (owner instruction 2026-10-09: `Not recorded` · `Could not read` · `No access` are kept
-apart, an unread Finance hold is never `No Finance hold`; sources in `OUTRIGHT_FACT_SOURCES`,
-`so-outright/outright-columns.tsx`; words in COPY "Sales Order Outright list"); Settings → Personal →
-Appearance lets each person pick a theme and focus outline, saved to their own profile. Retired by these rulings: the blue selection, the 2026-10-05
-icon Quick Rail, the header Help (?) and gear, the curved menu elbows, `Listing` / `Monthly demand`
-and `Table / Cards` on the Outright list.
 
 ## §0.1 · Page anatomy — the table of contents
 
@@ -148,6 +142,8 @@ reference at the operator's viewport and a narrow layout. Verify the mission sou
 table loading/filtering, the listing interactions, record-to-panel opening, Info and the module tab (the page's main work tab selected on open),
 authorised edit/preview/result, source scope and retained return state. Record verified and missing
 coverage per module (§4.3, §6.1). Tests or shared-component imports alone do not prove adoption.
+
+**Current SO composition exception — owner 9 Oct 2026:** the supplied Outright list opens the full SO on row click, with Sales Order / Order Route / Timeline. Its Summary and Tasks are independently collapsible. This replaces the previous SO default compact-card opening and visual rail example; other modules’ source-owned work and document doors are not silently changed. CompactModuleCard remains the reusable work/embedded adapter where that purpose applies.
 
 ## §0.3 · Every new chat — before acting
 
@@ -298,7 +294,7 @@ object/recipient/result + actual working date** (§2.1, §5.1). When the owner a
 decision, overwrite this MASTER or the owning module MASTER immediately (PLAN may update governing
 documents; it may not implement application code).
 
-## §1.3 · Reference direction — current owner instruction 8 Oct 2026
+## §1.3 · Reference direction — current owner instruction 9 Oct 2026
 
 The supplied Sales Order design is the current visual reference. Adapt it through the shared kit, not by copying page-local CSS or its simulated backend. Its full-page SO, Route and Timeline establish the visual family; module content and doors still come from their MASTERs. Houzs and other products may supply capabilities and organisation, but do not become another token authority. Five compositions share one kit: Register, Object, Task, Form and Overview/Settings.
 
@@ -375,7 +371,7 @@ focus to the element that opened it (§3); a grid is one Tab stop (§6.2); icon-
 tooltip and an accessible name; colour is never the only signal.
 
 **Narrow screens:** the page never scrolls sideways; a table scrolls inside itself; touch targets are
-at least 40px; check 1440 / 1180 / 820 / 390 and 200% zoom; nothing (footer, floating control, toast) covers a
+at least 44px; check 1440 / 1180 / 820 / 390 and 200% zoom; nothing (footer, floating control, toast) covers a
 fact or an action; the bottom of long content stays reachable.
 
 **Field-operation UI — owner ruling 2026-09-29 (Opit-Warehouse) · APPROVED DIRECTION, validation
@@ -401,8 +397,8 @@ business result decides completion.
 - Preserve the module's governed columns, quantities, statuses, permissions and write ownership.
 - Show a complete working page, not a cropped header: desktop and 390px, plus the 896px
   available-canvas rail boundary with global navigation expanded and collapsed.
-- Check rail open/closed, backdrop/Escape, search, selection, column filters and Table/Cards;
-  switching presentation keeps the same result and filters.
+- Check contextual regions open/closed, backdrop/Escape, search, selection and column filters;
+  supported presentation switches keep the same result and filters. The supplied SO target omits Table/Cards; do not add it from an older example.
 - Check the Working Panel and full-object door, long identities, all §2.2 states, keyboard focus,
   icon accessible names and 40px touch controls.
 - Check long content is reachable, headers stay fixed and horizontal overflow stays in its pane.
@@ -418,71 +414,9 @@ Appearance and dimensions are defined once in 01; component use and states in 02
 
 Soft status pairs replace the previous solid-white status styling; Hold is dark. A condition determines tone, never the verb. Counts are not record status. Main action is charcoal, selection is orange. Business status words still come from COPY and the owning module. See 01 for every value and migration gap.
 
-# §4 · Shell and page composition — page header, toolbar row, Settings, search
+# §4 · Shell and page composition
 
-Use 03 §§1–4 and 01 §4 for geometry. Contextual summary and Tasks regions collapse independently. Preserve global utilities, source navigation and module permission boundaries. A template page opening does not authorise replacing every module's record doors.
-
-**Owner-confirmed template 2026-10-08 (§0.4).** The shell draws the frame once:
-
-```
-┌ menu 220 ┬ Sales Order / Outright ············ [ Search SO, PO, supplier, customer ] (Team ●8) (🔔6) ┐ 56
-│          ├────────────────────────────────────────────────────────────┬──────────────┤
-│          │ page (its own cards, 12px apart, on the theme ground)      │ Tasks 320    │
-└──────────┴────────────────────────────────────────────────────────────┴──────────────┘
-```
-
-- **Row 1 · The page header — BUILT ON BRANCH (`ShellHeader.tsx`).** 56px, pad 0 18, gap 14, no band
-  and no border. Left: `crumb / title` — 14px grey crumb, a light slash, the 20/500 title (−0.02em).
-  A page names itself through `ModuleHeader`, which renders INTO this header (its `word / page`, its
-  tab strip and page-meta) and never draws a second row; a page that does not is named by its menu
-  item (Settings pages read `Settings / {section}`). Right, and nothing else: the search pill, the
-  Team button, the bell. **No Help (?) and no header gear** (Settings is at the bottom of the menu).
-- **Search — owner ruling 2026-10-08.** One 34px grey pill `Search SO, PO, supplier, customer` (⌘K)
-  opens the `Jump to` surface (`JumpTo.tsx`): destination names, document numbers (SO · PO · GRN ·
-  INV) and now **customer names → their Sales Orders and supplier names → their Purchase Orders**
-  (`/api/operation/jump`, under the caller's token so RLS decides; the name is reduced to letters,
-  digits, spaces and `&.'-` before `ilike`). Navigate-only.
-- **Team — owner ruling 2026-10-08 · migration 0663 (NOT APPLIED).** A 34px round button with the
-  online count; its `Team today` pop-up lists Online · Away · Off today · Not seen today with each
-  person's last activity. **Online = portal activity in the last 15 minutes** (owner default,
-  `TEAM_ONLINE_MINUTES`); off = staff settings mark the person not available. Read by the definer
-  function `workspace_team_today()` (operation and principal only; today's last minute only).
-- **Bell** keeps its real alert count (charcoal badge = needs action).
-- **Settings door:** the one Settings entry is the `Settings` row at the bottom of the side menu,
-  opening the Settings Workspace (Finance keeps `/finance/settings`). **Settings → Personal →
-  Appearance** (owner rulings 2026-10-08/09): values and behaviour are 01 §9 (one place); words are
-  COPY "Personal Appearance". It follows the Settings pattern below — pick, then one `Save changes`.
-- **Row 2 · The page toolbar (template, Sales Orders → Outright BUILT ON BRANCH).** On the ground,
-  above the table card: view tabs (pad 5 12, radius 8, selected 600 in the theme select colours),
-  `· {view} view`, filter chips `Label ×`; right: the column-view icon, `⋮` More actions, then the
-  `Tasks {n}` pill when the panel is hidden. Ticking rows replaces the row with the selection bar.
-  Registers not yet moved to the template keep their DataGrid toolbar until their module migrates.
-- **No KPI preamble.** A register is truth, not a dashboard: no card strip, totals band or counters
-  above the table; the 44px status footer carries the summary.
-- **Staff & Duties** lives at Settings → `Staff & Duties` (PRODUCTION
-  VERIFIED 2026-09-29, PR #1791); Work's unresolved-Duty link opens that exact Duty and keeps return
-  context; Workspace MASTER §§3–4 owns its composition and manager actions. Its owner-approved UI
-  targets (2026-09-28/29, NOT BUILT unless Workspace says so): current facts → plain `Next` →
-  collapsed `History`; manager actions in the selected Duty header's visible `⋯` (`More actions`);
-  catalogue + detail at 1440/1180px, list then full-width detail at 820/743/390px; `Manage staff`
-  opens existing People management with return context; two manager-editable times
-  `Morning check time` (10:30 AM) and `Afternoon check time` (3:00 PM); a temporary duty adjustment
-  shows the affected arrangements and needs person, start, end and reason; an effective departure
-  leaves active staff lists while history keeps actual actors.
-- **Settings Workspace — APPROVED / LOCKED 2026-08-14 / 2026-09-09, BUILT.** Its section rail is the
-  governed rail: 240px, flush left, one straight right divider, no card/radius/shadow, active row
-  the theme select wash (no line); `Hide settings` removes the whole rail (remembered as
-  `ops-settings-rail`), never a 60px icon strip. Every section draws a `kicker` (module) over an
-  `h1.text-page font-display` (page). A module may own several rows when they are sections of one page
-  (`Warehouse Details · Working Hours · Public Holidays · Special Dates · Access`). A module page
-  renders plain-language groups and readable rows; a coherent configuration commits with **one**
-  header `Save changes`, disabled until something changed and naming any invalid gap. No empty
-  Settings pages, no duplicate settings homes, no raw database-shaped fields as the default view.
-- **`PageShell` makes the height budget a TYPE** (`variant="list"` has no KPI slot; no extra band).
-- **ERP Shell (owner ruling 2026-08-13):** navigation is grouped by responsibility
-  (`../ERP-ARCHITECTURE.md` §2.1); `Workspace` (`/operation?tab=work`, owner label ruling 2026-09-29)
-  is the formal destination for `My Task` / `Team Work`; one central Settings destination with module
-  deep links; `Old Orders` is temporary cutover infrastructure.
+Use 03 §§1–4 and 01 §4. Contextual summary and Tasks regions collapse independently. Settings uses plain grouped rows and entity tables, not mandatory extra rails. Preserve global utilities, source navigation and module permission boundaries. A prototype page opening does not authorise replacing every module's record doors.
 
 ## §4.1 · Object page — the full record
 
@@ -496,8 +430,7 @@ DOCUMENT   document preview         the saved/current document the other party r
 ```
 
 **Anatomy of the page:** identity row → tab row → form pane (left) + document pane (right) where the
-object rule splits (§4.4), otherwise one facts flow. The Working Panel is the default record-to-panel
-opening from a listing (§0.2); the full object page keeps its approved roles and is reached from the identity number or the panel's ↗. View, deliberate
+object rule splits (§4.4), otherwise one facts flow. The supplied SO target opens the full object on row click (03 §2.1), rather than automatically editing or opening a compact card. Other module record doors remain governed by their MASTER; the Working Panel remains available for its approved work purpose (§0.2). the full object page keeps its approved roles and is reached from the identity number or the panel's ↗. View, deliberate
 Edit, PDF, Revisions and History stay distinct: only explicit `Edit` opens the formal edit context;
 View, Preview and Print are never edit; Revisions are complete versions, History is events.
 
@@ -561,36 +494,9 @@ Order Route ONE NODE MAP (`docs/orders/MASTER.md`). Other objects copy the gramm
 arithmetic. The owner-selected Houzs Service Case detail composition (2026-10-01) is a reference for
 hierarchy and sections, not an approved adaptation (research file §6).
 
-## §4.2 · Portal navigation — the one shared side menu · owner rulings 2026-10-08 · BUILT ON BRANCH
+## §4.2 · Portal navigation
 
-`PortalSidebar` + `portal-nav.ts` is the ONE side menu of every portal page (Operations, Admin,
-Finance, People); only the selected row changes. Numbers are the template's UI Kit "Side menu":
-220px open / 64px closed, **open by default** (only the person's own `«` closes it, remembered as
-`carres-menu-collapsed`); logo row = wordmark 20px open / heart mark 34px closed + `«`/`»`; items
-14/500 menu grey, pad 7 10, gap 10, radius 8, Material Symbols 20; selected = theme select colours,
-600; hover `#EFECE8`; Settings ⚙ and the person (32px avatar, online dot) at the bottom.
-
-**Operations groups (template Layout Standard §2):** `OVERVIEW` Dashboard · Workspace ·
-`SALES LOCATIONS` Showroom (Carres · Dealer) · `SALES` Sales Orders (Outright · Subscription) ·
-`SUPPLY CHAIN` Purchasing · Warehouse · Payments · Delivery · `SERVICE` Service Case · Issue Tracker ·
-`DATA` Reports · Suppliers · Catalog (`OPERATION_MENU_GROUPS`). No group is called "Operations"; the
-boss's other areas (Finance, People, Admin) follow as their own folding area words. **Every real page
-stays reachable as a sub-item** (owner answer 2026-10-08): Warehouse → its five pages, Delivery →
-Monitor · Delivery Orders, Payments → Monitor · Payment Records · Payment Requests, Service Case →
-Service Cases · Guarantees, Suppliers → Suppliers · Supplier items, Reports → Purchasing · Receiving &
-Inbound · Delivery. Purchasing keeps its four drawers `BUY · RECEIVE · PROBLEMS · SHOWROOM`
-(`docs/purchasing/MASTER.md` §4), remembered per signed-in user.
-
-- Sub-items hang 19px in on one thin straight tree line; Purchasing's pages are 13px.
-- **Exactly one visible selected row:** tree open → the exact child; tree shut while on its page →
-  the module row; menu closed → the module icon.
-- An approved but unbuilt destination is a `<span>` printing `Coming soon`, never a link.
-- Counts mean human work waiting; zero prints nothing; a shut module carries its children's count.
-- A collapsed module icon opens a NAMED destination (Purchasing → `SO Batch Purchase`).
-
-Implementation: `pages/portal/portal-nav.ts` · `PortalSidebar.tsx` · `components/carres/MIcon.tsx`.
-
-Navigation order is not a new permission: each user still sees only the areas their role opens. Source menus in the imported HTML are visual evidence, not automatic activation of unbuilt pages. Long navigation scrolls rather than shrinking items; bottom Settings and the person stay reachable.
+Reuse PortalSidebar and portal-nav; geometry and selected appearance live in 01 §4. Preserve the approved module hierarchy and each user's access. Navigation order is not a new permission. Source menus in the imported HTML are visual evidence, not automatic activation of Subscription or unbuilt pages. Scroll long navigation rather than shrinking items. Bottom Settings and user identity remain reachable.
 
 ## §4.3 · Working Panel — the compact module card
 
@@ -616,7 +522,7 @@ Never copy reference HTML or CSS into a page; never draw a lookalike panel.
   hand-off (`orders.proceeded_at`) and never appears on this card. Name only: the card reads the same
   date. On a card wider than 440px the longer label wraps to two lines in its `1fr` column, so the four
   labels share one row and the four values the next (CSS subgrid; sizes and fractions unchanged, +16px
-  on the 560px card); ≤440px is unchanged. BUILT on branch, not yet deployed.
+  on the then-current card); these historical dimensions are not the new visual target. BUILT on branch, not yet deployed.
 
 ### §4.3.1 · The panel opens on the current page's own main work tab — owner-approved 2026-10-05
 
@@ -648,7 +554,7 @@ pending review from completed stock, payment, delivery or approval. No new panel
 | | Standalone SO card | Embedded SO (`Sales Order` tab inside a host panel) |
 |---|---|---|
 | Where | the Sales Orders register (and any surface whose main record is the SO) | a PO panel, a purchasing round panel or another approved host whose main record is not the SO |
-| Identity | the dark shared Header (customer · SO No · phone · original requested delivery · ↗ · ×) | light identity in the tab: name, underlined SO No → saved PDF, phone, two-line `Customer’s original` / `requested delivery`, `31d · Sat, 31 Oct` (original revision-1 date minus Planned production start, calendar days), ↗ full SO page. No second dark header, no nested tabs, no × |
+| Identity | the shared identity Header (customer · SO No · phone · original requested delivery · ↗ · ×), styled by current 01 | light identity in the tab: name, underlined SO No → saved PDF, phone, two-line `Customer’s original` / `requested delivery`, `31d · Sat, 31 Oct` (original revision-1 date minus Planned production start, calendar days), ↗ full SO page. No second identity header, no nested tabs, no × |
 | Tabs | `Info · Delivery` | none inside the tab |
 | Opens with | Info: address and sales facts open; Items, Communication and Timeline closed | address and sales facts open; money; the items table shown by default with `Item · Qty · Unit (RM) · Disc (RM) · Amount (RM)` |
 | Component | `CompactModuleCard` | the same component in its embedded presentation |
@@ -742,22 +648,30 @@ PAYMENT     the customer-facing 50/50 composition is used only while editing a c
 
 # §5 · The Tasks panel (right) — owner rulings 2026-10-08 · BUILT ON BRANCH, NOT DEPLOYED
 
-**The right side of every Operations page is the Tasks panel and nothing else** (Jess 2026-10-08,
-answering the shell question: *Tasks panel only*). The 2026-10-05 Quick Rail (`Calendar · Tasks ·
-Activity`) is retired: **Calendar and Activity leave the shell**; an order's history is its
-`Timeline` tab (§4.1). Layout Standard §1/§3.3 of the template (§0.4): a 320px white card (1px card
-border, radius 8) beside the page, under the one shell header; `›` hides it and a `Tasks {n}` pill at
-the end of the page toolbar (or the header when a page has none) opens it again; open on screens
-≥1100px unless the person hid it; while a task's own work form is open the card widens to fit it.
+**Current supplied shell target — owner 9 Oct 2026.** A collapsible Tasks region (01 §4)
+is opened by the labelled Tasks/count control; Summary collapses independently. Do not add the old
+permanent right icon column to the supplied SO composition. Tasks uses the signed-in person's
+cross-module work from the one Work source; Workspace keeps its formal My Task/Team Work purpose.
+The latest visual target replaces the old icon-only Tasks-door placement, not task business law.
 
-- Header: day badge (month over day) · `Tasks` · `{weekday} · {n} left` (missed + today, the one Work
-  count; nothing printed while loading or failed) · hide. The list is the existing Tasks area
-  (`tasks/TasksArea.tsx`, the one Work source); never a second task list or engine.
-- **APPROVED TARGET / NOT BUILT** (template §3.3): module filter icons in menu order with counts (pale
-  when none), whole row opens the result form, `Log a call or WhatsApp` form (Who → What happened →
-  details → Remark → Proof → Save).
+- A task row opens the exact source-owned work/result. Module filter icons follow the menu order;
+  counts come from authorised source work, never current table filters or a second engine.
+- Keep task/source, reason, owner, due, required proof, recorded result and next action. Prototype
+  choices and generic Save do not create permissions, evidence waivers or completion rules.
+- Document inspection and task work share the available page area without stacked duplicate task
+  panels; drafts and return context remain. Desktop drawer geometry lives in 01; narrow adoption
+  still needs full-page checks.
+- Calendar is still a shared quick-reference capability. Activity and Calendar integration not shown
+  in this ZIP remain unresolved placement, not deleted capability or permission to invent new doors.
+  The previously approved quick access while handling work must remain available in later composition.
+- No Customers rail door. Customer/contact lookup remains an approved capability whose source-free
+  enquiry placement is still reviewed with Workspace/Customer Service; never fabricate an SO.
+- Module Quick Schedule and Activity's unfinished blueprint remain separate owner-reviewed work.
 
-**One job, two doors (owner-confirmed 2026-09-25).** A job can be done from Tasks/Work or on its owning
+Historical production behaviour and old Quick Rail screenshots are implementation evidence only,
+not another current shell standard. This document has not measured the new runtime deployment.
+
+**One job, two doors (owner-confirmed 2026-09-25).** A job can be done from Work or on its owning
 module page; both use the same module action and write the same record. Done means the source fact
 exists — the item closes everywhere; nobody presses `Done`.
 
@@ -833,7 +747,7 @@ seconds, or the record fails.
 
 ## §6.0 · Listing template — every Portal listing
 
-Read 01 §§4–5 and 03 §2. Current visual reference: `docs/ui-reference/carres-template-2026-10-08/Sales Order Outright Layout v8.dc.html`; shared runtime adapter: DataGrid. The old dense-row/blue/vertical-separator recipe is removed.
+Read 01 §§4–5 and 03 §2. Current visual reference: `docs/ui-reference/sales-order-design/Sales Order Outright Layout v8.dc.html`; shared runtime adapter: DataGrid. The old dense-row/blue/vertical-separator recipe is removed.
 
 1. Module views, shared search/tools, source-owned table, footer; contextual summary and Tasks may collapse.
 2. Columns, quantities, meanings and opening doors come from the owning module MASTER. Linked document numbers open their own records.
@@ -1085,7 +999,7 @@ approval`). *Falsifier: a browser where a sticky
 
 ## §6.11 · Field-width registry — one number per field
 
-**Migration note 8 Oct:** the table below is prior implementation measurement evidence. Re-measure all adopted fields with 01 typography/padding before using them as new target widths. Preserve stable registry keys; do not copy literal old widths into pages.
+**Migration note 9 Oct:** the table below is prior implementation measurement evidence. Re-measure all adopted fields with 01 typography/padding before using them as new target widths. Preserve stable registry keys; do not copy literal old widths into pages.
 
 A page MASTER never carries its own width for a registry field; it records its MEASUREMENT as evidence.
 **The registry number is the WIDEST measured requirement across the pages showing the field.**
@@ -1211,7 +1125,7 @@ into the section it belongs to, and this list loses it.
 
 ## §7.5 · Approved targets not yet built (shared)
 
-Quick Rail `Calendar` · `Tasks` · `Activity` icon-only doors (Tasks layout under research) and the all-module calendar filters (§5) · `Assigned to` /
+Shared Tasks-region adoption plus retained Calendar/Activity integration and all-module calendar filters (§5) · `Assigned to` /
 `Completed by` wording (§5.1) · mission entries on module rails (§6.1) · `Warehouse` tab (§4.3.4) ·
 personal saved-layout rollout (§6.7) · facet-count convergence (§6.7) · SO dealer/product multi-select
 `base-*` → kit palette (4,661 sites; page by page with the page migrations, never globally) · real

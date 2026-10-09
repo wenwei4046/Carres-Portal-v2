@@ -199,10 +199,13 @@ exceptions. The manual form is reached through `⋯` for applicable exceptions u
 required step for normal monthly rotation or recorded PO/GRN leave.
 
 **JOINER / LEAVER TIMING — OWNER-APPROVED 2026-09-28 / APPROVED TARGET / NOT BUILT.**
-A new employee joins routine monthly Duty rotation on the first day of the month following the
-month in which they acquire the required People-owned rotation eligibility, using the company
-calendar/timezone. Creating an account or starting employment alone is not rotation eligibility.
-The current month's allocation is not reshuffled merely because a new eligible person joins.
+**Current scoped clarification — owner 8–9 October 2026; implementation UNVERIFIED.**
+The joining-month exclusion applies only to formal PO Duty allocation. A new employee becomes
+eligible on the first day of the calendar month after joining, subject to active role/access
+eligibility; 20 October joining means 1 November eligibility. Do not impose that waiting period
+on GRN Duty, other ordinary work or qualified help/cover. Keep the existing stable rotation order;
+PO eligibility is not an automatic takeover of existing orders or a promise of the next PO slot.
+Creating an account alone does not establish People-owned employment or role eligibility.
 Departure removes a person immediately when departure becomes effective; do not wait for the next
 month. Re-resolve the affected current/future routine allocation through the one shared Duty model,
 preserving historical actual-actor evidence. This timing ruling does not auto-grant approval rights,
@@ -222,8 +225,13 @@ remain separate.
 Maintain a stable cyclic order of eligible routine Operation staff. Each month one person owns PO
 Duty and the next person in that order owns GRN Duty; advance the PO position by one each month.
 For three eligible people A/B/C, the cycle is PO A / GRN B → PO B / GRN C → PO C / GRN A.
-These letters illustrate the rule, not stored people or a live assignment. A newcomer joins the
-end of the existing rotation order at the approved admission boundary; preserve the existing
+**Owner reaffirmation 9 October 2026 — APPROVED; implementation UNVERIFIED:** PO and GRN
+rotate once per calendar month, normally with different coordinating holders. The existing
+Variable team size clarification permits one qualified available person to coordinate both when
+only one remains; this is not the normal multi-person rota. No eligible person stays a visible
+exception, never an invented assignee. Helpers retain their own actual-actor evidence.
+These letters illustrate the rule, not stored people or a live assignment. An eligible newcomer joins the
+end of the existing rotation order under the duty-specific admission rule (the next-month wait is PO-only); preserve the existing
 people's relative order rather than restarting the schedule. Entry into the pool is not a promise
 of the next PO slot. Remove a departed person when departure is effective and continue the remaining
 order, re-resolving affected current/future allocation without rewriting historical actual actors.
@@ -581,56 +589,79 @@ No earlier-period activity was fabricated and no unavailable recipient was selec
 afternoon pass independently began at 15:00:42 MYT and recorded another 104 receipts with the same
 no-candidate/unassigned split; the two periods remain separate.
 
-**OWNER RULING 2026-09-29 — DELIVERED 2026-09-30 (#1798).** Settings → Staff & Duties contains
-TWO manager-editable time settings, `Morning check time` and `Afternoon check time`, initially
-**10:30 AM** and **3:00 PM**, in Malaysia/company time. One configuration governs both checks
-across modules; there is no parallel per-module threshold. Store/read one shared configuration with changer, change time and previous values.
-Validate ordered morning/afternoon times and apply them to the applicable working day/calendar.
-No offline browser timer or per-user browser preference is the business authority.
+**CURRENT OWNER RULES — 8–9 October 2026; APPROVED TARGET, implementation UNVERIFIED.**
+Sources: `Carres Settings List.md` OFF-01–05, WS-01–12 and its dated owner clarifications;
+`Carres-Business-Blueprint-RESTART-2026-10-07/OWNER-CLARIFICATIONS.md`, “Current attendance and
+lunch configuration”, “Variable team size”, “Office, Warehouse separation and Saturday duty”,
+and the 9 October leave/rota rulings. These are scoped owner decisions, not blanket approval of
+all inventory rows. The older “Office unconfirmed” note dated 8 October is superseded by the
+Settings List's explicit 9 October Office confirmation. Neither file's observed runtime values
+prove implementation of these targets.
 
-**Owner clarification 2026-09-29 — operating hours and flexible starts.** Carres Operation's
-usual hours are **9:00 AM–6:00 PM**. Staff may arrive by **10:00 AM** and finish at
-**7:00 PM**, provided they work **eight hours**. A permitted 10:00 AM start is not an
-absence or late-start finding. The 10:30 AM and 3:00 PM settings are availability checkpoints
-for assigning work; they are not shift start/end times or proof of eight hours worked.
-Office lunch is fixed at **1:00–2:00 PM** (owner ruling, 2026-09-29). This hour is
-excluded from the eight working hours; both permitted schedules therefore provide eight hours.
-This does not introduce an attendance or payroll calculation.
-Two observations cannot prove continuous availability: departure after the afternoon check is
-not automatically detected by that check. Lack of portal activity can also mean telephone,
-receiving or other offline work; the evidence contract must address this before activation.
+**Office, publication and checks.** Ordinary Office work is Monday–Friday, 9:00 AM–6:00 PM;
+Office holiday configuration remains separate from Warehouse site calendars. Publish daily work
+at 9:00 AM without changing source deadlines. Preserve the permitted one-hour flexible start:
+a 10:00 AM start finishes at 7:00 PM with eight working hours excluding lunch. Missing activity
+at 10:00 is not proof of lateness or absence. The two authorised-editable availability-check
+defaults are **10:00 AM / 2:01 PM**, one shared configuration, not additional 10:30/15:00 checks.
+Record editor, old/new values, effective treatment and time. No browser timer or per-user
+preference is the business authority.
 
-Each check evaluates its OWN work period. A morning activity stamp does not prove afternoon
-availability: morning attendance followed by afternoon MC must be detectable. Fresh, authenticated
-use by the real person is the intended signal; an overnight/background tab's periodic requests
-cannot establish that the person started a new period. This is work-routing evidence, not an HR
-attendance/MC diagnosis. Do not auto-create leave, mark misconduct, or change employment/access.
-The morning evidence window starts at **9:00 AM** and ends at the configured morning check;
-the afternoon window starts at **2:00 PM**, after lunch, and ends at the configured afternoon
-check. With the default settings these are **9:00–10:30 AM** and **2:00–3:00 PM**.
-A permitted 10:00 AM arrival has until the morning checkpoint to establish activity.
-Lunch and pre-2:00 PM activity never satisfy the afternoon check. Settings validation must keep
-the morning check after the permitted 10:00 AM arrival and before lunch, and the afternoon check
-after 2:00 PM and before the usual 6:00 PM close. These are office rules, not inferred store shifts.
-The exact recognised activity evidence must be measured before engine Build; the repository's
-single all-day `last_seen_at` is NOT sufficient. Do not equate a failed read with absence.
+**Lunch.** Office owns the one-hour lunch policy: default 1:00–2:00 PM, shiftable by up to one
+hour. Workspace reads the actual person's lunch occurrence; it does not keep another policy
+editor. Retain assigned tasks during lunch and skip the person's activity check during actual
+lunch; the applicable check follows the shifted lunch's end. Do not infer absence from lunch,
+use lunch activity as proof of working availability or invent a minute offset for a delayed check.
 
-At the configured checkpoint, an assigned person without the required current-period evidence
-has their unfinished ordinary work assigned by the system to an active, available, eligible person
-with evidence for that period. Record the assignment movement and the checkpoint reason; show the
-new `Assigned to` consistently in Settings, Workspace and owning-module surfaces. Use the Duty's
-existing selection rule: PO/GRN keep their approved cyclic order and joining-month PO exclusion;
-object-owned work keeps its governed selection rule. No second per-module person list is created.
-Recorded leave and effective departure remain authoritative exclusions and do not wait for a check.
+**Activity evidence and uncertain attendance.** Each check uses its own work period; morning
+activity does not establish afternoon availability. Background tabs and an overnight session do
+not prove a new period's activity. Missing activity without recorded leave/lunch prompts one
+availability confirmation about the person, not once per task. Confirmed working/offsite staff
+retain tasks; confirmed not working triggers direct qualified available cover. The detailed
+“Not sure” morning-wait/final-check-transfer-to-respondent branch remains **DESIGNER-REPORTED /
+UNVERIFIED**, not an approved automatic rule. No missing activity or failed source read creates
+MC, misconduct, payroll or employment facts. An MC submission login does not establish working
+availability. The exact activity/confirmation implementation remains to verify.
 
-A system change affects responsibility for unfinished work, never who is authorised to help.
-Completed work, actual performers, source business facts, Sales Order PIC and the monthly Duty
-cycle are not rewritten. Both morning and afternoon checks are distinct: afternoon can change an
-assignment made that morning if its current assignee is unavailable. Late activity does not silently
-bounce an already-moved assignment back; subsequent changes are recorded under the shared policy.
-The next working day resolves its normal allocation and eligibility again. No candidate or
-unreliable evidence produces a visible management exception, not an invented assignee or silent
-permission expansion. Approver Duties do not inherit automatic ordinary-work reassignment rights.
+**One leave entry — Workspace → Leave.** MC, Emergency and Planned leave use the same submission
+entry and People-owned dated absence facts; `On leave` is a status, not a fourth application type.
+MC requires dates and proof; Emergency requires dates and a short reason. No standalone MC Report
+page or duplicate HR record. All three types **currently require no approval**. Staff & Duties
+leave policy defaults to `Approval required = No`; Jess or a section-authorised editor may change
+it later, with effective date and treatment of existing submissions explicitly defined. No
+retroactive refusal is assumed and required evidence is not waived.
+
+A submission covering today activates qualified available cover immediately, without waiting for
+approval or an activity checkpoint. Future leave activates cover on the absence date, not the
+submission date. Receiving colleagues must be eligible and working; exclude recorded leave and
+effective departures. Operational cover is separate from evidence review and payroll treatment.
+Keep normal responsibility, effective assignment and actual helper as distinct recorded facts,
+using the existing single `Assigned to` presentation. Return does not silently bounce work back.
+
+**Saturday on-call coverage is separate.** Staff & Duties governs rotating Saturday customer/driver/
+Warehouse/Delivery contact support, default **9:00 AM–6:00 PM**, authorised-editable, with qualified
+cover. Record issues and their next accountable work. This does not make Saturday an ordinary
+Office workday, override source calendars, transfer all Delivery work, or grant money/approval
+rights. Saturday rota cadence and its exact calendar integration remain **UNVERIFIED**; do not
+infer monthly cadence from PO/GRN. Warehouse receiving/collection hours stay Warehouse-owned.
+
+**Assignment consequences.** Use the existing shared resolver and duty-specific eligibility;
+never create a module staff list. Preserve the original owner/source PIC, source deadlines,
+completion facts, historical actual performers and monthly rota. Assistance does not reassign
+responsibility. Subsequent cover changes are recorded; no silent task ping-pong. Missing eligible
+cover or unreadable evidence stays a visible exception, never fabricated assignment. Approver
+qualifications do not inherit ordinary-work help rights.
+
+**Historical implementation evidence, not current defaults.** The 30 September #1798 release
+used 10:30 AM / 3:00 PM and fixed 1:00–2:00 PM lunch; the measured passes above remain history.
+The Settings List / Owner Clarifications record **10:15 AM observed live on 8 October**, unchanged
+by that audit. It is an observation, not a new owner default and does not replace **10:00 AM**.
+No production change or new live verification is claimed by this 9 October document update.
+**Cross-module reconciliation still owed:** HR MASTER's rotation-entry paragraph and §5 leave
+row still describe a general next-month eligibility wait and 10:30/15:00 defaults in the inspected
+checkout. The scoped owner corrections above govern Workspace; HR's owner must align those
+references. The 8 October clarification's earlier Planned-leave-after-approval proposal is
+superseded by its explicit 9 October no-approval ruling. Neither stale text reopens these decisions.
 
 History retains the assignment when the job opened, each change (from/to, system or personal
 assigner, reason, effective/recorded time), every updater and the actual completer/time/origin.
@@ -852,7 +883,8 @@ authoritative module action remains scheduled on Saturday after applying that mo
 resolved owner's working calendar. Payment keeps its locked Friday-action rule for a Saturday
 deadline. Physical Receiving or Delivery work remains on Saturday when its authoritative rule and
 resolved actor admit Saturday; without a qualified actor it is `Not assigned`, not silently moved.
-There is no invented `Saturday Duty`. A separate preparation action may appear on Friday only when
+The approved Saturday contact-support rota (§4.4) does not override these source-owned
+action calendars or create duplicate operational tasks. A separate preparation action may appear on Friday only when
 its owning module generates that action. A public holiday remains visible and is named; normal work advances by
 the source calendar, while an authorised holiday operation remains on the holiday and says so.
 `No working date` is an admitted obligation without a lawful day and never pretends to belong to
@@ -2983,3 +3015,5 @@ artifact's implementation.
 **Owner correction 2026-09-28 — actionable work first (local prototype):** show admitted unfinished cards above the collapsed Order Route, missed before due. Render each actionable card once; route rows link back to it. Supplier before send confirmation shows `Sending not confirmed`; expanding reveals read-only facts without empty completion boxes or a progress ratio. Recipient is a recorded supplier contact/group, never free text; multiple recorded destinations permit selection, missing contact data must not be invented. Production integration remains owed.
 
 Review fixes (owner approved 2026-09-28): communication tabs wrap within their panel at medium widths. Time reminders are facts without checkbox or progress weight. DELIVERY ORDER has one requirements ratio, no second done ratio. Unavailable messages cannot be copied; disconnected prototype messaging controls remain disabled.
+
+**Saturday on-call boundary — owner confirmed 9 October 2026:** rotating contact coverage, default 9:00 AM–6:00 PM and editable. Answer customer, driver and warehouse calls/WhatsApp and record any required follow-up. It is not normal Saturday office attendance, PO Duty or GRN Duty, and does not automatically transfer all routine Tasks to the on-call person. Any follow-up retains its source-owned permission, normal owner and qualified cover rules. Rotation frequency remains unspecified; implementation unverified.
