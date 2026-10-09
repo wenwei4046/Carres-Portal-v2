@@ -351,14 +351,21 @@ Dealer commission rules:
 - 0647 fixes a fault 0642 shipped with: a credit note's two account columns did not follow a renumbered account (0570 says every key that names the chart must), so renumbering an account a credit note used was refused. Both now follow, and the file refuses to apply while any key onto the chart still does not. A test renumbers an account under a confirmed credit note.
 - Falsifier: in Chew's test, a supplier's `Unpaid After Advance and Credit` differs from its balance in the books, or a bill shows a credit note Chew did not knock off.
 
-**Credit and debit notes to follow up — Chew 2026-10-06 and 2026-10-07; APPROVED / NOT BUILT except where marked.**
+**Credit and debit notes to follow up — Chew 2026-10-06, 2026-10-07 and 2026-10-09; APPROVED / BUILD IN PROGRESS.**
 - Chew needs one list of the credit and debit notes suppliers still owe, so he can follow each one up (「我需要有一个listing 关于supplier 那边要follow up 的cn」). It is a reminder only and posts nothing, because there is no supplier claims account (Chew 2026-10-06).
 - Where one starts (「就是我转grn 去pi 时会对比我的po price， 然后提醒我，我会remark pending supplier cn or dn / 同时也有可能是开了pi, 然后要purchase return， 就要让他pending cn」):
   - when a bill is made from its GRN, each line is compared with its PO price and a difference is pointed out; Chew marks it pending a supplier credit note or debit note, with a remark;
   - a purchase return on goods already billed makes a pending credit note. Purchasing's return record is read, never changed.
 - One record per note owed: supplier, credit or debit, the bill, GRN, PO or return it belongs to, the amount, the date it was noted, each follow-up (the date and what the supplier said) and the next follow-up date.
 - It closes when the supplier's note arrives: entering the credit note (or, once built, the debit note) offers that supplier's open ones to settle, and a part leaves the rest open. It can also be closed with a reason, for example the supplier refused or replaced the goods.
-- PROPOSAL / NOT LAW, asked on 2026-10-07 and not answered: the reasons are "Price differs from PO", "Purchase return" and "Other", and preparing a voucher for a supplier shows the notes it still owes.
+- **How it works (Chew 2026-10-09, 「可以，开始做」):**
+  - Payables → `Notes to follow up`: one row per note owed (supplier, credit or debit, why, the bill, GRN, PO or return it came from, the amount, what is settled, what is left, the next follow-up), in three groups: to follow up today or earlier, still waiting, and settled or closed. A row opens the note: record a follow-up (the date, what the supplier said, the next date), close it with a reason, and see what settled it. A note can also be added by hand, with the reason Other.
+  - A confirmed bill: a line whose price differs from its PO price offers `Follow up`. Above the PO price it suggests a credit note, below it a debit note; the amount it suggests is the difference times the quantity, and can be changed. A line already marked shows its note. A draft bill offers nothing, because its lines can still change.
+  - A purchase return on goods on a confirmed bill makes a credit note to follow up by itself, worth the bill's price for the returned goods: the latest confirmed bill line for that GRN and PO line, never more units than were billed. A wrong item is never billed, so it adds nothing.
+  - A confirmed credit note settles that supplier's credit notes owed, in part or in full; the rest stays owed. Cancelling the credit note gives back what it settled. A debit note owed is closed with a reason until supplier debit notes are built.
+  - The reasons are "Price differs from PO", "Purchase return" and "Other".
+  - Preparing a voucher for a supplier says what notes it still owes.
+  - Finance and principal only. It posts nothing.
 - Falsifier: in Chew's test, a note he is waiting for is not on the list, or one the supplier already sent still shows as owed.
 
 **Bill scanning approach — PROPOSAL / NOT LAW, built for Chew's test (no migration).**
