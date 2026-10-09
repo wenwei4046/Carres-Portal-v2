@@ -69,3 +69,38 @@ The shared Button exposes its existing variant as `data-variant`; the current pr
 Existing source names are entry points, not proof the latest visual target is built. A missing
 API is recorded as KIT GAP; later implementation extends the same family with a `/ui` example.
 The imported HTML/support.js demonstrates interactions only and is never the runtime component.
+
+## Behaviour contracts retained through the visual replacement
+
+- **Button/overlays:** existing variants remain API-compatible and read current tokens. Button
+  forwards its DOM ref so menu, tooltip and popover anchors remain correct. Loading/disabled
+  and keyboard focus are distinct. A navigation link is not a business-action button.
+- **Checkbox:** label activates the whole hit area; table controls require an accessible name.
+  Select-all preserves checked/unchecked/indeterminate and the exact authorised selection scope.
+- **Select:** chooses a value; DropdownMenu performs an action. Input/Select share field skin,
+  labels and validation. Use existing options-data API and keyboard behaviour; long choice sets
+  need the existing searchable control. Do not remove a permission or validation to match a mock.
+- **DropdownMenu/Popover:** trigger, floating content and labelled items; keep keyboard navigation,
+  safe dismissal and focus return. A row menu acts on its row, a selection bar on its selection.
+- **PdfPreview/PdfPreviewHeader:** caller supplies the actual rendered/saved PDF URL and owns its
+  lifetime. Preview never issues a document or fetches business facts. Fit/zoom and contained
+  scrolling remain; source change/retry/unmount cancel stale paints and release worker resources.
+  Ready means all pages painted. Loading, decode failure and Retry are distinct from business
+  success. Source header keeps identity, permitted download and Close reachable.
+- **SavedEvidenceViewer:** authorised source supplies stable file IDs, media kind, signed URL and
+  recorded context/Unit associations. Viewer does not list storage, widen access, upload, delete
+  or rewrite evidence. Known-but-unreadable files show failure; truly empty evidence has no fake
+  opening door. Retry calls the owning reader. Switching file resets zoom and cannot be replaced
+  by a late retry. Retain photo zoom/drag/reset, video playback, previous/next and focus return
+  after fullscreen. Never infer Unit attribution from receipt-level photos.
+- **CompactModuleCard:** host passes identity once plus module facts, editors/items and source
+  events; `presentation="embedded"` reuses the same SO adapter. Card never writes another
+  module's record, uploads evidence or marks a message sent. Editors close only on confirmed
+  save success; failure keeps the draft. Standalone/embedded defaults stay in MODULE-CARD-TEMPLATE.
+  `CardEditorButtons`, `CardChecklist` and `compactCardStyles` remain reuse entry points.
+- **Icon:** reuse the existing semantic-name adapter. Current font/glyph family and measurements
+  come from 01; historical Lucide dimensions do not override the new visual target. Missing
+  meanings join the shared registry once, never a page-local icon map.
+
+These contracts preserve useful supported behaviour, not retired colours, font sizes or geometry.
+Current source APIs must be checked before calling any family fully adopted.
