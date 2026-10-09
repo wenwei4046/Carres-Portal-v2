@@ -567,6 +567,12 @@ FINANCE          its title folds the area (§4.1)
 6. **Year-end close.** Design it before year end.
 7. **New words.** New Finance screen words go through COPY-STANDARD before UI work.
 
+### 5.1 · Cross-module Settings reconciliation — 9 October 2026
+
+This pass reconciles documentation boundaries only; it does not change Chew's scoped decisions, Jess's overriding authority, production permissions or existing release status. Finance still owns its own money-out, bank/card reconciliation, ledger/month-end/tax and Finance-report configuration; customer recording, receipts, allocation, customer-facing bank instructions and collection remain Payment-owned (§3.1). The two receiving accounts observed in Payment Settings are not proof of Finance account mapping, settlement or reconciliation completion. `Payment Approver` and `Finance Approver` remain distinct duties resolved through the shared Workspace source (§2), not a second Finance staff rota. Leave/cover and ordinary helpers do not grant either approval right.
+
+Central Reports placement does not remove Finance's approved source-owned report pages (§§3.6,4) or approve a new company-wide formula. Any central summary must consume the Finance-owned definition, date anchor, permissions and coverage; provisional stock valuation remains provisional until Stock's required confirmation (§5). Customer bank messages, accounting money-account codes and bank statement accounts must be reconciled rather than presumed identical. Unverified mappings are not missing database facts. Deposit invoices remain switched off until the existing checks in §3.1 and §5 are met. No notification, sync, import, payout or automatic recovery is activated by this reconciliation. Existing samples, year-end design and release/acceptance gaps in §5 remain open.
+
 ## 6 · Sources
 
 - **Houzs Finance Specification V5 (2026-10-02):** kept locally by Chew and not in this repository. Reference only.

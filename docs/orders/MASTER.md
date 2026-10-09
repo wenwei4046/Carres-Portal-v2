@@ -343,6 +343,36 @@ OWNER SCOPE  an authorised operator may find every order; owner may remain a fil
 = filters narrow truth; they do not redefine the page as My Work.
 ```
 
+### Current cross-module dependency boundary — owner alignment 9 Oct 2026
+
+**APPROVED direction; latest implementation/complete production chain UNVERIFIED.** Outright
+Sales is the current delivery priority. Subscription expansion is deferred; preserve authorised
+existing Subscription records and links, without folding its quantities or rules into Outright.
+
+- SO shows source-owned Purchasing, Stock, Delivery and Payment facts, their original record
+  links and remaining obligations. Read each owner’s effective calculation and Settings version;
+  do not duplicate calculations, clocks, configuration editors or completion writers in Orders.
+- Operations has no new-SO creation or money-approval door. Customer order intake stays Sales
+  Portal-owned; ordinary collection is permitted source-governed work, not money approval.
+  DO creation remains automatic through Delivery’s existing gates, not an SO release action.
+- Collection retains Payment’s effective responsibility ledger/formal handover. Display normal
+  responsible person, today’s qualified cover and actual executor separately; ordinary help
+  neither transfers ownership nor grants approval rights.
+- Settings SO-01/02/03 are links to the single Order Entry configuration, source operational
+  rules, and personal Register preferences respectively. Central Settings hosts configuration;
+  Orders does not own another Purchasing/Stock/Delivery/Payment editor. Authorised section
+  delegation is an approved capability, not evidence that any access grant has been executed.
+- A missing list, link or adapter does not prove absent database records. The authenticated
+  Settings observations on 9 Oct are read-only evidence, not new approved defaults, save-right
+  verification or end-to-end SO → Proceed → PO → PDF proof. Keep the latter unverified until an
+  actual current-version chain is evidenced.
+
+Sources: root `Carres Settings List.md`, Sales Orders SO-01–03 and “Current Settings authenticated
+page audit · 9 Oct 2026”; `Carres-Business-Blueprint-RESTART-2026-10-07/OWNER-CLARIFICATIONS.md`,
+“Team work and Delivery assignment”, “Variable team size” and the 9 Oct leave clarifications.
+These are decision/evidence pointers; owning module MASTERs remain the operational authority.
+No new design, code, deployment, account grant or production-data change is authorised here.
+
 ### WHAT SALES ORDER OWNS
 ```
 ✓ the customer order's identity          ✓ the customer
@@ -4697,9 +4727,10 @@ keep their own precise keys, and `workItemsForOrder` resolves the person per rul
   choice and calls, delivery date/time, today's result, proof, Failed Delivery next step, loan
   return and ordinary collection. Delivery, Payment and Warehouse still own their business facts;
   action ownership does not transfer those write boundaries.
-- **`collect` resolves to the same PIC** as the Sales Order's stable collection owner. A formal
-  handover changes the order responsibility and its append-only evidence together. Delivery Duty
-  appears only when the order has no PIC; it never replaces a valid PIC.
+- **`collect` reads Payment's effective collection-responsibility ledger and formal handover**,
+  not a fresh assignment from the SO PIC. Preserve the normal collection owner, the current
+  qualified cover assignee and the actual executor as separate facts. Orders displays that
+  resolution; it does not create another collection owner or reset the ledger.
 - Completion facts, clocks, the two-line presentation and the duty-word honest-gap rule
   (`Delivery staff` · `Finance`) are unchanged. `WorkItem` gained `ownerUserId` so My Work
   filters on the RESOLVED account, and Team Work groups by account, then named person, then duty
@@ -4755,14 +4786,13 @@ Delivery Duty word until that exceptional owner is resolved.
   evidence and never owns; the manual assignment door answers 422 and the sweep skips it. The
   old guard was an email list (`isOpsGenericAccount`), which `operation-test@x.com` walked
   straight past.
-- **Absence needs no click, and absence is COVER — never a reassignment.** A heartbeat is stamped
-  while an operator has the portal open. **Before 10:00 MYT everybody counts as in** — late is not
-  absent. From 10:00 a member with no heartbeat counts as out for the day, and so does anyone on
-  planned leave (`ops_staff_settings.available`). Their orders **do not move**: for that day the
-  work is acted on by their governed buddy cover, or — when none is named — by the least-loaded
-  individual who is in. The normal owner is preserved and the work returns when they are back.
-  **The one read that answers all of this is `delivery_responsible_operation(order, day)`** (0504),
-  which Delivery's contact writer and Payment's collection owner both use.
+- **Absence is governed cover, not a new SO owner.** Read the current People/Workspace
+  leave, qualification and availability contract rather than deriving absence from a missing
+  heartbeat here. Under the owner’s 9 Oct ruling, all leave currently requires no approval;
+  today’s submitted absence starts qualified available cover immediately, and future absence
+  starts on its date. Normal owner, current cover assignee and actual executor stay distinct.
+  Cover does not silently return or ping-pong on the employee’s return. These are approved
+  operating dependencies; implementation of this latest policy is not verified by this section.
 - **A permanent change is a formal handover.** Management reassigning the order, and the
   `Hand over collection` door, write the same two facts — the assignment and the append-only
   responsibility ledger (`payment_collection_owners`: previous owner · new owner · reason ·

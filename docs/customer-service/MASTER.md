@@ -727,6 +727,15 @@ with staff review. It may not approve money/remedies, invent dates or destinatio
 identities, dismiss uncertain messages or send unrestricted autonomous customer replies. Fixed
 availability acknowledgements below are a distinct approved target, not generative AI discretion.
 
+**Company support identity — owner-confirmed; configuration/channel implementation unverified
+(9 October 2026).** Read Company COM-02 in `Carres Settings List.md`: **Carres Support Team ·
+011-6133 8862** is the shared customer-facing support identity and telephone. Individual staff
+actors remain attributable in History. Read the Company-owned setting; do not create another
+Customer Service contact editor. This is not evidence that the telephone is WhatsApp-enabled,
+that a WhatsApp API is connected, or that historical chats are available. Support WhatsApp contact
+and support email remain unverified in that inventory. Channel status and end-to-end evidence
+remain separate under §13.4; this document update changes no live configuration.
+
 ### 13.2 · Approved first-response clock
 
 **OWNER-APPROVED TARGET; current operating rule, automation not verified.** Response coverage is
@@ -750,6 +759,25 @@ meets first response, but not final resolution or an outstanding promised update
 module deadlines remain distinct. Extending this clock to every later substantive reply remains
 proposed (§4.4), not silently included in this approved first-response rule.
 
+**Office and Saturday distinction — 9 October document alignment.** The scoped owner decisions
+recorded in `Carres Settings List.md` OFF-01–05 and WS-12, and consolidated in Workspace MASTER
+§4.4, establish ordinary Office Monday–Friday, base 9:00 AM–6:00 PM with one-hour flexibility,
+and a separate Saturday contact-support rota, default 9:00 AM–6:00 PM. Office public holidays
+use the Kuala Lumpur calendar; Warehouse calendars remain separate. These facts do **not** move
+the approved customer first-response start to 9:00 AM, extend it to 7:00 PM, or add Saturday to
+its SLA. Preserve the first-response calculation above until an explicit response-policy ruling.
+Saturday support handles customer/driver/Warehouse/Delivery contacts through Workspace's governed
+duty and qualified cover; it does not acquire source-module approval rights or reset deadlines.
+Its exact rota cadence/calendar integration and runtime implementation remain unverified.
+
+Actual staff lunch and absence use **Workspace MASTER §4.4**, reading Office's one-hour lunch
+policy and People-owned dated leave. Retain tasks during actual lunch; lunch alone does not
+prove absence or trigger transfer. Governed absence activates qualified available cover, with
+original due times and actual actors preserved. Do not create a Customer Service attendance,
+leave or cover engine. A shifted person's lunch does not silently move the customer-facing
+13:00–14:00 response exclusion above; individual availability and the public response clock are
+separate facts. Availability-check settings/observations are not response-SLA settings.
+
 ### 13.3 · Fixed availability acknowledgements
 
 **APPROVED TARGET / NOT ACTIVATED.** Once the channel and automation are separately authorised,
@@ -766,6 +794,12 @@ not on every message. Use the holiday/weekend condition instead of promising a 2
 closed day. Never replace an earlier, tighter outstanding deadline with the generic acknowledgement.
 Automatic acknowledgement is recorded as automatic and does not satisfy first human response,
 reset due time, claim staff action or close any work.
+
+Before activating these acknowledgements, verify their wording against the actual staffed
+channel coverage, including Saturday support and actual lunch arrangements. The weekday SLA
+must not be silently broadened, but neither may automation falsely imply nobody is available
+when Saturday support is operating. Saturday-specific acknowledgement treatment remains
+unverified; this synchronisation does not approve replacement wording or activate automation.
 
 ### 13.4 · Launch boundary and failure recovery
 
@@ -870,6 +904,16 @@ Recommend operational review of unanswered/overdue work and actual first-respons
 shared Work. Do not lead with decorative dashboards or AI answered percentages. No separate bulk
 messaging, conversation export, advanced analytics or data-retention/deletion capability is approved.
 Any later report must distinguish automatic acknowledgements, human response and final outcome.
+
+**Settings evidence boundary — 9 October 2026.** `Carres Settings List.md` is the current
+cross-module inventory, not a new law or proof of implementation. CARE-01 links the existing
+source settings; COM-02, OFF-01–05 and WS-04/08/11/12 supply the scoped references used in §13.
+Distinguish owner-approved targets, reported observations and unverified capabilities. For example,
+the inventory reports a 10:15 AM morning availability check and 2:01 PM afternoon check on the
+inspected Staff & Duties page; that observation neither changes the response SLA nor proves
+Company/Office/Leave/Saturday configuration or channel integration is deployed. No fresh
+production inspection, permission grant, Settings write or channel activation occurred in this
+Customer Service document synchronisation.
 
 ### 14.5 · Reference-to-Carres capability matrix
 
