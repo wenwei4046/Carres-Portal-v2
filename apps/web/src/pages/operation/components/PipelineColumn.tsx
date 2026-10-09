@@ -156,12 +156,10 @@ function PipelineOrderCard({ order, onClick }: OrderCardProps) {
   // M5 task 2 (OperationOrders) wires the kanban + drawer.
   const inner = (
     <>
-      <div className="flex items-baseline justify-between">
-        <span className="text-label font-semibold tabular-nums text-base-900">
-          SO-{order.so}
-        </span>
-        <span className="text-label tabular-nums text-base-500">{deliveryDate}</span>
-      </div>
+      {/* The SO number never breaks; the date sits under it so a narrow
+          column keeps both whole. */}
+      <div className="whitespace-nowrap text-label font-semibold tabular-nums text-base-900">SO-{order.so}</div>
+      <div className="whitespace-nowrap text-label tabular-nums text-base-500">{deliveryDate}</div>
       <div
         className={`${cjkClassName(customerName)} text-body font-medium text-base-900 mt-0.5`}
       >
