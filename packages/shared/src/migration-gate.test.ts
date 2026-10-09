@@ -8,6 +8,10 @@ import { fileURLToPath } from "node:url";
    is run by CI with node, not compiled. Typed at the boundary here. */
 // @ts-expect-error -- untyped .mjs tooling module
 import * as collisions from "../../../scripts/migration-collisions.mjs";
+// @ts-expect-error -- untyped .mjs tooling module
+import * as destructive from "../../../scripts/migration-destructive.mjs";
+
+const { isDestructiveSql } = destructive as { isDestructiveSql: (sql: string) => boolean };
 
 const { findCollisions, staleBaselineEntries, collisionMessage, groupByNumber } =
   collisions as {
@@ -118,6 +122,39 @@ describe("the shipped gate refuses two files with one number", () => {
   it("the REAL repository passes its own gate", () => {
     const out = execFileSync("node", [SCRIPT], { cwd: REPO, encoding: "utf8" });
     expect(out).toContain("No migration was applied.");
+  });
+});
+
+describe("what the gate calls destructive SQL", () => {
+  const rewrite = (snippet: string) =>
+    "select pg_temp.mig0681_rewrite('public.f(uuid)'::regprocedure,\n" +
+    `$old$  ${snippet}$old$,\n$new$  ${snippet}\n    -- a comment$new$);\n`;
+
+  it("refuses a bare delete, truncate or drop table at migration level", () => {
+    expect(isDestructiveSql("delete from public.orders;\n")).toBe(true);
+    expect(isDestructiveSql("truncate public.orders;\n")).toBe(true);
+    expect(isDestructiveSql("drop table public.orders;\n")).toBe(true);
+  });
+
+  it("refuses one inside a do block, which runs when the migration applies", () => {
+    expect(isDestructiveSql("do $$ begin delete from public.orders; end $$;\n")).toBe(true);
+  });
+
+  it("sets aside a function body: it runs when a user acts, not on apply", () => {
+    expect(isDestructiveSql("create or replace function public.f() returns void language sql as $fn$ delete from public.t $fn$;\n")).toBe(false);
+  });
+
+  it("sets aside a function rewrite's snippets: they are text of a function body (0681)", () => {
+    expect(isDestructiveSql(rewrite("delete from public.payment_voucher_allocations where voucher_id = v_id;"))).toBe(false);
+  });
+
+  it("still refuses a bare delete written after a rewrite call", () => {
+    expect(isDestructiveSql(`${rewrite("select 1;")}delete from public.orders;\n`)).toBe(true);
+  });
+
+  it("does not read a comment, or a revoke of truncate", () => {
+    expect(isDestructiveSql("-- it used to delete from orders\nselect 1;\n")).toBe(false);
+    expect(isDestructiveSql("revoke truncate on public.orders from authenticated;\n")).toBe(false);
   });
 });
 
