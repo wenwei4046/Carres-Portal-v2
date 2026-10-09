@@ -3385,6 +3385,16 @@ export {
 
 export { evaluateWorkspaceActivityCheck, type WorkspaceActivityEvidence, type WorkspaceActivityCheck } from "./workspace-activity-check";
 export type { OutrightOrderFacts, OutrightFactsFailed } from "./outright-order-facts";
+export {
+  DEFAULT_OFFICE_CALENDAR,
+  officeCalendarOf,
+  officeOffDays,
+  officeWorkingDayOptions,
+  officeOwnerCalendar,
+  officeHolidayName,
+  type OfficeCalendar,
+  type OfficeHoliday,
+} from "./office-calendar";
 
 export { decideWorkspaceReassignment, type WorkspaceCheckpointIdentity, type WorkspaceReassignmentDecision } from "./workspace-reassignment";
 
