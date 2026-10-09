@@ -1,5 +1,6 @@
 import { Hono, type Context } from "hono";
 import {
+  deliveryAssignmentLeadInput,
   deliveryTemplateActiveInput,
   deliveryTemplateKeyInput,
   deliveryTemplateSaveInput,
@@ -12,10 +13,13 @@ import {
   partnerVehicleInput,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
+import { requireSettingsEditor } from "../../lib/settings-editor";
 import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import { resolveActorNames } from "../../lib/actor-names";
-import { loadPurchasingSettings } from "../../lib/purchasing-settings";
+import { loadPurchasingNumbers, loadPurchasingSettings } from "../../lib/purchasing-settings";
+import { readDeliveryRules } from "../../lib/delivery-rules";
+import { readDeliveryCalendar } from "../../lib/delivery-calendar";
 import type { AppEnv } from "../../types";
 
 /**
@@ -38,7 +42,7 @@ const PARTNER_SELECT =
 
 deliverySettingsRouter.get("/", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const [partnersR, driversR, vehiclesR, templatesR, changesR, accountsR, canR, purchasing] =
+  const [partnersR, driversR, vehiclesR, templatesR, changesR, accountsR, canR, purchasing, rules, canRulesR] =
     await Promise.all([
       sb.from("delivery_partners").select(PARTNER_SELECT).order("name"),
       sb.from("partner_drivers").select("id, partner_id, name, phone, active").order("name"),
@@ -54,12 +58,17 @@ deliverySettingsRouter.get("/", requireOperationOrPrincipal, async (c) => {
         .order("version", { ascending: false }),
       sb
         .from("delivery_setting_changes")
-        .select("id, what, partner_id, old_value, new_value, actor_id, changed_at")
+        .select("*")
         .order("changed_at", { ascending: false })
         .limit(200),
       sb.from("app_users").select("id, name, email, partner_id, status").eq("role", "partner"),
       sb.rpc("delivery_can_manage_settings"),
       loadPurchasingSettings(sb).catch(() => null),
+      /* 0673 — Delivery Rules (`Assign logistics by`), fail-safe to 3. */
+      readDeliveryRules(sb),
+      /* The Settings editor gate (0668): Jess, or a person she names for
+         Delivery — the gate the 0673 door itself calls. */
+      sb.rpc("settings_can_edit", { p_section: "delivery" }),
     ]);
   for (const r of [partnersR, driversR, vehiclesR, templatesR, changesR, accountsR]) {
     if (r.error) return fail(c, r.error);
@@ -84,6 +93,84 @@ deliverySettingsRouter.get("/", requireOperationOrPrincipal, async (c) => {
     /* Delivery Rules mirrors, read-only (§11): the contact lead lives in the
        shared `chase` setting — one home, never a second number here. */
     contactLeadWorkingDays: purchasing?.logisticsCallWorkingDays ?? null,
+    /* DEL-04 · `Assign logistics by` (0673). `stored: false` = the table is
+       not installed: the default answers and Edit is not offered. */
+    rules: {
+      assignmentLeadWorkingDays: rules.assignmentLeadWorkingDays,
+      /* DEL-10 · `Courier dispatch within` (0678); `courierDispatchStored:
+         false` until the column exists — the default 3 shows, no Edit. */
+      courierDispatchWorkingDays: rules.courierDispatchWorkingDays,
+      courierDispatchStored: rules.courierDispatchStored,
+      revision: rules.revision,
+      stored: rules.stored,
+      canEdit: rules.stored && !canRulesR.error && canRulesR.data === true,
+    },
+  });
+});
+
+/**
+ * The two Delivery leads every deadline reads (DEL-04 · DEL-05) — a small
+ * read for screens that need only the numbers (the Logistics card, the Order
+ * Route), never the whole Settings surface. Each fails safe to its default.
+ */
+deliverySettingsRouter.get("/leads", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const [numbers, rules] = await Promise.all([
+    loadPurchasingNumbers(sb).catch(() => null),
+    readDeliveryRules(sb),
+  ]);
+  return c.json({
+    contactLeadWorkingDays: numbers?.logisticsCallWorkingDays ?? null,
+    assignmentLeadWorkingDays: rules.assignmentLeadWorkingDays,
+    stored: rules.stored,
+  });
+});
+
+/**
+ * THE DELIVERY CALENDAR every Delivery date counts on (owner order
+ * 9 Oct 2026): Monday–Saturday with the Selangor public holidays Warehouse
+ * Settings stores for the dispatching Site, else the built-in list
+ * (`readDeliveryCalendar`). Read-only — the dates are edited in Settings →
+ * Warehouse → Public Holidays, never here. Finance reads it too: the
+ * payment-due FACT counts on it, and the Warehouse Schedule uses its holidays
+ * as the governed fallback. Row security decides what each role reads; a
+ * refused read answers the built-in list.
+ */
+deliverySettingsRouter.get("/calendar", async (c) => {
+  const role = c.var.auth?.role;
+  if (role !== "operation" && role !== "principal" && role !== "finance" && role !== "warehouse") {
+    return c.json({ error: "forbidden", message: "Carres staff only" }, 403);
+  }
+  const { calendar, stored } = await readDeliveryCalendar(userClient(c.env, c.var.auth.jwt));
+  return c.json({
+    region: calendar.region,
+    holidays: calendar.holidays,
+    holidaySource: calendar.holidaySource,
+    recordedYears: calendar.recordedYears,
+    stored,
+  });
+});
+
+/** DEL-10 · Delivery Rules → `Courier dispatch within` (0678's door; the
+ *  same editor gate, revision and change record as `Assign logistics by`). */
+deliverySettingsRouter.put("/rules/courier-dispatch", requireOperationOrPrincipal, async (c) => {
+  const body = await parseJsonBody(c, deliveryAssignmentLeadInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  return rpc(c, "delivery_set_courier_dispatch_lead", {
+    p_working_days: body.data.workingDays,
+    p_revision: body.data.revision,
+    p_reason: body.data.reason ?? null,
+  });
+});
+
+/** DEL-04 · Delivery Rules → `Assign logistics by` (0673's door). */
+deliverySettingsRouter.put("/rules/assignment-lead", requireOperationOrPrincipal, async (c) => {
+  const body = await parseJsonBody(c, deliveryAssignmentLeadInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  return rpc(c, "delivery_set_assignment_lead", {
+    p_working_days: body.data.workingDays,
+    p_revision: body.data.revision,
+    p_reason: body.data.reason ?? null,
   });
 });
 
@@ -94,7 +181,7 @@ async function rpc(c: Context<AppEnv>, fn: string, args: Record<string, unknown>
   return c.json(data ?? { ok: true });
 }
 
-deliverySettingsRouter.put("/partner/details", requireOperationOrPrincipal, async (c) => {
+deliverySettingsRouter.put("/partner/details", requireSettingsEditor("delivery"), async (c) => {
   const body = await parseJsonBody(c, partnerDetailsInput);
   if (!body.ok) return c.json(body.body, body.status);
   const d = body.data;
@@ -109,7 +196,7 @@ deliverySettingsRouter.put("/partner/details", requireOperationOrPrincipal, asyn
   });
 });
 
-deliverySettingsRouter.put("/partner/coverage", requireOperationOrPrincipal, async (c) => {
+deliverySettingsRouter.put("/partner/coverage", requireSettingsEditor("delivery"), async (c) => {
   const body = await parseJsonBody(c, partnerCoverageInput);
   if (!body.ok) return c.json(body.body, body.status);
   return rpc(c, "delivery_set_partner_coverage", {
@@ -119,7 +206,7 @@ deliverySettingsRouter.put("/partner/coverage", requireOperationOrPrincipal, asy
   });
 });
 
-deliverySettingsRouter.put("/partner/schedule", requireOperationOrPrincipal, async (c) => {
+deliverySettingsRouter.put("/partner/schedule", requireSettingsEditor("delivery"), async (c) => {
   const body = await parseJsonBody(c, partnerScheduleInput);
   if (!body.ok) return c.json(body.body, body.status);
   return rpc(c, "delivery_set_partner_schedule", {
@@ -129,7 +216,7 @@ deliverySettingsRouter.put("/partner/schedule", requireOperationOrPrincipal, asy
   });
 });
 
-deliverySettingsRouter.put("/partner/services", requireOperationOrPrincipal, async (c) => {
+deliverySettingsRouter.put("/partner/services", requireSettingsEditor("delivery"), async (c) => {
   const body = await parseJsonBody(c, partnerServicesInput);
   if (!body.ok) return c.json(body.body, body.status);
   return rpc(c, "delivery_set_partner_services", {
@@ -138,7 +225,7 @@ deliverySettingsRouter.put("/partner/services", requireOperationOrPrincipal, asy
   });
 });
 
-deliverySettingsRouter.put("/partner/rules", requireOperationOrPrincipal, async (c) => {
+deliverySettingsRouter.put("/partner/rules", requireSettingsEditor("delivery"), async (c) => {
   const body = await parseJsonBody(c, partnerRulesInput);
   if (!body.ok) return c.json(body.body, body.status);
   return rpc(c, "delivery_set_partner_rules", {
@@ -149,7 +236,7 @@ deliverySettingsRouter.put("/partner/rules", requireOperationOrPrincipal, async 
   });
 });
 
-deliverySettingsRouter.post("/partner/driver", requireOperationOrPrincipal, async (c) => {
+deliverySettingsRouter.post("/partner/driver", requireSettingsEditor("delivery"), async (c) => {
   const body = await parseJsonBody(c, partnerDriverInput);
   if (!body.ok) return c.json(body.body, body.status);
   const d = body.data;
@@ -162,7 +249,7 @@ deliverySettingsRouter.post("/partner/driver", requireOperationOrPrincipal, asyn
   });
 });
 
-deliverySettingsRouter.post("/partner/vehicle", requireOperationOrPrincipal, async (c) => {
+deliverySettingsRouter.post("/partner/vehicle", requireSettingsEditor("delivery"), async (c) => {
   const body = await parseJsonBody(c, partnerVehicleInput);
   if (!body.ok) return c.json(body.body, body.status);
   const d = body.data;
@@ -178,7 +265,7 @@ deliverySettingsRouter.post("/partner/vehicle", requireOperationOrPrincipal, asy
   });
 });
 
-deliverySettingsRouter.post("/templates/save", requireOperationOrPrincipal, async (c) => {
+deliverySettingsRouter.post("/templates/save", requireSettingsEditor("delivery"), async (c) => {
   const body = await parseJsonBody(c, deliveryTemplateSaveInput);
   if (!body.ok) return c.json(body.body, body.status);
   const d = body.data;
@@ -191,13 +278,13 @@ deliverySettingsRouter.post("/templates/save", requireOperationOrPrincipal, asyn
   });
 });
 
-deliverySettingsRouter.post("/templates/set-default", requireOperationOrPrincipal, async (c) => {
+deliverySettingsRouter.post("/templates/set-default", requireSettingsEditor("delivery"), async (c) => {
   const body = await parseJsonBody(c, deliveryTemplateKeyInput);
   if (!body.ok) return c.json(body.body, body.status);
   return rpc(c, "delivery_template_set_default", { p_template_key: body.data.templateKey });
 });
 
-deliverySettingsRouter.post("/templates/set-active", requireOperationOrPrincipal, async (c) => {
+deliverySettingsRouter.post("/templates/set-active", requireSettingsEditor("delivery"), async (c) => {
   const body = await parseJsonBody(c, deliveryTemplateActiveInput);
   if (!body.ok) return c.json(body.body, body.status);
   return rpc(c, "delivery_template_set_active", {

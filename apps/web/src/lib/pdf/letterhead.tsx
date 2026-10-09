@@ -7,7 +7,7 @@
  * + suppliers see the legal entity + address inline next to the doc title:
  *
  *   CARRES SDN. BHD.                          TAX INVOICE
- *   20201055306 (1601150-X)                   INV-2026-001001
+ *   202401055306 (1601150-X)                  INV-2026-001001
  *   E-28-02, and E-28-03, ...                 Date: 2026-05-16
  *   No.2, Jalan Kerinchi, ...                 Order: SO-1001
  *   59200 Kuala Lumpur, ...
@@ -19,24 +19,22 @@
  * showroom's address, not Carres HQ's. Pass `addressLines` to swap it,
  * optionally `subTitle` to label the location (e.g., the outlet name).
  *
- * Single source of truth: edit `CARRES_COMPANY` here when the office or
- * registration changes, and every template picks it up.
+ * Single source of truth (owner 9 Oct 2026, Carres Settings List COM-01):
+ * the company identity is STORED in Settings → Company (0669). The shell
+ * reads it once after sign-in (`useCompanyIdentitySync`) and hands it here
+ * with `setCompanyIdentity`; every template reads `CARRES_COMPANY` at render
+ * time and picks it up. Until it is read, the verified identity from the
+ * owner's letterhead prints — never a blank header, never the old
+ * `20201055306` number.
  */
 
 import { StyleSheet, Text, View } from "@react-pdf/renderer";
+import { CARRES_COMPANY } from "./company-identity-store";
 
 const BORDER = "#D9D2C7";
 const MUTED  = "#7A7268";
 
-export const CARRES_COMPANY = {
-  legalName: "CARRES SDN. BHD.",
-  regNo: "20201055306 (1601150-X)",
-  addressLines: [
-    "E-28-02, and E-28-03, Menara SUEZCAP 2, KL Gateway,",
-    "No.2, Jalan Kerinchi, Gerbang Kerinchi Lestari,",
-    "59200 Kuala Lumpur, Wilayah Persekutuan KL.",
-  ],
-} as const;
+export { CARRES_COMPANY, setCompanyIdentity, printedAddressLines } from "./company-identity-store";
 
 const styles = StyleSheet.create({
   band: {

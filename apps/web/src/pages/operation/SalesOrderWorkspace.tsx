@@ -77,6 +77,7 @@ import {
   resolveSalesOrderRoute,
   salesOrderNumberWord,
   salesOrderParamOf,
+  isOutstation,
   mytDayOf,
   PLANNED_PRODUCTION_START_REFUSALS,
   type CustomField,
@@ -92,6 +93,7 @@ import { offerableAddons } from "../dealer/pos/AddonsPanel";
 import Loading from "@/components/kit/Loading";
 import { serviceCodeWord } from "@/lib/service-code";
 import { apiFetch, ApiError } from "@/lib/api";
+import { useDeliveryDays, useDeliveryLeads, useOrderCollectionTiming } from "@/lib/deadline-queries";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { floorSurchargeRaw, stairCarryCount } from "@/lib/order-totals";
@@ -1105,6 +1107,10 @@ function SalesOrderWorkspaceBody() {
     return stops.length >= 2 ? Math.max(...stops.map((stop) => Number(stop.leg) || 0)) : 0;
   }, [detailQ.data]);
   const routePartnerQ = useLogisticsCardFacts(showRoute ? (orderId ?? null) : null, routeCustomerLeg);
+  /* The stored deadline settings the route's dates read (9 Oct 2026). */
+  const routeCollectionTiming = useOrderCollectionTiming(showRoute ? (orderId ?? null) : null);
+  const routeDeliveryDays = useDeliveryDays();
+  const routeLeads = useDeliveryLeads();
   /* The customer leg's scheduled day by Delivery's own ladder — live DO, then
      Delivery's arrangement, then a confirmed booking (`customerLegDeliveryOf`,
      Delivery MASTER §8.8). An unread Delivery is `failed`, never "not scheduled". */
@@ -2079,10 +2085,12 @@ function SalesOrderWorkspaceBody() {
         deliverToLines: goodsTruthQ.data?.lines,
         cancelledLines,
         money,
-        /* Payment must be complete 3 working days before an outstation
-           delivery, 2 in the Klang Valley — the Work panel's own reading of
-           the partner (Law D). */
-        outstation: routePartnerQ.data?.partner ? !routePartnerQ.data.partner.kvDefault : false,
+        /* The outstation pair of the stored Collection timing — the Work
+           panel's own reading of the company (`isOutstation`, Law D). */
+        outstation: isOutstation(routePartnerQ.data?.partner),
+        paymentTiming: routeCollectionTiming,
+        deliveryHolidays: routeDeliveryDays.holidays,
+        assignLeadWorkingDays: routeLeads.assignmentLeadWorkingDays,
         amendmentFailed: amendmentQ.isError,
         /* `PROPOSED CHANGE` — the same read the Order tab makes. Only a request
            still waiting for a decision is announced. */
@@ -2115,6 +2123,9 @@ function SalesOrderWorkspaceBody() {
     amendmentQ.isError,
     requestView,
     routePartnerQ.data,
+    routeCollectionTiming,
+    routeDeliveryDays,
+    routeLeads,
   ]);
 
   const retryRouteRead = useCallback(

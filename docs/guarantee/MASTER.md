@@ -212,6 +212,23 @@ The approved 14 August legacy-policy ruling in §1 governs older claims. An old 
 
 Terms remain principal-write-only (§7). Policy version/effective range, covered category and Unit, cutover, remedy, evidence, delivery-based start and derived expiry are eligibility facts; their appearance in a Settings inventory is not permission to change them freely. A later policy must not rewrite earlier rights. Price maintenance stays Catalog-owned, staff/cover stays Workspace/People-owned, actual goods movement stays Stock/Delivery-owned, and any money consequence follows Payment/Finance approvals. The sale Guarantee, 100-Day Trial, TCF sofa and bedframe policies in §1 are distinct; no universal 15-year cover or new refund route is inferred. Subscription remains deferred and does not inherit sale policy. Settings UI, complete stock-connected claim execution and runtime enforcement still require the explicit evidence in §8; this document reconciliation does not close them.
 
+### Complete entitlement-to-outcome journey — recommended reconciliation, 9 Oct 2026
+
+This completes the business recommendation around the existing entitlement ledger; it does not claim fresh Houzs Guarantee inspection. Houzs Service evidence in Service MASTER §7.21 illustrates why stage labels and supplied reports cannot replace accepted physical outcomes. Carres §§1–4 policy and one-shot laws remain authority; proposed execution refinements below await review.
+
+| Step / owner | Staff journey and source evidence | Failure / completion boundary |
+|---|---|---|
+| Sell / Sales and Catalog | Select the governed package against the exact covered item. Preserve one entitlement per covered quantity unit, original policy/item snapshot and permanent searchable ID | No standalone cover or inferred attachment. Missing/ambiguous association remains a named repair gap; never invent a historical paid line |
+| Start / Delivery source | Read the actual delivery event applicable to the covered item; preserve sale-selected policy and delivery-based start/derived expiry | Planned date, DO issue and partial delivery of other goods do not prove this item's coverage start. Current ledger uses order-level delivered_at (§3); exact-item/partial-delivery admission needs source reconciliation before claiming that reader handles every case |
+| Receive complaint / Service | Find live or spent ID, original SO/item and policy source. Open/link the actual Case; retain missing date/evidence and policy reasons | A spent ID answers with its prior claim facts. Missing legacy paid line is not rejection; unknown source is not eligible or expired by guess |
+| Decide / Service qualified approver | Apply the permitted policy/remedy and formal Case approval (§7.4 of Service); record exact goods, entitlement version, decision and evidence | Ordinary Operation assessment does not approve the formal replacement. The existing claim RPC role gate (§7) is measured access, not proof of this later approval integration |
+| Execute / Stock, Receiving, Delivery | Link the approved replacement and any required collection to exact source documents and Units; each owner records its real handover, receipt, inspection or accepted delivery proof | Claiming an entitlement does not move goods. Failed/partial legs remain open on the Case, retries preserve the same claim/execution lineage; money stays with Payment/Finance |
+| Consume and finish / Guarantee plus Service | Keep the one-shot consumption event and retired ID traceable, linked to the Case and replacement. Service separately records outcome communication and actual customer confirmation | No automatic new cover on the replacement; a separately bought package is its own entitlement. Case closure cannot fabricate delivery or consumption, and a failed replacement cannot silently restore/delete the original spent ID |
+
+**REAL GAP / review recommendation:** the exact authorised consumption trigger and correction path for a claim recorded before failed/cancelled replacement are not established by the simple §3 lifecycle or current RPC role gate. Recommended contract: one atomic, version-checked consumption tied to the approved exact entitlement/Case, idempotent retries and immutable prior evidence; any correction uses an explicitly authorised, audited remedy rather than ordinary “unclaim”. Do not infer that dispatch, approval or final customer confirmation is already the approved consumption trigger. Implementation must reconcile the current claim event with the selected business trigger and preserve historical claimed facts.
+
+**Acceptance for review and later delivery:** two covered mattresses retain two unambiguous entitlements; partial delivery does not start an undelivered item's clock; pre-cutover evidence uses legacy policy without a fabricated paid line; duplicate/concurrent claim cannot spend twice; failed collection/replacement leaves its actual obligations open; a retired ID remains searchable; changed terms/model names retain original rights; expired is consistently derived in object/list/report reads. Existing claim-stock gap in §8 remains open until exact replacement/movement acceptance is proven. No new screen composition, permission grant, policy amount or application change.
+
 ## 5. Why a trigger, not RPC edits
 
 A guarantee line can enter an order through **five doors** today: `create_order` (0089),
@@ -246,8 +263,8 @@ config table plus one partial-index probe per inserted line.
   (that is what powers the POS badge).
 - `guarantee_claim` and `guarantee_attach` are `SECURITY DEFINER` RPCs that re-check
   `is_operation()` (operation **or** principal) server-side. The route gate is the friendly
-  403; RLS + the RPC are the real boundary. Finance is deliberately excluded — the claim
-  moves goods, not money.
+  403; RLS + the RPC are the real boundary. Finance is deliberately excluded from this entitlement-claim RPC. It records entitlement consumption,
+  not a financial approval or physical movement; §8 explicitly records the stock-connected execution gap.
 - Every claim writes an `order_history` row (guardrail 4: no silent movement).
 - Terms are principal-write-only.
 

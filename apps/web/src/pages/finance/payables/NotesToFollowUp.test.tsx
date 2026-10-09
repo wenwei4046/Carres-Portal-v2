@@ -217,7 +217,8 @@ describe("A note to follow up", () => {
     expect(await screen.findByTestId("note-status")).toHaveTextContent("Closed");
     expect(screen.queryByRole("button", { name: "Record a follow-up" })).toBeNull();
     expect(screen.getByText(/Supplier waived it/)).toBeInTheDocument();
-    expect(screen.getByTestId("note-settlements")).toHaveTextContent("A debit note owed is closed with a reason");
+    // 0681: a debit note owed is settled by the supplier's debit note.
+    expect(screen.getByTestId("note-settlements")).toHaveTextContent("No debit note has settled it yet. Settle it from the supplier's debit note.");
   });
 });
 

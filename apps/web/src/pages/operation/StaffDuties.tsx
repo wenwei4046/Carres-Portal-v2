@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import ModuleHeader from "./components/ModuleHeader";
 import DutyCatalogue from "./staff-duties/DutyCatalogue";
 import DutyDetail, { DutyHistory } from "./staff-duties/DutyDetail";
+import LeaveAndOnCall from "./staff-duties/LeaveAndOnCall";
 import type { DutyStateFilter } from "./staff-duties/staff-duties-model";
 import Button from "@/components/kit/Button";
 import { useAuth } from "@/lib/auth";
@@ -32,7 +33,10 @@ import { useWorkspaceDuties } from "@/lib/queries";
  */
 export default function StaffDuties({ settingsNavigation, activitySettings }: { settingsNavigation?: ReactNode; activitySettings?: ReactNode } = {}) {
   const dutiesQ = useWorkspaceDuties();
-  const personnelManager = useAuth(s => s.role === "principal");
+  /* `Manage staff` goes to whoever may manage People records — the same
+     principal-or-HR gate the People API (`requireHr`) applies (owner-approved
+     2026-09-29; Workspace §4.2). */
+  const personnelManager = useAuth(s => s.role === "principal" || s.role === "hr");
   const navigate = useNavigate();
   const location = useLocation();
   const focusOnReturn = useRef<string | null>(null);
@@ -108,6 +112,7 @@ export default function StaffDuties({ settingsNavigation, activitySettings }: { 
           {workOrigin ? <Button onClick={() => navigate(workOrigin)}>Back to work</Button> : null}
         </div> : null}
         {activitySettings}
+        <LeaveAndOnCall />
         {dutiesQ.isError && duties.length > 0 ? <div role="alert" className="flex flex-wrap items-center gap-3 px-6 pt-3">
           <p className="text-meta">Staff &amp; Duties could not be opened</p>
           <Button onClick={() => void dutiesQ.refetch()}>Try again</Button>

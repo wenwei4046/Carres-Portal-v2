@@ -14,7 +14,7 @@ import {
   type MonthlyDemandRow,
   demandPurposeLabelOf,
   manualPurchaseSourceLine,
-  myHolidaySet,
+  type WorkingDayOptions,
   poExpectedArrivalsOf,
   poLineSupplierAnswersOf,
   poSupplierAnswerSummaryOf,
@@ -82,6 +82,7 @@ import {
   type SupplierRow,
 } from "@/lib/queries";
 import { workspaceDutyActor } from "../workspace-duty-owner";
+import { useOfficeDays } from "@/lib/deadline-queries";
 import PurchasingTabs from "../PurchasingTabs";
 import PoIssueEvidence, { CHANNEL_WORD, doorsForIssuedPo } from "../components/PoIssueEvidence";
 import ChangeDeliverToForm from "./ChangeDeliverToForm";
@@ -309,7 +310,7 @@ function supplierDateOf(po: operationPoListRow): string | null {
 /** 0587 — the PO's expected arrivals, one per line / batch, and whether any
  *  of them has an open, unconfirmed day-before check (the ONE call engine,
  *  `tomorrowDeliveryCallOf`, per arrival — Law D). */
-function arrivalFactsOf(po: operationPoListRow, today: string) {
+function arrivalFactsOf(po: operationPoListRow, today: string, office: WorkingDayOptions) {
   const version = po.version ?? 1;
   const lines = (po.purchase_order_lines ?? []).map((line, i) => ({
     id: line.id ?? `${po.id}#${i}`, qty: Number(line.qty ?? 0), receivedQty: Number(line.received_qty ?? 0),
@@ -319,7 +320,8 @@ function arrivalFactsOf(po: operationPoListRow, today: string) {
     promises: (po.promises ?? []) as never, lines,
   });
   const dates = [...new Set(arrivals.map((a) => a.arrival))];
-  const holidays = myHolidaySet();
+  /* The day-before check is PO Duty's OFFICE work: the stored Office
+     calendar's weekdays and holidays (Settings → Office). */
   const arrivalCheckOpen = dates.some((date) => {
     const confirmed = (po.arrival_confirmations ?? []).some((c) =>
       c.po_version === version && c.for_date === date && !!po.destination_id && c.destination_id === po.destination_id);
@@ -329,16 +331,16 @@ function arrivalFactsOf(po: operationPoListRow, today: string) {
       lines: arrivals.filter((a) => a.arrival === date).map((a, i) => ({
         id: `${po.id}#${i}`, sku: "", qty: a.qty, receivedQty: 0, shortSinceIso: null, balanceAnswerAboutQty: null,
       })),
-    }, { todayIso: today, holidays });
+    }, { todayIso: today, holidays: office.holidays as ReadonlySet<string>, offDays: office.offDays });
     return !!call;
   });
   return { dates, arrivalCheckOpen };
 }
 
-function toRegisterInput(po: operationPoListRow, supplierName: string, today: string): PurchaseOrderRegisterInput {
+function toRegisterInput(po: operationPoListRow, supplierName: string, today: string, office: WorkingDayOptions): PurchaseOrderRegisterInput {
   const lineIds = (po.purchase_order_lines ?? []).map((line, i) => line.id ?? `${po.id}#${i}`);
   const summary = poSupplierAnswerSummaryOf(po.promises, po.version ?? 1, lineIds, po.official_delivery_date ?? null);
-  const arrival = arrivalFactsOf(po, today);
+  const arrival = arrivalFactsOf(po, today, office);
   return {
     id: po.id,
     supplierName,
@@ -453,6 +455,8 @@ export default function PurchaseOrdersPage() {
      receipts — not two different collections. */
   const [receiptsFor, setReceiptsFor] = useState<RegisterRow | null>(null);
   const today = todayMYT();
+  /* The stored Office calendar (Settings → Office) — Purchasing's week. */
+  const officeDays = useOfficeDays();
   const monthly = params.get("view") === "monthly";
   const cards = params.get("view") === "cards";
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
@@ -509,7 +513,7 @@ export default function PurchaseOrdersPage() {
     return (posQ.data?.pos ?? []).map((po) => {
       const supplier = suppliers.get(po.supplier_id) ?? null;
       const supplierName = supplier?.name ?? "Supplier not recorded";
-      const input = toRegisterInput(po, supplierName, today);
+      const input = toRegisterInput(po, supplierName, today, officeDays.office);
       const facts = purchaseOrderRegisterFacts(input, today);
       const sources = sourceRefsOf(po);
       const lineIds = (po.purchase_order_lines ?? []).map((line, i) => line.id ?? `${po.id}#${i}`);
@@ -531,7 +535,7 @@ export default function PurchaseOrdersPage() {
         work: purchaseOrderWork(input, facts),
       };
     }).sort(compareDefault);
-  }, [destinations, posQ.data, suppliers, today, warehouses]);
+  }, [destinations, posQ.data, suppliers, today, warehouses, officeDays.office]);
 
   /* ⛔ A DECORATIVE BADGE MAY NOT BLANK THE REGISTER (YH, 2026-09-01, defect 14).
      `dutyQ` was in both mandatory-read gates, and it is the ONE query on this

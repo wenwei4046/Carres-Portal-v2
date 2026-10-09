@@ -221,7 +221,7 @@ admission makes the person available for the governed rotation; it does not mean
 must be the PO holder on that first day. Existing approval capability and receiving-posting rules
 remain separate.
 
-**MONTHLY ROTATION ORDER — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT.**
+**MONTHLY ROTATION ORDER — OWNER-APPROVED 2026-09-29 / BUILT ON BRANCH 2026-10-09 (0671, `build/settings-completion`; not applied, not deployed — see §4.4 "Leave, rota and Saturday on-call build").**
 Maintain a stable cyclic order of eligible routine Operation staff. Each month one person owns PO
 Duty and the next person in that order owns GRN Duty; advance the PO position by one each month.
 For three eligible people A/B/C, the cycle is PO A / GRN B → PO B / GRN C → PO C / GRN A.
@@ -272,7 +272,14 @@ them.
 People/HR also owns each employee's normal working-week eligibility. Module calendars own
 business-open days and public-holiday/special-date rules. The Shared Duty Resolver combines the
 person calendar with the module calendar for the resolved actor; Staff & Duties displays that result
-but does not become a second People calendar editor.
+but does not become a second People calendar editor. **Built on branch `build/settings-completion` (9 Oct 2026; 0678 not
+applied):** the person's week is `hr_employees.work_days` (NULL = not recorded), written only by HR /
+principal through `hr_upsert_employee` and shown as `Working days` in the HR person drawer; internal
+readers get only user id + days through `workspace_person_work_days`. The first consumer is the
+payment collection ACTION day (Work, Payment Monitor, collection workspace): the resolved actor's
+recorded days, else the Office weekdays, with the Office holidays (Payment MASTER "Two calendars, one
+clock" names the sources). It never moves a payment fact. Staff & Duties neither shows nor edits it
+yet.
 
 Distinct Duties include Storage Waiver Approver, Payment Approver, Purchasing Approver, Delivery
 Charge Approver, Stock Adjustment Approver, Service Case Approver and Delivery Duty
@@ -569,7 +576,7 @@ People date and no such membership is excluded from automatic PO allocation only
 enter automatic PO eligibility from the next calendar month. This is not the pending general
 monthly roster/admission engine; current baseline assignment remains the dated source.
 
-**Remaining target work:** complete monthly rotation, the People-owned departure/access workflow
+**Remaining target work:** the monthly rotation's release (built on branch, §4.4 below), the People-owned departure/access workflow
 and restricted former-profile lookup, complete bounded manual-exception convergence across a
 changing monthly baseline, full legacy-history pagination, and original/update/completion Work
 assignment snapshots with originating-surface audit. The two-period movement ledger must not be
@@ -625,11 +632,13 @@ availability. The exact activity/confirmation implementation remains to verify.
 
 **One leave entry — Workspace → Leave.** MC, Emergency and Planned leave use the same submission
 entry and People-owned dated absence facts; `On leave` is a status, not a fourth application type.
-MC requires dates and proof; Emergency requires dates and a short reason. No standalone MC Report
+MC requires dates; proof is optional and never required (owner rule confirmed 9 Oct 2026). Emergency requires dates and a short reason. No standalone MC Report
 page or duplicate HR record. All three types **currently require no approval**. Staff & Duties
 leave policy defaults to `Approval required = No`; Jess or a section-authorised editor may change
 it later, with effective date and treatment of existing submissions explicitly defined. No
 retroactive refusal is assumed and required evidence is not waived.
+
+**Leave recorded for a colleague — owner ruling 9 Oct 2026 (Jess, corrected the same day).** Every signed-in active staff member may record leave for a colleague (for example, one who is ill and cannot log in); this is not limited to the owner or Settings editors, and recording leave is a separate permission from changing Settings. Workspace → Leave → Record leave: the person defaults to me and may be changed to a colleague; choose MC, Emergency leave or Planned leave and the dates; Submit takes effect at once with no approval; MC proof is optional. The system keeps whose leave it is, who recorded it, when, and the change history (recorded, cancelled). Today's leave starts the existing cover; future leave starts on its day. Whole days only; half-day leave is not decided. Built on branch `build/settings-completion` (0680, not applied): `staff_leave.recorded_by`, `staff_leave_changes`, doors `staff_leave_submit` / `staff_leave_record_for` / `staff_leave_cancel` (unchanged 0670 rule: only the person whose leave it is cancels its future days; recording a colleague's leave gives no right to cancel it — owner correction 9 Oct 2026).
 
 A submission covering today activates qualified available cover immediately, without waiting for
 approval or an activity checkpoint. Future leave activates cover on the absence date, not the
@@ -638,7 +647,7 @@ effective departures. Operational cover is separate from evidence review and pay
 Keep normal responsibility, effective assignment and actual helper as distinct recorded facts,
 using the existing single `Assigned to` presentation. Return does not silently bounce work back.
 
-**Saturday on-call coverage is separate.** Staff & Duties governs rotating Saturday customer/driver/
+**Saturday on-call coverage is separate — owner clarification 9 October 2026.** Staff & Duties governs rotating Saturday customer/driver/
 Warehouse/Delivery contact support, default **9:00 AM–6:00 PM**, authorised-editable, with qualified
 cover. Record issues and their next accountable work. This does not make Saturday an ordinary
 Office workday, override source calendars, transfer all Delivery work, or grant money/approval
@@ -651,6 +660,43 @@ completion facts, historical actual performers and monthly rota. Assistance does
 responsibility. Subsequent cover changes are recorded; no silent task ping-pong. Missing eligible
 cover or unreadable evidence stays a visible exception, never fabricated assignment. Approver
 qualifications do not inherit ordinary-work help rights.
+
+**Leave, rota and Saturday on-call build — BUILT ON BRANCH 2026-10-09 (`build/settings-completion`,
+migrations 0670/0671 NOT APPLIED, NOT DEPLOYED; owner walk owed).** Measured implementation, not a
+production claim:
+- *Leave (0670).* `staff_leave` (People-owned dated absence; one row per submission; cancel stamps
+  `cancelled_from/by/at`, never deletes) and `workspace_leave_policies` (one row per type,
+  `approval_required` stored false and held false by a CHECK until an approval change with its
+  effective treatment is built). Doors `staff_leave_submit` / `staff_leave_cancel`; private bucket
+  `staff-leave-proof` (own folder; principal and HR read). Workspace → Leave is a plain Workspace
+  menu row (`?tab=leave`). Colleagues see who is away and when through `workspace_leave_upcoming`,
+  never type, reason or proof.
+- *Cover reads leave through one question,* `_workspace_on_leave` (dated leave or the undated
+  away switch), in the scope's eligibility and candidates, the visibility rule, the Team list and
+  the movement loop. Today's PO, GRN and Delivery Duty answer the next eligible person at read
+  time, any hour (the approach of PR #1966, which this supersedes). A same-day submission on an
+  Office weekday also writes the durable movement at once; the minute engine covers future leave
+  on its day. Orders stay on the movement ledger only (their workload order could change between
+  a read and the movement). Leave is an eligibility fact, not an assignment-source change, so it
+  never bounces work back to someone who missed a check.
+- *Monthly rota (0671).* `workspace_plan_duty_rota(month)` (scheduler or Staff & Duties editor):
+  PO advances one place in staff-code order from last month's PO; GRN is the next person after
+  the PO holder; the PO newcomer wait reuses the cover engine's rule; one eligible person holds
+  both; nobody eligible writes nothing. A manager's row starting inside a month leaves that
+  month alone; a month not yet begun follows a changed cycle (newcomer admitted, exit recorded); a
+  running month never flips except when its holder is no longer active (re-planned from today).
+  Rows carry `origin = monthly_rotation`, `assigned_by` NULL, note `Monthly rotation`; History
+  reads `Assigned by system`. The daily 09:00 MYT run plans this month (only to continue a
+  running rotation) and, from the 25th, next month. 0437's pre-written two-person alternation
+  (Oct 2026 to Sep 2027) is labelled as the rotation, so a newcomer is not frozen out for a year.
+- *Saturday on-call (0671).* One editable window (default 9:00 AM to 6:00 PM, change history) and
+  a dated rota (Saturday → person, optional cover), appended, edited by Staff & Duties editors
+  (`_settings_require_editor('staff_duties')`). A person on leave that Saturday is flagged, never
+  replaced. No automatic rotation (cadence undecided); it touches no Duty, Task or Office day.
+- *Staff & Duties.* `Manage staff` shows for principal or HR (the People API gate). Three closed
+  sections beside the duty facts: `On leave`, `Saturday on-call`, `Leave approval`.
+- *Check times.* 10:00 AM morning is storable (CHECK, door and shared validation); live values are
+  untouched by the release.
 
 **Historical implementation evidence, not current defaults.** The 30 September #1798 release
 used 10:30 AM / 3:00 PM and fixed 1:00–2:00 PM lunch; the measured passes above remain history.
@@ -702,6 +748,23 @@ database's or the network's own text.
 
 Client validation may guide early, but the server returns the same business refusal and remains
 authoritative. No message says `Invalid`, `Error` or `Something went wrong` without the repair.
+
+### 4.4.9 · Settings editors, Company and Office — BUILT ON BRANCH 2026-10-09 (`build/settings-completion`; 0669 · 0674 not applied, not deployed)
+
+Owner rules TEAM-02 · SET-01 · COM · OFF (Carres Settings List, 9 Oct 2026). **Who edits Settings:**
+the owner (principal) edits every section; she names a person per section in Settings → Team and
+access → `Settings editors` (`settings_section_editors`, 0668 — applied to production by another
+session 9 Oct). Every Settings write asks the one gate `settings_can_edit(section)` in the API
+(`requireSettingsEditor`) and in SQL (0674 rewrites the Purchasing, Payment, Delivery, Warehouse and
+Staff & Duties gates and the Sales Order entry door; Warehouse keeps its own manage-settings
+capability). A named editor gets configuration editing only — never a money approval, a Duty or
+ordinary-work rights. Measured 9 Oct: the only active `ops_manager` holder is the owner, so moving
+the gates removes nobody's live right. Pages show read-only to anyone not named. **Company**
+(COM-01/02) and **Office** (OFF-01…05) are stored singletons with who · when · old → new · optional
+reason (`settings_changes`, 0669); the Office calendar (Monday to Friday, Kuala Lumpur holidays
+recorded one year at a time, built-in list per unrecorded year) is the ONE calendar Office deadlines
+read (`readOfficeCalendar` / `useOfficeCalendar`). Saturday on-call never makes Saturday an Office
+day. Remaining gaps are listed in Carres Settings List "Build state".
 
 ### 4.5 · Access, states and responsive behaviour
 
@@ -1537,6 +1600,12 @@ keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll
      deadline by which the **Scheduled delivery must be recorded** — Work's `confirm_delivery_date`,
      the Route's `Contact` point and the Logistics card show it as that deadline.
    A surface that shows either day names which one it is; neither is relabelled as the other.
+   **9 Oct 2026 (BUILT ON BRANCH `build/settings-completion`):** the first check counts the stored
+   Contact lead (`logistics_call_working_days`, DEL-05) and prints its number (`{n} working days
+   before`, the ruled `3 working days before` at the default); `2` and `1` stay fixed, and
+   `confirm_delivery_date` stays on the fixed 2-day check. `Assign logistics` is due by Delivery
+   §2.1's stored assignment lead before the Scheduled delivery, else the Requested one; the PO day
+   only opens it.
 
 ### 5.10 · THE WORK PAGE — ONE SPEC · APPROVED / LOCKED (Jess, 2026-09-28: "yes" to 定 and to the four kit admissions)
 
@@ -2405,7 +2474,7 @@ are fixtures, and production keeps the current page until each admitted projecti
 | Delivery · `check_delivery_proof` | Latest delivery file is unreviewed · governed review result | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | 1 delivery working day after delivery | Review newer than latest file exists |
 | Delivery · `failed_delivery_next_step` | Failed Delivery has no recorded next step · named recovery fact | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | Same Delivery working day | Named next fact exists · delivery planning continues |
 | Delivery · `collect_loan_item` | Loan item remains out on delivery day · returned evidence | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | Delivery day | Loan row is returned |
-| Payment · `payment.collect_customer_balance` / `payment.missed_promise` | Issued Invoice remains owing when collection is actionable · payment obtained | Stable Collection Owner; active cover acts | Collection deadline or customer's promised day | Atomic allocations reduce Invoice/order outstanding to RM 0 |
+| Payment · `payment.collect_customer_balance` / `payment.missed_promise` | SO goods balance remains owing when Payment collection is actionable; a closing Sales Invoice is not a prerequisite (Payment §2, owner 25 Sep) | Stable Collection Owner; active cover acts | Payment-owned collection deadline or customer promise; unresolved clock-start reconciliation stays explicit | Canonical posted/allocated payment reduces the applicable SO goods balance to RM 0; closing Invoice automation and independent hold/Storage obligations remain separate |
 | Payment · `payment.send_storage_invoice` | Live Storage Invoice remains unpaid · invoice sent and money collected | Stable Collection Owner | Shared collection deadline, else `No date` | Live storage owing is RM 0 |
 | Payment · `payment.review_overpayment` | Money exceeds live obligations · allocation or approved refund decision | Payment Approver Duty | Governed `No date` | Overpaid amount is RM 0 or approved refund covers it |
 | Payment/Stock · `payment.check_stored_furniture` | **Not admitted:** open storage case reached inspection interval · inspection result | Warehouse capability/owner rule; admission waits for a governed person resolution | Last check/storage start + configured interval | Due inspection recorded |
@@ -2434,6 +2503,24 @@ and `collect` as its words on the Sales Order; none of them opens a Work item �
 window card, the calculated PO Delivery Date is not a supplier confirmation (Purchasing §5.7), and
 collection is Payment's. A module action not listed here is excluded until it passes §6.
 
+### 6.1.1 · Source occurrence and completion reconciliation — 9 October 2026
+
+**Blueprint contract clarification / runtime proof still owed.** Read §§2, 5.2.1, 5.6, 6.1 and §10 against the current module boundaries. The catalogue already supplies rule keys, owner rules, due law and closure facts; numbered demonstration tasks are not missing business rules or durable occurrence IDs. The remaining contract-v2 transport/projector gaps are stated in §5.2.1. The source-specific identity scopes below prevent an order-level shortcut from closing unrelated work; exact persisted encoding remains the owning projector's implementation contract, not a new Workspace API.
+
+| Existing source family | Occurrence scope and re-evaluation | Completion boundary |
+|---|---|---|
+| Purchasing PO window / send | Source window stamp and current issued PO versions; shared demand/PO counted once under §6.2. Re-read demand and send facts after issue/amendment | Issue alone does not finish buying-and-sending. No eligible demand remains and every applicable current version has actual send evidence |
+| Supplier arrival / day-before / balance | Exact PO goods line and split batch's effective dated promise; accepted receipt reduces only that batch's outstanding scope. A changed answer re-evaluates date-specific work without erasing prior late history | Required evidenced answer closes answer work; it does not prove receipt. Short balance and later split batch retain their own obligation |
+| Receiving / physical Outbound | Actual receipt/session or exact handover scope and goods identity mode; not a passed supplier date or generic SO status. Receiving, supplier chase and Claim remain different required results | Source-owned accepted posting/handover evidence covers only the actual goods. Retry or partial result cannot post twice or complete the unreceived remainder; unadmitted Outbound ownership stays a visible admission gap |
+| Delivery arrangement / attempt / proof | Arrangement uses its governed delivery scope; actual result/proof uses the exact DO/leg/visit and latest source evidence version. Later visits and replacement uploads remain distinguishable | Booking is not delivery; result is not uploaded proof; upload is not accepted proof review. Closing one visit's action cannot close another visit or a later return's warehouse obligation |
+| Payment collection / storage / exception | SO-keyed goods balance and canonical payment/source allocations under the one order Collection Owner; closing Sales Invoice is not a collection prerequisite. Exact issued storage papers remain distinguishable from goods balance. Finance exception keeps its independent source identity | Sent invoice/message and promise do not settle money. Allocated outstanding reaching zero closes the applicable collection obligation; cleared hold re-evaluates dispatch but cannot settle an Invoice, and RM0 cannot clear an unknown/open hold |
+| Claims / PR / RO | Exact source document/action, current send version and affected goods/consent/return scope under §6.1. Use existing physical-work occurrences for shared handover/receipt | Supplier answer is not actual returned goods or applied credit. Partial consent/return covers only named goods; financial continuation stays with its own owner |
+| Issue / Service / customer handoff | Issue uses its versioned action occurrence. Case/customer context links the owning action; no second customer-service task or duplicate generated Issue task | Actual governed result completes/replaces the Issue occurrence. Service remains unadmitted until its routine owner and derived clocks are governed; approval qualification cannot substitute for a routine owner |
+
+Across every family, source cancellation, replacement and correction need their owning valid result and retained reason/version. Disappearance from a filtered or failed feed is not completion. Normal owner, qualified Cover and actual actor remain distinct; ordinary help does not grant approval. Preserve business deadline versus actor working date and original lateness; no global fallback calendar or Saturday bulk reassignment. Direct object doors and source permission checks remain required even where an embedded interaction is unavailable.
+
+Acceptance must reconcile source and Tasks for split/partial goods, current versus obsolete version, concurrent correction, same-event retry, evidence replacement, absent owner/qualified cover, failed source and denied direct access. These cases are unexecuted here. This is document coverage for the first-order action chain, not admission or production proof.
+
 ### 6.2 · The PO window card — BUILT, awaiting owner review (not live)
 
 Purchasing §5.6.1 owns the window law and the one arithmetic (`poWindowFor`); the SO Batch read
@@ -2458,8 +2545,7 @@ Batch's `?window=` scope read that stamp. Workspace decides the composition (han
   showing an empty day.
 - **Open review points (not law).** The embedded send area keeps its own heading
   (`{PO} · PO V1 · Sending not confirmed`) inside the card — a shared-component wording question for
-  Purchasing. Purchasing Settings has storage (0585) for the window times and supplier cut-offs but
-  no editing screen yet; until one ships, the windows stay 11:30 AM and 4:00 PM.
+  Purchasing. Purchasing Settings has storage (0585); the window-times editor is recorded BUILT 2026-09-28 in the constitution, with production persistence/owner walk not proved by this document pass. Supplier earlier cut-off still has no screen. Read the current effective source; 11:30 AM and 4:00 PM are defaults, not substitutes for an unavailable or edited setting.
 
 ## 7 · Right Rail and Notifications
 
@@ -2741,8 +2827,9 @@ honest Work for admitted modules.
   #1259 preserve canonical Paid/Outstanding arithmetic while showing saved at-sale method,
   reference and slip as independent evidence. An absent individual transaction row does not prove
   that the customer never paid and does not authorise Workspace to infer a corrected amount.
-  Collection Work continues to project only from Payment's complete issued-Invoice truth and one
-  atomic outstanding calculation; saved evidence, an empty transaction list or the Sales Order
+  This dated reader evidence predates Payment §2’s 25 September SO-keyed collection ruling;
+  the issued-Invoice projection is historical implementation evidence, not the current target.
+  Collection Work must consume Payment’s one canonical outstanding source; saved evidence, an empty transaction list or the Sales Order
   reader may never generate a duplicate collection action. Warehouse/Delivery exact-Unit work uses
   recorded provenance; the Sales Orders `verifiedUnitIds` reader is evidence for display, not a new
   Unit assignment or Work source.
@@ -2865,7 +2952,7 @@ honest Work for admitted modules.
   result/proof act belongs; the server supplies the Delivery editor/DO door. Ownership of the
   business fact remains with Delivery while responsibility for the action resolves to the linked
   the current recorded Work assignment, initially Sales Order PIC, with Delivery Duty only when that order has no PIC.
-- Payment collection now enters from the complete issued-Invoice register, not a second Sales Order
+- **Historical implementation / superseded target:** this invoice-keyed projector predates Payment §2’s 25 September SO-keyed collection ruling. Its exact Invoice door and invoice-issue snapshot below are measured legacy behavior, not admission requirements for the current SO collection target. Source clock-start and route migration still require Payment-owned reconciliation; do not invent a replacement date or API. Payment collection in this measured implementation enters from the complete issued-Invoice register, not a second Sales Order
   balance calculation. The shared readiness and collection clock admit only due/late balances whose
   goods are ready or have a real arrival date; the order's ONE collection owner — the Responsible
   Delivery Operation, read through the one shared authority `delivery_responsible_operation`

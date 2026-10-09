@@ -4,6 +4,7 @@ import {
   AP_FILE_MIME,
   type AdvanceApplyInput,
   type ApAccountChoice,
+  type BillForeignAmountInput,
   type ApBillOutstandingRow,
   type ApCreditor,
   type ApOutstandingRow,
@@ -21,6 +22,10 @@ import {
   type SupplierCreditNoteDocument,
   type SupplierCreditNoteDraftInput,
   type SupplierCreditNoteRegisterRow,
+  type SupplierDebitNoteDocument,
+  type SupplierDebitNoteDraftInput,
+  type SupplierDebitNoteFollowups,
+  type SupplierDebitNoteRegisterRow,
   type SupplierFinanceFormInput,
   type SupplierFinanceRow,
   type SupplierBillLineFollowup,
@@ -68,6 +73,10 @@ export const payablesKeys = {
   supplierFinance: () => ["finance", "payables", "supplier-finance"] as const,
   creditNotes: () => ["finance", "payables", "credit-notes"] as const,
   creditNote: (id: string) => ["finance", "payables", "credit-note", id] as const,
+  /** 0681: supplier debit notes. */
+  debitNotes: () => ["finance", "payables", "debit-notes"] as const,
+  debitNote: (id: string) => ["finance", "payables", "debit-note", id] as const,
+  debitNoteNotes: (noteId: string) => ["finance", "payables", "debit-note-notes", noteId] as const,
   /** 0676: the credit and debit notes suppliers still owe. */
   notes: () => ["finance", "payables", "notes-to-follow-up"] as const,
   note: (id: string) => ["finance", "payables", "note-to-follow-up", id] as const,
@@ -357,6 +366,58 @@ export function useTakeCreditOff() {
   });
 }
 
+/** 0682: record, change or remove the currency a supplier invoiced in. A record only. */
+export function useSetBillForeignAmount() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { id: string; input: BillForeignAmountInput }>({
+    mutationFn: ({ id, input }) =>
+      apiFetch<{ id: string }>(`${BASE}/bills/${id}/foreign-amount`, { method: "PUT", body: JSON.stringify(input) }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+// ── supplier debit notes (0681; Chew 2026-10-03) ────────────────────────────
+
+export function useSupplierDebitNotes() {
+  return useQuery({
+    queryKey: payablesKeys.debitNotes(),
+    queryFn: async () => (await apiFetch<Rows<SupplierDebitNoteRegisterRow>>(`${BASE}/debit-notes`)).rows,
+    staleTime: 15_000,
+  });
+}
+
+export function useSupplierDebitNote(id: string | undefined) {
+  return useQuery({
+    queryKey: payablesKeys.debitNote(id ?? ""),
+    queryFn: () => apiFetch<SupplierDebitNoteDocument>(`${BASE}/debit-notes/${id}`),
+    enabled: !!id,
+  });
+}
+
+export function useSaveDebitNote() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { id?: string; input: SupplierDebitNoteDraftInput }>({
+    mutationFn: ({ id, input }) =>
+      apiFetch<{ id: string }>(id ? `${BASE}/debit-notes/${id}` : `${BASE}/debit-notes`, {
+        method: id ? "PUT" : "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+export function useDebitNoteAct() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { id: string; act: BillAct; reason?: string }>({
+    mutationFn: ({ id, act, reason }) =>
+      apiFetch<{ id: string }>(`${BASE}/debit-notes/${id}/${act}`, {
+        method: "POST",
+        body: act === "cancel" ? JSON.stringify({ reason }) : undefined,
+      }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
 export function useRecordMoneyBack() {
   const refresh = useInvalidatePayables();
   return useMutation<{ id: string }, ApiError, { voucherId: string; input: MoneyBackInput }>({
@@ -381,7 +442,7 @@ export function useCancelMoneyBack() {
   });
 }
 
-export type ApDocKind = "bills" | "vouchers" | "credit-notes";
+export type ApDocKind = "bills" | "vouchers" | "credit-notes" | "debit-notes";
 
 /**
  * Attach one file to a bill or a voucher — the repo's signed-upload pattern:
@@ -461,6 +522,15 @@ export function useCreditNoteNotesToFollowUp(noteId: string | undefined, enabled
   });
 }
 
+/** 0681: a debit note's settlements, and its supplier's debit notes still owed. */
+export function useDebitNoteNotesToFollowUp(noteId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: payablesKeys.debitNoteNotes(noteId ?? ""),
+    queryFn: () => apiFetch<SupplierDebitNoteFollowups>(`${BASE}/debit-notes/${noteId}/notes-to-follow-up`),
+    enabled: !!noteId && enabled,
+  });
+}
+
 /** What a supplier still owes, for the voucher's reminder. */
 export function useSupplierNotesOwed(supplierId: string | null) {
   return useQuery({
@@ -498,7 +568,8 @@ export function useCloseNoteToFollowUp() {
   });
 }
 
-/** A confirmed credit note settles a credit note owed. Posts nothing. */
+/** A confirmed credit note settles a credit note owed, or (0681) a confirmed
+ *  debit note a debit note owed. Posts nothing. */
 export function useSettleNoteToFollowUp() {
   const refresh = useInvalidatePayables();
   return useMutation<{ id: string }, ApiError, { id: string; input: SupplierNoteSettleInput }>({

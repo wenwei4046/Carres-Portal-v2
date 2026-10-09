@@ -1021,6 +1021,8 @@ export {
 // `Confirm balance delivery date` (per PO LINE). Pure; names its calendar.
 export {
   PURCHASING_OFFICE_OFF_DAYS,
+  purchasingOfficeDays,
+  type PurchasingOfficeDays,
   balanceDeliveryCallsOf,
   callCalendarBucketOf,
   purchasingCallCalendarDays,
@@ -1128,6 +1130,7 @@ export {
   deliveryStepDueIso,
   deliveryStepOverdue,
   deliveryQueueLeads,
+  assignLogisticsDueIso,
   type DeliveryQueueLeads,
   type DeliveryQueueDef,
   type DeliveryQueueKey,
@@ -3240,6 +3243,7 @@ export * from "./booking-brief";
 // CARD 4 — the collection clock: T−3 · T−2 · T−1 (final deadline) on working
 // days before the delivery, one arithmetic for every surface that presses.
 export * from "./collection-clock";
+export * from "./outstation";
 // DELIVERY MONITOR (2026-09-11) — when the goods reach us, as a delivery
 // surface must read it: the recorded purchase-order dates, the latest supplier
 // reply, the exact per-line shortage, and ONE arrival state over them. It
@@ -3371,7 +3375,15 @@ export {
   workspaceActivitySettingsResponseSchema,
   type WorkspaceActivitySettingsResponse,
   INITIAL_WORKSPACE_ACTIVITY_SETTINGS,
-  workspaceActivityWindow,
+  workspaceActivityOfficeHoursSchema,
+  type WorkspaceActivityOfficeHours,
+  workspaceActivityTimesFit,
+  workspaceActivityWindowSchema,
+  type WorkspaceActivityWindow,
+  workspaceStaffLunchSchema,
+  type WorkspaceStaffLunch,
+  workspaceStaffLunchInput,
+  type WorkspaceStaffLunchInput,
   type WorkspaceActivitySettings,
   TEAM_ONLINE_MINUTES,
   teamMemberStateSchema,
@@ -3387,14 +3399,44 @@ export { evaluateWorkspaceActivityCheck, type WorkspaceActivityEvidence, type Wo
 export type { OutrightOrderFacts, OutrightFactsFailed } from "./outright-order-facts";
 export {
   DEFAULT_OFFICE_CALENDAR,
+  BUILT_IN_HOLIDAY_YEARS,
   officeCalendarOf,
   officeOffDays,
   officeWorkingDayOptions,
   officeOwnerCalendar,
+  personOwnerCalendar,
+  personWorkDaysOf,
   officeHolidayName,
   type OfficeCalendar,
   type OfficeHoliday,
 } from "./office-calendar";
+export * from "./delivery-working-calendar";
+export {
+  SETTINGS_EDITOR_SECTIONS,
+  COMPANY_PROFILE_FIELDS,
+  VERIFIED_COMPANY_PROFILE,
+  companyAddressLines,
+  companyProfileValuesSchema,
+  companyProfileSaveInput,
+  companyProfileResponseSchema,
+  officeCalendarValuesSchema,
+  officeCalendarSaveInput,
+  officeHolidaysSaveInput,
+  officeCalendarResponseSchema,
+  settingsChangeSchema,
+  settingsEditorGrantInput,
+  settingsEditorsResponseSchema,
+  type SettingsEditorSection,
+  type CompanyProfileField,
+  type CompanyProfileValues,
+  type CompanyProfileSaveInput,
+  type CompanyProfileResponse,
+  type OfficeCalendarValues,
+  type OfficeHolidaysSaveInput,
+  type OfficeCalendarResponse,
+  type SettingsChange,
+  type SettingsEditorsResponse,
+} from "./settings-core";
 
 export { decideWorkspaceReassignment, type WorkspaceCheckpointIdentity, type WorkspaceReassignmentDecision } from "./workspace-reassignment";
 
@@ -3402,3 +3444,4 @@ export { documentDisplayNumber } from "./document-display";
 
 export { dateMatchesPreset, matchesRegisterColumnFilters } from "./register-column-query";
 export type { DatePreset, RegisterColumnQuery, RegisterColumnFact } from "./register-column-query";
+export * from "./courier-dispatch";

@@ -181,11 +181,15 @@ Staff submission of MC covering today immediately starts qualified available cov
 
 ### Owner clarification · 9 Oct 2026 · MC submission entry
 
-Confirmed entry: Workspace → Leave. Employee selects MC, chooses absence dates, uploads MC proof and presses Submit. Do not create a standalone MC Report page. Today’s MC submission starts operational cover immediately; HR review is separate. This is an approved blueprint entry, not a build claim.
+Confirmed entry: Workspace → Leave. Employee selects MC, chooses absence dates and presses Submit; uploading MC proof is optional and never required (owner rule confirmed 9 Oct 2026). Do not create a standalone MC Report page. Today’s MC submission starts operational cover immediately; HR review is separate. This is an approved blueprint entry, not a build claim.
 
 ### Leave types · owner update 9 Oct 2026
 
 Workspace → Leave is one submission entry. MC and Emergency leave submissions covering today immediately start qualified available cover without waiting for approval; this is operational routing, not HR approval. Emergency leave records absence dates and a short reason. On leave is the employee’s absence status, not another application type or page. Planned leave cover after approval on the absence date remains a proposal, not an owner decision.
+
+### Leave recorded for a colleague · confirmed 9 Oct 2026 (corrected the same day)
+
+Every signed-in active staff member may record leave for a colleague (for example, one who is ill and cannot log in); this is not limited to the owner or Settings editors, and recording leave is a separate permission from changing Settings. Workspace → Leave → Record leave: the person defaults to me and may be changed to a colleague; choose MC, Emergency leave or Planned leave and the dates; Submit takes effect at once with no approval; MC proof is optional. The system keeps whose leave it is, who recorded it, when, and the change history (recorded, cancelled). Today's leave starts the existing cover; future leave starts on its day. Whole days only; half-day leave is not decided.
 
 ### Leave approval policy · confirmed 9 Oct 2026
 

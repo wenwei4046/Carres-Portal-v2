@@ -46,7 +46,9 @@ Finance must show clearly where each sum of money comes in and goes out, channel
 4. The channel follows the debtor account (「根据debtor account 来决定」); Chew provides the chart of accounts.
 5. Transport is recorded as a cost of each order even though customers pay nothing for it and Carres bears it (「虽然是我们出，但是还是要记录运输费用啊，根据订单」). The logistics partner's bill is split by the delivery orders it lists; a bill with only a total is split equally (「如果一个总数就平除」).
 6. Debtors follow the channel in two levels for dealers (「Dealer 一个overall 母账，然后每个dealer under 这个母账 … 就是两层了」): Dealer Debtors, then each dealer, then that dealer's customers or orders. Showroom and Subscription each have one control account with their customers under it.
-7. Open (Chew 2026-10-06): goods bought without an order would leave money paid to suppliers outside every channel in Receipts & Payments (「这样我看receipt & payment 就不太对了」); how such a payment is placed is still to decide.
+7. Goods bought without an order must not leave money paid to suppliers outside every channel in Receipts & Payments (「这样我看receipt & payment 就不太对了」); Chew confirmed how such a purchase is placed on 2026-10-06 ("A purchase without an order" below).
+
+Status (measured 2026-10-10): ruling 3 holds today (a line can be set to Office). Rulings 1, 2, 4, 5 and 6 and "A purchase without an order" are APPROVED / NOT BUILT; the plan is "Splitting the money by channel" at the end of this section.
 
 **Chart of accounts (Chew's, AutoCount, dated 22 Sep 2026; kept by Chew, not in this repository).** It has one debtor control (Trade Debtors) and one Other Debtor control, so dealer and subscription customers are not separated (「本身里面没有分dealer customer 和 subscription customer」). Measured: the ledger already accepts its code shape (`ledgerAccountCodeShape`, for example 300-0000 and 900-A001). Customers sit under a control account as parties on each line (`gl_entry_lines.party_type` / `party_id`), not as accounts, so a control account holds any number of customers.
 
@@ -152,6 +154,19 @@ Two Finance Settings pages keep the mapping in Chew's hands (「其他的收入�
 - When Purchasing allocates such stock or PO quantity to a Sales Order, the goods take that order's channel. Allocated before the supplier is paid: the bill and the payment carry the order's channel. Allocated after: that month's Receipts & Payments keeps it under stock and does not change, and the cost reaches the order's channel when the goods are sold. A PO split between orders is split unit by unit.
 - The KPI allowance is accrued like the renovation rebate (900-C009 / 410-0065).
 
+**Splitting the money by channel — the plan, PROPOSAL / NOT LAW (2026-10-10, for Chew's review).** It builds Chew's rulings 1, 2, 4, 5 and 6 above and "A purchase without an order". Measured first (2026-10-10, read only):
+- Customer money: a payment, a deposit and an invoice each post to the one trade debtors account (`300-0000`) through `gl_ar_control_account()`, which allows exactly one customer control account; a second one makes every customer payment fail to post. These postings run inside Payment's own recording (Jess's), with no fallback, so a fault there would stop staff recording payments. No customer posting stores a department: the reports work it out from the order when they read (0578).
+- Supplier bills: a GRN line's department is filled in from its sales order (`fin_po_line_departments`), but it can be changed by hand; a PO line bought for orders in two channels gets none. A Manual Purchase Request keeps its purpose; a Showroom Display destination is not tied to a showroom outlet.
+- Cash Flow has no channel filter. A supplier payment carries no department (only the bill lines it paid do); a card payout carries none.
+- Transport: nothing ties a logistics partner's bill to the delivery orders it covers, and logistics partners are not suppliers in Payables.
+
+Recommended, in this order:
+1. **A bill line takes its order's channel** (ruling 2). A GRN line bought for one channel takes it and cannot be changed. A PO line bought for orders in different channels is split by quantity, one line per channel. A purchase without an order takes its channel from its request's purpose: Showroom Display needs Purchasing's destination tied to a showroom (Jess's data); Ready Stock needs the "not yet in a channel" place, whose cost reaches the order's channel when the goods are sold.
+2. **Cash Flow by channel** (ruling 1): a receipt goes to its order's channel; a supplier payment to the channels of the bill lines it paid, in proportion; a card payout to the channels of the card payments in it; a transfer between Carres's own accounts to none.
+3. **Debtors by channel** (rulings 4 and 6): `300-1000` Showroom, `300-2000` Dealer with one account per dealer under it (`300-2001` and on, a new dealer getting its own), `300-3000` Subscription, all under `300-0000`. Each posting picks the account from its order's channel. The test balances already on `300-0000` stay there; go-live starts clean. This rewrites the posting step inside Payment's recording, so it waits for Chew's go-ahead and Jess is told before it is built.
+4. **Transport on each order** (ruling 5): a logistics partner's bill names the delivery orders it covers; its amount is split over them (equally when it gives only a total); each part posts to `900-T002` with its order's channel.
+- Falsifier: in Chew's test, a channel's money in or out differs from what its orders, bills and vouchers show, or a customer payment fails to post after step 3.
+
 ## 1 · Boundary: Finance, Subscription and Dealer
 
 Chew, 2026-10-03: 「总之jess 的功能，ui 等等都别动到。我只专做我的finance 模块，我其他的资料也只是链接过来罢了」.
@@ -215,7 +230,7 @@ Each changes only what Finance needs on that screen; nothing else on Jess's scre
 | Topic | Decision |
 |---|---|
 | Recording, receipts and corrections | **Payment's rules stand.** Each recorded payment reaches the Finance ledger automatically, and Finance does not re-enter it. Payment's rules are: one collection owner; the receipt is made at recording; void or correct allocation is done by the Payment Approver. |
-| Refunds | **Jess's no-refund policy stands** (Payment MASTER §13). The exceptional refund (Service Case → Management → Finance pays) is paid with a Finance **Customer Refund** voucher, so that it is in the ledger. Where it shows: on Finance's own AR page, the refunded amount stands on its own beside the customer's outstanding; Payment's figures and pages do not change (Chew 2026-10-03). **Not built.** |
+| Refunds | **Jess's no-refund policy stands** (Payment MASTER §13). The exceptional refund (Service Case → Management → Finance pays) is paid with a Finance **Customer Refund** voucher, so that it is in the ledger. Where it shows: on Finance's own AR page, the refunded amount stands on its own beside the customer's outstanding; Payment's figures and pages do not change (Chew 2026-10-03). **Not built.** PROPOSAL / NOT LAW (2026-10-10, waiting for Chew's choice of accounts): the voucher pays one customer for one order and posts by whether the order was invoiced. Not invoiced (the money was paid ahead of the invoice): Dr Trade Debtors with the customer as the party, Cr the bank, so the customer's balance returns to nothing. Invoiced: Dr `510-0000 RETURN INWARDS`, Cr the bank. Falsifier: Chew's auditor books a refund another way. |
 | Moving a deposit to another order | **Not built.** It changes payment records, and Payment already has `Correct allocation`. |
 | Old-slip approval window | **Not built.** |
 | Customer credit and debit notes | **Not built.** Customer invoices belong to Payment (Payment MASTER §1). |
@@ -235,10 +250,10 @@ Deposit invoice rules:
 | Payment vouchers | Prepare → Check → Approve, as in §2. The voucher is the only way money leaves. |
 | Supplier bills | Keep: from a GRN at PO price, and through other creditors for non-goods bills. |
 | Supplier advances | Keep. |
-| Supplier credit and debit notes | **Build.** This includes reading the supplier's paper and knocking the note off that supplier's invoices. A **debit note** (the supplier charges more) is its own document, with its own number and list, never mixed with bills; it is paid by a payment voucher and counts in AP and AP Aging (Chew 2026-10-03; **not built**). A supplier never pays a credit back in money: the credit is knocked off the next bill, or a credit or debit note is raised, so no refund-from-supplier door is built. |
+| Supplier credit and debit notes | **Build.** This includes reading the supplier's paper and knocking the note off that supplier's invoices. A **debit note** (the supplier charges more) is its own document, with its own number and list, never mixed with bills; it is paid by a payment voucher and counts in AP and AP Aging (Chew 2026-10-03; **built in 0681**, "Supplier debit notes" below). A supplier never pays a credit back in money: the credit is knocked off the next bill, or a credit or debit note is raised, so no refund-from-supplier door is built. |
 | Supplier finance data (tax numbers, bank account) | **Build** as Finance's own record, linked to Purchasing's supplier. Purchasing screens do not change. |
 | Bill scanning | **Build.** It sends bill images to an external AI service and costs a little per bill. |
-| Foreign currency | Needed, but rarely used. Record the foreign amount and the rate only; the books stay in RM, and no exchange gain or loss is worked out automatically (Chew 2026-10-03). **Not built.** |
+| Foreign currency | Needed, but rarely used. Record the foreign amount and the rate only; the books stay in RM, and no exchange gain or loss is worked out automatically (Chew 2026-10-03). **Built for a bill in 0682**, "Foreign currency on a bill" below. |
 | Dealer commission | Calculated on money actually received; Finance maintains the rates. See the rules below this table. |
 
 Dealer commission rules:
@@ -338,18 +353,52 @@ Dealer commission rules:
   - Late interest is invoiced too.
   - Bad debt: the agreements Chew ticks on the bad-debt list post Dr bad debts, Cr the customer's debtor, once each.
   - The subscription invoice is Finance's (「invoice 那边算我这里」). Rental keeps the agreement and its billing schedule.
+  - APPROVED / NOT BUILT (measured 2026-10-10). The plan follows.
+- **Subscription money — the plan, PROPOSAL / NOT LAW (2026-10-10, for Chew's review).** It builds the Rental MASTER §0 rules and the bullets above. Measured first (2026-10-10, read only):
+  - Today each collected month posts Dr the money account, Cr `500-2000` on the day it is paid: no invoice, no subscription debtor, no customer on the line (0475). Accounts `300-3000`, `401-0000`, `610-0090` and `900-B002` exist but nothing posts to them.
+  - The schedule starts on the signing day and Stripe charges month 1 at signing (POS checkout); later months fall on the 7th. Nothing ties the first month to delivery.
+  - `Record transfer` can mark any month paid, takes the day the button is pressed, and closes a whole month for any amount. A month counts as late until someone records it.
+  - Late interest is 8% a month from the due date, typed in the code, charged by hand, never invoiced or posted. Paying off works (months left plus interest charged), but its interest never posts. Default, repossession and bad debt are statuses with no door. Diglant's share and the commission are worked out per month and stored, never paid or posted.
+  - Agreements are numbered `RA-{n}`; no SINV invoice exists; email goes out only for purchase orders.
+- Recommended, in this order (each its own release):
+  1. **The subscription debtor and the monthly invoice.** Each month's invoice (`SINV…`) is made by itself and posts Dr the customer's subscription debtor (`300-3000`, the customer as party), Cr `500-2000`. A payment posts Dr the bank, Cr the debtor, paying the oldest invoice first; a part payment leaves the rest owed. `Record transfer` asks the day received. Finance's page lists the month's invoices for Chew to look over.
+  2. **Late interest as Chew's setting.** The rate, per month or per year, and the day it starts, with each agreement keeping the rate of its signing day. It counts from after the due month ends, never for a month Carres recorded late, and is invoiced (an interest SINV), so it posts.
+  3. **Diglant's share.** As each month's rent is collected, Diglant's share is owed: Dr `610-0090` Diglant share, Cr `401-0000` Subscription creditors. On the 10th, the 20th and the last day (a setting), a draft payment voucher pays what is owed: Dr `401-0000`, Cr the bank.
+  4. **Paying off and ending.** Paying off makes the RM 1 sale invoice (its amount a setting); ending an agreement makes one invoice for the remaining months and the compensation; a lost-goods invoice the same way.
+  5. **Bad debt.** A list of each agreement's amount still owed; Chew ticks several and they post Dr `900-B002`, Cr the customer's debtor, once each.
+  6. **Sending.** The month's invoices go out from `accounts@carresofficial.com` after Chew looks them over.
+  - The first instalment on the 7th of the month after delivery, with nothing charged at signing, changes the POS signing and its Stripe checkout, which are order placement (Jess's): it waits for Chew to agree it with Jess.
+  - Falsifier: in Chew's test, a customer's subscription debtor differs from the invoices less the payments on the agreement, or a month shows paid that the customer did not pay.
 - **Still Jess's, for dealer commission:** an order recording its bundle discount (order placement); the 15-year guarantee's catalog price (Catalog).
 - **Noted for later (Chew 2026-10-05).** A list's search box opens already typed-into, not behind a click. To change together with other UI items; first check whether it is the shared kit search.
 
 **Supplier credit notes approach — PROPOSAL / NOT LAW, built for Chew's test (0642).**
-- Payables → Credit Notes. The supplier's own credit note is entered once, with lines, as a bill is: draft → confirmed → cancelled. Confirming posts on the credit note's date: Dr the payables account with the supplier as the party, Cr each line. An expense or asset line takes a cost back; an income line records a rebate. The stored number is `SCN-YYYYMMDD-RRRR`, drawn like a bill's; display uses `SCN-YYMMDD-RRRR` under Jess's system-wide 2026-10-04 COPY-STANDARD ruling (approved target, adoption not verified).
-- The prefix becomes `PCN`, so subscription credit notes keep `SCN` (Chew 2026-10-07, 「可以」). Not built yet.
+- Payables → Credit Notes. The supplier's own credit note is entered once, with lines, as a bill is: draft → confirmed → cancelled. Confirming posts on the credit note's date: Dr the payables account with the supplier as the party, Cr each line. An expense or asset line takes a cost back; an income line records a rebate. The stored number is `PCN-YYYYMMDD-RRRR`, drawn like a bill's, so subscription credit notes keep `SCN` (Chew 2026-10-07, 「可以」; built in 0681, a credit note numbered before keeps its `SCN` number); display uses the `YYMMDD` form under Jess's system-wide 2026-10-04 COPY-STANDARD ruling (approved target, adoption not verified).
 - Its credit is knocked off that supplier's confirmed bills on the same payables account, as an advance is (0485). A knock-off posts nothing and can be taken off with a reason. A bill counts it as paid from the later of the credit note's date and the knock-off's day. A voucher cannot pay what a credit note already took off, and a bill with a credit note on it cannot be cancelled.
 - AP · Payables gains `Credit Left`, and its last money column subtracts it (`Unpaid After Advance and Credit`), so it still equals the books. AP Aging and the Self-check read the same arithmetic. A test walks a bill, a credit note, a knock-off, a voucher refused over what is left, a take-off and a cancel through the real doors.
-- A supplier debit note is not entered as a bill: it is its own document (the table above, Chew 2026-10-03), not built yet.
+- A supplier debit note is not entered as a bill: it is its own document (the table above, Chew 2026-10-03), built in 0681 (Supplier debit notes, below).
 - Not built: a PDF.
 - 0647 fixes a fault 0642 shipped with: a credit note's two account columns did not follow a renumbered account (0570 says every key that names the chart must), so renumbering an account a credit note used was refused. Both now follow, and the file refuses to apply while any key onto the chart still does not. A test renumbers an account under a confirmed credit note.
 - Falsifier: in Chew's test, a supplier's `Unpaid After Advance and Credit` differs from its balance in the books, or a bill shows a credit note Chew did not knock off.
+
+**Supplier debit notes — Chew 2026-10-03 (the document) and 2026-10-07 (the `PDN` prefix); APPROVED; BUILT 2026-10-10 (「做」); 0681 APPLIED 2026-10-10 on Chew's word for the whole evening's work (「晚上做时，不要一个一个和我确认，到时直接做完」), the tracker holding the file exactly (md5 `39cf1e68e29e964ec181de6a90bda4d3`).**
+- Payables → `Debit Notes`. The supplier's own debit note (the supplier charges more) is entered once, with lines, as a credit note is: draft → confirmed → cancelled. Each line is a cost, as a bill line is: an expense or asset account with its department. It has its own due date (optional), number and list; it is never a bill.
+- Confirming posts on the debit note's date: Dr each line's account (with its department), Cr the payables account with the supplier as the party, so Carres owes more. Its number is `PDN-YYYYMMDD-RRRR`, drawn like a bill's. Cancelling a confirmed one takes the finance approver and reverses the entry; it is refused while any voucher not cancelled holds part of it.
+- A payment voucher that pays supplier bills pays a debit note the same way: the voucher form lists the supplier's confirmed debit notes under `Debit notes to pay` beside the bills, at most what no other voucher holds yet. Approving posts Dr the note's payables account (party = the supplier), Cr the bank. A debit note's page has `New Payment Voucher`, which opens the voucher form with it ticked. The voucher's page lists `Debit notes paid`; its list names them beside the bills.
+- What a debit note still needs paying has one arithmetic: approved vouchers by their date. AP · Payables gains `Debit Notes Unpaid`; `Unpaid` and `Unpaid After Advance and Credit` include it, so the latter still equals the books (the Self-check reads it), and the Dashboard's supplier figure includes it. `On a Voucher, Not Approved` and `Not on a Voucher` still count bills only. AP Aging ages a debit note among the bills, by its date or due date.
+- A confirmed debit note settles that supplier's debit notes owed on Notes to follow up, in part or in full (card `Notes it settles`, as on a credit note); while it is cancelled, what it settled is owed again.
+- Not built: knocking a credit note or an advance off a debit note (a voucher pays it); a debit note's PDF; reading the supplier's debit note with `Read the bill`.
+- Measured before applying (production, rolled back, 2026-10-10; a bill, debit notes and a voucher made inside the test): a debit note of RM 120.00 and RM 30.00 on two cost accounts posted Dr both with their department and Cr the payables account RM 150.00 with the supplier, numbered `PDN-…`; AP · Payables' figure and the supplier's balance in the books each rose by RM 150.00, and AP Aging showed it; one voucher paid a bill RM 50.00 and the debit note RM 100.00, posting Dr the payables account twice and Cr the bank RM 150.00, after which RM 50.00 of the note was left and both figures still moved together; paying more than the note, an unconfirmed note, another supplier's note, a debit note on a direct payment and a voucher line naming both a bill and a debit note were refused; the same paper entered twice, a due date before the date, a control, income or bank account and a blank description were refused; a debit note on a voucher could not be cancelled, and once the voucher was cancelled it could; a debit note settled a debit note owed in part, then in full, refused a second settlement and a credit note owed, and cancelling it made the note owed again; a credit note confirmed was numbered `PCN-…`; Operation could neither read nor write, and the tables could not be written around the doors.
+- Falsifier: in Chew's test, a supplier's `Unpaid After Advance and Credit` differs from its balance in the books after a debit note, or a voucher pays a debit note that AP · Payables still shows unpaid.
+- Deployed 2026-10-10 (PR #1999, `35802601`), every production surface reporting that SHA. Checked read-only in production the same night as the Finance user: the menu lists `Debit Notes` after `Credit Notes`; the register shows its empty sentence and `0 debit notes · RM 0.00 left to pay`; the form opens with its words; Unpaid by Supplier has `Debit Notes Unpaid`; the voucher list heads `Bills and Debit Notes Paid`; AP Aging still equals the books (difference RM 0.00); no console error. Chew's own test is owed.
+
+**Foreign currency on a bill — Chew 2026-10-03 (the rule in the table above); APPROVED; BUILT 2026-10-10 (「做」); 0682 APPLIED 2026-10-10 on Chew's word for the whole evening's work, the tracker holding the file exactly (md5 `bccc4dbfa9fab8f0336894d2f40cf205`).**
+- A bill's page has the fact `Foreign currency`. Finance records the currency the supplier invoiced in (three letters, never MYR), the amount on the supplier's invoice and the rate (RM for 1), changes it, or removes it. The page shows the RM the rate gives beside the bill's own total.
+- A record only: the bill's lines stay in RM and post as before; nothing here posts, and no exchange gain or loss is worked out. A draft or confirmed bill takes it; a cancelled bill does not. The bill's history says who recorded, changed or removed it.
+- Not built: a foreign currency on a debit note, credit note or payment voucher; a currency list (any three letters are accepted).
+- PROPOSAL / NOT LAW: when the bank pays a different RM amount than the bill, Finance enters the difference by hand, as the ruling leaves it: a supplier debit note with a line to `908-0000 LOSS ON FOREIGN EXCHANGE` when the bank paid more, a supplier credit note with a line to the same account when it paid less; the voucher then pays the bill with the note. Falsifier: Chew's auditor books the difference another way, or the chart gains a gain account.
+- Measured before applying (production, rolled back, 2026-10-10): `usd` 1,250.00 at 4.215 was recorded as USD by the Finance user; changed to EUR 100.50 at 10, one record remained and the history read `Foreign currency EUR 100.50 at 10`; MYR, two letters, an amount of 0, with three decimals or none, a rate of 0 or with seven decimals, and a bill that does not exist were refused; Operation and a caller with no role were refused, and Operation read nothing; removing twice left no record and one `Foreign currency removed`; a draft bill took one, a cancelled bill was refused; the table could not be written around its door.
+- Falsifier: in Chew's test, recording a foreign currency changes a bill's total, a ledger entry or AP · Payables.
 
 **Credit and debit notes to follow up — Chew 2026-10-06, 2026-10-07 and 2026-10-09; APPROVED; BUILT 2026-10-09 (「可以，开始做」, PR #1998); 0676 APPLIED 2026-10-09 with Chew's OK (「好，做完了告诉我」), the tracker holding the file exactly (md5 `28baaa8fbd83f84ca64382589fd1b240`).**
 - Chew needs one list of the credit and debit notes suppliers still owe, so he can follow each one up (「我需要有一个listing 关于supplier 那边要follow up 的cn」). It is a reminder only and posts nothing, because there is no supplier claims account (Chew 2026-10-06).
@@ -362,7 +411,7 @@ Dealer commission rules:
   - Payables → `Notes to follow up`: one row per note owed (supplier, credit or debit, why, the bill, GRN, PO or return it came from, the amount, what is settled, what is left, the next follow-up), in three groups: to follow up today or earlier, still waiting, and settled or closed. A row opens the note: record a follow-up (the date, what the supplier said, the next date), close it with a reason, and see what settled it. A note can also be added by hand, with the reason Other.
   - A confirmed bill: a line whose price differs from its PO price offers `Follow up`. Above the PO price it suggests a credit note, below it a debit note; the amount it suggests is the difference times the quantity, and can be changed. A line already marked shows its note. A draft bill offers nothing, because its lines can still change.
   - A purchase return on goods on a confirmed bill makes a credit note to follow up by itself, worth the bill's price for the returned goods: the latest confirmed bill line for that GRN and PO line, never more units than were billed. A wrong item is never billed, so it adds nothing.
-  - A confirmed credit note settles that supplier's credit notes owed, in part or in full; the rest stays owed. Cancelling the credit note gives back what it settled. A debit note owed is closed with a reason until supplier debit notes are built.
+  - A confirmed credit note settles that supplier's credit notes owed, in part or in full; the rest stays owed. Cancelling the credit note gives back what it settled. A confirmed supplier debit note (0681) settles that supplier's debit notes owed the same way.
   - The reasons are "Price differs from PO", "Purchase return" and "Other".
   - Preparing a voucher for a supplier says what notes it still owes.
   - Finance and principal only. It posts nothing.
@@ -378,6 +427,23 @@ Dealer commission rules:
 - It is OFF until Chew gives the key, which becomes the Worker secret `ANTHROPIC_API_KEY`; until then the button answers `Reading bills is not set up yet. Type the bill in.` Each reading costs a little per bill.
 - Not built: Houzs's account memory (filling a line's account from the supplier's earlier bills), the multi-bill scan page, and reading for payment vouchers and payment requests.
 - Falsifier: in Chew's test with real bills, a read figure is wrong more often than right, or the pre-filled form takes longer to check than typing it.
+
+#### Money-out source-to-result journey — consolidated review recommendation, 9 October 2026
+
+**Existing §2/§3.2 decisions remain controlling; added failure/result checks are review recommendations, not new accounting entries, roles or release authority.** Houzs Finance is inaccessible to the current study account; this journey uses the existing Chew-owned adaptation above and does not claim a fresh private-V5 inspection.
+
+| Stage | Required source and result | Completion / exception boundary |
+|---|---|---|
+| Intake and bill | Finance reads exact supplier/GRN/PO-price source for goods, or the admitted other-creditor bill source for non-goods; preserve actual supplier paper and eligible request evidence | A PO or uploaded image is not a confirmed bill or payment. Partial source, unclear supplier, possible duplicate, missing cost/currency/account and scan extraction remain named review facts; scanning does not approve or post by itself |
+| Prepare voucher | Qualified Finance preparer selects payable/advance/refund or other admitted purpose, exact recipient/account, amount/currency/rate, allocations and supporting evidence | Customer refund requires its existing exceptional Case/Management source. Requester access remains §3.3-scoped; no ordinary Operations money approval. Supplier credit/debit and advances retain their own source identities |
+| Check | A Finance checker other than preparer reviews current voucher/source version, amounts, recipient, allocations and evidence | A checked draft is not approved or paid. Source correction invalidates affected review; no invented three-different-people requirement, since §2 permits a qualified checker also to approve |
+| Approve / ledger result | Existing Finance Approver acts through the source-owned voucher transition and retains actual actor, decision and ledger linkage | Approval/posting and external bank execution/receipt are distinguishable evidence. Do not invent an extra payment-state writer or infer bank receipt from approval; §3.4 reconciliation owns bank/card evidence. Denied/uncertain result must be reconciled before a repeat, with no duplicate voucher or money effect |
+| Partial / credit / correction | Read actual remaining payable and Finance-owned applied advance/credit; route refused or disputed facts back to the owning Finance document | Supplier note receipt is not accepted/application evidence. Proposed credit-note knock-off rules remain explicitly NOT LAW above; no supplier cash-refund door. Cancel/correct uses existing qualification and source lineage, preserving original ledger/evidence and affected request stage |
+| Reconcile / report | Finance reconciles voucher, bill, bank/card and ledger under §3.4; AP, aging, Daily Bank and reports use the same accepted source arithmetic | Missing bank evidence remains unresolved; current waiting-voucher status is not a historical snapshot. Supplier payment never changes customer receipts, goods custody or Delivery completion |
+
+**Configuration and handoff:** Finance-only supplier economic details link Purchasing's supplier identity; People/Workspace supplies qualifications and Cover. Existing Chart/account roles, currency/rate inputs, qualified source permissions and document dates govern the Finance record. External-service activation, sample imports, closed-period activation and new cancellation/posting behavior require their existing specific review. Ordinary Tasks links the exact source result without confirming money or making a second account.
+
+**Acceptance owed:** goods versus non-goods provenance; same paper/request retried; exact remaining payable after partial/advance/credit; preparer cannot check own voucher; qualified checker may approve; unqualified actor refused; stale source requires re-review; uncertain approval reconciles once; requester cannot read restricted Finance detail; cancellation returns the linked request to its source-derived stage; bank/card evidence and AP/ledger/report totals reconcile. These checks were not run by this document pass and do not approve accounting mechanics beyond existing law.
 
 ### 3.3 Staff payment requests
 
@@ -479,6 +545,26 @@ Carres already has a simpler Card settlement. It takes Public Bank, GHL and Mayb
 - Not built: posting the value to the ledger (Dr stock on hand, Cr cost of goods sold; bills from a GRN post the goods to cost of goods sold, 0477, so without it the month's cost is every purchase of the month) and valuing the go-live opening stock, which comes in without a PO cost. When posting is built, Stock MASTER §9 applies: Finance values from the confirmation version it acknowledges and saves no month-end Stock total of its own. Both go to Chew.
 - Falsifier: in Chew's test, a Unit Chew knows was in the showroom or out for repair at a month end shows in another group, or a value differs from its PO line cost times its quantity.
 
+#### Year-end close — complete review recommendation, 9 Oct 2026
+
+**PROPOSAL / NOT APPROVED / NOT BUILT.** This replaces the missing journey with a reviewable contract; it does not activate §3.5's parked period locks/opening balances, decide fiscal dates, approve accounting entries or expand Chew's release scope. Houzs Finance remains inaccessible to this study account; its private V5 is not fetched or copied. Existing Chew-approved adaptation in this MASTER is the Finance authority. A bounded [Odoo official year-end reference](https://www.odoo.com/documentation/18.0/applications/finance/accounting/reporting/year_end.html) search excerpt supports an accuracy/up-to-date review before closing; full-page fetch timed out, so no detailed Odoo closing-entry or lock mechanics are adopted.
+
+**Purpose and trade-off:** Finance should review one traceable year-end evidence package, identify unresolved source problems and preserve approved results. The added preparation/version history costs effort but prevents a completed checklist being confused with approved ledger treatment or locked periods. Reject a second stock total, copied supplier/customer transactions and a one-click close that hides incomplete source coverage.
+
+| Journey / responsible source | Recommended action and result | Exception / handoff |
+|---|---|---|
+| Define the review | Finance selects the authorised fiscal period and company ledger; record cut-off, calendar/time zone, source coverage and report as-of/version | Fiscal start/end, prior-period correction and exact close/reopen qualification remain explicit decisions for Chew; never assume calendar-year end or infer approval from a duty label |
+| Prepare and reconcile | Read original ledger/report versions, bank/card reconciliation, payable/receivable source lineage and outstanding differences; record each reconciliation's accepted evidence | Unreadable or incomplete sources remain named gaps. No guessed balancing number, duplicate payment/bill or invented clearing transaction |
+| Reconcile stock | Read Stock's acknowledged confirmation version when available; retain Finance's valuation mapping and missing-cost coverage separately | Current provisional Stock reading remains labelled provisional. Supplier consignment/dealer-owned exclusions and repair/transit groups follow §3.5; no Finance-created physical count or duplicate month-end total |
+| Resolve differences | Finance corrects its own documents through existing qualified doors; an Orders/Payment/Purchasing/Stock discrepancy links to that owner and retains returned evidence | Preparation never edits another module. Bank/card file samples, missing account mapping and unverified valuation/posting remain open; task completion alone is not accepted reconciliation |
+| Review adjustments | Present proposed Finance adjustment facts, basis, accounts, date, evidence and report consequences through the existing applicable approval route | Exact year-end journal/retained-earnings treatment and posting permission require Chew's approved design. This proposal specifies no debit/credit formula and does not enable posting |
+| Confirm review / retain results | Qualified reviewer records the accepted package version and unresolved/provisional scope. Preserve ledger/report/source identities and actual actor/time | A source change invalidates the affected review; disclose new differences and request re-review. Saved package is not a period lock or automatic financial finality |
+| Close / later correction | After the specific approved close contract exists, show its gates and result; retain historical package and any subsequent correction/review lineage | Lock activation, exception access, reopen/correction and next-year carry treatment remain NOT APPROVED here. Never delete ledger history, reset accounts, duplicate go-live opening balances or silently revise prior reports |
+
+**Settings, work and reports:** any eventual fiscal configuration, close qualification and effective treatment stays Finance-owned within the shared Settings home. Work links the exact source discrepancy/review, named qualified person and accepted outcome; no invented year-end deadline or automatic approval. Reports consumes the same ledger/date/coverage definitions and retains the accepted package's as-of/version; later live reports disclose changed sources instead of impersonating the old result. Export/access follows existing Finance permissions; no new generic scheduled send or public file store.
+
+**Review acceptance:** missing bank evidence blocks that reconciliation; missing stock confirmation remains provisional; another module's corrected source invalidates only its affected review facts; repeated submission cannot double-post an adjustment; unqualified callers cannot close/correct; denied/failed actions preserve draft/evidence and prior ledger; old results remain traceable after a permitted correction. Complete this rule/permission/source review with Chew before implementation; no application or production verification is claimed.
+
 ### 3.6 Reports
 
 The reports are:
@@ -524,7 +610,7 @@ All reports only read. Reports → Payment stays Payment's.
   - `Balance`, delivered orders only: invoiced value, deposit, balance due, balance paid, balance % and outstanding.
 - Opening a salesperson lists the orders.
 - Deposit is the money taken with the new order (payments of kind `deposit`); balance paid is every other customer payment, storage excepted. Both are read from live allocations, so a payment moved by Payment's `Correct allocation` counts on the order it was moved to, and a voided one counts nowhere.
-- Invoiced value is the live sales invoice; without one, the order value. An order counts as delivered when it is delivered or its sales invoice is issued.
+- Invoiced value is the live sales invoice; without one, the order value. The test proposal originally counted an issued sales invoice as delivered; that shortcut is rejected by the current Payment §2 closing-invoice and Delivery actual-result laws. The corrected target reads Delivery's authoritative customer-leg result/goods scope. Invoice issue alone never establishes delivery; exact partial-order inclusion and denominator require Finance metric review rather than inventing all-delivered treatment.
 - The salesperson is the order's salesperson now.
 - It reads Orders' and Payment's records and changes none. It is per salesperson, so it does not repeat Payment's own reports, which are per order and per customer.
 - Not built: refunds netted against what was collected; an as-of date (the money is as it stands today); a PDF.
@@ -541,6 +627,7 @@ All reports only read. Reports → Payment stays Payment's.
 - Falsifier: in Chew's test, Chew needs to plan several months side by side, or reads `Difference` the other way round (plan less actual), or a gross profit or net result here differs from the P&L for the same month.
 
 **Performance P&L — NOT BUILT.** A sold item's cost is the cost on its PO; an item with no PO shows no cost, never a guessed one (Chew 2026-10-03). Houzs reads each order line's cost from its sales order; Carres has no governed cost per sold line, and `product_skus.cost` was filled at 55% of the price as a placeholder, so it is not used.
+- Plan, PROPOSAL / NOT LAW (2026-10-10, for Chew's review). Measured (read only): a PO line records the order lines it was bought for and how many (`po_line_sources`) and its cost (`purchase_order_lines.cost`); a stock item keeps the PO line it came from (`ops_stock_items.po_line_id`); a bill line keeps its PO line (`supplier_bill_lines.po_line_id`). So a sold line's cost can be read from its PO, as Chew ruled, without `product_skus.cost`. Recommended after channel step 1 ("Splitting the money by channel", §0), so a sale and its cost fall in the same channel: by month and channel, each order line's sale (read from Payment's invoices) beside its cost (the cost of the PO lines bought for it, for the quantity sold, or of the stock item delivered); a line with no PO shows no cost and is counted apart. Falsifier: in Chew's test, a sold line shows a cost that is not on its PO, or a line bought on a PO shows none.
 
 ## 4 · Menu
 
@@ -551,7 +638,8 @@ All reports only read. Reports → Payment stays Payment's.
 FINANCE          its title folds the area (§4.1)
 ├─ Dashboard
 ├─ Payments      Monitor · Payment Records                                   Payment's, unchanged
-├─ Payables      AP · Payables · Payment Vouchers · Bills · Payment Requests · Credit Notes · Suppliers
+├─ Payables      AP · Payables · Payment Vouchers · Bills · Payment Requests · Credit Notes · Debit Notes
+│                Notes to follow up · Suppliers
 ├─ Receivables   AR · Receivables · Other debtors · Other receipts
 ├─ Bank & Cards  Daily Bank · Card settlement · Card money waiting · Money moves
 ├─ Ledger        Journal · General Ledger · Trial Balance · Self-check
@@ -587,7 +675,7 @@ FINANCE          its title folds the area (§4.1)
 3. **Deposit invoices.** Chew confirms them with Jess (2026-10-03). Check them against Payment's invoice rules and e-invoice before switching them on.
 4. **Dealer commission.** Check the calculation with Chew step by step before anything about it changes.
 5. **Stock confirmation.** Stock's Month-end Stock Confirmation is not built, so Finance's stock value stays provisional until it is.
-6. **Year-end close.** Design it before year end.
+6. **Year-end close.** Complete review recommendation is now in §3.5. Chew must settle the fiscal period, close/correction permissions, accounting treatment and lock activation before build; this proposal is not approval.
 7. **New words.** New Finance screen words go through COPY-STANDARD before UI work.
 
 ### 5.1 · Cross-module Settings reconciliation — 9 October 2026

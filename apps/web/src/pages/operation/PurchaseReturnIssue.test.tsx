@@ -11,6 +11,7 @@ import { PurchaseReturnPanel } from "./PurchaseReturnRecord";
  */
 const mutate = vi.fn();
 let doorError: unknown = null;
+vi.mock("@/lib/deadline-queries", async () => (await import("@/test/deadline-queries-mock")).deadlineQueriesMock());
 vi.mock("@/lib/queries", () => ({
   usePurchaseReturnWrite: (path: string) => ({ mutate: (body: unknown, opts?: { onSuccess?: (o: unknown) => void }) => { mutate(path, body); opts?.onSuccess?.({ id: "pr1" }); }, isPending: false, error: doorError }),
   usePurchaseReturn: () => ({ data: undefined, isLoading: true }),

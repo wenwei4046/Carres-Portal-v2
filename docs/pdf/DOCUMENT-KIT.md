@@ -57,6 +57,13 @@ therefore a page that owns a paper:
 
 ## 2 · The shape every document shares
 
+**Where the company identity comes from (owner 9 Oct 2026, COM-01 · BUILT ON BRANCH
+`build/settings-completion`, 0669 not applied):** the legal name, SSM number and registered address
+print from Settings → Company (`company_profile`), read once after sign-in
+(`lib/pdf/company-identity-store.ts`); until read, the verified identity from the owner's letterhead
+prints (`CARRES SDN. BHD.` · `SSM 202401055306 (1601150-X)`). Address lines end with a comma except
+the last. A saved PDF already issued is never rewritten.
+
 ```
 HEADER   logo 13mm · CARRES SDN. BHD. 14/700 · SSM 8 grey · address THREE lines
          8pt · right: the NUMBER 18/700 over the document name 9pt grey caps

@@ -171,7 +171,12 @@ Calendar**, correct all along.
 **`packages/shared/working-days.ts` is still the ONE engine — no module writes its own** —
 but it now has to be TOLD which calendar. Until it is, a caller that passes nothing is
 counting on whichever week the engine defaults to, and that is a silent answer, not a chosen
-one.
+one. The three calendars it is told from (9 Oct 2026): **Office** →
+`packages/shared/src/office-calendar.ts` (Settings → Office, weekdays + Kuala Lumpur holidays; SQL
+`_office_is_working_day`); **Warehouse** → the Site's own calendar, `warehouseOperatesOn` /
+`warehouseDaysLate` (Settings → Warehouse); **Delivery** →
+`packages/shared/src/delivery-working-calendar.ts` (Monday–Saturday + the Selangor holidays Warehouse
+Settings stores, else the built-in list).
 
 **Saturday's delivery capacity is RECORDED, not built.** `Landed = 1 · Condo = 0.5` is a
 capacity weight, and nothing in the portal reads a building type for any purpose today

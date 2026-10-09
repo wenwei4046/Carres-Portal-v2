@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import {
   buildPurchaseTodayReport,
   buildPurchaseChaseReceive,
+  officeWorkingDayOptions,
   myHolidaySet,
   nextPoDayMYT,
   productionWorkingDaysFor,
@@ -15,6 +16,7 @@ import {
   type PurchasePoInput,
   type PurchaseReceive,
 } from "@carres/shared";
+import { readOfficeCalendar } from "../../lib/office-calendar";
 import { requireOperation } from "../../lib/auth-guards";
 import {
   loadPurchasingNumbers,
@@ -146,15 +148,15 @@ async function loadChaseReceive(
     };
   });
 
+  /* Chasing a supplier is Purchasing's OFFICE work: `daysLate` counts on the
+     STORED Office calendar — its weekdays (owner default Mon–Fri, so a
+     Saturday never inflates a long weekend) and its holidays (Settings →
+     Office). Fails safe to the owner defaults. */
+  const office = officeWorkingDayOptions((await readOfficeCalendar(sb)).calendar);
   const { chase, receive } = buildPurchaseChaseReceive(inputs, {
     today: todayIso(),
-    holidays: myHolidaySet(),
-    // Jess 2026-07-23 · Carres suppliers work Mon–Fri (Ohana confirmed; the
-    // rest match). Saturday counted as a working day used to inflate `daysLate`
-    // on chase rows over long weekends. Passing offDays = [Sun, Sat] fixes it
-    // without touching the shared engine default (which the sofa/bedframe
-    // 6-day-week tests still assume).
-    offDays: [0, 6],
+    holidays: office.holidays as ReadonlySet<string>,
+    offDays: office.offDays ?? [0, 6],
   });
   return { ok: true, chase, receive };
 }

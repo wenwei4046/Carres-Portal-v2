@@ -36,6 +36,7 @@ import {
   ReceiptText,
   Banknote,
   CalendarClock,
+  CalendarOff,
   CreditCard,
   Landmark,
   BookOpenText,
@@ -354,6 +355,10 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // worked out*. The page writes nothing; a row opens the owning module's
       // workspace.
       { key: "work", label: "Workspace", icon: Home, mIcon: "home", section: "Workspace" },
+      /* Workspace → Leave (0670; owner 9 Oct 2026, Settings List WS-11): the
+       * ONE leave entry — MC, Emergency leave, Planned leave — a person
+       * records their own. No standalone MC Report page. */
+      { key: "leave", label: "Leave", icon: CalendarOff, mIcon: "event_busy", section: "Workspace" },
       /* `Workspace → Staff & Duties` — the ONE company-wide duty assignment
        * door (workspace/MASTER.md, LOCKED 2026-09-03; built with the
        * Receiving & GRN card). Modules reference duties; they never keep a
@@ -677,6 +682,8 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "payment-requests", label: "Payment Requests", icon: HandCoins, financePath: "/finance/payment-requests", section: "Payables" },
       // 0642 — a supplier's credit note takes money off what Carres owes (Chew 2026-10-03).
       { key: "credit-notes", label: "Credit Notes", icon: ReceiptText, financePath: "/finance/credit-notes", section: "Payables" },
+      // 0681 — a supplier's debit note adds to what Carres owes; a voucher pays it (Chew 2026-10-03).
+      { key: "debit-notes", label: "Debit Notes", icon: ReceiptText, financePath: "/finance/debit-notes", section: "Payables" },
       // 0676 — the credit and debit notes suppliers still owe, followed up (Chew 2026-10-09).
       { key: "notes-to-follow-up", label: "Notes to follow up", icon: ClipboardList, financePath: "/finance/notes-to-follow-up", section: "Payables" },
       // 0636 — Finance's own tax and bank details per supplier (Chew 2026-10-03).

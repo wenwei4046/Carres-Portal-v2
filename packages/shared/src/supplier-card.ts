@@ -141,7 +141,11 @@ const RANK: Record<SupplierRowState, number> = {
 
 export function supplierCardModel(input: {
   todayIso: string;
+  /** The Office holidays — the day-before check is PO Duty's Office work. */
   holidays?: WorkingDayOptions["holidays"];
+  /** The stored Office calendar's non-working weekdays (Settings → Office).
+   *  Absent ⇒ Saturday and Sunday. */
+  offDays?: readonly number[];
   pos: ReadonlyArray<SupplierPoFact>;
   /** The Sales Order's goods lines (Delivery's readiness: qty and pieces the
    *  register does not hold). Omitted ⇒ no stock row is drawn. */
@@ -174,7 +178,7 @@ export function supplierCardModel(input: {
             tomorrowAnswerAboutDateIso: po.reply?.aboutIso ?? null,
             lines: [{ id: `${po.poNo}#owed`, sku: "owed", qty: owed, receivedQty: 0, shortSinceIso: null, balanceAnswerAboutQty: null }],
           },
-          { todayIso: today, holidays: new Set(holidays as Iterable<string>) },
+          { todayIso: today, holidays: new Set(holidays as Iterable<string>), ...(input.offDays ? { offDays: input.offDays } : {}) },
         )
       : null;
     const hasDo = Boolean(po.supplierDo?.number || po.supplierDo?.atIso);

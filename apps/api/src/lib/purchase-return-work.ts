@@ -26,6 +26,7 @@ import {
   type PurchaseReturnPendingIssue,
   type WorkspaceDutyResolution,
 } from "@carres/shared";
+import type { PurchasingOfficeDays } from "@carres/shared";
 import type { AppEnv } from "../types";
 import { todayIsoMYT } from "./today";
 import { workCompletion, workCompletionDeps, type WorkCompletionDeps, type WorkCompletionSpec } from "./work-completion";
@@ -60,7 +61,9 @@ async function readReturn(c: Context<AppEnv>, id: string): Promise<PurchaseRetur
  *  source honestly rather than showing an empty return desk. */
 export async function loadPurchaseReturnWork(
   c: Context<AppEnv>,
-  input: { poDuty: WorkspaceDutyResolution | null; today: string; observedAt: string },
+  /** `holidays` = the stored Office calendar (`officeWorkingDayOptions`: weekdays + holidays,
+   *  Settings → Office); absent ⇒ Monday–Friday with the built-in list. */
+  input: { poDuty: WorkspaceDutyResolution | null; today: string; observedAt: string; holidays?: PurchasingOfficeDays },
 ): Promise<OperationWorkItem[]> {
   return projectPurchaseReturnWork({ ...(await readWorkSource(c)), ...input });
 }

@@ -13,7 +13,11 @@ const params = new URLSearchParams(location.search);
 const reader = params.has("reader");
 const sourceFailed = params.has("failure");
 useAuth.setState({ role: reader ? "operation" : "principal", user: { id: "fixture-manager", email: "preview@example.test" } as never });
-let settings = { morning: "10:30", afternoon: "15:00", revision: 1, canEdit: !reader };
+let settings = { morning: "10:30", afternoon: "15:00", revision: 1, canEdit: !reader,
+  office: { start: "09:00", end: "18:00", lunchStart: "13:00", lunchEnd: "14:00" } };
+let lunch = { userId: "11111111-1111-4111-8111-111111111111", saved: null as string | null, savedFits: true,
+  lunchStart: "13:00", lunchEnd: "14:00", earliest: "12:00", latest: "14:00", officeLunchStart: "13:00",
+  officeLunchEnd: "14:00", morningCheck: "10:00", afternoonCheck: "14:01", canEdit: true };
 const people = [{ user_id: "11111111-1111-4111-8111-111111111111", name: "Shasha" }, { user_id: "22222222-2222-4222-8222-222222222222", name: params.has("long") ? "Yu Jun Tan Abdullah Muhammad bin Abdul Rahman" : "Yu Jun" }];
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
 window.fetch = async (input, init) => {
@@ -22,6 +26,19 @@ window.fetch = async (input, init) => {
  if (url.pathname.endsWith("/work-activity/settings")) {
   if (init?.method === "PUT") settings = { ...settings, ...JSON.parse(String(init.body)), revision: settings.revision + 1 };
   return json(settings);
+ }
+ /* Settings → Personal → Lunch time (0677): the fixture answers like the
+    database at the owner defaults (Office lunch 1:00 to 2:00 PM, may move one
+    hour, afternoon check one minute after lunch). */
+ if (url.pathname.endsWith("/work-activity/lunch")) {
+  if (init?.method === "PUT") {
+   const picked = (JSON.parse(String(init.body)) as { lunchStart: string | null }).lunchStart;
+   const start = picked ?? lunch.officeLunchStart;
+   const at = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+   const m = Number(start.slice(0, 2)) * 60 + Number(start.slice(3, 5));
+   lunch = { ...lunch, saved: picked, lunchStart: start, lunchEnd: at(m + 60), afternoonCheck: at(m + 61) };
+  }
+  return json(lunch);
  }
  if (url.pathname.endsWith("/history")) return json({ records: [{ id: 1, office_day: day, period: "morning", cutoff_at: `${day}T02:30:00Z`, recorded_at: `${day}T02:31:00Z`, from_user_id: people[0].user_id, to_user_id: people[1].user_id, from_name: people[0].name, to_name: people[1].name, outcome: "reassigned", reason: "missing_period_activity" }] });
  if (url.pathname.endsWith("/workspace-duties")) return json({ can_assign: !reader, duties: WORKSPACE_DUTIES.map((d, i) => {

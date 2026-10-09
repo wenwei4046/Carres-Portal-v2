@@ -15,6 +15,12 @@ is never automatically rewritten: Purchasing settles its own change with the sup
 SO changes without issued-PO coverage do not acquire this supplier gate. See Orders MASTER
 § Staff amendments and Sales Approver for evidence, exception approval and undecided scopes.
 
+**Fresh Houzs amendment adaptation — authenticated read-only, 9 Oct 2026.** PO Amendments register distinguishes PO amendments from SO-origin amendments and displays related PO(s). Sample `HC-PO-2610-115/A2` full object shows requested change, Was/Requesting, reason, requester/created/approver, approved PO revision and advisory department routing. Its description says the SO is already revised and confirmation re-derives the PO from the SO as it stands now. No approval, application, print or supplier-send tested; displayed approval is not server/transaction proof.
+
+**KEEP before/after and linked origins; REJECT foreign application order.** Carres preserves the preceding owner-approved pre-effectiveness supplier-answer gate for SO changes covered by issued POs. Recommended source contract: capture exact submitted SO revision, affected PO revision/line/source allocations and supplier response evidence; show original versus proposed goods/quantity/destination and the current-source differences. Obtain the existing qualified approvals and supplier answer before the covered SO amendment becomes effective. Purchasing then applies its own governed PO change, preserving the same PO identity and historical receipts/Units, and follows the exact-current-version send journey (§§5.4–5.6). A supplier promise/date answer alone does not mint a revision (§5.7).
+
+**Recommended conflict and multi-source acceptance — PROPOSAL where extending the approved dependency.** Re-reading a changed live SO must not silently replace the proposal that was reviewed. A changed SO/PO revision, new receipt, allocation change or lost permission produces a named conflict and a fresh review; retained draft/evidence does not imply approval. When one SO change affects several POs or a shared PO line covers several SOs, enumerate each affected source and independently satisfied supplier/approval conditions; one visible approved row cannot certify the whole scope. Application/retry must not double procurement coverage, recreate received Units or mark a newly revised PDF sent. Keep request, approval, effective application, supplier sending and supplier response as distinct events with actual actor/version/time. Existing rule-specific qualifications apply; advisory department routing never grants approval rights. These contracts refine the approved dependency for review, not commission a new amendment register or implementation.
+
 **All listing appearance — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED (approved Jess, 2026-09-17):** follow
 [UI MASTER §6.7 Portal-wide listing readability](../ui/MASTER.md#portal-wide-listing-readability--built-2026-09-17-slice-1--authenticated-walk-owed).
 This is the shared default, not a PO visual pilot. Preserve this module's filter content,
@@ -992,6 +998,12 @@ The remainder cannot be copied into another editable field. Cancellation or quan
 source recalculates the demand and creates a concrete PO impact if a supplier commitment already
 exists.
 
+**Fresh Houzs MRP adaptation — read-only, 9 Oct 2026; recommended reader contract.** Loaded MRP Stock Status distinguishes Combined/Per SO, category, warehouse and delivery/order-by/processing/SO date filters, missing-date and shortage views, as-of time and loaded-search coverage. It displays needed quantity, stock, PO outstanding and shortage. Regenerate, Re-bind Warehouse and Proceed PO are observed controls only; none was executed. No foreign quantity, date, allocation rule or automatic purchase authority adopted.
+
+KEEP §5.1's one source-line demand calculation. ADAPT a transparent readout within the existing SO Batch/approved reporting surfaces: exact source/configuration/destination, usable **allocated** stock, valid allocated PO coverage, remaining need and the date/calendar used. A warehouse's total stock is not automatically allocated stock for every SO; the same goods or shared PO quantity must not cover two demands. Combined and per-source results reconcile without double-counting. Missing source/quantity/date reads remain unknown and cannot make shortage zero or create buying authority. Replenishment still uses the approved Manual Purchase route (§5.2); accessory two-month advance planning does not delay customer fulfilment from real stock (§11).
+
+Recommended acceptance / PROPOSAL where extending the reader: open a shortage to its exact SO/MPR source and coverage contributors; show why a line cannot be bought; recheck demand, approved supplier/configuration and existing coverage at governed issue. Refreshing or regenerating a view completes no purchase, changes no allocation/custody and creates no duplicate PO. A changed source invalidates the old preview rather than issuing yesterday's shortage. Reference calculation, allocation and persistence remain unverified; do not introduce a new editable MRP ledger, independent demand page or warehouse-rebinding shortcut.
+
 ### 5.2 Two input doors
 
 `SO Batch Purchase` is system demand from customer Sales Orders. `Manual Purchase Request` is conscious
@@ -1127,7 +1139,11 @@ collection`. A supplier that delivers has NO collector row; the issue routes pas
 reprints exactly what the supplier received.
 
 EU is a Delivery second-leg partner, never a supplier collector (Jess, 2026-10-06: Carres moves
-stock KL → JB by any logistics, EU receives in JB and delivers to Singapore). That leg chain belongs
+stock KL → JB, EU receives in JB and delivers to Singapore). The 2026-10-09 owner ruling in
+Delivery §14 governs TT/TEOW cost/feasibility suggestions, EU primary and conditional SSY backup.
+Purchasing's approved listing shows the current supply stage and final expected arrival, with
+three-stage dates on hover (supplier → Klang; TT/TEOW → JB; EU → customer). This is approved
+design / not built; no automatic booking or application deployment is claimed. That leg chain belongs
 to Delivery's multi-leg model (`../delivery/MASTER.md`), not to Purchasing.
 
 **CURRENT PAGE OBSERVATION — 2026-10-09, READ-ONLY / NOT END-TO-END VERIFIED.**
@@ -1326,6 +1342,12 @@ at 07:35:20 UTC after production rollback assertions and a negative control pass
 function hashes and the tracker SQL SHA-256 match the committed approved file; no fixture rows
 remain. PR #1105 carries the dependent application and deployment proof.
 
+**Fresh Houzs Supplier adaptation — read-only, 9 Oct 2026.** Supplier register exposes Active/Inactive/Blocked and supply-category facets; sampled full supplier shows governed identity/contact/address, SKU mappings, lead-time/pricing destinations, recent PO history and a performance scorecard. Only Overview was inspected; nested price/lead-time editors, save/retire/block and performance arithmetic were not tested. Foreign contacts, terms, rates and score values are not copied.
+
+KEEP the complete supplier setup and category-specific working-calendar law above plus §11's source-owned addresses/channels. ADAPT source-linked attention/history: Operations finds the existing supplier, checks the exact approved SKU relationship and relevant production category/calendar, corrects a genuine gap through its qualified owner, then resumes the original demand. Supplier activity/category alone never proves SKU compatibility or capacity; a missing contact cannot be replaced with a guessed recipient. Historical POs/PDF versions retain their original identity/address snapshots when current master data changes. Catalog owns price maintenance; Finance owns creditor terms/accounts/settlement. Reference financial fields do not enlarge Operation access.
+
+Recommended supplier-performance acceptance connects §12's existing reporting target: disclose denominator, partial/late receipt treatment, expected-versus-actual date source, calendar and as-of/coverage before showing a rate. No recorded defect is not automatically proven perfect quality; no accepted receipts is not zero-percent performance. Supplier retirement/block behavior must distinguish new procurement admission from continuing existing receipt/claim/repair/return obligations; exact admission policy remains a review decision, not an adopted foreign status rule. No second scoring engine or blanket stop of existing operational work.
+
 ### 5.6 Issue means the PDF was actually sent
 
 **Sending evidence is built; revised visible copy BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED (approved Jess, 2026-09-17).**
@@ -1402,7 +1424,17 @@ window is visually composed remains a UI decision, not a reason to falsify its d
 **WINDOW DAYS — OWNER CORRECTION (Jess, 2026-09-25) · APPROVED / NOT BUILT.** The `PO Days`
 setting in Purchasing Settings **decides which days a PO window opens**. "Purchasing working day"
 above means a day ticked in `PO Days` that is also an Office working day (Office calendar and
-holidays). Work follows it: a PO window occurrence exists only on a PO Day. Jess sets `PO Days` to
+holidays). Work follows it: a PO window occurrence exists only on a PO Day. **Built on branch
+`build/settings-completion` (9 Oct 2026; 0678 not applied):** "Office working day" is the STORED
+Office calendar (Settings → Office weekdays + holidays) everywhere Purchasing counts — the PO window
+days and the Safety-days margin (`/purchase/demands`), the supplier claim, purchase return and
+repair order record pages and their Work items (`purchasingOfficeDays`), the PO register's
+day-before check and the Supplier card, the MRP Chase list's days late (which once dropped its
+Monday–Friday week and counted Saturdays), the Repair Order return target, and the two SQL doors
+(0584 reply due, 0602 RO target) through `_office_is_working_day` (0678). SQL sees recorded Office
+holidays only; the app computes every default date with the full calendar, including the built-in
+list for a year nobody recorded. The supplier production week (PUR-03) is unchanged: the purchase
+planning engine still uses the built-in holiday list for the supplier's lead. Jess sets `PO Days` to
 every Office working day (Mon–Fri) herself in Settings; the ruling does not hard-code that value,
 so a later change of the setting changes the window days without a new rule. `PO Days` still does
 not move `Order By` (§9.1). A supplier's governed earlier cut-off still wins inside a window day.
@@ -2364,6 +2396,16 @@ The user-facing gate uses two lines:
 
 > **Delivery note is missing**
 > Upload it before you finish receiving.
+
+**Houzs PO/GRN source reconciliation — authenticated reference, 9 Oct 2026; recommended verification contract.** Read-only reference inspection opened a current PO Register, quick view, full object and History, and a GRN Register, quick view and full object. PO rendered ordered/received/balance, per-line warehouse/allocation, original/expected/submitted dates, source activity and sending/amendment/receipt doors. Its loaded history retained an actual creator and change count. GRN separately rendered Supplier DO, receipt/post dates, header source PO and per-line source POs/ordered/received quantities; sampled lines linked more than the header's one PO. No send, confirm, receipt, cancel, amendment, edit, posting or file action was performed. Rendered status/activity is not independent delivery or posting proof; foreign amounts and rack assignments are not Carres rules.
+
+**KEEP / ADAPT / REJECT:** keep §5.6's exact-version recorded sending and §7.3's one Receiving writer, expected-Unit/quantity modes, individual receiver and actual physical outcome. Adapt source-linked drilldown and explicit remaining quantities where a Carres reader still lacks them. Reject deriving receipt scope from one header PO or SKU text, adopting Houzs's rack placement, equating Submitted with evidenced current-version send, and counting a GRN as a payable/supplier acceptance by itself. This comparison creates no permission for mixed suppliers or a new multi-PO receipt workflow; Carres's existing admitted session scope remains controlling.
+
+**Recommended reader/acceptance contract — PROPOSAL where extending approved law:** each receipt result carries its admitted source document/version and source-line identity, actual receiving Site, applicable expected Unit IDs or quantity mode, accepted/issue/rejected/pending results, Supplier DO/evidence and actual confirmer. Per-line source references, not the header summary, govern exact consequence matching. Readers of SO, PO, Inbound and Stock must agree after canonical re-read; no unscoped join by equal SKU, display number or date. Where a receipt contains multiple admitted source lines, preserve each lineage and apply accepted consequences once to its own remaining obligation. Missing/invalid links remain explicit and invoke the existing source correction; do not attach a receipt to a convenient order.
+
+**Operator continuation:** PO Duty reviews exact unreceived lines and records governed supplier follow-up; authorised receiver confirms actual goods through the existing session; GRN Duty handles differences through Claim/amendment/void authorities. Receiving creates the GRN; Stock writes accepted custody and source-governed reservation; SO reads coverage; Finance independently matches supplier billing. A supplier answer does not finish physical receipt, and GRN posting does not finish a claim, delivery or supplier invoice. Relevant shared Tasks close only on their own source completion fact.
+
+**Verification owed:** a partial receipt preserves exact pending quantities; equal-SKU lines on different PO/SO sources never cross-match; issue/wrong/extra scope never becomes reserved usable stock; unknown source remains unposted; a repeated/uncertain receipt does not duplicate GRN or movements; a failed source read remains unknown rather than zero; amendments/void respect downstream reservation/document guards. Compare actual current source and consumer outcomes, not merely a populated Register. These are documented acceptance requirements, not tests executed in this pass. Existing §5.6/§7.3 approvals are preserved; no UI composition/build/cutover is commissioned.
 
 ### 7.4 Partial, reject, claim and return consequences
 
@@ -7922,6 +7964,13 @@ closed the remaining Houzs capability choices for this review as follows:
 | Copy previous PO | REJECT for this scope. New purchases continue from authorised source demand; no blank/independent PO entrance. This is a scope ruling, not a verified claim about a Houzs button's runtime behaviour. |
 | Multi-PO printing / multi-PO date recording | DEFER until measured operator need warrants it. Existing multi-line recording within one PO remains; it is not equivalent to cross-PO bulk operation. |
 | Excess receipt | KEEP Receiving's Extra Qty handling and existing stock-availability safeguards; do not introduce a second overreceipt engine. |
+
+**Fresh Houzs cancellation/return reconciliation — read-only, 9 Oct 2026.** Cancellation Requests loaded Open and All views; All showed mixed SO/PO/DO history with requester, reason, requested time, approval actor/time and remarks. The page describes two SO approvals versus reason-only PO/DO cancellation. Purchase Returns register and full `HC-PRT-2610-001` showed two goods lines, source reference, return/post dates and a repair reason saying no credit note is owed, while the footer said awaiting credit note. These are observed display facts, not verified transition/stock/accounting behavior; no cancellation, approval, completion, edit or print executed.
+
+- **KEEP / ADAPT provenance, REJECT foreign approval shortcuts:** Carres §5.8.1 remains the sole outstanding-PO cancellation journey: select exact unreceived scope → record supplier agreement/inability and fee state with evidence → ordinary cancellation or qualified exception → preserve quantities/version → recompute remaining source demand → notify Finance for its own follow-up. A reason, withdrawn request or history row never substitutes for an effective source cancellation. Do not import the reference two-level SO chain into Orders or make a reason-only DO cancellation override Delivery custody/gates.
+- **KEEP separate execution objects:** the reference repair-labelled return does not justify merging Carres Purchase Return and Repair Order. §9.5 authorised outcome selects §9.6 supplier return or §9.7 repair; physical pickup, supplier receipt, return receipt and inspection retain their owning records. A source label must identify the actual document type, not infer GRN solely from a displayed “Transfer From” caption or PO-like number.
+- **IMPROVE recommended cross-source reporting:** use §12's existing performance scope to distinguish unreceived cancelled quantities, returned goods, goods with supplier for repair, accepted supplier receipts and separately Finance-confirmed credits/refunds. Preserve exact source/document/goods lineage and missing coverage. Operation's money-free view links the financial continuation without exposing foreign credit/rate/tax columns or declaring settlement. This reporting refinement is PROPOSAL, not a new ledger or permission.
+- **Acceptance:** a pending supplier cancellation remains covered; concurrent receipt prevents cancellation of received scope; cancelled/withdrawn requests cannot erase physical events; a repair requiring return/inspection cannot complete merely because no credit is expected; a supplier return awaiting financial follow-up may show its completed physical facts without claiming financial settlement. Source read failure remains unknown. Actual current Carres enforcement and reference amendment objects remain unverified.
 
 **Immediate delivery priority:** complete the already commissioned PO-placement unblock. Supplier
 WhatsApp group/email maintenance belongs in Settings under §11, with authorised editing and

@@ -8,6 +8,7 @@ import {
   warehousePickupScopeKey,
   warehouseScheduleOperatingDates,
   warehouseSchedulePreviousFrom,
+  warehouseReceivingDaysLate,
   type WarehouseArrivalSourceFacts,
   type WarehouseScheduleSettings,
 } from "./warehouse-schedule";
@@ -1100,5 +1101,34 @@ describe("Purchasing line/batch dates converge across Warehouse Schedule and Cal
     input.pos[0].version = 2;
     events = warehouseCalendarArrivals(inboundArrivals(input), [], input.sites).events;
     expect(events.map((event) => [event.date, event.expectedQty])).toEqual([["2026-09-15", 6]]);
+  });
+});
+
+describe("GRN lateness counts on the receiving Site's own calendar (9 Oct 2026)", () => {
+  const site = (over: Partial<WarehouseScheduleSettings> = {}): WarehouseScheduleSettings =>
+    ({ siteStatus: "active", workingHours: [], specialDates: [], holidayPolicy: null, holidayDates: [], ...over }) as WarehouseScheduleSettings;
+
+  it("falls back explicitly to Sunday off + the holidays when nothing is configured", () => {
+    // Due Fri 18 Sep 2026, today Tue 22: Sat 19 · (Sun 20 off) · Mon 21 · Tue 22 = 3.
+    expect(warehouseReceivingDaysLate("2026-09-18", "2026-09-22", null)).toBe(3);
+    expect(warehouseReceivingDaysLate("2026-09-18", "2026-09-22", site())).toBe(3);
+    expect(warehouseReceivingDaysLate("2026-09-18", "2026-09-22", null, ["2026-09-21"])).toBe(2);
+  });
+
+  it("a Site whose receiving is closed on Saturday does not count Saturday", () => {
+    const closedSat = site({ workingHours: [{ weekday: 6, activity: "receiving", closed: true, opensAt: null, closesAt: null }] });
+    expect(warehouseReceivingDaysLate("2026-09-18", "2026-09-22", closedSat)).toBe(2);
+  });
+
+  it("a Special Date that opens Sunday counts Sunday; one that closes a day drops it", () => {
+    const openSun = site({ specialDates: [{ onDate: "2026-09-20", kind: "special_receiving_hours", opensAt: "09:00", closesAt: "12:00" }] as WarehouseScheduleSettings["specialDates"] });
+    expect(warehouseReceivingDaysLate("2026-09-18", "2026-09-22", openSun)).toBe(4);
+    const closedMon = site({ specialDates: [{ onDate: "2026-09-21", kind: "receiving_unavailable", opensAt: null, closesAt: null }] as WarehouseScheduleSettings["specialDates"] });
+    expect(warehouseReceivingDaysLate("2026-09-18", "2026-09-22", closedMon)).toBe(2);
+  });
+
+  it("is never late on or before the due day", () => {
+    expect(warehouseReceivingDaysLate("2026-09-22", "2026-09-22", null)).toBe(0);
+    expect(warehouseReceivingDaysLate("2026-09-23", "2026-09-22", null)).toBe(0);
   });
 });

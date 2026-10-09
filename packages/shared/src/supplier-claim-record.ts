@@ -17,7 +17,7 @@
  * governed starting values below.
  */
 import { SUPPLIER_CLAIM_RESPONSES, supplierClaimResponseLabel, supplierClaimTypeLabel } from "./supplier-claim";
-import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
+import { purchasingOfficeDays, type PurchasingOfficeDays } from "./purchasing-supplier-calls";
 import { myHolidaySet } from "./my-holidays";
 import { addWorkingDays, countWorkingDays, type IsoDate } from "./working-days";
 import type { WorkItem } from "./work-engine";
@@ -136,12 +136,13 @@ export function klDateOfIso(iso: string): IsoDate {
   return new Date(new Date(iso).getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-const office = (holidays: ReadonlySet<string>) => ({ offDays: PURCHASING_OFFICE_OFF_DAYS, holidays });
+/** The stored Office calendar (weekdays + holidays) — `purchasingOfficeDays`. */
+const office = (holidays: PurchasingOfficeDays) => purchasingOfficeDays(holidays);
 
 export function supplierClaimReplyDates(
   requestedAt: string,
   timing: SupplierClaimReplyTiming = SUPPLIER_CLAIM_REPLY_DEFAULTS,
-  holidays: ReadonlySet<string> = myHolidaySet(),
+  holidays: PurchasingOfficeDays = myHolidaySet(),
 ): { askedOn: IsoDate; replyExpected: IsoDate; escalateOn: IsoDate } {
   const askedOn = klDateOfIso(requestedAt);
   const replyExpected = addWorkingDays(askedOn, timing.replyWaitingDays, office(holidays));
@@ -184,7 +185,7 @@ export type SupplierClaimReplyState =
 export function supplierClaimReplyState(
   c: Pick<SupplierClaimFacts, "requested_at" | "supplier_response" | "reply_waiting_days" | "escalation_extra_days">,
   today: IsoDate,
-  holidays?: ReadonlySet<string>,
+  holidays?: PurchasingOfficeDays,
 ): SupplierClaimReplyState {
   if (c.supplier_response) return { kind: "answered" };
   if (!c.requested_at) return { kind: "not_recorded" };
@@ -228,7 +229,7 @@ export interface SupplierClaimAction {
  */
 export function supplierClaimCurrentAction(
   c: SupplierClaimFacts,
-  holidays: ReadonlySet<string> = myHolidaySet(),
+  holidays: PurchasingOfficeDays = myHolidaySet(),
 ): SupplierClaimAction | null {
   if (c.status !== "open") return null;
   const w = supplierClaimWorkWords(c.supplier_name ?? "the supplier");
@@ -252,7 +253,7 @@ function occurrences(
   c: SupplierClaimFacts,
   owners: { poDuty: WorkspaceDutyResolution | null; approver: WorkspaceDutyResolution | null },
   today: IsoDate,
-  holidays: ReadonlySet<string>,
+  holidays: PurchasingOfficeDays,
 ): Occurrence[] {
   if (c.status !== "open" || c.supplier_response || !c.requested_at) return [];
   const w = supplierClaimWorkWords(c.supplier_name ?? "the supplier");
@@ -315,7 +316,8 @@ export function projectSupplierClaimWork(input: {
   approver: WorkspaceDutyResolution | null;
   today: IsoDate;
   observedAt?: string;
-  holidays?: ReadonlySet<string>;
+  /** The stored Office calendar (`officeWorkingDayOptions`) or a holiday set. */
+  holidays?: PurchasingOfficeDays;
 }): OperationWorkItem[] {
   const holidays = input.holidays ?? myHolidaySet();
   return input.claims.flatMap((c) =>

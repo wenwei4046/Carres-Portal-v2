@@ -13,6 +13,7 @@ import {
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
+import { useWarehouseSiteDaysLate } from "@/lib/warehouse-calendar-queries";
 import {
   useOperationPos,
   useOperationSuppliers,
@@ -287,6 +288,12 @@ export default function WarehouseInbound() {
     [setFilter],
   );
   const today = appTodayIso();
+  /* `Expected arrival was …` once a Receiving day of the arrival's Site has
+     passed — the Site's own calendar, never a closed Sunday. */
+  const receivingDaysLate = useWarehouseSiteDaysLate(
+    activeSite && activeSite !== INBOUND_UNMAPPED_SITE ? activeSite : null,
+    "receiving",
+  );
   const dutyAllowed = dutyQ.data?.allowed ?? false;
   const dutyKnown = !dutyQ.isLoading;
   /**
@@ -625,16 +632,16 @@ export default function WarehouseInbound() {
         label: "Exceptions",
         width: REGISTER_FIELD_WIDTH.address,
         chooserGroup: "Goods",
-        searchValue: (r) => inboundExceptionLines(r, today, fmtDate).join(" "),
-        exportValue: (r) => inboundExceptionLines(r, today, fmtDate).join(" · "),
-        overflowText: (r) => inboundExceptionLines(r, today, fmtDate).join(" · "),
+        searchValue: (r) => inboundExceptionLines(r, today, fmtDate, receivingDaysLate).join(" "),
+        exportValue: (r) => inboundExceptionLines(r, today, fmtDate, receivingDaysLate).join(" · "),
+        overflowText: (r) => inboundExceptionLines(r, today, fmtDate, receivingDaysLate).join(" · "),
         accessor: (r) => {
-          const lines = inboundExceptionLines(r, today, fmtDate);
+          const lines = inboundExceptionLines(r, today, fmtDate, receivingDaysLate);
           return lines.length === 0 ? <Blank /> : <span>{lines.join(" · ")}</span>;
         },
       },
     ],
-    [today, dutyAllowed, dutyKnown, openReceiving, activeSite],
+    [today, dutyAllowed, dutyKnown, openReceiving, activeSite, receivingDaysLate],
   );
   const context = params.get("date") || params.get("from");
   const dateContext = context

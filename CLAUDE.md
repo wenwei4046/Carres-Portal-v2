@@ -10,6 +10,23 @@
 
 ---
 
+## Shared Blueprint reading entry — Claude, Codex and ChatGPT
+
+Use the current repository files, not a remembered chat answer or frozen restart copy.
+Before ERP work, read `docs/ERP-ARCHITECTURE.md`, the owning `docs/<module>/MASTER.md`,
+and the relevant upstream/downstream authority. `Carres Settings List.md` is the single
+Settings inventory; `Carres-Business-Blueprint-RESTART-2026-10-07/26-BLUEPRINT-AUDIT-BACKLOG.md`
+is the existing completion/gap audit, not another business authority.
+
+Independent checkouts must fetch `origin/main` and compare their governing files before
+continuing; preserve local work and reconcile newer authority instead of overwriting it.
+A chat can read current remote authority with `git show origin/main:<path>` without changing
+its application branch. Claude and Codex follow this same entry. ChatGPT needs repository
+access or the current supplied files; chat memory alone is not repository access.
+Document publication does not turn proposals into approved law, authorise application builds,
+or prove production implementation. Keep FACT, PROPOSAL, APPROVED, BUILT and VERIFIED separate.
+
+
 ## 1 · Mission
 
 Carres sells furniture. This portal runs the business end to end — a customer order is taken,

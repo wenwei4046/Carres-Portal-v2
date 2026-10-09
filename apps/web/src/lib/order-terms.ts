@@ -23,7 +23,7 @@
 
 /** Heading above the clauses on the POS screen.
  *  `Carres Group Sdn Bhd` was WRONG — the legal entity is `CARRES SDN. BHD.`
- *  (SSM 20201055306 · 1601150-X), the name on every Carres document. The
+ *  (SSM 202401055306 · 1601150-X), the name on every Carres document. The
  *  customer was signing under one company name and receiving another. The
  *  owner's call (2026-09-21): drop the name here and just say what the block
  *  is — the entity is on the document's letterhead, which is where a legal

@@ -39,7 +39,7 @@ import {
   deliveryWorkStatusOf,
   deliveryJourneyProgressOf,
   lineKind,
-  myHolidaySet,
+  deliveryHolidaySet,
   latestDeliveryContactOf,
   scheduledDeliveryOf,
   type DeliveryArrangementRow,
@@ -557,7 +557,8 @@ export function buildDeliveryScopeRows({
   proofReviews,
   attemptEvidence,
 }: ScopeInputs): DeliveryScopeRow[] {
-  const holidaySet = holidays ?? myHolidaySet();
+  /* The Delivery calendar's holidays; absent ⇒ the built-in Selangor list. */
+  const holidaySet = holidays ?? deliveryHolidaySet();
   const contactsByScope = new Map<string, DeliveryContactRow[]>();
   for (const contact of contacts ?? []) {
     const key = `${contact.order_id}#${contact.leg}`;

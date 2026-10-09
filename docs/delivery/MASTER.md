@@ -157,7 +157,30 @@ goods may be arranged
 
 ### 2.1 · Logistics assignment timing
 
-**OWNER-APPROVED / LOCKED 2026-09-29 · APPROVED TARGET / NOT BUILT.** Assignment opens early;
+**OWNER-APPROVED / LOCKED 2026-09-29 · BUILT ON BRANCH `build/settings-completion` 9 Oct 2026 (0673
+not applied):** Delivery Rules row `Assign logistics by` (1–30, default 3, Settings editor gate, change
+record with reason) and the one `assignLogisticsDueIso` read by Work, the Logistics card, the Orders list
+and the Order Route. A partner's own booking lead is not yet read: no company is assigned while this
+deadline runs, so no partner requirement can apply until the assignment exists. **THE Delivery
+calendar (built on branch `build/settings-completion`, 9 Oct 2026; 0678 not applied):** every
+Delivery date — this deadline, the Logistics card's three checks and `confirm_delivery_date`, the
+contact / deliver / photo / proof deadlines, the Scheduled-date refusal (Delivery panel, external
+link page and API, DO issue gate, Order Route), the partner booking check, the booking brief and the
+payment-due FACT — counts Monday–Saturday (Sunday closed; ACTION-FLOW-STANDARD Law 2A) with the
+Selangor public holidays Warehouse Settings stores for the dispatching Site (policy state → active
+imported calendar → dates; replacement days count), and the built-in Selangor + national list for any
+year nothing is imported (`packages/shared/src/delivery-working-calendar.ts`, API
+`readDeliveryCalendar`, web `useDeliveryDays`). It is never the Office (Kuala Lumpur) list, and there is
+no second holiday editor: the dates are edited in Settings → Warehouse → Public Holidays. The Orders
+list's `Assign logistics` late count uses the same `assignLogisticsDueIso` (opening day included).
+
+**Courier dispatch within (DEL-10) — owner default 8 Oct, confirmed 9 Oct 2026: 3 working days,
+adjustable.** Stored on Delivery Rules (`courier_dispatch_working_days`, 1–30, 0678) behind the
+Settings editor gate with its change record, shown as `Courier dispatch within` on Delivery Settings →
+Delivery Rules, and one shared due function `courierDispatchDueIso` (dispatching Warehouse's
+Collection days, explicit Sunday + Selangor fallback). **BUILD GAP — NOT BUILT:** the workflow itself
+(Warehouse confirms the packable scope → dispatch due → handover in batches with tracking →
+Operations follows) has no door, Work item or Route node yet. Assignment opens early;
 the assignment cut-off determines when it is late. For a delivery with no company assigned, the
 `Assign logistics` action becomes available on the day its Purchase Order is issued. A stock-source
 order without a PO opens that action on the day it enters Operations. This is an opening trigger,
@@ -605,6 +628,10 @@ a short explanation. A pre-trip customer postponement is an arrangement change; 
 after arrival or an actual delivery attempt is Failed Delivery with the governed reason. No bare
 `Failed Delivery` may be saved or closed.
 
+**Fresh Houzs delivered-DO reconciliation — read-only, 9 Oct 2026.** Delivered-filter register → `DO-010057` quick/full object displays linked SO/source POs, five goods lines, quantities and dates. The header calls it Delivered/complete while the delivery status/activity says Returned; driver is unassigned, line photos absent and the note says legacy mirroring with no stock movement. A timed-out click did open the drawer; fresh state was checked before proceeding. No result, proof, rack, cancellation, invoice, print or payment action exercised. These display contradictions are not proof of a server defect or that no external evidence exists.
+
+**KEEP linked scope/date provenance; REJECT document-status completion.** Carres's actual Visit and per-goods results above remain authority. Recommended acceptance refinement: preserve the historical delivered event and any later scoped return as separate facts rather than replacing all goods with one current document label; show current open obligations from their original sources. A partial return cannot undo delivery of unaffected goods or prove returned goods were received back. Driver/uploader/reviewer, schedule/actual date and physical result/proof acceptance stay distinct; missing source evidence is visibly unverified. Invoice creation and SO payment receipts are separate source consequences, never delivery proof. Read-only line photos do not prove event-bound accepted evidence; §6.1 owns review and corrections. No borrowed invoice-after-delivery policy, rack-driven custody shortcut or legacy-data cleanup adopted.
+
 ### 6.1 · Proof and its review
 
 Proof is bound to the exact event it proves: Logistics confirmation, customer confirmation,
@@ -700,6 +727,14 @@ not reach the customer and is still reserved to the order; the Warehouse's recei
 is what puts the Unit on `Check required` — the immediate inspection hold is retired because a
 Logistics report never substitutes for the Warehouse's actual receipt (§4). A plan that cannot be
 made is written to the order's history, never hidden.
+
+**Fresh Houzs Delivery Return reconciliation — authenticated read-only, 9 Oct 2026.** Delivery Returns loaded register and `HC-DR-2610-002` full object show original SO/DO, exact goods/configuration, return date, location, received/inspection state and dated activity. The object notes legacy mirroring with no stock movement while presenting received/goods-back wording. Its register couples returns to pending refunds. No inspection, cancellation, refund, edit, stock effect or proof acceptance tested; foreign customer/contact/amounts not copied.
+
+**KEEP source-linked scope, ADAPT evidence gaps, REJECT refund/restock assumptions.** Carres §7 distinguishes failed-delivery return from a customer Service remedy; one return label cannot grant a refund or decide the customer agreement. The normal failed-delivery journey remains actual visit result → exact undelivered goods and evidenced holder → linked planned Inbound → Warehouse actual receipt → Stock inspection/eligibility → authorised rebooking. A legacy mirrored document or Received label alone cannot prove each physical event. Service collection follows §1.2/Service's approved decision; Payment/Finance own any exceptional monetary consequence.
+
+Recommended acceptance / PROPOSAL where extending source visibility: show original DO/visit and exact Unit or governed quantity scope, reason, reported versus actual return date, return instruction, actual receiver and accepted inspection evidence separately. Preserve old delivery/return documents and source-history limits; no fabricated GRN or restock from a note. Partial return leaves other goods at their last evidenced holder, reserved under the existing source until its owner changes it. Cancellation after actual movement cannot undo custody. Repeated receipt/inspection submission reconciles the recorded event before retry, never adds the same goods twice. Failed reads remain unavailable, not received or inspected by default. Rebooking uses current goods/Payment/independent Finance gates and does not erase the failed attempt.
+
+Reports distinguish failed visits, reported returns, actual receipt, passed inspection, rebooking and separately approved/paid refunds. A zero amount does not close the physical/QC obligation; a financial decision does not prove goods are back. Existing source owners and approval scopes remain unchanged; no new return register, refund workflow, UI composition or production proof adopted. This inspection covers a returned-goods object, not an actual trip/visit/proof review object.
 
 ## 8 · Information architecture: Monitor and Delivery Orders
 
@@ -1829,6 +1864,30 @@ for Pontian, Kota Tinggi, Kulai Tesco and Sedenak. §5.3's backward calculation 
 calendars; assigning such a partner raises the dated Warehouse and Purchasing Work computed from
 them. Staff never memorise a pickup weekday.
 
+**Outstation carrier handover buffer — OWNER-APPROVED TARGET / NOT BUILT, Jess 2026-10-09.**
+For the current outstation planning check, handing goods to the relevant carrier before the
+customer date meets the owner-defined handover deadline; no additional buffer is required.
+Every carrier defaults to 0 buffer working days. Future `Settings → Outstation routes` may set
+the buffer per carrier: EU = 2 would require handover to EU at least two applicable working days
+before the customer date; a later handover shows the amber deadline risk. This is handover
+timeliness, not evidence of final customer delivery or a promise that final arrival is on time.
+Preserve the final-arrival fact separately. This current check replaces the prior requirement
+for a proven final-arrival estimate when judging this handover deadline; unknown final arrival
+still cannot be presented as confirmed delivery. The exact working calendar, same-day handling
+at zero, change authority and effective treatment are not decided. Do not guess them.
+The Settings screen and runtime remain unverified/not built; permission to use the current
+default does not mean a hardcoded value or Task engine has been implemented.
+
+**Equal-cost logistics suggestion — OWNER-APPROVED TARGET / NOT BUILT, Jess 2026-10-09.**
+In the Johor TEOW/TT cost-comparison discussion, Jess selected A: when eligible logistics
+options have the same complete total cost and can meet the customer delivery date, recommend
+the option with the earlier evidenced customer delivery date. This is a suggestion tie-break,
+not automatic booking, assignment or permission to replace an existing booking. Pickup date
+alone does not establish customer delivery date; unknown charges or delivery dates cannot prove
+an equal-cost or earlier-delivery comparison. This scoped approval does not approve the whole
+pasted Ops Rules proposal, a new pricing engine, Settings editor or deployment. No configurable
+override, change authority or retrospective application was decided. Runtime acceptance remains owed.
+
 **Partner contact is company master data**, stored and read through the partner record and never
 printed on a calendar card. Payment reads the customer-facing partner number from here. The
 numbers are entered by a manager in this surface, never typed into code.
@@ -2068,14 +2127,43 @@ Location`) and IN at the transit point; nobody records the road.
 
 **Singapore — owner ruling 2026-10-06 (Jess: "eu is 2nd leg to send to singapore … eu is jb, then
 eu send to singapore").** A Singapore address creates two arrangement rows from the day the order
-arrives. Leg 1 `Klang WH → EU (JB)`: any Logistics company Carres assigns carries the goods from
+arrives. Leg 1 `Klang WH → EU (JB)`: TT or TEOW is recommended by complete applicable cost and
+evidenced arrival feasibility under the 2026-10-09 ruling below; the assigned company carries the goods from
 Kuala Lumpur to EU at Johor Bahru. Leg 2 `EU (JB) → Singapore customer`: EU delivers to the
 customer in Singapore. EU is the Logistics company of the second leg and the JB handover point; it
 is never a supplier collector and never a Carres warehouse. Each leg keeps its own Logistics,
 dates, DO, handover, `Who has it` fact and result; leg 1's company is chosen per order and is not
 fixed to EU. Leg 1 completion means the goods reached EU at JB, never that the customer received
-them. The route prints without a `Leg` word; the leg number rides the URL only. Falsifier: a
-Singapore order whose second leg an evidenced company other than EU carries.
+them. The route prints without a `Leg` word; the leg number rides the URL only.
+
+**Singapore supply route and Purchasing listing — OWNER-APPROVED TARGET / NOT BUILT,
+Jess 2026-10-09 (A).** The complete supply journey has three stages: supplier → Carres Klang
+Warehouse; TT/TEOW → EU's JB warehouse; EU → Singapore customer. The first stage is Purchasing/
+Receiving supply, not a third customer Delivery arrangement or an invented warehouse receipt.
+Compare TT/TEOW's complete applicable KL → JB charges and evidenced onward feasibility; suggest
+the cheaper feasible option, using the equal-cost tie-break in §11. Unknown delivery dates or
+charges do not prove feasibility or cheapness. EU is the primary JB → customer carrier, not a
+routine EU/SSY price competition. Only when EU cannot meet the date or is full may SSY be used
+as backup; verify SSY acceptance and its actual JB handover destination before rerouting. Do not
+send to EU's warehouse and silently assume SSY will collect there. Future carriers may be added;
+this does not authorise access rollout or a new Settings editor.
+
+Purchasing's listing shows the current stage/actual waiting fact and final expected customer
+arrival; its hover disclosure shows all three stages and their own dates. Completed stages require
+actual source evidence; estimates remain estimates, and an unknown final date stays unknown.
+The owner's example dates are illustrative, not measured order data. This approval covers the
+listing design and business scope, not application build or deployment readiness.
+
+**EU rate authority — owner-confirmed 2026-10-09 / runtime unverified.** Owner supplied
+`/Users/chaichiewlim/Downloads/CARRES_Proposed_EU_Delivery_Rate.pdf` as the final base rate:
+SO below RM1,500: RM225 minimum; RM1,500 through RM2,490 inclusive: actual SO amount × 15%;
+above RM2,490: mattress OR bedframe 3'/3.5' RM340, 5'/6' RM380; mattress + bedframe
+3'/3.5' RM380/set, 5'/6' RM430/set; same-house additional mattress or bedframe RM100/item.
+This supersedes the old EU 15%/16% threshold base-rate calculation only. Owner explicitly retains
+the old disposal charges: downstairs legal disposal with customer present SGD30/item or
+SGD60/bed-and-mattress set; disposal elsewhere estimated SGD70/item or SGD110/set, confirmed
+by area/item. Source: `Logistic Pricing 6 Oct (2).xlsx`, G8–G9. Unspecified sofa/base cases,
+taxes, mixed-item treatment and cross-currency conversion remain unresolved; do not invent totals.
 
 **East Malaysia (owner approval 2026-09-01).** A Sabah or Sarawak order travels through HOUZS:
 Carres hands the goods to HOUZS with exact-Unit handover facts and proof, and HOUZS owns the
@@ -2230,6 +2318,16 @@ built. The remaining recommendation on the structured company-cost reference is 
 | Record the attempt | Record actual date, reliable exact time only when known, full/partial/failed result and the affected goods | DO's frozen scope. Partial remainder retains its own location, reason and next action; pre-trip postponement stays an arrangement change |
 | Receive and review evidence | Driver sends signed DO and goods/service photos; Operation uploads them to ERP and reviews them separately | Result, submission, upload and acceptance are different facts. Missing required proof stays open; service completion is not inferred from goods delivery |
 | Recover and finish | Resolve failed/remaining goods, agreed redelivery and actual returns; Warehouse receipt starts Check required | Same Unit chain. Service/Claims/Commercial owns remedies; Rental reads accepted customer receipt for its service-start witness. Outstanding services, proof and recovery work stay open at day end |
+
+**Fresh Houzs transportation comparison — read-only, 9 Oct 2026.** The Transportation hub exposes planning, DP Orders, date/time arrangement, Last Mile, capacity, crew leave and maintenance. Delivery Date Arrangement describes postcode-based date proposals and date-only writes before lorry/time scheduling; its loaded view separates pending/date-arranged populations and warns search covers loaded rows. Last Mile describes time-arranged trips, map, crew proposals and per-lorry/day packing sheets in reverse stop order. The map loaded day-order coverage separately while trip/packing sections showed no scheduled trips; main row loading at inspection was not a verified empty order population. No selection/apply/date change/crew proposal/dispatch/print/send/save was performed; no actual delivery-result/proof workflow or capacity algorithm was verified. Foreign regional rules, fleet facts and costs are not adopted.
+
+**Recommendation / KEEP + ADAPT + REJECT:** adapt progressive scheduling visibility, source-linked trip/packing scope and explicit map/list population explanations only where useful. Keep Carres §5's requested versus agreed scheduled date, optional agreed time/window and separate ETA; date-only booking remains valid. Reject mandatory time arrangement for every Carres order, geography-only customer agreement, own-fleet/headcount assumptions, automatic crew authority, and map/packing output as delivery evidence. External Logistics still owns routine customer scheduling; Workspace/People supplies eligibility/cover, Warehouse owns exact physical preparation/handover, and Delivery owns trip/attempt/proof. A reference planning module never gains Stock, customer-promise, money or permission writers.
+
+**Recommended remaining scheduling contract — PROPOSAL where new:** any schedule/capacity suggestion identifies the delivery scope, calendar, site/customer access, actual confirmed agreement, applicable configuration version and input completeness. A suggestion is neither customer consent nor booking saved; the owning arrangement write must retain actual agreement and audit before other consumers treat it as scheduled. When a source changes or a save fails, preserve attempted input, re-read current facts and show the outstanding action. A map may include requested/planned orders while a trip list contains confirmed trips; state those populations rather than assert disagreement from unequal counts. No map implies live tracking without independently evidenced tracking data.
+
+Any packing/run-sheet is a snapshot of the owning trip/DO and goods scope, not a second goods allocation, release or completion record. Changes/rebooking retain document lineage and the current versus superseded scope. Loading sequence must respect actual goods/site handling rules; reverse stop order is a reference suggestion, not adopted Carres law. Missing fleet/crew/volume data stays unknown, not zero capacity or automatic approval. Fleet/capacity planning remains conditional to an actual commissioned Carres operating need; do not invent a Warehouse daily capacity or silently extend a deadline.
+
+**Acceptance evidence owed:** date-only and appointment-required paths; optional effective period versus ETA; suggestion without customer agreement; failed/concurrent arrangement update; source-qualified crew/site access; differing map/order/trip coverage; trip amendment after packing snapshot; partial handover; RM0 with independent hold; actual full/partial/failed visit and event-bound proof review. Consumer dates, Tasks and Payment must read the owning saved facts and effective calendars. These requirements do not assert observed reference or current Carres backend behavior. Carres §3–§7 guards and §15.2 normal journey remain controlling; no UI composition, fleet rollout or build authorised.
 
 **Page and information architecture.** Monitor retains its work list, company filters, governed
 search/filter/sort/columns/export, delivery-scope checkbox and four expansion panels: Customer

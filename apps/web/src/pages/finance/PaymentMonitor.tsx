@@ -14,9 +14,8 @@ import {
   type PaymentMonitorRow,
   type PaymentWeekDay,
 } from "@carres/shared/payment-monitor";
-import type { CollectionTimingRule } from "@carres/shared/collection-clock";
+import { collectionTimingRulesOf, type CollectionTimingRule } from "@carres/shared/collection-clock";
 import type { OperationWorkItem } from "@carres/shared/operation-work";
-import { myHolidayName, myHolidaySet } from "@carres/shared/my-holidays";
 import { inOrderScope, orderScopeOf } from "@carres/shared/payment-register-scope";
 import {
   COLLECTION_NOT_ASSIGNED as NOT_ASSIGNED,
@@ -50,6 +49,7 @@ import { DATE_TO_BE_CONFIRMED_FULL } from "@/pages/operation/sales-order-guidanc
 import InvoiceCalendar, { type CalendarEntryKind } from "./InvoiceCalendar";
 import PaymentCollectionWorkspace from "./PaymentCollectionWorkspace";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
+import { useDeliveryDays, useOfficeDays, usePersonOwnerCalendars } from "@/lib/deadline-queries";
 
 /**
  * PAYMENT MONITOR — the full-width collection control listing (owner ruling
@@ -219,8 +219,16 @@ export default function PaymentMonitor() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const today = appTodayIso();
-  const holidays = useMemo(() => myHolidaySet(), []);
-  const opts = useMemo(() => ({ holidays }), [holidays]);
+  /* ⭐ THE TWO CALENDARS (9 Oct 2026). The payment FACTS (due · ask) and
+     Items & Stock count on THE Delivery calendar (Monday–Saturday + the
+     stored Selangor holidays). The plan's days are the stored Office
+     calendar's; each row's ACTION day steps back on the responsible person's
+     own working days (Office weekdays when none are recorded). */
+  const officeDays = useOfficeDays();
+  const holidays = officeDays.holidays;
+  const deliveryDays = useDeliveryDays();
+  const deliveryHolidays = deliveryDays.holidays;
+  const opts = deliveryDays.opts;
   const isPhone = useIsPhone();
 
   /* ── The rail-collapse memory ─────────────────────────────────────────── */
@@ -242,7 +250,7 @@ export default function PaymentMonitor() {
   /* ⭐ THE PICKED DAY (owner ruling 2026-09-16). Absent = the plan day —
      today when Operation works today, else the next working day. A reader
      without the Work feed has no plan, so its landing is every unpaid order. */
-  const planDay = paymentPlanDay(today, holidays);
+  const planDay = paymentPlanDay(today, holidays, officeDays.offDays);
   const rawDay = params.get("day");
   // A door that names one order (`?order=`) opens on every day — the order
   // is the question, not the plan.
@@ -299,8 +307,8 @@ export default function PaymentMonitor() {
 
   /* ── The rows, through the one shared derivation ──────────────────────── */
   const invoices = useMemo(() => invoicesQ.data ?? [], [invoicesQ.data]);
-  const timingRules = useMemo<CollectionTimingRule[]>(() => (settingsQ.data?.collection_timing ?? [])
-    .map((r) => ({ askDaysBefore: r.ask_days_before, deadlineDaysBefore: r.deadline_days_before, effectiveFrom: r.effective_from })),
+  const timingRules = useMemo<CollectionTimingRule[]>(
+    () => collectionTimingRulesOf(settingsQ.data?.collection_timing ?? []),
     [settingsQ.data]);
   const promisedByOrder = useMemo(() => {
     const map = new Map<string, string>();
@@ -310,6 +318,20 @@ export default function PaymentMonitor() {
     }
     return map;
   }, [invoices]);
+  /* The responsible person per order — the Work feed's own resolved actor
+     (today's cover, else the normal owner) on the order's payment items. */
+  const actorByOrder = useMemo(() => {
+    const orderOfInvoice = new Map(invoices.map((r) => [r.id, r.order_id] as const));
+    const m = new Map<string, string>();
+    for (const item of workQ.data?.items ?? []) {
+      if (item.module !== "payment") continue;
+      const orderId = orderOfInvoice.get(item.object.id);
+      const person = item.owner.acting?.userId ?? item.owner.normal?.userId ?? null;
+      if (orderId && person && !m.has(orderId)) m.set(orderId, person);
+    }
+    return m;
+  }, [invoices, workQ.data]);
+  const ownerOf = usePersonOwnerCalendars([...actorByOrder.values()]);
   const allRows = useMemo(() => paymentMonitorRows({
     invoices,
     cases: casesQ.data?.cases ?? [],
@@ -318,7 +340,9 @@ export default function PaymentMonitor() {
     opts,
     timingRules,
     promisedByOrder,
-  }), [invoices, casesQ.data, requestsQ.data, today, opts, timingRules, promisedByOrder]);
+    owner: officeDays.owner,
+    ownerFor: (orderId) => (actorByOrder.has(orderId) ? ownerOf(actorByOrder.get(orderId)) : null),
+  }), [invoices, casesQ.data, requestsQ.data, today, opts, timingRules, promisedByOrder, officeDays.owner, actorByOrder, ownerOf]);
   const scopedRows = useMemo(
     () => allRows.filter((r) => inOrderScope(r.door, orderScope)),
     [allRows, orderScope],
@@ -331,8 +355,9 @@ export default function PaymentMonitor() {
   // owners — nothing scheduled here.
   const plan = useMemo(() => paymentWeekPlan({
     items: (workItems ?? []).filter((i) => i.module === "payment"),
-    rows: scopedRows, todayIso: today, weekOfIso: weekOf, holidays, holidayName: myHolidayName,
-  }), [workItems, scopedRows, today, weekOf, holidays]);
+    rows: scopedRows, todayIso: today, weekOfIso: weekOf, holidays, holidayName: officeDays.holidayName,
+    offDays: officeDays.offDays,
+  }), [workItems, scopedRows, today, weekOf, holidays, officeDays]);
   const pickedDay = picked === ALL_UNPAID ? null : (plan.days.find((d) => d.iso === picked) ?? null);
   const orderById = useMemo(
     () => new Map((canReadWork ? ordersQ.data?.orders ?? [] : []).map((o) => [o.id, o] as const)),
@@ -347,7 +372,7 @@ export default function PaymentMonitor() {
      its readiness is every line's, through Delivery's own arithmetic. */
   const goodsOf = (r: PaymentMonitorRow, order: operationOrderListRow) => monitorGoodsOf({
     o: order, lines: order.order_lines ?? [], leg: null,
-    requestedIso: r.delivery.requested.iso, todayIso: today, holidays, addonNameByKey,
+    requestedIso: r.delivery.requested.iso, todayIso: today, holidays: deliveryHolidays, addonNameByKey,
   });
   const stockOf = (r: PaymentMonitorRow, order: operationOrderListRow): MonitorStock => {
     const delivered = order.status === "delivered" || !!r.door.orders?.delivered_at;
@@ -646,7 +671,7 @@ export default function PaymentMonitor() {
                   fitExpansionToViewport: true,
                   revealExpandedKey: revealKey,
                   renderExpansion: (r) => <PaymentWorkspaceBelow row={r} invoices={invoices} timingRules={timingRules}
-                    today={today} holidays={holidays} addonNameByKey={addonNameByKey} stockAbsence={stockAbsence}
+                    today={today} holidays={deliveryHolidays} addonNameByKey={addonNameByKey} stockAbsence={stockAbsence}
                     focusSection={reveal?.key === r.orderId ? reveal.section : null} onClose={close} />,
                 }}
                 statusSummary={(visible) => {

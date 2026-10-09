@@ -61,6 +61,15 @@ describe("workOrderGroups", () => {
     expect(groups[0]!.acts[2]!.why).toBe("Get the scheduled delivery date · due Mon, 28 Sep");
   });
 
+  it("Assign logistics names its stored deadline, never a hard-coded `3 working days before` (DEL-04)", () => {
+    const groups = workOrderGroups([
+      row("a1", { ruleKey: "assign_logistics", module: "delivery", kind: "sales_order", objectId: "o-1333", label: "SO-1333" }),
+    ], index, spell);
+    const assign = groups[0]!.acts[0]!;
+    expect(assign.why).toBe("Choose the company that carries this delivery · due Mon, 28 Sep");
+    expect(assign.why).not.toContain("3 working days before");
+  });
+
   it("never copies a PO act onto each order when the PO serves several orders: it opens the PO view (A3)", () => {
     const groups = workOrderGroups([
       row("p1", { ruleKey: "purchasing.supplier_date_passed", module: "purchasing", kind: "purchase_order", objectId: "PO-SHARED", label: "PO-SHARED", recipient: "Ohana" }),

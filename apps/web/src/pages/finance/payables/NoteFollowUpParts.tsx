@@ -16,6 +16,7 @@ import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import {
   useAddNoteToFollowUp,
   useCreditNoteNotesToFollowUp,
+  useDebitNoteNotesToFollowUp,
   useSettleNoteToFollowUp,
   useSupplierNotesOwed,
   useTakeNoteSettlementOff,
@@ -36,7 +37,8 @@ import {
 /**
  * The credit and debit notes suppliers owe (migration 0676), where other
  * Payables pages show them: a confirmed bill's line marks one, a confirmed
- * credit note settles them, and a voucher says what its supplier still owes.
+ * credit or (0681) debit note settles them, and a voucher says what its
+ * supplier still owes.
  */
 
 const link = "text-kit-blue-11 underline underline-offset-2";
@@ -127,30 +129,46 @@ function MarkLineModal({ billId, line, diff, onClose }: {
   );
 }
 
+type NoteSide = "credit" | "debit";
+
 /** A confirmed credit note settles its supplier's credit notes owed, in part
  *  or in full. Posts nothing. */
 export function CreditNoteSettlesCard({ noteId, confirmed }: { noteId: string; confirmed: boolean }) {
-  const query = useCreditNoteNotesToFollowUp(noteId, confirmed);
+  return <NoteSettlesCard side="credit" noteId={noteId} confirmed={confirmed} />;
+}
+
+/** 0681: a confirmed debit note settles its supplier's debit notes owed, in
+ *  part or in full. Posts nothing. */
+export function DebitNoteSettlesCard({ noteId, confirmed }: { noteId: string; confirmed: boolean }) {
+  return <NoteSettlesCard side="debit" noteId={noteId} confirmed={confirmed} />;
+}
+
+function NoteSettlesCard({ side, noteId, confirmed }: { side: NoteSide; noteId: string; confirmed: boolean }) {
+  const creditQuery = useCreditNoteNotesToFollowUp(noteId, confirmed && side === "credit");
+  const debitQuery = useDebitNoteNotesToFollowUp(noteId, confirmed && side === "debit");
+  const query = side === "credit" ? creditQuery : debitQuery;
   const takeOff = useTakeNoteSettlementOff();
   const [settling, setSettling] = useState<SupplierNoteFollowup | null>(null);
   const [takingOff, setTakingOff] = useState<string | null>(null);
+  const what = side === "credit" ? "credit note" : "debit note";
+  const testId = `${side}-note-settles`;
   if (!confirmed) {
     return (
-      <Facts title="Notes it settles" testId="credit-note-settles">
-        <p>A credit note settles the notes its supplier owes once it is confirmed.</p>
+      <Facts title="Notes it settles" testId={testId}>
+        <p>A {what} settles the notes its supplier owes once it is confirmed.</p>
       </Facts>
     );
   }
   const d = query.data;
   return (
-    <Facts title="Notes it settles" testId="credit-note-settles">
+    <Facts title="Notes it settles" testId={testId}>
       {query.isError ? <p>The notes owed could not be loaded. Try again.</p>
       : !d ? <p>Loading notes owed…</p>
       : (
         <>
           <p>{money(d.settled)} settled · {money(d.left_to_settle)} left to settle notes owed</p>
           {d.settlements.map((s) => (
-            <p key={s.id} data-testid={`credit-note-settlement-${s.id}`}>
+            <p key={s.id} data-testid={`${side}-note-settlement-${s.id}`}>
               <Link className={link} to={`/finance/notes-to-follow-up/${s.followup_id}`}>
                 {noteFromWord({ reason: s.reason, bill_no: s.bill_no, supplier_invoice_no: null, line_no: null, pr_no: s.pr_no })}
               </Link>
@@ -165,9 +183,9 @@ export function CreditNoteSettlesCard({ noteId, confirmed }: { noteId: string; c
             </p>
           ))}
           {d.owed.length === 0
-            ? <p>This supplier owes no other credit note to follow up.</p>
+            ? <p>This supplier owes no other {what} to follow up.</p>
             : d.owed.map((n) => (
-              <p key={n.id} data-testid={`credit-note-owed-${n.id}`}>
+              <p key={n.id} data-testid={`${side}-note-owed-${n.id}`}>
                 <Link className={link} to={`/finance/notes-to-follow-up/${n.id}`}>{noteFromWord(n)}</Link>
                 {" · "}{word(NOTE_REASON_WORD, n.reason)} · {money(n.left)} left
                 {(num(d.left_to_settle) ?? 0) > 0 && (
@@ -181,7 +199,7 @@ export function CreditNoteSettlesCard({ noteId, confirmed }: { noteId: string; c
         </>
       )}
       {settling && d && (
-        <SettleModal noteId={noteId} owed={settling} leftToSettle={num(d.left_to_settle) ?? 0} onClose={() => setSettling(null)} />
+        <SettleModal side={side} noteId={noteId} owed={settling} leftToSettle={num(d.left_to_settle) ?? 0} onClose={() => setSettling(null)} />
       )}
       <ReasonModal
         open={takingOff !== null}
@@ -202,7 +220,8 @@ export function CreditNoteSettlesCard({ noteId, confirmed }: { noteId: string; c
   );
 }
 
-function SettleModal({ noteId, owed, leftToSettle, onClose }: {
+function SettleModal({ side, noteId, owed, leftToSettle, onClose }: {
+  side: NoteSide;
   noteId: string;
   owed: SupplierNoteFollowup;
   leftToSettle: number;
@@ -217,7 +236,8 @@ function SettleModal({ noteId, owed, leftToSettle, onClose }: {
     : null;
   const submit = () => {
     if (gap) return;
-    settle.mutate({ id: owed.id, input: { creditNoteId: noteId, amount: cents(value) } }, {
+    const input = side === "credit" ? { creditNoteId: noteId, amount: cents(value) } : { debitNoteId: noteId, amount: cents(value) };
+    settle.mutate({ id: owed.id, input }, {
       onSuccess: () => { toast.success("Note settled"); onClose(); },
       onError: (e) => toast.error(refusal(e)),
     });
