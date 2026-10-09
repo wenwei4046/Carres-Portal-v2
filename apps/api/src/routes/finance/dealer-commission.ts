@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { dcPaymentLinkInput, dcQuotaInput, dcRuleAddInput, dcTakeBackInput } from "@carres/shared/dealer-commission";
+import { dcKpiRuleAddInput, dcPaymentLinkInput, dcQuotaInput, dcRuleAddInput, dcTakeBackInput } from "@carres/shared/dealer-commission";
 import { requireFinance } from "../../lib/auth-guards";
 import { fail, parseJsonBody } from "../../lib/route-helpers";
 import { getStaffContext } from "../../lib/staff-token";
@@ -22,7 +22,11 @@ import type { AppEnv } from "../../types";
  *   GET    /payment-choices    paid direct vouchers not yet a payment to a dealer
  *   POST   /payments           a paid voucher counted as a payment to a dealer
  *   DELETE /payments/:id       taken off the dealer's statement
- *   PUT    /quotas/:dealerId   a dealer's renovation quota, rebate rate, start date
+ *   PUT    /quotas/:dealerId   a dealer's renovation quota (empty: no limit yet, 0665),
+ *                              rebate rate, start date
+ *   GET    /kpi-rules          dealer_kpi_rules_read (0665): the KPI allowance rules
+ *   POST   /kpi-rules          dealer_kpi_rule_add: a KPI allowance from a day
+ *   DELETE /kpi-rules/:id      dealer_kpi_rule_remove: one added by mistake
  *
  * And `dealerStatementRouter` (mounted at /api/dealer-commission): the
  * dealer's own statement, for its store owner (0664, D3).
@@ -117,6 +121,32 @@ r.delete("/payments/:id", requireFinance, async (c) => {
   const id = c.req.param("id");
   if (!UUID.test(id)) return c.json({ error: "not_found", message: "That payment is not on the statement." }, 404);
   const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("dealer_commission_payment_unlink", { p_id: id });
+  if (error) return fail(c, error);
+  return c.json(data);
+});
+
+r.get("/kpi-rules", requireFinance, async (c) => {
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("dealer_kpi_rules_read");
+  if (error) return fail(c, error);
+  return c.json(data);
+});
+
+r.post("/kpi-rules", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, dcKpiRuleAddInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const b = body.data;
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("dealer_kpi_rule_add", {
+    p_starts_on: b.startsOn, p_model_id: b.modelId, p_per_unit: b.perUnit,
+    p_tiers: b.tiers, p_period: b.period, p_memo: b.memo ?? null,
+  });
+  if (error) return fail(c, error);
+  return c.json(data, 201);
+});
+
+r.delete("/kpi-rules/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID.test(id)) return c.json({ error: "not_found", message: "That KPI allowance is not on the list." }, 404);
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("dealer_kpi_rule_remove", { p_id: id });
   if (error) return fail(c, error);
   return c.json(data);
 });

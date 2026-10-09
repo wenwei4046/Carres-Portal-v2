@@ -7,9 +7,10 @@
  * Two months ago SO-2101 earned RM337.50, paid by PV-000123 on the 15th of
  * last month. Last month SO-2101's balance, SO-2107 and SO-2109 earned
  * RM1,262.50; this month SO-2118 has earned RM650 so far and SO-2109 was
- * cancelled. Carres owes RM1,912.50; RM900 is still to come.
+ * cancelled. The made-up KPI allowance (RM10 a guarantee) adds RM20 last month
+ * and RM10 this month. Carres owes RM1,942.50; RM900 is still to come.
  */
-import type { DcOrder, DcPaymentChoice, DcSource, DcStatementSource } from "@carres/shared/dealer-commission";
+import type { DcKpiRule, DcOrder, DcPaymentChoice, DcSource, DcStatementSource } from "@carres/shared/dealer-commission";
 import { appTodayIso } from "@/lib/fmt-date";
 
 const TODAY = appTodayIso();
@@ -26,6 +27,14 @@ export const DEALER = { id: "d-example", name: "Example Furniture Gallery Sdn Bh
 const OTHER = { id: "d-sample", name: "Sample Home Living" };
 
 const line = (category: string, value: number, rate: number) => ({ modelId: null, category, value, rate, qty: 1 });
+const GRT = "m-grt-example";
+/** A 15-year guarantee: one covers one mattress. */
+const guarantee = (qty: number) => ({ modelId: GRT, category: "guarantee", value: 150 * qty, rate: 0, qty });
+
+/** A made-up KPI allowance (the memo's amounts stay out of this repository). */
+export const KPI: DcKpiRule[] = [
+  { id: "k-example", startsOn: "2026-01-01", modelId: GRT, perUnit: 10, tiers: [{ units: 3, bonus: 30 }], period: "month" },
+];
 const order = (o: Partial<DcOrder> & Pick<DcOrder, "orderId" | "so">): DcOrder => ({
   dealerId: DEALER.id, outletId: "o-example", addons: 0, lines: [], payments: [], ...o,
 });
@@ -35,13 +44,13 @@ export const ORDERS: DcOrder[] = [
     lines: [line("sofa", 3000, 25), line("service", 300, 0)],
     payments: [{ paidOn: `${M2}-05`, amount: 1650 }, { paidOn: `${M1}-07`, amount: 1650 }] }),
   order({ orderId: "o2107", so: 2107, orderedOn: `${M1}-12`, customer: "NURUL AIN BINTI ISMAIL",
-    lines: [line("mattress", 4000, 25)], payments: [{ paidOn: `${M1}-14`, amount: 2400 }] }),
+    lines: [line("mattress", 4000, 25), guarantee(2)], payments: [{ paidOn: `${M1}-14`, amount: 2400 }] }),
   order({ orderId: "o2109", so: 2109, orderedOn: `${M1}-20`, customer: "WONG MEI LING", cancelledOn: `${M0}-06`,
     lines: [line("sofa", 1800, 25)], payments: [{ paidOn: `${M1}-21`, amount: 1000 }] }),
   order({ orderId: "o2115", so: 2115, orderedOn: `${M0}-02`, customer: "TAN SRI DATO' SERI MUHAMMAD HAFIZUDDIN BIN ABDUL RAHMAN",
     lines: [line("bedframe", 2000, 25)], payments: [{ paidOn: `${M0}-03`, amount: 800 }] }),
   order({ orderId: "o2118", so: 2118, orderedOn: `${M0}-04`, customer: "SITI AMINAH",
-    lines: [line("mattress", 2600, 25)], payments: [{ paidOn: `${M0}-05`, amount: 2600 }] }),
+    lines: [line("mattress", 2600, 25), guarantee(1)], payments: [{ paidOn: `${M0}-05`, amount: 2600 }] }),
 ];
 
 export const STATEMENT: DcStatementSource = {
@@ -49,6 +58,7 @@ export const STATEMENT: DcStatementSource = {
   dealer: DEALER,
   orders: ORDERS,
   quotas: [],
+  kpi: KPI,
   payments: [{ id: "pay-123", voucherId: "pv-123", voucherNo: "PV-000123", paidOn: `${M1}-15`, amount: 337.5 }],
 };
 
@@ -58,7 +68,7 @@ export function source(month: string): DcSource {
   const next = new Date(Date.UTC(y!, m!, 1)).toISOString().slice(0, 10);
   const before = (d: string) => d < next;
   return {
-    settings: { defaultRate: 25 }, rates: [], quotas: [], models: [],
+    settings: { defaultRate: 25 }, rates: [], quotas: [], models: [], kpi: KPI,
     dealers: [DEALER, OTHER],
     outlets: [{ id: "o-example", name: "Example Gallery Kota Damansara", dealerId: DEALER.id }],
     orders: ORDERS.filter((o) => before(o.orderedOn ?? "")).map((o) => ({

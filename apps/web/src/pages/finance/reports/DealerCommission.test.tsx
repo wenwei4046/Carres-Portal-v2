@@ -8,7 +8,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { DcPaymentChoice, DcRulesRead, DcSource, DcStatementSource } from "@carres/shared/dealer-commission";
+import type { DcKpiRulesRead, DcPaymentChoice, DcRulesRead, DcSource, DcStatementSource } from "@carres/shared/dealer-commission";
 import { fmtDate, fmtMonth } from "@/lib/fmt-date";
 import DealerCommission from "./DealerCommission";
 
@@ -358,5 +358,108 @@ describe("Statement (0664)", () => {
     expect(screen.getByTestId("commission-orders-summary")).toBeTruthy();
     await waitFor(() => expect(net.calls).toContain(`GET ${DC}?month=${PREV}`));
     expect(screen.getByText("New orders this month")).toBeTruthy();
+  });
+});
+
+describe("KPI allowance and the rebate's total (0665)", () => {
+  const KPI_URL = `${DC}/kpi-rules`;
+  // Made-up amounts: the memo's are Finance's and stay out of this repository.
+  const KPI_READ: DcKpiRulesRead = {
+    today: "2026-10-09",
+    rules: [{
+      id: "k1", startsOn: "2026-07-22", modelId: "g1", modelName: "Mattress Guarantee", perUnit: 10,
+      tiers: [{ units: 5, bonus: 50 }], period: "month", memo: "Memo 22 Jul", createdAt: "2026-10-09T01:00:00Z",
+      createdBy: "Chew", state: "in_use",
+    }],
+    guarantees: [{ id: "g1", name: "Mattress Guarantee" }],
+  };
+  beforeEach(() => {
+    net.routes[`GET ${KPI_URL}`] = KPI_READ;
+    net.routes[`POST ${KPI_URL}`] = { id: "k2" };
+    net.routes[`DELETE ${KPI_URL}/k1`] = { id: "k1", already: false };
+    net.routes[`PUT ${DC}/quotas/d1`] = { ok: true };
+  });
+
+  it("lists each KPI allowance from its day", async () => {
+    renderAt("/?view=kpi");
+    const page = await screen.findByTestId("commission-kpi-page");
+    await within(page).findByText("Mattress Guarantee");
+    expect(within(page).getByText("RM 10.00")).toBeTruthy();
+    expect(within(page).getByText("5 guarantees RM 50.00")).toBeTruthy();
+    expect(within(page).getByText("Each month")).toBeTruthy();
+    expect(within(page).getByText("In use")).toBeTruthy();
+    expect(screen.getByTestId("commission-kpi-summary")).toHaveTextContent(
+      "1 of 1 rows · Each guarantee counts on its order's day. The highest tier reached pays its bonus.",
+    );
+  });
+
+  it("adds one; Save names what is missing until then", async () => {
+    renderAt("/?view=kpi");
+    await screen.findByText("Mattress Guarantee");
+    fireEvent.click(screen.getByRole("button", { name: "Add a KPI allowance" }));
+    const dialog = await screen.findByRole("dialog");
+    // The one guarantee on sale is already the one counted.
+    expect(within(dialog).getByRole("button", { name: "Save: type the amount per guarantee" })).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText("Per guarantee (RM)", { exact: false }), { target: { value: "10" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add a tier" }));
+    expect(within(dialog).getByRole("button", { name: "Save: complete each tier" })).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText("From guarantees", { exact: false }), { target: { value: "5" } });
+    fireEvent.change(within(dialog).getByLabelText("Bonus (RM)", { exact: false }), { target: { value: "50" } });
+    expect(within(dialog).getByRole("button", { name: "Save: pick the day it starts" })).toBeDisabled();
+    fireEvent.click(within(dialog).getByRole("button", { name: /Starts on/ }));
+    fireEvent.click(screen.getByText("15"));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(net.calls).toContain(`POST ${KPI_URL}`));
+    expect(net.bodies[`POST ${KPI_URL}`]).toEqual({
+      startsOn: `${MONTH}-15`, modelId: "g1", perUnit: 10, tiers: [{ units: 5, bonus: 50 }], period: "month", memo: null,
+    });
+  });
+
+  it("removes one from its window", async () => {
+    renderAt("/?view=kpi");
+    fireEvent.click(await screen.findByText("Mattress Guarantee"));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("Tier bonus: 5 guarantees RM 50.00");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(net.calls).toContain(`DELETE ${KPI_URL}/k1`));
+  });
+
+  it("By dealer counts the dealer's guarantees and works its KPI allowance out", async () => {
+    net.routes[`GET ${DC}?month=${MONTH}`] = {
+      ...SOURCE,
+      kpi: [{ id: "k1", startsOn: "2026-01-01", modelId: "g1", perUnit: 10, tiers: [{ units: 5, bonus: 50 }], period: "month" }],
+      orders: [...SOURCE.orders, {
+        orderId: "ord3", so: 2060, dealerId: "d1", outletId: "o1", addons: 0, orderedOn: `${MONTH}-03`,
+        customer: "Probe Customer Three", payments: [],
+        lines: [{ modelId: "g1", category: "guarantee", value: 150, rate: 0, qty: 2 }],
+      }],
+    };
+    renderAt();
+    await screen.findByText("Ace Furniture");
+    // Two guarantees at RM 10: the row and the totals row.
+    expect(screen.getAllByText("RM 20.00")).toHaveLength(2);
+    expect(screen.queryByText("Not set up")).toBeNull();
+    expect(screen.getByTestId("dealer-commission-summary")).toHaveTextContent(
+      "The rebate and the KPI allowance are the dealer's whole, whatever showroom is picked.",
+    );
+  });
+
+  it("a rebate whose total is not filled in reads No limit yet", async () => {
+    net.routes[`GET ${DC}?month=${MONTH}`] = { ...SOURCE, quotas: [{ dealerId: "d1", quota: null, rebateRate: 5, startsOn: `${PREV}-01` }] };
+    renderAt();
+    expect(await screen.findByText("No limit yet")).toBeTruthy();
+    // No KPI rule yet.
+    expect(screen.getByText("Not set up")).toBeTruthy();
+  });
+
+  it("saves a renovation quota with its total left empty", async () => {
+    renderAt();
+    await screen.findByText("Ace Furniture");
+    fireEvent.click(screen.getByRole("button", { name: "No quota" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("Leave it empty to fill in later. Until then there is no limit.");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(net.calls).toContain(`PUT ${DC}/quotas/d1`));
+    expect(net.bodies[`PUT ${DC}/quotas/d1`]).toEqual({ quota: null, rebateRate: 5, startsOn: `${MONTH}-01` });
   });
 });
