@@ -112,6 +112,15 @@ describe("Settings → Office", () => {
   });
 });
 
+describe("May I edit this section?", () => {
+  it("answers the database gate for a known section, refuses an unknown one", async () => {
+    rpc.mockResolvedValue({ data: false, error: null });
+    expect(await (await app("operation").request("/settings/can-edit/issue_tracker")).json()).toEqual({ canEdit: false });
+    expect(rpc).toHaveBeenCalledWith("settings_can_edit", { p_section: "issue_tracker" });
+    expect((await app().request("/settings/can-edit/finance")).status).toBe(422);
+  });
+});
+
 describe("Settings editors", () => {
   it("names the owner from the owner accounts even when the reader cannot see them", async () => {
     tables.settings_section_editors = { data: [], error: null };

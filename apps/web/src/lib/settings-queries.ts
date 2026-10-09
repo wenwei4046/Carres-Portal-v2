@@ -23,6 +23,17 @@ import {
 } from "@carres/shared";
 import { apiFetch } from "./api";
 
+/** May the signed-in person change this Settings section? (TEAM-02) —
+ *  false while loading, so no Edit flashes for a reader. */
+export function useCanEditSettings(section: SettingsEditorSection): boolean {
+  const q = useQuery({
+    queryKey: ["settings", "can-edit", section] as const,
+    queryFn: () => apiFetch<{ canEdit: boolean }>(`/api/operation/settings/can-edit/${section}`),
+    staleTime: 60_000,
+  });
+  return q.data?.canEdit === true;
+}
+
 export const settingsKeys = {
   company: ["settings", "company"] as const,
   companyIdentity: ["settings", "company-identity"] as const,

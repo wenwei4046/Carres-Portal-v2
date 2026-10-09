@@ -22,6 +22,7 @@ import { Hono, type Context } from "hono";
 import {
   VERIFIED_COMPANY_PROFILE,
   COMPANY_PROFILE_FIELDS,
+  SETTINGS_EDITOR_SECTIONS,
   DEFAULT_OFFICE_CALENDAR,
   companyProfileSaveInput,
   officeCalendarSaveInput,
@@ -181,6 +182,13 @@ router.put("/office/holidays", requireSettingsEditor("office"), async (c) => {
     return c.json(f.body, f.status);
   }
   return c.json({ ok: true });
+});
+
+// ── May I edit this section? (TEAM-02) — for pages without their own flag ──
+router.get("/can-edit/:section", requireOperationOrPrincipal, async (c) => {
+  const section = SETTINGS_EDITOR_SECTIONS.find((s) => s === c.req.param("section"));
+  if (!section) return c.json({ error: "invalid_section", code: "invalid_param", message: "Unknown Settings section." }, 422);
+  return c.json({ canEdit: await canEditSettings(c.env, c.var.auth.jwt, section, c.var.auth.role) });
 });
 
 // ── Settings editors (TEAM-02) ────────────────────────────────────────────
