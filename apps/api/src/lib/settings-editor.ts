@@ -50,7 +50,7 @@ export function requireSettingsEditor(section: SettingsSection): MiddlewareHandl
   return async (c, next) => {
     const auth = c.var.auth;
     if (!auth?.jwt || !(await canEditSettings(c.env, auth.jwt, section, auth.role))) {
-      throw new HTTPException(403, { message: "Only Jess or a person she names may change these settings." });
+      throw new HTTPException(403, { message: "Only the people named for this section may change these settings." });
     }
     await next();
   };

@@ -5441,3 +5441,19 @@ Receiving placement; UI MASTER owns Calendar. No posting/permission change is im
 | Personal scope explanation | Choose how your portal looks. This changes only your profile. | Implementation explanatory copy |
 | Fixed status explanation | Theme changes the page background and selection. Status colours stay the same. | Current v4 UI Kit §9 meaning |
 | Save / result / failure | Save changes · Saved · Could not save. Try again. | Existing save/retry grammar |
+
+## Settings → Company · Office · Settings editors · owner 9 Oct 2026 (Carres Settings List COM · OFF · TEAM-02) · BUILT ON BRANCH, NOT DEPLOYED
+
+| Situation | Exact words | Source |
+|---|---|---|
+| Settings menu groups / rows | Company · Company · Office · Office · Team and access · Settings editors | Settings List display categories |
+| Company sections | Legal company (`Every printed document reads these details.`) · Customer support (`The one contact customers see. Staff who act are still recorded by name.`) | COM-01 · COM-02 |
+| Company rows, in order | Legal company name · Former company name · SSM registration number · Registered address line 1 · Registered address line 2 · Registered address line 3 · Postcode · City · Country · Company telephone · Company email · Printed address · Customer support name · Customer support telephone · Customer support WhatsApp · Customer support email | Settings List Company field breakdown |
+| Office sections | Office working days and hours (`Every Office deadline counts these days. Saturday on-call is set in Staff & Duties and does not make Saturday an Office working day.`) · Office public holidays (`Office deadlines skip these days. Warehouse keeps its own holidays.`) | OFF-01..05 · Saturday on-call boundary |
+| Office rows | Office working days · Office hours · Flexi allowance · Lunch · Lunch may move by · Holiday region · Year · List in force; editing: Office opens · Office closes · Flexi allowance (minutes) · Lunch starts · Lunch ends · Lunch may move by (minutes) · Date · Holiday name · Add holiday · Remove | OFF-01..05 |
+| Office values | `Monday to Friday` · `9:00 AM to 6:00 PM` · `1 hour` · `None` · `Recorded in Settings` · `Built-in list. Not yet checked for Kuala Lumpur. Record this year to replace it.` · `No holidays recorded for this year.` | OFF-05: no Kuala Lumpur date invented |
+| Office review notes | `Deadlines from now on count the new days. Dates already recorded do not move.` · `An empty list returns this year to the built-in list.` | 01 §6 timing changes never silently rewrite |
+| Shared Settings words | Edit · Review changes · `Review changes: {gap}` · Save changes · Back · Cancel · Reason (optional) · Changes · `No changes recorded yet.` · `Not set` · `Staff identity not recorded` | Existing Settings grammar |
+| Read-only / not installed | `You can read these settings. Only the owner and the people named in Settings editors can change them.` · `These settings are not saved in the system yet. The values below are the confirmed defaults.` · `These settings could not be loaded. Try again.` · `Someone else saved these settings. Reload to see them.` | TEAM-02 · GLOBAL OWNER LAW (no hard-coded person name) |
+| Settings editors | Who may change each section (`The owner may change every section. A person named here may change that section's settings only. It gives no approval, no Duty and no money rights.`) · `{name} · owner` · Add person · Person · Remove · `named by {name} · {date}` · `removed by {name} on {date}` · `Name not recorded` · `You can read this page. Only the owner names Settings editors.` | TEAM-02 |
+| Saved toasts | `Company settings saved` · `Office settings saved` · `Office public holidays {year} saved` · `{Section} editor added` · `{name} no longer edits {Section}` | Existing save grammar |

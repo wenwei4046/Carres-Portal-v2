@@ -11,13 +11,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DEFAULT_OFFICE_CALENDAR,
-  VERIFIED_COMPANY_PROFILE,
   companyProfileResponseSchema,
   officeCalendarOf,
   officeCalendarResponseSchema,
   settingsEditorsResponseSchema,
   type CompanyProfileSaveInput,
-  type CompanyProfileValues,
   type OfficeCalendar,
   type OfficeCalendarValues,
   type OfficeHolidaysSaveInput,
@@ -49,19 +47,6 @@ export function useSaveCompanySettings() {
       void client.invalidateQueries({ queryKey: settingsKeys.company });
       void client.invalidateQueries({ queryKey: settingsKeys.companyIdentity });
     },
-  });
-}
-
-/** The company identity printed on documents — any signed-in account. */
-export function useCompanyIdentity() {
-  return useQuery({
-    queryKey: settingsKeys.companyIdentity,
-    queryFn: async () => {
-      const body = await apiFetch<{ stored: boolean; values: CompanyProfileValues }>("/api/company-profile");
-      return body.values;
-    },
-    staleTime: 5 * 60_000,
-    placeholderData: VERIFIED_COMPANY_PROFILE,
   });
 }
 

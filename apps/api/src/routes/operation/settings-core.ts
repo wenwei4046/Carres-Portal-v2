@@ -200,8 +200,12 @@ router.get("/editors", requireOperationOrPrincipal, async (c) => {
       .eq("status", "active")
       .order("name"),
   ]);
+  const owners = (people.data ?? [])
+    .filter((p) => p.role === "principal" && p.is_person !== false)
+    .map((p) => String(p.name ?? "").trim())
+    .filter(Boolean);
   if (grants.error) {
-    return c.json({ stored: false, canManage: false, grants: [], people: [] });
+    return c.json({ stored: false, canManage: false, grants: [], people: [], owners });
   }
   const one = (v: unknown) => ((Array.isArray(v) ? v[0] : v) as { name?: string | null } | null)?.name ?? null;
   return c.json({
@@ -221,12 +225,13 @@ router.get("/editors", requireOperationOrPrincipal, async (c) => {
       .filter((p) => p.is_person !== false && p.role !== "principal")
       .map((p) => ({ id: String(p.id), name: String(p.name ?? "") }))
       .filter((p) => p.name.trim() !== ""),
+    owners,
   });
 });
 
 async function editorDoor(c: Context<AppEnv>, fn: "settings_grant_section_editor" | "settings_revoke_section_editor") {
   if (c.var.auth.role !== "principal") {
-    return c.json({ error: "forbidden", code: "forbidden", message: "Only Jess may name Settings editors." }, 403);
+    return c.json({ error: "forbidden", code: "forbidden", message: "Only the owner names Settings editors." }, 403);
   }
   const parsed = await parseJsonBody(c, settingsEditorGrantInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);

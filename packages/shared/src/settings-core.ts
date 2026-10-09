@@ -173,8 +173,10 @@ export const settingsEditorsResponseSchema = z.object({
     revokedByName: z.string().nullable(),
     revokedAt: z.string().nullable(),
   })),
-  /** Active internal people Jess may name. */
+  /** Active internal people who may be named. */
   people: z.array(z.object({ id: z.string(), name: z.string() })),
+  /** The owner accounts (principal) — they change every section. */
+  owners: z.array(z.string()),
 });
 export type SettingsEditorsResponse = z.infer<typeof settingsEditorsResponseSchema>;
 
