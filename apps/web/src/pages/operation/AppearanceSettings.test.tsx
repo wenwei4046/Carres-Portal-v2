@@ -93,7 +93,8 @@ describe("Settings → Personal → Appearance — one choice, on the person's o
   });
 
   it("the first frame reads the person's own login session, not a shared browser copy", () => {
-    const key = `sb-${new URL(import.meta.env.VITE_SUPABASE_URL ?? "https://placeholder.supabase.co").hostname.split(".")[0]}-auth-token`;
+    vi.stubEnv("VITE_SUPABASE_URL", "https://appearance-test.supabase.co");
+    const key = "sb-appearance-test-auth-token";
     localStorage.setItem("carres-appearance", JSON.stringify({ theme: "rose", focus: "strong" }));
     localStorage.setItem(key, JSON.stringify({ user: { id: "a", user_metadata: { appearance: { theme: "teal", focus: "theme" } } } }));
     applyStoredAppearance();
@@ -102,5 +103,6 @@ describe("Settings → Personal → Appearance — one choice, on the person's o
     localStorage.removeItem(key);
     applyStoredAppearance(); // nobody signed in
     expect(html()).toMatchObject({ theme: "carres", focus: "soft" });
+    vi.unstubAllEnvs();
   });
 });

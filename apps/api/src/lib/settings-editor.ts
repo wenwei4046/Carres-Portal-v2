@@ -3,7 +3,7 @@
  * List, confirmed 9 Oct 2026): Jess edits every Settings section and may name
  * a person for a named section. Every Settings write route puts
  * `requireSettingsEditor("<section>")` in front of its handler; the answer is
- * the database's own `settings_can_edit` (0664) under the caller's token, so
+ * the database's own `settings_can_edit` (0668) under the caller's token, so
  * the API and the database can never disagree about who may edit.
  *
  * Reading Settings is unchanged: whoever may read a section still sees it.

@@ -1,4 +1,4 @@
--- 0664 — Settings sections are edited by the people Jess names.
+-- 0668 — Settings sections are edited by the people Jess names.
 --
 -- Owner rule (Carres Settings List TEAM-02 · SET-01, confirmed 9 Oct 2026):
 -- Jess (the principal) edits every Settings section and may delegate editing
@@ -61,7 +61,7 @@ as $fn$
 $fn$;
 
 comment on function public.settings_can_edit(text) is
-  '0664: the one Settings write gate — the principal, or an active person with an unrevoked grant for that named section (TEAM-02). Never a money approval.';
+  '0668: the one Settings write gate — the principal, or an active person with an unrevoked grant for that named section (TEAM-02). Never a money approval.';
 
 create or replace function public.settings_grant_section_editor(p_section text, p_user_id uuid)
 returns public.settings_section_editors

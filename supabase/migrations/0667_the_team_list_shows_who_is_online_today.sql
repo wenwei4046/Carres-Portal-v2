@@ -1,4 +1,4 @@
--- 0663 — the Team list in the page header shows who is online today.
+-- 0667 — the Team list in the page header shows who is online today.
 --
 -- Owner ruling 2026-10-08 (Jess, Sales Order Outright template, Carres Layout
 -- Standard §1 header: "team (avatar icon + online count)"): build the real
