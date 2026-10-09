@@ -1965,7 +1965,10 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   });
   // Repair Orders (Purchasing §9.7 · §10): their own projection, read inside
   // the Purchasing source so a failed read fails that source's health.
-  const repairOrderWork = () => loadRepairOrderWork(c, { poDuty, today, observedAt });
+  /* The three Purchasing loaders count on the stored Office holidays; their
+     off days stay the owner-default Monday–Friday inside each record module. */
+  const officeHolidays = holidaySetOf(calendars.office);
+  const repairOrderWork = () => loadRepairOrderWork(c, { poDuty, today, observedAt, holidays: officeHolidays });
   const sourceResults = await Promise.all([
     loadWorkSource("orders", observedAt, async () =>
       orderItems.filter((item) =>
@@ -1989,8 +1992,8 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
         office: calendars.office,
       }),
       ...(await repairOrderWork()),
-      ...(await loadSupplierClaimWork(c, { poDuty, approver: dutyResolution(duties, "purchasing_approver", today), today, observedAt })),
-      ...(await loadPurchaseReturnWork(c, { poDuty, today, observedAt })),
+      ...(await loadSupplierClaimWork(c, { poDuty, approver: dutyResolution(duties, "purchasing_approver", today), today, observedAt, holidays: officeHolidays })),
+      ...(await loadPurchaseReturnWork(c, { poDuty, today, observedAt, holidays: officeHolidays })),
     ]),
     loadWorkSource("receiving", observedAt, async () => receivingItems),
     loadWorkSource("delivery", observedAt, async () =>

@@ -60,6 +60,11 @@ export interface OfficeDays {
 
 export function useOfficeDays(): OfficeDays {
   const calendar = useOfficeCalendar();
+  /* `useOfficeCalendar` builds a fresh object on every render once a stored
+     calendar answers; key the derived shapes on what they read, so screens
+     that memoise on them do not recount every render. */
+  const key = `${calendar.workDays.join(",")}|${calendar.holidays.map((h) => `${h.date}:${h.name}`).join(",")}`;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   return useMemo(() => {
     const office = officeWorkingDayOptions(calendar);
     return {
@@ -70,7 +75,7 @@ export function useOfficeDays(): OfficeDays {
       owner: officeOwnerCalendar(calendar),
       holidayName: (iso: string) => officeHolidayName(calendar, iso),
     };
-  }, [calendar]);
+  }, [key]);
 }
 
 interface CollectionTimingPayload {

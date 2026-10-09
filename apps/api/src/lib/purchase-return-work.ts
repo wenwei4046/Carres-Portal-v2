@@ -60,7 +60,8 @@ async function readReturn(c: Context<AppEnv>, id: string): Promise<PurchaseRetur
  *  source honestly rather than showing an empty return desk. */
 export async function loadPurchaseReturnWork(
   c: Context<AppEnv>,
-  input: { poDuty: WorkspaceDutyResolution | null; today: string; observedAt: string },
+  /** `holidays` = the stored Office holidays (Settings → Office); absent ⇒ the built-in list. */
+  input: { poDuty: WorkspaceDutyResolution | null; today: string; observedAt: string; holidays?: ReadonlySet<string> },
 ): Promise<OperationWorkItem[]> {
   return projectPurchaseReturnWork({ ...(await readWorkSource(c)), ...input });
 }

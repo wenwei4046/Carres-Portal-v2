@@ -6,7 +6,8 @@
  * stored Delivery Rules lead; a GRN's lateness counts on its own Site.
  */
 import { describe, expect, it } from "vitest";
-import { DEFAULT_OFFICE_CALENDAR, type InvoiceRegisterRow } from "@carres/shared";
+import { DEFAULT_OFFICE_CALENDAR } from "@carres/shared";
+import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
 import {
   projectPaymentCollectionWork,
   projectPurchaseOrderReplyWork,
