@@ -44,6 +44,7 @@ import SettingsWorkspace, { settingsSectionLabel } from "./SettingsWorkspace";
 import OperationDelivery from "./OperationDelivery";
 import EditDeliveryRedirect from "./EditDeliveryRedirect";
 import OperationWork from "./OperationWork";
+import OperationLeave from "./OperationLeave";
 import OperationRental from "./OperationRental";
 // Purchase / Procurement MRP cockpit — the "what to buy today" guided worklist.
 import OperationToOrder from "./OperationToOrder";
@@ -553,6 +554,9 @@ export default function OperationApp() {
                 open work set (Card 9's engine). The page writes nothing; a
                 row opens the Sales Order Workspace. */}
             {tab === "work" && <OperationWork />}
+            {/* Workspace → Leave (0670): a person records their own MC,
+                Emergency leave or Planned leave. */}
+            {tab === "leave" && <OperationLeave />}
             {/* ⭐ THE OLD PAYMENTS URL LEADS TO THE CANONICAL EXPERIENCE
                 (entry-point correction, 2026-09-09). `?tab=payments` was the
                 0165 Master-Sheet "Balance" desk — its own Summary band, its

@@ -22,7 +22,7 @@ function SettingsForm({ value }: { value: WorkspaceActivitySettingsResponse }) {
     if (value.canEdit && valid && changed && !save.isPending) save.mutate({ morning, afternoon, revision: baseline.revision }, { onSuccess: (saved) => { setBaseline(saved); setMorning(saved.morning); setAfternoon(saved.afternoon); } });
   }}>
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      <Input id="morning-check-time" label="Morning check time" type="time" min="10:01" max="12:59" required
+      <Input id="morning-check-time" label="Morning check time" type="time" min="10:00" max="12:59" required
         value={morning} readOnly={!value.canEdit} disabled={save.isPending} onChange={(event) => setMorning(event.target.value)} />
       <Input id="afternoon-check-time" label="Afternoon check time" type="time" min="14:01" max="17:59" required
         value={afternoon} readOnly={!value.canEdit} disabled={save.isPending} onChange={(event) => setAfternoon(event.target.value)} />

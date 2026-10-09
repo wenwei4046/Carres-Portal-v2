@@ -241,9 +241,13 @@ export function DutyHistory({ duty }: { duty: Duty }) {
                 a.effective_until
                   ? `${fmtDate(a.effective_from)} to ${fmtDate(a.effective_until)}`
                   : `from ${fmtDate(a.effective_from)}`,
-                ...(a.assigned_by_name
-                  ? [`Assigned by ${a.assigned_by_name}`]
-                  : []),
+                /* 0671: the monthly rota assigns as the system, never as
+                   the account that bootstrapped an older row. */
+                ...(a.origin === "monthly_rotation"
+                  ? ["Assigned by system"]
+                  : a.assigned_by_name
+                    ? [`Assigned by ${a.assigned_by_name}`]
+                    : []),
               ]}
               note={a.note}
             />

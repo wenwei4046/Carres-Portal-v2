@@ -36,6 +36,7 @@ import {
   ReceiptText,
   Banknote,
   CalendarClock,
+  CalendarOff,
   CreditCard,
   Landmark,
   BookOpenText,
@@ -354,6 +355,10 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // worked out*. The page writes nothing; a row opens the owning module's
       // workspace.
       { key: "work", label: "Workspace", icon: Home, mIcon: "home", section: "Workspace" },
+      /* Workspace → Leave (0670; owner 9 Oct 2026, Settings List WS-11): the
+       * ONE leave entry — MC, Emergency leave, Planned leave — a person
+       * records their own. No standalone MC Report page. */
+      { key: "leave", label: "Leave", icon: CalendarOff, mIcon: "event_busy", section: "Workspace" },
       /* `Workspace → Staff & Duties` — the ONE company-wide duty assignment
        * door (workspace/MASTER.md, LOCKED 2026-09-03; built with the
        * Receiving & GRN card). Modules reference duties; they never keep a
