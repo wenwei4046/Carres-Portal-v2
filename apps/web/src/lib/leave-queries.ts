@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  leaveRecorderViewSchema,
   myLeaveResponseSchema,
   teamLeaveResponseSchema,
+  type StaffLeaveRecordForInput,
   type StaffLeaveSubmitInput,
 } from "@carres/shared/workspace-leave";
 import { apiFetch } from "./api";
@@ -58,6 +60,28 @@ export function useSubmitLeave() {
   });
 }
 
+/** 0680 — may I record leave for a colleague, whom, and what I recorded. */
+export function useLeaveRecorder() {
+  return useQuery({
+    queryKey: ["workspace", "leave", "recorder"] as const,
+    queryFn: async () => leaveRecorderViewSchema.parse(await apiFetch<unknown>("/api/operation/leave/recorder")),
+    staleTime: 60_000,
+  });
+}
+
+/** 0680 — record a colleague's leave (the owner or a named Staff & Duties editor). */
+export function useRecordLeaveFor() {
+  const refresh = useRefreshAfterLeave();
+  return useMutation({
+    mutationFn: (input: StaffLeaveRecordForInput) =>
+      apiFetch<{ id: string; cover_moved: number }>("/api/operation/leave/for", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: refresh,
+  });
+}
+
 export function useCancelLeave() {
   const refresh = useRefreshAfterLeave();
   return useMutation({
@@ -95,10 +119,13 @@ export function leaveRefusalCode(error: unknown): string {
 
 /** COPY-STANDARD "Workspace → Leave" — one sentence per refusal, never the
  *  database's own text. */
-export function leaveRefusalSentence(act: "submit" | "cancel", error: unknown): string {
+export function leaveRefusalSentence(act: "submit" | "cancel", error: unknown, forName?: string): string {
   switch (leaveRefusalCode(error)) {
     case "leave_overlap":
-      return "You already have leave on these dates.";
+      return forName ? `${forName} already has leave on these dates.` : "You already have leave on these dates.";
+    case "not_leave_recorder":
+    case "forbidden":
+      return "Only the owner and the people named for Staff & Duties can record leave for a colleague.";
     case "invalid_proof":
       return "Upload the MC proof again.";
     case "reason_required":

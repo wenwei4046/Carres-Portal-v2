@@ -1,8 +1,16 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppEnv } from "../../types";
-vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
-import { userClient } from "../../lib/supabase";
+vi.mock("../../lib/supabase", () => ({ userClient: vi.fn(), adminClient: vi.fn() }));
+const gate = vi.hoisted(() => ({ allow: true }));
+vi.mock("../../lib/settings-editor", () => ({
+  canEditSettings: vi.fn(async () => gate.allow),
+  requireSettingsEditor: () => async (c: { json: (b: unknown, s: number) => unknown }, next: () => Promise<void>) => {
+    if (!gate.allow) return c.json({ error: "forbidden" }, 403);
+    await next();
+  },
+}));
+import { adminClient, userClient } from "../../lib/supabase";
 import router from "./leave";
 
 /** 0670 — Workspace → Leave. The router is thin: every rule is the SQL door's,
@@ -34,6 +42,7 @@ const post = (path: string, body: unknown, role?: string) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  gate.allow = true;
   rows.data = []; rows.error = null; policies.data = []; policies.error = null;
   vi.mocked(userClient).mockReturnValue({
     rpc,
@@ -117,5 +126,36 @@ describe("Workspace → Leave API", () => {
     expect((await app("dealer").request("/leave")).status).toBe(403);
     expect((await app("hr").request("/leave/team")).status).toBe(403);
     expect(userClient).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows who recorded my leave when a colleague recorded it for me (0680)", async () => {
+    const RECORDER = "eeeeeeee-0000-4000-8000-0000000000cc";
+    rows.data = [{ id: "eeeeeeee-0000-4000-8000-0000000000dd", leave_type: "emergency", starts_on: "2026-10-09", ends_on: "2026-10-09",
+      reason: "Fever", note: null, proof_paths: [], approval_required: false, submitted_at: "2026-10-09T01:00:00+00:00",
+      cancelled_from: null, cancelled_at: null, recorded_by: RECORDER }];
+    vi.mocked(adminClient).mockReturnValue({ from: () => ({ select: () => ({ in: async () => ({ data: [{ id: RECORDER, name: "Jess" }], error: null }) }) }) } as never);
+    const body = await (await app().request("/leave")).json() as { leave: { recorded_by_name: string | null }[] };
+    expect(body.leave[0]!.recorded_by_name).toBe("Jess");
+  });
+
+  it("records a colleague's leave through the recorder door, never the self door", async () => {
+    const COLLEAGUE = "eeeeeeee-0000-4000-8000-0000000000ee";
+    rpc.mockResolvedValue({ data: { id: "eeeeeeee-0000-4000-8000-0000000000ff", cover_moved: 1 }, error: null });
+    const res = await post("/leave/for", { userId: COLLEAGUE, type: "mc", startsOn: "2026-10-09", endsOn: "2026-10-09" });
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("staff_leave_record_for", expect.objectContaining({ p_user: COLLEAGUE, p_type: "mc" }));
+    expect(rpc).not.toHaveBeenCalledWith("staff_leave_submit", expect.anything());
+  });
+
+  it("someone not named for Staff & Duties cannot record for a colleague", async () => {
+    gate.allow = false;
+    const res = await post("/leave/for", { userId: "eeeeeeee-0000-4000-8000-0000000000ee", type: "planned", startsOn: "2026-10-12", endsOn: "2026-10-12" });
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("the recorder view answers nobody-to-record before 0680 is applied", async () => {
+    rpc.mockResolvedValue({ data: null, error: { code: "PGRST202", message: "not found" } });
+    expect(await (await app().request("/leave/recorder")).json()).toEqual({ canRecordForOthers: false, people: [], recorded: [] });
   });
 });

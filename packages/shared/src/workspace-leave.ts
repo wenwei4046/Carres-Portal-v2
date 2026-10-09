@@ -62,6 +62,44 @@ export const staffLeaveSubmitInput = z
   });
 export type StaffLeaveSubmitInput = z.infer<typeof staffLeaveSubmitInput>;
 
+/** 0680 — leave recorded FOR a colleague by the owner or a named Staff &
+ *  Duties editor (owner ruling 9 Oct 2026). Same rules as my own leave; no
+ *  proof file on this door (proof is optional). */
+export const staffLeaveRecordForInput = z
+  .object({
+    userId: z.string().uuid(),
+    type: leaveTypeSchema,
+    startsOn: isoDay,
+    endsOn: isoDay,
+    reason: z.string().max(LEAVE_REASON_MAX).optional(),
+    note: z.string().max(LEAVE_NOTE_MAX).optional(),
+  })
+  .strict()
+  .superRefine((v, ctx) => {
+    if (v.endsOn < v.startsOn) ctx.addIssue({ code: "custom", path: ["endsOn"], message: "invalid_dates" });
+    if (v.type === "emergency" && !hasText(v.reason)) {
+      ctx.addIssue({ code: "custom", path: ["reason"], message: "reason_required" });
+    }
+  });
+export type StaffLeaveRecordForInput = z.infer<typeof staffLeaveRecordForInput>;
+
+/** What the Record leave form needs to offer a colleague (0680). */
+export const leaveRecorderViewSchema = z.object({
+  canRecordForOthers: z.boolean(),
+  people: z.array(z.object({ id: z.string().uuid(), name: z.string() })),
+  recorded: z.array(z.object({
+    id: z.string().uuid(),
+    userId: z.string().uuid(),
+    name: z.string(),
+    leave_type: leaveTypeSchema,
+    starts_on: isoDay,
+    ends_on: isoDay,
+    cancelled_from: isoDay.nullable(),
+    submitted_at: z.string(),
+  })),
+});
+export type LeaveRecorderView = z.infer<typeof leaveRecorderViewSchema>;
+
 export const staffLeaveProofSignInput = z
   .object({
     mimeType: z.enum(LEAVE_PROOF_MIME),
@@ -81,6 +119,9 @@ export const staffLeaveRowSchema = z.object({
   submitted_at: z.string(),
   cancelled_from: isoDay.nullable(),
   cancelled_at: z.string().nullable(),
+  /** 0680: who recorded it (null before 0680, or when the person did). */
+  recorded_by: z.string().uuid().nullable().optional(),
+  recorded_by_name: z.string().nullable().optional(),
 });
 export type StaffLeaveRow = z.infer<typeof staffLeaveRowSchema>;
 

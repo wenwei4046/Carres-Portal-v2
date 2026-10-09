@@ -5,15 +5,18 @@ import {
   LEAVE_PROOF_BUCKET,
   LEAVE_PROOF_EXT,
   LEAVE_PROOF_PATH,
+  leaveRecorderViewSchema,
   myLeaveResponseSchema,
   staffLeaveProofSignInput,
+  staffLeaveRecordForInput,
   staffLeaveSubmitInput,
   teamLeaveResponseSchema,
 } from "@carres/shared/workspace-leave";
 import { requireOperation } from "../../lib/auth-guards";
+import { requireSettingsEditor } from "../../lib/settings-editor";
 import { klDateOf } from "../../lib/receiving-time";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
-import { userClient } from "../../lib/supabase";
+import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 /**
@@ -25,6 +28,10 @@ import type { AppEnv } from "../../types";
  *   POST /proof/sign     a one-time upload slot for MC proof in MY folder
  *   POST /               submit my own leave (no approval; today's leave
  *                        starts cover at once — the SQL door decides)
+ *   GET  /recorder       may I record leave for a colleague, whom, and the
+ *                        leave I recorded for others (0680)
+ *   POST /for            record a colleague's leave — the owner or a named
+ *                        Staff & Duties editor (owner ruling 9 Oct 2026)
  *   POST /:id/cancel     cancel before it starts, or the days after today
  *   GET  /proof/url      a short-lived read link (the bucket policy decides)
  *   GET  /team           who is away today and the next days — names and
@@ -54,6 +61,7 @@ const REFUSALS = new Set([
   "invalid_proof",
   "leave_overlap",
   "not_your_leave",
+  "not_leave_recorder",
   "already_cancelled",
   "leave_finished",
 ]);
@@ -75,11 +83,7 @@ router.get("/", requireStaff, async (c) => {
     sb.from("workspace_leave_policies")
       .select("leave_type, approval_required, proof_required, reason_required")
       .order("leave_type"),
-    sb.from("staff_leave")
-      .select("id, leave_type, starts_on, ends_on, reason, note, proof_paths, approval_required, submitted_at, cancelled_from, cancelled_at")
-      .eq("user_id", c.var.auth.id)
-      .order("starts_on", { ascending: false })
-      .limit(200),
+    readMyLeave(c.env, sb, c.var.auth.id),
   ]);
   const failed = mayRes.error ?? policies.error ?? rows.error;
   if (failed) {
@@ -97,6 +101,62 @@ router.get("/", requireStaff, async (c) => {
     policies: policies.data ?? [],
     leave: rows.data ?? [],
   }));
+});
+
+/** My leave rows with who recorded each (0680). Before 0680 is applied the
+ *  recorder column does not exist (42703): read without it instead of failing.
+ *  The recorders' NAMES are read on the server (the owner's account row may be
+ *  hidden from a colleague's own token); nothing else about them is returned. */
+async function readMyLeave(env: AppEnv["Bindings"], sb: ReturnType<typeof userClient>, me: string) {
+  const base = "id, leave_type, starts_on, ends_on, reason, note, proof_paths, approval_required, submitted_at, cancelled_from, cancelled_at";
+  const withRecorder = await sb.from("staff_leave")
+    .select(`${base}, recorded_by`)
+    .eq("user_id", me).order("starts_on", { ascending: false }).limit(200);
+  if (withRecorder.error) {
+    if (withRecorder.error.code !== "42703") return withRecorder;
+    return sb.from("staff_leave").select(base).eq("user_id", me).order("starts_on", { ascending: false }).limit(200);
+  }
+  const rows = (withRecorder.data ?? []) as Array<Record<string, unknown> & { recorded_by?: string | null }>;
+  const others = [...new Set(rows.map((r) => r.recorded_by).filter((id): id is string => !!id && id !== me))];
+  const names = new Map<string, string>();
+  if (others.length > 0) {
+    const read = await adminClient(env).from("app_users").select("id, name").in("id", others);
+    for (const u of read.data ?? []) names.set(String(u.id), String(u.name ?? ""));
+  }
+  return {
+    error: null,
+    data: rows.map((r) => ({
+      ...r,
+      recorded_by_name: r.recorded_by && r.recorded_by !== me ? names.get(r.recorded_by) ?? null : null,
+    })),
+  };
+}
+
+router.get("/recorder", requireStaff, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("staff_leave_recorder_view");
+  // Before 0680: nobody records for a colleague yet.
+  if (error) return c.json({ canRecordForOthers: false, people: [], recorded: [] });
+  return c.json(leaveRecorderViewSchema.parse(data));
+});
+
+router.post("/for", requireStaff, requireSettingsEditor("staff_duties"), async (c) => {
+  const body = await parseJsonBody(c, staffLeaveRecordForInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("staff_leave_record_for", {
+    p_user: body.data.userId,
+    p_type: body.data.type,
+    p_starts_on: body.data.startsOn,
+    p_ends_on: body.data.endsOn,
+    p_reason: body.data.reason ?? null,
+    p_note: body.data.note ?? null,
+  });
+  if (error) {
+    const r = refusal(error);
+    return c.json(r.body, r.status);
+  }
+  return c.json(data, 201);
 });
 
 router.post("/proof/sign", requireStaff, async (c) => {

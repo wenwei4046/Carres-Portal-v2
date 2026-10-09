@@ -10,11 +10,13 @@ import { appTodayIso } from "@/lib/fmt-date";
  */
 
 const submitMutate = vi.fn();
+const recordForMutate = vi.fn();
 const cancelMutate = vi.fn();
 const state: {
   data?: MyLeaveResponse;
   submitError: unknown;
   cancelError: unknown;
+  recorder?: { canRecordForOthers: boolean; people: { id: string; name: string }[]; recorded: unknown[] };
 } = { submitError: null, cancelError: null };
 
 vi.mock("@/lib/leave-queries", async () => {
@@ -25,6 +27,8 @@ vi.mock("@/lib/leave-queries", async () => {
     openLeaveProof: vi.fn(),
     useMyLeave: () => ({ data: state.data, isPending: false, isError: false, refetch: vi.fn() }),
     useSubmitLeave: () => ({ mutate: submitMutate, isPending: false, error: state.submitError }),
+    useRecordLeaveFor: () => ({ mutate: recordForMutate, isPending: false, error: null }),
+    useLeaveRecorder: () => ({ data: state.recorder }),
     useCancelLeave: () => ({ mutate: cancelMutate, isPending: false, error: state.cancelError, reset: vi.fn() }),
   };
 });
@@ -72,12 +76,13 @@ function pickDay(triggerId: string, day: number): string {
   const [y, m] = TODAY.split("-");
   return `${y}-${m}-${String(day).padStart(2, "0")}`;
 }
-const submitButton = () => screen.getByRole("button", { name: "Submit leave" });
+const submitButton = () => screen.getByRole("button", { name: "Submit" });
 
 beforeEach(() => {
   vi.clearAllMocks();
   state.submitError = null;
   state.cancelError = null;
+  state.recorder = { canRecordForOthers: false, people: [], recorded: [] };
   state.data = { today: TODAY, canSubmit: true, policies: POLICIES, leave: [] };
 });
 
@@ -168,6 +173,35 @@ describe("Workspace → Leave", () => {
     state.data = { today: TODAY, canSubmit: false, policies: POLICIES, leave: [] };
     render(<OperationLeave />);
     expect(screen.getByText("Only active staff can record leave.")).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Submit leave" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Submit" })).toBeNull();
+  });
+
+  it("Record leave defaults to me; someone not named sees no Leave for choice (0680)", () => {
+    render(<OperationLeave />);
+    expect(screen.getByText("Record leave")).toBeVisible();
+    expect(document.getElementById("leave-person")).toBeNull();
+  });
+
+  it("the owner or a named editor records a colleague's MC: no proof field, the recorder door, recorded for that name", () => {
+    state.recorder = { canRecordForOthers: true, people: [{ id: "eeeeeeee-0000-4000-8000-0000000000ee", name: "Shasha" }], recorded: [] };
+    render(<OperationLeave />);
+    choose("leave-person", "Shasha");
+    choose("leave-type", "MC");
+    const from = pickDay("leave-from", 15);
+    const until = pickDay("leave-until", 15);
+    expect(screen.queryByRole("button", { name: "MC proof" })).toBeNull();
+    fireEvent.click(submitButton());
+    expect(submitMutate).not.toHaveBeenCalled();
+    expect(recordForMutate).toHaveBeenCalledWith(
+      { userId: "eeeeeeee-0000-4000-8000-0000000000ee", type: "mc", startsOn: from, endsOn: until },
+      expect.anything(),
+    );
+  });
+
+  it("my own leave recorded by someone else says who recorded it", () => {
+    state.data = { today: TODAY, canSubmit: true, policies: POLICIES,
+      leave: [row({ id: "eeeeeeee-0000-4000-8000-0000000000ab", recorded_by: "eeeeeeee-0000-4000-8000-0000000000cc", recorded_by_name: "Jess" })] };
+    render(<OperationLeave />);
+    expect(screen.getByText("Recorded by Jess")).toBeVisible();
   });
 });
