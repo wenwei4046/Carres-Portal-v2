@@ -73,6 +73,7 @@ import Icon from "./Icon";
 import Loading from "./Loading";
 import Popover from "./Popover";
 import SearchInput from "./SearchInput";
+import { controlClass } from "./field-recipe";
 import { applyColumnOrder, moveColumnOrder, resizeColumnPair } from "./grid-layout";
 import { Z_TABLE_FOOTER, Z_TABLE_HEADER } from "./overlay-layer";
 
@@ -80,57 +81,22 @@ import { Z_TABLE_FOOTER, Z_TABLE_HEADER } from "./overlay-layer";
 const MIN_COLUMN_PCT = 4;
 
 /**
- * **The vertical hairline between two columns** (card P17, Loo 2026-08-05).
- *
- * Ruled from two photographs of the live page, seconds apart, same data.
- * Measured before the change: **every cell in all four grids carried
- * `border-right: 0px`** — rows had a hairline, the head had one, and there was
- * not a single vertical rule in the table. Three complaints turned out to be
- * one cause: the group band floated because nothing beneath it was ruled, the
- * empty right side read as broken because Excel's whitespace only works while
- * the GRID CONTINUES, and the page was tiring because the eye had nothing to
- * track down.
- *
- * **`slate-5` is not a choice, it is the token** — `01-design-tokens` §2.1
- * names `border` = `slate-5` and its stated use is *"table lines · card edge"*.
- * A column separator IS a table line. No colour was invented, and the row
- * hairline already renders in exactly this value (measured on production:
- * `rgb(224, 225, 230)`), so a column line and a row line are the same line
- * turned ninety degrees.
- *
- * **It is deliberately NOT `slate-6`.** That token is `divider` — *"section
- * split"* — and it is right for the head's own bottom edge, where the head
- * stops and the data starts. Using it here would make the column line change
- * colour at the header and read as two different lines stacked, which is the
- * opposite of something to track down.
- *
- * **The rule is drawn on a cell's RIGHT, so the LAST cell in a row never
- * carries one:** it would sit 1px inside the wrapper's own border and read as
- * a 2px edge. Everything interior gets it, and the last real column keeps its
- * rule whenever a filler follows — which is what BOUNDS the trailing
- * whitespace instead of leaving it open.
- *
- * **THE KIT'S OWN TWO COLUMNS RULE NOTHING, AND THAT IS A MEASUREMENT RATHER
- * THAN A PREFERENCE.** P16 sized them to their contents EXACTLY — the checkbox
- * cell is `8 + 16 + 8 = 32` and the disclosure cell `2 + 8 + 24 + 8 = 42`, so
- * both have ZERO slack. Measured on the live page, a right border on the
- * checkbox cell takes its content box to 15px and the 16px control overflows,
- * which `[&_td]:overflow-hidden` then clips: a shaved checkbox on every row.
- * Widening the column to pay for the line would move every business column
- * 1px right, and P17 may not move a column.
- *
- * So the gutter's own boundary is drawn as the FIRST DATA COLUMN'S LEFT
- * border. **The line lands on exactly the same pixel** — a border on the right
- * of one cell and the left of the next share a boundary — but it is paid for
- * by a column that has room. It also stops the grid ruling BETWEEN the
- * disclosure and the checkbox: those are one gutter, not two facts, and
- * AutoCount and Excel both separate the gutter from the data with a single
- * line.
+ * **v4 table lines** (owner instruction 9 Oct 2026, `01-design-tokens.md` §5):
+ * the header sits on `--c-head-line`, every body row on `--c-row-line`, the
+ * totals strip under `--c-footer-line`, and **no vertical cell lines** — the
+ * P17 column rules (Loo, 2026-08-05) are retired by the v4 kit. Every border
+ * keeps its colour PER SIDE (`border-b-…`), so no two edges fight over one
+ * property. The frame around the sheet stays (P16).
  */
-const COLUMN_RULE = "border-r border-r-kit-slate-5";
-
-/** The same line, drawn from the other side — see `COLUMN_RULE`. */
-const GUTTER_RULE = "border-l border-l-kit-slate-5";
+const HEAD_CELL = "bg-c-card border-b border-b-c-head-line";
+const ROW_CELLS = "[&>td]:border-b [&>td]:border-b-c-row-line";
+const FOOT_CELL = "bg-c-card border-t border-t-c-footer-line";
+/** The group band and the opened record: the v4 neutral grey. */
+const QUIET_WASH = "bg-c-info-bg";
+/** The kit's own small square controls (disclosure, column filter). */
+const MINI_CONTROL =
+  "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-c-secondary hover:bg-c-hover " +
+  "focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px]";
 
 /**
  * A column's Excel filter (Jess, 2026-08-01 — the AutoCount workspace: every
@@ -566,13 +532,13 @@ function HeaderFilter({ colKey, filter }: { colKey: string; filter: ColumnFilter
           aria-label={filter.label}
           data-testid={`table-filter-${colKey}`}
           data-active={active || undefined}
-          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-control text-kit-slate-11 hover:bg-kit-slate-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+          className={MINI_CONTROL}
         >
           <Icon name={active ? "filter" : "columnFilter"} size={14} />
         </button>
       }
     >
-      <div className="flex w-56 flex-col gap-2" data-kit="table-filter">
+      <div className="flex w-56 flex-col gap-2 p-1.5" data-kit="table-filter">
         {filter.searchPlaceholder != null ? (
           <SearchInput
             id={`table-filter-search-${colKey}`}
@@ -584,7 +550,7 @@ function HeaderFilter({ colKey, filter }: { colKey: string; filter: ColumnFilter
         ) : null}
         <div className="max-h-64 overflow-y-auto flex flex-col gap-1">
           {shown.map((o) => (
-            <label key={o.value} className="flex items-center gap-2 text-body text-kit-slate-12">
+            <label key={o.value} className="flex items-center gap-2 text-body text-c-ink">
               <Checkbox
                 id={`table-filter-${colKey}-${o.value.replace(/[^\w-]/g, "_")}`}
                 ariaLabel={o.label}
@@ -605,10 +571,10 @@ function HeaderFilter({ colKey, filter }: { colKey: string; filter: ColumnFilter
            * date fields on purpose — a DatePicker popover inside this popover
            * would stack two floating layers for a two-field form. */
           <div
-            className="flex flex-col gap-1.5 border-t border-kit-slate-5 pt-2"
+            className="flex flex-col gap-1.5 border-t border-c-section-line pt-2"
             data-kit="table-filter-range"
           >
-            <span className="text-label text-kit-slate-11">{filter.range.label}</span>
+            <span className="text-meta text-c-secondary">{filter.range.label}</span>
             <div className="flex items-center gap-1.5">
               <input
                 type="date"
@@ -616,7 +582,7 @@ function HeaderFilter({ colKey, filter }: { colKey: string; filter: ColumnFilter
                 onChange={(e) => setRangeFrom(e.target.value)}
                 aria-label={`${filter.range.label} from`}
                 data-testid={`table-filter-range-from-${colKey}`}
-                className="h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+                className={controlClass(false, "single")}
               />
               <input
                 type="date"
@@ -624,7 +590,7 @@ function HeaderFilter({ colKey, filter }: { colKey: string; filter: ColumnFilter
                 onChange={(e) => setRangeTo(e.target.value)}
                 aria-label={`${filter.range.label} to`}
                 data-testid={`table-filter-range-to-${colKey}`}
-                className="h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+                className={controlClass(false, "single")}
               />
             </div>
             <Button
@@ -709,36 +675,16 @@ export default function DataTable<Row>({
     ordered.length + (selection ? 1 : 0) + (expansion ? 1 : 0) + (fills ? 1 : 0);
 
   /**
-   * P17 — a data column's rules.
-   *
-   * RIGHT: every column but the last, because the last is the table's own
-   * right edge and that edge belongs to the wrapper. A filler counts as
-   * something to the right, so the last REAL column keeps its rule and bounds
-   * the whitespace.
-   *
-   * LEFT: only the first column, and only when a control gutter precedes it.
-   * That is the gutter's boundary, drawn from this side because the kit's own
-   * columns have no pixel to spare (see `COLUMN_RULE`). With no gutter the
-   * first column is the table's left edge and rules nothing — and it is the
-   * cell already carrying the 2px late bar, which must not be fought over.
-   */
-  const hasGutter = selection != null || expansion != null;
-
-  /**
    * The group line's separation — see `group.tone`. `band` keeps the grey every
    * page had before the prop existed; `plain` keeps the line white and puts a
    * `divider` rule above it instead, which is what a SECTION break looks like
    * everywhere else in this portal.
    */
   const plainGroup = group?.tone === "plain";
-  const groupCellWash = plainGroup ? "" : "bg-kit-slate-3";
+  const groupCellWash = plainGroup ? "" : QUIET_WASH;
   const groupRowClass = plainGroup
-    ? "border-b border-kit-slate-5 [&>td]:border-t [&>td]:border-t-kit-slate-6"
-    : "border-b border-kit-slate-5";
-  const columnRule = (ci: number) =>
-    `${fills || ci < ordered.length - 1 ? COLUMN_RULE : ""} ${
-      ci === 0 && hasGutter ? GUTTER_RULE : ""
-    }`;
+    ? `${ROW_CELLS} [&>td]:border-t [&>td]:border-t-c-section-line`
+    : ROW_CELLS;
 
   /**
    * Resize by pointer. The FIRST drag snapshots every column's rendered width
@@ -802,7 +748,7 @@ export default function DataTable<Row>({
        * square toolbar reads as a card floating on a page; a list grid is a
        * SHEET and meets what is above it flush. The kit owns the frame so a
        * page cannot omit a left or right side. */
-      className="min-h-0 flex-1 overflow-auto border border-kit-slate-5 bg-white"
+      className="min-h-0 flex-1 overflow-auto border border-c-card-border bg-c-card"
     >
       <table
         aria-label={label}
@@ -847,10 +793,10 @@ export default function DataTable<Row>({
             {/* Header wash = slate-3 (Jess, 2026-08-02 surface law): one step
                 above the near-white strip, always lighter than the data. */}
             {expansion && (
-              <th className="bg-kit-slate-3 border-b border-b-kit-slate-6" />
+              <th className={HEAD_CELL} />
             )}
             {selection && (
-              <th className="px-2 bg-kit-slate-3 border-b border-b-kit-slate-6">
+              <th className={`px-2 ${HEAD_CELL}`}>
                 <Checkbox
                   id="kit-table-select-all"
                   ariaLabel={selection.label}
@@ -912,9 +858,7 @@ export default function DataTable<Row>({
                  * header is `aria-roledescription`, never part of its name. */
                 aria-label={layout ? c.label : undefined}
                 aria-roledescription={layout?.reorderLabel}
-                className={`relative px-2 bg-kit-slate-3 border-b border-b-kit-slate-6 ${columnRule(
-                  ci,
-                )} text-label font-medium text-kit-slate-12 ${
+                className={`relative px-2 ${HEAD_CELL} text-meta font-medium text-c-muted ${
                   layout ? "cursor-grab" : ""
                 } ${c.align === "right" ? "text-right" : "text-left"}`}
               >
@@ -984,7 +928,7 @@ export default function DataTable<Row>({
                     draggable={false}
                     onPointerDown={(e) => startResize(ci, e)}
                     onClick={(e) => e.stopPropagation()}
-                    className="absolute inset-y-0 right-0 w-1 cursor-col-resize hover:bg-kit-blue-9"
+                    className="absolute inset-y-0 right-0 w-1 cursor-col-resize hover:bg-c-select-fg"
                   />
                 ) : null}
               </th>
@@ -992,20 +936,14 @@ export default function DataTable<Row>({
             {/* The filler carries the header's own wash and rule so the band
              *  reaches the right edge. It holds no word — there is nothing
              *  here to sort, filter or read — and is hidden from a screen
-             *  reader for the same reason.
-             *
-             *  P17 — IT IS BOUNDED, NEVER LATTICED. The last real column now
-             *  rules its own right edge, so the empty region reads as closed
-             *  rather than as a table that stopped. It is deliberately not
-             *  filled with further column lines: P16 froze Loo's ruling that
-             *  trailing whitespace SAYS *this page holds these business facts
-             *  and no more*, and fake rules out to the edge would say there
-             *  are more columns coming. */}
+             *  reader for the same reason. It draws no vertical line: v4 has
+             *  none, and P16's trailing whitespace SAYS *this page holds these
+             *  business facts and no more*. */}
             {fills && (
               <th
                 aria-hidden="true"
                 data-kit="table-filler"
-                className="bg-kit-slate-3 border-b border-b-kit-slate-6"
+                className={HEAD_CELL}
               />
             )}
           </tr>
@@ -1051,8 +989,7 @@ export default function DataTable<Row>({
                      * name them and the eye reads DOWN a column instead of
                      * parsing a sentence. P17's "the band is not sliced" ruled a
                      * free-text band; a band whose content IS columnar is the
-                     * opposite case, and each cell keeps the column rule so the
-                     * lattice runs through it. */
+                     * opposite case, so it is one cell per column. */
                     <tr data-kit="data-group" className={groupRowClass}>
                       {expansion && <td className={`px-2 h-9 align-middle ${groupCellWash}`} />}
                       {selection && (
@@ -1074,18 +1011,13 @@ export default function DataTable<Row>({
                         </td>
                       )}
                       {(() => {
-                        let at = 0;
                         return group.cells(row).map((c, i) => {
-                          const start = at;
                           const span = c.span ?? 1;
-                          at += span;
                           return (
                             <td
                               key={i}
                               colSpan={span}
                               className={`px-2 h-9 align-middle ${groupCellWash} ${
-                                fills || at < ordered.length ? COLUMN_RULE : ""
-                              } ${start === 0 && hasGutter ? GUTTER_RULE : ""} ${
                                 c.align === "right" ? "text-right" : ""
                               }`}
                             >
@@ -1095,18 +1027,13 @@ export default function DataTable<Row>({
                         });
                       })()}
                       {fills && (
-                        <td aria-hidden="true" data-kit="table-filler" className="h-9 bg-kit-slate-3" />
+                        <td aria-hidden="true" data-kit="table-filler" className={`h-9 ${groupCellWash}`} />
                       )}
                     </tr>
                   ) : (
-                  /* P17 — THE BAND IS NOT SLICED, and that is the card's own
-                   * diagnosis followed rather than reversed: it floated
-                   * because there was *nothing BENEATH it to anchor to*, not
-                   * because it lacked rules of its own. The columns under it
-                   * are ruled now, so it sits on a lattice. Cutting the band
-                   * itself into per-column cells would draw a line through the
-                   * middle of one sentence — the customer's name and the date
-                   * are ONE statement spanning the width, not seven facts. */
+                  /* THE BAND IS NOT SLICED (P17): the customer's name and the
+                   * date are ONE statement spanning the width, not seven
+                   * facts, so the band stays one cell. */
                   <tr data-kit="data-group" className={groupRowClass}>
                     <td colSpan={colSpan} className={`px-2 h-9 align-middle ${groupCellWash}`}>
                       {group.header?.(row)}
@@ -1128,7 +1055,7 @@ export default function DataTable<Row>({
                    * because the sweep looked for blue-3 — found by reading
                    * this file, not by the lint.) */
                   data-muted={rowMuted?.(row) || undefined}
-                  className={`border-b border-kit-slate-5 ${
+                  className={`${ROW_CELLS} ${
                     isSelected ? "bg-kit-blue-3" : "hover:bg-kit-slate-3"
                   } ${onRowOpen ? "cursor-pointer" : ""} ${
                     rowMuted?.(row) ? "opacity-50 grayscale" : ""
@@ -1150,7 +1077,7 @@ export default function DataTable<Row>({
                           aria-label={expansion.label(row)}
                           data-testid={`table-expand-${id}`}
                           onClick={() => expansion.onToggle(id)}
-                          className="inline-flex h-6 w-6 items-center justify-center rounded-control text-kit-slate-11 hover:bg-kit-slate-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+                          className={MINI_CONTROL}
                         >
                           <Icon name={isExpanded ? "collapse" : "expand"} size={14} />
                         </button>
@@ -1183,7 +1110,7 @@ export default function DataTable<Row>({
                   {ordered.map((c, i) => (
                     <td
                       key={c.key}
-                      className={`px-2 text-kit-slate-12 ${columnRule(i)} ${
+                      className={`px-2 text-c-ink ${
                         !selection && !expansion && i === 0 ? `border-l-2 ${lateBar}` : ""
                       } ${c.align === "right" ? "text-right" : ""} ${
                         c.numeric ? "tabular-nums" : ""
@@ -1203,7 +1130,7 @@ export default function DataTable<Row>({
                   <tr data-kit="data-expansion" data-row={id}>
                     <td
                       colSpan={colSpan}
-                      className="!h-auto !overflow-visible !whitespace-normal border-b border-kit-slate-5 bg-kit-slate-3 px-4 py-3 align-top"
+                      className={`!h-auto !overflow-visible !whitespace-normal border-b border-b-c-row-line ${QUIET_WASH} px-4 py-3 align-top`}
                     >
                       {expansion!.render(row)}
                     </td>
@@ -1219,12 +1146,12 @@ export default function DataTable<Row>({
          *  totals strip over no rows states a total of nothing. */}
         {totals && !loading && rows.length > 0 ? (
           <tfoot className={`sticky bottom-0 ${Z_TABLE_FOOTER}`}>
-            <tr className="h-10" aria-label={totals.label} data-kit="data-totals">
+            <tr className="h-11" aria-label={totals.label} data-kit="data-totals">
               {expansion && (
-                <td className="bg-kit-slate-3 border-t border-t-kit-slate-6" />
+                <td className={FOOT_CELL} />
               )}
               {selection && (
-                <td className="bg-kit-slate-3 border-t border-t-kit-slate-6" />
+                <td className={FOOT_CELL} />
               )}
               {totals.cells
                 ? (() => {
@@ -1236,21 +1163,17 @@ export default function DataTable<Row>({
                         <td
                           key={i}
                           colSpan={span}
-                          className={`px-2 bg-kit-slate-3 border-t border-t-kit-slate-6 ${
-                            fills || at < ordered.length ? COLUMN_RULE : ""
-                          } text-kit-slate-12 ${c.align === "right" ? "text-right" : ""}`}
+                          className={`px-2 ${FOOT_CELL} text-c-secondary ${c.align === "right" ? "text-right" : ""}`}
                         >
                           {c.content}
                         </td>
                       );
                     });
                   })()
-                : ordered.map((c, ci) => (
+                : ordered.map((c) => (
                 <td
                   key={c.key}
-                  className={`px-2 bg-kit-slate-3 border-t border-t-kit-slate-6 ${columnRule(
-                    ci,
-                  )} text-kit-slate-12 ${c.align === "right" ? "text-right" : ""} ${
+                  className={`px-2 ${FOOT_CELL} text-c-secondary ${c.align === "right" ? "text-right" : ""} ${
                     c.numeric ? "tabular-nums" : ""
                   }`}
                 >
@@ -1261,7 +1184,7 @@ export default function DataTable<Row>({
                 <td
                   aria-hidden="true"
                   data-kit="table-filler"
-                  className="bg-kit-slate-3 border-t border-t-kit-slate-6"
+                  className={FOOT_CELL}
                 />
               )}
             </tr>

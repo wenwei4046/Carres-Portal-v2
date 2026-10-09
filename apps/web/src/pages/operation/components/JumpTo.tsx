@@ -43,6 +43,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import MIcon from "@/components/carres/MIcon";
 import Icon from "@/components/kit/Icon";
 import { JUMP_DOC_LABEL, type JumpDocumentResult } from "@carres/shared";
 import Modal from "@/components/kit/Modal";
@@ -173,7 +174,12 @@ type Row =
   | { kind: "destination"; destination: JumpDestination }
   | { kind: "document"; document: JumpDocumentResult };
 
-export default function JumpTo() {
+export default function JumpTo({ pill = false }: {
+  /** The shell header's search pill (Carres Layout Standard §1, owner-confirmed
+   *  2026-10-08): the same surface, opened from a 34px grey pill that names
+   *  what it finds. */
+  pill?: boolean;
+} = {}) {
   const navigate = useNavigate();
   const role = useAuth((s) => s.role);
   const [open, setOpen] = useState(false);
@@ -306,17 +312,32 @@ export default function JumpTo() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Jump to"
-        title={`Jump to… (${hint})`}
-        aria-keyshortcuts="Meta+K Control+K"
-        data-testid="jump-to-trigger"
-        className="flex items-center justify-center h-10 w-10 min-[768px]:h-8 min-[768px]:w-8 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
-      >
-        <Icon name="jump" size={16} />
-      </button>
+      {pill ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Search everything"
+          title={`Search SO, PO, supplier, customer (${hint})`}
+          aria-keyshortcuts="Meta+K Control+K"
+          data-testid="jump-to-trigger"
+          className="flex h-[34px] w-[300px] min-w-[140px] shrink items-center gap-2 rounded-full bg-c-search-bg px-3 text-left text-[13px] text-c-muted"
+        >
+          <MIcon name="search" size={18} />
+          <span className="min-w-0 flex-1 truncate">Search SO, PO, supplier, customer</span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Jump to"
+          title={`Jump to… (${hint})`}
+          aria-keyshortcuts="Meta+K Control+K"
+          data-testid="jump-to-trigger"
+          className="flex items-center justify-center h-10 w-10 min-[768px]:h-8 min-[768px]:w-8 rounded-md text-base-500 hover:text-base-900 hover:bg-hovertint transition-colors"
+        >
+          <Icon name="jump" size={16} />
+        </button>
+      )}
 
       <Modal open={open} onOpenChange={(o) => (o ? setOpen(true) : close())} title="Jump to…">
         <div onKeyDown={onKeyDown} data-testid="jump-to-surface">
@@ -326,7 +347,7 @@ export default function JumpTo() {
               with eyes. */}
           <SearchInput
             id="jump-to-query"
-            placeholder="Destination or document number"
+            placeholder="Search SO, PO, supplier, customer"
             aria-label="Jump to"
             role="combobox"
             aria-expanded
@@ -423,7 +444,7 @@ function RowButton({
       onMouseMove={onHover}
       onClick={onSelect}
       className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-control text-left ${
-        activeRow ? "bg-kit-blue-3" : "hover:bg-kit-slate-3"
+        activeRow ? "bg-c-select-bg" : "hover:bg-c-search-bg"
       }`}
     >
       {isDoc ? (

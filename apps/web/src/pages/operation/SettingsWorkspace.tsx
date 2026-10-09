@@ -38,6 +38,7 @@ import IssueTrackerSettings from "./IssueTrackerSettings";
 import PaymentSettings from "./PaymentSettings";
 import WarehouseSettings, { WAREHOUSE_SETTINGS_SECTIONS } from "./WarehouseSettings";
 import DeliverySettings from "./DeliverySettings";
+import AppearanceSettings from "./AppearanceSettings";
 import { DELIVERY_SETTINGS_SECTIONS } from "@carres/shared";
 
 /**
@@ -51,6 +52,9 @@ import { DELIVERY_SETTINGS_SECTIONS } from "@carres/shared";
  * but the navigation between them.
  */
 const SECTIONS = [
+  /* Personal · Appearance — each person's own theme and focus outline (01 §9,
+     COPY "Personal Appearance"). */
+  { group: "Personal", items: [{ slug: "appearance", label: "Appearance" }] },
   { group: "Staff & Duties", items: [{ slug: "staff-duties", label: "Staff & Duties" }] },
   { group: "Sales Orders", items: [{ slug: "sales-orders", label: "Sales Order Settings" }] },
   { group: "Purchasing", items: [{ slug: "purchasing", label: "Purchasing Settings" }] },
@@ -74,6 +78,18 @@ const SECTIONS = [
     })),
   },
 ] as const;
+
+/** The section a Settings address names, for the shell header's
+ *  `Settings / {section}` (Layout Standard §1). */
+export function settingsSectionLabel(pathname: string): string | null {
+  const rest = pathname.replace(/^\/operation\/settings\/?/, "");
+  for (const group of SECTIONS) {
+    for (const item of group.items) {
+      if (rest === item.slug || rest.startsWith(`${item.slug}/`)) return item.label;
+    }
+  }
+  return null;
+}
 
 /** One browser's own choice. Never a server preference — it is a view state. */
 const SETTINGS_RAIL_STORAGE_KEY = "ops-settings-rail";
@@ -149,20 +165,14 @@ export default function SettingsWorkspace() {
                     [
                       "relative flex min-h-[36px] w-full items-start gap-2 rounded-control px-2 py-[9px] text-left text-body",
                       isActive
-                        ? "bg-kit-blue-3 text-kit-slate-12 font-semibold"
+                        ? "bg-c-select-bg text-c-select-fg font-semibold"
                         : "text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12",
                     ].join(" ")
                   }
                   data-testid={`settings-section-${item.slug.replace("/", "-")}`}
                 >
-                  {({ isActive }) => (
+                  {() => (
                     <>
-                      {isActive && (
-                        <span
-                          aria-hidden
-                          className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
-                        />
-                      )}
                       <span className="min-w-0 flex-1">{item.label}</span>
                     </>
                   )}
@@ -197,6 +207,7 @@ export default function SettingsWorkspace() {
             </button>
           ) : undefined} />} />
           <Route index element={<Navigate to="sales-orders" replace />} />
+          <Route path="appearance" element={<AppearanceSettings />} />
           <Route path="sales-orders" element={<SalesOrderSettings />} />
           <Route path="purchasing" element={<OperationPurchasingSettings embedded />} />
           <Route path="payment" element={<PaymentSettings />} />

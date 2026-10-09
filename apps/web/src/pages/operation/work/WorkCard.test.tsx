@@ -79,7 +79,8 @@ describe("WorkCard", () => {
     const open = screen.getByRole("button", { name: "Open SO-1318 in Delivery" });
     expect(open.className).toContain("h-8");
     expect(open.className).toContain("w-8");
-    expect(open.querySelector("svg")?.getAttribute("width")).toBe("14");
+    /* The kit icon is Material Symbols since the v4 kit (01 §3: 16 to 21px). */
+    expect((open.querySelector(".material-symbols-rounded") as HTMLElement | null)?.style.fontSize).toBe("16px");
   });
 
   it("the skeleton keeps the card's geometry: 104px, 60px rail", () => {

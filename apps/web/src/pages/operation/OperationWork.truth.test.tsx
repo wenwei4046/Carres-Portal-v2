@@ -182,9 +182,9 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(screen.queryByTestId("work-rail-day-2026-09-20")).toBeNull(); // Sunday never drawn
     expect(dayCard("2026-09-17")).toHaveAttribute("data-today", "yes");
     expect(dayCard("2026-09-17")).toHaveAttribute("aria-pressed", "true"); // the focus day is chosen
-    expect(dayCard("2026-09-17").className).toContain("bg-kit-slate-5"); // a chosen day is grey: the rail's one blue is the chosen order row
-    expect(dayCard("2026-09-17").className).not.toContain("bg-kit-blue");
-    expect(dayCard("2026-09-14").className).not.toContain("bg-kit-blue");
+    expect(dayCard("2026-09-17").className).toContain("bg-c-btn-border"); // a chosen day is grey: the rail's one selection colour is the chosen order row
+    expect(dayCard("2026-09-17").className).not.toContain("bg-c-select-bg");
+    expect(dayCard("2026-09-14").className).not.toContain("bg-c-select-bg");
     expect(screen.getByTestId("work-rail-month-label")).toHaveTextContent(/^Sep 2026$/);
   });
 
@@ -200,7 +200,7 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     show();
     const holiday = dayCard("2026-09-16");
     expect(holiday).toHaveAttribute("data-closed", "yes");
-    expect(holiday.className).toContain("text-kit-slate-9");
+    expect(holiday.className).toContain("text-c-muted");
     expect(holiday).toHaveTextContent(/^16$/);
     expect(holiday).toHaveAttribute("aria-label", "Wed, 16 Sep · Malaysia Day · 0 actions");
     expect(screen.getByTestId("work-rail-broken")).toHaveTextContent("Broken commitment0");

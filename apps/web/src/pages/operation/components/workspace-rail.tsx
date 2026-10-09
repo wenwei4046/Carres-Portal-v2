@@ -9,6 +9,15 @@
  * A page-level recipe, not a kit component: the kit has no rail, and a
  * navigation rail is a WORKSPACE shape rather than a general one. When the kit
  * grows one, this file is what it replaces.
+ *
+ * ── THE LOOK — v4 UI kit (owner 9 Oct 2026, `01-design-tokens.md` §§1–4) ──
+ * The rail is ONE white card (1px card border, radius 8, no shadow), 240px
+ * open, sitting on the theme ground. Inside: 6px padding so a row's 10px
+ * padding puts every word 16px from the card edge (the card padding); a 10/600
+ * .12em uppercase muted label names a static group; rows are 13px body, hover
+ * the grey hover, the chosen row 600 in the theme select colours, radius 8;
+ * counts 12px muted; groups part on the thin section line. No box inside the
+ * box, no coloured edge marker. Icons are Material Symbols through `MIcon`.
  */
 import {
   createContext,
@@ -23,6 +32,17 @@ import {
   type RefObject,
 } from "react";
 import Icon, { type IconName } from "@/components/kit/Icon";
+import MIcon from "@/components/carres/MIcon";
+
+/* The v4 recipe, typed once so no row in this file drifts from another. */
+const GROUP_LABEL =
+  "text-[10px] font-semibold uppercase leading-[13px] tracking-[0.12em] text-c-muted";
+/** A rail row: 7px × 10px, 13/18, radius 8 (the side menu's item grammar). */
+const ROW =
+  "relative flex min-h-8 w-full gap-2 rounded-lg px-2.5 py-[7px] text-left text-[13px] leading-[18px] max-[767px]:min-h-10";
+const ROW_ON = "bg-c-select-bg font-semibold text-c-select-fg";
+const ROW_REST = "text-c-body hover:bg-c-hover";
+const COUNT = "shrink-0 tabular-nums text-[12px] leading-[18px] font-normal text-c-muted";
 
 export function RailGroup({
   title,
@@ -32,13 +52,11 @@ export function RailGroup({
   children: ReactNode;
 }) {
   return (
-    <div>
-      <div className="flex items-center px-1.5">
-        <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">
-          {title}
-        </span>
+    <div className="py-1">
+      <div className="flex items-center px-2.5 pb-1 pt-1.5">
+        <span className={GROUP_LABEL}>{title}</span>
       </div>
-      <div className="mt-1 flex flex-col gap-0.5">{children}</div>
+      <div className="flex flex-col gap-0.5">{children}</div>
     </div>
   );
 }
@@ -73,30 +91,17 @@ export function RailItem({
       title={title}
       data-testid={testId}
       className={[
-        // Hover is GREY (01-design-tokens §2.3, ruled 2026-08-03). Blue is the
-        // primary action and the SELECTED row only. Both inline copies of this
-        // rail were written before that rule and still carry the blue tint;
-        // extracting the recipe is what made the linter able to see it.
-        "relative flex items-center gap-2 px-2 py-1.5 rounded-control text-left text-body w-full",
-        active
-          ? "bg-kit-blue-3 text-kit-slate-12 font-semibold"
-          : "text-kit-slate-11 hover:bg-kit-slate-3",
+        // Hover is GREY; the theme select colours mark the chosen row only.
+        `${ROW} items-center`,
+        active ? ROW_ON : ROW_REST,
       ].join(" ")}
     >
-      {active && (
-        <span
-          aria-hidden
-          className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
-        />
-      )}
       <span
-        className={`flex-1 truncate ${danger && !active ? "text-kit-red-11" : ""}`}
+        className={`flex-1 truncate ${danger && !active ? "text-c-err-fg" : ""}`}
       >
         {label}
       </span>
-      {count != null && (
-        <span className="tabular-nums text-label text-kit-slate-11">{count}</span>
-      )}
+      {count != null && <span className={COUNT}>{count}</span>}
     </button>
   );
 }
@@ -106,15 +111,16 @@ export function RailItem({
  * (`docs/ui/MASTER.md` §6.7 Portal-wide listing readability, Jess 2026-09-17;
  * geometry from Card 02-C, owner ruling 2026-08-27).
  *
- * 240px wide · 12px outer padding · a 1px divider between groups · 36px
- * minimum row — and a governed label is NEVER truncated: it wraps onto a
- * second line in the same body font at its natural height, count still
- * visible and right-aligned. The rail is navigation, not batch selection — no
- * row here ever grows a checkbox, and each group stays single-choice.
+ * 240px wide · one white card · the thin section line between groups · 32px
+ * minimum row (40px on a phone) — and a governed label is NEVER truncated: it
+ * wraps onto a second line in the same body font at its natural height, count
+ * still visible and right-aligned. The rail is navigation, not batch
+ * selection — no row here ever grows a checkbox, and each group stays
+ * single-choice.
  *
- * Every group heading is a button: kit icon + 13px/600 slate-12 normal-case
- * title, the group's chosen value in blue at the right ONLY while that group
- * is filtered (empty otherwise), and a chevron. Collapsing hides the group's
+ * Every group heading is a button: kit icon + 13px/600 ink normal-case title,
+ * the group's chosen value in the theme select colour at the right ONLY while
+ * that group is filtered (empty otherwise), and a chevron. Collapsing hides the group's
  * controls but keeps them mounted, so a collapsed group never loses or clears
  * its filter. The open/closed state is remembered per browser, per rail, per
  * group.
@@ -168,9 +174,10 @@ export function ShowFiltersButton({
       title="Show filters"
       data-testid={testId}
       onClick={onShow}
-      className="grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+      /* The v4 toolbar icon button: 36 round, no border, body ink, grey hover. */
+      className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-c-body hover:bg-c-hover"
     >
-      <Icon name="panelToggle" />
+      <MIcon name="left_panel_open" size={20} />
     </button>
   );
 }
@@ -210,28 +217,30 @@ export function FilterRail({
       onClick={onHide}
       aria-label="Hide filters"
       title="Hide filters"
-      className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+      className="absolute right-1.5 top-1.5 z-10 grid h-8 w-8 place-items-center rounded-lg text-c-muted hover:bg-c-hover hover:text-c-body"
     >
-      <Icon name="panelToggle" panelOpen />
+      <MIcon name="left_panel_close" size={20} />
     </button>
   );
+  /* ONE white card on the ground: 1px card border, radius 8, no shadow. */
+  const card = "relative flex w-[240px] min-h-0 shrink-0 flex-col rounded-lg border border-c-card-border bg-c-card";
   if (header) {
     return (
       <RailContext.Provider value={ctx}>
         <aside
           data-testid={testId}
           aria-label={ariaLabel}
-          className={`relative flex w-[240px] min-h-0 shrink-0 flex-col border-r border-kit-slate-5 bg-white ${className ?? ""}`}
+          className={`${card} overflow-hidden ${className ?? ""}`}
         >
           {hide}
           <div
-            className="shrink-0 border-b border-kit-slate-5 p-3"
+            className="shrink-0 border-b border-c-section-line px-2.5 py-2"
             data-testid={testId ? `${testId}-fixed` : undefined}
           >
             {header}
           </div>
           <div
-            className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-3"
+            className="flex min-h-0 flex-1 flex-col overflow-y-auto p-1.5 [scrollbar-width:thin]"
             data-testid={testId ? `${testId}-scroll` : undefined}
           >
             {children}
@@ -245,9 +254,9 @@ export function FilterRail({
       <aside
         data-testid={testId}
         aria-label={ariaLabel}
-        /* The collapse toggle sits `top-2`, absolutely positioned beside the
+        /* The collapse toggle sits `top-1.5`, absolutely positioned beside the
            first heading; the first heading leaves it room on the right. */
-        className={`relative flex w-[240px] min-h-0 shrink-0 flex-col overflow-y-auto border-r border-kit-slate-5 bg-white px-3 pb-3 ${onHide ? "pt-1 [&>div:first-of-type>button]:pr-9" : ""} ${className ?? ""}`}
+        className={`${card} overflow-y-auto p-1.5 [scrollbar-width:thin] ${onHide ? "[&>div:first-of-type>button]:pr-9" : ""} ${className ?? ""}`}
       >
         {hide}
         {children}
@@ -305,7 +314,7 @@ export function FilterRailGroup({
   };
   return (
     <div
-      className="border-t border-kit-slate-5 py-2 first-of-type:border-t-0"
+      className="border-t border-c-section-line py-1 first-of-type:border-t-0"
       data-rail-group={groupKey ?? title}
     >
       <button
@@ -313,33 +322,32 @@ export function FilterRailGroup({
         onClick={toggle}
         aria-expanded={open}
         aria-controls={bodyId}
-        className="flex min-h-[36px] w-full items-center gap-2 rounded-control px-1.5 text-left hover:bg-kit-slate-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-kit-blue-9"
+        /* Keyboard focus is the shell's one outline (`--c-focus`, offset −2). */
+        className="flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-c-hover max-[767px]:min-h-10"
       >
-        <span className="shrink-0 text-kit-slate-11">
+        <span className="flex shrink-0 text-c-secondary">
           <Icon name={icon} />
         </span>
         {/* A title never breaks inside a word (it may still wrap at a space); the
             chosen value beside it gives way and truncates instead. */}
-        <span className="min-w-min flex-1 break-normal text-body font-semibold text-kit-slate-12">
+        <span className="min-w-min flex-1 break-normal text-[13px] font-semibold leading-[18px] text-c-ink">
           {title}
         </span>
         {!open && shown != null && (
           <span
-            className="min-w-0 max-w-[45%] truncate text-body font-semibold text-kit-blue-11"
+            className="min-w-0 max-w-[45%] truncate text-[13px] font-semibold leading-[18px] text-c-select-fg"
             title={shown}
             data-testid="rail-group-chosen"
           >
             {shown}
           </span>
         )}
-        <span className="shrink-0 text-kit-slate-11">
-          <Icon name={open ? "collapse" : "expand"} />
-        </span>
+        <MIcon name={open ? "expand_more" : "chevron_right"} size={18} className="text-c-muted" />
       </button>
       <GroupContext.Provider value={groupCtx}>
         {/* `hidden` alone lost to `flex` (a class beats the attribute), so a
             closed group still drew its rows: the display follows `open`. */}
-        <div id={bodyId} hidden={!open} className={`mt-1 flex-col gap-0.5 ${open ? "flex" : "hidden"}`}>
+        <div id={bodyId} hidden={!open} className={`mt-0.5 flex-col gap-0.5 pb-1 ${open ? "flex" : "hidden"}`}>
           {children}
         </div>
       </GroupContext.Provider>
@@ -360,9 +368,9 @@ export function FilterRailRow({
   indent = false,
 }: {
   label: string;
-  /** `workspace` — the Work rail (Workspace MASTER §5.10 BUILD SHEET): rows
-   *  14/400 with the count on the right; the chosen row is the pale-blue wash
-   *  with the 3px blue edge, full width. */
+  /** `workspace` — the Work rail (Workspace MASTER §5.10 BUILD SHEET): full
+   *  width rows with the count on the right; the chosen order row wears the
+   *  theme select colours. */
   tone?: "default" | "workspace";
   /** A record row under its module row (the Work order list). */
   indent?: boolean;
@@ -387,42 +395,32 @@ export function FilterRailRow({
       title={title}
       data-testid={testId}
       className={tone === "workspace" ? [
-        "relative flex min-h-[36px] w-full items-center gap-2 py-2 pr-4 text-left text-control text-kit-slate-12",
+        "relative flex min-h-9 w-full items-center gap-2 py-2 pr-4 text-left text-[13px] leading-[18px] text-c-body max-[767px]:min-h-10",
         indent ? "pl-6" : "pl-4",
-        /* ONE BLUE IN THE RAIL (Jess, 2026-09-28: "why force to select all
-           module with blue? confusing like select 2"): only the chosen order
-           row is blue. A chosen filter (Attention, Module) is the grey chip
-           with bold text, the same as the My Task / Team Work switch. */
-        active ? (indent ? "bg-kit-blue-3 font-semibold" : "bg-kit-slate-3 font-semibold") : "hover:bg-kit-slate-2",
+        /* ONE SELECTION COLOUR IN THE RAIL (Jess, 2026-09-28: "why force to
+           select all module with blue? confusing like select 2"): only the
+           chosen order row wears the theme select colours. A chosen filter
+           (Attention, Module) is the grey chip with bold text, the same as the
+           My Task / Team Work switch. */
+        active ? (indent ? ROW_ON : "bg-c-hover font-semibold text-c-ink") : "hover:bg-c-hover",
       ].join(" ") : [
-        /* 36px minimum: 18px text-body line + 9px above and below. A wrapped
-           label simply adds its second 18px line — natural height, same font,
-           never a tooltip. `items-start` keeps the count on the first line. */
-        "relative flex min-h-[36px] w-full items-start gap-2 rounded-control px-2 py-[9px] text-left text-body text-kit-slate-12",
-        /* ONE BLUE PER PAGE (Jess, 2026-09-26): a rail choice is bold with the
-           2px left line, never a wash; the group's `All …` row is the
-           unfiltered state — bold, nothing else. The only washed row on a
-           page is the chosen work/record row. */
-        active ? "font-semibold" : "hover:bg-kit-slate-3",
+        /* 32px minimum: the 18px line + 7px above and below. A wrapped label
+           simply adds its second 18px line — natural height, same font, never
+           a tooltip. `items-start` keeps the count on the first line. */
+        `${ROW} items-start`,
+        /* A rail choice is 600 in the theme select colours (v4). The group's
+           `All …` row is the unfiltered state — bold ink, never the select
+           wash, so an unfiltered group never reads as a second choice. */
+        active ? (resets ? "font-semibold text-c-ink hover:bg-c-hover" : ROW_ON) : ROW_REST,
       ].join(" ")}
     >
-      {active && (tone === "workspace" ? indent : !resets) && (
-        <span
-          aria-hidden
-          className={tone === "workspace" ? "absolute bottom-0 left-0 top-0 w-[3px] bg-kit-blue-9" : "absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"}
-        />
-      )}
       <span className="min-w-0 flex-1 break-words">
         {label}
         {supportingText && (
-          <span className="block text-meta font-normal text-kit-slate-11">{supportingText}</span>
+          <span className="block text-[12px] leading-4 font-normal text-c-secondary">{supportingText}</span>
         )}
       </span>
-      {count != null && (
-        <span className={tone === "workspace" ? `shrink-0 tabular-nums ${indent ? "text-meta" : "text-control"} font-normal text-kit-slate-11` : "shrink-0 tabular-nums text-meta leading-[18px] font-normal text-kit-slate-11"}>
-          {count}
-        </span>
-      )}
+      {count != null && <span className={COUNT}>{count}</span>}
     </button>
   );
 }
@@ -443,7 +441,7 @@ export function FilterRailRow({
  * register to that week. Both are real buttons, both reachable by keyboard,
  * and the arrow states what it is doing through `aria-expanded`.
  *
- * It is the `FilterRailRow` geometry unchanged — 36px minimum, wrapping label,
+ * It is the `FilterRailRow` geometry unchanged — 32px minimum, wrapping label,
  * right-aligned count, the same selected treatment — with the disclosure in
  * front of it. A group that has nothing to open passes no `children` and gets
  * an ordinary row.
@@ -473,12 +471,6 @@ export function FilterRailExpandableRow({
   return (
     <div>
       <div className="relative flex items-start">
-        {active && (
-          <span
-            aria-hidden
-            className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
-          />
-        )}
         {children ? (
           <button
             type="button"
@@ -488,9 +480,9 @@ export function FilterRailExpandableRow({
             title={expandLabel}
             data-testid={`${testId}-expand`}
             onClick={() => setOpen((v) => !v)}
-            className="mt-[9px] grid h-[18px] w-4 shrink-0 place-items-center rounded-control text-kit-slate-11 hover:bg-kit-slate-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-kit-blue-9"
+            className="mt-[7px] grid h-[18px] w-4 shrink-0 place-items-center rounded-lg text-c-muted hover:bg-c-hover hover:text-c-body"
           >
-            <Icon name={open ? "expand" : "forward"} size={14} />
+            <MIcon name={open ? "expand_more" : "chevron_right"} size={16} />
           </button>
         ) : (
           <span className="w-4 shrink-0" aria-hidden />
@@ -500,17 +492,10 @@ export function FilterRailExpandableRow({
           onClick={onClick}
           aria-pressed={active}
           data-testid={testId}
-          className={[
-            "flex min-h-[36px] w-full items-start gap-2 rounded-control px-2 py-[9px] text-left text-body text-kit-slate-12",
-            active ? "bg-kit-blue-3 font-semibold" : "hover:bg-kit-slate-3",
-          ].join(" ")}
+          className={[`${ROW} items-start`, active ? ROW_ON : ROW_REST].join(" ")}
         >
           <span className="min-w-0 flex-1 break-words">{label}</span>
-          {count != null && (
-            <span className="shrink-0 tabular-nums text-meta leading-[18px] font-normal text-kit-slate-11">
-              {count}
-            </span>
-          )}
+          {count != null && <span className={COUNT}>{count}</span>}
         </button>
       </div>
       {children && (
@@ -543,9 +528,9 @@ export function FilterRailExpandableRow({
  * multi-select, and it never grows a checkbox — the rail is navigation, not
  * batch selection.
  *
- * The ACTIVE treatment is the rail's own: a chosen value keeps the blue
- * left-edge marker and the blue field, so a narrowed section is as visible
- * as a selected row was. A count rides in the option text (`Ohana · 4`),
+ * The ACTIVE treatment is the rail's own: a chosen value wears the theme
+ * select colours at 600, so a narrowed section is as visible as a selected
+ * row. A count rides in the option text (`Ohana · 4`),
  * because the reason the counts existed — knowing a name is worth clicking
  * before you click it — does not go away just because the rows became
  * options.
@@ -572,25 +557,18 @@ export function FilterRailSelect({
   useReportChosen(active ? (options.find((o) => o.value === value)?.label ?? null) : null);
   return (
     <div className="relative">
-      {active && (
-        <span
-          aria-hidden
-          className="absolute left-0 top-1 bottom-1 z-10 w-0.5 bg-kit-blue-9"
-        />
-      )}
       <select
         aria-label={label}
         data-testid={testId}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
         className={[
-          /* The rail row's own geometry: 36px minimum, the same rounded
-             control, the same body type — so a section that collapsed does
-             not change the rail's rhythm. */
-          "min-h-[36px] w-full rounded-control border px-2 py-[9px] text-body",
+          /* The v4 field: 32px, 1px input border, radius 8, 10px sides, 13px
+             — so a section that collapsed does not change the rail's rhythm. */
+          "h-8 w-full rounded-lg border px-2.5 text-[13px] leading-[18px] max-[767px]:h-10",
           active
-            ? "border-kit-blue-9 bg-kit-blue-3 font-semibold text-kit-slate-12"
-            : "border-kit-slate-6 bg-white text-kit-slate-12 hover:bg-kit-slate-3",
+            ? "border-c-select-bg bg-c-select-bg font-semibold text-c-select-fg"
+            : "border-c-input-border bg-c-card text-c-body hover:bg-c-hover",
         ].join(" ")}
       >
         <option value="">{allLabel}</option>
@@ -697,10 +675,10 @@ export function useFilterRailOpen(
  * accessible name and tooltip. Today is the number in a RING; the week that
  * holds today is the tinted row (Jess, 2026-09-26: "circle the day you are
  * today, not write today; the week should have colour"). The full grid's
- * chosen tile is solid blue, white text. The compact Work grid has NO blue
- * (Jess, 2026-09-28: one blue in the Work rail = the chosen order row): its
- * chosen day is the darker grey chip, today a dark ring. Six columns share
- * the 216px row.
+ * chosen tile wears the theme select colours. The compact Work grid has NO
+ * select colour (Jess, 2026-09-28: one selection colour in the Work rail = the
+ * chosen order row): its chosen day is the darker grey chip, today a dark
+ * ring. Six columns share the 216px row.
  */
 export interface RailWeekDay {
   iso: string;
@@ -736,13 +714,13 @@ export function FilterRailMonthGrid({
     <div className={compact ? "py-1" : "py-2"} data-testid={testId}>
       <div className="grid grid-cols-6 gap-x-1" aria-hidden="true">
         {MONTH_GRID_COLUMNS.map((c) => (
-          <span key={c} className="text-center text-[10px] font-semibold leading-4 text-kit-slate-9">{c}</span>
+          <span key={c} className="text-center text-[10px] font-semibold leading-4 text-c-muted">{c}</span>
         ))}
       </div>
       {weeks.map((week, row) => {
         const thisWeek = week.some((d) => d?.today);
         return (
-        <div key={row} className={`grid grid-cols-6 gap-x-1 gap-y-1 rounded-control ${thisWeek ? "bg-kit-slate-3" : ""}`} data-testid={`${testId}-week-${row}`} data-this-week={thisWeek ? "yes" : undefined}>
+        <div key={row} className={`grid grid-cols-6 gap-x-1 gap-y-1 rounded-lg ${thisWeek ? "bg-c-ground" : ""}`} data-testid={`${testId}-week-${row}`} data-this-week={thisWeek ? "yes" : undefined}>
           {week.map((d, col) => {
             if (!d) return <span key={col} aria-hidden="true" />;
             const chosen = chosenIso === d.iso;
@@ -763,12 +741,12 @@ export function FilterRailMonthGrid({
                   /* The count sits UNDER the day number in both grids (Workspace
                      §5.10 8b; Jess 2026-09-28 on the compact grid's count beside
                      the number: "failed ui. how to make it easy read"). */
-                  "flex h-9 min-w-0 flex-col items-center justify-start rounded-control pt-0.5 tabular-nums",
-                  chosen ? (compact ? "bg-kit-slate-5 text-kit-slate-12" : "bg-kit-blue-9 text-white") : closed || (compact && d.count === 0) ? "text-kit-slate-9 hover:bg-kit-slate-2" : "text-kit-slate-12 hover:bg-kit-slate-2",
+                  "flex h-9 min-w-0 flex-col items-center justify-start rounded-lg pt-0.5 tabular-nums",
+                  chosen ? (compact ? "bg-c-btn-border text-c-ink" : "bg-c-select-bg text-c-select-fg") : closed || (compact && d.count === 0) ? "text-c-muted hover:bg-c-hover" : "text-c-ink hover:bg-c-hover",
                 ].join(" ")}
               >
-                <span className={`grid h-5 w-5 place-items-center rounded-full leading-4 ${compact ? `text-body ${(d.count > 0 && !closed) || chosen ? "font-semibold" : "font-normal"}` : "text-[13px] font-semibold"} ${d.today ? (compact ? "ring-1 ring-kit-slate-12" : chosen ? "ring-1 ring-white" : "ring-1 ring-kit-slate-12") : ""}`}>{d.dayNumber}</span>
-                <span className={compact ? `h-3.5 text-label ${chosen ? "text-kit-slate-12" : "text-kit-slate-11"}` : `h-3.5 text-[10px] leading-[14px] ${chosen ? "text-white" : "text-kit-slate-11"}`}>
+                <span className={`grid h-5 w-5 place-items-center rounded-full leading-4 ${compact ? `text-[13px] ${(d.count > 0 && !closed) || chosen ? "font-semibold" : "font-normal"}` : "text-[13px] font-semibold"} ${d.today ? (!compact && chosen ? "ring-1 ring-c-select-fg" : "ring-1 ring-c-ink") : ""}`}>{d.dayNumber}</span>
+                <span className={compact ? `h-3.5 text-[11px] leading-[14px] ${chosen ? "text-c-ink" : "text-c-secondary"}` : `h-3.5 text-[10px] leading-[14px] ${chosen ? "text-c-select-fg" : "text-c-secondary"}`}>
                   {!closed && d.count > 0 ? d.count : ""}
                 </span>
               </button>
@@ -791,22 +769,22 @@ export function FilterRailMultiSelect({label, values, options, onChange, allLabe
  const listId=useId();
  useReportChosen(values.length ? (values.length===1 ? values[0] : `${values.length} selected`) : null);
  const content = <div data-testid={testId} className="flex min-w-0 flex-col gap-1">
-  <input aria-label={`Search ${label}`} placeholder="Search…" value={query} onChange={e=>setQuery(e.target.value)} className="h-8 min-w-0 rounded-control border border-kit-slate-6 bg-white px-2 text-body" />
-  <button type="button" aria-pressed={!values.length} onClick={()=>onChange([])} className="min-h-8 rounded-control px-2 text-left text-body font-medium hover:bg-kit-slate-3">{allLabel}</button>
+  <input aria-label={`Search ${label}`} placeholder="Search…" value={query} onChange={e=>setQuery(e.target.value)} className="h-8 min-w-0 rounded-lg border border-c-input-border bg-c-card px-2.5 text-[13px] text-c-ink placeholder:text-c-muted" />
+  <button type="button" aria-pressed={!values.length} onClick={()=>onChange([])} className={`${ROW} items-center font-medium ${ROW_REST}`}>{allLabel}</button>
   <div className={compact ? "max-h-36 overflow-y-auto" : "max-h-48 overflow-y-auto"}>
    {options.filter(o=>o.label.toLocaleLowerCase().includes(query.toLocaleLowerCase())).map(o=><button
     key={o.value} type="button" aria-pressed={values.includes(o.value)}
     onClick={()=>onChange(values.includes(o.value)?values.filter(v=>v!==o.value):[...values,o.value])}
-    className={`flex min-h-8 w-full items-center rounded-control px-2 py-1 text-left text-body ${values.includes(o.value)?"bg-kit-blue-3 text-kit-blue-11":"hover:bg-kit-slate-3"}`}>
+    className={`${ROW} items-center ${values.includes(o.value)?ROW_ON:ROW_REST}`}>
     <span className="min-w-0 break-words">{o.label}</span>
    </button>)}
   </div>
  </div>;
  if (!compact) return content;
  return <div className="flex min-w-0 flex-col gap-1">
-  <button type="button" className="flex h-8 w-full items-center justify-between rounded-control border border-kit-slate-6 bg-white px-2 text-left text-body" aria-label={`Select ${label}`} aria-expanded={expanded} aria-controls={listId} onClick={()=>setExpanded(value=>!value)}>
-   <span className="truncate">{values.length === 0 ? allLabel : values.length === 1 ? values[0] : `${values.length} selected`}</span><span aria-hidden="true">{expanded ? "▴" : "▾"}</span>
+  <button type="button" className="flex h-8 w-full items-center justify-between gap-1 rounded-lg border border-c-input-border bg-c-card px-2.5 text-left text-[13px] text-c-body hover:bg-c-hover" aria-label={`Select ${label}`} aria-expanded={expanded} aria-controls={listId} onClick={()=>setExpanded(value=>!value)}>
+   <span className="truncate">{values.length === 0 ? allLabel : values.length === 1 ? values[0] : `${values.length} selected`}</span><MIcon name={expanded ? "expand_less" : "expand_more"} size={18} className="text-c-muted" />
   </button>
-  {expanded && <div id={listId} className="rounded-control border border-kit-slate-6 bg-white p-1">{content}</div>}
+  {expanded && <div id={listId} className="rounded-lg border border-c-btn-border bg-c-card p-1.5">{content}</div>}
  </div>;
 }

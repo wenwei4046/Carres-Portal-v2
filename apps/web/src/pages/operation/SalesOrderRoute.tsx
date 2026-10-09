@@ -329,12 +329,12 @@ const MARK_GLYPH: Record<NodeMark, typeof Check> = {
 };
 
 const MARK_BADGE: Record<NodeMark, string> = {
-  complete: "bg-kit-green-3 text-kit-green-11",
-  current: "bg-kit-blue-3 text-kit-blue-11",
-  waiting: "bg-kit-slate-3 text-kit-slate-9",
-  blocked: "bg-kit-amber-3 text-kit-amber-11",
-  future: "bg-kit-slate-3 text-kit-slate-9",
-  unreadable: "bg-kit-amber-3 text-kit-amber-11",
+  complete: "bg-c-ok-bg text-c-ok-fg",
+  current: "bg-c-info-bg text-c-ink",
+  waiting: "bg-c-info-bg text-c-muted",
+  blocked: "bg-c-warn-bg text-c-warn-fg",
+  future: "bg-c-info-bg text-c-muted",
+  unreadable: "bg-c-warn-bg text-c-warn-fg",
 };
 
 /**
@@ -344,12 +344,12 @@ const MARK_BADGE: Record<NodeMark, string> = {
  * nothing at all (`kit-palette.test.ts`), so no ramp is invented here.
  */
 const MARK_BOX: Record<NodeMark, string> = {
-  complete: "border-kit-slate-5 bg-white",
-  current: "border-kit-blue-9 bg-white shadow-sm",
-  waiting: "border-kit-slate-5 bg-white",
-  blocked: "border-kit-slate-5 bg-kit-amber-3",
-  future: "border-dashed border-kit-slate-5 bg-white",
-  unreadable: "border-kit-slate-5 bg-kit-amber-3",
+  complete: "border-c-card-border bg-c-card",
+  current: "border-c-ink bg-c-card",
+  waiting: "border-c-card-border bg-c-card",
+  blocked: "border-c-card-border bg-c-warn-bg",
+  future: "border-dashed border-c-card-border bg-c-card",
+  unreadable: "border-c-card-border bg-c-warn-bg",
 };
 
 /** The owners whose failed read the operator can ask for again. */
@@ -431,8 +431,8 @@ function Node({
         aria-expanded={goodsExpanded}
         title={node.mark === "unreadable" ? node.spoken[node.spoken.length - 2] : undefined}
         onClick={() => onToggleGoods?.(node.id)}
-        className={`absolute overflow-hidden rounded-card border border-kit-slate-5 px-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 ${
-          node.mark === "unreadable" ? "bg-kit-amber-3" : "bg-kit-slate-3 hover:bg-white"
+        className={`absolute overflow-hidden rounded-lg border border-c-card-border px-3 text-left focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] ${
+          node.mark === "unreadable" ? "bg-c-warn-bg" : "bg-c-ground hover:bg-c-card"
         }`}
         style={{
           left: node.x,
@@ -444,20 +444,20 @@ function Node({
         }}
       >
         <div
-          className="flex items-center gap-1 truncate text-label font-semibold text-base-900"
+          className="flex items-center gap-1 truncate text-label font-semibold text-c-ink"
           style={{ height: TITLE_H, lineHeight: `${TITLE_H}px` }}
         >
           {goodsExpanded ? <ChevronDown size={12} aria-hidden="true" /> : <ChevronRight size={12} aria-hidden="true" />}
           <span className="truncate">{node.title}</span>
           {/* State is never colour alone: the failed read carries its glyph. */}
           {node.mark === "unreadable" && (
-            <AlertTriangle size={12} className="ml-auto shrink-0 text-kit-amber-11" aria-hidden="true" />
+            <AlertTriangle size={12} className="ml-auto shrink-0 text-c-warn-fg" aria-hidden="true" />
           )}
         </div>
         {node.lines.map((line, i) => (
           <div
             key={`${node.id}-line-${i}`}
-            className="truncate text-label text-base-600"
+            className="truncate text-label text-c-secondary"
             style={{ height: LINE_H, lineHeight: `${LINE_H}px` }}
           >
             {spellDates(line)}
@@ -478,7 +478,7 @@ function Node({
         tabIndex={0}
         aria-label={node.spoken.join(" — ")}
         onFocus={() => onReveal?.(node)}
-        className="absolute overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3 px-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+        className="absolute overflow-hidden rounded-lg border border-c-card-border bg-c-ground px-3 focus:outline-none focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px]"
         style={{
           left: node.x,
           top: node.y,
@@ -489,7 +489,7 @@ function Node({
         }}
       >
         <div
-          className="text-label font-semibold text-base-900"
+          className="text-label font-semibold text-c-ink"
           style={{ height: TITLE_H, lineHeight: `${TITLE_H}px` }}
         >
           {node.title}{" "}
@@ -497,7 +497,7 @@ function Node({
         {node.lines.map((line, i) => (
           <div
             key={`${node.id}-line-${i}`}
-            className="whitespace-nowrap text-label text-base-600"
+            className="whitespace-nowrap text-label text-c-secondary"
             style={{ height: LINE_H, lineHeight: `${LINE_H}px` }}
           >
             {line}{" "}
@@ -552,7 +552,7 @@ function Node({
           go();
         }
       }}
-      className={`absolute overflow-hidden rounded-card border ${MARK_BOX[node.mark]} focus:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9`}
+      className={`absolute overflow-hidden rounded-lg border ${MARK_BOX[node.mark]} focus:outline-none focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px]`}
       style={{
         left: node.x,
         top: node.y,
@@ -579,12 +579,12 @@ function Node({
             (measured 2026-09-28: `DELIVERY PHO…`). The word gives up its
             letter spacing first. */}
         <span
-          className={`whitespace-nowrap text-label font-semibold uppercase text-base-600 ${node.current ? "" : "tracking-wide"}`}
+          className={`whitespace-nowrap text-label font-semibold uppercase text-c-secondary ${node.current ? "" : "tracking-wide"}`}
         >
           {node.title}
         </span>
         {node.current && (
-          <span className="ml-auto shrink-0 text-label font-semibold uppercase text-kit-blue-11">
+          <span className="ml-auto shrink-0 text-label font-semibold uppercase text-c-ink">
             Current
           </span>
         )}
@@ -595,7 +595,7 @@ function Node({
           key={`${node.id}-line-${i}`}
           data-testid={`route-fact-${node.id}-${i}`}
           className={`truncate text-body ${node.action ? "font-semibold" : ""} ${
-            node.mark === "future" ? "text-kit-slate-9" : "text-base-900"
+            node.mark === "future" ? "text-c-muted" : "text-c-ink"
           }`}
           style={{ height: LINE_H, lineHeight: `${LINE_H}px` }}
         >
@@ -616,12 +616,12 @@ function Node({
             style={{ height: REQ_H * rows.length, lineHeight: `${REQ_H}px` }}
           >
             <span
-              className={`w-3 shrink-0 ${req.met ? "text-kit-green-11" : "text-kit-slate-9"}`}
+              className={`w-3 shrink-0 ${req.met ? "text-c-ok-fg" : "text-c-muted"}`}
               aria-hidden="true"
             >
               {req.met ? "✓" : "·"}
             </span>
-            <span className={`min-w-0 ${req.met ? "text-base-600" : "text-base-900"}`}>
+            <span className={`min-w-0 ${req.met ? "text-c-secondary" : "text-c-ink"}`}>
               {rows.map((row, i) => (
                 <span key={i} className="block whitespace-nowrap">
                   {spellDates(row)}{" "}
@@ -645,7 +645,7 @@ function Node({
             </span>
           )}
           {/* A long instruction wraps under the chip; it never ends in "…". */}
-          <span className="text-label text-base-600">
+          <span className="text-label text-c-secondary">
             {wrapRouteText(node.action.label, ROUTE_TEXT_BUDGET.action).map((row, i) => (
               <span
                 key={i}
@@ -662,7 +662,7 @@ function Node({
       {node.action && actionContext && (
         <div
           data-testid={`route-context-${node.id}`}
-          className="text-label text-base-600"
+          className="text-label text-c-secondary"
           style={{ lineHeight: `${CONTEXT_H}px` }}
         >
           {wrapRouteText(actionContext, ROUTE_TEXT_BUDGET.context).map((row, i) => (
@@ -678,7 +678,7 @@ function Node({
           <button
             type="button"
             onClick={go}
-            className="truncate text-label font-medium text-kit-blue-11 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+            className="truncate text-label font-medium text-c-ink underline-offset-2 hover:underline focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px]"
           >
             {node.door.label}
           </button>
@@ -690,7 +690,7 @@ function Node({
           <Link
             to={node.door.href}
             tabIndex={-1}
-            className="truncate text-label font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+            className="truncate text-label font-medium text-c-ink underline-offset-2 hover:underline"
           >
             {node.door.label}
           </Link>
@@ -718,7 +718,7 @@ function Edges({ map }: { map: RouteMap }) {
           <polyline
             points={edge.points.map((p) => `${p.x},${p.y}`).join(" ")}
             fill="none"
-            className={edge.style === "dashed" ? "stroke-kit-slate-6" : "stroke-kit-slate-9"}
+            className={edge.style === "dashed" ? "stroke-c-input-border" : "stroke-c-muted"}
             strokeWidth={1.5}
             strokeDasharray={edge.style === "dashed" ? "4 4" : undefined}
           />
@@ -729,7 +729,7 @@ function Edges({ map }: { map: RouteMap }) {
                 x={edge.labelAt!.x}
                 y={edge.labelAt!.y - (edge.labelLines.length - 1 - i) * 12}
                 textAnchor="middle"
-                className="fill-kit-slate-9 text-label"
+                className="fill-c-muted text-label"
               >
                 {line}
               </text>
@@ -861,7 +861,7 @@ export default function SalesOrderRoute({
           role="alert"
           data-testid="route-proposed-change"
           data-kind={route.proposedChange.kind}
-          className="flex min-h-10 flex-wrap items-center gap-x-2 gap-y-0.5 rounded-card border border-kit-amber-6 bg-kit-amber-3 px-3 py-1.5 text-meta text-kit-amber-11"
+          className="flex min-h-10 flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border border-c-btn-border bg-c-warn-bg px-3 py-1.5 text-meta text-c-warn-fg"
         >
           <AlertTriangle size={14} className="shrink-0" aria-hidden="true" />
           <span>{spellDates(route.proposedChange.fact)}</span>
@@ -869,14 +869,14 @@ export default function SalesOrderRoute({
             <button
               type="button"
               onClick={() => onRetry?.("amendment")}
-              className="font-medium text-kit-blue-11 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+              className="font-medium text-c-ink underline-offset-2 hover:underline focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px]"
             >
               {route.proposedChange.door.label}
             </button>
           ) : (
             <Link
               to={route.proposedChange.door.href}
-              className="font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+              className="font-medium text-c-ink underline-offset-2 hover:underline"
             >
               {route.proposedChange.door.label}
             </Link>
@@ -895,19 +895,19 @@ export default function SalesOrderRoute({
           beside the map, rendered only when one is open. */}
       {route.linkedProblems.length > 0 && (
         <section
-          className="rounded-card border border-kit-slate-5 bg-kit-amber-3 px-4 py-3"
+          className="rounded-lg border border-c-card-border bg-c-warn-bg px-4 py-3"
           data-testid="linked-problems"
         >
-          <h2 className="text-label font-semibold uppercase tracking-wide text-kit-amber-11">
+          <h2 className="text-label font-semibold uppercase tracking-wide text-c-warn-fg">
             Linked problems
           </h2>
           <ul className="mt-1 flex flex-col gap-1">
             {route.linkedProblems.map((problem) => (
-              <li key={problem.id} className="flex items-center gap-2 text-body text-base-900">
+              <li key={problem.id} className="flex items-center gap-2 text-body text-c-ink">
                 <span>{problem.title}</span>
                 <Link
                   to={problem.door.href}
-                  className="text-label font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+                  className="text-label font-medium text-c-ink underline-offset-2 hover:underline"
                 >
                   {problem.door.label}
                 </Link>
@@ -918,13 +918,13 @@ export default function SalesOrderRoute({
       )}
 
         <div className="flex shrink-0 items-center justify-end" data-testid="route-controls">
-        <div className="flex overflow-hidden rounded-control border border-kit-slate-5 bg-white">
+        <div className="flex overflow-hidden rounded-lg border border-c-card-border bg-c-card">
           <button
             type="button"
             onClick={() => zoom(-1)}
             data-testid="route-zoom-out"
             aria-label="Zoom out"
-            className="grid h-7 w-7 place-items-center text-base-600 hover:bg-kit-slate-3"
+            className="grid h-7 w-7 place-items-center text-c-secondary hover:bg-c-hover"
           >
             <Minus size={14} aria-hidden="true" />
           </button>
@@ -933,7 +933,7 @@ export default function SalesOrderRoute({
             onClick={() => zoom(1)}
             data-testid="route-zoom-in"
             aria-label="Zoom in"
-            className="grid h-7 w-7 place-items-center border-l border-kit-slate-5 text-base-600 hover:bg-kit-slate-3"
+            className="grid h-7 w-7 place-items-center border-l border-c-card-border text-c-secondary hover:bg-c-hover"
           >
             <Plus size={14} aria-hidden="true" />
           </button>
@@ -942,7 +942,7 @@ export default function SalesOrderRoute({
             onClick={() => fit(true)}
             data-testid="route-fit"
             aria-label="Fit the whole route"
-            className="grid h-7 w-7 place-items-center border-l border-kit-slate-5 text-base-600 hover:bg-kit-slate-3"
+            className="grid h-7 w-7 place-items-center border-l border-c-card-border text-c-secondary hover:bg-c-hover"
           >
             <Maximize2 size={14} aria-hidden="true" />
           </button>
@@ -951,7 +951,7 @@ export default function SalesOrderRoute({
 
       <div
         data-testid="route-canvas"
-        className="relative flex h-[calc(100vh-260px)] min-h-[420px] flex-col overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3"
+        className="relative flex h-[calc(100vh-260px)] min-h-[420px] flex-col overflow-hidden rounded-lg border border-c-card-border bg-c-ground"
       >
       {/* Controls sit outside the viewport so they never cover a route node. */}
       <div
@@ -959,7 +959,7 @@ export default function SalesOrderRoute({
         data-testid="route-viewport"
         tabIndex={0}
         aria-label="Order Route"
-        className="relative min-h-0 flex-1 overflow-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+        className="relative min-h-0 flex-1 overflow-auto focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px]"
         onPointerDown={(e) => {
           if ((e.target as HTMLElement).closest("[data-testid^='route-node-']")) return;
           drag.current = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty };
@@ -997,7 +997,7 @@ export default function SalesOrderRoute({
             <div
               key={band.id}
               data-testid={`route-band-${band.id}`}
-              className="absolute truncate border-b border-kit-slate-5 text-label font-semibold uppercase tracking-wide text-base-600"
+              className="absolute truncate border-b border-c-card-border text-label font-semibold uppercase tracking-wide text-c-secondary"
               style={{
                 left: band.x,
                 top: band.y,
@@ -1036,9 +1036,9 @@ export function RouteLoadingFrame() {
   return (
     <div
       data-testid="route-loading"
-      className="relative flex h-[calc(100vh-260px)] min-h-[420px] items-start overflow-hidden rounded-card border border-kit-slate-5 bg-kit-slate-3 p-6"
+      className="relative flex h-[calc(100vh-260px)] min-h-[420px] items-start overflow-hidden rounded-lg border border-c-card-border bg-c-ground p-6"
     >
-      <div className="w-[208px] rounded-card border border-kit-slate-5 bg-white p-3">
+      <div className="w-[208px] rounded-lg border border-c-card-border bg-c-card p-3">
         <Loading variant="skeleton" lines={3} label="Opening the order route" />
       </div>
     </div>

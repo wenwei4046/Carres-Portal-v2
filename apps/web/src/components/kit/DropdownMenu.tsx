@@ -55,14 +55,17 @@ export default function DropdownMenu({
           sideOffset={4}
           aria-label={label}
           data-kit="dropdown-menu"
-          className={`${FLOATING_SURFACE} min-w-40 p-1`}
+          className={`${FLOATING_SURFACE} min-w-40 p-1.5`}
         >
           {items.map((item) => (
             <div key={item.key}>
-              {item.separatorBefore && <Menu.Separator className="my-1 h-px bg-kit-slate-5" />}
+              {item.separatorBefore && <Menu.Separator className="my-1 h-px bg-c-section-line" />}
               <Menu.Item
                 disabled={item.disabled}
                 onSelect={item.onSelect}
+                /* Typeahead reads the WORD: the glyph is a ligature whose own
+                 * letters would otherwise lead the item's text. */
+                textValue={item.label}
                 data-kit="dropdown-item"
                 className={FLOATING_ITEM}
               >

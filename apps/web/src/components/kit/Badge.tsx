@@ -6,16 +6,19 @@
  * badge that could be red would be a second status renderer with none of
  * `StatusPill`'s rules. There is no `tone` prop to pass, so it cannot happen.
  *
+ * v4 (01 §1 · §3): the pill's own shape in the neutral grey pair.
+ *
  * Use it for the neutral counts a queue rail and a tab bar carry. Anything that
  * says how an order is DOING is a `StatusPill`.
  */
 import type { ReactNode } from "react";
+import { PILL_SHAPE } from "./StatusPill";
 
 export default function Badge({ children }: { children: ReactNode }) {
   return (
     <span
       data-kit="badge"
-      className="inline-flex items-center rounded-full bg-kit-slate-3 px-2 py-1 text-label text-kit-slate-11 tabular-nums"
+      className={`${PILL_SHAPE} bg-c-info-bg text-c-info-fg tabular-nums`}
     >
       {children}
     </span>

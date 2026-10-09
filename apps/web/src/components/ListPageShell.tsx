@@ -12,6 +12,11 @@
  * List-first: no oversized title, no KPI cards above the table. The list is the hero;
  * any summary lives in the facet panel's own Summary block.
  *
+ * v4 UI kit (owner 9 Oct 2026, `01-design-tokens.md` §§3–4): the frame draws no
+ * band and no border of its own. Content regions are white cards on the theme
+ * ground, 12px apart; the toolbar row sits on the ground above the table card;
+ * the footer is the 44px status line that closes that card.
+ *
  * Usage (see OperationOrdersControl for the reference implementation):
  *   <ListPageShell
  *     breadcrumb={<Crumbs/>} meta={<SyncStamp/>}
@@ -25,7 +30,8 @@
  *   </ListPageShell>
  */
 import type { ReactNode } from "react";
-import { PanelLeft, X } from "lucide-react";
+import MIcon from "@/components/carres/MIcon";
+import { useShellHeader } from "@/pages/operation/components/shell-header-context";
 
 export interface ActiveChip {
   /** Chip label, e.g. "Region: KV". */
@@ -38,11 +44,12 @@ interface Props {
   /** The Register engine owns its toolbar and footer; the shell supplies only spacing. */
   register?: boolean;
   /** A workspace page (Work) draws its own toolbar and unframed columns; the
-   *  shell supplies a one-row header and the canvas padding (16px, 12px
-   *  below 768px) only. */
+   *  frame supplies a one-row header only (the Operations shell owns the
+   *  12px page padding). */
   workspace?: boolean;
-  /** Page title → the 56px PageHeader bar (t-h2). Optional: when both `title`
-   *  and `breadcrumb` are omitted the whole white header row is skipped — used
+  /** Page title → a quiet card-title row on the ground (the page's own name
+   *  lives in the shell header). Optional: when both `title` and
+   *  `breadcrumb` are omitted the whole header row is skipped — used
    *  by module-tab pages (Purchasing's To Order / Purchase Orders / Receiving)
    *  where the tab bar above IS the title. See UI-KIT §A0 "Module-tab law". */
   title?: ReactNode;
@@ -111,29 +118,32 @@ export default function ListPageShell({
   const hasFacet = facet != null && onFacetToggle != null;
   const hasHeader =
     title != null || breadcrumb != null || meta != null || titleRight != null || actions != null;
+  /* v4 page area (01 §4): inside the Operations shell the ground already has
+   * its 12px padding and 12px gaps, so from 768px the frame adds NO padding of
+   * its own; the phone shell (no padding) and a page outside the shell keep a
+   * gutter here. */
+  const inShell = useShellHeader() != null;
+  const registerPad = inShell ? "max-[767px]:p-2" : "p-2";
+  const pagePad = inShell ? "max-[767px]:p-3" : "p-3";
+  const headerPad = inShell ? "max-[767px]:px-3 max-[767px]:pt-3" : "px-3 pt-3";
+  /* The page's name lives in the shell header. A frame's own header is a
+   *  quiet row on the ground: card-title type, no band, no border. */
+  const titleType = "text-[15px] font-semibold leading-[22px] text-c-ink";
   return (
     <div
-      className={`h-full flex flex-col bg-background ${className}`}
+      className={`h-full flex flex-col ${className}`}
       data-testid={testId}
     >
-      {/* Header — TWO rows (Jess 2026-07-18 round-3): row 1 = breadcrumb with
-          the search/utility cluster on the SAME line (her round-2 ask); row 2 =
-          the page title + freshness stamp, KEPT (round-3: "i never ask you
-          removed my 2row header — Order + synced"). Module-tab pages skip the
-          whole block (Jess 2026-07-22, UI-KIT §A0 "Module-tab law"). */}
-      {/* A workspace page (Work) has ONE title row and nothing above it — owner
-          density ruling 2026-09-25: 72px / 24px sides from 768px, 64px / 16px
-          below; the title is 28/34 (24/30 narrow). */}
+      {/* A workspace page (Work): ONE title row, nothing above it. */}
       {hasHeader && workspace && (
         <div
-          className="shrink-0 flex h-16 items-center gap-3 bg-white border-b border-base-200 px-4 min-[768px]:h-[72px] min-[768px]:px-6"
+          className={`shrink-0 flex min-h-11 items-center gap-3 ${headerPad}`}
           data-testid="workspace-header"
         >
           {/* The title never truncates; when the row is too narrow (390px,
-              with the top-bar icons) the count wraps beneath it inside the
-              same 64px row. */}
+              with the top-bar icons) the count wraps beneath it. */}
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3">
-            <h1 className="shrink-0 text-[24px] font-semibold leading-[30px] text-base-900 min-[768px]:text-[28px] min-[768px]:leading-[34px]">
+            <h1 className={`shrink-0 ${titleType}`}>
               {title}
             </h1>
             {titleRight && <div className="ml-auto flex min-w-0 max-w-full items-center gap-1.5">{titleRight}</div>}
@@ -142,23 +152,22 @@ export default function ListPageShell({
         </div>
       )}
       {hasHeader && !workspace && (
-        <div className="shrink-0 bg-white border-b border-base-200 px-6 pt-2 pb-2.5">
+        <div className={`shrink-0 ${headerPad}`}>
           <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0 flex items-center gap-1.5 text-meta text-base-400">
+            <div className="min-w-0 flex items-center gap-1.5 text-[12px] leading-4 text-c-secondary">
               {breadcrumb}
             </div>
             {actions && <div className="shrink-0 flex items-center gap-1">{actions}</div>}
           </div>
           <div className="flex items-baseline gap-2.5 min-w-0">
-            <div className="min-w-0 truncate text-page text-base-900">{title}</div>
+            <div className={`min-w-0 truncate ${titleType}`}>{title}</div>
             {meta && (
-              <div className="shrink-0 flex items-center gap-1 text-meta text-base-400">
+              <div className="shrink-0 flex items-center gap-1 text-[12px] leading-4 text-c-secondary">
                 {meta}
               </div>
             )}
             {/* Right cluster on the TITLE row (Jess 2026-07-19): ambient status
-                chips / announcements live in the title row's dead space instead
-                of a dedicated banner row — saves a full row on a MacBook. */}
+                chips / announcements live in the title row's dead space. */}
             {titleRight && (
               <div className="shrink-0 ml-auto self-center flex items-center gap-1.5 min-w-0">
                 {titleRight}
@@ -168,11 +177,11 @@ export default function ListPageShell({
         </div>
       )}
 
-      {/* Body split — facet aside (left) + right column (control strip + table),
-          on the cream page bg. The strip lives INSIDE the right column, so it
-          NEVER spans above the facet: the facet's Summary top sits on the same
-          line as the strip top. */}
-      <div className={register ? "flex-1 flex min-h-0 p-2" : workspace ? "flex-1 flex min-h-0 p-3 min-[768px]:p-4" : "flex-1 flex gap-4 min-h-0 px-6 pt-4 pb-5"}>
+      {/* Body split — facet aside (left) + right column (toolbar row + table),
+          on the theme ground, 12px apart. The toolbar lives INSIDE the right
+          column, so it NEVER spans above the facet: the facet's top sits on
+          the same line as the toolbar top. */}
+      <div className={`flex-1 flex gap-3 min-h-0 ${register ? registerPad : pagePad}`}>
         {hasFacet && facetOpen && (
           <aside
             style={
@@ -180,29 +189,28 @@ export default function ListPageShell({
             }
             className={`${
               facetWidthPx ? "" : "w-[240px]"
-            } shrink-0 flex flex-col gap-2 overflow-y-auto no-scrollbar pb-2`}
+            } shrink-0 flex flex-col gap-3 overflow-y-auto no-scrollbar`}
             data-testid="listshell-facet"
           >
             {facet}
           </aside>
         )}
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
-          {/* Control strip — the two-row control bar on ONE white surface panel
-              (so the tabs + search + actions + count row don't sit naked on the
-              cream page bg), OR (when a bulkBar is supplied because rows are
-              selected) the bulk band IN PLACE of it, so nothing jumps. */}
+          {/* Toolbar row — v4: on the ground above the table card, no panel of
+              its own; OR (rows selected) the bulk band IN PLACE of it, so
+              nothing jumps. */}
           {bulkBar ? (
-            <div className="shrink-0 mb-3">{bulkBar}</div>
+            <div className="shrink-0 mb-2.5">{bulkBar}</div>
           ) : (
             // Skip the whole strip when it would render empty (Jess 2026-07-22,
             // purchase cockpit §5.4). Facet-alone is not enough — a strip only
             // exists when there's real content (tabs / right actions / a second
             // row) OR the reopen toggle needs a home (facet closed).
             (toolbar || toolbarRight || toolbarSecondary || (hasFacet && !facetOpen)) && (
-              <div className="shrink-0 mb-3 bg-white border border-base-200 rounded-[12px] shadow-sm px-3 py-2.5">
+              <div className="shrink-0 mb-2.5">
                 {/* Row 1 — reopen toggle (only while collapsed; when open, the
                     facet's own control collapses it) + tabs · search + actions. */}
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex min-h-9 flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     {hasFacet && !facetOpen && (
                       <button
@@ -212,9 +220,10 @@ export default function ListPageShell({
                         aria-label="Show filters"
                         aria-pressed={false}
                         data-testid="listshell-facet-toggle"
-                        className="shrink-0 p-1.5 rounded-lg border transition-colors bg-white border-base-200 text-base-500 hover:text-base-800"
+                        /* The v4 toolbar icon button: 36 round, no border. */
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-c-body hover:bg-c-hover"
                       >
-                        <PanelLeft size={15} />
+                        <MIcon name="left_panel_open" size={20} />
                       </button>
                     )}
                     {toolbar}
@@ -225,7 +234,7 @@ export default function ListPageShell({
                 </div>
                 {/* Row 2 — thin, right-aligned: count + the ⋮ overflow. */}
                 {toolbarSecondary && (
-                  <div className="mt-2 pt-2 border-t border-base-100 flex items-center justify-end gap-2.5">
+                  <div className="mt-1.5 flex items-center justify-end gap-2.5">
                     {toolbarSecondary}
                   </div>
                 )}
@@ -233,7 +242,8 @@ export default function ListPageShell({
             )
           )}
 
-          {/* Active-filter chips — auto-hidden when empty */}
+          {/* Active-filter chips — auto-hidden when empty. The v4 filter chip:
+              pad 4 × 10 · 12/600 · grey fill · `Label ×`. */}
           {activeChips && activeChips.length > 0 && (
             <div className="shrink-0 mb-2 flex items-center gap-1.5 flex-wrap" data-testid="listshell-active-chips">
               {activeChips.map((c, i) => (
@@ -241,10 +251,10 @@ export default function ListPageShell({
                   key={i}
                   type="button"
                   onClick={c.onClear}
-                  className="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 rounded-full border border-base-200 bg-white text-meta text-base-700 hover:border-base-400"
+                  className="inline-flex items-center gap-1 rounded-lg border border-c-input-border bg-c-search-bg px-2.5 py-1 text-[12px] font-semibold leading-4 text-c-body hover:bg-c-hover"
                 >
                   {c.label}
-                  <X size={12} className="text-base-400" />
+                  <MIcon name="close" size={16} className="text-c-muted" />
                 </button>
               ))}
             </div>
@@ -253,7 +263,8 @@ export default function ListPageShell({
           {children}
           {footer && (
             <footer
-              className="shrink-0 flex items-center justify-between gap-3 px-3 h-9 rounded-b-[12px] border border-t-0 border-base-200 bg-white text-meta text-base-500"
+              /* The v4 status footer: 44 · 13 secondary · closes the card above. */
+              className="shrink-0 flex items-center justify-between gap-3 px-3.5 h-11 rounded-b-lg border border-t-0 border-c-card-border bg-c-card text-[13px] text-c-secondary"
               data-testid="listshell-footer"
             >
               {footer}

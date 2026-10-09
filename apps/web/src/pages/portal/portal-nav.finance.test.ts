@@ -120,11 +120,24 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
   });
 
   it("no other area has a page in a Finance module", () => {
-    const financeSections = new Set(["Payables", "Receivables", "Bank & Cards", "Ledger", "Reports", "Forecast"]);
+    /* `Reports` left this set on 2026-10-08: the owner gave Operations its own
+       Reports module under DATA (Layout Standard §2). The modules stay apart —
+       it holds only the three Operations report pages, none of them Finance's. */
+    const financeSections = new Set(["Payables", "Receivables", "Bank & Cards", "Ledger", "Forecast"]);
     const elsewhere = PORTAL_NAV.filter((g) => g.area !== "finance").flatMap((g) =>
       g.items.filter((it) => it.section && financeSections.has(it.section)).map((it) => `${g.area}:${it.key}`),
     );
     expect(elsewhere).toEqual([]);
+    const opsReports = PORTAL_NAV.filter((g) => g.area !== "finance").flatMap((g) =>
+      g.items.filter((it) => it.section === "Reports").map((it) => `${g.area}:${it.key}`),
+    );
+    expect(opsReports).toEqual([
+      "operation:purchasing-report",
+      "operation:receiving-report",
+      "operation:delivery-report",
+    ]);
+    const financeKeys = new Set(FINANCE.items.map((it) => it.key));
+    for (const key of opsReports) expect(financeKeys.has(key.split(":")[1]!), key).toBe(false);
   });
 });
 
@@ -142,10 +155,11 @@ describe("Payment Requests in the Operations rail", () => {
     expect(keys(new Set(["payment-requester"] as const))).toContain("payment-requests");
   });
 
-  it("opens the Finance page and sits in Workspace", () => {
+  it("opens the Finance page and sits under Payments", () => {
     const item = OPERATIONS.items.find((i) => i.key === "payment-requests")!;
     expect(navItemHref(OPERATIONS, item)).toBe("/finance/payment-requests");
-    expect(item.section).toBe("Workspace");
+    // Moved from Workspace to the Payments module (owner 2026-10-08).
+    expect(item.section).toBe("Payments");
     expect(item.needs).toBe("payment-requester");
   });
 

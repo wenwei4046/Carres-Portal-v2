@@ -1,6 +1,9 @@
 import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { LucideIcon } from "lucide-react";
 import { TopBarIcons } from "./GlobalTopBar";
+import { useShellHeader } from "./shell-header-context";
+import { ShellTitle } from "./ShellHeader";
 
 /**
  * ModuleHeader — THE fixed header row of a module (Shell pattern,
@@ -72,6 +75,33 @@ export default function ModuleHeader({
       document.title = "Carres Portal";
     };
   }, [docTitle]);
+
+  /* ⭐ INSIDE THE OPERATIONS SHELL (Carres Layout Standard §1, owner-confirmed
+   * template 2026-10-08) the page header is drawn ONCE by the shell, above the
+   * page and the Tasks panel. This header then names the page in the shell's
+   * slot — `word / page` as crumb and title, its tab strip and its page-meta
+   * after it — and draws no second row of its own. */
+  const shell = useShellHeader();
+  const claim = shell?.claim;
+  useEffect(() => (claim ? claim() : undefined), [claim]);
+  if (shell) {
+    if (!shell.el) return null;
+    return createPortal(
+      <div className="flex min-w-0 flex-1 items-center gap-3.5" data-testid={testId}>
+        <span data-testid={`${testId}-module-word`} className="contents">
+          <ShellTitle crumb={page ? word : null} title={page ?? word} />
+        </span>
+        {children != null && <div className="flex min-w-0 items-center">{children}</div>}
+        <div className="flex-1" />
+        {right && (
+          <div className="flex shrink-0 items-center gap-2" data-testid={`${testId}-right`}>
+            {right}
+          </div>
+        )}
+      </div>,
+      shell.el,
+    );
+  }
 
   return (
     /**

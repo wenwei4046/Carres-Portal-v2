@@ -71,11 +71,11 @@ export default function WorkListRow({
           }
         }}
         className={[
-          "relative flex min-h-[47px] w-full cursor-pointer items-center gap-3 border-b border-kit-slate-4 px-3 py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kit-blue-9",
-          selected ? "bg-kit-blue-3" : "bg-white hover:bg-kit-slate-2",
+          "relative flex min-h-[47px] w-full cursor-pointer items-center gap-3 border-b border-kit-slate-4 px-3 py-1.5 text-left outline-none focus-visible:[outline:var(--c-focus)] focus-visible:-outline-offset-2",
+          selected ? "bg-c-select-bg" : "bg-white hover:bg-c-search-bg",
         ].join(" ")}
       >
-        {selected ? <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-kit-blue-9" /> : null}
+        {selected ? <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-c-select-fg" /> : null}
         <span aria-hidden className="shrink-0 text-kit-slate-11">{task.icon}</span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="line-clamp-2 break-words text-[13px] font-semibold leading-[18px] text-kit-slate-12" title={action} data-testid="task-row-act">{action}</span>
@@ -109,11 +109,11 @@ export default function WorkListRow({
       onClick={onSelect}
       onKeyDown={onKey}
       className={[
-        "relative flex h-[76px] w-full cursor-pointer flex-col justify-center border-b border-kit-slate-4 px-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kit-blue-9",
-        selected ? "bg-kit-blue-3" : "bg-white hover:bg-kit-slate-2",
+        "relative flex h-[76px] w-full cursor-pointer flex-col justify-center border-b border-kit-slate-4 px-3 text-left outline-none focus-visible:[outline:var(--c-focus)] focus-visible:-outline-offset-2",
+        selected ? "bg-c-select-bg" : "bg-white hover:bg-c-search-bg",
       ].join(" ")}
     >
-      {selected ? <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-kit-blue-9" /> : null}
+      {selected ? <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-c-select-fg" /> : null}
       <span className="flex min-w-0 items-baseline gap-2">
         {/* The whole row chooses the act; `Open order` lives in the middle (Jess, 2026-09-27). */}
         <span className="shrink-0 text-[12px] font-medium leading-4 text-kit-slate-11">{item.soRef}</span>

@@ -107,7 +107,7 @@ function records() {
     .filter(Boolean);
 
   const glyphBlock = (icon.match(/const GLYPH = \{([\s\S]*?)\n\} as const;/) ?? [, ""])[1];
-  const meanings = [...glyphBlock.matchAll(/^\s*"?([a-z-]+)"?:\s*[A-Z]/gm)].map((m) => m[1]);
+  const meanings = [...glyphBlock.matchAll(/^\s*"?([a-z-]+)"?:\s*(?:[A-Z]|"[a-z_]+")/gm)].map((m) => m[1]);
 
   if (!spacing.length || !typeClasses.length || !radii.length || !meanings.length) {
     console.error("✗ check-design: could not read the kit token records. Did tokens.ts move?");
@@ -388,6 +388,7 @@ function scan(files, rec, words) {
       const resolve = (expr) => {
         const e = expr.trim();
         if (/^[`"']/.test(e)) return e; // already a literal
+        if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(e)) return null; // only resolve a variable declaration, not a partial call
         const decl = src.match(new RegExp(`(?:const|let|var)\\s+${e.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}\\s*=\\s*([^;\\n]+)`));
         return decl ? decl[1].trim() : null;
       };

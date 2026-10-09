@@ -63,8 +63,8 @@ not a current pattern: do not copy it from a neighbouring page. Live examples ar
 |---|---|---|---|
 | Tokens: type · colour · radius · icons · layers | Tailwind token classes; `Icon`; `overlay-layer` | `01-design-tokens.md`, `tailwind.config.ts`, `components/kit/Icon.tsx` | Existing component built; current visual migration owed |
 | Page frame | `ListPageShell` today; kit `PageShell` is the target | `components/ListPageShell.tsx` · `components/kit/PageShell.tsx` | Moving a page onto `PageShell` re-lays it out: owner preview first |
-| Destination header + global utilities | `ModuleHeader` + `GlobalTopBar` | `pages/operation/components/` | §4 · built |
-| Portal navigation | `PortalSidebar` + `portal-nav` | `pages/portal/` | §4.2 · built |
+| Page header + global utilities | `ShellHeader` (shell-drawn; `ModuleHeader` names the page into it) · search pill · `TeamButton` · bell | `pages/operation/components/` | §4 · template 2026-10-08 · built on branch |
+| Portal navigation | `PortalSidebar` + `portal-nav` (six groups, one shared menu) | `pages/portal/` | §4.2 · template 2026-10-08 · built on branch |
 | Left mission rail | `FilterRail` family + `useFilterRailOpen` + the Sales Orders `.so-template-rail` composition | `pages/operation/components/workspace-rail.tsx` · `SalesOrdersRegister.tsx` | §6.1 · rail recipe built; mission rule APPROVED TARGET 2026-10-05; complete composition not yet extracted to the kit (KIT GAP) |
 | Register / listing | `register/DataGrid` | `components/register/DataGrid.tsx` | §6.0 · §6.2 · SO-derived template owner accepted 2026-10-01 · built; adoption per page |
 | Goods expansion | `GoodsMiniTable` + connector | `pages/operation/components/GoodsMiniTable.tsx` · `ConnectedSections.tsx` | §6.9 · built |
@@ -646,7 +646,7 @@ PAYMENT     the customer-facing 50/50 composition is used only while editing a c
 
 ---
 
-# §5 · The right Quick Rail
+# §5 · The Tasks panel (right) — owner rulings 2026-10-08 · BUILT ON BRANCH, NOT DEPLOYED
 
 **Current supplied shell target — owner 9 Oct 2026.** A collapsible Tasks region (01 §4)
 is opened by the labelled Tasks/count control; Summary collapses independently. Do not add the old
@@ -673,53 +673,13 @@ not another current shell standard. This document has not measured the new runti
 
 **One job, two doors (owner-confirmed 2026-09-25).** A job can be done from Work or on its owning
 module page; both use the same module action and write the same record. Done means the source fact
-exists — the Work item closes everywhere; nobody presses `Done`. The rail only reflects and links:
-Activity shows who · when · what; the customer's recorded history shows the event; Calendar changes
-only when a dated arrangement changes. No rail door performs or completes a job.
+exists — the item closes everywhere; nobody presses `Done`.
 
-**Calendar (owner-confirmed 2026-09-25; shared all-module calendar owner-approved 2026-10-04, NOT
-BUILT).** One right-rail Calendar, never a calendar page per module. `All modules` shows only
-authorised, implemented dated event types, with `Filter by module` and `Filter by location` where the
-source supports location. Each module reports its own dated arrangements in its own words (never a
-mixed `5 jobs`; zero prints nothing); a row opens the owning page on that day, filtered to that kind,
-and Back returns to the same day. One event, one owner, one count (a supplier arrival counts once,
-under Warehouse, from the `warehouse-schedule` projection; Receiving reads it, never republishes it).
-A source that fails says so and never prints `0`. Not on Calendar: Work to-dos, Issue Tracker, private
-HR facts, unbuilt modules. Contact deadlines belong to the Logistics company
-(`{n} {company} contact deadline(s)`). The day comes from the BOOKING through the one shared rule;
-day chips print actual days (never `Today`/`Tomorrow`; `This week` survives as a span) with the
-portal's one date string.
+**Customer lookup — capability APPROVED 2026-09-24/26; placement OPEN.** Find a caller by name, phone
+or saved order number across their orders, read only, permission-filtered, exact matches first, name-only
+hits kept apart as `Possible match`. The header search (§4) now finds customer names → their Sales
+Orders; a full cross-order caller view still has no placement (§7.2).
 
-```text
-Calendar                                    [×]
-Everything you can see · Updated 10:42
-[Thu, 24 Sep] [Fri, 25 Sep] [This week]      month grid below
-FRI, 25 SEP
-Delivery      2 scheduled deliveries      ›  Delivery Monitor ?date=
-Warehouse     1 arriving                  ›  ?tab=warehouse-arrival-schedule&date=
-Payment       2 promised payments         ›  Payment Monitor ?status=
-```
-
-**Customer lookup — capability APPROVED 2026-09-24/26; rail door removed 2026-10-05; placement OPEN.**
-Find a caller by name, phone or saved order number (SO/SUB, including historical forms) across all
-their orders and recorded history. Read only: changing details, recording a contact result or taking
-money is done on the source record through its own module action; no edit, note or completion
-control. Exact phone or number matches rank first, then name matches; nothing opens by itself.
-`Matched by phone` where the canonical phone links records; a name-only hit is a `Possible match`, kept
-separate and never merged into one person, balance or entitlement. Permissions decide what exists:
-results, counts and suggestions never reveal a customer or order the person may not see. Delivery
-contact by the Logistics company reads as the company's act recorded on its behalf, never a Carres
-call. A different job from Work's Customer card (Workspace §5.10); both read the same source records and
-neither keeps a second copy. Selecting a customer never silently filters Calendar or Activity.
-**Where the cross-order caller lookup now lives is OPEN** — PROPOSAL: Tasks → `Sales Order` tab covers
-the linked SO only; a full caller search across all a customer's orders has no placement yet (§7.2).
-
-**Activity** previews recent append-only events within the person's permissions and links to their
-objects; it never replaces an object's History. No stored value reaches the screen untranslated and no
-`—` stands in for a value (COPY-STANDARD).
-
-**Frozen:** the rail reads and links; a source module owns every change and completion; a filter can
-narrow access, never widen it.
 **A page never resolves Duty** (owner ruling 2026-09-01): every action surface renders the resolved
 owner from the one Work Engine Action contract (`../ERP-ARCHITECTURE.md` Law F.1); only Settings →
 Staff & Duties edits assignments.

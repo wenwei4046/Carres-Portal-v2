@@ -795,6 +795,7 @@ describe("appearance and geometry", () => {
     fireEvent.click(change);
     const save = screen.getByTestId(`ready-stock-save-${LINE_A}`);
     expect(save.className).toContain("h-8");
-    expect(save.className).toContain("bg-kit-blue-9");
+    // The kit primary is CHARCOAL since 2026-10-08 (Layout Standard §4.1).
+    expect(save.className).toContain("bg-c-ink");
   });
 });

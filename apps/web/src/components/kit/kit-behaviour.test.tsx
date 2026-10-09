@@ -255,9 +255,10 @@ describe("Select", () => {
   it("wears the field skin, not a second one", () => {
     render(<Select id="carrier" options={OPTIONS} onValueChange={() => {}} />);
     const trigger = document.querySelector('[data-kit="select"]');
+    // v4 (01 §3): 32px field, 8px corner, the input hairline.
     expect(trigger).toHaveClass("h-8");
-    expect(trigger).toHaveClass("rounded-control");
-    expect(trigger).toHaveClass("border-kit-slate-5");
+    expect(trigger).toHaveClass("rounded-lg");
+    expect(trigger).toHaveClass("border-c-input-border");
   });
 
   it("is disabled when told to be", () => {
@@ -440,7 +441,7 @@ describe("DatePicker", () => {
 
   it("shows the placeholder when there is no date, and says so in the placeholder's own ink", () => {
     render(<DatePicker id="d" label="Delivery date" value={null} onChange={() => {}} placeholder="Pick a date" />);
-    expect(screen.getByText("Pick a date")).toHaveClass("text-kit-slate-9");
+    expect(screen.getByText("Pick a date")).toHaveClass("text-c-muted");
   });
 
   it("hands back a YYYY-MM-DD string, not a Date, and closes", () => {
@@ -482,7 +483,8 @@ describe("Toast", () => {
     render(<Toast kind="success" message="Delivery order issued" />);
     const toast = document.querySelector('[data-kit="toast"]');
     expect(toast).toHaveAttribute("data-tone", "success");
-    expect(toast).toHaveClass("bg-white");
+    // v4 (01 §3): the white card surface token.
+    expect(toast).toHaveClass("bg-c-card");
     expect(document.querySelector('[data-icon="ready"]')).toBeInTheDocument();
   });
 
@@ -751,11 +753,11 @@ describe("DataTable sort + filter", () => {
 });
 
 describe("Button pill shape", () => {
-  it("pill rounds fully; the default keeps the control radius — shape, never a variant", () => {
+  it("pill rounds fully; the default keeps the v4 8px corner — shape, never a variant", () => {
     const { rerender } = render(<Button shape="pill">Issue Purchase Orders</Button>);
     expect(screen.getByRole("button").className).toContain("rounded-full");
     rerender(<Button>Issue Purchase Orders</Button>);
-    expect(screen.getByRole("button").className).toContain("rounded-control");
+    expect(screen.getByRole("button").className).toContain("rounded-lg");
     expect(screen.getByRole("button").className).not.toContain("rounded-full");
   });
 });

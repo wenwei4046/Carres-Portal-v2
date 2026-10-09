@@ -750,7 +750,7 @@ function ReceivingMode({
               aria-label="Received by"
               data-kit="automatic-field"
               data-testid="received-by"
-              className={`${CONTROL_BASE.replace("bg-white", "bg-kit-slate-3")} ${CONTROL_BORDER.rest} rounded-control min-h-8 min-w-0 break-words px-2 py-1`}
+              className={`${CONTROL_BASE.replace("bg-c-card ", "bg-c-search-bg ")} ${CONTROL_BORDER.rest} rounded-control min-h-8 min-w-0 break-words px-2 py-1`}
             >
               {receiver.name ?? "Staff identity not recorded"}
             </div>

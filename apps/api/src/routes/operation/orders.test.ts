@@ -820,6 +820,11 @@ describe("GET /api/operation/orders/:id", () => {
      *  — a salesperson whose name only `salespersons` can answer. */
     appUsers?: any[];
     salespersons?: any[];
+    /** The `ops_order_control` overlay row; `controlFail` makes its read fail. */
+    control?: any;
+    controlFail?: boolean;
+    /** What `app_users` answers for the SO PIC (null = RLS hides the row). */
+    picUser?: any;
   }) {
     const fromImpl = vi.fn((table: string) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -888,6 +893,15 @@ describe("GET /api/operation/orders/:id", () => {
           chain.then = (res: (v: unknown) => unknown) =>
             res({ data: opts.productSkus ?? [], error: null });
           break;
+        case 'ops_order_control':
+          chain.maybeSingle = vi.fn(() =>
+            opts.controlFail
+              ? Promise.resolve({ data: null, error: { code: "XX000", message: "boom" } })
+              : promise(opts.control ?? null));
+          break;
+        case 'app_users':
+          chain.maybeSingle = vi.fn(() => promise(opts.picUser ?? null));
+          break;
         case 'ops_stock_items':
           chain.then = (res: (v: unknown) => unknown) =>
             res({ data: opts.freeUnits ?? [], error: null });
@@ -918,6 +932,27 @@ describe("GET /api/operation/orders/:id", () => {
       env,
     );
     expect(res.status).toBe(404);
+  });
+
+  it("names the SO PIC from assigned_staff, keeping unread and hidden apart", async () => {
+    const get = async () => {
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(new Request(`http://t/api/operation/orders/${ORDER_ID}`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }), env);
+      expect(res.status).toBe(200);
+      return (await res.json()) as { pic: unknown; picRead: string };
+    };
+    const order = { id: ORDER_ID, so: 1319, paid: 0 };
+    const pic = "22222222-2222-2222-2222-000000000001";
+    mockDetailQueries({ order, control: { assigned_staff: pic }, picUser: { id: pic, name: " Shasha " } });
+    expect(await get()).toMatchObject({ picRead: "ok", pic: { userId: pic, name: "Shasha" } });
+    mockDetailQueries({ order, control: { assigned_staff: pic }, picUser: null });
+    expect(await get()).toMatchObject({ picRead: "ok", pic: { userId: pic, name: null } });
+    mockDetailQueries({ order, control: { assigned_staff: null } });
+    expect(await get()).toMatchObject({ picRead: "ok", pic: null });
+    mockDetailQueries({ order, controlFail: true });
+    expect(await get()).toMatchObject({ picRead: "failed", pic: null });
   });
 
   it("carries saved POS payment facts without creating or inferring a transaction", async () => {

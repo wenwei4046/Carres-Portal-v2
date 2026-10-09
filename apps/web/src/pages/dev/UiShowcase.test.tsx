@@ -14,8 +14,8 @@
  *   · every D0.5b box, since a Radix component that renders nowhere is a
  *     component the screenshot gate cannot see.
  *
- * NEGATIVE CONTROL: change `hover:brightness-95` in Button.tsx to
- * `hover:brightness-90` — only the mirror test goes red.
+ * NEGATIVE CONTROL: change `hover:brightness-125` in Button.tsx to
+ * `hover:brightness-110` — only the mirror test goes red.
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -116,26 +116,29 @@ describe("/ui showcase", () => {
 
   it("forces the SAME hover and focus the components declare", () => {
     // Button's own declarations…
-    expect(BUTTON).toContain("hover:brightness-95");
+    // The primary is CHARCOAL since 2026-10-08 (Layout Standard §4.1) and
+    // lightens on hover; the neutral one takes the info tint.
+    expect(BUTTON).toContain("hover:brightness-125");
+    expect(BUTTON).toContain("hover:bg-c-info-bg");
     // GREY, not blue (Loo, 2026-08-03): hover says "the mouse is here" and is
-    // true for one second, so it may not spend the accent. Blue now marks
-    // exactly two things on any screen — the primary action and the current
-    // SELECTION, which is a lasting state with a consequence. This mirror is
-    // what stops the two drifting apart again.
+    // true for one second, so it may not spend the accent. This mirror is what
+    // stops the component and the showcase drifting apart again.
     expect(BUTTON).toContain("hover:bg-kit-slate-3");
     expect(BUTTON).not.toContain("hover:bg-kit-blue-3");
     expect(BUTTON).toContain("focus-visible:ring-2");
     expect(BUTTON).toContain("focus-visible:ring-kit-blue-9");
     expect(BUTTON).toContain("focus-visible:ring-offset-1");
-    expect(FIELD).toContain("focus:ring-2");
-    expect(FIELD).toContain("focus:ring-kit-blue-9");
-    expect(FIELD).toContain("focus:border-kit-blue-9");
+    // The field focus is the v4 Appearance outline (01 §3 · §9), not a ring.
+    expect(FIELD).toContain("focus:[outline:var(--c-focus)]");
+    expect(FIELD).not.toContain("focus:ring-kit-blue-9");
     // …and the showcase's forced mirrors of them.
-    expect(SHOWCASE).toContain("[&>button]:brightness-95");
-    expect(SHOWCASE).toContain("[&>button]:bg-kit-blue-3");
+    expect(SHOWCASE).toContain("[&>button]:brightness-125");
+    expect(SHOWCASE).toContain("[&>button]:bg-c-info-bg");
     expect(SHOWCASE).toContain("[&>button]:ring-2");
     expect(SHOWCASE).toContain("[&>button]:ring-kit-blue-9");
     expect(SHOWCASE).toContain("[&>button]:ring-offset-1");
+    // OWED: `UiShowcase.tsx` still forces the retired field ring below; its v4
+    // mirror (`[&_input]:[outline:var(--c-focus)]`) moves with that file.
     expect(SHOWCASE).toContain("[&_input]:ring-2");
     expect(SHOWCASE).toContain("[&_input]:ring-kit-blue-9");
     expect(SHOWCASE).toContain("[&_input]:border-kit-blue-9");

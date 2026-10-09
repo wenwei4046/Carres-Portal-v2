@@ -18,6 +18,15 @@ import OperationApp from "@/pages/operation/OperationApp";
 import type { SoBatchPurchaseResponse } from "@carres/shared";
 import { appTodayIso } from "@/lib/fmt-date";
 import "@/index.css";
+import { supabase } from "@/lib/supabase";
+
+/* DEV ONLY: Appearance saves to the person's profile; the preview has no real
+   session, so the save is answered here and only the page changes. */
+/* Like Supabase: the signed-in user comes back with the merged metadata. */
+supabase.auth.updateUser = (async (attrs: { data?: Record<string, unknown> }) => ({
+  data: { user: { id: "u-op", email: "preview@carres.local", user_metadata: { ...(attrs.data ?? {}) } } },
+  error: null,
+})) as never;
 
 const CUSTOMERS = [
   "Kimmy", "LIM KUAN YANG", "Nurul Aisyah binti Abdul Rahman", "PETER", "ANNE", "Tan Ah Kow",
@@ -51,6 +60,9 @@ const orders = Array.from({ length: ROWS }, (_, n) => {
     customer_phone: `01${i % 10}-34789${String(10 + i).slice(-2)}`,
     customer_address_city: city,
     customer_address_state: state,
+    // The register read embeds receipts; every fourth order has one.
+    receipt_documents: i % 4 === 0 ? [{ id: `rc${i}`, receipt_no: `OR-26${String(i).padStart(4, "0")}` }] : [],
+    allocated_receipts: [],
     // One order from an earlier year: the widest date the column must hold.
     placed_at: i === 7 ? "2025-05-28T02:00:00Z" : `2026-09-${String(1 + (i % 16)).padStart(2, "0")}T02:00:00Z`,
     proceeded_at: i === 7 ? "2025-06-02T02:00:00Z" : `2026-09-${String(2 + (i % 16)).padStart(2, "0")}T06:00:00Z`,
@@ -58,6 +70,7 @@ const orders = Array.from({ length: ROWS }, (_, n) => {
     salespersons: { name: SALESPEOPLE[i % SALESPEOPLE.length] },
     delivery_date: `2026-10-${String(1 + (i % 27)).padStart(2, "0")}`,
     delivery_date_tbd: false,
+    original_request: [{ revision: 1, snapshot: { header: { delivery_date: `2026-10-${String(1 + (i % 27)).padStart(2, "0")}`, delivery_date_tbd: false } } }],
     delivery_partner_id: null,
     request_for_delivery_at: null,
     partner_accepted_at: null,
@@ -161,11 +174,33 @@ window.fetch = async (input, init) => {
   }
   /* The Order list's server facts: a spread so every rail value has rows. */
   if (/\/api\/operation\/orders\/register-facts/.test(url)) {
+    /* Owner facts shaped on real test orders (SO-1362 · SO-1358 · SO-1333,
+       read-only SQL 2026-10-09); `?fail=finance,delivery` fails those reads. */
+    const fail = new Set((new URLSearchParams(window.location.search).get("fail") ?? "").split(",").filter(Boolean));
+    const noDelivery = { dateIso: null, time: null, source: null, partnerId: null, partnerName: null };
+    const ownedOf = (i: number) => {
+      const k = i % 6;
+      return {
+        pic: k === 3 ? null : { userId: `u${k}`, name: k === 2 ? null : k === 1 ? "Yu Jun" : "Shasha" },
+        poCount: k === 0 ? 2 : 0,
+        supplierDos: [], grns: [],
+        delivery: k === 0 ? { dateIso: "2026-09-29", time: "Afternoon (12pm to 3pm)", source: "arrangement", partnerId: "p1", partnerName: "NETS" }
+          : k === 1 ? { dateIso: "2026-09-30", time: "Morning (9am\u201312pm)", source: "arrangement", partnerId: "p1", partnerName: "NETS" }
+          : k === 4 ? { dateIso: "2026-10-17", time: "2 PM to 5 PM", source: "document", partnerId: "p2", partnerName: "AL" }
+          : noDelivery,
+        loading: k === 4 ? { hasDo: true, kind: "handed_over", at: "2026-10-16T03:00:00Z" } : { hasDo: false, kind: null, at: null },
+        locations: [],
+        financeHold: k === 5 ? { reason: "Cheque not cleared" } : null,
+      };
+    };
     const facts = Object.fromEntries(orders.map((o, i) => [o.id, {
       obligations: i % 3 === 0 ? "none" : "outstanding",
       cases: i % 5 === 0 ? "open" : i % 7 === 0 ? "closed" : "none",
+      owned: ownedOf(i),
     }]));
-    return new Response(JSON.stringify({ facts, failed: { obligations: false, cases: false } }), { status: 200, headers: { "content-type": "application/json" } });
+    const failed = { obligations: false, cases: false, pic: fail.has("pic"), purchasing: fail.has("purchasing"), delivery: fail.has("delivery"),
+      loading: fail.has("delivery"), location: fail.has("location"), finance: fail.has("finance") };
+    return new Response(JSON.stringify({ facts, failed }), { status: 200, headers: { "content-type": "application/json" } });
   }
   if (/\/api\/operation\/purchase\/demands/.test(url)) {
     return new Response(JSON.stringify(demandPurchase), { status: 200, headers: { "content-type": "application/json" } });
@@ -183,14 +218,44 @@ window.fetch = async (input, init) => {
   const detailId = /\/api\/operation\/orders\/([^/?]+)/.exec(path)?.[1];
   const detail = orders.find(o => o.id === detailId);
   const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
-  if (detail && path.endsWith(detail.id)) return json({ order: detail, lines: detail.order_lines, addons: [], total: 2499, warehouse: null, stockBalances: [], freeUnits: [], pos: [], history: [], threads: [] });
+  if (detail && path.endsWith(detail.id)) return json({ order: detail, lines: detail.order_lines, addons: [], total: 2499, warehouse: null, stockBalances: [], freeUnits: [], pos: [], threads: [],
+    picRead: "ok", pic: { userId: "u0", name: "Shasha" },
+    history: [
+      { text: "Sales Order created at Sales Portal", occurred_at: detail.placed_at, actor_kind: "system" },
+      { text: "Operations received the order", occurred_at: detail.proceeded_at, actor_kind: "system" },
+      { text: "Delivery date checked with TEST Logistics", occurred_at: "2026-10-06T06:30:00Z", actor: "TEST · Staff D", actor_kind: "human" },
+    ] });
   if (path === "/api/ops/service-cases") return json({ items: [], total: 0 });
+  /* Delivery's reads for the Order Route (shaped on SO-1333: NETS, 29 Sep). */
+  if (detail && path.endsWith("/booking-brief")) return json({ brief: null });
+  if (detail && path.endsWith("/delivery-attempts")) return json({ attempts: [] });
+  if (path.startsWith("/api/finance/exceptions/") || path.startsWith("/api/operation/payment-approvals/")) return json([]);
+  if (path === "/api/operation/delivery-arrangements") {
+    const orderId = new URL(url, window.location.href).searchParams.get("order");
+    return json({ arrangements: [{ id: "a1", order_id: orderId, leg: 0, partner_id: "p1", confirmed_date: "2026-09-29", confirmed_time: "Afternoon (12pm to 3pm)" }] });
+  }
+  if (path === "/api/operation/delivery-orders") return json({ deliveryOrders: [], attempts: [], handoverEvents: [] });
+  /* Payments' four reads for `Pay by` (no invoices recorded in this preview). */
+  if (path === "/api/finance/invoices/register") return json({ rows: [], total: 0 });
+  if (path === "/api/finance/payment-storage") return json({ cases: [] });
+  if (path === "/api/finance/payment-storage/later-delivery-requests") return json({ requests: [] });
+  if (path === "/api/finance/payment-settings") return json({ bank_accounts: [], manual_methods: [], rules: [], collection_timing: [], changes: [] });
   if (detail && path.endsWith("/refunds")) return json({ refunds: [] });
   if (detail && path.endsWith("/payments")) return json({ payments: [] });
   if (detail && path.endsWith("/amendment")) return json({ amendment: null });
   if (detail && path.endsWith("/correction-work")) return json({ work: [] });
   if (detail && path.endsWith("/service-cases")) return json({ items: [] });
-  if (detail && path.endsWith("/revisions")) return json({ revisions: [] });
+  /* DEV ONLY · TEST facts so Order Route and Timeline draw (screenshots 3–4). */
+  if (detail && path.endsWith("/revisions")) return json({ revisions: [{
+    revision: 1, created_at: detail.placed_at, created_by: null, actor_kind: "system",
+    snapshot: { header: { delivery_date: detail.delivery_date, delivery_date_tbd: false, customer_name: detail.customer_name }, lines: detail.order_lines, addons: [] },
+  }] });
+  if (detail && path.endsWith("/allocation")) return json({ allocation: { orderId: detail.id, soRef: `SO-${detail.so}`, lines: [], unmatchedUnits: [],
+    totals: { committedQty: detail.order_lines.reduce((n, l) => n + l.qty, 0), reservedQty: 0, soldQty: 0, outstandingQty: detail.order_lines.reduce((n, l) => n + l.qty, 0) } } });
+  if (detail && path.endsWith("/loans")) return json({ loans: [] });
+  if (detail && path.endsWith("/loan-offers")) return json({ offers: [] });
+  if (path === "/api/operation/supplier-claims") return json({ claims: [] });
+
   if (path.endsWith("/workspace-duties")) return json({ duties: [] });
   if (path.endsWith("/customer-type")) return json({ existing: false, matches: 0 });
   /* The server's paged contract (`paged=1`): 500 per page, placed_at desc then
@@ -211,6 +276,20 @@ window.fetch = async (input, init) => {
       ...(after ? {} : { salesOrderTotal: population.length }),
       nextCursor: page.length === 500 ? keyOf(page[page.length - 1]!) : null,
     });
+  }
+  /* The header's Team list (0663). TEST people, never real staff. */
+  if (path === "/api/operation/work-activity/team-today") {
+    const now = Date.now();
+    const at = (min: number) => new Date(now - min * 60_000).toISOString();
+    const member = (n: string, state: string, idle: number | null) => ({
+      userId: `00000000-0000-4000-9000-${String(n.charCodeAt(0)).padStart(12, "0")}`,
+      name: `TEST · Staff ${n}`, role: "operation", state,
+      lastActiveAt: idle == null ? null : at(idle), idleMinutes: idle,
+    });
+    return json({ asOf: new Date(now).toISOString(), onlineMinutes: 15, members: [
+      member("A", "online", 0), member("B", "off", null), member("C", "away", 34), member("D", "online", 2),
+      member("E", "not_seen", null), member("F", "online", 1), member("G", "online", 5), member("H", "away", 12),
+    ] });
   }
   const body = /\/api\/operation\/orders(\?|$)/.test(url)
     ? { orders: scenario === "empty" ? [] : orders, salesOrderTotal: scenario === "empty" ? 0 : orders.length }
@@ -243,7 +322,7 @@ const client = new QueryClient({ defaultOptions: { queries: { retry: false } } }
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[`/operation/orders${window.location.search}`]}>
+      <MemoryRouter initialEntries={[previewParams.get("path") ?? `/operation/orders${window.location.search}`]}>
         <Routes>
           <Route path="/operation/*" element={<OperationApp />} />
         </Routes>

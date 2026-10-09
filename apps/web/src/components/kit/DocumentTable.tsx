@@ -4,15 +4,15 @@
  * The table a document draws inside a card: a Sales Order's `Items`, a
  * `Payment` ledger, Monthly demand's month table.
  *
- *   header   11/500 slate-11 over a 1px slate-5 line
- *   rows     13px · 8px cell insets · a 1px slate-5 line beneath each
- *   columns  NO vertical lines (tokens §5.1: numbers under distinct words)
+ *   header   12/500 muted over the v4 header line (`--c-head-line`)
+ *   rows     13px ink · 8px cell insets · the v4 row line (`--c-row-line`)
+ *   columns  NO vertical lines (01 §5)
  *   numbers  right-aligned · tabular · never wrap
  *   weight   only the closing total is 600
  *
- * The class strings are the ONE recipe `so-document-table.ts` already wrote
- * for the Sales Order page; they are imported, never retyped, so the pages
- * that read them directly and this component cannot drift apart.
+ * The geometry is the ONE recipe `so-document-table.ts` already wrote for the
+ * Sales Order page; it is imported, never retyped. The v4 lines and header
+ * type (01 §5) are swapped in here, by name, until that page recipe moves too.
  *
  * A ROW MAY BE A DOOR. Its first cell is then a real button with its own
  * accessible name; the row itself only carries the hover. An empty cell prints
@@ -54,10 +54,16 @@ export interface DocumentTableRow {
 
 /** The one cell alignment: the recipe's cell, on the row's middle line. */
 const CELL = SO_TD.replace("align-top", "align-middle");
+/** v4 lines (01 §5): the header line under the head, the row line under each
+ *  row. */
+const HEAD_ROW = SO_HEAD_ROW.replace("border-kit-slate-5", "border-c-head-line");
+const ROW = SO_ROW.replace("border-kit-slate-5", "border-c-row-line");
+/** v4 header type: 12 / 500 muted. */
+const TH = SO_TH.replace("text-label text-base-500", "text-meta text-c-muted");
 /** The first column stays while the rest scroll. A sticky cell already paints
  *  above the plain cells (no z-index: the kit names one ladder); it carries the row's own
  *  background so scrolled numbers pass under it, never through it. */
-const PINNED = "sticky left-0 bg-white";
+const PINNED = "sticky left-0 bg-c-card";
 
 const isEmpty = (value: ReactNode) => value == null || value === false || value === "";
 
@@ -75,12 +81,12 @@ export default function DocumentTable({
     <div data-kit="document-table" className="w-full min-w-0 overflow-x-auto">
       <table aria-label={label} className={SO_TABLE}>
         <thead>
-          <tr className={SO_HEAD_ROW}>
+          <tr className={HEAD_ROW}>
             {columns.map((column) => (
               <th
                 key={column.key}
                 scope="col"
-                className={`${SO_TH} font-medium ${column.numeric ? SO_AMOUNT : "whitespace-nowrap text-left"} ${
+                className={`${TH} font-medium ${column.numeric ? SO_AMOUNT : "whitespace-nowrap text-left"} ${
                   column === columns[0] ? PINNED : ""
                 }`}
               >
@@ -96,9 +102,9 @@ export default function DocumentTable({
               data-row={row.key}
               data-total={row.total ? "true" : undefined}
               className={[
-                SO_ROW,
-                row.total ? "font-semibold text-kit-slate-12" : "text-kit-slate-12",
-                row.onOpen ? "group hover:bg-kit-slate-3" : "",
+                ROW,
+                row.total ? "font-semibold text-c-ink" : "text-c-ink",
+                row.onOpen ? "group hover:bg-c-hover" : "",
               ].join(" ")}
             >
               {columns.map((column, index) => {
@@ -109,7 +115,7 @@ export default function DocumentTable({
                   <td
                     key={column.key}
                     className={`${CELL} ${column.numeric ? SO_AMOUNT : "whitespace-nowrap text-left"} ${
-                      index === 0 ? `${PINNED} ${row.onOpen ? "group-hover:bg-kit-slate-3" : ""}` : ""
+                      index === 0 ? `${PINNED} ${row.onOpen ? "group-hover:bg-c-hover" : ""}` : ""
                     }`}
                   >
                     {door ? (
@@ -117,7 +123,7 @@ export default function DocumentTable({
                         type="button"
                         aria-label={row.openLabel}
                         onClick={row.onOpen}
-                        className="inline-flex items-center rounded-control text-left font-medium text-kit-blue-11 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-kit-blue-9 max-md:min-h-10"
+                        className="inline-flex items-center rounded-lg text-left font-semibold text-c-ink underline-offset-2 hover:underline focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] max-md:min-h-10"
                       >
                         {content}
                       </button>

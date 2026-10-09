@@ -26,15 +26,20 @@ describe("ERP Shell V1 quick rail contract", () => {
    * system entirely. One TABS entry drives both the collapsed icon strip and
    * the expanded panel header, so the two states cannot drift apart.
    */
-  it("gives Tasks the same icon as the left-navigation Work destination", () => {
-    const rail = read("OperationRightRail.tsx");
+  /* RETIRED (owner ruling 2026-10-08): the Quick Rail is no longer mounted —
+   * the shell's right side is the `ShellTasks` card only, and Calendar and
+   * Activity left the shell — so its Tasks door no longer has to wear the
+   * left-menu Work row's face. The Work row itself is now `Workspace`, drawn
+   * with the Material `home` symbol. What stays binding is that the shell does
+   * not bring the rail back. */
+  it("the shell no longer mounts the Quick Rail; the Work row wears the Material `home` face", () => {
+    const shell = read("../OperationApp.tsx");
+    expect(shell).not.toMatch(/import\s+OperationRightRail\b/);
+    expect(shell).not.toContain("<OperationRightRail");
+    expect(shell).toContain("<ShellTasks");
     const nav = read("../../portal/portal-nav.ts");
-    const navIcon = /\{\s*key:\s*"work",[^}]*icon:\s*(\w+)/.exec(nav)?.[1];
-    expect(navIcon).toBe("ListTodo");
-    expect(rail).toMatch(
-      new RegExp(`key:\\s*"tasks",\\s*label:\\s*"Tasks",\\s*icon:\\s*${navIcon}\\b`),
-    );
-    expect(rail).not.toContain("icon: Flag");
+    expect(nav).toMatch(/\{\s*key:\s*"work",\s*label:\s*"Workspace",[^}]*mIcon:\s*"home"/);
+    expect(read("OperationRightRail.tsx")).not.toContain("icon: Flag");
   });
 
   it("does not put duty editing or a second Team queue in Quick Rail", () => {

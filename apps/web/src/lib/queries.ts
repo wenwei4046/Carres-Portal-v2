@@ -1,3 +1,4 @@
+import type { OutrightFactsFailed, OutrightOrderFacts } from "@carres/shared";
 import { workspaceActivitySettingsResponseSchema, type WorkspaceActivitySettingsResponse } from "@carres/shared";
 import { supabase } from "@/lib/supabase";
 import {
@@ -3339,7 +3340,13 @@ export interface operationOrderDetailResponse {
    *  seeds its draft from that object. `null` = no overlay row (UNKNOWN). */
   control?: {
     delivery_photos?: DeliveryLedgerEntry[] | null;
+    assigned_staff?: string | null;
   } | null;
+  /** The SO PIC (`ops_order_control.assigned_staff`, named from People).
+   *  `picRead: "failed"` = not read; `name: null` = this caller may not see
+   *  the person. Absent on an older Worker = not read. */
+  pic?: { userId: string; name: string | null } | null;
+  picRead?: "ok" | "failed";
 }
 
 /** Row in GET /api/operation/pos. `purchase_order_lines(...)` is the embedded
@@ -6299,8 +6306,15 @@ export function useMonthlyDemandFacts(enabled: boolean) {
  *  obligations through the object page's completion, cases from Service. A
  *  fact the server could not establish is `null` and matches no filter. */
 export interface SalesOrderRegisterFacts {
-  facts: Record<string, { obligations: "outstanding" | "none" | null; cases: "open" | "closed" | "none" | null; stock?: Record<string, string> }>;
-  failed: { obligations: boolean; cases: boolean };
+  facts: Record<string, {
+    obligations: "outstanding" | "none" | null;
+    cases: "open" | "closed" | "none" | null;
+    stock?: Record<string, string>;
+    /** The Outright list's owner facts (PIC, Supplier DO, GRN, delivery day,
+     *  loading, location, Finance hold); absent on an older server. */
+    owned?: OutrightOrderFacts;
+  }>;
+  failed: { obligations: boolean; cases: boolean } & Partial<OutrightFactsFailed>;
 }
 
 export function useSalesOrderRegisterFacts(enabled: boolean) {

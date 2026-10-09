@@ -101,12 +101,15 @@ describe("WorkActionPanel", () => {
     expect(screen.getByTestId("work-detail-message")).toHaveTextContent("TCF0541 · LIM KUAN YANG");
     const chat = screen.getByTestId("work-detail-open-chat");
     expect(chat).toHaveTextContent("Open WhatsApp group");
-    expect(chat.className).toContain("bg-kit-blue-9");
+    // The one main button is charcoal (template 2026-10-08); no blue anywhere.
+    expect(chat.className).toContain("bg-c-ink");
     expect(screen.getByRole("button", { name: "Copy message" })).toBeInTheDocument();
     expect(screen.getByTestId("work-detail-record-door")).toHaveTextContent("Open in Delivery");
     /* One blue: the message door holds it, so no second blue act and a neutral Open door. */
     expect(screen.queryByTestId("work-detail-primary-act")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open DO-140926-0007" }).className).not.toContain("bg-kit-blue-9");
+    // ...nor the charcoal kit primary (2026-10-08): the Open door stays neutral.
+    expect(screen.getByRole("button", { name: "Open DO-140926-0007" }).className).not.toContain("bg-c-ink");
   });
 
   it("says the party once", () => {
@@ -120,8 +123,9 @@ describe("WorkActionPanel", () => {
     render(<WorkActionPanel hasParties primaryAct={{ label: "Contact logistics today", onClick }} item={{ ...base, interaction: { mode: "open_module" } } as OperationWorkItem} onOpen={() => {}} />);
     const act = screen.getByTestId("work-detail-primary-act");
     expect(act).toHaveTextContent("Contact logistics today");
-    expect(act.className).toContain("bg-kit-blue-9");
-    expect(screen.getByRole("button", { name: "Open DO-140926-0007" }).className).not.toContain("bg-kit-blue-9");
+    // The kit primary is CHARCOAL since 2026-10-08 (Layout Standard §4.1).
+    expect(act.className).toContain("bg-c-ink");
+    expect(screen.getByRole("button", { name: "Open DO-140926-0007" }).className).not.toContain("bg-c-ink");
     fireEvent.click(act);
     expect(onClick).toHaveBeenCalled();
   });

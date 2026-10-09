@@ -18,6 +18,9 @@ interface TasksHostState {
   discardRequest: number;
   requestDiscard: () => void;
   dirty: boolean;
+  /** A task's own work panel is open (the shell widens the Tasks card). */
+  taskOpen: boolean;
+  setTaskOpen: (open: boolean) => void;
   /** What the open task is about, for the guard's sentence (`SO-1368`). */
   subject: string | null;
   pending: (() => void) | null;
@@ -33,6 +36,8 @@ export const useTasksHost = create<TasksHostState>((set, get) => ({
   discardRequest: 0,
   requestDiscard: () => set((s) => ({ discardRequest: s.discardRequest + 1 })),
   dirty: false,
+  taskOpen: false,
+  setTaskOpen: (taskOpen) => set({ taskOpen }),
   subject: null,
   pending: null,
   setDirty: (dirty, subject) => set((s) => ({ dirty, subject: subject === undefined ? s.subject : subject })),

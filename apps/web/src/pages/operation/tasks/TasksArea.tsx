@@ -30,6 +30,7 @@ import {
   type SoBatchPurchaseResponse,
 } from "@carres/shared";
 import Icon from "@/components/kit/Icon";
+import MIcon from "@/components/carres/MIcon";
 import Modal from "@/components/kit/Modal";
 import Button from "@/components/kit/Button";
 import Popover from "@/components/kit/Popover";
@@ -84,7 +85,12 @@ function usePoWindowFacts(enabled: boolean): Map<string, PoWindowFacts> {
 
 type Result = { text: string; taskId: string; stay: boolean };
 
-export default function TasksArea({ onClose, fill = false }: { onClose: () => void; fill?: boolean }) {
+export default function TasksArea({ onClose, fill = false, bare = false }: {
+  onClose: () => void;
+  fill?: boolean;
+  /** Inside the shell's Tasks card, which draws the title row itself. */
+  bare?: boolean;
+}) {
   const work = useOpenWorkSet();
   const { items, myUserId, hasData, error, refreshFailed, lastUpdatedAt, unhealthySources, generatedOn, retry } = work;
   const today = generatedOn;
@@ -110,6 +116,11 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
   const live = taskId ? items.find((r) => r.id === taskId) ?? null : null;
   if (live) snapshot.current = live;
   const task = taskId ? live ?? snapshot.current : null;
+  const setTaskOpen = useTasksHost((s) => s.setTaskOpen);
+  useEffect(() => {
+    setTaskOpen(Boolean(task));
+    return () => setTaskOpen(false);
+  }, [task, setTaskOpen]);
   const [result, setResult] = useState<Result | null>(null);
   const [review, setReview] = useState<((close: () => void) => ReactNode) | null>(null);
   const setDirty = useTasksHost((s) => s.setDirty);
@@ -207,7 +218,7 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
   const countBadge = (n: number, tone: "red" | "blue" | "grey") => (
     <span
       className={`grid h-5 min-w-5 shrink-0 place-items-center rounded-full px-1.5 text-[11px] font-semibold leading-4 tabular-nums ${
-        tone === "red" ? "bg-danger text-white" : tone === "blue" ? "bg-kit-blue-9 text-white" : "bg-kit-slate-4 text-kit-slate-12"
+        tone === "red" ? "bg-danger text-white" : tone === "blue" ? "bg-c-ink text-white" : "bg-kit-slate-4 text-kit-slate-12"
       }`}
       data-testid="section-count"
     >
@@ -223,8 +234,8 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
     const { key, rows, tone } = opts;
     const empty = rows.length === 0;
     const expanded = !empty && isOpen(key, opts.defaultOpen);
-    const bg = tone === "missed" ? "bg-kit-red-3" : tone === "today" ? "bg-kit-blue-3" : "bg-white";
-    const edge = tone === "today" ? "border-l-[3px] border-l-kit-blue-9" : "";
+    const bg = tone === "missed" ? "bg-kit-red-3" : tone === "today" ? "bg-c-select-bg" : "bg-white";
+    const edge = tone === "today" ? "border-l-[3px] border-l-c-select-fg" : "";
     const header = (
       <>
         {empty ? <span className="w-5 shrink-0" aria-hidden /> : (
@@ -255,7 +266,7 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
             aria-label={`${opts.aria} · ${rows.length}`}
             title={opts.holiday ?? undefined}
             onClick={() => toggle(key, opts.defaultOpen)}
-            className={`flex min-h-[52px] w-full items-center gap-2.5 border-b border-kit-slate-4 px-3 text-left hover:brightness-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kit-blue-9 ${bg} ${edge}`}
+            className={`flex min-h-[52px] w-full items-center gap-2.5 border-b border-kit-slate-4 px-3 text-left hover:brightness-[0.98] focus-visible:[outline:var(--c-focus)] focus-visible:-outline-offset-2 ${bg} ${edge}`}
           >
             {header}
           </button>
@@ -267,7 +278,7 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
 
   /* ── states ───────────────────────────────────────────────────────────── */
   const failedBanner = (error || refreshFailed || unhealthySources.length > 0) ? (
-    <div role="alert" className="mx-3 mt-3 flex items-start gap-2 rounded-control bg-kit-red-3 px-3 py-2 text-meta text-kit-red-11" data-testid="tasks-failed">
+    <div role="alert" className="mx-3 mt-3 flex items-start gap-2 rounded-lg bg-c-err-bg px-3 py-2 text-meta text-c-err-fg" data-testid="tasks-failed">
       <Icon name="late" size={14} />
       <div className="min-w-0 flex-1">
         <p>
@@ -276,7 +287,7 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
         </p>
         {unhealthySources.map((s) => <p key={s.key}>{T.couldNotRefresh(TASK_MODULE_WORD[s.key as OperationWorkModule] ?? s.key)}</p>)}
       </div>
-      <button type="button" onClick={retry} className="shrink-0 font-semibold text-kit-blue-11 hover:underline">{T.tryAgain}</button>
+      <button type="button" onClick={retry} className="shrink-0 font-semibold text-c-ink hover:underline">{T.tryAgain}</button>
     </div>
   ) : null;
 
@@ -324,7 +335,7 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
           <button
             key={m ?? "all"}
             type="button"
-            className={`flex h-8 items-center gap-2 rounded-control px-2 text-left text-body ${m === module ? "bg-kit-blue-3 font-semibold text-kit-blue-11" : "hover:bg-kit-slate-3"}`}
+            className={`flex h-8 items-center gap-2 rounded-control px-2 text-left text-body ${m === module ? "bg-c-select-bg font-semibold text-c-select-fg" : "hover:bg-kit-slate-3"}`}
             onClick={() => { setModule(m); setModuleOpen(false); }}
             data-testid={`tasks-module-${m ?? "all"}`}
           >
@@ -335,6 +346,42 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
         ))}
       </div>
     </Popover>
+  );
+
+  /* The shell's Tasks card (template Layout Standard §3.3, 2026-10-08): one
+     icon per work module in menu order, its count when it has jobs, pale when
+     none; the chosen one wears the theme select colours. Same filter as the
+     menu above, which stays for the phone drawer. */
+  const MODULE_ORDER: OperationWorkModule[] = ["orders", "purchasing", "receiving", "payment", "delivery", "issue_tracker"];
+  const MODULE_SYMBOL: Record<OperationWorkModule, string> = {
+    orders: "receipt_long", purchasing: "shopping_cart", receiving: "warehouse",
+    payment: "payments", delivery: "local_shipping", issue_tracker: "assignment_late",
+  };
+  const moduleIcons = (
+    <div role="group" aria-label="Filter by module" className="flex flex-wrap items-center gap-1" data-testid="tasks-module-icons">
+      {MODULE_ORDER.map((m) => {
+        const n = list ? list.moduleCounts[m] : 0;
+        const on = module === m;
+        const name = `${TASK_MODULE_WORD[m]} · ${n > 0 ? n : "none today"}`;
+        return (
+          <button
+            key={m}
+            type="button"
+            aria-pressed={on}
+            aria-label={name}
+            title={name}
+            onClick={() => setModule(on ? null : m)}
+            data-testid={`tasks-module-icon-${m}`}
+            className={`flex h-8 items-center gap-1 rounded-lg px-1.5 text-[12px] font-semibold tabular-nums ${
+              on ? "bg-c-select-bg text-c-select-fg" : n > 0 ? "text-c-secondary hover:bg-c-hover" : "text-c-head-line hover:bg-c-hover"
+            }`}
+          >
+            <MIcon name={MODULE_SYMBOL[m]} size={18} />
+            {n > 0 ? n : null}
+          </button>
+        );
+      })}
+    </div>
   );
 
   const resultLine = result ? (
@@ -349,15 +396,15 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
 
   const listView = (
     <div className={`${task ? "hidden" : "flex"} min-h-0 flex-1 flex-col`} hidden={Boolean(task)} data-testid="tasks-list">
-      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-kit-slate-4 px-3">
+      <div className={`${bare ? "hidden" : "flex"} h-12 shrink-0 items-center gap-2 border-b border-kit-slate-4 px-3`}>
         <ListTodo size={18} aria-hidden className="text-kit-slate-11" />
         <h2 className="flex-1 text-strong text-kit-slate-12">{T.title}</h2>
         <button type="button" onClick={() => guard(onClose)} className="rounded p-1 text-kit-slate-11 hover:bg-kit-slate-3" aria-label="Close panel" data-testid="tasks-close">
           <X size={16} />
         </button>
       </div>
-      <div className="flex shrink-0 items-center gap-2 border-b border-kit-slate-4 px-3 py-2">
-        {moduleMenu}
+      <div className={`flex shrink-0 items-center gap-2 border-b px-3 py-2 ${bare ? "border-c-row-line" : "border-kit-slate-4"}`}>
+        {bare ? moduleIcons : moduleMenu}
         <div className="ml-auto flex items-center gap-1" data-testid="tasks-week">
           <button type="button" aria-label={T.previousWeek} title={T.previousWeek} disabled={!list} onClick={() => list && setWeek(list.previousWeek)}
             className="grid h-7 w-7 place-items-center rounded-control border border-kit-slate-5 bg-white text-kit-slate-11 hover:bg-kit-slate-3 disabled:opacity-40">
@@ -385,9 +432,9 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
               key: day.iso, tone: day.today ? "today" : "day", rows: day.rows, defaultOpen: day.today, holiday: day.holiday,
               aria: `${day.weekday} ${day.dayNumber} ${day.month}${day.holiday ? ` · ${day.holiday}` : ""}`,
               label: day.today ? (
-                <span className="flex items-center gap-1.5 text-kit-blue-11">
+                <span className="flex items-center gap-1.5 text-c-select-fg">
                   <span className="text-label font-semibold uppercase tracking-wider">{day.weekday}</span>
-                  <span className="grid h-6 w-6 place-items-center rounded-full bg-kit-blue-9 text-[12px] font-semibold text-white" data-testid="today-circle">{day.dayNumber}</span>
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-c-select-fg text-[12px] font-semibold text-white" data-testid="today-circle">{day.dayNumber}</span>
                   <span className="text-body font-semibold">{day.month}</span>
                 </span>
               ) : (
@@ -416,7 +463,7 @@ export default function TasksArea({ onClose, fill = false }: { onClose: () => vo
       onInput={() => setDirty(true, task.source.object.label)}
     >
       <div className="flex h-10 shrink-0 items-center gap-2 border-b border-kit-slate-4 px-3">
-        <button type="button" onClick={() => guard(closeTask)} className="flex items-center gap-1.5 text-meta font-semibold text-kit-blue-11 hover:underline" data-testid="tasks-back">
+        <button type="button" onClick={() => guard(closeTask)} className="flex items-center gap-1.5 text-meta font-semibold text-c-ink hover:underline" data-testid="tasks-back">
           <ArrowLeft size={14} aria-hidden />
           {T.back}
         </button>
