@@ -20,7 +20,10 @@ export function setCompanyIdentity(values: CompanyProfileValues | null | undefin
  *  prints `addressLines[0..2]` never drops the postcode. */
 export function printedAddressLines(p: CompanyProfileValues): string[] {
   const parts = companyAddressLines(p);
-  return parts.length <= 3 ? parts : [parts[0]!, parts[1]!, parts.slice(2).join(", ")];
+  const lines = parts.length <= 3 ? parts : [parts[0]!, parts[1]!, parts.slice(2).join(", ")];
+  // Every line but the last ends with a comma, as the letterhead always did:
+  // templates that print two lines on one row then still read as an address.
+  return lines.map((l, i) => (i < lines.length - 1 && !/[,.]$/.test(l) ? `${l},` : l));
 }
 
 export const CARRES_COMPANY = {

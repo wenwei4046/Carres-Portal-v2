@@ -11,8 +11,8 @@ describe("the company identity every document prints", () => {
   });
   it("prints three address lines with the postcode kept", () => {
     expect(CARRES_COMPANY.addressLines).toEqual([
-      "E-28-02 & E-28-03, MENARA SUEZCAP 2",
-      "KL GATEWAY, NO. 2, JALAN KERINCHI",
+      "E-28-02 & E-28-03, MENARA SUEZCAP 2,",
+      "KL GATEWAY, NO. 2, JALAN KERINCHI,",
       "GERBANG KERINCHI LESTARI, 59200 KUALA LUMPUR",
     ]);
   });
@@ -20,8 +20,8 @@ describe("the company identity every document prints", () => {
     setCompanyIdentity({ ...VERIFIED_COMPANY_PROFILE, legal_name: "CARRES TEST SDN. BHD.", address_line3: null });
     expect(CARRES_COMPANY.legalName).toBe("CARRES TEST SDN. BHD.");
     expect(CARRES_COMPANY.addressLines).toEqual([
-      "E-28-02 & E-28-03, MENARA SUEZCAP 2",
-      "KL GATEWAY, NO. 2, JALAN KERINCHI",
+      "E-28-02 & E-28-03, MENARA SUEZCAP 2,",
+      "KL GATEWAY, NO. 2, JALAN KERINCHI,",
       "59200 KUALA LUMPUR",
     ]);
   });
