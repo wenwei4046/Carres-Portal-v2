@@ -161,7 +161,26 @@ goods may be arranged
 not applied):** Delivery Rules row `Assign logistics by` (1–30, default 3, Settings editor gate, change
 record with reason) and the one `assignLogisticsDueIso` read by Work, the Logistics card, the Orders list
 and the Order Route. A partner's own booking lead is not yet read: no company is assigned while this
-deadline runs, so no partner requirement can apply until the assignment exists. Assignment opens early;
+deadline runs, so no partner requirement can apply until the assignment exists. **THE Delivery
+calendar (built on branch `build/settings-delivery-cal`, 9 Oct 2026; 0677 not applied):** every
+Delivery date — this deadline, the Logistics card's three checks and `confirm_delivery_date`, the
+contact / deliver / photo / proof deadlines, the Scheduled-date refusal (Delivery panel, external
+link page and API, DO issue gate, Order Route), the partner booking check, the booking brief and the
+payment-due FACT — counts Monday–Saturday (Sunday closed; ACTION-FLOW-STANDARD Law 2A) with the
+Selangor public holidays Warehouse Settings stores for the dispatching Site (policy state → active
+imported calendar → dates; replacement days count), and the built-in Selangor + national list for any
+year nothing is imported (`packages/shared/src/delivery-working-calendar.ts`, API
+`readDeliveryCalendar`, web `useDeliveryDays`). It is never the Office (Kuala Lumpur) list, and there is
+no second holiday editor: the dates are edited in Settings → Warehouse → Public Holidays. The Orders
+list's `Assign logistics` late count uses the same `assignLogisticsDueIso` (opening day included).
+
+**Courier dispatch within (DEL-10) — owner default 8 Oct, confirmed 9 Oct 2026: 3 working days,
+adjustable.** Stored on Delivery Rules (`courier_dispatch_working_days`, 1–30, 0677) behind the
+Settings editor gate with its change record, shown as `Courier dispatch within` on Delivery Settings →
+Delivery Rules, and one shared due function `courierDispatchDueIso` (dispatching Warehouse's
+Collection days, explicit Sunday + Selangor fallback). **BUILD GAP — NOT BUILT:** the workflow itself
+(Warehouse confirms the packable scope → dispatch due → handover in batches with tracking →
+Operations follows) has no door, Work item or Route node yet. Assignment opens early;
 the assignment cut-off determines when it is late. For a delivery with no company assigned, the
 `Assign logistics` action becomes available on the day its Purchase Order is issued. A stock-source
 order without a PO opens that action on the day it enters Operations. This is an opening trigger,

@@ -236,14 +236,30 @@ describe("Delivery Rules → Assign logistics by (DEL-04, 0673)", () => {
   it("GET / returns the stored lead and the Settings editor gate", async () => {
     const { rpcCalls } = withRules({ assignment_lead_working_days: 5, revision: 2, changed_at: null, changed_by: null }, true);
     const body = (await (await call("", "operation")).json()) as { rules: Record<string, unknown> };
-    expect(body.rules).toEqual({ assignmentLeadWorkingDays: 5, revision: 2, stored: true, canEdit: true });
+    // Before 0677 the row has no courier column: its default answers, not editable.
+    expect(body.rules).toEqual({ assignmentLeadWorkingDays: 5, courierDispatchWorkingDays: 3, courierDispatchStored: false, revision: 2, stored: true, canEdit: true });
     expect(rpcCalls.find((c) => c.fn === "settings_can_edit")?.args).toEqual({ p_section: "delivery" });
   });
 
   it("an uninstalled table answers the default 3 and is never editable", async () => {
     withRules(null, true);
     const body = (await (await call("", "operation")).json()) as { rules: Record<string, unknown> };
-    expect(body.rules).toEqual({ assignmentLeadWorkingDays: 3, revision: null, stored: false, canEdit: false });
+    expect(body.rules).toEqual({ assignmentLeadWorkingDays: 3, courierDispatchWorkingDays: 3, courierDispatchStored: false, revision: null, stored: false, canEdit: false });
+  });
+
+  it("DEL-10 · a stored courier lead reads back (0677), and its door refuses 0 or 31 before SQL", async () => {
+    withRules({ assignment_lead_working_days: 3, courier_dispatch_working_days: 4, revision: 7, changed_at: null, changed_by: null }, true);
+    const body = (await (await call("", "operation")).json()) as { rules: Record<string, unknown> };
+    expect(body.rules).toMatchObject({ courierDispatchWorkingDays: 4, courierDispatchStored: true, revision: 7 });
+    const { rpcCalls } = mockSb({});
+    for (const workingDays of [0, 31]) {
+      const bad = await call("/rules/courier-dispatch", "principal", { method: "PUT", body: JSON.stringify({ workingDays, revision: 7 }) });
+      expect(bad.status).toBe(422);
+    }
+    expect(rpcCalls).toHaveLength(0);
+    const ok = await call("/rules/courier-dispatch", "principal", { method: "PUT", body: JSON.stringify({ workingDays: 5, revision: 7, reason: "One packer" }) });
+    expect(ok.status).toBe(200);
+    expect(rpcCalls[0]).toEqual({ fn: "delivery_set_courier_dispatch_lead", args: { p_working_days: 5, p_revision: 7, p_reason: "One packer" } });
   });
 
   it("GET /leads returns both stored leads", async () => {

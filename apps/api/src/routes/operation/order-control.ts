@@ -15,7 +15,7 @@ import {
   type BookingGateResult,
   partnerBookingWarnings,
   partnerDeliveryRules,
-  myHolidaySet,
+  deliveryHolidaySet,
   type PartnerBookingWarning,
   type PartnerDeliveryRules,
   deliveryGroupLabel,
@@ -50,6 +50,7 @@ import {
 import { requireDuty } from "../../lib/duties";
 import { mapPgError, fail } from "../../lib/route-helpers";
 import { adminClient, userClient } from "../../lib/supabase";
+import { readDeliveryCalendar } from "../../lib/delivery-calendar";
 import type { AppEnv } from "../../types";
 
 /**
@@ -897,6 +898,8 @@ async function partnerBookingCheck(
     }).length;
   }
 
+  // The Delivery calendar's holidays (stored Selangor, else built-in).
+  const delivery = await readDeliveryCalendar(sb);
   return {
     partner: { id: partner.id as string, name: (partner.name as string) ?? "" },
     rules,
@@ -907,7 +910,7 @@ async function partnerBookingCheck(
       dateIso,
       todayIso: todayIsoMYT(),
       bookedOnDate,
-      holidays: myHolidaySet(),
+      holidays: deliveryHolidaySet(delivery.calendar),
     }),
   };
 }

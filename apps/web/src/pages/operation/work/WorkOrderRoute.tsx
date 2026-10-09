@@ -77,8 +77,8 @@ export function useMissionRoute(orderId: string) {
     if (!supplier && !factsQ.isError) return null;
     const today = appTodayIso();
     /* Payment's own clock (Law D): the stored Collection timing for this
-       order and the Office holidays — the one stored holiday list. */
-    const holidays = lm.officeDays.holidays;
+       order; the deadline is a FACT on the Delivery calendar. */
+    const holidays = lm.deliveryDays.holidays;
     const timing = lm.collectionTiming;
     const money = moneyOfOrder(o);
     const owed = money.known ? money.outstanding : 0;
@@ -112,7 +112,7 @@ export function useMissionRoute(orderId: string) {
       },
       spell,
     });
-  }, [card, o, lm.model, lm.facts, lm.officeDays, lm.collectionTiming, supplier, factsQ.isError, loansQ.data]);
+  }, [card, o, lm.model, lm.facts, lm.deliveryDays, lm.collectionTiming, supplier, factsQ.isError, loansQ.data]);
   return { route, lm, supplier, customer, factsQ, loading: lm.scope.loading || factsQ.isLoading, failed: lm.scope.failed };
 }
 

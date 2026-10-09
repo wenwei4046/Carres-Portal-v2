@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import * as XLSX from "xlsx";
-import { deliveryQueueLeads, myHolidaySet } from "@carres/shared";
+import { deliveryQueueLeads } from "@carres/shared";
+import { useDeliveryDays } from "../../lib/deadline-queries";
 import EmptyState from "@/components/kit/EmptyState";
 import Select from "@/components/kit/Select";
 import { SectionCard } from "@/components/SectionPanel";
@@ -124,7 +125,8 @@ export default function OperationDeliveryReport() {
   const attempts = useMemo(() => docsQ.data?.attempts ?? [], [docsQ.data]);
   const handoverEvents = useMemo(() => docsQ.data?.handoverEvents ?? [], [docsQ.data]);
   const queueLeads = useMemo(() => (settingsQ.data ? deliveryQueueLeads(settingsQ.data) : undefined), [settingsQ.data]);
-  const holidays = useMemo(() => myHolidaySet(), []);
+  /* The Delivery calendar's holidays (stored Selangor, else built-in). */
+  const holidays = useDeliveryDays().holidays;
   const addonNameByKey = useMemo(() => {
     const m = new Map<string, string>();
     for (const a of catalogQ.data?.addons ?? []) if (a.key && a.name) m.set(a.key, a.name);

@@ -1021,6 +1021,8 @@ export {
 // `Confirm balance delivery date` (per PO LINE). Pure; names its calendar.
 export {
   PURCHASING_OFFICE_OFF_DAYS,
+  purchasingOfficeDays,
+  type PurchasingOfficeDays,
   balanceDeliveryCallsOf,
   callCalendarBucketOf,
   purchasingCallCalendarDays,
@@ -3402,10 +3404,13 @@ export {
   officeOffDays,
   officeWorkingDayOptions,
   officeOwnerCalendar,
+  personOwnerCalendar,
+  personWorkDaysOf,
   officeHolidayName,
   type OfficeCalendar,
   type OfficeHoliday,
 } from "./office-calendar";
+export * from "./delivery-working-calendar";
 export {
   SETTINGS_EDITOR_SECTIONS,
   COMPANY_PROFILE_FIELDS,
@@ -3439,3 +3444,4 @@ export { documentDisplayNumber } from "./document-display";
 
 export { dateMatchesPreset, matchesRegisterColumnFilters } from "./register-column-query";
 export type { DatePreset, RegisterColumnQuery, RegisterColumnFact } from "./register-column-query";
+export * from "./courier-dispatch";

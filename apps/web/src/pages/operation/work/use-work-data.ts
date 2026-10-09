@@ -28,7 +28,7 @@ import {
   useSalesOrderExpansion,
   useSalesOrderRouteFacts,
 } from "@/lib/queries";
-import { useDeliveryLeads, useOfficeDays, useOrderCollectionTiming } from "@/lib/deadline-queries";
+import { useDeliveryDays, useDeliveryLeads, useOrderCollectionTiming } from "@/lib/deadline-queries";
 import { salesOrderRouteInputOf, type RouteOrderDetail } from "../sales-order-route-input";
 import type { WorkOrderIndex } from "./work-orders";
 
@@ -96,7 +96,7 @@ export function useWorkOrderRoute(orderId: string | null): WorkOrderRoute {
   const partnerQ = useLogisticsCardFacts(orderId, customerLeg);
   /* The stored deadline settings the route's dates read (9 Oct 2026). */
   const collectionTiming = useOrderCollectionTiming(orderId);
-  const officeDays = useOfficeDays();
+  const deliveryDays = useDeliveryDays();
   const leads = useDeliveryLeads();
   const route = useMemo(() => {
     const detail = detailQ.data;
@@ -123,13 +123,13 @@ export function useWorkOrderRoute(orderId: string | null): WorkOrderRoute {
         money: { known: money.known, outstanding: money.outstanding },
         outstation: isOutstation(partnerQ.data?.partner),
         paymentTiming: collectionTiming,
-        officeHolidays: officeDays.holidays,
+        deliveryHolidays: deliveryDays.holidays,
         assignLeadWorkingDays: leads.assignmentLeadWorkingDays,
         amendment: null,
         amendmentFailed: false,
       }),
     );
-  }, [orderId, detailQ.data, factsQ.data, goodsTruthQ.data, partnerQ.data, collectionTiming, officeDays, leads]);
+  }, [orderId, detailQ.data, factsQ.data, goodsTruthQ.data, partnerQ.data, collectionTiming, deliveryDays, leads]);
   return {
     route,
     detail: (detailQ.data?.order ? detailQ.data : null) as RouteOrderDetail | null,

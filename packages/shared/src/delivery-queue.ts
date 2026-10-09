@@ -25,11 +25,12 @@
  * DATA is the truth — and the confirm lead alone is a SETTING, so the number
  * here is a seed, not the law.
  *
- * WORKING days, not calendar days — Carres runs Mon–Sat and pauses on Selangor
- * public holidays, so "3 days before Monday" is Wednesday, not Friday. The math
- * is delegated to `working-days.ts` (already shipped with procurement
- * 2026-07-21); this module does NOT reimplement it and, like it, takes the
- * holiday set by INJECTION so the calendar stays editable data.
+ * WORKING days, not calendar days — the Delivery calendar runs Mon–Sat and
+ * pauses on the Selangor public holidays, so "3 days before Monday" is
+ * Wednesday, not Friday. The math is delegated to `working-days.ts`; this
+ * module does NOT reimplement it and takes the calendar by INJECTION — every
+ * caller passes `deliveryWorkingDayOptions(cal)` (`delivery-working-calendar.ts`:
+ * the stored Warehouse Selangor calendar, else the built-in list).
  *
  * PURE — no I/O, no clock. `todayIso` is always passed in, so a test can sit on
  * any date and the caller owns the timezone question (MYT for this business).
@@ -91,8 +92,11 @@ export const DELIVERY_QUEUES: readonly DeliveryQueueDef[] = [
     // but..." — it described a gate the engine never had (`deliveryAction`
     // raises this step from order birth) and told the operator the opposite of
     // the rule. The DEADLINE is unchanged; only the sentence was wrong.
+    // The deadline is the stored `Assign logistics by` (DEL-04), never a
+    // hardcoded "under 3 working days away" (COPY "Stored deadline settings
+    // words").
     description:
-      "No logistics company is picked yet. Assign one as soon as the route is known, whether or not the goods are in; late once the customer's date is under 3 working days away",
+      "No logistics company is picked yet. Assign one as soon as the route is known, whether or not the goods are in. Late after the Assign logistics by date set in Delivery Settings, Delivery Rules",
   },
   {
     key: "chase",
@@ -196,9 +200,10 @@ function stepLeadWorkingDays(
  * MASTER §2.1, owner 2026-09-29 · confirmed 9 Oct 2026). The Work item, the
  * Logistics card, the Orders list and the Order Route all read THIS.
  *
- *   deadline = `assign` lead Delivery working days (Mon–Sat minus public
- *              holidays — `opts`) before the Scheduled delivery, else the
- *              Requested delivery.
+ *   deadline = `assign` lead Delivery working days (`opts` =
+ *              `deliveryWorkingDayOptions(cal)`: Mon–Sat minus the Delivery
+ *              holidays) before the Scheduled delivery, else the Requested
+ *              delivery.
  *
  * The opening trigger (the PO issue day, or the day a stock order entered
  * Operations — `openedIso`) is NOT the deadline. An order that opens inside

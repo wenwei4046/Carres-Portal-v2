@@ -8,10 +8,14 @@
  * `stored: false`; a Settings page never offers Edit on that answer.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DEFAULT_ASSIGNMENT_LEAD_WORKING_DAYS } from "@carres/shared";
+import { DEFAULT_ASSIGNMENT_LEAD_WORKING_DAYS, DEFAULT_COURIER_DISPATCH_WORKING_DAYS } from "@carres/shared";
 
 export interface StoredDeliveryRules {
   assignmentLeadWorkingDays: number;
+  /** DEL-10 · `Courier dispatch within` (0677), default 3. */
+  courierDispatchWorkingDays: number;
+  /** False until 0677 adds the column — the default answers and Edit is not offered. */
+  courierDispatchStored: boolean;
   revision: number | null;
   changedAt: string | null;
   changedBy: string | null;
@@ -20,6 +24,8 @@ export interface StoredDeliveryRules {
 
 export const DEFAULT_DELIVERY_RULES: StoredDeliveryRules = Object.freeze({
   assignmentLeadWorkingDays: DEFAULT_ASSIGNMENT_LEAD_WORKING_DAYS,
+  courierDispatchWorkingDays: DEFAULT_COURIER_DISPATCH_WORKING_DAYS,
+  courierDispatchStored: false,
   revision: null,
   changedAt: null,
   changedBy: null,
@@ -30,14 +36,26 @@ export async function readDeliveryRules(sb: SupabaseClient): Promise<StoredDeliv
   try {
     const { data, error } = await sb
       .from("delivery_rules")
-      .select("assignment_lead_working_days, revision, changed_at, changed_by")
+      /* `*` so the row still reads before 0677 adds the courier column: a
+         missing column answers its default instead of failing the row. */
+      .select("*")
       .eq("id", 1)
       .maybeSingle();
     if (error || !data) return DEFAULT_DELIVERY_RULES;
-    const row = data as { assignment_lead_working_days: number; revision: number; changed_at: string | null; changed_by: string | null };
+    const row = data as {
+      assignment_lead_working_days: number;
+      courier_dispatch_working_days?: number | null;
+      revision: number;
+      changed_at: string | null;
+      changed_by: string | null;
+    };
     const days = Number(row.assignment_lead_working_days);
+    const courier = Number(row.courier_dispatch_working_days);
+    const courierStored = row.courier_dispatch_working_days != null && Number.isInteger(courier) && courier >= 1 && courier <= 30;
     return {
       assignmentLeadWorkingDays: Number.isInteger(days) && days >= 1 && days <= 30 ? days : DEFAULT_ASSIGNMENT_LEAD_WORKING_DAYS,
+      courierDispatchWorkingDays: courierStored ? courier : DEFAULT_COURIER_DISPATCH_WORKING_DAYS,
+      courierDispatchStored: courierStored,
       revision: Number(row.revision),
       changedAt: row.changed_at ?? null,
       changedBy: row.changed_by ?? null,

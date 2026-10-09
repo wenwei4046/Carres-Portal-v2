@@ -264,7 +264,7 @@ function CollectionTimingCard({ current, onSaved }: { current: TimingRule | null
       <p><span className="font-semibold">Payment must be complete</span><br />{dayWord(outDeadlineNow)}</p>
       <p className="text-label font-normal text-kit-slate-11" data-testid="collection-timing-calendar">
         {current ? `In effect from ${fmtDate(current.effective_from)}${current.reason ? ` · ${current.reason}` : ""}. ` : ""}
-        Days are counted Monday to Saturday, skipping public holidays. If that day is not an Office working day, staff act on the Office working day before it. Office working days are set in Settings, Office.
+        Days are counted Monday to Saturday, skipping the public holidays set in Settings, Warehouse. These dates never move for the customer. If that day is not a working day of the person responsible, they act on their working day before it: their working days in People, else the Office working days in Settings, Office.
       </p>
       {step === "view" && <Button variant="neutral" onClick={() => {
         setAsk(String(current?.ask_days_before ?? 3));

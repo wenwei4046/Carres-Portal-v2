@@ -5,7 +5,7 @@ import {
   invoiceGoodsFacts,
   soRemaining,
 } from "@carres/shared/payment-invoice-register";
-import { myHolidaySet } from "@carres/shared/my-holidays";
+import { useDeliveryDays } from "@/lib/deadline-queries";
 import MonthCalendar from "@/components/kit/MonthCalendar";
 import { SectionCard } from "@/components/SectionPanel";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
@@ -99,7 +99,9 @@ export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderI
   onOpenInvoice: (row: InvoiceRegisterRow) => void;
   onBack: () => void;
 }) {
-  const holidays = useMemo(() => myHolidaySet(), []);
+  /* The invoice dates are delivery and payment FACTS: shade the Delivery
+     calendar's closed days (Sunday + its holidays). */
+  const holidays = useDeliveryDays().holidays;
   const entries = useMemo(() => calendarEntriesOf(rows), [rows]);
   const visible = filter === "all" ? entries : entries.filter((e) => e.kind === filter);
   const safeDate = ISO_DATE.test(selectedDateIso)

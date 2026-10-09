@@ -175,7 +175,7 @@ describe("Hold delivery — one yes/no, never money, never why (owner ruling 202
     expect(view.holdDelivery).toBe(true);
     expect(text).not.toMatch(/1,?200|unpaid|outstanding|paid|amount|reason|Finance|RM /i);
     expect(Object.keys(view).sort()).toEqual(
-      ["address", "building", "company", "customerName", "customerPhone", "goods", "holdDelivery", "pickup", "reference", "requestedDate", "scheduledDate", "scheduledTime"].sort(),
+      ["address", "building", "company", "customerName", "customerPhone", "deliveryHolidays", "goods", "holdDelivery", "pickup", "reference", "requestedDate", "scheduledDate", "scheduledTime"].sort(),
     );
   });
 

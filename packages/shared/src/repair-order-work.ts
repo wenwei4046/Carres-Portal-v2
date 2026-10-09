@@ -20,7 +20,7 @@
  * calendar. Owner consent has no governed date (Workspace §6: never invent one).
  */
 import { REPAIR_ORDER_ABSENT, repairOrderConsentOutstanding, type RepairOrderDetail } from "./repair-order";
-import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
+import { purchasingOfficeDays, type PurchasingOfficeDays } from "./purchasing-supplier-calls";
 import { myHolidaySet } from "./my-holidays";
 import { addWorkingDays, countWorkingDays, type IsoDate } from "./working-days";
 import type { WorkItem } from "./work-engine";
@@ -64,10 +64,11 @@ export function repairOrderWorkItems(
   ro: RepairOrderWorkSource,
   owner: WorkspaceDutyResolution | null,
   today: IsoDate,
-  holidays: ReadonlySet<string> = myHolidaySet(),
+  /** The stored Office calendar (`officeWorkingDayOptions`) or a holiday set. */
+  holidays: PurchasingOfficeDays = myHolidaySet(),
 ): RepairOrderWorkOccurrence[] {
   if (ro.cancelled_at) return [];
-  const office = { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays };
+  const office = purchasingOfficeDays(holidays);
   const supplier = ro.supplier_name ?? "the Supplier";
   const late = (due: IsoDate | null) => (due && due < today ? countWorkingDays(due, today, office) : 0);
   const make = (ruleKey: RepairOrderWorkRule, action: string, dueIso: IsoDate | null): WorkItem => ({
@@ -159,7 +160,8 @@ export function projectRepairOrderWork(input: {
   poDuty: WorkspaceDutyResolution | null;
   today: IsoDate;
   observedAt?: string;
-  holidays?: ReadonlySet<string>;
+  /** The stored Office calendar (`officeWorkingDayOptions`) or a holiday set. */
+  holidays?: PurchasingOfficeDays;
 }): OperationWorkItem[] {
   const holidays = input.holidays ?? myHolidaySet();
   return input.repairOrders.flatMap((ro) =>

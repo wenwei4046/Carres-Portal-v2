@@ -21,6 +21,7 @@ import {
   type SupplierClaimFacts,
   type WorkspaceDutyResolution,
 } from "@carres/shared";
+import type { PurchasingOfficeDays } from "@carres/shared";
 import type { AppEnv } from "../types";
 import { todayIsoMYT } from "./today";
 import { workCompletion, workCompletionDeps, type WorkCompletionDeps, type WorkCompletionSpec } from "./work-completion";
@@ -48,8 +49,9 @@ async function readWorkSource(c: Context<AppEnv>): Promise<Source> {
  *  source honestly rather than showing an empty claim desk. */
 export async function loadSupplierClaimWork(
   c: Context<AppEnv>,
-  /** `holidays` = the stored Office holidays (Settings → Office); absent ⇒ the built-in list. */
-  input: { poDuty: WorkspaceDutyResolution | null; approver: WorkspaceDutyResolution | null; today: string; observedAt: string; holidays?: ReadonlySet<string> },
+  /** `holidays` = the stored Office calendar (`officeWorkingDayOptions`: weekdays + holidays,
+   *  Settings → Office); absent ⇒ Monday–Friday with the built-in list. */
+  input: { poDuty: WorkspaceDutyResolution | null; approver: WorkspaceDutyResolution | null; today: string; observedAt: string; holidays?: PurchasingOfficeDays },
 ): Promise<OperationWorkItem[]> {
   const { claims } = await readWorkSource(c);
   return projectSupplierClaimWork({ claims, ...input });

@@ -39,10 +39,15 @@ import {
   type WorkingDayOptions,
   PURCHASING_OFFICE_OFF_DAYS,
   DEFAULT_OFFICE_CALENDAR,
+  DEFAULT_DELIVERY_CALENDAR,
+  deliveryHolidaySet,
+  deliveryWorkingDayOptions,
+  type DeliveryCalendar,
   deliveryQueueLeads,
   isOutstation,
   officeOwnerCalendar,
   officeWorkingDayOptions,
+  personOwnerCalendar,
   warehouseReceivingDaysLate,
   type OfficeCalendar,
   type OwnerCalendar,
@@ -81,6 +86,8 @@ import { loadPurchasingSettings } from "../../lib/purchasing-settings";
 import { readOfficeCalendar } from "../../lib/office-calendar";
 import { DEFAULT_DELIVERY_RULES, readDeliveryRules } from "../../lib/delivery-rules";
 import { readWarehouseReceivingSettings } from "../../lib/warehouse-receiving-calendar";
+import { readDeliveryCalendar } from "../../lib/delivery-calendar";
+import { readPersonWorkDays } from "../../lib/person-work-days";
 import { chunk } from "../../lib/purchase-demand-read";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -137,10 +144,17 @@ export interface OperationWorkStaff {
  *   office    Settings → Office (`readOfficeCalendar`): the working weekdays
  *             and holidays every OFFICE deadline counts on — when Operation
  *             and Purchasing must act, and how many working days it is late.
- *   owner     the same calendar as the payment clock's action owner.
- *   delivery  the Delivery week (Mon–Sat) with the built-in public holidays:
- *             the FACTS Delivery owns (Logistics checks, `Assign logistics
- *             by`, deliver/photo). Not the Office calendar (Settings List
+ *   owner     the Office calendar as the payment clock's action owner when no
+ *             person is resolved; `ownerOf(userId)` is the RESPONSIBLE
+ *             PERSON's calendar — their recorded working week (People/HR,
+ *             0677), Office weekdays when none is recorded, with the Office
+ *             holidays (`personOwnerCalendar`). It decides only WHEN staff
+ *             act, never a payment fact.
+ *   delivery  the Delivery calendar (`readDeliveryCalendar`): Monday–Saturday
+ *             with the Selangor holidays Warehouse Settings stores for the
+ *             dispatching Site, else the built-in list. The FACTS Delivery
+ *             owns (Logistics checks, `Assign logistics by`, deliver/photo)
+ *             and the payment-due fact. Not the Office calendar (Settings List
  *             OFF-01: supplier, warehouse and logistics calendars are separate).
  *
  * A caller that read nothing gets the owner-confirmed defaults.
@@ -149,14 +163,29 @@ export interface WorkFeedCalendars {
   office: WorkingDayOptions;
   owner: OwnerCalendar;
   delivery: WorkingDayOptions;
+  /** The responsible person's calendar (`personOwnerCalendar`). */
+  ownerOf: (userId: string | null | undefined) => OwnerCalendar;
 }
 
-export function workFeedCalendarsOf(cal: OfficeCalendar = DEFAULT_OFFICE_CALENDAR): WorkFeedCalendars {
+export function workFeedCalendarsOf(
+  cal: OfficeCalendar = DEFAULT_OFFICE_CALENDAR,
+  delivery: DeliveryCalendar = DEFAULT_DELIVERY_CALENDAR,
+  /** Each person's recorded working week (`readPersonWorkDays`). */
+  personWorkDays: ReadonlyMap<string, readonly number[]> = new Map(),
+): WorkFeedCalendars {
+  const officeOwner = officeOwnerCalendar(cal);
   return {
     office: officeWorkingDayOptions(cal),
-    owner: officeOwnerCalendar(cal),
-    delivery: { holidays: myHolidaySet() },
+    owner: officeOwner,
+    delivery: deliveryWorkingDayOptions(delivery),
+    ownerOf: (userId) => (userId ? personOwnerCalendar(cal, personWorkDays.get(userId) ?? null) : officeOwner),
   };
+}
+
+/** The person whose working days an order's collection action follows: the
+ *  resolved actor (today's cover when covered), else the normal owner. */
+function collectionActorOf(resolution: WorkspaceDutyResolution | null | undefined): string | null {
+  return resolution?.actingPerson?.userId ?? resolution?.normalOwner?.userId ?? null;
 }
 
 /** Settings → Office for this request, as the caller (RLS). Never throws: an
@@ -167,6 +196,16 @@ async function officeCalendarOf(c: Context<AppEnv>): Promise<OfficeCalendar> {
     return (await readOfficeCalendar(userClient(c.env, c.var.auth.jwt))).calendar;
   } catch {
     return DEFAULT_OFFICE_CALENDAR;
+  }
+}
+
+/** The Delivery calendar for this request, as the caller (RLS). Never throws:
+ *  an unreadable Warehouse calendar answers the built-in list. */
+async function deliveryCalendarFor(c: Context<AppEnv>): Promise<DeliveryCalendar> {
+  try {
+    return (await readDeliveryCalendar(userClient(c.env, c.var.auth.jwt))).calendar;
+  } catch {
+    return DEFAULT_DELIVERY_CALENDAR;
   }
 }
 
@@ -467,7 +506,12 @@ export function projectSalesOrdersFromModuleFacts(input: {
       today: input.today,
       workingDays: calendars.delivery,
       queueLeads: input.queueLeads,
-      calendars,
+      /* The payment action (`collect` · `issue_delivery_order`) steps back on
+         the responsible person's working days; its FACT stays on Delivery. */
+      calendars: {
+        ...calendars,
+        owner: calendars.ownerOf(collectionActorOf(input.collectionOwnerFor?.(row.id) ?? null)),
+      },
     });
   });
 }
@@ -816,16 +860,21 @@ export function projectPaymentCollectionWork(input: {
    *  runs under is the rule in force on its issue day — a snapshot by
    *  construction. Absent ⇒ the ruled default (3 · 2). */
   timingRules?: readonly CollectionTimingRule[] | null;
-  /** The Office calendar: the clock's holiday set, the owner's working days
-   *  and the week lateness is counted on. Absent ⇒ the defaults. */
+  /** The calendars: the payment-due FACT counts on `delivery`; the action
+   *  day steps back on the responsible person's calendar (`ownerCalendarFor`,
+   *  else `owner`); lateness is counted on `office`. Absent ⇒ the defaults. */
   calendars?: WorkFeedCalendars;
+  /** The responsible person's calendar for this order's collection action
+   *  (their working days, Office weekdays when none are recorded). Absent ⇒
+   *  the Office calendar. Never consulted for the payment facts. */
+  ownerCalendarFor?: (orderId: string) => OwnerCalendar;
 }): OperationWorkItem[] {
   const calendars = input.calendars ?? workFeedCalendarsOf();
-  const holidays = calendars.office.holidays;
   return input.invoices.flatMap((invoice) => {
     if (invoice.status !== "issued" || !invoice.orders) return [];
     const timingRule = collectionTimingFor(input.timingRules, invoice.issued_at?.slice(0, 10) ?? input.today);
-    const { timing, clock } = invoicePaymentTiming(invoice, input.today, { holidays }, undefined, timingRule, calendars.owner);
+    const ownerCalendar = input.ownerCalendarFor?.(invoice.order_id) ?? calendars.owner;
+    const { timing, clock } = invoicePaymentTiming(invoice, input.today, calendars.delivery, undefined, timingRule, ownerCalendar);
     const money = invoiceNeeded(invoice);
     const owing = money.known && money.outstanding > 0;
     const latest = latestOutcomeOf(input.outcomes, invoice.order_id);
@@ -902,9 +951,10 @@ export function projectStorageInvoiceWork(input: {
    *  word stands; never the PIC. */
   ownerFor: (orderId: string) => WorkspaceDutyResolution | null;
   calendars?: WorkFeedCalendars;
+  /** The responsible person's calendar (see `projectPaymentCollectionWork`). */
+  ownerCalendarFor?: (orderId: string) => OwnerCalendar;
 }): OperationWorkItem[] {
   const calendars = input.calendars ?? workFeedCalendarsOf();
-  const holidays = calendars.office.holidays;
   const seen = new Set<string>();
   return input.invoices.flatMap((invoice) => {
     if (invoice.kind === "sales" || invoice.status !== "issued" || !invoice.orders) return [];
@@ -913,7 +963,8 @@ export function projectStorageInvoiceWork(input: {
     if (!money.known || money.storageOwing <= 0 || money.outstanding <= 0) return [];
     seen.add(invoice.order_id);
     const timingRule = collectionTimingFor(input.timingRules, invoice.issued_at?.slice(0, 10) ?? input.today);
-    const { clock } = invoicePaymentTiming(invoice, input.today, { holidays }, undefined, timingRule, calendars.owner);
+    const ownerCalendar = input.ownerCalendarFor?.(invoice.order_id) ?? calendars.owner;
+    const { clock } = invoicePaymentTiming(invoice, input.today, calendars.delivery, undefined, timingRule, ownerCalendar);
     const dueIso = clock.actionDueIso;
     const late = !!clock.dueIso && input.today > clock.dueIso;
     const owner = input.ownerFor(invoice.order_id);
@@ -1170,7 +1221,7 @@ export function projectSalesOrderWork(input: {
     input.today,
     input.workingDays ?? calendars.delivery,
     input.queueLeads,
-    { office: calendars.office, owner: calendars.owner, paymentHolidays: calendars.office.holidays },
+    { office: calendars.office, owner: calendars.owner },
   ).map((item) => {
     const deliveryOwned = item.module === "delivery";
     const deliveryOrder = input.deliveryOrderNumber ?? null;
@@ -1775,7 +1826,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
 
   const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings,
          invoices, outcomes, refunds, issueSource, timingRules, proofFacts,
-         officeStored, deliveryRules, kvDefaultByPartner] =
+         officeStored, deliveryRules, kvDefaultByPartner, deliveryStored] =
     await Promise.all([
       readInternal<{ orders: SalesOrderModuleRow[] }>(internal, "/orders", c),
       readInternal<{ skus: Array<{ sku: string; available: number }> }>(internal, "/stock", c),
@@ -1817,8 +1868,11 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       /* DEL-04 · Delivery Rules (`Assign logistics by`), fails safe to 3. */
       deliveryRulesOf(c),
       readPartnerKvDefaults(c),
+      /* ⭐ The Delivery calendar (Monday–Saturday + the stored Selangor
+         holidays, else the built-in list), read ONCE for the whole feed. */
+      deliveryCalendarFor(c),
     ]);
-  const calendars = workFeedCalendarsOf(officeStored);
+  const calendars = workFeedCalendarsOf(officeStored, deliveryStored);
   /* The two stored Delivery leads (DEL-04 assignment · DEL-05 contact), one
      helper so the Orders list, the Delivery board and Work read them alike. */
   const queueLeads = deliveryQueueLeads({
@@ -1898,8 +1952,19 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   const ownerRows = await establishAndReadCollectionOwners(c, [...actionable], deliveryOwned, today);
   const collectionOwnerFor = (orderId: string) =>
     collectionOwnerResolution(ownerRows.get(orderId) ?? null, today);
+  /* ⭐ The responsible person's own working week (People/HR, 0677) — the
+     collection ACTION day steps back on it (Office weekdays when none is
+     recorded). The probe above admitted orders on the Office calendar; the
+     payment FACTS never read a person calendar. */
+  const personWorkDays = await readPersonWorkDays(
+    userClient(c.env, c.var.auth.jwt),
+    [...ownerRows.values()].flatMap((row) => [row.acting_user_id, row.normal_user_id]),
+  );
+  const ownerCalendars = workFeedCalendarsOf(officeStored, deliveryStored, personWorkDays);
+  const ownerCalendarFor = (orderId: string) => ownerCalendars.ownerOf(collectionActorOf(collectionOwnerFor(orderId)));
   const orderItems = projectSalesOrdersFromModuleFacts({
     ...orderFacts,
+    calendars: ownerCalendars,
     collectionOwnerFor,
     responsibleOperationFor: collectionOwnerFor,
   });
@@ -1918,13 +1983,14 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   /* GRN lateness counts on the RECEIVING Site's own calendar (Warehouse-
      owned hours, special dates, holiday policy) — never the Office one. A
      Site with nothing readable or a day nobody configured falls back,
-     explicitly, to the governed Warehouse week: Sunday off + the built-in
-     public holidays (today's behaviour). */
+     explicitly, to the governed Warehouse week: Sunday off + the Selangor
+     public holidays (the stored Warehouse calendar the Delivery calendar
+     reads, else the built-in list). */
   const receivingSettings = await readWarehouseReceivingSettings(
     userClient(c.env, c.var.auth.jwt),
     receivingSource.submitted.map((row) => row.site_id ?? "").filter(Boolean),
   );
-  const warehouseFallbackHolidays = myHolidaySet();
+  const warehouseFallbackHolidays = deliveryHolidaySet(deliveryStored);
   const receivingItems = projectReceivingWork({
     source: receivingSource,
     duty: grnDuty,
@@ -1946,8 +2012,8 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     today,
     office: calendars.office,
   });
-  const paymentItems = projectPaymentCollectionWork({ invoices, ownerFor: collectionOwnerFor, today, outcomes, timingRules, calendars });
-  const storageInvoiceItems = projectStorageInvoiceWork({ invoices, today, timingRules, ownerFor: collectionOwnerFor, calendars });
+  const paymentItems = projectPaymentCollectionWork({ invoices, ownerFor: collectionOwnerFor, today, outcomes, timingRules, calendars, ownerCalendarFor });
+  const storageInvoiceItems = projectStorageInvoiceWork({ invoices, today, timingRules, ownerFor: collectionOwnerFor, calendars, ownerCalendarFor });
   const overpaymentItems = projectOverpaymentReviewWork({
     invoices, refunds, approver: paymentApprover, today,
   });
@@ -1965,9 +2031,9 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   });
   // Repair Orders (Purchasing §9.7 · §10): their own projection, read inside
   // the Purchasing source so a failed read fails that source's health.
-  /* The three Purchasing loaders count on the stored Office holidays; their
-     off days stay the owner-default Monday–Friday inside each record module. */
-  const officeHolidays = holidaySetOf(calendars.office);
+  /* The three Purchasing loaders count on the stored Office calendar — its
+     weekdays AND its holidays (`purchasingOfficeDays`). */
+  const officeHolidays = calendars.office;
   const repairOrderWork = () => loadRepairOrderWork(c, { poDuty, today, observedAt, holidays: officeHolidays });
   const sourceResults = await Promise.all([
     loadWorkSource("orders", observedAt, async () =>
@@ -2264,13 +2330,14 @@ export async function probeOrderWork(
   const skus = [...new Set((order.order_lines ?? []).map((line) => line.sku).filter(Boolean))];
   /* The same calendars and leads the feed counts with, so a probe's dues
      match the feed's (they decide WHEN, never WHETHER). */
-  const [stock, settings, officeStored, deliveryRules] = await Promise.all([
+  const [stock, settings, officeStored, deliveryRules, deliveryStored] = await Promise.all([
     skus.length === 0
       ? Promise.resolve({ data: [] as Array<{ sku: string; sellable: number | null }>, error: null })
       : sb.from("stock_sku_availability").select("sku, sellable").in("sku", skus),
     loadPurchasingSettings(sb),
     officeCalendarOf(c),
     deliveryRulesOf(c),
+    deliveryCalendarFor(c),
   ]);
   if (stock.error) throw new Error(`stock read failed: ${stock.error.message}`);
   const bySku = new Map<string, Array<{ sellable: number | null }>>();
@@ -2284,7 +2351,7 @@ export async function probeOrderWork(
     dutyResolutions: {},
     today: todayIsoMYT(),
     safetyDays: settings.orderByBufferDays,
-    calendars: workFeedCalendarsOf(officeStored),
+    calendars: workFeedCalendarsOf(officeStored, deliveryStored),
     queueLeads: deliveryQueueLeads({
       logisticsCallWorkingDays: settings.logisticsCallWorkingDays,
       assignmentLeadWorkingDays: deliveryRules.assignmentLeadWorkingDays,

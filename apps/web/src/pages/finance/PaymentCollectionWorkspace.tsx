@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
 import {
   deliveryWords,
@@ -10,6 +10,7 @@ import {
   soRemaining,
 } from "@carres/shared/payment-invoice-register";
 import { collectionTimingFor, type CollectionTimingRule, type OwnerCalendar } from "@carres/shared/collection-clock";
+import type { WorkingDayOptions } from "@carres/shared/working-days";
 import { COLLECTION_OUTCOME_NEXT, COLLECTION_OUTCOME_WORD } from "@carres/shared/payment-collection-outcome";
 import InvoiceRecordPayment from "./InvoiceRecordPayment";
 import InvoiceAskToPay from "./InvoiceAskToPay";
@@ -20,8 +21,8 @@ import InvoiceVoidReplace from "./InvoiceVoidReplace";
 import InvoiceCollectionOwner from "./InvoiceCollectionOwner";
 import CustomerStatement from "./CustomerStatement";
 import { useAuth } from "@/lib/auth";
-import { useOfficeDays } from "@/lib/deadline-queries";
-import { useCollectionOutcomes } from "@/lib/queries";
+import { useDeliveryDays, usePersonOwnerCalendars } from "@/lib/deadline-queries";
+import { useCollectionOutcomes, useCollectionOwner } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
 import { renderInvoicePdf } from "@/lib/pdf/render";
 import type { InvoiceTemplateData } from "@/lib/pdf/types";
@@ -49,9 +50,11 @@ export function collectionFactsOf(
   row: InvoiceRegisterRow,
   rows: InvoiceRegisterRow[],
   today: string,
-  opts: { holidays?: ReadonlySet<string> },
+  /** THE Delivery calendar — the payment facts count on it. */
+  opts: WorkingDayOptions,
   timingRules?: readonly CollectionTimingRule[] | null,
-  /** The stored Office calendar as the collection owner's week. */
+  /** The responsible person's calendar (their working days, Office weekdays
+   *  when none are recorded) — moves only the action day. */
   owner?: OwnerCalendar,
 ) {
   const money = soRemaining(rows, row.order_id);
@@ -106,11 +109,14 @@ export default function PaymentCollectionWorkspace({ invoice, rows, timingRules,
   embedded?: EmbeddedWorkspace;
 }) {
   const today = appTodayIso();
-  /* The stored Office calendar (Settings → Office): the clock's holidays and
-     the collection owner's working days. */
-  const officeDays = useOfficeDays();
-  const opts = useMemo(() => ({ holidays: officeDays.holidays }), [officeDays.holidays]);
+  /* The payment FACTS count on THE Delivery calendar; the ask/action day
+     steps back on the responsible person's own working days (Office weekdays
+     when none are recorded). */
+  const opts = useDeliveryDays().opts;
   const role = useAuth((s) => s.role);
+  const ownerQ = useCollectionOwner(invoice.order_id, role === "operation" || role === "principal");
+  const actor = ownerQ.data?.owner?.acting_user_id ?? ownerQ.data?.owner?.normal_user_id ?? null;
+  const ownerOf = usePersonOwnerCalendars([actor]);
   const [recording, setRecording] = useState(false);
   const [asking, setAsking] = useState(false);
   const [linking, setLinking] = useState(false);
@@ -120,7 +126,7 @@ export default function PaymentCollectionWorkspace({ invoice, rows, timingRules,
   const money = soRemaining(rows, invoice.order_id);
   const canRecord = (role === "operation" || role === "principal")
     && invoice.status !== "voided" && money.known && money.outstanding > 0;
-  const facts = collectionFactsOf(invoice, rows, today, opts, timingRules, officeDays.owner);
+  const facts = collectionFactsOf(invoice, rows, today, opts, timingRules, ownerOf(actor));
   // The ask door exists only when the shared clock says the money is
   // genuinely askable: never while Wait, never with no anchor, never when paid.
   const canAsk = canRecord && (facts.timing.kind === "due" || facts.timing.kind === "late");

@@ -8,6 +8,7 @@ let useRealRegisterGrid = false;
    rows the real grid draws collapsed (the Cancelled group). */
 let lastGridProps: any = null;
 const printPurchaseOrderSpy = vi.hoisted(() => vi.fn(async (_poId: string) => {}));
+vi.mock("@/lib/deadline-queries", async () => (await import("@/test/deadline-queries-mock")).deadlineQueriesMock());
 vi.mock("../record-print", async () => {
   const actual = await vi.importActual<typeof import("../record-print")>("../record-print");
   return { ...actual, printPurchaseOrder: printPurchaseOrderSpy };

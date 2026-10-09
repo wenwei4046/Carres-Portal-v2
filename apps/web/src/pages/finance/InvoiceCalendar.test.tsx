@@ -2,6 +2,7 @@ import { render, screen, fireEvent, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
 import InvoiceCalendar, { calendarEntriesOf, weekMondayOf } from "./InvoiceCalendar";
+vi.mock("@/lib/deadline-queries", async () => (await import("@/test/deadline-queries-mock")).deadlineQueriesMock());
 
 function row(over: {
   id?: string; so?: number; customer?: string; order_id?: string;

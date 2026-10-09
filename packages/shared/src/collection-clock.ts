@@ -21,23 +21,25 @@
  * settings read still computes the ruled clock.
  *
  * ONE arithmetic (Law D). "Actual dates and the working calendar, not
- * calendar-day subtraction" — the caller injects the Malaysian holiday set
- * (`myHolidaySet()`), and the COUNT runs on the DELIVERY week (Mon–Sat, the
- * same default `delivery-queue.ts` counts on, because the anchor is a
- * delivery). Every consumer — the Payment Monitor, the Invoice object and the
+ * calendar-day subtraction" — the COUNT runs on the DELIVERY calendar
+ * (`deliveryWorkingDayOptions`: Mon–Sat with the Delivery holidays — the
+ * stored Selangor calendar, else the built-in list), because the anchor is a
+ * delivery. Every consumer — the Payment Monitor, the Invoice object and the
  * Work engine's dues — reads this one function, so the deadline cannot exist
  * in two versions.
  *
- * ⭐ TWO CALENDARS, ONE CLOCK (owner ruling 2026-09-13). The PAYMENT DEADLINE
- * and the ask day are FACTS on the configured company calendar (the delivery
- * week + Malaysian holidays). The customer-contact ACTION is scheduled on the
- * resolved action owner's governed working days: when a fact day is not one
- * the owner works, the action moves to the owner's previous working day. The
- * fact itself never moves — a deadline may stand on a Saturday; an Office
- * action may not while the stored Office calendar (Settings → Office, Mon–Fri
- * by default) does not work Saturday. That is a property of the OWNER's
- * calendar (`officeOwnerCalendar`), not a global rule: an Office calendar
- * that works Saturdays keeps a Saturday action.
+ * ⭐ TWO CALENDARS, ONE CLOCK (owner ruling 2026-09-13; split 9 Oct 2026).
+ * The PAYMENT DEADLINE and the ask day are FACTS on the Delivery calendar
+ * (`opts`: the delivery week + its holidays). The customer-contact ACTION is
+ * scheduled on the resolved action owner's governed working days AND the
+ * owner's own holidays (`owner`): when a fact day is not one the owner works,
+ * the action moves to the owner's previous working day. The fact itself never
+ * moves — a deadline may stand on a Saturday or on a Kuala Lumpur-only Office
+ * holiday; an Office action may not while the stored Office calendar
+ * (Settings → Office, Mon–Fri by default, Office holidays) does not work that
+ * day. That is a property of the OWNER's calendar (`officeOwnerCalendar`),
+ * not a global rule: an Office calendar that works Saturdays keeps a
+ * Saturday action.
  *
  * The ANCHOR is the customer's confirmed delivery date when one exists —
  * that is the day a truck moves — otherwise the promised date: collection
@@ -175,6 +177,9 @@ export function collectionTimingFor(
 export interface OwnerCalendar {
   /** Weekday numbers the owner does NOT work (0=Sun … 6=Sat). */
   offDays: readonly number[];
+  /** The owner's OWN holidays — the Office holidays for an Office owner
+   *  (`officeOwnerCalendar`). Absent ⇒ the fact calendar's holidays (`opts`). */
+  holidays?: WorkingDayOptions["holidays"];
 }
 export const OPERATION_OFF_DAYS: readonly number[] = [0, 6];
 export const OPERATION_CALENDAR: OwnerCalendar = Object.freeze({ offDays: OPERATION_OFF_DAYS });
@@ -231,15 +236,16 @@ export function resolveCollectionAnchor(input: {
 
 /**
  * The owner's previous working day on or before `iso`: the owner's off days
- * and public holidays step back. A customer-contact action never lands on a
- * day its owner does not work.
+ * and the OWNER's holidays step back (the fact calendar's holidays only when
+ * the owner calendar carries none). A customer-contact action never lands on
+ * a day its owner does not work.
  */
 export function ownerActionDay(
   iso: IsoDate,
   opts: WorkingDayOptions = {},
   owner: OwnerCalendar = OPERATION_CALENDAR,
 ): IsoDate {
-  const week: WorkingDayOptions = { holidays: opts.holidays, offDays: owner.offDays };
+  const week: WorkingDayOptions = { holidays: owner.holidays ?? opts.holidays, offDays: owner.offDays };
   let day = iso;
   let guard = 0;
   while (!isWorkingDay(day, week) && guard++ < 31) day = stepBack(day);
@@ -258,14 +264,57 @@ function stepBack(iso: IsoDate): IsoDate {
 }
 
 /**
- * The whole clock in one call. `opts` carries the holiday set (and, in tests,
- * an off-day override for the COMPANY count); the default counting week is
- * Mon–Sat — the delivery week. The holiday set is the Office holiday list
- * (Settings → Office, `officeWorkingDayOptions(cal).holidays`) — the one
- * stored list. `timing` is the effective Settings pair; absent, the ruled
+ * THE PAYMENT FACTS — the ask day and the deadline, counted on the Delivery
+ * calendar ONLY. This function takes no owner calendar, by construction: a
+ * person's working days decide only WHEN staff chase the customer; they can
+ * never move the customer's payment due date or ask day (owner boundary,
+ * 9 Oct 2026). `opts` is the Delivery calendar (`deliveryWorkingDayOptions`).
+ */
+export function collectionFactDays(
+  input: {
+    confirmedDateIso?: string | null;
+    promisedDateIso?: string | null;
+    outstation?: boolean;
+  },
+  opts: WorkingDayOptions = {},
+  timing: CollectionTiming = DEFAULT_COLLECTION_TIMING,
+): { anchorIso: IsoDate | null; askIso: IsoDate | null; dueIso: IsoDate | null; timing: CollectionPair; outstation: boolean } {
+  const anchorIso = resolveCollectionAnchor(input);
+  const outstation = input.outstation === true;
+  const chosen = collectionPairOf(timing, outstation);
+  const pair: CollectionPair = {
+    askDaysBefore: Math.max(0, Math.floor(chosen.askDaysBefore)),
+    deadlineDaysBefore: Math.max(0, Math.floor(chosen.deadlineDaysBefore)),
+  };
+  if (!anchorIso) return { anchorIso, askIso: null, dueIso: null, timing: pair, outstation };
+  const dueIso = subtractWorkingDays(anchorIso, pair.deadlineDaysBefore, opts);
+  const rawAsk = subtractWorkingDays(anchorIso, pair.askDaysBefore, opts);
+  return { anchorIso, askIso: rawAsk < dueIso ? rawAsk : dueIso, dueIso, timing: pair, outstation };
+}
+
+/**
+ * THE ACTION DAYS — when the responsible person acts on the two facts: each
+ * fact day, or that person's previous working day (their weekdays and their
+ * holidays, `owner`). Reads the FACTS; never recomputes them.
+ */
+export function collectionActionDays(
+  facts: { askIso: IsoDate; dueIso: IsoDate },
+  owner: OwnerCalendar = OPERATION_CALENDAR,
+  factOpts: WorkingDayOptions = {},
+): { actionAskIso: IsoDate; actionDueIso: IsoDate } {
+  const actionDueIso = ownerActionDay(facts.dueIso, factOpts, owner);
+  const rawActionAsk = ownerActionDay(facts.askIso, factOpts, owner);
+  return { actionAskIso: rawActionAsk < actionDueIso ? rawActionAsk : actionDueIso, actionDueIso };
+}
+
+/**
+ * The whole clock in one call. `opts` is the FACT calendar — the Delivery
+ * calendar (`deliveryWorkingDayOptions(cal)`: Mon–Sat with the Delivery
+ * holidays). `timing` is the effective Settings pair; absent, the ruled
  * default. `input.outstation` picks the outstation pair (`collectionPairOf`).
- * `owner` is the action owner's governed working days — the Office calendar
- * (`officeOwnerCalendar`); absent, the Operation week.
+ * `owner` is the action owner's governed working days and holidays — the
+ * Office calendar (`officeOwnerCalendar`, Office weekdays + Office holidays);
+ * absent, the Operation week with the fact holidays.
  */
 export function collectionClock(
   input: {
@@ -279,29 +328,18 @@ export function collectionClock(
   timing: CollectionTiming = DEFAULT_COLLECTION_TIMING,
   owner: OwnerCalendar = OPERATION_CALENDAR,
 ): CollectionClock {
-  const anchorIso = resolveCollectionAnchor(input);
   const today = todayIso.slice(0, 10);
-  const outstation = input.outstation === true;
-  const chosen = collectionPairOf(timing, outstation);
-  const pair: CollectionPair = {
-    askDaysBefore: Math.max(0, Math.floor(chosen.askDaysBefore)),
-    deadlineDaysBefore: Math.max(0, Math.floor(chosen.deadlineDaysBefore)),
-  };
-  if (!anchorIso || !ISO_DATE.test(today)) {
+  // The FACTS, on the Delivery calendar — no owner calendar reaches them.
+  const facts = collectionFactDays(input, opts, timing);
+  const { anchorIso, askIso, dueIso, timing: pair, outstation } = facts;
+  if (!anchorIso || !askIso || !dueIso || !ISO_DATE.test(today)) {
     return {
       anchorIso, askIso: null, dueIso: null, actionAskIso: null, actionDueIso: null,
       attention: "none", overdue: false, timing: pair, outstation,
     };
   }
-
-  // The FACTS, on the company calendar.
-  const dueIso = subtractWorkingDays(anchorIso, pair.deadlineDaysBefore, opts);
-  const rawAsk = subtractWorkingDays(anchorIso, pair.askDaysBefore, opts);
-  const askIso = rawAsk < dueIso ? rawAsk : dueIso;
-  // The ACTIONS, on the owner's working days.
-  const actionDueIso = ownerActionDay(dueIso, opts, owner);
-  const rawActionAsk = ownerActionDay(askIso, opts, owner);
-  const actionAskIso = rawActionAsk < actionDueIso ? rawActionAsk : actionDueIso;
+  // The ACTIONS, on the responsible person's working days and holidays.
+  const { actionAskIso, actionDueIso } = collectionActionDays({ askIso, dueIso }, owner, opts);
 
   if (today > dueIso) {
     return { anchorIso, askIso, dueIso, actionAskIso, actionDueIso, attention: "late", overdue: true, timing: pair, outstation };

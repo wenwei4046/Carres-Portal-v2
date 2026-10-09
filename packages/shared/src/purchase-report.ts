@@ -330,7 +330,10 @@ export function buildPurchaseChaseReceive(
   options: PurchaseChaseReceiveOptions,
 ): { chase: PurchaseChase[]; receive: PurchaseReceive[] } {
   const today = options.today.slice(0, 10);
-  const wd: WorkingDayOptions = { holidays: options.holidays };
+  /* The caller's week is honoured: the route passes the stored Office
+     calendar's off days. This line once dropped `offDays`, so `daysLate`
+     counted Saturdays although the route asked for Monday–Friday. */
+  const wd: WorkingDayOptions = { holidays: options.holidays, ...(options.offDays ? { offDays: options.offDays } : {}) };
   const chaseSet = new Set<string>(PURCHASE_CHASE_STATUSES);
   const receiveSet = new Set<string>(PURCHASE_RECEIVE_STATUSES);
 

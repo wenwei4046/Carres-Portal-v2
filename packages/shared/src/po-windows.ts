@@ -100,10 +100,13 @@ function calendarOf(opts: PoWindowCalendar) {
 export function poWindowCalendarOf(
   poDays: readonly number[],
   holidays?: ReadonlySet<string>,
+  /** The STORED Office calendar's non-working weekdays (Settings → Office,
+   *  `officeOffDays`). Absent ⇒ Saturday and Sunday (the owner default). */
+  officeOffDays: readonly number[] = PURCHASING_OFFICE_OFF_DAYS,
 ): PoWindowCalendar {
   const ticked = new Set(poDays.map(Number));
   const offDays = [0, 1, 2, 3, 4, 5, 6].filter(
-    (day) => PURCHASING_OFFICE_OFF_DAYS.includes(day) || (ticked.size > 0 && !ticked.has(day)),
+    (day) => officeOffDays.includes(day) || (ticked.size > 0 && !ticked.has(day)),
   );
   return { offDays, ...(holidays ? { holidays } : {}) };
 }

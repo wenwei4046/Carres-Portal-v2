@@ -29,15 +29,14 @@ import {
   CHANGE_LOGISTICS_REASONS,
   DELIVERY_TIME_SLOTS,
   isLogisticsChange,
-  isSundayIso,
   laterThanRequested,
-  myHolidaySet,
   parseEmergencyContact,
   unitIdOf,
   type DeliveryWorkStatusTone,
   type InformationReceivedFrom,
 } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
+import { useDeliveryDays } from "@/lib/deadline-queries";
 import { apiFetch, ApiError } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { displayCustomerName } from "@/lib/customer-name";
@@ -213,12 +212,13 @@ export function DeliveryDatesEdit({
     compact ? undefined : partner ? "partner" : "customer",
   );
   const [proofPath, setProofPath] = useState<string | null>(arrangement?.reply_proof_path ?? null);
-  const holidays = useMemo(() => myHolidaySet(), []);
+  /* THE Delivery calendar: Sunday + its holidays (stored Selangor, else built-in). */
+  const deliveryDays = useDeliveryDays();
 
   const requestedIso = row.customerDeliveryIso;
   const later = laterThanRequested(date, requestedIso);
   const needsReply = later && !proofPath;
-  const dayRefused = date && (isSundayIso(date) || holidays.has(date)) ? MONITOR_COPY.notDeliveryDay : undefined;
+  const dayRefused = date && deliveryDays.refusal(date) ? MONITOR_COPY.notDeliveryDay : undefined;
   const canSave = Boolean(date) && (!compact || Boolean(from)) && !needsReply && !dayRefused && !save.isPending && !proof.busy;
 
   const fromOptions = [

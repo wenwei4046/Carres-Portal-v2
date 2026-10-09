@@ -242,7 +242,7 @@ export const ORDER_WORK_RULES: readonly WorkRuleDefinition[] = [
     ownerRule: "collection_owner",
     action: orderActionQueue("collect"),
     dueRule:
-      "the collection clock: Settings → Payments → Collection timing (2, outstation 3) working days before the delivery (confirmed, else promised), delivery week + the Office holidays; the owner acts on the Office calendar",
+      "the collection clock: Settings → Payments → Collection timing (2, outstation 3) working days before the delivery (confirmed, else promised), on the Delivery calendar (Mon–Sat + the Selangor holidays); the action follows the responsible person's working days (Office weekdays when none are recorded) and never moves the customer's dates",
     completionFact: "outstanding = RM 0 through the one money arithmetic (orderMoney over orders.paid)",
   },
   // ── The blueprint card's two NEW acts (owner-approved 2026-08-16, §7) ──
@@ -828,18 +828,17 @@ export interface OrderWorkContext {
 
 /**
  * The calendars one order's work counts on (9 Oct 2026). `delivery` facts
- * (Logistics checks, Assign logistics by, deliver/photo) count on the
- * Delivery week passed as `opts`; OFFICE work — when Operation must act —
+ * (Logistics checks, Assign logistics by, deliver/photo, the payment-due
+ * fact) count on the Delivery calendar passed as `opts`
+ * (`deliveryWorkingDayOptions`); OFFICE work — when Operation must act —
  * counts on the stored Office calendar (`officeWorkingDayOptions`), and the
- * payment clock's owner acts on it (`officeOwnerCalendar`). Absent ⇒ the
- * owner-confirmed defaults (Mon–Fri with the delivery-fact holidays).
+ * payment clock's owner acts on its weekdays AND holidays
+ * (`officeOwnerCalendar`). Absent ⇒ the owner-confirmed defaults (Mon–Fri
+ * with the delivery-fact holidays).
  */
 export interface OrderWorkCalendars {
   office?: WorkingDayOptions;
   owner?: OwnerCalendar;
-  /** The Office holiday list — the payment clock's holiday set in both its
-   *  layers (Payment MASTER "Two calendars, one clock"). */
-  paymentHolidays?: WorkingDayOptions["holidays"];
 }
 
 /**
@@ -909,7 +908,9 @@ export function workItemsForOrder(
             outstation: ctx.outstation,
           },
           todayIso,
-          { ...opts, holidays: calendars.paymentHolidays ?? opts.holidays },
+          // The payment-due FACT counts on the Delivery calendar (`opts`);
+          // the owner's action day steps back on the Office calendar.
+          opts,
           ctx.collectionTiming,
           calendars.owner,
         ).dueIso;

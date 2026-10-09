@@ -29,6 +29,7 @@ import {
   type RepairOrderDetail,
   type WorkspaceDutyResolution,
 } from "@carres/shared";
+import type { PurchasingOfficeDays } from "@carres/shared";
 import type { AppEnv } from "../types";
 import { userClient } from "./supabase";
 import { todayIsoMYT } from "./today";
@@ -44,8 +45,9 @@ export { projectRepairOrderWork, repairOrderDestination } from "@carres/shared";
  *  Purchasing source honestly rather than showing an empty repair desk. */
 export async function loadRepairOrderWork(
   c: Context<AppEnv>,
-  /** `holidays` = the stored Office holidays (Settings → Office); absent ⇒ the built-in list. */
-  input: { poDuty: WorkspaceDutyResolution | null; today: string; observedAt: string; holidays?: ReadonlySet<string> },
+  /** `holidays` = the stored Office calendar (`officeWorkingDayOptions`: weekdays + holidays,
+   *  Settings → Office); absent ⇒ Monday–Friday with the built-in list. */
+  input: { poDuty: WorkspaceDutyResolution | null; today: string; observedAt: string; holidays?: PurchasingOfficeDays },
 ): Promise<OperationWorkItem[]> {
   const res = await (await repairOrderReader(c)).request("http://workspace.internal/repair-orders/work-source", {}, c.env);
   if (!res.ok) throw new Error(`Repair Order work source failed (${res.status})`);

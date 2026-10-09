@@ -1,10 +1,11 @@
 import {
   deliveryOrderIssueGate,
-  myHolidaySet,
+  deliveryHolidaySet,
   orderActionDone,
   type DeliveryGroupKey,
 } from "@carres/shared";
 import { loadBookingContext } from "./booking-context";
+import { readDeliveryCalendar } from "./delivery-calendar";
 import { todayIsoMYT } from "./today";
 
 /**
@@ -102,7 +103,7 @@ export async function attemptDeliveryOrderIssue(
   // figure against the approval record (0362), and Finance's exception (0355)
   // — each read from its one owning table, never derived from each other; the
   // gate words every refusal itself through the shared spellings.
-  const [feRes, paRes] = await Promise.all([
+  const [feRes, paRes, delivery] = await Promise.all([
     sb
       .from("order_finance_exceptions")
       .select("id, status, reason, opened_at, cleared_at, clear_evidence")
@@ -111,6 +112,8 @@ export async function attemptDeliveryOrderIssue(
       .from("order_delivery_payment_approvals")
       .select("id, status, request_reason, requested_at, decided_at, decision_reason")
       .eq("order_id", orderId),
+    // The Delivery calendar's holidays (stored Selangor, else built-in).
+    readDeliveryCalendar(sb),
   ]);
   if (feRes.error) {
     return { outcome: "error", body: { message: feRes.error.message }, status: 500 };
@@ -144,7 +147,7 @@ export async function attemptDeliveryOrderIssue(
         decisionReason: (row.decision_reason as string | null) ?? null,
       }),
     ),
-    holidays: myHolidaySet(),
+    holidays: deliveryHolidaySet(delivery.calendar),
     waitBookingConfirm: opts?.waitBookingConfirm ?? true,
   });
   if (!issue.ok) return { outcome: "blocked", reasons: issue.reasons };
@@ -275,9 +278,10 @@ export async function attemptLegDocumentIssue(
   // The order's money and goods gate — ONE booking context, ONE gate (Law D).
   const loaded = await loadBookingContext(sb, orderId, null);
   if (!loaded.ok) return { outcome: "error", body: loaded.body, status: loaded.status };
-  const [feRes, paRes] = await Promise.all([
+  const [feRes, paRes, delivery] = await Promise.all([
     sb.from("order_finance_exceptions").select("id, status, reason, opened_at, cleared_at, clear_evidence").eq("order_id", orderId),
     sb.from("order_delivery_payment_approvals").select("id, status, request_reason, requested_at, decided_at, decision_reason").eq("order_id", orderId),
+    readDeliveryCalendar(sb),
   ]);
   if (feRes.error) return { outcome: "error", body: { message: feRes.error.message }, status: 500 };
   if (paRes.error) return { outcome: "error", body: { message: paRes.error.message }, status: 500 };
@@ -302,7 +306,7 @@ export async function attemptLegDocumentIssue(
       decidedAt: (row.decided_at as string | null) ?? null,
       decisionReason: (row.decision_reason as string | null) ?? null,
     })),
-    holidays: myHolidaySet(),
+    holidays: deliveryHolidaySet(delivery.calendar),
     waitBookingConfirm: false,
   });
   if (!issue.ok) return { outcome: "blocked", reasons: issue.reasons };

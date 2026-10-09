@@ -19,6 +19,7 @@
  * row is the Portal having no record, not proof nobody sent it. Pickup facts
  * are Stock's; `Fully picked up` never implies `Supplier Received Date`.
  */
+import { useOfficeDays } from "@/lib/deadline-queries";
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -90,8 +91,10 @@ export function PurchaseReturnPanel({ pr, today = appTodayIso() }: { pr: Purchas
   const pickup = purchaseReturnPickupState(pr);
   const received = purchaseReturnSupplierReceivedDate(pr);
   const supplier = pr.supplier_name ?? "the supplier";
-  // The record's ONE current action is the same arithmetic Work projects.
-  const current = purchaseReturnWorkItems(pr, null, today)[0] ?? null;
+  // The record's ONE current action is the same arithmetic Work projects —
+  // on the stored Office calendar (Settings → Office), as Work counts it.
+  const office = useOfficeDays().office;
+  const current = purchaseReturnWorkItems(pr, null, today, office)[0] ?? null;
   const button = !current ? null
     : current.item.ruleKey === "purchase_return.send" ? { word: RETURN_DOCUMENT_SENT, open: "send" as const }
     : { word: "Confirmed Pickup", open: "pickup" as const };

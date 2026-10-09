@@ -406,6 +406,11 @@ function ExitBlock({
 
 // ── the drawer ───────────────────────────────────────────────────────────────
 
+/** 0677 · the normal working week, Monday first (0 = Sunday … 6 = Saturday). */
+const WORK_DAY_CHOICES: ReadonlyArray<readonly [number, string]> = [
+  [1, "Mon"], [2, "Tue"], [3, "Wed"], [4, "Thu"], [5, "Fri"], [6, "Sat"], [0, "Sun"],
+];
+
 export default function HrPersonDrawer({
   person,
   onClose,
@@ -438,6 +443,17 @@ export default function HrPersonDrawer({
     key in draft
       ? ((draft[key] as string | null) ?? null)
       : ((detail?.[camel] as string | null) ?? null);
+
+  /* The person's working week — People/HR's own fact. Not recorded ⇒ the
+     Office working weekdays apply wherever an action day is planned. */
+  const workDays: number[] =
+    "work_days" in draft ? (draft.work_days ?? []) : (detail?.workDays ?? []);
+  const toggleWorkDay = (day: number, on: boolean) =>
+    setDraft((d) => {
+      const current = "work_days" in d ? (d.work_days ?? []) : (detail?.workDays ?? []);
+      const next = [...new Set(on ? [...current, day] : current.filter((n) => n !== day))].sort();
+      return { ...d, work_days: next.length > 0 ? next : null };
+    });
 
   const ticked = useMemo(
     () => new Set((detail?.checklist ?? []).map((c) => `${c.kind}:${c.itemKey}`)),
@@ -716,6 +732,26 @@ export default function HrPersonDrawer({
                     <option value="contract">Contract</option>
                     <option value="intern">Intern</option>
                   </select>
+                </Row>
+                <Row label="Working days">
+                  <div className="flex flex-col gap-1" data-testid="hr-work-days">
+                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                      {WORK_DAY_CHOICES.map(([day, label]) => (
+                        <label key={day} className="flex cursor-pointer items-center gap-1.5 text-body">
+                          <input
+                            type="checkbox"
+                            className="h-[17px] w-[17px] shrink-0 accent-primary"
+                            checked={workDays.includes(day)}
+                            onChange={(e) => toggleWorkDay(day, e.target.checked)}
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                    {workDays.length === 0 && (
+                      <p className="text-meta text-base-400">Not recorded. Office working days apply.</p>
+                    )}
+                  </div>
                 </Row>
               </Panel>
 

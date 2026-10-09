@@ -47,6 +47,11 @@ vi.mock("@/lib/deadline-queries", async () => {
       holidayName: () => null,
     }),
     useDeliveryLeads: () => leadsState,
+    useDeliveryDays: () => {
+      const cal = shared.DEFAULT_DELIVERY_CALENDAR;
+      const opts = shared.deliveryWorkingDayOptions(cal);
+      return { calendar: cal, opts, holidays: opts.holidays, holidayName: () => null, refusal: (iso: string) => shared.deliveryDayRefusal(cal, iso) };
+    },
   };
 });
 vi.mock("../components/DeliveryBrief", () => ({

@@ -310,6 +310,11 @@ export interface PaymentMonitorInput {
   promisedByOrder?: ReadonlyMap<string, string>;
   /** The action owner's governed working days; absent ⇒ the Operation week. */
   owner?: OwnerCalendar;
+  /** The RESPONSIBLE PERSON's calendar per order (their recorded working
+   *  days, Office weekdays when none are recorded — `personOwnerCalendar`).
+   *  Moves only the action days; never `dueIso` / `askIso`. Absent or null ⇒
+   *  `owner`. */
+  ownerFor?: (orderId: string) => OwnerCalendar | null | undefined;
 }
 
 /**
@@ -338,7 +343,7 @@ export function paymentMonitorRows(input: PaymentMonitorInput): PaymentMonitorRo
     const promisedIso = input.promisedByOrder?.get(orderId) ?? null;
     const timing = monitorTiming({
       door, rows: input.invoices, storage, todayIso: input.todayIso, opts: input.opts,
-      timingRules: input.timingRules, promisedIso, owner: input.owner,
+      timingRules: input.timingRules, promisedIso, owner: input.ownerFor?.(orderId) ?? input.owner,
     });
     out.push({
       orderId,
