@@ -181,6 +181,28 @@ export const supplierCreditNoteDraftInput = z
   .strict();
 export type SupplierCreditNoteDraftInput = z.infer<typeof supplierCreditNoteDraftInput>;
 
+// ── a bill's foreign currency (0682; Chew 2026-10-03, Finance MASTER §3.2) ────
+/** Record only: the bill stays in RM. No currency removes what was recorded. */
+export const billForeignAmountInput = z.union([
+  z.object({ currency: z.null() }).strict(),
+  z.object({
+    currency: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Type the currency as three letters, like USD")
+      .refine((c) => c !== "MYR", "A bill in ringgit has no foreign currency"),
+    foreignAmount: money.refine((n) => n > 0, "Type the amount on the supplier's invoice"),
+    rate: z.number().positive("Type the rate as a number above 0")
+      .refine((n) => Number(n.toFixed(6)) === n, "Keep the rate to six decimals"),
+  }).strict(),
+]);
+export type BillForeignAmountInput = z.infer<typeof billForeignAmountInput>;
+
+/** What a bill records of its foreign currency (0682), or null. */
+export interface BillForeignAmount {
+  currency: string;
+  foreign_amount: ApMoney;
+  rate: ApMoney;
+  set_at: string;
+}
+
 // ── supplier debit notes (0681; Chew 2026-10-03, Finance MASTER §3.2) ─────────
 /** One line of a supplier's debit note: what the supplier charges more for, and
  *  the cost it goes to (an expense or asset account — the database checks). */
@@ -399,6 +421,9 @@ export interface SupplierBillDocument {
   /** The supplier's advances left on this bill's payables account. */
   advance_open: ApMoney;
   go_live_on: string | null;
+  /** 0682: the currency the supplier invoiced in, when not ringgit; null when
+   *  none is recorded. Absent before 0682 is applied. */
+  foreign_amount?: BillForeignAmount | null;
   can: {
     edit: boolean;
     confirm: boolean;

@@ -5,6 +5,7 @@ import {
   apFileAddInput,
   apFileSignInput,
   apReasonInput,
+  billForeignAmountInput,
   moneyBackInput,
   otherCreditorInput,
   paymentVoucherDraftInput,
@@ -55,6 +56,8 @@ import type { AppEnv } from "../../types";
  *     PUT  /bills/:id                   supplier_bill_save_draft (rewrite a draft)
  *     POST /bills/:id/confirm           supplier_bill_confirm — posts the bill
  *     POST /bills/:id/cancel            supplier_bill_cancel — reverses it if confirmed
+ *     PUT  /bills/:id/foreign-amount    supplier_bill_foreign_amount_set (0682) — the currency the
+ *                                       supplier invoiced in, its amount and rate; a record only
  *     POST /read-bill                   read a bill's pages with Claude to pre-fill a form;
  *                                       writes nothing; 503 until ANTHROPIC_API_KEY is set
  *
@@ -389,7 +392,27 @@ payablesRouter.get("/bills/:id", requireFinance, async (c) => {
   if (!data) return c.json({ error: "not_found", code: "bill_missing", message: "That bill does not exist." }, 404);
   const merged = await withLineDepartments(sb(c), BILL_LINES, id, data);
   if ("error" in merged) return pgFail(c, merged.error);
-  return c.json(merged.doc);
+  // 0682: the currency the supplier invoiced in, when not ringgit. A database
+  // without 0682 has no such table: the bill reads as before, with none.
+  const fx = await sb(c).from("supplier_bill_foreign_amounts")
+    .select("currency, foreign_amount, rate, set_at").eq("bill_id", id).maybeSingle();
+  if (fx.error && fx.error.code !== "42P01" && fx.error.code !== "PGRST205") return pgFail(c, fx.error);
+  return c.json({ ...(merged.doc as Record<string, unknown>), foreign_amount: fx.error ? null : (fx.data ?? null) });
+});
+
+// 0682 (Chew 2026-10-03): record the currency a supplier invoiced in, its
+// amount and the rate. A record only: the bill stays in RM and nothing posts.
+payablesRouter.put("/bills/:id/foreign-amount", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "bill");
+  const body = await parseJsonBody(c, billForeignAmountInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const d = body.data;
+  const { error } = await sb(c).rpc("supplier_bill_foreign_amount_set", d.currency === null
+    ? { p_bill_id: id, p_currency: null, p_foreign_amount: null, p_rate: null }
+    : { p_bill_id: id, p_currency: d.currency, p_foreign_amount: d.foreignAmount, p_rate: d.rate });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
 });
 
 payablesRouter.post("/bills", requireFinance, async (c) => {
