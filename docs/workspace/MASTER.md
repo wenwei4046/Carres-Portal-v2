@@ -272,7 +272,7 @@ them.
 People/HR also owns each employee's normal working-week eligibility. Module calendars own
 business-open days and public-holiday/special-date rules. The Shared Duty Resolver combines the
 person calendar with the module calendar for the resolved actor; Staff & Duties displays that result
-but does not become a second People calendar editor. **Built on branch `build/settings-delivery-cal` (9 Oct 2026; 0677 not
+but does not become a second People calendar editor. **Built on branch `build/settings-completion` (9 Oct 2026; 0677 not
 applied):** the person's week is `hr_employees.work_days` (NULL = not recorded), written only by HR /
 principal through `hr_upsert_employee` and shown as `Working days` in the HR person drawer; internal
 readers get only user id + days through `workspace_person_work_days`. The first consumer is the

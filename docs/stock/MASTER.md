@@ -1376,7 +1376,7 @@ Warehouse Site details, receiving hours, collection hours, public holidays, Spec
 Warehouse capabilities belong to Settings → Warehouse, independently of Office. Never copy Office
 weekdays, Kuala Lumpur holidays, Saturday support duty or Company address into a Site by assumption.
 Keep receiving and collection availability separate and use the existing Site-calendar precedence
-below. **Built on branch `build/settings-delivery-cal` (9 Oct 2026):** Warehouse lateness counts on
+below. **Built on branch `build/settings-completion` (9 Oct 2026):** Warehouse lateness counts on
 the Site's own calendar through the one walk `warehouseDaysLate` — the Work GRN item and the
 Schedule's arrival cards on Receiving days, the Schedule's pickup cards on Collection days, Inbound's
 `Expected arrival was …` line on Receiving days — and a Unit problem's check (GRN Duty) is due the
@@ -1400,7 +1400,7 @@ The working-day calendar is the **dispatching Warehouse's own** (owner, 9 Oct 20
 working days, adjustable, reading the dispatching Warehouse's calendar): its Collection days, special
 dates and holiday policy, with the explicit fallback of Sunday off + the Selangor holidays — never
 Office, never a mixed Delivery/Warehouse calendar, and no due date before Warehouse confirms the
-scope (`courierDispatchDueIso`, built on branch `build/settings-delivery-cal`; the setting is stored
+scope (`courierDispatchDueIso`, built on branch `build/settings-completion`; the setting is stored
 on Delivery Rules by 0677, not applied). The dispatch workflow itself is a BUILD GAP, not built. Each batch retains quantity,
 tracking and actual handover evidence; remaining quantity stays visible until the entire dispatch
 scope is handed over. Customer delivery remains a separate completion fact. A delay records an

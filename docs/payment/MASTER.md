@@ -391,7 +391,7 @@ effective-dated rule row (default ask 4 · deadline 3; n > m in each pair) and e
 (the live Sales Invoice's issue day, else today), so the Work right panel, the Order Route, the Logistics
 card, the Monitor and Work's payment items read one arithmetic. One `isOutstation` reading: a company is
 assigned and it is not the Klang Valley default. **Calendars (built on branch
-`build/settings-delivery-cal`, 9 Oct 2026; 0677 not applied):** the payment-due and ask-day FACTS count
+`build/settings-completion`, 9 Oct 2026; 0677 not applied):** the payment-due and ask-day FACTS count
 on THE Delivery calendar — Monday–Saturday with the Selangor public holidays Warehouse Settings stores
 for the dispatching Site, else the built-in list (`delivery-working-calendar.ts`); the ACTION day follows
 the responsible person's working days (Office weekdays when none are recorded) with the Office holidays
@@ -416,7 +416,7 @@ on the previous working day while the Monitor retains the Saturday deadline. **S
 decide only when to chase the customer; they never change the customer's payment due date or ask
 day** (owner boundary, 9 Oct 2026).
 
-How the person's calendar is derived (built 9 Oct 2026, branch `build/settings-delivery-cal`) — two
+How the person's calendar is derived (built 9 Oct 2026, branch `build/settings-completion`) — two
 derived rules, each with its sources, not new law:
 
 - **No personal working days recorded → the Operation/Office weekdays.** Sources:

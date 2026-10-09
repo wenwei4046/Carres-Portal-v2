@@ -5497,7 +5497,7 @@ Each person's own lunch start; the activity check skips that lunch. Times print 
 | Settings editors | Who may change each section (`The owner may change every section. A person named here may change that section's settings only. It gives no approval, no Duty and no money rights.`) · `{name} · owner` · Add person · Person · Remove · `named by {name} · {date}` · `removed by {name} on {date}` · `Name not recorded` · `You can read this page. Only the owner names Settings editors.` | TEAM-02 |
 | Saved toasts | `Company settings saved` · `Office settings saved` · `Office public holidays {year} saved` · `{Section} editor added` · `{name} no longer edits {Section}` | Existing save grammar |
 
-## Stored deadline settings words · 9 Oct 2026 (BUILT ON BRANCH `build/settings-completion`; 0672 · 0673 not applied; the 0677 rows on `build/settings-delivery-cal`, 0677 not applied)
+## Stored deadline settings words · 9 Oct 2026 (BUILT ON BRANCH `build/settings-completion`; 0672 · 0673 · 0677 not applied)
 
 The words the screens print where a deadline now reads its stored setting (Settings List PAY-04 ·
 DEL-04 · DEL-05 · OFF-01/05, owner confirmed 9 Oct 2026). No dash is used as a separator.

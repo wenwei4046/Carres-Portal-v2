@@ -162,7 +162,7 @@ not applied):** Delivery Rules row `Assign logistics by` (1–30, default 3, Set
 record with reason) and the one `assignLogisticsDueIso` read by Work, the Logistics card, the Orders list
 and the Order Route. A partner's own booking lead is not yet read: no company is assigned while this
 deadline runs, so no partner requirement can apply until the assignment exists. **THE Delivery
-calendar (built on branch `build/settings-delivery-cal`, 9 Oct 2026; 0677 not applied):** every
+calendar (built on branch `build/settings-completion`, 9 Oct 2026; 0677 not applied):** every
 Delivery date — this deadline, the Logistics card's three checks and `confirm_delivery_date`, the
 contact / deliver / photo / proof deadlines, the Scheduled-date refusal (Delivery panel, external
 link page and API, DO issue gate, Order Route), the partner booking check, the booking brief and the
