@@ -217,10 +217,12 @@ function BillDetail() {
             {doc.can.edit && <Button onClick={() => navigate(`/finance/bills/${id}/edit`)} icon="edit">Edit</Button>}
             {doc.can.cancel && <Button onClick={() => setCancelling(true)}>Cancel bill</Button>}
             {doc.can.confirm && <Button variant="primary" onClick={() => setConfirming(true)}>Confirm bill</Button>}
+            {/* Paying is a confirmed bill's next step: the kit's primary button, as on a debit note. */}
             {b.status === "confirmed" && num(doc.unpaid) !== null && (num(doc.unpaid) ?? 0) > 0 && (
-              <Link className="btn-secondary" to={`/finance/payment-vouchers/new?supplier=${b.supplier_id}&bill=${b.id}`}>
+              <Button variant="primary" data-testid="pay-bill"
+                onClick={() => navigate(`/finance/payment-vouchers/new?supplier=${b.supplier_id}&bill=${b.id}`)}>
                 New Payment Voucher
-              </Link>
+              </Button>
             )}
           </span>
         }

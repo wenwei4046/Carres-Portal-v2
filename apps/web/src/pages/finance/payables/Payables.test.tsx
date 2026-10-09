@@ -491,6 +491,16 @@ describe("Bill form — Convert GRN to bill", () => {
     ]));
   });
 
+  it("a confirmed bill with something unpaid offers New Payment Voucher as the kit's primary button", async () => {
+    api.routes[`${B}/bills/${BILL1}`] = rentBill({ foreign_amount: null });
+    api.routes[`${B}/bills/${BILL1}/notes-to-follow-up`] = { rows: [] };
+    show(`/finance/bills/${BILL1}`);
+    const pay = await screen.findByTestId("pay-bill");
+    expect(pay.tagName).toBe("BUTTON");
+    expect(pay).toHaveTextContent("New Payment Voucher");
+    expect(screen.queryByRole("link", { name: "New Payment Voucher" })).toBeNull();
+  });
+
   it("0682: refuses ringgit as a foreign currency before saving", async () => {
     api.routes[`${B}/bills/${BILL1}`] = rentBill({ foreign_amount: null });
     show(`/finance/bills/${BILL1}`);
