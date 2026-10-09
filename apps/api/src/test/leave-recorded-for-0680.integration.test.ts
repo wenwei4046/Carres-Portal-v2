@@ -88,15 +88,18 @@ describe.skipIf(!URL)("leave recorded for a colleague keeps who recorded it (rea
     expect(r.recorded_by).toBe(U.plain);
   });
 
-  it("overlap is refused for the colleague; the recorder or the person may cancel future days, nobody else", async () => {
+  it("overlap is refused for the colleague; only the person cancels their own leave — never the recorder", async () => {
     await as(U.jess);
     expect(await attempt("select public.staff_leave_record_for($1, 'planned', $2::date, $2::date)", [U.sick, tomorrow])).toBe("leave_overlap");
     const id = ((await one("select id from staff_leave where user_id = $1 and starts_on = $2::date", [U.sick, tomorrow])) as { id: string }).id;
+    // The recorder (Jess recorded it) may NOT cancel it, nor may anyone else.
+    expect(await attempt("select public.staff_leave_cancel($1)", [id])).toBe("not_your_leave");
     await as(U.plain);
     expect(await attempt("select public.staff_leave_cancel($1)", [id])).toBe("not_your_leave");
-    await as(U.jess);
+    await as(U.sick);
     const c = (await one("select public.staff_leave_cancel($1) as r", [id])).r as J;
-    expect(c.cancelled_by).toBe(U.jess);
+    expect(c.cancelled_by).toBe(U.sick);
+    await as(U.jess);
   });
 
   it("every recorded and cancelled leave keeps its change history: whose, who acted, when, old → new", async () => {
@@ -106,7 +109,7 @@ describe.skipIf(!URL)("leave recorded for a colleague keeps who recorded it (rea
     )).rows as { user_id: string; event: string; actor_id: string; has_time: boolean; new_value: J }[];
     expect(rows.filter((r) => r.event === "recorded").map((r) => r.actor_id)).toEqual([U.jess, U.editor, U.plain]);
     const cancelled = rows.find((r) => r.event === "cancelled");
-    expect(cancelled?.actor_id).toBe(U.jess);
+    expect(cancelled?.actor_id).toBe(U.sick);
     expect(rows.every((r) => r.has_time && r.user_id === U.sick)).toBe(true);
     // Row security, read as a signed-in user (the test connection itself is a
     // superuser that bypasses it): a colleague who had no part in it cannot

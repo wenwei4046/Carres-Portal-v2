@@ -19,8 +19,10 @@
 --      No proof file on this door: proof is optional and a file in the
 --      recorder's folder could not be read by the colleague (0670 bucket
 --      policy: own folder, principal, HR).
---   §5 staff_leave_cancel(...) — the person, or whoever recorded it for them,
---      may cancel future days (rules unchanged otherwise).
+--   §5 staff_leave_cancel(...) — the ORIGINAL cancel rule (0670) is kept: only
+--      the person whose leave it is may cancel its future days; recording a
+--      colleague's leave gives NO right to cancel it (owner correction 9 Oct
+--      2026). The only addition is the change-history row.
 --   §6 staff_leave_recorder_view() — the active colleagues I may choose
 --      (names only) and the leave I recorded for others.
 --   §7 staff_leave_changes — the append-only change history of every leave:
@@ -218,8 +220,8 @@ declare
   v_row   public.staff_leave;
 begin
   select * into v_row from public.staff_leave where id = p_leave_id for update;
-  -- The person themselves, or whoever recorded it for them.
-  if not found or (v_row.user_id is distinct from v_uid and v_row.recorded_by is distinct from v_uid) then
+  -- Only the person whose leave it is (0670 rule, unchanged).
+  if not found or v_row.user_id is distinct from v_uid then
     raise exception 'leave not found' using errcode = '42501', detail = 'not_your_leave';
   end if;
   if v_row.cancelled_from is not null then

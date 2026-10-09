@@ -204,7 +204,6 @@ function LeaveRow({ row, today }: { row: StaffLeaveRow; today: string }) {
       </p>
       {(row.reason ?? row.note) ? <p className="text-meta text-c-secondary">{row.reason ?? row.note}</p> : null}
       {row.recorded_by_name ? <p className="text-meta text-c-secondary">Recorded by {row.recorded_by_name}</p> : null}
-      {row.cancelled_by_name ? <p className="text-meta text-c-secondary">Cancelled by {row.cancelled_by_name}</p> : null}
       {row.proof_paths.length > 0 ? (
         <div className="flex flex-wrap gap-2">
           {row.proof_paths.map((path, i) => (
@@ -238,13 +237,11 @@ function LeaveRow({ row, today }: { row: StaffLeaveRow; today: string }) {
   );
 }
 
-/** A leave I recorded for a colleague: the person, type, dates, and — while
- *  days remain — the same Cancel as my own leave (the door allows the recorder). */
+/** A leave I recorded for a colleague: the person, type and dates. Read only:
+ *  only the person whose leave it is may cancel it (0670 rule, kept by the
+ *  owner's correction 9 Oct 2026). */
 function RecordedForRow({ row, today }: { row: LeaveRecorderView["recorded"][number]; today: string }) {
-  const cancel = useCancelLeave();
-  const [asking, setAsking] = useState(false);
   const asLeave = { starts_on: row.starts_on, ends_on: row.ends_on, cancelled_from: row.cancelled_from } as StaffLeaveRow;
-  const action = leaveCancelAction(asLeave, today);
   const state = leaveState(asLeave, today);
   const last = leaveLastDay(asLeave);
   return (
@@ -257,22 +254,6 @@ function RecordedForRow({ row, today }: { row: LeaveRecorderView["recorded"][num
             ? `${dateRange(row.starts_on, last)} · Cancelled from ${fmtDate(row.cancelled_from)}`
             : dateRange(row.starts_on, row.ends_on)}
       </p>
-      {action && !asking ? (
-        <div><Button size="sm" onClick={() => { cancel.reset(); setAsking(true); }}>
-          {action === "whole" ? "Cancel leave" : "Cancel remaining days"}
-        </Button></div>
-      ) : null}
-      {action && asking ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-body text-c-ink">{action === "whole" ? "Cancel this leave?" : "Cancel the days after today?"}</span>
-          <Button size="sm" variant="primary" loading={cancel.isPending}
-            onClick={() => cancel.mutate(row.id, { onSuccess: () => setAsking(false) })}>
-            {action === "whole" ? "Cancel leave" : "Cancel remaining days"}
-          </Button>
-          <Button size="sm" disabled={cancel.isPending} onClick={() => setAsking(false)}>Keep leave</Button>
-        </div>
-      ) : null}
-      {cancel.error ? <FieldError>{leaveRefusalSentence("cancel", cancel.error)}</FieldError> : null}
     </li>
   );
 }

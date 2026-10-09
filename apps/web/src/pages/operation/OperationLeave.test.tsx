@@ -203,12 +203,21 @@ describe("Workspace → Leave", () => {
     );
   });
 
-  it("my own leave recorded or cancelled by someone else says who did it", () => {
+  it("my own leave recorded by someone else says who recorded it, and only I can cancel it", () => {
     state.data = { today: TODAY, canSubmit: true, policies: POLICIES,
-      leave: [row({ id: "eeeeeeee-0000-4000-8000-0000000000ab", recorded_by: "eeeeeeee-0000-4000-8000-0000000000cc", recorded_by_name: "Yu Jun",
-        cancelled_from: plusDays(TODAY, 3), cancelled_at: "2026-10-09T02:00:00Z", cancelled_by: "eeeeeeee-0000-4000-8000-0000000000cc", cancelled_by_name: "Yu Jun" })] };
+      leave: [row({ id: "eeeeeeee-0000-4000-8000-0000000000ab", recorded_by: "eeeeeeee-0000-4000-8000-0000000000cc", recorded_by_name: "Yu Jun" })] };
     render(<OperationLeave />);
     expect(screen.getByText("Recorded by Yu Jun")).toBeVisible();
-    expect(screen.getByText("Cancelled by Yu Jun")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Cancel leave" })).toBeVisible();
+  });
+
+  it("a leave I recorded for a colleague is listed without any Cancel (only the person may cancel)", () => {
+    state.recorder = { canRecordForOthers: true, people: [], recorded: [{
+      id: "eeeeeeee-0000-4000-8000-0000000000ac", userId: "eeeeeeee-0000-4000-8000-0000000000ee", name: "Shasha",
+      leave_type: "planned", starts_on: plusDays(TODAY, 3), ends_on: plusDays(TODAY, 3), cancelled_from: null, submitted_at: "2026-10-09T02:00:00Z" }] };
+    render(<OperationLeave />);
+    const list = screen.getByTestId("leave-recorded-for-others");
+    expect(within(list).getByText("Shasha · Planned leave")).toBeVisible();
+    expect(within(list).queryByRole("button")).toBeNull();
   });
 });
