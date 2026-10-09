@@ -108,11 +108,20 @@ describe.skipIf(!URL)("leave recorded for a colleague keeps who recorded it (rea
     const cancelled = rows.find((r) => r.event === "cancelled");
     expect(cancelled?.actor_id).toBe(U.jess);
     expect(rows.every((r) => r.has_time && r.user_id === U.sick)).toBe(true);
-    // A colleague who had no part in it cannot read the history; the person on leave can.
-    await as(U.shared);
-    expect((await q("select count(*)::int as n from staff_leave_changes where user_id = $1", [U.sick])).rows[0].n).toBe(0);
-    await as(U.sick);
-    expect((await q("select count(*)::int as n from staff_leave_changes where user_id = $1", [U.sick])).rows[0].n).toBe(rows.length);
+    // Row security, read as a signed-in user (the test connection itself is a
+    // superuser that bypasses it): a colleague who had no part in it cannot
+    // read the history; the person on leave can.
+    const countAs = async (who: string) => {
+      await as(who);
+      await q("set role authenticated");
+      try {
+        return (await q("select count(*)::int as n from staff_leave_changes where user_id = $1", [U.sick])).rows[0].n as number;
+      } finally {
+        await q("reset role");
+      }
+    };
+    expect(await countAs(U.shared)).toBe(0);
+    expect(await countAs(U.sick)).toBe(rows.length);
     await as(U.jess);
   });
 
