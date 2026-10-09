@@ -9,6 +9,7 @@ vi.mock("../../lib/supabase", () => ({
 }));
 vi.mock("../../lib/purchasing-settings", () => ({
   loadPurchasingSettings: vi.fn().mockResolvedValue({ logisticsCallWorkingDays: 3 }),
+  loadPurchasingNumbers: vi.fn().mockResolvedValue({ logisticsCallWorkingDays: 4 }),
 }));
 import { adminClient, userClient } from "../../lib/supabase";
 
@@ -204,5 +205,60 @@ describe("the section doors forward to their SQL doors", () => {
       body: JSON.stringify({ partnerId: NETS, name: "NETS", active: true }),
     });
     expect(res.status).toBeGreaterThanOrEqual(400);
+  });
+});
+
+describe("Delivery Rules → Assign logistics by (DEL-04, 0673)", () => {
+  /** `delivery_rules` is one row read through maybeSingle. */
+  function withRules(row: Record<string, unknown> | null, canEdit: boolean) {
+    const mocked = mockSb({}, {
+      delivery_can_manage_settings: { data: true, error: null },
+      settings_can_edit: { data: canEdit, error: null },
+    });
+    const baseFrom = mocked.from.getMockImplementation()!;
+    mocked.from.mockImplementation((table: string) => {
+      if (table !== "delivery_rules") return baseFrom(table);
+      const chain: Record<string, unknown> = {};
+      for (const m of ["select", "eq"]) chain[m] = () => chain;
+      chain.maybeSingle = () => Promise.resolve({ data: row, error: null });
+      return chain;
+    });
+    return mocked;
+  }
+
+  it("GET / returns the stored lead and the Settings editor gate", async () => {
+    const { rpcCalls } = withRules({ assignment_lead_working_days: 5, revision: 2, changed_at: null, changed_by: null }, true);
+    const body = (await (await call("", "operation")).json()) as { rules: Record<string, unknown> };
+    expect(body.rules).toEqual({ assignmentLeadWorkingDays: 5, revision: 2, stored: true, canEdit: true });
+    expect(rpcCalls.find((c) => c.fn === "settings_can_edit")?.args).toEqual({ p_section: "delivery" });
+  });
+
+  it("an uninstalled table answers the default 3 and is never editable", async () => {
+    withRules(null, true);
+    const body = (await (await call("", "operation")).json()) as { rules: Record<string, unknown> };
+    expect(body.rules).toEqual({ assignmentLeadWorkingDays: 3, revision: null, stored: false, canEdit: false });
+  });
+
+  it("GET /leads returns both stored leads", async () => {
+    withRules({ assignment_lead_working_days: 5, revision: 2 }, false);
+    const body = await (await call("/leads", "operation")).json();
+    expect(body).toEqual({ contactLeadWorkingDays: 4, assignmentLeadWorkingDays: 5, stored: true });
+  });
+
+  it("PUT /rules/assignment-lead → delivery_set_assignment_lead, and 0 or 31 is refused before SQL", async () => {
+    const { rpcCalls } = mockSb({});
+    for (const workingDays of [0, 31]) {
+      const bad = await call("/rules/assignment-lead", "principal", { method: "PUT", body: JSON.stringify({ workingDays, revision: 1 }) });
+      expect(bad.status).toBe(422);
+    }
+    expect(rpcCalls).toHaveLength(0);
+    const ok = await call("/rules/assignment-lead", "principal", {
+      method: "PUT", body: JSON.stringify({ workingDays: 4, revision: 1, reason: "Partners book earlier" }),
+    });
+    expect(ok.status).toBe(200);
+    expect(rpcCalls[0]).toEqual({
+      fn: "delivery_set_assignment_lead",
+      args: { p_working_days: 4, p_revision: 1, p_reason: "Partners book earlier" },
+    });
   });
 });

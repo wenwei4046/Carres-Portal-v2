@@ -7,7 +7,9 @@ import {
   paymentTemplateSaveInput,
 } from "@carres/shared/payment-templates";
 import { ledgerAccountCodeShape, paymentMethodKeySchema, paymentMethodSaveInput } from "@carres/shared";
+import { orderCollectionClockStartIso } from "@carres/shared/payment-invoice-register";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { todayIsoMYT } from "../../lib/today";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -62,15 +64,60 @@ paymentSettingsRouter.get("/", async (c) => {
 const collectionTimingInput = z.object({
   askDaysBefore: z.number().int().min(0).max(60),
   deadlineDaysBefore: z.number().int().min(0).max(60),
+  /* PAY-04 (0672) — the outstation pair, same rule: asking starts earlier. */
+  outstationAskDaysBefore: z.number().int().min(0).max(60),
+  outstationDeadlineDaysBefore: z.number().int().min(0).max(60),
   effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   reason: z.string().trim().min(1, "A reason is required.").max(500),
 }).refine((v) => v.askDaysBefore > v.deadlineDaysBefore, {
   message: "Asking must start earlier than the payment deadline.",
   path: ["askDaysBefore"],
+}).refine((v) => v.outstationAskDaysBefore > v.outstationDeadlineDaysBefore, {
+  message: "Asking an outstation customer must start earlier than the outstation payment deadline.",
+  path: ["outstationAskDaysBefore"],
 });
 
-/** 0486 — `Settings → Payments → Collection timing`. The SQL door is the
- *  manager gate, the ask-before-deadline rule and the change record. */
+/**
+ * The effective-dated Collection timing rules alone (0486 · 0672) — the small
+ * read every screen that counts a payment deadline needs (the Order Route, the
+ * Logistics card), without the whole Settings payload. With `?order=<id>` it
+ * also answers the day that order's clock started (`orderCollectionClockStartIso`:
+ * its live Sales Invoice's issue day, else the first live paper's, else
+ * today), so the screen runs the rule in force on that day.
+ */
+paymentSettingsRouter.get("/collection-timing", async (c) => {
+  const auth = c.var.auth;
+  if (!INTERNAL.includes(auth.role as (typeof INTERNAL)[number])) {
+    throw new HTTPException(403, { message: "You cannot view Payment settings." });
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const orderId = c.req.query("order") ?? null;
+  const [rules, invoices] = await Promise.all([
+    sb.from("payment_collection_timing_rules").select("*")
+      .order("effective_from", { ascending: false }).order("created_at", { ascending: false }),
+    orderId && /^[0-9a-f-]{36}$/i.test(orderId)
+      ? sb.from("invoices").select("order_id, kind, status, issued_at").eq("order_id", orderId)
+      : Promise.resolve({ data: [] as Array<Record<string, unknown>>, error: null }),
+  ]);
+  if (rules.error) {
+    throw new HTTPException(500, { message: "Payment settings could not be loaded. Try again." });
+  }
+  const today = todayIsoMYT();
+  return c.json({
+    rules: rules.data ?? [],
+    clockStartIso: orderId && !invoices.error
+      ? orderCollectionClockStartIso(
+          (invoices.data ?? []) as Parameters<typeof orderCollectionClockStartIso>[0],
+          orderId,
+          today,
+        )
+      : today,
+  });
+});
+
+/** 0486 · 0672 — `Settings → Payments → Collection timing`. The SQL door is
+ *  the Settings editor gate, both ask-before-deadline rules and the change
+ *  record. */
 paymentSettingsRouter.post("/collection-timing", async (c) => {
   const auth = c.var.auth;
   if (!INTERNAL.includes(auth.role as (typeof INTERNAL)[number])) {
@@ -82,6 +129,8 @@ paymentSettingsRouter.post("/collection-timing", async (c) => {
   const { data, error } = await sb.rpc("payment_set_collection_timing", {
     p_ask_days_before: body.data.askDaysBefore,
     p_deadline_days_before: body.data.deadlineDaysBefore,
+    p_outstation_ask_days_before: body.data.outstationAskDaysBefore,
+    p_outstation_deadline_days_before: body.data.outstationDeadlineDaysBefore,
     p_effective_from: body.data.effectiveFrom,
     p_reason: body.data.reason,
   });

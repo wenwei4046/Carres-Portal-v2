@@ -124,6 +124,16 @@ export const partnerRulesInput = z.object({
 });
 export type PartnerRulesInput = z.infer<typeof partnerRulesInput>;
 
+/** DEL-04 · Delivery Rules → `Assign logistics by` (0673): working days
+ *  before Scheduled delivery, else Requested delivery. 1–30; default 3. */
+export const DEFAULT_ASSIGNMENT_LEAD_WORKING_DAYS = 3;
+export const deliveryAssignmentLeadInput = z.object({
+  workingDays: z.number().int().min(1, "Choose between 1 and 30 working days.").max(30, "Choose between 1 and 30 working days."),
+  revision: z.number().int().min(1),
+  reason: z.string().trim().max(500).nullish(),
+}).strict();
+export type DeliveryAssignmentLeadInput = z.infer<typeof deliveryAssignmentLeadInput>;
+
 export const partnerDriverInput = z.object({
   partnerId: uuid,
   driverId: uuid.nullish(),

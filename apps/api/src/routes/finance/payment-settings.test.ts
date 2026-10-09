@@ -335,24 +335,56 @@ describe("Collection timing (0486)", () => {
     // No STRIPE_SECRET_KEY in the test env → the provider is honestly not configured.
     expect(body.online_provider).toEqual({ name: "Stripe", configured: false });
   });
+  it("GET /collection-timing answers the rules and the day this order's clock started (0672)", async () => {
+    const chainOf = (rows: unknown[]) => {
+      const chain: Record<string, unknown> = {};
+      for (const m of ["select", "order", "eq"]) chain[m] = vi.fn().mockReturnValue(chain);
+      chain.then = (resolve: (v: unknown) => void) => resolve({ data: rows, error: null });
+      return chain;
+    };
+    const sb = { from: vi.fn().mockImplementation((name: string) => chainOf(name === "payment_collection_timing_rules"
+      ? [{ ask_days_before: 3, deadline_days_before: 2, outstation_ask_days_before: 4, outstation_deadline_days_before: 3, effective_from: "2026-08-19" }]
+      : [
+        { order_id: "00000000-0000-0000-0000-000000000001", kind: "storage", status: "issued", issued_at: "2026-09-20T02:00:00Z" },
+        { order_id: "00000000-0000-0000-0000-000000000001", kind: "sales", status: "issued", issued_at: "2026-09-05T02:00:00Z" },
+      ])) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(new Request("http://t/api/finance/payment-settings/collection-timing?order=00000000-0000-0000-0000-000000000001", {
+      headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+    }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { rules: Array<Record<string, unknown>>; clockStartIso: string };
+    expect(body.rules[0]).toMatchObject({ outstation_deadline_days_before: 3 });
+    // The live Sales Invoice's issue day — the Monitor's own door rule.
+    expect(body.clockStartIso).toBe("2026-09-05");
+  });
   it("a change reaches the manager-gated SQL door with its reason and effective date", async () => {
     const sb = { rpc: vi.fn().mockResolvedValue({ data: { id: "t1" }, error: null }) };
     vi.mocked(userClient).mockReturnValue(sb as never);
     const res = await post("collection-timing", "principal", {
-      askDaysBefore: 4, deadlineDaysBefore: 3, effectiveFrom: "2026-10-01", reason: "  Give staff a day more  ",
+      askDaysBefore: 4, deadlineDaysBefore: 3, outstationAskDaysBefore: 5, outstationDeadlineDaysBefore: 4,
+      effectiveFrom: "2026-10-01", reason: "  Give staff a day more  ",
     });
     expect(res.status).toBe(200);
+    // 0672 — both pairs reach the one door in one effective-dated row.
     expect(sb.rpc).toHaveBeenCalledWith("payment_set_collection_timing", {
-      p_ask_days_before: 4, p_deadline_days_before: 3, p_effective_from: "2026-10-01",
+      p_ask_days_before: 4, p_deadline_days_before: 3,
+      p_outstation_ask_days_before: 5, p_outstation_deadline_days_before: 4,
+      p_effective_from: "2026-10-01",
       p_reason: "Give staff a day more",
     });
   });
   it("asking must start EARLIER than the deadline — refused before SQL", async () => {
     const sb = { rpc: vi.fn() };
     vi.mocked(userClient).mockReturnValue(sb as never);
+    const outstation = { outstationAskDaysBefore: 4, outstationDeadlineDaysBefore: 3 };
     for (const body of [
-      { askDaysBefore: 2, deadlineDaysBefore: 2, effectiveFrom: "2026-10-01", reason: "x" },
-      { askDaysBefore: 1, deadlineDaysBefore: 2, effectiveFrom: "2026-10-01", reason: "x" },
+      { askDaysBefore: 2, deadlineDaysBefore: 2, effectiveFrom: "2026-10-01", reason: "x", ...outstation },
+      { askDaysBefore: 1, deadlineDaysBefore: 2, effectiveFrom: "2026-10-01", reason: "x", ...outstation },
+      // The outstation pair follows the same rule.
+      { askDaysBefore: 3, deadlineDaysBefore: 2, effectiveFrom: "2026-10-01", reason: "x", outstationAskDaysBefore: 3, outstationDeadlineDaysBefore: 3 },
+      // And it is required: a client that only knows the ordinary pair is refused.
+      { askDaysBefore: 3, deadlineDaysBefore: 2, effectiveFrom: "2026-10-01", reason: "x" },
     ]) {
       expect((await post("collection-timing", "principal", body)).status).toBe(422);
     }
@@ -362,7 +394,8 @@ describe("Collection timing (0486)", () => {
     const sb = { rpc: vi.fn() };
     vi.mocked(userClient).mockReturnValue(sb as never);
     const res = await post("collection-timing", "principal", {
-      askDaysBefore: 4, deadlineDaysBefore: 3, effectiveFrom: "2026-10-01", reason: " ",
+      askDaysBefore: 4, deadlineDaysBefore: 3, outstationAskDaysBefore: 4, outstationDeadlineDaysBefore: 3,
+      effectiveFrom: "2026-10-01", reason: " ",
     });
     expect(res.status).toBe(422);
     expect(sb.rpc).not.toHaveBeenCalled();
@@ -373,7 +406,8 @@ describe("Collection timing (0486)", () => {
     }) };
     vi.mocked(userClient).mockReturnValue(sb as never);
     const res = await post("collection-timing", "operation", {
-      askDaysBefore: 4, deadlineDaysBefore: 3, effectiveFrom: "2026-10-01", reason: "x",
+      askDaysBefore: 4, deadlineDaysBefore: 3, outstationAskDaysBefore: 4, outstationDeadlineDaysBefore: 3,
+      effectiveFrom: "2026-10-01", reason: "x",
     });
     expect(res.status).toBe(403);
   });

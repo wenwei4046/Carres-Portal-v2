@@ -79,6 +79,11 @@ export const DELIVERY_QUEUES: readonly DeliveryQueueDef[] = [
     actionKey: "assign_logistics",
     label: orderActionQueue("assign_logistics"),
     anchor: "delivery_date",
+    // DEL-04 (Delivery MASTER §2.1, owner 2026-09-29 · confirmed 9 Oct 2026):
+    // a SETTING — `Delivery Settings → Delivery Rules → Assign logistics by`
+    // (0673). The number here is the seed used only where no settings row is
+    // supplied. Its anchor is the Scheduled delivery, else the Requested one
+    // (`assignLogisticsDueIso`); the PO issue day only OPENS the action.
     leadWorkingDays: 3,
     // CARD 3 (owner ruling 2026-08-13, Rule 1): "Assign Logistics early. The
     // purpose is capacity planning. Do NOT wait until stock is physically ready
@@ -151,20 +156,30 @@ export function deliveryQueueByKey(key: DeliveryQueueKey): DeliveryQueueDef {
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * The step leads a SETTING may move. Only `chase` is one (P1 §2: "days before
- * the delivery date the logistics call is raised"); the other three steps are
- * the shape of the work, not a policy number.
+ * The step leads a SETTING may move. `chase` is the Contact lead (DEL-05, P1
+ * §2: "days before the delivery date the logistics call is raised" — the
+ * shared `logistics_call_working_days`); `assign` is the assignment lead
+ * (DEL-04, Delivery Rules, 0673). `deliver_today` and `photo` are the shape
+ * of the work, not a policy number. `assign` is optional so a caller that
+ * read only the Contact lead keeps the seed for assignment.
  */
 export interface DeliveryQueueLeads {
   chase: number;
+  assign?: number;
 }
 
-/** Build the leads from the purchasing settings row. One helper, so the Orders
- *  list and the Delivery module cannot read the setting two different ways. */
+/** Build the leads from the settings rows. One helper, so the Orders list,
+ *  the Delivery module and the Work feed cannot read a setting two ways. */
 export function deliveryQueueLeads(settings: {
   logisticsCallWorkingDays: number;
+  /** `Delivery Settings → Delivery Rules → Assign logistics by` (0673). */
+  assignmentLeadWorkingDays?: number | null;
 }): DeliveryQueueLeads {
-  return { chase: Math.max(0, Math.trunc(settings.logisticsCallWorkingDays)) };
+  const assign = settings.assignmentLeadWorkingDays;
+  return {
+    chase: Math.max(0, Math.trunc(settings.logisticsCallWorkingDays)),
+    ...(typeof assign === "number" && Number.isFinite(assign) ? { assign: Math.max(0, Math.trunc(assign)) } : {}),
+  };
 }
 
 function stepLeadWorkingDays(
@@ -172,7 +187,41 @@ function stepLeadWorkingDays(
   leads: DeliveryQueueLeads | undefined,
 ): number {
   if (step === "chase" && leads) return leads.chase;
+  if (step === "assign" && leads?.assign !== undefined) return leads.assign;
   return deliveryQueueByKey(step).leadWorkingDays;
+}
+
+/**
+ * ⭐ ASSIGN LOGISTICS BY — the ONE assignment deadline (DEL-04, Delivery
+ * MASTER §2.1, owner 2026-09-29 · confirmed 9 Oct 2026). The Work item, the
+ * Logistics card, the Orders list and the Order Route all read THIS.
+ *
+ *   deadline = `assign` lead Delivery working days (Mon–Sat minus public
+ *              holidays — `opts`) before the Scheduled delivery, else the
+ *              Requested delivery.
+ *
+ * The opening trigger (the PO issue day, or the day a stock order entered
+ * Operations — `openedIso`) is NOT the deadline. An order that opens inside
+ * the cut-off is due the day it opens: the system never fabricates an earlier
+ * staff omission. No customer date ⇒ null — the action stays visible with no
+ * invented countdown.
+ */
+export function assignLogisticsDueIso(input: {
+  scheduledIso?: string | null;
+  requestedIso?: string | null;
+  openedIso?: string | null;
+  opts?: WorkingDayOptions;
+  leads?: DeliveryQueueLeads;
+}): IsoDate | null {
+  const valid = (iso: string | null | undefined) => {
+    const d = (iso ?? "").slice(0, 10);
+    return ISO_DATE.test(d) ? d : null;
+  };
+  const anchor = valid(input.scheduledIso) ?? valid(input.requestedIso);
+  if (!anchor) return null;
+  const due = subtractWorkingDays(anchor, stepLeadWorkingDays("assign", input.leads), input.opts ?? {});
+  const opened = valid(input.openedIso);
+  return opened && opened > due ? opened : due;
 }
 
 /**

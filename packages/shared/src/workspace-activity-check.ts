@@ -23,12 +23,15 @@ export function evaluateWorkspaceActivityCheck(input: {
   settings: WorkspaceActivitySettings;
   now: string;
   holidays: ReadonlySet<string>;
+  /** The stored Office calendar's non-working weekdays (`officeOffDays`,
+   *  Settings → Office). Absent ⇒ the owner default, Saturday and Sunday. */
+  offDays?: readonly number[];
   evidence: WorkspaceActivityEvidence;
 }): WorkspaceActivityCheck {
   const window = workspaceActivityWindow(input.day, input.period, input.settings);
   const now = Date.parse(input.now);
   if (!Number.isFinite(now)) throw new Error("Invalid server time");
-  if (!isWorkingDay(input.day, { holidays: input.holidays, offDays: OFFICE_OFF_DAYS })) {
+  if (!isWorkingDay(input.day, { holidays: input.holidays, offDays: input.offDays ?? OFFICE_OFF_DAYS })) {
     return { status: "not_working_day" };
   }
   const cutoff = Date.parse(window.cutoff);

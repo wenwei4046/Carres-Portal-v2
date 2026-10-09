@@ -1,5 +1,6 @@
 import { Hono, type Context } from "hono";
 import {
+  deliveryAssignmentLeadInput,
   deliveryTemplateActiveInput,
   deliveryTemplateKeyInput,
   deliveryTemplateSaveInput,
@@ -15,7 +16,8 @@ import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import { resolveActorNames } from "../../lib/actor-names";
-import { loadPurchasingSettings } from "../../lib/purchasing-settings";
+import { loadPurchasingNumbers, loadPurchasingSettings } from "../../lib/purchasing-settings";
+import { readDeliveryRules } from "../../lib/delivery-rules";
 import type { AppEnv } from "../../types";
 
 /**
@@ -38,7 +40,7 @@ const PARTNER_SELECT =
 
 deliverySettingsRouter.get("/", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const [partnersR, driversR, vehiclesR, templatesR, changesR, accountsR, canR, purchasing] =
+  const [partnersR, driversR, vehiclesR, templatesR, changesR, accountsR, canR, purchasing, rules, canRulesR] =
     await Promise.all([
       sb.from("delivery_partners").select(PARTNER_SELECT).order("name"),
       sb.from("partner_drivers").select("id, partner_id, name, phone, active").order("name"),
@@ -54,12 +56,17 @@ deliverySettingsRouter.get("/", requireOperationOrPrincipal, async (c) => {
         .order("version", { ascending: false }),
       sb
         .from("delivery_setting_changes")
-        .select("id, what, partner_id, old_value, new_value, actor_id, changed_at")
+        .select("*")
         .order("changed_at", { ascending: false })
         .limit(200),
       sb.from("app_users").select("id, name, email, partner_id, status").eq("role", "partner"),
       sb.rpc("delivery_can_manage_settings"),
       loadPurchasingSettings(sb).catch(() => null),
+      /* 0673 — Delivery Rules (`Assign logistics by`), fail-safe to 3. */
+      readDeliveryRules(sb),
+      /* The Settings editor gate (0668): Jess, or a person she names for
+         Delivery — the gate the 0673 door itself calls. */
+      sb.rpc("settings_can_edit", { p_section: "delivery" }),
     ]);
   for (const r of [partnersR, driversR, vehiclesR, templatesR, changesR, accountsR]) {
     if (r.error) return fail(c, r.error);
@@ -84,6 +91,43 @@ deliverySettingsRouter.get("/", requireOperationOrPrincipal, async (c) => {
     /* Delivery Rules mirrors, read-only (§11): the contact lead lives in the
        shared `chase` setting — one home, never a second number here. */
     contactLeadWorkingDays: purchasing?.logisticsCallWorkingDays ?? null,
+    /* DEL-04 · `Assign logistics by` (0673). `stored: false` = the table is
+       not installed: the default answers and Edit is not offered. */
+    rules: {
+      assignmentLeadWorkingDays: rules.assignmentLeadWorkingDays,
+      revision: rules.revision,
+      stored: rules.stored,
+      canEdit: rules.stored && !canRulesR.error && canRulesR.data === true,
+    },
+  });
+});
+
+/**
+ * The two Delivery leads every deadline reads (DEL-04 · DEL-05) — a small
+ * read for screens that need only the numbers (the Logistics card, the Order
+ * Route), never the whole Settings surface. Each fails safe to its default.
+ */
+deliverySettingsRouter.get("/leads", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const [numbers, rules] = await Promise.all([
+    loadPurchasingNumbers(sb).catch(() => null),
+    readDeliveryRules(sb),
+  ]);
+  return c.json({
+    contactLeadWorkingDays: numbers?.logisticsCallWorkingDays ?? null,
+    assignmentLeadWorkingDays: rules.assignmentLeadWorkingDays,
+    stored: rules.stored,
+  });
+});
+
+/** DEL-04 · Delivery Rules → `Assign logistics by` (0673's door). */
+deliverySettingsRouter.put("/rules/assignment-lead", requireOperationOrPrincipal, async (c) => {
+  const body = await parseJsonBody(c, deliveryAssignmentLeadInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  return rpc(c, "delivery_set_assignment_lead", {
+    p_working_days: body.data.workingDays,
+    p_revision: body.data.revision,
+    p_reason: body.data.reason ?? null,
   });
 });
 

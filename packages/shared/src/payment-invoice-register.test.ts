@@ -5,6 +5,7 @@ import {
   invoiceGoodsFacts,
   invoiceGoodsWord,
   invoiceNeeded,
+  invoiceOutstation,
   invoicePaymentTiming,
   soRemaining,
   type InvoiceRegisterRow,
@@ -298,5 +299,40 @@ describe("invoiceConfirmedDelivery — Delivery's ladder", () => {
 
   it("nothing agreed anywhere is no confirmed delivery", () => {
     expect(invoiceConfirmedDelivery(withDelivery({}))).toEqual({ dateIso: null, time: null });
+  });
+});
+
+describe("invoiceOutstation — the outstation pair reaches the invoice clock", () => {
+  const base = (orders: Record<string, unknown>) => ({
+    id: "inv", invoice_no: "INV-1", status: "issued", kind: "sales", amount: 1000, tax_amount: 0,
+    issued_at: "2026-10-01T00:00:00Z", voided_at: null, void_reason: null, replaces_invoice_id: null,
+    created_at: "2026-10-01T00:00:00Z", order_id: "o1",
+    orders: {
+      id: "o1", so: 1, customer_name: "C", status: "confirmed", paid: 0, delivery_date: "2026-10-27",
+      delivery_date_tbd: false, delivered_at: null, order_lines: [{ qty: 1, unit_price: 1000 }], order_addons: [],
+      ops_order_control: [{ balance: null, confirmed_date: null, line_etas: null, line_stock_status: null }],
+      ...orders,
+    },
+  }) as unknown as InvoiceRegisterRow;
+
+  it("the customer leg's company decides; the order's company is the fallback; no company is ordinary", () => {
+    expect(invoiceOutstation(base({}))).toBe(false);
+    expect(invoiceOutstation(base({ delivery_partners: { name: "TT", contact: null, kv_default: false } }))).toBe(true);
+    expect(invoiceOutstation(base({ delivery_partners: { name: "NETS", contact: null, kv_default: true } }))).toBe(false);
+    // Delivery's arrangement wins over the order's column.
+    expect(invoiceOutstation(base({
+      delivery_partners: { name: "TT", contact: null, kv_default: false },
+      ops_delivery_arrangements: [{ leg: 0, confirmed_date: null, confirmed_time: null, partner_id: "p", delivery_partners: { kv_default: true } }],
+    }))).toBe(false);
+    // An unread kv_default is never guessed outstation.
+    expect(invoiceOutstation(base({ delivery_partners: { name: "TT", contact: null } }))).toBe(false);
+  });
+
+  it("an outstation invoice's clock counts 3 working days before delivery", () => {
+    const row = base({ delivery_partners: { name: "TT", contact: null, kv_default: false } });
+    const { clock } = invoicePaymentTiming(row, "2026-10-20", { holidays: new Set<string>() });
+    expect(clock.dueIso).toBe("2026-10-23");
+    const kv = base({ delivery_partners: { name: "NETS", contact: null, kv_default: true } });
+    expect(invoicePaymentTiming(kv, "2026-10-20", { holidays: new Set<string>() }).clock.dueIso).toBe("2026-10-24");
   });
 });

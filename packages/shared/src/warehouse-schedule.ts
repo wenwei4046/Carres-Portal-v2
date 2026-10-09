@@ -651,7 +651,47 @@ export function warehouseScheduleOperatingDates(
   return out;
 }
 
-/** The three-rung ladder above, as one decision. */
+/** The three-rung ladder above, as one decision — exported as
+ *  `warehouseOperatesOn` so the receiving lateness counts the SAME days the
+ *  Schedule walks (Law D). */
+export function warehouseOperatesOn(
+  date: IsoDate,
+  activity: WarehouseActivity,
+  settings: WarehouseScheduleSettings | null | undefined,
+  holidays: ReadonlySet<IsoDate> | readonly IsoDate[] = [],
+): boolean {
+  return operatesOn(date, activity, settings, holidays);
+}
+
+/**
+ * ⭐ RECEIVING DAYS LATE on the receiving Site's own calendar (9 Oct 2026,
+ * Warehouse-owned working hours / special dates / holiday policy — never the
+ * Office calendar). Counts the days strictly after `dueIso` up to and
+ * including `todayIso` on which the Site RECEIVES.
+ *
+ * EXPLICIT FALLBACK: a Site with no readable settings, or a day nobody
+ * configured, answers with the governed Warehouse week — Sunday off and the
+ * `fallbackHolidays` closed — exactly today's behaviour.
+ */
+export function warehouseReceivingDaysLate(
+  dueIso: IsoDate,
+  todayIso: IsoDate,
+  settings: WarehouseScheduleSettings | null | undefined,
+  fallbackHolidays: ReadonlySet<IsoDate> | readonly IsoDate[] = [],
+): number {
+  const from = dueIso.slice(0, 10);
+  const to = todayIso.slice(0, 10);
+  if (to <= from) return 0;
+  let cursor = from;
+  let count = 0;
+  let guard = 0;
+  while (cursor < to && guard++ < 3700) {
+    cursor = stepIsoDate(cursor);
+    if (operatesOn(cursor, "receiving", settings, fallbackHolidays)) count += 1;
+  }
+  return count;
+}
+
 function operatesOn(
   date: IsoDate,
   activity: WarehouseActivity,

@@ -464,21 +464,31 @@ export function mondayOf(iso: string): string {
   return addDaysIso(iso, dow === 0 ? -6 : 1 - dow);
 }
 
-/** The plan day: today when Operation works today, else the next day it does. */
-export function paymentPlanDay(todayIso: string, holidays: ReadonlySet<string>): string {
+/** The owner-confirmed default Office week's non-working days (Sat, Sun). */
+const DEFAULT_OFFICE_OFF_DAYS: readonly number[] = [0, 6];
+
+/** The plan day: today when the Office works today, else the next day it
+ *  does. `offDays` is the stored Office calendar's (`officeOffDays`);
+ *  absent ⇒ Saturday and Sunday. `holidays` is the Office holiday list. */
+export function paymentPlanDay(
+  todayIso: string,
+  holidays: ReadonlySet<string>,
+  offDays: readonly number[] = DEFAULT_OFFICE_OFF_DAYS,
+): string {
   let day = todayIso.slice(0, 10);
   for (let guard = 0; guard < 31; guard++) {
     const dow = weekdayOfIso(day);
-    if (dow !== 0 && dow !== 6 && !holidays.has(day)) return day;
+    if (!offDays.includes(dow) && !holidays.has(day)) return day;
     day = addDaysIso(day, 1);
   }
   return todayIso.slice(0, 10);
 }
 
 /**
- * The Monday–Friday plan for the week holding `weekOfIso`. `rows` are the
- * Monitor rows in scope; an item is counted only when its invoice belongs to
- * one of them.
+ * The Office-week plan for the week holding `weekOfIso` — Monday to Friday at
+ * the default, the stored Office calendar's working weekdays otherwise. `rows`
+ * are the Monitor rows in scope; an item is counted only when its invoice
+ * belongs to one of them.
  */
 export function paymentWeekPlan(input: {
   items: readonly PaymentWeekWorkItem[];
@@ -487,9 +497,12 @@ export function paymentWeekPlan(input: {
   weekOfIso: string;
   holidays: ReadonlySet<string>;
   holidayName?: (iso: string) => string | null;
+  /** The stored Office calendar's non-working weekdays; absent ⇒ Sat + Sun. */
+  offDays?: readonly number[];
 }): PaymentWeekPlan {
   const today = input.todayIso.slice(0, 10);
-  const planDayIso = paymentPlanDay(today, input.holidays);
+  const offDays = input.offDays ?? DEFAULT_OFFICE_OFF_DAYS;
+  const planDayIso = paymentPlanDay(today, input.holidays, offDays);
   const weekStartIso = mondayOf(input.weekOfIso);
   const orderOfInvoice = new Map<string, string>();
   for (const row of input.rows) {
@@ -508,8 +521,11 @@ export function paymentWeekPlan(input: {
     if (!seen || dueOn < seen.dueOn) earliest.set(key, { orderId, kind, dueOn });
   }
   const entries = [...earliest.values()];
-  const days: PaymentWeekDay[] = [0, 1, 2, 3, 4].map((offset) => {
-    const iso = addDaysIso(weekStartIso, offset);
+  // Monday … Sunday of the week, keeping the Office's working weekdays.
+  const weekDays = [0, 1, 2, 3, 4, 5, 6]
+    .map((offset) => addDaysIso(weekStartIso, offset))
+    .filter((iso) => !offDays.includes(weekdayOfIso(iso)));
+  const days: PaymentWeekDay[] = weekDays.map((iso) => {
     const isPlanDay = iso === planDayIso;
     const counted = entries.filter((e) => (isPlanDay ? e.dueOn <= iso : e.dueOn === iso && iso >= planDayIso));
     const carriedEntries = isPlanDay ? counted.filter((e) => e.dueOn < iso) : [];
