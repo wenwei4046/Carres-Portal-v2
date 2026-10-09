@@ -366,8 +366,8 @@ Start asking the customer to pay   {n} working days before Scheduled delivery   
 Payment must be complete           {m} working days before Scheduled delivery   (ruled default 2)
 ```
 
-**Outstation row — owner ruling 2026-09-24 (APPROVED TARGET / NOT BUILT; `../ERP-ARCHITECTURE.md`
-§6.5):** an outstation order's `Payment must be complete` is **3 working days before Scheduled
+**Outstation row — owner ruling 2026-09-24 (BUILT ON BRANCH `build/settings-deadlines` 9 Oct 2026,
+0672 not applied; `../ERP-ARCHITECTURE.md` §6.5):** an outstation order's `Payment must be complete` is **3 working days before Scheduled
 Delivery** (the customer's delivery date). Its ask day follows the same n > m rule; the default
 ask day is an engineering setting, not an owner ruling. Same one clock, same calendar.
 
@@ -384,8 +384,14 @@ hold · {reason}`) — owner reconciliation 2026-09-25: the collection desk's fi
 fact, never `Hold delivery` — beside the doors `Record payment` and, for Finance only, `Remove hold`. The reason
 is this module's own record; Delivery, Warehouse and Work read it. Money completion and Finance hold clearance are independent requirements: RM 0 never clears
 a Finance hold, and removing a hold never settles money. Only when both and all other Delivery
-gates pass may the system issue the DO; each surface reads the same source facts. **Gap:** both still use the ruled default m = 2 (3 outstation)
-rather than the effective-dated rule row, because Operation cannot read the Payment settings payload.
+gates pass may the system issue the DO; each surface reads the same source facts. **Built on branch
+`build/settings-deadlines` (9 Oct 2026; 0672 not applied):** the outstation pair is stored in the same
+effective-dated rule row (default ask 4 · deadline 3; n > m in each pair) and edited in Settings → Payments;
+`paymentDeadlineOf` counts through `collectionClock` with the rule in force on the order's clock start
+(the live Sales Invoice's issue day, else today), so the Work right panel, the Order Route, the Logistics
+card, the Monitor and Work's payment items read one arithmetic. One `isOutstation` reading: a company is
+assigned and it is not the Klang Valley default. The clock's holiday set is the Office holiday list
+(Settings → Office) and the owner acts on the stored Office calendar.
 Every change records old value · new value · effective from · changed by · changed on · reason.
 A clock runs under the rule in force on the day it started — the invoice's issue day — so an
 existing clock keeps its snapshot by construction and a new rule affects only new clocks from its
