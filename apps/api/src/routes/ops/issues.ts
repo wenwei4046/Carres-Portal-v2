@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { addIssueMoneyInputSchema, buildIssueEnglish, createIssueInputSchema, issueActionResultInputSchema } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
+import { requireSettingsEditor } from "../../lib/settings-editor";
 import { resolveActorNames } from "../../lib/actor-names";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -39,7 +40,7 @@ router.get("/work-source", requireOperationOrPrincipal, async (c) => {
   if (error) throw new HTTPException(500, { message: error.message });
   return c.json({ actions: (data ?? []).map((row: any) => ({ id: row.id, issueId: row.issue_id, issueNo: row.issues.issue_no, trigger: row.trigger, ownerRule: row.owner_rule, action: row.action, recipient: row.recipient, requiredResult: row.required_result, dueOn: row.due_on, materiality: row.issues.materiality })) });
 });
-router.post("/related-parties", requireOperationOrPrincipal, async (c) => {
+router.post("/related-parties", requireOperationOrPrincipal, requireSettingsEditor("issue_tracker"), async (c) => {
   const raw = await c.req.json<{ name?: string; kind?: string; reportContact?: string; reportRecipient?: string }>();
   if (!raw.name || !["supplier","logistics","warehouse","customer","other"].includes(raw.kind ?? "")) throw new HTTPException(400, { message: "Name and party type are required" });
   const sb = userClient(c.env, c.var.auth.jwt); const { data, error } = await sb.from("issue_related_parties").insert({ name: raw.name.trim(), kind: raw.kind, report_contact: raw.reportContact?.trim() || null, report_recipient: raw.reportRecipient?.trim() || null }).select("*").single();

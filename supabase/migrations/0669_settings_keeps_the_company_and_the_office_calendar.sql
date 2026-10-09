@@ -25,7 +25,7 @@
 -- ── The one change record for the Settings sections this migration adds ──
 create table if not exists public.settings_changes (
   id          bigint generated always as identity primary key,
-  section     text not null check (section in ('company', 'office')),
+  section     text not null check (section in ('company', 'office', 'sales_orders')),
   what        text not null,
   old_value   jsonb,
   new_value   jsonb,

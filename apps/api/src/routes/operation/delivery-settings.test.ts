@@ -7,6 +7,13 @@ vi.mock("../../lib/supabase", () => ({
   userClient: vi.fn(),
   adminClient: vi.fn(),
 }));
+/* The Settings editor gate (TEAM-02, 0668/0674) has its own tests in
+ * settings-core.test.ts; here it answers like the database does while nobody
+ * is named: the owner may edit, the route is otherwise unchanged. */
+vi.mock("../../lib/settings-editor", () => ({
+  canEditSettings: vi.fn(async (_env: unknown, _jwt: unknown, _section: unknown, role?: string | null) => role === "principal"),
+  requireSettingsEditor: () => async (_c: unknown, next: () => Promise<void>) => { await next(); },
+}));
 vi.mock("../../lib/purchasing-settings", () => ({
   loadPurchasingSettings: vi.fn().mockResolvedValue({ logisticsCallWorkingDays: 3 }),
 }));

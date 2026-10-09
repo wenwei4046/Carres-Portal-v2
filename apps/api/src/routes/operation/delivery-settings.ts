@@ -12,6 +12,7 @@ import {
   partnerVehicleInput,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
+import { requireSettingsEditor } from "../../lib/settings-editor";
 import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import { resolveActorNames } from "../../lib/actor-names";
@@ -94,7 +95,7 @@ async function rpc(c: Context<AppEnv>, fn: string, args: Record<string, unknown>
   return c.json(data ?? { ok: true });
 }
 
-deliverySettingsRouter.put("/partner/details", requireOperationOrPrincipal, async (c) => {
+deliverySettingsRouter.put("/partner/details", requireSettingsEditor("delivery"), async (c) => {
   const body = await parseJsonBody(c, partnerDetailsInput);
   if (!body.ok) return c.json(body.body, body.status);
   const d = body.data;
@@ -109,7 +110,7 @@ deliverySettingsRouter.put("/partner/details", requireOperationOrPrincipal, asyn
   });
 });
 
-deliverySettingsRouter.put("/partner/coverage", requireOperationOrPrincipal, async (c) => {
+deliverySettingsRouter.put("/partner/coverage", requireSettingsEditor("delivery"), async (c) => {
   const body = await parseJsonBody(c, partnerCoverageInput);
   if (!body.ok) return c.json(body.body, body.status);
   return rpc(c, "delivery_set_partner_coverage", {
@@ -119,7 +120,7 @@ deliverySettingsRouter.put("/partner/coverage", requireOperationOrPrincipal, asy
   });
 });
 
-deliverySettingsRouter.put("/partner/schedule", requireOperationOrPrincipal, async (c) => {
+deliverySettingsRouter.put("/partner/schedule", requireSettingsEditor("delivery"), async (c) => {
   const body = await parseJsonBody(c, partnerScheduleInput);
   if (!body.ok) return c.json(body.body, body.status);
   return rpc(c, "delivery_set_partner_schedule", {
@@ -129,7 +130,7 @@ deliverySettingsRouter.put("/partner/schedule", requireOperationOrPrincipal, asy
   });
 });
 
-deliverySettingsRouter.put("/partner/services", requireOperationOrPrincipal, async (c) => {
+deliverySettingsRouter.put("/partner/services", requireSettingsEditor("delivery"), async (c) => {
   const body = await parseJsonBody(c, partnerServicesInput);
   if (!body.ok) return c.json(body.body, body.status);
   return rpc(c, "delivery_set_partner_services", {
@@ -138,7 +139,7 @@ deliverySettingsRouter.put("/partner/services", requireOperationOrPrincipal, asy
   });
 });
 
-deliverySettingsRouter.put("/partner/rules", requireOperationOrPrincipal, async (c) => {
+deliverySettingsRouter.put("/partner/rules", requireSettingsEditor("delivery"), async (c) => {
   const body = await parseJsonBody(c, partnerRulesInput);
   if (!body.ok) return c.json(body.body, body.status);
   return rpc(c, "delivery_set_partner_rules", {
@@ -149,7 +150,7 @@ deliverySettingsRouter.put("/partner/rules", requireOperationOrPrincipal, async 
   });
 });
 
-deliverySettingsRouter.post("/partner/driver", requireOperationOrPrincipal, async (c) => {
+deliverySettingsRouter.post("/partner/driver", requireSettingsEditor("delivery"), async (c) => {
   const body = await parseJsonBody(c, partnerDriverInput);
   if (!body.ok) return c.json(body.body, body.status);
   const d = body.data;
@@ -162,7 +163,7 @@ deliverySettingsRouter.post("/partner/driver", requireOperationOrPrincipal, asyn
   });
 });
 
-deliverySettingsRouter.post("/partner/vehicle", requireOperationOrPrincipal, async (c) => {
+deliverySettingsRouter.post("/partner/vehicle", requireSettingsEditor("delivery"), async (c) => {
   const body = await parseJsonBody(c, partnerVehicleInput);
   if (!body.ok) return c.json(body.body, body.status);
   const d = body.data;
@@ -178,7 +179,7 @@ deliverySettingsRouter.post("/partner/vehicle", requireOperationOrPrincipal, asy
   });
 });
 
-deliverySettingsRouter.post("/templates/save", requireOperationOrPrincipal, async (c) => {
+deliverySettingsRouter.post("/templates/save", requireSettingsEditor("delivery"), async (c) => {
   const body = await parseJsonBody(c, deliveryTemplateSaveInput);
   if (!body.ok) return c.json(body.body, body.status);
   const d = body.data;
@@ -191,13 +192,13 @@ deliverySettingsRouter.post("/templates/save", requireOperationOrPrincipal, asyn
   });
 });
 
-deliverySettingsRouter.post("/templates/set-default", requireOperationOrPrincipal, async (c) => {
+deliverySettingsRouter.post("/templates/set-default", requireSettingsEditor("delivery"), async (c) => {
   const body = await parseJsonBody(c, deliveryTemplateKeyInput);
   if (!body.ok) return c.json(body.body, body.status);
   return rpc(c, "delivery_template_set_default", { p_template_key: body.data.templateKey });
 });
 
-deliverySettingsRouter.post("/templates/set-active", requireOperationOrPrincipal, async (c) => {
+deliverySettingsRouter.post("/templates/set-active", requireSettingsEditor("delivery"), async (c) => {
   const body = await parseJsonBody(c, deliveryTemplateActiveInput);
   if (!body.ok) return c.json(body.body, body.status);
   return rpc(c, "delivery_template_set_active", {

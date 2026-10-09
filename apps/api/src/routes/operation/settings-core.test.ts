@@ -39,7 +39,7 @@ beforeEach(() => {
 describe("Settings → Company", () => {
   it("before 0669 is installed: the verified identity, read only, never Edit", async () => {
     tables.company_profile = { data: null, error: { code: "42P01", message: "missing" } };
-    const body = await (await app().request("/settings/company")).json();
+    const body = (await (await app().request("/settings/company")).json()) as { stored: boolean; canEdit: boolean; values: Record<string, string | null> };
     expect(body.stored).toBe(false);
     expect(body.canEdit).toBe(false);
     expect(body.values.registration_no).toBe("202401055306 (1601150-X)");

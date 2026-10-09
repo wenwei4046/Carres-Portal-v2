@@ -9,6 +9,7 @@ import {
 import { ledgerAccountCodeShape, paymentMethodKeySchema, paymentMethodSaveInput } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
+import { requireSettingsEditor } from "../../lib/settings-editor";
 import type { AppEnv } from "../../types";
 
 /**
@@ -71,7 +72,7 @@ const collectionTimingInput = z.object({
 
 /** 0486 — `Settings → Payments → Collection timing`. The SQL door is the
  *  manager gate, the ask-before-deadline rule and the change record. */
-paymentSettingsRouter.post("/collection-timing", async (c) => {
+paymentSettingsRouter.post("/collection-timing", requireSettingsEditor("payment"), async (c) => {
   const auth = c.var.auth;
   if (!INTERNAL.includes(auth.role as (typeof INTERNAL)[number])) {
     throw new HTTPException(403, { message: "You cannot change Payment settings." });
@@ -99,7 +100,7 @@ const bankAccountInput = z.object({
   accountNo: z.string().trim().max(40).nullish(),
 });
 
-paymentSettingsRouter.post("/bank-account", async (c) => {
+paymentSettingsRouter.post("/bank-account", requireSettingsEditor("payment"), async (c) => {
   const auth = c.var.auth;
   if (!INTERNAL.includes(auth.role as (typeof INTERNAL)[number])) {
     throw new HTTPException(403, { message: "You cannot change Payment settings." });
@@ -147,7 +148,7 @@ paymentSettingsRouter.get("/methods", async (c) => {
   return c.json({ methods: methods.data, money_accounts: accounts.data, system_rows: system.data ?? [] });
 });
 
-paymentSettingsRouter.post("/method/save", async (c) => {
+paymentSettingsRouter.post("/method/save", requireSettingsEditor("payment"), async (c) => {
   const auth = c.var.auth;
   if (!INTERNAL.includes(auth.role as (typeof INTERNAL)[number])) {
     throw new HTTPException(403, { message: "You cannot change Payment settings." });
@@ -175,7 +176,7 @@ const systemRowInput = z.object({
   accountCode: z.string().regex(ledgerAccountCodeShape),
 });
 
-paymentSettingsRouter.post("/system-method", async (c) => {
+paymentSettingsRouter.post("/system-method", requireSettingsEditor("payment"), async (c) => {
   const auth = c.var.auth;
   if (!INTERNAL.includes(auth.role as (typeof INTERNAL)[number])) {
     throw new HTTPException(403, { message: "You cannot change Payment settings." });
@@ -201,7 +202,7 @@ const methodInput = z.object({
   active: z.boolean(),
 });
 
-paymentSettingsRouter.post("/method", async (c) => {
+paymentSettingsRouter.post("/method", requireSettingsEditor("payment"), async (c) => {
   const auth = c.var.auth;
   if (!INTERNAL.includes(auth.role as (typeof INTERNAL)[number])) {
     throw new HTTPException(403, { message: "You cannot change Payment settings." });
@@ -239,7 +240,7 @@ const storageRuleInput = z.object({
   message: "The Operation limit cannot exceed the Approver limit.", path: ["operationLimitDay"],
 });
 
-paymentSettingsRouter.post("/storage-rule", async (c) => {
+paymentSettingsRouter.post("/storage-rule", requireSettingsEditor("payment"), async (c) => {
   const auth = c.var.auth;
   if (!INTERNAL.includes(auth.role as (typeof INTERNAL)[number])) {
     throw new HTTPException(403, { message: "You cannot change Payment settings." });
@@ -290,7 +291,7 @@ paymentSettingsRouter.get("/templates", async (c) => {
   return c.json({ templates: data });
 });
 
-paymentSettingsRouter.post("/templates/save", async (c) => {
+paymentSettingsRouter.post("/templates/save", requireSettingsEditor("payment"), async (c) => {
   const auth = c.var.auth;
   if (!INTERNAL.includes(auth.role as (typeof INTERNAL)[number])) {
     throw new HTTPException(403, { message: "You cannot change templates." });
@@ -311,7 +312,7 @@ paymentSettingsRouter.post("/templates/save", async (c) => {
   return c.json(data);
 });
 
-paymentSettingsRouter.post("/templates/set-default", async (c) => {
+paymentSettingsRouter.post("/templates/set-default", requireSettingsEditor("payment"), async (c) => {
   const auth = c.var.auth;
   if (!INTERNAL.includes(auth.role as (typeof INTERNAL)[number])) {
     throw new HTTPException(403, { message: "You cannot change templates." });
@@ -329,7 +330,7 @@ paymentSettingsRouter.post("/templates/set-default", async (c) => {
   return c.json(data);
 });
 
-paymentSettingsRouter.post("/templates/set-active", async (c) => {
+paymentSettingsRouter.post("/templates/set-active", requireSettingsEditor("payment"), async (c) => {
   const auth = c.var.auth;
   if (!INTERNAL.includes(auth.role as (typeof INTERNAL)[number])) {
     throw new HTTPException(403, { message: "You cannot change templates." });

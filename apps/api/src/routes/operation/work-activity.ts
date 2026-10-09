@@ -7,6 +7,7 @@ import {
   workspaceActivitySettingsResponseSchema,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
+import { requireSettingsEditor } from "../../lib/settings-editor";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -34,7 +35,7 @@ router.get("/settings", requireOperation, async (c) => {
   try { return c.json(settings(read.data, gate.data === true)); }
   catch { return c.json({ error: "settings_unavailable", code: "settings_unavailable" }, 503); }
 });
-router.put("/settings", requireOperation, async (c) => {
+router.put("/settings", requireOperation, requireSettingsEditor("staff_duties"), async (c) => {
   const parsed = await parseJsonBody(c, workspaceActivitySettingsInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const { morning, afternoon, revision } = parsed.data;

@@ -1464,12 +1464,12 @@ export function useCancelOrder(
 /** 0219 — GET /api/operation/sales-order-maintenance/entry-config — the Order
  *  Entry config (payment methods + POS form fields). Internal only. */
 export function useOrderEntryConfig(
-  opts?: Partial<UseQueryOptions<{ entryConfig: OrderEntryConfigDto }>>,
+  opts?: Partial<UseQueryOptions<{ entryConfig: OrderEntryConfigDto; canEdit?: boolean }>>,
 ) {
   return useQuery({
     queryKey: qk.salesOrderGrid.entryConfig(),
     queryFn: () =>
-      apiFetch<{ entryConfig: OrderEntryConfigDto }>(
+      apiFetch<{ entryConfig: OrderEntryConfigDto; canEdit?: boolean }>(
         "/api/operation/sales-order-maintenance/entry-config",
       ),
     staleTime: 30_000,

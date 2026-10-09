@@ -5,6 +5,7 @@ import {
   workspaceCoverDutyInput,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
+import { requireSettingsEditor } from "../../lib/settings-editor";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import { resolveActorNames } from "../../lib/actor-names";
@@ -217,7 +218,7 @@ workspaceDutiesRouter.get("/", requireOperation, async (c) => {
   });
 });
 
-workspaceDutiesRouter.post("/assign", requireOperation, async (c) => {
+workspaceDutiesRouter.post("/assign", requireOperation, requireSettingsEditor("staff_duties"), async (c) => {
   const parsed = await parseJsonBody(c, workspaceAssignDutyInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -243,7 +244,7 @@ workspaceDutiesRouter.post("/assign", requireOperation, async (c) => {
   );
 });
 
-workspaceDutiesRouter.post("/cover", requireOperation, async (c) => {
+workspaceDutiesRouter.post("/cover", requireOperation, requireSettingsEditor("staff_duties"), async (c) => {
   const parsed = await parseJsonBody(c, workspaceCoverDutyInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
