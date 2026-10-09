@@ -187,6 +187,10 @@ Confirmed entry: Workspace → Leave. Employee selects MC, chooses absence dates
 
 Workspace → Leave is one submission entry. MC and Emergency leave submissions covering today immediately start qualified available cover without waiting for approval; this is operational routing, not HR approval. Emergency leave records absence dates and a short reason. On leave is the employee’s absence status, not another application type or page. Planned leave cover after approval on the absence date remains a proposal, not an owner decision.
 
+### Leave recorded for someone else · confirmed 9 Oct 2026
+
+When a staff member cannot log in (for example, ill), the owner or a person she names as a Staff & Duties editor may record that person's leave for them. The record keeps who recorded it, separate from whose leave it is. The same leave rules apply (types, dates, no approval, today's leave starts cover at once on an Office working day).
+
 ### Leave approval policy · confirmed 9 Oct 2026
 
 All leave types currently need no approval (MC, Emergency leave, Planned leave). Keep one Workspace → Leave entry. Configure Approval required = No in Staff & Duties leave policy; Jess may change it or delegate an authorised editor to change it later. Submission covering today activates qualified available cover immediately; a future absence activates cover on its absence date. This does not remove required evidence fields. Any future approval-policy change must define its effective date and treatment of existing submissions; do not retroactively reject them by assumption. No implementation claim.

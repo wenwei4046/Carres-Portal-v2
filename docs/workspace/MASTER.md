@@ -638,6 +638,8 @@ leave policy defaults to `Approval required = No`; Jess or a section-authorised 
 it later, with effective date and treatment of existing submissions explicitly defined. No
 retroactive refusal is assumed and required evidence is not waived.
 
+**Leave recorded for someone else — owner ruling 9 Oct 2026 (Jess).** When a staff member cannot log in (for example, ill), the owner or a person she names as a Staff & Duties editor may record that person's leave for them. The record keeps who recorded it, separate from whose leave it is. The same leave rules apply (types, dates, no approval, today's leave starts cover at once on an Office working day).
+
 A submission covering today activates qualified available cover immediately, without waiting for
 approval or an activity checkpoint. Future leave activates cover on the absence date, not the
 submission date. Receiving colleagues must be eligible and working; exclude recorded leave and
