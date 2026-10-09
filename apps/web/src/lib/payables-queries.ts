@@ -4,6 +4,7 @@ import {
   AP_FILE_MIME,
   type AdvanceApplyInput,
   type ApAccountChoice,
+  type BillForeignAmountInput,
   type ApBillOutstandingRow,
   type ApCreditor,
   type ApOutstandingRow,
@@ -361,6 +362,16 @@ export function useTakeCreditOff() {
         method: "POST",
         body: JSON.stringify({ reason }),
       }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+/** 0682: record, change or remove the currency a supplier invoiced in. A record only. */
+export function useSetBillForeignAmount() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { id: string; input: BillForeignAmountInput }>({
+    mutationFn: ({ id, input }) =>
+      apiFetch<{ id: string }>(`${BASE}/bills/${id}/foreign-amount`, { method: "PUT", body: JSON.stringify(input) }),
     onSuccess: () => { void refresh(); },
   });
 }

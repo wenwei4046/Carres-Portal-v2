@@ -135,13 +135,70 @@ describe("GET readers", () => {
     expect(res.status).toBe(422);
   });
 
-  it("GET /bills/:id returns the document", async () => {
+  /** A bill read: the document from its function, and (0682) its foreign currency from the table. */
+  function mockBillRead(doc: unknown, fx: { data: unknown; error: unknown }) {
+    const eq = vi.fn(() => ({ maybeSingle: vi.fn().mockResolvedValue(fx) }));
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({ data: doc, error: null }),
+      from: vi.fn(() => ({ select: vi.fn(() => ({ eq })) })),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    return { sb, eq };
+  }
+
+  it("GET /bills/:id returns the document, with no foreign currency recorded", async () => {
     const doc = { bill: { id: BILL_ID }, lines: [], can: { edit: true } };
-    const sb = mockRpc({ data: doc, error: null });
+    const { sb, eq } = mockBillRead(doc, { data: null, error: null });
     const res = await call(`/bills/${BILL_ID}`);
     expect(res.status).toBe(200);
     expect(sb.rpc).toHaveBeenCalledWith("supplier_bill_document", { p_bill_id: BILL_ID });
-    expect(await res.json()).toEqual(doc);
+    expect(sb.from).toHaveBeenCalledWith("supplier_bill_foreign_amounts");
+    expect(eq).toHaveBeenCalledWith("bill_id", BILL_ID);
+    expect(await res.json()).toEqual({ ...doc, foreign_amount: null });
+  });
+
+  it("GET /bills/:id carries the foreign currency recorded (0682)", async () => {
+    const doc = { bill: { id: BILL_ID }, lines: [], can: { edit: true } };
+    const fx = { currency: "USD", foreign_amount: 1250, rate: 4.215, set_at: "2026-10-10T01:00:00Z" };
+    mockBillRead(doc, { data: fx, error: null });
+    expect(await (await call(`/bills/${BILL_ID}`)).json()).toEqual({ ...doc, foreign_amount: fx });
+  });
+
+  it("GET /bills/:id still reads on a database without 0682", async () => {
+    const doc = { bill: { id: BILL_ID }, lines: [], can: { edit: true } };
+    mockBillRead(doc, { data: null, error: { code: "42P01", message: "relation does not exist" } });
+    const res = await call(`/bills/${BILL_ID}`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ...doc, foreign_amount: null });
+  });
+
+  it("PUT /bills/:id/foreign-amount records it, in capitals, or removes it (0682)", async () => {
+    let sb = mockRpc({ data: BILL_ID, error: null });
+    expect((await call(`/bills/${BILL_ID}/foreign-amount`, { method: "PUT", body: { currency: "usd", foreignAmount: 1250, rate: 4.215 } })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_bill_foreign_amount_set", {
+      p_bill_id: BILL_ID, p_currency: "USD", p_foreign_amount: 1250, p_rate: 4.215,
+    });
+    sb = mockRpc({ data: BILL_ID, error: null });
+    expect((await call(`/bills/${BILL_ID}/foreign-amount`, { method: "PUT", body: { currency: null } })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_bill_foreign_amount_set", {
+      p_bill_id: BILL_ID, p_currency: null, p_foreign_amount: null, p_rate: null,
+    });
+  });
+
+  it("PUT /bills/:id/foreign-amount refuses ringgit, a bad currency, no amount and no rate before the database", async () => {
+    const sb = mockRpc({ data: BILL_ID, error: null });
+    for (const body of [
+      { currency: "MYR", foreignAmount: 10, rate: 1 },
+      { currency: "US", foreignAmount: 10, rate: 4.2 },
+      { currency: "USD", foreignAmount: 0, rate: 4.2 },
+      { currency: "USD", foreignAmount: 10, rate: 0 },
+      { currency: "USD", foreignAmount: 10.005, rate: 4.2 },
+      { currency: "USD", foreignAmount: 10, rate: 4.1234567 },
+    ]) {
+      expect((await call(`/bills/${BILL_ID}/foreign-amount`, { method: "PUT", body })).status).toBe(422);
+    }
+    expect(sb.rpc).not.toHaveBeenCalled();
   });
 
   it("GET /vouchers/:id answers 404 when the database returns nothing", async () => {

@@ -446,6 +446,62 @@ describe("Bill form — Convert GRN to bill", () => {
     expect(row.textContent).not.toMatch(/[—–]/);
   });
 
+  function rentBill(over: Record<string, unknown>) {
+    return {
+      bill: { id: BILL1, bill_no: "BILL-4XK2", status: "confirmed", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
+        supplier_kind: "supplier", supplier_invoice_no: "LSW-US-77", bill_date: "2026-09-10", due_date: null, po_id: null,
+        ap_account_code: "2110", ap_account_name: "Trade payables", total_amount: "5268.75", narration: null,
+        cancel_reason: null, created_at: "2026-09-10T01:00:00Z", created_by_name: "Aina", confirmed_at: null,
+        confirmed_by_name: null, cancelled_at: null, cancelled_by_name: null, entry_no: "JE-1", reversal_entry_no: null },
+      lines: [], payments: [], files: [], events: [], paid_total: "0.00", allocated_total: "0.00", unpaid: "5268.75",
+      left_to_pay: "5268.75", advance_open: null, go_live_on: "2026-09-10",
+      can: { edit: false, confirm: false, cancel: false, add_file: true, apply_advance: false, take_advance_off: false },
+      ...over,
+    };
+  }
+
+  it("0682: records the currency a supplier invoiced in, its amount and rate; a record only", async () => {
+    api.routes[`${B}/bills/${BILL1}`] = rentBill({ foreign_amount: null });
+    show(`/finance/bills/${BILL1}`);
+    expect(await screen.findByTestId("bill-foreign-amount")).toHaveTextContent("None");
+    fireEvent.click(screen.getByTestId("record-foreign-amount"));
+    const form = await screen.findByTestId("foreign-amount-form");
+    expect(screen.getByRole("button", { name: "Save: type the currency" })).toBeDisabled();
+    fireEvent.change(within(form).getByLabelText("Currency"), { target: { value: "usd" } });
+    fireEvent.change(within(form).getByLabelText("Amount on the supplier's invoice"), { target: { value: "1250" } });
+    fireEvent.change(within(form).getByLabelText(/^Rate/), { target: { value: "4.215" } });
+    expect(form).toHaveTextContent("RM 5,268.75 at this rate. The bill is RM 5,268.75.");
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes()).toEqual([
+      { url: `${B}/bills/${BILL1}/foreign-amount`, method: "PUT", body: { currency: "USD", foreignAmount: 1250, rate: 4.215 } },
+    ]));
+  });
+
+  it("0682: shows what is recorded, and removes it", async () => {
+    api.routes[`${B}/bills/${BILL1}`] = rentBill({
+      foreign_amount: { currency: "USD", foreign_amount: "1250.00", rate: "4.215000", set_at: "2026-10-10T01:00:00Z" },
+    });
+    show(`/finance/bills/${BILL1}`);
+    expect(await screen.findByTestId("bill-foreign-amount")).toHaveTextContent("USD 1,250.00 at 4.215 · RM 5,268.75 at this rate");
+    fireEvent.click(screen.getByRole("button", { name: "Change" }));
+    await screen.findByTestId("foreign-amount-form");
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(writes()).toEqual([
+      { url: `${B}/bills/${BILL1}/foreign-amount`, method: "PUT", body: { currency: null } },
+    ]));
+  });
+
+  it("0682: refuses ringgit as a foreign currency before saving", async () => {
+    api.routes[`${B}/bills/${BILL1}`] = rentBill({ foreign_amount: null });
+    show(`/finance/bills/${BILL1}`);
+    fireEvent.click(await screen.findByTestId("record-foreign-amount"));
+    const form = await screen.findByTestId("foreign-amount-form");
+    fireEvent.change(within(form).getByLabelText("Currency"), { target: { value: "MYR" } });
+    fireEvent.change(within(form).getByLabelText("Amount on the supplier's invoice"), { target: { value: "10" } });
+    fireEvent.change(within(form).getByLabelText(/^Rate/), { target: { value: "1" } });
+    expect(screen.getByRole("button", { name: "Save: a bill in ringgit has no foreign currency" })).toBeDisabled();
+  });
+
   it("0659: a reopened draft sends a goods line nobody chose an account for back empty, and keeps a chosen one", async () => {
     api.routes[`${B}/bills/${BILL1}`] = {
       bill: { id: BILL1, bill_no: null, status: "draft", supplier_id: SUP, supplier_name: "Lumen Sofa Works",

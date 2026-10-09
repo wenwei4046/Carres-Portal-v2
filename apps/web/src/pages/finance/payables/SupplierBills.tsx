@@ -9,7 +9,8 @@ import type {
   SupplierBillDraftInput,
   SupplierBillRegisterRow,
 } from "@carres/shared/schemas/finance-ap";
-import { defaultBillDueDate } from "@carres/shared/schemas/finance-ap";
+import { billForeignAmountInput, defaultBillDueDate } from "@carres/shared/schemas/finance-ap";
+import Input from "@/components/kit/Input";
 import { roleAccount, type LedgerAccount } from "@carres/shared/finance-ledger";
 import { useLedgerChart } from "../ledger/ledger-queries";
 import ListPageShell from "@/components/ListPageShell";
@@ -31,6 +32,7 @@ import {
   useCreateOtherCreditor,
   useGrnCandidates,
   useSaveBill,
+  useSetBillForeignAmount,
   useSupplierBill,
   useSupplierBills,
   useApplyAdvance,
@@ -234,6 +236,12 @@ function BillDetail() {
             <FactRow label="Total">{money(b.total_amount)}</FactRow>
             <FactRow label="Paid">{b.status === "confirmed" ? money(doc.paid_total) : "Not confirmed"}</FactRow>
             <FactRow label="Unpaid">{b.status === "confirmed" ? money(doc.unpaid) : "Not confirmed"}</FactRow>
+            {/* 0682: the currency the supplier invoiced in. A record only: the bill stays in RM. */}
+            {doc.foreign_amount !== undefined && (
+              <FactRow label="Foreign currency">
+                <ForeignAmountFact doc={doc} canEdit={doc.can.add_file} />
+              </FactRow>
+            )}
             {b.narration && <FactRow label="Note">{b.narration}</FactRow>}
             <FactRow label="Ledger entry">
               {b.entry_no ?? "None yet. Confirming the bill makes it"}
@@ -405,6 +413,78 @@ function ApplyToBillModal({ billId, supplierId, apAccountCode, leftToPay, onClos
               </div>
             )}
     </AdvanceModal>
+  );
+}
+
+/** 0682 (Chew 2026-10-03): the currency, amount and rate a supplier invoiced
+ *  in, recorded beside the bill. The bill's lines stay in RM; nothing posts,
+ *  and no exchange difference is worked out. */
+function ForeignAmountFact({ doc, canEdit }: { doc: SupplierBillDocument; canEdit: boolean }) {
+  const [open, setOpen] = useState(false);
+  const fx = doc.foreign_amount ?? null;
+  const rate = num(fx?.rate ?? null);
+  const amount = num(fx?.foreign_amount ?? null);
+  return (
+    <span data-testid="bill-foreign-amount">
+      {fx && amount !== null && rate !== null
+        ? `${fx.currency} ${amount.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} at ${rate} · ${money(cents(amount * rate))} at this rate`
+        : "None"}
+      {canEdit && (
+        <>
+          {" "}
+          <Button size="sm" variant="ghost" data-testid="record-foreign-amount" onClick={() => setOpen(true)}>
+            {fx ? "Change" : "Record foreign currency"}
+          </Button>
+        </>
+      )}
+      {open && <ForeignAmountModal doc={doc} onClose={() => setOpen(false)} />}
+    </span>
+  );
+}
+
+function ForeignAmountModal({ doc, onClose }: { doc: SupplierBillDocument; onClose: () => void }) {
+  const save = useSetBillForeignAmount();
+  const fx = doc.foreign_amount ?? null;
+  const [currency, setCurrency] = useState(fx?.currency ?? "");
+  const [amount, setAmount] = useState(fx ? String(fx.foreign_amount) : "");
+  const [rate, setRate] = useState(fx ? String(Number(fx.rate)) : "");
+  const input = { currency: currency.trim(), foreignAmount: Number(amount), rate: Number(rate) };
+  const checked = billForeignAmountInput.safeParse(input);
+  const gap = currency.trim() === "" ? "Save: type the currency"
+    : amount.trim() === "" ? "Save: type the amount"
+    : rate.trim() === "" ? "Save: type the rate"
+    : checked.success ? null : `Save: ${(checked.error.issues[0]?.message ?? "check the form").replace(/^./, (c) => c.toLowerCase())}`;
+  const rm = Number(amount) > 0 && Number(rate) > 0 ? cents(Number(amount) * Number(rate)) : null;
+  const send = (body: Parameters<typeof save.mutate>[0]["input"], done: string) =>
+    save.mutate({ id: doc.bill.id, input: body }, {
+      onSuccess: () => { toast.success(done); onClose(); },
+      onError: (e) => toast.error(refusal(e)),
+    });
+  return (
+    <Modal
+      open
+      onOpenChange={(o) => { if (!o) onClose(); }}
+      title="Foreign currency"
+      description={`What the supplier's invoice says, when it is not in ringgit. A record only: the bill stays at ${money(doc.bill.total_amount)} and nothing is entered in the ledger.`}
+      footer={
+        <span className="flex gap-2">
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          {fx && <Button variant="ghost" loading={save.isPending} onClick={() => send({ currency: null }, "Foreign currency removed")}>Remove</Button>}
+          <Button variant="primary" disabled={gap !== null} loading={save.isPending}
+            onClick={() => checked.success && send(checked.data, "Foreign currency recorded")}>{gap ?? "Save"}</Button>
+        </span>
+      }
+    >
+      <div className="flex flex-col gap-3" data-testid="foreign-amount-form">
+        <Input id="foreign-currency" label="Currency" value={currency} maxLength={3} placeholder="USD"
+          onChange={(e) => setCurrency(e.target.value.toUpperCase())} />
+        <Input id="foreign-amount" label="Amount on the supplier's invoice" type="number" inputMode="decimal" value={amount}
+          onChange={(e) => setAmount(e.target.value)} />
+        <Input id="foreign-rate" label="Rate (RM for 1)" type="number" inputMode="decimal" value={rate}
+          onChange={(e) => setRate(e.target.value)}
+          hint={rm !== null ? `${money(rm)} at this rate. The bill is ${money(doc.bill.total_amount)}.` : undefined} />
+      </div>
+    </Modal>
   );
 }
 
