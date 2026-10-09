@@ -11,52 +11,83 @@
  * class strings**. This is the string that replaces them.
  */
 
-/** Everything a control shares: surface, hairline, type, focus. The RADIUS
- *  is the shape's (see `controlClass`) — a pill search and a form field share
- *  everything else. */
+/** Everything a control shares: surface, hairline, type, focus (v4 owner
+ *  instruction 9 Oct 2026, 01 §3). The focus is the person's own Appearance
+ *  outline, `var(--c-focus)`. The RADIUS and padding are the shape's (see
+ *  `controlClass`). Pages that compose their own control read this too, so it
+ *  carries no height and no padding. */
 export const CONTROL_BASE =
-  "w-full bg-white text-body text-kit-slate-12 border " +
-  "placeholder:text-kit-slate-9 " +
-  "focus:outline-none focus-visible:outline-none focus:ring-2 focus:ring-kit-blue-9 focus:border-kit-blue-9 " +
-  "disabled:bg-kit-slate-3 disabled:text-kit-slate-9 disabled:cursor-not-allowed";
+  "w-full bg-c-card text-body text-c-ink border " +
+  "placeholder:text-c-muted " +
+  "focus:[outline:var(--c-focus)] focus:[outline-offset:-2px] " +
+  "disabled:bg-c-search-bg disabled:text-c-muted disabled:cursor-not-allowed";
 
-/** Resting hairline vs the error hairline. §3.3: red = "late · act now", and a
- *  refused field is exactly that — the one place red belongs on a control. */
+/** Resting hairline vs the refused field. 01 §1: form errors are AMBER; the
+ *  red Problem pair is reserved for an evidenced problem. */
 export const CONTROL_BORDER = {
-  rest: "border-kit-slate-5",
-  error: "border-kit-red-9",
+  rest: "border-c-input-border",
+  error: "border-c-warn-fg",
 } as const;
 
-/** 32px single-line control — the height every form row aligns to. */
-export const CONTROL_SINGLE_LINE = "h-8 px-2";
+/** The v4 control corner, 8px (`rounded-lg` is `var(--radius)`). */
+export const CONTROL_RADIUS = "rounded-lg";
+
+/** 32px single-line field, 10px sides — the height every form row aligns to. */
+export const CONTROL_SINGLE_LINE = "h-8 [padding-inline:10px]";
 
 /** Multi-line: same skin, natural height. */
-export const CONTROL_MULTI_LINE = "px-2 py-1";
+export const CONTROL_MULTI_LINE = "[padding-inline:10px] py-1.5";
 
 /**
- * `pill` — the top-strip search's shape (the Orders page's own, adopted as
- * the Portal standard 2026-08-01): fully rounded, a little more breathing
- * room, same skin as every other control.
+ * `pill` — the global search (01 §3): 34px, round, the search grey and no
+ * visible edge, 12px sides.
  */
+export const CONTROL_SEARCH_PILL = "h-[var(--search-h)] [padding-inline:12px]";
+
 /**
  * `toolbar` — a workspace toolbar control (Work, owner density ruling
  * 2026-09-25): 36px from 768px, 40px below, 14/20 type, 12px sides.
  */
 export const CONTROL_TOOLBAR = "h-10 min-[768px]:h-9 px-3 text-control";
 
-export function controlClass(error: boolean, shape: "single" | "multi" | "pill" | "toolbar"): string {
+/** Leading glyph room: the side padding plus an 18px glyph plus a 6px gap. */
+const LEADING = {
+  single: "[padding-inline:34px_10px]",
+  pill: "[padding-inline:36px_12px]",
+  toolbar: "[padding-inline:36px_12px]",
+} as const;
+
+export function controlClass(
+  error: boolean,
+  shape: "single" | "multi" | "pill" | "toolbar",
+  /** Room for a glyph inside the left padding (`SearchInput`). */
+  leadingIcon = false,
+): string {
+  const border = error ? CONTROL_BORDER.error : CONTROL_BORDER.rest;
   if (shape === "toolbar") {
     return [
       CONTROL_BASE.replace("text-body ", ""),
-      "rounded-control",
-      error ? CONTROL_BORDER.error : CONTROL_BORDER.rest,
-      CONTROL_TOOLBAR,
+      CONTROL_RADIUS,
+      border,
+      leadingIcon ? CONTROL_TOOLBAR.replace("px-3", LEADING.toolbar) : CONTROL_TOOLBAR,
+    ].join(" ");
+  }
+  if (shape === "pill") {
+    return [
+      CONTROL_BASE.replace("bg-c-card ", "bg-c-search-bg "),
+      "rounded-full",
+      error ? CONTROL_BORDER.error : "border-transparent",
+      leadingIcon ? CONTROL_SEARCH_PILL.replace("[padding-inline:12px]", LEADING.pill) : CONTROL_SEARCH_PILL,
     ].join(" ");
   }
   return [
     CONTROL_BASE,
-    shape === "pill" ? "rounded-full" : "rounded-control",
-    error ? CONTROL_BORDER.error : CONTROL_BORDER.rest,
-    shape === "multi" ? CONTROL_MULTI_LINE : shape === "pill" ? "h-8 px-4" : CONTROL_SINGLE_LINE,
+    CONTROL_RADIUS,
+    border,
+    shape === "multi"
+      ? CONTROL_MULTI_LINE
+      : leadingIcon
+        ? CONTROL_SINGLE_LINE.replace("[padding-inline:10px]", LEADING.single)
+        : CONTROL_SINGLE_LINE,
   ].join(" ");
 }

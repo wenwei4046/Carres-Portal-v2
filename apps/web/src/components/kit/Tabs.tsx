@@ -55,13 +55,26 @@ export default function Tabs({
   orientation?: "horizontal" | "vertical";
   variant?: "underline" | "segmented";
 }) {
+  /* v4 UI kit (01 §3 · UI-KIT "Tabs"). Two shapes, one grammar:
+   *   tabs   · pad 5 × 12 · 13 · radius 8 · gap 2 · selected 600 in the theme
+   *            select colours · others 500 transparent tab grey · hover grey.
+   *   switch · a view switch inside a card: the ground-colour round track,
+   *            pad 3, buttons pad 4 × 10 at 12.
+   * No underline and no indicator bar: the selected wash IS the indicator.
+   * Keyboard focus is the shell's one outline (`--c-focus`, offset −2). */
+  const segmented = variant === "segmented";
   return (
     <RadixTabs.Root orientation={orientation} value={value} onValueChange={onValueChange}>
       <RadixTabs.List
         aria-label={label}
         data-kit="tabs"
         data-variant={variant}
-        className={`flex items-center border-b border-kit-slate-5 ${fill ? "gap-0" : "gap-4"}`}
+        className={
+          (segmented
+            ? "inline-flex items-center rounded-full bg-c-ground p-[3px] "
+            : "flex items-center ") +
+          `${fill ? "gap-0" : "gap-0.5"} data-[orientation=vertical]:flex-col data-[orientation=vertical]:items-stretch`
+        }
       >
         {tabs.map((t) => (
           <RadixTabs.Trigger
@@ -69,31 +82,18 @@ export default function Tabs({
             value={t.value}
             disabled={t.disabled}
             data-kit="tab"
-            /* §3.5: "Underline tab hover — darken the text, not the
-             * background." The selected label is dark semibold; its indicator is blue.
-             *
-             * The indicator is a BACKGROUND BAR, not a border, and that is
-             * deliberate: §4.3 says borders are "1px only… no coloured
-             * borders", so the usual `border-b-2 border-blue` would break the
-             * law twice over. §3.5 assumes tabs are underlined and §4.3
-             * forbids the underline — reported to the kit, and built the way
-             * that breaks neither. */
             className={
-              `group relative flex items-center gap-2 px-1 py-2 text-body ${fill ? "flex-auto justify-center" : ""} ` +
-              "text-kit-slate-11 hover:text-kit-slate-12 " +
-              "data-[state=active]:text-kit-slate-12 data-[state=active]:font-semibold " +
-              "disabled:opacity-40 disabled:cursor-not-allowed " +
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+              `relative flex items-center gap-1.5 whitespace-nowrap rounded-lg font-medium ${fill ? "flex-auto justify-center" : ""} ` +
+              (segmented ? "px-2.5 py-1 text-meta " : "px-3 py-[5px] text-body ") +
+              "data-[orientation=vertical]:justify-start " +
+              "data-[state=inactive]:text-c-tab data-[state=inactive]:hover:bg-c-hover " +
+              "data-[state=active]:bg-c-select-bg data-[state=active]:font-semibold data-[state=active]:text-c-select-fg " +
+              "disabled:opacity-40 disabled:cursor-not-allowed"
             }
           >
             {t.icon && <Icon name={t.icon} />}
             {t.label}
             {t.count !== undefined && <Badge>{t.count}</Badge>}
-            <span
-              aria-hidden="true"
-              data-kit="tab-indicator"
-              className="absolute inset-x-0 bottom-0 h-0.5 bg-transparent group-data-[state=active]:bg-kit-blue-9"
-            />
           </RadixTabs.Trigger>
         ))}
       </RadixTabs.List>

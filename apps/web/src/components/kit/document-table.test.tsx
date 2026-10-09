@@ -42,6 +42,9 @@ describe("DocumentTable", () => {
     );
     const row = screen.getAllByRole("row")[1]!;
     expect(row.className).toContain("border-b");
+    // v4 lines (01 §5): the header line under the head, the row line under a row.
+    expect(screen.getAllByRole("row")[0]!.className).toContain("border-c-head-line");
+    expect(row.className).toContain("border-c-row-line");
     for (const cell of screen.getAllByRole("cell")) {
       expect(cell.className).not.toMatch(/border-[lrx]\b|border-[lrx]-/);
     }
@@ -65,7 +68,7 @@ describe("DocumentTable", () => {
     expect(door.className).toContain("max-md:min-h-10");
     fireEvent.click(door);
     expect(onOpen).toHaveBeenCalledTimes(1);
-    expect(screen.getAllByRole("row")[1]!.className).toContain("hover:bg-kit-slate-3");
+    expect(screen.getAllByRole("row")[1]!.className).toContain("hover:bg-c-hover");
   });
 
   it("a row with no door has no control and no hover", () => {
@@ -129,11 +132,11 @@ describe("TotalsSummary", () => {
     expect([...list.querySelectorAll("dd")].map((n) => n.textContent)).toEqual(["8", "0", "8"]);
   });
 
-  it("puts the label left in slate-11 and the value right, tabular, in slate-12", () => {
+  it("puts the label left in secondary and the value right, tabular, in ink (v4)", () => {
     const { container } = render(<TotalsSummary label="t" rows={ROWS} />);
-    expect(container.querySelector("dt")!.className).toContain("text-kit-slate-11");
+    expect(container.querySelector("dt")!.className).toContain("text-c-secondary");
     const value = container.querySelector("dd")!;
-    expect(value.className).toContain("text-kit-slate-12");
+    expect(value.className).toContain("text-c-ink");
     expect(value.className).toContain("text-right");
     expect(value.className).toContain("tabular-nums");
   });
@@ -171,7 +174,7 @@ describe("DocumentTable keeps a number with its row", () => {
     expect(second!.className).not.toContain("sticky");
     const cells = screen.getAllByRole("cell");
     expect(cells[0]!.className).toContain("sticky");
-    expect(cells[0]!.className).toContain("bg-white");
+    expect(cells[0]!.className).toContain("bg-c-card");
   });
 
   it("sets every cell on the row's middle line", () => {

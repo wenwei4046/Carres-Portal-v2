@@ -31,8 +31,8 @@ import { matchesRegisterColumnFilters, type DatePreset, type RegisterColumnQuery
 //     multiple group levels supported; rows collapse with caret
 //   - Layout persisted to localStorage[storageKey]:
 //       { order, hidden, widths, groupBy, sort }
-//   - Sticky header. Density: row height ~28px, body fs-12, header fs-10
-//     uppercase letter-spacing 0.06em.
+//   - Sticky header. Look: the v4 template table (01 §5) — header 40 at
+//     12/500, body rows at least 54 at 13, one white card (DataGrid.module.css).
 //
 // Pure React + HTML5 drag-and-drop.
 //
@@ -73,11 +73,11 @@ import { SkeletonRows } from "./Skeleton";
 import { DateField } from "./DateField";
 import styles from "./DataGrid.module.css";
 
-/* The row-highlight stripe (see `rowHighlight`). Literal class strings so the
-   Tailwind build keeps them; tokens only (kit red-9 / blue-9). */
+/* The row-highlight stripe (see `rowHighlight`), drawn by the v4 sheet in the
+   problem ink / neutral info ink (DataGrid.module.css). */
 const ROW_HIGHLIGHT_CLASS = {
-  critical: "[&>td:first-child]:shadow-[inset_3px_0_0_theme(colors.kit.red.9)]",
-  info: "[&>td:first-child]:shadow-[inset_3px_0_0_theme(colors.kit.blue.9)]",
+  critical: styles.rowHighlightCritical,
+  info: styles.rowHighlightInfo,
 } as const;
 
 import { ViewportExpansion } from "./ViewportExpansion";
@@ -2275,7 +2275,7 @@ function DataGridInner<T>({
           const allSel = keys.length > 0 && keys.every((k) => selectable.selectedKeys.has(k));
           const someSel = !allSel && keys.some((k) => selectable.selectedKeys.has(k));
           return (
-            <th key={col.key} scope="col" className={`${styles.th}${inGroup ? ` ${styles.thInGroup}` : ""}${pinClass(col.key)}`} style={style}>
+            <th key={col.key} scope="col" className={`${styles.th}${inGroup ? ` ${styles.thInGroup}` : ""}${pinClass(col.key)}`} style={{ ...style, padding: "4px 6px", textAlign: "center" }}>
               <span className={styles.thInner}>
                 <input
                   type="checkbox"
@@ -2366,7 +2366,7 @@ function DataGridInner<T>({
                         : "var(--fg-soft)",
                   }}
                 >
-                  <Filter size={11} strokeWidth={2} aria-hidden />
+                  <Filter size={14} strokeWidth={1.75} aria-hidden />
                 </button>
               )}
             </span>
@@ -2421,7 +2421,7 @@ function DataGridInner<T>({
           <td
             className={styles.groupRowCell}
             colSpan={totalCols || 1}
-            style={{ paddingLeft: 8 + item.level * 16 }}
+            style={{ paddingLeft: 14 + item.level * 16 }}
           >
             <span className={styles.groupCaret}>{item.collapsed ? ">" : "v"}</span>
             {item.label}
@@ -2767,7 +2767,7 @@ function DataGridInner<T>({
           <tr
             className={`${styles.tr} ${styles.trExpansion}`}
             style={{
-              background: "var(--grid-expansion, var(--c-cream))",
+              background: "var(--grid-expansion, var(--c-ground))",
               ...(expansionJoinable ? { ["--expansion-join-y" as string]: `${EXPANSION_JOIN_Y}px` } : {}),
             }}
           >
@@ -2784,7 +2784,7 @@ function DataGridInner<T>({
                   key={key}
                   data-testid={`grid-expansion-gutter-${key}`}
                   className={piece ? styles.expansionGutter : undefined}
-                  style={{ padding: 0, borderTop: "1px solid var(--line)", ...(piece ? pinStyle(key) : {}) }}
+                  style={{ padding: 0, borderTop: "1px solid var(--c-row-line)", ...(piece ? pinStyle(key) : {}) }}
                 >
                   {piece ? <span aria-hidden="true" className={piece} data-testid={`expansion-connector-${gi === caretAt ? "elbow" : "run"}`} /> : null}
                 </td>
@@ -2798,7 +2798,7 @@ function DataGridInner<T>({
                  one — but HORIZONTAL padding is exactly what the gutter cells
                  replaced, so it stays at zero: the left edge is the first data
                  column's, the right edge is the parent table's. */
-              style={{ padding: expandable.flush ? 0 : "12px 0", borderTop: "1px solid var(--line)" }}
+              style={{ padding: expandable.flush ? 0 : "12px 0", borderTop: "1px solid var(--c-row-line)" }}
             >
               {/* The caret line joins only a FLUSH expansion (the §6.9 Purchasing
                   geometry), where the stated join height is where the first
@@ -3402,7 +3402,7 @@ function DataGridInner<T>({
 
       {warning != null && warning !== false && (
         <div
-          className="flex min-h-10 flex-none items-center gap-2 border-b border-kit-amber-6 bg-kit-amber-3 px-3 py-1.5 text-meta text-kit-amber-11"
+          className="flex min-h-10 flex-none items-center gap-2 rounded-lg bg-c-warn-bg px-3.5 py-1.5 text-[13px] leading-[18px] text-c-warn-fg"
           role="alert"
           data-testid="grid-warning"
         >
@@ -3440,7 +3440,15 @@ function DataGridInner<T>({
         </div>
       )}
 
-      {/* Table */}
+      {/* Table — the scroll area and its status footer sit in ONE white card
+          (v4 template, 01 §5); the toolbar above stays on the page. A
+          drill-down draws no card, and an alternate presentation (cards)
+          keeps the footer without a card around its own cards. */}
+      <div
+        className={embedded
+          ? styles.tableCardEmbedded
+          : `${styles.tableCard}${renderResults && !isLoading && errorState == null && sortedRows.length > 0 ? ` ${styles.tableCardBare}` : ""}`}
+      >
       <div
         ref={scrollRef}
         onScroll={(event) => {
@@ -3608,6 +3616,7 @@ function DataGridInner<T>({
               : <span>{`${filteredRows.length} of ${rows.length} rows`}</span>}
         </div>
       )}
+      </div>
 
       {/* Context menu */}
       {ctx &&
@@ -3670,7 +3679,7 @@ function DataGridInner<T>({
                 return (
                   <>
                     <div className={styles.ctxDivider} />
-                    <div style={{ padding: "4px 10px", color: "var(--fg-muted)", fontSize: "var(--fs-11)" }}>
+                    <div style={{ padding: "6px 10px 2px", color: "var(--c-muted)", fontSize: "var(--fs-small)", fontWeight: 600 }}>
                       Hidden:
                     </div>
                     {hiddenKeys.map((k) => {
@@ -3728,11 +3737,13 @@ function DataGridInner<T>({
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  padding: "4px 10px",
-                  borderBottom: "1px solid var(--line)",
+                  gap: 8,
+                  padding: "6px 10px",
+                  marginBottom: 4,
+                  borderBottom: "1px solid var(--c-section-line)",
                 }}
               >
-                <strong style={{ fontSize: "var(--fs-11)" }}>Filter: {col?.label}</strong>
+                <strong style={{ fontSize: "var(--fs-label)", fontWeight: 600, color: "var(--c-secondary)" }}>Filter: {col?.label}</strong>
                 {(sel.length > 0 ||
                   dateFilters[filterMenu.colKey] ||
                   numberFilters[filterMenu.colKey] ||
@@ -3743,9 +3754,11 @@ function DataGridInner<T>({
                     style={{
                       background: "transparent",
                       border: 0,
-                      color: "var(--c-orange)",
+                      borderRadius: "var(--radius)",
+                      padding: "2px 6px",
+                      color: "var(--c-body)",
                       cursor: "pointer",
-                      fontSize: "var(--fs-11)",
+                      fontSize: "var(--fs-label)",
                       fontWeight: 600,
                     }}
                   >
@@ -3755,8 +3768,8 @@ function DataGridInner<T>({
               </div>
               {col?.filterType === "number" ? (
                 /* ── Number: min / max range ── */
-                <div style={{ display: "grid", gap: 8, padding: "10px" }}>
-                  <label style={{ display: "grid", gap: 3, fontSize: "var(--fs-11)", color: "var(--fg-muted)" }}>
+                <div style={{ display: "grid", gap: 8, padding: "6px 10px" }}>
+                  <label style={{ display: "grid", gap: 4, fontSize: "var(--fs-label)", color: "var(--c-secondary)" }}>
                     Min
                     <input
                       type="number"
@@ -3765,14 +3778,17 @@ function DataGridInner<T>({
                       value={numberFilters[filterMenu.colKey]?.min ?? ""}
                       onChange={(e) => setNumberBound(filterMenu.colKey, "min", e.target.value)}
                       style={{
-                        fontSize: "var(--fs-12)",
-                        padding: "4px 8px",
-                        border: "1px solid var(--line)",
-                        borderRadius: "var(--radius-sm, 6px)",
+                        boxSizing: "border-box",
+                        height: "var(--input-h)",
+                        fontSize: "var(--fs-body)",
+                        padding: "0 10px",
+                        color: "var(--c-ink)",
+                        border: "1px solid var(--c-input-border)",
+                        borderRadius: "var(--radius)",
                       }}
                     />
                   </label>
-                  <label style={{ display: "grid", gap: 3, fontSize: "var(--fs-11)", color: "var(--fg-muted)" }}>
+                  <label style={{ display: "grid", gap: 4, fontSize: "var(--fs-label)", color: "var(--c-secondary)" }}>
                     Max
                     <input
                       type="number"
@@ -3781,18 +3797,21 @@ function DataGridInner<T>({
                       value={numberFilters[filterMenu.colKey]?.max ?? ""}
                       onChange={(e) => setNumberBound(filterMenu.colKey, "max", e.target.value)}
                       style={{
-                        fontSize: "var(--fs-12)",
-                        padding: "4px 8px",
-                        border: "1px solid var(--line)",
-                        borderRadius: "var(--radius-sm, 6px)",
+                        boxSizing: "border-box",
+                        height: "var(--input-h)",
+                        fontSize: "var(--fs-body)",
+                        padding: "0 10px",
+                        color: "var(--c-ink)",
+                        border: "1px solid var(--c-input-border)",
+                        borderRadius: "var(--radius)",
                       }}
                     />
                   </label>
                 </div>
               ) : col?.filterType === "date" ? (
                 /* ── Date: quick presets + custom from→to range ── */
-                <div style={{ display: "grid", gap: 8, padding: "8px 10px" }}>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                <div style={{ display: "grid", gap: 8, padding: "6px 10px" }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {DATE_PRESETS.map((p) => {
                       const on = dateFilters[filterMenu.colKey] === p.key;
                       return (
@@ -3801,14 +3820,14 @@ function DataGridInner<T>({
                           type="button"
                           onClick={() => toggleDatePreset(filterMenu.colKey, p.key)}
                           style={{
-                            fontSize: "var(--fs-11)",
+                            fontSize: "var(--fs-label)",
                             fontWeight: 600,
-                            padding: "3px 9px",
-                            borderRadius: "999px",
+                            padding: "var(--chip-pad)",
+                            borderRadius: "var(--radius)",
                             cursor: "pointer",
-                            border: `1px solid ${on ? "var(--c-orange)" : "var(--line)"}`,
-                            background: on ? "var(--c-orange)" : "var(--c-paper)",
-                            color: on ? "var(--c-paper)" : "var(--c-ink)",
+                            border: `1px solid ${on ? "var(--c-select-bg)" : "var(--c-input-border)"}`,
+                            background: on ? "var(--c-select-bg)" : "var(--c-search-bg)",
+                            color: on ? "var(--c-select-fg)" : "var(--c-body)",
                           }}
                         >
                           {p.label}
@@ -3816,7 +3835,7 @@ function DataGridInner<T>({
                       );
                     })}
                   </div>
-                  <label style={{ display: "grid", gap: 3, fontSize: "var(--fs-11)", color: "var(--fg-muted)" }}>
+                  <label style={{ display: "grid", gap: 4, fontSize: "var(--fs-label)", color: "var(--c-secondary)" }}>
                     From
                     <DateField
                       fullWidth
@@ -3825,7 +3844,7 @@ function DataGridInner<T>({
                       onChange={(iso) => setDateBound(filterMenu.colKey, "from", iso)}
                     />
                   </label>
-                  <label style={{ display: "grid", gap: 3, fontSize: "var(--fs-11)", color: "var(--fg-muted)" }}>
+                  <label style={{ display: "grid", gap: 4, fontSize: "var(--fs-label)", color: "var(--c-secondary)" }}>
                     To
                     <DateField
                       fullWidth
@@ -3840,7 +3859,7 @@ function DataGridInner<T>({
                  type-to-find box shows for 'numbering' and any long value list. */
                 <>
                   {(col?.filterType === "numbering" || filterValues.length > 8) && (
-                    <div style={{ padding: "6px 10px", borderBottom: "1px solid var(--line)" }}>
+                    <div style={{ padding: "4px 4px 8px" }}>
                       <input
                         type="search"
                         value={filterSearch}
@@ -3849,28 +3868,30 @@ function DataGridInner<T>({
                         style={{
                           width: "100%",
                           boxSizing: "border-box",
-                          fontSize: "var(--fs-12)",
-                          padding: "4px 8px",
-                          border: "1px solid var(--line)",
-                          borderRadius: "var(--radius-sm, 6px)",
+                          height: "var(--input-h)",
+                          fontSize: "var(--fs-body)",
+                          padding: "0 10px",
+                          color: "var(--c-ink)",
+                          border: "1px solid var(--c-input-border)",
+                          borderRadius: "var(--radius)",
                         }}
                       />
                     </div>
                   )}
                   {visibleFilterValues.length > 0 && (
-                    <div style={{ display: "flex", gap: 4, padding: "6px 10px", borderBottom: "1px solid var(--line)" }}>
+                    <div style={{ display: "flex", gap: 6, padding: "4px 10px 8px", marginBottom: 4, borderBottom: "1px solid var(--c-section-line)" }}>
                       <button
                         type="button"
                         onClick={() => selectAllFilterValues(filterMenu.colKey, visibleFilterValues)}
                         style={{
-                          fontSize: "var(--fs-11)",
+                          fontSize: "var(--fs-label)",
                           fontWeight: 600,
-                          padding: "3px 9px",
-                          borderRadius: "999px",
+                          padding: "var(--chip-pad)",
+                          borderRadius: "var(--radius)",
                           cursor: "pointer",
-                          border: "1px solid var(--line)",
-                          background: "var(--c-paper)",
-                          color: "var(--c-ink)",
+                          border: "1px solid var(--c-input-border)",
+                          background: "var(--c-search-bg)",
+                          color: "var(--c-body)",
                         }}
                       >
                         Select all
@@ -3879,14 +3900,14 @@ function DataGridInner<T>({
                         type="button"
                         onClick={() => invertFilterValues(filterMenu.colKey, visibleFilterValues)}
                         style={{
-                          fontSize: "var(--fs-11)",
+                          fontSize: "var(--fs-label)",
                           fontWeight: 600,
-                          padding: "3px 9px",
-                          borderRadius: "999px",
+                          padding: "var(--chip-pad)",
+                          borderRadius: "var(--radius)",
                           cursor: "pointer",
-                          border: "1px solid var(--line)",
-                          background: "var(--c-paper)",
-                          color: "var(--c-ink)",
+                          border: "1px solid var(--c-input-border)",
+                          background: "var(--c-search-bg)",
+                          color: "var(--c-body)",
                         }}
                       >
                         Select invert
@@ -3894,7 +3915,7 @@ function DataGridInner<T>({
                     </div>
                   )}
                   {visibleFilterValues.length === 0 && (
-                    <div style={{ padding: "6px 10px", color: "var(--fg-muted)", fontSize: "var(--fs-11)" }}>
+                    <div style={{ padding: "var(--menu-item-pad)", color: "var(--c-secondary)", fontSize: "var(--fs-label)" }}>
                       No values.
                     </div>
                   )}
@@ -3902,7 +3923,7 @@ function DataGridInner<T>({
                     <label
                       key={v}
                       className={styles.ctxItem}
-                      style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}
+                      style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
                     >
                       <input
                         type="checkbox"
@@ -4040,7 +4061,7 @@ export function OverflowText({ text, label }: { text: string; label: string }) {
         </Tooltip>
       }
     >
-      <p className="max-w-[320px] whitespace-normal break-words text-body text-kit-slate-12">{text}</p>
+      <p className="max-w-[320px] whitespace-normal break-words text-body text-c-ink">{text}</p>
     </Popover>
   );
 }

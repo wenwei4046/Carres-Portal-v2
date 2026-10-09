@@ -6,8 +6,9 @@
  * cards, the Warehouse Unit and Workspace.
  *
  * One chrome (owner instruction 2026-09-26, "follow sales order ui kit … every
- * page of purchasing"): white, 1px `slate-5`, the kit card radius, 12/16
- * padding, a black `text-strong` title over a 1px rule.
+ * page of purchasing"), drawn in v4 values (01 §3, 9 Oct 2026): white, 1px
+ * `--c-card-border`, 8px corner, no shadow, 14 × 16 padding, a 15 / 600 ink
+ * title over a 1px `--c-section-line` rule. Never a box inside a box.
  */
 import { useState } from "react";
 
@@ -40,7 +41,7 @@ export default function Block({
   children,
 }: {
   title: string;
-  /** Quiet summary identity surface, using the accepted slate-3 token. */
+  /** Quiet summary identity surface, on the v4 neutral grey. */
   tone?: "muted";
   /** ⭐ THE WORK ROUTE CARD'S SECOND LINE (Workspace MASTER §5.10 BUILD SHEET,
    *  Jess 2026-09-28): under the title, inside the header, 13/400 — red when
@@ -91,7 +92,7 @@ export default function Block({
   const bodyId = `block-b-${title.replace(/\s+/g, "-").toLowerCase()}`;
 
   return (
-    <section className={`rounded-card border border-kit-slate-5 ${tone === "muted" ? "bg-kit-slate-3" : "bg-white"} px-4 py-3`} data-block={title}>
+    <section className={`rounded-lg border border-c-card-border ${tone === "muted" ? "bg-c-info-bg" : "bg-c-card"} [padding:var(--card-pad)]`} data-block={title}>
       {/* ⭐ ONE CARD, ONE CHROME — every page draws its cards from here.
           A white card with a 1px rule under the title; the title is
           `text-strong` slate-12 BLACK bold, sentence case (ONE KIT LAW, Jess
@@ -99,19 +100,19 @@ export default function Block({
           Blue stays for the primary button, links and selection only. There
           is no second tone and no band: the grey band and the mono uppercase
           heading are retired. */}
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-kit-slate-5 pb-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-c-section-line pb-2">
         {/* ONE KIT LAW (Jess, 2026-09-27): the card title is BLACK bold
             `text-strong` slate-12 — never blue (blue is the primary button,
             links and selection only), never a band. Overwrites the
             2026-09-21 "remain blue" ruling in the one place every page draws from. */}
-        <h2 id={headingId} className="text-strong text-kit-slate-12">
+        <h2 id={headingId} className="text-strong text-c-ink">
           {title}
         </h2>
         {headerSlot}
-        {note && <span className="text-meta font-normal text-base-600">{note}</span>}
+        {note && <span className="text-meta font-normal text-c-secondary">{note}</span>}
         {why ? (
           <p
-            className={`basis-full text-body ${why.tone === "missed" ? "text-kit-red-11" : why.tone === "due" ? "text-kit-amber-11" : "text-kit-slate-11"}`}
+            className={`basis-full text-body ${why.tone === "missed" ? "text-c-err-fg" : why.tone === "due" ? "text-c-warn-fg" : "text-c-secondary"}`}
             data-testid={`block-why-${title}`}
           >
             {why.text}
@@ -119,7 +120,7 @@ export default function Block({
         ) : null}
       </div>
       {subtitle && (
-        <p className="mt-1 text-meta font-normal text-base-500" data-testid={`block-subtitle-${title}`}>
+        <p className="mt-1 text-meta font-normal text-c-secondary" data-testid={`block-subtitle-${title}`}>
           {subtitle}
         </p>
       )}
@@ -129,10 +130,10 @@ export default function Block({
           onClick={() => setOpen(true)}
           aria-expanded={false}
           aria-controls={bodyId}
-          className="mt-2 flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-left text-body text-base-600 hover:bg-hovertint"
+          className="mt-2 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-body text-c-body hover:bg-c-hover"
           data-testid={`block-expand-${title}`}
         >
-          <span className="text-base-400">▸</span>
+          <span className="text-c-muted">▸</span>
           <span className="min-w-0 flex-1 truncate">{summary}</span>
         </button>
       ) : (
@@ -145,11 +146,11 @@ export default function Block({
               disabled={Boolean(forceOpen)}
               aria-expanded
               aria-controls={bodyId}
-              className="mt-2 flex items-center gap-2 rounded-control px-2 py-1 text-left text-meta text-base-500 hover:bg-hovertint disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-2 flex items-center gap-2 rounded-lg px-2 py-1 text-left text-meta text-c-secondary hover:bg-c-hover disabled:cursor-not-allowed disabled:opacity-50"
               data-testid={`block-collapse-${title}`}
               title={forceOpen ? "This section has unsaved changes" : undefined}
             >
-              <span className="text-base-400">▾</span>
+              <span className="text-c-muted">▾</span>
               <span>{forceOpen ? "Unsaved changes here" : "Hide"}</span>
             </button>
           )}

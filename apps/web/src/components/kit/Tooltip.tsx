@@ -49,10 +49,9 @@ const Tooltip = forwardRef<
             side={side}
             sideOffset={4}
             data-kit="tooltip"
-            /* Ink-on-dark rather than the white floating surface: a tooltip is
-             * the one overlay that must read as a note ABOUT the page instead
-             * of a piece OF it. `slate-12` is §3.2's primary-text step. */
-            className={`max-w-xs rounded-control bg-kit-slate-12 px-2 py-1 text-meta text-white ${Z_FLOATING}`}
+            /* v4 (01 §3 Popup): the popup surface — white, 8px corner, the
+             * menu shadow, 6px padding — with one line of 12px body ink. */
+            className={`max-w-xs rounded-lg bg-c-card px-2 py-1.5 text-meta text-c-body [box-shadow:var(--shadow-menu)] ${Z_FLOATING}`}
           >
             {content}
           </RadixTooltip.Content>

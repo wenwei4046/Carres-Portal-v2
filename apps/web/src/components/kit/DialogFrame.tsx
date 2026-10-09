@@ -23,8 +23,11 @@
  * So the frame remembers the element that had focus when it opened and puts it
  * back. One fix, every surface — a page-local patch would have to be repeated
  * in sixty places and would be wrong in fifty-nine of them.
- * Every visible value here is Carres's — `slate-5` hairline, `rounded-card`,
- * §2.1 type, §4.1's frozen spacing, §4.4's layer 4.
+ * Every visible value here is the v4 kit's (01 §3 · §4, 9 Oct 2026): white,
+ * 1px `--c-btn-border`, the 8px corner, `--shadow-drawer`, a 14 × 16 header,
+ * the `--backdrop` scrim, §4.4's layer 4. The drawer sits on the right, inset
+ * 12px top, bottom and right, 400px wide (`--drawer-w`); the compact module
+ * card keeps its own wider 560px home (`max-w-drawer`).
  *
  * **Placement is a TYPE, not a prop a page passes.** `Modal` calls this with
  * `place="centre"` and `Drawer` with `place="side"`; there is no third value and
@@ -58,14 +61,22 @@ import Icon from "./Icon";
 import { DialogContainerProvider } from "./dialog-container";
 import { Z_DIALOG } from "./overlay-layer";
 
-const SURFACE = "bg-white border border-kit-slate-5 flex flex-col";
+const SURFACE =
+  "bg-c-card text-c-ink border border-c-btn-border rounded-lg [box-shadow:var(--shadow-drawer)] flex flex-col";
 
 const PLACE = {
   /** Centred; it never grows past the viewport — the body scrolls instead. */
   centre:
-    "fixed left-1/2 top-1/2 w-full max-h-dialog -translate-x-1/2 -translate-y-1/2 rounded-card",
-  /** Full height on the right, rounded on the leading edge only. */
-  side: "fixed inset-y-0 right-0 w-full max-w-drawer rounded-l-card",
+    "fixed left-1/2 top-1/2 w-full max-h-dialog -translate-x-1/2 -translate-y-1/2",
+  /** On the right, inset 12px top, bottom and right; never wider than the
+   *  screen less its two 12px gutters. */
+  side: "fixed bottom-3 right-3 top-3 w-[calc(100vw-24px)]",
+} as const;
+
+/** The drawer's widths: the v4 400px, and the compact module card's own 560px. */
+const SIDE_WIDTH = {
+  standard: "max-w-[var(--drawer-w)]",
+  card: "max-w-drawer",
 } as const;
 
 /**
@@ -127,7 +138,7 @@ export default function DialogFrame({
   const widthClass =
     place === "centre"
       ? CENTRE_WIDTH[width === "wide" || width === "viewer" ? width : "standard"]
-      : "";
+      : SIDE_WIDTH[variant === "compact-card" ? "card" : "standard"];
 
   /* WHO HAD FOCUS WHEN THIS OPENED. Captured on the OPEN transition, because
      once the surface has mounted the answer is something inside it. */
@@ -139,12 +150,10 @@ export default function DialogFrame({
       <DialogContainerProvider>
         {(setContainer) => (
           <Dialog.Portal>
-        {/* The scrim. §3 has no row for one — reported to the kit rather than
-         *  settled here — so it is the primary-text step at 40%, which is the
-         *  nearest thing the law does name. */}
+        {/* The scrim: the v4 `--backdrop` token (01 §3). */}
         <Dialog.Overlay
           data-kit="dialog-overlay"
-          className={`fixed inset-0 bg-kit-slate-12/40 ${Z_DIALOG}`}
+          className={`fixed inset-0 [background:var(--backdrop)] ${Z_DIALOG}`}
         />
         {/* D0.5b.1 — publishing the content node is what lets a Select, a
          *  Popover or a DatePicker opened INSIDE this dialog render above it,
@@ -177,14 +186,14 @@ export default function DialogFrame({
             if (back && document.contains(back)) back.focus();
           }}
         >
-          <header className={variant === "compact-card" ? "sr-only" : "flex items-start justify-between gap-4 border-b border-kit-slate-6 px-4 py-3"}>
+          <header className={variant === "compact-card" ? "sr-only" : "flex items-start justify-between gap-4 rounded-t-lg border-b border-c-section-line [padding:var(--card-pad)]"}>
             <div className={`flex flex-col gap-1 ${variant === "quick-view" ? "min-w-0 flex-1" : ""}`}>
               <Dialog.Title
-                className={`text-strong text-kit-slate-12 ${variant === "quick-view" ? "truncate" : ""}`}
+                className={`text-strong text-c-ink ${variant === "quick-view" ? "truncate" : ""}`}
                 title={variant === "quick-view" && typeof title === "string" ? title : undefined}
               >{title}</Dialog.Title>
               {description && (
-                <Dialog.Description className="text-meta text-kit-slate-11">
+                <Dialog.Description className="text-meta text-c-secondary">
                   {description}
                 </Dialog.Description>
               )}
@@ -194,16 +203,19 @@ export default function DialogFrame({
               aria-label="Close"
               title="Close"
               data-kit="dialog-close"
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control text-kit-slate-11 hover:bg-kit-slate-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 md:h-8 md:w-8"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-c-secondary hover:bg-c-hover focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] md:h-8 md:w-8"
             >
               <Icon name="close" size={16} />
             </Dialog.Close></div>}
           </header>
 
-          <div className={variant === "compact-card" ? "flex-1 overflow-y-auto" : "flex-1 overflow-y-auto p-4"}>{children}</div>
+          {/* The compact card's own identity band reaches the corners, so its
+              scroller clips to the 8px corner. Never the whole surface: a list
+              portaled into this dialog must not be cut off. */}
+          <div className={variant === "compact-card" ? "flex-1 overflow-y-auto rounded-lg" : "flex-1 overflow-y-auto p-4"}>{children}</div>
 
           {footer && (
-            <footer className="flex items-center justify-end gap-2 border-t border-kit-slate-6 px-4 py-3">
+            <footer className="flex items-center justify-end gap-2 rounded-b-lg border-t border-c-section-line [padding:var(--card-pad)]">
               {footer}
             </footer>
           )}

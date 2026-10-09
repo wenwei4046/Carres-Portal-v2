@@ -9,7 +9,8 @@
  * **It reuses the ONE host already in `App.tsx`.** `sonner`'s `<Toaster>` has
  * been mounted app-wide since long before the kit; a second host would stack two
  * toasts in two corners. `notify()` renders through `toast.custom`, so the
- * SURFACE is the kit's (white, `slate-5` hairline, §2.1 type, a §5.3 glyph)
+ * SURFACE is the kit's (v4: white, card hairline, 8px corner, menu shadow,
+ * 13px ink, a §5.3 glyph in the soft status pair)
  * while sonner keeps the behaviour it already owns — the stack, the timer, the
  * swipe, the layer (§4.4's z-50, which is sonner's and which the kit never
  * writes). **No existing caller changes**: the 40-odd pages still calling
@@ -43,7 +44,7 @@ export default function Toast({ kind, message }: { kind: ToastKind; message: str
       data-kit="toast"
       data-tone={kind}
       role="status"
-      className="flex items-center gap-2 rounded-card border border-kit-slate-5 bg-white px-4 py-3 text-body text-kit-slate-12"
+      className="flex items-center gap-2 rounded-lg border border-c-card-border bg-c-card [padding:var(--card-pad)] text-body text-c-ink [box-shadow:var(--shadow-menu)]"
     >
       {/* The tone lives on the GLYPH, not on the surface: a fully coloured
        *  toast is a status pill the size of a card, and §3.4 keeps colour for

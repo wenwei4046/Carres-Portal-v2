@@ -128,15 +128,17 @@ describe("/ui showcase", () => {
     expect(BUTTON).toContain("focus-visible:ring-2");
     expect(BUTTON).toContain("focus-visible:ring-kit-blue-9");
     expect(BUTTON).toContain("focus-visible:ring-offset-1");
-    expect(FIELD).toContain("focus:ring-2");
-    expect(FIELD).toContain("focus:ring-kit-blue-9");
-    expect(FIELD).toContain("focus:border-kit-blue-9");
+    // The field focus is the v4 Appearance outline (01 §3 · §9), not a ring.
+    expect(FIELD).toContain("focus:[outline:var(--c-focus)]");
+    expect(FIELD).not.toContain("focus:ring-kit-blue-9");
     // …and the showcase's forced mirrors of them.
     expect(SHOWCASE).toContain("[&>button]:brightness-125");
     expect(SHOWCASE).toContain("[&>button]:bg-c-info-bg");
     expect(SHOWCASE).toContain("[&>button]:ring-2");
     expect(SHOWCASE).toContain("[&>button]:ring-kit-blue-9");
     expect(SHOWCASE).toContain("[&>button]:ring-offset-1");
+    // OWED: `UiShowcase.tsx` still forces the retired field ring below; its v4
+    // mirror (`[&_input]:[outline:var(--c-focus)]`) moves with that file.
     expect(SHOWCASE).toContain("[&_input]:ring-2");
     expect(SHOWCASE).toContain("[&_input]:ring-kit-blue-9");
     expect(SHOWCASE).toContain("[&_input]:border-kit-blue-9");

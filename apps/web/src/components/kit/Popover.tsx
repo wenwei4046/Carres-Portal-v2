@@ -52,7 +52,7 @@ export default function Popover({
           sideOffset={4}
           aria-label={label}
           data-kit="popover"
-          className={`${FLOATING_SURFACE} p-4 focus:outline-none`}
+          className={`${FLOATING_SURFACE} p-1.5 focus:outline-none`}
         >
           {children}
         </RadixPopover.Content>

@@ -5,6 +5,13 @@
 /* Material Symbols Rounded, outline, weight 300 (handoff Design tokens). */
 @import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&display=block");
 
+/* MIcon draws its glyph from `data-icon` through the font's ligature, so the
+   icon name is never part of a button's text (search, copy, exports and
+   accessible names read no `keyboard_command_key`). */
+.material-symbols-rounded[data-icon]::before {
+  content: attr(data-icon);
+}
+
 /* Appearance picker: each theme's identity dot (UI Kit §9 table). Only the
    picker reads these; the theme itself lives in carres-tokens.css. */
 :root {

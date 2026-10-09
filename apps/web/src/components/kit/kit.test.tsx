@@ -1,4 +1,3 @@
-import { amber, blue, green, red, slate } from "@radix-ui/colors";
 /**
  * Foundation components — the RULES, not the pixels (card D0.5a).
  *
@@ -15,6 +14,9 @@ import { amber, blue, green, red, slate } from "@radix-ui/colors";
  *   style expectations below stop erroring and `tsc` reports six unused
  *   `@ts-expect-error` directives. Nothing else moves.
  */
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import Badge from "./Badge";
@@ -192,19 +194,33 @@ describe("Textarea and SearchInput", () => {
 });
 
 describe("StatusPill", () => {
-  it("keeps white text at WCAG AA contrast on every canonical solid fill, without icons", () => {
-    const fills = { danger: red.red11, warning: amber.amber11, info: blue.blue11, success: green.green11, neutral: slate.slate11 };
-    render(<>{TONES.map(tone => <StatusPill key={tone} tone={tone}>{tone}</StatusPill>)}</>);
+  it("keeps every v4 soft pair at WCAG AA contrast, without icons and without white text", () => {
+    /* The pairs are the `--c-*` variables (01 §1); read them from the one token
+     * file so this contrast check and the screen cannot disagree. */
+    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "styles", "carres-tokens.css"), "utf8");
+    const value = (name: string) => css.match(new RegExp(`--c-${name}:\\s*(#[0-9A-Fa-f]{6})`))![1]!;
+    const luminance = (hex: string) => {
+      const [r, g, b] = hex.slice(1).match(/../g)!.map(v => parseInt(v, 16) / 255)
+        .map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+      return r! * 0.2126 + g! * 0.7152 + b! * 0.0722;
+    };
+    const contrast = (a: string, b: string) => {
+      const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+      return (hi! + 0.05) / (lo! + 0.05);
+    };
+    render(<>{TONES.map(tone => <StatusPill key={tone} tone={tone}>{tone}</StatusPill>)}<StatusPill tone="neutral" hold>Hold</StatusPill></>);
     for (const tone of TONES) {
-      const components = fills[tone].slice(1).match(/../g)!.map(value => parseInt(value, 16) / 255)
-        .map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
-      const luminance = components[0]! * 0.2126 + components[1]! * 0.7152 + components[2]! * 0.0722;
-      expect(1.05 / (luminance + 0.05), tone).toBeGreaterThanOrEqual(4.5);
+      const [bg, fg] = [STATUS_PILL_CLASS[tone].match(/bg-c-([a-z]+-bg)/)![1]!, STATUS_PILL_CLASS[tone].match(/text-c-([a-z]+-fg)/)![1]!];
+      expect(contrast(value(bg), value(fg)), tone).toBeGreaterThanOrEqual(4.5);
       const pill = screen.getByText(tone).closest('[data-kit="status-pill"]')!;
-      expect(pill).toHaveClass("text-white");
+      expect(pill).not.toHaveClass("text-white");
+      expect(pill).toHaveClass("whitespace-nowrap");
       expect(pill.querySelector("svg,[data-icon]")).toBeNull();
     }
-    expect(TONE_CLASS.warning).toBe("bg-kit-amber-3 text-kit-amber-11");
+    // Hold is the ONE dark pill (01 §1).
+    expect(contrast(value("hold-bg"), value("hold-fg"))).toBeGreaterThanOrEqual(4.5);
+    expect(screen.getByText("Hold").closest('[data-kit="status-pill"]')).toHaveClass("bg-c-hold-bg");
+    expect(TONE_CLASS.warning).toBe("bg-c-warn-bg text-c-warn-fg");
   });
 
   it("paints the tone the engine computed and says which one it was", () => {

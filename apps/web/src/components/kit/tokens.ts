@@ -65,34 +65,37 @@ export const TYPE_TOKENS: readonly TypeTokenSpec[] = [
  * ──────────────────────────────────────────────────────────────────────── */
 
 /**
- * §3.3 — the four jobs colour is allowed to do, as pill fill + ink.
+ * §3.3 — the status pairs, as soft fill + dark ink (v4 owner instruction
+ * 9 Oct 2026, `docs/01-design-tokens.md` §1). The values are the `--c-*`
+ * variables in `styles/carres-tokens.css`, published as Tailwind `c-*`.
  *
  * Keyed by `OrderActionTone`, the union the action engine already computes
  * (`packages/shared/src/order-actions.ts`). A surface cannot invent a sixth
- * tone: there is no sixth member, so it does not compile.
+ * tone: there is no sixth member, so it does not compile. `info` and
+ * `neutral` share the one grey pair, exactly as §1 lists them.
  */
 export const TONE_CLASS: Record<OrderActionTone, string> = {
-  danger: "bg-kit-red-3 text-kit-red-11",
-  warning: "bg-kit-amber-3 text-kit-amber-11",
-  info: "bg-kit-blue-3 text-kit-blue-11",
-  success: "bg-kit-green-3 text-kit-green-11",
-  neutral: "bg-kit-slate-3 text-kit-slate-11",
+  danger: "bg-c-err-bg text-c-err-fg",
+  warning: "bg-c-warn-bg text-c-warn-fg",
+  info: "bg-c-info-bg text-c-info-fg",
+  success: "bg-c-ok-bg text-c-ok-fg",
+  neutral: "bg-c-info-bg text-c-info-fg",
 };
 
-/** Solid status presentation; action and toast surfaces retain TONE_CLASS. */
-export const STATUS_PILL_CLASS: Record<OrderActionTone, string> = {
-  danger: "bg-kit-red-11 text-white",
-  warning: "bg-kit-amber-11 text-white",
-  info: "bg-kit-blue-11 text-white",
-  success: "bg-kit-green-11 text-white",
-  neutral: "bg-kit-slate-11 text-white",
-};
+/** The status pill reads the same soft pairs. No solid white text remains
+ *  except the one dark Hold pair below (§1). */
+export const STATUS_PILL_CLASS: Record<OrderActionTone, string> = TONE_CLASS;
+
+/** Finance hold: the ONE dark pill, charcoal with white words (§1 Hold). */
+export const HOLD_PILL_CLASS = "bg-c-hold-bg text-c-hold-fg";
 
 /** Every tone, in the order §3.6 lists them — used by `/ui` and by tests. */
 export const TONES: readonly OrderActionTone[] = ["danger", "warning", "info", "success", "neutral"];
 
 /* ─────────────────────────────────────────────────────────────────────────
- * §4.2 Radius — four, frozen.
+ * §4.2 Radius — v4 (owner instruction 9 Oct 2026, 01 §3): corner 8, pill 999,
+ * and the checkbox keeps its square 4. The old 6 control and 10 card corners
+ * are retired; `rounded-lg` is `var(--radius)`, 8px.
  *
  * ⭐ A PILL IS A CAPSULE — owner ruling 2026-08-15 (Chai), re-ruling §4.
  *
@@ -109,13 +112,13 @@ export const TONES: readonly OrderActionTone[] = ["danger", "warning", "info", "
 
 export const RADII = [
   { px: 4, className: "rounded-pill", use: "checkbox" },
-  { px: 6, className: "rounded-control", use: "button · input · dropdown" },
-  { px: 10, className: "rounded-card", use: "card · panel · modal · drawer" },
+  { px: 8, className: "rounded-lg", use: "button · input · dropdown · popup · card · panel · modal · drawer" },
   { px: null, className: "rounded-full", use: "pill · small tag · avatar · status dot" },
 ] as const;
 
 /* ─────────────────────────────────────────────────────────────────────────
- * §4.1 Spacing — ✅ FROZEN Q1 = Candidate A, 8 steps (Jess, 2026-07-28).
+ * §4.1 Spacing — Q1 = Candidate A's 8 steps (Jess, 2026-07-28), plus the two
+ * side paddings the v4 kit names (10 and 14, owner instruction 9 Oct 2026).
  *
  * `tailwind` is the numeric class suffix, because that is the thing a source
  * scan can check: `p-1.5` is 6px. `kit-source.test.ts` reads this record, so
@@ -132,9 +135,11 @@ export interface SpacingStep {
 export const SPACING_SCALE: readonly SpacingStep[] = [
   { px: 2, tailwind: "0.5", use: "hairline nudge (pill y-padding)" },
   { px: 4, tailwind: "1", use: "touching" },
-  { px: 6, tailwind: "1.5", use: "icon-to-text gap — most used" },
+  { px: 6, tailwind: "1.5", use: "icon-to-text gap · popup padding" },
   { px: 8, tailwind: "2", use: "inside a control" },
+  { px: 10, tailwind: "2.5", use: "v4 control, chip and menu item side (01 §3)" },
   { px: 12, tailwind: "3", use: "standard gap" },
+  { px: 14, tailwind: "3.5", use: "v4 card and table cell side (01 §3 · §5)" },
   { px: 16, tailwind: "4", use: "dense card padding · table cell x-pad" },
   { px: 24, tailwind: "6", use: "between blocks · card padding" },
   { px: 32, tailwind: "8", use: "between major regions" },
@@ -148,7 +153,9 @@ export type IconSize = 14 | 16 | 18;
 export const ICON_SIZES: readonly IconSize[] = [14, 16, 18];
 
 /**
- * Lucide's own default, and now the law (Q4, Jess 2026-07-28). `Icon` has no
- * `strokeWidth` prop at all, so this is the only stroke the portal can draw.
+ * The retired Lucide stroke (Q4, Jess 2026-07-28), kept only as the record `/ui`
+ * prints. `Icon` now draws Material Symbols Rounded at weight 300 through
+ * `MIcon` (01 §3), which has no stroke at all. The three `IconSize` props map
+ * to glyph sizes 16 / 18 / 20 inside `Icon`.
  */
 export const ICON_STROKE = 2;
