@@ -51,7 +51,8 @@ another 3PL or a future Carres-operated warehouse.
 | exact Unit promised, reservation and release decision | Sales Order |
 | journey, carrier handover and proof | Delivery |
 | customer problem after delivery | Service Case |
-| invoice, settlement, payment and valuation | Finance |
+| customer invoices, receipts and collection | Payment |
+| supplier invoices, settlement, money out and valuation | Finance |
 | material adjustment, write-off and major dispute approval | Stock Adjustment Approver |
 
 Purchasing explains why Carres obtained the Unit. Stock explains where it is now. A consequence
@@ -195,8 +196,11 @@ Dealer customer assets do not enter the Carres stock balance. UI delivery awaits
 
 ## 4 · Availability, reservation and replenishment
 
-The Unit register is authority. Every quantity is derived from identifiable Units; no rollup,
-page or integration maintains another available quantity.
+Stock's governed register is authority. Exact-Unit goods derive quantities from identifiable
+Units; Catalog-governed quantity goods derive quantities from their counted register rows and
+Stock-owned movement history (§3). The stored identity mode determines the reader; quantity
+goods never acquire fictional Unit IDs. No rollup, page or integration maintains another
+available quantity.
 
 | Facts | Result |
 |---|---|
@@ -1589,7 +1593,7 @@ that totals must trace to physical Units. Reject 2990's signed-quantity centre, 
 ship-despite-shortage behaviour, duplicate rack/bin quantities and accounting-led Warehouse view.
 
 **RULING → KEEP + ADAPT + IMPROVE + REJECT.** Keep Carres Unit ID; adapt progressive drilldown and
-source-linked history; improve every quantity into a derived projection of exact Units; reject
+source-linked history; derive exact-Unit quantities from Units and governed quantity goods from counted Stock rows/movements under Catalog identity mode (§3); reject
 editable totals, negative Stock and a second Rack/Bin ledger.
 
 **RECOMMENDED CARRES BUSINESS FLOW →** Purchasing explains acquisition; Receiving proves the exact
@@ -2265,6 +2269,50 @@ No relevant 2990 capability is adopted because of terminology or layout alone. C
 rejects negative Stock, shortage override, duplicate quantity/rack ledgers, direct adjustment,
 instant Transfer, automatic returned-stock availability, broad external administration, and
 unmeasured pallet/license-plate/wave/labour/robotics complexity.
+
+### 12.15 Fresh Houzs receipt/count reconciliation — 9 Oct 2026
+
+**Evidence scope:** authenticated read-only Houzs Warehouse hub and Stock Take Register/object, plus Purchasing's PO/GRN objects. Reference Stock Take displayed scoped date/warehouse/assignee, line-count and net-variance summaries, while its sampled open object showed zero counted lines and the entire scope untouched. The same object exposed Blind count = No, system quantities and Fill all to system/Match/Post affordances; explanatory Register copy describes posting variance as adjustment movements. No count, fill, upload, save, post, cancel or delete action was taken. Explanation/affordance is not proof of server behavior. GRN displayed per-line source POs and rack assignments; Warehouse hub alone does not prove inventory/transfer execution. That count inspection did not cover Inventory/Transfer detail; subsequent coverage is recorded in §12.16. Adjustment detail was subsequently inspected in the bounded reconciliation below; no posting or enforcement tested.
+
+**Disposition:** ADAPT scoped snapshots, actual assignee, untouched/count distinctions and source-document drilldown. KEEP Carres §12.5 blind first exact-Unit Count, Count again, investigation and separately qualified Stock Adjustment Approver. REJECT copying a visible system answer into the first count, Fill all to system/Match-all completion, automatic variance adjustment and a second rack/bin quantity ledger. Exact-Unit and governed quantity-mode scope follow the stored Catalog identity rule; equal totals never prove traceable furniture identity. This pass adds no UI composition or permission.
+
+**Recommended completeness contract (PROPOSAL wherever new):** count summaries and Reports must state coverage alongside differences. Zero net variance with untouched scope is a partial observation, not completed count or matched stock. Explicitly observed zero differs from an unentered count. For traceable Units, explain matched/missing/unexpected/wrong-holder or condition facts against the retained snapshot; opposing discrepancies cannot cancel into a claim of no problem. Record snapshot date, actual count date, submission/actor and each later investigation/decision separately. A movement after the snapshot needs source reconciliation, not silent alteration of the expected answer. Failed source read remains unavailable rather than an empty snapshot.
+
+**Complete operating chain:** admitted scope → individually recorded blind physical pass → scope completion → revealed differences → governed Count again/investigation → source correction or qualified Adjustment decision → append-only physical consequences. Partial scope stays open; actual movement cannot be fabricated by cancelling or deleting a count. Source-linked GRN/Transfer/Outbound/Delivery evidence explains custody; the approved adjustment records an unexplained physical correction without rewriting those original events. Warehouse/Stock owns this chain; Finance consumes the governed month-end/result version, not the reference's provisional valuation or a new direct adjustment feed. Shared Tasks and exports read the same source scope/results.
+
+**Acceptance owed:** untouched versus explicit zero; equal aggregate but wrong exact Unit; offsetting found/lost scope; partial/failed scan; post-snapshot movement; denied ordinary adjustment; qualified investigation/approval; repeated or interrupted posting; protected first blind pass; preserved count/recount/decision lineage and source-consistent Reports. Existing approved §12.5/§12.10 gates remain controlling. These requirements are not implementation or production acceptance evidence; the full current Stock blueprint approval is neither reopened nor converted into build proof.
+
+### 12.16 Fresh Houzs inventory/transfer adaptation — 9 Oct 2026
+
+**Authenticated rendered evidence, no source mutation:** Inventory Balances renders owned/consignment quantities, incoming/scheduled/available/unscheduled/spare/age and economic fields, category/warehouse/as-of controls, and Balances/Batches/Reservations/Warehouses/Analytics tabs. A sampled Stock Card renders per-warehouse balance and dated IN/OUT/ADJUSTMENT movements, source document, running balance, reason and notes; it explicitly warns search covers loaded rows only. Some derived availability/spare entries are negative. These rendered planning numbers do not prove physical negative stock or any actual shortage override. Batches/Reservations/Analytics and as-of recalculation were not exercised.
+
+The Transfer Register states create-time posting and cancel-time reversal. A sampled confirmed Transfer object shows created/posted timestamps, disabled From/To/date fields, SKU quantities, notes and Edit/History/Cancel/Print doors. The Stock Card shows paired Transfer IN/OUT and document-linked cancellation adjustment rows. These are recorded historical projections, not a controlled write test or proof of physical handover. No transfer, edit, cancel, reservation, export, valuation or adjustment was performed.
+
+**KEEP / ADAPT / REJECT:** adapt per-Site/source-document drilldown and explicit dated history into the existing Inventory/Unit source. Keep §12.1 exact-Unit/quantity authority, §12.3 eligibility/reservation and §12.7 actual origin/carrier/destination events. Reject copying immediate location transfer, cancellation-based physical restoration, signed-quantity permission or a second Stock Card ledger. For traceable furniture, a SKU total cannot replace Unit identity/condition/holder; governed interchangeable quantity goods remain counted under their stored mode. Stock and forecast availability are separate concepts; a planned shortfall signals a source obligation, not permission to ship absent goods. Finance retains valuation ownership and field access; observing cost in Houzs grants no Carres economic-field right.
+
+**Recommended provenance/coverage contract — PROPOSAL where extending approved law:** every reported stock amount/availability states its identity mode, actual Site/holder/ownership and relevant source/effective date. Current physical inventory, historic as-of stock and future demand/supply are separately scoped readings. A historical view requires reproducible source events/snapshots and coverage; it cannot project today's reservation or master-data change backwards as though it existed then. Incomplete loaded-row search and missing/failing source must remain explicit. Derived totals reconcile to exact Units or admitted quantity movements; no independent balance writer.
+
+**Transfer continuation and failure contract:** use the approved §12.7 request → origin handover → carrier acceptance/holding → destination receipt per actual goods scope. Partial collection/arrival keeps unmatched goods at their evidenced holder and leaves remaining source work open. Correct a mistake through the governing source event/history and downstream guards; cancellation after physical handover cannot restore origin custody by arithmetic. Missing or conflicting receiving evidence creates investigation, not invented arrival. Duplicate/retried/uncertain handovers reconcile recorded effects before another write. An SO reference typed in a transfer note is not a governed reservation link; preserve exact source identity and explicit SO-line bindings.
+
+**Acceptance owed:** per-Site and whole-scope totals agree with admitted Unit/quantity provenance; historic versus current/forecast views state actual coverage; negative planning demand never authorises missing physical goods; identical SKUs with different Unit/source/ownership remain distinct; partial/in-transit/received transfer facts preserve each holder; cancellation never teleports dispatched goods; retried handovers do not duplicate movement; failed history/source read is not zero stock. Source-linked reports/export remain read-only and permission-scoped. These are blueprint requirements, not current implementation/production proof. Existing approved navigation and physical laws remain unchanged.
+
+**Fresh Houzs Adjustment reconciliation — read-only, 9 Oct 2026.** Loaded Stock Adjustments register shows warehouse/date/net quantity, per-record reason/notes/performer and thirty-day aggregates. Sample `HC-SA-2610-002` full object shows warehouse, actual performer, created time and one SKU signed-quantity line with Sample reason/note; History/Edit doors visible but not opened. Historical register notes describe truncated-code duplicate corrections, without a controlled test. No new adjustment, edit, approval, posting or history change performed; absence of approval evidence on this read is not proof the foreign server lacks controls.
+
+**KEEP provenance; REJECT direct correction as a general movement door.** Carres §12.5 blind count/investigation/qualified Stock Adjustment Approver remains controlling. Before requesting an adjustment, identify whether the discrepancy is a source error, a real transfer/sample dispatch/return, damaged goods or an unexplained physical difference. Known actual movement uses its existing owning source and custody facts; a Sample label or signed quantity does not replace dispatch/recipient evidence. An imported/truncated-code duplicate requires governed Catalog/source identity reconciliation before any physical correction; similar names alone never prove two records represent the same goods.
+
+**Recommended source/result acceptance — PROPOSAL where extending law:** adjustment request carries exact Unit or governed quantity-mode scope, actual Site/holder, count/investigation evidence, reason and proposed effect; approval records its qualified actor/version independently of recorder. Recheck reservations, downstream movements and concurrent source changes before applying the approved effect once. Unknown or stale sources block that effect with a named reason. Retain original receipt/movement/count history and exact adjustment lineage; cancellation or retry never restores physical custody or deletes evidence. Counts, losses and samples are distinct report populations; net zero cannot conceal offsetting discrepancies, missing performer remains missing and no recorded loss cannot prove perfect stock. Finance reads the accepted source/version under its valuation law; no inferred amount or duplicate total.
+
+This closes bounded Adjustment object comparison only. Inventory reservation/batch/analytics were subsequently read in the bounded comparison below; existing Carres reservation/identity law continues. No approval right, sample-outbound business policy, UI composition or automatic adjustment adopted.
+
+**Fresh Houzs Reservations/Batches/Analytics reconciliation — read-only, 9 Oct 2026.** All three Inventory views loaded before observation. Reservations describes MRP allocation of on-hand lots to SOs, with assigned/free, warehouse/batch/quantity and reserved-since facts; it labels free goods dead-stock candidates. Batches groups PO/warehouse/supplier/component/module/received-age and explicitly limits assembly/search to up to 1,000 loaded lot rows. Analytics exposes period choices, received-date ageing, sales-value ABC, annualised turnover/days-on-hand and a separate no-sale-window dead-stock definition. No allocation, release, stock change, export or metric calculation tested; foreign figures, thresholds and lot identities are not copied.
+
+**Disposition and complete reader journey:** KEEP Carres §4/§12.3 source-SO-line ownership and automatic usable receipt reservation only on approved explicit lineage. ADAPT opening an existing Unit/quantity source to see exact assigned SO line, allocation quantity, actual Site/holder and reservation event; an MRP suggestion or aggregate assignment label is not a persisted Carres binding. Warehouse problem reporting preserves reservation until the authorised source changes it. Partial receipt reserves accepted usable goods only; wrong/damaged/extra remain governed exceptions. No generic lot auto-allocation or release writer is introduced.
+
+ADAPT batch/source drilldown as a read-only grouping, not new stock identity: PO can span multiple receipt dates and Units/configurations/holders; grouping must preserve each original receipt and exact goods. A batch-age label cannot become an item's receipt date when its sources differ. Incomplete lot loading discloses its coverage and cannot prove total warehouse scope. Traceable furniture remains exact Unit; quantity-mode batches do not acquire invented Unit IDs.
+
+ADAPT useful ageing/turnover/ABC analysis through existing central Reports and Stock/Finance definitions. Distinguish free-to-allocate, no recent recorded sale, inactive product and approved disposal; these are different facts. Reject the reference assumption that all unassigned goods are abnormal: Carres has authorised Ready Stock and showroom inventory. Missing sales history/receipt date/cost is incomplete coverage, not “never sold”, age zero or value zero. No reference ninety-day threshold, ABC split or turnover formula becomes Carres policy without its source/period/numerator/denominator/ownership/access contract. Finance owns valuation; operational status never authorises discount/write-off.
+
+**Recommended acceptance / PROPOSAL where new:** two same-SKU SO lines remain distinctly allocated; a partial or failed source read cannot free goods; batch totals reconcile to underlying source identities within declared coverage; transfers do not reset original receipt-age by guess; analytics discloses absent history/zero denominators and links its exact filtered records; the same definition is used by module summary and central report. Repeated refresh writes nothing; actual reservation correction uses the owning SO/Stock door. These are Blueprint contracts, not passed server or production tests.
 
 ## 13 · Implementation evidence and remaining limits
 

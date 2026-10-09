@@ -67,6 +67,33 @@ against a real session.
   editor. No module Settings surface keeps another approver list or rota. The Shared Duty Resolver
   defined by ERP Architecture Law F.1 is the only reader exposed to pages and Work.
 
+### Houzs people-control adaptation — review draft, 9 October 2026
+
+Source evidence: existing `25-MODULE-DESIGN-WORKLIST.md`, Houzs Team comparison and additional read-only Directory/Title/Bulk observations. This section records coverage and proposals, not approval, implementation or tested permission enforcement. Existing §2 account/position laws and §3 privacy/departure rules prevail.
+
+| Reference capability | Current Carres boundary | Missing adaptation / verification |
+|---|---|---|
+| Directory and attention filters | §2 Team creates accounts; §3 People owns employment/access | PROPOSAL: current staff, invitation pending, never logged in and disabled attention views with explicitly scoped counts. Login does not prove attendance. Former-profile access remains restricted. Verify current fields/filters before adding anything. |
+| Invite member, resend and bulk onboarding | Existing Team is the sole internal account writer | PROPOSAL: one authorised onboarding door with company/department/position/reporting assignment and no-access initial qualification. Bulk invalid/duplicate input, partial results, delivery and effective access require verification; no invite/password/import is authorised by this draft. |
+| Departments and leads | Existing organisation registry under §2 | PROPOSAL: distinguish configured lead from derived reporting lead; headcount targets are not Duty or approval rights. Rename/reassign/archive effects and historical references need verification. Do not copy Houzs departments or personnel. |
+| Titles and organisation chart | §2 position-based permissions; one People identity | PROPOSAL: department-scoped title maintenance and read-only hierarchy from existing assignments. Chart editing must use the same writer; member reassignment before title removal and historical retention need review. Outsourced-team exclusion is not adopted. |
+| Roles, title policy and action permissions | §2 position/duty gates; ERP Law F/F.1 | PROPOSAL: inspectable resource/action matrix, page visibility separated from approval and Settings delegation. Preserve governed position/duty qualification; do not import Houzs role grants or an extra permission resolver. Denied direct API access and post-change enforcement remain unverified. |
+| Profile, activity and offboarding | §3 sensitive reveal/audit and one departure flow | KEEP existing law; verify unified account/profile identity, assignment history, effective departure and retained actors. A profile login-as control is NOT adopted or authorised. |
+
+**Recommended people-control journey — PROPOSAL; existing approved laws remain controlling.** The current registry/account laws solve identity and access ownership; the reference demonstrates useful organisation and onboarding controls, but merely listing them leaves the failure and handoff journey unspecified. Adapt them through the existing Team/People writers, paying the cost of explicit validation and attempt history to avoid duplicate employees and false invitation completion. Reject any proposed addition already fulfilled by an evidenced existing workflow.
+
+| Journey | Recommended normal result | Exception / downstream boundary and acceptance |
+|---|---|---|
+| Find staff | Read one People/account identity, permitted company/department/position/reporting assignments and distinct employment/access facts; counts identify their population | Pending invitation, never-login, recorded absence and departed employment are different facts. Incomplete/failed searches remain explicit. Verify count/filter scope and denied former-profile/detail reads; reference counts are not Carres headcount |
+| Single or bulk onboarding | Qualified account manager validates identity and assignments before the one Team writer creates an account/invitation. Proposed preview reports invalid, duplicate, existing and eligible rows individually | Preserve per-row result/attempt; a repeated invite must not create another employee. Provider failure does not claim delivery or activation. Default qualification never imports Houzs role grants; active login does not admit joining-month PO allocation. Populated bulk validation, retry and access evidence remain owed |
+| Change organisation/position | Qualified owner changes source department/title/reporting membership; hierarchy and Directory read the same saved assignment | Invalid cross-company/reporting relationships and referenced-title removal need governed handling. A lead/title change never appoints a Duty or approver. Verify canonical re-read, permission consequences through existing gates and preserved historical actors; no new chart writer |
+| Review access | Display governed position/action/Duty/Settings qualification separately; perform changes only through their current qualified source doors | Verify denied direct API access, company scope and post-change enforcement; account/profile display is no grant. Existing token-residual law remains explicit, not silently replaced with immediate revocation claims |
+| Absence and departure | People supplies eligible identity and effective departure; Workspace owns Leave/availability, assignment/cover and stable monthly rota. Existing one departure flow coordinates due access and handover effects | Future departure preserves current access until the governed effective date; partial failure retains unfinished effects. PO-only next-month admission, ordinary help and GRN distinction remain approved. Zero eligible staff stays unassigned without pausing deadlines or granting approval |
+
+Daily operator use is current staff discovery and source-qualified action; personnel managers reconcile failed invitations/assignment/departure effects. Ordinary task recipients continue the same Tasks with their current qualified cover. Directory exports, company-wide profiles, sensitive reveals and any bulk operations require existing scoped permission; no reference export or impersonation affordance creates a Carres right. Save/source re-read, invitation delivery, actual account access and Work routing are separate completion evidence. Team placement remains unresolved; this lifecycle adds no UI composition or new navigation.
+
+Mailbox ownership/provisioning, system health, notifications and integrations belong to ERP Architecture's system-control adaptation; HR supplies identities and memberships only. Team navigation placement remains undecided. These proposals do not block Outright and do not commission UI/code.
+
 # §3 · People — one record per CR-coded human
 
 ### FROZEN RULES
@@ -141,6 +168,18 @@ against a real session.
   so the count could never reach zero and the badge stopped meaning anything. **The rule moved
   into the database.**
 
+### Commission reference reconciliation and complete journey — review draft, 9 Oct 2026
+
+**Fresh Houzs observation:** authenticated Commission shows a date range, live open-period calculation wording, payout-history revision/status/people/total/closed-by/reopened columns and disabled Close/Export in the observed no-profile state. HR Settings renders staff/tier/showroom membership, commission/KPI thresholds, showroom-versus-chain override explanations and product/category/fabric/special item-KPI setup. No staff assignment, rate change, calculation, close, reopen or export was performed; no payout or enforcement is proven.
+
+**KEEP / ADAPT / REJECT:** keep Carres's approved one engine, four-check preflight, frozen closed lines, open-month adjustments and guarded backdating. Adapt explicit missing-configuration and period-history explanations where the current workflow lacks them. Reject copying Houzs commission percentages, payout amounts, tiers, item bonuses or manager override modes as Carres policy. In particular, Houzs's showroom/chain selector does not solve Carres §5's missing manager-duty/store dimensions; the Carres manager rollup remains off under its existing law.
+
+**Recommended complete journey (PROPOSAL wherever it extends the frozen law):** the qualified HR owner establishes source-linked employee/eligible seller identity and approved effective rates; an authorised reader chooses an admitted period and reviews the shared calculation, source coverage and missing inputs. Ordinary corrections return to their owner (Sales attribution, Payment/Finance facts or HR rates), never a second commission ledger. Run the existing four-check preflight before freezing: actual preflight predicates come from the existing engine/authority and must be inspected, not replaced with invented checks. A successful close preserves the exact computed lines and applicable source/rate version evidence; later reports read those frozen lines. Authorised adjustments attach to an open month with their origin pointer; no history rewrite or new reopen/payout right follows from the reference's history columns.
+
+**Exceptions and handoffs:** no configured profile/rate, unresolved source coverage, changed data during review, failed/duplicate close and denied access must remain explicit and must not announce a paid or frozen period. Reconcile recorded close outcome after an uncertain response before attempting it again. Missing configuration is not proven zero entitlement. HR determines its approved commission result; any actual money-out remains Finance-owned and independently evidenced. People cost and performance retain their separate §5/§6 arithmetic and coverage boundaries; statutory payroll remains excluded.
+
+**Evidence needed:** authorised/denied period reads and close; actual four-check predicates; preview-versus-frozen equality; changed effective configuration leaves a closed statement unchanged; open-month adjustment origin retained; interrupted/duplicate close produces no duplicate freeze; source coverage and report/export totals reconcile. These are blueprint acceptance requirements, not tests run in this pass. Complete HR policy/domain verification remains open.
+
 # §5 · Targets and the scoreboard
 
 ### FROZEN RULES
@@ -167,6 +206,21 @@ against a real session.
 - **HQ cost is NEVER allocated across stores.** There is no allocation function.
 
 ---
+
+### Targets and People cost operating journey — consolidated review draft, 9 Oct 2026
+
+This completes the operating coverage of §§5–6 alongside the Commission journey in §4. **Existing frozen calculation laws remain authority; additional review/error/history requirements are recommendations, not new HR policy or implementation proof.** Houzs KPI/profile configuration is reference evidence only, not Carres target rates, scopes or payroll rules.
+
+1. **Prepare the owning inputs.** Qualified editors maintain admitted person/store targets and effective personnel cost inputs through their existing source. People owns employee identity, join/departure and actual eligibility; Sales owns attributed revenue; HR owns approved target/cost configuration. Do not fabricate a store or dealer owner to fill a missing dimension. Approved join-date pro-rating cannot be computed from an unknown join date.
+2. **Choose the period and scope.** The authorised reader selects an admitted person/store and period, sees source coverage and observation time, then reads the one shared sold computation. Closed commission statements still use frozen lines; a target scoreboard is not commission, money paid or entitlement approval. Missing target, absent attribution, unavailable source and genuine zero sales are separate outcomes.
+3. **Review performance.** Compare only the same governed scope, period and definition. Manager rollup remains off until its required duty/store sources exist; no team/chain approximation. A source-linked drilldown explains included sales and exclusions without multiplying an order through its goods, payments or deliveries. Activity checks and Saturday contact coverage are not attendance or performance findings.
+4. **Review cost.** Show fixed and commission costs separately, preserve the existing in-progress cost/revenue withholding and never allocate HQ cost to stores. Dealer/BD revenue uses its own enrolled-owner source when admitted; showroom revenue cannot substitute. Unknown cost/configuration is not zero cost or a proven profitable period. Finance owns actual payout and accounting treatment.
+5. **Correct at source and re-read.** Wrong attribution returns to Sales under existing closed-period guards; wrong personnel inputs return to People/HR; actual payment returns to Finance. Qualified configuration correction must respect approved effective treatment and closed Commission freezes. A refreshed scoreboard/cost report reads the corrected owning result, with no manual total or competing calculation. Where historical target/configuration treatment is not governed, retain that as a review gap rather than assume retroactivity.
+6. **Share the permitted result.** Reports/module summaries consume these same definitions, scope and coverage; source-specific access protects personnel economic fields. New exports, ranking, manager aggregation or automated HR decisions require their own admitted contract. Viewing or exporting a report never closes Commission or proves payout.
+
+**Settings and completion:** targets use the admitted person/store scope; cost uses approved personnel inputs and eligibility facts; Commission configuration remains §4-owned. Source re-read proves a saved permitted input, not full downstream acceptance. Failed/stale writes preserve operator input and must not announce saved figures; uncertain responses require reconciliation before retry. Effective dating already approved in §7 must be implemented through the owning source, not a new Workspace or Reports configuration copy.
+
+**Acceptance owed:** same sold source for open/closed periods; source drilldown reconciles totals; missing target/rate/join date is explicit; denied personnel cost access leaks no counts/amounts; unenrolled BD remains distinct from zero; in-progress ratio remains withheld; HQ cost unallocated; fixed and commission cost remain separate; closed Commission unchanged by later configuration; permitted source correction updates the same report definition. No calculation, save, close, export or production test was performed in this document pass. Exact new metric/target-history policies remain review decisions; existing frozen laws are not reopened.
 
 # §7 · Approved Evolution
 

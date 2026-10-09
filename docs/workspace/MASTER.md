@@ -647,7 +647,7 @@ effective departures. Operational cover is separate from evidence review and pay
 Keep normal responsibility, effective assignment and actual helper as distinct recorded facts,
 using the existing single `Assigned to` presentation. Return does not silently bounce work back.
 
-**Saturday on-call coverage is separate.** Staff & Duties governs rotating Saturday customer/driver/
+**Saturday on-call coverage is separate — owner clarification 9 October 2026.** Staff & Duties governs rotating Saturday customer/driver/
 Warehouse/Delivery contact support, default **9:00 AM–6:00 PM**, authorised-editable, with qualified
 cover. Record issues and their next accountable work. This does not make Saturday an ordinary
 Office workday, override source calendars, transfer all Delivery work, or grant money/approval
@@ -2474,7 +2474,7 @@ are fixtures, and production keeps the current page until each admitted projecti
 | Delivery · `check_delivery_proof` | Latest delivery file is unreviewed · governed review result | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | 1 delivery working day after delivery | Review newer than latest file exists |
 | Delivery · `failed_delivery_next_step` | Failed Delivery has no recorded next step · named recovery fact | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | Same Delivery working day | Named next fact exists · delivery planning continues |
 | Delivery · `collect_loan_item` | Loan item remains out on delivery day · returned evidence | Current Work assignment, initially Sales Order PIC; Delivery Duty fallback only when no PIC | Delivery day | Loan row is returned |
-| Payment · `payment.collect_customer_balance` / `payment.missed_promise` | Issued Invoice remains owing when collection is actionable · payment obtained | Stable Collection Owner; active cover acts | Collection deadline or customer's promised day | Atomic allocations reduce Invoice/order outstanding to RM 0 |
+| Payment · `payment.collect_customer_balance` / `payment.missed_promise` | SO goods balance remains owing when Payment collection is actionable; a closing Sales Invoice is not a prerequisite (Payment §2, owner 25 Sep) | Stable Collection Owner; active cover acts | Payment-owned collection deadline or customer promise; unresolved clock-start reconciliation stays explicit | Canonical posted/allocated payment reduces the applicable SO goods balance to RM 0; closing Invoice automation and independent hold/Storage obligations remain separate |
 | Payment · `payment.send_storage_invoice` | Live Storage Invoice remains unpaid · invoice sent and money collected | Stable Collection Owner | Shared collection deadline, else `No date` | Live storage owing is RM 0 |
 | Payment · `payment.review_overpayment` | Money exceeds live obligations · allocation or approved refund decision | Payment Approver Duty | Governed `No date` | Overpaid amount is RM 0 or approved refund covers it |
 | Payment/Stock · `payment.check_stored_furniture` | **Not admitted:** open storage case reached inspection interval · inspection result | Warehouse capability/owner rule; admission waits for a governed person resolution | Last check/storage start + configured interval | Due inspection recorded |
@@ -2503,6 +2503,24 @@ and `collect` as its words on the Sales Order; none of them opens a Work item �
 window card, the calculated PO Delivery Date is not a supplier confirmation (Purchasing §5.7), and
 collection is Payment's. A module action not listed here is excluded until it passes §6.
 
+### 6.1.1 · Source occurrence and completion reconciliation — 9 October 2026
+
+**Blueprint contract clarification / runtime proof still owed.** Read §§2, 5.2.1, 5.6, 6.1 and §10 against the current module boundaries. The catalogue already supplies rule keys, owner rules, due law and closure facts; numbered demonstration tasks are not missing business rules or durable occurrence IDs. The remaining contract-v2 transport/projector gaps are stated in §5.2.1. The source-specific identity scopes below prevent an order-level shortcut from closing unrelated work; exact persisted encoding remains the owning projector's implementation contract, not a new Workspace API.
+
+| Existing source family | Occurrence scope and re-evaluation | Completion boundary |
+|---|---|---|
+| Purchasing PO window / send | Source window stamp and current issued PO versions; shared demand/PO counted once under §6.2. Re-read demand and send facts after issue/amendment | Issue alone does not finish buying-and-sending. No eligible demand remains and every applicable current version has actual send evidence |
+| Supplier arrival / day-before / balance | Exact PO goods line and split batch's effective dated promise; accepted receipt reduces only that batch's outstanding scope. A changed answer re-evaluates date-specific work without erasing prior late history | Required evidenced answer closes answer work; it does not prove receipt. Short balance and later split batch retain their own obligation |
+| Receiving / physical Outbound | Actual receipt/session or exact handover scope and goods identity mode; not a passed supplier date or generic SO status. Receiving, supplier chase and Claim remain different required results | Source-owned accepted posting/handover evidence covers only the actual goods. Retry or partial result cannot post twice or complete the unreceived remainder; unadmitted Outbound ownership stays a visible admission gap |
+| Delivery arrangement / attempt / proof | Arrangement uses its governed delivery scope; actual result/proof uses the exact DO/leg/visit and latest source evidence version. Later visits and replacement uploads remain distinguishable | Booking is not delivery; result is not uploaded proof; upload is not accepted proof review. Closing one visit's action cannot close another visit or a later return's warehouse obligation |
+| Payment collection / storage / exception | SO-keyed goods balance and canonical payment/source allocations under the one order Collection Owner; closing Sales Invoice is not a collection prerequisite. Exact issued storage papers remain distinguishable from goods balance. Finance exception keeps its independent source identity | Sent invoice/message and promise do not settle money. Allocated outstanding reaching zero closes the applicable collection obligation; cleared hold re-evaluates dispatch but cannot settle an Invoice, and RM0 cannot clear an unknown/open hold |
+| Claims / PR / RO | Exact source document/action, current send version and affected goods/consent/return scope under §6.1. Use existing physical-work occurrences for shared handover/receipt | Supplier answer is not actual returned goods or applied credit. Partial consent/return covers only named goods; financial continuation stays with its own owner |
+| Issue / Service / customer handoff | Issue uses its versioned action occurrence. Case/customer context links the owning action; no second customer-service task or duplicate generated Issue task | Actual governed result completes/replaces the Issue occurrence. Service remains unadmitted until its routine owner and derived clocks are governed; approval qualification cannot substitute for a routine owner |
+
+Across every family, source cancellation, replacement and correction need their owning valid result and retained reason/version. Disappearance from a filtered or failed feed is not completion. Normal owner, qualified Cover and actual actor remain distinct; ordinary help does not grant approval. Preserve business deadline versus actor working date and original lateness; no global fallback calendar or Saturday bulk reassignment. Direct object doors and source permission checks remain required even where an embedded interaction is unavailable.
+
+Acceptance must reconcile source and Tasks for split/partial goods, current versus obsolete version, concurrent correction, same-event retry, evidence replacement, absent owner/qualified cover, failed source and denied direct access. These cases are unexecuted here. This is document coverage for the first-order action chain, not admission or production proof.
+
 ### 6.2 · The PO window card — BUILT, awaiting owner review (not live)
 
 Purchasing §5.6.1 owns the window law and the one arithmetic (`poWindowFor`); the SO Batch read
@@ -2527,8 +2545,7 @@ Batch's `?window=` scope read that stamp. Workspace decides the composition (han
   showing an empty day.
 - **Open review points (not law).** The embedded send area keeps its own heading
   (`{PO} · PO V1 · Sending not confirmed`) inside the card — a shared-component wording question for
-  Purchasing. Purchasing Settings has storage (0585) for the window times and supplier cut-offs but
-  no editing screen yet; until one ships, the windows stay 11:30 AM and 4:00 PM.
+  Purchasing. Purchasing Settings has storage (0585); the window-times editor is recorded BUILT 2026-09-28 in the constitution, with production persistence/owner walk not proved by this document pass. Supplier earlier cut-off still has no screen. Read the current effective source; 11:30 AM and 4:00 PM are defaults, not substitutes for an unavailable or edited setting.
 
 ## 7 · Right Rail and Notifications
 
@@ -2810,8 +2827,9 @@ honest Work for admitted modules.
   #1259 preserve canonical Paid/Outstanding arithmetic while showing saved at-sale method,
   reference and slip as independent evidence. An absent individual transaction row does not prove
   that the customer never paid and does not authorise Workspace to infer a corrected amount.
-  Collection Work continues to project only from Payment's complete issued-Invoice truth and one
-  atomic outstanding calculation; saved evidence, an empty transaction list or the Sales Order
+  This dated reader evidence predates Payment §2’s 25 September SO-keyed collection ruling;
+  the issued-Invoice projection is historical implementation evidence, not the current target.
+  Collection Work must consume Payment’s one canonical outstanding source; saved evidence, an empty transaction list or the Sales Order
   reader may never generate a duplicate collection action. Warehouse/Delivery exact-Unit work uses
   recorded provenance; the Sales Orders `verifiedUnitIds` reader is evidence for display, not a new
   Unit assignment or Work source.
@@ -2934,7 +2952,7 @@ honest Work for admitted modules.
   result/proof act belongs; the server supplies the Delivery editor/DO door. Ownership of the
   business fact remains with Delivery while responsibility for the action resolves to the linked
   the current recorded Work assignment, initially Sales Order PIC, with Delivery Duty only when that order has no PIC.
-- Payment collection now enters from the complete issued-Invoice register, not a second Sales Order
+- **Historical implementation / superseded target:** this invoice-keyed projector predates Payment §2’s 25 September SO-keyed collection ruling. Its exact Invoice door and invoice-issue snapshot below are measured legacy behavior, not admission requirements for the current SO collection target. Source clock-start and route migration still require Payment-owned reconciliation; do not invent a replacement date or API. Payment collection in this measured implementation enters from the complete issued-Invoice register, not a second Sales Order
   balance calculation. The shared readiness and collection clock admit only due/late balances whose
   goods are ready or have a real arrival date; the order's ONE collection owner — the Responsible
   Delivery Operation, read through the one shared authority `delivery_responsible_operation`
