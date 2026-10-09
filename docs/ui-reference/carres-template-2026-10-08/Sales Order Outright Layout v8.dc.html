@@ -354,27 +354,19 @@
               
             </sc-if>
             <sc-if value="{{ dt.tRoute }}">
-              <section aria-label="Order status" style="background:#FFFFFF;border:1px solid #E9EBEE;border-radius:8px;padding:16px 18px;display:flex;flex-direction:column;gap:12px">
-                <div style="display:flex;align-items:center;gap:10px 12px;flex-wrap:wrap">
-                  <div style="display:flex;flex-direction:column;gap:2px;min-width:180px">
-                    <span style="font-size:12px;font-weight:500;color:#6B7178">Customer original delivery date</span>
-                    <sc-if value="{{ dt.rt.top.noPp }}"><span style="font-size:20px;font-weight:600;color:#221F20">{{ dt.rt.top.req }}</span></sc-if>
-                  </div>
-                  <sc-if value="{{ dt.rt.top.hasConf }}"><span style="display:flex;align-items:center;color:#A0A6AE;padding-top:14px"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:20px;font-style:normal">arrow_forward</i></span>
-                  <div style="display:flex;flex-direction:column;gap:2px;min-width:180px">
-                    <span style="font-size:12px;font-weight:500;color:#6B7178">Customer confirmed delivery date</span>
-                    <span style="font-size:20px;font-weight:600;color:#221F20">{{ dt.rt.top.confTxt }}</span>
-                    <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="background:{{ dt.rt.top.confBg }};color:{{ dt.rt.top.confFg }};border-radius:999px;padding:1px 8px;font-size:11px;font-weight:600;white-space:nowrap">{{ dt.rt.top.confNote }}</span><span style="font-size:12px;color:#8A9099">{{ dt.rt.top.confBy }}</span></span>
-                  </div></sc-if>
-                  <sc-if value="{{ dt.rt.top.noConf }}"><div style="display:flex;flex-direction:column;gap:2px;min-width:160px;padding-left:12px;border-left:1px solid #EEECE8"><span style="font-size:12px;font-weight:500;color:#6B7178">Customer confirmed delivery date</span><span style="font-size:14px;font-weight:500;color:#8A9099">Not confirmed yet</span></div></sc-if>
-                  <div style="display:none">
-                    <sc-if value="{{ dt.rt.top.hasPp }}"><span style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px"><span style="font-size:20px;font-weight:600;color:#221F20">{{ dt.rt.top.mon }}</span><span style="font-size:12px;font-weight:600;color:#7A5A00;background:#FBF0D6;border-radius:999px;padding:2px 8px;white-space:nowrap">Postponed by customer</span></span><span style="font-size:12px;color:#6B7178">{{ dt.rt.top.orig }}</span></sc-if>
-                  </div>
-                  <span style="background:{{ dt.rt.top.leftBg }};color:{{ dt.rt.top.leftFg }};border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;white-space:nowrap">{{ dt.rt.top.left }}</span>
-                  <span style="background:{{ dt.rt.probBg }};color:{{ dt.rt.probFg }};border-radius:999px;padding:3px 10px 3px 7px;font-size:12px;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;gap:4px"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:15px;line-height:1;font-style:normal">{{ dt.rt.probIc }}</i>{{ dt.rt.probTxt }}</span>
-                  <div role="tablist" aria-label="View" style="margin-left:auto;display:flex;gap:2px;background:#F5F3F0;border-radius:999px;padding:3px">
+              <section aria-label="Order status" style="background:#FFFFFF;border:1px solid #E9EBEE;border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:15px;font-weight:600;flex:1">Delivery date</span>
+                  <div role="tablist" aria-label="View" style="flex:none;display:flex;gap:2px;background:#F5F3F0;border-radius:999px;padding:3px">
                     <sc-for list="{{ dt.rt.views }}" as="v" hint-placeholder-count="4"><button role="tab" aria-selected="{{ v.on }}" onClick="{{ v.pick }}" style="border:0;border-radius:8px;padding:4px 12px;font:inherit;font-size:12px;font-weight:{{ v.fw }};background:{{ v.bg }};color:{{ v.fg }};cursor:pointer">{{ v.l }}</button></sc-for>
                   </div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 16px;border-top:1px solid {{ th.rowLine }};padding-top:8px">
+                  <span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:12px;color:#6B7178">Customer original delivery date</span><span style="font-size:13px;font-weight:500;color:#221F20;overflow-wrap:anywhere">{{ dt.rt.top.req }}</span></span>
+                  <sc-if value="{{ dt.rt.top.hasConf }}"><span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:12px;color:#6B7178">Customer confirmed delivery date</span><span style="font-size:13px;font-weight:500;color:#221F20;overflow-wrap:anywhere">{{ dt.rt.top.confTxt }}</span><span style="font-size:12px;color:#8A9099">{{ dt.rt.top.confNote }} · {{ dt.rt.top.confBy }}</span></span></sc-if>
+                  <sc-if value="{{ dt.rt.top.noConf }}"><span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:12px;color:#6B7178">Customer confirmed delivery date</span><span style="font-size:13px;font-weight:500;color:#8A9099">Not confirmed yet</span></span></sc-if>
+                  <span style="display:flex;flex-direction:column;gap:2px;min-width:0;align-items:flex-start"><span style="font-size:12px;color:#6B7178">Days left</span><span style="background:{{ dt.rt.top.leftBg }};color:{{ dt.rt.top.leftFg }};border-radius:999px;padding:1px 8px;font-size:12px;font-weight:500;white-space:nowrap">{{ dt.rt.top.left }}</span></span>
+                  <span style="display:flex;flex-direction:column;gap:2px;min-width:0;align-items:flex-start"><span style="font-size:12px;color:#6B7178">Status</span><span style="background:{{ dt.rt.probBg }};color:{{ dt.rt.probFg }};border-radius:999px;padding:1px 8px 1px 6px;font-size:12px;font-weight:500;white-space:nowrap;display:inline-flex;align-items:center;gap:4px"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:14px;line-height:1;font-style:normal">{{ dt.rt.probIc }}</i>{{ dt.rt.probTxt }}</span></span>
                 </div>
                 <sc-if value="{{ dt.rt.top.passed }}"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#FBF0D6;color:#7A5A00;border-radius:8px;padding:10px 12px"><span style="font-size:13px;font-weight:500;flex:1;min-width:200px">{{ dt.rt.top.passTxt }}</span><button onClick="{{ dt.rt.top.askLog }}" style="height:30px;border:0;border-radius:8px;background:#FFFFFF;color:#7A5A00;padding:0 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer">Log call with logistics</button></div></sc-if>
                 <sc-if value="{{ dt.rt.isOv }}">

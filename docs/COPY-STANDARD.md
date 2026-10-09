@@ -4842,6 +4842,7 @@ was read and holds nothing, a read that failed, and a record this person may not
 | Location | the Stock Location site name · **`Fully delivered`** once every piece is delivered · `Not yet` while no Unit is reserved | Customer · With customer |
 | Pay by | Payments' deadline day (amber when late) · **`Paid`** · Payments' own fact when it has no day (`No delivery date`) | a second arithmetic · `Overdue` |
 | Finance hold | **`Hold delivery`** over **`Finance hold · {reason}`** · **`No Finance hold`** | `On hold` (Stock's word) · `None` · `No Finance hold` from a failed read |
+| Order Route status card (latest owner handoff v8, 2026-10-09) | title **`Delivery date`**; facts **`Customer original delivery date`** (or **`Customer new delivery date`** with `Originally {day}`) · **`Customer confirmed delivery date`** with `Same` / `{n} days later` / `{n} days earlier` under it, else **`Not scheduled`** · **`Days left`** (`{n} days left` · `Today` · `Passed {n} days ago · not delivered` · `Delivered {day}`) · **`Status`** (`On track` · `{Goods} · problem` · `Delivered`) | `Not confirmed yet` (retired 2026-09-16) · two 20px dates with an arrow (the 2026-10-08 card) |
 
 
 ## An old version's own sentences — owner ruling 2026-09-23

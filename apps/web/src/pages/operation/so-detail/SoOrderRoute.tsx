@@ -1,10 +1,10 @@
 /**
  * ORDER ROUTE — the status card and its three views (Layout Standard §3.2,
- * owner-confirmed handoff 2026-10-08):
+ * latest owner handoff v8, 2026-10-09):
  *
- *   Customer original (or new) delivery date → Customer confirmed delivery
- *   date · Same / n days later · days left · problem pill · Overview · Steps ·
- *   Details
+ *   Delivery date                                [Overview · Steps · Details]
+ *   Customer original (or new) delivery date · Customer confirmed delivery
+ *   date (Same / n days later) · Days left · Status
  *
  *   Overview  Goods · Delivery · Payment (· Loan) cards; a card with a problem
  *             is amber and comes first.
@@ -317,67 +317,12 @@ export default function SoOrderRoute({
 
   return (
     <div className="flex flex-col gap-3" data-testid="so-order-route">
-      <Card label="Order status" testId="route-status-card" className="gap-3 !px-[18px] !py-4">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5">
-          <div className="flex min-w-[180px] flex-col gap-0.5">
-            <span className="text-[12px] font-medium text-c-secondary">
-              {postponed ? "Customer new delivery date" : "Customer original delivery date"}
-            </span>
-            <span className={`text-[20px] font-semibold leading-6 ${monitored ? "text-c-ink" : "text-c-muted"}`} data-testid="route-monitored-date">
-              {monitored ? fmtDate(monitored) : "Not recorded"}
-            </span>
-            {postponed && originalDate && <span className="text-[12px] text-c-secondary">Originally {fmtDate(originalDate)}</span>}
-          </div>
-          {confirmedDate && !deliveredDate ? (
-            <>
-              <span className="pt-3.5 text-c-muted" aria-hidden="true">
-                <MIcon name="arrow_forward" size={20} />
-              </span>
-              <div className="flex min-w-[180px] flex-col gap-0.5">
-                <span className="text-[12px] font-medium text-c-secondary">Customer confirmed delivery date</span>
-                <span className="text-[20px] font-semibold leading-6 text-c-ink" data-testid="route-confirmed-date">{fmtDate(confirmedDate)}</span>
-                <span className="flex">
-                  <CPill tone={confDiff > 0 ? "warn" : "ok"}>
-                    {confDiff > 0
-                      ? `${confDiff} ${confDiff === 1 ? "day" : "days"} later`
-                      : confDiff < 0
-                        ? `${-confDiff} ${-confDiff === 1 ? "day" : "days"} earlier`
-                        : "Same"}
-                  </CPill>
-                </span>
-              </div>
-            </>
-          ) : (
-            <div className="flex min-w-[160px] flex-col gap-0.5 border-l border-c-section-line pl-3">
-              <span className="text-[12px] font-medium text-c-secondary">Customer confirmed delivery date</span>
-              {confirmedRead === "failed" ? (
-                <span
-                  className="text-[14px] font-medium text-c-warn-fg"
-                  data-testid="route-confirmed-date"
-                  title="Could not read Delivery for this order. This does not mean nothing is arranged."
-                >
-                  Could not read
-                </span>
-              ) : (
-                <span className="text-[14px] font-medium text-c-muted" data-testid="route-confirmed-date">
-                  {confirmedRead === "loading" ? "Loading" : "Not scheduled"}
-                </span>
-              )}
-            </div>
-          )}
-          {daysPill && <CPill tone={daysPill.tone} strong>{daysPill.word}</CPill>}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full py-[3px] pl-[7px] pr-2.5 text-[12px] font-semibold ${
-              probOk ? "bg-c-ok-bg text-c-ok-fg" : "bg-c-warn-bg text-c-warn-fg"
-            }`}
-            data-testid="route-problem-pill"
-          >
-            <MIcon name={probOk ? "check_circle" : "error"} size={16} />
-            {probWord}
-          </span>
-          <span className="flex-1" />
+      {/* The status card — latest owner handoff (v8, 2026-10-09): one card
+          titled `Delivery date`, the view switch on its title row, then four
+          small facts in a row (label 12 grey over value 13/500). */}
+      <Card label="Order status" testId="route-status-card" className="gap-2">
+        <div className="flex items-center gap-2">
+          <span className="flex-1 text-[15px] font-semibold text-c-ink">Delivery date</span>
           <ViewSwitch
             label="View"
             value={view}
@@ -388,6 +333,73 @@ export default function SoOrderRoute({
               { key: "dt", label: "Details" },
             ]}
           />
+        </div>
+        {/* Each fact keeps its natural width (a pill is never cut or run into
+            its neighbour) and the row wraps on a narrow card. */}
+        <div className="flex flex-wrap gap-x-8 gap-y-2 border-t border-c-row-line pt-2">
+          <span className="flex min-w-[140px] flex-col gap-0.5">
+            <span className="text-[12px] text-c-secondary">
+              {postponed ? "Customer new delivery date" : "Customer original delivery date"}
+            </span>
+            <span className={`break-words text-[13px] font-medium ${monitored ? "text-c-ink" : "text-c-muted"}`} data-testid="route-monitored-date">
+              {monitored ? fmtDate(monitored) : "Not recorded"}
+            </span>
+            {postponed && originalDate && <span className="text-[12px] text-c-muted">Originally {fmtDate(originalDate)}</span>}
+          </span>
+          <span className="flex min-w-[140px] flex-col gap-0.5">
+            <span className="text-[12px] text-c-secondary">Customer confirmed delivery date</span>
+            {confirmedDate && !deliveredDate ? (
+              <>
+                <span className="break-words text-[13px] font-medium text-c-ink" data-testid="route-confirmed-date">{fmtDate(confirmedDate)}</span>
+                <span className="text-[12px] text-c-muted" data-testid="route-confirmed-note">
+                  {confDiff > 0
+                    ? `${confDiff} ${confDiff === 1 ? "day" : "days"} later`
+                    : confDiff < 0
+                      ? `${-confDiff} ${-confDiff === 1 ? "day" : "days"} earlier`
+                      : "Same"}
+                </span>
+              </>
+            ) : confirmedRead === "failed" ? (
+              <span
+                className="text-[13px] font-medium text-c-warn-fg"
+                data-testid="route-confirmed-date"
+                title="Could not read Delivery for this order. This does not mean nothing is arranged."
+              >
+                Could not read
+              </span>
+            ) : (
+              <span className="text-[13px] font-medium text-c-muted" data-testid="route-confirmed-date">
+                {confirmedRead === "loading" ? "Loading" : "Not scheduled"}
+              </span>
+            )}
+          </span>
+          <span className="flex min-w-0 flex-col items-start gap-0.5">
+            <span className="text-[12px] text-c-secondary">Days left</span>
+            {daysPill ? (
+              <span
+                className={`whitespace-nowrap rounded-full px-2 py-px text-[12px] font-medium ${
+                  daysPill.tone === "ok" ? "bg-c-ok-bg text-c-ok-fg" : daysPill.tone === "warn" ? "bg-c-warn-bg text-c-warn-fg" : "bg-c-info-bg text-c-ink"
+                }`}
+                data-testid="route-days-left"
+              >
+                {daysPill.word}
+              </span>
+            ) : (
+              <span className="text-[13px] font-medium text-c-muted" data-testid="route-days-left">Not recorded</span>
+            )}
+          </span>
+          <span className="flex min-w-0 flex-col items-start gap-0.5">
+            <span className="text-[12px] text-c-secondary">Status</span>
+            <span
+              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full py-px pl-1.5 pr-2 text-[12px] font-medium ${
+                probOk ? "bg-c-ok-bg text-c-ok-fg" : "bg-c-warn-bg text-c-warn-fg"
+              }`}
+              data-testid="route-problem-pill"
+            >
+              <MIcon name={probOk ? "check_circle" : "error"} size={16} />
+              {probWord}
+            </span>
+          </span>
         </div>
         {(route.proposedChange || route.linkedProblems.length > 0) && view !== "st" && (
           <div className="flex flex-col gap-1 rounded-lg bg-c-warn-bg px-3 py-2 text-[12px] text-c-warn-fg" data-testid="route-notices">

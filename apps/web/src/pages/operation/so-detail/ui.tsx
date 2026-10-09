@@ -512,7 +512,7 @@ export function ViewSwitch<K extends string>({
             aria-selected={on}
             onClick={() => onChange(v.key)}
             data-testid={`route-view-${v.key}`}
-            className={`rounded-lg px-2.5 py-1 text-[12px] leading-4 focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] ${
+            className={`rounded-lg px-3 py-1 text-[12px] leading-4 focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] ${
               on ? "bg-c-select-bg font-semibold text-c-select-fg" : "font-medium text-c-tab"
             }`}
           >
