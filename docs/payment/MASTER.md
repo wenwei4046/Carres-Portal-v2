@@ -390,8 +390,14 @@ effective-dated rule row (default ask 4 · deadline 3; n > m in each pair) and e
 `paymentDeadlineOf` counts through `collectionClock` with the rule in force on the order's clock start
 (the live Sales Invoice's issue day, else today), so the Work right panel, the Order Route, the Logistics
 card, the Monitor and Work's payment items read one arithmetic. One `isOutstation` reading: a company is
-assigned and it is not the Klang Valley default. The clock's holiday set is the Office holiday list
-(Settings → Office) and the owner acts on the stored Office calendar.
+assigned and it is not the Klang Valley default. **Calendars (built on branch
+`build/settings-delivery-cal`, 9 Oct 2026; 0677 not applied):** the payment-due and ask-day FACTS count
+on THE Delivery calendar — Monday–Saturday with the Selangor public holidays Warehouse Settings stores
+for the dispatching Site, else the built-in list (`delivery-working-calendar.ts`); the ACTION day follows
+the responsible person's working days (Office weekdays when none are recorded) with the Office holidays
+(`personOwnerCalendar`). **Staff working days decide only when to chase the customer; they never change
+the customer's payment due date or ask day.** In code the facts come from `collectionFactDays`, which
+takes no owner calendar; a test proves a Saturday-working or a short-week owner leaves `dueIso` unchanged.
 Every change records old value · new value · effective from · changed by · changed on · reason.
 A clock runs under the rule in force on the day it started — the invoice's issue day — so an
 existing clock keeps its snapshot by construction and a new rule affects only new clocks from its
@@ -406,7 +412,34 @@ Schedule the actual customer-contact ACTION on the resolved action owner's gover
 ```
 
 Use the resolved person’s effective working/cover calendar. A person not working Saturday acts
-on the previous working day while the Monitor retains the Saturday deadline. The approved
+on the previous working day while the Monitor retains the Saturday deadline. **Staff working days
+decide only when to chase the customer; they never change the customer's payment due date or ask
+day** (owner boundary, 9 Oct 2026).
+
+How the person's calendar is derived (built 9 Oct 2026, branch `build/settings-delivery-cal`) — two
+derived rules, each with its sources, not new law:
+
+- **No personal working days recorded → the Operation/Office weekdays.** Sources:
+  `docs/ACTION-FLOW-STANDARD.md:154` (the Office calendar, Monday–Friday, counts for Purchasing ·
+  Operation · Finance …); this MASTER's build record "The calendar rule corrected" ("the resolved owner's
+  governed working days (`OwnerCalendar`, default the Operation week)"); `docs/workspace/MASTER.md:2943` ("resolved
+  owner's governed working days (Operation: Mon–Fri)"). The weekdays are the STORED Office calendar
+  (Settings → Office, OFF-01).
+- **Personal working days combined with the Office holidays.** Sources:
+  `docs/workspace/MASTER.md:272–274` ("People/HR also owns each employee's normal working-week
+  eligibility. Module calendars own business-open days and public-holiday/special-date rules. The
+  Shared Duty Resolver combines the person calendar with the module calendar for the resolved
+  actor"); `docs/ACTION-FLOW-STANDARD.md:154` (Operation's module calendar is Office); Settings List
+  OFF-05 (Office holidays = Kuala Lumpur).
+- The person's week is People/HR's fact (`hr_employees.work_days`, 0677), edited only in the HR
+  person drawer (`Working days`); Workspace and Payment read it and never edit it. The resolved
+  person is the collection owner's acting person today (the cover when covered), else the normal
+  owner — the "resolved person's effective working/cover calendar" above.
+- **PROPOSAL / NOT LAW — the Work feed admits an order to collection work on the Office calendar
+  before it reads the person's week** (the owner must exist before their week can be read). For a
+  person whose recorded week is narrower than the Office's, an order can therefore appear one day
+  later than their own week would place it. Falsifier: an observed collection item for a
+  short-week owner that first appears after that owner's action ask day. The approved
 Saturday support rota (09:00–18:00, editable) does not make Saturday an ordinary Office working
 day for everyone, nor does it reset the collection responsibility ledger. That is a property of the owner's calendar, not a global rule: a
 future duty holder who works Saturdays keeps a Saturday action. A Sunday or public-holiday fact
