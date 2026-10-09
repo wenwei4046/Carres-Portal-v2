@@ -18,7 +18,7 @@
 
 **APPROVED IN THIS CHAT — one current scope:** Operation shares routine service work with one per-Case owner and helpers (§7.9); every Case receives a substantive first response within two Office working days (§7.2); the scoped internal processing deadlines are §7.9; every formal repair/replacement/charge/customer-movement decision goes through Service Case Approver (§7.4), with no repeat approval for unchanged approved-scope follow-up. Original Case clock, source-module permissions and actual completion facts remain.
 
-**NOT COMPLETE:** Service Register/Working Panel/Object/Tasks shared UI is still awaiting the UI controller's combined review, not a local variant. No-remedy/withdrawn/reopen, unapproved Excel extensions, settings changes and other explicitly marked proposals must not be silently implemented. No READY scope, Card, application code, live data change or deployment is authorised by this PLAN. Seven module reviews are recorded; they do not prove interfaces are connected. All scoped owner approvals must be available in the exact reviewed Git version before BUILD.
+**NOT COMPLETE:** Service Register/Working Panel/Object/Tasks shared UI is still awaiting the UI controller's combined review, not a local variant. No-remedy/withdrawn/reopen, unapproved Excel extensions and other explicitly marked proposals must not be silently implemented. Authorised Settings editability is approved direction (9 Oct; §7.16), but effective treatment and calendar conflicts remain unresolved and no editor/runtime change is claimed. No READY scope, Card, application code, live data change or deployment is authorised by this PLAN. Seven module reviews are recorded; they do not prove interfaces are connected. All scoped owner approvals must be available in the exact reviewed Git version before BUILD.
 
 **STATUS IS DERIVED AND READS WHO + ACTION + OBJECT — OWNER RULING 2026-10-06 (Jess).** On
 being shown the current `Pending / In Progress / Follow-up / Resolved` dropdown, the owner ruled:
@@ -602,8 +602,9 @@ Constitution's engineering/design rule, recorded here so no chat asks it again:
   Operation person in Staff & Duties order; the Case stays with that person until it closes, so the
   customer hears one voice. No name is written here (GLOBAL DUTY LAW): who is eligible today is
   People's fact, and a departed person leaves the cycle on their last working day.
-- **Leave moves it automatically** through the shared resolver's leave/cover rule; the owner takes
-  the Case back on return only through a recorded reassignment, never silently.
+- **Leave/cover uses shared Workspace and People sources — approved direction, 9 Oct; implementation UNVERIFIED.** Workspace → Leave is the single submission entry; all leave types currently require no approval. Today’s submitted MC/Emergency/other dated leave activates qualified available cover immediately; future absence activates on its absence date. MC retains proof; Emergency leave retains dates/reason. Login to submit MC is not working availability. Normal Case owner, current cover assignee and actual helper remain separate; return does not silently undo recorded cover. Service neither creates a Staff/Leave editor nor changes payroll/evidence acceptance. Future leave-approval policy changes need their own effective treatment and cannot waive Service business approvals.
+- **Direct assignment, ordinary help and lunch:** governed source/cover records show unfinished work directly in the recipient’s Tasks without a Take/Accept/Claim prerequisite; this does not claim Service Tasks are already admitted. Any authorised recipient of a customer call/message responds and records it, while follow-up keeps its accountable Case owner. Actual one-hour lunch (default13:00–14:00, permitted shift) retains assignments and is excluded from availability checks. Workspace owns the owner-approved10:00/14:01 check defaults; the observed10:15 morning value is runtime evidence, not a changed default. No Service-local check or assignment algorithm is introduced.
+- **No qualified recipient:** leave work visibly unassigned/blocked under the shared escalation rule; do not pause Case clocks, invent an actor or grant approval rights. PO/GRN monthly rota and the PO-only next-month newcomer rule do not turn Service per-Case ownership into a monthly sole holder.
 - **Anyone may help** (Workspace §3 STAFF HELP): `Assigned to` is the owner, `Completed by` is whoever
   recorded the fact. Helping never changes the owner.
 - **Reassignment is one governed act** on the Case (who, when, why), never a second staff list.
@@ -679,8 +680,16 @@ named (entitlement result block · document checklist row with a state word · s
 | Paid-policy cutover | 2026-08-01 (code constant) | Service Settings | NOT BUILT |
 | Mattress threshold | `> 2 cm` (code) | read-only display | NOT BUILT |
 | Trial length / transport minimum | 100 days / RM 250 (code) | Service Settings | NOT BUILT |
-| First response · finish · day-10 call | 2 Office working days · 14 working days · day 10 (owner-approved rules, code constants) | **read-only display only** in central Settings; no edit control. RESOLVED 2026-10-06 by reduction (§7.30 item 4): an editable value would need an existing-Case snapshot that conflicts with §4's calendar-derived rule, and the owner approved the numbers, not their editability. A future edit control is a new ruling. | engine BUILT for 14 · day 10; first response NOT BUILT |
+| First response · finish · deadline-bound contact | 2 Office working days · 14 Case working days · contact four Case working days before deadline (day 10 of the unextended 14-day period) | Central Settings hosts the Service-owned timing rules. Jess or an explicitly section-authorised editor may configure rules with old/new, actor/time and effective treatment/history; no arbitrary staff grant or duplicate writer. Existing-Case applicability remains unresolved (§7.16 below). | APPROVED editable-rule direction, 9 Oct; editor/effective-rule implementation UNVERIFIED. Prior measured 14-day/contact engine evidence is not new runtime proof; first-response implementation not verified |
 | Delay reasons · condition refusal reasons | code constants (shared with Delivery) | read-only display | BUILT |
+
+**9 Oct source reconciliation — approved direction versus unresolved application.** Sources: root `Carres Settings List.md`, “Latest owner direction”, SVC-01–SVC-04 and “Service Case / Issue Tracker · consolidated Settings coverage”; `Carres-Business-Blueprint-RESTART-2026-10-07/OWNER-CLARIFICATIONS.md`, “Settings editability boundary”, “Approval decision timing”, “Team research scope”, and 9 Oct leave clarifications. These are owner-message evidence/indexes, not a replacement module MASTER or proof that editors were built. The former planner-only “read-only forever / editing inherently conflicts with §4” conclusion is superseded; authorised configuration does not itself change any numeric default or permit disabling evidence, customer confirmation, money/stock/Delivery gates.
+
+- **RESOLVED FROM AUTHORITY:** all Cases retain the approved two-Office-working-day substantive reply and §4 fourteen-working-day completion rule. Central Settings hosts source-owned rules; Jess may delegate a named section, but no permission grant has been executed. Staff qualifications, duty holders, leave and cover are shared sources, not Service settings editors.
+- **REAL GAP / CONTRADICTION — calendar:** Settings SVC-02 labels the completion period Office, while §4 and §7.27.7 preserve the Case calendar (Sunday/holiday exclusion, not Office Mon–Fri). The approved 9 Oct Office weekdays Mon–Fri, hours 09:00–18:00 and Kuala Lumpur holiday scope govern Office obligations; they do not silently replace the Case calendar or supplier/warehouse calendars. Preserve each existing source calculation until scoped reconciliation; Saturday support 09:00–18:00 does not make Saturday an Office working day. No duplicate holiday editor.
+- **REAL GAP / CONTRADICTION — effective rules:** §4 derives deadlines and applies holiday corrections to existing Cases; numeric-rule editability needs explicit treatment for existing open Cases, existing contact events and valid once-only extensions. “New cases only”, universal snapshots or retroactive recalculation have not been approved. Keep original report date, base/extended deadline references, contact history and lateness evidence; do not recalculate them merely because the index now says configurable. Calendar correction and a changed numeric promise are distinct changes.
+- **Approval deadline boundary:** the 8 Oct generic configurable one-working-day decision target does not overwrite §7.9's specific complete/ready-request trigger and next Office working day rule. Both use the qualified business approver; overdue never auto-approves. Generic trigger/calendar remain unresolved where no specific contract exists; no new Service clock is created.
+- **OBSERVATION / NOT LAW:** the authenticated Settings inventory reports Service Case Approver unassigned; this chat did not independently repeat the online walk or test enforcement. A catalogue key is not a staffed approval role. No qualified approver means a visible block, not Operation self-approval. All imported on-screen counts and values remain observations, not new rulings.
 
 ## 7.17 · Reports and export
 
@@ -791,7 +800,7 @@ Payment · Sales Order. Tally recorded here as sent / acknowledged / aligned.
 | 审批范围 | §7.4正式处理决定审批已批准，2026-10-06 | 已解决：Operation准备，Approver批准；原模块执行门保持，不重复审批已批准范围的普通跟进 |
 | No remedy／Withdrawn／Entered in error／reopen | 现有close gate保留 | 推荐答案已写在 §7.30 第1–3项（证据、授权、客户告知、重开触发、期限）；**等 owner 一次审阅**，未批准前不得实现 |
 | Excel发现的扩展 | Excel事实不等于新增rule批准 | §7.30 第5项：A1、A2、A3、A4、A6、A7、A8 已从现有 authority 解决（RESOLVED FROM AUTHORITY，引用列出）；A5 多个SO 与 A9 外部客户表单仍是 owner 决定 |
-| Settings期限改变 | §4现有calendar-derived rule | §7.30 第4项：已解决（以减少解决）——首版只读显示，不提供编辑，不引入 existing Case snapshot；之后要编辑是新裁定 |
+| Settings期限改变 | 授权规则可配置方向已批准，9 Oct；2日首回、14日完成数字不重问 | §7.16／§7.30 第4项：删除旧只读结论；现有Case适用、新旧事件/延期及Office/Case日历仍有真实冲突，未批准任意编辑或重算；实现UNVERIFIED |
 
 首次回复规则已批准；其他新screen copy以及shared host/tabs/layout不包含在以上业务批准内。正式handoff只用可取得的合并commit，不用本地草稿替代main。
 
@@ -1125,11 +1134,11 @@ not reopened.
   original owner if still eligible, otherwise round robin (§7.9).
 - **Falsifier:** the owner wants a reopened problem counted only against the original deadline.
 
-### 4 · Settings — RESOLVED by reduction (planner decision, recorded)
+### 4 · Settings — authorised configuration direction APPROVED; application conflict unresolved, 9 Oct 2026
 
-The approved numbers stay code constants and Settings shows them read-only (§7.16). An editable value
-would need a snapshot rule for existing Cases that conflicts with §4. The owner approved the numbers,
-not their editability. A future edit control is a new ruling.
+The owner’s configurable-rule direction supersedes the former planner-only read-only conclusion. Numeric defaults stay two Office working days for substantive first response and fourteen Case working days for completion; contact remains bound to the applicable deadline four working days before it, not an independent absolute day-10 clock after extension. See §7.16 for the actual sources and separate classifications.
+
+Central Settings is the entry; Service owns its timing contract, Workspace/People own staff/leave/cover, Guarantee owns policy and Payment owns money. Exact existing-Case treatment, new numeric version applicability and the Settings SVC-02 Office-calendar mismatch remain REAL GAP / CONTRADICTION. No assumption of new-Cases-only, snapshots or retroactive recalculation is approved. Configuration capability approval is not whole-Blueprint approval, a new permission grant, built editor or production change. Do not ask Jess to repeat the decided numbers.
 
 ### 5 · Excel extensions A1–A9 — checked against authority
 

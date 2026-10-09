@@ -202,21 +202,15 @@ sold ─────────────► pending ──(orders.delivered_
 `expired` is **never written**. It is derived on every read by `effectiveGuaranteeStatus()`
 so nothing depends on a nightly job having run. Any raw-SQL report must apply the same rule.
 
-## 4. Scope: the POS is the only order entry, and history is out of scope
+## 4. Sale entry and legacy-policy handling
 
-Loo, 2026-07-26: **every order from here on is entered through the POS** — the orders visible in
-the system today are the legacy testimony orders carried over at migration, and **no Guarantee
-Program existed then**, so there is deliberately **no backfill and no historical handling**. Old
-orders simply have no entitlements, which is correct: nobody was sold one.
+Current Guarantee sales use the governed Sales Portal/POS entry and covered-item picker. A paid Guarantee attaches to a specific covered item; neither import nor an additional entry may create an unguarded line. The two measured selling doors are the POS cart (`CatalogStep`) and adding a line to an existing order (`AddProductOverlay`). Both use the same picker. The trigger described below also guards the other RPC entry paths; that is implementation coverage, not approval of a new sales channel.
 
-That makes exactly **two** doors a guarantee line can come through in practice, and BOTH are
-gated by the covered-item picker:
+The approved 14 August legacy-policy ruling in §1 governs older claims. An old order without an RM150 line is not automatically rejected: its SO date selects the applicable policy, and actual Delivery starts coverage. Before 1 August 2026 the legacy policy applies; from that date the separately purchased Guarantee is required. Preserve the evidence/version/Unit decision snapshot. This does not authorise manufacturing a historical paid Guarantee line, bulk backfilling purchased entitlements or rewriting old documents. Missing source evidence remains an explicit evidence gap; Service owns the Case and Guarantee owns eligibility.
 
-1. selling one in the POS cart (`CatalogStep`);
-2. adding one to an order that already exists (`AddProductOverlay`).
+### Settings and linked execution boundary — reconciliation 9 Oct 2026
 
-The trigger below still covers the other three RPC paths — free, and it means a future door
-(bulk import, a script, an API client) cannot mint an unguarded guarantee.
+Terms remain principal-write-only (§7). Policy version/effective range, covered category and Unit, cutover, remedy, evidence, delivery-based start and derived expiry are eligibility facts; their appearance in a Settings inventory is not permission to change them freely. A later policy must not rewrite earlier rights. Price maintenance stays Catalog-owned, staff/cover stays Workspace/People-owned, actual goods movement stays Stock/Delivery-owned, and any money consequence follows Payment/Finance approvals. The sale Guarantee, 100-Day Trial, TCF sofa and bedframe policies in §1 are distinct; no universal 15-year cover or new refund route is inferred. Subscription remains deferred and does not inherit sale policy. Settings UI, complete stock-connected claim execution and runtime enforcement still require the explicit evidence in §8; this document reconciliation does not close them.
 
 ## 5. Why a trigger, not RPC edits
 

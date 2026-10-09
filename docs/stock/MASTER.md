@@ -1371,6 +1371,43 @@ The only Warehouse Settings entry is `Page Header → Settings → Warehouse`. N
 Monitor, panel or object menu may create a second Settings door. Settings governs rules/master data
 only; it never edits a Unit, reservation, Count result, Transfer/event or Month-end version.
 
+**9 Oct 2026 owner alignment — APPROVED boundaries; implementation not verified by this document update.**
+Warehouse Site details, receiving hours, collection hours, public holidays, Special Dates and
+Warehouse capabilities belong to Settings → Warehouse, independently of Office. Never copy Office
+weekdays, Kuala Lumpur holidays, Saturday support duty or Company address into a Site by assumption.
+Keep receiving and collection availability separate and use the existing Site-calendar precedence
+below. Only authorised editors change settings; configured capability grants are not proof that
+the receipt, collection and Count doors enforce them. Staff & Duties owns the monthly GRN Duty
+rota and normal separate PO/GRN holders; Warehouse links to Workspace MASTER rather than maintaining
+another rota or imposing PO-only newcomer eligibility on GRN.
+
+**Pillow / MP courier dispatch — APPROVED owner default, 8 Oct 2026; implementation UNVERIFIED.**
+Warehouse/partner packs and physically hands goods to the courier. The Sales Order Operations
+responsible person arranges and monitors dispatch quantities, tracking and expected dispatch;
+helpers retain the normal owner and record the actual actor. The separate editable dispatch target
+defaults to **3 working days**, starting only when Warehouse confirms the relevant scope is received,
+checked fit and available for packing. It is not a customer-delivery guarantee, a promise of fixed
+daily capacity, or a clock from an unverified arrival. Read the single Delivery-owned effective
+dispatch rule through Settings; Warehouse must not create a second timing editor or arithmetic.
+The exact applicable working-day calendar remains **UNVERIFIED**: do not substitute Office or a
+mixed Delivery/Warehouse calendar, or manufacture a due date. Each batch retains quantity,
+tracking and actual handover evidence; remaining quantity stays visible until the entire dispatch
+scope is handed over. Customer delivery remains a separate completion fact. A delay records an
+expected dispatch and customer notification without resetting the original target or deleting
+the remainder.
+
+**Authenticated observation, 9 Oct 2026 — evidence, not new owner defaults or a fresh production walk.**
+Source: `Carres Settings List.md`, final authenticated audit. Carres Klang/NETS is active with
+Klang address and GMT+8; key contact renders a raw UUID. Monday receiving shows 8:30 AM–6:00 PM,
+Sunday receiving is closed, **Tuesday–Saturday receiving and all collection hours are Not configured**.
+Public-holiday policy/calendar is unconfigured and Special Dates are empty. Shasha/Yu Jun display
+four checked capabilities; departed-holder/history actor identity is not recorded, and enforcement
+was not tested. These observations do not approve the displayed values or establish the missing
+calendar. Preserve the earlier dated production evidence below as history; do not describe its
+all-unconfigured snapshot as today's configuration. The Settings index WH-01–WH-05 and
+`OWNER-CLARIFICATIONS.md` (courier timing and Office/Warehouse separation) identify the sources;
+neither a Confirmed index label nor an online value adds a business ruling.
+
 **THE BUILT SURFACE — PRODUCTION-VERIFIED, owner card 2026-09-09, migrations 0456 · 0457 · 0458.**
 Merged in PR #1191 (`05b36bd8`) and PR #1194 (`d3630bea`); both Pages projects and the Worker
 report `d3630bea`. Walked signed in at `erp.carresofficial.com/operation/settings/warehouse/*`

@@ -382,8 +382,9 @@ exists and the DO cannot issue, the Payment Monitor row, the collection workspac
 customer to pay` Work item print `Payment due {day}` over `RM {amount} unpaid` (or `Finance
 hold · {reason}`) — owner reconciliation 2026-09-25: the collection desk's first line is its deadline
 fact, never `Hold delivery` — beside the doors `Record payment` and, for Finance only, `Remove hold`. The reason
-is this module's own record; Delivery, Warehouse and Work read it. Paying in full or removing the
-hold lets the system issue the DO, and the hold leaves every surface in the same read. **Gap:** both still use the ruled default m = 2 (3 outstation)
+is this module's own record; Delivery, Warehouse and Work read it. Money completion and Finance hold clearance are independent requirements: RM 0 never clears
+a Finance hold, and removing a hold never settles money. Only when both and all other Delivery
+gates pass may the system issue the DO; each surface reads the same source facts. **Gap:** both still use the ruled default m = 2 (3 outstation)
 rather than the effective-dated rule row, because Operation cannot read the Payment settings payload.
 Every change records old value · new value · effective from · changed by · changed on · reason.
 A clock runs under the rule in force on the day it started — the invoice's issue day — so an
@@ -398,9 +399,10 @@ Schedule the actual customer-contact ACTION on the resolved action owner's gover
   working day.
 ```
 
-Operation does not work on Saturday, so an Operation collection owner acts on Friday for a
-Saturday deadline while the Monitor still names the Saturday (`Payment due Sat, 12 Sep`) and
-the Work item is due Friday. That is a property of the owner's calendar, not a global rule: a
+Use the resolved person’s effective working/cover calendar. A person not working Saturday acts
+on the previous working day while the Monitor retains the Saturday deadline. The approved
+Saturday support rota (09:00–18:00, editable) does not make Saturday an ordinary Office working
+day for everyone, nor does it reset the collection responsibility ledger. That is a property of the owner's calendar, not a global rule: a
 future duty holder who works Saturdays keeps a Saturday action. A Sunday or public-holiday fact
 day gives each owner its own governed previous working day. Logistics Partner DO lead time is
 Delivery's own setting (`Delivery Settings → Logistics → Delivery Order needed {n}
@@ -610,6 +612,20 @@ opens Service Case/Issue, not a Payment note.
 
 ## 7 · Storage commercial rule
 
+**Authority conflict — unresolved as of 9 Oct 2026.** The owner clarification “Operations
+approves no money” restricts Operations to customer notification and submission of requests.
+The older day-21 concession in the table and §8 below, also observed in live Settings on 9 Oct,
+conflicts with that boundary. Those limits are retained as the specific unresolved authority
+record, not permission to exercise Operations money approval. Do not infer a new approver,
+change the free days/rates, or silently treat the conflict as resolved.
+
+**Customer storage-charge notification — APPROVED / implementation UNVERIFIED.** Owner answered
+Same day on 8 Oct: Operations informs the customer on the same day the customer needs to pay
+storage charges and records notification evidence. This governs notification only, not charge
+creation, invoice timing, waiver authority or payment completion. Reconcile the exact payable
+source event and existing action identity before implementation; no duplicate task or second due.
+Source: OWNER-CLARIFICATIONS “Storage charge customer notification deadline”; Settings index PAY-08.
+
 Rates apply per customer order and **product group**, never quantity:
 
 | Product group | Automatic free | Charge after free | Extra-free authority |
@@ -729,9 +745,10 @@ handover, when its person is still an active individual
   else  nobody
 ```
 
-**Contact history and the Delivery Duty holder are not collection-owner sources.** The normal
-owner is the Sales Order PIC in `ops_order_control.assigned_staff`, or the current formal handover
-record when one exists. An order without a PIC remains an ownership exception; Payment never
+**Contact history and the Delivery Duty holder are not collection-owner sources.** Resolve the
+effective formal responsibility ledger first, then the active individual SO PIC in
+`ops_order_control.assigned_staff`, then nobody. Ordinary helping or answering a customer does not
+reset the ledger or constitute formal handover. An order without a PIC remains an ownership exception; Payment never
 establishes its collection owner from Delivery Duty.
 
 **WORK ASSIGNMENT — OWNER RULING 2026-09-29 / APPROVED TARGET / NOT BUILT.**
@@ -787,6 +804,27 @@ with reason/approver · Payment corrections · Money needing review. No Refund r
 Matching workspace.
 
 ## 12 · Settings, duties and permissions
+
+**9 Oct 2026 dependency/settings reconciliation — approved directions versus observations.**
+Ordinary collection retains the three admission conditions in §3 and the 3/2-working-day rule;
+outstation timing remains separately governed. Owner wording is `Start chasing payment` (setting)
+and `Chase payment` (task); COPY/runtime adoption remains unverified. RM 0 and Finance hold remain
+separate. Responsibility resolution remains formal ledger → active individual SO PIC → unassigned
+(§10); Settings delegation grants neither money approval nor a new owner roster.
+
+**Authenticated read-only observation, not a new owner ruling:** `Carres Settings List.md`,
+“Receiving bank accounts” and “Read-only authenticated page” record on 9 Oct at
+`https://erp.carresofficial.com/operation/settings/payment`:
+- PJ own-showroom → Hong Leong Bank · CARRES SDN BHD · `177-003-23633`.
+- Dealer → RHB · CARRES SDN BHD · `26219 3000 29076`.
+
+This supersedes the historical claim that the two receiving-account numbers are missing.
+No Settings write/payment occurred; end-to-end message/payment routing is untested. An unresolved
+`310-2000` ledger-account mapping is a separate accounting/method dependency, not evidence that
+these receiving bank details are absent. Verify that mapping before asserting its meaning.
+Live audit also found six of eight template purposes empty, two reminder templates present,
+and changes with missing staff identity. These are observations, not newly approved defaults.
+Storage day-21 authority remains unresolved (§7); notification Same day does not settle it.
 
 `Settings → Payments` is a maintenance surface, not daily Work. Its final section order:
 
@@ -2254,8 +2292,9 @@ exercised on live rows — its verification is probe/test based, as recorded in 
   owner's words and neither may be invented, so §16's customer message is incomplete until
   they exist. They are: (a) the approved **Important Notes** wording that goes on the payment
   message — the sentences Carres wants every customer to read before paying; and (b) the
-  **receiving bank account numbers** for the two bank rows already configured, which today
-  hold a bank name and NO account number. They can be entered directly in
+  **receiving bank account numbers** were historically absent; the 9 Oct authenticated read
+  now establishes both numbers and channel mappings (§12). That part is no longer a missing-content
+  blocker; end-to-end routing remains untested. Important Notes remains subject to content verification in
   `Settings → Payment` (the manager-permission surface, 0431) — no engineering step waits on
   anything else.
 - **Who holds the Payment Approver duty.** Measured 2026-09-08: `workspace_duty_assignments`
@@ -2268,8 +2307,8 @@ exercised on live rows — its verification is probe/test based, as recorded in 
 **Overall status: PARTIALLY DELIVERED.** Every approved CAPABILITY in the table above is now
 built. What keeps the module short of DELIVERED is not engineering:
 
-1. **#20 — owner content.** The approved Important Notes wording and the receiving bank account
-   numbers. Entered in `Settings → Payment`; never invented here.
+1. **#20 — owner content.** Verify approved Important Notes wording in Settings. Receiving bank
+   numbers are observed on 9 Oct (§12), not missing; message/payment routing is still untested.
 2. **#22 — Stripe test-mode keys**, so the provider end-to-end walk can run against the isolated
    local environment documented in `apps/api/.dev.vars.example`.
 3. **#30 — the acceptance that needs a person**: the production visual pass, the native 200%

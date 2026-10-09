@@ -400,9 +400,11 @@ Issue workspace: identity/summary · Current Action · linked records · four ac
 The Current Action block shows `What is true · What to do · Why · What to check/send · What to ask ·
 Choose their answer · What happens next` and only relevant fields.
 
-Central Settings → Issue Tracker owns issue types/source mappings, materiality/review rules,
-cost/recovery thresholds, attribution/recovery roles, Related Party report contacts/recipients,
-meeting/learning destinations, retention and restricted categories.
+Central Settings → Issue Tracker surfaces the Issue-owned configuration for issue types/source
+mappings, materiality/review rules, cost/recovery thresholds, attribution/recovery policy, Related
+Party report contacts/recipients, meeting/learning destinations, retention and restricted
+categories. This is one central Settings destination, not permission to duplicate Staff & Duties,
+Payment/Finance or Related Party source records inside Issue Tracker.
 
 Permissions:
 
@@ -643,6 +645,37 @@ Blueprint or localhost review alone.
 | Exact visual result, dimensions in context, responsive UX and complete localhost | **OWNER REVIEW REQUIRED — NOT APPROVED** |
 | Existing standalone or real-component Issue Tracker previews | **REJECTED AS UI/UX AUTHORITY** |
 | Implementation plan/Cards, production code and deployment | **NOT AUTHORISED** |
+
+**Settings reconciliation — 2026-10-09:** the consolidated Settings inventory confirms the
+required Issue Tracker coverage; it is an index and evidence record, not a second Issue authority or
+a build claim. Issue Tracker continues to own its classification, source mapping, restricted
+category, review/materiality, responsibility, cost-attribution/recovery-policy, Weekly Review,
+Minutes/learning and Related Party reporting configuration. The owning sources remain separate:
+
+- Staff identity, qualification, duty, approver resolution, recorded leave and qualified Cover come
+  from Workspace Staff & Duties; Issue Tracker stores the resolved role/person and actual actor, but
+  does not create another staff, rota, leave or approver editor.
+- Payment/Finance owns actual incurred, paid, receivable, recovered, waiver/write-off and ledger
+  truth. Issue Tracker may configure classification, thresholds and attribution/recovery workflow,
+  but it does not create a second money account, posting, payment or Finance-approval editor.
+- The governed Related Party source supplies party identity and verified communication records.
+  Issue Tracker owns report-purpose contacts/recipients, permitted access, retention and audited
+  send use; a visible party row or typed recipient is not proof that the recipient is verified, the
+  report is approved, sending is enabled or delivery succeeded.
+
+Authenticated observation on 2026-10-09 found only the Related Party name/type/contact/recipient
+surface and an empty table on the current Issue Settings page. Treat that only as displayed runtime
+evidence. It does **not** prove the wider classification, review/materiality, Weekly Review, Minutes,
+learning, reporting or retention Settings are built, saved, enforced or production-verified. The
+same Staff & Duties observation showed Issue Triage and Issue Review unassigned; that is a current
+displayed value, not an approved default and not permission to invent a person.
+
+Owner direction that rules are configurable means an authorised editor, version/effective treatment
+and audit history must be defined before implementation. It does not grant unrestricted editing,
+permit disabling mandatory evidence or Finance controls, silently recalculate completed sessions or
+sent reports, or make a new setting retroactive by assumption. `Confirmed` in the Settings inventory
+means the setting scope/default has authority; it never means every value is supplied or the control
+already exists online.
 
 The confirmed shared composition means Issue Tracker must reuse the current UI MASTER and actual
 shared components; it does not approve any module-local arrangement. A future UI review must show

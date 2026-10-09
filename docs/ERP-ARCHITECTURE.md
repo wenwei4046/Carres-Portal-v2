@@ -166,7 +166,7 @@ confirm physical warehouse receipt → authorised Warehouse individual (2026-10-
 receipt exceptions / direct receipt → GRN Duty ownership / authorised Operation capability
 missing arrival / supplier chasing → current PO Duty (Operation)
 order/customer/delivery follow-up → Work assignment, initially Sales Order PIC
-collect customer balance          → Work assignment, initially Sales Order PIC
+collect customer balance          → Payment responsibility ledger, else effective personal SO PIC, else unassigned; Work applies recorded cover
 ```
 
 The rule resolves automatically. Staff do not assign routine work order by order. **People** owns
@@ -319,6 +319,23 @@ These are business authorities, not a promise of one navigation door per row. **
 no canonical module MASTER; that is a current authority gap, not permission for another module to
 invent Catalog truth.** Receiving and Supplier Claim remain responsibilities governed inside the
 Purchasing MASTER until an approved re-ruling gives either a separate MASTER.
+
+**System-wide documentation ownership — controller reconciliation, 9 Oct 2026.** A missing chat is not a missing business owner. The controller maintains uncovered cross-module scope in these existing architecture sections and the existing blueprint audit, without creating another MASTER or declaring full approval. Reports uses the existing `Carres-Business-Blueprint-RESTART-2026-10-07/23-REPORTS-PLACEMENT-DECISION.md`: central Reports plus contextual module summaries is approved; metric definitions, access, schedules, history coverage and exact composition remain unverified/proposed. Dashboard consumes those definitions and Workspace obligations, never a second metric calculation. Company legal identity comes from the owner-provided 9 Oct letterhead and `Carres Settings List.md` Company field breakdown; registered address does not replace Warehouse/Showroom delivery locations. Bank instructions remain Payment-owned; Office and duty calendars remain Workspace-owned. Finance, People/HR and Guarantee retain their own MASTERs and cannot be declared fully covered by Payment, Staff or Service notifications. Notifications/email, mailbox/announcement administration, change history, health and integration controls remain individually scoped research/verification items in the existing audit: Houzs capability is neither Carres approval nor build proof. Subscription and optional Assistant/Agent/Venture work remain deferred. Notification receipt, original-document edit, repository publication and production acceptance are four separate facts.
+
+### System controls — evidence and ownership reconciliation, 9 Oct 2026
+
+This is source reconciliation in the existing architecture, not new capability or permission approval. Existing audit records retain verification gaps.
+
+| Control | Inspected source / ownership | Limits and remaining verification |
+|---|---|---|
+| Change history | `apps/api/src/routes/principal/audit.ts` reads audit_log with principal gate, role filter and bounded 1–500 rows; PrincipalAudit.tsx consumes it | Code inspection only; not production/RLS acceptance, universal old/new/effective-date history or complete audit coverage. Read-only does not permit history editing/deletion. |
+| System Health | Shared stock-health helpers and Operation StockHealthPanel; Stock owns inventory facts | File presence is not passed tests or system-wide health. Database/jobs/integration/ledger health and recovery permissions need separate evidence. |
+| AutoCount | Shared autocount-import schema and existing autocount-import-contract document | Excel import contract is not bidirectional live sync. Verify source identity, duplicates, failures, permissions and reconciliation; Houzs controls are reference only. |
+| Notifications / Email | Module event obligations and Customer Service source; Houzs research in existing worklist | Recipient/channel/provider/trigger/delivery evidence are separate; configured toggle is not successful delivery. No new event, address or send authority inferred. |
+| Mailboxes / Announcements | Houzs registry/access/provisioning research only | ERP registry is not external provisioning. Carres owner, access, retention and publication lifecycle remain verification gaps; no provision/invite/send authority. |
+| Shared Settings | Owning MASTERs; Workspace people/duties/calendars; personal Appearance current kit | Central view does not move source ownership. Verify editor scope, saved history and effective treatment. Payment-specific compulsory reasons must not silently govern every Company field. |
+
+Unread routes, missing filename matches and browser failures do not prove absence of data/features. A release blocker must identify the exact affected Outright step and evidence; reference-system feature gaps do not automatically block first-order use.
 
 **Customer communication boundary — Blueprint consolidated 2026-10-06.**
 [`customer-service/MASTER.md`](customer-service/MASTER.md) owns customer-enquiry answer and
@@ -553,6 +570,8 @@ either place — neither is money, so neither is 0175-locked and the API leaves 
 ⛔ **COST did NOT come with it, and that is a ruling, not an oversight.** Loo dropped the cost
 column from the selling grid on 2026-07-06 (*"not needed for now"*, `9f21582e`) and nothing has
 reopened it. The alignment is therefore asymmetric ON ONE COLUMN by explicit decision.
+
+**Catalog coverage reconciliation — 9 Oct; existing authority only.** Catalog maintenance covers model/SKU identity and variants, category and exact-Unit versus quantity identity, applicable model choices, supplier/item-code mapping, selling prices and purchasing cost, selling availability, and the existing New SKU/import/export doors. This is a coverage checklist inside the current authority, not approval of every schema field or editable setting. Supplier contacts, supplier calendars and destinations remain Purchasing-owned. Order promises and historical document snapshots remain Orders-owned; Catalog changes do not authorise rewriting signed or issued records. Scheduled supplier-price maintenance follows its source contract; schedule/effective treatment and availability transitions still require verification. Existing API/role gates above remain controlling, including the explicit selling-grid cost exception. No duplicate Catalog editor or bulk-delete permission is granted. There is still no canonical Catalog MASTER; the missing complete lifecycle/settings/acceptance audit remains open rather than being inferred from field coverage.
 
 🟡 **Bulk delete is the one gap deliberately left open.** Every other difference Jess named is
 closed, but permanently destroying catalog rows was never asked for by name, and *align* is not a
