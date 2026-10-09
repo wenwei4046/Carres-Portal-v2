@@ -241,7 +241,8 @@ describe.skipIf(!URL)("leave feeds cover, PO/GRN rotate monthly, Saturday on-cal
   it("each type keeps its own evidence rule, overlap is refused, and only future days can be cancelled", async () => {
     await scoped(async () => {
       await as(U.c);
-      expect(await attempt("select public.staff_leave_submit('mc', $1::date, $1::date)", [tomorrow])).toBe("proof_required");
+      // MC proof is optional (owner rule 9 Oct 2026): an MC without a file is recorded.
+      expect(await attempt("select public.staff_leave_submit('mc', $1::date + 20, $1::date + 20)", [tomorrow])).toBe("ok");
       // Somebody else's file, or a file never uploaded, is not proof.
       await q("insert into storage.objects (bucket_id, name) values ('staff-leave-proof', $1)", [`${U.a}/${uid("98")}.pdf`]);
       expect(await attempt("select public.staff_leave_submit('mc', $1::date, $1::date, null, null, array[$2])", [

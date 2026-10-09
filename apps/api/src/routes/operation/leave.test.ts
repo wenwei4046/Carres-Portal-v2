@@ -53,7 +53,7 @@ describe("Workspace → Leave API", () => {
   });
 
   it("reads only my own leave, the three policies and whether I may submit", async () => {
-    policies.data = [{ leave_type: "mc", approval_required: false, proof_required: true, reason_required: false }];
+    policies.data = [{ leave_type: "mc", approval_required: false, proof_required: false, reason_required: false }];
     rows.data = [{ id: "eeeeeeee-0000-4000-8000-0000000000aa", leave_type: "mc", starts_on: "2026-10-09", ends_on: "2026-10-09",
       reason: null, note: null, proof_paths: [PROOF], approval_required: false, submitted_at: "2026-10-09T01:00:00+00:00",
       cancelled_from: null, cancelled_at: null }];
@@ -75,10 +75,16 @@ describe("Workspace → Leave API", () => {
     });
   });
 
-  it("refuses an MC without proof or an Emergency leave without a reason before the door", async () => {
-    expect((await post("/leave", { type: "mc", startsOn: "2026-10-09", endsOn: "2026-10-09" })).status).toBe(422);
+  it("refuses an Emergency leave without a reason before the door", async () => {
     expect((await post("/leave", { type: "emergency", startsOn: "2026-10-09", endsOn: "2026-10-09" })).status).toBe(422);
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("an MC without proof reaches the door: proof is optional (owner rule 9 Oct 2026)", async () => {
+    rpc.mockResolvedValue({ data: { id: "eeeeeeee-0000-4000-8000-0000000000bb", cover_moved: 0 }, error: null });
+    const res = await post("/leave", { type: "mc", startsOn: "2026-10-09", endsOn: "2026-10-09" });
+    expect(res.status).not.toBe(422);
+    expect(rpc).toHaveBeenCalled();
   });
 
   it("returns the door's refusal as its code, never the database sentence", async () => {

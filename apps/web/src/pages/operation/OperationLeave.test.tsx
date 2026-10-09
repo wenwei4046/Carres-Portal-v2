@@ -57,7 +57,7 @@ function row(over: Partial<StaffLeaveRow>): StaffLeaveRow {
 }
 const POLICIES = [
   { leave_type: "emergency", approval_required: false, proof_required: false, reason_required: true },
-  { leave_type: "mc", approval_required: false, proof_required: true, reason_required: false },
+  { leave_type: "mc", approval_required: false, proof_required: false, reason_required: false },
   { leave_type: "planned", approval_required: false, proof_required: false, reason_required: false },
 ] as MyLeaveResponse["policies"];
 
@@ -100,12 +100,20 @@ describe("Workspace → Leave", () => {
     expect(screen.getByTestId("leave-form-error")).toHaveTextContent("Choose the dates.");
     pickDay("leave-from", 15);
     pickDay("leave-until", 15);
-    fireEvent.click(submitButton());
-    expect(screen.getByTestId("leave-form-error")).toHaveTextContent("Upload the MC proof.");
     choose("leave-type", "Emergency leave");
     fireEvent.click(submitButton());
     expect(screen.getByTestId("leave-form-error")).toHaveTextContent("Write the reason.");
     expect(submitMutate).not.toHaveBeenCalled();
+  });
+
+  it("sends an MC without proof: proof is optional (owner rule 9 Oct 2026)", () => {
+    render(<OperationLeave />);
+    choose("leave-type", "MC");
+    const from = pickDay("leave-from", 15);
+    const until = pickDay("leave-until", 15);
+    expect(screen.getByText("MC proof (optional)")).toBeInTheDocument();
+    fireEvent.click(submitButton());
+    expect(submitMutate).toHaveBeenCalledWith({ type: "mc", startsOn: from, endsOn: until }, expect.anything());
   });
 
   it("sends an MC with its proof to the one door", () => {

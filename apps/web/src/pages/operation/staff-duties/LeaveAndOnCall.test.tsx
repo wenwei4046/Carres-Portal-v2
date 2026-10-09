@@ -52,7 +52,7 @@ beforeEach(() => {
     today: "2026-10-09", canSubmit: true, leave: [],
     policies: [
       { leave_type: "emergency", approval_required: false, proof_required: false, reason_required: true },
-      { leave_type: "mc", approval_required: false, proof_required: true, reason_required: false },
+      { leave_type: "mc", approval_required: false, proof_required: false, reason_required: false },
       { leave_type: "planned", approval_required: false, proof_required: false, reason_required: false },
     ],
   };
@@ -92,7 +92,8 @@ describe("On leave · Saturday on-call · Leave approval", () => {
   it("shows the read-only leave policy: no approval for any type", () => {
     render(<LeaveAndOnCall />);
     const section = open("leave-policy");
-    expect(within(section).getByText("No approval needed · Proof needed")).toBeVisible();
+    expect(within(section).getAllByText("No approval needed").length).toBeGreaterThan(0);
+    expect(within(section).queryByText(/Proof needed/)).toBeNull();
     expect(within(section).getByText("No approval needed · Reason needed")).toBeVisible();
     expect(within(section).queryByRole("button", { name: /Save|Edit/ })).toBeNull();
   });

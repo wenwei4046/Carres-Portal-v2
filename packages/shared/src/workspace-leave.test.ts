@@ -22,9 +22,9 @@ describe("Workspace → Leave submission (0670)", () => {
   it("names the three types in the governed words", () => {
     expect(["mc", "emergency", "planned"].map(leaveTypeLabel)).toEqual(["MC", "Emergency leave", "Planned leave"]);
   });
-  it("MC needs proof, Emergency leave needs a reason, Planned leave needs neither", () => {
-    expect(issues(staffLeaveSubmitInput.safeParse({ type: "mc", startsOn: "2026-10-12", endsOn: "2026-10-12" }))).toEqual(["proof_required"]);
-    expect(issues(staffLeaveSubmitInput.safeParse({ type: "mc", startsOn: "2026-10-12", endsOn: "2026-10-12", proofPaths: [] }))).toEqual(["proof_required"]);
+  it("MC proof is optional (owner rule 9 Oct 2026), Emergency leave needs a reason, Planned leave needs neither", () => {
+    expect(staffLeaveSubmitInput.safeParse({ type: "mc", startsOn: "2026-10-12", endsOn: "2026-10-12" }).success).toBe(true);
+    expect(staffLeaveSubmitInput.safeParse({ type: "mc", startsOn: "2026-10-12", endsOn: "2026-10-12", proofPaths: [] }).success).toBe(true);
     expect(staffLeaveSubmitInput.safeParse({ type: "mc", startsOn: "2026-10-12", endsOn: "2026-10-12", proofPaths: [PROOF] }).success).toBe(true);
     expect(issues(staffLeaveSubmitInput.safeParse({ type: "emergency", startsOn: "2026-10-12", endsOn: "2026-10-12", reason: " \t" }))).toEqual(["reason_required"]);
     expect(staffLeaveSubmitInput.safeParse({ type: "emergency", startsOn: "2026-10-12", endsOn: "2026-10-12", reason: "Fever" }).success).toBe(true);

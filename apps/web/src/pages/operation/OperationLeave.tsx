@@ -36,7 +36,7 @@ import {
  * (migration 0670; owner rules 9 Oct 2026, `Carres Settings List.md` WS-11;
  * docs/workspace/MASTER.md §4.4 "One leave entry"). No standalone MC Report.
  *
- * A person records their OWN leave. No type needs approval. MC needs proof,
+ * A person records their OWN leave. No type needs approval. MC proof is optional (owner rule 9 Oct 2026),
  * Emergency leave a short reason, Planned leave an optional note. Today's leave
  * starts cover at once and future leave on its own day — the database decides
  * who covers; this page never names a colleague or promises one.
@@ -74,7 +74,6 @@ function SubmitLeave({ policyNeedsApproval }: { policyNeedsApproval: boolean }) 
     if (!type) return setProblem("Choose a type.");
     if (!from || !until) return setProblem("Choose the dates.");
     if (until < from) return setProblem("Until must be on or after From.");
-    if (type === "mc" && proofs.length === 0) return setProblem("Upload the MC proof.");
     if (type === "emergency" && !/\S/.test(reason)) return setProblem("Write the reason.");
     const input = {
       type,
@@ -82,7 +81,7 @@ function SubmitLeave({ policyNeedsApproval }: { policyNeedsApproval: boolean }) 
       endsOn: until,
       ...(type === "emergency" ? { reason: reason.trim() } : {}),
       ...(type !== "emergency" && /\S/.test(note) ? { note: note.trim() } : {}),
-      ...(type === "mc" ? { proofPaths: proofs.map((p) => p.path) } : {}),
+      ...(type === "mc" && proofs.length > 0 ? { proofPaths: proofs.map((p) => p.path) } : {}),
     };
     const parsed = staffLeaveSubmitInput.safeParse(input);
     if (!parsed.success) return setProblem("Choose valid leave dates.");
@@ -116,7 +115,7 @@ function SubmitLeave({ policyNeedsApproval }: { policyNeedsApproval: boolean }) 
       </div>
       {type === "mc" ? (
         <div className="flex flex-col gap-1">
-          <p className="text-meta text-c-secondary">MC proof<span className="text-c-warn-fg"> *</span></p>
+          <p className="text-meta text-c-secondary">MC proof (optional)</p>
           <EvidenceUploadField
             key={proofKey}
             entries={proofs}

@@ -7,8 +7,9 @@
 -- work assignment"):
 --   · ONE entry, Workspace → Leave. Three types: MC, Emergency leave, Planned
 --     leave. A person submits their OWN leave: type, start date, end date.
---     MC needs proof (up to three photos or PDFs). Emergency leave needs a
---     short reason.
+--     MC proof is OPTIONAL (owner, confirmed rule 9 Oct 2026: MC needs no
+--     upload); up to three photos or PDFs may be attached. Emergency leave
+--     needs a short reason.
 --     Planned leave may carry a note. No standalone MC Report page.
 --   · No type needs approval today. The policy is stored per type with
 --     approval_required = false; a CHECK keeps it false until the treatment of
@@ -109,7 +110,7 @@ comment on table public.workspace_leave_policies is
   '0670: Staff & Duties leave policy per type (owner 9 Oct 2026). approval_required is stored and false for every type; the CHECK keeps it false until an approval change has a defined effective treatment.';
 
 insert into public.workspace_leave_policies (leave_type, proof_required, reason_required)
-values ('mc', true, false), ('emergency', false, true), ('planned', false, false)
+values ('mc', false, false), ('emergency', false, true), ('planned', false, false)
 on conflict (leave_type) do nothing;
 
 alter table public.workspace_leave_policies enable row level security;
@@ -130,7 +131,7 @@ create table if not exists public.staff_leave (
   ends_on           date not null,
   reason            text check (reason is null or length(reason) between 1 and 200),
   note              text check (note is null or length(note) between 1 and 500),
-  -- MC proof: up to three photos or PDFs in the submitter's own folder
+  -- Optional MC proof: up to three photos or PDFs in the submitter's own folder
   -- (`<user id>/<file id>.<ext>`), checked by the door against storage.
   proof_paths       text[] not null default '{}'::text[] check (cardinality(proof_paths) <= 3),
   -- The policy in force when this was submitted. Today always false; kept so a

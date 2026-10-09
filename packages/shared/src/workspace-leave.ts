@@ -5,7 +5,7 @@ import { z } from "zod";
  * List.md` WS-11 and "Leave types"; docs/workspace/MASTER.md §4.4).
  *
  * One entry for three types. A person submits their OWN leave; no type needs
- * approval today. MC carries proof (photo or PDF), Emergency leave a short
+ * approval today. MC may carry proof (photo or PDF, optional: owner rule 9 Oct 2026), Emergency leave a short
  * reason, Planned leave an optional note. Every rule is enforced again by the
  * SQL door `staff_leave_submit`; this file only guides early and shapes the
  * wire. Who covers the work is the database's answer, never this file's.
@@ -58,9 +58,6 @@ export const staffLeaveSubmitInput = z
     if (v.endsOn < v.startsOn) ctx.addIssue({ code: "custom", path: ["endsOn"], message: "invalid_dates" });
     if (v.type === "emergency" && !hasText(v.reason)) {
       ctx.addIssue({ code: "custom", path: ["reason"], message: "reason_required" });
-    }
-    if (v.type === "mc" && !v.proofPaths?.length) {
-      ctx.addIssue({ code: "custom", path: ["proofPaths"], message: "proof_required" });
     }
   });
 export type StaffLeaveSubmitInput = z.infer<typeof staffLeaveSubmitInput>;

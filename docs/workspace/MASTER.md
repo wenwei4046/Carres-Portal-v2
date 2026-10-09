@@ -625,7 +625,7 @@ availability. The exact activity/confirmation implementation remains to verify.
 
 **One leave entry — Workspace → Leave.** MC, Emergency and Planned leave use the same submission
 entry and People-owned dated absence facts; `On leave` is a status, not a fourth application type.
-MC requires dates and proof; Emergency requires dates and a short reason. No standalone MC Report
+MC requires dates; proof is optional and never required (owner rule confirmed 9 Oct 2026). Emergency requires dates and a short reason. No standalone MC Report
 page or duplicate HR record. All three types **currently require no approval**. Staff & Duties
 leave policy defaults to `Approval required = No`; Jess or a section-authorised editor may change
 it later, with effective date and treatment of existing submissions explicitly defined. No
