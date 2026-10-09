@@ -213,7 +213,7 @@ Previous table entries saying full Finance/Guarantee reviews remain outstanding 
 
 ## Final document synchronisation result — 9 October 2026
 
-**Document review/publication scope complete on `codex/blueprint-sync-20261009`, PR #1992; not merged, not production acceptance.** This closes the controller's existing-file synchronisation pass, not all proposed product features. No new chat, MASTER or blueprint document was authored. Previously local files were first tracked in Git; their existing identities/content ownership are retained. Draft publication is deliberately distinct from main because merging may trigger deployment, which the owner stopped in this lane.
+**Document review/publication scope complete on `codex/blueprint-sync-20261009`, PR #1992 merged to main at `6a4c7b3e8`; not production acceptance.** This closes the controller's existing-file synchronisation pass, not all proposed product features. No new chat, MASTER or blueprint document was authored. Previously local files were first tracked in Git; their existing identities/content ownership are retained. PR CI passed before merge. The document-only squash commit uses GitHub workflow skipping so this publication does not deploy; application acceptance remains separate.
 
 | Coverage | Actual original-file evidence | State |
 |---|---|---|
@@ -236,3 +236,5 @@ Previous table entries saying full Finance/Guarantee reviews remain outstanding 
 **Engineering/acceptance gaps retained:** source-read integration, qualified roster/cover and calendar configuration, logistics subpages not reached, immutable-scope/permission/stale-save and actual send/export/dispatch/stock movement, saved values and document chain. An absent list field is not absent database data. These are not new business questions. No release is declared ready without the exact original step's evidence.
 
 **First-order boundaries:** Outright remains the active scope. Subscription, optional system-control extensions and new Reports metrics do not automatically block it. Any claimed blocker must name the affected approved order/PO/stock/payment/DO step; this pass did not execute the production journey and cannot certify live readiness.
+
+**Publication verified 9 Oct:** PR #1992 merged to main (`6a4c7b3e8`) after successful PR CI. Document publication uses `[skip ci]` on the merge and status-only follow-up to avoid push-triggered production deployment; no workflow configuration is changed. Earlier unmerged statements above describe the earlier review stage, not current publication state.
