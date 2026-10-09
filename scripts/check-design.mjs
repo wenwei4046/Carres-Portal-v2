@@ -107,7 +107,7 @@ function records() {
     .filter(Boolean);
 
   const glyphBlock = (icon.match(/const GLYPH = \{([\s\S]*?)\n\} as const;/) ?? [, ""])[1];
-  const meanings = [...glyphBlock.matchAll(/^\s*"?([a-z-]+)"?:\s*[A-Z]/gm)].map((m) => m[1]);
+  const meanings = [...glyphBlock.matchAll(/^\s*"?([a-z-]+)"?:\s*(?:[A-Z]|"[a-z_]+")/gm)].map((m) => m[1]);
 
   if (!spacing.length || !typeClasses.length || !radii.length || !meanings.length) {
     console.error("✗ check-design: could not read the kit token records. Did tokens.ts move?");
