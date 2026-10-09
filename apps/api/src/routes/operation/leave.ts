@@ -13,7 +13,6 @@ import {
   teamLeaveResponseSchema,
 } from "@carres/shared/workspace-leave";
 import { requireOperation } from "../../lib/auth-guards";
-import { requireSettingsEditor } from "../../lib/settings-editor";
 import { klDateOf } from "../../lib/receiving-time";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { adminClient, userClient } from "../../lib/supabase";
@@ -28,10 +27,10 @@ import type { AppEnv } from "../../types";
  *   POST /proof/sign     a one-time upload slot for MC proof in MY folder
  *   POST /               submit my own leave (no approval; today's leave
  *                        starts cover at once — the SQL door decides)
- *   GET  /recorder       may I record leave for a colleague, whom, and the
- *                        leave I recorded for others (0680)
- *   POST /for            record a colleague's leave — the owner or a named
- *                        Staff & Duties editor (owner ruling 9 Oct 2026)
+ *   GET  /recorder       the colleagues I may record leave for, and the leave
+ *                        I recorded for others (0680)
+ *   POST /for            record a colleague's leave — ANY active staff member
+ *                        (owner ruling 9 Oct 2026); not a Settings permission
  *   POST /:id/cancel     cancel before it starts, or the days after today
  *   GET  /proof/url      a short-lived read link (the bucket policy decides)
  *   GET  /team           who is away today and the next days — names and
@@ -61,7 +60,6 @@ const REFUSALS = new Set([
   "invalid_proof",
   "leave_overlap",
   "not_your_leave",
-  "not_leave_recorder",
   "already_cancelled",
   "leave_finished",
 ]);
@@ -110,14 +108,15 @@ router.get("/", requireStaff, async (c) => {
 async function readMyLeave(env: AppEnv["Bindings"], sb: ReturnType<typeof userClient>, me: string) {
   const base = "id, leave_type, starts_on, ends_on, reason, note, proof_paths, approval_required, submitted_at, cancelled_from, cancelled_at";
   const withRecorder = await sb.from("staff_leave")
-    .select(`${base}, recorded_by`)
+    .select(`${base}, recorded_by, cancelled_by`)
     .eq("user_id", me).order("starts_on", { ascending: false }).limit(200);
   if (withRecorder.error) {
     if (withRecorder.error.code !== "42703") return withRecorder;
     return sb.from("staff_leave").select(base).eq("user_id", me).order("starts_on", { ascending: false }).limit(200);
   }
   const rows = (withRecorder.data ?? []) as Array<Record<string, unknown> & { recorded_by?: string | null }>;
-  const others = [...new Set(rows.map((r) => r.recorded_by).filter((id): id is string => !!id && id !== me))];
+  const others = [...new Set(rows.flatMap((r) => [r.recorded_by, (r as { cancelled_by?: string | null }).cancelled_by])
+    .filter((id): id is string => !!id && id !== me))];
   const names = new Map<string, string>();
   if (others.length > 0) {
     const read = await adminClient(env).from("app_users").select("id, name").in("id", others);
@@ -125,10 +124,14 @@ async function readMyLeave(env: AppEnv["Bindings"], sb: ReturnType<typeof userCl
   }
   return {
     error: null,
-    data: rows.map((r) => ({
-      ...r,
-      recorded_by_name: r.recorded_by && r.recorded_by !== me ? names.get(r.recorded_by) ?? null : null,
-    })),
+    data: rows.map((r) => {
+      const cancelledBy = (r as { cancelled_by?: string | null }).cancelled_by ?? null;
+      return {
+        ...r,
+        recorded_by_name: r.recorded_by && r.recorded_by !== me ? names.get(r.recorded_by) ?? null : null,
+        cancelled_by_name: cancelledBy && cancelledBy !== me ? names.get(cancelledBy) ?? null : null,
+      };
+    }),
   };
 }
 
@@ -140,7 +143,10 @@ router.get("/recorder", requireStaff, async (c) => {
   return c.json(leaveRecorderViewSchema.parse(data));
 });
 
-router.post("/for", requireStaff, requireSettingsEditor("staff_duties"), async (c) => {
+/* Any active staff member records a colleague's leave (owner ruling 9 Oct
+ * 2026). Recording leave is NOT a Settings permission; the SQL door applies
+ * the same active-staff test as my own leave and keeps who recorded it. */
+router.post("/for", requireStaff, async (c) => {
   const body = await parseJsonBody(c, staffLeaveRecordForInput);
   if (!body.ok) return c.json(body.body, body.status);
   const sb = userClient(c.env, c.var.auth.jwt);

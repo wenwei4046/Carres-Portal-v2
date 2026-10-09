@@ -2,13 +2,12 @@ import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppEnv } from "../../types";
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn(), adminClient: vi.fn() }));
-const gate = vi.hoisted(() => ({ allow: true }));
+/* Recording leave is NOT a Settings permission (owner ruling 9 Oct 2026): if
+ * the leave router ever asked the Settings gate, this spy would see it. */
+const settingsGate = vi.hoisted(() => vi.fn());
 vi.mock("../../lib/settings-editor", () => ({
-  canEditSettings: vi.fn(async () => gate.allow),
-  requireSettingsEditor: () => async (c: { json: (b: unknown, s: number) => unknown }, next: () => Promise<void>) => {
-    if (!gate.allow) return c.json({ error: "forbidden" }, 403);
-    await next();
-  },
+  canEditSettings: settingsGate,
+  requireSettingsEditor: () => { settingsGate(); return async (_c: unknown, next: () => Promise<void>) => { await next(); }; },
 }));
 import { adminClient, userClient } from "../../lib/supabase";
 import router from "./leave";
@@ -42,7 +41,6 @@ const post = (path: string, body: unknown, role?: string) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
-  gate.allow = true;
   rows.data = []; rows.error = null; policies.data = []; policies.error = null;
   vi.mocked(userClient).mockReturnValue({
     rpc,
@@ -147,10 +145,16 @@ describe("Workspace → Leave API", () => {
     expect(rpc).not.toHaveBeenCalledWith("staff_leave_submit", expect.anything());
   });
 
-  it("someone not named for Staff & Duties cannot record for a colleague", async () => {
-    gate.allow = false;
-    const res = await post("/leave/for", { userId: "eeeeeeee-0000-4000-8000-0000000000ee", type: "planned", startsOn: "2026-10-12", endsOn: "2026-10-12" });
-    expect(res.status).toBe(403);
+  it("any staff role records for a colleague without the Settings gate; a role that is not staff cannot", async () => {
+    rpc.mockResolvedValue({ data: { id: "eeeeeeee-0000-4000-8000-0000000000ff", cover_moved: 0 }, error: null });
+    for (const role of ["operation", "finance", "bd", "hr", "principal"]) {
+      const res = await post("/leave/for", { userId: "eeeeeeee-0000-4000-8000-0000000000ee", type: "planned", startsOn: "2026-10-12", endsOn: "2026-10-12" }, role);
+      expect(res.status).toBe(201);
+    }
+    expect(settingsGate).not.toHaveBeenCalled();
+    rpc.mockClear();
+    const dealer = await post("/leave/for", { userId: "eeeeeeee-0000-4000-8000-0000000000ee", type: "planned", startsOn: "2026-10-12", endsOn: "2026-10-12" }, "dealer");
+    expect(dealer.status).toBe(403);
     expect(rpc).not.toHaveBeenCalled();
   });
 

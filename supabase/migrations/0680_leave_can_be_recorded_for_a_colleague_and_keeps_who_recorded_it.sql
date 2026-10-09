@@ -1,34 +1,63 @@
 -- 0680 — Leave can be recorded for a colleague, and keeps who recorded it.
 --
--- Owner ruling 9 Oct 2026 (Jess): when a staff member cannot log in, the owner
--- or a person she names as a Staff & Duties editor (`settings_can_edit
--- ('staff_duties')`, 0668) may record that person's leave. The record keeps
--- WHO the leave is for and WHO recorded it. Owner flow (9 Oct): Workspace →
--- Leave → Record leave — the person defaults to me, an authorised recorder may
--- choose a colleague; MC / Emergency leave / Planned leave; dates; Submit takes
--- effect at once with no approval; MC proof optional; today's leave starts the
--- existing cover, future leave on its day.
+-- Owner ruling 9 Oct 2026 (Jess, corrected the same day): EVERY signed-in
+-- active staff member may record leave for a colleague — not only the owner or
+-- Settings editors. Recording leave is NOT a Settings permission: nothing here
+-- reads settings_can_edit. The record keeps WHO the leave is for, WHO recorded
+-- it, WHEN, and its change history. Owner flow (9 Oct): Workspace → Leave →
+-- Record leave — the person defaults to me, I may choose a colleague; MC /
+-- Emergency leave / Planned leave; whole days; Submit takes effect at once with
+-- no approval; MC proof optional; today's leave starts the existing cover,
+-- future leave on its day. Half-day leave is not decided and not built.
 --
 --   §1 staff_leave.recorded_by — the person who recorded it (self or recorder).
 --   §2 _staff_leave_record(...) — the ONE body (0679 staff_leave_submit's,
 --      unchanged rules) for the person p_user, recorded by p_recorder.
 --   §3 staff_leave_submit(...) — my own leave (same signature as 0670/0679).
---   §4 staff_leave_record_for(...) — a colleague's leave, by the owner or a
---      named Staff & Duties editor who is a person. No proof file on this
---      door: proof is optional and a file in the recorder's folder could not be
---      read by the colleague (0670 bucket policy: own folder, principal, HR).
+--   §4 staff_leave_record_for(...) — a colleague's leave, by any active staff
+--      person (the same test as recording my own: staff_leave_may_submit).
+--      No proof file on this door: proof is optional and a file in the
+--      recorder's folder could not be read by the colleague (0670 bucket
+--      policy: own folder, principal, HR).
 --   §5 staff_leave_cancel(...) — the person, or whoever recorded it for them,
 --      may cancel future days (rules unchanged otherwise).
---   §6 staff_leave_recorders() — the active people a recorder may choose,
---      names only, for the Record leave form.
--- No RLS policy changes: staff_leave stays readable by its owner, the
--- principal and HR (0670); every write is through these definer doors.
+--   §6 staff_leave_recorder_view() — the active colleagues I may choose
+--      (names only) and the leave I recorded for others.
+--   §7 staff_leave_changes — the append-only change history of every leave:
+--      recorded / cancelled, who, when, old → new. Written only by the doors.
+-- RLS: staff_leave is unchanged (its owner, the principal and HR read it). The
+-- NEW staff_leave_changes table is readable by the person on leave, the person
+-- who acted, the principal and HR; there is no write grant (definer doors only).
 
 -- §1 ─────────────────────────────────────────────────────────────────────────
 alter table public.staff_leave
   add column if not exists recorded_by uuid references public.app_users(id);
 comment on column public.staff_leave.recorded_by is
   '0680: who recorded this leave — the person themselves, or the owner / a Staff & Duties editor recording it for them (owner ruling 9 Oct 2026).';
+
+-- §7 (created first; the doors below write it) ─────────────────────────────
+create table if not exists public.staff_leave_changes (
+  id         bigint generated always as identity primary key,
+  leave_id   uuid not null references public.staff_leave(id),
+  user_id    uuid not null references public.app_users(id),   -- whose leave
+  event      text not null check (event in ('recorded', 'cancelled')),
+  actor_id   uuid not null references public.app_users(id),   -- who did it
+  at         timestamptz not null default clock_timestamp(),
+  old_value  jsonb,
+  new_value  jsonb
+);
+create index if not exists staff_leave_changes_leave on public.staff_leave_changes (leave_id, at);
+alter table public.staff_leave_changes enable row level security;
+revoke all on public.staff_leave_changes from public, anon, authenticated;
+grant select on public.staff_leave_changes to authenticated;
+grant all on public.staff_leave_changes to service_role;
+drop policy if exists staff_leave_changes_read on public.staff_leave_changes;
+create policy staff_leave_changes_read on public.staff_leave_changes
+  for select to authenticated
+  using (user_id = (select auth.uid()) or actor_id = (select auth.uid())
+         or coalesce((select public.app_role())::text in ('principal', 'hr'), false));
+comment on table public.staff_leave_changes is
+  '0680: append-only change history of every leave (recorded / cancelled; whose, who acted, when, old → new). Written only by the leave doors; owner ruling 9 Oct 2026.';
 
 -- §2 ─────────────────────────────────────────────────────────────────────────
 create or replace function public._staff_leave_record(
@@ -105,6 +134,12 @@ begin
           v_policy.approval_required, p_recorder)
   returning * into v_row;
 
+  insert into public.staff_leave_changes (leave_id, user_id, event, actor_id, old_value, new_value)
+  values (v_row.id, p_user, 'recorded', p_recorder, null,
+          jsonb_build_object('leave_type', v_row.leave_type, 'starts_on', v_row.starts_on,
+                             'ends_on', v_row.ends_on, 'reason', v_row.reason, 'note', v_row.note,
+                             'proof_files', cardinality(v_row.proof_paths), 'recorded_by', p_recorder));
+
   -- Today's leave starts cover now, on a stored Office working day (0678
   -- _office_is_working_day); future leave waits for its own day. Only
   -- Operation people and the principal carry routine work.
@@ -158,11 +193,10 @@ security definer
 set search_path = public, pg_temp
 as $fn$
 begin
-  if not public.staff_leave_may_submit()
-     or not coalesce(public.workspace_is_person(auth.uid()), false)
-     or not coalesce(public.settings_can_edit('staff_duties'), false) then
-    raise exception 'only the owner or a named Staff & Duties editor records leave for a colleague'
-      using errcode = '42501', detail = 'not_leave_recorder';
+  -- Any active staff person may record a colleague's leave (owner ruling
+  -- 9 Oct 2026); this is not a Settings permission.
+  if not public.staff_leave_may_submit() then
+    raise exception 'only an active staff member records leave' using errcode = '42501', detail = 'not_staff';
   end if;
   return public._staff_leave_record(p_user, auth.uid(), p_type, p_starts_on, p_ends_on,
                                     p_reason, p_note, '{}'::text[]);
@@ -200,6 +234,10 @@ begin
          cancelled_at   = clock_timestamp()
    where id = p_leave_id
   returning * into v_row;
+  insert into public.staff_leave_changes (leave_id, user_id, event, actor_id, old_value, new_value)
+  values (v_row.id, v_row.user_id, 'cancelled', v_uid,
+          jsonb_build_object('cancelled_from', null),
+          jsonb_build_object('cancelled_from', v_row.cancelled_from));
   return to_jsonb(v_row);
 end;
 $fn$;
@@ -217,9 +255,7 @@ security definer
 set search_path = public, pg_temp
 as $fn$
 begin
-  if not public.staff_leave_may_submit()
-     or not coalesce(public.workspace_is_person(auth.uid()), false)
-     or not coalesce(public.settings_can_edit('staff_duties'), false) then
+  if not public.staff_leave_may_submit() then
     return jsonb_build_object('canRecordForOthers', false, 'people', '[]'::jsonb, 'recorded', '[]'::jsonb);
   end if;
   return jsonb_build_object(

@@ -69,7 +69,7 @@ export function useLeaveRecorder() {
   });
 }
 
-/** 0680 — record a colleague's leave (the owner or a named Staff & Duties editor). */
+/** 0680 — record a colleague's leave (any active staff member; owner ruling 9 Oct 2026). */
 export function useRecordLeaveFor() {
   const refresh = useRefreshAfterLeave();
   return useMutation({
@@ -123,9 +123,6 @@ export function leaveRefusalSentence(act: "submit" | "cancel", error: unknown, f
   switch (leaveRefusalCode(error)) {
     case "leave_overlap":
       return forName ? `${forName} already has leave on these dates.` : "You already have leave on these dates.";
-    case "not_leave_recorder":
-    case "forbidden":
-      return "Only the owner and the people named for Staff & Duties can record leave for a colleague.";
     case "invalid_proof":
       return "Upload the MC proof again.";
     case "reason_required":

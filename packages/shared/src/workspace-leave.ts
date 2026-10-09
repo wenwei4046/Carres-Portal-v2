@@ -62,9 +62,9 @@ export const staffLeaveSubmitInput = z
   });
 export type StaffLeaveSubmitInput = z.infer<typeof staffLeaveSubmitInput>;
 
-/** 0680 — leave recorded FOR a colleague by the owner or a named Staff &
- *  Duties editor (owner ruling 9 Oct 2026). Same rules as my own leave; no
- *  proof file on this door (proof is optional). */
+/** 0680 — leave recorded FOR a colleague by any active staff member (owner
+ *  ruling 9 Oct 2026; not a Settings permission). Same rules as my own leave;
+ *  no proof file on this door (proof is optional). */
 export const staffLeaveRecordForInput = z
   .object({
     userId: z.string().uuid(),
@@ -122,6 +122,9 @@ export const staffLeaveRowSchema = z.object({
   /** 0680: who recorded it (null before 0680, or when the person did). */
   recorded_by: z.string().uuid().nullable().optional(),
   recorded_by_name: z.string().nullable().optional(),
+  /** Who cancelled it, when that was someone else (0680). */
+  cancelled_by: z.string().uuid().nullable().optional(),
+  cancelled_by_name: z.string().nullable().optional(),
 });
 export type StaffLeaveRow = z.infer<typeof staffLeaveRowSchema>;
 

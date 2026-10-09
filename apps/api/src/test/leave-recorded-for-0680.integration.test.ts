@@ -4,10 +4,12 @@ import pg from "pg";
 /**
  * 0680 ON A REAL POSTGRESQL RUNNING THE WHOLE MIGRATION CHAIN.
  *
- * Owner ruling 9 Oct 2026: the owner or a named Staff & Duties editor may
- * record leave for a colleague who cannot log in; the record keeps who it is
- * for AND who recorded it. Same rules: no approval, MC proof optional, today's
- * leave starts the existing cover on an Office working day.
+ * Owner ruling 9 Oct 2026 (corrected the same day): EVERY signed-in active
+ * staff member may record leave for a colleague — not only the owner or
+ * Settings editors; recording leave is not a Settings permission. The record
+ * keeps whose leave it is, who recorded it, when, and its change history. Same
+ * rules: whole days, no approval, MC proof optional, today's leave starts the
+ * existing cover on an Office working day.
  *
  * One transaction, rolled back at the end. PREREQUISITE — a throwaway cluster:
  *   LC_ALL=en_US.UTF-8 node scripts/dry-run-migrations.mjs --keep
@@ -18,7 +20,7 @@ const LOCAL = /^postgres(ql)?:\/\/[^@/]*@?(localhost|127\.0\.0\.1|\[::1\])(:\d+)
 const RUN = Date.now() % 100000;
 const HEX = RUN.toString(16).padStart(5, "0");
 const uid = (tail: string) => `eeeeeeee-0680-4000-8000-${HEX}${tail.padStart(7, "0")}`;
-const U = { jess: uid("1"), editor: uid("2"), sick: uid("3"), plain: uid("4") };
+const U = { jess: uid("1"), editor: uid("2"), sick: uid("3"), plain: uid("4"), shared: uid("5") };
 type J = Record<string, unknown>;
 
 describe.skipIf(!URL)("leave recorded for a colleague keeps who recorded it (real PostgreSQL, 0680)", () => {
@@ -51,7 +53,12 @@ describe.skipIf(!URL)("leave recorded for a colleague keeps who recorded it (rea
       await q("insert into auth.users (id, email) values ($1, $2)", [id, email]);
       await q("insert into app_users (id, email, name, role, status, is_person) values ($1, $2, $3, $4, 'active', true)", [id, email, name, role]);
     }
-    // The owner names Rec Editor for Staff & Duties (0668).
+    // A shared (non-person) login: not a staff member, may record nothing.
+    const sharedEmail = `it-rec-shared-${RUN}@carres.test`;
+    await q("insert into auth.users (id, email) values ($1, $2)", [U.shared, sharedEmail]);
+    await q("insert into app_users (id, email, name, role, status, is_person) values ($1, $2, 'Rec Shared', 'operation', 'active', false)", [U.shared, sharedEmail]);
+    // Rec Editor is named for Staff & Duties Settings — which must make NO
+    // difference to recording leave (a separate permission).
     await as(U.jess);
     await q("select public.settings_grant_section_editor('staff_duties', $1)", [U.editor]);
   });
@@ -65,11 +72,14 @@ describe.skipIf(!URL)("leave recorded for a colleague keeps who recorded it (rea
     expect(r.approval_required).toBe(false);
   });
 
-  it("a named Staff & Duties editor may record too; a colleague not named may not", async () => {
+  it("any active staff member records a colleague's leave — Settings editor or not; a shared login may not", async () => {
     await as(U.editor);
     expect(await attempt("select public.staff_leave_record_for($1, 'planned', $2::date + 3, $2::date + 3)", [U.sick, tomorrow])).toBe("ok");
-    await as(U.plain);
-    expect(await attempt("select public.staff_leave_record_for($1, 'planned', $2::date + 5, $2::date + 5)", [U.sick, tomorrow])).toBe("not_leave_recorder");
+    await as(U.plain); // never named in Settings editors
+    expect(await one("select public.settings_can_edit('staff_duties') as v")).toEqual({ v: false });
+    expect(await attempt("select public.staff_leave_record_for($1, 'planned', $2::date + 5, $2::date + 5)", [U.sick, tomorrow])).toBe("ok");
+    await as(U.shared);
+    expect(await attempt("select public.staff_leave_record_for($1, 'planned', $2::date + 9, $2::date + 9)", [U.sick, tomorrow])).toBe("not_staff");
   });
 
   it("my own leave through the self door records me as the recorder", async () => {
@@ -89,7 +99,24 @@ describe.skipIf(!URL)("leave recorded for a colleague keeps who recorded it (rea
     expect(c.cancelled_by).toBe(U.jess);
   });
 
-  it("the recorder view lists colleagues (never me) and what I recorded; others see nothing", async () => {
+  it("every recorded and cancelled leave keeps its change history: whose, who acted, when, old → new", async () => {
+    const rows = (await q(
+      "select l.user_id, c.event, c.actor_id, c.at is not null as has_time, c.new_value from staff_leave_changes c join staff_leave l on l.id = c.leave_id where l.user_id = $1 order by c.id",
+      [U.sick],
+    )).rows as { user_id: string; event: string; actor_id: string; has_time: boolean; new_value: J }[];
+    expect(rows.filter((r) => r.event === "recorded").map((r) => r.actor_id)).toEqual([U.jess, U.editor, U.plain]);
+    const cancelled = rows.find((r) => r.event === "cancelled");
+    expect(cancelled?.actor_id).toBe(U.jess);
+    expect(rows.every((r) => r.has_time && r.user_id === U.sick)).toBe(true);
+    // A colleague who had no part in it cannot read the history; the person on leave can.
+    await as(U.shared);
+    expect((await q("select count(*)::int as n from staff_leave_changes where user_id = $1", [U.sick])).rows[0].n).toBe(0);
+    await as(U.sick);
+    expect((await q("select count(*)::int as n from staff_leave_changes where user_id = $1", [U.sick])).rows[0].n).toBe(rows.length);
+    await as(U.jess);
+  });
+
+  it("the recorder view lists colleagues (never me) and what I recorded; a shared login sees nothing", async () => {
     await as(U.jess);
     const v = (await one("select public.staff_leave_recorder_view() as v")).v as {
       canRecordForOthers: boolean; people: { id: string }[]; recorded: { userId: string }[];
@@ -99,6 +126,9 @@ describe.skipIf(!URL)("leave recorded for a colleague keeps who recorded it (rea
     expect(v.people.some((p) => p.id === U.sick)).toBe(true);
     expect(v.recorded.every((r) => r.userId !== U.jess)).toBe(true);
     await as(U.plain);
+    const plain = (await one("select public.staff_leave_recorder_view() as v")).v as { canRecordForOthers: boolean };
+    expect(plain.canRecordForOthers).toBe(true);
+    await as(U.shared);
     const none = (await one("select public.staff_leave_recorder_view() as v")).v as { canRecordForOthers: boolean };
     expect(none.canRecordForOthers).toBe(false);
   });

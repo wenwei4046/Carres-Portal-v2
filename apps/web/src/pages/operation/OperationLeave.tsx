@@ -40,9 +40,9 @@ import {
  * (migration 0670; owner rules 9 Oct 2026, `Carres Settings List.md` WS-11;
  * docs/workspace/MASTER.md §4.4 "One leave entry"). No standalone MC Report.
  *
- * Record leave (owner flow 9 Oct 2026): the person defaults to me; the owner or
- * a named Staff & Duties editor may choose a colleague who cannot log in, and
- * the record keeps who recorded it (0680). No type needs approval. MC proof is optional (owner rule 9 Oct 2026),
+ * Record leave (owner flow 9 Oct 2026): the person defaults to me; any active
+ * staff member may choose a colleague (not a Settings permission), and the
+ * record keeps who recorded it (0680). Whole days only. No type needs approval. MC proof is optional (owner rule 9 Oct 2026),
  * Emergency leave a short reason, Planned leave an optional note. Today's leave
  * starts cover at once and future leave on its own day — the database decides
  * who covers; this page never names a colleague or promises one.
@@ -204,6 +204,7 @@ function LeaveRow({ row, today }: { row: StaffLeaveRow; today: string }) {
       </p>
       {(row.reason ?? row.note) ? <p className="text-meta text-c-secondary">{row.reason ?? row.note}</p> : null}
       {row.recorded_by_name ? <p className="text-meta text-c-secondary">Recorded by {row.recorded_by_name}</p> : null}
+      {row.cancelled_by_name ? <p className="text-meta text-c-secondary">Cancelled by {row.cancelled_by_name}</p> : null}
       {row.proof_paths.length > 0 ? (
         <div className="flex flex-wrap gap-2">
           {row.proof_paths.map((path, i) => (

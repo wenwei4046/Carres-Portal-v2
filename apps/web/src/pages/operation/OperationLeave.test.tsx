@@ -176,13 +176,18 @@ describe("Workspace → Leave", () => {
     expect(screen.queryByRole("button", { name: "Submit" })).toBeNull();
   });
 
-  it("Record leave defaults to me; someone not named sees no Leave for choice (0680)", () => {
-    render(<OperationLeave />);
+  it("Record leave defaults to Me for every staff member; without the recorder answer there is no Leave for choice (0680)", () => {
+    state.recorder = { canRecordForOthers: true, people: [{ id: "eeeeeeee-0000-4000-8000-0000000000ee", name: "Shasha" }], recorded: [] };
+    const { unmount } = render(<OperationLeave />);
     expect(screen.getByText("Record leave")).toBeVisible();
+    expect(document.getElementById("leave-person")).toHaveTextContent("Me");
+    unmount();
+    state.recorder = { canRecordForOthers: false, people: [], recorded: [] };
+    render(<OperationLeave />);
     expect(document.getElementById("leave-person")).toBeNull();
   });
 
-  it("the owner or a named editor records a colleague's MC: no proof field, the recorder door, recorded for that name", () => {
+  it("any staff member records a colleague's MC: no proof field, the colleague door, recorded for that name", () => {
     state.recorder = { canRecordForOthers: true, people: [{ id: "eeeeeeee-0000-4000-8000-0000000000ee", name: "Shasha" }], recorded: [] };
     render(<OperationLeave />);
     choose("leave-person", "Shasha");
@@ -198,10 +203,12 @@ describe("Workspace → Leave", () => {
     );
   });
 
-  it("my own leave recorded by someone else says who recorded it", () => {
+  it("my own leave recorded or cancelled by someone else says who did it", () => {
     state.data = { today: TODAY, canSubmit: true, policies: POLICIES,
-      leave: [row({ id: "eeeeeeee-0000-4000-8000-0000000000ab", recorded_by: "eeeeeeee-0000-4000-8000-0000000000cc", recorded_by_name: "Jess" })] };
+      leave: [row({ id: "eeeeeeee-0000-4000-8000-0000000000ab", recorded_by: "eeeeeeee-0000-4000-8000-0000000000cc", recorded_by_name: "Yu Jun",
+        cancelled_from: plusDays(TODAY, 3), cancelled_at: "2026-10-09T02:00:00Z", cancelled_by: "eeeeeeee-0000-4000-8000-0000000000cc", cancelled_by_name: "Yu Jun" })] };
     render(<OperationLeave />);
-    expect(screen.getByText("Recorded by Jess")).toBeVisible();
+    expect(screen.getByText("Recorded by Yu Jun")).toBeVisible();
+    expect(screen.getByText("Cancelled by Yu Jun")).toBeVisible();
   });
 });
