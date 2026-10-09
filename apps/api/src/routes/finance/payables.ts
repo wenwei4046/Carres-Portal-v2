@@ -11,6 +11,9 @@ import {
   supplierBillDraftInput,
   supplierCreditNoteDraftInput,
   supplierFinanceInput,
+  supplierNoteContactInput,
+  supplierNoteFollowupAddInput,
+  supplierNoteSettleInput,
   type PaymentVoucherDraftInput,
   type SupplierBillDraftInput,
   type SupplierCreditNoteDraftInput,
@@ -78,6 +81,18 @@ import type { AppEnv } from "../../types";
  *     POST /credit-notes/:id/cancel     supplier_credit_note_cancel — reverses it if confirmed
  *     POST /credit-notes/:id/applications       supplier_credit_note_apply — knock it off a bill; posts nothing
  *     POST /credit-note-applications/:id/cancel supplier_credit_note_application_cancel — take it off again
+ *
+ *   Credit and debit notes to follow up (0676: what suppliers still owe; posts nothing)
+ *     GET  /notes-to-follow-up          supplier_note_followups_read (adds the purchase returns' own first)
+ *     GET  /notes-to-follow-up/owed?supplierId=   supplier_note_followups_owed — the voucher's reminder
+ *     GET  /notes-to-follow-up/:id      supplier_note_followup_document
+ *     POST /notes-to-follow-up          supplier_note_followup_add — from a bill line, or by hand
+ *     POST /notes-to-follow-up/:id/contacts      supplier_note_followup_contact_add
+ *     POST /notes-to-follow-up/:id/close         supplier_note_followup_close
+ *     POST /notes-to-follow-up/:id/settlements   supplier_note_followup_settle — a confirmed credit note settles it
+ *     POST /note-settlements/:id/take-off        supplier_note_followup_settlement_take_off
+ *     GET  /bills/:id/notes-to-follow-up         supplier_note_followups_of_bill
+ *     GET  /credit-notes/:id/notes-to-follow-up  supplier_note_followups_of_credit_note
  *
  *   Files (supplier invoices, receipts, bank slips, credit notes)
  *     POST /bills/:id/files/sign  · POST /vouchers/:id/files/sign · POST /credit-notes/:id/files/sign
@@ -610,6 +625,117 @@ payablesRouter.post("/credit-note-applications/:id/cancel", requireFinance, asyn
   });
   if (error) return pgFail(c, error);
   return c.json({ id });
+});
+
+// ── credit and debit notes to follow up (0676) ──────────────────────────────
+payablesRouter.get("/notes-to-follow-up", requireFinance, async (c) => {
+  const { data, error } = await sb(c).rpc("supplier_note_followups_read");
+  if (error) return pgFail(c, error);
+  return c.json(data);
+});
+
+payablesRouter.get("/notes-to-follow-up/owed", requireFinance, async (c) => {
+  const supplier = supplierFilter(c);
+  if (!supplier.ok || !supplier.value) return badId(c, "supplier");
+  const { data, error } = await sb(c).rpc("supplier_note_followups_owed", { p_supplier_id: supplier.value });
+  if (error) return pgFail(c, error);
+  return c.json(data);
+});
+
+payablesRouter.get("/notes-to-follow-up/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "note to follow up");
+  const { data, error } = await sb(c).rpc("supplier_note_followup_document", { p_id: id });
+  if (error) return pgFail(c, error);
+  if (!data) return c.json({ error: "not_found", code: "followup_missing", message: "That note to follow up does not exist." }, 404);
+  return c.json(data);
+});
+
+payablesRouter.post("/notes-to-follow-up", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, supplierNoteFollowupAddInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const d = body.data;
+  const { data, error } = await sb(c).rpc("supplier_note_followup_add", {
+    p_reason: d.reason,
+    p_kind: d.kind,
+    p_supplier_id: d.reason === "OTHER" ? d.supplierId : null,
+    p_bill_id: d.reason === "PRICE" ? d.billId : null,
+    p_line_no: d.reason === "PRICE" ? d.lineNo : null,
+    p_amount: d.amount,
+    p_remark: d.remark ?? null,
+    p_next_on: d.nextOn ?? null,
+  });
+  if (error) return pgFail(c, error);
+  return c.json(data, 201);
+});
+
+payablesRouter.post("/notes-to-follow-up/:id/contacts", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "note to follow up");
+  const body = await parseJsonBody(c, supplierNoteContactInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("supplier_note_followup_contact_add", {
+    p_id: id,
+    p_contacted_on: body.data.contactedOn,
+    p_said: body.data.said,
+    p_next_on: body.data.nextOn,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string }, 201);
+});
+
+payablesRouter.post("/notes-to-follow-up/:id/close", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "note to follow up");
+  const body = await parseJsonBody(c, apReasonInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { error } = await sb(c).rpc("supplier_note_followup_close", { p_id: id, p_reason: body.data.reason });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
+payablesRouter.post("/notes-to-follow-up/:id/settlements", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "note to follow up");
+  const body = await parseJsonBody(c, supplierNoteSettleInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("supplier_note_followup_settle", {
+    p_id: id,
+    p_credit_note_id: body.data.creditNoteId,
+    p_amount: body.data.amount,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string }, 201);
+});
+
+payablesRouter.post("/note-settlements/:id/take-off", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "settlement");
+  const body = await parseJsonBody(c, apReasonInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { error } = await sb(c).rpc("supplier_note_followup_settlement_take_off", {
+    p_settlement_id: id,
+    p_reason: body.data.reason,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
+payablesRouter.get("/bills/:id/notes-to-follow-up", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "bill");
+  const { data, error } = await sb(c).rpc("supplier_note_followups_of_bill", { p_bill_id: id });
+  if (error) return pgFail(c, error);
+  return c.json({ rows: data ?? [] });
+});
+
+payablesRouter.get("/credit-notes/:id/notes-to-follow-up", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "credit note");
+  const { data, error } = await sb(c).rpc("supplier_note_followups_of_credit_note", { p_note_id: id });
+  if (error) return pgFail(c, error);
+  if (!data) return c.json({ error: "not_found", code: "note_missing", message: "That credit note does not exist." }, 404);
+  return c.json(data);
 });
 
 payablesRouter.post("/vouchers/:id/money-back", requireFinance, async (c) => {
