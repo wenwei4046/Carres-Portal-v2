@@ -1,9 +1,37 @@
 import type { Config } from "tailwindcss";
 import animate from "tailwindcss-animate";
-// UI-KIT §3.1 — "The law names the STEP, never the hex", so the hexes are read
-// out of @radix-ui/colors rather than typed here. Nobody maintains a hex table
-// and nobody can mistype a digit. Card D0.5a.
-import { amber, blue, green, red, slate } from "@radix-ui/colors";
+// Colours come from the ONE token file (styles/carres-tokens.css) through
+// CSS variables; nothing here types a hex.
+
+
+/* ⭐ THE ONE KIT for Tailwind's own colour families (owner 2026-10-08/09: every
+ * page takes the v4 kit). Pages that still write `text-blue-700` or
+ * `bg-amber-50` get the v4 MEANING of that family — light steps are the soft
+ * fill, dark steps the text — from styles/carres-tokens.css, so no page keeps
+ * a colour outside the kit. Decorative identity hues (violet, pink, teal…)
+ * are left as they are. */
+const STEPS = ["50", "100", "200", "300", "400", "500", "600", "700", "800", "900", "950"] as const;
+const pair = (soft: string, edge: string, ink: string) =>
+  Object.fromEntries(STEPS.map((s) => [s, Number(s) <= 200 ? soft : Number(s) <= 400 ? edge : ink]));
+const ladder = {
+  50: "var(--c-ground)", 100: "var(--c-hover)", 200: "var(--c-card-border)", 300: "var(--c-input-border)",
+  400: "var(--c-muted)", 500: "var(--c-secondary)", 600: "var(--c-tab)", 700: "var(--c-body)",
+  800: "var(--c-ink)", 900: "var(--c-ink)", 950: "var(--c-ink)",
+};
+const KIT_FAMILIES = {
+  /* blue was info and the action ink: info is the grey pair, action ink is ink */
+  blue: pair("var(--c-info-bg)", "var(--c-btn-border)", "var(--c-ink)"),
+  sky: pair("var(--c-info-bg)", "var(--c-btn-border)", "var(--c-ink)"),
+  indigo: pair("var(--c-info-bg)", "var(--c-btn-border)", "var(--c-ink)"),
+  amber: pair("var(--c-warn-bg)", "var(--c-btn-border)", "var(--c-warn-fg)"),
+  orange: pair("var(--c-warn-bg)", "var(--c-btn-border)", "var(--c-warn-fg)"),
+  yellow: pair("var(--c-warn-bg)", "var(--c-btn-border)", "var(--c-warn-fg)"),
+  red: pair("var(--c-err-bg)", "var(--c-btn-border)", "var(--c-err-fg)"),
+  rose: pair("var(--c-err-bg)", "var(--c-btn-border)", "var(--c-err-fg)"),
+  green: pair("var(--c-ok-bg)", "var(--c-btn-border)", "var(--c-ok-fg)"),
+  emerald: pair("var(--c-ok-bg)", "var(--c-btn-border)", "var(--c-ok-fg)"),
+  gray: ladder, slate: ladder, zinc: ladder, neutral: ladder, stone: ladder,
+};
 
 export default {
   darkMode: ["class"],
@@ -16,6 +44,7 @@ export default {
     },
     extend: {
       colors: {
+        ...KIT_FAMILIES,
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -165,33 +194,31 @@ export default {
           canvas: "var(--c-ground)", // the theme ground (handoff v4, 2026-10-08) — formerly = #F7F8FA (Jess 2026-08-02; UI MASTER §6.7 2026-09-17) — body and every page read the same variable
           // `strip` retired the same day (Jess's polish: too many greys were
           // competing) — the header strip sits on the canvas, no grey of its own.
+          /* ⭐ THE ONE KIT (owner 2026-10-08/09): every page takes the v4
+           * kit. The Radix step NAMES stay, so the pages that use them need no
+           * edit; each step now resolves to its v4 token (carres-tokens.css),
+           * so the theme reaches them too. Blue was selection and the action
+           * ink — selection is the theme's select pair, action ink is ink. */
           slate: {
-            2: slate.slate2, // expansion area under an opened register row (owner ruling R5, 2026-09-16 · additive)
-            3: slate.slate3, // table header #F1F3F5 (Jess, 2026-08-02) · page canvas on unmigrated pages (Q2)
-            4: slate.slate4, // quiet control border (Jess, 2026-08-01; thead moved to slate-3, 2026-08-02)
-            5: slate.slate5, // hairline — table lines, card edge
-            6: slate.slate6, // stronger divider — section split
-            9: slate.slate9, // icon at rest · placeholder
-            11: slate.slate11, // secondary text
-            12: slate.slate12, // primary text
+            2: "var(--c-ground)", // expansion area · quiet fill
+            3: "var(--c-search-bg)", // grey chrome · automatic field · header band
+            4: "var(--c-input-border)", // quiet control border
+            5: "var(--c-card-border)", // hairline — card edge, table line
+            6: "var(--c-head-line)", // stronger divider — section split
+            9: "var(--c-muted)", // icon at rest · placeholder
+            11: "var(--c-secondary)", // secondary text
+            12: "var(--c-ink)", // primary text
           },
           blue: {
-            2: blue.blue2, // row HOVER — one step under selected (Jess, 2026-08-01)
-            3: blue.blue3, // selected row · info fill
-            /* The EDGE of a tinted surface (Warehouse Schedule, owner-approved
-             * design 2026-09-14). A tinted card needs a border one step up from
-             * its own fill or it dissolves into the column, and slate-5 over an
-             * amber or blue fill reads as a mistake. Radix step 6 is each ramp's
-             * own "subtle border" step, so this is the palette's answer rather
-             * than a hex someone matched by eye. ADDITIVE — no existing step
-             * moves, so no shipped page changes colour. */
-            6: blue.blue6, // border of a blue-3 surface
-            9: blue.blue9, // the one action fill · focus ring
-            11: blue.blue11, // action ink
+            2: "var(--c-hover)", // row hover
+            3: "var(--c-select-bg)", // selected row · active choice
+            6: "var(--c-btn-border)", // edge of a selected surface
+            9: "var(--c-ink)", // the one action fill — the charcoal main button
+            11: "var(--c-ink)", // action ink — document links read in ink
           },
-          green: { 3: green.green3, 11: green.green11 }, // done · received · in stock
-          amber: { 3: amber.amber3, 6: amber.amber6, 11: amber.amber11 }, // needs attention · waiting
-          red: { 3: red.red3, 9: red.red9, 11: red.red11 }, // late · act now
+          green: { 3: "var(--c-ok-bg)", 11: "var(--c-ok-fg)" }, // done · received · in stock
+          amber: { 3: "var(--c-warn-bg)", 6: "var(--c-btn-border)", 11: "var(--c-warn-fg)" }, // needs attention · waiting
+          red: { 3: "var(--c-err-bg)", 9: "var(--c-err-fg)", 11: "var(--c-err-fg)" }, // late · act now
         },
       },
       /* ⭐ THE KIT TYPE SCALE (UI-KIT §2.1, card D0.5a) — six tokens, each
@@ -235,7 +262,10 @@ export default {
         // proportions, free license. Keep scoped to Login.tsx; other pages use
         // `font-display` (DM Sans) per CLAUDE.md §10.
         editorial: ['"Cera Pro"', "Mulish", "DM Sans", "system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "ui-monospace", "monospace"],
+        // v4 kit: numbers and codes are Inter with tabular figures, never a
+        // mono face (body carries `font-variant-numeric: tabular-nums`), so
+        // the pages that still write `font-mono` read in Inter.
+        mono: ["Inter", "DM Sans", "system-ui", "sans-serif"],
         // POS price hero — Archivo Black (2990s-style), condensed via
         // font-stretch in CSS. Falls back to Inter / system-ui.
         price: ["Archivo", "Inter", "system-ui", "sans-serif"],

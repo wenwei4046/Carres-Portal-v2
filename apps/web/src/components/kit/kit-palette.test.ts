@@ -25,31 +25,22 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
+import tailwindConfig from "../../../tailwind.config";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = join(HERE, "..", "..");
-const CONFIG = join(HERE, "..", "..", "..", "tailwind.config.ts");
 
 /**
- * Every `kit.<ramp>.<step>` the config actually publishes.
- *
- * Read off the RADIX REFERENCE (`9: red.red9,`) rather than by slicing the
- * `kit:` object into ramp blocks: the blocks carry multi-line comments, and a
- * `}` inside one silently ends the slice — which is how a first draft of this
- * guard reported five live tokens as missing.
+ * Every `kit.<ramp>.<step>` the config actually publishes — read from the
+ * config OBJECT itself (since the v4 kit each step is a `var(--c-*)` token,
+ * not a Radix reference), so a comment or a brace can never hide a step.
  */
 const RAMPS = ["slate", "blue", "green", "amber", "red"] as const;
 
 function publishedSteps(): Map<string, Set<string>> {
-  const text = readFileSync(CONFIG, "utf8");
+  const kit = (tailwindConfig.theme?.extend?.colors as unknown as { kit: Record<string, Record<string, string>> }).kit;
   const out = new Map<string, Set<string>>();
-  for (const ramp of RAMPS) {
-    const steps = new Set<string>();
-    for (const m of text.matchAll(new RegExp(`\\b${ramp}\\.${ramp}(\\d+)\\b`, "g"))) {
-      steps.add(m[1]!);
-    }
-    out.set(ramp, steps);
-  }
+  for (const ramp of RAMPS) out.set(ramp, new Set(Object.keys(kit[ramp] ?? {})));
   return out;
 }
 

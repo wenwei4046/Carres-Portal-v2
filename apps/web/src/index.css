@@ -43,100 +43,84 @@
      * docs/workspace/MASTER.md §5.5) — the Work page's section
      * edge, card ink ladder and date-status fills. Read ONLY through the
      * `work-*` Tailwind names; no other page uses them. */
-    --work-line: #ccd7e5;          /* every Work section and card edge */
-    --work-line-hover: #aebfd3;    /* card edge under the pointer */
-    --work-ink: #17243a;           /* card fact · date number */
-    --work-slate: #40516a;         /* card action · module name */
-    --work-muted: #66758b;         /* party · weekday · document number */
-    --work-tabs: #e9eef5;          /* the To do / Waiting / Completed rail */
-    --work-missed-fill: #fff0f1;   --work-missed-line: #efb7bd;   --work-missed-ink: #c62835;
-    --foreground: 0 0% 10%;            /* #1A1A1A — v4 text primary near-black */
+    --work-line: var(--c-card-border);       /* every Work section and card edge */
+    --work-line-hover: var(--c-head-line);   /* card edge under the pointer */
+    --work-ink: var(--c-ink);                /* card fact · date number */
+    --work-slate: var(--c-body);             /* card action · module name */
+    --work-muted: var(--c-secondary);        /* party · weekday · document number */
+    --work-tabs: var(--c-ground);            /* the To do / Waiting / Completed rail */
+    --work-missed-fill: var(--c-err-bg);   --work-missed-line: var(--c-err-bg);   --work-missed-ink: var(--c-err-fg);
 
-    --card: 0 0% 100%;                 /* white cards */
-    --card-foreground: 221 39% 11%;
+    /* ⭐ THE ONE KIT (owner 2026-10-08/09: every page takes the v4 kit). The
+       legacy variables below are kept by NAME so the pages that still read
+       them need no edit, and they carry the v4 values of
+       styles/carres-tokens.css (as HSL, because they are read as
+       `hsl(var(--x))`). Theme-aware colours (ground, selection) are the `c-*`
+       classes; these legacy names hold the Carres theme's values. */
+    --foreground: 340 5% 13%;          /* ink */
+
+    --card: 0 0% 100%;
+    --card-foreground: 340 5% 13%;     /* ink */
 
     --popover: 0 0% 100%;
-    --popover-foreground: 221 39% 11%;
+    --popover-foreground: 340 5% 13%;
 
-    --primary: 13 64% 47%;             /* flame #C44D2B */
+    --primary: 340 5% 13%;             /* the main button is charcoal ink */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 14% 96%;          /* gray-100 */
-    --secondary-foreground: 221 39% 11%;
+    --secondary: 34 18% 92%;           /* hover */
+    --secondary-foreground: 340 5% 13%;
 
-    --muted: 220 13% 91%;              /* gray-200 */
-    --muted-foreground: 220 9% 46%;    /* gray-500 */
+    --muted: 216 13% 92%;              /* card border */
+    --muted-foreground: 212 6% 45%;    /* secondary text */
 
-    --accent: 18 51% 91%;              /* flame-light #F4E4DD */
-    --accent-foreground: 13 64% 47%;   /* flame */
+    --accent: 34 18% 92%;              /* hover */
+    --accent-foreground: 340 5% 13%;
 
-    --destructive: 0 72% 51%;          /* red-600 #DC2626 */
+    --destructive: 4 76% 40%;          /* problem text */
     --destructive-foreground: 0 0% 100%;
-
-    /* --danger: bright red (#DC2626) — "out of stock" / "overdue" / negative-net
-       accents. v17 collapses the old wine/red split into one semantic red. */
-    --danger: 0 72% 51%;
+    --danger: 4 76% 40%;
     --danger-foreground: 0 0% 100%;
 
-    --border: 220 13% 91%;             /* gray-200 */
-    --input: 220 13% 91%;
-    --ring: 13 64% 47%;                /* flame focus ring */
+    --border: 216 13% 92%;             /* card border */
+    --input: 214 13% 90%;              /* input border */
+    --ring: 217 14% 81%;               /* the soft focus outline */
 
-    --radius: 0.5rem;                  /* 8px (v17 lg) */
+    --radius: 0.5rem;                  /* 8px */
 
-    /* Neutral ramp — Tailwind cool gray (v17). Names kept = zero component churn. */
-    --base-50:  210 20% 98%;  /* #F9FAFB */
-    --base-100: 220 14% 96%;  /* #F3F4F6 */
-    --base-200: 220 13% 91%;  /* #E5E7EB */
-    --base-300: 216 12% 84%;  /* #D1D5DB */
-    --base-400: 218 11% 65%;  /* #9CA3AF */
-    --base-500: 220 9% 46%;   /* #6B7280 */
-    --base-600: 215 14% 34%;  /* #4B5563 */
-    --base-700: 217 19% 27%;  /* #374151 */
-    --base-800: 215 28% 17%;  /* #1F2937 */
-    --base-900: 221 39% 11%;  /* #111827 */
+    /* Neutral ramp → the v4 ladder: ground · hover · card border · input
+       border · muted · secondary · tab · body · ink. */
+    --base-50:  36 20% 95%;   /* ground */
+    --base-100: 34 18% 92%;   /* hover */
+    --base-200: 216 13% 92%;  /* card border */
+    --base-300: 214 13% 90%;  /* input border */
+    --base-400: 216 7% 57%;   /* muted */
+    --base-500: 212 6% 45%;   /* secondary */
+    --base-600: 217 8% 32%;   /* unselected tab */
+    --base-700: 217 10% 25%;  /* body */
+    --base-800: 340 5% 13%;   /* ink */
+    --base-900: 340 5% 13%;   /* ink */
 
-    /* Brand — flame (token name `--terracotta` kept for zero churn). */
-    --terracotta: 13 64% 47%;          /* #C44D2B */
+    /* The former flame accent → the Carres select pair. */
+    --terracotta: 16 78% 36%;          /* select text */
+    --signature-50:  21 80% 92%;       /* select wash */
+    --signature-100: 21 80% 92%;
+    --signature-700: 16 78% 36%;
 
-    /* Brand tints — active fills + darker hover. */
-    --signature-50:  18 51% 91%;  /* flame-light #F4E4DD — active chip/card fill */
-    --signature-100: 16 60% 85%;  /* a touch deeper */
-    --signature-700: 14 64% 37%;  /* flame-dark #9A3D22 — primary/hero hover */
-
-    /* Status — v17 bright semantic + soft fills (Tailwind 600 / 100). */
-    --success:        142 71% 45%;  /* #16A34A */
-    --success-soft:   138 76% 93%;  /* #DCFCE7 */
+    /* Status → the v4 pairs (soft fill · dark text). */
+    --success:        142 61% 30%;
+    --success-soft:   140 45% 94%;
     --success-foreground: 0 0% 100%;
-    --warning:         32 95% 44%;  /* #D97706 */
-    --warning-soft:    48 96% 89%;  /* #FEF3C7 */
+    --warning:         44 100% 24%;
+    --warning-soft:    42 82% 91%;
     --warning-foreground: 0 0% 100%;
-    --info:           217 91% 60%;  /* #2563EB */
-    --info-soft:      214 95% 93%;  /* #DBEAFE */
+    --info:           217 10% 25%;
+    --info-soft:      220 11% 95%;
     --info-foreground: 0 0% 100%;
-    /* Hover tint — THE single hover fill for every clickable row/nav/chip.
-       Use hover:bg-hovertint.
-
-       GREY, ruled by Loo 2026-08-03, settling a live conflict between two
-       frozen laws: `01-design-tokens.md` §2.3 said a row hovers blue and
-       "never grey", while his own 2026-07-30 accent law said blue marks the
-       CURRENT thing and the primary action and nothing else. Both were half
-       right, and the missing sentence is the division of labour:
-
-         hover     = GREY   — "the mouse is here", true for one second,
-                              carries no meaning and must not spend the accent
-         selection = BLUE   — "this row is in the batch", a lasting state with
-                              a consequence (on To Order it means this line
-                              becomes a purchase order today)
-
-       Blue now marks exactly TWO things on any screen — the primary action
-       and the current selection — which is what makes the accent readable.
-       GitHub, SAP Fiori and Excel all split it the same way. Changing this ONE
-       value moves 88 of the portal's 99 hovers; the rest were literals and
-       were swept the same day. */
-    --hover-tint:     210 17% 95%;  /* slate-3 — the neutral hover */
-    /* --error shares the v17 red; *-soft kept for pill/callout fills. */
-    --error-soft:      0 93% 94%;   /* #FEE2E2 */
+    /* Hover tint — THE single hover fill for every clickable row/nav/chip
+       (hover:bg-hovertint): the v4 hover. Selection is the select wash. */
+    --hover-tint:     34 18% 92%;
+    --error-soft:      0 81% 96%;   /* problem wash */
   }
 }
 

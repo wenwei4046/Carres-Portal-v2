@@ -1251,7 +1251,7 @@ export default function SalesOrdersRegister() {
           leaves the 44px strip that brings it back. */}
       <div ref={areaRef} className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden" data-testid="sales-orders-area">
       {visibleRail ? (
-        railFloats ? <div className="absolute inset-0 z-20 flex" onKeyDown={(event) => { if (event.key === "Escape") hideRail(); }}><div className="relative z-10 flex shadow-lg">{rail}</div><button type="button" className="flex-1 bg-kit-slate-12/40" aria-label="Hide filters" onClick={hideRail} /></div> : rail
+        railFloats ? <div className="absolute inset-0 z-20 flex" onKeyDown={(event) => { if (event.key === "Escape") hideRail(); }}><div className="relative z-10 flex shadow-lg">{rail}</div><button type="button" className="flex-1 bg-[var(--backdrop)]" aria-label="Hide filters" onClick={hideRail} /></div> : rail
       ) : (
         <aside className="flex w-11 shrink-0 flex-col items-center gap-2 border-r border-kit-slate-5 bg-white py-2" data-testid="sales-orders-rail-collapsed">
           <ShowFiltersButton onShow={showRail} testId="sales-orders-show-filters" />
