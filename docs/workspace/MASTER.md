@@ -570,10 +570,32 @@ enter automatic PO eligibility from the next calendar month. This is not the pen
 monthly roster/admission engine; current baseline assignment remains the dated source.
 
 **Remaining target work:** complete monthly rotation, the People-owned departure/access workflow
-and restricted former-profile lookup, complete bounded manual-exception convergence across a
-changing monthly baseline, full legacy-history pagination, and original/update/completion Work
-assignment snapshots with originating-surface audit. The two-period movement ledger must not be
-reported as those capabilities.
+and restricted former-profile lookup, the People-owned dated leave record (HR §7), complete bounded
+manual-exception convergence across a changing monthly baseline, full legacy-history pagination,
+and original/update/completion Work assignment snapshots with originating-surface audit. The
+two-period movement ledger must not be reported as those capabilities.
+
+**AUTOMATIC PO/GRN LEAVE COVER — BUILT ON BRANCH 2026-10-06 (PR #1966, `build/workspace-auto-cover`,
+migration 0653); production apply PENDING, not deployed.** Measured before the change: the only
+recorded leave fact is the Operation pool away switch (`ops_staff_settings.available = false`,
+0232, undated, `ops_manager`-gated). Only the minute cron (`* 1-10 * * 1-5`, weekday 09:00–18:59
+MYT) turned it into an assignment movement, so until that movement existed the Shared Duty Resolver
+kept naming the person on leave and stamped `no_candidate` even when a colleague was free. 0653
+makes `workspace_resolve_duty` answer at read time for PO Duty and GRN Duty on today's company
+date: when the resolved person has recorded leave, the next candidate from
+`_workspace_activity_scope` — the movement writer's own cycle arithmetic (staff-code cycle after
+the absent person, active Operation people, nobody on leave, joining-month PO exclusion) — is
+returned as the cover (`is_cover`, `source: system_assignment`, `assignment_reason:
+recorded_unavailability`, no movement id until the ledger records it). The normal owner is
+unchanged. No eligible cover keeps the holder with the visible `no_candidate` exception; no eligible
+Primary or cover stays `Not assigned`; nobody is invented and there is no PIC/manager/principal
+fallback. History is unchanged: the movement ledger still records the change (same person, proven),
+source writers record the actual actor, PO issue history keeps normal owner/cover/issuer apart, and
+GRN amendment authority still reads the recorded holder (0619). Replay proof with a 0625-resolver
+negative control: `apps/api/src/test/duty-leave-cover-0653.integration.test.ts` (7 pass; 5 fail
+without 0653). Boundaries: the switch carries no dates, so future days and planned leave are not
+covered until People owns dated leave; Delivery Duty and order-scope read-time cover and departure
+read-time re-resolution remain on the movement cron.
 
 Release: merge `0f80cff62a73d17ade68fce0c07b87a73732cf59`, deployment run
 [36677653387](https://github.com/wenwei4046/Carres-Portal-v2/actions/runs/36677653387).
