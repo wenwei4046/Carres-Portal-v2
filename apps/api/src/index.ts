@@ -43,6 +43,8 @@ import warehouseReceiptsRouter from "./routes/operation/warehouse-receipts";
 import workActivityRouter from "./routes/operation/work-activity";
 import settingsCoreRouter, { companyProfileReadRouter } from "./routes/operation/settings-core";
 import workspaceDutiesRouter from "./routes/operation/workspace-duties";
+import leaveRouter from "./routes/operation/leave";
+import saturdayOnCallRouter from "./routes/operation/saturday-on-call";
 import operationWorkRouter from "./routes/operation/work";
 import procurementTabsRouter from "./routes/operation/procurement-tabs";
 import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg";
@@ -146,6 +148,7 @@ import rentalRouter from "./routes/rental";
 import { runContactByCron, runFollowUpMaintenanceCron } from "./cron/contact-by";
 import { runDealerCommissionCloseCron } from "./cron/dealer-commission-close";
 import { runWorkActivityCron } from "./cron/work-activity";
+import { runDutyRotaCron } from "./cron/duty-rota";
 import type { AppEnv, Bindings } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -347,6 +350,8 @@ api.route("/operation/repair-orders", repairOrdersRouter);
 api.route("/operation/warehouse-receipts", warehouseReceiptsRouter);
 api.route("/operation/workspace-duties", workspaceDutiesRouter);
 api.route("/operation/work-activity", workActivityRouter);
+api.route("/operation/leave", leaveRouter);
+api.route("/operation/saturday-on-call", saturdayOnCallRouter);
 api.route("/operation/work", operationWorkRouter);
 api.route("/operation/orders", annotationsRouter);
 api.route("/operation/escalations", escalationsRouter);
@@ -370,6 +375,9 @@ export default {
         // 0666: the dealer commission month before closes by itself (on the 1st);
         // its failure is logged and never stops the jobs after it.
         await runDealerCommissionCloseCron(env).catch((e) => console.error("dealer commission close failed:", e));
+        // 0671: the monthly PO / GRN rota — this month, and next month from the
+        // 25th. Its failure is logged and never stops the jobs after it.
+        await runDutyRotaCron(env).catch((e) => console.error("duty rota failed:", e));
         await runContactByCron(env);
         await runFollowUpMaintenanceCron(env);
         // Purchasing MASTER §9.5: an overdue date is PO/Work follow-up,
