@@ -213,3 +213,31 @@ describe("Message Templates and Access", () => {
     expect(screen.queryByText(/Shasha|Yu Jun/)).toBeNull();
   });
 });
+
+describe("Delivery Rules → Courier dispatch within (DEL-10, 0677)", () => {
+  it("an editor saves it through its own door; a lead saved first hands its new revision on", async () => {
+    apiFetch.mockImplementation(async (url: string) =>
+      url.endsWith("/rules/assignment-lead") ? { revision: 5 } : {});
+    state.data = response({ rules: { assignmentLeadWorkingDays: 3, courierDispatchWorkingDays: 3, courierDispatchStored: true, revision: 4, stored: true, canEdit: true } });
+    renderAt("/operation/settings/delivery/rules");
+    const card = screen.getByTestId("delivery-settings-courier-dispatch");
+    expect(card).toHaveTextContent("Counts the dispatching Warehouse's working days");
+    expect(card).toHaveTextContent("not a customer delivery date");
+    fireEvent.change(screen.getByLabelText("Assign logistics by"), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText("Courier dispatch within"), { target: { value: "4" } });
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "One packer" } });
+    fireEvent.click(screen.getByTestId("delivery-settings-save"));
+    await screen.findByText("Save changes");
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/api/operation/delivery-settings/rules/courier-dispatch",
+      expect.objectContaining({ method: "PUT", body: JSON.stringify({ workingDays: 4, revision: 5, reason: "One packer" }) }),
+    );
+  });
+
+  it("before 0677 the default reads in words and is not editable", () => {
+    state.data = response({ rules: { assignmentLeadWorkingDays: 3, courierDispatchWorkingDays: 3, courierDispatchStored: false, revision: 4, stored: true, canEdit: true } });
+    renderAt("/operation/settings/delivery/rules");
+    expect(screen.getByTestId("delivery-settings-courier-dispatch")).toHaveTextContent("3 working days after Warehouse confirms the goods can be packed");
+    expect(screen.queryByLabelText("Courier dispatch within")).not.toBeInTheDocument();
+  });
+});

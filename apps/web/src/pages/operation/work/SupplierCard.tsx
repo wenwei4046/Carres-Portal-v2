@@ -15,7 +15,8 @@ import type { PartyTone } from "@carres/shared";
 import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { SUPPLIER_CARD_COPY as S, myHolidaySet, supplierCardModel, type SupplierRow } from "@carres/shared";
+import { SUPPLIER_CARD_COPY as S, supplierCardModel, type SupplierRow } from "@carres/shared";
+import { useOfficeDays } from "@/lib/deadline-queries";
 import Button from "@/components/kit/Button";
 import Icon from "@/components/kit/Icon";
 import { appTodayIso, fmtDateShort } from "@/lib/fmt-date";
@@ -53,12 +54,14 @@ export function useSupplierCard(orderId: string) {
     [scope.card],
   );
   const stockSite = (logisticsQ.data?.routes ?? []).find((r) => r.readyUnits > 0)?.place ?? null;
+  /* The day-before check is PO Duty's Office work: the stored Office calendar. */
+  const officeDays = useOfficeDays();
   const model = useMemo(
     () =>
       factsQ.data
-        ? supplierCardModel({ todayIso: appTodayIso(), holidays: myHolidaySet(), pos: factsQ.data.purchaseOrders, goods, stockSite, spell })
+        ? supplierCardModel({ todayIso: appTodayIso(), holidays: officeDays.holidays, offDays: officeDays.offDays, pos: factsQ.data.purchaseOrders, goods, stockSite, spell })
         : null,
-    [factsQ.data, goods, stockSite],
+    [factsQ.data, goods, stockSite, officeDays],
   );
   return { factsQ, model };
 }

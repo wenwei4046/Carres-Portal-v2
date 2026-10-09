@@ -54,6 +54,7 @@
  * (its full month opens through the kit's standard date control). Arrows
  * replace the whole displayed window; the calendar never scrolls sideways.
  */
+import { useDeliveryDays } from "../../lib/deadline-queries";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -71,7 +72,6 @@ import {
   arrivalSentenceOf,
   deliveryQueueLeads,
   isArrivalException,
-  myHolidaySet,
 } from "@carres/shared";
 import { fmtDate, fmtMonth, appTodayIso } from "@/lib/fmt-date";
 import Select from "@/components/kit/Select";
@@ -981,7 +981,8 @@ export default function OperationDelivery() {
     () => (settingsQ.data ? deliveryQueueLeads(settingsQ.data) : undefined),
     [settingsQ.data],
   );
-  const holidays = useMemo(() => myHolidaySet(), []);
+  /* The Delivery calendar's holidays (stored Selangor, else built-in). */
+  const holidays = useDeliveryDays().holidays;
   /* The addon's own catalog NAME — the list read carries the key, the catalog
      carries the word, and the operator may never see the key. */
   const addonNameByKey = useMemo(() => {

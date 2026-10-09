@@ -24,7 +24,7 @@ import { carresExecutionLabel, customerResolutionLabel } from "./supplier-claim"
 import { klDateOfIso } from "./supplier-claim-record";
 import type { PurchaseReturnListRow } from "./purchase-return";
 import { purchaseReturnCollectedQty, purchaseReturnQty } from "./purchase-return";
-import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
+import { purchasingOfficeDays, type PurchasingOfficeDays } from "./purchasing-supplier-calls";
 import { myHolidaySet } from "./my-holidays";
 import { addWorkingDays, countWorkingDays, subtractWorkingDays, type IsoDate } from "./working-days";
 import type { WorkItem } from "./work-engine";
@@ -241,7 +241,8 @@ export interface PurchaseReturnWorkOccurrence {
   requiredResult: string;
 }
 
-const office = (holidays: ReadonlySet<string>) => ({ offDays: PURCHASING_OFFICE_OFF_DAYS, holidays });
+/** The stored Office calendar (weekdays + holidays) — `purchasingOfficeDays`. */
+const office = (holidays: PurchasingOfficeDays) => purchasingOfficeDays(holidays);
 
 function klDate(iso: string): IsoDate {
   return new Date(new Date(iso).getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -251,7 +252,7 @@ function workItem(
   input: { ruleKey: PurchaseReturnWorkRule; ref: string; objectId: string; action: string; due: IsoDate | null },
   owner: WorkspaceDutyResolution | null,
   today: IsoDate,
-  holidays: ReadonlySet<string>,
+  holidays: PurchasingOfficeDays,
 ): WorkItem {
   const late = input.due && input.due < today ? countWorkingDays(input.due, today, office(holidays)) : 0;
   return {
@@ -283,7 +284,7 @@ export function purchaseReturnIssueWork(
   claim: PurchaseReturnPendingIssue,
   owner: WorkspaceDutyResolution | null,
   today: IsoDate,
-  holidays: ReadonlySet<string> = myHolidaySet(),
+  holidays: PurchasingOfficeDays = myHolidaySet(),
 ): PurchaseReturnWorkOccurrence {
   const supplier = claim.supplier_name ?? "the supplier";
   const decided = claim.carres_execution_at ? klDate(claim.carres_execution_at) : null;
@@ -306,7 +307,7 @@ export function purchaseReturnWorkItems(
   pr: PurchaseReturnDetail,
   owner: WorkspaceDutyResolution | null,
   today: IsoDate,
-  holidays: ReadonlySet<string> = myHolidaySet(),
+  holidays: PurchasingOfficeDays = myHolidaySet(),
 ): PurchaseReturnWorkOccurrence[] {
   const supplier = pr.supplier_name ?? "the supplier";
   const ref = pr.pr_no ?? "Not issued";
@@ -362,7 +363,8 @@ export function projectPurchaseReturnWork(input: {
   poDuty: WorkspaceDutyResolution | null;
   today: IsoDate;
   observedAt?: string;
-  holidays?: ReadonlySet<string>;
+  /** The stored Office calendar (`officeWorkingDayOptions`) or a holiday set. */
+  holidays?: PurchasingOfficeDays;
 }): OperationWorkItem[] {
   const holidays = input.holidays ?? myHolidaySet();
   const observed = input.observedAt ? { observedAt: input.observedAt } : {};

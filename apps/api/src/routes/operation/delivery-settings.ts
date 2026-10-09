@@ -19,6 +19,7 @@ import { userClient } from "../../lib/supabase";
 import { resolveActorNames } from "../../lib/actor-names";
 import { loadPurchasingNumbers, loadPurchasingSettings } from "../../lib/purchasing-settings";
 import { readDeliveryRules } from "../../lib/delivery-rules";
+import { readDeliveryCalendar } from "../../lib/delivery-calendar";
 import type { AppEnv } from "../../types";
 
 /**
@@ -96,6 +97,10 @@ deliverySettingsRouter.get("/", requireOperationOrPrincipal, async (c) => {
        not installed: the default answers and Edit is not offered. */
     rules: {
       assignmentLeadWorkingDays: rules.assignmentLeadWorkingDays,
+      /* DEL-10 · `Courier dispatch within` (0677); `courierDispatchStored:
+         false` until the column exists — the default 3 shows, no Edit. */
+      courierDispatchWorkingDays: rules.courierDispatchWorkingDays,
+      courierDispatchStored: rules.courierDispatchStored,
       revision: rules.revision,
       stored: rules.stored,
       canEdit: rules.stored && !canRulesR.error && canRulesR.data === true,
@@ -118,6 +123,43 @@ deliverySettingsRouter.get("/leads", requireOperationOrPrincipal, async (c) => {
     contactLeadWorkingDays: numbers?.logisticsCallWorkingDays ?? null,
     assignmentLeadWorkingDays: rules.assignmentLeadWorkingDays,
     stored: rules.stored,
+  });
+});
+
+/**
+ * THE DELIVERY CALENDAR every Delivery date counts on (owner order
+ * 9 Oct 2026): Monday–Saturday with the Selangor public holidays Warehouse
+ * Settings stores for the dispatching Site, else the built-in list
+ * (`readDeliveryCalendar`). Read-only — the dates are edited in Settings →
+ * Warehouse → Public Holidays, never here. Finance reads it too: the
+ * payment-due FACT counts on it, and the Warehouse Schedule uses its holidays
+ * as the governed fallback. Row security decides what each role reads; a
+ * refused read answers the built-in list.
+ */
+deliverySettingsRouter.get("/calendar", async (c) => {
+  const role = c.var.auth?.role;
+  if (role !== "operation" && role !== "principal" && role !== "finance" && role !== "warehouse") {
+    return c.json({ error: "forbidden", message: "Carres staff only" }, 403);
+  }
+  const { calendar, stored } = await readDeliveryCalendar(userClient(c.env, c.var.auth.jwt));
+  return c.json({
+    region: calendar.region,
+    holidays: calendar.holidays,
+    holidaySource: calendar.holidaySource,
+    recordedYears: calendar.recordedYears,
+    stored,
+  });
+});
+
+/** DEL-10 · Delivery Rules → `Courier dispatch within` (0677's door; the
+ *  same editor gate, revision and change record as `Assign logistics by`). */
+deliverySettingsRouter.put("/rules/courier-dispatch", requireOperationOrPrincipal, async (c) => {
+  const body = await parseJsonBody(c, deliveryAssignmentLeadInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  return rpc(c, "delivery_set_courier_dispatch_lead", {
+    p_working_days: body.data.workingDays,
+    p_revision: body.data.revision,
+    p_reason: body.data.reason ?? null,
   });
 });
 

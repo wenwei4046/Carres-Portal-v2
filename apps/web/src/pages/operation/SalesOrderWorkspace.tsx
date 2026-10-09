@@ -93,7 +93,7 @@ import { offerableAddons } from "../dealer/pos/AddonsPanel";
 import Loading from "@/components/kit/Loading";
 import { serviceCodeWord } from "@/lib/service-code";
 import { apiFetch, ApiError } from "@/lib/api";
-import { useDeliveryLeads, useOfficeDays, useOrderCollectionTiming } from "@/lib/deadline-queries";
+import { useDeliveryDays, useDeliveryLeads, useOrderCollectionTiming } from "@/lib/deadline-queries";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { floorSurchargeRaw, stairCarryCount } from "@/lib/order-totals";
@@ -1109,7 +1109,7 @@ function SalesOrderWorkspaceBody() {
   const routePartnerQ = useLogisticsCardFacts(showRoute ? (orderId ?? null) : null, routeCustomerLeg);
   /* The stored deadline settings the route's dates read (9 Oct 2026). */
   const routeCollectionTiming = useOrderCollectionTiming(showRoute ? (orderId ?? null) : null);
-  const routeOfficeDays = useOfficeDays();
+  const routeDeliveryDays = useDeliveryDays();
   const routeLeads = useDeliveryLeads();
   /* The customer leg's scheduled day by Delivery's own ladder — live DO, then
      Delivery's arrangement, then a confirmed booking (`customerLegDeliveryOf`,
@@ -2089,7 +2089,7 @@ function SalesOrderWorkspaceBody() {
            panel's own reading of the company (`isOutstation`, Law D). */
         outstation: isOutstation(routePartnerQ.data?.partner),
         paymentTiming: routeCollectionTiming,
-        officeHolidays: routeOfficeDays.holidays,
+        deliveryHolidays: routeDeliveryDays.holidays,
         assignLeadWorkingDays: routeLeads.assignmentLeadWorkingDays,
         amendmentFailed: amendmentQ.isError,
         /* `PROPOSED CHANGE` — the same read the Order tab makes. Only a request
@@ -2124,7 +2124,7 @@ function SalesOrderWorkspaceBody() {
     requestView,
     routePartnerQ.data,
     routeCollectionTiming,
-    routeOfficeDays,
+    routeDeliveryDays,
     routeLeads,
   ]);
 

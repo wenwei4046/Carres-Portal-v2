@@ -94,7 +94,9 @@ export interface DeliveryOrderIssueInput {
    *  Only an APPROVED one opens the money gate; pending and refused keep it
    *  shut. */
   paymentApprovals: ReadonlyArray<DeliveryPaymentApproval>;
-  /** Malaysian public holidays, injected as ISO dates (`myHolidaySet()`). */
+  /** The Delivery calendar's public holidays, injected as ISO dates
+   *  (`deliveryHolidaySet(cal)` — the stored Selangor calendar, else the
+   *  built-in list). */
   holidays?: ReadonlySet<string> | readonly string[];
   /** The manual `Request Delivery Order` door (card §5) passes `false`: the
    *  booking-confirm requirement is the ONLY one it does not wait for.

@@ -24,6 +24,7 @@
  * Supplier; at 390 one Unit tick per row and 40px bottom actions. Every write
  * is the claim's own door; the page never prints a refusal it did not receive.
  */
+import { useOfficeDays } from "@/lib/deadline-queries";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -125,6 +126,9 @@ export default function SupplierClaimPanel({ claim }: { claim: SupplierClaimList
   const navigate = useNavigate();
   const wide = useWide();
   const today = appTodayIso();
+  /* The claim's dates are Purchasing's OFFICE work: the stored Office
+     calendar's weekdays and holidays (Settings → Office). */
+  const office = useOfficeDays().office;
   const facts = {
     id: claim.id, claim_no: claim.claim_no, status: claim.status, supplier_name: claim.supplier_name,
     requested_action: claim.requested_action, requested_at: claim.requested_at, supplier_response: claim.supplier_response,
@@ -138,7 +142,7 @@ export default function SupplierClaimPanel({ claim }: { claim: SupplierClaimList
   // §9.6: `Return to supplier` recorded and no Purchase Return yet — the same
   // fact Work projects as `Issue the purchase return to {Supplier}`.
   const pendingReturn = open && execution === "return_to_supplier" && record.data != null && (record.data.purchase_returns ?? []).length === 0;
-  const action = supplierClaimCurrentAction(facts) ?? (pendingReturn
+  const action = supplierClaimCurrentAction(facts, office) ?? (pendingReturn
     ? { rule: null, fact: "Not issued", instruction: `Issue the purchase return to ${claim.supplier_name ?? "the supplier"}`, date: null, button: ISSUE_PURCHASE_RETURN }
     : null);
   const openDoor = (button: string | null) => {
@@ -259,7 +263,7 @@ function SupplierSection({ claim, record, today, onAsk, onReply, open, inlineFor
   const data = record.data;
   const codes = new Map((data?.units ?? []).map((u) => [u.id, u.unit_code ?? u.id]));
   // Dates come from the timing the ask snapshotted (0607), never the live setting.
-  const state = supplierClaimReplyState(claim, today);
+  const state = supplierClaimReplyState(claim, today, useOfficeDays().office);
   const stateLine = state.kind === "not_recorded" ? `Supplier Response: ${absent}`
     : state.kind === "expected" ? `Reply expected ${fmtDate(state.date)}`
     : state.kind === "overdue" ? `Reply overdue · ${fmtDate(state.date)}`

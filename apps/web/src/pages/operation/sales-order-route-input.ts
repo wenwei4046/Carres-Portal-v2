@@ -10,8 +10,8 @@
 import {
   deliveryReasonLabel,
   lineKind,
-  myHolidaySet,
   receivingRecordNo,
+  deliveryHolidaySet,
   routeDeliveryScopesOf,
   routeGoodsLinesOf,
   supplierClaimStatusLabel,
@@ -41,9 +41,11 @@ export interface SalesOrderRouteInputArgs {
   /** The stored Collection timing this order's clock runs under
    *  (`useOrderCollectionTiming`). Absent ⇒ the ruled default. */
   paymentTiming?: CollectionTiming;
-  /** The Office holidays (`useOfficeDays().holidays`) — the payment clock's
-   *  holiday set. Absent ⇒ the built-in list. */
-  officeHolidays?: ReadonlySet<string>;
+  /** THE Delivery calendar's holidays (`useDeliveryDays().holidays`: the
+   *  stored Selangor calendar, else the built-in list) — the delivery-day
+   *  refusal, the goods chain's supplier-delivery days and the payment-due
+   *  FACT all count on it. Absent ⇒ the built-in list. */
+  deliveryHolidays?: ReadonlySet<string>;
   /** DEL-04 · the stored `Assign logistics by` lead (`useDeliveryLeads`). */
   assignLeadWorkingDays?: number;
   amendment: SalesOrderRouteInput["amendment"];
@@ -77,7 +79,7 @@ export function salesOrderRouteInputOf(a: SalesOrderRouteInputArgs): SalesOrderR
         ? routeGoodsLinesOf({
             ...a.facts.goods,
             todayIso: appTodayIso(),
-            holidays: myHolidaySet(),
+            holidays: a.deliveryHolidays ?? deliveryHolidaySet(),
             lines: a.facts.goods.lines
               .filter((line) => lineKind(line.sku) !== "service")
               .map((line) => ({
@@ -218,13 +220,15 @@ export function salesOrderRouteInputOf(a: SalesOrderRouteInputArgs): SalesOrderR
         recordedAt: offer.recorded_at,
       })),
       /* Sunday and Malaysian public holidays are the two days no company runs
-         (§8) — the gate names the refused day instead of failing silently. */
-      publicHolidays: [...myHolidaySet()],
+         (§8) — the gate names the refused day instead of failing silently.
+         The Delivery calendar's holidays, never the Office list. */
+      publicHolidays: [...(a.deliveryHolidays ?? deliveryHolidaySet())],
       /* Payment's own clock (one arithmetic with the Monitor): the stored
-         Collection timing and the Office holiday list. */
+         Collection timing; `Customer must pay by` is a FACT on the Delivery
+         calendar. */
       paymentClock: {
         ...(a.paymentTiming ? { timing: a.paymentTiming } : {}),
-        ...(a.officeHolidays ? { holidays: [...a.officeHolidays] } : {}),
+        ...(a.deliveryHolidays ? { holidays: [...a.deliveryHolidays] } : {}),
       },
       /* ⭐ A FAILED READ IS `unreadable`, NEVER A BUSINESS SENTENCE (owner
          ruling 2026-09-26). The group whose owner could not be read says so;

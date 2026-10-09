@@ -5,6 +5,7 @@ import type { DeliveryMonitorCard } from "../delivery-monitor";
 
 const save = vi.fn();
 let fleetError = false;
+vi.mock("@/lib/deadline-queries", async () => (await import("@/test/deadline-queries-mock")).deadlineQueriesMock());
 vi.mock("@/lib/queries", async () => ({
   ...await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries"),
   useDeliveryPartners: () => ({ data: { partners: [{ id: "nets", name: "NETS" }, { id: "al", name: "AL" }] } }),

@@ -413,7 +413,9 @@ export function moneyAffectsDelivery(input: {
  * `dueIso`, Law D — a second `outstation ? 3 : 2` arithmetic retired
  * 9 Oct 2026): the effective `Settings → Payments → Collection timing` pair
  * (`timing`; absent ⇒ the ruled default 2, outstation 3), counted on the
- * delivery week with the Office holiday list (`holidays`).
+ * Delivery calendar — Mon–Sat with the Delivery holidays (`holidays`:
+ * `deliveryHolidaySet`, the stored Selangor calendar, else the built-in
+ * list). It is a FACT: the Office holidays never move it.
  */
 export function paymentDeadlineOf(input: {
   anchorIso: string | null;
@@ -531,6 +533,10 @@ export interface ExternalDeliveryLinkView {
    *  Scheduled delivery exists AND the DO money gate holds. A yes/no only —
    *  never money, never why. */
   holdDelivery: boolean;
+  /** The Delivery calendar's public holidays (the stored Selangor calendar,
+   *  else the built-in list) — the page refuses the days the API refuses.
+   *  Absent (an older Worker) ⇒ the page's built-in list. */
+  deliveryHolidays?: string[];
 }
 
 /** The facts the Logistics card reads from Delivery beyond the Monitor card. */

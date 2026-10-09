@@ -12,7 +12,7 @@ import { useCallback, useMemo } from "react";
 import { paymentMonitorRows, type PaymentMonitorRow } from "@carres/shared/payment-monitor";
 import { collectionTimingRulesOf } from "@carres/shared/collection-clock";
 import { ApiError } from "@/lib/api";
-import { useOfficeDays } from "@/lib/deadline-queries";
+import { useDeliveryDays, useOfficeDays } from "@/lib/deadline-queries";
 import { appTodayIso } from "@/lib/fmt-date";
 import {
   useInvoiceRegister,
@@ -38,9 +38,11 @@ export function usePayBy(): (orderId: string) => PayByRead {
   const requestsQ = useLaterDeliveryRequests();
   const settingsQ = usePaymentSettings();
   const today = appTodayIso();
-  /* The stored Office calendar: the clock's holidays and the owner's week. */
+  /* `Pay by` is the payment-due FACT: it counts on THE Delivery calendar
+     (Monday–Saturday + the stored Selangor holidays). The owner calendar
+     moves only an action day, which this column never prints. */
   const officeDays = useOfficeDays();
-  const holidays = officeDays.holidays;
+  const deliveryOpts = useDeliveryDays().opts;
 
   const state = readStateOf([invoicesQ, casesQ, requestsQ, settingsQ]);
   const byOrder = useMemo(() => {
@@ -57,13 +59,13 @@ export function usePayBy(): (orderId: string) => PayByRead {
       cases: casesQ.data?.cases ?? [],
       requests: requestsQ.data?.requests ?? [],
       todayIso: today,
-      opts: { holidays },
+      opts: deliveryOpts,
       timingRules,
       promisedByOrder,
       owner: officeDays.owner,
     });
     return new Map<string, PaymentMonitorRow>(rows.map((r) => [r.orderId, r]));
-  }, [state, invoicesQ.data, casesQ.data, requestsQ.data, settingsQ.data, today, holidays, officeDays.owner]);
+  }, [state, invoicesQ.data, casesQ.data, requestsQ.data, settingsQ.data, today, deliveryOpts, officeDays.owner]);
 
   return useCallback(
     (orderId: string): PayByRead => {

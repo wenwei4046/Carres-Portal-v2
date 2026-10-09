@@ -19,7 +19,7 @@ import {
   recheckStockInput,
   reselectPartnerInput,
   deliveryQueueLeads,
-  myHolidaySet,
+  deliveryWorkingDayOptions,
   resolveBookingBrief,
   resolveCurrentCustomerCommitment,
   resolveUnitAllocation,
@@ -44,6 +44,7 @@ import { readFreeStock } from "../../lib/purchase-demand-read";
 // renderDoPdf moved to apps/web/src/lib/pdf/render.ts (Workers WASM ban).
 import type { DoTemplateData } from "../../lib/pdf/types";
 import { loadBookingContext } from "../../lib/booking-context";
+import { readDeliveryCalendar } from "../../lib/delivery-calendar";
 import { drawDeliveryOrderNumber } from "../../lib/delivery-order-issue";
 import { requireOperation, requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody, refusalMessage } from "../../lib/route-helpers";
@@ -2193,7 +2194,7 @@ operationOrdersRouter.get("/:id/booking-brief", requireOperation, async (c) => {
     (v): v is string => !!v,
   );
 
-  const [unitsRes, partnersRes, settingsRes] = await Promise.all([
+  const [unitsRes, partnersRes, settingsRes, deliveryCalendar] = await Promise.all([
     sb
       .from("ops_stock_items")
       .select(
@@ -2209,6 +2210,7 @@ operationOrdersRouter.get("/:id/booking-brief", requireOperation, async (c) => {
       .from("purchasing_settings")
       .select("logistics_call_working_days")
       .maybeSingle(),
+    readDeliveryCalendar(sb),
   ]);
   for (const r of [unitsRes, partnersRes, settingsRes]) {
     if (r.error) {
@@ -2250,9 +2252,9 @@ operationOrdersRouter.get("/:id/booking-brief", requireOperation, async (c) => {
     units,
   });
 
-  // Mon–Sat delivery week + the Malaysian public holidays, the same calendar
-  // every other delivery clock in the portal counts on.
-  const opts = { holidays: myHolidaySet(), offDays: [0] };
+  // The Delivery calendar — Mon–Sat + the stored Selangor holidays (else the
+  // built-in list) — the same one every other delivery clock counts on.
+  const opts = deliveryWorkingDayOptions(deliveryCalendar.calendar);
   const callDays = (
     settingsRes.data as { logistics_call_working_days?: number } | null
   )?.logistics_call_working_days;

@@ -7630,6 +7630,9 @@ export interface DeliverySettingsResponse {
    *  an older API. */
   rules?: {
     assignmentLeadWorkingDays: number;
+    /** 0677 · DEL-10 `Courier dispatch within` (default 3). Absent on an older API. */
+    courierDispatchWorkingDays?: number;
+    courierDispatchStored?: boolean;
     revision: number | null;
     stored: boolean;
     canEdit: boolean;

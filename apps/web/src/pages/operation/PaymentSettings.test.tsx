@@ -217,7 +217,11 @@ describe("Settings → Payment (§16)", () => {
     expect(card).toHaveTextContent("4 working days before Scheduled delivery");
     // The Office calendar sentence replaces the retired Saturday sentence.
     expect(card).not.toHaveTextContent("Operation does not work on Saturday");
-    expect(screen.getByTestId("collection-timing-calendar")).toHaveTextContent("Office working day");
+    // The facts never move for the customer; the action follows the person
+    // responsible (Office working days when none are recorded).
+    expect(screen.getByTestId("collection-timing-calendar")).toHaveTextContent("These dates never move for the customer.");
+    expect(screen.getByTestId("collection-timing-calendar")).toHaveTextContent("working day of the person responsible");
+    expect(screen.getByTestId("collection-timing-calendar")).toHaveTextContent("else the Office working days in Settings, Office");
     fireEvent.click(within(card).getByRole("button", { name: "Edit" }));
     fireEvent.change(screen.getByLabelText(/Outstation: start asking/), { target: { value: "3" } });
     fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "Outstation" } });

@@ -6,7 +6,7 @@
  * stored Delivery Rules lead; a GRN's lateness counts on its own Site.
  */
 import { describe, expect, it } from "vitest";
-import { DEFAULT_OFFICE_CALENDAR } from "@carres/shared";
+import { DEFAULT_OFFICE_CALENDAR, deliveryCalendarOf, officeCalendarOf } from "@carres/shared";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
 import {
   projectPaymentCollectionWork,
@@ -161,5 +161,58 @@ describe("GRN lateness names the receiving Site", () => {
       ],
     });
     expect(source.submitted.map((r) => r.site_id)).toEqual(["site-b", "site-a", null]);
+  });
+});
+
+describe("⭐ the Delivery calendar and the responsible person's week reach the feed (9 Oct 2026)", () => {
+  /** An Office whose 2026 Kuala Lumpur holidays were recorded — the Sultan of
+   *  Selangor's Birthday (Fri 11 Dec) is not one of them. */
+  const KL = officeCalendarOf(null, [
+    { holiday_date: "2026-01-01", name: "New Year's Day" },
+    { holiday_date: "2026-02-01", name: "Federal Territory Day" },
+    { holiday_date: "2026-12-25", name: "Christmas Day" },
+  ]);
+
+  it("the payment FACT counts on the Delivery (Selangor) calendar, never the Office list", () => {
+    // Mon 14 Dec 2026, deadline 2 Delivery working days: Sat 12 · (Fri 11) · Thu 10.
+    const [item] = projectPaymentCollectionWork({
+      invoices: [invoice({ confirmed: "2026-12-14" })], ownerFor: owner, today: "2026-12-01",
+      calendars: workFeedCalendarsOf(KL),
+    });
+    expect(item?.timing.actionOn).toBe("2026-12-10");
+  });
+
+  it("the action day follows the responsible person's own working week; no record ⇒ Office weekdays", () => {
+    // Tue 27 Oct: the deadline FACT is Sat 24.
+    const people = new Map<string, number[]>([["op-1", [1, 2, 3, 4, 5, 6]]]);
+    const calendars = workFeedCalendarsOf(DEFAULT_OFFICE_CALENDAR, undefined, people);
+    const sat = projectPaymentCollectionWork({
+      invoices: [invoice({ confirmed: "2026-10-27" })], ownerFor: owner, today: "2026-10-20", calendars,
+      ownerCalendarFor: () => calendars.ownerOf("op-1"),
+    });
+    expect(sat[0]?.timing.actionOn).toBe("2026-10-24");
+    const unrecorded = projectPaymentCollectionWork({
+      invoices: [invoice({ confirmed: "2026-10-27" })], ownerFor: owner, today: "2026-10-20", calendars,
+      ownerCalendarFor: () => calendars.ownerOf("op-2"),
+    });
+    expect(unrecorded[0]?.timing.actionOn).toBe("2026-10-23");
+  });
+
+  it("an imported Warehouse (Selangor) holiday moves a Delivery due; the Office calendar does not", () => {
+    // Delivered Mon 19 Oct 2026; the imported 2026 calendar closes Tue 20 Oct.
+    const imported = deliveryCalendarOf({ region: "Selangor", dates: [{ onDate: "2026-10-20", name: "Imported holiday" }] });
+    const photo = (calendars?: ReturnType<typeof workFeedCalendarsOf>) => projectSalesOrderWork({
+      open: [{ key: "upload_delivery_photo", track: "delivery", tone: "warning" }],
+      context: {
+        orderId: "order-7", so: 7, picName: "PIC", picUserId: "pic-1",
+        promisedDateIso: "2026-10-19", confirmedDateIso: "2026-10-19", deliveredAtIso: "2026-10-19T08:00:00Z",
+        delayDetectedAtIso: null, delayDecisionAtIso: null,
+      },
+      customer: "Tan",
+      today: "2026-10-19",
+      calendars,
+    })[0]?.timing.actionOn;
+    expect(photo()).toBe("2026-10-20");
+    expect(photo(workFeedCalendarsOf(DEFAULT_OFFICE_CALENDAR, imported))).toBe("2026-10-21");
   });
 });

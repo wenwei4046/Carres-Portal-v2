@@ -452,9 +452,9 @@ export interface SalesOrderRouteInput {
     assignLeadWorkingDays?: number;
   };
   /** The payment clock's own inputs (one arithmetic with Payment, 9 Oct
-   *  2026): the effective Collection timing for this order's clock, and the
-   *  Office holiday list — the one stored list, the clock's holiday set.
-   *  Absent ⇒ the ruled default and `publicHolidays`. */
+   *  2026): the effective Collection timing for this order's clock, and THE
+   *  Delivery calendar's holidays — `Customer must pay by` is a FACT on the
+   *  Delivery calendar. Absent ⇒ the ruled default and `publicHolidays`. */
   paymentClock?: {
     timing?: CollectionTiming;
     holidays?: ReadonlyArray<string>;
@@ -489,8 +489,9 @@ export interface SalesOrderRouteInput {
   loanOffers?: ReadonlyArray<RouteLoanOffer>;
   cases: ReadonlyArray<RouteLinkedCase>;
   claims: ReadonlyArray<RouteLinkedClaim>;
-  /** Malaysian public holidays as `YYYY-MM-DD`. A confirmed date landing on one
-   *  — or on a Sunday — is a refused delivery day (§8). */
+  /** THE Delivery calendar's public holidays as `YYYY-MM-DD` (the stored
+   *  Selangor calendar, else the built-in list). A confirmed date landing on
+   *  one — or on a Sunday — is a refused delivery day (§8). */
   publicHolidays?: ReadonlyArray<string>;
   /** Which owning reads FAILED. A failed read yellows its own group only. */
   unreadable?: RouteUnreadable;

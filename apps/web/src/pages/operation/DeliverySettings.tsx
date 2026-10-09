@@ -137,8 +137,16 @@ const DS = {
   assignBy: "Assign logistics by",
   assignByValue: (n: number) => (n === 1 ? "1 working day before Scheduled delivery" : `${n} working days before Scheduled delivery`),
   assignByRule:
-    "Counts Monday to Saturday, skipping public holidays. Uses Requested delivery until the delivery is scheduled. Assign logistics opens on the day the PO is issued.",
+    "Counts Monday to Saturday, skipping the public holidays set in Settings, Warehouse, Public Holidays (the built-in Selangor list until a calendar is imported there). Uses Requested delivery until the delivery is scheduled. Assign logistics opens on the day the PO is issued.",
   assignByRange: "Choose between 1 and 30 working days.",
+  /* DEL-10 · Delivery Rules (0677) */
+  courierDispatch: "Courier dispatch within",
+  courierDispatchValue: (n: number) =>
+    n === 1
+      ? "1 working day after Warehouse confirms the goods can be packed"
+      : `${n} working days after Warehouse confirms the goods can be packed`,
+  courierDispatchRule:
+    "Counts the dispatching Warehouse's working days, set in Settings, Warehouse. Starts when Warehouse confirms the goods are received, checked and can be packed. This is the Warehouse's dispatch target, not a customer delivery date.",
   reason: "Reason",
   contactLeadRule: (n: number) => `${n} working days before the requested delivery date. This is the shared chase setting.`,
   paymentRule: "Payment clearance",
@@ -954,13 +962,33 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
   const leadN = Number(lead);
   const leadDirty = canEditLead && leadSaved != null && lead.trim() !== "" && leadN !== leadSaved;
   const leadGap = leadDirty && (!Number.isInteger(leadN) || leadN < 1 || leadN > 30) ? DS.assignByRange : null;
-  const canSave = !leadGap && ((data.canEdit && changedIds.length > 0) || leadDirty);
+  /* DEL-10 · `Courier dispatch within` (0677) — the same row, gate and record. */
+  const courierSaved = rules?.courierDispatchWorkingDays ?? null;
+  const canEditCourier = canEditLead && rules?.courierDispatchStored === true;
+  const [courier, setCourier] = useState(courierSaved != null ? String(courierSaved) : "");
+  useEffect(() => { setCourier(courierSaved != null ? String(courierSaved) : ""); }, [courierSaved]);
+  const courierN = Number(courier);
+  const courierDirty = canEditCourier && courierSaved != null && courier.trim() !== "" && courierN !== courierSaved;
+  const courierGap = courierDirty && (!Number.isInteger(courierN) || courierN < 1 || courierN > 30) ? DS.assignByRange : null;
+  const rulesGap = leadGap ?? courierGap;
+  const canSave = !rulesGap && ((data.canEdit && changedIds.length > 0) || leadDirty || courierDirty);
   const save = useMutation({
     mutationFn: async () => {
-      if (leadDirty && rules?.revision != null) {
-        await apiFetch("/api/operation/delivery-settings/rules/assignment-lead", {
+      /* One Delivery Rules row: each save returns the new revision, which the
+         next save of the same row carries. */
+      let revision = rules?.revision ?? null;
+      const reason = leadReason.trim() || null;
+      if (leadDirty && revision != null) {
+        const after = await apiFetch<{ revision?: number }>("/api/operation/delivery-settings/rules/assignment-lead", {
           method: "PUT",
-          body: JSON.stringify({ workingDays: leadN, revision: rules.revision, reason: leadReason.trim() || null }),
+          body: JSON.stringify({ workingDays: leadN, revision, reason }),
+        });
+        revision = typeof after?.revision === "number" ? after.revision : revision;
+      }
+      if (courierDirty && revision != null) {
+        await apiFetch("/api/operation/delivery-settings/rules/courier-dispatch", {
+          method: "PUT",
+          body: JSON.stringify({ workingDays: courierN, revision, reason }),
         });
       }
       for (const id of data.canEdit ? changedIds : []) {
@@ -988,7 +1016,7 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
       title={DS.rules}
       titleRight={
         <Button variant="primary" data-testid="delivery-settings-save" disabled={!canSave} loading={save.isPending} onClick={() => save.mutate()}>
-          {leadGap ? `${DS.saveChanges}: ${leadGap}` : DS.saveChanges}
+          {rulesGap ? `${DS.saveChanges}: ${rulesGap}` : DS.saveChanges}
         </Button>
       }
     >
@@ -1004,6 +1032,19 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
           {leadDirty && (
             <Row label={DS.reason} htmlFor="rule-assign-by-reason">
               <Input id="rule-assign-by-reason" value={leadReason} maxLength={500} onChange={(e) => setLeadReason(e.target.value)} />
+            </Row>
+          )}
+        </SectionCard>
+        <SectionCard title={DS.courierDispatch} blurb={DS.courierDispatchRule} testId="delivery-settings-courier-dispatch">
+          <Row label={DS.courierDispatch} htmlFor="rule-courier-dispatch">
+            {canEditCourier ? (
+              <Input id="rule-courier-dispatch" type="number" min={1} max={30}
+                value={courier} onChange={(e) => setCourier(e.target.value)} />
+            ) : courierSaved != null ? DS.courierDispatchValue(courierSaved) : <span className="text-kit-slate-9">{NOT_CONFIGURED}</span>}
+          </Row>
+          {courierDirty && !leadDirty && (
+            <Row label={DS.reason} htmlFor="rule-courier-dispatch-reason">
+              <Input id="rule-courier-dispatch-reason" value={leadReason} maxLength={500} onChange={(e) => setLeadReason(e.target.value)} />
             </Row>
           )}
         </SectionCard>
@@ -1050,7 +1091,7 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
             </SectionCard>
           );
         })}
-        <ChangesList changes={data.changes.filter((c) => c.what === "partner_rules" || c.what === "assignment_lead")} />
+        <ChangesList changes={data.changes.filter((c) => c.what === "partner_rules" || c.what === "assignment_lead" || c.what === "courier_dispatch_lead")} />
       </div>
     </PageShell>
   );
