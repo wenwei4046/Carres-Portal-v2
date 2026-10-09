@@ -46,7 +46,9 @@ const REGISTRY = {
 };
 
 /** Every read and write, routed by URL — the page makes several. */
+let canEdit = true;
 function route(url: string) {
+  if (url === "/api/operation/settings/can-edit/payment") return { canEdit };
   if (url === "/api/finance/payment-settings") return PAYLOAD;
   if (url === "/api/finance/payment-settings/methods") return REGISTRY;
   if (url.includes("/templates")) return { templates: [] };
@@ -63,11 +65,27 @@ function show() {
 }
 
 beforeEach(() => {
+  canEdit = true;
   state.fetch.mockReset();
   state.fetch.mockImplementation(async (url: string) => route(url));
 });
 
 describe("Settings → Payment (§16)", () => {
+  it("someone not named for Payment reads the page with every control disabled (TEAM-02)", async () => {
+    canEdit = false;
+    show();
+    expect(await screen.findByTestId("payment-settings-read-only")).toBeInTheDocument();
+    const fieldset = screen.getByTestId("payment-settings").querySelector("fieldset")!;
+    expect(fieldset).toBeDisabled();
+  });
+
+  it("a named editor gets the controls", async () => {
+    show();
+    await waitFor(() => expect(screen.getAllByText(/PJ own-showroom order/).length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getByTestId("payment-settings").querySelector("fieldset")).not.toBeDisabled());
+    expect(screen.queryByTestId("payment-settings-read-only")).toBeNull();
+  });
+
   it("shows readable summaries: routing, methods, numbering and the storage cards", async () => {
     show();
     await waitFor(() => expect(screen.getAllByText(/PJ own-showroom order/).length).toBeGreaterThan(0));

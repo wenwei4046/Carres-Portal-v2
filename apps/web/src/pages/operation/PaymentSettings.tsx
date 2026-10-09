@@ -18,6 +18,7 @@ import {
   usePaymentMethodRegistry,
 } from "@/lib/payment-methods";
 import { qk, usePaymentSettings, type PaymentSettingsPayload } from "@/lib/queries";
+import { useCanEditSettings } from "@/lib/settings-queries";
 
 /**
  * Settings → Payments (payment/MASTER.md §12 · §16; owner ruling 2026-09-12;
@@ -71,6 +72,7 @@ function Section({ title, lead, children, testId }: {
 export default function PaymentSettings() {
   const qc = useQueryClient();
   const query = usePaymentSettings();
+  const canEdit = useCanEditSettings("payment");
   const [editing, setEditing] = useState<BankAccount["route_source"] | null>(null);
   const [accountName, setAccountName] = useState("");
   const [accountNo, setAccountNo] = useState("");
@@ -105,6 +107,12 @@ export default function PaymentSettings() {
   const timing = data?.collection_timing?.[0] ?? null;
   return <PageShell variant="settings" title="Payment Settings">
     <div className="mx-auto grid w-full max-w-4xl gap-5 overflow-auto p-5" data-testid="payment-settings">
+      {/* TEAM-02 (0674): only the owner or a person named for Payment changes
+          these settings; everyone else reads them. */}
+      {!canEdit && <p className="text-meta text-kit-slate-11" data-testid="payment-settings-read-only">
+        You can read these settings. Only the owner and the people named in Settings editors can change them.
+      </p>}
+      <fieldset disabled={!canEdit} className="m-0 grid min-w-0 gap-5 border-0 p-0">
 
       <Section title="Receiving bank accounts"
         lead="The system picks the bank from the order source. Staff never choose or type an account.">
@@ -194,6 +202,7 @@ export default function PaymentSettings() {
       </Section>
 
       <ChangeLog changes={data?.setting_changes ?? []} />
+      </fieldset>
     </div>
   </PageShell>;
 }
