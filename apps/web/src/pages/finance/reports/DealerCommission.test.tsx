@@ -8,7 +8,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { DcRulesRead, DcSource } from "@carres/shared/dealer-commission";
+import type { DcPaymentChoice, DcRulesRead, DcSource, DcStatementSource } from "@carres/shared/dealer-commission";
+import { fmtDate, fmtMonth } from "@/lib/fmt-date";
 import DealerCommission from "./DealerCommission";
 
 const net = vi.hoisted(() => ({
@@ -61,6 +62,23 @@ const SOURCE: DcSource = {
   ],
 };
 
+/**
+ * 0664: Ace Furniture's statement. Last month SO-2050 earned RM120 (due the
+ * 15th of this month); RM100 was paid on the 3rd; this month so far SO-2054
+ * earned RM120. Carres owes RM140 now; SO-2054's RM80 is still to come.
+ */
+const STATEMENT: DcStatementSource = {
+  today: `${MONTH}-08`,
+  dealer: { id: "d1", name: "Ace Furniture" },
+  orders: SOURCE.orders,
+  quotas: [],
+  payments: [{ id: "pay1", voucherId: "v1", voucherNo: "PV-0001", paidOn: `${MONTH}-03`, amount: 100 }],
+};
+const CHOICES: DcPaymentChoice[] = [
+  { id: "00000000-0000-4000-8000-0000000000a2", voucherNo: "PV-0002", voucherDate: `${MONTH}-07`, payee: "Ace Furniture", amount: 40, narration: null },
+];
+const DC = "/api/finance/dealer-commission";
+
 const RULES_URL = "/api/finance/dealer-commission/rules";
 const rule = (over: Partial<DcRulesRead["rules"][number]>): DcRulesRead["rules"][number] => ({
   id: "r", kind: "standard", dealerId: null, dealerName: null, modelId: null, modelName: null,
@@ -87,6 +105,11 @@ beforeEach(() => {
     [`POST ${RULES_URL}`]: { id: "new" },
     [`DELETE ${RULES_URL}/r-prod`]: { id: "r-prod", already: false },
     [`PUT /api/finance/dealer-commission/orders/ord2/take-back`]: { orderId: "ord2", takenBackOn: `${MONTH}-08`, already: false },
+    [`GET /api/finance/dealer-commission?month=${PREV}`]: SOURCE,
+    [`GET ${DC}/statement/d1`]: STATEMENT,
+    [`GET ${DC}/payment-choices`]: CHOICES,
+    [`POST ${DC}/payments`]: { id: "pay2", already: false },
+    [`DELETE ${DC}/payments/pay1`]: { id: "pay1", already: false },
   };
   net.calls = [];
   net.bodies = {};
@@ -279,5 +302,61 @@ describe("Commission rates (0661)", () => {
     const start = await screen.findByRole("dialog");
     expect(start).toHaveTextContent("A rate from the start stays. Add a new one from a day instead.");
     expect(within(start).queryByRole("button", { name: "Remove" })).toBeNull();
+  });
+});
+
+/** The kit Select whose options arrive with the read: open it, then wait for the option. */
+async function pickWhenReady(name: string, option: string) {
+  fireEvent.keyDown(screen.getByRole("combobox", { name: new RegExp(`^${name}`) }), { key: "Enter" });
+  fireEvent.click(await screen.findByRole("option", { name: option }));
+}
+
+describe("Statement (0664)", () => {
+  it("asks for a dealer, then shows what Carres owes it month by month", async () => {
+    renderAt("/?view=statement");
+    expect(await screen.findByText("Choose a dealer")).toBeTruthy();
+    await pickWhenReady("Dealer", "Ace Furniture");
+
+    expect(await screen.findByText(`Commission ${fmtMonth(PREV)}`)).toBeTruthy();
+    expect(screen.getByText("Payment PV-0001")).toBeTruthy();
+    expect(screen.getByText(`Commission ${fmtMonth(MONTH)} so far`)).toBeTruthy();
+    expect(screen.getByTestId("commission-statement-summary")).toHaveTextContent(
+      `Owed to Ace Furniture now RM 140.00 · Due ${fmtDate(`${MONTH}-15`)} RM 20.00 · Commission still to come RM 80.00`,
+    );
+    // The running balance: 120, less 100 paid, plus 120 so far.
+    expect(screen.getByText("RM 20.00")).toBeTruthy();
+    expect(screen.getAllByText("RM 140.00").length).toBeGreaterThan(0);
+  });
+
+  it("counts a paid voucher as a payment to the dealer; Save names what is missing until then", async () => {
+    renderAt("/?view=statement");
+    await pickWhenReady("Dealer", "Ace Furniture");
+    await screen.findByText("Payment PV-0001");
+    fireEvent.click(screen.getByRole("button", { name: "Add a payment" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: "Save: pick the payment voucher" })).toBeDisabled();
+    await waitFor(() => expect(net.calls).toContain(`GET ${DC}/payment-choices`));
+    fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /^Payment voucher/ }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("option", { name: /PV-0002/ }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(net.calls).toContain(`POST ${DC}/payments`));
+    expect(net.bodies[`POST ${DC}/payments`]).toEqual({ voucherId: CHOICES[0].id, dealerId: "d1" });
+  });
+
+  it("a payment's row takes it off the statement; a month's row opens its orders", async () => {
+    renderAt("/?view=statement");
+    await pickWhenReady("Dealer", "Ace Furniture");
+    fireEvent.click(await screen.findByText("Payment PV-0001"));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("Taking it off leaves the payment voucher as it is");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Take off this statement" }));
+    await waitFor(() => expect(net.calls).toContain(`DELETE ${DC}/payments/pay1`));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.click(screen.getByText(`Commission ${fmtMonth(PREV)}`));
+    expect(await screen.findByText("SO-2050")).toBeTruthy();
+    expect(screen.getByTestId("commission-orders-summary")).toBeTruthy();
+    await waitFor(() => expect(net.calls).toContain(`GET ${DC}?month=${PREV}`));
+    expect(screen.getByText("New orders this month")).toBeTruthy();
   });
 });

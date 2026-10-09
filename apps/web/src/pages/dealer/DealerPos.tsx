@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Bookmark, ListOrdered, LogOut, Menu, ShoppingBag, Users } from "lucide-react";
+import { Bookmark, ListOrdered, LogOut, Menu, ShoppingBag, Users, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import type {
   CreateOrderInput,
@@ -17,6 +17,8 @@ import { rm } from "@/lib/format-currency";
 import { useAuth } from "@/lib/auth";
 import { useStaffSession } from "@/lib/staff";
 import StaffManagePage from "./staff/StaffManagePage";
+import CommissionPage from "./commission/CommissionPage";
+import { seesCommission } from "./commission/commission-door";
 import StaffSwitchChip from "./staff/StaffSwitchChip";
 import { staffColorHex, staffInitials } from "./staff/staff-ui";
 import {
@@ -197,6 +199,8 @@ export default function DealerPos({
   // BD only (2026-07-19) — the Accounts overlay (open dealer accounts +
   // manage store staff) behind its own top-bar pill.
   const [accountsOpen, setAccountsOpen] = useState(false);
+  // Chew 2026-10-09 (Finance · Dealer, 0664): the store owner's own commission.
+  const [commissionOpen, setCommissionOpen] = useState(false);
 
   const dealerId = useAuth((s) => s.dealerId);
   const role = useAuth((s) => s.role);
@@ -1158,6 +1162,21 @@ export default function DealerPos({
               <span>Staff</span>
             </button>
           )}
+          {/* Commission (Chew 2026-10-09, Finance · Dealer, 0664): the store
+              owner sees what Carres owes the store. */}
+          {seesCommission(role, staffMember?.tier) && (
+            <button
+              type="button"
+              onClick={() => setCommissionOpen(true)}
+              className="topbar-pill"
+              aria-label="Commission"
+              title="Commission"
+              data-testid="pos-topbar-commission"
+            >
+              <Wallet size={13} strokeWidth={1.75} />
+              <span>Commission</span>
+            </button>
+          )}
           {!submitted && itemCount > 0 && (
             <button
               type="button"
@@ -1564,6 +1583,8 @@ export default function DealerPos({
       {accountsOpen && isBd && <BdAccountsPage onClose={() => setAccountsOpen(false)} />}
 
       {teamOpen && <StaffManagePage onClose={() => setTeamOpen(false)} />}
+
+      {commissionOpen && <CommissionPage onClose={() => setCommissionOpen(false)} />}
 
       {/* Footer — step 3 only (step 1 advances via the cart; step 2's wizard
           owns its own Back/Next). Prototype-styled bar: ghost Back · Total ·

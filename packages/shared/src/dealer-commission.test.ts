@@ -1,15 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
+  dcPaymentLinkInput,
   dcRuleAddInput,
   dcTakeBackInput,
   dealerCommissionOrders,
   dealerCommissionReport,
+  dealerStatement,
   orderMonth,
   orderTerms,
   rebateByMonth,
+  statementAsSource,
   type DcLine,
   type DcOrder,
   type DcSource,
+  type DcStatementSource,
 } from "./dealer-commission";
 
 /** A line as the database sends it (0661): its rate on the order's day. */
@@ -167,6 +171,66 @@ describe("the rebate", () => {
   });
 });
 
+describe("the dealer's statement (0664)", () => {
+  // Chew's example: RM 1,650 in September earns RM 337.50, the balance in
+  // October RM 412.50; Carres paid RM 337.50 on 15 October.
+  const statement = (today: string, payments: DcStatementSource["payments"] = []) => dealerStatement({
+    today, dealer: { id: "d1", name: "Dealer" }, quotas: [], payments,
+    orders: [goodsAndService({ payments: [paid("2026-09-05", 1650), paid("2026-10-07", 1650)] })],
+  });
+
+  it("each month's commission is owed at its end and falls due on the 15th after; payments come off", () => {
+    const s = statement("2026-11-02", [{ id: "p1", voucherId: "v1", voucherNo: "PV-0001", paidOn: "2026-10-15", amount: 337.5 }]);
+    expect(s.lines.map((l) => [l.day, l.kind, l.owed, l.paid, l.balance, l.due])).toEqual([
+      ["2026-09-30", "commission", 337.5, 0, 337.5, "2026-10-15"],
+      ["2026-10-15", "payment", 0, 337.5, 0, null],
+      ["2026-10-31", "commission", 412.5, 0, 412.5, "2026-11-15"],
+    ]);
+    expect(s).toMatchObject({ owedNow: 412.5, stillToCome: 0, nextDue: { day: "2026-11-15", amount: 412.5 } });
+  });
+
+  it("the month in progress shows its commission so far, on today", () => {
+    const s = statement("2026-10-09");
+    expect(s.lines.at(-1)).toMatchObject({ day: "2026-10-09", kind: "commission", soFar: true, owed: 412.5 });
+    expect(s.nextDue).toEqual({ day: "2026-10-15", amount: 337.5 });
+  });
+
+  it("what is due next: the oldest month not paid, even when its day is past, never more than is owed now", () => {
+    // Nothing paid by 1 November: September's RM 337.50 was due on 15 October.
+    expect(statement("2026-11-01").nextDue).toEqual({ day: "2026-10-15", amount: 337.5 });
+    // All paid: nothing is due.
+    const all = statement("2026-11-20", [{ id: "p1", voucherId: "v1", voucherNo: "PV-0001", paidOn: "2026-11-15", amount: 750 }]);
+    expect(all).toMatchObject({ owedNow: 0, nextDue: null });
+    // A November refund takes RM 500 back: RM 250 is owed, so no more than that is due.
+    const back = dealerStatement({
+      today: "2026-11-20", dealer: { id: "d1", name: "Dealer" }, quotas: [], payments: [],
+      orders: [goodsAndService({ payments: [paid("2026-09-05", 1650), paid("2026-10-07", 1650)], refunds: [paid("2026-11-10", 2000)] })],
+    });
+    expect(back).toMatchObject({ owedNow: 250, nextDue: { day: "2026-10-15", amount: 250 } });
+  });
+
+  it("commission still to come is what today's orders would still earn", () => {
+    const s = dealerStatement({
+      today: "2026-09-20", dealer: { id: "d1", name: "Dealer" }, quotas: [], payments: [],
+      orders: [goodsAndService({ payments: [paid("2026-09-05", 1650)] })],
+    });
+    expect(s).toMatchObject({ owedNow: 337.5, stillToCome: 412.5 });
+  });
+
+  it("a month before an order was placed neither lists it nor counts it still to come", () => {
+    const src = statementAsSource({
+      today: "2026-10-09", dealer: { id: "d1", name: "Dealer" }, quotas: [], payments: [],
+      orders: [
+        goodsAndService({ payments: [paid("2026-09-05", 1650)] }),
+        goodsAndService({ orderId: "o2", so: 2, orderedOn: "2026-10-03", payments: [] }),
+      ],
+    });
+    expect(dealerCommissionOrders(src, "2026-09").map((r) => r.order.orderId)).toEqual(["o1"]);
+    expect(dealerCommissionReport(src, "2026-09")[0].stillToCollect).toBe(412.5);
+    expect(dealerCommissionOrders(src, "2026-10").map((r) => [r.order.orderId, r.group])).toEqual([["o1", "waiting"], ["o2", "new"]]);
+  });
+});
+
 describe("the inputs", () => {
   const day = "2026-11-01";
   const model = "11111111-1111-4111-8111-111111111111";
@@ -186,5 +250,10 @@ describe("the inputs", () => {
   it("taking a cancelled order's commission back is a yes or a no (0662)", () => {
     expect(dcTakeBackInput.safeParse({ takeBack: true }).success).toBe(true);
     expect(dcTakeBackInput.safeParse({ takeBack: "yes" }).success).toBe(false);
+  });
+
+  it("a payment to a dealer names its voucher and the dealer (0664)", () => {
+    expect(dcPaymentLinkInput.safeParse({ voucherId: model, dealerId: model }).success).toBe(true);
+    expect(dcPaymentLinkInput.safeParse({ voucherId: "PV-1", dealerId: model }).success).toBe(false);
   });
 });

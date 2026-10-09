@@ -192,12 +192,16 @@ export function orderMonth(o: DcOrder, month: string): DcOrderMonth {
   const earned = earnedToMonthEnd - earnedThrough(o, terms, reached, prevEnd);
   const cancelled = !!o.cancelledOn && o.cancelledOn <= end;
   const takenBack = !!o.takeBackOn && o.takeBackOn <= end;
-  const stillToEarn = cancelled || takenBack ? 0 : Math.max(0, terms.full - earnedToMonthEnd);
+  // 0664: the statement reads every order to today, so an earlier month can
+  // see an order placed after it. It is not in that month at all.
+  const placedLater = !!o.orderedOn && o.orderedOn > end;
+  const stillToEarn = cancelled || takenBack || placedLater ? 0 : Math.max(0, terms.full - earnedToMonthEnd);
   const keptToMonthEnd = keptThrough(o, end);
   const keptThisMonth = keptToMonthEnd - keptThrough(o, prevEnd);
   const isNew = !!o.orderedOn && o.orderedOn.slice(0, 7) === month;
   const cancelledThisMonth = !!o.cancelledOn && o.cancelledOn.slice(0, 7) === month;
-  const group: DcOrderGroup | null = isNew ? "new"
+  const group: DcOrderGroup | null = placedLater ? null
+    : isNew ? "new"
     : cents(earned) < 0 ? "taken_back"
     : cancelledThisMonth ? "cancelled"
     : cents(earned) > 0 || cents(keptThisMonth) !== 0 ? "balance"
@@ -280,7 +284,122 @@ export function dealerCommissionReport(src: DcSource, month: string, filter: DcF
   return [...rows.values()].map((r) => ({ ...r, earned: cents(r.earned), stillToCollect: cents(r.stillToCollect) }));
 }
 
+/**
+ * 0664 — a dealer's statement, like a supplier's (Finance MASTER §3.2 "Dealer
+ * statement", 「我欠他多少，几时付他」): what Carres owes the dealer month by
+ * month and the payments made to it, with a running balance, live. Each
+ * month's commission and rebate are the same arithmetic as the report; a
+ * month's lines fall due on the 15th of the month after (Chew 2026-10-06).
+ */
+export interface DcStatementSource {
+  today: string;
+  dealer: { id: string; name: string };
+  orders: DcOrder[];
+  quotas: DcSource["quotas"];
+  /** Paid vouchers counted as payments to this dealer. */
+  payments: { id: string; voucherId: string; voucherNo: string; paidOn: string; amount: number }[];
+}
+
+export type DcStatementLineKind = "commission" | "rebate" | "payment";
+
+export interface DcStatementLine {
+  /** The month's last day (today for the month in progress), or the voucher's day. */
+  day: string;
+  kind: DcStatementLineKind;
+  /** YYYY-MM for commission and rebate. */
+  month: string | null;
+  /** The month in progress: its commission so far. */
+  soFar: boolean;
+  /** The 15th of the month after, for commission and rebate. */
+  due: string | null;
+  voucherNo: string | null;
+  paymentId: string | null;
+  /** What the line adds to what Carres owes (can be negative: taken back). */
+  owed: number;
+  paid: number;
+  balance: number;
+}
+
+export interface DcStatement {
+  dealer: { id: string; name: string };
+  lines: DcStatementLine[];
+  /** What Carres owes the dealer after the last line. */
+  owedNow: number;
+  /** Commission still to earn on the dealer's orders, today. */
+  stillToCome: number;
+  /** The first due day that the payments made do not cover, and what is due
+   *  by then (payments pay the oldest months first), never more than is owed
+   *  now. Null when nothing is owed. The day can be past: Carres is late. */
+  nextDue: { day: string; amount: number } | null;
+}
+
+const monthAfter = (month: string) => {
+  const [y, m] = month.split("-").map(Number);
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+};
+const lastDayOf = (month: string) => {
+  const [y, m] = month.split("-").map(Number);
+  return `${month}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`;
+};
+const KIND_ORDER: Record<DcStatementLineKind, number> = { commission: 0, rebate: 1, payment: 2 };
+
+/** A statement read as the report source for its one dealer, so the store
+ *  page can list a month order by order with the same arithmetic. */
+export function statementAsSource(src: DcStatementSource): DcSource {
+  return {
+    settings: { defaultRate: 0 }, rates: [], models: [], outlets: [],
+    quotas: src.quotas, dealers: [src.dealer], orders: src.orders,
+  };
+}
+
+export function dealerStatement(src: DcStatementSource): DcStatement {
+  const thisMonth = src.today.slice(0, 7);
+  const report = statementAsSource(src);
+  const firstMonth = src.orders.map((o) => (o.orderedOn ?? src.today).slice(0, 7)).sort()[0] ?? thisMonth;
+  const lines: Omit<DcStatementLine, "balance">[] = [];
+  for (let m = firstMonth; m <= thisMonth; m = monthAfter(m)) {
+    const row = dealerCommissionReport(report, m)[0];
+    if (!row) continue;
+    const soFar = m === thisMonth;
+    const day = soFar ? src.today : lastDayOf(m);
+    const due = `${monthAfter(m)}-15`;
+    const base = { day, month: m, soFar, due, voucherNo: null, paymentId: null, paid: 0 };
+    if (row.earned !== 0) lines.push({ ...base, kind: "commission", owed: row.earned });
+    if (row.rebate !== null && row.rebate !== 0) lines.push({ ...base, kind: "rebate", owed: row.rebate });
+  }
+  for (const p of src.payments) {
+    lines.push({ day: p.paidOn, kind: "payment", month: null, soFar: false, due: null,
+      voucherNo: p.voucherNo, paymentId: p.id, owed: 0, paid: cents(Number(p.amount)) });
+  }
+  lines.sort((a, b) => a.day.localeCompare(b.day) || KIND_ORDER[a.kind] - KIND_ORDER[b.kind]);
+  let balance = 0;
+  const withBalance = lines.map((l) => {
+    balance = cents(balance + l.owed - l.paid);
+    return { ...l, balance };
+  });
+  const now = dealerCommissionReport(report, thisMonth)[0];
+  const paid = lines.reduce((s, l) => s + l.paid, 0);
+  let nextDue: DcStatement["nextDue"] = null;
+  for (const day of [...new Set(lines.flatMap((l) => (l.due ? [l.due] : [])))].sort()) {
+    const dueBy = lines.reduce((s, l) => s + (l.due && l.due <= day ? l.owed : 0), 0);
+    const amount = cents(Math.min(dueBy - paid, balance));
+    if (amount > 0) {
+      nextDue = { day, amount };
+      break;
+    }
+  }
+  return { dealer: src.dealer, lines: withBalance, owedNow: balance, stillToCome: now?.stillToCollect ?? 0, nextDue };
+}
+
 const rate = z.number().min(0).max(100);
+
+/** 0664 — a paid voucher counted as a payment to a dealer. */
+export const dcPaymentLinkInput = z.object({ voucherId: z.string().uuid(), dealerId: z.string().uuid() }).strict();
+
+/** 0664 — a paid direct voucher Finance may count as a payment to a dealer. */
+export interface DcPaymentChoice {
+  id: string; voucherNo: string; voucherDate: string; payee: string; amount: number; narration: string | null;
+}
 
 /**
  * 0661 — Finance's dated commission rules (docs/finance/MASTER.md §3.2,

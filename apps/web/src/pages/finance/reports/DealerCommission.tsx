@@ -4,15 +4,19 @@
  *
  * One read of `dealer_commission_source(month)`; every figure is the shared
  * arithmetic (Law D), each line at the rate the database read for its order
- * day (0661). Four views on the toolbar switch:
+ * day (0661). Five views on the toolbar switch:
  *   By dealer          `dealerCommissionReport`: one row per dealer; a row
  *                      opens that dealer's orders
  *   `?view=orders`     By order (CommissionOrders.tsx, step 2): the month order
  *                      by order, and taking a cancelled order's commission back
+ *   `?view=statement`  one dealer's statement (CommissionStatement.tsx, step 3,
+ *                      0664): what Carres owes it month by month, the payments
+ *                      made to it and the balance; a month opens its orders
  *   `?view=rates`      the dated rates and switches (CommissionRates.tsx)
  *   `?view=quotas`     each dealer's renovation quota. A dealer with no quota
  *                      opens the quota form from its own `Quota left` cell.
- * The month, dealer and showroom chosen stay the same on both report views.
+ * The month, dealer and showroom chosen stay the same on every report view;
+ * the statement takes the dealer only (it runs from the dealer's first order).
  *
  * Frame: `ModuleHeader` + `<ListPageShell register>` + the Register engine, the
  * shape every other Finance register draws (Trial Balance, Unpaid by Supplier,
@@ -41,11 +45,13 @@ import { rm } from "@/lib/format-currency";
 import { LoadFailed } from "../other-money-in/parts";
 import CommissionOrders from "./CommissionOrders";
 import CommissionRates from "./CommissionRates";
+import CommissionStatement from "./CommissionStatement";
 
 const BASE = "/api/finance/dealer-commission";
 const ALL = "all";
 type QuotaDraft = { dealerId: string; quota: string; rebateRate: string; startsOn: string };
-type View = "report" | "orders" | "rates" | "quotas";
+type View = "report" | "orders" | "statement" | "rates" | "quotas";
+const VIEWS: readonly View[] = ["report", "orders", "statement", "rates", "quotas"];
 
 /** This month and the 23 before it, newest first (YYYY-MM). */
 function lastMonths(): string[] {
@@ -60,7 +66,7 @@ export default function DealerCommission() {
   const months = useMemo(lastMonths, []);
   const [params, setParams] = useSearchParams();
   const v = params.get("view");
-  const view: View = v === "orders" || v === "rates" || v === "quotas" ? v : "report";
+  const view: View = VIEWS.find((x) => x === v) ?? "report";
   const [month, setMonth] = useState(months[0]);
   const [dealerId, setDealerId] = useState(ALL);
   const [outletId, setOutletId] = useState(ALL);
@@ -77,6 +83,8 @@ export default function DealerCommission() {
     }) : []),
     [src, month, dealerId, outletId]);
   const outlets = (src?.outlets ?? []).filter((o) => dealerId === ALL || o.dealerId === dealerId);
+  // A statement month older than the list still shows as itself.
+  const monthChoices = months.includes(month) ? months : [...months, month];
 
   const columns = useMemo<DataGridColumn<DcReportRow>[]>(() => [
     { key: "dealer", label: "Dealer", width: 240, accessor: (r) => r.dealer, searchValue: (r) => r.dealer },
@@ -99,12 +107,20 @@ export default function DealerCommission() {
   const scope = (current: View) => <div className="flex flex-wrap items-end gap-2">
     <Views current={current} />
     <div className="w-[180px]"><Select id="dc-month" label="Month" value={month} onValueChange={setMonth}
-      options={months.map((m) => ({ value: m, label: fmtMonth(m) }))} /></div>
+      options={monthChoices.map((m) => ({ value: m, label: fmtMonth(m) }))} /></div>
     <div className="w-[220px]"><Select id="dc-dealer" label="Dealer" value={dealerId}
       onValueChange={(v) => { setDealerId(v); setOutletId(ALL); }}
       options={[{ value: ALL, label: "All" }, ...(src?.dealers ?? []).map((d) => ({ value: d.id, label: d.name }))]} /></div>
     <div className="w-[220px]"><Select id="dc-outlet" label="Showroom" value={outletId} onValueChange={setOutletId}
       options={[{ value: ALL, label: "All" }, ...outlets.map((o) => ({ value: o.id, label: o.name }))]} /></div>
+  </div>;
+
+  /** The statement is one dealer's, from its first order: the dealer only. */
+  const statementScope = <div className="flex flex-wrap items-end gap-2">
+    <Views current="statement" />
+    <div className="w-[220px]"><Select id="dc-statement-dealer" label="Dealer" value={dealerId === ALL ? undefined : dealerId}
+      placeholder="Choose" onValueChange={(v) => { setDealerId(v); setOutletId(ALL); }}
+      options={(src?.dealers ?? []).map((d) => ({ value: d.id, label: d.name }))} /></div>
   </div>;
 
   return <div className="flex h-full min-h-0 flex-col" data-testid="dealer-commission">
@@ -117,6 +133,9 @@ export default function DealerCommission() {
     view === "orders" ? <CommissionOrders src={src} loading={!q.isSuccess} month={month}
       filter={{ dealerId: dealerId === ALL ? undefined : dealerId, outletId: outletId === ALL ? undefined : outletId }}
       toolbarStart={scope("orders")} /> :
+    view === "statement" ? <CommissionStatement dealerId={dealerId === ALL ? null : dealerId} toolbarStart={statementScope}
+      // A month's row opens that month's orders for this dealer.
+      onOpenMonth={(m) => { setMonth(m); setOutletId(ALL); setParams({ view: "orders" }); }} /> :
     <ListPageShell register>
       <DataGrid rows={rows} columns={columns} rowKey={(r) => r.dealerId} storageKey="carres.finance.dealer-commission.v1"
         appearance="reference" exportName={`Dealer commission ${month}`} groupBanner={false} stickyIdentity
@@ -131,12 +150,13 @@ export default function DealerCommission() {
   </div>;
 }
 
-/** The two report views and the two settings views, on the app's one segmented link switch. */
+/** The three report views and the two settings views, on the app's one segmented link switch. */
 function Views({ current }: { current: View }) {
-  // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), dealer commission step 2).
+  // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), dealer commission steps 2 and 3).
   const views = [
     { value: "report", to: "/finance/reports/dealer-commission", label: "By dealer" },
     { value: "orders", to: "/finance/reports/dealer-commission?view=orders", label: "By order" },
+    { value: "statement", to: "/finance/reports/dealer-commission?view=statement", label: "Statement" },
     { value: "rates", to: "/finance/reports/dealer-commission?view=rates", label: "Commission rates" },
     { value: "quotas", to: "/finance/reports/dealer-commission?view=quotas", label: "Renovation quotas" },
   ] as const;
