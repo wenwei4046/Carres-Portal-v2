@@ -378,6 +378,23 @@ Dealer commission rules:
 - Not built: Houzs's account memory (filling a line's account from the supplier's earlier bills), the multi-bill scan page, and reading for payment vouchers and payment requests.
 - Falsifier: in Chew's test with real bills, a read figure is wrong more often than right, or the pre-filled form takes longer to check than typing it.
 
+#### Money-out source-to-result journey — consolidated review recommendation, 9 October 2026
+
+**Existing §2/§3.2 decisions remain controlling; added failure/result checks are review recommendations, not new accounting entries, roles or release authority.** Houzs Finance is inaccessible to the current study account; this journey uses the existing Chew-owned adaptation above and does not claim a fresh private-V5 inspection.
+
+| Stage | Required source and result | Completion / exception boundary |
+|---|---|---|
+| Intake and bill | Finance reads exact supplier/GRN/PO-price source for goods, or the admitted other-creditor bill source for non-goods; preserve actual supplier paper and eligible request evidence | A PO or uploaded image is not a confirmed bill or payment. Partial source, unclear supplier, possible duplicate, missing cost/currency/account and scan extraction remain named review facts; scanning does not approve or post by itself |
+| Prepare voucher | Qualified Finance preparer selects payable/advance/refund or other admitted purpose, exact recipient/account, amount/currency/rate, allocations and supporting evidence | Customer refund requires its existing exceptional Case/Management source. Requester access remains §3.3-scoped; no ordinary Operations money approval. Supplier credit/debit and advances retain their own source identities |
+| Check | A Finance checker other than preparer reviews current voucher/source version, amounts, recipient, allocations and evidence | A checked draft is not approved or paid. Source correction invalidates affected review; no invented three-different-people requirement, since §2 permits a qualified checker also to approve |
+| Approve / ledger result | Existing Finance Approver acts through the source-owned voucher transition and retains actual actor, decision and ledger linkage | Approval/posting and external bank execution/receipt are distinguishable evidence. Do not invent an extra payment-state writer or infer bank receipt from approval; §3.4 reconciliation owns bank/card evidence. Denied/uncertain result must be reconciled before a repeat, with no duplicate voucher or money effect |
+| Partial / credit / correction | Read actual remaining payable and Finance-owned applied advance/credit; route refused or disputed facts back to the owning Finance document | Supplier note receipt is not accepted/application evidence. Proposed credit-note knock-off rules remain explicitly NOT LAW above; no supplier cash-refund door. Cancel/correct uses existing qualification and source lineage, preserving original ledger/evidence and affected request stage |
+| Reconcile / report | Finance reconciles voucher, bill, bank/card and ledger under §3.4; AP, aging, Daily Bank and reports use the same accepted source arithmetic | Missing bank evidence remains unresolved; current waiting-voucher status is not a historical snapshot. Supplier payment never changes customer receipts, goods custody or Delivery completion |
+
+**Configuration and handoff:** Finance-only supplier economic details link Purchasing's supplier identity; People/Workspace supplies qualifications and Cover. Existing Chart/account roles, currency/rate inputs, qualified source permissions and document dates govern the Finance record. External-service activation, sample imports, closed-period activation and new cancellation/posting behavior require their existing specific review. Ordinary Tasks links the exact source result without confirming money or making a second account.
+
+**Acceptance owed:** goods versus non-goods provenance; same paper/request retried; exact remaining payable after partial/advance/credit; preparer cannot check own voucher; qualified checker may approve; unqualified actor refused; stale source requires re-review; uncertain approval reconciles once; requester cannot read restricted Finance detail; cancellation returns the linked request to its source-derived stage; bank/card evidence and AP/ledger/report totals reconcile. These checks were not run by this document pass and do not approve accounting mechanics beyond existing law.
+
 ### 3.3 Staff payment requests
 
 - **Build.** Staff with permission raise a request with the bill. Finance answers it with a voucher or a bill, and the requester can see which stage it has reached.
@@ -478,6 +495,26 @@ Carres already has a simpler Card settlement. It takes Public Bank, GHL and Mayb
 - Not built: posting the value to the ledger (Dr stock on hand, Cr cost of goods sold; bills from a GRN post the goods to cost of goods sold, 0477, so without it the month's cost is every purchase of the month) and valuing the go-live opening stock, which comes in without a PO cost. When posting is built, Stock MASTER §9 applies: Finance values from the confirmation version it acknowledges and saves no month-end Stock total of its own. Both go to Chew.
 - Falsifier: in Chew's test, a Unit Chew knows was in the showroom or out for repair at a month end shows in another group, or a value differs from its PO line cost times its quantity.
 
+#### Year-end close — complete review recommendation, 9 Oct 2026
+
+**PROPOSAL / NOT APPROVED / NOT BUILT.** This replaces the missing journey with a reviewable contract; it does not activate §3.5's parked period locks/opening balances, decide fiscal dates, approve accounting entries or expand Chew's release scope. Houzs Finance remains inaccessible to this study account; its private V5 is not fetched or copied. Existing Chew-approved adaptation in this MASTER is the Finance authority. A bounded [Odoo official year-end reference](https://www.odoo.com/documentation/18.0/applications/finance/accounting/reporting/year_end.html) search excerpt supports an accuracy/up-to-date review before closing; full-page fetch timed out, so no detailed Odoo closing-entry or lock mechanics are adopted.
+
+**Purpose and trade-off:** Finance should review one traceable year-end evidence package, identify unresolved source problems and preserve approved results. The added preparation/version history costs effort but prevents a completed checklist being confused with approved ledger treatment or locked periods. Reject a second stock total, copied supplier/customer transactions and a one-click close that hides incomplete source coverage.
+
+| Journey / responsible source | Recommended action and result | Exception / handoff |
+|---|---|---|
+| Define the review | Finance selects the authorised fiscal period and company ledger; record cut-off, calendar/time zone, source coverage and report as-of/version | Fiscal start/end, prior-period correction and exact close/reopen qualification remain explicit decisions for Chew; never assume calendar-year end or infer approval from a duty label |
+| Prepare and reconcile | Read original ledger/report versions, bank/card reconciliation, payable/receivable source lineage and outstanding differences; record each reconciliation's accepted evidence | Unreadable or incomplete sources remain named gaps. No guessed balancing number, duplicate payment/bill or invented clearing transaction |
+| Reconcile stock | Read Stock's acknowledged confirmation version when available; retain Finance's valuation mapping and missing-cost coverage separately | Current provisional Stock reading remains labelled provisional. Supplier consignment/dealer-owned exclusions and repair/transit groups follow §3.5; no Finance-created physical count or duplicate month-end total |
+| Resolve differences | Finance corrects its own documents through existing qualified doors; an Orders/Payment/Purchasing/Stock discrepancy links to that owner and retains returned evidence | Preparation never edits another module. Bank/card file samples, missing account mapping and unverified valuation/posting remain open; task completion alone is not accepted reconciliation |
+| Review adjustments | Present proposed Finance adjustment facts, basis, accounts, date, evidence and report consequences through the existing applicable approval route | Exact year-end journal/retained-earnings treatment and posting permission require Chew's approved design. This proposal specifies no debit/credit formula and does not enable posting |
+| Confirm review / retain results | Qualified reviewer records the accepted package version and unresolved/provisional scope. Preserve ledger/report/source identities and actual actor/time | A source change invalidates the affected review; disclose new differences and request re-review. Saved package is not a period lock or automatic financial finality |
+| Close / later correction | After the specific approved close contract exists, show its gates and result; retain historical package and any subsequent correction/review lineage | Lock activation, exception access, reopen/correction and next-year carry treatment remain NOT APPROVED here. Never delete ledger history, reset accounts, duplicate go-live opening balances or silently revise prior reports |
+
+**Settings, work and reports:** any eventual fiscal configuration, close qualification and effective treatment stays Finance-owned within the shared Settings home. Work links the exact source discrepancy/review, named qualified person and accepted outcome; no invented year-end deadline or automatic approval. Reports consumes the same ledger/date/coverage definitions and retains the accepted package's as-of/version; later live reports disclose changed sources instead of impersonating the old result. Export/access follows existing Finance permissions; no new generic scheduled send or public file store.
+
+**Review acceptance:** missing bank evidence blocks that reconciliation; missing stock confirmation remains provisional; another module's corrected source invalidates only its affected review facts; repeated submission cannot double-post an adjustment; unqualified callers cannot close/correct; denied/failed actions preserve draft/evidence and prior ledger; old results remain traceable after a permitted correction. Complete this rule/permission/source review with Chew before implementation; no application or production verification is claimed.
+
 ### 3.6 Reports
 
 The reports are:
@@ -523,7 +560,7 @@ All reports only read. Reports → Payment stays Payment's.
   - `Balance`, delivered orders only: invoiced value, deposit, balance due, balance paid, balance % and outstanding.
 - Opening a salesperson lists the orders.
 - Deposit is the money taken with the new order (payments of kind `deposit`); balance paid is every other customer payment, storage excepted. Both are read from live allocations, so a payment moved by Payment's `Correct allocation` counts on the order it was moved to, and a voided one counts nowhere.
-- Invoiced value is the live sales invoice; without one, the order value. An order counts as delivered when it is delivered or its sales invoice is issued.
+- Invoiced value is the live sales invoice; without one, the order value. The test proposal originally counted an issued sales invoice as delivered; that shortcut is rejected by the current Payment §2 closing-invoice and Delivery actual-result laws. The corrected target reads Delivery's authoritative customer-leg result/goods scope. Invoice issue alone never establishes delivery; exact partial-order inclusion and denominator require Finance metric review rather than inventing all-delivered treatment.
 - The salesperson is the order's salesperson now.
 - It reads Orders' and Payment's records and changes none. It is per salesperson, so it does not repeat Payment's own reports, which are per order and per customer.
 - Not built: refunds netted against what was collected; an as-of date (the money is as it stands today); a PDF.
@@ -586,7 +623,7 @@ FINANCE          its title folds the area (§4.1)
 3. **Deposit invoices.** Chew confirms them with Jess (2026-10-03). Check them against Payment's invoice rules and e-invoice before switching them on.
 4. **Dealer commission.** Check the calculation with Chew step by step before anything about it changes.
 5. **Stock confirmation.** Stock's Month-end Stock Confirmation is not built, so Finance's stock value stays provisional until it is.
-6. **Year-end close.** Design it before year end.
+6. **Year-end close.** Complete review recommendation is now in §3.5. Chew must settle the fiscal period, close/correction permissions, accounting treatment and lock activation before build; this proposal is not approval.
 7. **New words.** New Finance screen words go through COPY-STANDARD before UI work.
 
 ### 5.1 · Cross-module Settings reconciliation — 9 October 2026
