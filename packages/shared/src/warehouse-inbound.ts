@@ -278,12 +278,21 @@ export function inboundExceptionLines(
   r: InboundArrival,
   todayIso: string,
   fmt: (iso: string) => string = (iso) => iso,
+  /** Receiving days late on the arrival Site's own calendar
+   *  (`warehouseDaysLate(…, "receiving", …)`). Absent ⇒ the calendar date
+   *  has passed. */
+  daysLate?: (dueIso: string, siteId: string | null) => number,
 ): string[] {
   const lines: string[] = [];
   const q = r.quantities;
   if (r.identitiesMissing)
     lines.push("Unit IDs or Receiving results are not fully recorded");
-  if (r.date && r.date < todayIso && q.known && q.pendingDeliveryQty > 0)
+  const late = r.date
+    ? daysLate
+      ? daysLate(r.date, r.siteMapped ? r.siteId : null) > 0
+      : r.date < todayIso
+    : false;
+  if (r.date && late && q.known && q.pendingDeliveryQty > 0)
     lines.push(
       `Expected arrival was ${fmt(r.date)}. Pending Delivery Qty ${q.pendingDeliveryQty}`,
     );

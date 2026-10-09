@@ -52,6 +52,22 @@ import {
  */
 export const PURCHASING_OFFICE_OFF_DAYS: readonly number[] = [0, 6];
 
+/**
+ * The Office calendar a Purchasing record counts on. Pass the STORED Office
+ * calendar's options (`officeWorkingDayOptions(cal)`, Settings → Office) so
+ * the record follows its weekdays AND its holidays. A bare holiday set (an
+ * older caller) keeps Monday–Friday with those holidays; nothing at all
+ * keeps Monday–Friday with the built-in list — the owner defaults.
+ */
+export type PurchasingOfficeDays = ReadonlySet<string> | WorkingDayOptions;
+
+export function purchasingOfficeDays(cal?: PurchasingOfficeDays | null): WorkingDayOptions {
+  if (!cal) return { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays: myHolidaySet() };
+  if (cal instanceof Set) return { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays: cal };
+  const opts = cal as WorkingDayOptions;
+  return { offDays: opts.offDays ?? PURCHASING_OFFICE_OFF_DAYS, holidays: opts.holidays ?? myHolidaySet() };
+}
+
 export type PurchasingSupplierCallKey =
   | "confirm_ready_date"
   | "confirm_tomorrows_delivery"
@@ -131,8 +147,11 @@ export interface SupplierCallPo {
 
 export interface SupplierCallOptions {
   todayIso: IsoDate;
-  /** Malaysian public holidays. Omitted → the live Selangor set. */
+  /** The Office holidays (Settings → Office). Omitted → the built-in set. */
   holidays?: ReadonlySet<string>;
+  /** The stored Office calendar's off days (`officeOffDays`). Omitted → the
+   *  owner default, Saturday and Sunday (`PURCHASING_OFFICE_OFF_DAYS`). */
+  offDays?: readonly number[];
 }
 
 export interface PurchasingOpenCall {
@@ -151,7 +170,7 @@ export interface PurchasingOpenCall {
 
 function wd(opts: SupplierCallOptions): WorkingDayOptions {
   return {
-    offDays: PURCHASING_OFFICE_OFF_DAYS,
+    offDays: opts.offDays ?? PURCHASING_OFFICE_OFF_DAYS,
     holidays: opts.holidays ?? myHolidaySet(),
   };
 }

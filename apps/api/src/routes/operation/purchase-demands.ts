@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import {
-  myHolidaySet,
+  officeWorkingDayOptions,
   parsePoWindowKey,
   poDeliveryDateOf,
   poWindowCalendarOf,
@@ -39,6 +39,7 @@ import {
 import { mapPgError, fail } from "../../lib/route-helpers";
 import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
 import { loadPoWindows } from "../../lib/purchasing-settings";
+import { readOfficeCalendar } from "../../lib/office-calendar";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -385,9 +386,14 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
   if (!res.ok) return c.json(res.body as Record<string, unknown>, res.status as 400);
   const { proposals, registerFacts, supplierNames, supplierAddresses, supplierKinds, catalog, today, settings } =
     res.data;
-  /* The SAME holiday set the engine planned with — the classification only
-     compares the engine's dates, it never re-plans them. */
-  const holidays = myHolidaySet();
+  /* The classification only compares the engine's dates, it never re-plans
+     them; the Safety-days margin and the PO windows are OFFICE arithmetic
+     (Law 2A), so they count on the STORED Office calendar — its weekdays and
+     its holidays (Settings → Office; owner defaults when unreadable). */
+  const officeStored = await readOfficeCalendar(sb);
+  const officeOpts = officeWorkingDayOptions(officeStored.calendar);
+  const holidays = new Set(officeStored.calendar.holidays.map((h) => h.date));
+  const officeOffDays = officeOpts.offDays ?? [0, 6];
 
   /**
    * The two owner facts, read here because they are Register-only.
@@ -593,6 +599,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
                 customerDelivery: row.delivery,
                 safetyDays: settings.orderByBufferDays,
                 holidays,
+                offDays: officeOffDays,
               }
             : null;
         const state: PurchaseDemandState =
@@ -853,7 +860,7 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
   try {
     const windows = await loadPoWindows(sb);
     poCutoffTimes = [...new Set([windows.settings.first, ...(windows.settings.secondEnabled && windows.settings.second ? [windows.settings.second] : [])].map(time => time.slice(0, 5)))];
-    const calendar = poWindowCalendarOf(windows.poDays, holidays);
+    const calendar = poWindowCalendarOf(windows.poDays, holidays, officeOffDays);
     const memo = new Map<string, string | null>();
     const stamp = (orderId: string, supplierId: string | null): string | null => {
       const key = `${orderId}::${supplierId ?? ""}`;

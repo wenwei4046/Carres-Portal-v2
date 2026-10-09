@@ -31,6 +31,7 @@ import correctionWorkRouter from "./routes/operation/correction-work";
 import operationOrdersRouter from "./routes/operation/orders";
 import operationPartnersRouter from "./routes/operation/partners";
 import deliverySettingsRouter from "./routes/operation/delivery-settings";
+import peopleWorkDaysRouter from "./routes/operation/people-work-days";
 import operationPosRouter from "./routes/operation/pos";
 import operationReceiveThreadsRouter from "./routes/operation/receive-threads";
 // R2 — the supplier-claim queue (read side; claims are minted by 0288 RPCs)
@@ -41,7 +42,10 @@ import repairOrdersRouter from "./routes/operation/repair-orders";
 // the ONE receive engine (0302).
 import warehouseReceiptsRouter from "./routes/operation/warehouse-receipts";
 import workActivityRouter from "./routes/operation/work-activity";
+import settingsCoreRouter, { companyProfileReadRouter } from "./routes/operation/settings-core";
 import workspaceDutiesRouter from "./routes/operation/workspace-duties";
+import leaveRouter from "./routes/operation/leave";
+import saturdayOnCallRouter from "./routes/operation/saturday-on-call";
 import operationWorkRouter from "./routes/operation/work";
 import procurementTabsRouter from "./routes/operation/procurement-tabs";
 import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg";
@@ -145,6 +149,7 @@ import rentalRouter from "./routes/rental";
 import { runContactByCron, runFollowUpMaintenanceCron } from "./cron/contact-by";
 import { runDealerCommissionCloseCron } from "./cron/dealer-commission-close";
 import { runWorkActivityCron } from "./cron/work-activity";
+import { runDutyRotaCron } from "./cron/duty-rota";
 import type { AppEnv, Bindings } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -254,10 +259,17 @@ api.route("/operation/purchasing/requests", manualPurchaseRouter);
 // P1 (0303) — Purchasing → Settings: the numbers the ordering engine reads.
 api.route("/operation/purchasing/settings", purchasingSettingsRouter);
 api.route("/operation/warehouse-settings", warehouseSettingsRouter);
+// 0668 + 0669 — Settings → Company · Office · Settings editors (Carres Settings
+// List COM · OFF · TEAM-02). The company identity read is open to every
+// signed-in account because every printed document carries it.
+api.route("/operation/settings", settingsCoreRouter);
+api.route("/company-profile", companyProfileReadRouter);
 // 0232 staff assignment pool — GET / + PUT /:userId
 api.route("/operation/staff", opsStaffRouter);
 api.route("/operation/partners", operationPartnersRouter);
 api.route("/operation/delivery-settings", deliverySettingsRouter);
+// 0678 — the responsible person's recorded working week (People/HR), read-only.
+api.route("/operation/people", peopleWorkDaysRouter);
 api.route("/operation/pos", operationPosRouter);
 api.route("/operation/pos", lpInboundRouter);
 api.route("/operation/pos", dispatchCustomerLegRouter);
@@ -341,6 +353,8 @@ api.route("/operation/repair-orders", repairOrdersRouter);
 api.route("/operation/warehouse-receipts", warehouseReceiptsRouter);
 api.route("/operation/workspace-duties", workspaceDutiesRouter);
 api.route("/operation/work-activity", workActivityRouter);
+api.route("/operation/leave", leaveRouter);
+api.route("/operation/saturday-on-call", saturdayOnCallRouter);
 api.route("/operation/work", operationWorkRouter);
 api.route("/operation/orders", annotationsRouter);
 api.route("/operation/escalations", escalationsRouter);
@@ -357,13 +371,18 @@ export default {
   scheduled: (_event: ScheduledController, env: Bindings, ctx: ExecutionContext) => {
     ctx.waitUntil(
       (async () => {
-        if (_event.cron === "* 1-10 * * 1-5") {
+        /* The activity check runs every minute 08:00–20:59 MYT every day; the
+           stored Office calendar decides which days and hours count. */
+        if (_event.cron === "* 0-12 * * *") {
           await runWorkActivityCron(env);
           return;
         }
         // 0666: the dealer commission month before closes by itself (on the 1st);
         // its failure is logged and never stops the jobs after it.
         await runDealerCommissionCloseCron(env).catch((e) => console.error("dealer commission close failed:", e));
+        // 0671: the monthly PO / GRN rota — this month, and next month from the
+        // 25th. Its failure is logged and never stops the jobs after it.
+        await runDutyRotaCron(env).catch((e) => console.error("duty rota failed:", e));
         await runContactByCron(env);
         await runFollowUpMaintenanceCron(env);
         // Purchasing MASTER §9.5: an overdue date is PO/Work follow-up,

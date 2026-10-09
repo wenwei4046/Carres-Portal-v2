@@ -193,7 +193,7 @@ Workspace-owned Staff & Duties page under global Settings (placement production 
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
-| Workspace destinations | `Workspace` · `Issue Tracker` (owner ruling 2026-09-29; existing work route) | Work as the menu destination · Workspace Dashboard · Tasks · Duty roster · Service Notes |
+| Workspace destinations | `Workspace` · `Leave` (owner 9 Oct 2026; the one leave entry, see "Workspace → Leave" below) · `Issue Tracker` (owner ruling 2026-09-29; existing work route) | Work as the menu destination · Workspace Dashboard · Tasks · Duty roster · Service Notes · MC Report |
 | Work scopes | `My Task` · `Team Work` (Workspace MASTER §5.10) | My Work on this page · My Tasks · Team Tasks · Work queue |
 | Work header search (Jess reverted the `Search` rename, 2026-09-26) | `Jump to…` beside its keyboard hint | Search · Find · Go to |
 | Work timing | `Broken commitment` · `Missed` · governed working weekdays · Saturday when an authoritative action remains there · `Today` (accessible name only) · `Holiday operation` · `No date` | Due as the primary structure · Upcoming · Later · Overdue as the section word · Backlog |
@@ -265,7 +265,7 @@ Workspace-owned Staff & Duties page under global Settings (placement production 
 | Duty assignment form (owner ruling 2026-09-29; NOT BUILT) | Read-only `Duty` and current assignment; fields `Assigned to` · `From` · `Until` · `Reason`; `Cancel` / `Assign`; bounded PO/GRN adjustments require both dates and reason | Holder · Acting person · a future assignment shown as current |
 | Duty actions (owner ruling 2026-09-29; NOT BUILT) | Visible `⋯` with accessible name `More actions`; authorised assignment actions use `Assign` and the governed date/reason form | Assign holder · Add cover · permanent manual buttons · right-click-only entry · Take it · Release |
 | Duty filters (owner ruling 2026-09-29; NOT BUILT) | `All duties` · `Not assigned`; future assignments remain in `Next`/history | Covered today · Cover scheduled · cover-specific filters |
-| Two assignment checks (owner-approved 2026-09-29; NOT BUILT) | Settings: `Morning check time` · `Afternoon check time`; initial `10:30 AM` · `3:00 PM`; manager-editable, company time | one combined daily check · treating a morning activity stamp as afternoon evidence |
+| Two assignment checks (owner-approved 2026-09-29; owner defaults 9 Oct 2026) | Settings: `Morning check time` · `Afternoon check time`; owner defaults `10:00 AM` · `2:01 PM` (the stored live times are not changed by a release); editor-editable, company time; bounds follow Settings → Office and each person's afternoon check follows their own lunch (0677, see "Settings → Personal → Lunch time") | one combined daily check · treating a morning activity stamp as afternoon evidence |
 | Assignment check setting feedback | `Check times could not be loaded.` · `Check times could not be refreshed. Try again.` · `Check times were not saved. Try again.` · `These times changed. Cancel and try again.` · `Save` · `Cancel` · `Try again` | claiming defaults were loaded after a failed read · silently overwriting another manager’s change |
 | Assignment check without another person (implementation clarification of the approved non-blocking work rule, 2026-09-30) | `No one else could be assigned at this check.` · `Any authorised staff may help.` | calling a successful no-candidate check an update failure · telling staff to retry a fixed past checkpoint · implying execution is blocked |
 | Automatic assignment reason (owner-approved 2026-09-29; NOT BUILT) | `Assignment reason: {name} was not online by {time}`; use the configured checkpoint time and only verified missing current-period activity | MC / absence diagnosis · claiming inactivity when the source failed |
@@ -298,6 +298,27 @@ Workspace-owned Staff & Duties page under global Settings (placement production 
 An empty or failure sentence uses the exact object it describes. `No open work` cannot describe an
 empty Issue Register; `No issues recorded` cannot describe a filtered no-match; neither may appear
 until the complete authorised source is healthy.
+
+### Workspace → Leave, Saturday on-call and the monthly rota — owner 9 Oct 2026 · BUILT ON BRANCH (0670/0671)
+
+Authority: `Carres Settings List.md` WS-05, WS-11, WS-12 and the 9 Oct "Leave types", "Leave approval
+policy" and "Saturday on-call boundary" rulings; Workspace MASTER §4.4. One leave entry; no type needs
+approval; Saturday on-call is contact coverage, never a Duty. Built on `build/settings-completion`, not
+deployed; owner walk owed.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| Leave page and menu row | `Leave` (page and Workspace menu row) · block `Record leave`, subtitle `MC, Emergency leave or Planned leave. It counts at once; no approval.` (owner flow 9 Oct 2026) · block `Leave I recorded for colleagues` (shown when I recorded any; read only — only the person cancels their own leave) · block `My leave` · groups `Upcoming` · `Past` | MC Report · Leave application · Apply leave · Absence |
+| Leave types | `MC` · `Emergency leave` · `Planned leave` (`On leave` is a status, never a fourth type) | Medical leave · Sick leave · Annual leave · Unpaid leave |
+| Leave form | `Leave for` (every active staff member; first choice `Me`, then active colleagues; 0680, owner ruling 9 Oct 2026) · `Type` · `From` · `Until` · `MC proof (optional)` (photos or PDF, up to 3 files, through the shared evidence picker; owner rule 9 Oct 2026: MC needs no upload) · `Reason` (Emergency leave) · `Note` (Planned leave and MC, optional) · button `Submit` (owner flow 9 Oct 2026: Record leave → Submit) · beside it `No approval needed.` | Submit leave · Apply · Request · Send for approval |
+| Leave form guidance and refusals | `Choose a type.` · `Choose the dates.` · `Until must be on or after From.` · `Write the reason.` · `Choose valid leave dates.` · `You already have leave on these dates.` · `{name} already has leave on these dates.` · `Upload the MC proof again.` · `The text is too long. Make it shorter.` · `Only active staff can record leave.` · `Leave was not recorded. Try again.` | Invalid · Error · Required · Something went wrong · the database's own sentence |
+| Leave recorded and its list | `Leave recorded.` · `Leave recorded for {name}.` · `Recorded by {name}` (when someone recorded it for me) · a recorder's row `{name} · {type}` · row: type, then `{date}` or `{from} to {until}`, then the reason or note · `{dates} · Cancelled` · `{dates} · Cancelled from {date}` · `View proof` (`View proof {n}` when several) · empty `No leave recorded.` · failure `Leave could not be opened.` · `Try again` · loading `Opening Leave…` · before the leave storage is installed `Leave is not switched on yet.` | Approved · Pending · Rejected (no approval exists) · Deleted |
+| Cancelling leave | before it starts `Cancel leave` → `Cancel this leave?` · `Cancel leave` · `Keep leave`; while it runs `Cancel remaining days` → `Cancel the days after today?` · `Cancel remaining days` · `Keep leave`; refusals `This leave is already cancelled.` · `This leave has no days left to cancel.` · `Leave was not cancelled. Try again.` | Delete leave · Withdraw · Undo |
+| Staff & Duties: who is away (names and dates only) | section `On leave`, header `Nobody` · `1 person` · `{n} people`; rows `{name}` · `{date}` or `{from} to {until}`; empty `Nobody is on leave in the next 7 days.` | the leave type, reason or proof · Absent · MIA |
+| Staff & Duties: leave policy (read-only) | section `Leave approval`, header `No approval needed`; rows `MC` · `No approval needed`; `Emergency leave` · `No approval needed · Reason needed`; `Planned leave` · `No approval needed` | Approval required (until an approval change with its effective treatment is built) |
+| Saturday on-call (Staff & Duties section, not a Duty) | section `Saturday on-call`, header `{name or Not assigned} · {9:00 AM} to {6:00 PM}`; purpose `Answers customer, driver and warehouse calls and WhatsApp. Not an Office workday. Routine work does not move.`; fact `Time` · `{start} to {end}`; rows `{Sat, 10 Oct}` · `{name}` or `Not assigned` · `On leave` · second line `Cover {name}`; editor `Edit time` (`Starts` · `Ends` · `Save` · `Cancel`) and `Assign` (`On call` with `Not assigned` · `Cover` with `No cover` · `Save` · `Cancel`) | Saturday Duty · Saturday shift · Office Saturday · On-call Duty · Duty roster |
+| Saturday on-call refusals | `Ends must be after Starts.` · `Choose a person.` · `Choose another person for Cover.` · `{name} cannot be on call. Choose an eligible active staff member.` · `These times changed. Cancel and try again.` · `Saturday on-call is set by Jess or a person she names.` · `Saturday on-call was not saved. Try again.` · failure `Saturday on-call could not be opened.` | the database's own sentence · Error |
+| Monthly PO / GRN rota in Duty history | `Assigned by system` on a monthly-rotation row (never the account that bootstrapped an older row); note `Monthly rotation`; future month under `Next` | Roster · Auto-assigned · Rota bot |
 
 ## Action copy / work clarity law — owner ruling 2026-08-11
 
@@ -813,7 +834,7 @@ the `ETA` field in the Logistics Details edit state.
 |---|---|
 | Settings rail row and page | `Logistics` (never `Logistics Partners`; `Partner` is banned) · sections `Company details` · `Coverage` · `Schedule` · `Transit points` · `Drivers and Vehicles` · `Services & charges` · `Portal access` · one `Save changes` per page · `Not configured` |
 | Delivery Rules | `Logistics contacts the customer` (fixed) · `Carres contacts the customer only for: a known delay · another date requested · customer refused · wrong phone number` · `Contact lead days` (reads the shared `chase` setting) · `Evidence required by result` |
-| Logistics assignment timing (owner-approved 2026-09-29 / NOT BUILT) | `Assign logistics` remains the action. Its date comes from Delivery MASTER §2.1's configured assignment deadline, not the action's opening day or a hardcoded three-day label. Preserve the governed date format and separate assignment metadata. This timing ruling introduces no new screen label. |
+| Logistics assignment timing (owner-approved 2026-09-29 · confirmed 9 Oct 2026 · BUILT ON BRANCH `build/settings-completion`, 0673 not applied) | `Assign logistics` remains the action. Its date comes from Delivery MASTER §2.1's configured assignment deadline, not the action's opening day or a hardcoded three-day label. Preserve the governed date format and separate assignment metadata. The Settings row and the Route fact that name the deadline are in § "Stored deadline settings words" below. |
 | NETS arrange page | `Delivery dates` · facts `Reference` · `Customer` · `Area` · `Goods` · `Requested delivery` · fields `Scheduled date` · `Scheduled time (optional)` · `ETA (optional)` · `Result` · `Note` · `Reply screenshot` · acts `Save delivery date` · `Cannot deliver` (`Confirmed date`, `Time window`, `Save Delivery Arrangement` retired) · `Hold delivery` alone while the gate holds. **BUILT 2026-10-06 (PR #1947):** `Scheduled date` · `Scheduled time (optional)` · `ETA (optional)` · `Save delivery date` · `Hold delivery`; NOT BUILT: the facts `Reference` · `Area` · `Requested delivery` (the page still says `Customer asked`), `Result`, `Reply screenshot`, and `Cannot deliver` casing (the page says `Cannot Deliver`) |
 
 ### Reports → Delivery words — 【DELIVERY】 CARD 17 (Delivery MASTER §12, 2026-09-13)
@@ -5458,3 +5479,56 @@ Receiving placement; UI MASTER owns Calendar. No posting/permission change is im
 | Personal scope explanation | Choose how your portal looks. This changes only your profile. | Implementation explanatory copy |
 | Fixed status explanation | Theme changes the page background and selection. Status colours stay the same. | Current v4 UI Kit §9 meaning |
 | Save / result / failure | Save changes · Saved · Could not save. Try again. | Existing save/retry grammar |
+
+## Settings → Personal → Lunch time · owner order 9 Oct 2026 (Settings List OFF-04 · WS-04; migration 0677) · BUILT ON BRANCH, NOT DEPLOYED
+
+Each person's own lunch start; the activity check skips that lunch. Times print as `1:00 PM to 2:00 PM`; no dash.
+
+| Situation | Exact words | Source |
+|---|---|---|
+| Settings row / page title | Personal · Lunch time | Owner order 9 Oct 2026 ("personal lunch setting") |
+| Personal scope explanation | Choose when your one hour lunch starts. This changes only your profile. | Personal Appearance grammar |
+| Rows | Lunch starts · Your lunch · Afternoon check | OFF-04 · WS-04 |
+| Choices | `{time}` every quarter hour; the Office one reads `{time} · Office lunch` (choosing it follows the Office lunch) | OFF-04 default and shift |
+| Range note | `You can start lunch from {earliest} to {latest}.` | OFF-04 actual start 12:00 to 14:00 at the defaults |
+| Values | `{start} to {end}` · `{afternoon check time}` | the database's one window arithmetic |
+| Lunch rule note | Your work stays with you during lunch. The afternoon check waits until after your lunch. | WS-04 "no task transfer solely for lunch" |
+| Saved start no longer allowed | Your saved lunch time no longer fits the Office lunch. The Office lunch applies until you choose again. | Office change after a personal choice |
+| Refusal / failure / read | `Choose a time from {earliest} to {latest}.` · Could not save. Try again. · Lunch time could not be loaded. · Try again | Existing save/retry grammar |
+| Not a staff member | Only a staff member can set a lunch time. | Shared logins record no lunch |
+| Staff & Duties check time bounds | `Morning check from {Office start} to {last minute before the Office lunch}. Afternoon check from {first minute after the Office lunch} to {last minute before Office end}. A person's afternoon check moves with their own lunch.` | WS-02 · WS-03 bounds follow Settings → Office (0677) |
+
+## Settings → Company · Office · Settings editors · owner 9 Oct 2026 (Carres Settings List COM · OFF · TEAM-02) · BUILT ON BRANCH, NOT DEPLOYED
+
+| Situation | Exact words | Source |
+|---|---|---|
+| Settings menu groups / rows | Company · Company · Office · Office · Team and access · Settings editors | Settings List display categories |
+| Company sections | Legal company (`Every printed document reads these details.`) · Customer support (`The one contact customers see. Staff who act are still recorded by name.`) | COM-01 · COM-02 |
+| Company rows, in order | Legal company name · Former company name · SSM registration number · Registered address line 1 · Registered address line 2 · Registered address line 3 · Postcode · City · Country · Company telephone · Company email · Printed address · Customer support name · Customer support telephone · Customer support WhatsApp · Customer support email | Settings List Company field breakdown |
+| Office sections | Office working days and hours (`Every Office deadline counts these days. Saturday on-call is set in Staff & Duties and does not make Saturday an Office working day.`) · Office public holidays (`Office deadlines skip these days. Warehouse keeps its own holidays.`) | OFF-01..05 · Saturday on-call boundary |
+| Office rows | Office working days · Office hours · Flexi allowance · Lunch · Lunch may move by · Holiday region · Year · List in force; editing: Office opens · Office closes · Flexi allowance (minutes) · Lunch starts · Lunch ends · Lunch may move by (minutes) · Date · Holiday name · Add holiday · Remove | OFF-01..05 |
+| Office values | `Monday to Friday` · `9:00 AM to 6:00 PM` · `1 hour` · `None` · `Recorded in Settings` · `Built-in list. Not yet checked for Kuala Lumpur. Record this year to replace it.` · `No holidays recorded for this year.` | OFF-05: no Kuala Lumpur date invented |
+| Office review notes | `Deadlines from now on count the new days. Dates already recorded do not move.` · `An empty list returns this year to the built-in list.` | 01 §6 timing changes never silently rewrite |
+| Shared Settings words | Edit · Review changes · `Review changes: {gap}` · Save changes · Back · Cancel · Reason (optional) · Changes · `No changes recorded yet.` · `Not set` · `Staff identity not recorded` | Existing Settings grammar |
+| Read-only / not installed | `You can read these settings. Only the owner and the people named in Settings editors can change them.` · `These settings are not saved in the system yet. The values below are the confirmed defaults.` · `These settings could not be loaded. Try again.` · `Someone else saved these settings. Reload to see them.` | TEAM-02 · GLOBAL OWNER LAW (no hard-coded person name) |
+| Settings editors | Who may change each section (`The owner may change every section. A person named here may change that section's settings only. It gives no approval, no Duty and no money rights.`) · `{name} · owner` · Add person · Person · Remove · `named by {name} · {date}` · `removed by {name} on {date}` · `Name not recorded` · `You can read this page. Only the owner names Settings editors.` | TEAM-02 |
+| Saved toasts | `Company settings saved` · `Office settings saved` · `Office public holidays {year} saved` · `{Section} editor added` · `{name} no longer edits {Section}` | Existing save grammar |
+
+## Stored deadline settings words · 9 Oct 2026 (BUILT ON BRANCH `build/settings-completion`; 0672 · 0673 · 0678 not applied)
+
+The words the screens print where a deadline now reads its stored setting (Settings List PAY-04 ·
+DEL-04 · DEL-05 · OFF-01/05, owner confirmed 9 Oct 2026). No dash is used as a separator.
+
+| Surface | Exact words | Meaning |
+|---|---|---|
+| Settings → Payments → Collection timing | sub-heading `Outstation delivery` · note `A delivery whose logistics company is not the Klang Valley default.` · the two existing lines `Start asking the customer to pay` · `Payment must be complete`, each `{n} working days before Scheduled delivery` (`1 working day before Scheduled delivery`) | PAY-04 outstation pair (deadline 3, ask 4 at the default) |
+| Collection timing form fields | `Outstation: start asking (working days before Scheduled delivery)` · `Outstation: payment must be complete (working days before Scheduled delivery)`; review lines `Outstation start asking: {old} → {new} working days before` · `Outstation payment must be complete: {old} → {new} working days before`; gap `asking an outstation customer must start earlier than the outstation payment deadline` | the same Edit → Review changes → Save changes flow |
+| Collection timing calendar note (replaces the retired `Operation does not work on Saturday`) | `Days are counted Monday to Saturday, skipping the public holidays set in Settings, Warehouse. These dates never move for the customer. If that day is not a working day of the person responsible, they act on their working day before it: their working days in People, else the Office working days in Settings, Office.` | Payment MASTER "Two calendars, one clock": the facts count on the Delivery calendar; the action follows the responsible person's working days (Office weekdays when none are recorded). Staff working days decide only when to chase the customer; they never change the customer's payment due date or ask day. |
+| Delivery Settings → Delivery Rules | card and row `Assign logistics by` · value `{n} working days before Scheduled delivery` · note `Counts Monday to Saturday, skipping the public holidays set in Settings, Warehouse, Public Holidays (the built-in Selangor list until a calendar is imported there). Uses Requested delivery until the delivery is scheduled. Assign logistics opens on the day the PO is issued.` · refusal `Choose between 1 and 30 working days.` · `Reason` | DEL-04 (default 3, range 1–30); the holidays are THE Delivery calendar's (9 Oct 2026) |
+| Delivery Settings → Delivery Rules (0678) | card and row `Courier dispatch within` · value `{n} working days after Warehouse confirms the goods can be packed` (`1 working day after …`) · note `Counts the dispatching Warehouse's working days, set in Settings, Warehouse. Starts when Warehouse confirms the goods are received, checked and can be packed. This is the Warehouse's dispatch target, not a customer delivery date.` · the same refusal and `Reason` | DEL-10 (default 3, range 1–30). The dispatch workflow itself is NOT BUILT |
+| Orders list → `Assign logistics` queue tooltip | `No logistics company is picked yet. Assign one as soon as the route is known, whether or not the goods are in. Late after the Assign logistics by date set in Delivery Settings, Delivery Rules` | replaces `late once the customer's date is under 3 working days away`; the late count uses the one `assignLogisticsDueIso` (opening day included) |
+| People → HR person drawer → Employment (0678) | row `Working days` · checkboxes `Mon` `Tue` `Wed` `Thu` `Fri` `Sat` `Sun` · when none is ticked `Not recorded. Office working days apply.` | the person's normal working week (People/HR owns it); it moves only when that person acts on a payment, never a customer date |
+| Order Route LOGISTICS node, no company yet | `Logistics not assigned` over `Assign logistics by {date}` | the one assignment deadline; printed only when the stored lead was read |
+| Work action, `Assign logistics` | line two `Choose the company that carries this delivery · due {date}` | the hard-coded `3 working days before · {date}` is retired |
+| Logistics card, first check | `{n} working days before · {date}` with `n` = the stored Contact lead (`Contact lead days`, DEL-05); at the default it reads the ruled `3 working days before`. `2 working days before` and `1 working day before` stay fixed (Workspace §5.9) | the contact day follows its one setting |
+

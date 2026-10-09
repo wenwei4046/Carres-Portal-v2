@@ -674,6 +674,9 @@ export interface ReceivingWorkSource {
     supplier_name: string | null;
     goods_received_at?: string;
     submitted_at: string;
+    /** The Site that physically received (`actual_site_id`, else the PO's
+     *  `warehouse_id`) — its own receiving calendar counts the lateness. */
+    site_id?: string | null;
   }[];
 }
 
@@ -686,7 +689,9 @@ export function receivingWorkItems(
   src: ReceivingWorkSource,
   ctx: { grnDuty: { userId: string; name: string | null } | null },
   todayIso: string,
-  workingDaysLate: (dueIso: string) => number,
+  /** Counted on the receiving Site's own calendar (`warehouseReceivingDaysLate`);
+   *  the row is handed in so the caller can read its Site. */
+  workingDaysLate: (dueIso: string, row: ReceivingWorkSource["submitted"][number]) => number,
 ): Array<{
   ruleKey: "receiving.check_in";
   module: "receiving";
@@ -723,7 +728,7 @@ export function receivingWorkItems(
       locked: false,
       broken: false,
       dueIso: due,
-      workingDaysLate: due && today > due ? workingDaysLate(due) : 0,
+      workingDaysLate: due && today > due ? workingDaysLate(due, r) : 0,
       receiptId: r.id,
       poId: r.po_id,
     });

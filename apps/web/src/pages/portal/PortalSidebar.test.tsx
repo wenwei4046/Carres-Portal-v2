@@ -359,6 +359,7 @@ describe("a module is an expandable PARENT ROW, never a heading", () => {
       "group-head-overview",
       "child-dashboard",
       "child-work",
+      "child-leave",
       "group-head-sales-locations",
       "module-showroom",
       "group-head-sales",
@@ -388,9 +389,9 @@ describe("a module is an expandable PARENT ROW, never a heading", () => {
     }
   });
 
-  it("single pages stay plain rows — no caret on Dashboard, Workspace, Issue Tracker, Catalog", () => {
+  it("single pages stay plain rows — no caret on Dashboard, Workspace, Leave, Issue Tracker, Catalog", () => {
     renderAt("/operation");
-    for (const key of ["dashboard", "work", "issue-tracker", "op-catalog"]) {
+    for (const key of ["dashboard", "work", "leave", "issue-tracker", "op-catalog"]) {
       const row = child(key);
       expect(row.tagName).toBe("A");
       expect(row.getAttribute("aria-expanded")).toBeNull();

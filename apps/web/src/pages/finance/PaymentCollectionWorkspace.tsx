@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
 import {
   deliveryWords,
@@ -9,9 +9,9 @@ import {
   invoicePaymentTiming,
   soRemaining,
 } from "@carres/shared/payment-invoice-register";
-import { collectionTimingFor, type CollectionTimingRule } from "@carres/shared/collection-clock";
+import { collectionTimingFor, type CollectionTimingRule, type OwnerCalendar } from "@carres/shared/collection-clock";
+import type { WorkingDayOptions } from "@carres/shared/working-days";
 import { COLLECTION_OUTCOME_NEXT, COLLECTION_OUTCOME_WORD } from "@carres/shared/payment-collection-outcome";
-import { myHolidaySet } from "@carres/shared/my-holidays";
 import InvoiceRecordPayment from "./InvoiceRecordPayment";
 import InvoiceAskToPay from "./InvoiceAskToPay";
 import InvoicePaymentLink from "./InvoicePaymentLink";
@@ -21,7 +21,8 @@ import InvoiceVoidReplace from "./InvoiceVoidReplace";
 import InvoiceCollectionOwner from "./InvoiceCollectionOwner";
 import CustomerStatement from "./CustomerStatement";
 import { useAuth } from "@/lib/auth";
-import { useCollectionOutcomes } from "@/lib/queries";
+import { useDeliveryDays, usePersonOwnerCalendars } from "@/lib/deadline-queries";
+import { useCollectionOutcomes, useCollectionOwner } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
 import { renderInvoicePdf } from "@/lib/pdf/render";
 import type { InvoiceTemplateData } from "@/lib/pdf/types";
@@ -49,15 +50,19 @@ export function collectionFactsOf(
   row: InvoiceRegisterRow,
   rows: InvoiceRegisterRow[],
   today: string,
-  opts: { holidays?: Set<string> },
+  /** THE Delivery calendar — the payment facts count on it. */
+  opts: WorkingDayOptions,
   timingRules?: readonly CollectionTimingRule[] | null,
+  /** The responsible person's calendar (their working days, Office weekdays
+   *  when none are recorded) — moves only the action day. */
+  owner?: OwnerCalendar,
 ) {
   const money = soRemaining(rows, row.order_id);
   const goodsMoney = invoiceNeeded(row);
   const goods = invoiceGoodsFacts(row);
   const delivery = invoiceCustomerDelivery(row);
   const timingRule = collectionTimingFor(timingRules, row.issued_at?.slice(0, 10) ?? today);
-  const { timing } = invoicePaymentTiming(row, today, opts, rows, timingRule);
+  const { timing } = invoicePaymentTiming(row, today, opts, rows, timingRule, owner);
   const neededWord = money.known ? rm(money.outstanding) : "Value not recorded";
   /* The SAME words the Monitor row prints (Law D). This used to throw the
      status away and print a bare date, so a day the customer had NOT confirmed
@@ -104,8 +109,14 @@ export default function PaymentCollectionWorkspace({ invoice, rows, timingRules,
   embedded?: EmbeddedWorkspace;
 }) {
   const today = appTodayIso();
-  const opts = useMemo(() => ({ holidays: myHolidaySet() }), []);
+  /* The payment FACTS count on THE Delivery calendar; the ask/action day
+     steps back on the responsible person's own working days (Office weekdays
+     when none are recorded). */
+  const opts = useDeliveryDays().opts;
   const role = useAuth((s) => s.role);
+  const ownerQ = useCollectionOwner(invoice.order_id, role === "operation" || role === "principal");
+  const actor = ownerQ.data?.owner?.acting_user_id ?? ownerQ.data?.owner?.normal_user_id ?? null;
+  const ownerOf = usePersonOwnerCalendars([actor]);
   const [recording, setRecording] = useState(false);
   const [asking, setAsking] = useState(false);
   const [linking, setLinking] = useState(false);
@@ -115,7 +126,7 @@ export default function PaymentCollectionWorkspace({ invoice, rows, timingRules,
   const money = soRemaining(rows, invoice.order_id);
   const canRecord = (role === "operation" || role === "principal")
     && invoice.status !== "voided" && money.known && money.outstanding > 0;
-  const facts = collectionFactsOf(invoice, rows, today, opts, timingRules);
+  const facts = collectionFactsOf(invoice, rows, today, opts, timingRules, ownerOf(actor));
   // The ask door exists only when the shared clock says the money is
   // genuinely askable: never while Wait, never with no anchor, never when paid.
   const canAsk = canRecord && (facts.timing.kind === "due" || facts.timing.kind === "late");

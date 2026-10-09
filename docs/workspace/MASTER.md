@@ -221,7 +221,7 @@ admission makes the person available for the governed rotation; it does not mean
 must be the PO holder on that first day. Existing approval capability and receiving-posting rules
 remain separate.
 
-**MONTHLY ROTATION ORDER — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT.**
+**MONTHLY ROTATION ORDER — OWNER-APPROVED 2026-09-29 / BUILT ON BRANCH 2026-10-09 (0671, `build/settings-completion`; not applied, not deployed — see §4.4 "Leave, rota and Saturday on-call build").**
 Maintain a stable cyclic order of eligible routine Operation staff. Each month one person owns PO
 Duty and the next person in that order owns GRN Duty; advance the PO position by one each month.
 For three eligible people A/B/C, the cycle is PO A / GRN B → PO B / GRN C → PO C / GRN A.
@@ -272,7 +272,14 @@ them.
 People/HR also owns each employee's normal working-week eligibility. Module calendars own
 business-open days and public-holiday/special-date rules. The Shared Duty Resolver combines the
 person calendar with the module calendar for the resolved actor; Staff & Duties displays that result
-but does not become a second People calendar editor.
+but does not become a second People calendar editor. **Built on branch `build/settings-completion` (9 Oct 2026; 0678 not
+applied):** the person's week is `hr_employees.work_days` (NULL = not recorded), written only by HR /
+principal through `hr_upsert_employee` and shown as `Working days` in the HR person drawer; internal
+readers get only user id + days through `workspace_person_work_days`. The first consumer is the
+payment collection ACTION day (Work, Payment Monitor, collection workspace): the resolved actor's
+recorded days, else the Office weekdays, with the Office holidays (Payment MASTER "Two calendars, one
+clock" names the sources). It never moves a payment fact. Staff & Duties neither shows nor edits it
+yet.
 
 Distinct Duties include Storage Waiver Approver, Payment Approver, Purchasing Approver, Delivery
 Charge Approver, Stock Adjustment Approver, Service Case Approver and Delivery Duty
@@ -569,7 +576,7 @@ People date and no such membership is excluded from automatic PO allocation only
 enter automatic PO eligibility from the next calendar month. This is not the pending general
 monthly roster/admission engine; current baseline assignment remains the dated source.
 
-**Remaining target work:** complete monthly rotation, the People-owned departure/access workflow
+**Remaining target work:** the monthly rotation's release (built on branch, §4.4 below), the People-owned departure/access workflow
 and restricted former-profile lookup, complete bounded manual-exception convergence across a
 changing monthly baseline, full legacy-history pagination, and original/update/completion Work
 assignment snapshots with originating-surface audit. The two-period movement ledger must not be
@@ -625,11 +632,13 @@ availability. The exact activity/confirmation implementation remains to verify.
 
 **One leave entry — Workspace → Leave.** MC, Emergency and Planned leave use the same submission
 entry and People-owned dated absence facts; `On leave` is a status, not a fourth application type.
-MC requires dates and proof; Emergency requires dates and a short reason. No standalone MC Report
+MC requires dates; proof is optional and never required (owner rule confirmed 9 Oct 2026). Emergency requires dates and a short reason. No standalone MC Report
 page or duplicate HR record. All three types **currently require no approval**. Staff & Duties
 leave policy defaults to `Approval required = No`; Jess or a section-authorised editor may change
 it later, with effective date and treatment of existing submissions explicitly defined. No
 retroactive refusal is assumed and required evidence is not waived.
+
+**Leave recorded for a colleague — owner ruling 9 Oct 2026 (Jess, corrected the same day).** Every signed-in active staff member may record leave for a colleague (for example, one who is ill and cannot log in); this is not limited to the owner or Settings editors, and recording leave is a separate permission from changing Settings. Workspace → Leave → Record leave: the person defaults to me and may be changed to a colleague; choose MC, Emergency leave or Planned leave and the dates; Submit takes effect at once with no approval; MC proof is optional. The system keeps whose leave it is, who recorded it, when, and the change history (recorded, cancelled). Today's leave starts the existing cover; future leave starts on its day. Whole days only; half-day leave is not decided. Built on branch `build/settings-completion` (0680, not applied): `staff_leave.recorded_by`, `staff_leave_changes`, doors `staff_leave_submit` / `staff_leave_record_for` / `staff_leave_cancel` (unchanged 0670 rule: only the person whose leave it is cancels its future days; recording a colleague's leave gives no right to cancel it — owner correction 9 Oct 2026).
 
 A submission covering today activates qualified available cover immediately, without waiting for
 approval or an activity checkpoint. Future leave activates cover on the absence date, not the
@@ -651,6 +660,43 @@ completion facts, historical actual performers and monthly rota. Assistance does
 responsibility. Subsequent cover changes are recorded; no silent task ping-pong. Missing eligible
 cover or unreadable evidence stays a visible exception, never fabricated assignment. Approver
 qualifications do not inherit ordinary-work help rights.
+
+**Leave, rota and Saturday on-call build — BUILT ON BRANCH 2026-10-09 (`build/settings-completion`,
+migrations 0670/0671 NOT APPLIED, NOT DEPLOYED; owner walk owed).** Measured implementation, not a
+production claim:
+- *Leave (0670).* `staff_leave` (People-owned dated absence; one row per submission; cancel stamps
+  `cancelled_from/by/at`, never deletes) and `workspace_leave_policies` (one row per type,
+  `approval_required` stored false and held false by a CHECK until an approval change with its
+  effective treatment is built). Doors `staff_leave_submit` / `staff_leave_cancel`; private bucket
+  `staff-leave-proof` (own folder; principal and HR read). Workspace → Leave is a plain Workspace
+  menu row (`?tab=leave`). Colleagues see who is away and when through `workspace_leave_upcoming`,
+  never type, reason or proof.
+- *Cover reads leave through one question,* `_workspace_on_leave` (dated leave or the undated
+  away switch), in the scope's eligibility and candidates, the visibility rule, the Team list and
+  the movement loop. Today's PO, GRN and Delivery Duty answer the next eligible person at read
+  time, any hour (the approach of PR #1966, which this supersedes). A same-day submission on an
+  Office weekday also writes the durable movement at once; the minute engine covers future leave
+  on its day. Orders stay on the movement ledger only (their workload order could change between
+  a read and the movement). Leave is an eligibility fact, not an assignment-source change, so it
+  never bounces work back to someone who missed a check.
+- *Monthly rota (0671).* `workspace_plan_duty_rota(month)` (scheduler or Staff & Duties editor):
+  PO advances one place in staff-code order from last month's PO; GRN is the next person after
+  the PO holder; the PO newcomer wait reuses the cover engine's rule; one eligible person holds
+  both; nobody eligible writes nothing. A manager's row starting inside a month leaves that
+  month alone; a month not yet begun follows a changed cycle (newcomer admitted, exit recorded); a
+  running month never flips except when its holder is no longer active (re-planned from today).
+  Rows carry `origin = monthly_rotation`, `assigned_by` NULL, note `Monthly rotation`; History
+  reads `Assigned by system`. The daily 09:00 MYT run plans this month (only to continue a
+  running rotation) and, from the 25th, next month. 0437's pre-written two-person alternation
+  (Oct 2026 to Sep 2027) is labelled as the rotation, so a newcomer is not frozen out for a year.
+- *Saturday on-call (0671).* One editable window (default 9:00 AM to 6:00 PM, change history) and
+  a dated rota (Saturday → person, optional cover), appended, edited by Staff & Duties editors
+  (`_settings_require_editor('staff_duties')`). A person on leave that Saturday is flagged, never
+  replaced. No automatic rotation (cadence undecided); it touches no Duty, Task or Office day.
+- *Staff & Duties.* `Manage staff` shows for principal or HR (the People API gate). Three closed
+  sections beside the duty facts: `On leave`, `Saturday on-call`, `Leave approval`.
+- *Check times.* 10:00 AM morning is storable (CHECK, door and shared validation); live values are
+  untouched by the release.
 
 **Historical implementation evidence, not current defaults.** The 30 September #1798 release
 used 10:30 AM / 3:00 PM and fixed 1:00–2:00 PM lunch; the measured passes above remain history.
@@ -702,6 +748,23 @@ database's or the network's own text.
 
 Client validation may guide early, but the server returns the same business refusal and remains
 authoritative. No message says `Invalid`, `Error` or `Something went wrong` without the repair.
+
+### 4.4.9 · Settings editors, Company and Office — BUILT ON BRANCH 2026-10-09 (`build/settings-completion`; 0669 · 0674 not applied, not deployed)
+
+Owner rules TEAM-02 · SET-01 · COM · OFF (Carres Settings List, 9 Oct 2026). **Who edits Settings:**
+the owner (principal) edits every section; she names a person per section in Settings → Team and
+access → `Settings editors` (`settings_section_editors`, 0668 — applied to production by another
+session 9 Oct). Every Settings write asks the one gate `settings_can_edit(section)` in the API
+(`requireSettingsEditor`) and in SQL (0674 rewrites the Purchasing, Payment, Delivery, Warehouse and
+Staff & Duties gates and the Sales Order entry door; Warehouse keeps its own manage-settings
+capability). A named editor gets configuration editing only — never a money approval, a Duty or
+ordinary-work rights. Measured 9 Oct: the only active `ops_manager` holder is the owner, so moving
+the gates removes nobody's live right. Pages show read-only to anyone not named. **Company**
+(COM-01/02) and **Office** (OFF-01…05) are stored singletons with who · when · old → new · optional
+reason (`settings_changes`, 0669); the Office calendar (Monday to Friday, Kuala Lumpur holidays
+recorded one year at a time, built-in list per unrecorded year) is the ONE calendar Office deadlines
+read (`readOfficeCalendar` / `useOfficeCalendar`). Saturday on-call never makes Saturday an Office
+day. Remaining gaps are listed in Carres Settings List "Build state".
 
 ### 4.5 · Access, states and responsive behaviour
 
@@ -1537,6 +1600,12 @@ keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll
      deadline by which the **Scheduled delivery must be recorded** — Work's `confirm_delivery_date`,
      the Route's `Contact` point and the Logistics card show it as that deadline.
    A surface that shows either day names which one it is; neither is relabelled as the other.
+   **9 Oct 2026 (BUILT ON BRANCH `build/settings-completion`):** the first check counts the stored
+   Contact lead (`logistics_call_working_days`, DEL-05) and prints its number (`{n} working days
+   before`, the ruled `3 working days before` at the default); `2` and `1` stay fixed, and
+   `confirm_delivery_date` stays on the fixed 2-day check. `Assign logistics` is due by Delivery
+   §2.1's stored assignment lead before the Scheduled delivery, else the Requested one; the PO day
+   only opens it.
 
 ### 5.10 · THE WORK PAGE — ONE SPEC · APPROVED / LOCKED (Jess, 2026-09-28: "yes" to 定 and to the four kit admissions)
 

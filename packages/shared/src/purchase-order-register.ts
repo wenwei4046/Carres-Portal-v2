@@ -286,6 +286,8 @@ export function purchaseOrderReplyWorkItems(
   owner: WorkspaceDutyResolution | null,
   today: string,
   holidays: ReadonlySet<string> = myHolidaySet(),
+  /** The stored Office calendar's off days; default Saturday and Sunday. */
+  offDays: readonly number[] = PURCHASING_OFFICE_OFF_DAYS,
 ): WorkItem[] {
   const facts = purchaseOrderRegisterFacts(input, today);
   /* Only a PASSED supplier date is supplier-contact Work here; a sent PO
@@ -297,8 +299,8 @@ export function purchaseOrderReplyWorkItems(
   let due = input.expectedArrivals != null
     ? [...input.expectedArrivals].filter((date) => date < today).sort()[0] ?? null
     : input.supplierDate ?? null;
-  const options = { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays };
-  if (due && (PURCHASING_OFFICE_OFF_DAYS.includes(new Date(`${due}T00:00:00Z`).getUTCDay()) || holidays.has(due))) {
+  const options = { offDays, holidays };
+  if (due && (offDays.includes(new Date(`${due}T00:00:00Z`).getUTCDay()) || holidays.has(due))) {
     due = addWorkingDays(due, 1, options);
   }
   return [{
@@ -362,6 +364,8 @@ export function purchaseOrderArrivalCheckWorkItems(
   owner: WorkspaceDutyResolution | null,
   today: string,
   holidays: ReadonlySet<string> = myHolidaySet(),
+  /** The stored Office calendar's off days; default Saturday and Sunday. */
+  offDays: readonly number[] = PURCHASING_OFFICE_OFF_DAYS,
 ): WorkItem[] {
   /* The call engine reads only status, the anchor, the answer's about-date
    * and each line's outstanding quantity. The remaining `SupplierCallLine`
@@ -383,9 +387,9 @@ export function purchaseOrderArrivalCheckWorkItems(
       balanceAnswerAboutQty: null,
     })),
   };
-  const call = tomorrowDeliveryCallOf(po, { todayIso: today, holidays });
+  const call = tomorrowDeliveryCallOf(po, { todayIso: today, holidays, offDays });
   if (!call) return [];
-  const options = { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays };
+  const options = { offDays, holidays };
   return [{
     ruleKey: "purchasing.confirm_tomorrows_delivery",
     module: "purchasing",

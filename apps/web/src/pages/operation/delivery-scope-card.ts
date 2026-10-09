@@ -8,7 +8,8 @@
  * delivery, this says, word for word.
  */
 import { useMemo } from "react";
-import { deliveryQueueLeads, myHolidaySet, type DeliveryArrangementRow } from "@carres/shared";
+import { deliveryQueueLeads, type DeliveryArrangementRow } from "@carres/shared";
+import { useDeliveryDays } from "../../lib/deadline-queries";
 import { appTodayIso } from "@/lib/fmt-date";
 import {
   useCatalog,
@@ -54,6 +55,7 @@ export function useDeliveryScopeCard(orderId: string | null, leg = 0, knownOrder
   const settingsQ = usePurchasingSettings();
   const catalogQ = useCatalog();
   const today = appTodayIso();
+  const deliveryHolidays = useDeliveryDays().holidays;
 
   const card = useMemo(() => {
     const order = knownOrder ?? (ordersQ.data?.orders ?? []).find((o) => o.id === orderId);
@@ -78,7 +80,7 @@ export function useDeliveryScopeCard(orderId: string | null, leg = 0, knownOrder
       partnerNameById,
       arrangements,
       queueLeads: settingsQ.data ? deliveryQueueLeads(settingsQ.data) : undefined,
-      holidays: myHolidaySet(),
+      holidays: deliveryHolidays,
       addonNameByKey,
       todayIso: today,
     });
@@ -86,7 +88,7 @@ export function useDeliveryScopeCard(orderId: string | null, leg = 0, knownOrder
     return selected && (order.status === "delivered" || order.delivered_at)
       ? { ...selected, settled: true }
       : selected;
-  }, [orderId, leg, knownOrder, ordersQ.data, docsQ.data, arrangementsQ.data, partnersQ.data, settingsQ.data, catalogQ.data, today]);
+  }, [orderId, leg, knownOrder, ordersQ.data, docsQ.data, arrangementsQ.data, partnersQ.data, settingsQ.data, catalogQ.data, today, deliveryHolidays]);
 
   return {
     card,

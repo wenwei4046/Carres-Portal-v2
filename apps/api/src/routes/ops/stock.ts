@@ -42,6 +42,8 @@ import {
   unitCountAgainAction,
   unitProblemAction,
   unitProblemChoice,
+  deliveryHolidaySet,
+  warehouseAddOperatingDays,
   unitProblemIntake,
   unitProblemReportInputSchema,
   type UnitProblemUnit,
@@ -54,6 +56,8 @@ import { attemptDeliveryOrderIssue, todayIsoMYT } from "../../lib/delivery-order
 import { myDuties } from "../../lib/duties";
 import { skuCategories } from "../../lib/sku-categories";
 import { userClient } from "../../lib/supabase";
+import { readWarehouseReceivingSettings } from "../../lib/warehouse-receiving-calendar";
+import { readDeliveryCalendar } from "../../lib/delivery-calendar";
 import type { AppEnv } from "../../types";
 import { parseBody } from "../../lib/route-helpers";
 import { resolveActorNames } from "../../lib/actor-names";
@@ -394,7 +398,7 @@ const UNIT_ACTION_SELECT =
   "hold_reason, reserved_ref, sold_order_id, availability, identity_scope";
 
 /** The exact Unit behind a `⋮` act — by its permanent ID, never a counted row. */
-async function unitForAction(sb: ReturnType<typeof userClient>, unitCode: string): Promise<UnitProblemUnit & { needsRepair: boolean }> {
+async function unitForAction(sb: ReturnType<typeof userClient>, unitCode: string): Promise<UnitProblemUnit & { needsRepair: boolean; siteId: string | null }> {
   const code = unitCode.replace(/([\\%_])/g, "\\$1");
   const { data: found, error } = await sb.from("stock_unit_register_v").select(UNIT_ACTION_SELECT).ilike("unit_code", code).maybeSingle();
   if (error) throw mapErr(error);
@@ -412,8 +416,27 @@ async function unitForAction(sb: ReturnType<typeof userClient>, unitCode: string
     reservedRef: (data.reserved_ref as string | null) ?? null,
     soldOrderId: (data.sold_order_id as string | null) ?? null,
     siteName: (data.site_name as string | null) ?? null,
+    siteId: (data.warehouse_id as string | null) ?? null,
     needsRepair: Boolean(data.needs_repair),
   };
+}
+
+/**
+ * A Unit check is GRN Duty's work AT the Unit's Site, so it is due the next
+ * day that Site works — on the Site's own calendar (Warehouse Settings
+ * hours, special dates, holiday policy). A day nobody configured falls back,
+ * explicitly, to the governed Warehouse week: Sunday off + the Selangor
+ * holidays (the stored Warehouse calendar the Delivery calendar reads, else
+ * the built-in list). Never the Office calendar.
+ */
+async function siteWorkingDayStep(sb: ReturnType<typeof userClient>, siteId: string | null) {
+  const [siteSettings, delivery] = await Promise.all([
+    readWarehouseReceivingSettings(sb, siteId ? [siteId] : []),
+    readDeliveryCalendar(sb),
+  ]);
+  const settings = siteId ? siteSettings.get(siteId) ?? null : null;
+  const fallback = deliveryHolidaySet(delivery.calendar);
+  return (from: string, n: number) => warehouseAddOperatingDays(from, n, "receiving", settings, fallback);
 }
 
 /** The open Issues that name this Unit, with their current action. */
@@ -478,7 +501,7 @@ opsStockRouter.post("/register/:unitCode/report-problem", requireOperationOrPrin
   const names = await resolveActorNames(sb, [c.var.auth.id]);
   const foundByName = names.get(c.var.auth.id) ?? c.var.auth.email ?? "Warehouse";
   const intake = unitProblemIntake(unit, parsed, foundByName, observedOn);
-  const action = unitProblemAction(unit, parsed.problem, today);
+  const action = unitProblemAction(unit, parsed.problem, today, await siteWorkingDayStep(sb, unit.siteId));
   const { data, error } = await sb.rpc("stock_unit_report_problem", {
     p_request_id: parsed.requestId,
     p_item_id: unit.id,
@@ -533,7 +556,7 @@ opsStockRouter.post("/register/:unitCode/count-again", requireOperationOrPrincip
   if (!notFound?.currentAction) {
     throw new HTTPException(409, { message: "No open Not found report names this Unit" });
   }
-  const next = unitCountAgainAction(unit, todayIsoMYT());
+  const next = unitCountAgainAction(unit, todayIsoMYT(), await siteWorkingDayStep(sb, unit.siteId));
   const { data, error } = await sb.rpc("issue_record_action_result", {
     p_issue_id: notFound.id,
     p_action_id: notFound.currentAction.id,

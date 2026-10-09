@@ -366,8 +366,8 @@ Start asking the customer to pay   {n} working days before Scheduled delivery   
 Payment must be complete           {m} working days before Scheduled delivery   (ruled default 2)
 ```
 
-**Outstation row — owner ruling 2026-09-24 (APPROVED TARGET / NOT BUILT; `../ERP-ARCHITECTURE.md`
-§6.5):** an outstation order's `Payment must be complete` is **3 working days before Scheduled
+**Outstation row — owner ruling 2026-09-24 (BUILT ON BRANCH `build/settings-completion` 9 Oct 2026,
+0672 not applied; `../ERP-ARCHITECTURE.md` §6.5):** an outstation order's `Payment must be complete` is **3 working days before Scheduled
 Delivery** (the customer's delivery date). Its ask day follows the same n > m rule; the default
 ask day is an engineering setting, not an owner ruling. Same one clock, same calendar.
 
@@ -384,8 +384,20 @@ hold · {reason}`) — owner reconciliation 2026-09-25: the collection desk's fi
 fact, never `Hold delivery` — beside the doors `Record payment` and, for Finance only, `Remove hold`. The reason
 is this module's own record; Delivery, Warehouse and Work read it. Money completion and Finance hold clearance are independent requirements: RM 0 never clears
 a Finance hold, and removing a hold never settles money. Only when both and all other Delivery
-gates pass may the system issue the DO; each surface reads the same source facts. **Gap:** both still use the ruled default m = 2 (3 outstation)
-rather than the effective-dated rule row, because Operation cannot read the Payment settings payload.
+gates pass may the system issue the DO; each surface reads the same source facts. **Built on branch
+`build/settings-completion` (9 Oct 2026; 0672 not applied):** the outstation pair is stored in the same
+effective-dated rule row (default ask 4 · deadline 3; n > m in each pair) and edited in Settings → Payments;
+`paymentDeadlineOf` counts through `collectionClock` with the rule in force on the order's clock start
+(the live Sales Invoice's issue day, else today), so the Work right panel, the Order Route, the Logistics
+card, the Monitor and Work's payment items read one arithmetic. One `isOutstation` reading: a company is
+assigned and it is not the Klang Valley default. **Calendars (built on branch
+`build/settings-completion`, 9 Oct 2026; 0678 not applied):** the payment-due and ask-day FACTS count
+on THE Delivery calendar — Monday–Saturday with the Selangor public holidays Warehouse Settings stores
+for the dispatching Site, else the built-in list (`delivery-working-calendar.ts`); the ACTION day follows
+the responsible person's working days (Office weekdays when none are recorded) with the Office holidays
+(`personOwnerCalendar`). **Staff working days decide only when to chase the customer; they never change
+the customer's payment due date or ask day.** In code the facts come from `collectionFactDays`, which
+takes no owner calendar; a test proves a Saturday-working or a short-week owner leaves `dueIso` unchanged.
 **Cross-module rule-version start reconciliation — 9 October 2026 / REAL GAP.** §2's approved 25 September law collects against the SO and issues the closing Sales Invoice only when goods balance reaches zero. The delivery-date anchor is already governed: §3's Scheduled delivery fact and the owning shared timing contract determine the date from which lead days are counted. That is different from the date selecting the effective Settings version. The inherited invoice-issue start below and Workspace's historical issued-Invoice prerequisite cannot serve unpaid SO collection. The residual gap is the SO obligation's rule-version start/snapshot event, migration and source door; do not substitute SO creation, deposit date or booking-recorded timestamp without a governed contract. Existing historic invoice snapshots remain evidence. Workspace §6.1 reflects SO goods collection and keeps storage/Finance hold separate.
 
 **Local source evidence, read-only 9 October:** `packages/shared/src/payment-monitor.ts` selects `issued_at` or today's date as `clockStart`; `apps/api/src/routes/operation/work.ts` does the same for invoice-derived occurrences. `collectionTimingFor` selects the newest effective rule at that supplied date, while `resolveCollectionAnchor` separately reads confirmed date then promised date. Those code paths demonstrate the legacy coupling, not approval of the fallback or production behavior. The promised-date fallback must be reconciled against the current §3 distinction between Requested and Scheduled dates at the actual caller; an absent confirmed date must not be presented as confirmed by assumption. Acceptance requires separate evidence for deadline anchor, stored rule-version start, company versus actor calendar, rebooking treatment and old/new obligation versions; unrelated aging dates do not resolve this gap. No code, clock, payment or production data changed; no runtime test executed.
@@ -404,7 +416,34 @@ Schedule the actual customer-contact ACTION on the resolved action owner's gover
 ```
 
 Use the resolved person’s effective working/cover calendar. A person not working Saturday acts
-on the previous working day while the Monitor retains the Saturday deadline. The approved
+on the previous working day while the Monitor retains the Saturday deadline. **Staff working days
+decide only when to chase the customer; they never change the customer's payment due date or ask
+day** (owner boundary, 9 Oct 2026).
+
+How the person's calendar is derived (built 9 Oct 2026, branch `build/settings-completion`) — two
+derived rules, each with its sources, not new law:
+
+- **No personal working days recorded → the Operation/Office weekdays.** Sources:
+  `docs/ACTION-FLOW-STANDARD.md:154` (the Office calendar, Monday–Friday, counts for Purchasing ·
+  Operation · Finance …); this MASTER's build record "The calendar rule corrected" ("the resolved owner's
+  governed working days (`OwnerCalendar`, default the Operation week)"); `docs/workspace/MASTER.md:2943` ("resolved
+  owner's governed working days (Operation: Mon–Fri)"). The weekdays are the STORED Office calendar
+  (Settings → Office, OFF-01).
+- **Personal working days combined with the Office holidays.** Sources:
+  `docs/workspace/MASTER.md:272–274` ("People/HR also owns each employee's normal working-week
+  eligibility. Module calendars own business-open days and public-holiday/special-date rules. The
+  Shared Duty Resolver combines the person calendar with the module calendar for the resolved
+  actor"); `docs/ACTION-FLOW-STANDARD.md:154` (Operation's module calendar is Office); Settings List
+  OFF-05 (Office holidays = Kuala Lumpur).
+- The person's week is People/HR's fact (`hr_employees.work_days`, 0678), edited only in the HR
+  person drawer (`Working days`); Workspace and Payment read it and never edit it. The resolved
+  person is the collection owner's acting person today (the cover when covered), else the normal
+  owner — the "resolved person's effective working/cover calendar" above.
+- **PROPOSAL / NOT LAW — the Work feed admits an order to collection work on the Office calendar
+  before it reads the person's week** (the owner must exist before their week can be read). For a
+  person whose recorded week is narrower than the Office's, an order can therefore appear one day
+  later than their own week would place it. Falsifier: an observed collection item for a
+  short-week owner that first appears after that owner's action ask day. The approved
 Saturday support rota (09:00–18:00, editable) does not make Saturday an ordinary Office working
 day for everyone, nor does it reset the collection responsibility ledger. That is a property of the owner's calendar, not a global rule: a
 future duty holder who works Saturdays keeps a Saturday action. A Sunday or public-holiday fact

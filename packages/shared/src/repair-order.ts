@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { addWorkingDays } from "./working-days";
 import { myHolidaySet } from "./my-holidays";
-import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
+import { purchasingOfficeDays, type PurchasingOfficeDays } from "./purchasing-supplier-calls";
 import { PO_DELAY_REASONS } from "./po-workspace";
 import { GOODS_CATEGORY_WORDS } from "./line-category";
 
@@ -478,8 +478,11 @@ export function repairOrderDocumentState(row: RepairOrderListRow): string {
 
 // ── the Carres return target: 14 OFFICE working days from Supplier receipt ───
 /** The calendar the target is counted on, named (Law 2A: an action that does
- *  not name its calendar is not finished). Snapshotted onto the RO. */
-export const REPAIR_ORDER_TARGET_CALENDAR = "office-mon-fri+my-selangor-holidays";
+ *  not name its calendar is not finished). Snapshotted onto the RO. Since
+ *  9 Oct 2026 it is the STORED Office calendar (Settings → Office: its
+ *  weekdays and its holidays; the built-in list for a year nobody recorded),
+ *  which the 0678 door checks the target against. */
+export const REPAIR_ORDER_TARGET_CALENDAR = "office-calendar";
 export const REPAIR_ORDER_DEFAULT_WORKING_DAYS = 14;
 
 /** The KL business date of an instant. */
@@ -491,9 +494,10 @@ export function klDate(iso: string): string {
 export function repairOrderReturnTarget(
   receivedAtIso: string,
   workingDays: number = REPAIR_ORDER_DEFAULT_WORKING_DAYS,
-  holidays: ReadonlySet<string> = myHolidaySet(),
+  /** The stored Office calendar (`officeWorkingDayOptions`) or a holiday set. */
+  holidays: PurchasingOfficeDays = myHolidaySet(),
 ): string {
-  return addWorkingDays(klDate(receivedAtIso), workingDays, { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays });
+  return addWorkingDays(klDate(receivedAtIso), workingDays, purchasingOfficeDays(holidays));
 }
 
 // ── inputs ───────────────────────────────────────────────────────────────────

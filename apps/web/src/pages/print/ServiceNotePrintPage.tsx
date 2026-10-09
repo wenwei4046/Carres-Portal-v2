@@ -1,3 +1,4 @@
+import { CARRES_COMPANY } from "@/lib/pdf/company-identity-store";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useParams } from "react-router-dom";
@@ -78,7 +79,7 @@ export default function ServiceNotePrintPage() {
               Carres
             </div>
             <div style={{ fontSize: 9, color: "#6b7280", lineHeight: 1.4, maxWidth: 200 }}>
-              CARRES SDN. BHD. (1434019335) | No 7, Gateway 2-1, Gateway, No 2, Jalan Hamlin Bertam, Bertam Industrial Estate, 68000 Kepong, Kuala Lumpur
+              {CARRES_COMPANY.legalName} ({CARRES_COMPANY.regNo}) | {CARRES_COMPANY.addressLines.join(", ")}
             </div>
           </div>
           <div style={{ textAlign: "right" }}>

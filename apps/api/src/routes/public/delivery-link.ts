@@ -4,17 +4,19 @@ import {
   CANNOT_DELIVER_REASONS,
   LINK_COPY,
   STOCK_ROUTE_LABEL,
-  isSundayIso,
+  deliveryDayRefusal,
+  deliveryHolidaySet,
   linkAnotherDateInput,
   linkCannotDeliverInput,
   linkSaveScheduledInput,
-  myHolidaySet,
+  type DeliveryCalendar,
   type ExternalDeliveryLinkView,
 } from "@carres/shared";
 import { heldDeliveryScopes, holdKey } from "../../lib/delivery-hold";
 import { mapPgError } from "../../lib/route-helpers";
 import { adminClient } from "../../lib/supabase";
 import { todayIsoMYT } from "../../lib/today";
+import { readDeliveryCalendar } from "../../lib/delivery-calendar";
 import { readStockRoutes, scopePartner } from "../operation/delivery-links";
 import type { AppEnv } from "../../types";
 
@@ -111,11 +113,14 @@ async function body(c: Context<AppEnv>): Promise<unknown> {
   }
 }
 
-/** A date the company may use: not past, not Sunday, not a public holiday. */
-function dateRefusal(iso: string): string | null {
+/** A date the company may use: not past, not Sunday, not a public holiday of
+ *  the ONE Delivery calendar (the stored Selangor calendar, else the built-in
+ *  list). */
+function dateRefusal(iso: string, calendar: DeliveryCalendar): string | null {
   if (iso < todayIsoMYT()) return LINK_COPY.pastRefused;
-  if (isSundayIso(iso)) return LINK_COPY.sundayRefused;
-  if (myHolidaySet().has(iso)) return LINK_COPY.holidayRefused;
+  const refusal = deliveryDayRefusal(calendar, iso);
+  if (refusal === "sunday") return LINK_COPY.sundayRefused;
+  if (refusal === "holiday") return LINK_COPY.holidayRefused;
   return null;
 }
 
@@ -125,7 +130,7 @@ publicDeliveryLinkRouter.get("/:token", async (c) => {
     const r = await resolve(sb, c.req.param("token"));
     if (!r) return dead(c);
     const skus = [...new Set((r.order.order_lines ?? []).map((l) => l.sku))];
-    const [{ data: skuRows }, { data: arrangement }, routes] = await Promise.all([
+    const [{ data: skuRows }, { data: arrangement }, routes, delivery] = await Promise.all([
       skus.length ? sb.from("product_skus").select("sku, variant").in("sku", skus) : Promise.resolve({ data: [] }),
       sb
         .from("ops_delivery_arrangements")
@@ -134,6 +139,7 @@ publicDeliveryLinkRouter.get("/:token", async (c) => {
         .eq("leg", r.link.leg)
         .maybeSingle(),
       readStockRoutes(sb, r.link.order_id),
+      readDeliveryCalendar(sb),
     ]);
     const nameOf = new Map(((skuRows ?? []) as Array<{ sku: string; variant: string | null }>).map((s) => [s.sku, s.variant]));
     const refs = Array.isArray(r.order.source_ref) ? r.order.source_ref : r.order.source_ref ? [r.order.source_ref] : [];
@@ -163,6 +169,9 @@ publicDeliveryLinkRouter.get("/:token", async (c) => {
       scheduledDate: arr?.confirmed_date ?? null,
       scheduledTime: arr?.confirmed_time ?? null,
       holdDelivery: held.has(holdKey(r.link.order_id, r.link.leg)),
+      /* The Delivery calendar's holidays, so the page refuses the same days
+         this route refuses — dates only, never a name or a source. */
+      deliveryHolidays: [...deliveryHolidaySet(delivery.calendar)],
     };
     return c.json(view);
   } catch (err) {
@@ -185,7 +194,7 @@ publicDeliveryLinkRouter.put("/:token/arrangement", async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_input", message: parsed.error.issues[0]?.message ?? "invalid input" }, 422);
   }
-  const refusal = dateRefusal(parsed.data.scheduledDate);
+  const refusal = dateRefusal(parsed.data.scheduledDate, (await readDeliveryCalendar(sb)).calendar);
   if (refusal) return c.json({ error: "invalid_date", message: refusal }, 422);
   try {
     const r = await resolve(sb, c.req.param("token"));
@@ -235,7 +244,7 @@ publicDeliveryLinkRouter.post("/:token/another-date", async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_input", message: parsed.error.issues[0]?.message ?? "invalid input" }, 422);
   }
-  const refusal = dateRefusal(parsed.data.proposedDate);
+  const refusal = dateRefusal(parsed.data.proposedDate, (await readDeliveryCalendar(sb)).calendar);
   if (refusal) return c.json({ error: "invalid_date", message: refusal }, 422);
   try {
     const r = await resolve(sb, c.req.param("token"));

@@ -29,8 +29,8 @@ import {
   CANNOT_DELIVER_REASONS,
   DELIVERY_TIME_SLOTS,
   LINK_COPY,
-  isSundayIso,
-  myHolidaySet,
+  deliveryDayRefusal,
+  deliveryHolidaySet,
   type ExternalDeliveryLinkView,
 } from "@carres/shared";
 import Button from "@/components/kit/Button";
@@ -42,11 +42,16 @@ import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 
 type Mode = "schedule" | "another" | "cannot";
 
-function dayRefusal(iso: string | null): string | undefined {
+/** The same refusal the link's API makes: not past, not Sunday, not a holiday
+ *  of the ONE Delivery calendar — the holidays the view carries (the stored
+ *  Selangor calendar, else the built-in list); an older Worker that sends
+ *  none leaves the built-in list. */
+function dayRefusal(iso: string | null, holidays: readonly string[] | undefined): string | undefined {
   if (!iso) return undefined;
   if (iso < appTodayIso()) return LINK_COPY.pastRefused;
-  if (isSundayIso(iso)) return LINK_COPY.sundayRefused;
-  if (myHolidaySet().has(iso)) return LINK_COPY.holidayRefused;
+  const refusal = deliveryDayRefusal(holidays ?? deliveryHolidaySet(), iso);
+  if (refusal === "sunday") return LINK_COPY.sundayRefused;
+  if (refusal === "holiday") return LINK_COPY.holidayRefused;
   return undefined;
 }
 
@@ -141,7 +146,7 @@ export default function DeliveryLinkPage() {
     );
   }
 
-  const refusal = mode === "cannot" ? undefined : dayRefusal(date);
+  const refusal = mode === "cannot" ? undefined : dayRefusal(date, view.deliveryHolidays);
   const canSave =
     !busy &&
     (mode === "cannot"

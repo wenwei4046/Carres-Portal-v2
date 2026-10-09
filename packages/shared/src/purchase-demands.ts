@@ -510,8 +510,12 @@ export interface PurchaseDemandTimingInput {
   customerDelivery: IsoDate;
   /** The governed Safety days value (`order_by_buffer_days`). */
   safetyDays: number;
-  /** Malaysian public holidays — the same set the engine planned with. */
+  /** The Office holidays the Safety-days margin counts on (Settings →
+   *  Office, `officeWorkingDayOptions(cal).holidays`). */
   holidays: ReadonlySet<string>;
+  /** The stored Office calendar's non-working weekdays. Absent ⇒ Saturday
+   *  and Sunday (the owner default). */
+  offDays?: readonly number[];
 }
 
 /**
@@ -557,7 +561,7 @@ export function purchaseDemandSafetyDaysLeft(f: PurchaseDemandTimingInput): numb
   const days = countWorkingDays(
     forward ? f.readyIfOrderedToday : f.customerDelivery,
     forward ? f.customerDelivery : f.readyIfOrderedToday,
-    { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays: f.holidays },
+    { offDays: f.offDays ?? PURCHASING_OFFICE_OFF_DAYS, holidays: f.holidays },
   );
   return forward ? days : -days;
 }

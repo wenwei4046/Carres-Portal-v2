@@ -18,6 +18,9 @@ vi.mock("./LogisticsCard", () => ({
     facts: { partner: { kvDefault: true }, answer: null },
     partnerName: "AL Logistics",
     model: { rows: [{}, { dueIso: "2026-10-24", state: "not_open", fact: null }, {}], exception: null },
+    /* The stored settings the card read (9 Oct 2026): the defaults. */
+    deliveryDays: { holidays: new Set<string>() },
+    collectionTiming: undefined,
   }),
 }));
 vi.mock("./SupplierCard", () => ({

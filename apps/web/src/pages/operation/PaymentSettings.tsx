@@ -18,6 +18,7 @@ import {
   usePaymentMethodRegistry,
 } from "@/lib/payment-methods";
 import { qk, usePaymentSettings, type PaymentSettingsPayload } from "@/lib/queries";
+import { useCanEditSettings } from "@/lib/settings-queries";
 
 /**
  * Settings → Payments (payment/MASTER.md §12 · §16; owner ruling 2026-09-12;
@@ -71,6 +72,7 @@ function Section({ title, lead, children, testId }: {
 export default function PaymentSettings() {
   const qc = useQueryClient();
   const query = usePaymentSettings();
+  const canEdit = useCanEditSettings("payment");
   const [editing, setEditing] = useState<BankAccount["route_source"] | null>(null);
   const [accountName, setAccountName] = useState("");
   const [accountNo, setAccountNo] = useState("");
@@ -105,6 +107,12 @@ export default function PaymentSettings() {
   const timing = data?.collection_timing?.[0] ?? null;
   return <PageShell variant="settings" title="Payment Settings">
     <div className="mx-auto grid w-full max-w-4xl gap-5 overflow-auto p-5" data-testid="payment-settings">
+      {/* TEAM-02 (0674): only the owner or a person named for Payment changes
+          these settings; everyone else reads them. */}
+      {!canEdit && <p className="text-meta text-kit-slate-11" data-testid="payment-settings-read-only">
+        You can read these settings. Only the owner and the people named in Settings editors can change them.
+      </p>}
+      <fieldset disabled={!canEdit} className="m-0 grid min-w-0 gap-5 border-0 p-0">
 
       <Section title="Receiving bank accounts"
         lead="The system picks the bank from the order source. Staff never choose or type an account.">
@@ -194,20 +202,30 @@ export default function PaymentSettings() {
       </Section>
 
       <ChangeLog changes={data?.setting_changes ?? []} />
+      </fieldset>
     </div>
   </PageShell>;
 }
 
 /**
- * Collection timing (0486) — `Start asking the customer to pay {n} working
- * days before Scheduled delivery` · `Payment must be complete {m} working
- * days before`. Asking must start earlier than the deadline. A new rule
- * applies to new clocks from its effective date; running clocks keep theirs.
+ * Collection timing (0486 · 0672) — `Start asking the customer to pay {n}
+ * working days before Scheduled delivery` · `Payment must be complete {m}
+ * working days before`, and the same pair for an outstation delivery (PAY-04:
+ * deadline 3, ask 4). Asking must start earlier than the deadline in each
+ * pair. A new rule applies to new clocks from its effective date; running
+ * clocks keep theirs.
  */
+const OUTSTATION_DEFAULT = { ask: 4, deadline: 3 } as const;
+const dayWord = (n: number) => (n === 1 ? "1 working day before Scheduled delivery" : `${n} working days before Scheduled delivery`);
+
 function CollectionTimingCard({ current, onSaved }: { current: TimingRule | null; onSaved: () => void }) {
   const [step, setStep] = useState<"view" | "edit" | "review">("view");
+  const outAskNow = current?.outstation_ask_days_before ?? OUTSTATION_DEFAULT.ask;
+  const outDeadlineNow = current?.outstation_deadline_days_before ?? OUTSTATION_DEFAULT.deadline;
   const [ask, setAsk] = useState(String(current?.ask_days_before ?? 3));
   const [deadline, setDeadline] = useState(String(current?.deadline_days_before ?? 2));
+  const [outAsk, setOutAsk] = useState(String(outAskNow));
+  const [outDeadline, setOutDeadline] = useState(String(outDeadlineNow));
   const [effectiveFrom, setEffectiveFrom] = useState(appTodayIso());
   const [reason, setReason] = useState("");
   const save = useMutation({
@@ -215,6 +233,7 @@ function CollectionTimingCard({ current, onSaved }: { current: TimingRule | null
       method: "POST",
       body: JSON.stringify({
         askDaysBefore: Number(ask), deadlineDaysBefore: Number(deadline),
+        outstationAskDaysBefore: Number(outAsk), outstationDeadlineDaysBefore: Number(outDeadline),
         effectiveFrom, reason: reason.trim(),
       }),
     }),
@@ -222,24 +241,36 @@ function CollectionTimingCard({ current, onSaved }: { current: TimingRule | null
     onError: (e: Error) => toast.error(e.message),
   });
   const askN = Number(ask), deadlineN = Number(deadline);
-  const gap = !Number.isInteger(askN) || !Number.isInteger(deadlineN) || askN < 0 || deadlineN < 0
+  const outAskN = Number(outAsk), outDeadlineN = Number(outDeadline);
+  const whole = (n: number) => Number.isInteger(n) && n >= 0 && n <= 60;
+  const gap = ![askN, deadlineN, outAskN, outDeadlineN].every(whole)
     ? "enter whole days"
     : askN <= deadlineN ? "asking must start earlier than the payment deadline"
+    : outAskN <= outDeadlineN ? "asking an outstation customer must start earlier than the outstation payment deadline"
     : !effectiveFrom ? "choose the effective date"
     : !reason.trim() ? "give a reason"
     : null;
   return <Section title="Collection timing" testId="payment-settings-collection-timing">
     <div className="mt-2 text-body space-y-1">
       <p><span className="font-semibold">Start asking the customer to pay</span><br />
-        {current ? `${current.ask_days_before} working days before Scheduled delivery` : "3 working days before Scheduled delivery (the ruled default)"}</p>
+        {current ? dayWord(current.ask_days_before) : `${dayWord(3)} (the ruled default)`}</p>
       <p><span className="font-semibold">Payment must be complete</span><br />
-        {current ? `${current.deadline_days_before} working days before Scheduled delivery` : "2 working days before Scheduled delivery (the ruled default)"}</p>
-      {current && <p className="text-label font-normal text-kit-slate-11">
-        In effect from {fmtDate(current.effective_from)}{current.reason ? ` · ${current.reason}` : ""}. An action that lands on a Saturday, Sunday or public holiday moves to the previous working day. Operation does not work on Saturday.
-      </p>}
+        {current ? dayWord(current.deadline_days_before) : `${dayWord(2)} (the ruled default)`}</p>
+      <p className="pt-1 font-semibold" data-testid="collection-timing-outstation">Outstation delivery</p>
+      <p className="text-label font-normal text-kit-slate-11">
+        A delivery whose logistics company is not the Klang Valley default.
+      </p>
+      <p><span className="font-semibold">Start asking the customer to pay</span><br />{dayWord(outAskNow)}</p>
+      <p><span className="font-semibold">Payment must be complete</span><br />{dayWord(outDeadlineNow)}</p>
+      <p className="text-label font-normal text-kit-slate-11" data-testid="collection-timing-calendar">
+        {current ? `In effect from ${fmtDate(current.effective_from)}${current.reason ? ` · ${current.reason}` : ""}. ` : ""}
+        Days are counted Monday to Saturday, skipping the public holidays set in Settings, Warehouse. These dates never move for the customer. If that day is not a working day of the person responsible, they act on their working day before it: their working days in People, else the Office working days in Settings, Office.
+      </p>
       {step === "view" && <Button variant="neutral" onClick={() => {
         setAsk(String(current?.ask_days_before ?? 3));
         setDeadline(String(current?.deadline_days_before ?? 2));
+        setOutAsk(String(outAskNow));
+        setOutDeadline(String(outDeadlineNow));
         // Read today again: the page may have been open since yesterday.
         setEffectiveFrom(appTodayIso());
         setStep("edit");
@@ -250,6 +281,10 @@ function CollectionTimingCard({ current, onSaved }: { current: TimingRule | null
         value={ask} onChange={(e) => setAsk(e.target.value)} disabled={step === "review"} />
       <Input id="timing-deadline" label="Payment must be complete (working days before Scheduled delivery)" type="number" min={0} max={60}
         value={deadline} onChange={(e) => setDeadline(e.target.value)} disabled={step === "review"} />
+      <Input id="timing-outstation-ask" label="Outstation: start asking (working days before Scheduled delivery)" type="number" min={0} max={60}
+        value={outAsk} onChange={(e) => setOutAsk(e.target.value)} disabled={step === "review"} />
+      <Input id="timing-outstation-deadline" label="Outstation: payment must be complete (working days before Scheduled delivery)" type="number" min={0} max={60}
+        value={outDeadline} onChange={(e) => setOutDeadline(e.target.value)} disabled={step === "review"} />
       <DatePicker id="timing-effective" label="Effective from" value={effectiveFrom} minDate={appTodayIso()}
         onChange={(iso) => setEffectiveFrom(iso ?? "")} disabled={step === "review"} />
       <Input id="timing-reason" label="Reason" value={reason} maxLength={500}
@@ -258,6 +293,8 @@ function CollectionTimingCard({ current, onSaved }: { current: TimingRule | null
         <p className="font-semibold">Review changes</p>
         <p>Start asking: {current?.ask_days_before ?? 3} → {askN} working days before</p>
         <p>Payment must be complete: {current?.deadline_days_before ?? 2} → {deadlineN} working days before</p>
+        <p>Outstation start asking: {outAskNow} → {outAskN} working days before</p>
+        <p>Outstation payment must be complete: {outDeadlineNow} → {outDeadlineN} working days before</p>
         <p>Effective from {fmtDate(effectiveFrom)} · {reason.trim()}</p>
         <p className="text-label font-normal text-kit-slate-11">Clocks already running keep their current rule. New clocks from the effective date use the new one.</p>
       </div>}
@@ -388,7 +425,7 @@ function changeWord(what: string): string {
 
 function valueSummary(v: Record<string, unknown> | null): string {
   if (!v) return "none";
-  const keep = ["ask_days_before", "deadline_days_before", "free_days", "charge_amount", "cycle_days",
+  const keep = ["ask_days_before", "deadline_days_before", "outstation_ask_days_before", "outstation_deadline_days_before", "free_days", "charge_amount", "cycle_days",
     "operation_limit_day", "waiver_limit_day", "extra_free_allowed", "inspection_days", "account_no", "active", "label", "account_code"];
   const parts = keep.filter((k) => k in v && v[k] != null).map((k) => `${k.replaceAll("_", " ")} ${String(v[k])}`);
   return parts.length ? parts.join(" · ") : "recorded";

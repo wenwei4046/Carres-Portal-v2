@@ -133,6 +133,21 @@ const DS = {
   contactByOperation: "Operation",
   onBehalf: "Operation may record on the partner's behalf",
   contactLead: "Contact lead days",
+  /* DEL-04 · Delivery Rules (0673) */
+  assignBy: "Assign logistics by",
+  assignByValue: (n: number) => (n === 1 ? "1 working day before Scheduled delivery" : `${n} working days before Scheduled delivery`),
+  assignByRule:
+    "Counts Monday to Saturday, skipping the public holidays set in Settings, Warehouse, Public Holidays (the built-in Selangor list until a calendar is imported there). Uses Requested delivery until the delivery is scheduled. Assign logistics opens on the day the PO is issued.",
+  assignByRange: "Choose between 1 and 30 working days.",
+  /* DEL-10 · Delivery Rules (0678) */
+  courierDispatch: "Courier dispatch within",
+  courierDispatchValue: (n: number) =>
+    n === 1
+      ? "1 working day after Warehouse confirms the goods can be packed"
+      : `${n} working days after Warehouse confirms the goods can be packed`,
+  courierDispatchRule:
+    "Counts the dispatching Warehouse's working days, set in Settings, Warehouse. Starts when Warehouse confirms the goods are received, checked and can be packed. This is the Warehouse's dispatch target, not a customer delivery date.",
+  reason: "Reason",
   contactLeadRule: (n: number) => `${n} working days before the requested delivery date. This is the shared chase setting.`,
   paymentRule: "Payment clearance",
   paymentRuleWord:
@@ -937,9 +952,46 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
   useEffect(() => setDraft(rulesDraftOf(data)), [data]);
   const saved = useMemo(() => rulesDraftOf(data), [data]);
   const changedIds = data.partners.map((p) => p.id).filter((id) => !same(draft[id], saved[id]));
+  /* DEL-04 · `Assign logistics by` (0673) — its own Settings editor gate. */
+  const rules = data.rules ?? null;
+  const leadSaved = rules?.assignmentLeadWorkingDays ?? null;
+  const canEditLead = Boolean(rules?.stored && rules.canEdit);
+  const [lead, setLead] = useState(leadSaved != null ? String(leadSaved) : "");
+  const [leadReason, setLeadReason] = useState("");
+  useEffect(() => { setLead(leadSaved != null ? String(leadSaved) : ""); setLeadReason(""); }, [leadSaved]);
+  const leadN = Number(lead);
+  const leadDirty = canEditLead && leadSaved != null && lead.trim() !== "" && leadN !== leadSaved;
+  const leadGap = leadDirty && (!Number.isInteger(leadN) || leadN < 1 || leadN > 30) ? DS.assignByRange : null;
+  /* DEL-10 · `Courier dispatch within` (0678) — the same row, gate and record. */
+  const courierSaved = rules?.courierDispatchWorkingDays ?? null;
+  const canEditCourier = canEditLead && rules?.courierDispatchStored === true;
+  const [courier, setCourier] = useState(courierSaved != null ? String(courierSaved) : "");
+  useEffect(() => { setCourier(courierSaved != null ? String(courierSaved) : ""); }, [courierSaved]);
+  const courierN = Number(courier);
+  const courierDirty = canEditCourier && courierSaved != null && courier.trim() !== "" && courierN !== courierSaved;
+  const courierGap = courierDirty && (!Number.isInteger(courierN) || courierN < 1 || courierN > 30) ? DS.assignByRange : null;
+  const rulesGap = leadGap ?? courierGap;
+  const canSave = !rulesGap && ((data.canEdit && changedIds.length > 0) || leadDirty || courierDirty);
   const save = useMutation({
     mutationFn: async () => {
-      for (const id of changedIds) {
+      /* One Delivery Rules row: each save returns the new revision, which the
+         next save of the same row carries. */
+      let revision = rules?.revision ?? null;
+      const reason = leadReason.trim() || null;
+      if (leadDirty && revision != null) {
+        const after = await apiFetch<{ revision?: number }>("/api/operation/delivery-settings/rules/assignment-lead", {
+          method: "PUT",
+          body: JSON.stringify({ workingDays: leadN, revision, reason }),
+        });
+        revision = typeof after?.revision === "number" ? after.revision : revision;
+      }
+      if (courierDirty && revision != null) {
+        await apiFetch("/api/operation/delivery-settings/rules/courier-dispatch", {
+          method: "PUT",
+          body: JSON.stringify({ workingDays: courierN, revision, reason }),
+        });
+      }
+      for (const id of data.canEdit ? changedIds : []) {
         const r = draft[id]!;
         await apiFetch("/api/operation/delivery-settings/partner/rules", {
           method: "PUT",
@@ -952,6 +1004,7 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: DELIVERY_SETTINGS_QUERY_KEY });
       void qc.invalidateQueries({ queryKey: ["operation", "partners"] });
+      void qc.invalidateQueries({ queryKey: ["settings", "deadlines", "delivery-leads"] });
     },
   });
   const canEdit = data.canEdit;
@@ -962,13 +1015,39 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
       variant="settings"
       title={DS.rules}
       titleRight={
-        <Button variant="primary" data-testid="delivery-settings-save" disabled={!canEdit || changedIds.length === 0} loading={save.isPending} onClick={() => save.mutate()}>
-          {DS.saveChanges}
+        <Button variant="primary" data-testid="delivery-settings-save" disabled={!canSave} loading={save.isPending} onClick={() => save.mutate()}>
+          {rulesGap ? `${DS.saveChanges}: ${rulesGap}` : DS.saveChanges}
         </Button>
       }
     >
       <div className="mx-auto grid w-full max-w-4xl gap-5 overflow-auto p-5" data-testid="delivery-settings-rules">
-        {!canEdit && <p className="text-meta text-kit-slate-11" data-testid="delivery-settings-read-only">{DS.readOnly}</p>}
+        {!canEdit && !canEditLead && <p className="text-meta text-kit-slate-11" data-testid="delivery-settings-read-only">{DS.readOnly}</p>}
+        <SectionCard title={DS.assignBy} blurb={DS.assignByRule} testId="delivery-settings-assign-by">
+          <Row label={DS.assignBy} htmlFor="rule-assign-by">
+            {canEditLead ? (
+              <Input id="rule-assign-by" type="number" min={1} max={30}
+                value={lead} onChange={(e) => setLead(e.target.value)} />
+            ) : leadSaved != null ? DS.assignByValue(leadSaved) : <span className="text-kit-slate-9">{NOT_CONFIGURED}</span>}
+          </Row>
+          {leadDirty && (
+            <Row label={DS.reason} htmlFor="rule-assign-by-reason">
+              <Input id="rule-assign-by-reason" value={leadReason} maxLength={500} onChange={(e) => setLeadReason(e.target.value)} />
+            </Row>
+          )}
+        </SectionCard>
+        <SectionCard title={DS.courierDispatch} blurb={DS.courierDispatchRule} testId="delivery-settings-courier-dispatch">
+          <Row label={DS.courierDispatch} htmlFor="rule-courier-dispatch">
+            {canEditCourier ? (
+              <Input id="rule-courier-dispatch" type="number" min={1} max={30}
+                value={courier} onChange={(e) => setCourier(e.target.value)} />
+            ) : courierSaved != null ? DS.courierDispatchValue(courierSaved) : <span className="text-kit-slate-9">{NOT_CONFIGURED}</span>}
+          </Row>
+          {courierDirty && !leadDirty && (
+            <Row label={DS.reason} htmlFor="rule-courier-dispatch-reason">
+              <Input id="rule-courier-dispatch-reason" value={leadReason} maxLength={500} onChange={(e) => setLeadReason(e.target.value)} />
+            </Row>
+          )}
+        </SectionCard>
         <SectionCard title="Shared rules, read here and owned elsewhere" testId="delivery-settings-rule-mirrors">
           <Row label={DS.contactLead}>
             {data.contactLeadWorkingDays != null ? DS.contactLeadRule(data.contactLeadWorkingDays) : <span className="text-kit-slate-9">{NOT_CONFIGURED}</span>}
@@ -1012,7 +1091,7 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
             </SectionCard>
           );
         })}
-        <ChangesList changes={data.changes.filter((c) => c.what === "partner_rules")} />
+        <ChangesList changes={data.changes.filter((c) => c.what === "partner_rules" || c.what === "assignment_lead" || c.what === "courier_dispatch_lead")} />
       </div>
     </PageShell>
   );

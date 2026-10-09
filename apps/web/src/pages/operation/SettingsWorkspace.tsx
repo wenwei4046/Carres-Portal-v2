@@ -39,6 +39,10 @@ import PaymentSettings from "./PaymentSettings";
 import WarehouseSettings, { WAREHOUSE_SETTINGS_SECTIONS } from "./WarehouseSettings";
 import DeliverySettings from "./DeliverySettings";
 import AppearanceSettings from "./AppearanceSettings";
+import LunchTimeSettings from "./LunchTimeSettings";
+import CompanySettings from "./settings-core/CompanySettings";
+import OfficeSettings from "./settings-core/OfficeSettings";
+import SettingsEditors from "./settings-core/SettingsEditors";
 import { DELIVERY_SETTINGS_SECTIONS } from "@carres/shared";
 
 /**
@@ -53,8 +57,22 @@ import { DELIVERY_SETTINGS_SECTIONS } from "@carres/shared";
  */
 const SECTIONS = [
   /* Personal · Appearance — each person's own theme and focus outline (01 §9,
-     COPY "Personal Appearance"). */
-  { group: "Personal", items: [{ slug: "appearance", label: "Appearance" }] },
+     COPY "Personal Appearance"). Personal · Lunch time — each person's own
+     lunch start, read by the activity check (owner order 9 Oct 2026, 0677;
+     COPY "Settings → Personal → Lunch time"). */
+  {
+    group: "Personal",
+    items: [
+      { slug: "appearance", label: "Appearance" },
+      { slug: "lunch-time", label: "Lunch time" },
+    ],
+  },
+  /* Carres Settings List COM · OFF · TEAM-02 (owner confirmed 9 Oct 2026):
+     the company identity, the one Office calendar, and who may edit which
+     section. */
+  { group: "Company", items: [{ slug: "company", label: "Company" }] },
+  { group: "Office", items: [{ slug: "office", label: "Office" }] },
+  { group: "Team and access", items: [{ slug: "settings-editors", label: "Settings editors" }] },
   { group: "Staff & Duties", items: [{ slug: "staff-duties", label: "Staff & Duties" }] },
   { group: "Sales Orders", items: [{ slug: "sales-orders", label: "Sales Order Settings" }] },
   { group: "Purchasing", items: [{ slug: "purchasing", label: "Purchasing Settings" }] },
@@ -208,6 +226,10 @@ export default function SettingsWorkspace() {
           ) : undefined} />} />
           <Route index element={<Navigate to="sales-orders" replace />} />
           <Route path="appearance" element={<AppearanceSettings />} />
+          <Route path="lunch-time" element={<LunchTimeSettings />} />
+          <Route path="company" element={<CompanySettings />} />
+          <Route path="office" element={<OfficeSettings />} />
+          <Route path="settings-editors" element={<SettingsEditors />} />
           <Route path="sales-orders" element={<SalesOrderSettings />} />
           <Route path="purchasing" element={<OperationPurchasingSettings embedded />} />
           <Route path="payment" element={<PaymentSettings />} />

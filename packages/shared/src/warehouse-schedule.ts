@@ -410,7 +410,12 @@ export function warehouseArrivalScheduleCards(
   facts: readonly WarehouseArrivalSourceFacts[],
   todayIso: IsoDate,
   categories?: WarehouseSkuCategories,
+  /** Receiving days late on the arrival Site's own calendar
+   *  (`warehouseDaysLate(…, "receiving", …)`). Absent ⇒ the calendar date
+   *  has passed. */
+  daysLate?: WarehouseDaysLate,
 ): WarehouseScheduleCard[] {
+  const lateBy: WarehouseDaysLate = daysLate ?? ((due) => (due < todayIso ? 1 : 0));
   const factsById = new Map(facts.map((f) => [f.sourceId, f]));
   return arrivals.flatMap((arrival) => expectedArrivalGroups(arrival).map((group) => {
     const fact = factsById.get(arrival.sourceId);
@@ -468,7 +473,7 @@ export function warehouseArrivalScheduleCards(
           ? `/operation/procurement/${encodeURIComponent(arrival.sourceId)}`
           : null,
       overdue: Boolean(
-        group.date && group.date < todayIso && (group.qty === null || group.qty > 0),
+        group.date && lateBy(group.date, arrival.siteMapped ? arrival.siteId : null) > 0 && (group.qty === null || group.qty > 0),
       ),
     };
   }));
@@ -486,6 +491,9 @@ export function warehouseArrivalScheduleCards(
  * yields `expected`, and only the proof yields `scheduled`.
  */
 export type WarehousePickupAgreementProofs = ReadonlySet<string>;
+
+/** Days late for a dated Warehouse act at a Site (null = Site not recorded). */
+export type WarehouseDaysLate = (dueIso: IsoDate, siteId: string | null) => number;
 
 export function warehousePickupScopeKey(orderId: string, leg: number): string {
   return `${orderId}#leg${leg}`;
@@ -516,7 +524,12 @@ export function warehousePickupScheduleCards(
   todayIso: IsoDate,
   proofs?: WarehousePickupAgreementProofs,
   categories?: WarehouseSkuCategories,
+  /** Collection days late on the pickup Site's own calendar
+   *  (`warehouseDaysLate(…, "collection", …)`). Absent ⇒ the calendar date
+   *  has passed. */
+  daysLate?: WarehouseDaysLate,
 ): WarehouseScheduleCard[] {
+  const lateBy: WarehouseDaysLate = daysLate ?? ((due) => (due < todayIso ? 1 : 0));
   return cards.map((card) => ({
     id: `pickup:${card.deliveryOrderId ?? card.doNumber}@${
       card.warehouseSiteId ?? card.fromLocation
@@ -560,7 +573,7 @@ export function warehousePickupScheduleCards(
     openHref: pickupOpenHref(card),
     detailHref: card.deliveryOrderHref,
     overdue: Boolean(
-      card.eventDate && card.eventDate < todayIso && card.notHandedOver > 0,
+      card.eventDate && lateBy(card.eventDate, card.warehouseSiteId ?? null) > 0 && card.notHandedOver > 0,
     ),
   }));
 }
@@ -651,7 +664,91 @@ export function warehouseScheduleOperatingDates(
   return out;
 }
 
-/** The three-rung ladder above, as one decision. */
+/** The three-rung ladder above, as one decision — exported as
+ *  `warehouseOperatesOn` so the receiving lateness counts the SAME days the
+ *  Schedule walks (Law D). */
+export function warehouseOperatesOn(
+  date: IsoDate,
+  activity: WarehouseActivity,
+  settings: WarehouseScheduleSettings | null | undefined,
+  holidays: ReadonlySet<IsoDate> | readonly IsoDate[] = [],
+): boolean {
+  return operatesOn(date, activity, settings, holidays);
+}
+
+/**
+ * ⭐ RECEIVING DAYS LATE on the receiving Site's own calendar (9 Oct 2026,
+ * Warehouse-owned working hours / special dates / holiday policy — never the
+ * Office calendar). Counts the days strictly after `dueIso` up to and
+ * including `todayIso` on which the Site RECEIVES.
+ *
+ * EXPLICIT FALLBACK: a Site with no readable settings, or a day nobody
+ * configured, answers with the governed Warehouse week — Sunday off and the
+ * `fallbackHolidays` closed — exactly today's behaviour.
+ */
+export function warehouseReceivingDaysLate(
+  dueIso: IsoDate,
+  todayIso: IsoDate,
+  settings: WarehouseScheduleSettings | null | undefined,
+  fallbackHolidays: ReadonlySet<IsoDate> | readonly IsoDate[] = [],
+): number {
+  return warehouseDaysLate(dueIso, todayIso, "receiving", settings, fallbackHolidays);
+}
+
+/**
+ * DAYS LATE on the Site's own calendar for one activity (9 Oct 2026): the
+ * days strictly after `dueIso` up to and including `todayIso` on which the
+ * Site performs `activity` — Receiving for an arrival, Collection for a
+ * pickup. The Schedule, Inbound and the Work feed count lateness with this
+ * one walk (Law D). A date that has passed only across closed days (a
+ * Saturday arrival seen on Sunday) is not late yet.
+ *
+ * Same explicit fallback as `warehouseReceivingDaysLate`: no readable
+ * settings, or a day nobody configured, answers with the governed Warehouse
+ * week — Sunday off and `fallbackHolidays` closed.
+ */
+export function warehouseDaysLate(
+  dueIso: IsoDate,
+  todayIso: IsoDate,
+  activity: WarehouseActivity,
+  settings: WarehouseScheduleSettings | null | undefined,
+  fallbackHolidays: ReadonlySet<IsoDate> | readonly IsoDate[] = [],
+): number {
+  const from = dueIso.slice(0, 10);
+  const to = todayIso.slice(0, 10);
+  if (to <= from) return 0;
+  let cursor = from;
+  let count = 0;
+  let guard = 0;
+  while (cursor < to && guard++ < 3700) {
+    cursor = stepIsoDate(cursor);
+    if (operatesOn(cursor, activity, settings, fallbackHolidays)) count += 1;
+  }
+  return count;
+}
+
+/**
+ * The `n`th day AFTER `from` on which the Site performs `activity` — a
+ * Warehouse Work due date on the Site's own calendar (a Unit problem's check
+ * is due the next day the Site works). Same ladder and fallback as above.
+ */
+export function warehouseAddOperatingDays(
+  from: IsoDate,
+  n: number,
+  activity: WarehouseActivity,
+  settings: WarehouseScheduleSettings | null | undefined,
+  fallbackHolidays: ReadonlySet<IsoDate> | readonly IsoDate[] = [],
+): IsoDate {
+  let cursor = from.slice(0, 10);
+  let left = Math.max(0, Math.trunc(n));
+  let guard = 0;
+  while (left > 0 && guard++ < 3700) {
+    cursor = stepIsoDate(cursor);
+    if (operatesOn(cursor, activity, settings, fallbackHolidays)) left -= 1;
+  }
+  return cursor;
+}
+
 function operatesOn(
   date: IsoDate,
   activity: WarehouseActivity,

@@ -24,6 +24,8 @@
  */
 import { z } from "zod";
 import { subtractWorkingDays, type WorkingDayOptions } from "./working-days";
+import { collectionClock, DEFAULT_COLLECTION_TIMING, type CollectionTiming } from "./collection-clock";
+import { assignLogisticsDueIso } from "./delivery-queue";
 import { CANNOT_DELIVER_REASON_KEYS } from "./schemas/delivery-arrangement";
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -37,6 +39,9 @@ export const LOGISTICS_COPY = {
   notAssigned: "Logistics not assigned",
   checks: (done: number) => `Checks ${done} of 3`,
   checkLabel: { t3: "3 working days before", t2: "2 working days before", t1: "1 working day before" } as const,
+  /** The first check's label with the stored Contact lead (DEL-05) — reads
+   *  the ruled `3 working days before` at the default. */
+  contactCheckLabel: (n: number) => (n === 1 ? "1 working day before" : `${n} working days before`),
   opens: (date: string) => `Opens ${date}`,
   requested: "Requested delivery",
   scheduled: "Scheduled delivery",
@@ -101,6 +106,12 @@ export function stockRouteOfDestination(kind: DestinationSiteKind | null | undef
 /* ── the checks ────────────────────────────────────────────────────────── */
 
 export type LogisticsCheckKey = "t3" | "t2" | "t1";
+/** The three checks' leads. `t2` and `t1` are FIXED (Workspace MASTER §5.9:
+ *  the Scheduled-date deadline and the day-before check). `t3` is the seed of
+ *  the CONTACT lead — the shared `logistics_call_working_days` setting
+ *  (Purchasing Settings → `Confirm delivery date`, DEL-05; §5.9 item 8: the
+ *  `3 working days before` contact day IS that setting). A caller that read
+ *  the setting passes it as `contactLeadWorkingDays`. */
 export const LOGISTICS_CHECK_LEAD: Record<LogisticsCheckKey, number> = { t3: 3, t2: 2, t1: 1 };
 export type LogisticsCheckState = "not_open" | "open" | "done" | "missed" | "not_needed";
 
@@ -141,6 +152,13 @@ export interface LogisticsPartnerAnswer {
 export interface LogisticsCardInput {
   todayIso: string;
   holidays?: WorkingDayOptions["holidays"];
+  /** The stored Contact lead (DEL-05, `logistics_call_working_days`) — the
+   *  first check's working days. Absent ⇒ the seed 3. */
+  contactLeadWorkingDays?: number;
+  /** The stored assignment lead (DEL-04, Delivery Rules) — `Assign logistics`
+   *  is due this many Delivery working days before the Scheduled delivery,
+   *  else the Requested one. Absent ⇒ the seed 3. */
+  assignLeadWorkingDays?: number;
   requestedIso: string | null;
   scheduledIso: string | null;
   partnerName: string | null;
@@ -204,13 +222,24 @@ function stateFor(dueIso: string | null, todayIso: string, startedIso: string | 
  */
 export function logisticsCheckDueIso(
   key: LogisticsCheckKey,
-  input: { requestedIso: string | null; scheduledIso: string | null; holidays?: WorkingDayOptions["holidays"] },
+  input: {
+    requestedIso: string | null;
+    scheduledIso: string | null;
+    holidays?: WorkingDayOptions["holidays"];
+    /** The stored Contact lead for the first check (DEL-05). */
+    contactLeadWorkingDays?: number;
+  },
 ): string | null {
   const valid = (iso: string | null) => (iso && ISO.test(iso.slice(0, 10)) ? iso.slice(0, 10) : null);
   const requested = valid(input.requestedIso);
   const scheduled = valid(input.scheduledIso);
   const from = key === "t1" ? scheduled ?? requested : requested ?? scheduled;
-  return from ? subtractWorkingDays(from, LOGISTICS_CHECK_LEAD[key], { holidays: input.holidays }) : null;
+  const lead = key === "t3" ? contactLeadOf(input.contactLeadWorkingDays) : LOGISTICS_CHECK_LEAD[key];
+  return from ? subtractWorkingDays(from, lead, { holidays: input.holidays }) : null;
+}
+
+function contactLeadOf(n: number | undefined): number {
+  return typeof n === "number" && Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : LOGISTICS_CHECK_LEAD.t3;
 }
 
 export function logisticsCardModel(input: LogisticsCardInput): LogisticsCardModel {
@@ -226,16 +255,26 @@ export function logisticsCardModel(input: LogisticsCardInput): LogisticsCardMode
 
   /* The first two checks keep the date they were counted from: the requested
      date (the scheduled one only when the customer never named a day). */
-  const clock = { requestedIso: requested, scheduledIso: scheduled, holidays: opts.holidays };
+  const contactLead = contactLeadOf(input.contactLeadWorkingDays);
+  const clock = { requestedIso: requested, scheduledIso: scheduled, holidays: opts.holidays, contactLeadWorkingDays: contactLead };
   const t3Due = logisticsCheckDueIso("t3", clock);
   const t2Due = logisticsCheckDueIso("t2", clock);
   const t1Due = logisticsCheckDueIso("t1", clock);
+  /* `Assign logistics by` — Delivery's ONE assignment deadline (§2.1): the
+     Scheduled delivery, else the Requested one; the start opens it. */
+  const assignDue = assignLogisticsDueIso({
+    scheduledIso: scheduled,
+    requestedIso: requested,
+    openedIso: input.startedIso,
+    opts,
+    leads: { chase: contactLead, ...(input.assignLeadWorkingDays !== undefined ? { assign: input.assignLeadWorkingDays } : {}) },
+  });
 
-  /* ── 3 working days before ── */
+  /* ── the contact check (the stored Contact lead; 3 at the seed) ── */
   const t3Done = Boolean(partner && (input.detailsReceivedIso || scheduled));
   const t3: LogisticsCheckRow = {
     key: "t3",
-    label: LOGISTICS_COPY.checkLabel.t3,
+    label: LOGISTICS_COPY.contactCheckLabel(contactLead),
     dueIso: t3Due,
     state: t3Done ? "done" : stateFor(t3Due, today, input.startedIso),
     fact: t3Done
@@ -294,7 +333,7 @@ export function logisticsCardModel(input: LogisticsCardInput): LogisticsCardMode
   let currentAction: LogisticsAction | null = null;
   if (!input.settled) {
     if (!partner) {
-      currentAction = { ...LOGISTICS_COPY.assign, dueIso: t3Due, timing: timingOf(t3Due, today), door: "assign" };
+      currentAction = { ...LOGISTICS_COPY.assign, dueIso: assignDue, timing: timingOf(assignDue, today), door: "assign" };
     } else if (input.answer?.kind === "cannot_deliver" && !t2Done) {
       currentAction = {
         act: LOGISTICS_COPY.decideNext,
@@ -350,10 +389,9 @@ export function logisticsCardModel(input: LogisticsCardInput): LogisticsCardMode
 }
 
 /**
- * Money AFFECTS this delivery from the day payment must be complete: 2
- * working days before the anchor in the Klang Valley, 3 for an outstation
- * delivery (ERP-ARCHITECTURE §6.5). Before that it is Payment's own work and
- * the Logistics card stays quiet about it.
+ * Money AFFECTS this delivery from the day payment must be complete
+ * (`paymentDeadlineOf`). Before that it is Payment's own work and the
+ * Logistics card stays quiet about it.
  */
 export function moneyAffectsDelivery(input: {
   owed: number;
@@ -361,6 +399,7 @@ export function moneyAffectsDelivery(input: {
   todayIso: string;
   outstation: boolean;
   holidays?: WorkingDayOptions["holidays"];
+  timing?: CollectionTiming;
 }): boolean {
   if (!(input.owed > 0) || !input.anchorIso) return false;
   const deadline = paymentDeadlineOf(input);
@@ -370,19 +409,28 @@ export function moneyAffectsDelivery(input: {
 /**
  * The day payment must be complete for this delivery — the ONE deadline the
  * Logistics day-before check, the Order Route's payment line and the collapsed
- * exception all read (Law D). Payment's ruled default: 2 working days before
- * the anchor in the Klang Valley, 3 outstation (Payment MASTER "Collection
- * timing"; the effective-dated rule row is not readable by Operation — gap
- * recorded there).
+ * exception all read. It is Payment's own collection clock (`collectionClock`
+ * `dueIso`, Law D — a second `outstation ? 3 : 2` arithmetic retired
+ * 9 Oct 2026): the effective `Settings → Payments → Collection timing` pair
+ * (`timing`; absent ⇒ the ruled default 2, outstation 3), counted on the
+ * Delivery calendar — Mon–Sat with the Delivery holidays (`holidays`:
+ * `deliveryHolidaySet`, the stored Selangor calendar, else the built-in
+ * list). It is a FACT: the Office holidays never move it.
  */
 export function paymentDeadlineOf(input: {
   anchorIso: string | null;
   outstation: boolean;
   holidays?: WorkingDayOptions["holidays"];
+  timing?: CollectionTiming;
 }): string | null {
   const anchor = input.anchorIso?.slice(0, 10) ?? null;
   if (!anchor || !ISO.test(anchor)) return null;
-  return subtractWorkingDays(anchor, input.outstation ? 3 : 2, { holidays: input.holidays });
+  return collectionClock(
+    { confirmedDateIso: anchor, outstation: input.outstation },
+    anchor,
+    { holidays: input.holidays },
+    input.timing ?? DEFAULT_COLLECTION_TIMING,
+  ).dueIso;
 }
 
 /* ── the external link ─────────────────────────────────────────────────── */
@@ -485,6 +533,10 @@ export interface ExternalDeliveryLinkView {
    *  Scheduled delivery exists AND the DO money gate holds. A yes/no only —
    *  never money, never why. */
   holdDelivery: boolean;
+  /** The Delivery calendar's public holidays (the stored Selangor calendar,
+   *  else the built-in list) — the page refuses the days the API refuses.
+   *  Absent (an older Worker) ⇒ the page's built-in list. */
+  deliveryHolidays?: string[];
 }
 
 /** The facts the Logistics card reads from Delivery beyond the Monitor card. */

@@ -10,9 +10,9 @@
  */
 import { useCallback, useMemo } from "react";
 import { paymentMonitorRows, type PaymentMonitorRow } from "@carres/shared/payment-monitor";
-import type { CollectionTimingRule } from "@carres/shared/collection-clock";
-import { myHolidaySet } from "@carres/shared/my-holidays";
+import { collectionTimingRulesOf } from "@carres/shared/collection-clock";
 import { ApiError } from "@/lib/api";
+import { useDeliveryDays, useOfficeDays } from "@/lib/deadline-queries";
 import { appTodayIso } from "@/lib/fmt-date";
 import {
   useInvoiceRegister,
@@ -38,17 +38,17 @@ export function usePayBy(): (orderId: string) => PayByRead {
   const requestsQ = useLaterDeliveryRequests();
   const settingsQ = usePaymentSettings();
   const today = appTodayIso();
-  const holidays = useMemo(() => myHolidaySet(), []);
+  /* `Pay by` is the payment-due FACT: it counts on THE Delivery calendar
+     (Monday–Saturday + the stored Selangor holidays). The owner calendar
+     moves only an action day, which this column never prints. */
+  const officeDays = useOfficeDays();
+  const deliveryOpts = useDeliveryDays().opts;
 
   const state = readStateOf([invoicesQ, casesQ, requestsQ, settingsQ]);
   const byOrder = useMemo(() => {
     if (state !== "ok") return null;
     const invoices = invoicesQ.data ?? [];
-    const timingRules: CollectionTimingRule[] = (settingsQ.data?.collection_timing ?? []).map((r) => ({
-      askDaysBefore: r.ask_days_before,
-      deadlineDaysBefore: r.deadline_days_before,
-      effectiveFrom: r.effective_from,
-    }));
+    const timingRules = collectionTimingRulesOf(settingsQ.data?.collection_timing ?? []);
     const promisedByOrder = new Map<string, string>();
     for (const r of invoices) {
       const p = r.orders?.latest_promise?.promised_date;
@@ -59,12 +59,13 @@ export function usePayBy(): (orderId: string) => PayByRead {
       cases: casesQ.data?.cases ?? [],
       requests: requestsQ.data?.requests ?? [],
       todayIso: today,
-      opts: { holidays },
+      opts: deliveryOpts,
       timingRules,
       promisedByOrder,
+      owner: officeDays.owner,
     });
     return new Map<string, PaymentMonitorRow>(rows.map((r) => [r.orderId, r]));
-  }, [state, invoicesQ.data, casesQ.data, requestsQ.data, settingsQ.data, today, holidays]);
+  }, [state, invoicesQ.data, casesQ.data, requestsQ.data, settingsQ.data, today, deliveryOpts, officeDays.owner]);
 
   return useCallback(
     (orderId: string): PayByRead => {

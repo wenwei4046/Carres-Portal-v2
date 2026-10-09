@@ -1,6 +1,5 @@
 import { Hono, type Context } from "hono";
 import {
-  checkDuty,
   purchasingCreateDestinationInput,
   purchasingSetNumberInput,
   purchasingSetPoDaysInput,
@@ -18,7 +17,7 @@ import {
 } from "@carres/shared";
 import { z } from "zod";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
-import { myDuties } from "../../lib/duties";
+import { canEditSettings as canEditSection, requireSettingsEditor } from "../../lib/settings-editor";
 import { loadPoWindows, loadPurchasingSettings } from "../../lib/purchasing-settings";
 import { parseJsonBody, fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
@@ -80,20 +79,13 @@ async function loadSettingsWithWindows(sb: ReturnType<typeof userClient>) {
   };
 }
 
-/** Settings is manager-only (§1 of the working flow). The card names the key:
- *  the existing `ops_manager` duty — NO new duty key.
- *
- *  ⛔ NOT THE LEGACY EMAIL. The shared `operation@` login passes
- *  `isOpsManager` through the pre-0260 email fallback, but every Settings
- *  door re-gates in SQL (`purchasing_settings_gate`: principal, or a position
- *  carrying `ops_manager`), and that gate has no email list. The page used to
- *  offer Save on the shared login and then fail every save with `forbidden`
- *  (owner report 2026-09-29, "current setting cant save any"). What renders
- *  now matches what the database accepts. */
+/** Who may change Purchasing Settings (owner rule TEAM-02, 9 Oct 2026): the
+ *  owner, or a person named for Purchasing in Settings → Settings editors —
+ *  the same `settings_can_edit('purchasing')` the SQL gate asks (0674), so
+ *  what renders matches what the database accepts. The shared `operation@`
+ *  login is never named and never sees Save. */
 async function canEditSettings(c: Context<AppEnv>): Promise<boolean> {
-  const { role, email } = c.var.auth;
-  const grant = checkDuty("ops_manager", role, email, await myDuties(c));
-  return grant.allowed && grant.via !== "legacy_email";
+  return canEditSection(c.env, c.var.auth.jwt, "purchasing", c.var.auth.role);
 }
 
 purchasingSettingsRouter.get("/", requireOperationOrPrincipal, async (c) => {
@@ -131,7 +123,7 @@ async function respondWithSettings(c: Context<AppEnv>) {
   );
 }
 
-purchasingSettingsRouter.put("/number", requireOperationOrPrincipal, async (c) => {
+purchasingSettingsRouter.put("/number", requireSettingsEditor("purchasing"), async (c) => {
   const parsed = await parseJsonBody(c, purchasingSetNumberInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -143,7 +135,7 @@ purchasingSettingsRouter.put("/number", requireOperationOrPrincipal, async (c) =
   return respondWithSettings(c);
 });
 
-purchasingSettingsRouter.put("/po-days", requireOperationOrPrincipal, async (c) => {
+purchasingSettingsRouter.put("/po-days", requireSettingsEditor("purchasing"), async (c) => {
   const parsed = await parseJsonBody(c, purchasingSetPoDaysInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -152,7 +144,7 @@ purchasingSettingsRouter.put("/po-days", requireOperationOrPrincipal, async (c) 
   return respondWithSettings(c);
 });
 
-purchasingSettingsRouter.put("/ready-stock-priority", requireOperationOrPrincipal, async (c) => {
+purchasingSettingsRouter.put("/ready-stock-priority", requireSettingsEditor("purchasing"), async (c) => {
   const parsed = await parseJsonBody(c, purchasingSetReadyStockPriorityInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const { error } = await userClient(c.env, c.var.auth.jwt).rpc("purchasing_set_ready_stock_priority", { p_priority: parsed.data.priority });
@@ -163,7 +155,7 @@ purchasingSettingsRouter.put("/ready-stock-priority", requireOperationOrPrincipa
 /** 0585 · `First PO window` · `Second PO window` + its switch. The SECURITY
  *  DEFINER door re-gates the manager and re-checks the order of the times,
  *  and records the old and new value in the Settings history. */
-purchasingSettingsRouter.put("/po-windows", requireOperationOrPrincipal, async (c) => {
+purchasingSettingsRouter.put("/po-windows", requireSettingsEditor("purchasing"), async (c) => {
   const parsed = await parseJsonBody(c, purchasingSetPoWindowsInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -178,7 +170,7 @@ purchasingSettingsRouter.put("/po-windows", requireOperationOrPrincipal, async (
 
 /** 0585 · one supplier's `Last PO time` (null = the PO windows). The door
  *  refuses a time that is not earlier than the last PO window. */
-purchasingSettingsRouter.put("/po-cutoff", requireOperationOrPrincipal, async (c) => {
+purchasingSettingsRouter.put("/po-cutoff", requireSettingsEditor("purchasing"), async (c) => {
   const parsed = await parseJsonBody(c, purchasingSetSupplierPoCutoffInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -190,7 +182,7 @@ purchasingSettingsRouter.put("/po-cutoff", requireOperationOrPrincipal, async (c
   return respondWithSettings(c);
 });
 
-purchasingSettingsRouter.put("/production-days", requireOperationOrPrincipal, async (c) => {
+purchasingSettingsRouter.put("/production-days", requireSettingsEditor("purchasing"), async (c) => {
   const parsed = await parseJsonBody(c, purchasingSetProductionDaysInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -219,7 +211,7 @@ purchasingSettingsRouter.put("/terms-days", requireOperationOrPrincipal, async (
 /** PUT /supplier-address — 0611, one supplier's `Address` or `Return
  *  address`, one field per call (blank clears). Same gate and history as the
  *  other supplier rows; answers with the whole settings payload. */
-purchasingSettingsRouter.put("/supplier-address", requireOperationOrPrincipal, async (c) => {
+purchasingSettingsRouter.put("/supplier-address", requireSettingsEditor("purchasing"), async (c) => {
   const parsed = await parseJsonBody(c, purchasingSetSupplierAddressInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -232,7 +224,7 @@ purchasingSettingsRouter.put("/supplier-address", requireOperationOrPrincipal, a
   return respondWithSettings(c);
 });
 
-purchasingSettingsRouter.put("/supplier-channel", requireOperationOrPrincipal, async (c) => {
+purchasingSettingsRouter.put("/supplier-channel", requireSettingsEditor("purchasing"), async (c) => {
   const parsed = await parseJsonBody(c, purchasingSetSupplierChannelInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -245,7 +237,7 @@ purchasingSettingsRouter.put("/supplier-channel", requireOperationOrPrincipal, a
   return respondWithSettings(c);
 });
 
-purchasingSettingsRouter.put("/work-week", requireOperationOrPrincipal, async (c) => {
+purchasingSettingsRouter.put("/work-week", requireSettingsEditor("purchasing"), async (c) => {
   const parsed = await parseJsonBody(c, purchasingSetWorkWeekInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -257,7 +249,7 @@ purchasingSettingsRouter.put("/work-week", requireOperationOrPrincipal, async (c
   return respondWithSettings(c);
 });
 
-purchasingSettingsRouter.post("/destinations", requireOperationOrPrincipal, async (c) => {
+purchasingSettingsRouter.post("/destinations", requireSettingsEditor("purchasing"), async (c) => {
   const parsed = await parseJsonBody(c, purchasingCreateDestinationInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -271,7 +263,7 @@ purchasingSettingsRouter.post("/destinations", requireOperationOrPrincipal, asyn
 
 purchasingSettingsRouter.put(
   "/destinations/:destinationId",
-  requireOperationOrPrincipal,
+  requireSettingsEditor("purchasing"),
   async (c) => {
     const destinationId = z.string().uuid().safeParse(c.req.param("destinationId"));
     if (!destinationId.success) {
@@ -294,7 +286,7 @@ purchasingSettingsRouter.put(
 
 purchasingSettingsRouter.put(
   "/supplier-collection/:supplierId",
-  requireOperationOrPrincipal,
+  requireSettingsEditor("purchasing"),
   async (c) => {
     const supplierId = z.string().uuid().safeParse(c.req.param("supplierId"));
     if (!supplierId.success) {

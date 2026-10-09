@@ -87,12 +87,20 @@ vi.mock("@/lib/queries", () => ({
 // The shell header pulls the whole GlobalTopBar (orders query, router) — not
 // this page's subject. A stub keeps the word visible and the page isolated.
 vi.mock("./components/ModuleHeader", () => ({
-  default: ({ word }: { word: string }) => (
-    <h1 data-testid="module-header">{word}</h1>
+  default: ({ word, right }: { word: string; right?: React.ReactNode }) => (
+    <>
+      <h1 data-testid="module-header">{word}</h1>
+      {right}
+    </>
   ),
+}));
+// The leave / Saturday on-call band has its own test (LeaveAndOnCall.test.tsx).
+vi.mock("./staff-duties/LeaveAndOnCall", () => ({
+  default: () => <div data-testid="staff-leave-and-on-call" />,
 }));
 
 import StaffDuties from "./StaffDuties";
+import { useAuth } from "@/lib/auth";
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 
@@ -488,5 +496,52 @@ describe("assignment evidence and refresh", () => {
     historyState.next = true; draw(); fireEvent.click(screen.getByRole("button", { name: "History" }));
     expect(historyNext).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Next" })); expect(historyNext).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Manage staff and the leave band (owner 2026-09-29 / 9 Oct 2026)", () => {
+  it.each([
+    ["principal", true],
+    ["hr", true],
+    ["operation", false],
+  ])("offers Manage staff to a %s only when they may manage People records", (role, shown) => {
+    useAuth.setState({ role: role as never });
+    draw();
+    expect(screen.queryByRole("button", { name: "Manage staff" }) !== null).toBe(shown);
+    useAuth.setState({ role: null as never });
+  });
+  it("keeps Manage staff opening People with the way back", () => {
+    useAuth.setState({ role: "hr" as never });
+    let hr: { search: string; state: unknown } | null = null;
+    function People() {
+      const l = useLocation();
+      hr = { search: l.search, state: l.state };
+      return <p>People</p>;
+    }
+    render(
+      <MemoryRouter initialEntries={["/operation?tab=staff-duties&duty=po_duty"]}>
+        <Routes>
+          <Route path="/operation/*" element={<StaffDuties />} />
+          <Route path="/hr" element={<People />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Manage staff" }));
+    expect(hr).toEqual({ search: "?tab=people", state: { returnTo: "/operation?tab=staff-duties&duty=po_duty" } });
+    useAuth.setState({ role: null as never });
+  });
+  it("shows the leave and Saturday on-call band beside the duty facts", () => {
+    draw();
+    expect(screen.getByTestId("staff-leave-and-on-call")).toBeInTheDocument();
+  });
+  it("names the system, not the bootstrap account, on a monthly-rotation row", () => {
+    const duties = wholeCatalogue();
+    const po = duties.duties.find((d) => d.key === "po_duty")!;
+    po.assignments = [{ ...po.assignments[0]!, origin: "monthly_rotation", assigned_by_name: "Principal" }];
+    state.duties = duties;
+    draw("/operation?tab=staff-duties&duty=po_duty");
+    fireEvent.click(screen.getByRole("button", { name: "History" }));
+    expect(screen.getByText("Assigned by system")).toBeVisible();
+    expect(screen.queryByText("Assigned by Principal")).toBeNull();
   });
 });

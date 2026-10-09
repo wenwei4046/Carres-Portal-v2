@@ -31,6 +31,14 @@ HrPeopleCostTab 556   HrSetupTab 962
 
 **HR lands on an OVERVIEW — *what needs me today*, not a dashboard.**
 
+**A person's working week (built on branch `build/settings-completion`, 9 Oct 2026; 0678 not
+applied).** People/HR owns each employee's normal working weekdays (Workspace MASTER: "People/HR also
+owns each employee's normal working-week eligibility"): `hr_employees.work_days`, edited only by HR /
+principal in the person drawer's Employment panel as `Working days` (`Mon` … `Sun`; none ticked =
+`Not recorded. Office working days apply.`) through the existing `hr_upsert_employee` door, and read
+by Work and Payment only through the narrow `workspace_person_work_days` (user id + days). It moves
+only when that person acts on a collection, never a customer date.
+
 ### LIVE SCALE
 **9 CR-coded humans.** ⚠️ **No `app_users` row holds `role='hr'`**, so the whole portal is
 reachable by the principal account only, and the `hr` branch of every gate has never run

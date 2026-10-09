@@ -55,7 +55,7 @@ import {
   lineKind,
   SERVER_EXCLUSIVE_ADDON_KEYS,
   lineShortagesOf,
-  myHolidaySet,
+  deliveryHolidaySet,
   orderActionLines,
   type DeliveryArrivalState,
   type DeliveryQueueLeads,
@@ -849,7 +849,8 @@ export interface DeliveryMonitorFilters {
  */
 export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): DeliveryMonitorCard[] {
   const rows = buildDeliveryScopeRows(input);
-  const holidays = input.holidays ?? myHolidaySet();
+  /* The Delivery calendar's holidays; absent ⇒ the built-in Selangor list. */
+  const holidays = input.holidays ?? deliveryHolidaySet();
   const docByNumber = new Map(input.deliveryOrders.map((d) => [d.do_number, d] as const));
 
   return rows.map((row): DeliveryMonitorCard => {

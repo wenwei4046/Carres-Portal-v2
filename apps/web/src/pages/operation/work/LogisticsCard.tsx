@@ -32,8 +32,8 @@ import {
   LOGISTICS_COPY,
   STOCK_ROUTE_LABEL,
   logisticsCardModel,
+  isOutstation,
   moneyAffectsDelivery,
-  myHolidaySet,
   mytDayOf,
   type LogisticsAction,
   type LogisticsCheckRow,
@@ -45,6 +45,7 @@ import { apiFetch } from "@/lib/api";
 import { appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
 import { useDeliveryLinkActs, useDeliveryPartners, useLogisticsCardFacts } from "@/lib/queries";
+import { useDeliveryDays, useDeliveryLeads, useOrderCollectionTiming } from "@/lib/deadline-queries";
 import { DeliveryDatesEdit, LogisticsDetailsEdit } from "../components/DeliveryBrief";
 import { useDeliveryScopeCard } from "../delivery-scope-card";
 import { chaseMessageFor } from "../delivery-chase";
@@ -153,10 +154,18 @@ export function useLogisticsModel(orderId: string, leg = 0) {
   const partnerName = card?.logisticsPartnerName ?? facts?.partner?.name ?? null;
   const o = card?.scope.o ?? null;
   const linkUrl = facts?.link ? `${window.location.origin}/delivery-link/${facts.link.token}` : null;
+  /* The stored settings every date on this card reads (9 Oct 2026): the
+     Collection timing this order's clock runs under, THE Delivery calendar
+     (the checks, Assign logistics by and the payment-due FACT) and the two
+     Delivery leads. */
+  const collectionTiming = useOrderCollectionTiming(orderId);
+  const deliveryDays = useDeliveryDays();
+  const leads = useDeliveryLeads();
 
   const model = useMemo(() => {
     if (!card || !o) return null;
-    const holidays = myHolidaySet();
+    /* The Delivery calendar's holidays — the checks are Delivery facts. */
+    const holidays = deliveryDays.holidays;
     const anchor = card.confirmedDate ?? card.scope.customerDeliveryIso ?? null;
     const money = moneyOfOrder(o);
     const owed = money.known ? money.outstanding : 0;
@@ -164,8 +173,9 @@ export function useLogisticsModel(orderId: string, leg = 0) {
       owed,
       anchorIso: anchor,
       todayIso: today,
-      outstation: facts?.partner ? !facts.partner.kvDefault : false,
+      outstation: isOutstation(facts?.partner),
       holidays,
+      timing: collectionTiming,
     });
     const financeHolds = (o.order_finance_exceptions ?? []).some((e) => e.status === "open");
     const arrangement = card.scope.arrangement;
@@ -199,6 +209,8 @@ export function useLogisticsModel(orderId: string, leg = 0) {
     return logisticsCardModel({
       todayIso: today,
       holidays,
+      ...(leads.contactLeadWorkingDays !== null ? { contactLeadWorkingDays: leads.contactLeadWorkingDays } : {}),
+      assignLeadWorkingDays: leads.assignmentLeadWorkingDays,
       requestedIso: card.scope.customerDeliveryIso ?? null,
       scheduledIso: card.confirmedDate,
       partnerName,
@@ -215,8 +227,8 @@ export function useLogisticsModel(orderId: string, leg = 0) {
       financeHold: financeHolds ? "" : null,
       spell,
     });
-  }, [card, o, facts, partnerName, today]);
-  return { scope, factsQ, card, facts, today, partnerName, o, linkUrl, model };
+  }, [card, o, facts, partnerName, today, collectionTiming, deliveryDays, leads]);
+  return { scope, factsQ, card, facts, today, partnerName, o, linkUrl, model, collectionTiming, deliveryDays };
 }
 
 /** THE PREPARED LOGISTICS MESSAGES for the act card (§5.10): Delivery's

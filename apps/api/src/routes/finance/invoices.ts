@@ -63,7 +63,9 @@ const INVOICE_REGISTER_SELECT =
   // The Finance Dashboard's A/R Aging counts an order's age from the day it
   // was placed — the same date finance_ar_aging (0062/0125) aged it by.
   "placed_at," +
-  "ops_assigned_logistic,delivery_partners!orders_delivery_partner_id_fkey(name,contact)," +
+  // `kv_default` decides outstation — the collection clock's outstation pair
+  // (PAY-04, `invoiceOutstation`).
+  "ops_assigned_logistic,delivery_partners!orders_delivery_partner_id_fkey(name,contact,kv_default)," +
   // §5 likely-duplicate: the comparison needs the reference and the method
   // beside the amount and the paid date, so the operator inspects the RIGHT
   // earlier payment instead of guessing from a figure alone.
@@ -75,7 +77,7 @@ const INVOICE_REGISTER_SELECT =
   // the booking overlay only while its stage is `confirmed`. The shared
   // `invoiceConfirmedDelivery` reads these for the Monitor AND the Work feed,
   // so the clock starts on the day Delivery actually agreed.
-  "ops_delivery_arrangements(leg,confirmed_date,confirmed_time)," +
+  "ops_delivery_arrangements(leg,confirmed_date,confirmed_time,partner_id,delivery_partners(kv_default))," +
   "ops_delivery_orders(leg,delivery_date,time_slot,voided_at,issued_at)," +
   "ops_order_control(balance,confirmed_date,booking_stage,confirmed_time_slot,line_etas,line_stock_status," +
   // The 2026-09-08 correction: the Payment screens must see the LEGACY

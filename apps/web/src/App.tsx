@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useWorkActivity } from "@/lib/use-work-activity";
 import { useProfileAppearance } from "@/lib/appearance";
+import { useCompanyIdentitySync } from "@/lib/company-identity";
 import { RequireRole } from "@/lib/require-role";
 import { loginState } from "@/lib/return-to";
 import { roleAllowedOnPortal } from "@/lib/portal";
@@ -86,6 +87,8 @@ export default function App() {
   useWorkActivity();
   /* Each person's own theme and focus outline (handoff v4, UI Kit §9). */
   useProfileAppearance();
+  /* The company identity every printed document carries (Settings → Company). */
+  useCompanyIdentitySync();
   const hydrate = useAuth((s) => s.hydrate);
   const location = useLocation();
   useEffect(() => {

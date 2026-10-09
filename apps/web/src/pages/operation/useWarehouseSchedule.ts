@@ -8,7 +8,7 @@ import {
   warehousePickupScopeKey,
   warehouseScheduleOperatingDates,
   warehouseSchedulePreviousFrom,
-  myHolidaySet,
+  warehouseDaysLate,
   WAREHOUSE_SCHEDULE_DATE_COUNT,
   type DeliveryWarehouseScheduleEvent,
   type InboundArrival,
@@ -21,6 +21,7 @@ import {
 } from "@carres/shared";
 import { apiFetch, type ApiError } from "@/lib/api";
 import { appTodayIso } from "@/lib/fmt-date";
+import { useDeliveryDays } from "@/lib/deadline-queries";
 
 /**
  * WAREHOUSE — ARRIVAL / PICKUP SCHEDULE, the one read the Schedule screen makes.
@@ -79,7 +80,7 @@ interface ArrangementsPayload {
 /** The Settings bundle `resolveWarehouseSchedule` needs, shaped as the
  *  Settings endpoint already returns it. */
 interface SettingsPayload {
-  details: { status: "active" | "closed" };
+  details: { siteId?: string; status: "active" | "closed" };
   workingHours: WarehouseScheduleSettings["workingHours"];
   specialDates: WarehouseScheduleSettings["specialDates"];
   holidayPolicy: WarehouseScheduleSettings["holidayPolicy"];
@@ -104,6 +105,9 @@ export function useWarehouseSchedule(
   const today = appTodayIso();
   const windowFrom = from ?? today;
   const isArrival = direction === "arrival";
+  /* The governed Selangor closed dates — the stored Warehouse calendar the
+     Delivery calendar reads, else the built-in list. */
+  const holidays = useDeliveryDays().holidays;
 
   const inboundQuery = useQuery<InboundPayload, ApiError>({
     queryKey: ["operation", "warehouse-schedule", "arrival", siteId ?? ""],
@@ -182,9 +186,17 @@ export function useWarehouseSchedule(
     };
   }, [settingsQuery.data]);
 
+  const settingsSiteId = settingsQuery.data?.details.siteId ?? null;
+
   return useMemo<WarehouseScheduleResult>(() => {
     const errors: WarehouseScheduleError[] = [];
     let cards: WarehouseScheduleCard[] = [];
+    /* LATENESS ON THE SITE'S OWN CALENDAR (9 Oct 2026): an arrival is late
+       once a Receiving day of its Site has passed, a pickup once a Collection
+       day has — never because a closed Sunday went by. A card at another
+       Site, or with no Site, counts on the governed Warehouse week. */
+    const lateOn = (activity: "receiving" | "collection") => (due: string, site: string | null) =>
+      warehouseDaysLate(due, today, activity, site && site === settingsSiteId ? settings : null, holidays);
 
     if (isArrival) {
       if (inboundQuery.error) {
@@ -240,6 +252,7 @@ export function useWarehouseSchedule(
           payload.skuCategories
             ? new Map(payload.skuCategories.map((r) => [r.sku, r.category]))
             : undefined,
+          lateOn("receiving"),
         );
       }
     } else {
@@ -282,6 +295,7 @@ export function useWarehouseSchedule(
                 pickupQuery.data.skuCategories.map((r) => [r.sku, r.category]),
               )
             : undefined,
+          lateOn("collection"),
         );
       }
     }
@@ -300,10 +314,9 @@ export function useWarehouseSchedule(
           "Site operating dates could not be read. Dates below follow the standard Warehouse week, not this Site's configured schedule.",
       });
 
-    /* The governed Malaysian closed dates ride alongside the Site
+    /* The governed Selangor closed dates (`holidays`) ride alongside the Site
        configuration — the same set the rest of the Warehouse counts by. A Site
        that saves its own holiday policy still overrides them. */
-    const holidays = myHolidaySet();
     const dates = warehouseScheduleOperatingDates(
       windowFrom,
       count,
@@ -336,6 +349,8 @@ export function useWarehouseSchedule(
     count,
     today,
     settings,
+    holidays,
+    settingsSiteId,
     inboundQuery.data,
     inboundQuery.error,
     inboundQuery.isPending,

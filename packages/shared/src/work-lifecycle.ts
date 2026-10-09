@@ -18,7 +18,7 @@
 import { z } from "zod";
 import { myHolidaySet } from "./my-holidays";
 import { OFFICE_OFF_DAYS } from "./order-action-due";
-import { addWorkingDays } from "./working-days";
+import { addWorkingDays, type WorkingDayOptions } from "./working-days";
 
 export const WORK_EVENT_KINDS = ["request_sent", "reply_received", "completed"] as const;
 export const WORK_CHANNELS = ["whatsapp", "email", "phone", "in_person"] as const;
@@ -119,12 +119,15 @@ export function workLifecycleOf(events: readonly WorkOccurrenceEvent[], today: s
 /** Working days a reply is given, by rule. A rule not listed gets one. */
 export const WORK_REPLY_WORKING_DAYS: Readonly<Record<string, number>> = {};
 
-/** The reply due date: working days after `sentOn` on the Malaysian office
- *  calendar — Saturday, Sunday and the shared public holidays are skipped,
- *  the same days the 0584 door refuses. */
-export function workReplyDueOn(sentOn: string, ruleKey?: string): string {
+/** The reply due date: working days after `sentOn` on the stored Office
+ *  calendar (`officeWorkingDayOptions`, Settings → Office) — its off days and
+ *  holidays are skipped. Absent ⇒ the owner default (Saturday, Sunday, the
+ *  built-in holidays). The 0584 door refuses a Saturday or Sunday reply day
+ *  whatever the calendar says, so those two days are always skipped too. */
+export function workReplyDueOn(sentOn: string, ruleKey?: string, office?: WorkingDayOptions): string {
   const days = (ruleKey && WORK_REPLY_WORKING_DAYS[ruleKey]) || 1;
-  return addWorkingDays(sentOn, days, { holidays: myHolidaySet(), offDays: OFFICE_OFF_DAYS });
+  const offDays = [...new Set([...(office?.offDays ?? OFFICE_OFF_DAYS), 0, 6])];
+  return addWorkingDays(sentOn, days, { holidays: office?.holidays ?? myHolidaySet(), offDays });
 }
 
 /** An item's lifecycle, To do when the read attached none. */

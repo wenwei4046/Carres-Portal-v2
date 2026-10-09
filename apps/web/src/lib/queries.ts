@@ -1464,12 +1464,12 @@ export function useCancelOrder(
 /** 0219 — GET /api/operation/sales-order-maintenance/entry-config — the Order
  *  Entry config (payment methods + POS form fields). Internal only. */
 export function useOrderEntryConfig(
-  opts?: Partial<UseQueryOptions<{ entryConfig: OrderEntryConfigDto }>>,
+  opts?: Partial<UseQueryOptions<{ entryConfig: OrderEntryConfigDto; canEdit?: boolean }>>,
 ) {
   return useQuery({
     queryKey: qk.salesOrderGrid.entryConfig(),
     queryFn: () =>
-      apiFetch<{ entryConfig: OrderEntryConfigDto }>(
+      apiFetch<{ entryConfig: OrderEntryConfigDto; canEdit?: boolean }>(
         "/api/operation/sales-order-maintenance/entry-config",
       ),
     staleTime: 30_000,
@@ -4398,6 +4398,8 @@ export interface WorkspaceDutyAssignment {
   assigned_by_name: string | null;
   note: string | null;
   created_at: string;
+  /** 0671: `monthly_rotation` rows were written by the PO/GRN monthly rota. */
+  origin?: "manual" | "monthly_rotation";
 }
 export interface WorkspaceDutyCover {
   id: string;
@@ -7623,6 +7625,18 @@ export interface DeliverySettingsResponse {
   partnerAccounts: Array<{ id: string; name: string | null; email: string; partner_id: string | null; status: string }>;
   canEdit: boolean;
   contactLeadWorkingDays: number | null;
+  /** 0673 · Delivery Rules → `Assign logistics by` (DEL-04). `stored: false`
+   *  = not installed: the default answers and Edit is not offered. Absent on
+   *  an older API. */
+  rules?: {
+    assignmentLeadWorkingDays: number;
+    /** 0678 · DEL-10 `Courier dispatch within` (default 3). Absent on an older API. */
+    courierDispatchWorkingDays?: number;
+    courierDispatchStored?: boolean;
+    revision: number | null;
+    stored: boolean;
+    canEdit: boolean;
+  };
 }
 export const DELIVERY_SETTINGS_QUERY_KEY = ["operation", "delivery-settings"] as const;
 export function useDeliverySettings() {
@@ -9141,6 +9155,8 @@ export interface PaymentSettingsPayload {
   /** 0486 — newest effective first; the head is the current rule. */
   collection_timing: Array<{
     id: string; ask_days_before: number; deadline_days_before: number;
+    /** 0672 — the outstation pair; absent on a row read before 0672. */
+    outstation_ask_days_before?: number | null; outstation_deadline_days_before?: number | null;
     effective_from: string; reason: string | null; created_at: string;
   }>;
   setting_changes: Array<{
@@ -12595,7 +12611,7 @@ export function useWorkActivitySettings() {
 export function useSaveWorkActivitySettings() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async (input: Omit<WorkspaceActivitySettingsResponse, "canEdit">) =>
+    mutationFn: async (input: Omit<WorkspaceActivitySettingsResponse, "canEdit" | "office">) =>
       workspaceActivitySettingsResponseSchema.parse(await apiFetch<unknown>(
         "/api/operation/work-activity/settings", { method: "PUT", body: JSON.stringify(input) },
       )),

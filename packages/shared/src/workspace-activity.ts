@@ -3,9 +3,13 @@ import { z } from "zod";
 /** Persisted settings are required. Defaults initialise configuration; they
  * must never stand in for an unreadable server configuration. */
 const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+/* The SHAPE of the two shared check times. Where they may sit follows the
+ * stored Office calendar (`workspaceActivityTimesFit`, 0677): a stored value
+ * that an Office change has since moved outside that range must still be
+ * readable, so the range is not part of the shape. */
 export const workspaceActivitySettingsSchema = z.object({
-  morning: clockTime.refine((value) => value > "10:00" && value < "13:00"),
-  afternoon: clockTime.refine((value) => value > "14:00" && value < "18:00"),
+  morning: clockTime,
+  afternoon: clockTime,
 }).strict();
 export type WorkspaceActivitySettings = z.infer<typeof workspaceActivitySettingsSchema>;
 export const INITIAL_WORKSPACE_ACTIVITY_SETTINGS: WorkspaceActivitySettings = {
@@ -13,32 +17,86 @@ export const INITIAL_WORKSPACE_ACTIVITY_SETTINGS: WorkspaceActivitySettings = {
   afternoon: "15:00",
 };
 
-/** Company-clock projection only. This does not infer attendance, a working
- * day, employee eligibility, or an assignment from the absence of an event. */
-export function workspaceActivityWindow(
-  day: string,
-  period: "morning" | "afternoon",
+/** The Office hours the check times are bounded by (Settings → Office, 0669). */
+export const workspaceActivityOfficeHoursSchema = z.object({
+  start: clockTime,
+  end: clockTime,
+  lunchStart: clockTime,
+  lunchEnd: clockTime,
+}).strict();
+export type WorkspaceActivityOfficeHours = z.infer<typeof workspaceActivityOfficeHoursSchema>;
+
+/** Morning: from Office start and before the Office lunch. Afternoon: after
+ * the Office lunch and before Office end. The SQL door
+ * `workspace_set_activity_times` (0677) asks the same four comparisons. */
+export function workspaceActivityTimesFit(
   settings: WorkspaceActivitySettings,
-): { start: string; cutoff: string } {
-  const valid = workspaceActivitySettingsSchema.parse(settings);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) ||
-      !Number.isFinite(Date.parse(`${day}T00:00:00Z`)) ||
-      new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) !== day) {
-    throw new Error("Invalid company date");
-  }
-  return {
-    start: new Date(`${day}T${period === "morning" ? "09:00" : "14:00"}:00+08:00`).toISOString(),
-    cutoff: new Date(`${day}T${valid[period]}:00+08:00`).toISOString(),
-  };
+  office: WorkspaceActivityOfficeHours,
+): boolean {
+  const s = workspaceActivitySettingsSchema.safeParse(settings);
+  const o = workspaceActivityOfficeHoursSchema.safeParse(office);
+  if (!s.success || !o.success) return false;
+  const { morning, afternoon } = s.data;
+  const { start, end, lunchStart, lunchEnd } = o.data;
+  return morning >= start && morning < lunchStart && afternoon > lunchEnd && afternoon < end;
 }
+
+/* One person's activity window for one period, computed ONLY by the database
+ * (`_workspace_activity_window`, 0677 — the one arithmetic): morning from
+ * Office start to the morning check (never into the person's lunch);
+ * afternoon from the person's lunch end. The Worker reads it from the
+ * checkpoint snapshot; it never recomputes it. */
+const instant = z.string().refine((value) => Number.isFinite(Date.parse(value)), "Invalid time");
+export const workspaceActivityWindowSchema = z.object({
+  start: instant,
+  cutoff: instant,
+  lunchStart: instant,
+  lunchEnd: instant,
+}).refine((w) => Date.parse(w.cutoff) >= Date.parse(w.start) && Date.parse(w.lunchEnd) >= Date.parse(w.lunchStart),
+  "Invalid activity window");
+export type WorkspaceActivityWindow = z.infer<typeof workspaceActivityWindowSchema>;
 
 export const workspaceActivitySettingsInput = workspaceActivitySettingsSchema.extend({
   revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
 });
 export const workspaceActivitySettingsResponseSchema = workspaceActivitySettingsInput.extend({
   canEdit: z.boolean(),
+  /** The stored Office hours the two check times must fit (Settings → Office). */
+  office: workspaceActivityOfficeHoursSchema,
 });
 export type WorkspaceActivitySettingsResponse = z.infer<typeof workspaceActivitySettingsResponseSchema>;
+
+/* ── LUNCH TIME — each person's standing lunch start (owner order 9 Oct 2026;
+ * Settings → Personal → Lunch time; 0677). Empty = the Office lunch. The
+ * length is the Office lunch length; the allowed start is the Office lunch
+ * start moved by up to the Office shift either way. Every time below is
+ * computed by the database, never here. */
+export const workspaceStaffLunchSchema = z.object({
+  userId: z.string().uuid(),
+  /** The saved start, or null when the person follows the Office lunch. */
+  saved: clockTime.nullable(),
+  /** False when an Office change has left the saved start outside the range:
+   *  the Office lunch then applies. */
+  savedFits: z.boolean(),
+  lunchStart: clockTime,
+  lunchEnd: clockTime,
+  earliest: clockTime,
+  latest: clockTime,
+  officeLunchStart: clockTime,
+  officeLunchEnd: clockTime,
+  /** This person's own check times today. */
+  morningCheck: clockTime,
+  afternoonCheck: clockTime,
+  canEdit: z.boolean(),
+}).strict();
+export type WorkspaceStaffLunch = z.infer<typeof workspaceStaffLunchSchema>;
+export const workspaceStaffLunchInput = z.object({
+  /** null = follow the Office lunch. */
+  lunchStart: clockTime.nullable(),
+  /** Another person (Staff & Duties editors only); absent = yourself. */
+  userId: z.string().uuid().optional(),
+}).strict();
+export type WorkspaceStaffLunchInput = z.infer<typeof workspaceStaffLunchInput>;
 
 /* ── TEAM TODAY — the page header's Team list (owner ruling 2026-10-08,
  * Carres Layout Standard §1). Online = portal activity in the last
