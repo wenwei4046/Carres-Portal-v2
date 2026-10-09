@@ -46,3 +46,16 @@ describe("office checkpoint evidence", () => {
     ] } })).toMatchObject({ status: "ready", activeUserIds: [] });
   });
 });
+
+describe("the stored Office calendar decides the checked days (9 Oct 2026)", () => {
+  const sat = { ...base, day: "2026-10-03", now: "2026-10-03T02:30:00Z" };
+  it("Saturday is not checked on the default Office week", () => {
+    expect(evaluate({ ...sat, evidence: { status: "healthy", events: [] } }).status).toBe("not_working_day");
+  });
+  it("an Office calendar whose working weekdays include Saturday checks it", () => {
+    expect(evaluate({ ...sat, offDays: [0], evidence: { status: "healthy", events: [] } }).status).toBe("ready");
+  });
+  it("an Office holiday is not checked", () => {
+    expect(evaluate({ ...base, holidays: new Set(["2026-09-29"]), evidence: { status: "healthy", events: [] } }).status).toBe("not_working_day");
+  });
+});

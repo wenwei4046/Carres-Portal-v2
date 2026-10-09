@@ -26,6 +26,29 @@ vi.mock("@/lib/queries", () => ({
   useDeliveryLinkActs: () => ({ create, revoke }),
   useCatalog: () => ({ data: undefined }),
 }));
+/* The stored deadline settings answer their owner defaults here (the hooks'
+   own loading answer): Office Mon–Fri with the built-in holidays, the ruled
+   Collection timing and the seed leads. */
+const leadsState: { contactLeadWorkingDays: number | null; assignmentLeadWorkingDays: number } = {
+  contactLeadWorkingDays: null,
+  assignmentLeadWorkingDays: 3,
+};
+vi.mock("@/lib/deadline-queries", async () => {
+  const shared = await vi.importActual<typeof import("@carres/shared")>("@carres/shared");
+  const office = shared.officeWorkingDayOptions(shared.DEFAULT_OFFICE_CALENDAR);
+  return {
+    useOrderCollectionTiming: () => shared.DEFAULT_COLLECTION_TIMING,
+    useOfficeDays: () => ({
+      calendar: shared.DEFAULT_OFFICE_CALENDAR,
+      office,
+      holidays: office.holidays,
+      offDays: office.offDays,
+      owner: shared.officeOwnerCalendar(shared.DEFAULT_OFFICE_CALENDAR),
+      holidayName: () => null,
+    }),
+    useDeliveryLeads: () => leadsState,
+  };
+});
 vi.mock("../components/DeliveryBrief", () => ({
   DeliveryDatesEdit: () => <div data-testid="stub-dates-edit" />,
   LogisticsDetailsEdit: () => <div data-testid="stub-logistics-edit" />,
@@ -173,6 +196,20 @@ describe("collapsed — at most five facts", () => {
     /* One row in three segments (Jess, 2026-09-27): the heading column, the
        status column, then the trailing date/button outside the toggle. */
     expect(screen.getByTestId("logistics-card-status").textContent).toBe("Scheduled delivery · 27 Oct · Hold delivery · RM 1,000.00 unpaid");
+  });
+});
+
+describe("the stored Contact lead (DEL-05, 9 Oct 2026)", () => {
+  it("the first check counts the stored lead and names it; the other two stay fixed", () => {
+    leadsState.contactLeadWorkingDays = 5;
+    try {
+      draw();
+      fireEvent.click(screen.getByTestId("logistics-card-toggle"));
+      expect(screen.getByTestId("logistics-check-t3")).toHaveTextContent("5 working days before · 21 Oct");
+      expect(screen.getByTestId("logistics-check-t2")).toHaveTextContent("2 working days before · 24 Oct");
+    } finally {
+      leadsState.contactLeadWorkingDays = null;
+    }
   });
 });
 

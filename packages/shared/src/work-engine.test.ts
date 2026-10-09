@@ -367,8 +367,9 @@ describe("the Action Owner Engine resolution (§0.1, built 2026-08-27)", () => {
 describe("workItemsForOrder — WHO + ACTION + actual working day", () => {
   it("composes the engine's open set with the PIC and weekday+date dues", () => {
     const open = openOrderActions(baseSignals); // assign_logistics expected
-    // Owner re-ruling 2026-08-16 (blueprint card §7, supersedes the
-    // 3-working-days law): due WITHIN THE DAY the PO was issued.
+    // Delivery MASTER §2.1 (owner 2026-09-29 · confirmed 9 Oct 2026): the PO
+    // issue day only OPENS the action; it is due 3 Delivery working days
+    // before the Requested delivery (Thu 20 Aug → Mon 17 Aug, Mon–Sat).
     const items = workItemsForOrder(
       open,
       { ...ctx, poIssuedAtIso: "2026-08-11" },
@@ -382,7 +383,7 @@ describe("workItemsForOrder — WHO + ACTION + actual working day", () => {
     expect(assign.ownerDutyKey).toBe("delivery_duty");
     expect(assign.ownerDuty).toBe("Delivery Duty");
     expect(assign.soRef).toBe("SO-1318");
-    expect(assign.dueIso).toBe("2026-08-11"); // the PO's own issue day
+    expect(assign.dueIso).toBe("2026-08-17"); // `Assign logistics by`, not the PO day
     expect(assign.workingDaysLate).toBe(0);
   });
 
@@ -506,5 +507,37 @@ describe("workItemsForOrder — WHO + ACTION + actual working day", () => {
     const items = workItemsForOrder(open, ctx, "2026-08-11", HOLS);
     const po = items.find((i) => i.ruleKey === "issue_po")!;
     expect(po.dueIso).toBeNull();
+  });
+});
+
+describe("the stored leads and calendars reach the order's Work (9 Oct 2026)", () => {
+  const assignOf = (over: Partial<import("./work-engine").OrderWorkContext>, leads?: { chase: number; assign?: number }) =>
+    workItemsForOrder(openOrderActions(baseSignals), { ...ctx, ...over }, "2026-08-11", HOLS, leads)
+      .find((i) => i.ruleKey === "assign_logistics")!;
+
+  it("Assign logistics is due the stored lead before the Scheduled delivery, else the Requested one", () => {
+    expect(assignOf({ poIssuedAtIso: "2026-08-11" }, { chase: 3, assign: 5 }).dueIso).toBe("2026-08-14"); // Thu 20 − 5 (Mon–Sat)
+    // A Scheduled delivery outranks the Requested one.
+    expect(assignOf({ poIssuedAtIso: "2026-08-11", confirmedDateIso: "2026-08-25" }).dueIso).toBe("2026-08-21");
+  });
+
+  it("an order opening inside the cut-off is due the day it opens; no customer date has no countdown", () => {
+    expect(assignOf({ poIssuedAtIso: "2026-08-19" }).dueIso).toBe("2026-08-19");
+    expect(assignOf({ poIssuedAtIso: "2026-08-11", promisedDateIso: null }).dueIso).toBeNull();
+  });
+
+  it("delay planning counts on the stored Office calendar", () => {
+    // The supplier's date overshoots the promise → the ladder opens Delay planning.
+    const s: OrderActionSignals = { ...baseSignals, goodsReady: false, promisedDateIso: "2026-08-20", stockEtaIso: "2026-08-25" };
+    const open = openOrderActions(s);
+    // Detected Fri 14 Aug: +2 Office working days = Tue 18 (Mon–Fri).
+    const monFri = workItemsForOrder(open, { ...ctx, delayDetectedAtIso: "2026-08-14" }, "2026-08-14", HOLS);
+    const plan = monFri.find((i) => i.ruleKey === "delay_planning");
+    expect(plan).toBeDefined();
+    expect(plan!.dueIso).toBe("2026-08-18");
+    // An Office that works Saturday: +2 = Mon 17.
+    const sat = workItemsForOrder(open, { ...ctx, delayDetectedAtIso: "2026-08-14" }, "2026-08-14", HOLS, undefined,
+      { office: { holidays: HOLS.holidays, offDays: [0] } });
+    expect(sat.find((i) => i.ruleKey === "delay_planning")!.dueIso).toBe("2026-08-17");
   });
 });

@@ -131,8 +131,11 @@ export interface SupplierCallPo {
 
 export interface SupplierCallOptions {
   todayIso: IsoDate;
-  /** Malaysian public holidays. Omitted → the live Selangor set. */
+  /** The Office holidays (Settings → Office). Omitted → the built-in set. */
   holidays?: ReadonlySet<string>;
+  /** The stored Office calendar's off days (`officeOffDays`). Omitted → the
+   *  owner default, Saturday and Sunday (`PURCHASING_OFFICE_OFF_DAYS`). */
+  offDays?: readonly number[];
 }
 
 export interface PurchasingOpenCall {
@@ -151,7 +154,7 @@ export interface PurchasingOpenCall {
 
 function wd(opts: SupplierCallOptions): WorkingDayOptions {
   return {
-    offDays: PURCHASING_OFFICE_OFF_DAYS,
+    offDays: opts.offDays ?? PURCHASING_OFFICE_OFF_DAYS,
     holidays: opts.holidays ?? myHolidaySet(),
   };
 }

@@ -48,7 +48,8 @@ async function readWorkSource(c: Context<AppEnv>): Promise<Source> {
  *  source honestly rather than showing an empty claim desk. */
 export async function loadSupplierClaimWork(
   c: Context<AppEnv>,
-  input: { poDuty: WorkspaceDutyResolution | null; approver: WorkspaceDutyResolution | null; today: string; observedAt: string },
+  /** `holidays` = the stored Office holidays (Settings → Office); absent ⇒ the built-in list. */
+  input: { poDuty: WorkspaceDutyResolution | null; approver: WorkspaceDutyResolution | null; today: string; observedAt: string; holidays?: ReadonlySet<string> },
 ): Promise<OperationWorkItem[]> {
   const { claims } = await readWorkSource(c);
   return projectSupplierClaimWork({ claims, ...input });

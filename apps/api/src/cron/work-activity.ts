@@ -1,10 +1,11 @@
 import {
   decideWorkspaceReassignment,
   evaluateWorkspaceActivityCheck,
-  myHolidaySet,
+  officeWorkingDayOptions,
   workspaceActivitySettingsInput,
   type WorkspaceCheckpointIdentity,
 } from "@carres/shared";
+import { readOfficeCalendar } from "../lib/office-calendar";
 import { adminClient } from "../lib/supabase";
 import type { Bindings } from "../types";
 
@@ -31,6 +32,15 @@ interface Snapshot {
  * Morning is committed before a fresh afternoon snapshot is obtained. */
 export async function runWorkActivityCron(env: Bindings): Promise<void> {
   const sb = adminClient(env);
+  /* The stored Office calendar (Settings → Office), read ONCE per run: its
+     working weekdays decide whether a period is checked at all, and its
+     holidays are the ones the commit door is told about. Fails safe to the
+     owner defaults (Monday–Friday, the built-in holidays). The commit SQL
+     (`workspace_commit_activity_checkpoint`) still refuses Saturday and
+     Sunday on its own; a Saturday Office day would therefore be evaluated
+     here and refused there — never silently recorded. */
+  const office = officeWorkingDayOptions((await readOfficeCalendar(sb)).calendar);
+  const officeHolidays = office.holidays as ReadonlySet<string>;
   const unavailable = await sb.rpc("workspace_process_recorded_unavailability");
   if (unavailable.error) throw new Error(`Recorded availability check failed: ${unavailable.error.message}`);
   for (const period of ["morning", "afternoon"] as const) {
@@ -43,7 +53,7 @@ export async function runWorkActivityCron(env: Bindings): Promise<void> {
     const settings = workspaceActivitySettingsInput.parse(snapshot.settings);
     const check = evaluateWorkspaceActivityCheck({
       day: snapshot.day, period, settings: { morning: settings.morning, afternoon: settings.afternoon }, now: snapshot.now,
-      holidays: myHolidaySet(), evidence: snapshot.evidence,
+      holidays: officeHolidays, offDays: office.offDays, evidence: snapshot.evidence,
     });
     if (check.status !== "ready") continue;
     const checkpoint = { day: snapshot.day, period };
@@ -66,7 +76,7 @@ export async function runWorkActivityCron(env: Bindings): Promise<void> {
         p_from_user_id: scope.assignedUserId,
         p_to_user_id: decision.kind === "reassign" ? decision.toUserId : scope.assignedUserId,
         p_outcome: outcome, p_reason: decision.reason,
-        p_office_holidays: [...myHolidaySet()],
+        p_office_holidays: [...officeHolidays],
       });
       // The next minute gets fresh source state. Never retry a stale decision.
       if (commit.error?.code === "40001") continue;

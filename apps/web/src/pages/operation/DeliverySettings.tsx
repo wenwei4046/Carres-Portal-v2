@@ -133,6 +133,13 @@ const DS = {
   contactByOperation: "Operation",
   onBehalf: "Operation may record on the partner's behalf",
   contactLead: "Contact lead days",
+  /* DEL-04 · Delivery Rules (0673) */
+  assignBy: "Assign logistics by",
+  assignByValue: (n: number) => (n === 1 ? "1 working day before Scheduled delivery" : `${n} working days before Scheduled delivery`),
+  assignByRule:
+    "Counts Monday to Saturday, skipping public holidays. Uses Requested delivery until the delivery is scheduled. Assign logistics opens on the day the PO is issued.",
+  assignByRange: "Choose between 1 and 30 working days.",
+  reason: "Reason",
   contactLeadRule: (n: number) => `${n} working days before the requested delivery date. This is the shared chase setting.`,
   paymentRule: "Payment clearance",
   paymentRuleWord:
@@ -937,9 +944,26 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
   useEffect(() => setDraft(rulesDraftOf(data)), [data]);
   const saved = useMemo(() => rulesDraftOf(data), [data]);
   const changedIds = data.partners.map((p) => p.id).filter((id) => !same(draft[id], saved[id]));
+  /* DEL-04 · `Assign logistics by` (0673) — its own Settings editor gate. */
+  const rules = data.rules ?? null;
+  const leadSaved = rules?.assignmentLeadWorkingDays ?? null;
+  const canEditLead = Boolean(rules?.stored && rules.canEdit);
+  const [lead, setLead] = useState(leadSaved != null ? String(leadSaved) : "");
+  const [leadReason, setLeadReason] = useState("");
+  useEffect(() => { setLead(leadSaved != null ? String(leadSaved) : ""); setLeadReason(""); }, [leadSaved]);
+  const leadN = Number(lead);
+  const leadDirty = canEditLead && leadSaved != null && lead.trim() !== "" && leadN !== leadSaved;
+  const leadGap = leadDirty && (!Number.isInteger(leadN) || leadN < 1 || leadN > 30) ? DS.assignByRange : null;
+  const canSave = !leadGap && ((data.canEdit && changedIds.length > 0) || leadDirty);
   const save = useMutation({
     mutationFn: async () => {
-      for (const id of changedIds) {
+      if (leadDirty && rules?.revision != null) {
+        await apiFetch("/api/operation/delivery-settings/rules/assignment-lead", {
+          method: "PUT",
+          body: JSON.stringify({ workingDays: leadN, revision: rules.revision, reason: leadReason.trim() || null }),
+        });
+      }
+      for (const id of data.canEdit ? changedIds : []) {
         const r = draft[id]!;
         await apiFetch("/api/operation/delivery-settings/partner/rules", {
           method: "PUT",
@@ -952,6 +976,7 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: DELIVERY_SETTINGS_QUERY_KEY });
       void qc.invalidateQueries({ queryKey: ["operation", "partners"] });
+      void qc.invalidateQueries({ queryKey: ["settings", "deadlines", "delivery-leads"] });
     },
   });
   const canEdit = data.canEdit;
@@ -962,13 +987,26 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
       variant="settings"
       title={DS.rules}
       titleRight={
-        <Button variant="primary" data-testid="delivery-settings-save" disabled={!canEdit || changedIds.length === 0} loading={save.isPending} onClick={() => save.mutate()}>
-          {DS.saveChanges}
+        <Button variant="primary" data-testid="delivery-settings-save" disabled={!canSave} loading={save.isPending} onClick={() => save.mutate()}>
+          {leadGap ? `${DS.saveChanges}: ${leadGap}` : DS.saveChanges}
         </Button>
       }
     >
       <div className="mx-auto grid w-full max-w-4xl gap-5 overflow-auto p-5" data-testid="delivery-settings-rules">
-        {!canEdit && <p className="text-meta text-kit-slate-11" data-testid="delivery-settings-read-only">{DS.readOnly}</p>}
+        {!canEdit && !canEditLead && <p className="text-meta text-kit-slate-11" data-testid="delivery-settings-read-only">{DS.readOnly}</p>}
+        <SectionCard title={DS.assignBy} blurb={DS.assignByRule} testId="delivery-settings-assign-by">
+          <Row label={DS.assignBy} htmlFor="rule-assign-by">
+            {canEditLead ? (
+              <Input id="rule-assign-by" type="number" min={1} max={30}
+                value={lead} onChange={(e) => setLead(e.target.value)} />
+            ) : leadSaved != null ? DS.assignByValue(leadSaved) : <span className="text-kit-slate-9">{NOT_CONFIGURED}</span>}
+          </Row>
+          {leadDirty && (
+            <Row label={DS.reason} htmlFor="rule-assign-by-reason">
+              <Input id="rule-assign-by-reason" value={leadReason} maxLength={500} onChange={(e) => setLeadReason(e.target.value)} />
+            </Row>
+          )}
+        </SectionCard>
         <SectionCard title="Shared rules, read here and owned elsewhere" testId="delivery-settings-rule-mirrors">
           <Row label={DS.contactLead}>
             {data.contactLeadWorkingDays != null ? DS.contactLeadRule(data.contactLeadWorkingDays) : <span className="text-kit-slate-9">{NOT_CONFIGURED}</span>}
@@ -1012,7 +1050,7 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
             </SectionCard>
           );
         })}
-        <ChangesList changes={data.changes.filter((c) => c.what === "partner_rules")} />
+        <ChangesList changes={data.changes.filter((c) => c.what === "partner_rules" || c.what === "assignment_lead")} />
       </div>
     </PageShell>
   );

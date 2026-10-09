@@ -33,11 +33,11 @@
  * week + Malaysian holidays). The customer-contact ACTION is scheduled on the
  * resolved action owner's governed working days: when a fact day is not one
  * the owner works, the action moves to the owner's previous working day. The
- * fact itself never moves — a deadline may stand on a Saturday; an Operation
- * action may not, because Operation does not work on Saturday. That is a
- * property of the OWNER's calendar (`OWNER_CALENDAR.offDays`), not a global
- * rule: a future collection owner who works Saturdays keeps a Saturday
- * action.
+ * fact itself never moves — a deadline may stand on a Saturday; an Office
+ * action may not while the stored Office calendar (Settings → Office, Mon–Fri
+ * by default) does not work Saturday. That is a property of the OWNER's
+ * calendar (`officeOwnerCalendar`), not a global rule: an Office calendar
+ * that works Saturdays keeps a Saturday action.
  *
  * The ANCHOR is the customer's confirmed delivery date when one exists —
  * that is the day a truck moves — otherwise the promised date: collection
@@ -62,12 +62,27 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 export interface CollectionTiming {
   askDaysBefore: number;
   deadlineDaysBefore: number;
+  /** ⭐ THE OUTSTATION PAIR (PAY-04, owner ruling 2026-09-24 · stored 0672):
+   *  an outstation delivery's `Payment must be complete` is 3 working days
+   *  before Scheduled delivery; its ask day follows the same n > m rule and
+   *  its default (4) is an engineering setting, not an owner ruling. The same
+   *  one clock and calendar — only the pair differs. Absent (a rule row read
+   *  before 0672, or a caller that never read Settings) ⇒ the defaults. */
+  outstationAskDaysBefore?: number;
+  outstationDeadlineDaysBefore?: number;
 }
 
-/** The 2026-08-19 ruling's own pair — T−3 attention, T−2 deadline. */
+/** The outstation defaults: the owner's 3-day deadline, the engineering ask day 4. */
+export const DEFAULT_OUTSTATION_ASK_DAYS_BEFORE = 4;
+export const DEFAULT_OUTSTATION_DEADLINE_DAYS_BEFORE = 3;
+
+/** The 2026-08-19 ruling's own pair — T−3 attention, T−2 deadline — and the
+ *  2026-09-24 outstation pair (ask 4 · deadline 3). */
 export const DEFAULT_COLLECTION_TIMING: CollectionTiming = Object.freeze({
   askDaysBefore: 3,
   deadlineDaysBefore: 2,
+  outstationAskDaysBefore: DEFAULT_OUTSTATION_ASK_DAYS_BEFORE,
+  outstationDeadlineDaysBefore: DEFAULT_OUTSTATION_DEADLINE_DAYS_BEFORE,
 });
 
 /** One effective-dated rule row, as `Settings → Payments → Collection timing`
@@ -75,6 +90,52 @@ export const DEFAULT_COLLECTION_TIMING: CollectionTiming = Object.freeze({
 export interface CollectionTimingRule extends CollectionTiming {
   /** ISO date the rule takes effect. */
   effectiveFrom: IsoDate;
+}
+
+/** The two numbers a clock actually counts with. */
+export interface CollectionPair {
+  askDaysBefore: number;
+  deadlineDaysBefore: number;
+}
+
+/**
+ * The pair a delivery's clock counts with: the ordinary pair, or the
+ * outstation pair for an outstation delivery (`isOutstation`). ONE choice, so
+ * no surface can count an outstation order with the Klang Valley numbers.
+ */
+export function collectionPairOf(timing: CollectionTiming, outstation: boolean): CollectionPair {
+  if (!outstation) return { askDaysBefore: timing.askDaysBefore, deadlineDaysBefore: timing.deadlineDaysBefore };
+  return {
+    askDaysBefore: timing.outstationAskDaysBefore ?? DEFAULT_OUTSTATION_ASK_DAYS_BEFORE,
+    deadlineDaysBefore: timing.outstationDeadlineDaysBefore ?? DEFAULT_OUTSTATION_DEADLINE_DAYS_BEFORE,
+  };
+}
+
+/** A `payment_collection_timing_rules` row as PostgREST returns it. The two
+ *  outstation columns arrive with 0672; a row read before it has none. */
+export interface CollectionTimingRuleRow {
+  ask_days_before: number;
+  deadline_days_before: number;
+  outstation_ask_days_before?: number | null;
+  outstation_deadline_days_before?: number | null;
+  effective_from: string;
+}
+
+/** Rows → rules, ONE mapping for the Work feed, the Monitor and the screens. */
+export function collectionTimingRulesOf(
+  rows: ReadonlyArray<CollectionTimingRuleRow> | null | undefined,
+): CollectionTimingRule[] {
+  return (rows ?? []).map((r) => ({
+    askDaysBefore: Number(r.ask_days_before),
+    deadlineDaysBefore: Number(r.deadline_days_before),
+    outstationAskDaysBefore: r.outstation_ask_days_before == null
+      ? DEFAULT_OUTSTATION_ASK_DAYS_BEFORE
+      : Number(r.outstation_ask_days_before),
+    outstationDeadlineDaysBefore: r.outstation_deadline_days_before == null
+      ? DEFAULT_OUTSTATION_DEADLINE_DAYS_BEFORE
+      : Number(r.outstation_deadline_days_before),
+    effectiveFrom: String(r.effective_from).slice(0, 10),
+  }));
 }
 
 /**
@@ -97,12 +158,20 @@ export function collectionTimingFor(
     if (!best || rule.effectiveFrom > best.effectiveFrom) best = rule;
   }
   if (!best) return DEFAULT_COLLECTION_TIMING;
-  return { askDaysBefore: best.askDaysBefore, deadlineDaysBefore: best.deadlineDaysBefore };
+  return {
+    askDaysBefore: best.askDaysBefore,
+    deadlineDaysBefore: best.deadlineDaysBefore,
+    outstationAskDaysBefore: best.outstationAskDaysBefore ?? DEFAULT_OUTSTATION_ASK_DAYS_BEFORE,
+    outstationDeadlineDaysBefore: best.outstationDeadlineDaysBefore ?? DEFAULT_OUTSTATION_DEADLINE_DAYS_BEFORE,
+  };
 }
 
 /** The action owner's governed working days. Sunday AND Saturday off is the
  *  OPERATION week — the calendar every Operation-held owner (the collection owner)
- *  acts on. A duty whose holder works Saturdays passes `{ offDays: [0] }`. */
+ *  acts on. A duty whose holder works Saturdays passes `{ offDays: [0] }`.
+ *  Since 9 Oct 2026 the stored Office calendar is that week: callers pass
+ *  `officeOwnerCalendar(cal)` (Settings → Office); `OPERATION_CALENDAR` is the
+ *  owner-confirmed default it falls back to. */
 export interface OwnerCalendar {
   /** Weekday numbers the owner does NOT work (0=Sun … 6=Sat). */
   offDays: readonly number[];
@@ -142,8 +211,11 @@ export interface CollectionClock {
   /** True exactly when `attention === "late"`. */
   overdue: boolean;
   /** The pair this clock ran under — surfaced so a screen can say which rule
-   *  applied and a test can prove the snapshot held. */
-  timing: CollectionTiming;
+   *  applied and a test can prove the snapshot held. For an outstation
+   *  delivery it is the outstation pair. */
+  timing: CollectionPair;
+  /** True when the outstation pair was counted. */
+  outstation: boolean;
 }
 
 export function resolveCollectionAnchor(input: {
@@ -188,14 +260,19 @@ function stepBack(iso: IsoDate): IsoDate {
 /**
  * The whole clock in one call. `opts` carries the holiday set (and, in tests,
  * an off-day override for the COMPANY count); the default counting week is
- * Mon–Sat — the delivery week. `timing` is the effective Settings pair;
- * absent, the ruled default. `owner` is the action owner's governed working
- * days; absent, the Operation week (the collection owner is Operation staff).
+ * Mon–Sat — the delivery week. The holiday set is the Office holiday list
+ * (Settings → Office, `officeWorkingDayOptions(cal).holidays`) — the one
+ * stored list. `timing` is the effective Settings pair; absent, the ruled
+ * default. `input.outstation` picks the outstation pair (`collectionPairOf`).
+ * `owner` is the action owner's governed working days — the Office calendar
+ * (`officeOwnerCalendar`); absent, the Operation week.
  */
 export function collectionClock(
   input: {
     confirmedDateIso?: string | null;
     promisedDateIso?: string | null;
+    /** The delivery is outstation (`isOutstation`): count the outstation pair. */
+    outstation?: boolean;
   },
   todayIso: string,
   opts: WorkingDayOptions = {},
@@ -204,14 +281,16 @@ export function collectionClock(
 ): CollectionClock {
   const anchorIso = resolveCollectionAnchor(input);
   const today = todayIso.slice(0, 10);
-  const pair: CollectionTiming = {
-    askDaysBefore: Math.max(0, Math.floor(timing.askDaysBefore)),
-    deadlineDaysBefore: Math.max(0, Math.floor(timing.deadlineDaysBefore)),
+  const outstation = input.outstation === true;
+  const chosen = collectionPairOf(timing, outstation);
+  const pair: CollectionPair = {
+    askDaysBefore: Math.max(0, Math.floor(chosen.askDaysBefore)),
+    deadlineDaysBefore: Math.max(0, Math.floor(chosen.deadlineDaysBefore)),
   };
   if (!anchorIso || !ISO_DATE.test(today)) {
     return {
       anchorIso, askIso: null, dueIso: null, actionAskIso: null, actionDueIso: null,
-      attention: "none", overdue: false, timing: pair,
+      attention: "none", overdue: false, timing: pair, outstation,
     };
   }
 
@@ -225,9 +304,9 @@ export function collectionClock(
   const actionAskIso = rawActionAsk < actionDueIso ? rawActionAsk : actionDueIso;
 
   if (today > dueIso) {
-    return { anchorIso, askIso, dueIso, actionAskIso, actionDueIso, attention: "late", overdue: true, timing: pair };
+    return { anchorIso, askIso, dueIso, actionAskIso, actionDueIso, attention: "late", overdue: true, timing: pair, outstation };
   }
   const attention: CollectionAttention =
     today >= actionDueIso ? "t2" : today >= actionAskIso ? "t3" : "none";
-  return { anchorIso, askIso, dueIso, actionAskIso, actionDueIso, attention, overdue: false, timing: pair };
+  return { anchorIso, askIso, dueIso, actionAskIso, actionDueIso, attention, overdue: false, timing: pair, outstation };
 }

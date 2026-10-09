@@ -9,9 +9,8 @@ import {
   invoicePaymentTiming,
   soRemaining,
 } from "@carres/shared/payment-invoice-register";
-import { collectionTimingFor, type CollectionTimingRule } from "@carres/shared/collection-clock";
+import { collectionTimingFor, type CollectionTimingRule, type OwnerCalendar } from "@carres/shared/collection-clock";
 import { COLLECTION_OUTCOME_NEXT, COLLECTION_OUTCOME_WORD } from "@carres/shared/payment-collection-outcome";
-import { myHolidaySet } from "@carres/shared/my-holidays";
 import InvoiceRecordPayment from "./InvoiceRecordPayment";
 import InvoiceAskToPay from "./InvoiceAskToPay";
 import InvoicePaymentLink from "./InvoicePaymentLink";
@@ -21,6 +20,7 @@ import InvoiceVoidReplace from "./InvoiceVoidReplace";
 import InvoiceCollectionOwner from "./InvoiceCollectionOwner";
 import CustomerStatement from "./CustomerStatement";
 import { useAuth } from "@/lib/auth";
+import { useOfficeDays } from "@/lib/deadline-queries";
 import { useCollectionOutcomes } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
 import { renderInvoicePdf } from "@/lib/pdf/render";
@@ -49,15 +49,17 @@ export function collectionFactsOf(
   row: InvoiceRegisterRow,
   rows: InvoiceRegisterRow[],
   today: string,
-  opts: { holidays?: Set<string> },
+  opts: { holidays?: ReadonlySet<string> },
   timingRules?: readonly CollectionTimingRule[] | null,
+  /** The stored Office calendar as the collection owner's week. */
+  owner?: OwnerCalendar,
 ) {
   const money = soRemaining(rows, row.order_id);
   const goodsMoney = invoiceNeeded(row);
   const goods = invoiceGoodsFacts(row);
   const delivery = invoiceCustomerDelivery(row);
   const timingRule = collectionTimingFor(timingRules, row.issued_at?.slice(0, 10) ?? today);
-  const { timing } = invoicePaymentTiming(row, today, opts, rows, timingRule);
+  const { timing } = invoicePaymentTiming(row, today, opts, rows, timingRule, owner);
   const neededWord = money.known ? rm(money.outstanding) : "Value not recorded";
   /* The SAME words the Monitor row prints (Law D). This used to throw the
      status away and print a bare date, so a day the customer had NOT confirmed
@@ -104,7 +106,10 @@ export default function PaymentCollectionWorkspace({ invoice, rows, timingRules,
   embedded?: EmbeddedWorkspace;
 }) {
   const today = appTodayIso();
-  const opts = useMemo(() => ({ holidays: myHolidaySet() }), []);
+  /* The stored Office calendar (Settings → Office): the clock's holidays and
+     the collection owner's working days. */
+  const officeDays = useOfficeDays();
+  const opts = useMemo(() => ({ holidays: officeDays.holidays }), [officeDays.holidays]);
   const role = useAuth((s) => s.role);
   const [recording, setRecording] = useState(false);
   const [asking, setAsking] = useState(false);
@@ -115,7 +120,7 @@ export default function PaymentCollectionWorkspace({ invoice, rows, timingRules,
   const money = soRemaining(rows, invoice.order_id);
   const canRecord = (role === "operation" || role === "principal")
     && invoice.status !== "voided" && money.known && money.outstanding > 0;
-  const facts = collectionFactsOf(invoice, rows, today, opts, timingRules);
+  const facts = collectionFactsOf(invoice, rows, today, opts, timingRules, officeDays.owner);
   // The ask door exists only when the shared clock says the money is
   // genuinely askable: never while Wait, never with no anchor, never when paid.
   const canAsk = canRecord && (facts.timing.kind === "due" || facts.timing.kind === "late");

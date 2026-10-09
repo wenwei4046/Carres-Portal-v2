@@ -1574,6 +1574,12 @@ keep kit geometry and wrap; a long link wraps inside its box; no sideways scroll
      deadline by which the **Scheduled delivery must be recorded** — Work's `confirm_delivery_date`,
      the Route's `Contact` point and the Logistics card show it as that deadline.
    A surface that shows either day names which one it is; neither is relabelled as the other.
+   **9 Oct 2026 (BUILT ON BRANCH `build/settings-deadlines`):** the first check counts the stored
+   Contact lead (`logistics_call_working_days`, DEL-05) and prints its number (`{n} working days
+   before`, the ruled `3 working days before` at the default); `2` and `1` stay fixed, and
+   `confirm_delivery_date` stays on the fixed 2-day check. `Assign logistics` is due by Delivery
+   §2.1's stored assignment lead before the Scheduled delivery, else the Requested one; the PO day
+   only opens it.
 
 ### 5.10 · THE WORK PAGE — ONE SPEC · APPROVED / LOCKED (Jess, 2026-09-28: "yes" to 定 and to the four kit admissions)
 

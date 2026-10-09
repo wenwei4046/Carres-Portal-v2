@@ -62,6 +62,8 @@ import { deliveryGroupOf, type DeliveryGroupKey } from "./delivery-groups";
 import { paymentApprovalOpensGate } from "./delivery-payment-approval";
 import { financeHoldLineOf } from "./finance-exception";
 import { paymentDeadlineOf } from "./logistics-card";
+import type { CollectionTiming } from "./collection-clock";
+import { assignLogisticsDueIso } from "./delivery-queue";
 import type { DeliveryHandoverKind, DeliveryOrderAttemptFact } from "./delivery-order-status";
 import {
   deliveryFailed,
@@ -441,9 +443,21 @@ export interface SalesOrderRouteInput {
      *  present they OVERWRITE `logistics`, `booking`, `doNumber`, `photos` and
      *  `attempts`, which read the V1 booking fields. */
     scopes?: ReadonlyArray<RouteDeliveryScope>;
-    /** The assigned company is not a Klang Valley default — payment must be
-     *  complete 3 working days before the delivery instead of 2. */
+    /** The assigned company is not a Klang Valley default (`isOutstation`) —
+     *  the payment clock counts the outstation pair. */
     outstation?: boolean;
+    /** DEL-04 · the stored `Assign logistics by` lead (Delivery Rules). Given,
+     *  an unassigned LOGISTICS node prints the one assignment deadline
+     *  (`assignLogisticsDueIso`); absent, the node says nothing about it. */
+    assignLeadWorkingDays?: number;
+  };
+  /** The payment clock's own inputs (one arithmetic with Payment, 9 Oct
+   *  2026): the effective Collection timing for this order's clock, and the
+   *  Office holiday list — the one stored list, the clock's holiday set.
+   *  Absent ⇒ the ruled default and `publicHolidays`. */
+  paymentClock?: {
+    timing?: CollectionTiming;
+    holidays?: ReadonlyArray<string>;
   };
   /** Straight from `orderMoney` — this module never recomputes the number.
    *  Decision A removed `holds`: money cannot hold a delivery any more, so a
@@ -1190,12 +1204,28 @@ function stockDraft(
 
 function logisticsDraft(input: SalesOrderRouteInput): NodeDraft {
   const name = input.delivery.logistics?.partnerName?.trim() || null;
+  /* `Assign logistics by` — Delivery's ONE assignment deadline (§2.1): the
+     stored lead before the Scheduled delivery, else the Requested one; the
+     first PO's issue day (else the order day) only opens it. */
+  const lead = input.delivery.assignLeadWorkingDays;
+  const assignBy = !name && lead !== undefined
+    ? assignLogisticsDueIso({
+        scheduledIso: input.delivery.booking?.confirmedDate ?? null,
+        requestedIso: input.order.deliveryDate,
+        openedIso: [...input.purchaseOrders.map((po) => po.issuedAt).filter((d): d is string => Boolean(d))].sort()[0]
+          ?? input.order.placedAt ?? null,
+        opts: { holidays: input.publicHolidays ? new Set(input.publicHolidays) : undefined },
+        leads: { chase: 3, assign: lead },
+      })
+    : null;
   return {
     id: "logistics",
     kind: "logistics",
     title: "LOGISTICS",
     complete: Boolean(name),
-    lines: name ? [name] : ["Logistics not assigned"],
+    lines: name
+      ? [name]
+      : ["Logistics not assigned", ...(assignBy ? [`Assign logistics by ${assignBy}`] : [])],
     action: {
       ownerKey: "delivery",
       label: "Assign logistics",
@@ -1236,9 +1266,9 @@ function deliveryDateDraft(input: SalesOrderRouteInput): NodeDraft {
  * full before delivery is absolute (2026-08-19, door closed 2026-09-01), so the
  * node says what that means for the truck — `Hold delivery` — over the amount
  * and the day it must be paid by. The deadline is ONE arithmetic with the Work
- * right panel and the Logistics card (`paymentDeadlineOf`, Law D): 2 working
- * days before the Scheduled delivery, else the Customer requested date; 3 for
- * an outstation delivery.
+ * right panel and the Logistics card (`paymentDeadlineOf`, Law D): the stored
+ * Collection timing pair (2, outstation 3 at the default) working days before
+ * the Scheduled delivery, else the Customer requested date.
  */
 function paymentDraft(input: SalesOrderRouteInput): NodeDraft {
   const payments = open("Payments", paymentsHref(input.order.so));
@@ -1263,10 +1293,12 @@ function paymentDraft(input: SalesOrderRouteInput): NodeDraft {
 
   const scheduled = input.delivery.booking?.confirmedDate ?? null;
   const anchor = scheduled ?? input.order.deliveryDate;
+  const clockHolidays = input.paymentClock?.holidays ?? input.publicHolidays;
   const deadline = paymentDeadlineOf({
     anchorIso: anchor,
     outstation: input.delivery.outstation === true,
-    holidays: input.publicHolidays ? new Set(input.publicHolidays) : undefined,
+    holidays: clockHolidays ? new Set(clockHolidays) : undefined,
+    timing: input.paymentClock?.timing,
   });
   const amount = `Customer has not paid ${ringgit(input.money.outstanding)}${deadline ? ` · Customer must pay by ${deadline}` : ""}`;
   /* An approval granted before the door closed is still honoured by the 0362

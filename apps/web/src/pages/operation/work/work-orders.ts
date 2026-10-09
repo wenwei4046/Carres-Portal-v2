@@ -126,7 +126,9 @@ export function actsOfItem(
     case "receiving.check_in":
       return [act(item, "other", "receiving", `Check in ${po}${who ? ` from ${who}` : ""}`, item.problem, "", { poId: po })];
     case "assign_logistics":
-      return [act(item, "assign_logistics", "logistics", "Assign logistics", due ? `3 working days before · ${due}` : null, "Assign logistics")];
+      /* The date is Delivery's ONE assignment deadline (§2.1, the stored
+         lead) — never a hard-coded `3 working days before` label (COPY). */
+      return [act(item, "assign_logistics", "logistics", "Assign logistics", due ? `Choose the company that carries this delivery · due ${due}` : "Choose the company that carries this delivery", "Assign logistics")];
     case "confirm_delivery_date":
       return [act(item, "delivery_date", "delivery-date", `Call ${who ?? "logistics"}`, due ? `Get the scheduled delivery date · due ${due}` : "Get the scheduled delivery date", "Update date and time")];
     case "deliver_today":

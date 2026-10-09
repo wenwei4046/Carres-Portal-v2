@@ -1400,9 +1400,11 @@ export function manualPurchaseWorkItems(
   todayIso: string,
   opts: WorkingDayOptions = {},
 ): WorkItem[] {
+  /* The stored Office calendar when the caller passes it (`officeWorkingDayOptions`);
+     the owner default Monday–Friday otherwise. */
   const officeOpts: WorkingDayOptions = {
     ...opts,
-    offDays: PURCHASING_OFFICE_OFF_DAYS,
+    offDays: opts.offDays ?? PURCHASING_OFFICE_OFF_DAYS,
   };
   const today = todayIso.slice(0, 10);
   const late = (dueIso: string | null): number =>

@@ -37,8 +37,15 @@ import {
   type WorkOwnerRule,
   type WorkspaceDutyResolution,
   type WorkingDayOptions,
-  WAREHOUSE_OFF_DAYS,
   PURCHASING_OFFICE_OFF_DAYS,
+  DEFAULT_OFFICE_CALENDAR,
+  deliveryQueueLeads,
+  isOutstation,
+  officeOwnerCalendar,
+  officeWorkingDayOptions,
+  warehouseReceivingDaysLate,
+  type OfficeCalendar,
+  type OwnerCalendar,
   orderActionLines,
   poWindowWorkFromSoBatch,
   type PoWindowSupplierDoors,
@@ -71,6 +78,9 @@ import {
 import { z } from "zod";
 import { requireOperation } from "../../lib/auth-guards";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
+import { readOfficeCalendar } from "../../lib/office-calendar";
+import { DEFAULT_DELIVERY_RULES, readDeliveryRules } from "../../lib/delivery-rules";
+import { readWarehouseReceivingSettings } from "../../lib/warehouse-receiving-calendar";
 import { chunk } from "../../lib/purchase-demand-read";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -91,13 +101,16 @@ import { loadPurchaseReturnWork } from "../../lib/purchase-return-work";
 import {
   invoiceNeeded,
   invoicePaymentTiming,
+  orderCollectionClockStartIso,
   soRemaining,
   type InvoiceRegisterPage,
   type InvoiceRegisterRow,
 } from "@carres/shared/payment-invoice-register";
 import {
   collectionTimingFor,
+  collectionTimingRulesOf,
   type CollectionTimingRule,
+  type CollectionTimingRuleRow,
 } from "@carres/shared/collection-clock";
 import {
   latestOutcomeOf,
@@ -116,6 +129,61 @@ export interface OperationWorkStaff {
   userId: string;
   name: string | null;
   email: string;
+}
+
+/**
+ * ⭐ THE CALENDARS THE FEED COUNTS ON — read ONCE per request (9 Oct 2026).
+ *
+ *   office    Settings → Office (`readOfficeCalendar`): the working weekdays
+ *             and holidays every OFFICE deadline counts on — when Operation
+ *             and Purchasing must act, and how many working days it is late.
+ *   owner     the same calendar as the payment clock's action owner.
+ *   delivery  the Delivery week (Mon–Sat) with the built-in public holidays:
+ *             the FACTS Delivery owns (Logistics checks, `Assign logistics
+ *             by`, deliver/photo). Not the Office calendar (Settings List
+ *             OFF-01: supplier, warehouse and logistics calendars are separate).
+ *
+ * A caller that read nothing gets the owner-confirmed defaults.
+ */
+export interface WorkFeedCalendars {
+  office: WorkingDayOptions;
+  owner: OwnerCalendar;
+  delivery: WorkingDayOptions;
+}
+
+export function workFeedCalendarsOf(cal: OfficeCalendar = DEFAULT_OFFICE_CALENDAR): WorkFeedCalendars {
+  return {
+    office: officeWorkingDayOptions(cal),
+    owner: officeOwnerCalendar(cal),
+    delivery: { holidays: myHolidaySet() },
+  };
+}
+
+/** Settings → Office for this request, as the caller (RLS). Never throws: an
+ *  unreadable calendar — or a request with no database at all — answers the
+ *  owner defaults (`readOfficeCalendar`'s own fail-safe). */
+async function officeCalendarOf(c: Context<AppEnv>): Promise<OfficeCalendar> {
+  try {
+    return (await readOfficeCalendar(userClient(c.env, c.var.auth.jwt))).calendar;
+  } catch {
+    return DEFAULT_OFFICE_CALENDAR;
+  }
+}
+
+/** Delivery Rules for this request; never throws (default 3). */
+async function deliveryRulesOf(c: Context<AppEnv>) {
+  try {
+    return await readDeliveryRules(userClient(c.env, c.var.auth.jwt));
+  } catch {
+    return DEFAULT_DELIVERY_RULES;
+  }
+}
+
+/** The Office holidays as the set the Purchasing engines take. */
+function holidaySetOf(opts: WorkingDayOptions): ReadonlySet<string> {
+  const h = opts.holidays;
+  if (!h) return myHolidaySet();
+  return h instanceof Set ? h : new Set(h as readonly string[]);
 }
 
 interface SalesOrderModuleRow {
@@ -239,7 +307,21 @@ export function projectSalesOrdersFromModuleFacts(input: {
   /** The order's LIVE Delivery Orders — the document's day outranks the
    *  arrangement in the one delivery-day reader. */
   deliveryOrders?: ReadonlyMap<string, ReadonlyArray<CustomerLegDocumentRead>> | null;
+  /** The Office and Delivery calendars (`workFeedCalendarsOf`). Absent ⇒ the
+   *  owner-confirmed defaults. */
+  calendars?: WorkFeedCalendars;
+  /** The stored Delivery leads: `assign` (DEL-04, Delivery Rules) and
+   *  `chase` (DEL-05, the Contact lead). */
+  queueLeads?: DeliveryQueueLeads;
+  /** `delivery_partners.kv_default` per company id — the outstation fact
+   *  (`isOutstation`). A company not in the map is never guessed outstation. */
+  kvDefaultByPartner?: ReadonlyMap<string, boolean>;
+  /** Each order's collection clock start (`orderCollectionClockStartIso`) —
+   *  the rule in force on it is the one the order's payment deadline runs
+   *  under. Absent ⇒ today. */
+  clockStartByOrder?: ReadonlyMap<string, string>;
 }): OperationWorkItem[] {
+  const calendars = input.calendars ?? workFeedCalendarsOf();
   const availableBySku = Object.fromEntries(
     input.stock.map((row) => [row.sku, row.available]),
   );
@@ -372,11 +454,20 @@ export function projectSalesOrdersFromModuleFacts(input: {
           (loan) => loan.status === "on_loan",
         ),
         ...proofReviewFlagsOf(row, control, input.proofFacts ?? null),
+        /* 0486 · 0672 — the rule in force on the day this order's clock
+           started, and the outstation pair for an outstation company. */
+        collectionTiming: collectionTimingFor(input.timingRules, input.clockStartByOrder?.get(row.id) ?? input.today),
+        outstation: partnerId !== null && input.kvDefaultByPartner?.has(partnerId) === true
+          ? isOutstation({ kv_default: input.kvDefaultByPartner.get(partnerId) })
+          : false,
       },
       customer: row.customer_name,
       logistics: partnerId ? input.partnerNameById?.get(partnerId) ?? null : null,
       deliveryOrderNumber: row.do_number ?? null,
       today: input.today,
+      workingDays: calendars.delivery,
+      queueLeads: input.queueLeads,
+      calendars,
     });
   });
 }
@@ -463,9 +554,12 @@ export function projectPurchaseOrderReplyWork(input: {
   suppliers: readonly { id: string; name: string | null }[];
   poDuty: WorkspaceDutyResolution | null;
   today: string;
+  /** The stored Office calendar (`officeWorkingDayOptions`); default Mon–Fri. */
+  office?: WorkingDayOptions;
 }): OperationWorkItem[] {
   const supplierById = new Map(input.suppliers.map((row) => [row.id, row.name]));
-  const holidays = myHolidaySet();
+  const holidays = input.office ? holidaySetOf(input.office) : myHolidaySet();
+  const offDays = input.office?.offDays ?? PURCHASING_OFFICE_OFF_DAYS;
   return input.pos.flatMap((po) => {
     const version = po.version ?? 1;
     const supplierName = supplierById.get(po.supplier_id) || "Supplier";
@@ -503,7 +597,7 @@ export function projectPurchaseOrderReplyWork(input: {
         dutyName: send.duty_name,
         actingName: send.acting_name,
       })),
-    }, input.poDuty, input.today, holidays);
+    }, input.poDuty, input.today, holidays, offDays);
     /* A PO the supplier has not answered since it was sent is NOT work
        (owner ruling 2026-09-24, Purchasing MASTER §5.7 / §9.3) — the shared
        builder emits only the passed-date follow-up; the day-before check is
@@ -533,9 +627,12 @@ export function projectPurchaseOrderArrivalCheckWork(input: {
   suppliers: readonly { id: string; name: string | null }[];
   poDuty: WorkspaceDutyResolution | null;
   today: string;
+  /** The stored Office calendar (`officeWorkingDayOptions`); default Mon–Fri. */
+  office?: WorkingDayOptions;
 }): OperationWorkItem[] {
   const supplierById = new Map(input.suppliers.map((row) => [row.id, row.name]));
-  const holidays = myHolidaySet();
+  const holidays = input.office ? holidaySetOf(input.office) : myHolidaySet();
+  const offDays = input.office?.offDays ?? PURCHASING_OFFICE_OFF_DAYS;
   return input.pos.flatMap((po) => {
     const supplierName = supplierById.get(po.supplier_id) || "Supplier";
     /* Owner ruling 2026-09-24 / 2026-09-25 (Purchasing MASTER §5.7): the check
@@ -582,7 +679,7 @@ export function projectPurchaseOrderArrivalCheckWork(input: {
         lines: batchLines,
         poNo: po.id,
         channel,
-      }, input.poDuty, input.today, holidays);
+      }, input.poDuty, input.today, holidays, offDays);
       return items.map((item) => operationWorkItemFromProjection(item, {
         object: { kind: "purchase_order", id: po.id, label: po.id },
         /* The card's own date badge and party line carry the date and the
@@ -640,9 +737,12 @@ export function projectPoWindowWork(input: {
   poDuty: WorkspaceDutyResolution | null;
   today: string;
   now: string;
+  /** The stored Office calendar (`officeWorkingDayOptions`); default Mon–Fri. */
+  office?: WorkingDayOptions;
 }): OperationWorkItem[] {
   const windows = poWindowsOf(input.read, input.suppliers);
-  const holidays = myHolidaySet();
+  const holidays = input.office ? holidaySetOf(input.office) : myHolidaySet();
+  const offDays = input.office?.offDays ?? PURCHASING_OFFICE_OFF_DAYS;
   const owner = input.poDuty;
   const now = Date.parse(input.now);
   return windows.map((w: PoWindowWork) => {
@@ -668,7 +768,7 @@ export function projectPoWindowWork(input: {
       broken: false,
       dueIso: w.date,
       workingDaysLate: input.today > w.date
-        ? countWorkingDays(w.date, input.today, { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays })
+        ? countWorkingDays(w.date, input.today, { offDays, holidays })
         : 0,
     };
     return operationWorkItemFromProjection(item, {
@@ -716,12 +816,16 @@ export function projectPaymentCollectionWork(input: {
    *  runs under is the rule in force on its issue day — a snapshot by
    *  construction. Absent ⇒ the ruled default (3 · 2). */
   timingRules?: readonly CollectionTimingRule[] | null;
+  /** The Office calendar: the clock's holiday set, the owner's working days
+   *  and the week lateness is counted on. Absent ⇒ the defaults. */
+  calendars?: WorkFeedCalendars;
 }): OperationWorkItem[] {
-  const holidays = myHolidaySet();
+  const calendars = input.calendars ?? workFeedCalendarsOf();
+  const holidays = calendars.office.holidays;
   return input.invoices.flatMap((invoice) => {
     if (invoice.status !== "issued" || !invoice.orders) return [];
     const timingRule = collectionTimingFor(input.timingRules, invoice.issued_at?.slice(0, 10) ?? input.today);
-    const { timing, clock } = invoicePaymentTiming(invoice, input.today, { holidays }, undefined, timingRule);
+    const { timing, clock } = invoicePaymentTiming(invoice, input.today, { holidays }, undefined, timingRule, calendars.owner);
     const money = invoiceNeeded(invoice);
     const owing = money.known && money.outstanding > 0;
     const latest = latestOutcomeOf(input.outcomes, invoice.order_id);
@@ -756,8 +860,10 @@ export function projectPaymentCollectionWork(input: {
       locked: false,
       broken: false,
       dueIso,
+      /* The due is the OWNER's day (Office calendar), so lateness counts the
+         Office working days after it — never the Mon–Sat fact week. */
       workingDaysLate: late && dueIso
-        ? countWorkingDays(dueIso, input.today, { holidays })
+        ? countWorkingDays(dueIso, input.today, calendars.office)
         : 0,
     };
     return [operationWorkItemFromProjection(workItem, {
@@ -795,8 +901,10 @@ export function projectStorageInvoiceWork(input: {
    *  (owner ruling 2026-09-13). Absent or unassigned ⇒ the Delivery Duty
    *  word stands; never the PIC. */
   ownerFor: (orderId: string) => WorkspaceDutyResolution | null;
+  calendars?: WorkFeedCalendars;
 }): OperationWorkItem[] {
-  const holidays = myHolidaySet();
+  const calendars = input.calendars ?? workFeedCalendarsOf();
+  const holidays = calendars.office.holidays;
   const seen = new Set<string>();
   return input.invoices.flatMap((invoice) => {
     if (invoice.kind === "sales" || invoice.status !== "issued" || !invoice.orders) return [];
@@ -805,7 +913,7 @@ export function projectStorageInvoiceWork(input: {
     if (!money.known || money.storageOwing <= 0 || money.outstanding <= 0) return [];
     seen.add(invoice.order_id);
     const timingRule = collectionTimingFor(input.timingRules, invoice.issued_at?.slice(0, 10) ?? input.today);
-    const { clock } = invoicePaymentTiming(invoice, input.today, { holidays }, undefined, timingRule);
+    const { clock } = invoicePaymentTiming(invoice, input.today, { holidays }, undefined, timingRule, calendars.owner);
     const dueIso = clock.actionDueIso;
     const late = !!clock.dueIso && input.today > clock.dueIso;
     const owner = input.ownerFor(invoice.order_id);
@@ -828,7 +936,7 @@ export function projectStorageInvoiceWork(input: {
       locked: false,
       broken: false,
       dueIso,
-      workingDaysLate: late && dueIso ? countWorkingDays(dueIso, input.today, { holidays }) : 0,
+      workingDaysLate: late && dueIso ? countWorkingDays(dueIso, input.today, calendars.office) : 0,
     };
     return [operationWorkItemFromProjection(workItem, {
       object: { kind: "invoice", id: invoice.id, label: invoice.invoice_no ?? `SO-${invoice.orders.so} storage invoice` },
@@ -919,6 +1027,9 @@ export function receivingWorkSourceFromModuleFacts(data: {
     status: string;
     goods_received_at?: string;
     submitted_at: string;
+    /** The Site that physically received, else the PO's Warehouse. */
+    actual_site_id?: string | null;
+    warehouse_id?: string | null;
   }>;
 }): ReceivingWorkSource {
   return {
@@ -930,6 +1041,7 @@ export function receivingWorkSourceFromModuleFacts(data: {
         supplier_name: row.supplier_name,
         goods_received_at: row.goods_received_at,
         submitted_at: row.submitted_at,
+        site_id: row.actual_site_id ?? row.warehouse_id ?? null,
       })),
   };
 }
@@ -1045,15 +1157,20 @@ export function projectSalesOrderWork(input: {
   logistics?: string | null;
   deliveryOrderNumber?: string | null;
   today: string;
+  /** The Delivery week facts count on (`WorkFeedCalendars.delivery`). */
   workingDays?: WorkingDayOptions;
   queueLeads?: DeliveryQueueLeads;
+  /** The Office calendar for Office dues and the payment clock's owner. */
+  calendars?: WorkFeedCalendars;
 }): OperationWorkItem[] {
+  const calendars = input.calendars ?? workFeedCalendarsOf();
   return workItemsForOrder(
     input.open,
     input.context,
     input.today,
-    input.workingDays,
+    input.workingDays ?? calendars.delivery,
     input.queueLeads,
+    { office: calendars.office, owner: calendars.owner, paymentHolidays: calendars.office.holidays },
   ).map((item) => {
     const deliveryOwned = item.module === "delivery";
     const deliveryOrder = input.deliveryOrderNumber ?? null;
@@ -1123,7 +1240,11 @@ export function projectManualPurchaseWork(input: {
   approver: { userId: string; name: string | null } | null;
   poDuty: WorkspaceDutyResolution | null;
   today: string;
+  /** The stored Office calendar (`officeWorkingDayOptions`); default Mon–Fri
+   *  with the built-in holidays. */
+  office?: WorkingDayOptions;
 }): OperationWorkItem[] {
+  const office = input.office ?? workFeedCalendarsOf().office;
   return input.requests.flatMap((request) =>
     manualPurchaseWorkItems(
       request,
@@ -1133,6 +1254,7 @@ export function projectManualPurchaseWork(input: {
         poDutyResolution: input.poDuty,
       },
       input.today,
+      office,
     ).map((item) => {
       const approval = item.ruleKey === "manual_purchase.approve";
       return operationWorkItemFromProjection(item, {
@@ -1165,7 +1287,8 @@ export function projectReceivingWork(input: {
   source: ReceivingWorkSource;
   duty: WorkspaceDutyResolution | null;
   today: string;
-  workingDaysLate: (dueIso: string) => number;
+  /** Counted on the receiving Site's own calendar; the row names the Site. */
+  workingDaysLate: (dueIso: string, row?: ReceivingWorkSource["submitted"][number]) => number;
 }): OperationWorkItem[] {
   const acting = input.duty?.actingPerson ?? null;
   const projected = receivingWorkItems(
@@ -1225,17 +1348,26 @@ export function projectReceivingWork(input: {
  */
 async function readCollectionTimingRules(c: Context<AppEnv>): Promise<CollectionTimingRule[]> {
   const sb = userClient(c.env, c.var.auth.jwt);
+  // `*`: the 0672 outstation columns ride when installed; a row read before
+  // 0672 maps to the outstation defaults (`collectionTimingRulesOf`).
   const { data, error } = await sb
     .from("payment_collection_timing_rules")
-    .select("ask_days_before,deadline_days_before,effective_from")
+    .select("*")
     .order("effective_from", { ascending: false });
   if (error) throw new Error("Workspace collection-timing source could not be read");
-  return ((data ?? []) as Array<{ ask_days_before: number; deadline_days_before: number; effective_from: string }>)
-    .map((r) => ({
-      askDaysBefore: r.ask_days_before,
-      deadlineDaysBefore: r.deadline_days_before,
-      effectiveFrom: r.effective_from,
-    }));
+  return collectionTimingRulesOf((data ?? []) as CollectionTimingRuleRow[]);
+}
+
+/** `delivery_partners.kv_default` per company — the outstation fact. A read
+ *  failure yields an EMPTY map: no company is then guessed outstation, and
+ *  the ordinary pair stands (never a false earlier deadline). */
+async function readPartnerKvDefaults(c: Context<AppEnv>): Promise<Map<string, boolean>> {
+  const { data, error } = await userClient(c.env, c.var.auth.jwt)
+    .from("delivery_partners")
+    .select("id, kv_default");
+  if (error) return new Map();
+  return new Map(((data ?? []) as Array<{ id: string; kv_default: boolean | null }>)
+    .map((r) => [r.id, r.kv_default === true]));
 }
 
 /** The one response boundary. Module loaders remain responsible for producing
@@ -1642,7 +1774,8 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   internal.route("/purchase/demands", purchaseDemandsRouter);
 
   const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings,
-         invoices, outcomes, refunds, issueSource, timingRules, proofFacts] =
+         invoices, outcomes, refunds, issueSource, timingRules, proofFacts,
+         officeStored, deliveryRules, kvDefaultByPartner] =
     await Promise.all([
       readInternal<{ orders: SalesOrderModuleRow[] }>(internal, "/orders", c),
       readInternal<{ skus: Array<{ sku: string; available: number }> }>(internal, "/stock", c),
@@ -1678,7 +1811,20 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       readInternal<{ actions: Parameters<typeof projectIssueActionWork>[0]["actions"] }>(internal, "/issues/work-source", c),
       readCollectionTimingRules(c),
       readProofFacts(c),
+      /* ⭐ Settings → Office, read ONCE for the whole feed; fails safe to the
+         owner defaults (Monday–Friday, the built-in holidays). */
+      officeCalendarOf(c),
+      /* DEL-04 · Delivery Rules (`Assign logistics by`), fails safe to 3. */
+      deliveryRulesOf(c),
+      readPartnerKvDefaults(c),
     ]);
+  const calendars = workFeedCalendarsOf(officeStored);
+  /* The two stored Delivery leads (DEL-04 assignment · DEL-05 contact), one
+     helper so the Orders list, the Delivery board and Work read them alike. */
+  const queueLeads = deliveryQueueLeads({
+    logisticsCallWorkingDays: purchasingSettings.logisticsCallWorkingDays,
+    assignmentLeadWorkingDays: deliveryRules.assignmentLeadWorkingDays,
+  });
   const orderIds = orders.orders.map((row) => row.id);
   const [arrangements, deliveryOrders] = await Promise.all([
     readArrangements(c, orderIds),
@@ -1716,8 +1862,13 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   // answers the same stable owner for every later pass.
   const actionable = new Set<string>();
   const probe = (orderId: string) => { actionable.add(orderId); return null; };
-  projectPaymentCollectionWork({ invoices, ownerFor: probe, today, outcomes, timingRules });
-  projectStorageInvoiceWork({ invoices, today, timingRules, ownerFor: probe });
+  projectPaymentCollectionWork({ invoices, ownerFor: probe, today, outcomes, timingRules, calendars });
+  projectStorageInvoiceWork({ invoices, today, timingRules, ownerFor: probe, calendars });
+  // Each order's collection clock start (the Monitor's own door rule).
+  const invoicesByOrder = new Map<string, InvoiceRegisterRow[]>();
+  for (const inv of invoices) invoicesByOrder.set(inv.order_id, [...(invoicesByOrder.get(inv.order_id) ?? []), inv]);
+  const clockStartByOrder = new Map(orders.orders.map((row) =>
+    [row.id, orderCollectionClockStartIso(invoicesByOrder.get(row.id) ?? [], row.id, today)]));
   const orderFacts = {
     orders: orders.orders,
     stock: stock.skus,
@@ -1731,6 +1882,10 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     proofFacts,
     arrangements,
     deliveryOrders,
+    calendars,
+    queueLeads,
+    kvDefaultByPartner,
+    clockStartByOrder,
   };
   // Owner ruling 2026-09-17 — routine Delivery work is the order's responsible
   // Operation person. A probe pass per order learns which orders carry a
@@ -1755,32 +1910,44 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       : null,
     poDuty,
     today,
+    office: calendars.office,
   });
   const receivingSource = receivingWorkSourceFromModuleFacts({
     receipts: receipts.receipts,
   });
-  const holidays = myHolidaySet();
+  /* GRN lateness counts on the RECEIVING Site's own calendar (Warehouse-
+     owned hours, special dates, holiday policy) — never the Office one. A
+     Site with nothing readable or a day nobody configured falls back,
+     explicitly, to the governed Warehouse week: Sunday off + the built-in
+     public holidays (today's behaviour). */
+  const receivingSettings = await readWarehouseReceivingSettings(
+    userClient(c.env, c.var.auth.jwt),
+    receivingSource.submitted.map((row) => row.site_id ?? "").filter(Boolean),
+  );
+  const warehouseFallbackHolidays = myHolidaySet();
   const receivingItems = projectReceivingWork({
     source: receivingSource,
     duty: grnDuty,
     today,
-    workingDaysLate: (dueIso) =>
-      countWorkingDays(dueIso, today, { holidays, offDays: WAREHOUSE_OFF_DAYS }),
+    workingDaysLate: (dueIso, row) =>
+      warehouseReceivingDaysLate(dueIso, today, row?.site_id ? receivingSettings.get(row.site_id) ?? null : null, warehouseFallbackHolidays),
   });
   const purchaseOrderItems = projectPurchaseOrderReplyWork({
     pos: pos.pos as PurchaseOrderWorkSource[],
     suppliers: suppliers.suppliers,
     poDuty,
     today,
+    office: calendars.office,
   });
   const arrivalCheckItems = projectPurchaseOrderArrivalCheckWork({
     pos: pos.pos as PurchaseOrderArrivalSource[],
     suppliers: suppliers.suppliers,
     poDuty,
     today,
+    office: calendars.office,
   });
-  const paymentItems = projectPaymentCollectionWork({ invoices, ownerFor: collectionOwnerFor, today, outcomes, timingRules });
-  const storageInvoiceItems = projectStorageInvoiceWork({ invoices, today, timingRules, ownerFor: collectionOwnerFor });
+  const paymentItems = projectPaymentCollectionWork({ invoices, ownerFor: collectionOwnerFor, today, outcomes, timingRules, calendars });
+  const storageInvoiceItems = projectStorageInvoiceWork({ invoices, today, timingRules, ownerFor: collectionOwnerFor, calendars });
   const overpaymentItems = projectOverpaymentReviewWork({
     invoices, refunds, approver: paymentApprover, today,
   });
@@ -1798,7 +1965,10 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   });
   // Repair Orders (Purchasing §9.7 · §10): their own projection, read inside
   // the Purchasing source so a failed read fails that source's health.
-  const repairOrderWork = () => loadRepairOrderWork(c, { poDuty, today, observedAt });
+  /* The three Purchasing loaders count on the stored Office holidays; their
+     off days stay the owner-default Monday–Friday inside each record module. */
+  const officeHolidays = holidaySetOf(calendars.office);
+  const repairOrderWork = () => loadRepairOrderWork(c, { poDuty, today, observedAt, holidays: officeHolidays });
   const sourceResults = await Promise.all([
     loadWorkSource("orders", observedAt, async () =>
       orderItems.filter((item) =>
@@ -1819,10 +1989,11 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
         poDuty,
         today,
         now: observedAt,
+        office: calendars.office,
       }),
       ...(await repairOrderWork()),
-      ...(await loadSupplierClaimWork(c, { poDuty, approver: dutyResolution(duties, "purchasing_approver", today), today, observedAt })),
-      ...(await loadPurchaseReturnWork(c, { poDuty, today, observedAt })),
+      ...(await loadSupplierClaimWork(c, { poDuty, approver: dutyResolution(duties, "purchasing_approver", today), today, observedAt, holidays: officeHolidays })),
+      ...(await loadPurchaseReturnWork(c, { poDuty, today, observedAt, holidays: officeHolidays })),
     ]),
     loadWorkSource("receiving", observedAt, async () => receivingItems),
     loadWorkSource("delivery", observedAt, async () =>
@@ -2091,11 +2262,15 @@ export async function probeOrderWork(
   if (!order) return null;
   const sb = userClient(c.env, c.var.auth.jwt);
   const skus = [...new Set((order.order_lines ?? []).map((line) => line.sku).filter(Boolean))];
-  const [stock, settings] = await Promise.all([
+  /* The same calendars and leads the feed counts with, so a probe's dues
+     match the feed's (they decide WHEN, never WHETHER). */
+  const [stock, settings, officeStored, deliveryRules] = await Promise.all([
     skus.length === 0
       ? Promise.resolve({ data: [] as Array<{ sku: string; sellable: number | null }>, error: null })
       : sb.from("stock_sku_availability").select("sku, sellable").in("sku", skus),
     loadPurchasingSettings(sb),
+    officeCalendarOf(c),
+    deliveryRulesOf(c),
   ]);
   if (stock.error) throw new Error(`stock read failed: ${stock.error.message}`);
   const bySku = new Map<string, Array<{ sellable: number | null }>>();
@@ -2109,6 +2284,11 @@ export async function probeOrderWork(
     dutyResolutions: {},
     today: todayIsoMYT(),
     safetyDays: settings.orderByBufferDays,
+    calendars: workFeedCalendarsOf(officeStored),
+    queueLeads: deliveryQueueLeads({
+      logisticsCallWorkingDays: settings.logisticsCallWorkingDays,
+      assignmentLeadWorkingDays: deliveryRules.assignmentLeadWorkingDays,
+    }),
   });
   const { currentId } = await readWorkLedger(c, ledger, items.map((item) => item.id));
   return items.map((item) => ({ ...item, id: currentId.get(item.id) ?? item.id }));
@@ -2139,9 +2319,10 @@ export async function probePurchaseOrderWork(
   const po = pos.find((row) => row.id === poId);
   if (!po) return null;
   const today = todayIsoMYT();
+  const office = workFeedCalendarsOf(await officeCalendarOf(c)).office;
   const items = [
-    ...projectPurchaseOrderReplyWork({ pos: [po], suppliers: [], poDuty: null, today }),
-    ...projectPurchaseOrderArrivalCheckWork({ pos: [po as PurchaseOrderArrivalSource], suppliers: [], poDuty: null, today }),
+    ...projectPurchaseOrderReplyWork({ pos: [po], suppliers: [], poDuty: null, today, office }),
+    ...projectPurchaseOrderArrivalCheckWork({ pos: [po as PurchaseOrderArrivalSource], suppliers: [], poDuty: null, today, office }),
   ];
   const { currentId } = await readWorkLedger(c, ledger, items.map((item) => item.id));
   return items.map((item) => ({ ...item, id: currentId.get(item.id) ?? item.id }));
@@ -2173,10 +2354,11 @@ export async function probePoWindowWork(
   windowKey: string,
   ledger: WorkLedger = supabaseWorkLedger,
 ): Promise<OperationWorkItem[] | null> {
-  const source = await readPoWindowSource(c);
+  const [source, officeStored] = await Promise.all([readPoWindowSource(c), officeCalendarOf(c)]);
   const now = new Date().toISOString();
-  const items = projectPoWindowWork({ ...source, poDuty: null, today: todayIsoMYT(), now })
-    .filter((item) => item.object.id === windowKey);
+  const items = projectPoWindowWork({
+    ...source, poDuty: null, today: todayIsoMYT(), now, office: workFeedCalendarsOf(officeStored).office,
+  }).filter((item) => item.object.id === windowKey);
   const { currentId } = await readWorkLedger(c, ledger, items.map((item) => item.id));
   return items.map((item) => ({ ...item, id: currentId.get(item.id) ?? item.id }));
 }
@@ -2219,8 +2401,11 @@ async function readManualPurchaseWorkSource(c: Context<AppEnv>) {
 export async function probeManualPurchaseWork(
   c: Context<AppEnv>, requestId: string, ledger: WorkLedger = supabaseWorkLedger,
 ): Promise<OperationWorkItem[] | null> {
-  const requests = (await readManualPurchaseWorkSource(c)).filter((r) => r.requestId === requestId);
-  const items = projectManualPurchaseWork({ requests, approver: null, poDuty: null, today: todayIsoMYT() });
+  const [source, officeStored] = await Promise.all([readManualPurchaseWorkSource(c), officeCalendarOf(c)]);
+  const requests = source.filter((r) => r.requestId === requestId);
+  const items = projectManualPurchaseWork({
+    requests, approver: null, poDuty: null, today: todayIsoMYT(), office: workFeedCalendarsOf(officeStored).office,
+  });
   const { currentId } = await readWorkLedger(c, ledger, items.map((item) => item.id));
   return items.map((item) => ({ ...item, id: currentId.get(item.id) ?? item.id }));
 }
@@ -2304,8 +2489,10 @@ export function createOperationWorkRouter(
     };
     let id: string;
     try {
+      /* The reply day counts on the stored Office calendar (Settings → Office). */
+      const office = kind === "request_sent" ? workFeedCalendarsOf(await officeCalendarOf(c)).office : null;
       id = kind === "request_sent"
-        ? await ledger.recordRequestSent(c, { ...write, replyDueOn: workReplyDueOn(response.generatedOn, item.ruleKey) })
+        ? await ledger.recordRequestSent(c, { ...write, replyDueOn: workReplyDueOn(response.generatedOn, item.ruleKey, office ?? undefined) })
         : await ledger.recordReplyReceived(c, write);
     } catch (e) {
       if (e instanceof WorkLedgerRefusal) {

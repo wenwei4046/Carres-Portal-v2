@@ -20,6 +20,16 @@ export interface StoredOfficeCalendar {
 }
 
 export async function readOfficeCalendar(sb: SupabaseClient): Promise<StoredOfficeCalendar> {
+  try {
+    return await readStored(sb);
+  } catch {
+    // A thrown read (network, a client without a table API) is the same
+    // answer as an unreadable table: the owner defaults, `stored: false`.
+    return { calendar: DEFAULT_OFFICE_CALENDAR, row: null, holidays: [], stored: false };
+  }
+}
+
+async function readStored(sb: SupabaseClient): Promise<StoredOfficeCalendar> {
   const [cal, hol] = await Promise.all([
     sb
       .from("office_calendar")
