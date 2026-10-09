@@ -106,6 +106,22 @@ describe("the store's Commission page", () => {
     expect(within(september).queryByText("SO-2054")).toBeNull();
   });
 
+  it("shows the KPI allowance on its own line (0665)", async () => {
+    net.routes = { "GET /api/dealer-commission/statement": {
+      ...STATEMENT,
+      kpi: [{ id: "k1", startsOn: "2026-01-01", modelId: "g1", perUnit: 10, tiers: [], period: "month" }],
+      orders: [...STATEMENT.orders, {
+        orderId: "ord3", so: 2060, dealerId: "d1", outletId: "o1", addons: 0, orderedOn: `${MONTH}-03`,
+        customer: "Probe Customer Three", payments: [],
+        lines: [{ modelId: "g1", category: "guarantee", value: 150, rate: 0, qty: 2 }],
+      }],
+    } };
+    renderPage();
+    const table = await screen.findByTestId("pos-commission-statement");
+    expect(within(table).getByText(`KPI allowance ${fmtMonth(MONTH)} so far`)).toBeTruthy();
+    expect(screen.getByTestId("pos-commission-owed")).toHaveTextContent("RM 160.00");
+  });
+
   it("Back closes it", async () => {
     const onClose = renderPage();
     fireEvent.click(await screen.findByTestId("pos-commission-back"));

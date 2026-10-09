@@ -6,10 +6,12 @@ import {
   dealerCommissionOrders,
   dealerCommissionReport,
   dealerStatement,
+  kpiAmount,
   orderMonth,
   orderTerms,
   rebateByMonth,
   statementAsSource,
+  type DcKpiRule,
   type DcLine,
   type DcOrder,
   type DcSource,
@@ -146,12 +148,36 @@ describe("the rebate", () => {
     expect(dealerCommissionReport(src, "2026-10")[0]).toMatchObject({ rebate: 50, quotaLeft: 950 });
   });
 
-  it("a cancelled order's money does not count toward the rebate", () => {
-    const src = source(
-      [order({ lines: [line("sofa", 1000)], payments: [paid("2026-09-03", 1000)], cancelledOn: "2026-09-10" })],
-      { quotas: [{ dealerId: "d1", quota: 1000, rebateRate: 5, startsOn: "2026-01-01" }] },
-    );
-    expect(dealerCommissionReport(src, "2026-09")[0]).toMatchObject({ earned: 250, stillToCollect: 0, rebate: 0 });
+  it("a cancelled order's money still counts until Finance takes its commission back; then its rebate is given back (7.4)", () => {
+    const quotas = [{ dealerId: "d1", quota: 1000, rebateRate: 5, startsOn: "2026-01-01" }];
+    const cancelled = order({ lines: [line("sofa", 1000)], payments: [paid("2026-09-03", 1000)], cancelledOn: "2026-09-10" });
+    expect(dealerCommissionReport(source([cancelled], { quotas }), "2026-09")[0]).toMatchObject({ earned: 250, stillToCollect: 0, rebate: 50 });
+    const back = { ...cancelled, takeBackOn: "2026-10-04" };
+    expect(dealerCommissionReport(source([back], { quotas }), "2026-09")[0]).toMatchObject({ rebate: 50 });
+    expect(dealerCommissionReport(source([back], { quotas }), "2026-10")[0]).toMatchObject({ earned: -250, rebate: -50, quotaLeft: 1000 });
+  });
+
+  it("an order under half adds nothing to the rebate; the month it reaches half adds all it kept (7.4)", () => {
+    const quotas = [{ dealerId: "d1", quota: null, rebateRate: 5, startsOn: "2026-01-01" }];
+    const src = source([order({ lines: [line("sofa", 1000)], payments: [paid("2026-09-03", 400), paid("2026-10-05", 200)] })], { quotas });
+    expect(dealerCommissionReport(src, "2026-09")[0]).toMatchObject({ rebate: 0, quotaLeft: null });
+    expect(dealerCommissionReport(src, "2026-10")[0]).toMatchObject({ rebate: 30, quotaLeft: null });
+  });
+
+  it("the total can be filled in later: no limit until then, then what is left is the total less all given (7.3)", () => {
+    // Chew's example: August receipts RM 9,855 at 5% give RM 492.75; a RM 10,000 total leaves RM 9,507.25.
+    const orders = [order({ lines: [line("sofa", 9855)], payments: [paid("2026-08-10", 9855)] })];
+    const noTotal = source(orders, { quotas: [{ dealerId: "d1", quota: null, rebateRate: 5, startsOn: "2026-08-01" }] });
+    expect(dealerCommissionReport(noTotal, "2026-08")[0]).toMatchObject({ rebate: 492.75, quotaLeft: null });
+    const total = source(orders, { quotas: [{ dealerId: "d1", quota: 10000, rebateRate: 5, startsOn: "2026-08-01" }] });
+    expect(dealerCommissionReport(total, "2026-09")[0]).toMatchObject({ rebate: 0, quotaLeft: 9507.25 });
+  });
+
+  it("a total not filled in has no limit (7.3)", () => {
+    expect(rebateByMonth(null, 5, [["2026-09", 60000], ["2026-10", 80000]])).toEqual([
+      { month: "2026-09", rebate: 3000, quotaLeft: null },
+      { month: "2026-10", rebate: 4000, quotaLeft: null },
+    ]);
   });
 
   it("a refund after the rebate hit the cap takes back only what was paid", () => {
@@ -228,6 +254,55 @@ describe("the dealer's statement (0664)", () => {
     expect(dealerCommissionOrders(src, "2026-09").map((r) => r.order.orderId)).toEqual(["o1"]);
     expect(dealerCommissionReport(src, "2026-09")[0].stillToCollect).toBe(412.5);
     expect(dealerCommissionOrders(src, "2026-10").map((r) => [r.order.orderId, r.group])).toEqual([["o1", "waiting"], ["o2", "new"]]);
+  });
+});
+
+describe("the KPI allowance (0665)", () => {
+  // Made-up amounts: the memo's are Finance's and stay out of this repository.
+  const GRT = "m-grt";
+  const rule = (over: Partial<DcKpiRule> = {}): DcKpiRule => ({
+    id: "k1", startsOn: "2026-07-22", modelId: GRT, perUnit: 10, period: "month",
+    tiers: [{ units: 5, bonus: 50 }, { units: 20, bonus: 300 }], ...over,
+  });
+  const withGuarantees = (orderedOn: string, qty: number, over: Partial<DcOrder> = {}) =>
+    order({ orderedOn, lines: [line("mattress", 1000), { modelId: GRT, category: "guarantee", value: 150, rate: 0, qty }], ...over });
+
+  it("pays each guarantee plus the bonus of the highest tier reached; tiers do not add up (8.2)", () => {
+    expect(kpiAmount(rule(), 4)).toBe(40);
+    expect(kpiAmount(rule(), 21)).toBe(510);
+  });
+
+  it("counts guarantees by order day, a line of 2 as two, never a cancelled order's (8.1, 8.4)", () => {
+    const src = source([
+      withGuarantees("2026-09-03", 2),
+      withGuarantees("2026-09-20", 3),
+      withGuarantees("2026-09-25", 4, { cancelledOn: "2026-09-28" }),
+      withGuarantees("2026-10-01", 1),
+    ], { kpi: [rule()] });
+    expect(dealerCommissionReport(src, "2026-09")[0]).toMatchObject({ kpiUnits: 5, kpi: 100 });
+    expect(dealerCommissionReport(src, "2026-10")[0]).toMatchObject({ kpiUnits: 1, kpi: 10 });
+  });
+
+  it("no rule yet, no allowance; orders before the first rule's day do not count", () => {
+    const src = source([withGuarantees("2026-07-10", 3), withGuarantees("2026-07-25", 2)], { kpi: [rule()] });
+    expect(dealerCommissionReport(src, "2026-06")[0]).toMatchObject({ kpi: null, kpiUnits: 0 });
+    expect(dealerCommissionReport(src, "2026-07")[0]).toMatchObject({ kpiUnits: 2, kpi: 20 });
+  });
+
+  it("a yearly count pays each guarantee as it comes and a tier's bonus in the month it is reached (8.3)", () => {
+    const src = source([withGuarantees("2026-08-03", 3), withGuarantees("2026-09-03", 3)], { kpi: [rule({ period: "year" })] });
+    expect(dealerCommissionReport(src, "2026-08")[0]).toMatchObject({ kpiUnits: 3, kpi: 30 });
+    // Six by September reach the tier of 5: 30 for the guarantees and the 50 bonus.
+    expect(dealerCommissionReport(src, "2026-09")[0]).toMatchObject({ kpiUnits: 3, kpi: 80 });
+  });
+
+  it("has its own line on the statement, due with the month's commission (10.4)", () => {
+    const s = dealerStatement({
+      today: "2026-10-09", dealer: { id: "d1", name: "Dealer" }, quotas: [], payments: [],
+      kpi: [rule()], orders: [withGuarantees("2026-09-03", 2)],
+    });
+    expect(s.lines.map((l) => [l.kind, l.month, l.owed, l.due])).toEqual([["kpi", "2026-09", 20, "2026-10-15"]]);
+    expect(s.owedNow).toBe(20);
   });
 });
 

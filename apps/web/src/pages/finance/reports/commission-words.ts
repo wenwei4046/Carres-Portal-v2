@@ -1,10 +1,11 @@
-import type { DcOrder, DcOrderMonth, DcStatementLine } from "@carres/shared/dealer-commission";
+import type { DcKpiRule, DcOrder, DcOrderMonth, DcStatementLine } from "@carres/shared/dealer-commission";
 import { fmtMonth } from "@/lib/fmt-date";
+import { rm } from "@/lib/format-currency";
 
 /*
  * The words of dealer commission that Finance's report and the store's own
  * Commission page both show, so the two always say the same thing.
- * PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), dealer commission steps 2 and 3).
+ * PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), dealer commission steps 2 to 4).
  */
 
 export const soWord = (o: Pick<DcOrder, "so">) => (o.so !== null ? `SO-${o.so}` : "SO not available");
@@ -20,12 +21,24 @@ export function noteWord(r: Pick<DcOrderMonth, "takenBack" | "cancelled" | "term
   return "Waiting for the balance";
 }
 
-/** A statement line's description (0664). */
+/** A statement line's description (0664, 0665). */
 export function statementLineWord(l: Pick<DcStatementLine, "kind" | "month" | "soFar" | "voucherNo">): string {
   if (l.kind === "payment") return `Payment ${l.voucherNo ?? ""}`.trim();
   const month = l.month ? fmtMonth(l.month) : "";
-  if (l.kind === "rebate") return `Renovation rebate ${month}`;
-  return l.soFar ? `Commission ${month} so far` : `Commission ${month}`;
+  const what = l.kind === "rebate" ? "Renovation rebate" : l.kind === "kpi" ? "KPI allowance" : "Commission";
+  return l.soFar ? `${what} ${month} so far` : `${what} ${month}`;
+}
+
+/** 0665 — whether a KPI count starts again each month or each year. */
+export const kpiPeriodWord = (period: DcKpiRule["period"]) => (period === "year" ? "Each year" : "Each month");
+
+/** 0665 — a KPI rule's tiers, lowest first. */
+export function kpiTiersWord(r: Pick<DcKpiRule, "tiers">): string {
+  if (r.tiers.length === 0) return "No tier bonus";
+  return [...r.tiers]
+    .sort((a, b) => Number(a.units) - Number(b.units))
+    .map((t) => `${Number(t.units)} guarantees ${rm(Number(t.bonus))}`)
+    .join(" · ");
 }
 
 /** A statement line's key in a list. */
