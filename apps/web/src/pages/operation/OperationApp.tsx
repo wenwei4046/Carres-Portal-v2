@@ -32,6 +32,7 @@ import OperationDashboard from "./OperationDashboard";
 // ROLLBACK is no longer an identifier swap. It is the deployment rollback
 // named in the cutover card — revert + redeploy the previous Pages build.
 import OperationOrdersControl from "./OperationOrdersControl";
+import { useOrderDealSweep } from "./components/order-deal-sweep";
 import SalesOrdersOutright from "./so-outright/SalesOrdersOutright";
 import DeliveryOrderPage from "./DeliveryOrderPage";
 import DeliveryOrdersRegister from "./DeliveryOrdersRegister";
@@ -125,6 +126,9 @@ import type { MovementsFilters } from "@/lib/queries";
 export default function OperationApp() {
   const location = useLocation();
   const phone = usePhone();
+  /* The system deals every order to a person (0504) — from the shell, so it
+     runs whichever Operations page is opened. */
+  useOrderDealSweep();
   const shellHost = useShellHeaderHost();
   const [menuOpen, setMenuOpen] = useState(false);
   /* A chosen page closes the drawer. */
