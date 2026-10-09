@@ -215,6 +215,10 @@ export default function OperationLeave() {
       <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 sm:px-6" data-testid="leave-page">
         {q.isPending ? (
           <Loading variant="skeleton" lines={6} label="Opening Leave…" />
+        ) : !data && (q.error as { status?: number } | null)?.status === 503 ? (
+          <p role="status" className="text-body text-c-secondary" data-testid="leave-not-installed">
+            Leave is not switched on yet.
+          </p>
         ) : !data ? (
           <div role="alert" className="flex flex-col items-start gap-3">
             <p className="text-body text-c-ink">Leave could not be opened.</p>

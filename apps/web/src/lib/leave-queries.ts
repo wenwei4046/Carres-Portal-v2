@@ -22,6 +22,8 @@ export function useMyLeave() {
     queryKey: leaveKeys.mine,
     queryFn: async () => myLeaveResponseSchema.parse(await apiFetch<unknown>("/api/operation/leave")),
     staleTime: 30_000,
+    // Not switched on yet (503) is an answer, not a blip: show it at once.
+    retry: (count, error) => (error as { status?: number })?.status !== 503 && count < 2,
   });
 }
 

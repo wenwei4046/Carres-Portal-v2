@@ -44,6 +44,14 @@ beforeEach(() => {
 });
 
 describe("Workspace → Leave API", () => {
+  it("before 0670 is applied answers 503 not_installed, never a 500 the page keeps retrying", async () => {
+    rpc.mockResolvedValue({ data: null, error: { code: "PGRST202", message: "function not found" } });
+    rows.error = { code: "42P01", message: "relation does not exist" };
+    const res = await app().request("/leave");
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ code: "not_installed" });
+  });
+
   it("reads only my own leave, the three policies and whether I may submit", async () => {
     policies.data = [{ leave_type: "mc", approval_required: false, proof_required: true, reason_required: false }];
     rows.data = [{ id: "eeeeeeee-0000-4000-8000-0000000000aa", leave_type: "mc", starts_on: "2026-10-09", ends_on: "2026-10-09",

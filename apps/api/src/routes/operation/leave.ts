@@ -65,6 +65,8 @@ function refusal(error: { code?: string; message?: string; details?: string }) {
 }
 
 const UUID = z.string().uuid();
+/** Missing table / function / schema-cache entry: the migration is not applied yet. */
+const NOT_INSTALLED = new Set(["42P01", "42883", "PGRST202", "PGRST205"]);
 
 router.get("/", requireStaff, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -81,6 +83,11 @@ router.get("/", requireStaff, async (c) => {
   ]);
   const failed = mayRes.error ?? policies.error ?? rows.error;
   if (failed) {
+    /* Before 0670 is applied the leave storage does not exist: say so plainly
+     * (503 not_installed) instead of a 500 the page keeps retrying. */
+    if (NOT_INSTALLED.has(failed.code ?? "")) {
+      return c.json({ error: "not_installed", code: "not_installed", message: "Leave is not switched on yet." }, 503);
+    }
     const m = mapPgError(failed);
     return c.json(m.body, m.status);
   }
