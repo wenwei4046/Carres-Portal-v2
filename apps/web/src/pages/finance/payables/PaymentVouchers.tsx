@@ -105,6 +105,13 @@ export default function PaymentVouchers() {
 
 // ── register ────────────────────────────────────────────────────────────────
 
+/** 0666: the account a voucher pays from; a draft the system raised (a
+ *  dealer's commission) waits for Finance to pick it. */
+// PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), dealer commission step 4).
+function paidFromWord(v: { pay_from_account_code: string | null; pay_from_name: string | null }): string {
+  return v.pay_from_account_code ? `${v.pay_from_account_code} ${v.pay_from_name ?? ""}`.trim() : "Not chosen yet";
+}
+
 function VoucherRegister() {
   const navigate = useNavigate();
   const [dept, setDept] = useDepartmentParam();
@@ -124,7 +131,7 @@ function VoucherRegister() {
     { key: "bills", label: "Bills Paid", width: 200, accessor: (r) => r.bill_nos ?? "No bill",
       searchValue: (r) => r.bill_nos ?? "" },
     { key: "from", label: "Paid From", width: 180,
-      accessor: (r) => `${r.pay_from_account_code} ${r.pay_from_name ?? ""}`.trim(), filterType: "enum" },
+      accessor: paidFromWord, filterType: "enum" },
     { key: "method", label: "Method", width: 130, accessor: (r) => word(PAY_METHOD_WORD, r.pay_method),
       filterValue: (r) => word(PAY_METHOD_WORD, r.pay_method), filterType: "enum" },
     { key: "status", label: "Status", width: 120, accessor: (r) => word(VOUCHER_STATUS_WORD, r.status),
@@ -274,7 +281,7 @@ function VoucherDetail() {
       setPrinting(false);
     }
   };
-  const approveAsk = `Approve paying ${money(v.amount)} to ${v.payee_name} from ${v.pay_from_account_code} ${v.pay_from_name ?? ""}? `
+  const approveAsk = `Approve paying ${money(v.amount)} to ${v.payee_name} from ${paidFromWord(v)}? `
     + `It is entered in the ledger on ${fmtDate(v.voucher_date)}.`;
 
   return (
@@ -323,7 +330,7 @@ function VoucherDetail() {
               <FactRow label="Pay to"><span data-testid="voucher-pay-to">{payToWords(payTo)}</span></FactRow>
             )}
             <FactRow label="Voucher date">{fmtDate(v.voucher_date)}</FactRow>
-            <FactRow label="Paid from">{v.pay_from_account_code} {v.pay_from_name ?? ""}</FactRow>
+            <FactRow label="Paid from">{paidFromWord(v)}</FactRow>
             <FactRow label="Method">{word(PAY_METHOD_WORD, v.pay_method)}</FactRow>
             <FactRow label="Reference">{v.pay_reference ?? "No reference"}</FactRow>
             <FactRow label="Amount"><span data-testid="voucher-amount">{money(v.amount)}</span></FactRow>
@@ -554,7 +561,8 @@ function VoucherForm() {
     setSupplierId(d.voucher.supplier_id ?? "");
     setPayee(d.voucher.payee_name);
     setVoucherDate(d.voucher.voucher_date);
-    setPayFrom(d.voucher.pay_from_account_code);
+    // 0666: a draft the system raised waits for Finance to pick the bank.
+    setPayFrom(d.voucher.pay_from_account_code ?? "");
     setMethod((PAYMENT_VOUCHER_METHODS as readonly string[]).includes(d.voucher.pay_method)
       ? d.voucher.pay_method as Method : "OTHER");
     setReference(d.voucher.pay_reference ?? "");

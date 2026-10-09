@@ -463,3 +463,22 @@ describe("KPI allowance and the rebate's total (0665)", () => {
     expect(net.bodies[`PUT ${DC}/quotas/d1`]).toEqual({ quota: null, rebateRate: 5, startsOn: `${MONTH}-01` });
   });
 });
+
+describe("A closed month (0666)", () => {
+  it("shows what was charged and says when it closed", async () => {
+    net.routes[`GET ${DC}?month=${PREV}`] = { ...SOURCE, closes: [{
+      month: PREV, closedOn: `${MONTH}-01`,
+      dealers: [{ dealerId: "d1", commission: 111, rebate: 0, kpi: 0, kpiUnits: 0 }],
+      orders: [{ orderId: "ord2", earnedThrough: 111 }],
+    }] };
+    renderAt();
+    await screen.findByText("Ace Furniture");
+    pick("Month", fmtMonth(PREV));
+    await waitFor(() => expect(screen.getByTestId("dealer-commission-summary")).toHaveTextContent(
+      `${fmtMonth(PREV)} closed on ${fmtDate(`${MONTH}-01`)}: these are the amounts charged. A later change lands in the month still open.`,
+    ));
+    // What was charged, not today's RM 120.00: the row and the totals row.
+    expect(screen.getAllByText("RM 111.00")).toHaveLength(2);
+    expect(screen.queryByText("RM 120.00")).toBeNull();
+  });
+});

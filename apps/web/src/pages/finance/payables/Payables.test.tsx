@@ -275,6 +275,19 @@ describe("Payment vouchers register", () => {
     sortAdvance();
     expect(order()).toEqual(["PV-FIVE", "PV-NINE", "PV-NONE"]);
   });
+
+  /* 0666 (Chew 2026-10-09): a dealer's commission draft waits for Finance to pick the bank. */
+  it("a draft the system raised says its bank is not chosen yet", async () => {
+    api.routes[`${B}/vouchers`] = { rows: [{ id: PV, voucher_no: null, status: "draft", purpose: "DIRECT",
+      supplier_id: null, supplier_name: null, payee_name: "Ace Furniture", voucher_date: "2026-10-15",
+      amount: "337.50", pay_method: "BANK_TRANSFER", pay_reference: null, pay_from_account_code: null,
+      pay_from_name: null, bill_nos: null, line_count: 1, prepared_by_name: null, checked_by_name: null,
+      approved_by_name: null, file_count: 0, created_at: "2026-10-01T01:00:00Z", advance_amount: "0.00",
+      advance_open: null }] };
+    show("/finance/payment-vouchers");
+    expect(await screen.findByText("Not chosen yet")).toBeInTheDocument();
+    expect(screen.queryByText(/null/)).not.toBeInTheDocument();
+  });
 });
 
 describe("Bill form — Convert GRN to bill", () => {
@@ -678,6 +691,19 @@ describe("Payment voucher detail", () => {
     show(`/finance/payment-vouchers/${PV}`);
     await screen.findByTestId("voucher-amount");
     expect(screen.queryByTestId("voucher-pay-to")).not.toBeInTheDocument();
+  });
+
+  it("a draft with no bank yet says so (0666)", async () => {
+    const doc = voucherDoc({ status: "draft", can: { edit: true } });
+    api.routes[`${B}/vouchers/${PV}`] = { ...doc,
+      voucher: { ...doc.voucher, pay_from_account_code: null, pay_from_name: null },
+      events: [{ action: "month_close", note: "Dealer commission September 2026", at: "2026-10-01T01:00:00Z", actor_name: null }] };
+    show(`/finance/payment-vouchers/${PV}`);
+    await screen.findByTestId("voucher-amount");
+    expect(screen.getByText("Not chosen yet")).toBeInTheDocument();
+    // The month close raised it: its history names no one.
+    expect(screen.getByText(/^Raised by the month close · .* · Dealer commission September 2026$/)).toBeInTheDocument();
+    expect(screen.queryByText(/Name not available/)).not.toBeInTheDocument();
   });
 
   it("a failed read of the bank details says so, never 'no account'", async () => {

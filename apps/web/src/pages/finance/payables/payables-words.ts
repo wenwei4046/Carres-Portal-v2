@@ -54,6 +54,8 @@ export const EVENT_WORD: Record<string, string> = {
   // Supplier credit notes (migration 0642).
   credit_applied: "Credit note knocked off",
   credit_taken_off: "Credit note taken off",
+  // A dealer's commission draft, raised by the month close (migration 0666).
+  month_close: "Raised by the month close",
 };
 
 /** One knock-off of an advance against a bill (migration 0485). */

@@ -591,7 +591,8 @@ export interface PaymentVoucherRegisterRow {
   amount: ApMoney;
   pay_method: string;
   pay_reference: string | null;
-  pay_from_account_code: string;
+  /** 0666: empty on a draft the system raised (a dealer's commission) until Finance picks it. */
+  pay_from_account_code: string | null;
   pay_from_name: string | null;
   bill_nos: string | null;
   line_count: number;
@@ -671,7 +672,8 @@ export interface PaymentVoucherDocument {
     ap_account_name: string | null;
     pay_method: string;
     pay_reference: string | null;
-    pay_from_account_code: string;
+    /** 0666: empty on a draft the system raised until Finance picks it. */
+    pay_from_account_code: string | null;
     pay_from_name: string | null;
     narration: string | null;
     created_at: string;

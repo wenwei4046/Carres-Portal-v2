@@ -1,6 +1,6 @@
 /**
  * Dealer commission, renovation rebate and KPI allowance — the one arithmetic
- * (0544, 0661, 0662, 0664, 0665).
+ * (0544, 0661, 0662, 0664, 0665, 0666).
  *
  * Read-only: nothing here is owed or posted (CLAUDE.md §7). The report reads
  * `dealer_commission_source(month)` and passes it through `dealerCommissionReport`
@@ -31,10 +31,12 @@
  *      takes it back (0662), which counts in the month Finance does it.
  *   7. A month's commission is what the order has earned by the month's end
  *      less what it had earned by the end of the month before.
- * Amendments: an amended order is worked out again with its original rates.
- * Until months are closed (dealer commission step 4), an earlier month is
- * worked out again from today's order; closing makes the difference land in
- * the month of the change.
+ * Closed months (0666, rules 2.7 and 6.4): on the 1st the month before closes
+ * by itself and keeps what each dealer was charged, with each order's
+ * commission earned by its end. A closed month never changes again: an
+ * amendment (worked out again with its original rates), a refund recorded late
+ * or a take-back lands in the first month still open, as the difference from
+ * what was kept. A month not closed yet is worked out from today's records.
  *
  * Renovation rebate, per dealer (rules 7.2–7.4, 0665): rate × the money that
  * counts since the rebate started, never past its total; each month's rebate is
@@ -77,6 +79,18 @@ export interface DcOrder {
   /** The day Finance took a cancelled order's commission back (0662). */
   takeBackOn?: string | null;
 }
+/**
+ * 0666 — a closed month: what each dealer was charged for it, kept as it stood,
+ * and (only for the months a read needs) each order's commission earned by the
+ * month's end when it closed; an order not listed had earned nothing.
+ */
+export interface DcClose {
+  month: string;
+  closedOn: string;
+  dealers: { dealerId: string; commission: number; rebate: number; kpi: number; kpiUnits: number }[];
+  orders?: { orderId: string; earnedThrough: number }[] | null;
+}
+
 export interface DcSource {
   /** Today's standard rate and product rates (0661: read from the dated
    *  rules). The report reads each line's own rate instead. */
@@ -86,6 +100,8 @@ export interface DcSource {
   quotas: { dealerId: string; quota: number | null; rebateRate: number; startsOn: string }[];
   /** 0665 — the KPI allowance rules, each from its day. */
   kpi?: DcKpiRule[];
+  /** 0666 — the months closed so far. */
+  closes?: DcClose[];
   models: { id: string; name: string }[];
   dealers: { id: string; name: string }[];
   outlets: { id: string; name: string; dealerId: string }[];
@@ -110,6 +126,28 @@ function kept(o: DcOrder, upTo: (day: string) => boolean) {
   return Math.max(0, sum(o.payments) - sum(o.refunds));
 }
 const keptThrough = (o: DcOrder, day: string) => kept(o, (d) => d <= day);
+
+function closeOf(closes: DcClose[] | undefined, month: string): DcClose | undefined {
+  return closes?.find((c) => c.month === month);
+}
+
+const snapshots = new WeakMap<DcClose, Map<string, number>>();
+/** What an order had earned by a closed month's end when it closed; undefined
+ *  when the read did not bring that month's orders. */
+function closedEarned(c: DcClose | undefined, orderId: string): number | undefined {
+  if (!c || !c.orders) return undefined;
+  let m = snapshots.get(c);
+  if (!m) {
+    m = new Map(c.orders.map((x) => [x.orderId, Number(x.earnedThrough)]));
+    snapshots.set(c, m);
+  }
+  return m.get(orderId) ?? 0;
+}
+
+/** The month right after the last closed one: it takes every change since. */
+function opensAfterClose(closes: DcClose[] | undefined, month: string): DcClose | undefined {
+  return closeOf(closes, monthBefore(month));
+}
 
 /** An order's fixed figures: its total, what earns nothing, the earning base
  *  and its commission when paid in full. */
@@ -181,21 +219,32 @@ export interface DcOrderMonth {
   group: DcOrderGroup | null;
 }
 
-/** One order in `month` (YYYY-MM). */
-export function orderMonth(o: DcOrder, month: string): DcOrderMonth {
+/** One order in `month` (YYYY-MM). With the months closed so far (0666), a
+ *  closed month keeps what the order was charged in it, and the first month
+ *  still open takes the difference from what the last close kept. */
+export function orderMonth(o: DcOrder, month: string, closes?: DcClose[]): DcOrderMonth {
   const terms = orderTerms(o);
   const end = endOf(month);
   const prevEnd = endOf(monthBefore(month));
   const reached = halfReachedOn(o, terms);
   const half = reached !== null && reached <= end ? reached : null;
-  const earnedToMonthEnd = earnedThrough(o, terms, reached, end);
-  const earned = earnedToMonthEnd - earnedThrough(o, terms, reached, prevEnd);
+  const live = earnedThrough(o, terms, reached, end);
+  let earnedToMonthEnd = live;
+  let earned = live - earnedThrough(o, terms, reached, prevEnd);
+  const closedNow = closedEarned(closeOf(closes, month), o.orderId);
+  if (closedNow !== undefined) {
+    earnedToMonthEnd = closedNow;
+    earned = closedNow - (closedEarned(closeOf(closes, monthBefore(month)), o.orderId) ?? 0);
+  } else if (!closeOf(closes, month)) {
+    const base = closedEarned(opensAfterClose(closes, month), o.orderId);
+    if (base !== undefined) earned = live - base;
+  }
   const cancelled = !!o.cancelledOn && o.cancelledOn <= end;
   const takenBack = !!o.takeBackOn && o.takeBackOn <= end;
   // 0664: the statement reads every order to today, so an earlier month can
   // see an order placed after it. It is not in that month at all.
   const placedLater = !!o.orderedOn && o.orderedOn > end;
-  const stillToEarn = cancelled || takenBack || placedLater ? 0 : Math.max(0, terms.full - earnedToMonthEnd);
+  const stillToEarn = cancelled || takenBack || placedLater ? 0 : Math.max(0, terms.full - live);
   const keptToMonthEnd = keptThrough(o, end);
   const keptThisMonth = keptToMonthEnd - keptThrough(o, prevEnd);
   const isNew = !!o.orderedOn && o.orderedOn.slice(0, 7) === month;
@@ -277,12 +326,15 @@ function kpiRuleOn(rules: DcKpiRule[], day: string): DcKpiRule | null {
   return best;
 }
 
-/** The guarantees sold on orders placed from `from` to `to` (rule 8.1);
- *  a cancelled order's do not count (8.4). */
-function guaranteesSold(orders: DcOrder[], modelId: string, from: string, to: string): number {
+/** The guarantees sold on orders placed from `from` to `to` (rule 8.1). A
+ *  cancelled order's do not count (8.4); once their month has closed
+ *  (`closedOn`, 0666), a later cancellation takes them back only when Finance
+ *  takes the order's commission back. */
+function guaranteesSold(orders: DcOrder[], modelId: string, from: string, to: string, closedOn?: string): number {
   let n = 0;
   for (const o of orders) {
-    if (!o.orderedOn || o.orderedOn < from || o.orderedOn > to || o.cancelledOn) continue;
+    if (!o.orderedOn || o.orderedOn < from || o.orderedOn > to) continue;
+    if (o.takeBackOn || (o.cancelledOn && (closedOn === undefined || o.cancelledOn <= closedOn))) continue;
     for (const l of o.lines) if (l.modelId === modelId) n += Math.max(0, Number(l.qty ?? 1));
   }
   return n;
@@ -296,16 +348,16 @@ function guaranteesSold(orders: DcOrder[], modelId: string, from: string, to: st
  * month it is reached. Orders before the first rule's day do not count. Null
  * when no rule is in force.
  */
-export function kpiForMonth(rules: DcKpiRule[] | undefined, orders: DcOrder[], month: string): { amount: number; units: number } | null {
+export function kpiForMonth(rules: DcKpiRule[] | undefined, orders: DcOrder[], month: string, closedOn?: string): { amount: number; units: number } | null {
   const all = rules ?? [];
   const rule = kpiRuleOn(all, endOf(month));
   if (!rule) return null;
   const first = all.reduce((min, r) => (r.startsOn < min ? r.startsOn : min), rule.startsOn);
   const periodStart = rule.period === "year" ? `${month.slice(0, 4)}-01-01` : `${month}-01`;
   const from = periodStart > first ? periodStart : first;
-  const now = guaranteesSold(orders, rule.modelId, from, endOf(month));
+  const now = guaranteesSold(orders, rule.modelId, from, endOf(month), closedOn);
   const before = rule.period === "year" && !month.endsWith("-01")
-    ? guaranteesSold(orders, rule.modelId, from, endOf(monthBefore(month)))
+    ? guaranteesSold(orders, rule.modelId, from, endOf(monthBefore(month)), closedOn)
     : 0;
   return { amount: cents(kpiAmount(rule, now) - kpiAmount(rule, before)), units: now - before };
 }
@@ -332,12 +384,17 @@ export function dealerCommissionOrders(src: DcSource, month: string, filter: DcF
     .filter((o) => names.has(o.dealerId)
       && (!filter.dealerId || o.dealerId === filter.dealerId)
       && (!filter.outletId || o.outletId === filter.outletId))
-    .map((o) => ({ ...orderMonth(o, month), dealer: names.get(o.dealerId)! }))
+    .map((o) => ({ ...orderMonth(o, month, src.closes), dealer: names.get(o.dealerId)! }))
     .filter((r) => r.group !== null);
 }
 
-/** One row per dealer for `month` (YYYY-MM). `outletId` narrows commission; the rebate stays the dealer's. */
+/** One row per dealer for `month` (YYYY-MM). `outletId` narrows commission; the
+ *  rebate and the KPI allowance stay the dealer's. A closed month (0666) shows
+ *  what was charged; the first month still open takes every change since. */
 export function dealerCommissionReport(src: DcSource, month: string, filter: DcFilter = {}): DcReportRow[] {
+  const closes = src.closes ?? [];
+  const closed = closeOf(closes, month);
+  const charged = (dealerId: string, c: DcClose | undefined) => c?.dealers.find((d) => d.dealerId === dealerId);
   const rows = new Map<string, DcReportRow>();
   for (const d of src.dealers) {
     if (filter.dealerId && d.id !== filter.dealerId) continue;
@@ -347,34 +404,87 @@ export function dealerCommissionReport(src: DcSource, month: string, filter: DcF
     const row = rows.get(o.dealerId);
     if (!row) continue;
     if (filter.outletId && o.outletId !== filter.outletId) continue;
-    const m = orderMonth(o, month);
+    const m = orderMonth(o, month, closes);
     row.earned += m.earned;
     row.stillToCollect += m.stillToEarn;
   }
+  // A closed month's commission is what was charged, for the dealer's whole.
+  if (closed && !filter.outletId) for (const row of rows.values()) row.earned = charged(row.dealerId, closed)?.commission ?? 0;
   for (const q of src.quotas) {
     const row = rows.get(q.dealerId);
     if (!row) continue;
     const orders = src.orders.filter((o) => o.dealerId === q.dealerId);
     const quota = q.quota === null || q.quota === undefined ? null : Number(q.quota);
-    // The money that counts, month by month from the rebate's first month.
-    const months: [string, number][] = [];
-    let before = 0;
-    for (let m = q.startsOn.slice(0, 7); m <= month; m = monthAfter(m)) {
-      const now = rebateMoneyThrough(orders, q.startsOn, endOf(m));
-      months.push([m, now - before]);
-      before = now;
+    // What the closed months gave, through this month (closed) or before it.
+    const given = closes.filter((c) => (closed ? c.month <= month : c.month < month))
+      .reduce((sum, c) => sum + Number(charged(q.dealerId, c)?.rebate ?? 0), 0);
+    if (closed) {
+      row.rebate = Number(charged(q.dealerId, closed)?.rebate ?? 0);
+      row.quotaLeft = quota === null ? null : cents(Math.max(0, quota - given));
+      continue;
     }
-    const steps = rebateByMonth(quota, Number(q.rebateRate), months);
-    const last = steps[steps.length - 1];
-    row.rebate = last?.month === month ? last.rebate : 0;
-    row.quotaLeft = last ? last.quotaLeft : quota;
+    // The rebate due by a month's end: rate × the money that counts, never
+    // below 0, never past the total, and a total cut below what was already
+    // given takes nothing back (7.3a).
+    const cap = quota === null ? null : Math.max(quota, given);
+    const dueBy = (m: string) => {
+      if (endOf(m) < q.startsOn) return 0;
+      const worked = (rebateMoneyThrough(orders, q.startsOn, endOf(m)) * Number(q.rebateRate)) / 100;
+      return cents(Math.max(0, cap === null ? worked : Math.min(worked, cap)));
+    };
+    const now = dueBy(month);
+    row.rebate = cents(now - (opensAfterClose(closes, month) ? given : dueBy(monthBefore(month))));
+    row.quotaLeft = quota === null ? null : cents(Math.max(0, quota - now));
   }
   for (const row of rows.values()) {
-    const k = kpiForMonth(src.kpi, src.orders.filter((o) => o.dealerId === row.dealerId), month);
+    if (closed) {
+      // What was charged; a month with no KPI rule and nothing charged reads
+      // as an open one does (Not set up).
+      const c = charged(row.dealerId, closed);
+      const amount = Number(c?.kpi ?? 0);
+      row.kpi = kpiRuleOn(src.kpi ?? [], endOf(month)) || amount !== 0 ? amount : null;
+      row.kpiUnits = Number(c?.kpiUnits ?? 0);
+      continue;
+    }
+    const orders = src.orders.filter((o) => o.dealerId === row.dealerId);
+    const k = kpiForMonth(src.kpi, orders, month);
     row.kpi = k ? k.amount : null;
     row.kpiUnits = k ? k.units : 0;
+    // The first month still open takes every change in the closed months'
+    // allowance: an order taken back, or one amended (8.4).
+    if (k && opensAfterClose(closes, month)) {
+      let drift = 0;
+      for (const c of closes) {
+        if (c.month >= month) continue;
+        const now = kpiForMonth(src.kpi, orders, c.month, c.closedOn);
+        drift += (now?.amount ?? 0) - Number(charged(row.dealerId, c)?.kpi ?? 0);
+      }
+      row.kpi = cents(k.amount + drift);
+    }
   }
   return [...rows.values()].map((r) => ({ ...r, earned: cents(r.earned), stillToCollect: cents(r.stillToCollect) }));
+}
+
+/**
+ * 0666 — what closing `month` keeps: each dealer's charges for it (it is the
+ * first month still open, so it takes every change since the last close) and
+ * each order's commission earned by its end. An order that earned nothing is
+ * left out.
+ */
+export function closeFigures(src: DcSource, month: string): {
+  dealers: { dealerId: string; commission: number; rebate: number; kpi: number; kpiUnits: number }[];
+  orders: { orderId: string; dealerId: string; earnedThrough: number }[];
+} {
+  const end = endOf(month);
+  const orders = src.orders.flatMap((o) => {
+    const terms = orderTerms(o);
+    const earned = cents(earnedThrough(o, terms, halfReachedOn(o, terms), end));
+    return earned === 0 ? [] : [{ orderId: o.orderId, dealerId: o.dealerId, earnedThrough: earned }];
+  });
+  const dealers = dealerCommissionReport(src, month).map((r) => ({
+    dealerId: r.dealerId, commission: r.earned, rebate: r.rebate ?? 0, kpi: r.kpi ?? 0, kpiUnits: r.kpiUnits,
+  }));
+  return { dealers, orders };
 }
 
 /**
@@ -391,6 +501,8 @@ export interface DcStatementSource {
   quotas: DcSource["quotas"];
   /** 0665 — the KPI allowance rules. */
   kpi?: DcKpiRule[];
+  /** 0666 — the months closed so far. */
+  closes?: DcClose[];
   /** Paid vouchers counted as payments to this dealer. */
   payments: { id: string; voucherId: string; voucherNo: string; paidOn: string; amount: number }[];
 }
@@ -439,7 +551,7 @@ const KIND_ORDER: Record<DcStatementLineKind, number> = { commission: 0, rebate:
 export function statementAsSource(src: DcStatementSource): DcSource {
   return {
     settings: { defaultRate: 0 }, rates: [], models: [], outlets: [],
-    quotas: src.quotas, kpi: src.kpi, dealers: [src.dealer], orders: src.orders,
+    quotas: src.quotas, kpi: src.kpi, closes: src.closes, dealers: [src.dealer], orders: src.orders,
   };
 }
 

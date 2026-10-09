@@ -143,6 +143,7 @@ import stripeCheckoutRouter from "./routes/stripe-checkout";
 import stripeWebhookRouter from "./routes/stripe-webhook";
 import rentalRouter from "./routes/rental";
 import { runContactByCron, runFollowUpMaintenanceCron } from "./cron/contact-by";
+import { runDealerCommissionCloseCron } from "./cron/dealer-commission-close";
 import { runWorkActivityCron } from "./cron/work-activity";
 import type { AppEnv, Bindings } from "./types";
 
@@ -360,6 +361,9 @@ export default {
           await runWorkActivityCron(env);
           return;
         }
+        // 0666: the dealer commission month before closes by itself (on the 1st);
+        // its failure is logged and never stops the jobs after it.
+        await runDealerCommissionCloseCron(env).catch((e) => console.error("dealer commission close failed:", e));
         await runContactByCron(env);
         await runFollowUpMaintenanceCron(env);
         // Purchasing MASTER §9.5: an overdue date is PO/Work follow-up,
