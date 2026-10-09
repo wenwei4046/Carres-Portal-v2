@@ -20,8 +20,25 @@
 | Reference research (FACT, binds nobody) | [`../research/houzs-ui-reference.md`](../research/houzs-ui-reference.md) · [`../research/grid-findings.md`](../research/grid-findings.md) |
 | Shared page flow, shared contracts, exceptions and the status of every shared capability | **this MASTER** |
 
+**Current shared UI target — Jess, 9 Oct 2026:** `Sales Order.zip` (SHA-256
+`bafd9111a239c2c8f0ca7b54bf5622321b04a4739b64a267c07610ea4b2e388f`) replaces
+superseded visual values through the existing 01 / 02 / 03 and this MASTER. Source specimens live
+at `docs/ui-reference/sales-order-design/`; tokens mirror at `docs/ui/carres-tokens.css`.
+Read `UI Kit.md` + `Carres UI Kit.dc.html` for source component fidelity, then source screenshots,
+CSS and the v8 HTML; the canonical resolved values are in 01, not another kit document.
+The embedded README/Ops Rules are supplied material, not independent approval of business law.
+The shared visual target covers shell/menu, tables, controls, object facts, Tasks, Route, Timeline
+and density. Modules supply their own identities, columns, authorised actions and source facts.
+
+**Current work split — owner 9 Oct 2026:** Claude Code owns application implementation, tests and
+deployment. This UI owner updates governance documents only. Neither this document update nor a
+component specimen proves application adoption, deployment or production acceptance. Later pages,
+including SO Batch Purchasing, are supplied and reviewed one at a time against this same kit.
+The latest approved page delta replaces only superseded rules; unresolved proposals keep their label.
+No second MASTER, page-local kit or versioned standard is created.
+
 **Law order:** Business Rules → Information Architecture → Design System → Implementation; on a
-conflict Business wins. Token VALUES and component internals are LOCKED. Composition inside the
+conflict Business wins. Current target token values are defined in 01; existing component internals require migration to that target. Composition inside the
 admitted templates is the chat's job. A missing component or template capability is a **KIT GAP**:
 it joins the kit once, with its `/ui` example, and every page gets it — never a page-local copy.
 A rule that exists only as documentation is temporary: it should become a type, a lint rule or a
@@ -37,12 +54,14 @@ not built; built is not verified; one page verified is not every page adopted.
 
 # §0 · Current kit index — read this first
 
+**Implementation inventory:** Built/deployed entries below describe the existing components before visual migration. Their existence is not proof that the current target has been adopted. Appearance always comes from current 01.
+
 **One row per thing on screen; one current source per row.** If something is not in this table it is
 not a current pattern: do not copy it from a neighbouring page. Live examples are on `/ui`.
 
 | Area | Use this | Source | Status |
 |---|---|---|---|
-| Tokens: type · colour · radius · icons · layers | Tailwind token classes; `Icon`; `overlay-layer` | `01-design-tokens.md`, `tailwind.config.ts`, `components/kit/Icon.tsx` | LOCKED · built |
+| Tokens: type · colour · radius · icons · layers | Tailwind token classes; `Icon`; `overlay-layer` | `01-design-tokens.md`, `tailwind.config.ts`, `components/kit/Icon.tsx` | Existing component built; current visual migration owed |
 | Page frame | `ListPageShell` today; kit `PageShell` is the target | `components/ListPageShell.tsx` · `components/kit/PageShell.tsx` | Moving a page onto `PageShell` re-lays it out: owner preview first |
 | Destination header + global utilities | `ModuleHeader` + `GlobalTopBar` | `pages/operation/components/` | §4 · built |
 | Portal navigation | `PortalSidebar` + `portal-nav` | `pages/portal/` | §4.2 · built |
@@ -52,22 +71,21 @@ not a current pattern: do not copy it from a neighbouring page. Live examples ar
 | Simple and document tables | `DataTable` · `DocumentTable` · `TotalsSummary` · `TableScroller` | `components/kit/*` · `components/TableScroller.tsx` | §3 · built |
 | **Compact module card** (the right Working Panel: identity header, Info and module tabs, module summary, editors, Items, Communication, Timeline) | **`CompactModuleCard`** in kit `Drawer variant="compact-card"` — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | §4.3 · shared component built · Sales Orders adoption PRODUCTION VERIFIED 2026-10-05 (PR #1893/#1896/#1897, `2ce91e2d`) · embedded presentation DEPLOYED (PR #1926, `dc631e1a`, production SHA verified 2026-10-05; owner review owed) · other modules per §4.3.4 table |
 | Object header + tabs | `SalesOrderTabs` recipe | `pages/operation/SalesOrderTabs.tsx` | §4.1 · accepted; page-owned — no generic ObjectHeader/ObjectPage kit API (KIT GAP) |
-| Object facts | `Block` — the one card · `Panel` · `StatusPill` · `EmptyState` · `Loading` | `components/kit/*` | LOCKED · built |
-| Forms | `Input` · `Textarea` · `Select` · `SearchInput` · `Checkbox` · `DatePicker` · `FieldFrame` | `components/kit/*`, `field-recipe.ts` | LOCKED · built |
-| Buttons and menus | `Button` · `DropdownMenu` · `Popover` · `Tooltip` · `Tabs` (segmented Table/Cards) | `components/kit/*` | LOCKED · built |
+| Object facts | `Block` — the one card · `Panel` · `StatusPill` · `EmptyState` · `Loading` | `components/kit/*` | Existing component built; current visual migration owed |
+| Forms | `Input` · `Textarea` · `Select` · `SearchInput` · `Checkbox` · `DatePicker` · `FieldFrame` | `components/kit/*`, `field-recipe.ts` | Existing component built; current visual migration owed |
+| Buttons and menus | `Button` · `DropdownMenu` · `Popover` · `Tooltip` · `Tabs` (segmented Table/Cards) | `components/kit/*` | Existing component built; current visual migration owed |
 | Dialogs, documents and evidence | `Modal` · `Drawer` · `Toast` · `PdfPreview` + `PdfPreviewHeader` · `SavedEvidenceViewer` | `components/kit/*` | §4.4 · built |
 | Work route pieces | `RouteStop` · `ChecklistRow` · `QuietRouteRow` | `components/kit/*` | §3 · built 2026-09-28 |
 | Orders list / drawer band | `SectionPanel` (cream band) — that surface only, not a general card | `components/SectionPanel.tsx` | Not a `Block` duplicate |
 | Work right-panel Communication | `WorkCommunication` — recorded channels only | `pages/operation/work/WorkCommunication.tsx` | Built; differs from the card's editable `To` (§7.2) |
 | Record history | §5.2 three-rank grammar | this MASTER | LOCKED · no shared component; each page draws it |
-| Right Quick Rail | `OperationRightRail` | `pages/operation/components/OperationRightRail.tsx` | §5 · `Calendar` · `Tasks` · `Activity`, icon only — owner ruling 2026-10-05, NOT BUILT (production shows Calendar · My Work · Activity with labels) |
+| Tasks and quick reference | Existing Work/Tasks host; `OperationRightRail` for existing quick capabilities | `pages/operation/work/` · `pages/operation/components/OperationRightRail.tsx` | §5 · supplied target has a collapsible Tasks region; Calendar/Activity capability retained, unresolved placement stays explicit; runtime adoption not verified |
 
 **Retired — do not import; a test blocks new use** (`components/retired-components.test.ts`): `Btn`
 (→ `Button`), `Field` (→ kit inputs / `field-recipe`), `PageHeader` (→ `PageShell`). Their remaining
 pages move only after the owner approves a before/after preview, because each swap changes what the
 operator sees. The `carres-design` skill, the old `ui-reference/` mocks and the Delivery-only card
-reference are deleted; `docs/ui-reference/` holds only the compact-card contract, its reference page
-and its parity measurements.
+reference are deleted; `docs/ui-reference/` holds behaviour evidence for the compact card and the current imported Sales Order specimen. Neither is a second standard.
 
 ## §0.1 · Page anatomy — the table of contents
 
@@ -124,6 +142,8 @@ reference at the operator's viewport and a narrow layout. Verify the mission sou
 table loading/filtering, the listing interactions, record-to-panel opening, Info and the module tab (the page's main work tab selected on open),
 authorised edit/preview/result, source scope and retained return state. Record verified and missing
 coverage per module (§4.3, §6.1). Tests or shared-component imports alone do not prove adoption.
+
+**Current SO composition exception — owner 9 Oct 2026:** the supplied Outright list opens the full SO on row click, with Sales Order / Order Route / Timeline. Its Summary and Tasks are independently collapsible. This replaces the previous SO default compact-card opening and visual rail example; other modules’ source-owned work and document doors are not silently changed. CompactModuleCard remains the reusable work/embedded adapter where that purpose applies.
 
 ## §0.3 · Every new chat — before acting
 
@@ -217,8 +237,8 @@ is fixed first, not shown. State the six results in one line with the screenshot
 
 ```
 1  WORDS      every visible word is in COPY-STANDARD, with its row named; none invented
-2  ONE BLUE   one washed/filled blue = the chosen record/row; rail choices bold + left line;
-              tabs grey; no blue words; links grey underlined
+2  ONE KIT    selection, buttons, status and typography match current 01 tokens;
+              condition words remain readable without colour
 3  WIDTH      a card wider than 480px with more than three facts lays them in columns
 4  ICONS      a record door is the kit's `open` icon with its accessible name, not the word
               `Open …` beside a title
@@ -274,35 +294,9 @@ object/recipient/result + actual working date** (§2.1, §5.1). When the owner a
 decision, overwrite this MASTER or the owning module MASTER immediately (PLAN may update governing
 documents; it may not implement application code).
 
-## §1.3 · Reference products — owner direction 2026-10-01 · APPROVED DIRECTION
+## §1.3 · Reference direction — current owner instruction 9 Oct 2026
 
-- **References never author Carres visual tokens** (APPROVED / LOCKED). Linear, 2990, GitHub,
-  Shopify, AutoCount, Houzs and others may supply a proven structure, behaviour or trade-off; colour,
-  typography, radius, elevation, icons and component styling come only from 01 and the kit. Copying
-  2990 cream/yellow, orange ink or another product's control shape is a defect; mockups too.
-- **Register reference division** (APPROVED / LOCKED): headers follow the compact, width-spending
-  Linear pattern; listing behaviour and readability follow the governed 2990 reference (engine,
-  controls, column powers, row disclosure, hierarchy); GitHub is evidence for tab admission only.
-  Copy the POWER of the team's tools (AutoCount sortable headers, per-column filters, footer totals),
-  never their assumptions.
-- **Houzs-first complete templates** (Jess 2026-10-01: "we just copy and update"). The owner selected
-  Houzs **list, detail, form and card** families as the visual starting point for one shared Carres
-  presentation, adapting their geometry and information hierarchy to Inter and the existing Carres
-  semantic palette. This is not approval of literal Houzs values or palette (the warm-grey hex proposal
-  is withdrawn), of unreviewed layouts, of a new business engine or of source-code copying: Houzs code
-  is a REUSE CANDIDATE only, never COPY REQUIRED, until rights, dependencies, security and data fit are
-  verified. Existing explicit presentation locks stay until a reviewed replacement is persisted.
-  All Houzs measurements and inventories are FACT in
-  [`../research/houzs-ui-reference.md`](../research/houzs-ui-reference.md).
-- **The five template roles** — one kit, five compositions; module content differs, behaviour does not:
-
-| Role | Reading / action sequence | Carres sources | Forbidden shortcut |
-|---|---|---|---|
-| Register | shell → mission rail → search/tools + listing → Working Panel (Info + module tab) → approved work/edit/preview → retained list context | DataGrid, workspace-rail, CompactModuleCard; Sales Orders is the reference | page-local grid or panel clone; a different layout without a proven constraint and owner approval |
-| Object detail | identity/version → object views → grouped facts → action doors → documents and history | Block, DocumentTable, TotalsSummary; SalesOrderWorkspace, PurchaseOrdersPage, WarehouseUnitDetail | forcing the order-specific DetailShell on other objects; disabled-looking inputs for read-only facts |
-| Task / operation | exact source and goods scope → current task and owner → checks/input → missing requirements → one submission → recorded result, remaining work, handoff | ReceivingWorkspace, WarehouseIncoming, WarehouseOutboundWork; Block | an extra approval or duplicate form to mimic a reference; warehouse submission ≠ posted GRN; loaded ≠ driver-confirmed |
-| Form | grouped inputs → conditional requirements → field feedback + one blocker explanation → submit → success/error/conflict | Block, FieldFrame, Input, Select, DatePicker, EvidenceUploadField, Modal | local colour/control/storage wrappers; losing valid input on failure |
-| Work / overview card | identity/scope → factual reason → resolved owner → exact action; counts separate from tasks | Block + My Work/Team Work presentation | a competing truth, a second staff list or an unverified clickable KPI |
+The supplied Sales Order design is the current visual reference. Adapt it through the shared kit, not by copying page-local CSS or its simulated backend. Its full-page SO, Route and Timeline establish the visual family; module content and doors still come from their MASTERs. Houzs and other products may supply capabilities and organisation, but do not become another token authority. Five compositions share one kit: Register, Object, Task, Form and Overview/Settings.
 
 ---
 
@@ -315,8 +309,7 @@ documents; it may not implement application code).
 | the live look | **`/ui`** — public, lazy, its own chunk, so a kit reference never rides the operator's bundle |
 | the enforcement | `pnpm --filter @carres/web lint` + the kit source scans + `scripts/check-design-standard.mjs` |
 
-**Frozen and not reopened:** the spacing scale is 8 steps (`2 4 6 8 12 16 24 32`) · `font-bold` (700)
-is folded into 600 · Lucide's stroke stays 2.
+**Current values:** typography, spacing and icon target are in 01. Existing icon meaning IDs and shared component APIs are preserved during migration.
 
 ## §2.1 · New-staff operating language — owner ruling 2026-08-20 · APPROVED / LOCKED
 
@@ -378,7 +371,7 @@ focus to the element that opened it (§3); a grid is one Tab stop (§6.2); icon-
 tooltip and an accessible name; colour is never the only signal.
 
 **Narrow screens:** the page never scrolls sideways; a table scrolls inside itself; touch targets are
-40px; check 1440 / 1180 / 820 / 390 and 200% zoom; nothing (footer, floating control, toast) covers a
+at least 44px; check 1440 / 1180 / 820 / 390 and 200% zoom; nothing (footer, floating control, toast) covers a
 fact or an action; the bottom of long content stays reachable.
 
 **Field-operation UI — owner ruling 2026-09-29 (Opit-Warehouse) · APPROVED DIRECTION, validation
@@ -404,8 +397,8 @@ business result decides completion.
 - Preserve the module's governed columns, quantities, statuses, permissions and write ownership.
 - Show a complete working page, not a cropped header: desktop and 390px, plus the 896px
   available-canvas rail boundary with global navigation expanded and collapsed.
-- Check rail open/closed, backdrop/Escape, search, selection, column filters and Table/Cards;
-  switching presentation keeps the same result and filters.
+- Check contextual regions open/closed, backdrop/Escape, search, selection and column filters;
+  supported presentation switches keep the same result and filters. The supplied SO target omits Table/Cards; do not add it from an older example.
 - Check the Working Panel and full-object door, long identities, all §2.2 states, keyboard focus,
   icon accessible names and 40px touch controls.
 - Check long content is reachable, headers stay fixed and horizontal overflow stays in its pane.
@@ -415,138 +408,15 @@ business result decides completion.
 
 ---
 
-# §3 · The kit — frozen component rules
+# §3 · Shared kit
 
-**Live:** every kit component renders on `/ui`. Current kit (`components/kit/`, re-measured
-2026-10-05): `Badge · Block · Button · Card · Checkbox · ChecklistRow · CompactModuleCard · DataTable ·
-DatePicker · DetailShell · DialogFrame · DocumentTable · Drawer · DropdownMenu · EmptyState · FieldFrame ·
-GridToolbar · Icon · Input · Loading · Modal · MonthCalendar · PageShell · Panel · PdfPreview · Popover ·
-QuietRouteRow · RouteStop · SavedEvidenceViewer · ScheduleCard · SearchInput · SectionHeader · Select ·
-StatusPill · Tabs · Textarea · Toast · Tooltip · TotalsSummary`, plus `register/DataGrid`.
+Appearance and dimensions are defined once in 01; component use and states in 02; page compositions in 03. Reuse existing kit components and the DataGrid engine. Preserve component APIs, source-owned facts, accessible names and permissions. No page-local status, button, drawer, field or grid replacement.
 
-- **Radix for behaviour, the kit for appearance. NOT shadcn/ui.**
-- **No component takes `className` or `style`** (enforced by `@ts-expect-error` tests).
-- **`Icon`'s name is the ruled icon meaning list** and it has no `strokeWidth` prop.
-- **`StatusPill`'s tone is the action tone type** — tone from a CONDITION, never a verb. `Badge` has
-  no tone. `Button` has no `danger`. `Button` forwards its ref (every `asChild` trigger anchors on it).
-- **Widths and radii with no home in a standard live as named config keys**, never as numbers.
-- **Card titles are black bold `text-strong` (15/600, slate-12), never blue, never a band** (ONE KIT LAW,
-  owner ruling 2026-09-27). Blue is the primary button, links, selection and partial-progress pills.
-- **Colour use — the governed Carres semantic palette (01 §2).** Canvas and surface separate the page
-  from white cards; primary text slate-12, supporting slate-11; an important fact never wears
-  disabled/placeholder colour; hover and persistent selection are distinguishable; success, warning
-  and error use their semantic pairs with explanatory text; a status follows its actual business
-  meaning (a confirmed document is not a completed physical job); state is readable without colour.
-- **Solid status pills — owner confirmed 2026-10-02, PRODUCTION VERIFIED (PR #1842, `68d133c4`).**
-  White text on a solid semantic fill, no circular mark or decorative icon; `StatusPill` owns it,
-  neutral `Badge` counts are unaffected. Complete = green (`Fully delivered` · `Paid in full`);
-  partial progress = blue (`Partially …`); waiting/not started = neutral grey (`Not delivered` ·
-  `Unpaid`); issue = amber; unknown = neutral grey (`Amount unconfirmed`). The Sales Order Stock
-  Status words (`To purchase` · `Awaiting goods` · `Partially ready` · `Ready`) and their tones are
-  Orders MASTER "Stock Status" (owner ruling 2026-10-05, APPROVED / NOT BUILT; production still
-  prints the retired receipt words). Red needs a proven late/blocking
-  condition; unpaid alone is not one. Accessible, filter, sort, search and export strings keep the full
-  text.
-- **Action grammar (owner amendment 2026-10-01, correction 2026-10-02).** Full-object Print, Export
-  and Edit: icon 16 + visible word. Back, Close and More: shared icon-only controls with tooltip and
-  accessible name. Global utilities are icon-only (§4). Content tabs are text only. Status pills keep
-  their text; icons are not added indiscriminately. The compact card opens its saved document from
-  the document number (§4.4).
-- **The centred surface has three widths** — default (question/short form), `wide` (line list),
-  `viewer` (picture); values in 01 §8.2. `width` is a union of literals; a fourth width is a decision
-  for this table, never a caller's.
-- **Returning focus is `DialogFrame`'s job** (defect found and fixed 2026-09-11): it remembers the
-  element focused when it opened and restores it on close, skipping an opener the close removed.
-  `Modal` accepts `returnFocusRef` for a persistent trigger when the opening menu item unmounts.
-- **The portal has exactly four tables**, each a kit component with a `/ui` example; a page imports
-  one and never draws its own `<table>` (`check-design-standard.mjs` refuses page-local table styling):
+Soft status pairs replace the previous solid-white status styling; Hold is dark. A condition determines tone, never the verb. Counts are not record status. Main action is charcoal, selection is orange. Business status words still come from COPY and the owning module. See 01 for every value and migration gap.
 
-| # | Where | Component | Recipe |
-|---|---|---|---|
-| 1 | a Register / listing | `DataGrid` | §6.0 rule 5 · header 36px slate-3 11/600 · 8px insets · column separators by column count (01 §5.1) · hover slate-3, selection blue-3 · 32px footer |
-| 2 | a row's goods expansion | `GoodsMiniTable` | header 27px · 51px two-line rows · four-sided frame · §6.9 connector |
-| 3 | a document table inside a card (SO Items, Payment rows, PO lines) | `DocumentTable` | header 11/500 slate-11 over a 1px slate-5 line · 13px rows, 8px insets, a 1px slate-5 line beneath each · no vertical lines · amounts right, tabular · only the closing total 600 |
-| 4 | a totals block (`Goods` · `Services` · `Total payable` · `Paid to date` · `Balance due`) | `TotalsSummary` | two columns, label slate-11 left, amount slate-12 right tabular · 13px · 8px insets · 1px line between rows · no outer frame, no boxes per cell (owner 2026-09-27) · only `Total payable` and `Balance due` 600 · a missing value is a word (`No price yet`) · page and PDF draw it from the one arithmetic |
+# §4 · Shell and page composition
 
-- **The Work route pieces** (admitted by Jess 2026-09-28, Workspace MASTER §5.10, BUILT): `Block`
-  (white, 1px slate-5, card radius, 12/16 padding, black title over a 1px rule, optional `why` line
-  13/400 red/amber/slate-11), `RouteStop` (24px dot on a 1.5px line; red `!` missed, amber `!` due,
-  dark tick done), `ChecklistRow` (16px read-only mark; the act 13/600; `stacked` below 1340px),
-  `QuietRouteRow` (one ≥48px line; outline red/amber when it holds an act; `wrap` below 1100px). Opt-in
-  props that came with them: `Tabs fill` and `FilterRailRow tone="workspace"`.
-- **Every optional power is OPTIONAL and no signature moves.** A page must justify wiring a power; an
-  unwired power's ABSENCE is asserted by a test where it matters.
-
----
-
-# §4 · Shell — destination header, toolbar row, Settings, Jump to
-
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ Sales Orders                                              ⌘   🔔⁴⁸   ?   ⚙   │ 50 min
-└──────────────────────────────────────────────────────────────────────────────┘
-   the word alone                         global only: Jump to · Notifications · Help · Settings
-   ── 8px ──
- [active filter chips · Clear all]                          only while something is filtered
- {count / summary}                     [🔍 Search orders…] [▦ Table | ▤ Cards] [⋯]   40 toolbar
- table header 36 · rows · 32px status footer
-```
-
-- **Row 1 · Destination header — APPROVED / LOCKED (Loo 2026-08-11; Jess 2026-08-15).** One shared
-  `ModuleHeader`, rendered by the shell (pages never draw a header). Left: one short identity, **the
-  word alone**, `text-page` 24/32/600, no icon, no `{module} ·` prefix. Right: genuine global
-  utilities only. **Owner correction 2026-10-02:** Jump to, Help and Settings are icon-only at every
-  width (Jump to uses kit `jump` / Command 16, distinct from the register's magnifier); tooltips,
-  accessible names and the ⌘K shortcut stay; the bell keeps its count. **No page-owned control ever
-  enters this row**: no create, Scan, Export, Columns, Search, View, filter, selection state, breadcrumb,
-  duplicate title, KPI or tab. The 50px is a **floor**: a long identity wraps (`min-w-0 break-words`)
-  rather than truncating or forcing a sideways page scroll (BUILT 2026-09-18); a page's identity is
-  one fact (a Unit page's word is `{unitCode}` alone, BUILT 2026-09-19).
-- **Row 2 · Work toolbar.** Owned by the listing (§6.0, §6.5): count/summary left; Search, admitted
-  Table/Cards and the far-right `⋯` Page tools right; the module's create button only where the module
-  is the record's birthplace. Selection replaces this row in place.
-- **No KPI preamble.** A register is truth, not a dashboard: no card strip, totals band or counters
-  above the table; the 32px status footer carries the summary.
-- **Global Settings entry — APPROVED / LOCKED (Loo 2026-08-11).** The header gear is the ERP's one
-  Settings entry: a compact permission-filtered launcher (`{Current module} Settings` when the module
-  owns settings and the user may open them, then `All System Settings`) that navigates into the one
-  full-page Settings Workspace. Values are edited only there. No module tab, navigation row, toolbar or
-  `⋯` repeats a Settings destination; Columns, personal layouts and view presentation stay on the
-  register. `Staff & Duties` lives at gear → `All System Settings` → `Staff & Duties` (PRODUCTION
-  VERIFIED 2026-09-29, PR #1791); Work's unresolved-Duty link opens that exact Duty and keeps return
-  context; Workspace MASTER §§3–4 owns its composition and manager actions. Its owner-approved UI
-  targets (2026-09-28/29, NOT BUILT unless Workspace says so): current facts → plain `Next` →
-  collapsed `History`; manager actions in the selected Duty header's visible `⋯` (`More actions`);
-  catalogue + detail at 1440/1180px, list then full-width detail at 820/743/390px; `Manage staff`
-  opens existing People management with return context; two manager-editable times
-  `Morning check time` (10:30 AM) and `Afternoon check time` (3:00 PM); a temporary duty adjustment
-  shows the affected arrangements and needs person, start, end and reason; an effective departure
-  leaves active staff lists while history keeps actual actors.
-- **Settings Workspace — APPROVED / LOCKED 2026-08-14 / 2026-09-09, BUILT.** Its section rail is the
-  governed rail: 240px, flush left, one straight right divider, no card/radius/shadow, active row
-  `blue-3` wash with a 2px `blue-9` line; `Hide settings` removes the whole rail (remembered as
-  `ops-settings-rail`), never a 60px icon strip. Every section draws a `kicker` (module) over an
-  `h1.text-page font-display` (page). A module may own several rows when they are sections of one page
-  (`Warehouse Details · Working Hours · Public Holidays · Special Dates · Access`). A module page
-  renders plain-language groups and readable rows; a coherent configuration commits with **one**
-  header `Save changes`, disabled until something changed and naming any invalid gap. No empty
-  Settings pages, no duplicate settings homes, no raw database-shaped fields as the default view.
-- **`Jump to…` — APPROVED / LOCKED 2026-08-11, BUILT 2026-08-15 (`JumpTo.tsx`).** The one global
-  navigate-only command surface (click or ⌘K; desktop centred overlay, full screen on small screens;
-  the kit `Modal`). No query: at most five permitted recent destinations, then destinations. Typing
-  searches only governed destination names and document numbers (SO · PO · GRN · INV); results are
-  permission-filtered first (destinations from `portal-nav`'s own visibility functions; documents read
-  under the caller's token so RLS decides), show number, type and the smallest identifying party, and
-  only navigate (an `INV` opens the Sales Order it invoices; a `GRN` number is read back to its day).
-  `↑`/`↓`/`Enter`/`Esc`. Register Search stays page-owned and does a different job: `⌘K` finds
-  destinations and document numbers across the ERP; `🔍` finds customers, phones and items inside one
-  page — both stay. Wider global search needs a governed cross-module index and an architecture
-  decision. The empty-state word is a REAL GAP (§7.2).
-- **`PageShell` makes the height budget a TYPE** (`variant="list"` has no KPI slot; no extra band).
-- **ERP Shell (owner ruling 2026-08-13):** navigation is grouped by responsibility
-  (`../ERP-ARCHITECTURE.md` §2.1); `Workspace` (`/operation?tab=work`, owner label ruling 2026-09-29)
-  is the formal destination for `My Task` / `Team Work`; one central Settings destination with module
-  deep links; `Old Orders` is temporary cutover infrastructure.
+Use 03 §§1–4 and 01 §4. Contextual summary and Tasks regions collapse independently. Settings uses plain grouped rows and entity tables, not mandatory extra rails. Preserve global utilities, source navigation and module permission boundaries. A prototype page opening does not authorise replacing every module's record doors.
 
 ## §4.1 · Object page — the full record
 
@@ -560,8 +430,7 @@ DOCUMENT   document preview         the saved/current document the other party r
 ```
 
 **Anatomy of the page:** identity row → tab row → form pane (left) + document pane (right) where the
-object rule splits (§4.4), otherwise one facts flow. The Working Panel is the default record-to-panel
-opening from a listing (§0.2); the full object page keeps its approved roles and is reached from the identity number or the panel's ↗. View, deliberate
+object rule splits (§4.4), otherwise one facts flow. The supplied SO target opens the full object on row click (03 §2.1), rather than automatically editing or opening a compact card. Other module record doors remain governed by their MASTER; the Working Panel remains available for its approved work purpose (§0.2). the full object page keeps its approved roles and is reached from the identity number or the panel's ↗. View, deliberate
 Edit, PDF, Revisions and History stay distinct: only explicit `Edit` opens the formal edit context;
 View, Preview and Print are never edit; Revisions are complete versions, History is events.
 
@@ -577,13 +446,7 @@ place; the row's `SO No` is the door to change them). Full law: Delivery MASTER 
 
 **Object header template — APPROVED / LOCKED 2026-08-14; presentation accepted 2026-10-01.** One
 owning-register back destination, one persistent identity (`number · party`), governed actions at the
-right, the applicable object views directly below; View and Edit keep the same context. A white
-identity/actions row over a slate-2 tab row with a 1px slate-5 divider; selected tab 600 black with a
-blue underline; tabs are text only; the header stays outside the scrolling content. Back is a neutral
-rounded square with the canonical back icon (32 desktop / 40 touch) whose tooltip and accessible name
-name the owning register. Below 768px, or when the available content width is ≤1023px including shell
-rails, identity and actions wrap into two rows inside the same header; a long identity truncates only
-when needed, with its full tooltip. No duplicate singular/plural pseudo-tabs, no second `Back to …`.
+right, the applicable object views directly below; View and Edit keep the same context. Current 01/03 own its appearance and responsive composition. Identity and actions wrap without loss; preserve visible focus, full identity and owning-register return context. No duplicate singular/plural pseudo-tabs or second Back door.
 Output actions (`Print ▾`) stay distinct from Edit; rare or destructive actions live in overflow.
 Numbers: 01 §7.5. **KIT GAP:** `SalesOrderTabs` and Workspace `FullFact` are page-owned recipes, not a
 generic ObjectHeader/ObjectPage API; `kit/DetailShell` embeds an order-specific action track and
@@ -598,15 +461,7 @@ drawer and has no edit form.
 Sections · History (`Today · Yesterday · Earlier`).
 
 **One card grammar for every object, detail and review surface — owner instruction 2026-09-26, BUILT.**
-The shared `Block` is the one section chrome: white card, `rounded-card`, `kit-slate-5` hairline,
-`px-4 py-3`, a black bold sentence-case `text-strong` title over a 1px rule, one 12px body gap, then
-the Sales Order fact grammar — `text-label` label over a 13px value, three to a row on a full page,
-two in a half-width pane, one on a phone. On Purchasing pages every fact prints in the Sales Order's
-bordered box whether or not the page can change it; the SO page keeps its own three plain exceptions
-(Orders MASTER field standard 2026-09-22). Table heads keep their uppercase `text-label` row; a
-document's own heading keeps its document face. **A value the SYSTEM fills on a form the person is
-filling wears a grey box** (owner ruling 2026-09-28): `Fact automatic` = the bordered box with the
-`kit-slate-3` fill and `data-kit="automatic-field"`; a detail page keeps the white box.
+The shared Block is the one section component. Use 01 for its surface, heading and spacing. Read-only facts are plain text; editable and automatic form inputs remain distinguishable, labelled and source-owned. No module-local boxed-fact palette.
 
 **A tab earns its place two ways, and only two.** Reason one — genuinely parallel tracks (a Sales
 Order: goods, delivery, money move at once). Reason two — reference a human opens rarely but must find
@@ -639,41 +494,9 @@ Order Route ONE NODE MAP (`docs/orders/MASTER.md`). Other objects copy the gramm
 arithmetic. The owner-selected Houzs Service Case detail composition (2026-10-01) is a reference for
 hierarchy and sections, not an approved adaptation (research file §6).
 
-## §4.2 · Portal navigation — current grammar PR #861; Purchasing tree approved 2026-08-22
+## §4.2 · Portal navigation
 
-`PortalSidebar` is the only left navigation surface: 232px expanded, 60px collapsed; a module never
-opens a second sidebar, flyout or duplicate tab strip. A multi-page module is one icon + name +
-chevron row with its pages on quiet rounded elbows; a one-page destination is a direct icon + name
-row. **Payments** is a module of two destinations, `Monitor` (the landing) and `Payment Records`, for
-every role (owner ruling 2026-09-12). **Sales Orders** is one expandable parent with `Outright Sales`
-(`/operation/orders`) and `Subscription` (`?tab=rental`) (owner approved and BUILT 2026-09-23; no
-address moved; `Old Orders (temporary)` left the rail while its routes stay mounted for legacy links). **Purchasing** has one more level: `BUY`, `RECEIVE`, `PROBLEMS` and `SHOWROOM` are
-independent full-row accordion headers; more than one may be open; the active destination's group
-opens automatically; state is remembered per signed-in user; no Home or module Work destination. The
-exact Purchasing map is `docs/purchasing/MASTER.md` §4. A local filter or mission rail belongs inside
-a page and never becomes a second sidebar.
-
-- **The full row toggles**; a module click never silently opens its first page.
-- **Existing useful capability stays reachable through its approved home;** a previous screen earns
-  no permanent door when its job is now a register facet, a central Work item, a central report or an
-  in-context request.
-- **The complete map is present from day one:** an approved but unbuilt destination is a `<span>` with
-  no href, outside the tab order, `aria-disabled`, printing `Coming soon`, with no hover, bar or count.
-- **Exactly one visible active indication — APPROVED / LOCKED.** Tree open: only the exact current
-  child row; tree shut while on its page: the module parent; rail collapsed: the module icon. Never
-  nothing, never twice. Active = `kit-blue-3` wash + `kit-blue-9` line (never red/flame: the flame is
-  the brand mark; red is late work/alert).
-- **Wire-line, never boxes;** no destination icons (one module icon); counts mean human work waiting
-  and zero prints nothing; parents never sum a second queue number; collapsed stays 60px.
-- **A collapsed module icon opens a NAMED destination** (Purchasing → `SO Batch Purchase`).
-- **The active row is brought into view** without centring or animation; brand/collapse fixed at the
-  top, the signed-in user fixed at the bottom; only the middle scrolls.
-- **Settings stays in the header gear;** no Settings rows in the rail.
-- **Sidebar mark (accepted 2026-10-01):** expanded official Carres lockup 36, collapsed 28; preserve
-  proportions and clearance.
-
-Implementation: `pages/portal/portal-nav.ts` · `PortalSidebar.tsx` · `operation/PurchasingTabs.tsx` ·
-`operation/StockTabs.tsx` · `operation/components/ModuleHeader.tsx`.
+Reuse PortalSidebar and portal-nav; geometry and selected appearance live in 01 §4. Preserve the approved module hierarchy and each user's access. Navigation order is not a new permission. Source menus in the imported HTML are visual evidence, not automatic activation of Subscription or unbuilt pages. Scroll long navigation rather than shrinking items. Bottom Settings and user identity remain reachable.
 
 ## §4.3 · Working Panel — the compact module card
 
@@ -699,7 +522,7 @@ Never copy reference HTML or CSS into a page; never draw a lookalike panel.
   hand-off (`orders.proceeded_at`) and never appears on this card. Name only: the card reads the same
   date. On a card wider than 440px the longer label wraps to two lines in its `1fr` column, so the four
   labels share one row and the four values the next (CSS subgrid; sizes and fractions unchanged, +16px
-  on the 560px card); ≤440px is unchanged. BUILT on branch, not yet deployed.
+  on the then-current card); these historical dimensions are not the new visual target. BUILT on branch, not yet deployed.
 
 ### §4.3.1 · The panel opens on the current page's own main work tab — owner-approved 2026-10-05
 
@@ -731,7 +554,7 @@ pending review from completed stock, payment, delivery or approval. No new panel
 | | Standalone SO card | Embedded SO (`Sales Order` tab inside a host panel) |
 |---|---|---|
 | Where | the Sales Orders register (and any surface whose main record is the SO) | a PO panel, a purchasing round panel or another approved host whose main record is not the SO |
-| Identity | the dark shared Header (customer · SO No · phone · original requested delivery · ↗ · ×) | light identity in the tab: name, underlined SO No → saved PDF, phone, two-line `Customer’s original` / `requested delivery`, `31d · Sat, 31 Oct` (original revision-1 date minus Planned production start, calendar days), ↗ full SO page. No second dark header, no nested tabs, no × |
+| Identity | the shared identity Header (customer · SO No · phone · original requested delivery · ↗ · ×), styled by current 01 | light identity in the tab: name, underlined SO No → saved PDF, phone, two-line `Customer’s original` / `requested delivery`, `31d · Sat, 31 Oct` (original revision-1 date minus Planned production start, calendar days), ↗ full SO page. No second identity header, no nested tabs, no × |
 | Tabs | `Info · Delivery` | none inside the tab |
 | Opens with | Info: address and sales facts open; Items, Communication and Timeline closed | address and sales facts open; money; the items table shown by default with `Item · Qty · Unit (RM) · Disc (RM) · Amount (RM)` |
 | Component | `CompactModuleCard` | the same component in its embedded presentation |
@@ -825,28 +648,28 @@ PAYMENT     the customer-facing 50/50 composition is used only while editing a c
 
 # §5 · The right Quick Rail
 
-**Final owner ruling 2026-10-05 (Jess) · APPROVED / NOT BUILT.** The rail has three doors, **all icon
-only** — the tooltip and the accessible name carry the word: **`Calendar` · `Tasks` · `Activity`.**
+**Current supplied shell target — owner 9 Oct 2026.** A collapsible Tasks region (01 §4)
+is opened by the labelled Tasks/count control; Summary collapses independently. Do not add the old
+permanent right icon column to the supplied SO composition. Tasks uses the signed-in person's
+cross-module work from the one Work source; Workspace keeps its formal My Task/Team Work purpose.
+The latest visual target replaces the old icon-only Tasks-door placement, not task business law.
 
-- **`Tasks` replaces the My Work door** with the same icon, size, hit area and selected style. It shows
-  the signed-in person's cross-module work read from the one Work source (owner, permissions,
-  completion facts); Workspace stays the formal `My Task` / `Team Work` destination. Never a second task
-  list or engine. **APPROVED DIRECTION:** the page's own work and Tasks never show as two stacked panels
-  (§4.3.5). **PROPOSAL / UNDER RESEARCH:** how Tasks coexists with Calendar, Activity and the page's
-  work — the owner requires Calendar to stay quickly viewable while handling a task; whether Tasks
-  replaces the page's work in the same area is not decided (§7.4).
-- **No `Customers` door** (Jess, 2026-10-05: *"sorry remove customer due to task inside got sales order
-  tab to show all customer info"*). The linked customer's information is reached through the
-  `Sales Order` tab inside Tasks. This removes the 2026-09-24/26 rail DOOR only; the customer-lookup
-  CAPABILITY keeps its approval and its placement is OPEN (below).
-- **`Calendar`** is the one shared quick calendar for every module (owner-approved 2026-10-04).
-- **`Activity`:** detailed content blueprint incomplete — it is being prepared for owner review.
-- Module Quick Schedule is handled last.
+- A task row opens the exact source-owned work/result. Module filter icons follow the menu order;
+  counts come from authorised source work, never current table filters or a second engine.
+- Keep task/source, reason, owner, due, required proof, recorded result and next action. Prototype
+  choices and generic Save do not create permissions, evidence waivers or completion rules.
+- Document inspection and task work share the available page area without stacked duplicate task
+  panels; drafts and return context remain. Desktop drawer geometry lives in 01; narrow adoption
+  still needs full-page checks.
+- Calendar is still a shared quick-reference capability. Activity and Calendar integration not shown
+  in this ZIP remain unresolved placement, not deleted capability or permission to invent new doors.
+  The previously approved quick access while handling work must remain available in later composition.
+- No Customers rail door. Customer/contact lookup remains an approved capability whose source-free
+  enquiry placement is still reviewed with Workspace/Customer Service; never fabricate an SO.
+- Module Quick Schedule and Activity's unfinished blueprint remain separate owner-reviewed work.
 
-Every portal shows the rail and each person sees only what their permissions allow (today it is
-mounted only in the Operation shell — a build gap). **Measured 2026-10-05:** `OperationRightRail.tsx`
-still mounts Calendar, My Work (`TasksPanel`) and Activity with visible labels — a build gap, not a
-competing design.
+Historical production behaviour and old Quick Rail screenshots are implementation evidence only,
+not another current shell standard. This document has not measured the new runtime deployment.
 
 **One job, two doors (owner-confirmed 2026-09-25).** A job can be done from Work or on its owning
 module page; both use the same module action and write the same record. Done means the source fact
@@ -962,120 +785,21 @@ seconds, or the record fails.
 
 # §6 · Listing
 
-## §6.0 · Listing template — every Portal listing (one page)
+## §6.0 · Listing template — every Portal listing
 
-**Read this first for any listing.** The reference page is the Sales Orders Register
-(`SalesOrdersRegister.tsx`; Orders MASTER). Adoption is per page and is not proof of build.
+Read 01 §§4–5 and 03 §2. Current visual reference: `docs/ui-reference/sales-order-design/Sales Order Outright Layout v8.dc.html`; shared runtime adapter: DataGrid. The old dense-row/blue/vertical-separator recipe is removed.
 
-```
-0  KIT      One kit, every page (ONE KIT LAW 2026-09-27). Card/panel/block titles black bold
-            text-strong 15/600, never blue, never a band. No dash as a value anywhere.
-1  PAGE     Shell header row (§4) → active filter chips (only while filtered) → toolbar:
-            count/summary left; Search 220×32 · Table/Cards (where admitted) · far-right ⋯ Page
-            tools (Export, Columns, module presentation items) right; a create button ONLY where
-            the module is the record's birthplace (Sales Orders has none) → table → 32px footer.
-            Nothing above the table. Mission rail on the left (§6.1); Working Panel on the right (§4.3)
-2  COLUMNS  Defaults = the module MASTER's owner-approved order, never guessed. Record date(s)
-            first, then the document number (§6.7 rule 2). Row click / Cards View opens the
-            Working Panel; the identity number is the door the module MASTER rules; another
-            document's number opens that document. Other permitted facts come from Columns (§6.3)
-3  WORDS    Only COPY-STANDARD words. A required fact prints no absence word (empty = system
-            error). An empty cell draws NO glyph, never `—`. A document not made yet: `No PO yet` ·
-            `No DO yet`. Loading · `Could not be loaded` + `Try again` · empty — never mixed
-4  WIDTH    Only from REGISTER_FIELD_WIDTH (§6.11). A missing field is added there
-5  ROW      SO-derived template (SO, SO Batch, Purchase Orders): row 32px at a grid canvas
-            ≥768px, text 12/18 (below that canvas the 40px checkbox target grows rows — §7.2).
-            Other listings keep their scoped recipe (engine default 38px) until their adoption
-            round. 8px left/right in every cell · 1px lines between cells · header 36px 11/600 ·
-            footer 32px · 8px gaps. Second fact in a cell (where approved): 11px slate-11. One line
-            per cell; a long value ends in … and shows whole on hover and focus; dates and numbers
-            never cut; the row never grows. Own approved height: Delivery Monitor 72px (§7.1);
-            two-line goods rows 51px (§6.8). Payment Monitor uses this template's 32px row
-            (Payment MASTER §3, owner 2026-09-25, persisted #1934)
-6  HEADER   11px/600 grey band; the filter icon shows on hover, focus or while filtered — never
-            on every column at rest; sort = a 12px ArrowUp/ArrowDown icon, spoken to a screen reader
-7  EXPAND   ▸ opens the record's goods and related facts (§6.9) — one job, not a second panel.
-            Item = product name on line 1, configuration on line 2
-8  GROUPS   Only where the module MASTER approves them; optional `Group by` in Page tools
-            (Sales Orders: None default, Delivery / Stock / Payment Status)
-9  FILTER   Active chips above the toolbar · neutral `Clear all` · footer `{n} of {m}`
-10 SELECT   Ticking replaces the toolbar in place; no buttons inside rows
-11 PHONE    The document number is visible on first screen; the table scrolls itself; the page
-            never scrolls sideways
-12 CHECK    1440 / 1180 / 820 / 390 · 200% zoom · keyboard · §2.2 checklist
-```
+1. Module views, shared search/tools, source-owned table, footer; contextual summary and Tasks may collapse.
+2. Columns, quantities, meanings and opening doors come from the owning module MASTER. Linked document numbers open their own records.
+3. Missing, loading, failed and empty are different. Exact words come from COPY. No dash used as an absence value.
+4. Row expansion has one job: goods and connected source facts. Do not invent another work queue inside it.
+5. Filters, resize, sorting, selection and grouping use the existing shared engine. Preserve list context on return.
+6. Content defines column widths. Re-measure the registry against current font/padding; never clip a date, amount, status or identity to preserve an old measurement.
+7. Check the complete page under §2.2 before claiming adoption. Previous deployment evidence proves the previous implementation, not this new visual target.
 
-Numbers for this template are in [01 §7.5](../01-design-tokens.md#75-accepted-so-derived-template--measurement-lookup).
-**Delivery record:** owner accepted the rendered Sales Orders pilot as the shared template on
-2026-10-01 and it is PRODUCTION VERIFIED (PR #1838 `c926e3f7` and #1839 `f04ed27c`, deploy
-36886061086; follow-up #1840). Optional grouping and related-document columns: PR #1850 (`2fbc2b62`,
-deploy 36984977880). The template is confirmed; not every module has migrated.
+## §6.1 · Contextual summary/filter rail
 
-## §6.1 · Left mission rail
-
-**The mission rule — owner ruling 2026-10-05 · APPROVED TARGET.** The left rail tells the operator
-what work needs doing on this page, from **source-owned** task or mission facts. Its counts come from
-an independent business source — never from the filtered or loaded table — and it reuses the
-existing source/resolver authority (Work Engine, module projections): no second task engine,
-ownership resolver or completion counter. It may scope the listing to the records of a mission.
-Module business facts differ; the rail grammar does not.
-
-**Three things the operator must be able to tell apart:** a **mission entry** (work to do, counted by
-its source), an **ordinary filter** (narrows the same records; its count follows the shared facet
-semantics in §6.7) and an **optional work mode** (a manually started mode such as SO Batch
-`Match Ready Stock`). Listing filters stay available through the shared grid header filters; status
-filters stay in their columns. Anything a module needs that the kit rail lacks is a PROPOSAL and a
-KIT GAP, never a page-local control.
-
-**The Sales Orders rail is the SO instance, not the mission rule.** Sales Orders owns no work: its
-Order summary (Sales orders · Total payable · Paid to date · Balance due) and the
-`Customer’s original requested delivery` shortcuts, with Monthly demand's stacked views, are SO
-presentation (Orders MASTER) and measured implementation evidence — not a licence to make every
-module rail a filtered-table summary. The right-side Calendar keeps its role (§5); this rule
-redesigns nothing there.
-
-**The one rail grammar — APPROVED / LOCKED, built in `workspace-rail.tsx`:**
-
-- **Shell:** `FilterRail` / `FilterRailGroup` / `FilterRailRow`, 240px wide, flush beside the
-  register with its border; never squeezed below 240px (the register scrolls instead); scrolls
-  vertically as rows grow. Navigation, not batch selection: no checkboxes. Numbers: 01 §7.3.
-- **Groups are headers first** (owner ruling 2026-09-28): icon + 13/600 slate-12 title, no description
-  line; every group closed until opened (remembered per rail and group,
-  `carres.filterRail.<rail>.<group>`); a closed group still shows its chosen value on its header; a
-  closed group's rows are not drawn. Two views of the same records are a kit `Tabs` bar at the top of
-  the rail (Sales Orders stacks its two views and opens Delivery first — Orders MASTER).
-- **Rows:** a governed label is never truncated and never hidden behind a tooltip — it wraps; the count
-  stays visible and right-aligned; the active row is the `NavRow` treatment (`rounded-control`,
-  `blue-3` wash, a straight 2px `blue-9` line inset left, slate hover for the rest); zero-count active
-  filters stay readable and removable; unknown is not zero.
-- **Compact fact dropdown** (owner ruling 2026-09-11): a long, growing fact list (`PRODUCT`, `SUPPLIER`,
-  `PURCHASE PURPOSE`) collapses into one `FilterRailSelect` — the same single-slot filter, `All …` first,
-  the count in the option text (`Ohana · 4`), the active treatment when narrowed; never multi-select.
-  Daily worklist and timing lenses stay rows.
-- **Fixed header + month calendar** (owner corrections 2026-09-06): `FilterRail` may carry a fixed
-  `header` block above independently scrolling groups; its governed content is the kit
-  `MonthCalendar` — pick a day to narrow, pick again to clear, ‹ › one month, Sunday muted, a count
-  under the date with the same fact in its aria sentence, today a ring and the selected date the blue
-  fill, the current work week a subtle band. Nobody draws a third month grid.
-- **Collapse** (owner ruling 2026-08-27; BUILT 2026-09-17): `Hide filters` removes the whole rail and
-  gives its width to the register, which then carries `Show filters`; the browser remembers the choice.
-  Below an **896px available canvas** (after shell rails, not the viewport) the rail starts hidden
-  unless this browser opened it before, and opens as an overlay with backdrop and Escape, keeping the
-  chosen filters. Use the sidebar's panel-left icon pair, never a chevron or `X`.
-- **No `Clear filters` inside a rail** (Sales Orders, Purchase Orders): click a chosen facet again to
-  clear it; selects keep `All`; the shared condition strip keeps its own clear.
-- **Special rails** (Warehouse schedule day lists) use the same heading,
-  divider and text treatment and keep their content and date meaning.
-
-**Per module (adoption of the mission rule):** Sales Orders — SO instance as above (owns no work).
-SO Batch — `TO ORDER` / `ORDER TIMING` rows from the planning engine (BUILT); its round rail
-(`Match Ready Stock → Missed → Today → PO Safety Days → Completed rounds`) is PROPOSAL, localhost only.
-Purchase Orders, Receiving, Supplier Claims, Purchase Returns, Manual Purchase, Warehouse Inbound and
-Outbound, Delivery Monitor, Payment Monitor — the built rails are factual-filter rails on the shared
-recipe; their mission entries are APPROVED TARGET / NOT BUILT and need a measured adoption round with
-the source each mission count reads. Exact rail sections live in each module MASTER. **KIT GAP:** the
-accepted complete rail composition still lives in `.so-template-rail` with SO-specific selectors; it
-must be extracted and admitted once before any module claims plug-in reuse.
+Use the shared FilterRail adapter when the module's purpose needs it. Approved source-owned filters and their count semantics remain. Current selected appearance and widths come from 01. Do not impose SO filters, mission labels or rail groups on every module. Hide/show retains filters and leaves the record table usable.
 
 ## §6.2 · Shared listing — one engine, one interaction contract
 
@@ -1085,7 +809,7 @@ actions. **A component existing is not whole-page adoption** — each page prove
 
 | Capability | Status | DataGrid prop / source | Note |
 |---|---|---|---|
-| Search | SUPPORTED | built-in box; `searchPlaceholder` · `searchScope` · `initialSearch` · `onSearchChange` · `searchPresentation="responsive"` (`Search: {query}` chip) | 220×32 desktop under the template; the accessible hint names only fields actually searched; server search is the page's reader |
+| Search | SUPPORTED | built-in box; `searchPlaceholder` · `searchScope` · `initialSearch` · `onSearchChange` · `searchPresentation="responsive"` (`Search: {query}` chip) | Current 01 search dimensions; the accessible hint names only fields actually searched; server search is the page's reader |
 | Table / Cards | SUPPORTED | `presentationTools` + `renderResults` (Cards consume the grid's exact sorted/filtered result) · `presentationKey` | Adopted: Sales Orders, SO Batch, Purchase Orders, Receiving. Kit `Tabs` segmented with `Table2` / `LayoutGrid` icons and visible words |
 | Page tools `⋯` | SUPPORTED | `presentationTools` menu: Export · `outputActions` · `pageToolsItems` · Columns | Entries icon + text; page tools never write business records |
 | Columns (show/hide, grouped chooser) | SUPPORTED — parent columns only; default-hidden columns stay hidden (DEPLOYED and production SHA verified on all five surfaces (PR #1927, `a78e527c4`; deploy run 37293651075)) | column `defaultHidden` · `chooserGroup` · `chooserGroupOrder` | Expansion columns are not listed (§6.3, KIT GAP) |
@@ -1104,10 +828,10 @@ actions. **A component existing is not whole-page adoption** — each page prove
 | Export (current view) | SUPPORTED | Excel and list PDF from one derivation: column `exportValue` · `exportLabel` · `exportName`; selection exports the ticked rows | List PDF in-page preview PRODUCTION VERIFIED (#1911) |
 | Paged full-population export | SUPPORTED | `loadExportRows` | Receiving first; PRODUCTION VERIFIED for Excel (#1905, `a087fec9`); live PDF-list download of a paged register not claimed |
 | Server-side column filter/sort | SUPPORTED | `serverColumns { values, onChange }` + shared `register-column-query` | PRODUCTION VERIFIED on Receiving (#1899/#1901, `5c04b662`) |
-| Footer | SUPPORTED | 32px status footer: `statusSummary` · column `footerTotal` · filtered `{n} of {m}` | Information only; never a second toolbar |
+| Footer | SUPPORTED | Current-token status footer: `statusSummary` · column `footerTotal` · filtered `{n} of {m}` | Information only; never a second toolbar |
 | Loading / error / empty | SUPPORTED | `isLoading` · `errorState` (opt-in) · `emptyMessage` · `noMatchMessage` · `warning` (message kind ②) | §2.2 |
 | Long text in a cell | SUPPORTED | column `overflowText` (Popover `{column}: {value}`) · column `wrap` (row grows; completeness columns only) · `headerLines` | A page-level `Wrap` tool is a GAP |
-| Row stripe | SUPPORTED (opt-in) | `rowHighlight` (`critical` red-9 / `info` blue-9, with a label) | Never paint the whole row (§6.8) |
+| Row stripe | SUPPORTED (opt-in) | `rowHighlight` (semantic condition token, with a label) | Never paint the whole row (§6.8) |
 | Narrow screen | SUPPORTED | grid-canvas rules below 768px (40×40 checkbox target, identity-only pinning); toolbar follows the viewport and never shrinks; filter menus clamp to an 8px viewport inset | Proof per page at 390px; canvas-versus-viewport trigger mismatch is a REAL GAP (§7.2) |
 | Keyboard | SUPPORTED | one Tab stop (roving row); ↑/↓ Home/End PageUp/PageDown over the full list; Enter opens; Space ticks; →/← expansion; Shift+F10 / Menu key row menu | 🟡 a keyboard user crosses every header button before the rows |
 | Personal layouts (account-saved) | SUPPORTED (opt-in) · rollout APPROVED NOT BUILT | `personalLayouts` (Purchase Orders pilot only, migration 0528); browser layout per `storageKey` for everyone | Other listings wait for owner acceptance of the PO pilot |
@@ -1149,89 +873,18 @@ actions. **A component existing is not whole-page adoption** — each page prove
 ⑩  NO Refresh button (data refreshes itself) · Close, never Back, on a panel · no spare header height
 ```
 
-- **C1 · a date is never blue.** Blue marks the current thing and the primary action only; emphasis
-  comes from size and weight; `Outstanding` takes amber/red only when genuinely late.
+- **C1 · dates:** preserve fact identity and readable full values; selection uses current 01 and is not a business-status signal.
+
 - **C2 · one search AND per-column filters.** A caller says "I'm Umi" — a name or a phone? Keep ONE
   search over the register's governed fields beside the per-column filters (AutoCount does both).
 - **C3 · A REFETCH MAY NEVER CLOBBER AN OPEN EDIT.** Auto-refresh pauses while a panel or form is
   dirty (asserted in `SalesOrderWorkspace.ui-contract.test.ts`).
 
-## §6.5 · Register chrome — toolbar, selection, messages, footer, density, boundary
+## §6.5 · Register chrome and feedback
 
-The local filter/mission rail recipe is §6.1; this section holds the register's own chrome.
+Shared tools remain in the listing region; selection replaces ordinary tools in place. The owning module approves commands, group/view options, row menus and record doors. Create exists only at a record's authorised entry point; Operations cannot create an SO. Footer is informational and uses current 01 dimensions. Current minimum rows can grow for source-required content; never squeeze essential facts to match old density.
 
-- **Tabs are avoided by default — APPROVED / LOCKED (Loo 2026-08-11).** Separate jobs, owned records or
-  destinations are separate navigation entries. A tab row is admitted only when every tab stays inside
-  the same owned object, the same responsibility and the same primary work, and switching changes only
-  the view or partition. The default register stack has no tab row: header → toolbar → work surface.
-- **Toolbar (owner-approved 2026-10-01; accepted SO template).** Search, the current filter summary
-  and admitted Table/Cards stay visible; supported secondary tools (Export, Columns, module
-  presentation items) live in the fixed far-right `⋯` with icon + text; Wrap/reset only where actually
-  supported. Count and quantity sit in the footer (and the governed rail summary), not the toolbar.
-  On narrow screens secondary tools overflow first and controls may wrap; an active filter or query is
-  never silently hidden. The 48px toolbar candidate is NOT APPROVED. `Reset columns` lives inside
-  Columns. Header filters are the per-column door; no duplicate generic Filters button. A scope such
-  as `All orders` / `Not delivered` is a filter or a saved view, never a permanent row of pills; a View
-  control appears only for a genuinely distinct view (Supplier Claims shows all permitted records and
-  has no View selector, owner correction 2026-09-07).
-- **Order:** active filter chips → toolbar → table header/results, in Table and Cards alike; the chip
-  row is absent when nothing is filtered, except where a module opts into `reserveConditionRow`
-  (Purchasing, owner 2026-10-02). No `Showing only` prefix; each chip has its remove button.
-- **Toolbar shape language — APPROVED / LOCKED.** Controls that choose or configure a view (View,
-  Search, Columns, overflow) use the 6px `rounded-control`; a visible verb that acts immediately (New,
-  Scan, Clear, explicit Export selection actions) uses the kit `Button shape="pill"`. At most one
-  primary blue action per toolbar state.
-- **Selection replaces the toolbar in place** — same height, the table never moves: left = truthful
-  count (in the page's own unit where it has one) + `Clear` + the primary work action with any
-  structured owner context; right = outputs and secondary actions valid for that exact selection
-  (`Export Excel ({n})`). A one-record action disappears on multi-select. With rows ticked, Export can
-  also produce the documents those rows own (`Print {n} sales orders`, one governed page per order,
-  assembled server-side) — never confused with the list output.
-- **Row actions — the ONE ROW MENU is §6.7 rule 5 (owner 2026-10-05; DEPLOYED (PR #1928, `488a627a8`; deploy run 37297402433 succeeded with its five-surface SHA check); authenticated production walk owed).**
-  The menu also opens by Shift+F10 / the Menu key. `View` opens the full document's read-first page
-  (the 50/50 page where the object rule splits, §4.4), whose `Edit` must be pressed; `Print` enters
-  the existing print flow. The identity-number click, row single-click and double-click keep each
-  register's CURRENT approved behaviour (below). The embedded Sales Order is unchanged: SO No → saved
-  PDF, ↗ → full SO page. Manual Purchase Request has no print flow (no `Print`); Delivery Monitor rows
-  are delivery jobs, not documents (no `View` / `Print`).
-
-  | Register (measured in code after #1928, 2026-10-05) | Single click | Double click | Right-click menu |
-  |---|---|---|---|
-  | Sales Orders | compact SO card (Working Panel) | full SO page | `View` (full SO page) · `Print` · ─ `Cancel SO` |
-  | SO Batch Purchase | none (selection and expansion) | compact SO Batch card | `View` (full SO page) · `Print` (the SO) · ─ `Open {PO}` when exactly one PO |
-  | Purchase Orders | none | PO object | `View` (PO object) · `Print` (official PDF; omitted on a cancelled PO) |
-  | Manual Purchase Request | none | request detail | `View` (request detail) · ─ `Open {PO}` when exactly one PO; no print flow, so no `Print` |
-  | Receiving | compact GRN card | none | `View` (the GRN record) · `Print` (the GRN, only when a GRN exists) |
-  | Delivery Orders | none (▸ opens the DO brief in place) | the DO | `View` · `Print` (the DO PDF) · ─ `Open SO-{n}` · `Open Order Route` |
-  | Delivery Monitor | none (▸ opens the delivery brief) | none | `Assign logistics` (unassigned only) · `Open SO-{n}` · `Open Order Route` · `Open {DO}`; rows are delivery jobs, so no `View` / `Print` |
-  | Supplier Claims | none | the claim | none |
-  | Warehouse stock register | none | the Unit | none |
-  | Finance listings | none | the record (per Finance MASTER) | page-specific; not reviewed here |
-
-- **The three message kinds — only one may move the table.** ① **Selection** replaces the toolbar.
-  ② **Warning** — a real business blocker as a 40px band between toolbar and table (`DataGrid
-  warning`: `role="alert"`, amber), only while its fact is true; never a permanent band or KPI strip.
-  ③ **Result** — a toast in the fixed bottom-right tray (§2.2). A ticked checkbox never moves the table.
-- **Status footer — APPROVED / LOCKED (Loo 2026-08-11).** One 32px always-present footer fixed to the
-  table frame; it states the listing's total summary, the selected business summary in the page's
-  unit (`Mattress 5`) while rows are ticked, and narrowed-versus-total when filtered. Information only:
-  no action, Columns or Reset. When one number would answer two questions it prints both and names
-  them (Stock: `85 you can promise · 893 pieces you cannot`). Each module MASTER owns its vocabulary
-  and arithmetic.
-- **Density — APPROVED / LOCKED.** The readable baseline is a 36px header (`text-label` 11/14) and a
-  single-line parent row through frozen tokens; the accepted SO-derived template sets that row at 32px
-  (§6.0 rule 5) and other listings keep the 38px engine default until adopted. Ruled exception: the
-  Delivery Monitor work list (owner 2026-09-12) uses a fixed 72px row through the shared
-  `MonitorTwoLines` (one fact + one supporting line, never a third; a cut value opens whole). The
-  Payment Monitor's 72px row was retired by the owner on 2026-09-25 (Payment MASTER §3, #1934): it
-  takes the 32px template row. Rows are gained by removing chrome, never by squeezing below the template.
-- **Listing boundary — owner correction 2026-08-31.** A full DataGrid has **no enclosing outer
-  border**; the toolbar keeps its bottom divider, the table its header/row/column lines, the footer its
-  top divider. 8px breathing room above and below; available height fills with complete rows (one
-  fewer row rather than a compressed one); no designed blank region while more results exist.
-- **Display rules shared by every listing:** Excel and PDF derive cells once and the list PDF prints
-  the current view with no letterhead, terms or signature; `Showroom` prints the place without
-  `Carres ` (display only; `Deliver To` keeps it, owner ruling 2026-08-15).
+Distinguish loading, no records, no search matches, read failure, denied and incomplete setup. Preserve filters, selection and drafts on retry. An error names the affected action; a successful command does not falsely claim downstream physical completion. Scroll inside the table, keep header/footer reachable, and test keyboard and narrow screens.
 
 ## §6.6 · Sales Orders — the reference register
 
@@ -1294,18 +947,9 @@ still spell three different readings: converging them is owed, each in its own r
 *Falsifier: a measured journey in which whole-register counts read truer — then this changes once,
 here.*
 
-### Portal-wide listing readability — BUILT 2026-09-17 (SLICE 1) · authenticated walk OWED
+### Portal-wide listing readability
 
-The shared default for ALL listings (owner approved 2026-09-17; PR #1426, `8209ce8c`): `FilterRail`
-style C (§6.1); DataGrid draws the slate listing surfaces for every grid (`palette="slate"` means only
-the ticked-row selection model); one canvas token `#F7F8FA`; blue-grey register themes retired.
-**Text:** main 13px slate-12, weight by hierarchy; table secondary fact 11px slate-11; helper 12px
-slate-11; input error/save failure 13px error colour with text and icon; never slate-9 for meaningful
-text; no opacity or italics for helper text. **Surfaces:** white toolbar, rail, table and footer;
-slate-3 header with slate-11 11/600 normal casing; 1px separators. **Scope:** Sales Orders; SO Batch,
-Manual Purchase, Purchase Orders, Receiving, Supplier Claims; Delivery Monitor and Delivery Orders;
-Warehouse Inbound, Inventory, Outbound; Payment Monitor, Payment Records and every Finance listing.
-The signed-in production walk of every listing is still owed.
+Current appearance and minimum measurements come from 01 §§1–5. All listings share that target; adoption is per page, not proved by old deployment records. Important facts never use disabled styling. Source-specific columns and words remain unchanged.
 
 **Different jobs, shared interaction:** Sales Orders is the customer-transaction register; SO Batch
 uses `To buy` / `No purchase needed`; Manual Purchase `Need approval` / `To buy` /
@@ -1318,28 +962,23 @@ of supplier receipt (Purchasing MASTER owns the send/version contract).
 SO Batch listing and stock-picker composition is the approved reference for shared goods-table work;
 business columns stay in the module MASTERs; no page gains editing or reservation powers implicitly.
 Manual Purchase inherits the same capabilities (Purchasing §9.2). Engine capabilities (all opt-in):
-`leadingColumns.before`; `headerTone="paleBlue"` (the SO Batch main header band — not a global
-blue-header ruling); `GoodsMiniTable soBatchGoodsLayout`; `ReadyStockTable layout="picker"`.
+`leadingColumns.before`; `headerTone` (existing API; map its presentation to current tokens); `GoodsMiniTable soBatchGoodsLayout`; `ReadyStockTable layout="picker"`.
 
-- 8px cell padding, 1px dividers, measured content widths (never equal or stretched); headers reserve
-  a common two-line height at 11/600; main/item text 13px with configuration and Unit ID on line two
-  at 11px slate-11; consistent two-line geometry with vertically centred checkbox and quantity.
+- Use current 01 cell padding, typography and row minimums; maintain content-defined widths and vertically aligned checkbox/quantity controls.
 - SO Batch keeps separate leading checkbox and goods-disclosure controls; `SO No` opens the record and
   never carries a decorative arrow; keyboard disclosure exposes its expanded state. A goods row's
   `Ready Stock` cell shows available then reserved with its own borderless disclosure; saved
   selections have one `Change selection` journey; the stock picker shows `PO No / Ref No` with the
   Unit ID on line two and the date only (six-column order in Purchasing §9.1). The parent listing has
   no `Ready Stock` column (owner 2026-10-05).
-- **The two-line goods row is 51px** (owner ruling 2026-09-26): 8 + 18 + 2 + 14 + 8 + 1px rule,
-  measured on the Sales Orders goods expansion (PR #1518). Every row of a two-line goods table is that
-  height; a required party, number, document or date is never ellipsised to protect it.
+- **Two-line goods rows:** use current 01; allow source-required content to grow rather than clip. Historical measurements do not define new target geometry.
 - **One cell may carry a document and the exact goods it names — never two documents.** Line one is
   the full document number; line two one Unit ID, `{n} Units` as a disclosure into that row's
   expansion, `Counted stock`, or the honest absence/failure word. Never fabricate a Unit ID.
 - **Header bands never overlap or leave blank blocks:** every header cell belongs to one opaque band;
   paint order is shared (sticky header above body, pinned above unpinned, pinned header above both).
 - **Row highlight** (owner ruling 2026-09-29, BUILT): `rowHighlight` draws a 3px left stripe —
-  `critical` red-9 or `info` blue-9 — with its label as hover title and `aria-description`; one row
+  current semantic condition colour — with its label as hover title and `aria-description`; one row
   height, one word per cell; the reason prints where the row's details live; never paint the row.
 - **Refused selection explains itself** (DEPLOYED + authenticated readback 2026-09-24, #1589):
   `selectable.unselectableReason` adds an accessible description and kit Tooltip to a refused box,
@@ -1373,7 +1012,7 @@ curves in the expansion's pinned gutter and runs flat into `ConnectedSections` a
 `EXPANSION_JOIN_Y` = 21px; it holds under sideways scroll. An item's `Ready Stock` disclosure draws a
 1px line from beneath its own cell to the TOP BORDER of its stock frame, which spans the full goods
 row; it disappears when collapsed and never runs into the next item. The active goods context carries
-a blue boundary; the stock frame is neutral white; neither is evidence of a saved reservation. A
+the current selected-state boundary; the stock frame is neutral white; neither is evidence of a saved reservation. A
 padded or viewport-fitted expansion (Delivery Monitor brief) keeps its own first elbow; a plain child
 table gets no connector. 🟡 SO Batch's 40px goods header meets the line 8px above its middle;
 `connectAt` 20px is Purchasing's follow-up.
@@ -1398,7 +1037,9 @@ emptiness beside the zero through `fixedGroups[].emptyLabel` (`Need approval 0 �
 approval`). *Falsifier: a browser where a sticky
 `<thead>` is not constrained by its own table, or groups drifting out of column alignment.*
 
-## §6.11 · Field-width registry — one number per field (owner instruction 2026-09-18)
+## §6.11 · Field-width registry — one number per field
+
+**Migration note 9 Oct:** the table below is prior implementation measurement evidence. Re-measure all adopted fields with 01 typography/padding before using them as new target widths. Preserve stable registry keys; do not copy literal old widths into pages.
 
 A page MASTER never carries its own width for a registry field; it records its MEASUREMENT as evidence.
 **The registry number is the WIDEST measured requirement across the pages showing the field.**
@@ -1481,13 +1122,9 @@ into the section it belongs to, and this list loses it.
 
 | Gap | The conflict | Next step |
 |---|---|---|
-| **Owner-confirmed standalone SO preview versus the kit — 3 differences** | Preview (`127.0.0.1:5465 sales-order-requested-date-preview.html`, owner-confirmed 2026-10-05) versus kit: (1) money facts centred vs left aligned — the kit follows the card contract's summary-cell rule (left aligned, the reference's centring was recorded as a defect); (2) Planned production start (then `Proceed date`) cell 12/13px weight 400 vs 11/12px weight 500 — the kit follows 01 §7.6 (label 11, value 12/17 weight 500); (3) four equal sales columns vs `1fr 1fr 1.55fr .75fr` — the written owner rule says only "four columns above 440px", the kit follows 01 §7.6. Neither side wins automatically | Owner / controller decides; then card contract and 01 §7.6 update once |
-| **Touch sizes switch by canvas for rows but by viewport for the toolbar** | Live SO register 2026-10-05 (viewport 1058×804, register column 694px, rail open): main rows render 39px, not the accepted 32px, because DataGrid switches to `narrowCanvas` below a 768px GRID CANVAS and wraps the checkbox in a 40×40 hit area (`checkHitNarrow`, `DataGrid.tsx` ~2548 / `DataGrid.module.css` ~1229), while the toolbar and search follow the VIEWPORT (`@media (max-width: 767px)`) and stay desktop — one screen mixes a desktop toolbar with touch rows (01 §7.5 live table) | Owner presentation decision; controller recommends touch sizes follow the device/viewport (or pointer), not the canvas |
 | Card editable `To` vs Work recorded channels | `CompactModuleCard` Communication offers an editable `To`; Work's `WorkCommunication` allows recorded channels only (owner ruling 2026-09-17) | Owner decision |
 | `Jump to…` empty word | The locked contract prints `No results`; COPY-STANDARD rule 5 lists `No results` as the ✘ empty-state example. Reconcilable (a search matched nothing; a worklist is empty) but COPY does not yet carry that split | COPY ruling |
 | Facet counts spelt three ways | PO §9.3 (whole register), Purchase Returns §9.6 (respect other dimensions), Supplier Claims §9.5 (complete searched/filtered set) versus §6.7's one reading | Converge each page in its own round |
-| Native Input/Textarea inside the card | `.panel input/select/textarea` still overrides font, padding, radius and border of native Input/Textarea (01 §7.6 records the actual values); Select/DatePicker keep the kit skin | Governed source correction |
-| Reference table header weight | 01 §7.4 records source weight 700 vs governed 600 | Measure and correct in 01/source |
 | Shared Select long option at 390px | measured right edge 420.72px beyond the viewport (research file §9) | Kit fix |
 | WarehouseIncoming modal close | focus lands on the page, not the Count trigger (research file §9) | Adopt `DialogFrame` focus return |
 | Picker inside a dialog renders UNDER it | a real P1 defect, approved, not built | Kit fix |
@@ -1505,9 +1142,9 @@ into the section it belongs to, and this list loses it.
 - **Page-level Wrap tool** — only per-column `wrap` exists.
 - **Account-saved layouts beyond Purchase Orders; kit `DataTable` layout memory** — APPROVED TARGET /
   NOT BUILT (`OperationOrdersControl.test.tsx` measures the DataTable gap).
-- **Shared region error/permission recipe** — no universal numeric component proved (01 §8.3 PROPOSAL).
-- **Touch targets** — segmented tab 34 on phone, rail Hide/Show 28, chip remove 24, bare checkbox 16 do
-  not prove 40px hit areas; DialogFrame Close ≥40 is PROPOSAL.
+- **Shared region error/permission recipe** — component adoption and full-page states still require proof (01 §8).
+- **Touch targets** — existing consumers must pass §2.2; a drawn glyph size does not prove the control hit area.
+
 - **Accessible assignment avatar** — the avatar-only hover/focus/tap identity contract has no shared
   component.
 - **`/ui` whole-page coverage** — Register, Working Panel and Object examples with all responsive and
@@ -1520,23 +1157,17 @@ into the section it belongs to, and this list loses it.
 | How `Tasks` coexists with Calendar, Activity and the page's work (same-area replacing is one option, not decided); Calendar must stay quickly viewable while handling a task | owner direction 2026-10-05 | Under research; owner review |
 | Reduced motion: animations respect the operator's reduced-motion setting | consolidation review 2026-10-05 | Owner/kit decision; no rule until approved |
 | Confirm before an act that cannot be undone, in COPY wording | consolidation review 2026-10-05 | Any word change goes through COPY |
-| Compact-card token decision: the card's palette, font family, radius, drawn glyphs and red error line are the reference's own, not 01 (values in 01 §7.6) | card contract | Owner token decision |
-| 40px phone module tabs on the card (controls stay 32px today) | card contract | Module-tab-row decision |
 | Expansion-only Columns (opt-in goods columns, OFF by default) | Purchasing 2026-10-05 | Owner has not decided (§6.3) |
 | "Several SOs → list first, then one" inside a host panel | Purchasing 2026-10-05 | Owner decision |
 | PO working panel and round panel content layouts; SO Batch round rail; `Match Ready Stock` placement; SO Batch optional goods columns replacing the details table | Purchasing lane, localhost | Owner review in the Purchasing lane |
-| Filled primary button on blue-11 (white on blue-9 measures 3.26:1); darker semantic foregrounds for small labels | research file §8 | Real component samples + owner review |
-| Field-card typography 16/14/12 (Houzs Loading List) versus 15/13/12 | 2026-10-01 | Same-content comparison |
-| Cards grid: container minimum 320, three columns ≥984, two ≥652 | 01 §8.1 | Sample review |
 | Purchasing fit review — four cross-module contracts: linked sections distinguish loading/error/empty/present/denied; current, last-sent and goods completion are separate facts; blocker summaries point to the exact row/field and keep the draft; source/Unit evidence stays traceable | Purchasing PLAN 2026-10-01 | Verify against existing components; Purchasing owns its sample |
 | Inventory top-filter placement (instead of a rail) | research file §4 | Complete compact-top versus rail analysis |
 
 ## §7.5 · Approved targets not yet built (shared)
 
-Quick Rail `Calendar` · `Tasks` · `Activity` icon-only doors (Tasks layout under research) and the all-module calendar filters (§5) · `Assigned to` /
+Shared Tasks-region adoption plus retained Calendar/Activity integration and all-module calendar filters (§5) · `Assigned to` /
 `Completed by` wording (§5.1) · mission entries on module rails (§6.1) · `Warehouse` tab (§4.3.4) ·
 personal saved-layout rollout (§6.7) · facet-count convergence (§6.7) · SO dealer/product multi-select
-rail · the flame repoint `--primary` → blue (594 sites; needs its own card and a visual approval) ·
 `base-*` → kit palette (4,661 sites; page by page with the page migrations, never globally) · real
 pages on `PageShell` / `DataTable` / `DetailShell` (the order drawer is BLOCKED: L4 needs a facts
 4-tuple that does not exist) · splitting the grid's `layout` prop when a page needs resize without
@@ -1546,7 +1177,7 @@ reorder · `SavedEvidenceViewer` adoption in Stock and Service.
 
 `warehouse-ui-preview.html` (hand-written shell, blue summary box, concatenated goods expansion —
 rejected by the owner) · `inbound-flow.html` (not accepted as a build reference) · the 48px toolbar
-candidate · the warm-grey hex palette · literal Houzs colours, 9px badges, 700 weight or 12px radius ·
+candidate · the unapproved alternative palettes, 9px essential labels and 700 weight ·
 a generic full-order editing drawer beside the Working Panel · `DetailShell` as a cross-module shell ·
 the always-visible icon-only Export/Columns toolbar (replaced by `⋯`) · the former quick-view `Block`
 composition (replaced by `CompactModuleCard`).
