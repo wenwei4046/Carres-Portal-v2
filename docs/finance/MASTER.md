@@ -351,7 +351,7 @@ Dealer commission rules:
 - 0647 fixes a fault 0642 shipped with: a credit note's two account columns did not follow a renumbered account (0570 says every key that names the chart must), so renumbering an account a credit note used was refused. Both now follow, and the file refuses to apply while any key onto the chart still does not. A test renumbers an account under a confirmed credit note.
 - Falsifier: in Chew's test, a supplier's `Unpaid After Advance and Credit` differs from its balance in the books, or a bill shows a credit note Chew did not knock off.
 
-**Credit and debit notes to follow up — Chew 2026-10-06, 2026-10-07 and 2026-10-09; APPROVED; BUILT 2026-10-09; 0676 NOT APPLIED: it waits for Chew's OK.**
+**Credit and debit notes to follow up — Chew 2026-10-06, 2026-10-07 and 2026-10-09; APPROVED; BUILT 2026-10-09 (「可以，开始做」, PR #1998); 0676 APPLIED 2026-10-09 with Chew's OK (「好，做完了告诉我」), the tracker holding the file exactly (md5 `28baaa8fbd83f84ca64382589fd1b240`).**
 - Chew needs one list of the credit and debit notes suppliers still owe, so he can follow each one up (「我需要有一个listing 关于supplier 那边要follow up 的cn」). It is a reminder only and posts nothing, because there is no supplier claims account (Chew 2026-10-06).
 - Where one starts (「就是我转grn 去pi 时会对比我的po price， 然后提醒我，我会remark pending supplier cn or dn / 同时也有可能是开了pi, 然后要purchase return， 就要让他pending cn」):
   - when a bill is made from its GRN, each line is compared with its PO price and a difference is pointed out; Chew marks it pending a supplier credit note or debit note, with a remark;
