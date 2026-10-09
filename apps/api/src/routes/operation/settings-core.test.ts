@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppEnv } from "../../types";
-vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
-import { userClient } from "../../lib/supabase";
+vi.mock("../../lib/supabase", () => ({ userClient: vi.fn(), adminClient: vi.fn() }));
+import { adminClient, userClient } from "../../lib/supabase";
 import router, { companyProfileReadRouter } from "./settings-core";
 
 const rpc = vi.fn();
@@ -33,6 +33,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   for (const k of Object.keys(tables)) delete tables[k];
   vi.mocked(userClient).mockReturnValue({ rpc, from: (n: string) => chain(n) } as never);
+  vi.mocked(adminClient).mockReturnValue({ from: (n: string) => chain(`admin:${n}`) } as never);
   rpc.mockResolvedValue({ data: true, error: null });
 });
 
@@ -112,6 +113,16 @@ describe("Settings → Office", () => {
 });
 
 describe("Settings editors", () => {
+  it("names the owner from the owner accounts even when the reader cannot see them", async () => {
+    tables.settings_section_editors = { data: [], error: null };
+    tables.app_users = { data: [{ id: "u1", name: "Shasha", role: "operation", status: "active", is_person: true }], error: null };
+    tables["admin:app_users"] = { data: [{ name: "Jess" }], error: null };
+    const body = (await (await app("operation").request("/settings/editors")).json()) as { owners: string[]; canManage: boolean; people: unknown[] };
+    expect(body.owners).toEqual(["Jess"]);
+    expect(body.canManage).toBe(false);
+    expect(body.people).toEqual([{ id: "u1", name: "Shasha" }]);
+  });
+
   it("only the owner names an editor", async () => {
     const res = await app("operation").request("/settings/editors/grant", {
       method: "POST", headers: { "Content-Type": "application/json" },

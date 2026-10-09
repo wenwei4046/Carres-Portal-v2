@@ -36,7 +36,7 @@ import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { canEditSettings, requireSettingsEditor } from "../../lib/settings-editor";
 import { readOfficeCalendar } from "../../lib/office-calendar";
-import { userClient } from "../../lib/supabase";
+import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 const router = new Hono<AppEnv>();
@@ -200,8 +200,15 @@ router.get("/editors", requireOperationOrPrincipal, async (c) => {
       .eq("status", "active")
       .order("name"),
   ]);
-  const owners = (people.data ?? [])
-    .filter((p) => p.role === "principal" && p.is_person !== false)
+  /* The owner accounts' NAMES only (not secret; a reader's own token may
+   * not see the principal's row), so the page can say who edits everything. */
+  const ownerRead = await adminClient(c.env)
+    .from("app_users")
+    .select("name")
+    .eq("role", "principal")
+    .eq("status", "active")
+    .eq("is_person", true);
+  const owners = (ownerRead.data ?? [])
     .map((p) => String(p.name ?? "").trim())
     .filter(Boolean);
   if (grants.error) {

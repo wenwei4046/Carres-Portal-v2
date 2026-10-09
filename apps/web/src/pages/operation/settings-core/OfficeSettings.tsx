@@ -298,7 +298,7 @@ function OfficeHolidaysSection({ holidays, editable }: {
         inForce.length === 0 ? null : (
           <ul className="divide-y divide-kit-slate-4" data-testid="office-holiday-list">
             {inForce.map((h) => (
-              <li key={h.date} className="grid grid-cols-[160px_minmax(0,1fr)] gap-3 py-1.5 text-body">
+              <li key={h.date} className="grid grid-cols-1 gap-1 py-1.5 text-body md:grid-cols-[220px_minmax(0,1fr)] md:gap-3">
                 <span className="text-kit-slate-11">{fmtDate(h.date)}</span>
                 <span className="text-kit-slate-12">{h.name}</span>
               </li>
