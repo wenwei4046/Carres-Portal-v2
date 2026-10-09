@@ -11,6 +11,7 @@ import { ReadFailed } from "./PayablesParts";
 import { supplierUnpaid, unpaidTotal } from "../money-owed";
 import SupplierAdvancesOf from "./SupplierAdvancesOf";
 import SupplierCreditsOf from "./SupplierCreditsOf";
+import { SupplierDebitsOf } from "./SupplierDebitNotes";
 
 /**
  * Finance → Unpaid by Supplier (migration 0477, `ap_outstanding`). What
@@ -18,10 +19,12 @@ import SupplierCreditsOf from "./SupplierCreditsOf";
  * much of that is already on a payment voucher waiting for approval. Read
  * only: paying is a Payment Voucher, one door.
  *
- * Advance Left (0484), Credit Left (0642) and Unpaid After Advance and Credit
- * come from the database (`advance_open`, `credit_open`, `net_owing`) — the
- * same figure the ledger self-check reads. A supplier with only an advance or
- * a credit note shows here with a negative Unpaid After Advance and Credit.
+ * Debit Notes Unpaid (0681), Advance Left (0484), Credit Left (0642) and Unpaid
+ * After Advance and Credit come from the database (`debit_open`,
+ * `advance_open`, `credit_open`, `net_owing`) — the same figure the ledger
+ * self-check reads. Unpaid is the bills' unpaid plus Debit Notes Unpaid. A
+ * supplier with only an advance or a credit note shows here with a negative
+ * Unpaid After Advance and Credit.
  */
 export default function ApOutstanding() {
   const navigate = useNavigate();
@@ -38,6 +41,11 @@ export default function ApOutstanding() {
       numberValue: (r) => num(r.billed_total), filterType: "number", exportValue: (r) => num(r.billed_total) ?? "" },
     { key: "paid", label: "Paid", width: 140, align: "right", accessor: (r) => money(r.paid_total),
       numberValue: (r) => num(r.paid_total), filterType: "number", exportValue: (r) => num(r.paid_total) ?? "" },
+    // 0681: a confirmed supplier debit note not yet paid is owed like a bill;
+    // Unpaid adds it (supplierUnpaid), and so does net_owing.
+    { key: "debit", label: "Debit Notes Unpaid", headerLines: ["Debit Notes", "Unpaid"], width: 140, align: "right",
+      accessor: (r) => money(r.debit_open ?? 0),
+      numberValue: (r) => num(r.debit_open ?? 0), filterType: "number", exportValue: (r) => num(r.debit_open ?? 0) ?? "" },
     { key: "unpaid", label: "Unpaid", width: 140, align: "right", accessor: (r) => money(supplierUnpaid(r)),
       numberValue: (r) => supplierUnpaid(r), filterType: "number", exportValue: (r) => supplierUnpaid(r) ?? "" },
     // 0484: an advance paid before the bill is owed back to Carres until it is
@@ -122,6 +130,7 @@ function UnpaidBillsOf({ row }: { row: ApOutstandingRow }) {
                 {" · "}{money(b.balance_owing)} unpaid
               </p>
             ))}
+      {(num(row.debit_open ?? 0) ?? 0) > 0 && <SupplierDebitsOf supplierId={row.supplier_id} />}
       <SupplierAdvancesOf supplierId={row.supplier_id} />
       {(num(row.credit_open ?? 0) ?? 0) > 0 && <SupplierCreditsOf supplierId={row.supplier_id} />}
       <Link className="btn-secondary mt-3 inline-block" to={`/finance/payment-vouchers/new?supplier=${row.supplier_id}`}>

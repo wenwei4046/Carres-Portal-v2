@@ -50,7 +50,9 @@ const sum = (rows: ApAgingRow[], pick: (r: ApAgingRow) => number) => rm(rows.red
 
 function Bills({ row, columns }: { row: ApAgingRow; columns: AgingColumns }) {
   const cols: readonly Column<ApAgingRow["bills"][number]>[] = [
-    { key: "bill", label: "Bill No", width: "150px", cell: (b) => <Link className={link} to={`/finance/bills/${b.billId}`}>{b.billNo}</Link> },
+    // 0681: a supplier debit note is aged beside the bills, and opens its own page.
+    { key: "bill", label: "Bill No", width: "150px",
+      cell: (b) => <Link className={link} to={b.kind === "debit_note" ? `/finance/debit-notes/${b.billId}` : `/finance/bills/${b.billId}`}>{b.billNo}</Link> },
     { key: "invoice", label: "Supplier invoice", width: "150px", cell: (b) => b.supplierInvoiceNo ?? "" },
     { key: "date", label: "Bill date", width: "120px", cell: (b) => fmtDate(b.billDate) },
     { key: "due", label: "Due date", width: "120px", cell: (b) => (b.dueDate ? fmtDate(b.dueDate) : "") },

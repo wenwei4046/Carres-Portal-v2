@@ -9,7 +9,9 @@
  *                         per order through the shared `soRemaining`, storage
  *                         included. An order with no price yet is left out.
  *   Supplier Unpaid       `ap_outstanding.balance_owing` (0477) — billed minus
- *                         paid on confirmed bills, per supplier or creditor.
+ *                         paid on confirmed bills, per supplier or creditor —
+ *                         plus `debit_open` (0681), its confirmed debit notes
+ *                         not yet paid.
  *
  * The Finance Dashboard and the AR page read these helpers, never their own
  * sum. `supplierUnpaid` is the one line to change when the per-supplier figure
@@ -128,9 +130,14 @@ export function arAging(rows: readonly CustomerOwingRow[], today: string): ArAgi
   return { buckets, overdue: pick("over-30") };
 }
 
-/** What one supplier or creditor is still owed. `null` when the figure is unreadable. */
+/** What one supplier or creditor is still owed: its unpaid bills and (0681)
+ *  its unpaid supplier debit notes. `null` when a figure is unreadable. */
 export function supplierUnpaid(row: ApOutstandingRow): number | null {
-  return num(row.balance_owing);
+  const bills = num(row.balance_owing);
+  if (bills === null) return null;
+  // Before 0681 the database sends no debit_open: nothing is owed on a debit note.
+  const debit = row.debit_open === undefined ? 0 : num(row.debit_open);
+  return debit === null ? null : cents(bills + debit);
 }
 
 /** What Carres owes suppliers in total. `suppliers` counts only those still owed money. */

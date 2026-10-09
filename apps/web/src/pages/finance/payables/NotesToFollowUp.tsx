@@ -291,10 +291,13 @@ function NoteDetail() {
             {doc.settlements.length === 0
               ? <p>{n.kind === "CREDIT"
                 ? "No credit note has settled it yet. Settle it from the supplier's credit note."
-                : "A debit note owed is closed with a reason until supplier debit notes are built."}</p>
+                : "No debit note has settled it yet. Settle it from the supplier's debit note."}</p>
               : doc.settlements.map((s) => (
                 <p key={s.id} data-testid={`note-settlement-${s.id}`}>
-                  <Link className={link} to={`/finance/credit-notes/${s.credit_note_id}`}>{s.note_no ?? s.supplier_note_no}</Link>
+                  {/* 0681: a debit note settles a debit note owed, and opens its own page. */}
+                  <Link className={link} to={s.debit_note_id ? `/finance/debit-notes/${s.debit_note_id}` : `/finance/credit-notes/${s.credit_note_id}`}>
+                    {s.note_no ?? s.supplier_note_no}
+                  </Link>
                   {" · "}{money(s.amount)} · {fmtDate(s.created_at)}
                   {s.taken_off_at ? ` · Taken off · ${s.take_off_reason ?? "No reason on file"}`
                     : s.note_status === "cancelled" ? " · Credit note cancelled" : ""}

@@ -9,6 +9,7 @@ import {
   type PaymentVoucherDraftInput,
   type PaymentVoucherRegisterRow,
   type SupplierBillRegisterRow,
+  type SupplierDebitNoteRegisterRow,
   supplierPayTo,
 } from "@carres/shared/schemas/finance-ap";
 import ListPageShell from "@/components/ListPageShell";
@@ -27,6 +28,7 @@ import {
   useApSuppliers,
   usePaymentVoucher,
   useSupplierBills,
+  useSupplierDebitNotes,
   usePaymentVouchers,
   useSaveVoucher,
   useSupplierFinance,
@@ -129,8 +131,9 @@ function VoucherRegister() {
       searchValue: (r) => r.supplier_name ?? "", filterType: "enum" },
     { key: "purpose", label: "Purpose", width: 160, accessor: (r) => word(VOUCHER_PURPOSE_WORD, r.purpose),
       filterValue: (r) => word(VOUCHER_PURPOSE_WORD, r.purpose), filterType: "enum" },
-    { key: "bills", label: "Bills Paid", width: 200, accessor: (r) => r.bill_nos ?? "No bill",
-      searchValue: (r) => r.bill_nos ?? "" },
+    // 0681: the debit notes it pays are listed beside the bills.
+    { key: "bills", label: "Bills and Debit Notes Paid", headerLines: ["Bills and Debit", "Notes Paid"], width: 200,
+      accessor: (r) => r.bill_nos ?? "No bill", searchValue: (r) => r.bill_nos ?? "" },
     { key: "from", label: "Paid From", width: 180,
       accessor: paidFromWord, filterType: "enum" },
     { key: "method", label: "Method", width: 130, accessor: (r) => word(PAY_METHOD_WORD, r.pay_method),
@@ -351,6 +354,7 @@ function VoucherDetail() {
             )}
           </Facts>
           <VoucherBillsCard doc={doc} />
+          {(doc.debit_notes ?? []).length > 0 && <VoucherDebitNotesCard doc={doc} />}
           <VoucherAdvanceCard doc={doc} />
           <VoucherLinesCard doc={doc} />
           <FilesCard kind="vouchers" id={id} files={doc.files} canAdd={doc.can.add_file} />
@@ -437,6 +441,40 @@ function VoucherBillsCard({ doc }: { doc: PaymentVoucherDocument }) {
   );
 }
 
+/** 0681: the supplier debit notes this voucher pays. */
+function VoucherDebitNotesCard({ doc }: { doc: PaymentVoucherDocument }) {
+  return (
+    <Facts title="Debit notes paid">
+      <div className="overflow-x-auto">
+        <table className="w-full text-body" data-testid="voucher-debit-notes">
+          <thead>
+            <tr className="text-left text-base-500">
+              <th className="py-1 pr-3">Debit Note No</th>
+              <th className="py-1 pr-3">Supplier's debit note</th>
+              <th className="py-1 pr-3">Date</th>
+              <th className="py-1 pr-3">Due date</th>
+              <th className="py-1 pr-3 text-right">Total</th>
+              <th className="py-1 text-right">Paid by this voucher</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(doc.debit_notes ?? []).map((d) => (
+              <tr key={d.debit_note_id} className="border-t border-base-100">
+                <td className="py-1 pr-3"><Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/debit-notes/${d.debit_note_id}`}>{d.note_no ?? "Draft debit note"}</Link></td>
+                <td className="py-1 pr-3">{d.supplier_note_no}</td>
+                <td className="py-1 pr-3">{fmtDate(d.note_date)}</td>
+                <td className="py-1 pr-3">{d.due_date ? fmtDate(d.due_date) : "No due date"}</td>
+                <td className="py-1 pr-3 text-right">{money(d.note_total)}</td>
+                <td className="py-1 text-right">{money(d.amount_applied)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Facts>
+  );
+}
+
 function VoucherLinesCard({ doc }: { doc: PaymentVoucherDocument }) {
   return (
     <Facts title="Direct lines">
@@ -457,6 +495,9 @@ function VoucherLinesCard({ doc }: { doc: PaymentVoucherDocument }) {
 type Purpose = PaymentVoucherDraftInput["purpose"];
 type Method = PaymentVoucherDraftInput["payMethod"];
 type BillPick = { on: boolean; amount: string };
+/** 0681: a debit note's pick sits beside the bills' under this prefix, so the
+ *  total and the Save checks count it as they count a bill. */
+const DN = "dn:";
 type DirectLine = { key: string; accountCode: string; description: string; amount: string; departmentType: DepartmentType | null; departmentId: string | null };
 
 let seq = 0;
@@ -532,7 +573,12 @@ function VoucherForm() {
   const [narration, setNarration] = useState("");
   const [picks, setPicks] = useState<Record<string, BillPick>>(() => {
     const bill = params.get("bill");
-    return bill ? { [bill]: { on: true, amount: "" } } : {};
+    // 0681: a debit note sent from its own page arrives ticked, like a bill.
+    const debitNote = params.get("debitNote");
+    return {
+      ...(bill ? { [bill]: { on: true, amount: "" } } : {}),
+      ...(debitNote ? { [`${DN}${debitNote}`]: { on: true, amount: "" } } : {}),
+    };
   });
   const [lines, setLines] = useState<DirectLine[]>([]);
   const [advance, setAdvance] = useState("");
@@ -568,7 +614,10 @@ function VoucherForm() {
       ? d.voucher.pay_method as Method : "OTHER");
     setReference(d.voucher.pay_reference ?? "");
     setNarration(d.voucher.narration ?? "");
-    setPicks(Object.fromEntries(d.allocations.map((a) => [a.bill_id, { on: true, amount: String(a.amount_applied) }])));
+    setPicks(Object.fromEntries([
+      ...d.allocations.map((a) => [a.bill_id, { on: true, amount: String(a.amount_applied) }] as const),
+      ...(d.debit_notes ?? []).map((n) => [`${DN}${n.debit_note_id}`, { on: true, amount: String(n.amount_applied) }] as const),
+    ]));
     setLines(d.lines.map((l) => ({ ...newLine(), accountCode: l.account_code, description: l.description ?? "", amount: String(l.amount),
       departmentType: (l.department_type ?? null) as DepartmentType | null, departmentId: l.department_id ?? null })));
     setAdvance((num(d.voucher.advance_amount) ?? 0) > 0 ? String(d.voucher.advance_amount) : "");
@@ -607,6 +656,44 @@ function VoucherForm() {
     });
   }, [bills.data, mine]);
 
+  // 0681: the supplier's confirmed debit notes, paid like bills. What a note
+  // can still take is its total less what vouchers hold on it, plus what this
+  // draft already holds.
+  const debitNotes = useSupplierDebitNotes();
+  const mineDn = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const n of existing.data?.debit_notes ?? []) out[n.debit_note_id] = num(n.amount_applied) ?? 0;
+    return out;
+  }, [existing.data]);
+  const dnAvailable = (n: SupplierDebitNoteRegisterRow) =>
+    cents((num(n.total_amount) ?? 0) - (num(n.held_total) ?? 0) + (mineDn[n.id] ?? 0));
+  const debitRows = purpose === "SUPPLIER_BILLS" && supplierId !== ""
+    ? (debitNotes.data ?? [])
+      .filter((n) => n.supplier_id === supplierId && n.status === "confirmed")
+      .map((n) => ({ ...n, available: dnAvailable(n) }))
+      .filter((n) => n.available > 0 || picks[`${DN}${n.id}`]?.on)
+    : [];
+  // A debit note ticked from its own page arrives with no amount: it defaults
+  // to what is left to pay on it.
+  useEffect(() => {
+    if (!debitNotes.data) return;
+    setPicks((before) => {
+      let changed = false;
+      const next = { ...before };
+      for (const [key, p] of Object.entries(before)) {
+        if (!key.startsWith(DN) || !p.on || p.amount !== "") continue;
+        const row = debitNotes.data.find((n) => `${DN}${n.id}` === key);
+        if (row) {
+          next[key] = { on: true, amount: String(dnAvailable(row)) };
+          changed = true;
+        }
+      }
+      return changed ? next : before;
+    });
+    // dnAvailable reads only mineDn, already listed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debitNotes.data, mineDn]);
+
   const supplier = (suppliers.data ?? []).find((s) => s.id === supplierId) ?? null;
   // 0512: Paid from reads the one money-account list — cash and banks only.
   const payFromChoices = (moneyAccounts.data ?? []).filter(paysOut);
@@ -635,7 +722,9 @@ function VoucherForm() {
         departmentId: l.departmentId,
       })),
       allocations: purpose === "SUPPLIER_BILLS"
-        ? Object.entries(picks).filter(([, p]) => p.on).map(([billId, p]) => ({ billId, amount: Number(p.amount) }))
+        ? Object.entries(picks).filter(([, p]) => p.on).map(([key, p]) => (key.startsWith(DN)
+          ? { debitNoteId: key.slice(DN.length), amount: Number(p.amount) }
+          : { billId: key, amount: Number(p.amount) }))
         : [],
       advanceAmount: advanceN,
     };
@@ -775,6 +864,11 @@ function VoucherForm() {
                       : <BillPicks rows={billRows} picks={picks} onChange={setPicks} billChecks={billChecks} />}
             </Facts>
           )}
+          {debitRows.length > 0 && (
+            <Facts title="Debit notes to pay">
+              <DebitNotePicks rows={debitRows} picks={picks} onChange={setPicks} />
+            </Facts>
+          )}
           {purpose === "SUPPLIER_BILLS" && supplierId !== "" && (
             <Facts title="Advance">
               <label className="block">
@@ -853,6 +947,62 @@ function BillPicks({ rows, picks, onChange, billChecks }: {
                   <input aria-label={`Amount for ${b.bill_no}`} className={`${fieldCls} w-28`} inputMode="decimal"
                     disabled={!p.on} value={p.amount}
                     onChange={(e) => onChange({ ...picks, [b.bill_id]: { on: true, amount: e.target.value } })} />
+                  {over && <span className="block text-meta text-kit-red-11">More than is left to pay</span>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** 0681: the supplier's confirmed debit notes, ticked and paid like bills. */
+function DebitNotePicks({ rows, picks, onChange }: {
+  rows: Array<SupplierDebitNoteRegisterRow & { available: number }>;
+  picks: Record<string, BillPick>;
+  onChange: (next: Record<string, BillPick>) => void;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-body" data-testid="voucher-debit-note-picks">
+        <thead>
+          <tr className="text-left text-base-500">
+            <th className="py-1 pr-2" />
+            <th className="py-1 pr-2">Debit Note No</th>
+            <th className="py-1 pr-2">Supplier's debit note</th>
+            <th className="py-1 pr-2">Date</th>
+            <th className="py-1 pr-2">Due date</th>
+            <th className="py-1 pr-2 text-right">Total</th>
+            <th className="py-1 pr-2 text-right">Left to pay</th>
+            <th className="py-1">Pay now</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((n) => {
+            const key = `${DN}${n.id}`;
+            const p = picks[key] ?? { on: false, amount: "" };
+            const over = p.on && (num(p.amount) ?? 0) > n.available;
+            return (
+              <tr key={n.id} className="border-t border-base-100">
+                <td className="py-1 pr-2">
+                  <input type="checkbox" aria-label={`Pay ${n.note_no}`} checked={p.on}
+                    onChange={(e) => onChange({
+                      ...picks,
+                      [key]: { on: e.target.checked, amount: e.target.checked ? String(n.available) : "" },
+                    })} />
+                </td>
+                <td className="py-1 pr-2">{n.note_no}</td>
+                <td className="py-1 pr-2">{n.supplier_note_no}</td>
+                <td className="py-1 pr-2">{fmtDate(n.note_date)}</td>
+                <td className="py-1 pr-2">{n.due_date ? fmtDate(n.due_date) : "No due date"}</td>
+                <td className="py-1 pr-2 text-right">{money(n.total_amount)}</td>
+                <td className="py-1 pr-2 text-right">{money(n.available)}</td>
+                <td className="py-1">
+                  <input aria-label={`Amount for ${n.note_no}`} className={`${fieldCls} w-28`} inputMode="decimal"
+                    disabled={!p.on} value={p.amount}
+                    onChange={(e) => onChange({ ...picks, [key]: { on: true, amount: e.target.value } })} />
                   {over && <span className="block text-meta text-kit-red-11">More than is left to pay</span>}
                 </td>
               </tr>

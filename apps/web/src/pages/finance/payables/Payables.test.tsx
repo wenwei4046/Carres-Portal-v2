@@ -184,9 +184,20 @@ beforeEach(() => {
         applied_total: "200.00", money_back_total: "0.00", advance_open: "300.00" },
     ] },
     [`${B}/vouchers`]: { rows: [] },
+    // 0681: no supplier debit note unless a test adds one.
+    [`${B}/debit-notes`]: { rows: [] },
   };
   localStorage.clear();
 });
+
+// 0681: a confirmed supplier debit note, RM 100.00 of it already on a voucher.
+const DN = "abababab-abab-4bab-8bab-abababababab";
+const debitNoteRow = {
+  id: DN, note_no: "PDN-20261005-3381", status: "confirmed", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
+  supplier_kind: "supplier", supplier_note_no: "LSW-DN-4", note_date: "2026-10-05", due_date: "2026-11-04",
+  ap_account_code: "2110", total_amount: "180.00", paid_total: "0.00", held_total: "100.00", debit_open: "180.00",
+  file_count: 0, created_at: "2026-10-05T02:00:00Z",
+};
 
 function show(at: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -527,6 +538,33 @@ describe("Payment voucher form", () => {
     expect(w.body).toMatchObject({ advanceAmount: 0 });
   });
 
+  it("0681: pays a supplier debit note beside a bill, at most what no voucher holds yet", async () => {
+    api.routes[`${B}/debit-notes`] = { rows: [debitNoteRow] };
+    show(`/finance/payment-vouchers/new?supplier=${SUP}`);
+    fireEvent.click(await screen.findByLabelText("Pay BILL-8PZ7"));
+    const picks = await screen.findByTestId("voucher-debit-note-picks");
+    expect(picks).toHaveTextContent("PDN-20261005-3381");
+    expect(picks).toHaveTextContent("LSW-DN-4");
+    fireEvent.click(within(picks).getByLabelText("Pay PDN-20261005-3381"));
+    // RM 180.00, RM 100.00 already on another voucher: RM 80.00 can still be paid.
+    expect(within(picks).getByLabelText("Amount for PDN-20261005-3381")).toHaveValue("80");
+    expect(screen.getByTestId("voucher-form-total")).toHaveTextContent("RM 280.00");
+    fireEvent.change(screen.getByLabelText("Paid from"), { target: { value: "1120" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]!.body).toMatchObject({
+      allocations: [{ billId: BILL2, amount: 200 }, { debitNoteId: DN, amount: 80 }],
+    });
+  });
+
+  it("0681: a debit note sent from its page arrives ticked", async () => {
+    api.routes[`${B}/debit-notes`] = { rows: [debitNoteRow] };
+    show(`/finance/payment-vouchers/new?supplier=${SUP}&debitNote=${DN}`);
+    const picks = await screen.findByTestId("voucher-debit-note-picks");
+    expect(within(picks).getByLabelText("Pay PDN-20261005-3381")).toBeChecked();
+    await waitFor(() => expect(within(picks).getByLabelText("Amount for PDN-20261005-3381")).toHaveValue("80"));
+  });
+
   it("a disabled Save names the first thing still missing, top to bottom", async () => {
     show("/finance/payment-vouchers/new");
     expect(await screen.findByRole("button", { name: "Save: pick the supplier" })).toBeDisabled();
@@ -637,6 +675,21 @@ describe("Payment voucher form", () => {
 });
 
 describe("Payment voucher detail", () => {
+  it("0681: lists the debit notes it pays beside the bills", async () => {
+    api.routes[`${B}/vouchers/${PV}`] = {
+      ...voucherDoc({ status: "draft", can: {} }),
+      debit_notes: [{ debit_note_id: DN, note_no: "PDN-20261005-3381", supplier_note_no: "LSW-DN-4", note_date: "2026-10-05",
+        due_date: null, note_total: "180.00", ap_account_code: "2110", amount_applied: "80.00" }],
+    };
+    show(`/finance/payment-vouchers/${PV}`);
+    const table = await screen.findByTestId("voucher-debit-notes");
+    expect(table).toHaveTextContent("PDN-20261005-3381");
+    expect(table).toHaveTextContent("LSW-DN-4");
+    expect(table).toHaveTextContent("No due date");
+    expect(table).toHaveTextContent("RM 80.00");
+    expect(within(table).getByRole("link", { name: "PDN-20261005-3381" })).toHaveAttribute("href", `/finance/debit-notes/${DN}`);
+  });
+
   it("offers exactly the step the database allows — Approve payment — and posts it", async () => {
     api.routes[`${B}/vouchers/${PV}`] = voucherDoc({ status: "checked", can: { approve: true, reject: true } });
     show(`/finance/payment-vouchers/${PV}`);
@@ -913,6 +966,22 @@ describe("Unpaid by Supplier", () => {
     fireEvent.click(screen.getAllByTitle("Show unpaid bills")[0]!);
     expect(await screen.findByTestId(`ap-outstanding-credits-${SUP}`))
       .toHaveTextContent("SCN-20260920-4821 · Sun, 20 Sep · RM 150.00 left of RM 350.00");
+  });
+
+  it("0681: a debit note not paid yet is Debit Notes Unpaid, added to Unpaid, and listed under the supplier", async () => {
+    const owed = (api.routes[`${B}/outstanding`] as { rows: Array<Record<string, unknown>> }).rows[0]!;
+    api.routes[`${B}/outstanding`] = { rows: [{ ...owed, debit_open: "180.00", net_owing: "1105.00" }] };
+    api.routes[`${B}/debit-notes`] = { rows: [debitNoteRow] };
+    show("/finance/ap-outstanding");
+    await screen.findByText("Lumen Sofa Works");
+    expect(screen.getAllByText(/Debit Notes/).length).toBeGreaterThan(0);
+    expect(screen.getByText("RM 180.00")).toBeInTheDocument();
+    // Unpaid is the bills' RM 1,225.00 and the debit note's RM 180.00.
+    expect(screen.getByTestId("ap-outstanding-summary")).toHaveTextContent("1 supplier · RM 1,405.00 unpaid");
+    expect(screen.getByText("RM 1,105.00")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByTitle("Show unpaid bills")[0]!);
+    expect(await screen.findByTestId(`supplier-debits-${SUP}`))
+      .toHaveTextContent("PDN-20261005-3381 · LSW-DN-4 · Mon, 5 Oct · due Wed, 4 Nov · RM 180.00 unpaid");
   });
 
   it("shows what is owed per supplier, and what already sits on a voucher", async () => {
