@@ -272,7 +272,7 @@ Normal monthly rota assigns PO Duty and GRN Duty to different people. Each duty 
 | Staff departure | Effective last working date removes future allocations; preserve history and handover | People/HR-owned departure; Workspace MASTER:237 onward |
 | One available person | Qualified person may coordinate PO, GRN and ordinary Delivery | Existing OWNER-CLARIFICATIONS Variable team size; no additional owner question |
 | No qualified person | Work remains visibly unassigned; alert staffing gap; do not mark complete or bypass gates | Same existing owner clarification |
-| Saturday rota | Full day 9:00 AM–6:00 PM; eligible duty staff and cover order | Confirmed; exact rotation cadence still to verify, not an immediate blocker |
+| Saturday on-call rota | Full day 9:00 AM–6:00 PM; eligible on-call staff and cover order | Confirmed; exact rotation cadence still to verify, not an immediate blocker |
 | Leave submission | Workspace → Leave; MC/Emergency/Planned; dates and type-specific evidence | Owner confirmed 9 Oct; no separate MC Report |
 | Leave approval | Approval required = No; configurable later by authorised editor | Owner confirmed 9 Oct; later effective-policy treatment to define |
 | Leave cover | Today immediately on submission; future leave on absence date; eligible working recipient | Confirmed operational policy; HR review separate |
