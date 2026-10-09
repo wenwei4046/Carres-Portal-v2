@@ -104,7 +104,7 @@ describe("Settings → Personal → Lunch time (0676)", () => {
   it("passes the Office range refusal through with its tag", async () => {
     rpc.mockResolvedValue({ data: null, error: { code: "22023", details: "lunch_outside_range", message: "choose a lunch start inside the Office range" } });
     const res = await put({ lunchStart: "11:00" });
-    expect(res.status).toBe(422); expect((await res.json()).code).toBe("lunch_outside_range");
+    expect(res.status).toBe(422); expect(((await res.json()) as { code?: string }).code).toBe("lunch_outside_range");
   });
   it("refuses a malformed time before the database", async () => {
     expect((await put({ lunchStart: "noon" })).status).toBe(422);

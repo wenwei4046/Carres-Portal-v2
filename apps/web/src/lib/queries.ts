@@ -12608,7 +12608,7 @@ export function useWorkActivitySettings() {
 export function useSaveWorkActivitySettings() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async (input: Omit<WorkspaceActivitySettingsResponse, "canEdit">) =>
+    mutationFn: async (input: Omit<WorkspaceActivitySettingsResponse, "canEdit" | "office">) =>
       workspaceActivitySettingsResponseSchema.parse(await apiFetch<unknown>(
         "/api/operation/work-activity/settings", { method: "PUT", body: JSON.stringify(input) },
       )),

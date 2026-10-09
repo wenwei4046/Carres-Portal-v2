@@ -265,7 +265,7 @@ Workspace-owned Staff & Duties page under global Settings (placement production 
 | Duty assignment form (owner ruling 2026-09-29; NOT BUILT) | Read-only `Duty` and current assignment; fields `Assigned to` · `From` · `Until` · `Reason`; `Cancel` / `Assign`; bounded PO/GRN adjustments require both dates and reason | Holder · Acting person · a future assignment shown as current |
 | Duty actions (owner ruling 2026-09-29; NOT BUILT) | Visible `⋯` with accessible name `More actions`; authorised assignment actions use `Assign` and the governed date/reason form | Assign holder · Add cover · permanent manual buttons · right-click-only entry · Take it · Release |
 | Duty filters (owner ruling 2026-09-29; NOT BUILT) | `All duties` · `Not assigned`; future assignments remain in `Next`/history | Covered today · Cover scheduled · cover-specific filters |
-| Two assignment checks (owner-approved 2026-09-29; owner defaults 9 Oct 2026) | Settings: `Morning check time` · `Afternoon check time`; owner defaults `10:00 AM` · `2:01 PM` (10:00 AM storable from 0670; the stored live times are not changed by a release); editor-editable, company time | one combined daily check · treating a morning activity stamp as afternoon evidence |
+| Two assignment checks (owner-approved 2026-09-29; owner defaults 9 Oct 2026) | Settings: `Morning check time` · `Afternoon check time`; owner defaults `10:00 AM` · `2:01 PM` (the stored live times are not changed by a release); editor-editable, company time; bounds follow Settings → Office and each person's afternoon check follows their own lunch (0676, see "Settings → Personal → Lunch time") | one combined daily check · treating a morning activity stamp as afternoon evidence |
 | Assignment check setting feedback | `Check times could not be loaded.` · `Check times could not be refreshed. Try again.` · `Check times were not saved. Try again.` · `These times changed. Cancel and try again.` · `Save` · `Cancel` · `Try again` | claiming defaults were loaded after a failed read · silently overwriting another manager’s change |
 | Assignment check without another person (implementation clarification of the approved non-blocking work rule, 2026-09-30) | `No one else could be assigned at this check.` · `Any authorised staff may help.` | calling a successful no-candidate check an update failure · telling staff to retry a fixed past checkpoint · implying execution is blocked |
 | Automatic assignment reason (owner-approved 2026-09-29; NOT BUILT) | `Assignment reason: {name} was not online by {time}`; use the configured checkpoint time and only verified missing current-period activity | MC / absence diagnosis · claiming inactivity when the source failed |
@@ -5462,6 +5462,24 @@ Receiving placement; UI MASTER owns Calendar. No posting/permission change is im
 | Personal scope explanation | Choose how your portal looks. This changes only your profile. | Implementation explanatory copy |
 | Fixed status explanation | Theme changes the page background and selection. Status colours stay the same. | Current v4 UI Kit §9 meaning |
 | Save / result / failure | Save changes · Saved · Could not save. Try again. | Existing save/retry grammar |
+
+## Settings → Personal → Lunch time · owner order 9 Oct 2026 (Settings List OFF-04 · WS-04; migration 0676) · BUILT ON BRANCH, NOT DEPLOYED
+
+Each person's own lunch start; the activity check skips that lunch. Times print as `1:00 PM to 2:00 PM`; no dash.
+
+| Situation | Exact words | Source |
+|---|---|---|
+| Settings row / page title | Personal · Lunch time | Owner order 9 Oct 2026 ("personal lunch setting") |
+| Personal scope explanation | Choose when your one hour lunch starts. This changes only your profile. | Personal Appearance grammar |
+| Rows | Lunch starts · Your lunch · Afternoon check | OFF-04 · WS-04 |
+| Choices | `{time}` every quarter hour; the Office one reads `{time} · Office lunch` (choosing it follows the Office lunch) | OFF-04 default and shift |
+| Range note | `You can start lunch from {earliest} to {latest}.` | OFF-04 actual start 12:00 to 14:00 at the defaults |
+| Values | `{start} to {end}` · `{afternoon check time}` | the database's one window arithmetic |
+| Lunch rule note | Your work stays with you during lunch. The afternoon check waits until after your lunch. | WS-04 "no task transfer solely for lunch" |
+| Saved start no longer allowed | Your saved lunch time no longer fits the Office lunch. The Office lunch applies until you choose again. | Office change after a personal choice |
+| Refusal / failure / read | `Choose a time from {earliest} to {latest}.` · Could not save. Try again. · Lunch time could not be loaded. · Try again | Existing save/retry grammar |
+| Not a staff member | Only a staff member can set a lunch time. | Shared logins record no lunch |
+| Staff & Duties check time bounds | `Morning check from {Office start} to {last minute before the Office lunch}. Afternoon check from {first minute after the Office lunch} to {last minute before Office end}. A person's afternoon check moves with their own lunch.` | WS-02 · WS-03 bounds follow Settings → Office (0676) |
 
 ## Settings → Company · Office · Settings editors · owner 9 Oct 2026 (Carres Settings List COM · OFF · TEAM-02) · BUILT ON BRANCH, NOT DEPLOYED
 
