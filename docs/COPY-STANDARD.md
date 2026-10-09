@@ -5343,11 +5343,25 @@ Chew and management confirmed the calculation (Finance MASTER §3.2) and Chew th
 
 | Where | Words |
 |---|---|
-| The switch | `By dealer` · `By order` · `Commission rates` · `Renovation quotas` |
+| The switch | `By order` joins the switch (the whole switch: step 3 below) |
 | By dealer | `Commission on collected` becomes `Commission this month`; a totals row under the money columns |
 | By order | Groups `New orders this month` · `Balances this month` · `Cancelled this month` · `Taken back this month` · `Still waiting for money`. Columns `SO` · `Dealer` · `Customer` (`Customer not recorded`) · `Order day` (`Day not recorded`) · `Order total` · `Commission in full` · `Paid by month end` · `Commission this month` · `Still to earn` · `Note` (`Commission taken back` · `Cancelled` · `Earns nothing` · `Paid in full` · `Under half paid` · `Waiting for the balance`). Footer `{n} of {m} orders · What earns nothing is paid first. Nothing is earned before half the order is paid.` |
 | An order's window | Title `SO-{n}`, `{customer} · {dealer}` under it. `Order day:` · `Order total:` · `Earns nothing, paid first:` · `Earns commission:` · `Commission in full:` · `Half paid on:` (`Not yet`) · `Paid by the end of {month}:` · `Commission by the end of {month}:` · `Commission this month:` · `Still to earn:` · `Cancelled on:` · `Commission taken back on:`. A cancelled order: `What it earned on money Carres kept stays. Taking it back counts in the month you do it.` or `Keeping it gives the commission back in the month you do it.`; footer `Cancel` · `Take commission back` or `Keep commission`. Any other order: `Close` |
 | Refusals (the database's) | `Only Finance takes commission back.` · `Say whether to take the commission back.` · `That dealer order is not on the list.` · `Only a cancelled order's commission is taken back.` |
+
+### PROPOSAL — PENDING CHEW · Dealer statement and the store's own commission (step 3, 0664)
+
+Chew and management ruled the statement and the dealer's own view (Finance MASTER §3.2 "Dealer statement", D3) and Chew the build (「可以，开始做第3步」, 「直接做完」, 2026-10-09); the words below are proposed with them.
+
+| Where | Words |
+|---|---|
+| The switch | `By dealer` · `By order` · `Statement` · `Commission rates` · `Renovation quotas` |
+| Statement | Toolbar `Dealer` (`Choose`); no dealer yet: `Choose a dealer` · `Its statement shows what Carres owes it and what was paid.` Columns `Date` · `Description` (`Commission {month}` · `Commission {month} so far` · `Renovation rebate {month}` · `Payment {voucher no}`) · `Due` · `Commission` · `Paid` · `Balance`; a totals row. Footer `Owed to {dealer} now RM {n} · Due {day} RM {n} · Commission still to come RM {n}` (no `Due` part when nothing is owed; `Loading` while it reads). Toolbar `Add a payment` |
+| The add window | Title `Add a payment`, the dealer under it. Field `Payment voucher` (`Choose`, `Loading`; each `{voucher no} · {day} · {payee} · RM {n}`); none: `No paid direct payment voucher is waiting. Pay the dealer with a payment voucher first.` Note `A paid direct payment voucher counts as a payment to {dealer} on its statement.` Save names its gap: `Save: pick the payment voucher`; footer `Cancel` · `Save` |
+| A payment's window | Title `Payment {voucher no}`. `Paid on:` · `Amount:` · `Taking it off leaves the payment voucher as it is; only this statement stops counting it.`; footer `Cancel` · `Take off this statement` |
+| POS top bar, the store owner only | `Commission` |
+| The store's Commission page | The dealer's name over the title `Commission`; `Back`. Cards `Owed to you now` (`Due {day}` and the amount, when something is owed; `Each month's commission is paid on the 15th of the month after.`) · `Commission still to come` (`Earned as your customers pay. Nothing is earned before half the order is paid.`). `Statement` (`Pick a month to see its orders`) with the statement's columns; none: `No commission yet.` `Orders · {month}` (`{n} orders`), columns `SO` · `Customer` · `Order total` · `Commission this month` · `Still to earn` · `Note` (the By order notes); none: `No order in {month}.` While it reads `Loading`; when it cannot: `Your commission could not be opened.` · `Try again` |
+| Refusals (the database's) | `Only Finance records payments to a dealer.` · `That dealer is not on the list.` · `That payment voucher is not on the list.` · `Only a paid direct payment voucher counts as a payment to a dealer.` · `Payment voucher {no} is already a payment to another dealer.` · `That payment is not on the statement.` · `A dealer sees only its own statement.` · `Only Finance and the dealer see this statement.` |
 
 **SO compact file preview — owner approved 2026-10-04:** `Sales order PDF · {actual SO number}` · `Download` · accessible name/tooltip `Close PDF` for the file × and `Close order` for the dark order Header ×. File close returns to Info; order close returns to the Register.
 

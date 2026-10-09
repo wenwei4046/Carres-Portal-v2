@@ -12,7 +12,9 @@
  * journal · general-ledger · trial-balance · reports · profit-and-loss ·
  * balance-sheet · cash-flow · ap-aging · credit-notes · credit-note ·
  * credit-note-new · forecast (last month, so the actual is a whole month) ·
- * posting-accounts · item-groups (long lists under their tables, 0657–0659).
+ * posting-accounts · item-groups (long lists under their tables, 0657–0659) ·
+ * dealer-commission · dealer-statement (one made-up dealer, 0664; pick it on
+ * the Statement view).
  * `?role=principal` draws the area titles, to see an area fold.
  * Every listing carries at least one 60+ character party name so wrapping and
  * truncation are visible. Fixture evidence is not production evidence.
@@ -24,6 +26,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { appTodayIso } from "@/lib/fmt-date";
 import FinanceApp from "@/pages/finance/FinanceApp";
+import { PAYMENT_CHOICES as DC_CHOICES, STATEMENT as DC_STATEMENT, source as dcSource } from "./dealer-commission-fixture";
 import "@/index.css";
 
 const params = new URLSearchParams(window.location.search);
@@ -737,6 +740,10 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/finance/ledger/item-groups")) return json(ITEM_GROUPS);
   if (url.includes("/api/finance/ledger/posting-accounts")) return json(POSTINGS);
   if (url.includes("/api/finance/payment-settings/methods")) return json(PAYMENT_METHODS);
+  if (url.includes("/api/finance/dealer-commission/statement/")) return json(DC_STATEMENT);
+  if (url.includes("/api/finance/dealer-commission/payment-choices")) return json(DC_CHOICES);
+  if (url.includes("/api/finance/dealer-commission/rules")) return json({ today: TODAY, rules: [], dealers: [], models: [], categories: [] });
+  if (url.includes("/api/finance/dealer-commission")) return json(dcSource(q.get("month") ?? TODAY.slice(0, 7)));
   if (url.includes("/api/finance/ledger/accounts"))
     return json({ go_live_on: GO_LIVE, accounts: ACCOUNTS.map(([code, name, kind]) => ({ code, name, kind, parent_code: null,
       is_control: code === "1200" || code === "2100", control_for: null, is_active: true, is_header: false })) });
@@ -784,6 +791,8 @@ const ROUTES: Record<string, string> = {
   "request-access": "/finance/settings?tab=requests",
   "posting-accounts": "/finance/settings?tab=posting",
   "item-groups": "/finance/settings?tab=groups",
+  "dealer-commission": "/finance/reports/dealer-commission",
+  "dealer-statement": "/finance/reports/dealer-commission?view=statement",
   forecast: `/finance/reports/forecast?month=${monthBefore(TODAY.slice(0, 7))}`,
 };
 window.history.replaceState(null, "", ROUTES[PAGE] ?? ROUTES.ar);

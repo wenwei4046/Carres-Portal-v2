@@ -1,7 +1,9 @@
 import { Hono } from "hono";
-import { dcQuotaInput, dcRuleAddInput, dcTakeBackInput } from "@carres/shared/dealer-commission";
+import { HTTPException } from "hono/http-exception";
+import { dcPaymentLinkInput, dcQuotaInput, dcRuleAddInput, dcTakeBackInput } from "@carres/shared/dealer-commission";
 import { requireFinance } from "../../lib/auth-guards";
 import { fail, parseJsonBody } from "../../lib/route-helpers";
+import { getStaffContext } from "../../lib/staff-token";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -16,7 +18,14 @@ import type { AppEnv } from "../../types";
  *   DELETE /rules/:id          dealer_commission_rule_remove: one added by mistake
  *   PUT    /orders/:orderId/take-back   dealer_commission_take_back (0662): a
  *                              cancelled order's commission taken back, or kept again
+ *   GET    /statement/:dealerId  dealer_commission_statement (0664)
+ *   GET    /payment-choices    paid direct vouchers not yet a payment to a dealer
+ *   POST   /payments           a paid voucher counted as a payment to a dealer
+ *   DELETE /payments/:id       taken off the dealer's statement
  *   PUT    /quotas/:dealerId   a dealer's renovation quota, rebate rate, start date
+ *
+ * And `dealerStatementRouter` (mounted at /api/dealer-commission): the
+ * dealer's own statement, for its store owner (0664, D3).
  *
  * 0661: a rate has a start day, so the one default rate and the per-product
  * rates (PUT /settings, PUT and DELETE /rates) are gone; their values are the
@@ -80,6 +89,38 @@ r.put("/orders/:orderId/take-back", requireFinance, async (c) => {
   return c.json(data);
 });
 
+r.get("/statement/:dealerId", requireFinance, async (c) => {
+  const dealerId = c.req.param("dealerId");
+  if (!UUID.test(dealerId)) return c.json({ error: "not_found", message: "That dealer is not on the list." }, 404);
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("dealer_commission_statement", { p_dealer_id: dealerId });
+  if (error) return fail(c, error);
+  return c.json(data);
+});
+
+r.get("/payment-choices", requireFinance, async (c) => {
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("dealer_commission_payment_choices");
+  if (error) return fail(c, error);
+  return c.json(data);
+});
+
+r.post("/payments", requireFinance, async (c) => {
+  const body = await parseJsonBody(c, dcPaymentLinkInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("dealer_commission_payment_link", {
+    p_voucher_id: body.data.voucherId, p_dealer_id: body.data.dealerId,
+  });
+  if (error) return fail(c, error);
+  return c.json(data, 201);
+});
+
+r.delete("/payments/:id", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID.test(id)) return c.json({ error: "not_found", message: "That payment is not on the statement." }, 404);
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("dealer_commission_payment_unlink", { p_id: id });
+  if (error) return fail(c, error);
+  return c.json(data);
+});
+
 r.put("/quotas/:dealerId", requireFinance, async (c) => {
   const dealerId = c.req.param("dealerId");
   if (!UUID.test(dealerId)) return c.json({ error: "not_found", message: "That dealer is not on the list." }, 404);
@@ -93,3 +134,25 @@ r.put("/quotas/:dealerId", requireFinance, async (c) => {
 });
 
 export default r;
+
+/**
+ * 0664 (D3, 「dealer 要能看自己的statement」) — the dealer's own commission
+ * statement. A DEALER store login with its store owner's (principal-tier)
+ * staff token, as the store account page asks (routes/account.ts); the
+ * database gives a dealer login its own dealer only, whatever is asked.
+ */
+export const dealerStatementRouter = new Hono<AppEnv>();
+
+dealerStatementRouter.get("/statement", async (c) => {
+  const auth = c.var.auth;
+  if (auth.role !== "dealer" || !auth.dealerId) {
+    throw new HTTPException(403, { message: "Dealer store login only" });
+  }
+  const staff = await getStaffContext(c);
+  if (!staff || staff.tier !== "principal") {
+    throw new HTTPException(403, { message: "Store owner only" });
+  }
+  const { data, error } = await userClient(c.env, auth.jwt).rpc("dealer_commission_statement", { p_dealer_id: null });
+  if (error) return fail(c, error);
+  return c.json(data);
+});
