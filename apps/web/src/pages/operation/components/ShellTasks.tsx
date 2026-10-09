@@ -84,7 +84,9 @@ export function TasksPill({ fallback = false }: { fallback?: boolean } = {}) {
       type="button"
       onClick={() => setOpen(true)}
       data-testid="tasks-pill"
-      className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-c-input-border bg-white px-3 text-[14px] font-medium text-c-ink hover:bg-c-info-bg"
+      /* Below 768px the phone top bar carries its own Tasks door, so the
+         pill hides there: one Tasks control per screen. */
+      className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-c-input-border bg-white px-3 text-[14px] font-medium text-c-ink hover:bg-c-info-bg max-[767px]:hidden"
     >
       <MIcon name="right_panel_open" size={18} />
       Tasks
