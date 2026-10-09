@@ -3,8 +3,10 @@ import { z } from "zod";
 /** Persisted settings are required. Defaults initialise configuration; they
  * must never stand in for an unreadable server configuration. */
 const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+/* The owner default morning check is 10:00 AM (WS-02, 9 Oct 2026), so 10:00
+ * is storable (0670); earlier is still refused. Afternoon is unchanged. */
 export const workspaceActivitySettingsSchema = z.object({
-  morning: clockTime.refine((value) => value > "10:00" && value < "13:00"),
+  morning: clockTime.refine((value) => value >= "10:00" && value < "13:00"),
   afternoon: clockTime.refine((value) => value > "14:00" && value < "18:00"),
 }).strict();
 export type WorkspaceActivitySettings = z.infer<typeof workspaceActivitySettingsSchema>;

@@ -221,7 +221,7 @@ admission makes the person available for the governed rotation; it does not mean
 must be the PO holder on that first day. Existing approval capability and receiving-posting rules
 remain separate.
 
-**MONTHLY ROTATION ORDER — OWNER-APPROVED 2026-09-29 / APPROVED TARGET / NOT BUILT.**
+**MONTHLY ROTATION ORDER — OWNER-APPROVED 2026-09-29 / BUILT ON BRANCH 2026-10-09 (0671, `build/settings-people`; not applied, not deployed — see §4.4 "Leave, rota and Saturday on-call build").**
 Maintain a stable cyclic order of eligible routine Operation staff. Each month one person owns PO
 Duty and the next person in that order owns GRN Duty; advance the PO position by one each month.
 For three eligible people A/B/C, the cycle is PO A / GRN B → PO B / GRN C → PO C / GRN A.
@@ -569,7 +569,7 @@ People date and no such membership is excluded from automatic PO allocation only
 enter automatic PO eligibility from the next calendar month. This is not the pending general
 monthly roster/admission engine; current baseline assignment remains the dated source.
 
-**Remaining target work:** complete monthly rotation, the People-owned departure/access workflow
+**Remaining target work:** the monthly rotation's release (built on branch, §4.4 below), the People-owned departure/access workflow
 and restricted former-profile lookup, complete bounded manual-exception convergence across a
 changing monthly baseline, full legacy-history pagination, and original/update/completion Work
 assignment snapshots with originating-surface audit. The two-period movement ledger must not be
@@ -651,6 +651,43 @@ completion facts, historical actual performers and monthly rota. Assistance does
 responsibility. Subsequent cover changes are recorded; no silent task ping-pong. Missing eligible
 cover or unreadable evidence stays a visible exception, never fabricated assignment. Approver
 qualifications do not inherit ordinary-work help rights.
+
+**Leave, rota and Saturday on-call build — BUILT ON BRANCH 2026-10-09 (`build/settings-people`,
+migrations 0670/0671 NOT APPLIED, NOT DEPLOYED; owner walk owed).** Measured implementation, not a
+production claim:
+- *Leave (0670).* `staff_leave` (People-owned dated absence; one row per submission; cancel stamps
+  `cancelled_from/by/at`, never deletes) and `workspace_leave_policies` (one row per type,
+  `approval_required` stored false and held false by a CHECK until an approval change with its
+  effective treatment is built). Doors `staff_leave_submit` / `staff_leave_cancel`; private bucket
+  `staff-leave-proof` (own folder; principal and HR read). Workspace → Leave is a plain Workspace
+  menu row (`?tab=leave`). Colleagues see who is away and when through `workspace_leave_upcoming`,
+  never type, reason or proof.
+- *Cover reads leave through one question,* `_workspace_on_leave` (dated leave or the undated
+  away switch), in the scope's eligibility and candidates, the visibility rule, the Team list and
+  the movement loop. Today's PO, GRN and Delivery Duty answer the next eligible person at read
+  time, any hour (the approach of PR #1966, which this supersedes). A same-day submission on an
+  Office weekday also writes the durable movement at once; the minute engine covers future leave
+  on its day. Orders stay on the movement ledger only (their workload order could change between
+  a read and the movement). Leave is an eligibility fact, not an assignment-source change, so it
+  never bounces work back to someone who missed a check.
+- *Monthly rota (0671).* `workspace_plan_duty_rota(month)` (scheduler or Staff & Duties editor):
+  PO advances one place in staff-code order from last month's PO; GRN is the next person after
+  the PO holder; the PO newcomer wait reuses the cover engine's rule; one eligible person holds
+  both; nobody eligible writes nothing. A manager's row starting inside a month leaves that
+  month alone; a month not yet begun follows a changed cycle (newcomer admitted, exit recorded); a
+  running month never flips except when its holder is no longer active (re-planned from today).
+  Rows carry `origin = monthly_rotation`, `assigned_by` NULL, note `Monthly rotation`; History
+  reads `Assigned by system`. The daily 09:00 MYT run plans this month (only to continue a
+  running rotation) and, from the 25th, next month. 0437's pre-written two-person alternation
+  (Oct 2026 to Sep 2027) is labelled as the rotation, so a newcomer is not frozen out for a year.
+- *Saturday on-call (0671).* One editable window (default 9:00 AM to 6:00 PM, change history) and
+  a dated rota (Saturday → person, optional cover), appended, edited by Staff & Duties editors
+  (`_settings_require_editor('staff_duties')`). A person on leave that Saturday is flagged, never
+  replaced. No automatic rotation (cadence undecided); it touches no Duty, Task or Office day.
+- *Staff & Duties.* `Manage staff` shows for principal or HR (the People API gate). Three closed
+  sections beside the duty facts: `On leave`, `Saturday on-call`, `Leave approval`.
+- *Check times.* 10:00 AM morning is storable (CHECK, door and shared validation); live values are
+  untouched by the release.
 
 **Historical implementation evidence, not current defaults.** The 30 September #1798 release
 used 10:30 AM / 3:00 PM and fixed 1:00–2:00 PM lunch; the measured passes above remain history.

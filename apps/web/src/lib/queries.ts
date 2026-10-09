@@ -4398,6 +4398,8 @@ export interface WorkspaceDutyAssignment {
   assigned_by_name: string | null;
   note: string | null;
   created_at: string;
+  /** 0671: `monthly_rotation` rows were written by the PO/GRN monthly rota. */
+  origin?: "manual" | "monthly_rotation";
 }
 export interface WorkspaceDutyCover {
   id: string;

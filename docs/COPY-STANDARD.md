@@ -193,7 +193,7 @@ Workspace-owned Staff & Duties page under global Settings (placement production 
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
-| Workspace destinations | `Workspace` · `Issue Tracker` (owner ruling 2026-09-29; existing work route) | Work as the menu destination · Workspace Dashboard · Tasks · Duty roster · Service Notes |
+| Workspace destinations | `Workspace` · `Leave` (owner 9 Oct 2026; the one leave entry, see "Workspace → Leave" below) · `Issue Tracker` (owner ruling 2026-09-29; existing work route) | Work as the menu destination · Workspace Dashboard · Tasks · Duty roster · Service Notes · MC Report |
 | Work scopes | `My Task` · `Team Work` (Workspace MASTER §5.10) | My Work on this page · My Tasks · Team Tasks · Work queue |
 | Work header search (Jess reverted the `Search` rename, 2026-09-26) | `Jump to…` beside its keyboard hint | Search · Find · Go to |
 | Work timing | `Broken commitment` · `Missed` · governed working weekdays · Saturday when an authoritative action remains there · `Today` (accessible name only) · `Holiday operation` · `No date` | Due as the primary structure · Upcoming · Later · Overdue as the section word · Backlog |
@@ -265,7 +265,7 @@ Workspace-owned Staff & Duties page under global Settings (placement production 
 | Duty assignment form (owner ruling 2026-09-29; NOT BUILT) | Read-only `Duty` and current assignment; fields `Assigned to` · `From` · `Until` · `Reason`; `Cancel` / `Assign`; bounded PO/GRN adjustments require both dates and reason | Holder · Acting person · a future assignment shown as current |
 | Duty actions (owner ruling 2026-09-29; NOT BUILT) | Visible `⋯` with accessible name `More actions`; authorised assignment actions use `Assign` and the governed date/reason form | Assign holder · Add cover · permanent manual buttons · right-click-only entry · Take it · Release |
 | Duty filters (owner ruling 2026-09-29; NOT BUILT) | `All duties` · `Not assigned`; future assignments remain in `Next`/history | Covered today · Cover scheduled · cover-specific filters |
-| Two assignment checks (owner-approved 2026-09-29; NOT BUILT) | Settings: `Morning check time` · `Afternoon check time`; initial `10:30 AM` · `3:00 PM`; manager-editable, company time | one combined daily check · treating a morning activity stamp as afternoon evidence |
+| Two assignment checks (owner-approved 2026-09-29; owner defaults 9 Oct 2026) | Settings: `Morning check time` · `Afternoon check time`; owner defaults `10:00 AM` · `2:01 PM` (10:00 AM storable from 0670; the stored live times are not changed by a release); editor-editable, company time | one combined daily check · treating a morning activity stamp as afternoon evidence |
 | Assignment check setting feedback | `Check times could not be loaded.` · `Check times could not be refreshed. Try again.` · `Check times were not saved. Try again.` · `These times changed. Cancel and try again.` · `Save` · `Cancel` · `Try again` | claiming defaults were loaded after a failed read · silently overwriting another manager’s change |
 | Assignment check without another person (implementation clarification of the approved non-blocking work rule, 2026-09-30) | `No one else could be assigned at this check.` · `Any authorised staff may help.` | calling a successful no-candidate check an update failure · telling staff to retry a fixed past checkpoint · implying execution is blocked |
 | Automatic assignment reason (owner-approved 2026-09-29; NOT BUILT) | `Assignment reason: {name} was not online by {time}`; use the configured checkpoint time and only verified missing current-period activity | MC / absence diagnosis · claiming inactivity when the source failed |
@@ -298,6 +298,27 @@ Workspace-owned Staff & Duties page under global Settings (placement production 
 An empty or failure sentence uses the exact object it describes. `No open work` cannot describe an
 empty Issue Register; `No issues recorded` cannot describe a filtered no-match; neither may appear
 until the complete authorised source is healthy.
+
+### Workspace → Leave, Saturday on-call and the monthly rota — owner 9 Oct 2026 · BUILT ON BRANCH (0670/0671)
+
+Authority: `Carres Settings List.md` WS-05, WS-11, WS-12 and the 9 Oct "Leave types", "Leave approval
+policy" and "Saturday on-call boundary" rulings; Workspace MASTER §4.4. One leave entry; no type needs
+approval; Saturday on-call is contact coverage, never a Duty. Built on `build/settings-people`, not
+deployed; owner walk owed.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| Leave page and menu row | `Leave` (page and Workspace menu row) · block `Submit leave`, subtitle `Record your own MC or leave.` · block `My leave` · groups `Upcoming` · `Past` | MC Report · Leave application · Apply leave · Absence |
+| Leave types | `MC` · `Emergency leave` · `Planned leave` (`On leave` is a status, never a fourth type) | Medical leave · Sick leave · Annual leave · Unpaid leave |
+| Leave form | `Type` · `From` · `Until` · `MC proof` (photos or PDF, up to 3 files, through the shared evidence picker) · `Reason` (Emergency leave) · `Note` (Planned leave and MC, optional) · button `Submit leave` · beside it `No approval needed.` | Submit (alone) · Apply · Request · Send for approval |
+| Leave form guidance and refusals | `Choose a type.` · `Choose the dates.` · `Until must be on or after From.` · `Upload the MC proof.` · `Write the reason.` · `Choose valid leave dates.` · `You already have leave on these dates.` · `Upload the MC proof again.` · `The text is too long. Make it shorter.` · `Only active staff can record leave.` · `Leave was not recorded. Try again.` | Invalid · Error · Required · Something went wrong · the database's own sentence |
+| Leave recorded and its list | `Leave recorded.` · row: type, then `{date}` or `{from} to {until}`, then the reason or note · `{dates} · Cancelled` · `{dates} · Cancelled from {date}` · `View proof` (`View proof {n}` when several) · empty `No leave recorded.` · failure `Leave could not be opened.` · `Try again` · loading `Opening Leave…` | Approved · Pending · Rejected (no approval exists) · Deleted |
+| Cancelling leave | before it starts `Cancel leave` → `Cancel this leave?` · `Cancel leave` · `Keep leave`; while it runs `Cancel remaining days` → `Cancel the days after today?` · `Cancel remaining days` · `Keep leave`; refusals `This leave is already cancelled.` · `This leave has no days left to cancel.` · `Leave was not cancelled. Try again.` | Delete leave · Withdraw · Undo |
+| Staff & Duties: who is away (names and dates only) | section `On leave`, header `Nobody` · `1 person` · `{n} people`; rows `{name}` · `{date}` or `{from} to {until}`; empty `Nobody is on leave in the next 7 days.` | the leave type, reason or proof · Absent · MIA |
+| Staff & Duties: leave policy (read-only) | section `Leave approval`, header `No approval needed`; rows `MC` · `No approval needed · Proof needed`; `Emergency leave` · `No approval needed · Reason needed`; `Planned leave` · `No approval needed` | Approval required (until an approval change with its effective treatment is built) |
+| Saturday on-call (Staff & Duties section, not a Duty) | section `Saturday on-call`, header `{name or Not assigned} · {9:00 AM} to {6:00 PM}`; purpose `Answers customer, driver and warehouse calls and WhatsApp. Not an Office workday. Routine work does not move.`; fact `Time` · `{start} to {end}`; rows `{Sat, 10 Oct}` · `{name}` or `Not assigned` · `On leave` · second line `Cover {name}`; editor `Edit time` (`Starts` · `Ends` · `Save` · `Cancel`) and `Assign` (`On call` with `Not assigned` · `Cover` with `No cover` · `Save` · `Cancel`) | Saturday Duty · Saturday shift · Office Saturday · On-call Duty · Duty roster |
+| Saturday on-call refusals | `Ends must be after Starts.` · `Choose a person.` · `Choose another person for Cover.` · `{name} cannot be on call. Choose an eligible active staff member.` · `These times changed. Cancel and try again.` · `Saturday on-call is set by Jess or a person she names.` · `Saturday on-call was not saved. Try again.` · failure `Saturday on-call could not be opened.` | the database's own sentence · Error |
+| Monthly PO / GRN rota in Duty history | `Assigned by system` on a monthly-rotation row (never the account that bootstrapped an older row); note `Monthly rotation`; future month under `Next` | Roster · Auto-assigned · Rota bot |
 
 ## Action copy / work clarity law — owner ruling 2026-08-11
 
