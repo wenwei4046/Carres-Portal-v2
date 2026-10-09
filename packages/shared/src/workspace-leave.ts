@@ -26,8 +26,10 @@ export function leaveTypeLabel(key: string): string {
 /** The longest Emergency leave reason and Planned leave note the door keeps. */
 export const LEAVE_REASON_MAX = 200;
 export const LEAVE_NOTE_MAX = 500;
-/** The proof bucket's own limit (0670: 10 MB; PDF, JPEG, PNG, WEBP). */
+/** The proof bucket's own limit (0670: 10 MB; PDF, JPEG, PNG, WEBP), and
+ *  up to three files per leave (an MC photographed in parts). */
 export const LEAVE_PROOF_BUCKET = "staff-leave-proof";
+export const LEAVE_PROOF_MAX_FILES = 3;
 export const LEAVE_PROOF_MAX_BYTES = 10 * 1024 * 1024;
 export const LEAVE_PROOF_MIME = ["application/pdf", "image/jpeg", "image/png", "image/webp"] as const;
 export const LEAVE_PROOF_EXT: Record<(typeof LEAVE_PROOF_MIME)[number], string> = {
@@ -49,7 +51,7 @@ export const staffLeaveSubmitInput = z
     endsOn: isoDay,
     reason: z.string().max(LEAVE_REASON_MAX).optional(),
     note: z.string().max(LEAVE_NOTE_MAX).optional(),
-    proofPath: z.string().regex(LEAVE_PROOF_PATH).optional(),
+    proofPaths: z.array(z.string().regex(LEAVE_PROOF_PATH)).max(LEAVE_PROOF_MAX_FILES).optional(),
   })
   .strict()
   .superRefine((v, ctx) => {
@@ -57,8 +59,8 @@ export const staffLeaveSubmitInput = z
     if (v.type === "emergency" && !hasText(v.reason)) {
       ctx.addIssue({ code: "custom", path: ["reason"], message: "reason_required" });
     }
-    if (v.type === "mc" && !v.proofPath) {
-      ctx.addIssue({ code: "custom", path: ["proofPath"], message: "proof_required" });
+    if (v.type === "mc" && !v.proofPaths?.length) {
+      ctx.addIssue({ code: "custom", path: ["proofPaths"], message: "proof_required" });
     }
   });
 export type StaffLeaveSubmitInput = z.infer<typeof staffLeaveSubmitInput>;
@@ -77,7 +79,7 @@ export const staffLeaveRowSchema = z.object({
   ends_on: isoDay,
   reason: z.string().nullable(),
   note: z.string().nullable(),
-  proof_path: z.string().nullable(),
+  proof_paths: z.array(z.string()),
   approval_required: z.boolean(),
   submitted_at: z.string(),
   cancelled_from: isoDay.nullable(),

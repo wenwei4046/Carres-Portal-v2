@@ -47,7 +47,7 @@ describe("Workspace → Leave API", () => {
   it("reads only my own leave, the three policies and whether I may submit", async () => {
     policies.data = [{ leave_type: "mc", approval_required: false, proof_required: true, reason_required: false }];
     rows.data = [{ id: "eeeeeeee-0000-4000-8000-0000000000aa", leave_type: "mc", starts_on: "2026-10-09", ends_on: "2026-10-09",
-      reason: null, note: null, proof_path: PROOF, approval_required: false, submitted_at: "2026-10-09T01:00:00+00:00",
+      reason: null, note: null, proof_paths: [PROOF], approval_required: false, submitted_at: "2026-10-09T01:00:00+00:00",
       cancelled_from: null, cancelled_at: null }];
     const res = await app().request("/leave");
     expect(res.status).toBe(200);
@@ -60,10 +60,10 @@ describe("Workspace → Leave API", () => {
 
   it("passes my submission to the one door, MC proof included", async () => {
     rpc.mockResolvedValue({ data: { id: "x", cover_moved: 2 }, error: null });
-    const res = await post("/leave", { type: "mc", startsOn: "2026-10-09", endsOn: "2026-10-10", proofPath: PROOF });
+    const res = await post("/leave", { type: "mc", startsOn: "2026-10-09", endsOn: "2026-10-10", proofPaths: [PROOF] });
     expect(res.status).toBe(201);
     expect(rpc).toHaveBeenCalledWith("staff_leave_submit", {
-      p_type: "mc", p_starts_on: "2026-10-09", p_ends_on: "2026-10-10", p_reason: null, p_note: null, p_proof_path: PROOF,
+      p_type: "mc", p_starts_on: "2026-10-09", p_ends_on: "2026-10-10", p_reason: null, p_note: null, p_proof_paths: [PROOF],
     });
   });
 

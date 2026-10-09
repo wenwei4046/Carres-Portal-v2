@@ -24,7 +24,8 @@ describe("Workspace → Leave submission (0670)", () => {
   });
   it("MC needs proof, Emergency leave needs a reason, Planned leave needs neither", () => {
     expect(issues(staffLeaveSubmitInput.safeParse({ type: "mc", startsOn: "2026-10-12", endsOn: "2026-10-12" }))).toEqual(["proof_required"]);
-    expect(staffLeaveSubmitInput.safeParse({ type: "mc", startsOn: "2026-10-12", endsOn: "2026-10-12", proofPath: PROOF }).success).toBe(true);
+    expect(issues(staffLeaveSubmitInput.safeParse({ type: "mc", startsOn: "2026-10-12", endsOn: "2026-10-12", proofPaths: [] }))).toEqual(["proof_required"]);
+    expect(staffLeaveSubmitInput.safeParse({ type: "mc", startsOn: "2026-10-12", endsOn: "2026-10-12", proofPaths: [PROOF] }).success).toBe(true);
     expect(issues(staffLeaveSubmitInput.safeParse({ type: "emergency", startsOn: "2026-10-12", endsOn: "2026-10-12", reason: " \t" }))).toEqual(["reason_required"]);
     expect(staffLeaveSubmitInput.safeParse({ type: "emergency", startsOn: "2026-10-12", endsOn: "2026-10-12", reason: "Fever" }).success).toBe(true);
     expect(staffLeaveSubmitInput.safeParse({ type: "planned", startsOn: "2026-10-12", endsOn: "2026-10-14" }).success).toBe(true);
@@ -32,7 +33,8 @@ describe("Workspace → Leave submission (0670)", () => {
   it("refuses an end before the start, an unknown type and a client-chosen proof path", () => {
     expect(issues(staffLeaveSubmitInput.safeParse({ type: "planned", startsOn: "2026-10-14", endsOn: "2026-10-12" }))).toEqual(["invalid_dates"]);
     expect(staffLeaveSubmitInput.safeParse({ type: "annual", startsOn: "2026-10-12", endsOn: "2026-10-12" }).success).toBe(false);
-    expect(staffLeaveSubmitInput.safeParse({ type: "mc", startsOn: "2026-10-12", endsOn: "2026-10-12", proofPath: "../other/x.pdf" }).success).toBe(false);
+    expect(staffLeaveSubmitInput.safeParse({ type: "mc", startsOn: "2026-10-12", endsOn: "2026-10-12", proofPaths: ["../other/x.pdf"] }).success).toBe(false);
+    expect(staffLeaveSubmitInput.safeParse({ type: "mc", startsOn: "2026-10-12", endsOn: "2026-10-12", proofPaths: [PROOF, PROOF, PROOF, PROOF] }).success).toBe(false);
   });
   it("signs only a photo or PDF up to 10 MB", () => {
     expect(staffLeaveProofSignInput.safeParse({ mimeType: "image/jpeg", sizeBytes: 2_000_000 }).success).toBe(true);

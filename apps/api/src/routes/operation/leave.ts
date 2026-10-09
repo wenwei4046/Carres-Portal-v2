@@ -74,7 +74,7 @@ router.get("/", requireStaff, async (c) => {
       .select("leave_type, approval_required, proof_required, reason_required")
       .order("leave_type"),
     sb.from("staff_leave")
-      .select("id, leave_type, starts_on, ends_on, reason, note, proof_path, approval_required, submitted_at, cancelled_from, cancelled_at")
+      .select("id, leave_type, starts_on, ends_on, reason, note, proof_paths, approval_required, submitted_at, cancelled_from, cancelled_at")
       .eq("user_id", c.var.auth.id)
       .order("starts_on", { ascending: false })
       .limit(200),
@@ -146,7 +146,7 @@ router.post("/", requireStaff, async (c) => {
     p_ends_on: body.data.endsOn,
     p_reason: body.data.reason ?? null,
     p_note: body.data.note ?? null,
-    p_proof_path: body.data.proofPath ?? null,
+    p_proof_paths: body.data.proofPaths ?? [],
   });
   if (error) {
     const r = refusal(error);

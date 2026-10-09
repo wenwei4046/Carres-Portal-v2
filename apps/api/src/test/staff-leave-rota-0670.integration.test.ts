@@ -163,10 +163,11 @@ describe.skipIf(!URL)("leave feeds cover, PO/GRN rotate monthly, Saturday on-cal
       await q("insert into storage.objects (bucket_id, name) values ('staff-leave-proof', $1)", [
         `${U.a}/${uid("99")}.pdf`,
       ]);
-      const res = (await one("select public.staff_leave_submit('mc', $1::date, $1::date, null, null, $2) as r", [
+      const res = (await one("select public.staff_leave_submit('mc', $1::date, $1::date, null, null, array[$2]) as r", [
         today, `${U.a}/${uid("99")}.pdf`,
       ])).r as J;
       expect(res.user_id).toBe(U.a);
+      expect(res.proof_paths).toEqual([`${U.a}/${uid("99")}.pdf`]);
       expect(res.approval_required).toBe(false);
       const po = await resolve("po_duty");
       expect(po.normal_user_id).toBe(U.a);
@@ -241,8 +242,13 @@ describe.skipIf(!URL)("leave feeds cover, PO/GRN rotate monthly, Saturday on-cal
     await scoped(async () => {
       await as(U.c);
       expect(await attempt("select public.staff_leave_submit('mc', $1::date, $1::date)", [tomorrow])).toBe("proof_required");
-      expect(await attempt("select public.staff_leave_submit('mc', $1::date, $1::date, null, null, $2)", [
+      // Somebody else's file, or a file never uploaded, is not proof.
+      await q("insert into storage.objects (bucket_id, name) values ('staff-leave-proof', $1)", [`${U.a}/${uid("98")}.pdf`]);
+      expect(await attempt("select public.staff_leave_submit('mc', $1::date, $1::date, null, null, array[$2])", [
         tomorrow, `${U.a}/${uid("98")}.pdf`,
+      ])).toBe("invalid_proof");
+      expect(await attempt("select public.staff_leave_submit('mc', $1::date, $1::date, null, null, array[$2])", [
+        tomorrow, `${U.c}/${uid("95")}.pdf`,
       ])).toBe("invalid_proof");
       expect(await attempt("select public.staff_leave_submit('emergency', $1::date, $1::date, E' \\t')", [tomorrow])).toBe("reason_required");
       expect(await attempt("select public.staff_leave_submit('holiday', $1::date, $1::date)", [tomorrow])).toBe("invalid_type");

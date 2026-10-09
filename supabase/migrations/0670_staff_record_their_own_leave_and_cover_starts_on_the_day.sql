@@ -7,7 +7,8 @@
 -- work assignment"):
 --   · ONE entry, Workspace → Leave. Three types: MC, Emergency leave, Planned
 --     leave. A person submits their OWN leave: type, start date, end date.
---     MC needs proof (photo or PDF). Emergency leave needs a short reason.
+--     MC needs proof (up to three photos or PDFs). Emergency leave needs a
+--     short reason.
 --     Planned leave may carry a note. No standalone MC Report page.
 --   · No type needs approval today. The policy is stored per type with
 --     approval_required = false; a CHECK keeps it false until the treatment of
@@ -129,8 +130,9 @@ create table if not exists public.staff_leave (
   ends_on           date not null,
   reason            text check (reason is null or length(reason) between 1 and 200),
   note              text check (note is null or length(note) between 1 and 500),
-  proof_path        text check (proof_path is null
-                      or proof_path ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(pdf|jpg|png|webp)$'),
+  -- MC proof: up to three photos or PDFs in the submitter's own folder
+  -- (`<user id>/<file id>.<ext>`), checked by the door against storage.
+  proof_paths       text[] not null default '{}'::text[] check (cardinality(proof_paths) <= 3),
   -- The policy in force when this was submitted. Today always false; kept so a
   -- later policy change can name its treatment of existing submissions.
   approval_required boolean not null default false,
@@ -557,7 +559,7 @@ create or replace function public.staff_leave_submit(
   p_ends_on date,
   p_reason text default null,
   p_note text default null,
-  p_proof_path text default null
+  p_proof_paths text[] default '{}'::text[]
 )
 returns jsonb
 language plpgsql
@@ -570,7 +572,8 @@ declare
   v_policy public.workspace_leave_policies;
   v_reason text := case when coalesce(p_reason, '') ~ '[^[:space:]]' then btrim(p_reason, E' \t\r\n') end;
   v_note   text := case when coalesce(p_note, '') ~ '[^[:space:]]' then btrim(p_note, E' \t\r\n') end;
-  v_proof  text := case when coalesce(p_proof_path, '') ~ '[^[:space:]]' then btrim(p_proof_path) end;
+  v_proofs text[] := coalesce((select array_agg(distinct btrim(x)) from unnest(p_proof_paths) x
+                                where coalesce(x, '') ~ '[^[:space:]]'), '{}'::text[]);
   v_row    public.staff_leave;
   v_moved  integer := 0;
 begin
@@ -591,13 +594,15 @@ begin
   if length(coalesce(v_reason, '')) > 200 or length(coalesce(v_note, '')) > 500 then
     raise exception 'the text is too long' using errcode = '22023', detail = 'text_too_long';
   end if;
-  if v_policy.proof_required and v_proof is null then
+  if v_policy.proof_required and cardinality(v_proofs) = 0 then
     raise exception 'upload the proof' using errcode = '22023', detail = 'proof_required';
   end if;
-  if v_proof is not null and (
-       split_part(v_proof, '/', 1) <> v_uid::text
-       or not exists (select 1 from storage.objects o
-                       where o.bucket_id = 'staff-leave-proof' and o.name = v_proof)) then
+  -- Every file is the submitter's own, already uploaded to the proof bucket.
+  if cardinality(v_proofs) > 3 or exists (
+       select 1 from unnest(v_proofs) f
+        where split_part(f, '/', 1) <> v_uid::text
+           or not exists (select 1 from storage.objects o
+                           where o.bucket_id = 'staff-leave-proof' and o.name = f)) then
     raise exception 'upload the proof again' using errcode = '22023', detail = 'invalid_proof';
   end if;
 
@@ -613,8 +618,8 @@ begin
     raise exception 'you already have leave on these dates' using errcode = '22023', detail = 'leave_overlap';
   end if;
 
-  insert into public.staff_leave (user_id, leave_type, starts_on, ends_on, reason, note, proof_path, approval_required)
-  values (v_uid, p_type, p_starts_on, p_ends_on, v_reason, v_note, v_proof, v_policy.approval_required)
+  insert into public.staff_leave (user_id, leave_type, starts_on, ends_on, reason, note, proof_paths, approval_required)
+  values (v_uid, p_type, p_starts_on, p_ends_on, v_reason, v_note, v_proofs, v_policy.approval_required)
   returning * into v_row;
 
   -- Today's leave starts cover now, on an Office weekday (the days the minute
@@ -629,8 +634,8 @@ begin
   return to_jsonb(v_row) || jsonb_build_object('cover_moved', v_moved);
 end;
 $fn$;
-revoke all on function public.staff_leave_submit(text, date, date, text, text, text) from public, anon;
-grant execute on function public.staff_leave_submit(text, date, date, text, text, text) to authenticated;
+revoke all on function public.staff_leave_submit(text, date, date, text, text, text[]) from public, anon;
+grant execute on function public.staff_leave_submit(text, date, date, text, text, text[]) to authenticated;
 
 -- Cancel your OWN leave before it starts, or withdraw the days after today.
 -- Today stays leave (its cover already moved; work never bounces back).
