@@ -39,3 +39,43 @@ export const workspaceActivitySettingsResponseSchema = workspaceActivitySettings
   canEdit: z.boolean(),
 });
 export type WorkspaceActivitySettingsResponse = z.infer<typeof workspaceActivitySettingsResponseSchema>;
+
+/* ── TEAM TODAY — the page header's Team list (owner ruling 2026-10-08,
+ * Carres Layout Standard §1). Online = portal activity in the last
+ * `TEAM_ONLINE_MINUTES` (owner default 15, 2026-10-08). The server decides the
+ * state against its own clock; the screen only prints it. */
+export const TEAM_ONLINE_MINUTES = 15;
+export const teamMemberStateSchema = z.enum(["online", "away", "off", "not_seen"]);
+export type TeamMemberState = z.infer<typeof teamMemberStateSchema>;
+export const teamTodayMemberSchema = z.object({
+  userId: z.string().uuid(),
+  name: z.string(),
+  role: z.string(),
+  state: teamMemberStateSchema,
+  /** Last recorded activity today (ISO), or null when none today. */
+  lastActiveAt: z.string().nullable(),
+  /** Whole minutes since `lastActiveAt`, or null. */
+  idleMinutes: z.number().int().nonnegative().nullable(),
+}).strict();
+export type TeamTodayMember = z.infer<typeof teamTodayMemberSchema>;
+export const teamTodayResponseSchema = z.object({
+  asOf: z.string(),
+  onlineMinutes: z.number().int().positive(),
+  members: z.array(teamTodayMemberSchema),
+}).strict();
+export type TeamTodayResponse = z.infer<typeof teamTodayResponseSchema>;
+
+/** One person's state from the database facts. `available === false` (staff
+ * settings mark them off) wins over any activity; no activity today is
+ * `not_seen`, never assumed away or off. */
+export function teamMemberState(
+  lastActiveAt: string | null,
+  available: boolean,
+  now: Date,
+  onlineMinutes = TEAM_ONLINE_MINUTES,
+): { state: TeamMemberState; idleMinutes: number | null } {
+  if (!available) return { state: "off", idleMinutes: null };
+  if (!lastActiveAt) return { state: "not_seen", idleMinutes: null };
+  const idle = Math.max(0, Math.floor((now.getTime() - Date.parse(lastActiveAt)) / 60_000));
+  return { state: idle < onlineMinutes ? "online" : "away", idleMinutes: idle };
+}

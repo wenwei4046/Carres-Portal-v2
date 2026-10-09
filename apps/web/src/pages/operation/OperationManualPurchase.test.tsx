@@ -831,14 +831,11 @@ describe("Card 03 · the left filter rail", () => {
   it("a narrowed dropdown wears the rail's own active treatment", async () => {
     await loaded();
     const supplier = screen.getByTestId("mp-supplier-select");
-    expect(supplier.className).not.toContain("bg-kit-blue-3");
+    expect(supplier.className).not.toContain("bg-c-select-bg");
     pick("mp-supplier-select", "Hooka");
-    // Same blue field the selected ROW carried, plus the left-edge marker —
-    // a narrowed section must not be quieter than a selected row was.
-    expect(screen.getByTestId("mp-supplier-select").className).toContain("bg-kit-blue-3");
-    expect(
-      screen.getByTestId("mp-supplier-select").parentElement!.querySelector(".bg-kit-blue-9"),
-    ).not.toBeNull();
+    // The same select wash a selected row carries (v4 kit: the wash alone marks
+    // a choice, no edge marker) — a narrowed section must not read as unset.
+    expect(screen.getByTestId("mp-supplier-select").className).toContain("bg-c-select-bg");
   });
 
   it("the rail is navigation, not batch selection — a dropdown grows no checkbox", async () => {
@@ -1101,10 +1098,10 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     for (const id of ["mp-raised-by", "mp-proceed-date"]) {
       const box = screen.getByTestId(id);
       expect(box.getAttribute("data-kit")).toBe("automatic-field");
-      expect(box.className).toContain("bg-kit-slate-3");
-      expect(box.className).not.toContain("bg-white");
+      expect(box.className).toContain("bg-c-search-bg"); // v4 grey
+      expect(box.className).not.toContain("bg-c-card");
     }
-    expect(document.getElementById("mp-purpose")!.className).toContain("bg-white");
+    expect(document.getElementById("mp-purpose")!.className).toContain("bg-c-card"); // v4 white
   });
 
   it("Card 06 · Proceed Date is a read-only server preview; the browser holds no clock", async () => {

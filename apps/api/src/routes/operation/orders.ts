@@ -53,6 +53,7 @@ import { todayIsoMYT } from "../../lib/today";
 
 import { skuCategories, storageSkuCategories } from "../../lib/sku-categories";
 import { chunk } from "../../lib/purchase-demand-read";
+import { outrightOrderFacts, type OutrightOrderFacts, type OutrightOrderInput } from "../../lib/outright-order-facts";
 import {
   completionOfOrder,
   type CompletionOrderRow,
@@ -970,7 +971,7 @@ operationOrdersRouter.get("/register-facts", requireOperation, async (c) => {
       sb
         .from("orders")
         .select(
-          "id, so, status, paid, delivery_date, order_lines(sku, qty, unit_price), order_addons(qty, unit_price), ops_order_control(balance, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status, extension_original_date)",
+          "id, so, status, paid, delivery_date, delivery_partner_id, ops_assigned_logistic, order_lines(id, sku, qty, unit_price), order_addons(qty, unit_price), ops_order_control(balance, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status, extension_original_date, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot)",
         ),
     )
       .order("id", { ascending: true })
@@ -982,6 +983,7 @@ operationOrdersRouter.get("/register-facts", requireOperation, async (c) => {
   }
   const ids = orders.map((o) => o.id);
   const idBySoRef = new Map(orders.map((o) => [`SO-${o.so}`, o.id]));
+  const soRefById = new Map(orders.map((o) => [o.id, `SO-${o.so}`]));
 
   /* Every row of a batched `.in()` read, paged so no cap hides a row. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1037,7 +1039,17 @@ operationOrdersRouter.get("/register-facts", requireOperation, async (c) => {
     : new Map<string, string>();
   const asOf = todayIsoMYT();
 
-  const facts: Record<string, { obligations: "outstanding" | "none" | null; cases: "open" | "closed" | "none" | null; stock?: Record<string, string> }> = {};
+  /* The Outright list's owner facts (PIC, Supplier DO, GRN, delivery day,
+     loading, location, Finance hold) — each owner read separately, each with
+     its own failure flag, so an unread fact is never printed as unrecorded. */
+  const owned = await outrightOrderFacts(
+    sb,
+    orders as unknown as OutrightOrderInput[],
+    reserved,
+    (orderId) => soRefById.get(orderId) ?? "",
+  );
+
+  const facts: Record<string, { obligations: "outstanding" | "none" | null; cases: "open" | "closed" | "none" | null; stock?: Record<string, string>; owned?: OutrightOrderFacts }> = {};
   for (const o of orders) {
     const obligations = completionReadable
       ? completionOfOrder({
@@ -1074,9 +1086,9 @@ operationOrdersRouter.get("/register-facts", requireOperation, async (c) => {
       // Keep the display unknown until Stock supplies that source-linked projection.
       stock[sku] = "unknown";
     }
-    facts[o.id] = { obligations, cases: caseFact, stock };
+    facts[o.id] = { obligations, cases: caseFact, stock, owned: owned.facts[o.id] };
   }
-  return c.json({ facts, failed: { obligations: !completionReadable, cases: cases === null } });
+  return c.json({ facts, failed: { obligations: !completionReadable, cases: cases === null, ...owned.failed } });
 });
 
 operationOrdersRouter.get("/monthly-demand", requireOperation, async (c) => {
@@ -1231,7 +1243,7 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     // payload is a field a Save could try to write.
     sb
       .from("ops_order_control")
-      .select("delivery_photos")
+      .select("delivery_photos, assigned_staff")
       .eq("order_id", id)
       .maybeSingle(),
   ]);
@@ -1239,6 +1251,18 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
   if (addonsRes.error) { const m = mapPgError(addonsRes.error); return c.json(m.body, m.status); }
   if (historyRes.error) { const m = mapPgError(historyRes.error); return c.json(m.body, m.status); }
   if (threadsRes.error) { const m = mapPgError(threadsRes.error); return c.json(m.body, m.status); }
+
+  const assignedStaff = controlRes.error
+    ? undefined
+    : ((controlRes.data as { assigned_staff?: string | null } | null)?.assigned_staff ?? null);
+  let picOf: { picRead: "ok" | "failed"; pic: { userId: string; name: string | null } | null } =
+    assignedStaff === undefined ? { picRead: "failed", pic: null } : { picRead: "ok", pic: null };
+  if (assignedStaff) {
+    const who = await sb.from("app_users").select("id, name").eq("id", assignedStaff).maybeSingle();
+    picOf = who.error
+      ? { picRead: "failed", pic: null }
+      : { picRead: "ok", pic: { userId: assignedStaff, name: ((who.data as { name?: string | null } | null)?.name ?? "").trim() || null } };
+  }
 
   const rawLines = linesRes.data ?? [];
   const addons = addonsRes.data ?? [];
@@ -1476,6 +1500,12 @@ operationOrdersRouter.get("/:id", requireOperation, async (c) => {
     /* An absent overlay row is UNKNOWN, not "no photo": the Route says
        `No delivery photo yet` only on an explicit empty ledger. */
     control: controlRes.error ? null : (controlRes.data ?? null),
+    /* The SO PIC — `ops_order_control.assigned_staff` (Workspace MASTER
+       2026-09-17: a separate source fact from today's work owner), named
+       from People under the caller's token. `picRead: "failed"` = not read;
+       `name: null` = a PIC this caller may not see (operation reads only
+       operation colleagues). */
+    ...picOf,
   });
 });
 

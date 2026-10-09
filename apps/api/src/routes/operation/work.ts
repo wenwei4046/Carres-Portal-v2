@@ -1315,7 +1315,7 @@ export function composeOperationWorkResponse(
   });
 }
 
-function dutyResolution(
+export function dutyResolution(
   payload: Record<string, unknown>,
   key: string,
   today: string,
@@ -1339,14 +1339,20 @@ function dutyResolution(
   const activeCover = raw.is_cover === true
     ? person("acting_user_id", "acting_user_name")
     : null;
+  /* A system-assigned actor arrives as an id without a name. When that id is
+     the normal holder (or today's cover) the person is already named there —
+     use it, so a task never reads `Name not recorded` for Shasha. */
+  const actingNamed = acting && acting.name == null
+    ? { ...acting, name: [normalOwner, activeCover].find((p) => p?.userId === acting.userId)?.name ?? null }
+    : acting;
   return {
     dutyKey: key,
     onDate: today,
     normalOwner,
     buddy: activeCover,
     activeCover,
-    actingPerson: acting,
-    state: acting ? (activeCover ? "covered" : "primary") : "not_assigned",
+    actingPerson: actingNamed,
+    state: actingNamed ? (activeCover ? "covered" : "primary") : "not_assigned",
     assignmentId: null,
   };
 }

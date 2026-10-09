@@ -10,10 +10,21 @@ import { MemoryRouter, useLocation } from "react-router-dom";
  * 2026-06-30), rebuilt as EXPANDABLE MODULE ROWS (Jess, 2026-08-19 afternoon —
  * CARD-2026-08-19-sidebar-expandable-modules).
  *
- * Every module is an icon + name + chevron row whose pages hang beneath it on
- * rounded elbows. This SUPERSEDES the same morning's uppercase-heading rail:
- * she saw the shipped headings in production and re-ruled.
+ * Every module is an icon + name + caret row whose pages hang beneath it on
+ * one thin straight tree line. The Operations area is cut into six small
+ * uppercase group labels (Carres Layout Standard §2, owner-confirmed template,
+ * Jess 2026-10-08); the curved elbows, the trunk and the blue selection bar of
+ * the 2026-08-19 rail are retired with it.
  */
+
+/** The selected row (Layout Standard §2): the theme select colours, 600. */
+const SELECTED = "bg-c-select-bg";
+/** The one thin straight tree line every sub-item hangs on. */
+const TREE_LINE = "shadow-[inset_1px_0_0_var(--c-btn-border)]";
+/** A Material Symbols icon (`MIcon`) — the Operations menu's icons and carets. */
+const MICON = ".material-symbols-rounded";
+/** The person's own « choice, remembered (handoff 2026-10-08). */
+const COLLAPSE_KEY = "carres-menu-collapsed";
 
 let mockRole: string | null = "operation";
 // Purchasing remembers its drawers PER SIGNED-IN USER, so the tests need to be
@@ -101,11 +112,16 @@ describe("PortalSidebar — role visibility", () => {
     expect(screen.queryByText("Accounts")).not.toBeInTheDocument();
   });
 
-  it("principal sees all three area headers; only the active area is expanded", () => {
+  it("principal sees the Finance, HR and Admin area words, never an Operations one; only the active area is expanded", () => {
     mockRole = "principal";
     renderAt("/operation");
-    expect(screen.getByText("Operations")).toBeInTheDocument();
+    /* Owner ruling 2026-10-08: the Operations area draws its six groups with
+       no area word for the boss — no group is called "Operations". */
+    expect(screen.queryByText("Operations")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("nav-area-operation")).not.toBeInTheDocument();
     expect(screen.getAllByText("Finance").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByTestId("nav-area-finance")).toBeInTheDocument();
+    expect(screen.getByTestId("nav-area-hr")).toBeInTheDocument();
     expect(screen.getByText("Admin")).toBeInTheDocument();
     /* 2026-08-21 — Suppliers left Master Data for its own module, so Master
        Data holds ONE page (Catalog) and renders as a PLAIN row: a module is an
@@ -139,7 +155,11 @@ describe("PortalSidebar — role visibility", () => {
     mockRole = "principal";
     renderAt("/finance/ar");
     expect(screen.getByText("AR · Receivables")).toBeInTheDocument();
-    expect(screen.queryByTestId("nav-module-purchasing")).not.toBeInTheDocument();
+    /* Operations has no area word to open it with, so it is always drawn —
+       standing in Finance never hides the boss's Operations menu (fix
+       2026-10-09, found by the shell test pass). */
+    expect(screen.getByTestId("nav-group-head-supply-chain")).toBeInTheDocument();
+    expect(screen.getByTestId("nav-module-purchasing")).toBeInTheDocument();
   });
 });
 
@@ -156,58 +176,74 @@ describe("PortalSidebar — the area you are in folds", () => {
   it("its title folds it and opens it again, and the page does not move", () => {
     renderAt("/finance/dashboard");
     const finance = screen.getByTestId("nav-area-finance");
+    /* Operations is always drawn too, so it has its own Dashboard row: count
+       the Finance one inside the Finance area only. */
+    const financeDashboards = () =>
+      screen.queryAllByTestId("nav-child-dashboard").filter((el) => el.getAttribute("href") === "/finance/dashboard");
     expect(finance).toHaveAttribute("aria-expanded", "true");
-    expect(child("dashboard")).toBeInTheDocument();
+    expect(financeDashboards()).toHaveLength(1);
     fireEvent.click(finance);
     expect(finance).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByTestId("nav-child-dashboard")).not.toBeInTheDocument();
+    expect(financeDashboards()).toHaveLength(0);
     expect(screen.queryByTestId("nav-module-payables")).not.toBeInTheDocument();
     expect(screen.getByTestId("location-probe")).toHaveTextContent(/^\/finance\/dashboard$/);
     fireEvent.click(finance);
     expect(finance).toHaveAttribute("aria-expanded", "true");
-    expect(child("dashboard")).toBeInTheDocument();
+    expect(financeDashboards()).toHaveLength(1);
   });
 
-  it("folded, its title is the one blue mark of where you are", () => {
+  it("folded, its title is the one selected mark of where you are", () => {
     renderAt("/finance/dashboard");
     const finance = screen.getByTestId("nav-area-finance");
-    expect(finance).not.toHaveClass("text-kit-blue-9");
+    // The theme select colour, never the retired blue (Layout Standard §2).
+    expect(finance).not.toHaveClass("!text-c-select-fg");
     fireEvent.click(finance);
-    expect(finance).toHaveClass("text-kit-blue-9");
-    expect(screen.getByTestId("nav-area-operation")).not.toHaveClass("text-kit-blue-9");
+    expect(finance).toHaveClass("!text-c-select-fg");
+    expect(screen.getByTestId("nav-area-hr")).not.toHaveClass("!text-c-select-fg");
   });
 
-  it("every area title carries its chevron, open or shut", () => {
+  it("every area title carries its caret, open or shut", () => {
     renderAt("/finance/dashboard");
-    for (const area of ["operation", "finance", "hr", "principal"]) {
-      expect(screen.getByTestId(`nav-area-${area}`).querySelector("svg"), area).not.toBeNull();
+    // Operations has no area title for the boss (owner ruling 2026-10-08).
+    for (const area of ["finance", "hr", "principal"]) {
+      expect(screen.getByTestId(`nav-area-${area}`).querySelector(MICON), area).not.toBeNull();
     }
   });
 
   it("another area's title still jumps there, and that area opens", () => {
     renderAt("/finance/dashboard");
     fireEvent.click(screen.getByTestId("nav-area-finance"));
-    fireEvent.click(screen.getByTestId("nav-area-operation"));
-    expect(screen.getByTestId("location-probe")).toHaveTextContent("/operation?tab=dashboard");
-    expect(screen.getByTestId("nav-area-operation")).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(screen.getByTestId("nav-area-hr"));
+    expect(screen.getByTestId("location-probe")).toHaveTextContent("/hr?tab=overview");
+    expect(screen.getByTestId("nav-area-hr")).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByTestId("nav-area-finance")).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("is the same rule in every area: Operations folds too", () => {
-    renderAt("/operation");
-    const operations = screen.getByTestId("nav-area-operation");
+  /* The Operations area has no area word to click, so standing in another
+     area must not leave the boss without her Operations menu. */
+  it("standing in Finance, the boss still has her Operations menu", () => {
+    renderAt("/finance/dashboard");
+    expect(screen.getByTestId("nav-group-head-supply-chain")).toBeInTheDocument();
     expect(module_("purchasing")).toBeInTheDocument();
-    fireEvent.click(operations);
-    expect(operations).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByTestId("nav-module-purchasing")).not.toBeInTheDocument();
+  });
+
+  /* "Operations folds too" is RETIRED: the Operations area has no area word
+     for the boss (owner ruling 2026-10-08), so there is nothing to fold it by.
+     Its six groups draw open while she stands in it. */
+  it("Operations has no area word to fold — its groups draw open where she stands", () => {
+    renderAt("/operation");
+    expect(screen.queryByTestId("nav-area-operation")).not.toBeInTheDocument();
+    expect(screen.getByTestId("nav-group-head-overview")).toBeInTheDocument();
+    expect(module_("purchasing")).toBeInTheDocument();
     expect(screen.getByTestId("location-probe")).toHaveTextContent(/^\/operation$/);
   });
 });
 
 describe("PortalSidebar — narrow desktop", () => {
-  /* Owner review 2026-09-25 item 9 applies from 1280px; below it the named
-     rail would push Work into the phone layout, so it starts as icons. */
-  it("starts as the 60px icon rail below 1280", () => {
+  /* RETIRED: the 2026-09-25 auto-collapse below 1280px. The menu now OPENS at
+     220px on every desktop width (handoff 2026-10-08, "Do NOT" 2); only the
+     person's own « click closes it. */
+  it("opens at 220px below 1280 too — no automatic icon rail", () => {
     const previous = window.matchMedia;
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
@@ -225,28 +261,52 @@ describe("PortalSidebar — narrow desktop", () => {
 
     try {
       renderAt("/operation?tab=delivery");
-      expect(screen.getByRole("complementary")).toHaveStyle({ width: "60px" });
-      expect(screen.getByRole("button", { name: "Show menu" })).toBeInTheDocument();
+      expect(screen.getByRole("complementary")).toHaveStyle({ width: "220px" });
+      expect(screen.getByRole("button", { name: "Collapse menu" })).toBeInTheDocument();
     } finally {
       Object.defineProperty(window, "matchMedia", { configurable: true, value: previous });
     }
   });
+
+  it("the « button closes it to 64px, says so, and is remembered under its own key", () => {
+    const view = renderAt("/operation?tab=delivery");
+    const toggle = screen.getByRole("button", { name: "Collapse menu" });
+    expect(toggle).toHaveTextContent("«");
+    fireEvent.click(toggle);
+    expect(screen.getByRole("complementary")).toHaveStyle({ width: "64px" });
+    expect(screen.getByRole("button", { name: "Expand menu" })).toHaveTextContent("»");
+    expect(localStorage.getItem(COLLAPSE_KEY)).toBe("1");
+    view.unmount();
+    // The next load keeps the person's choice.
+    renderAt("/operation?tab=delivery");
+    expect(screen.getByRole("complementary")).toHaveStyle({ width: "64px" });
+  });
+
+  it("an older stored collapse never carries over — only the new key counts", () => {
+    localStorage.setItem("ops-sidebar-collapsed", "1");
+    renderAt("/operation?tab=delivery");
+    expect(screen.getByRole("complementary")).toHaveStyle({ width: "220px" });
+  });
 });
 
 /**
- * ⭐ THE CARD'S OWN SHAPE (Jess, 2026-08-19 afternoon).
+ * ⭐ THE CARD'S OWN SHAPE (Jess, 2026-08-19 afternoon), drawn to the Carres
+ * Layout Standard §2 (owner-confirmed template, 2026-10-08).
  *
- * `▣ Sales ⌄` — a module is an icon + a name + a chevron, and the uppercase
- * heading rank it replaced is gone from the rail for good.
+ * A module is an icon + a name + a caret. The Operations area is cut into six
+ * small uppercase GROUP LABELS — Overview · Sales locations · Sales · Supply
+ * chain · Service · Data — which are labels, never destinations; a module row
+ * itself is never an uppercase heading.
  */
 describe("a module is an expandable PARENT ROW, never a heading", () => {
-  it("every module row carries an icon, its name and a chevron", () => {
+  it("every module row carries an icon, its name and a caret", () => {
     renderAt("/operation");
     for (const [slug, name] of [
       ["sales", "Sales Orders"],
       ["purchasing", "Purchasing"],
       ["warehouse", "Warehouse"],
-      ["customer-care", "Customer Care"],
+      // The Customer Care module's word is `Service Case` (owner 2026-10-08).
+      ["customer-care", "Service Case"],
       /* Master Data dropped off this list on 2026-08-21: with Suppliers gone
          it carries one page, and a one-page section is a plain row by design.
          Suppliers takes its place — two pages, so a real module. */
@@ -255,32 +315,87 @@ describe("a module is an expandable PARENT ROW, never a heading", () => {
       const row = module_(slug);
       expect(row.tagName).toBe("BUTTON");
       expect(within(row).getByText(name)).toBeInTheDocument();
-      // icon + chevron: two SVGs, and the chevron states the open/shut fact.
-      expect(row.querySelectorAll("svg").length).toBe(2);
+      // icon + caret: two Material Symbols, and the caret states open/shut.
+      expect(row.querySelectorAll(MICON).length).toBe(2);
       expect(row.getAttribute("aria-expanded")).toBe("false");
     }
   });
 
-  it("no uppercase module heading survives anywhere in the rail", () => {
+  it("the Operations menu is six small uppercase group labels, in the approved order", () => {
     renderAt("/operation?tab=purchase");
-    for (const word of ["Sales", "Purchasing", "Warehouse", "Delivery"]) {
+    const heads = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-testid^='nav-group-head-']"),
+    );
+    expect(heads.map((h) => h.textContent)).toEqual([
+      "Overview",
+      "Sales locations",
+      "Sales",
+      "Supply chain",
+      "Service",
+      "Data",
+    ]);
+    for (const head of heads) {
+      // A label rank: 10px semibold uppercase, never a link or a button.
+      expect(head.tagName).toBe("SPAN");
+      expect(head.closest("a, button")).toBeNull();
+      expect(head.className).toContain("uppercase");
+      expect(head.className).toContain("text-[10px]");
+      expect(head.className).toContain("font-semibold");
+    }
+    // No group is called "Operations" (owner ruling 2026-10-08).
+    expect(screen.queryByText("Operations")).toBeNull();
+  });
+
+  it("each group carries its own modules and rows, in order", () => {
+    renderAt("/operation");
+    const nav = screen.getByRole("navigation", { name: "Modules" });
+    const walk: string[] = [];
+    for (const el of nav.querySelectorAll<HTMLElement>(
+      "[data-testid^='nav-group-head-'], [data-testid^='nav-module-'], [data-testid^='nav-child-']",
+    )) {
+      walk.push(el.dataset.testid!.replace(/^nav-/, ""));
+    }
+    expect(walk).toEqual([
+      "group-head-overview",
+      "child-dashboard",
+      "child-work",
+      "group-head-sales-locations",
+      "module-showroom",
+      "group-head-sales",
+      "module-sales",
+      "group-head-supply-chain",
+      "module-purchasing",
+      "module-warehouse",
+      "module-payments",
+      "module-delivery",
+      "group-head-service",
+      "module-customer-care",
+      "child-issue-tracker",
+      "group-head-data",
+      "module-reports",
+      "module-suppliers",
+      "child-op-catalog",
+    ]);
+  });
+
+  it("no module row is an uppercase heading", () => {
+    renderAt("/operation?tab=purchase");
+    for (const word of ["Purchasing", "Warehouse", "Delivery", "Sales Orders"]) {
       const uppercaseHeading = screen
         .queryAllByText(word)
         .some((el) => el.closest("a") === null && el.className.includes("uppercase"));
-      expect(uppercaseHeading).toBe(false);
+      expect(uppercaseHeading, word).toBe(false);
     }
-    // The umbrella word never comes back either.
-    expect(screen.queryByText("Supply Chain")).toBeNull();
   });
 
-  it("single pages stay plain rows — no chevron on Dashboard, Work, Issue Tracker", () => {
+  it("single pages stay plain rows — no caret on Dashboard, Workspace, Issue Tracker, Catalog", () => {
     renderAt("/operation");
-    for (const key of ["dashboard", "work", "issue-tracker"]) {
+    for (const key of ["dashboard", "work", "issue-tracker", "op-catalog"]) {
       const row = child(key);
       expect(row.tagName).toBe("A");
       expect(row.getAttribute("aria-expanded")).toBeNull();
       // icon only — a plain row has nothing to expand.
-      expect(row.querySelectorAll("svg").length).toBe(1);
+      expect(row.querySelectorAll(MICON).length, key).toBe(1);
     }
   });
 
@@ -315,7 +430,7 @@ describe("a module is an expandable PARENT ROW, never a heading", () => {
 
   it("the Monitor row stays lit on the retired Invoices address while it forwards", () => {
     renderAt("/finance/invoices?invoice=abc");
-    expect(child("payments").className).toContain("bg-kit-blue-3");
+    expect(child("payments").className).toContain("bg-c-select-bg");
   });
 
   it("finance sees the same two Payments destinations — never a second Payment IA", () => {
@@ -323,7 +438,7 @@ describe("a module is an expandable PARENT ROW, never a heading", () => {
     renderAt("/finance/payments");
     expect(child("payments")).toHaveAttribute("href", "/finance/monitor");
     expect(child("payment-records")).toHaveAttribute("href", "/finance/payments");
-    expect(child("payment-records").className).toContain("bg-kit-blue-3");
+    expect(child("payment-records").className).toContain("bg-c-select-bg");
     expect(screen.queryByText("Refunds & Credits")).not.toBeInTheDocument();
     expect(screen.queryByText("Invoices")).not.toBeInTheDocument();
     // Genuine finance-only capability keeps its own rows, in Finance's own modules.
@@ -342,7 +457,7 @@ describe("the accordion", () => {
     expect(screen.getByTestId("nav-children-purchasing")).toBeInTheDocument();
     // ...and every other module has hidden its pages.
     expect(screen.queryByTestId("nav-children-sales")).not.toBeInTheDocument();
-    expect(screen.queryByText("Outright Sales")).not.toBeInTheDocument();
+    expect(screen.queryByText("Outright")).not.toBeInTheDocument();
   });
 
   it("expanding Purchasing collapses Sales", () => {
@@ -358,7 +473,7 @@ describe("the accordion", () => {
     fireEvent.click(module_("warehouse"));
     // Arrival Schedule is Warehouse's landing (owner ruling 2026-09-14) —
     // the rail navigated there.
-    expect(child("wh-arrival-schedule").className).toContain("bg-kit-blue-3");
+    expect(child("wh-arrival-schedule").className).toContain("bg-c-select-bg");
   });
 
   it("clicking the open module closes it again", () => {
@@ -385,7 +500,7 @@ describe("the accordion", () => {
     fireEvent.click(module_("warehouse"));
     expect(screen.getByTestId("nav-children-warehouse")).toBeInTheDocument();
     expect(screen.queryByTestId("nav-children-purchasing")).not.toBeInTheDocument();
-    expect(child("wh-arrival-schedule").className).toContain("bg-kit-blue-3");
+    expect(child("wh-arrival-schedule").className).toContain("bg-c-select-bg");
   });
 
   it("a module shut by hand stays shut while you stand on its page", () => {
@@ -393,94 +508,60 @@ describe("the accordion", () => {
     fireEvent.click(module_("purchasing"));
     expect(screen.queryByTestId("nav-children-purchasing")).not.toBeInTheDocument();
     // ...and the shut module is the one carrying the light, so nothing is lost.
-    expect(module_("purchasing").className).toContain("bg-kit-blue-3");
+    expect(module_("purchasing").className).toContain("bg-c-select-bg");
   });
 });
 
 /**
- * THE ELBOWS — each child hangs off its OWN rounded connector, and the trunk
- * stops at the last child. A single straight bar running past the group is
- * the exact defect the drawing exists to avoid.
+ * THE TREE LINE — every sub-item hangs on ONE thin straight grey line, 19px in
+ * (Carres Layout Standard §2, owner-confirmed template 2026-10-08).
+ *
+ * RETIRED with it: the 2026-08-19 curved elbows (`nav-elbow-*`), the trunk
+ * that stopped at the last child (`nav-trunk-*`) and their geometry tests —
+ * the approved drawing has no elbow, no trunk and no radius to measure.
  */
-describe("the elbow connectors", () => {
-  /* Sales stays a two-page module, so it proves the one-level elbow grammar.
-   * Delivery is now one direct page and correctly carries no elbow. */
-  it("every child row carries its own elbow", () => {
+describe("the tree line", () => {
+  it("every child row hangs on the one thin straight line, 19px in", () => {
     renderAt("/operation/orders");
     const group = screen.getByTestId("nav-children-sales");
-    const rows = group.querySelectorAll("[data-testid^='nav-child-']");
-    const elbows = group.querySelectorAll("[data-testid^='nav-elbow-']");
+    const rows = Array.from(group.querySelectorAll<HTMLElement>("[data-testid^='nav-child-']"));
     expect(rows.length).toBe(2);
-    expect(elbows.length).toBe(rows.length);
-  });
-
-  it("every elbow turns at its own row's middle", () => {
-    renderAt("/operation/orders");
-    const group = screen.getByTestId("nav-children-sales");
-    for (const el of group.querySelectorAll<HTMLElement>("[data-testid^='nav-elbow-']")) {
-      // Capped at the row's centre; the number is only what it reaches UP by.
-      expect(el.style.height).toMatch(/^calc\(50% \+ \d+px\)$/);
-      expect(el.style.borderBottomLeftRadius).toBe("9px");
+    for (const row of rows) {
+      expect(row.className).toContain(TREE_LINE);
+      expect(row.className).toContain("ml-[19px]");
     }
   });
 
-  /* THE LINE ENDS AT THE LAST CHILD'S ELBOW — never a straight bar running
-   * past the group. Every child but the last carries the trunk on to the next
-   * one; the last carries none, so the drawing simply stops there. */
-  it("the trunk stops at the last child — it carries on from every other", () => {
-    renderAt("/operation/orders");
-    const group = screen.getByTestId("nav-children-sales");
-    const rows = group.querySelectorAll("[data-testid^='nav-child-']");
-    const trunks = group.querySelectorAll("[data-testid^='nav-trunk-']");
-    expect(rows.length).toBe(2);
-    expect(trunks.length).toBe(rows.length - 1);
-    // `Subscription` is last, and nothing hangs below it.
-    expect(screen.getByTestId("nav-elbow-rental")).toBeInTheDocument();
-    expect(screen.queryByTestId("nav-trunk-rental")).not.toBeInTheDocument();
-    // ...and the row above it DOES carry the line on.
-    expect(screen.getByTestId("nav-trunk-orders")).toBeInTheDocument();
+  it("no curved elbow and no trunk is drawn anywhere in the menu", () => {
+    renderAt("/operation?tab=purchase");
+    expect(document.querySelector("[data-testid^='nav-elbow-']")).toBeNull();
+    expect(document.querySelector("[data-testid^='nav-trunk-']")).toBeNull();
   });
 
-  it("a selected child still shows the elbow it hangs from", () => {
+  it("a selected child keeps the line it hangs on", () => {
     renderAt("/operation?tab=receiving");
-    // The row's own wash may not bury its indent guide.
-    expect(screen.getByTestId("nav-elbow-receiving").style.zIndex).toBe("1");
+    // The row's own selected colour may not bury the tree line.
+    const row = child("receiving");
+    expect(row.className).toContain(SELECTED);
+    expect(row.className).toContain(TREE_LINE);
   });
 
-  it("the trunk hangs from the module ICON's centre, and the elbow turns into the row", () => {
+  it("the line is a box shadow, so a screen reader hears nothing of it", () => {
     renderAt("/operation/orders");
-    const elbow = screen.getByTestId("nav-elbow-rental");
-    // px-3.5 (14) + half a 16px icon = 22; the 1px line is centred on it.
-    expect(elbow.style.left).toBe("21.5px");
-    expect(elbow.style.width).toBe("11px");
-    expect(elbow.style.borderBottomLeftRadius).toBe("9px");
+    // No decorative element sits inside the row; the line is the row's own edge.
+    expect(child("rental").children).toHaveLength(1);
+    expect(child("rental")).toHaveTextContent(/^Subscription$/);
   });
 
-  it("a child is decoration-free for a screen reader — the elbow is aria-hidden", () => {
-    renderAt("/operation/orders");
-    expect(
-      screen.getByTestId("nav-elbow-rental").getAttribute("aria-hidden"),
-    ).toBe("true");
-  });
-
-  /**
-   * ⭐ ONE DRAWING, TWO SURFACES — 2026-09-11.
-   *
-   * The owner asked for THIS line between the sections of an expanded SO Batch
-   * Purchase row, so the two spans that paint it moved to
-   * `components/tree-connector` and both surfaces call it. Every assertion
-   * above still measures the RENDERED geometry, which is what proves the
-   * extraction changed nothing. This one guards the other direction: neither
-   * surface may quietly grow a second copy and start drifting.
-   */
-  it("draws from the ONE shared connector — neither surface hand-rolls a second", () => {
+  /* ⭐ ONE DRAWING, TWO SURFACES (2026-09-11) is RETIRED for the menu: the side
+   * menu no longer draws the shared curved connector at all, so it may not
+   * import it. `ConnectedSections` still draws it, from the ONE shared file. */
+  it("the menu no longer draws the curved connector; ConnectedSections still draws the shared one", () => {
     const here = dirname(fileURLToPath(import.meta.url));
     const sidebar = readFileSync(join(here, "PortalSidebar.tsx"), "utf8");
-    expect(sidebar).toContain('from "@/components/tree-connector"');
-    expect(sidebar).toContain("<ConnectorElbow");
-    expect(sidebar).toContain("<ConnectorTrunk");
-    /* The radius is the drawing's, not the caller's — a literal here would be
-       the beginning of the second copy. */
+    expect(sidebar).not.toContain('from "@/components/tree-connector"');
+    expect(sidebar).not.toContain("<ConnectorElbow");
+    expect(sidebar).not.toContain("<ConnectorTrunk");
     expect(sidebar).not.toContain("borderBottomLeftRadius");
 
     const sections = readFileSync(
@@ -517,7 +598,8 @@ describe("badges across the collapse", () => {
       module_("sales").querySelector("[data-testid^='nav-badge-']"),
     ).toBeNull();
     expect(
-      within(child("orders")).getByTestId("nav-badge-outright-sales").textContent,
+      // The child's word is `Outright` (owner 2026-10-08), so is its chip's name.
+      within(child("orders")).getByTestId("nav-badge-outright").textContent,
     ).toBe("3");
   });
 
@@ -532,26 +614,25 @@ describe("badges across the collapse", () => {
 });
 
 /**
- * ⭐ PORTAL NAVIGATION ACTIVE COLOUR — APPROVED / LOCKED (`docs/ui/MASTER.md`).
+ * ⭐ THE SELECTED ROW — Carres Layout Standard §2 (owner-confirmed template,
+ * Jess 2026-10-08): `bg-c-select-bg text-c-select-fg font-semibold`, the
+ * theme's own select colours.
  *
- * "I am on this page" is SELECTION, so it wears the governed blue treatment:
- * a `kit-blue-9` active line + a `kit-blue-3` wash. It may never be the flame
- * `primary`, because red in Carres already means ONE thing — late / act now.
- *
- * ⚠️ The card sketched this row as a WHITE pill (`surface bg`), which is the
- * one place its drawing and this locked law disagree; the card itself defers
- * ("active COLOR follows the governed blue active law"), so the law wins and
- * the shape — a rounded pill at 13px medium — is the card's. Reported to the
- * owner for her production walk.
+ * RETIRED: the governed BLUE treatment (`kit-blue-3` wash + 3px `kit-blue-9`
+ * left bar). There is no blue and no left bar any more, so the bar assertions
+ * are gone. It still may never be the flame `primary` — red in Carres means
+ * late / act now.
  */
-describe("the active page — governed blue, never flame", () => {
-  it("the active child wears the blue-3 wash and a blue-9 line, at 13px medium", () => {
+describe("the active page — theme select colours, never flame", () => {
+  it("the active child wears the theme select colours at 600, with no blue and no left bar", () => {
     renderAt("/operation?tab=receiving");
     const row = child("receiving");
-    expect(row.className).toContain("bg-kit-blue-3");
-    expect(row.className).toContain("rounded-control");
-    expect(row.className).toContain("font-medium");
-    expect(row.querySelector(".bg-kit-blue-9")).not.toBeNull();
+    expect(row.className).toContain(SELECTED);
+    expect(row.className).toContain("text-c-select-fg");
+    expect(row.className).toContain("font-semibold");
+    expect(row.className).toContain("rounded-lg");
+    expect(row.className).not.toMatch(/kit-blue/);
+    expect(row.querySelector("[class*='kit-blue']")).toBeNull();
   });
 
   it("the active page sits INSIDE its auto-expanded module on a direct URL load", () => {
@@ -565,9 +646,11 @@ describe("the active page — governed blue, never flame", () => {
     // A sibling inside the drawer the route forced open — `Report` left the
     // rail on 2026-08-22, so the inactive row is proved on a live BUY page.
     const row = child("purchase-orders");
-    expect(row.className).not.toContain("bg-kit-blue-3");
-    expect(row.className).toContain("font-normal");
-    expect(row.querySelector(".bg-kit-blue-9")).toBeNull();
+    expect(row.className).not.toContain(SELECTED);
+    // 500 at rest, 600 selected (Layout Standard §2).
+    expect(row.className).toContain("font-medium");
+    expect(row.className).not.toContain("font-semibold");
+    expect(row.className).toContain("text-c-menu");
   });
 
   it("no flame and no grey wash survives in the active row", () => {
@@ -582,36 +665,38 @@ describe("the active page — governed blue, never flame", () => {
   it("a module that has SHUT on the page you are standing on lights instead", () => {
     renderAt("/operation?tab=purchase");
     fireEvent.click(module_("purchasing")); // shut it, still on its page
-    expect(module_("purchasing").className).toContain("bg-kit-blue-3");
-    expect(module_("purchasing").querySelector(".bg-kit-blue-9")).not.toBeNull();
+    expect(module_("purchasing").className).toContain(SELECTED);
+    expect(module_("purchasing").className).toContain("text-c-select-fg");
+    // (the retired 3px blue bar assertion is gone — the approved row has none)
   });
 
-  it("the COLLAPSED icon rail lights blue too — same law, smaller rail", () => {
-    localStorage.setItem("ops-sidebar-collapsed", "1");
+  it("the COLLAPSED icon rail is selected the same way — same law, smaller rail", () => {
+    localStorage.setItem(COLLAPSE_KEY, "1");
     try {
       renderAt("/operation/orders");
+      expect(screen.getByRole("complementary")).toHaveStyle({ width: "64px" });
       // Collapsed, the children disappear and the MODULE's one icon remains.
       const icon = screen.getByTitle("Sales Orders") as HTMLAnchorElement;
       expect(icon).toHaveAttribute("href", "/operation/orders");
-      expect(icon.className).toContain("bg-kit-blue-3");
-      expect(icon.querySelector(".bg-kit-blue-9")).not.toBeNull();
-      expect(icon.querySelector(".text-kit-blue-9")).not.toBeNull();
+      expect(icon.className).toContain(SELECTED);
+      expect(icon.className).toContain("text-c-select-fg");
+      expect(icon.querySelector("[class*='kit-blue']")).toBeNull();
       expect(icon.className).not.toContain("bg-base-100");
       expect(icon.querySelector(".text-primary")).toBeNull();
     } finally {
-      localStorage.removeItem("ops-sidebar-collapsed");
+      localStorage.removeItem("carres-menu-collapsed");
     }
   });
 
   it("the collapsed rail navigates thirteen pages by ONE icon, not thirteen", () => {
-    localStorage.setItem("ops-sidebar-collapsed", "1");
+    localStorage.setItem("carres-menu-collapsed", "1");
     try {
       renderAt("/operation?tab=purchase");
       expect(screen.getByTitle("Purchasing")).toBeInTheDocument();
       expect(screen.queryByTitle("Receiving")).toBeNull();
       expect(screen.queryByTitle("Supplier Claims")).toBeNull();
     } finally {
-      localStorage.removeItem("ops-sidebar-collapsed");
+      localStorage.removeItem("carres-menu-collapsed");
     }
   });
 });
@@ -634,7 +719,7 @@ describe("PortalSidebar — catalog split into two doors (2026-07-25)", () => {
   it("is active on /principal?tab=catalog — with NO section sub-links in the rail", () => {
     renderAt("/principal?tab=catalog");
     const pm = screen.getByText("Product & Maintenance").closest("a") as HTMLAnchorElement;
-    expect(pm.className).toContain("bg-kit-blue-3");
+    expect(pm.className).toContain("bg-c-select-bg");
     expect(screen.queryByText("SKU Master")).not.toBeInTheDocument();
     expect(screen.queryByText("Promo / GWP")).not.toBeInTheDocument();
   });
@@ -668,12 +753,12 @@ describe("PortalSidebar — Commission is ONE HR entry (Loo 2026-07-27)", () => 
 
   it("stays lit on the Setup sub-tab (?tab=setup)", () => {
     renderAt("/hr?tab=setup");
-    expect(commissionLink().className).toContain("bg-kit-blue-3");
+    expect(commissionLink().className).toContain("bg-c-select-bg");
   });
 
   it("is NOT lit on another HR tab (?tab=team)", () => {
     renderAt("/hr?tab=team");
-    expect(commissionLink().className).not.toContain("bg-kit-blue-3");
+    expect(commissionLink().className).not.toContain("bg-c-select-bg");
   });
 });
 
@@ -681,7 +766,7 @@ describe("PortalSidebar — Commission is ONE HR entry (Loo 2026-07-27)", () => 
  * ⭐ SALES ORDERS — ONE PARENT, TWO CHILDREN (Jess, owner ruling 2026-09-23).
  *
  *     Sales Orders
- *     ├─ Outright Sales
+ *     ├─ Outright        (was `Outright Sales`; owner 2026-10-08)
  *     └─ Subscription
  *
  * `docs/orders/MASTER.md` "Portal navigation", `docs/ui/MASTER.md` and the
@@ -694,13 +779,13 @@ describe("PortalSidebar — Commission is ONE HR entry (Loo 2026-07-27)", () => 
  * does not delete the legacy page whose menu row it removes.
  */
 describe("PortalSidebar — the approved Sales Orders tree", () => {
-  it("is exactly Outright Sales then Subscription, under one Sales Orders parent", () => {
+  it("is exactly Outright then Subscription, under one Sales Orders parent", () => {
     renderAt("/operation/orders");
     expect(module_("sales")).toHaveTextContent("Sales Orders");
     const group = screen.getByTestId("nav-children-sales");
     const rows = Array.from(group.querySelectorAll("[data-testid^='nav-child-']"));
     expect(rows.map((r) => r.textContent?.trim())).toEqual([
-      "Outright Sales",
+      "Outright",
       "Subscription",
     ]);
   });
@@ -719,16 +804,16 @@ describe("PortalSidebar — the approved Sales Orders tree", () => {
     expect(group.textContent).not.toMatch(/Purchase/);
   });
 
-  it("on /operation/orders only Outright Sales is lit", () => {
+  it("on /operation/orders only Outright is lit", () => {
     renderAt("/operation/orders");
-    expect(child("orders").className).toContain("bg-kit-blue-3");
-    expect(child("rental").className).not.toContain("bg-kit-blue-3");
+    expect(child("orders").className).toContain("bg-c-select-bg");
+    expect(child("rental").className).not.toContain("bg-c-select-bg");
   });
 
   it("on ?tab=rental only Subscription is lit, and it opens the Sales Orders module", () => {
     renderAt("/operation?tab=rental");
-    expect(child("rental").className).toContain("bg-kit-blue-3");
-    expect(child("orders").className).not.toContain("bg-kit-blue-3");
+    expect(child("rental").className).toContain("bg-c-select-bg");
+    expect(child("orders").className).not.toContain("bg-c-select-bg");
     expect(module_("sales").getAttribute("aria-expanded")).toBe("true");
   });
 
@@ -740,14 +825,18 @@ describe("PortalSidebar — the approved Sales Orders tree", () => {
     expect(screen.queryByText("Rental")).not.toBeInTheDocument();
   });
 
-  it("Customer Care keeps its own two pages", () => {
+  it("Customer Care keeps its own two pages, under the `Service Case` module word", () => {
     renderAt("/operation?tab=service-notes");
+    expect(module_("customer-care")).toHaveTextContent("Service Case");
     const group = screen.getByTestId("nav-children-customer-care");
     const rows = Array.from(group.querySelectorAll("[data-testid^='nav-child-']"));
     expect(rows.map((r) => r.textContent?.trim())).toEqual([
       "Service Cases",
       "Guarantees",
     ]);
+    // Issue Tracker is its own row under SERVICE, never inside the module.
+    expect(group.querySelector("[data-testid='nav-child-issue-tracker']")).toBeNull();
+    expect(child("issue-tracker")).toHaveAttribute("href", "/operation/issues");
   });
 
   /* ⭐ THE MENU ROW IS REMOVED. THE PAGE IS NOT. "Menu removal does not delete
@@ -782,7 +871,7 @@ describe("PortalSidebar — the approved Sales Orders tree", () => {
     mockRole = "principal";
     renderAt("/operation/orders");
     expect(module_("sales")).toHaveTextContent("Sales Orders");
-    expect(child("orders")).toHaveTextContent("Outright Sales");
+    expect(child("orders")).toHaveTextContent(/^Outright$/);
   });
 });
 
@@ -807,7 +896,11 @@ describe("PortalSidebar — the Purchasing map", () => {
       .filter((row) => (row.textContent ?? "").trim() !== "")
       .map((row) => {
         const groupButton = row.querySelector("[data-testid^='nav-group-']");
-        if (groupButton) return groupButton.textContent?.trim();
+        // The word only — the caret is a Material Symbol ligature beside it.
+        if (groupButton)
+          return Array.from(groupButton.children)
+            .find((el) => !el.matches(MICON))
+            ?.textContent?.trim();
         return row.textContent?.replace("Coming soon", "").trim();
       });
     expect(rows).toEqual(["BUY", "RECEIVE", "PROBLEMS", "SHOWROOM"]);
@@ -868,10 +961,14 @@ describe("PortalSidebar — the Purchasing map", () => {
       "purchase-demands",
       "consignment-overview",
       "consignment-receipts",
-      "purchasing-report",
     ]) {
       expect(screen.queryByTestId(`nav-child-${key}`), key).not.toBeInTheDocument();
     }
+    /* `purchasing-report` is a real page again, but under DATA → Reports
+       (owner 2026-10-08) — never back inside the Purchasing module. */
+    expect(
+      screen.getByTestId("nav-children-purchasing").querySelector("[data-testid='nav-child-purchasing-report']"),
+    ).toBeNull();
     for (const word of [
       "Purchasing Home",
       "My Purchasing Work",
@@ -995,7 +1092,7 @@ describe("PortalSidebar — the Purchasing map", () => {
 
   it("a nested path page wins — Receiving does not light next to Purchase Orders", () => {
     renderAt("/operation/procurement");
-    expect(child("purchase-orders").className).toContain("bg-kit-blue-3");
+    expect(child("purchase-orders").className).toContain("bg-c-select-bg");
     expect(screen.queryByTestId("nav-child-receiving")).not.toBeInTheDocument();
   });
 });
@@ -1047,37 +1144,38 @@ describe("PortalSidebar — the Purchasing parent toggles without navigating", (
   it("shutting the tree moves the light onto the Purchasing parent", () => {
     renderAt("/operation?tab=receiving");
     // Open: the parent is neutral and the child carries the light.
-    expect(module_("purchasing").className).not.toContain("bg-kit-blue-3");
-    expect(child("receiving").className).toContain("bg-kit-blue-3");
+    expect(module_("purchasing").className).not.toContain("bg-c-select-bg");
+    expect(child("receiving").className).toContain("bg-c-select-bg");
 
     fireEvent.click(module_("purchasing")); // shut it, still on Receiving
-    expect(module_("purchasing").className).toContain("bg-kit-blue-3");
-    expect(module_("purchasing").querySelector(".bg-kit-blue-9")).not.toBeNull();
+    expect(module_("purchasing").className).toContain("bg-c-select-bg");
+    // (the retired 3px blue bar assertion is gone — the approved row has none)
+    expect(module_("purchasing").className).toContain("font-semibold");
   });
 
   it("never both — the parent goes neutral again the moment the tree reopens", () => {
     renderAt("/operation?tab=receiving");
     fireEvent.click(module_("purchasing")); // shut
     fireEvent.click(module_("purchasing")); // and open again
-    expect(module_("purchasing").className).not.toContain("bg-kit-blue-3");
-    expect(child("receiving").className).toContain("bg-kit-blue-3");
+    expect(module_("purchasing").className).not.toContain("bg-c-select-bg");
+    expect(child("receiving").className).toContain("bg-c-select-bg");
   });
 
   it("open tree: exactly ONE row is selected — never parent + drawer + page", () => {
     renderAt("/operation?tab=receiving");
-    expect(module_("purchasing").className).not.toContain("bg-kit-blue-3");
-    expect(group_("purchasing-receive").className).not.toContain("bg-kit-blue-3");
+    expect(module_("purchasing").className).not.toContain("bg-c-select-bg");
+    expect(group_("purchasing-receive").className).not.toContain("bg-c-select-bg");
     const lit = screen
       .getByTestId("nav-children-purchasing")
-      .querySelectorAll(".bg-kit-blue-3");
+      .querySelectorAll(".bg-c-select-bg");
     expect(lit.length).toBe(1);
-    expect(child("receiving").className).toContain("bg-kit-blue-3");
+    expect(child("receiving").className).toContain("bg-c-select-bg");
   });
 
   it("arriving by URL opens Purchasing so the destination is never hidden", () => {
     renderAt("/operation?tab=claims");
     expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
-    expect(child("claims").className).toContain("bg-kit-blue-3");
+    expect(child("claims").className).toContain("bg-c-select-bg");
   });
 
   /* MANUAL PURCHASE — the BUY drawer's second row since 2026-08-22. Its rail
@@ -1096,15 +1194,15 @@ describe("PortalSidebar — the Purchasing parent toggles without navigating", (
     renderAt("/operation?tab=manual-purchase");
     expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
     expect(group_("purchasing-buy").getAttribute("aria-expanded")).toBe("true");
-    expect(child("manual-purchase").className).toContain("bg-kit-blue-3");
+    expect(child("manual-purchase").className).toContain("bg-c-select-bg");
     // Its drawer siblings stay dark.
-    expect(child("purchase").className).not.toContain("bg-kit-blue-3");
-    expect(child("purchase-orders").className).not.toContain("bg-kit-blue-3");
-    expect(module_("purchasing").className).not.toContain("bg-kit-blue-3");
-    expect(group_("purchasing-buy").className).not.toContain("bg-kit-blue-3");
+    expect(child("purchase").className).not.toContain("bg-c-select-bg");
+    expect(child("purchase-orders").className).not.toContain("bg-c-select-bg");
+    expect(module_("purchasing").className).not.toContain("bg-c-select-bg");
+    expect(group_("purchasing-buy").className).not.toContain("bg-c-select-bg");
     const lit = screen
       .getByTestId("nav-children-purchasing")
-      .querySelectorAll(".bg-kit-blue-3");
+      .querySelectorAll(".bg-c-select-bg");
     expect(lit.length).toBe(1);
   });
 
@@ -1113,12 +1211,12 @@ describe("PortalSidebar — the Purchasing parent toggles without navigating", (
     renderAt("/operation?tab=receiving");
     expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
     expect(group_("purchasing-receive").getAttribute("aria-expanded")).toBe("true");
-    expect(child("receiving").className).toContain("bg-kit-blue-3");
-    expect(module_("purchasing").className).not.toContain("bg-kit-blue-3");
-    expect(group_("purchasing-receive").className).not.toContain("bg-kit-blue-3");
+    expect(child("receiving").className).toContain("bg-c-select-bg");
+    expect(module_("purchasing").className).not.toContain("bg-c-select-bg");
+    expect(group_("purchasing-receive").className).not.toContain("bg-c-select-bg");
     const lit = screen
       .getByTestId("nav-children-purchasing")
-      .querySelectorAll(".bg-kit-blue-3");
+      .querySelectorAll(".bg-c-select-bg");
     expect(lit.length).toBe(1);
   });
 
@@ -1128,11 +1226,11 @@ describe("PortalSidebar — the Purchasing parent toggles without navigating", (
     renderAt("/operation/to-order");
     expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
     expect(group_("purchasing-buy").getAttribute("aria-expanded")).toBe("true");
-    expect(child("purchase").className).toContain("bg-kit-blue-3");
-    expect(child("purchase-orders").className).not.toContain("bg-kit-blue-3");
+    expect(child("purchase").className).toContain("bg-c-select-bg");
+    expect(child("purchase-orders").className).not.toContain("bg-c-select-bg");
     const lit = screen
       .getByTestId("nav-children-purchasing")
-      .querySelectorAll(".bg-kit-blue-3");
+      .querySelectorAll(".bg-c-select-bg");
     expect(lit.length).toBe(1);
   });
 });
@@ -1154,14 +1252,18 @@ describe("PortalSidebar — the Purchasing drawers", () => {
       const row = group_(key);
       expect(row.tagName, key).toBe("BUTTON");
       expect(row.getAttribute("aria-expanded"), key).not.toBeNull();
-      expect(row.className).toContain("w-full");
+      /* Full width by its column: the button is a stretched child of a
+         flex column (the `w-full` class itself left with the 2026-10-08
+         drawing). */
+      expect(row.parentElement?.className, key).toContain("flex-col");
     }
   });
 
-  it("the word is a LABEL rank — 11px semibold uppercase, never a destination", () => {
+  it("the word is a LABEL rank — 10px semibold uppercase, never a destination", () => {
     renderAt("/operation?tab=purchase");
     const row = group_("purchasing-buy");
-    expect(row.className).toContain("text-label");
+    // Layout Standard §2 group label: 10px / 600 / .12em, uppercase.
+    expect(row.className).toContain("text-[10px]");
     expect(row.className).toContain("font-semibold");
     expect(row.className).toContain("uppercase");
     expect(row.getAttribute("href")).toBeNull();
@@ -1203,55 +1305,56 @@ describe("PortalSidebar — the Purchasing drawers", () => {
     expect(group_("purchasing-buy").getAttribute("aria-disabled")).toBeNull();
   });
 
-  it("the drawer's children hang one level deeper, off their own trunk", () => {
+  /* The elbow/trunk geometry of these two tests is RETIRED (Layout Standard
+   * §2): the drawer word and its pages hang on the module's one straight tree
+   * line. What stays is the depth: a drawer's pages sit deeper, at 13px. */
+  it("the drawer's children sit one level deeper, at 13px, on the same tree line", () => {
     renderAt("/operation?tab=purchase");
-    const nested = screen.getByTestId("nav-elbow-purchase");
-    const topLevel = screen.getByTestId("nav-elbow-purchasing-showroom");
-    // The module's own trunk stays on the icon's centre (21.5px); the drawer's
-    // children hang from the drawer word's left edge, further right.
-    expect(topLevel.style.left).toBe("21.5px");
-    expect(Number.parseFloat(nested.style.left)).toBeGreaterThan(21.5);
-    expect(nested.style.borderBottomLeftRadius).toBe("9px");
-    expect(nested.getAttribute("aria-hidden")).toBe("true");
+    const nested = child("purchase");
+    const word = group_("purchasing-buy");
+    // The drawer word sits 16px off the line; its pages 28px, at 13px.
+    expect(word.className).toContain("pl-4");
+    expect(nested.className).toContain("pl-7");
+    expect(nested.className).toContain("text-[13px]");
+    expect(nested.className).toContain(TREE_LINE);
   });
 
-  it("a drawer hangs off the module's trunk exactly as a page does", () => {
+  it("a drawer hangs on the module's tree line exactly as a page does", () => {
     renderAt("/operation?tab=purchase");
-    const elbow = screen.getByTestId("nav-elbow-purchasing-buy");
-    expect(elbow.style.left).toBe("21.5px");
-    expect(elbow.style.borderBottomLeftRadius).toBe("9px");
-    // The module trunk carries on past the whole drawer to reach the next row.
-    expect(screen.getByTestId("nav-trunk-purchasing-buy")).toBeInTheDocument();
-    // FOUR drawers → four elbows → THREE trunks. SHOWROOM is the last row in
-    // the module now that Report has left, so it is the row that ends the line.
-    expect(screen.queryByTestId("nav-trunk-purchasing-showroom")).not.toBeInTheDocument();
+    for (const key of [
+      "purchasing-buy",
+      "purchasing-receive",
+      "purchasing-problems",
+      "purchasing-showroom",
+    ]) {
+      expect(group_(key).className, key).toContain(TREE_LINE);
+      expect(group_(key).className, key).toContain("ml-[19px]");
+    }
     expect(
-      screen.getByTestId("nav-children-purchasing").querySelectorAll(
-        "[data-testid^='nav-trunk-purchasing-']",
-      ),
-    ).toHaveLength(3);
+      screen.getByTestId("nav-children-purchasing").querySelector("[data-testid^='nav-trunk-']"),
+    ).toBeNull();
   });
 
-  /* ⭐ THE 60px ICON GOES WHERE IT IS TOLD, NOT WHERE ROW ORDER PUTS IT
+  /* ⭐ THE 64px ICON GOES WHERE IT IS TOLD, NOT WHERE ROW ORDER PUTS IT
    * (owner review, 2026-08-20). Deriving it from the first live row moved the
    * module's landing page the moment grouping reordered the rail. */
   it("the collapsed Purchasing icon links to SO Batch Purchase, and lights on any Purchasing page", () => {
-    localStorage.setItem("ops-sidebar-collapsed", "1");
+    localStorage.setItem("carres-menu-collapsed", "1");
     try {
       renderAt("/operation?tab=receiving");
       const icon = screen.getByTitle("Purchasing") as HTMLAnchorElement;
       // Named, never derived: the landing page does not move when row order does.
       expect(icon).toHaveAttribute("href", "/operation?tab=purchase");
       // Standing on Receiving still lights the module's one icon.
-      expect(icon.className).toContain("bg-kit-blue-3");
-      expect(icon.querySelector(".bg-kit-blue-9")).not.toBeNull();
+      expect(icon.className).toContain("bg-c-select-bg");
+      // (the retired 3px blue bar assertion is gone — the approved row has none)
     } finally {
-      localStorage.removeItem("ops-sidebar-collapsed");
+      localStorage.removeItem("carres-menu-collapsed");
     }
   });
 
-  it("collapsed to 60px, every direct/drawer/listing row disappears", () => {
-    localStorage.setItem("ops-sidebar-collapsed", "1");
+  it("collapsed to 64px, every direct/drawer/listing row disappears", () => {
+    localStorage.setItem("carres-menu-collapsed", "1");
     try {
       renderAt("/operation?tab=receiving");
       expect(screen.getByTitle("Purchasing")).toBeInTheDocument();
@@ -1261,7 +1364,7 @@ describe("PortalSidebar — the Purchasing drawers", () => {
       expect(screen.queryByText("Manual Purchase")).not.toBeInTheDocument();
       expect(screen.queryByText("SHOWROOM")).not.toBeInTheDocument();
     } finally {
-      localStorage.removeItem("ops-sidebar-collapsed");
+      localStorage.removeItem("carres-menu-collapsed");
     }
   });
 });
@@ -1320,7 +1423,7 @@ describe("PortalSidebar — Purchasing remembers its drawers", () => {
     renderAt("/operation?tab=claims");
     // The route still wins, the drawer still opens, the page is still lit.
     expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
-    expect(child("claims").className).toContain("bg-kit-blue-3");
+    expect(child("claims").className).toContain("bg-c-select-bg");
   });
 
   /* THE SAFETY RULE WINS OVER A STORED CLOSED STATE. Landing on a page the
@@ -1347,7 +1450,7 @@ describe("PortalSidebar — Purchasing remembers its drawers", () => {
     renderAt("/operation/orders");
     expect(screen.getByTestId("nav-children-sales")).toBeInTheDocument();
     expect(screen.queryByTestId("nav-children-purchasing")).not.toBeInTheDocument();
-    expect(child("orders").className).toContain("bg-kit-blue-3");
+    expect(child("orders").className).toContain("bg-c-select-bg");
   });
 
   /* ⭐ SWITCHING USER WITHOUT REMOUNTING (owner review, 2026-08-20).
@@ -1386,7 +1489,7 @@ describe("PortalSidebar — Purchasing remembers its drawers", () => {
     // ...and B is still shown the page B is standing on.
     expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
     expect(group_("purchasing-receive").getAttribute("aria-expanded")).toBe("true");
-    expect(child("receiving").className).toContain("bg-kit-blue-3");
+    expect(child("receiving").className).toContain("bg-c-select-bg");
     // B's own storage was not written by merely arriving.
     expect(localStorage.getItem(drawerKey("user-b"))).toBeNull();
   });
@@ -1430,34 +1533,40 @@ describe("PortalSidebar — the Delivery module's two destinations", () => {
     const monitor = child("delivery");
     expect(monitor.tagName).toBe("A");
     expect(monitor).toHaveAttribute("href", "/operation?tab=delivery");
-    expect(monitor.className).toContain("bg-kit-blue-3");
-    expect(child("delivery-orders").className).not.toContain("bg-kit-blue-3");
+    expect(monitor.className).toContain("bg-c-select-bg");
+    expect(child("delivery-orders").className).not.toContain("bg-c-select-bg");
   });
 
   it("Delivery Orders opens its restored register route and lights only itself", () => {
     renderAt("/operation/delivery-orders");
     const register = child("delivery-orders");
     expect(register).toHaveAttribute("href", "/operation/delivery-orders");
-    expect(register.className).toContain("bg-kit-blue-3");
-    expect(child("delivery").className).not.toContain("bg-kit-blue-3");
+    expect(register.className).toContain("bg-c-select-bg");
+    expect(child("delivery").className).not.toContain("bg-c-select-bg");
   });
 
   it("a DO object deep link lights the Delivery Orders row", () => {
     renderAt("/operation/delivery-orders/DO-040926-0001");
-    expect(child("delivery-orders").className).toContain("bg-kit-blue-3");
-    expect(child("delivery").className).not.toContain("bg-kit-blue-3");
+    expect(child("delivery-orders").className).toContain("bg-c-select-bg");
+    expect(child("delivery").className).not.toContain("bg-c-select-bg");
   });
 
   it("does not show retired Delivery destinations", () => {
     renderAt("/operation?tab=delivery");
+    const tree = screen.getByTestId("nav-children-delivery");
     for (const key of [
       "delivery-schedule",
       "delivery-history",
       "delivery-exceptions",
       "delivery-partners",
+      /* `delivery-report` is a real page again, but under DATA → Reports
+         (owner 2026-10-08) — never inside the Delivery module. */
       "delivery-report",
     ]) {
-      expect(screen.queryByTestId(`nav-child-${key}`)).toBeNull();
+      expect(tree.querySelector(`[data-testid='nav-child-${key}']`), key).toBeNull();
+    }
+    for (const key of ["delivery-schedule", "delivery-history", "delivery-exceptions", "delivery-partners"]) {
+      expect(screen.queryByTestId(`nav-child-${key}`), key).toBeNull();
     }
   });
 });
@@ -1529,28 +1638,30 @@ describe("PortalSidebar — the Warehouse module's four destinations", () => {
     expect(within(module_("warehouse")).getByText("Warehouse")).toBeInTheDocument();
   });
 
-  /* ⭐ THE 60px ICON GOES WHERE IT IS TOLD (the Purchasing law, applied):
+  /* ⭐ THE 64px ICON GOES WHERE IT IS TOLD (the Purchasing law, applied):
    * Warehouse names `Arrival Schedule` as its landing (owner ruling
    * 2026-09-14) — by name, never derived from row order. */
   it("the collapsed Warehouse icon links to Arrival Schedule, and lights on a Warehouse page", () => {
-    localStorage.setItem("ops-sidebar-collapsed", "1");
+    localStorage.setItem("carres-menu-collapsed", "1");
     try {
       renderAt("/operation?tab=stock-onhand");
       const icon = screen.getByTitle("Warehouse") as HTMLAnchorElement;
       expect(icon).toHaveAttribute("href", "/operation?tab=warehouse-arrival-schedule");
-      expect(icon.className).toContain("bg-kit-blue-3");
+      expect(icon.className).toContain("bg-c-select-bg");
     } finally {
-      localStorage.removeItem("ops-sidebar-collapsed");
+      localStorage.removeItem("carres-menu-collapsed");
     }
   });
 });
 
 /**
- * NO SETTINGS ROW ANYWHERE (Jess, 2026-08-19): *"Settings should be at the
- * header settings, not every panel got one setting."*
+ * SETTINGS SITS AT THE BOTTOM OF THE MENU (Carres Layout Standard §2, owner
+ * ruling 2026-10-08). The 2026-08-19 "no rail Settings row — the header gear
+ * is the one Settings entry" rule is RETIRED by the owner: the header gear is
+ * gone, and the ONE Settings entry is the row above the avatar.
  */
-describe("no rail carries a Settings row, for any role", () => {
-  it("operation — walking every module", () => {
+describe("the one Settings row, at the bottom of the menu", () => {
+  it("operation — one Settings row, below every module, on every page", () => {
     for (const path of [
       "/operation",
       "/operation/orders",
@@ -1559,24 +1670,57 @@ describe("no rail carries a Settings row, for any role", () => {
       "/operation?tab=stock-onhand",
     ]) {
       const view = renderAt(path);
-      expect(screen.queryByText("Settings")).not.toBeInTheDocument();
+      const settings = screen.getByTestId("nav-settings");
+      expect(screen.getAllByTestId("nav-settings"), path).toHaveLength(1);
+      expect(settings).toHaveAttribute("href", "/operation/settings");
+      expect(settings).toHaveTextContent("Settings");
+      // Below the module list, never inside it.
+      const nav = screen.getByRole("navigation", { name: "Modules" });
+      expect(nav.contains(settings)).toBe(false);
+      expect(nav.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      // ...and no module grows a Settings page of its own.
       expect(screen.queryByTestId("nav-child-purchasing-settings")).not.toBeInTheDocument();
       view.unmount();
     }
   });
 
-  it("principal — the boss gets no rail Settings door either", () => {
+  it("principal — the same one row, to Operations Settings or to Finance Settings where she stands", () => {
     mockRole = "principal";
-    renderAt("/operation?tab=purchase");
-    expect(screen.queryByText("Settings")).not.toBeInTheDocument();
+    const view = renderAt("/operation?tab=purchase");
+    expect(screen.getByTestId("nav-settings")).toHaveAttribute("href", "/operation/settings");
+    view.unmount();
+    renderAt("/finance/dashboard");
+    expect(screen.getByTestId("nav-settings")).toHaveAttribute("href", "/finance/settings");
+  });
+
+  it("finance has Finance Settings; People has no Settings page, so no row", () => {
+    mockRole = "finance";
+    const view = renderAt("/finance/dashboard");
+    expect(screen.getByTestId("nav-settings")).toHaveAttribute("href", "/finance/settings");
+    view.unmount();
+    mockRole = "hr";
+    renderAt("/hr?tab=overview");
+    expect(screen.queryByTestId("nav-settings")).not.toBeInTheDocument();
+  });
+
+  it("collapsed, the Settings row keeps its icon and its name for a screen reader", () => {
+    localStorage.setItem(COLLAPSE_KEY, "1");
+    renderAt("/operation");
+    const settings = screen.getByTestId("nav-settings");
+    expect(settings).toHaveAttribute("aria-label", "Settings");
+    expect(settings.querySelector(MICON)).not.toBeNull();
   });
 });
 
 
 it("Settings does not select Dashboard or restore a permanent Staff & Duties menu row", () => {
   renderAt("/operation/settings/staff-duties");
-  expect(child("dashboard")).not.toHaveClass("bg-kit-blue-3");
+  expect(child("dashboard")).not.toHaveClass(SELECTED);
   expect(screen.queryByTestId("nav-child-staff-duties")).toBeNull();
+  // The one selected row is Settings itself.
+  expect(screen.getByTestId("nav-settings")).toHaveAttribute("aria-current", "page");
+  expect(screen.getByTestId("nav-settings").className).toContain(SELECTED);
+  expect(document.querySelectorAll("nav [aria-current='page']")).toHaveLength(0);
 });
 
 

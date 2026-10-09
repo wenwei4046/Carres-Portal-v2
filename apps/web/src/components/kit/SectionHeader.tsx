@@ -25,7 +25,7 @@
  * Nothing about any one module reaches this file.
  */
 import type { ReactNode } from "react";
-import Icon from "./Icon";
+import MIcon from "@/components/carres/MIcon";
 
 interface Base {
   /** What this region IS. One word or two, ruled by COPY-STANDARD. */
@@ -57,8 +57,10 @@ type Props =
 export default function SectionHeader(props: Props) {
   const { title, meta, action, testId } = props;
 
+  /* v4 card title (01 §2): 15/600 ink, never blue, normal case — the
+   * caller's word is printed as written. */
   const label = (
-    <span className="text-label uppercase tracking-wide text-kit-slate-11 truncate">
+    <span className="truncate text-strong text-c-ink">
       {title}
     </span>
   );
@@ -67,7 +69,7 @@ export default function SectionHeader(props: Props) {
     <header
       data-kit="section-header"
       data-testid={testId}
-      className="flex items-center gap-3 px-4 py-2"
+      className="flex items-center gap-3 px-4 py-2.5"
     >
       {props.collapsible ? (
         <button
@@ -75,16 +77,16 @@ export default function SectionHeader(props: Props) {
           onClick={props.onToggle}
           aria-expanded={props.open}
           data-testid={testId ? `${testId}-toggle` : undefined}
-          className="flex items-center gap-1.5 min-w-0"
+          className="-ml-1 flex min-w-0 items-center gap-1 rounded-lg px-1 hover:bg-c-hover"
         >
-          <Icon name={props.open ? "expand" : "forward"} size={14} />
+          <MIcon name={props.open ? "expand_more" : "chevron_right"} size={18} className="text-c-muted" />
           {label}
         </button>
       ) : (
         label
       )}
       {meta != null ? (
-        <span className="ml-auto text-meta text-kit-slate-11 truncate">{meta}</span>
+        <span className="ml-auto truncate text-meta text-c-secondary">{meta}</span>
       ) : null}
       {action != null ? <span className={meta != null ? "" : "ml-auto"}>{action}</span> : null}
     </header>

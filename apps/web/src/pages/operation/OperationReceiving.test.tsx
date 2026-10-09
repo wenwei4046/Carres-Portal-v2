@@ -1067,12 +1067,18 @@ describe("OperationReceiving — one destination and the paged register", () => 
     ]) {
       expect(screen.queryByText(banned)).not.toBeInTheDocument();
     }
-    // The portal rail holds exactly ONE Receiving destination.
+    // The portal rail holds exactly ONE Receiving destination. Its REPORT
+    // (`Receiving & Inbound`) is a separate page under DATA → Reports since
+    // 2026-10-08 — a report, not a second receiving desk.
     const { PORTAL_NAV } = await import("../portal/portal-nav");
     const receivingRows = PORTAL_NAV.flatMap((g) => g.items).filter((i) =>
-      i.label.toLowerCase().includes("receiving"),
+      i.label.toLowerCase().includes("receiving") && i.section !== "Reports",
     );
     expect(receivingRows.map((i) => i.label)).toEqual(["Receiving"]);
+    const reportRows = PORTAL_NAV.flatMap((g) => g.items).filter((i) =>
+      i.label.toLowerCase().includes("receiving") && i.section === "Reports",
+    );
+    expect(reportRows.map((i) => i.key)).toEqual(["receiving-report"]);
   });
 
   it("paginates on the SERVER — Showing 1–1 of 2, Next asks for the next offset", async () => {

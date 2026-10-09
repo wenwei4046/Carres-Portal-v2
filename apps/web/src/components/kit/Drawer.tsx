@@ -1,8 +1,9 @@
 /**
  * Drawer — the record opened beside the list (UI-KIT §6, card D0.5b).
  *
- * Same object as `Modal`, placed on the right and full height, so it shares
- * `DialogFrame` rather than repeating a backdrop and a focus trap (§6.6).
+ * Same object as `Modal`, placed on the right (v4: inset 12px, 400px wide),
+ * so it shares `DialogFrame` rather than repeating a backdrop and a focus
+ * trap (§6.6).
  *
  * **Why a separate component and not `<Modal place="side">`.** The two answer
  * different questions — a Modal interrupts to ask something, a Drawer opens a

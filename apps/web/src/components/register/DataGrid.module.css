@@ -1,71 +1,79 @@
-/* DataGrid — THE REGISTER ENGINE's stylesheet, copied from
-   2990s/apps/backend/src/components/DataGrid.module.css (RG-2).
-   Density target: ~28px row height, fs-12 body, fs-10 uppercase header.
+/* DataGrid — THE REGISTER ENGINE's stylesheet (2990 RG-2 origin).
 
-   ADAPTED ONLY per the card: the token block below aliases 2990's variable
-   names to Carres' design-token VALUES (docs/01-design-tokens.md /
-   index.css), so every rule beneath stays byte-close to the 2990 original
-   and future engine syncs diff cleanly. The accent rgba() literals were
-   re-based from 2990 orange (232,107,58) to Carres flame (196,77,43), and
-   2990 ink (34,31,32) to Carres near-black (26,26,26). */
+   ⭐ THE ONE KIT · v4 TABLE (owner instruction 9 Oct 2026; docs/01-design-tokens.md
+   §3 Controls · §5 Register; docs/ui-reference/carres-template-2026-10-08/UI-KIT.md
+   "Table (list page)", "Buttons", "Inputs", "Tabs"). Every DataGrid listing on
+   every page draws the template table: the toolbar row sits on the page, and the
+   table plus its status footer sit in ONE white card. The finished reference is
+   pages/operation/so-outright/SalesOrdersOutright.tsx.
+
+   Token variables only. Every value below reads `styles/carres-tokens.css`
+   (`--c-*`, `--fs-*`, `--table-*`, `--btn-*`, `--radius`, `--shadow-menu`); this
+   file writes no colour of its own. Changing a value means changing the token
+   file, never this sheet. The one exception is the §6.9 expansion connector,
+   which must keep the exact ink ConnectedSections draws its half in. */
 
 .root {
-  /* ── Carres token aliases — the ONE styling adaptation ── */
-  /* PORTAL-WIDE LISTING READABILITY (UI MASTER §6.7, Jess 2026-09-17): every
-     listing is white with a slate-3 header band — the slate palette R5 first
-     gave SO Batch is now the default for every grid, never an opt-in. */
-  --c-paper: theme("colors.white"); /* white toolbar, rows, footer */
-  --c-cream: theme("colors.kit.slate.3"); /* header band + hover */
-  --c-ink: theme("colors.kit.slate.12"); /* main text */
-  --c-burnt: #9a3d22; /* flame-dark */
-  --c-orange: #c44d2b; /* flame */
-  --c-festive-b: #dc2626; /* destructive red-600 */
-  --line: theme("colors.kit.slate.5"); /* 1px separators */
-  --fg-muted: theme("colors.kit.slate.11"); /* secondary facts — never slate-9 */
-  --fg-soft: theme("colors.kit.slate.11");
-  --grid-expansion: theme("colors.kit.slate.2");
-  --font-sans: "Inter", "DM Sans", system-ui, sans-serif;
-  --font-button: "Inter", "DM Sans", system-ui, sans-serif;
-  /* Figures: Carres sets numerals with Inter + tabular-nums (no mono face). */
-  --font-mono: "Inter", "DM Sans", system-ui, sans-serif;
-  --fs-10: 10px;
-  --fs-11: 11px;
-  --fs-12: 12px;
-  --fs-13: 13px;
+  /* Legacy alias names, repointed to the v4 tokens. Inline styles in
+     DataGrid.tsx and older page code still read several of them. `--c-ink`
+     is deliberately NOT redefined: the grid inherits the one v4 ink. */
+  --c-paper: var(--c-card);
+  --c-cream: var(--c-card); /* the old header band is white in v4 */
+  --c-burnt: var(--c-select-fg);
+  --c-orange: var(--c-select-fg); /* an active filter is a chosen value */
+  --c-festive-b: var(--c-err-fg);
+  --line: var(--c-row-line);
+  --fg-muted: var(--c-muted);
+  --fg-soft: var(--c-muted);
+  --grid-expansion: var(--c-ground);
+  --font-sans: var(--font);
+  --font-button: var(--font);
+  /* Figures are Inter with tabular numerals, never a mono face. */
+  --font-mono: var(--font);
+  --fs-10: var(--fs-group);
+  --fs-11: var(--fs-small);
+  --fs-12: var(--fs-label);
+  --fs-13: var(--fs-body);
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
   --space-7: 28px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-pill: 999px;
-  --shadow-3: 0 8px 24px rgba(0, 0, 0, 0.16);
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
+  --radius-pill: var(--radius-round);
+  --shadow-3: var(--shadow-menu);
+  /* The body row is a MINIMUM of the template's 54px (01 §5). A page whose
+     owner ruling needs a TALLER row (`rowHeight`, e.g. the 72px Delivery
+     Monitor) still gets it; nothing renders shorter than the template. The
+     reset stops a drill-down grid inheriting its parent's row height (the
+     `rowHeight` inline style on the same element still wins). */
+  --grid-row-h: 0px;
+  --grid-cell-h: max(var(--grid-row-h, 0px), var(--table-row-h));
 
-  /* Owner correction 2026-08-31: the full Register has no enclosing border
-     around the Work Toolbar + table + status footer. Structure comes from
-     the toolbar divider, table cell grid and footer divider below — never a
-     second outside rectangle. */
+  /* Toolbar, condition strip and the table card are separate pieces on the
+     page, ten pixels apart (01 §5 row gap). */
   display: flex;
   flex-direction: column;
-  background: var(--c-paper);
+  gap: var(--table-gap);
+  background: transparent;
   box-sizing: border-box;
   border: none;
   border-radius: 0;
   box-shadow: none;
   overflow: hidden;
   font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--c-ink);
   /* Carres shell adaptation: the engine fills the flex column its page gives
-     it (ModuleHeader above, nothing below) instead of 2990's
-     calc(100vh − 150px) viewport math. */
+     it instead of 2990's calc(100vh − 150px) viewport math. */
   flex: 1 1 auto;
   min-height: 0;
 }
 
-/* Embedded (drill-down) mode — no card chrome. The grid sits inside a
-   parent expansion row and must read as a plain inline nested table that
-   flows with the whole page. Strip the border/shadow/radius/background so
-   there is no "外框", and let it grow to its natural height. */
+/* Embedded (drill-down) mode — no card chrome. The grid sits inside a parent
+   expansion row and reads as a plain nested table that flows with the page. */
 .rootEmbedded {
+  gap: 0;
   background: transparent;
   border: none;
   border-radius: 0;
@@ -74,30 +82,42 @@
   flex: none;
 }
 
-/* Sales Orders Reference Implementation. Geometry only: the engine and every
-   capability remain shared. REGISTER TABLE DENSITY LAW + REGISTER STATUS
-   FOOTER (docs/ui/MASTER.md) own these numbers — rendered 36px header on
-   text-label (11/14), 38px single-line parent row on text-body (13/18), 32px
-   fixed status footer. The earlier 31/33/22px high-density copy came from
-   2990's AutoCount-style ledger grid, not from 2990's readable listing
-   geometry, and no longer authors this destination.
+/* ── The table card (UI-KIT "Card"): white, 1px card border, radius 8, no
+   shadow. It holds the scroll area (header, rows, totals) and the status
+   footer; the toolbar stays outside it, on the page. ── */
+.tableCard {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--c-card);
+  border: 1px solid var(--c-card-border);
+  border-radius: var(--radius);
+  box-shadow: none;
+  overflow: hidden;
+}
+/* A drill-down draws no card: it is already inside its parent's. */
+.tableCardEmbedded {
+  display: contents;
+}
+/* An alternate presentation (cards) brings its own surfaces; a card around
+   cards would be a box inside a box. */
+.tableCardBare {
+  background: transparent;
+  border-color: transparent;
+}
+.tableCardBare .statusLine {
+  background: transparent;
+}
 
-   The opt-in stays because it names an intent, not because it is shielding
-   other pages. RE-MEASURED 2026-08-27: seven screens now render this engine
-   with appearance="reference" (Sales Orders · Delivery Orders · Delivery ·
-   Manual Purchase · Warehouse Stock · SO Batch · Supplier Items) — the
-   2026-08-14 "exactly one screen" note is history. A change here is a change
-   to the Register template on all of them, which is the point: one grammar.
-
-   No px font-size literal lives in this scope: the sizes are the `.root`
-   token aliases, never a token redefined to a different value. */
-/* Reference geometry keeps the shared internal listing structure. It does not
-   add an enclosing border around the toolbar, table and footer. */
+/* ── Reference geometry. The opt-in names an intent (the Register template),
+   not a second look: it fixes the toolbar to one 40px row and the footer to
+   one unwrapped 44px line. ── */
 .rootReference .toolbar {
   box-sizing: border-box;
-  height: 45px;
-  min-height: 45px;
-  padding: 6px 12px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
   flex-wrap: nowrap;
   overflow: hidden;
 }
@@ -112,84 +132,83 @@
 }
 .rootReference .th {
   box-sizing: border-box;
-  height: 36px;
-  padding: 0 8px;
-  font-size: var(--fs-11);
-  line-height: 14px;
-  font-weight: 700;
+  height: var(--table-head-h);
 }
-/* Approved 600 header weight, opt-in with the first shared-template pilot. */
-.rootReference[data-presentation-tools] .th { font-weight: 600; }
 .rootReference .td {
   box-sizing: border-box;
-  /* 38px baseline; a page with an owner-ruled exception sets --grid-row-h. */
-  height: var(--grid-row-h, 38px);
-  padding: 0 8px;
-  font-size: var(--fs-13);
-  line-height: 18px;
+  height: var(--grid-cell-h);
 }
-/* Always present, fixed to the table frame, never scrolls with the rows and
-   never gives its height back when space is tight — hence flex: none. The
-   summary is one unwrapped line, so the footer costs 32px and not a row. */
+/* Always present, fixed to the card, never scrolls with the rows and never
+   gives its height back when space is tight. */
 .rootReference .statusLine {
-  box-sizing: border-box;
-  flex: none;
-  height: 32px;
-  min-height: 32px;
-  padding: 0 12px;
-  letter-spacing: 0;
-  text-transform: none;
+  height: var(--table-foot-h);
   white-space: nowrap;
 }
 
-/* ── Toolbar ─────────────────────────────────────────────────────── */
+/* ── Toolbar — on the page, no band of its own ─────────────────────── */
 .toolbar {
   /* Never shrink: a wrapped toolbar inside the fixed-height register column
-     was squeezed below its own rows and its last row slid under the table
-     header (390px, measured 2026-09-16). */
+     was squeezed below its own rows (390px, measured 2026-09-16). */
   flex: none;
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--line);
-  background: var(--c-cream);
+  box-sizing: border-box;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   flex-wrap: wrap;
 }
 .toolbarSpacer {
   flex: 1;
 }
+/* The toolbar search is a field (UI-KIT "Inputs · Field"): h32, 1px input
+   border, radius 8, padding 0 10, text 13. REGISTER LAW 2 keeps it left and
+   compact. */
 .searchWrap {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: var(--c-paper);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  padding: 4px 8px;
-  /* REGISTER LAW 2 — search always left, compact ~200px (2990 gave it 240 on
-     the right; the width is the laws', the control is the engine's). */
+  box-sizing: border-box;
+  height: var(--input-h);
   width: 200px;
+  padding: 0 10px;
+  background: var(--c-card);
+  border: 1px solid var(--c-input-border);
+  border-radius: var(--radius);
+  color: var(--c-muted);
 }
-.searchInput {
+.searchWrap > svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.searchWrap:focus-within {
+  outline: var(--c-focus);
+  outline-offset: -1px;
+}
+.searchInput,
+.searchInput:focus-visible {
   border: 0;
   outline: 0;
+}
+.searchInput {
+  min-width: 0;
+  width: 100%;
   background: transparent;
   font-family: var(--font-sans);
-  font-size: var(--fs-12);
+  font-size: var(--fs-body);
+  line-height: 18px;
   color: var(--c-ink);
-  width: 100%;
 }
 .searchInput::placeholder {
-  color: var(--fg-muted);
+  color: var(--c-muted);
 }
 
-/* HOUZS-parity Columns popover button + dropdown
-   ────────────────────────────────────────────────
-   Commander 2026-05-27: "为什么不是跟houzs的一样" — the right-click header
-   menu was undiscoverable. This adds a visible pill in the toolbar matching
-   the houzs-erp pattern (Columns3 icon + label + N/M badge + popover with a
-   checkbox per column + Reset link). */
+/* Columns / Export anchors and the normal toolbar button (UI-KIT "Buttons ·
+   Normal, toolbar/forms"): h32, padding 0 12, 13/500, white, 1px button
+   border, radius 8, hover the hover wash, icon 18. */
 .columnsAnchor {
   position: relative;
   display: inline-flex;
@@ -198,169 +217,223 @@
 .toolbarPill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  box-sizing: border-box;
+  height: var(--btn-h);
+  padding: var(--btn-pad);
   font-family: var(--font-button);
-  font-size: var(--fs-13);
+  font-size: var(--fs-body);
   font-weight: 500;
+  line-height: 18px;
   letter-spacing: normal;
   color: var(--c-ink);
-  background: var(--c-paper);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm, 6px);
-  padding: 0 12px;
+  background: var(--c-card);
+  border: 1px solid var(--c-btn-border);
+  border-radius: var(--radius);
   cursor: pointer;
   white-space: nowrap;
-  height: 32px;
+}
+.toolbarPill > svg:first-child {
+  flex: none;
+  width: 18px;
+  height: 18px;
 }
 .toolbarPill:hover:not(:disabled) {
-  background: var(--c-cream);
+  background: var(--c-hover);
 }
 .toolbarPill:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
-.toolbarPillOn {
-  background: var(--c-cream);
-  color: var(--c-ink);
-  border-color: var(--fg-soft);
-}
+.toolbarPillOn,
 .toolbarPillOn:hover {
-  background: var(--c-cream);
+  background: var(--c-hover);
+  color: var(--c-ink);
+  border-color: var(--c-btn-border);
 }
 .toolbarPillBadge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 16px;
+  box-sizing: border-box;
+  height: 18px;
   min-width: 18px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: var(--c-cream);
-  color: var(--fg-muted);
+  padding: 0 6px;
+  border-radius: var(--radius-round);
+  background: var(--c-search-bg);
+  color: var(--c-body);
   font-family: var(--font-sans);
-  font-size: 10px;
+  font-size: var(--fs-small);
   font-weight: 600;
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
 }
 .toolbarPillOn .toolbarPillBadge {
-  background: var(--line);
+  background: var(--c-card);
   color: var(--c-ink);
 }
+/* Toolbar icon button (UI-KIT "Buttons · Icon, toolbar"): 36 round, no
+   border, body ink, hover wash. Search at rest and the icon-only Columns. */
+.toolbarIcon,
+.toolbarPillIconOnly {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--icon-btn);
+  height: var(--icon-btn);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-round);
+  background: transparent;
+  color: var(--c-body);
+  cursor: pointer;
+}
+.toolbarIcon:hover,
+.toolbarPillIconOnly:hover:not(:disabled),
+.toolbarPillIconOnly.toolbarPillOn {
+  background: var(--c-hover);
+  color: var(--c-ink);
+}
+.toolbarIcon > svg,
+.toolbarPillIconOnly > svg:first-child {
+  width: 20px;
+  height: 20px;
+}
+/* Export at rest on the reference Register: icon + caret, no word. The caret
+   stays because a control that opens a menu must say so. */
+.toolbarPillIconCaret {
+  padding: 0 4px;
+  gap: 1px;
+  justify-content: center;
+}
+
+/* ── Pop-up menus (UI-KIT "Pop-up menu" · components/carres/CPopover):
+   white, radius 8, the menu shadow, padding 6; one row = padding 7 × 10,
+   13/500, radius 8, hover the search fill. ── */
 .columnsMenuBackdrop {
   position: fixed;
   inset: 0;
   z-index: 39;
-  background: rgba(0, 0, 0, 0.08);
+  background: transparent;
 }
 .columnsMenu {
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
   z-index: 40;
+  box-sizing: border-box;
   width: 220px;
   max-height: 320px;
-  background: var(--c-paper);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-3, 0 8px 24px rgba(0, 0, 0, 0.16));
+  padding: 6px;
+  background: var(--c-card);
+  border: 0;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-menu);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  font-family: var(--font-sans);
+  color: var(--c-ink);
 }
 .columnsMenuHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--line);
-  background: var(--c-cream);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--c-section-line);
+  background: transparent;
   font-family: var(--font-button);
-  font-size: var(--fs-11);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--c-ink);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--c-secondary);
 }
 .columnsMenuReset {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  padding: 2px 6px;
   background: transparent;
   border: 0;
-  padding: 2px 4px;
+  border-radius: var(--radius);
   cursor: pointer;
   font-family: var(--font-button);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--c-burnt);
+  font-size: var(--fs-label);
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--c-body);
 }
 .columnsMenuReset:hover {
-  text-decoration: underline;
+  background: var(--c-search-bg);
 }
 .columnsMenuBody {
   overflow-y: auto;
   max-height: 320px;
-  padding: 4px 0;
+  padding: 4px 0 0;
 }
 .columnsMenuItem {
   display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
   align-items: center;
-  gap: 8px;
-  padding: 5px 12px;
+  gap: 10px;
+  padding: var(--menu-item-pad);
+  border-radius: var(--radius);
   font-family: var(--font-sans);
-  font-size: var(--fs-12);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  line-height: 18px;
   color: var(--c-ink);
   cursor: pointer;
 }
 .columnsMenuItem:hover {
-  background: var(--c-cream);
+  background: var(--c-search-bg);
 }
 .filterLauncherItem {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 6px 12px;
+  gap: 10px;
+  padding: var(--menu-item-pad);
   border: 0;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--c-ink);
   font-family: var(--font-sans);
-  font-size: var(--fs-12);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  line-height: 18px;
   text-align: left;
   cursor: pointer;
 }
-.filterLauncherItem:hover {
-  background: var(--c-cream);
+.filterLauncherItem:hover,
+.filterLauncherItem:focus-visible {
+  background: var(--c-search-bg);
 }
 .filterLauncherItem > span:last-child {
-  color: var(--c-burnt);
-  font-size: var(--fs-10);
-  font-weight: 600;
-  text-transform: uppercase;
+  color: var(--c-muted);
+  font-size: var(--fs-label);
+  font-weight: 400;
+  text-transform: none;
 }
-.columnsMenuItem input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
-  margin: 0;
-  accent-color: var(--c-burnt);
-  cursor: pointer;
-}
-/* STAGE 1 engine extension — the GROUPED chooser's section header. */
+/* STAGE 1 engine extension — the GROUPED chooser's section word (as the
+   template's CMenuGroup: 11/600, muted, a section line above). */
 .columnsMenuGroup {
-  padding: 7px 12px 3px;
-  font-family: var(--font-button);
-  font-size: var(--fs-10, 10px);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--fg-muted);
-  border-top: 1px solid var(--line);
   margin-top: 4px;
+  padding: 8px 10px 4px;
+  border-top: 1px solid var(--c-section-line);
+  font-family: var(--font-button);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-muted);
 }
 .columnsMenuGroup:first-child,
 div:first-child > .columnsMenuGroup {
@@ -368,51 +441,68 @@ div:first-child > .columnsMenuGroup {
   margin-top: 0;
 }
 
+/* ── Selection bar (RG-2 engine extension, Law 13) ──────────────────────
+   Replaces the toolbar while ticked rows are visible: the template's
+   selection pill — select wash and ink, a 13/600 count, 28px buttons. */
+.root .toolbar.selectionBar {
+  height: auto;
+  min-height: 40px;
+  overflow: visible;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 6px 0 14px;
+  border: 0;
+  border-radius: var(--radius-round);
+  background: var(--c-select-bg);
+  color: var(--c-select-fg);
+}
+.selectionCount {
+  font-family: var(--font-button);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--c-select-fg);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.selectionBar .toolbarPill {
+  height: 28px;
+  padding: 0 12px;
+  gap: 4px;
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+.selectionBar .toolbarPill > svg:first-child {
+  width: 16px;
+  height: 16px;
+}
+/* The selection bar's `Clear` — a quiet text button in the select ink. */
 .tbarBtn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  box-sizing: border-box;
+  height: 28px;
+  padding: 0 10px;
   font-family: var(--font-button);
-  font-size: var(--fs-11);
+  font-size: var(--fs-label);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--c-ink);
-  background: var(--c-paper);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm, 4px);
-  padding: 4px 10px;
+  letter-spacing: normal;
+  color: var(--c-select-fg);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
   cursor: pointer;
   white-space: nowrap;
 }
 .tbarBtn:hover:not(:disabled) {
-  background: var(--c-cream);
+  background: color-mix(in srgb, var(--c-card) 60%, transparent);
 }
 .tbarBtn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 .tbarBtnDanger {
-  color: var(--c-festive-b, #dc2626);
-}
-
-/* ── Selection bar (RG-2 engine extension, Law 13) ──────────────────
-   Exists only while ticked rows are visible under the current filters:
-   "N selected · Clear · Export Excel (N)". Same band language as the
-   toolbar so it reads as the grid's own chrome, not a page banner. */
-.selectionBar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 4px var(--space-3);
-  border-bottom: 1px solid var(--line);
-  background: var(--kit-blue-3, #e8f3ff);
-}
-.selectionCount {
-  font-family: var(--font-button);
-  font-size: var(--fs-12);
-  font-weight: 600;
-  color: var(--c-ink);
-  font-variant-numeric: tabular-nums;
+  color: var(--c-err-fg);
 }
 
 /* ── Group-by zone ───────────────────────────────────────────────── */
@@ -420,89 +510,88 @@ div:first-child > .columnsMenuGroup {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px var(--space-3);
-  background: rgba(26, 26, 26, 0.04);
-  border-bottom: 1px solid var(--line);
+  box-sizing: border-box;
+  min-height: 36px;
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  background: var(--c-search-bg);
   font-family: var(--font-sans);
-  font-size: var(--fs-11);
-  color: var(--fg-muted);
-  min-height: 28px;
+  font-size: var(--fs-label);
+  color: var(--c-secondary);
 }
 .groupZoneActive {
-  background: rgba(196, 77, 43, 0.08);
-  color: var(--c-burnt);
+  background: var(--c-select-bg);
+  color: var(--c-select-fg);
 }
 .groupChip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  background: var(--c-paper);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  padding: 2px 6px 2px 8px;
-  font-size: var(--fs-11);
-  color: var(--c-ink);
+  gap: 2px;
+  box-sizing: border-box;
+  min-height: 26px;
+  padding: 0 2px 0 10px;
+  background: var(--c-card);
+  border: 1px solid var(--c-input-border);
+  border-radius: var(--radius);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  color: var(--c-body);
 }
 .groupChipRemove {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0 4px;
   background: transparent;
   border: 0;
-  color: var(--fg-muted);
+  border-radius: var(--radius);
+  color: var(--c-muted);
   font-size: 14px;
-  cursor: pointer;
-  padding: 0 2px;
   line-height: 1;
+  cursor: pointer;
 }
 .groupChipRemove:hover {
-  color: var(--c-festive-b, #dc2626);
+  background: var(--c-hover);
+  color: var(--c-ink);
 }
 
 /* ── Table ───────────────────────────────────────────────────────── */
-/* Issue #2 fix (so-list-pixel-perfect-houzs) — force the horizontal
-   scrollbar to be always visible (overflow-x: scroll vs auto) and make
-   the WebKit scrollbar track thicker so the operator can grab it. */
+/* Issue #2 (so-list-pixel-perfect-houzs): the horizontal scrollbar stays
+   available (overflow-x: scroll). Its look is the template's thin bar. */
 .scroll {
   overflow-x: scroll;
   overflow-y: auto;
-  /* Carres shell adaptation — the scroller fills the engine's flex column
-     (2990 reserved topbar+header with a 100vh calc; Carres pages hand the
-     engine an already-bounded flex box). */
   flex: 1 1 auto;
   min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-head-line) transparent;
 }
-
-/* Embedded (drill-down) mode — no independent scrollbar, no height cap.
-   The drill-down must scroll with the whole page, not trap a separate
-   horizontal/vertical scrollbar inside a card. */
+/* Embedded (drill-down) mode — no independent scrollbar, no height cap. */
 .scrollEmbedded {
   overflow: visible;
   flex: none;
 }
 .scroll::-webkit-scrollbar {
-  height: 12px;
-  width: 12px;
+  height: 10px;
+  width: 10px;
 }
 .scroll::-webkit-scrollbar-track {
-  background: var(--c-cream);
-  border-top: 1px solid var(--line);
+  background: transparent;
 }
 .scroll::-webkit-scrollbar-thumb {
-  background: rgba(26, 26, 26, 0.32);
-  border-radius: 6px;
-  border: 2px solid var(--c-cream);
+  background: var(--c-head-line);
+  border: 2px solid var(--c-card);
+  border-radius: var(--radius-round);
 }
 .scroll::-webkit-scrollbar-thumb:hover {
-  background: var(--c-burnt);
-}
-.scroll {
-  /* Firefox */
-  scrollbar-width: auto;
-  scrollbar-color: rgba(26, 26, 26, 0.32) var(--c-cream);
+  background: var(--c-muted);
 }
 .table {
   border-collapse: collapse;
   width: max-content;
   min-width: 100%;
-  font-size: var(--fs-12);
+  font-size: var(--fs-body);
+  line-height: 18px;
+  color: var(--c-ink);
   font-variant-numeric: tabular-nums;
 }
 .tablePinnedBlock {
@@ -510,48 +599,52 @@ div:first-child > .columnsMenuGroup {
   border-spacing: 0;
 }
 .tablePinnedBlock .td {
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--c-row-line);
 }
 .tablePinnedBlock .tr:last-child .td {
   border-bottom: 0;
 }
+
+/* Header (01 §5): min 40, padding 6 × 14, 12/500 muted, normal casing and
+   spacing, white, one header line under it, sticky. Base cells are
+   content-box (their page widths are content widths), so the stated
+   heights subtract the padding and the rule. */
 .thead {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: var(--c-cream);
+  background: var(--c-card);
 }
-/* Embedded (drill-down) mode — the grid flows with the page, so there is
-   no inner scroll container for a sticky header to anchor to. Make the
-   header a plain non-sticky row like the Daily Breakdown view. */
+/* Embedded (drill-down) mode — the grid flows with the page, so there is no
+   inner scroll container for a sticky header to anchor to. */
 .theadEmbedded {
   position: static;
 }
 .th {
-  font-family: var(--font-button);
-  font-size: var(--fs-10, 10px);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--fg-muted);
+  height: calc(var(--table-head-h) - 13px);
+  padding: var(--table-row-pad);
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--c-muted);
   text-align: left;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--line);
-  border-right: 1px solid var(--line);
-  background: var(--c-cream);
+  vertical-align: middle;
+  border-bottom: 1px solid var(--c-head-line);
+  border-right: 0;
+  background: var(--c-card);
   position: relative;
   user-select: none;
   white-space: nowrap;
   cursor: grab;
 }
-.th:last-child {
-  border-right: 0;
-}
 .thAlignRight {
   text-align: right;
 }
 .thDragOver {
-  background: rgba(196, 77, 43, 0.12);
+  background: var(--c-select-bg);
 }
 .thInner {
   display: inline-flex;
@@ -586,236 +679,340 @@ div:first-child > .columnsMenuGroup {
   z-index: 3;
 }
 .resizeHandle:hover {
-  background: var(--c-orange);
+  background: var(--c-muted);
   opacity: 0.4;
 }
 /* The last column's handle stays inside the table: straddling the edge by 3px
    gave every register that exactly fills its width a phantom sideways scroll
-   (measured 2026-09-16: grid 1140 · scroll 1143, the only overflowing node). */
+   (measured 2026-09-16). */
 .th:last-child > .resizeHandle {
   right: 0;
 }
 
+/* Body (01 §5): min 54, padding 6 × 14, 13 ink, one row line, no vertical
+   cell lines. */
 .tbody {
-  background: var(--c-paper);
+  background: var(--c-card);
 }
-
 .tr {
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--c-row-line);
   cursor: pointer;
-}
-.tr:hover {
-  background: var(--c-cream);
-}
-.trSelected {
-  background: var(--kit-blue-3, #e8f3ff) !important;
-  font-weight: 600;
 }
 .tr:last-child {
   border-bottom: 0;
 }
-
 .td {
-  padding: 4px 8px;
-  border-right: 1px solid rgba(26, 26, 26, 0.04);
+  height: calc(var(--grid-cell-h) - 13px);
+  padding: var(--table-row-pad);
+  border-right: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: var(--fs-body);
+  line-height: 18px;
   color: var(--c-ink);
-  height: 28px;
   vertical-align: middle;
 }
-.td:last-child {
-  border-right: 0;
-}
-/* ⭐ THE ELLIPSIS BELONGS TO WHATEVER HOLDS THE TEXT (2026-09-14).
-   `.td` already declares overflow:hidden + text-overflow:ellipsis, but a cell's
-   text almost never sits in the td itself — it sits in the button or span the
-   column's accessor returns. text-overflow applies to a box's OWN inline
-   content, not to an overflowing child box, so the child was drawn at its full
-   width, the td clipped it, and the operator saw a word sliced mid-glyph with
-   no `…` to say anything was missing (`Stage Three Fixture — Invoi`).
-   Measured on production 2026-09-14: td 179px, inner button 193px, no ellipsis.
-   Giving the child the same three declarations puts the mark back. Wrap columns
-   are untouched — they are the opt-in that says height beats one line. */
+/* ⭐ THE ELLIPSIS BELONGS TO WHATEVER HOLDS THE TEXT (2026-09-14). A cell's
+   text sits in the button or span its accessor returns; text-overflow applies
+   to a box's own inline content, so the child carries the same three
+   declarations or a word is sliced mid-glyph with no `…`. Wrap columns are
+   untouched — they are the opt-in that says height beats one line. */
 .td:not(.tdWrap) > * {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* The template's two inks inside a cell: the main fact in ink, the second
+   line in the secondary ink (01 §5 "Second fact"). Older page cells still
+   spell the retired kit inks; inside the grid they read the v4 ones. */
+.td :global(.text-kit-slate-12) {
+  color: var(--c-ink);
+}
+.td :global(.text-kit-slate-11) {
+  color: var(--c-secondary);
+}
+/* Figures and document numbers are Inter with tabular numerals, never a mono
+   face (01 §2), whatever an older cell renderer asks for. */
+.td :global(.font-mono),
+.tfootTd :global(.font-mono) {
+  font-family: var(--font);
+}
 /* WRAP COLUMN (Warehouse unified Inbound/Outbound card, 2026-09-07).
    Information completeness outranks row height: a column that carries every
-   product of an arrangement declares `wrap: true` and its content wraps onto
-   further lines instead of being silently truncated. Opt-in per column -
-   every existing register cell keeps the single-line contract. */
+   product of an arrangement declares `wrap: true` and its content wraps
+   instead of being silently truncated. It stays on the row's centre line
+   while it is one line long. */
 .tdWrap {
   white-space: normal;
   overflow: visible;
   text-overflow: clip;
   overflow-wrap: break-word;
   height: auto;
-  min-height: 28px;
-  vertical-align: top;
-  padding-top: 6px;
-  padding-bottom: 6px;
+  vertical-align: middle;
 }
-/* Figures = one font system-wide. Carres sets numerals in Inter; the table
-   already sets tabular-nums, so numeric columns line up regardless of which
-   page renders them. */
+/* Figures = one font system-wide: Inter with tabular numerals. */
 .tdAlignRight {
   text-align: right;
   font-family: var(--font-mono);
 }
 .tdMuted {
-  color: var(--fg-muted);
-}
-
-/* ── STICKY IDENTITY (owner ruling 2026-08-15) ─────────────────────────────
-   When optional columns widen the sheet, the control gutter and the FIRST
-   data column stay against the left edge and the rest slides under them. A
-   row that scrolls sideways must never stop saying WHICH record it is.
-
-   Two things make it work and both are easy to get wrong:
-   · a sticky cell needs its OWN opaque fill, or the scrolled columns show
-     through it — so hover and selection are repainted here as well, or the
-     pinned block would be the one part of the row that never highlights;
-   · `.thead` is already sticky at z-index 2, so the pinned HEADER cells must
-     outrank it (3) while the pinned BODY cells sit below it (1) — otherwise
-     the corner cell either scrolls away vertically or covers the header. */
-.stickyCell {
-  position: sticky;
-  z-index: 1;
-  background: var(--c-paper);
-}
-.thead .stickyCell {
-  z-index: 3;
-  background: var(--c-cream);
-}
-.tr:hover .stickyCell {
-  background: var(--c-cream);
-}
-.trSelected .stickyCell {
-  background: var(--kit-blue-3, #e8f3ff);
-}
-/* The block's right edge, drawn as a shadow rather than a border so it does
-   not change any column's box and cannot shave a control (§5.1's rule about
-   the control gutter). */
-.stickyEdge {
-  box-shadow: 1px 0 0 0 var(--line);
+  color: var(--c-secondary);
 }
 .tdNumeric {
   font-variant-numeric: tabular-nums;
 }
 
+/* Hover: the person's focus outline (Settings → Appearance), the fill stays
+   white (UI-KIT "Focus outline … hovered row"). An opened expansion is not a
+   row and never lights. */
+.tr:not(.trExpansion):hover {
+  outline: var(--c-focus);
+  outline-offset: -2px;
+}
+/* A focused row shows the same outline for the keyboard. */
+.tr:focus {
+  outline: none;
+}
+.tr:not(.trExpansion):focus-visible {
+  outline: var(--c-focus);
+  outline-offset: -2px;
+}
+/* A selected row is the theme's select wash, pinned cells included. */
+.root .trSelected,
+.root .trSelected .stickyCell,
+.root .trSelected:hover .stickyCell {
+  background: var(--c-select-bg);
+}
+/* The ticked-row selection model stays opt-in (`palette="slate"`): a ticked
+   row is in the batch — the select wash across the WHOLE row, pinned cells
+   included, and it outranks hover. */
+.rootPaletteSlate .trTicked,
+.rootPaletteSlate .trTicked .stickyCell,
+.rootPaletteSlate .trTicked:hover,
+.rootPaletteSlate .trTicked:hover .stickyCell {
+  background: var(--c-select-bg);
+}
+/* A link keeps its underline and takes the ink on a selected wash, so it
+   never drops under the contrast floor. */
+.rootPaletteSlate .trTicked :global(.text-kit-blue-11) {
+  color: var(--c-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+/* The expanded-row area is the page ground (UI-KIT: no box inside a box). */
+.root .trExpansion,
+.root .trExpansion:hover {
+  background: var(--c-ground) !important;
+  cursor: default;
+}
+
+/* ⭐ ROW HIGHLIGHT — a 3px stripe at the row's left edge (`rowHighlight`,
+   owner ruling 2026-09-29). Problem ink for `critical`, the neutral info ink
+   for `info`; the reason is always in words too. */
+.rowHighlightCritical > td:first-child {
+  box-shadow: inset 3px 0 0 var(--c-err-fg);
+}
+.rowHighlightInfo > td:first-child {
+  box-shadow: inset 3px 0 0 var(--c-info-fg);
+}
+
+/* ── STICKY IDENTITY (owner ruling 2026-08-15) ─────────────────────────────
+   A pinned cell needs its OWN opaque fill or the scrolled columns show
+   through it. `.thead` is sticky at z-index 2, so pinned HEADER cells outrank
+   it (3) while pinned BODY cells sit below it (1). */
+.stickyCell {
+  position: sticky;
+  z-index: 1;
+  background: var(--c-card);
+}
+.thead .stickyCell {
+  z-index: 3;
+  background: var(--c-card);
+}
+/* The block's right edge, drawn as a shadow so it changes no column's box. */
+.stickyEdge {
+  box-shadow: 1px 0 0 0 var(--c-row-line);
+}
+
+/* Engine checkboxes (UI-KIT "Checkbox 16×16"; accent = the select ink). */
+.th input[type="checkbox"],
+.checkHit input[type="checkbox"],
+.checkHitNarrow input[type="checkbox"],
+.columnsMenuItem input[type="checkbox"],
+.ctxItem input[type="checkbox"] {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--c-select-fg);
+  cursor: pointer;
+}
+.th input[type="checkbox"]:focus-visible,
+.checkHit input[type="checkbox"]:focus-visible,
+.checkHitNarrow input[type="checkbox"]:focus-visible,
+.columnsMenuItem input[type="checkbox"]:focus-visible,
+.ctxItem input[type="checkbox"]:focus-visible {
+  outline: var(--c-focus);
+  outline-offset: 2px;
+}
+
 /* ── Group rows ──────────────────────────────────────────────────── */
+/* Group-by bands (12/600 body on the page ground). */
 .groupRow {
-  background: rgba(26, 26, 26, 0.06);
-  font-weight: 600;
+  background: var(--c-ground);
   cursor: pointer;
 }
 .groupRow:hover {
-  background: rgba(26, 26, 26, 0.1);
+  background: var(--c-hover);
 }
 .groupRowCell {
-  padding: 4px 8px;
+  padding: var(--table-row-pad);
+  border-bottom: 1px solid var(--c-row-line);
   font-family: var(--font-button);
-  font-size: var(--fs-11);
-  letter-spacing: 0.04em;
-  color: var(--c-ink);
+  font-size: var(--fs-label);
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: normal;
+  color: var(--c-body);
 }
 .groupCaret {
   display: inline-block;
   width: 12px;
-  color: var(--c-burnt);
+  color: var(--c-muted);
 }
 .groupCount {
   margin-left: 8px;
-  color: var(--fg-muted);
+  color: var(--c-muted);
   font-weight: 400;
 }
-
-/* ── Empty + loading ─────────────────────────────────────────────── */
-.empty {
-  padding: var(--space-7) var(--space-4);
-  text-align: center;
-  color: var(--fg-muted);
-  font-size: var(--fs-13);
+/* Governed group headings (fixedGroups): a white 40px band, 12/600 body, the
+   label pinned to the visible left edge. */
+.fixedGroupRow,
+.fixedGroupRow:hover {
+  background: var(--c-card);
+  cursor: default;
 }
-
-/* ── Context menu ────────────────────────────────────────────────── */
-.ctxMenu {
-  position: fixed;
-  z-index: 999;
-  background: var(--c-paper);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-3, 0 8px 24px rgba(0, 0, 0, 0.16));
-  padding: 4px;
+.fixedGroupRow .groupRowCell {
+  box-sizing: border-box;
+  height: var(--table-head-h);
+  padding: 0;
+  vertical-align: middle;
+  border-top: 1px solid var(--c-row-line);
+  border-bottom: 1px solid var(--c-row-line);
+  background: var(--c-card);
   font-family: var(--font-sans);
-  font-size: var(--fs-12);
-  min-width: 160px;
+  font-size: var(--fs-label);
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: normal;
+  color: var(--c-body);
 }
-.ctxItem {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: transparent;
+.fixedGroupLabel {
+  position: sticky;
+  left: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  min-height: var(--table-head-h);
+  padding: 0 14px;
+  font: inherit;
+  color: inherit;
+}
+.fixedGroupLabel .groupCount {
+  margin-left: 2px;
+  font-weight: 400;
+  color: var(--c-muted);
+}
+.fixedGroupToggle {
   border: 0;
-  padding: 6px 10px;
+  background: transparent;
   cursor: pointer;
-  color: var(--c-ink);
-  border-radius: var(--radius-sm, 4px);
+  border-radius: var(--radius);
 }
-.ctxItem:hover {
-  background: var(--c-cream);
+.fixedGroupToggle:hover {
+  background: var(--c-hover);
 }
-.ctxDivider {
-  height: 1px;
-  background: var(--line);
-  margin: 4px 0;
+.fixedGroupToggle svg {
+  color: var(--c-muted);
+  transition: transform 120ms ease;
+}
+.fixedGroupChevronOpen {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fixedGroupToggle svg {
+    transition: none;
+  }
 }
 
-/* ── Row context menu (right-click) ─────────────────────────────────
-   AutoCount-style. z-index sits above sticky <thead> and the header ctx
-   menu so the floating menu always clears chrome. */
+/* ── Empty + loading (the template's empty line: 13 secondary) ───── */
+.empty {
+  padding: 24px var(--space-4);
+  text-align: center;
+  color: var(--c-secondary);
+  font-size: var(--fs-body);
+}
+
+/* ── Header and filter menus, and the row menu (right-click) ─────────
+   The row menu's z-index sits above the sticky header and the header menu,
+   so the floating menu always clears chrome. */
+.ctxMenu,
 .contextMenu {
   position: fixed;
-  z-index: 1000;
-  background: var(--c-paper);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-3, 0 8px 24px rgba(0, 0, 0, 0.16));
-  padding: 4px;
+  box-sizing: border-box;
+  padding: 6px;
+  background: var(--c-card);
+  border: 0;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-menu);
   font-family: var(--font-sans);
-  font-size: var(--fs-12);
+  font-size: var(--fs-body);
+  color: var(--c-ink);
+}
+.ctxMenu {
+  z-index: 999;
+  min-width: 180px;
+}
+.contextMenu {
+  z-index: 1000;
   min-width: 200px;
 }
+.ctxItem,
 .contextMenuItem {
   display: block;
+  box-sizing: border-box;
   width: 100%;
+  padding: var(--menu-item-pad);
   text-align: left;
   background: transparent;
   border: 0;
-  padding: 6px 12px;
+  border-radius: var(--radius);
   cursor: pointer;
   color: var(--c-ink);
-  border-radius: var(--radius-sm, 4px);
   font-family: inherit;
-  font-size: inherit;
+  font-size: var(--fs-body);
+  font-weight: 500;
+  line-height: 18px;
 }
-.contextMenuItem:hover {
-  background: var(--c-cream);
+.ctxItem:hover,
+.contextMenuItem:hover,
+.contextMenuItem:focus {
+  background: var(--c-search-bg);
 }
+.ctxDivider,
 .contextMenuDivider {
   height: 1px;
-  background: var(--line);
-  margin: 4px 6px;
+  margin: 4px 0;
+  background: var(--c-section-line);
 }
 .contextMenuDanger {
-  color: var(--c-festive-b, #dc2626);
+  color: var(--c-err-fg);
 }
-.contextMenuDanger:hover {
-  background: rgba(220, 38, 38, 0.06);
+.contextMenuDanger:hover,
+.contextMenuDanger:focus {
+  background: var(--c-err-bg);
 }
 
 /* STAGE 1 engine extension — FOOTER TOTALS (AutoCount's power). Sticky to
@@ -824,95 +1021,65 @@ div:first-child > .columnsMenuGroup {
   position: sticky;
   bottom: 0;
   z-index: 2;
-  background: var(--c-cream);
+  background: var(--c-card);
 }
 .tfootTd {
-  padding: 5px 8px;
-  border-top: 2px solid var(--line);
-  border-right: 1px solid var(--line);
+  padding: var(--table-row-pad);
+  border-top: 1px solid var(--c-footer-line);
+  border-right: 0;
   font-family: var(--font-sans);
-  font-size: var(--fs-12);
-  font-weight: 700;
+  font-size: var(--fs-body);
+  line-height: 18px;
+  font-weight: 600;
   color: var(--c-ink);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  background: var(--c-cream);
-}
-.tfootTd:last-child {
-  border-right: 0;
+  background: var(--c-card);
 }
 
-/* ── Footer / status line ────────────────────────────────────────── */
+/* ── Footer / status line (01 §5): 44, footer line above, 13 secondary,
+   white, inside the table card. ── */
 .statusLine {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 4px 12px;
-  border-top: 1px solid var(--line);
-  background: var(--c-cream);
-  font-family: var(--font-button);
-  font-size: var(--fs-10, 10px);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--fg-muted);
-  min-height: 22px;
-}
-
-/* §6.7 Register shell (owner ruling 2026-08-15) — the Work Toolbar's right side.
-   Search rests as an icon and expands leftward; Columns is icon-only. Both keep
-   the toolbar's own 6px control shape so they read as one family. */
-.toolbarIcon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
+  gap: 12px;
+  flex: none;
   box-sizing: border-box;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--c-paper);
-  color: var(--fg-muted);
-  cursor: pointer;
-  padding: 0;
-}
-.toolbarIcon:hover { background: var(--c-cream); color: var(--c-ink); }
-.toolbarPillIconOnly {
-  width: 28px;
-  padding: 0;
-  justify-content: center;
-}
-
-/* Export at rest on the reference Register: icon + caret, no word. The caret
-   stays because a control that opens a menu must say so. */
-.toolbarPillIconCaret {
-  padding: 0 4px;
-  gap: 1px;
-  justify-content: center;
+  min-height: var(--table-foot-h);
+  padding: 0 14px;
+  border-top: 1px solid var(--c-footer-line);
+  background: var(--c-card);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: 18px;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--c-secondary);
 }
 
 /* ── THE ACTIVE CONDITION BAR (owner ruling 2026-09-11) ───────────────
-   A register can be narrowed from two places at once — the page's own
-   filter rail and the grid's per-column funnels — and until now neither
-   said what the other had done. An operator looking at four rows could
-   not see WHY there were four. This strip states every live condition in
-   one line, each one removable on its own, with one `Clear filters` that
-   removes them all.
-
-   Opt-in: a grid given no page conditions and carrying no column filter
-   renders nothing at all, so no existing register gains a band. */
+   Every live narrowing in one line, each removable on its own, with one
+   `Clear all`. The chips are the template's filter chip ("Label ×": 12/600,
+   search fill, 1px input border, radius 8). Opt-in: a grid with no page
+   conditions and no column filter renders nothing at all. */
 .conditionBar {
+  flex: none;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 5px var(--space-3);
-  background: var(--c-paper);
-  border-bottom: 1px solid var(--line);
+  box-sizing: border-box;
+  min-height: 28px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
   font-family: var(--font-sans);
-  font-size: var(--fs-11);
-  color: var(--fg-muted);
+  font-size: var(--fs-label);
+  color: var(--c-secondary);
 }
 .conditionBarLabel {
   font-weight: 600;
@@ -922,14 +1089,18 @@ div:first-child > .columnsMenuGroup {
 .conditionChip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  box-sizing: border-box;
   max-width: 260px;
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  padding: 1px 4px 1px 8px;
-  font-size: var(--fs-11);
-  color: var(--c-ink);
+  min-height: 26px;
+  padding: 0 2px 0 10px;
+  background: var(--c-search-bg);
+  border: 1px solid var(--c-input-border);
+  border-radius: var(--radius);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--c-body);
 }
 .conditionChipText {
   overflow: hidden;
@@ -937,33 +1108,52 @@ div:first-child > .columnsMenuGroup {
   white-space: nowrap;
 }
 .conditionChipRemove {
-  background: transparent;
-  border: 0;
-  color: var(--fg-muted);
-  cursor: pointer;
-  padding: 0 2px;
-  line-height: 1;
   display: inline-flex;
   align-items: center;
-}
-.conditionChipRemove:hover {
-  color: var(--c-festive-b, #dc2626);
-}
-.conditionClear {
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
   background: transparent;
   border: 0;
-  padding: 0 2px;
+  border-radius: var(--radius);
+  color: var(--c-body);
+  line-height: 1;
+  cursor: pointer;
+}
+.conditionChipRemove:hover {
+  background: var(--c-hover);
+  color: var(--c-ink);
+}
+.conditionClear {
+  min-height: 24px;
+  padding: 0 4px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
   font-family: var(--font-sans);
-  font-size: var(--fs-11);
+  font-size: var(--fs-label);
   font-weight: 600;
-  color: var(--c-burnt, #c44d2b);
+  color: var(--c-body);
   cursor: pointer;
 }
 .conditionClear:hover {
   text-decoration: underline;
 }
+/* Purchasing's approved fixed condition slot: controls never move on filtering. */
+.root .conditionBarReserved {
+  height: 36px;
+  flex: 0 0 36px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.root .conditionBarReserved > * {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
 
-/* Opt-in two-line heading; keep the 36px register header and controls beside it. */
+/* Opt-in two-line heading; keep the header and its controls beside it. */
 .thTwoLine .sortBtn {
   display: inline-flex;
   align-items: center;
@@ -975,21 +1165,19 @@ div:first-child > .columnsMenuGroup {
 }
 
 /* ── RESPONSIVE REGISTER SEARCH — owner ruling R4, 2026-09-16 ─────────────
-   Opt-in (`searchPresentation="responsive"`), adopted on SO Batch first. The
-   toolbar's OWN width decides, never the device: with room the search box is
-   always readable; narrow, an icon opens it. An active query keeps the box and
-   its clear control visible at every width. Selection still replaces the
-   toolbar in place. */
+   Opt-in (`searchPresentation="responsive"`). The toolbar's OWN width
+   decides, never the device: with room the search box is always readable;
+   narrow, an icon opens it. An active query keeps the box visible. */
 .rootSearchResponsive .toolbar {
   container: grid-toolbar / inline-size;
 }
 .searchResponsiveBox {
   display: none;
-  /* 340 = the governed placeholder (274px at 12px Inter) + icon, gaps, clear. */
+  /* 340 = the governed placeholder + icon, gaps, clear. */
   flex: 0 1 340px;
   min-width: 0;
   width: auto;
-  height: 28px;
+  height: var(--input-h);
   box-sizing: border-box;
 }
 .searchResponsiveBox[data-active="true"] {
@@ -1013,212 +1201,28 @@ div:first-child > .columnsMenuGroup {
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: transparent;
-  color: var(--fg-muted);
+  color: var(--c-muted);
   cursor: pointer;
 }
 .searchClear:hover {
-  background: var(--c-cream);
+  background: var(--c-hover);
   color: var(--c-ink);
-}
-.searchWrap:focus-within {
-  border-color: theme("colors.kit.blue.9");
-}
-
-/* ── LISTING SURFACES — the Portal default (UI MASTER §6.7, Jess 2026-09-17) ──
-   Born as the opt-in slate palette (owner ruling R5, 2026-09-16, SO Batch
-   first); every listing now reads this way. Radix steps through the kit role
-   names; no hex, and no page may copy these rules into its own stylesheet.
-   White toolbar/rows/footer · slate-3 header with slate-11 11px/600 normal
-   casing · 1px separators. `palette="slate"` keeps ONLY its selection model
-   (ticked rows in blue-3) further below. */
-.root .toolbar,
-.root .statusLine {
-  background: theme("colors.white");
-}
-.root .statusLine {
-  color: theme("colors.kit.slate.11");
-  font-size: var(--fs-12);
-  letter-spacing: 0;
-  text-transform: none;
-}
-.root .thead,
-.root .th,
-.root .thead .stickyCell {
-  background: theme("colors.kit.slate.3");
-}
-.root .th {
-  color: theme("colors.kit.slate.11");
-  font-size: var(--fs-11);
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: none;
-}
-.root .sortArrow {
-  color: theme("colors.kit.slate.11");
-}
-.root .tr:hover,
-.root .tr:hover .stickyCell {
-  background: theme("colors.kit.slate.3");
-}
-/* A single-selected row (no `palette`) keeps its blue-3 across pinned cells
-   while hovered, exactly as before this default moved to `.root`. */
-.root .trSelected .stickyCell,
-.root .trSelected:hover .stickyCell {
-  background: var(--kit-blue-3, #e8f3ff);
-}
-.root .trExpansion,
-.root .trExpansion:hover {
-  background: theme("colors.kit.slate.2") !important;
-}
-.root .toolbarIcon,
-.root .toolbarPill {
-  color: theme("colors.kit.slate.11");
-}
-.root .toolbarIcon svg,
-.root .toolbarPill svg {
-  stroke-width: 2;
-}
-.root button:focus-visible,
-.root input[type="checkbox"]:focus-visible {
-  outline: 2px solid theme("colors.kit.blue.9");
-  outline-offset: 1px;
-}
-/* ⭐ A PALE-BLUE MAIN HEADER, OPT-IN — owner ruling 2026-09-18, UI §6.8.
-   "Headers reserve a common two-line height, 11px/600, normal casing; main
-   header pale blue in this SO Batch reference, child headers neutral slate.
-   This is not a new global blue-header ruling."
-
-   So the PARENT listing's header band takes blue-2 — the palest step the kit
-   has — and every child table inside an expansion keeps slate-3. Two stacked
-   headers eight pixels apart otherwise read as one table that lost its place.
-   Only `headerTone="paleBlue"` draws it; every other Register is untouched,
-   and no page may copy this rule into its own stylesheet.
-
-   THE INK DOES NOT MOVE: slate-11 on blue-2 is the same 11px/600 normal-cased
-   label, and the separator stays the slate rule — this changes a FILL, not a
-   type or contrast decision. */
-.rootHeaderPaleBlue .thead,
-.rootHeaderPaleBlue .th,
-.rootHeaderPaleBlue .thead .stickyCell {
-  background: theme("colors.kit.blue.2");
-}
-
-/* The ticked-row selection model stays opt-in (`palette="slate"`): a ticked
-   row is in the batch — blue-3 across the WHOLE row, pinned cells included,
-   and it outranks hover. An expanded row that is not ticked stays white. */
-.rootPaletteSlate .trTicked,
-.rootPaletteSlate .trTicked .stickyCell,
-.rootPaletteSlate .trTicked:hover,
-.rootPaletteSlate .trTicked:hover .stickyCell {
-  background: theme("colors.kit.blue.3");
-}
-
-/* Governed group headings (fixedGroups): white band, 13px/600, 38px minimum,
-   the label vertically centred and pinned to the visible left edge. */
-.fixedGroupRow,
-.fixedGroupRow:hover {
-  background: theme("colors.white");
-  cursor: default;
-}
-.fixedGroupRow .groupRowCell {
-  box-sizing: border-box;
-  height: 38px;
-  padding: 0;
-  vertical-align: middle;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  font-family: var(--font-sans);
-  font-size: var(--fs-13);
-  line-height: 18px;
-  font-weight: 600;
-  letter-spacing: 0;
-  color: theme("colors.kit.slate.12");
-}
-.fixedGroupLabel {
-  position: sticky;
-  left: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 38px;
-  box-sizing: border-box;
-  padding: 0 12px;
-  font: inherit;
-  color: inherit;
-}
-.fixedGroupLabel .groupCount {
-  margin-left: 2px;
-  font-weight: 400;
-  color: theme("colors.kit.slate.11");
-}
-.fixedGroupToggle {
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-}
-.fixedGroupToggle:hover {
-  background: theme("colors.kit.slate.3");
-}
-.fixedGroupToggle svg {
-  color: theme("colors.kit.slate.11");
-  transition: transform 120ms ease;
-}
-.fixedGroupChevronOpen {
-  transform: rotate(90deg);
-}
-@media (prefers-reduced-motion: reduce) {
-  .fixedGroupToggle svg {
-    transition: none;
-  }
-}
-/* A wrapped text column stays on the row's centre line while it is one line
-   long, so it never sits 4px above its neighbours. */
-.rootPaletteSlate .tdWrap {
-  vertical-align: middle;
-  padding-top: 8px;
-  padding-bottom: 8px;
-}
-/* Measured 2026-09-16: blue-11 link ink on a blue-3 ticked row is 4.25:1,
-   under AA for 13px text. Inside a ticked row a link keeps its underline and
-   takes slate-12 ink (≈15:1) instead of dropping below the contrast floor. */
-.rootPaletteSlate .trTicked :global(.text-kit-blue-11) {
-  color: theme("colors.kit.slate.12");
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
 
 /* ── LISTING STANDARD 2026-09-16 — shared keyboard, touch and overflow ───── */
-/* The condition strip never shrinks under the table either. */
-.conditionBar {
-  flex: none;
-}
-/* A focused row shows a ring the pinned cells cannot paint over. */
-.tr:focus {
-  outline: none;
-}
-.tr:focus-visible > td {
-  box-shadow: inset 0 2px 0 theme("colors.kit.blue.9"), inset 0 -2px 0 theme("colors.kit.blue.9");
-}
-.tr:focus-visible > td:first-child {
-  box-shadow: inset 2px 2px 0 theme("colors.kit.blue.9"), inset 0 -2px 0 theme("colors.kit.blue.9");
-}
-.tr:focus-visible > td:last-child {
-  box-shadow: inset -2px 2px 0 theme("colors.kit.blue.9"), inset 0 -2px 0 theme("colors.kit.blue.9");
-}
 .fixedGroupLabel:focus-visible,
-.contextMenuItem:focus-visible {
-  outline: 2px solid theme("colors.kit.blue.9");
+.contextMenuItem:focus-visible,
+.overflowTrigger:focus-visible,
+.layoutAction:focus-visible,
+.layoutChoice:focus-visible {
+  outline: var(--c-focus);
   outline-offset: -2px;
-}
-.contextMenuItem:focus {
-  background: var(--c-cream);
 }
 .checkHit {
   display: inline-flex;
@@ -1253,21 +1257,17 @@ div:first-child > .columnsMenuGroup {
   font: inherit;
   text-align: left;
   cursor: pointer;
-  border-radius: var(--radius-sm);
-}
-.overflowTrigger:focus-visible {
-  outline: 2px solid theme("colors.kit.blue.9");
-  outline-offset: -2px;
+  border-radius: var(--radius);
 }
 
 /* ── Personal saved layouts (opt-in, ui MASTER §6.7 rule 4) ───────────────
-   The Columns menu's own action list: text rows in the menu's existing type,
-   a panel under the row that opened it, and the refusal as a two-tone line. */
+   The Columns menu's own action list: menu rows, a panel under the row that
+   opened it, and the refusal as a line in the form-error ink. */
 .layoutActions {
   display: flex;
   flex-direction: column;
   padding: 4px 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--c-section-line);
 }
 .layoutAction,
 .layoutChoice {
@@ -1275,39 +1275,37 @@ div:first-child > .columnsMenuGroup {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  box-sizing: border-box;
   width: 100%;
-  min-height: 28px;
-  padding: 4px 12px;
+  padding: var(--menu-item-pad);
   border: 0;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--c-ink);
   font-family: var(--font-sans);
-  font-size: var(--fs-12);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  line-height: 18px;
   text-align: left;
   cursor: pointer;
 }
 .layoutAction:hover:not(:disabled),
 .layoutChoice:hover:not(:disabled) {
-  background: var(--c-cream);
-}
-.layoutAction:focus-visible,
-.layoutChoice:focus-visible {
-  outline: 2px solid theme("colors.kit.blue.9");
-  outline-offset: -2px;
+  background: var(--c-search-bg);
 }
 .layoutAction:disabled,
 .layoutChoice:disabled {
-  color: var(--fg-muted);
+  color: var(--c-muted);
   cursor: default;
 }
 .layoutChoice {
-  padding-left: 24px;
+  padding-left: 22px;
 }
 .layoutPanel {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 4px 12px 8px;
+  padding: 4px 10px 8px;
 }
 .layoutChoice + .layoutChoice {
   margin-top: -6px;
@@ -1315,23 +1313,24 @@ div:first-child > .columnsMenuGroup {
 .layoutField {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  color: var(--fg-muted);
-  font-size: var(--fs-11);
+  gap: 4px;
+  color: var(--c-secondary);
+  font-size: var(--fs-label);
 }
 .layoutField input {
-  height: 28px;
-  padding: 0 8px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm, 6px);
+  box-sizing: border-box;
+  height: var(--input-h);
+  padding: 0 10px;
+  border: 1px solid var(--c-input-border);
+  border-radius: var(--radius);
   color: var(--c-ink);
-  font-size: var(--fs-12);
+  font-size: var(--fs-body);
 }
 .layoutProblem {
   margin: 0;
-  padding: 4px 12px;
-  color: theme("colors.kit.red.11");
-  font-size: var(--fs-11);
+  padding: 4px 10px;
+  color: var(--c-warn-fg);
+  font-size: var(--fs-label);
 }
 /* With the layout actions the menu needs more height; the column list keeps
    its own scroll so the actions never scroll away. */
@@ -1345,44 +1344,35 @@ div:first-child > .columnsMenuGroup {
 }
 
 /* ── Group-local headers — owner ruling, Jess 2026-09-18 ──────────────────
-   Supersedes the single header above all groups. Each governed group is its
-   own `<tbody>`, and a sticky cell is held by its table SECTION: that is what
-   makes the group's heading and its column header travel with the operator
-   through the group's own records and then STOP at the boundary, instead of
-   standing over the next group's rows.
-
-   Two stacked stops, in the order they are read:
-     0   the group heading (38px, the governed band)
-     38  that group's column header
-
-   Widths, visibility, sorting and resizing are not repeated here — one
-   `<colgroup>` and one `layout` serve every section, so there is nothing for
-   four headers to disagree about. */
-/* One table per group: `table-layout: fixed` so a long value in one group can
-   never widen a column in that group alone, and the width is the columns' own
-   sum so every group lines up with every other and with the scrollbar. */
+   Each governed group is its own table, so its heading and its column header
+   travel with that group's records and STOP at the boundary. One `<colgroup>`
+   and one `layout` serve every section: `table-layout: fixed` so a long value
+   in one group cannot widen a column in that group alone. */
 .tableGrouped {
   table-layout: fixed;
   min-width: 100%;
 }
-/* The group's heading rides in its own `<thead>` beside the column header, so
-   the two travel together and stop together. The band stays white against the
-   header's slate fill. */
 .tableGrouped .fixedGroupRow .groupRowCell {
-  background: theme("colors.white");
+  background: var(--c-card);
 }
-/* The header cell is already sticky through `.thead`; `.thInGroup` marks it
-   for the pinned-identity fill so a scrolled group header is opaque where the
-   columns slide under it. */
 .tableGrouped .thInGroup.stickyCell {
   z-index: 3;
 }
 
+/* ⭐ A PALE-BLUE MAIN HEADER, OPT-IN (owner ruling 2026-09-18, UI §6.8) —
+   SUPERSEDED by the v4 template (owner, 9 Oct 2026): every header is white.
+   The class is kept so `headerTone="paleBlue"` callers still mark the root. */
+.rootHeaderPaleBlue .thead,
+.rootHeaderPaleBlue .th,
+.rootHeaderPaleBlue .thead .stickyCell {
+  background: var(--c-card);
+}
+
 /* ⭐ §6.9 — THE EXPANSION CONNECTOR, ANCHORED TO THE CARET CELL (Card 12
    review, 2026-09-21). Three 1px pieces, each placed by CSS inside the cell it
-   belongs to — never by arithmetic over widths. All hidden unless the row's
-   expansion holds the shared ConnectedSections stack, so every other
-   expansion is unchanged. */
+   belongs to. All hidden unless the row's expansion holds the shared
+   ConnectedSections stack. The ink is the one ConnectedSections draws its own
+   half in, so the two halves meet as one line. */
 .expansionDrop,
 .expansionElbow,
 .expansionRun {
@@ -1392,25 +1382,19 @@ div:first-child > .columnsMenuGroup {
   border-color: theme("colors.kit.slate.6");
   z-index: 1;
 }
-/* The caret cell is the containing block for its drop (a pinned cell already
-   is, being sticky). */
 .expansionCaretCell:not(.stickyCell) {
   position: relative;
 }
-/* From beneath the caret to the row's bottom edge. The caret is the `▸` text
-   glyph, about 6.5px tall and centred in its cell, so its lower edge sits ~3px
-   below the middle; the line starts 1px under it (measured, Card 12 walk
-   2026-09-22 — `+7px` assumed a 14px icon and left a 5px gap). */
+/* From beneath the caret glyph to the row's bottom edge (measured, Card 12
+   walk 2026-09-22). */
 .expansionDrop {
   left: calc(50% - 0.5px);
   top: calc(50% + 4px);
   bottom: 0;
   border-left-width: 1px;
 }
-/* The curve: down the caret column to the join height, then to the cell edge.
-   It starts 2px up, over the parent row's bottom rule and this row's top rule,
-   so it meets the drop with no gap; +1px so its bottom rule lands on the same
-   pixel row as the section's run. */
+/* The curve: down the caret column to the join height, then to the cell edge,
+   starting 2px up so it meets the drop with no gap. */
 .expansionElbow {
   left: calc(50% - 0.5px);
   right: 0;
@@ -1439,83 +1423,75 @@ div:first-child > .columnsMenuGroup {
 .trExpansion:has([data-connected-sections]) .expansionGutter[style*="left"] {
   position: sticky;
   z-index: 1;
-  background: var(--grid-expansion, var(--c-cream));
+  background: var(--grid-expansion);
 }
 
 /* A disabled input must not swallow the existing row-fact tooltip. */
-.checkRefused { cursor: help; }
-.checkRefused input:disabled { pointer-events: none; }
-.checkRefused:focus-visible { outline: 2px solid theme("colors.kit.blue.9"); outline-offset: -2px; }
+.checkRefused {
+  cursor: help;
+}
+.checkRefused input:disabled {
+  pointer-events: none;
+}
+.checkRefused:focus-visible {
+  outline: var(--c-focus);
+  outline-offset: 2px;
+}
 
-/* Pilot overflow preserves existing menus without empty toolbar flex items. */
-.toolsAnchor { display: contents; }
-
-/* Owner-approved compact search; limited to the first template adopter. */
-.rootReference[data-presentation-tools] .searchResponsiveIcon { display: none; }
+/* ── Shared template tools (`presentationTools`) ─────────────────────────
+   Summary left, one right-aligned tools cluster, the compact search. Pilot
+   overflow preserves existing menus without empty toolbar flex items. */
+.toolsAnchor {
+  display: contents;
+}
+.pageTools {
+  order: 4;
+  flex: none;
+}
+.rootReference[data-presentation-tools] .searchResponsiveIcon {
+  display: none;
+}
 .rootReference[data-presentation-tools] .searchResponsiveBox {
   display: inline-flex;
   flex: 0 1 220px;
   width: 220px;
   max-width: 220px;
   min-width: 0;
-  height: 32px;
-  border-radius: 6px;
-  padding: 0 8px;
+  height: var(--input-h);
+  border-radius: var(--radius);
+  padding: 0 10px;
 }
-.rootReference[data-presentation-tools] .searchInput { min-width: 0; font-size: var(--fs-12); line-height: 18px; text-overflow: ellipsis; }
-.rootReference[data-presentation-tools] .searchResponsiveBox > svg { width: 16px; height: 16px; flex: none; }
-@media (max-width: 767px) {
-  .rootReference[data-presentation-tools] .searchResponsiveBox { height: 40px; }
+.rootReference[data-presentation-tools] .searchInput {
+  text-overflow: ellipsis;
 }
-.rootReference[data-presentation-tools] .toolbar:not(.selectionBar) { flex-wrap: nowrap; }
-/* Keep the admitted 16px checkbox glyph, while its card hit area is 40px. */
-@media (max-width: 767px) {
-  .rootReference[data-presentation-tools] [data-kit="checkbox"] { position: relative; }
-  .rootReference[data-presentation-tools] [data-kit="checkbox"]::after { content: ""; position: absolute; inset: -12px; }
+.rootReference[data-presentation-tools] .toolbar:not(.selectionBar) {
+  flex-wrap: nowrap;
 }
-
-/* SO template correction: summary left, one right-aligned tools cluster. */
-.rootReference[data-presentation-tools] .toolbar:not(.selectionBar) { height: 41px; min-height: 41px; padding: 4px 12px; }
-.rootReference[data-presentation-tools] .toolbar > .searchResponsiveBox { order: 2; margin-left: auto; }
-.rootReference[data-presentation-tools] .toolbar > span { order: 0; }
+.rootReference[data-presentation-tools] .toolbar > .searchResponsiveBox {
+  order: 2;
+  margin-left: auto;
+}
+.rootReference[data-presentation-tools] .toolbar > span {
+  order: 0;
+}
 .rootReference[data-presentation-tools] .toolbar > [data-kit],
-.rootReference[data-presentation-tools] .toolbar > div:has(> [data-kit="tabs"]) { order: 3; }
-.pageTools { order: 4; flex: none; }
-.rootReference[data-presentation-tools] .toolbar > div:has(> [data-kit="tabs"]) { flex: none; }
-@media (max-width: 767px) { .rootReference[data-presentation-tools] .toolbar:not(.selectionBar) { height: 49px; min-height: 49px; } }
-@media (max-width: 767px) {
- .rootReference[data-presentation-tools][data-row-height="32"] .td { height: 40px; }
+.rootReference[data-presentation-tools] .toolbar > div:has(> [data-kit="tabs"]) {
+  order: 3;
+}
+.rootReference[data-presentation-tools] .toolbar > div:has(> [data-kit="tabs"]) {
+  flex: none;
+}
+.rootReference .toolbar:not(.selectionBar) {
+  height: 40px;
+  min-height: 40px;
+  margin-bottom: 0;
+}
+.rootReference.rootLabelledToolbar .toolbar {
+  height: auto;
 }
 
-/* Owner-approved SO preview comparison: body12, line18; geometry unchanged. */
-.rootReference[data-presentation-tools][data-row-height="32"] .td { font-size: var(--fs-12); }
-.rootReference[data-presentation-tools][data-row-height="32"] .td .overflowText { font-size: inherit; }
-.rootReference[data-presentation-tools][data-row-height="32"] .td :global(.text-body) { font-size: inherit; line-height: 18px; }
-
-/* Scoped whole-page spacing correction. Absent conditions still take no space. */
-.rootReference[data-presentation-tools] .conditionBar { min-height: 36px; padding: 6px 12px; margin-bottom: 8px; font-size: var(--fs-12); }
-.rootReference[data-presentation-tools] .conditionChip { min-height: 24px; font-size: var(--fs-12); }
-.rootReference[data-presentation-tools] .conditionChipRemove { min-width: 24px; min-height: 24px; }
-.rootReference[data-presentation-tools] .toolbar:not(.selectionBar) { height: 40px; min-height: 40px; margin-bottom: 0; }
-.rootReference[data-presentation-tools] .scroll { scrollbar-width: thin; scrollbar-color: theme("colors.kit.slate.9") theme("colors.kit.slate.3"); }
-.rootReference[data-presentation-tools] .scroll::-webkit-scrollbar { width: 8px; height: 8px; }
-.rootReference[data-presentation-tools] .scroll::-webkit-scrollbar-thumb { background: theme("colors.kit.slate.9"); border-radius: 4px; }
-.rootReference[data-presentation-tools] .scroll::-webkit-scrollbar-track { background: theme("colors.kit.slate.3"); }
-
-.rootReference[data-presentation-tools] .toolbar { border-bottom: 0; }
-
-.rootReference[data-presentation-tools] .conditionClear { color: var(--fg-muted); }
-
-/* Shared listing template: filters, tools, results in DOM/keyboard order. */
-.root .conditionBar { min-height: 36px; padding: 6px 12px; border-bottom: 0; margin-bottom: 8px; }
-.root .conditionChip { min-height: 24px; }
-.root .conditionChipRemove { min-width: 24px; min-height: 24px; }
-.root .conditionClear { color: var(--fg-muted); }
-.root .toolbar { border-bottom: 0; }
-.rootReference .toolbar:not(.selectionBar) { height: 40px; min-height: 40px; margin-bottom: 0; }
-.rootReference.rootLabelledToolbar .toolbar { height: auto; }
-
-/* Owner-approved icon+word grammar: narrow controls wrap, never hide labels. */
+/* Phone canvas: controls wrap, never hide their labels; every touch target is
+   at least 40px. The glyphs keep their template sizes. */
 @media (max-width: 767px) {
   .rootReference .toolbar,
   .rootReference[data-presentation-tools] .toolbar:not(.selectionBar) {
@@ -1527,19 +1503,46 @@ div:first-child > .columnsMenuGroup {
   .rootReference[data-presentation-tools] .searchResponsiveBox {
     flex: 0 0 min(220px, 100%);
     max-width: 100%;
+    height: 40px;
   }
-  .toolbarPill { height: 40px; }
+  .rootReference[data-presentation-tools] [data-kit="checkbox"] {
+    position: relative;
+  }
+  .rootReference[data-presentation-tools] [data-kit="checkbox"]::after {
+    content: "";
+    position: absolute;
+    inset: -12px;
+  }
+  .toolbarPill,
+  .selectionBar .toolbarPill,
+  .tbarBtn {
+    height: 40px;
+  }
+  .toolbarPillIconOnly,
+  .toolbarIcon {
+    width: 40px;
+    height: 40px;
+  }
+  .root .toolbar.selectionBar {
+    border-radius: var(--radius);
+    padding: 4px 6px 4px 14px;
+  }
 }
 
-/* Purchasing's approved fixed condition slot: controls never move on filtering. */
-.root .conditionBarReserved {
-  height: 36px;
-  flex: 0 0 36px;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
+/* Header filter icons on hover only (owner ruling 2026-09-27): shown on the
+   hovered header, on keyboard focus, and always while that column is
+   filtered; a touch screen has no hover, so it keeps them visible. */
+.root .thFilter {
+  opacity: 0;
+  transition: opacity 120ms ease;
 }
-.root .conditionBarReserved > * {
-  flex-shrink: 0;
-  white-space: nowrap;
+.root .th:hover .thFilter,
+.root .thFilter:focus-visible,
+.root .thFilter[data-active="yes"] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .root .thFilter {
+    opacity: 1;
+  }
 }

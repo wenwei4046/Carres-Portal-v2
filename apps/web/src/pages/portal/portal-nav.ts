@@ -8,7 +8,6 @@ import {
   ArrowLeftRight,
   Wallet,
   BookOpen,
-  Calculator,
   Truck,
   Route,
   LifeBuoy,
@@ -31,8 +30,6 @@ import {
   ShieldCheck,
   HandCoins,
   UserCheck,
-  ListTodo,
-  CircleAlert,
   Library,
   SlidersHorizontal,
   Receipt,
@@ -44,6 +41,12 @@ import {
   BookOpenText,
   Hourglass,
   TrendingUp,
+  Home,
+  ShoppingCart,
+  Warehouse,
+  Headset,
+  ClipboardX,
+  Factory,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -92,6 +95,9 @@ export type PortalSection =
   | "Warehouse"
   | "Payments"
   | "Customer Care"
+  /* One page, so it draws as a plain row under SERVICE (Layout Standard §2,
+   * owner-confirmed 2026-10-08). */
+  | "Issue Tracker"
   | "Suppliers"
   | "Master Data"
   | "Admin"
@@ -116,6 +122,7 @@ export const SECTION_ORDER: ReadonlyArray<PortalSection> = [
   "Warehouse",
   "Payments",
   "Customer Care",
+  "Issue Tracker",
   "Suppliers",
   "Master Data",
   "Admin",
@@ -155,6 +162,8 @@ export interface PortalModule {
   section: PortalSection;
   label: string;
   icon: LucideIcon;
+  /** Material Symbols name — the Operations menu draws these (handoff 2026-10-08). */
+  mIcon?: string;
 }
 
 /** WHERE THE COLLAPSED WAREHOUSE ICON GOES — a NAMED destination, never "the
@@ -173,24 +182,24 @@ export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
   /* ⭐ SALES ORDERS — ONE PARENT, TWO CHILDREN (Jess, owner ruling 2026-09-23;
    * `docs/orders/MASTER.md` "Portal navigation", `docs/ui/MASTER.md` and the
    * COPY-STANDARD table "Sales Orders navigation"). The module row is the
-   * customer-order parent and its two destinations are `Outright Sales` and
-   * `Subscription`. It is a NAVIGATION ruling: no contract, transaction,
+   * customer-order parent and its two destinations are `Outright` and
+   * `Subscription` (`Outright Sales` until the 2026-10-08 template). It is a NAVIGATION ruling: no contract, transaction,
    * permission or calculation is merged by the shared parent. */
-  { section: "Sales", label: "Sales Orders", icon: ClipboardList },
-  { section: "Purchasing", label: "Purchasing", icon: ShoppingBag },
-  { section: "Showroom", label: "Showroom", icon: Store },
+  { section: "Sales", label: "Sales Orders", icon: ReceiptText, mIcon: "receipt_long" },
+  { section: "Purchasing", label: "Purchasing", icon: ShoppingCart, mIcon: "shopping_cart" },
+  { section: "Showroom", label: "Showroom", icon: Store, mIcon: "storefront" },
   /* THE FOUR-PAGE MAP (CARD-2026-09-04-delivery-01): Monitor → Delivery
    * Orders → Delivery Order → Edit Delivery. The first two are navigation,
    * so Delivery is a module again; the object and the writer stay doors on
    * cards and rows. This overwrites the 2026-08-21 one-page ruling. */
-  { section: "Delivery", label: "Delivery", icon: Route },
-  { section: "Warehouse", label: "Warehouse", icon: Boxes },
-  { section: "Payments", label: "Payments", icon: Wallet },
-  { section: "Customer Care", label: "Customer Care", icon: LifeBuoy },
+  { section: "Delivery", label: "Delivery", icon: Truck, mIcon: "local_shipping" },
+  { section: "Warehouse", label: "Warehouse", icon: Warehouse, mIcon: "warehouse" },
+  { section: "Payments", label: "Payments", icon: Banknote, mIcon: "payments" },
+  { section: "Customer Care", label: "Service Case", icon: Headset, mIcon: "support_agent" },
   /* Suppliers left Master Data on 2026-08-21 (YH's placement ruling): it is a
      PARTY the business deals with, not a reference list — the same kind of
      thing Customer Care is. The page itself did not move; only its door. */
-  { section: "Suppliers", label: "Suppliers", icon: Truck },
+  { section: "Suppliers", label: "Suppliers", icon: Factory, mIcon: "factory" },
   { section: "Master Data", label: "Master Data", icon: Library },
   /* THE FINANCE MODULES (Chew, 2026-10-03; docs/finance/MASTER.md §4). Each
    * module wears its flagship page's face, the same law as above. Reports
@@ -199,7 +208,7 @@ export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
   { section: "Receivables", label: "Receivables", icon: ArrowDownLeft },
   { section: "Bank & Cards", label: "Bank & Cards", icon: CreditCard },
   { section: "Ledger", label: "Ledger", icon: BookOpen },
-  { section: "Reports", label: "Reports", icon: BarChart3 },
+  { section: "Reports", label: "Reports", icon: BarChart3, mIcon: "bar_chart" },
 ];
 
 export interface PortalNavItem {
@@ -209,6 +218,11 @@ export interface PortalNavItem {
   key: string;
   label: string;
   icon: LucideIcon;
+  /** Material Symbols name for a plain Operations row (handoff 2026-10-08). */
+  mIcon?: string;
+  /** The page header's crumb when it differs from the module word
+   *  (`Sales Order / Outright`, handoff 2026-10-08). */
+  crumb?: string;
   /** operation only: a path-driven section reached by pathname, not `?tab=`. */
   path?: string;
   /** operation only: the `?tab=` value this item links to when it differs from
@@ -294,7 +308,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
     roles: ["operation", "principal"],
     defaultTab: "dashboard",
     items: [
-      { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, section: "Workspace" },
+      { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, mIcon: "dashboard", section: "Workspace" },
       {
         // SO-5 (Loo, 2026-08-09) — the page is Sales Orders and the door says so.
         // ⭐ PRODUCTION CUTOVER (owner, 2026-08-10) — this door is the NEW
@@ -302,7 +316,8 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         // customer-order entry. The old control table kept a temporary door
         // beside it until the 2026-09-23 ruling took that row off the rail.
         //
-        // ⭐ THE WORD IS `Outright Sales` (Jess, owner ruling 2026-09-23). The
+        // ⭐ THE WORD IS `Outright` (owner-confirmed template 2026-10-08; it was
+        // `Outright Sales` from the 2026-09-23 ruling). The
         // module row above now carries `Sales Orders`, so the child says which
         // KIND of customer order it opens: the ordinary outright sale, as
         // against `Subscription` beside it. `Purchase` is rejected by name in
@@ -311,7 +326,8 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         // still lands on the same register, the same detail and the same
         // governed amendment journey.
         key: "orders",
-        label: "Outright Sales",
+        label: "Outright",
+        crumb: "Sales Order",
         icon: ClipboardList,
         path: "/operation/orders",
         badge: "orders",
@@ -337,12 +353,12 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // *what to do today, with the number, the party and the date already
       // worked out*. The page writes nothing; a row opens the owning module's
       // workspace.
-      { key: "work", label: "Workspace", icon: ListTodo, section: "Workspace" },
+      { key: "work", label: "Workspace", icon: Home, mIcon: "home", section: "Workspace" },
       /* `Workspace → Staff & Duties` — the ONE company-wide duty assignment
        * door (workspace/MASTER.md, LOCKED 2026-09-03; built with the
        * Receiving & GRN card). Modules reference duties; they never keep a
        * second person list. */
-      { key: "issue-tracker", label: "Issue Tracker", icon: CircleAlert, path: "/operation/issues", section: "Workspace" },
+      { key: "issue-tracker", label: "Issue Tracker", icon: ClipboardX, mIcon: "assignment_late", path: "/operation/issues", section: "Issue Tracker" },
       /* 0645 — Chew 2026-10-03 (Finance MASTER §3.3), the ONE shared-menu entry
        * Chew approved: staff Finance or the boss allows ask Finance to pay a bill. Shown
        * only to them (`needs`); the page lives in Finance. */
@@ -352,7 +368,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         icon: HandCoins,
         path: "/finance/payment-requests",
         activeFor: ["path:/finance/payment-requests"],
-        section: "Workspace",
+        section: "Payments",
         needs: "payment-requester",
       },
       /* ⭐ `Old Orders (temporary)` LEFT THE RAIL (Jess, owner ruling
@@ -580,7 +596,13 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // door: the 0226 Operation Catalog (SKU Master / Modular / Fabric; the
       // money there is buying cost, isolated from POS selling). The selling
       // Product & Maintenance lives in the Admin area below.
-      { key: "op-catalog", label: "Catalog", icon: Calculator, section: "Master Data" },
+      { key: "op-catalog", label: "Catalog", icon: BookOpen, mIcon: "menu_book", section: "Master Data" },
+      /* REPORTS — the DATA group's own menu item (Layout Standard §2, owner-
+       * confirmed 2026-10-08). The three report pages already exist; until the
+       * one Reports page is built they hang under it as its pages. */
+      { key: "purchasing-report", label: "Purchasing report", icon: BarChart3, section: "Reports" },
+      { key: "receiving-report", label: "Receiving report", icon: BarChart3, section: "Reports" },
+      { key: "delivery-report", label: "Delivery report", icon: BarChart3, section: "Reports" },
       /* The roster stays exactly the page it was; `?tab=suppliers` is
          unchanged, so every bookmark and deep link still lands. */
       { key: "suppliers", label: "Suppliers", icon: Truck, section: "Suppliers" },
@@ -796,9 +818,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // in Operations AND Admin at once, so this row and the Operations child
       // above point at the same page and light together. Two different words on
       // two rows for one register is the duplicate the ruling names; the
-      // dictionary word for that register is now `Outright Sales`. The address
+      // word for that register is `Outright` (template 2026-10-08). The address
       // is unchanged, so the principal's bookmark still lands.
-      { key: "orders", label: "Outright Sales", icon: ClipboardList, path: "/operation/orders" },
+      { key: "orders", label: "Outright", icon: ClipboardList, path: "/operation/orders" },
       // YH, 2026-08-24 — the lead-time floor (earliest a store may sell) is a
       // principal-level decision, but its only editor lived under Operations
       // Settings. `role === "principal"` already grants edit there (checkDuty
@@ -912,4 +934,90 @@ export function navBlocks(
     else for (const item of pages) out.push({ kind: "plain", item });
   }
   return out;
+}
+
+/* ── THE MENU GROUPS — Carres Layout Standard §2 (owner-confirmed template,
+ * Jess 2026-10-08). The Operations area is drawn as six small uppercase
+ * groups, in this order, and no group is called "Operations". A page the
+ * design did not draw stays reachable under its module (owner answer
+ * 2026-10-08: keep every real page as a sub-item). */
+export interface MenuGroup {
+  label: string;
+  sections: ReadonlyArray<PortalSection>;
+}
+
+export const OPERATION_MENU_GROUPS: ReadonlyArray<MenuGroup> = [
+  { label: "Overview", sections: ["Workspace"] },
+  { label: "Sales locations", sections: ["Showroom"] },
+  { label: "Sales", sections: ["Sales"] },
+  { label: "Supply chain", sections: ["Purchasing", "Warehouse", "Payments", "Delivery"] },
+  { label: "Service", sections: ["Customer Care", "Issue Tracker"] },
+  { label: "Data", sections: ["Reports", "Suppliers", "Master Data"] },
+];
+
+/** The blocks of one area, cut into its menu groups. Only the Operations
+ *  area has groups; every other area is one unlabelled group in the order
+ *  `navBlocks` already gives it. A section no group names still shows, last. */
+export function menuGroups(
+  group: PortalNavGroup,
+  role: Role | null,
+  caps: ReadonlySet<NavCapability> = NO_CAPS,
+): { label: string | null; blocks: NavBlock[] }[] {
+  const blocks = navBlocks(group, role, caps);
+  if (group.area !== "operation") return [{ label: null, blocks }];
+  const sectionOf = (b: NavBlock): PortalSection | undefined =>
+    b.kind === "module" ? b.module.section : b.item.section;
+  const used = new Set<NavBlock>();
+  const out: { label: string | null; blocks: NavBlock[] }[] = [];
+  for (const g of OPERATION_MENU_GROUPS) {
+    const mine: NavBlock[] = [];
+    for (const section of g.sections) {
+      for (const b of blocks) {
+        if (!used.has(b) && sectionOf(b) === section) {
+          mine.push(b);
+          used.add(b);
+        }
+      }
+    }
+    if (mine.length) out.push({ label: g.label, blocks: mine });
+  }
+  const rest = blocks.filter((b) => !used.has(b));
+  if (rest.length) out.push({ label: null, blocks: rest });
+  return out;
+}
+
+/** The menu item a URL stands on, for the shell header's `crumb / title`
+ *  when a page does not name itself (Layout Standard §1). Same matching as the
+ *  menu's selected row: an item's own path, its `activeFor` matchers, then the
+ *  `?tab=` it links to. The crumb is the module the item hangs under. */
+export function activeNavTitle(
+  pathname: string,
+  search: string,
+): { crumb: string | null; title: string } | null {
+  const group = PORTAL_NAV.find((g) => g.area === "operation");
+  if (!group) return null;
+  const tab = new URLSearchParams(search).get("tab") ?? group.defaultTab;
+  const onPath = (prefix: string) => pathname.startsWith(prefix);
+  const pathItem = group.items.find(
+    (it) =>
+      (it.path && onPath(it.path)) ||
+      it.activeFor?.some((m) => m.startsWith("path:") && onPath(m.slice(5))),
+  );
+  const item =
+    pathItem ??
+    (pathname === group.base || pathname === `${group.base}/`
+      ? group.items.find(
+          (it) =>
+            !it.path &&
+            ((it.tab ?? it.key) === tab ||
+              it.activeFor?.some((m) => m === `tab:${tab}`)),
+        )
+      : undefined);
+  if (!item) return null;
+  const moduleRow = PORTAL_MODULES.find((m) => m.section === item.section);
+  const siblings = group.items.filter((it) => it.section === item.section).length;
+  return {
+    crumb: item.crumb ?? (moduleRow && siblings > 1 && moduleRow.label !== item.label ? moduleRow.label : null),
+    title: item.label,
+  };
 }

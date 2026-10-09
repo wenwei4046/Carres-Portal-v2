@@ -308,18 +308,25 @@ describe("FIX 1 · the register asks the SERVER", () => {
 });
 
 describe("Stage A · one destination identity and one governed work toolbar", () => {
-  it("renders one Sales Orders identity with no duplicate tab/title", () => {
+  /* The identity is `Sales Order / Outright` since the 2026-10-08 shell
+     (Layout Standard §1 `crumb / title`); the plural `Sales Orders` nameplate
+     is retired. Still ONE identity, never a duplicate tab or title. */
+  it("renders one Sales Order · Outright identity with no duplicate tab/title", () => {
     mount();
-    expect(screen.getAllByText("Sales Orders")).toHaveLength(1);
     expect(screen.getByTestId("sales-orders-destination-header")).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Sales Orders" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Sales Order")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sales-orders-destination-header-module-word")).toHaveTextContent(
+      /^Sales Order\s*·\s*Outright$/,
+    );
+    expect(screen.getAllByTestId("sales-orders-destination-header-page-word")).toHaveLength(1);
+    expect(screen.queryByText("Sales Orders")).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /Sales Order/ })).not.toBeInTheDocument();
   });
 
   it("the Destination Header is 50px, wordmark-only, at the governed 24px (§6.7)", () => {
     mount();
     const word = screen.getByTestId("sales-orders-destination-header-module-word");
-    expect(word).toHaveTextContent("Sales Orders");
+    expect(word).toHaveTextContent("Sales Order");
+    expect(screen.getByTestId("sales-orders-destination-header-page-word")).toHaveTextContent("Outright");
     /* The icon is gone: the word alone carries the identity, so nothing else
      * may sit inside the nameplate. */
     expect(word.querySelector("svg")).toBeNull();

@@ -231,7 +231,7 @@ describe("Order Route — the nodes", () => {
     );
     expect(context.querySelectorAll("span")).toHaveLength(3);
     expect(context).not.toHaveTextContent(/Due:|No due date|Next Action|Priority/i);
-    expect(context).toHaveClass("text-label", "text-base-600");
+    expect(context).toHaveClass("text-label", "text-c-secondary");
     expect(fact.parentElement).toBe(supplier);
     expect(action.parentElement).toBe(supplier);
     expect(context.parentElement).toBe(supplier);

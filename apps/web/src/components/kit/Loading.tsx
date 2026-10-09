@@ -7,8 +7,8 @@
  *
  * The spinner inherits `currentColor`, so it is the right colour inside a blue
  * button and inside grey body text without anybody choosing one. The skeleton
- * is `slate-3` — the canvas step, so a loading block reads as absence, never as
- * a filled row.
+ * is the v4 neutral grey (`--c-info-bg`), so a loading block reads as absence,
+ * never as a filled row.
  *
  * NO TIMING, NO STATE. This component does not know whether anything is
  * loading; the caller does. That is what keeps D0.5a "no behaviour".
@@ -37,7 +37,7 @@ export default function Loading({
             key={i}
             /* The last bar is short — a run of equal bars reads as a table,
              * which is the one thing a skeleton must not be mistaken for. */
-            className={`h-4 rounded-full bg-kit-slate-3 animate-pulse ${
+            className={`h-4 rounded-full bg-c-info-bg animate-pulse ${
               i === lines - 1 ? "w-3/5" : "w-full"
             }`}
           />

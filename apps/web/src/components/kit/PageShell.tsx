@@ -25,7 +25,8 @@
  * whose acceptance criterion is zero visual change.
  */
 import type { ReactNode } from "react";
-import Icon from "./Icon";
+import MIcon from "@/components/carres/MIcon";
+import { useShellHeader } from "@/pages/operation/components/shell-header-context";
 
 /** §1.3's four page types, with the fixed-chrome budget each one gets. */
 export type PageVariant = "list" | "dashboard" | "detail" | "settings";
@@ -109,22 +110,33 @@ export default function PageShell(props: PageShellProps) {
   /* §8.3: a module-tabbed page renders no title band, because the active tab
    * already says where you are and the band costs ~80px of a 200px budget. */
   const hasTitleBand = title != null || titleRight != null;
+  /* v4 page area (01 §4): inside the Operations shell the ground already has
+   * its 12px padding, so the frame adds none from 768px; the phone shell and
+   * any page outside it get the same 12px here. */
+  const inShell = useShellHeader() != null;
 
   return (
-    <div data-kit="page-shell" data-variant={variant} className="flex h-full min-h-0 flex-col bg-kit-slate-3">
+    <div
+      data-kit="page-shell"
+      data-variant={variant}
+      className={`flex h-full min-h-0 flex-col gap-3 ${inShell ? "max-[767px]:p-3" : "p-3"}`}
+    >
+      {/* The page's name lives in the shell header; this row is a card-title
+       *  sized label with its actions, on the ground — never a second band. */}
       {hasTitleBand && (
-        <div className="flex shrink-0 items-center justify-between gap-4 px-6 py-2">
-          <div className="min-w-0 truncate text-page text-kit-slate-12">{title}</div>
+        <div className="flex min-h-9 shrink-0 items-center justify-between gap-3">
+          <div className="min-w-0 truncate text-strong text-c-ink">{title}</div>
           {titleRight && <div className="flex shrink-0 items-center gap-2">{titleRight}</div>}
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 gap-4 px-6 pb-6">
+      <div className="flex min-h-0 flex-1 gap-3">
         {hasFacet && facetOpen && (
           <aside
             data-kit="page-facet"
             aria-label="Filters"
-            className="no-scrollbar flex w-60 shrink-0 flex-col gap-2 overflow-y-auto"
+            /* The rail is ONE white card: 1px card border, radius 8, no shadow. */
+            className="no-scrollbar flex w-60 shrink-0 flex-col gap-0.5 overflow-y-auto rounded-lg border border-c-card-border bg-c-card p-1.5"
           >
             {facet}
           </aside>
@@ -142,14 +154,15 @@ export default function PageShell(props: PageShellProps) {
           {/* One band, and the bulk bar takes its place rather than adding a
            *  second one — the behaviour `ListPageShell` already had. */}
           {bulkBar ? (
-            <div data-kit="page-bulkbar" className="mb-3 shrink-0">
+            <div data-kit="page-bulkbar" className="mb-2.5 shrink-0">
               {bulkBar}
             </div>
           ) : (
             (toolbar || toolbarRight || (hasFacet && !facetOpen)) && (
+              /* v4: the toolbar row sits on the ground above the table card. */
               <div
                 data-kit="page-toolbar"
-                className="mb-3 flex shrink-0 items-center justify-between gap-4 rounded-card border border-kit-slate-5 bg-white px-3 py-2"
+                className="mb-2.5 flex min-h-9 shrink-0 flex-wrap items-center justify-between gap-2"
               >
                 <div className="flex min-w-0 items-center gap-2">
                   {hasFacet && !facetOpen && (
@@ -158,9 +171,9 @@ export default function PageShell(props: PageShellProps) {
                       onClick={onFacetToggle}
                       aria-label="Show filters"
                       data-kit="page-facet-toggle"
-                      className="rounded-control p-1 text-kit-slate-11 hover:bg-kit-slate-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
+                      className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-c-body hover:bg-c-hover"
                     >
-                      <Icon name="filter" size={16} />
+                      <MIcon name="left_panel_open" size={18} />
                     </button>
                   )}
                   {toolbar}
@@ -180,10 +193,11 @@ export default function PageShell(props: PageShellProps) {
                   type="button"
                   onClick={c.onClear}
                   data-kit="page-chip"
-                  className="inline-flex items-center gap-1 rounded-full border border-kit-slate-5 bg-white py-0.5 pl-2 pr-1 text-label text-kit-slate-11 hover:border-kit-slate-6"
+                  /* The v4 filter chip: pad 4 × 10 · 12/600 · grey fill · `Label ×`. */
+                  className="inline-flex items-center gap-1 rounded-lg border border-c-input-border bg-c-search-bg px-2.5 py-1 text-meta font-semibold text-c-body hover:bg-c-hover"
                 >
                   {c.label}
-                  <Icon name="close" size={14} />
+                  <MIcon name="close" size={16} className="text-c-muted" />
                 </button>
               ))}
             </div>
@@ -194,7 +208,8 @@ export default function PageShell(props: PageShellProps) {
           {footer && (
             <div
               data-kit="page-footer"
-              className="flex h-9 shrink-0 items-center justify-between gap-4 rounded-b-card border border-t-0 border-kit-slate-5 bg-white px-3 text-meta text-kit-slate-11"
+              /* The v4 status footer: 44 · 13 secondary · closes the card above. */
+              className="flex h-11 shrink-0 items-center justify-between gap-3 rounded-b-lg border border-t-0 border-c-card-border bg-c-card px-3.5 text-body text-c-secondary"
             >
               {footer}
             </div>
