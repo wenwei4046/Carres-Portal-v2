@@ -210,3 +210,29 @@ Read actual repository diffs and current section headings; `git diff --check -- 
 | Finance complete-domain coverage row; BA-01/02/08/10/17 linked scope | docs/finance/MASTER.md **§5.1 Cross-module Settings reconciliation —9October2026**, line346 | Finance versus Payment/bank/calendar/duty/report owners clarified; Payment receiving-account observation is not Finance settlement/mapping proof. Chew's existing decisions and approval powers preserved; Deposit invoices remain switched off pending existing checks | This closes the named cross-module documentation-boundary gap only. Full money-out/bank-card/ledger/tax/report domain, source mappings, Settings/server and production acceptance remain UNVERIFIED; full Finance domain NOT COMPLETE |
 
 Previous table entries saying full Finance/Guarantee reviews remain outstanding still apply; they must now be read with these limited original-file updates, not as claims that nothing was edited. Notification, reported edit, locally inspected diff, publication and production outcome remain separate evidence. No new document/ticket/ID, module-source edit, code/deploy, production change or ZIP/manifest refresh performed here.
+
+## Final document synchronisation result — 9 October 2026
+
+**Document review/publication scope complete on `codex/blueprint-sync-20261009`, PR #1992; not merged, not production acceptance.** This closes the controller's existing-file synchronisation pass, not all proposed product features. No new chat, MASTER or blueprint document was authored. Previously local files were first tracked in Git; their existing identities/content ownership are retained. Draft publication is deliberately distinct from main because merging may trigger deployment, which the owner stopped in this lane.
+
+| Coverage | Actual original-file evidence | State |
+|---|---|---|
+| Orders | docs/orders/MASTER.md charter, collection resolver and absence references | Reviewed delta published; runtime chain still unverified |
+| Purchasing / suppliers / receipt / claims / returns / repair / showroom links | docs/purchasing/MASTER.md route/window/supplier and source-ownership deltas | Reviewed delta published; current approved subsections retained, not new build proof |
+| Stock / Warehouse | docs/stock/MASTER.md Settings, site calendar and accessory batches | Reviewed delta published; dispatch calendar/enforcement still unverified |
+| Payment | docs/payment/MASTER.md collection/hold/storage and live bank evidence | Reviewed delta published; Day21 waiver authority and account mapping conflict remain open |
+| Delivery | docs/delivery/MASTER.md §11.0 and existing §§2.1,5,6,11,12,13 | Controller completed source-backed original update; own-chat prior acknowledgement alone was not completion |
+| Workspace / people / HR | docs/workspace/MASTER.md §§4,4.4,5.1 and docs/hr/MASTER.md §§2,7 | Reviewed monthly duties/PO-only newcomer/leave/lunch/Office deltas published; assignment engine and Not sure cases not acceptance-tested |
+| Customer Service / Service / Issue | Their existing MASTERs: calendar/source boundaries, per-Case ownership, configurable-policy conflict, shared settings scope | Reviewed deltas published; explicitly unapproved lifecycle/UI policy remains proposed |
+| Catalog | docs/ERP-ARCHITECTURE.md existing Catalog authority and lifecycle/delivery checklist | Complete source-backed review-draft coverage published; no canonical Catalog MASTER invented; destructive/effective-policy decisions and runtime acceptance open |
+| Reports / Dashboard | Existing23: placement plus complete end-to-end review draft; Delivery §12, Purchasing §12 and Finance/Payment report source pointers | Review draft published; existing metrics preserved, new metrics/grouping/schedule/export proposals not approved |
+| Company / Finance / Guarantee | Existing Company inventory, ERP ownership, Finance §5.1, Guarantee §4 | Identity and source boundaries reconciled; legacy guarantee conflict fixed; complete runtime/domain approval not claimed |
+| Settings / notification / mailbox / announcements / history / health / integration | ERP existing system-control evidence/ownership table plus existing25 observations | Source/owner/research limits recorded; no invented provider, send/retry grants or verified full-system control suite |
+| UI Kit / PDF | Separate original owners' approved kit and document authorities | Not republished or modified by this PR; no second UI kit or PDF production claim |
+| Subscription / advanced Assistant/Agent/Venture | Existing source sections and explicit Deferred scope | Intentionally deferred, not an unassigned missing task |
+
+**Real owner decisions retained:** new Catalog destructive/bulk-delete/navigation/effective-price scope where no source ruling; new Reports measures/grouping and evening timing/recipients; storage free-extension/waiver authority conflict; protected SO amendment/address scope where owning Orders source explicitly leaves it open; Service configuration treatment of existing Cases. They are not answered by this synchronisation and are not re-asked one setting at a time.
+
+**Engineering/acceptance gaps retained:** source-read integration, qualified roster/cover and calendar configuration, logistics subpages not reached, immutable-scope/permission/stale-save and actual send/export/dispatch/stock movement, saved values and document chain. An absent list field is not absent database data. These are not new business questions. No release is declared ready without the exact original step's evidence.
+
+**First-order boundaries:** Outright remains the active scope. Subscription, optional system-control extensions and new Reports metrics do not automatically block it. Any claimed blocker must name the affected approved order/PO/stock/payment/DO step; this pass did not execute the production journey and cannot certify live readiness.
