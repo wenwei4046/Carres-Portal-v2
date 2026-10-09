@@ -1401,7 +1401,7 @@ working days, adjustable, reading the dispatching Warehouse's calendar): its Col
 dates and holiday policy, with the explicit fallback of Sunday off + the Selangor holidays — never
 Office, never a mixed Delivery/Warehouse calendar, and no due date before Warehouse confirms the
 scope (`courierDispatchDueIso`, built on branch `build/settings-completion`; the setting is stored
-on Delivery Rules by 0677, not applied). The dispatch workflow itself is a BUILD GAP, not built. Each batch retains quantity,
+on Delivery Rules by 0678, not applied). The dispatch workflow itself is a BUILD GAP, not built. Each batch retains quantity,
 tracking and actual handover evidence; remaining quantity stays visible until the entire dispatch
 scope is handed over. Customer delivery remains a separate completion fact. A delay records an
 expected dispatch and customer notification without resetting the original target or deleting

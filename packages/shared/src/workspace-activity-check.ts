@@ -19,7 +19,7 @@ export type WorkspaceActivityCheck =
  * here: the actual observation time decides whether an interaction preceded
  * the checkpoint.
  *
- * Every window comes from the database's one window arithmetic (0676), read
+ * Every window comes from the database's one window arithmetic (0677), read
  * through the checkpoint snapshot; nothing here computes a time of day:
  *   · the scope is due only when the ASSIGNED person's own cutoff has passed,
  *     so nobody's work moves while they are at lunch; they are active with an

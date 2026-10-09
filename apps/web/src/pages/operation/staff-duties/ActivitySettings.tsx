@@ -17,7 +17,7 @@ function SettingsForm({ value }: { value: WorkspaceActivitySettingsResponse }) {
   const [morning, setMorning] = useState(value.morning);
   const [afternoon, setAfternoon] = useState(value.afternoon);
   const save = useSaveWorkActivitySettings();
-  /* The bounds follow the stored Office calendar (Settings → Office, 0676):
+  /* The bounds follow the stored Office calendar (Settings → Office, 0677):
      morning from Office start and before the Office lunch; afternoon after
      the Office lunch and before Office end. */
   const office = value.office;

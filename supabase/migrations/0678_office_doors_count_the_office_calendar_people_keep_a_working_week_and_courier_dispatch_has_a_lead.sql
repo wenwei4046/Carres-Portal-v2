@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0677_office_doors_count_the_office_calendar_people_keep_a_working_week_and_courier_dispatch_has_a_lead.sql
+-- 0678_office_doors_count_the_office_calendar_people_keep_a_working_week_and_courier_dispatch_has_a_lead.sql
 -- =============================================================================
 -- WHAT THE OWNER ORDERED (Jess, 9 Oct 2026):
 --   "The database working-day calculations and the Delivery date calculations
@@ -82,7 +82,7 @@ revoke all on function public._office_is_working_day(date) from public, anon;
 grant execute on function public._office_is_working_day(date) to authenticated;
 
 comment on function public._office_is_working_day(date) is
-  '0677: an Office working day per the STORED Office calendar (0669 office_calendar.work_days, default Monday–Friday; recorded office_holidays). The built-in holiday list for unrecorded years lives in the app only.';
+  '0678: an Office working day per the STORED Office calendar (0669 office_calendar.work_days, default Monday–Friday; recorded office_holidays). The built-in holiday list for unrecorded years lives in the app only.';
 
 /** Office working days in (p_from, p_to] on the stored Office calendar. */
 create or replace function public._office_weekdays_between(p_from date, p_to date)
@@ -97,7 +97,7 @@ as $fn$
 $fn$;
 
 comment on function public._office_weekdays_between(date, date) is
-  '0677: Office working days in (p_from, p_to] on the stored Office calendar (weekdays + recorded holidays) — was Mon–Fri only (0602).';
+  '0678: Office working days in (p_from, p_to] on the stored Office calendar (weekdays + recorded holidays) — was Mon–Fri only (0602).';
 
 -- ── work_record_request_sent (latest definition: 0584) ───────────────────────
 create or replace function public.work_record_request_sent(
@@ -127,7 +127,7 @@ begin
     return v_id;
   end if;
   perform public._work_refuse_if_completed(p_occurrence_id);
-  -- 0677: an Office working day of the STORED Office calendar, not Mon–Fri.
+  -- 0678: an Office working day of the STORED Office calendar, not Mon–Fri.
   if p_reply_due_on is null or p_reply_due_on < v_today
      or not public._office_is_working_day(p_reply_due_on) then
     raise exception 'the reply due date must be a working day from today'
@@ -201,7 +201,7 @@ begin
   select repair_return_working_days into v_period from purchasing_settings order by id limit 1;
   v_period := coalesce(v_period, 14);
   v_from := (timezone('Asia/Kuala_Lumpur', p_received_at))::date;
-  -- 0677: the target is an Office working day of the STORED Office calendar.
+  -- 0678: the target is an Office working day of the STORED Office calendar.
   if p_target is null or not public._office_is_working_day(p_target) then
     raise exception 'the return target must be an Office working day' using errcode = '22023', detail = 'target_not_working_day';
   end if;
@@ -250,7 +250,7 @@ alter table public.hr_employees
              and work_days <@ '{0,1,2,3,4,5,6}'::smallint[]));
 
 comment on column public.hr_employees.work_days is
-  '0677: the person''s normal working weekdays (0 = Sunday … 6 = Saturday). NULL = not recorded — the Office working weekdays apply. People/HR owns it (Workspace MASTER: the Shared Duty Resolver combines the person calendar with the module calendar); only hr_upsert_employee writes it.';
+  '0678: the person''s normal working weekdays (0 = Sunday … 6 = Saturday). NULL = not recorded — the Office working weekdays apply. People/HR owns it (Workspace MASTER: the Shared Duty Resolver combines the person calendar with the module calendar); only hr_upsert_employee writes it.';
 
 -- ── hr_upsert_employee (latest definition: 0269) — `work_days` joins the whitelist
 create or replace function public.hr_upsert_employee(
@@ -297,7 +297,7 @@ begin
     raise exception 'field_not_editable: %', v_bad;
   end if;
 
-  -- 0677 · the working week: null (not recorded) or a non-empty set of 0..6.
+  -- 0678 · the working week: null (not recorded) or a non-empty set of 0..6.
   if p_patch ? 'work_days' then
     if jsonb_typeof(p_patch -> 'work_days') = 'null' then
       v_days := null;
@@ -407,7 +407,7 @@ begin
     'exitNote', v_e.exit_note,
     'employment', public._hr_employment_status(v_e),
     'filled', public._hr_employee_filled(v_e),
-    -- 0677 · the normal working week; null = not recorded.
+    -- 0678 · the normal working week; null = not recorded.
     'workDays', to_jsonb(v_e.work_days),
 
     -- NEVER the values. Reveal is its own audited call.
@@ -475,7 +475,7 @@ revoke all on function public.workspace_person_work_days(uuid[]) from public, an
 grant execute on function public.workspace_person_work_days(uuid[]) to authenticated;
 
 comment on function public.workspace_person_work_days(uuid[]) is
-  '0677: the recorded normal working weekdays of the named people (user id + work_days ONLY — nothing else of the HR file). Internal staff only. A person not returned has no recorded week: the Office working weekdays apply.';
+  '0678: the recorded normal working weekdays of the named people (user id + work_days ONLY — nothing else of the HR file). Internal staff only. A person not returned has no recorded week: the Office working weekdays apply.';
 
 -- ═════════════════════════════════════════════════════════════════════════════
 -- §3 · Delivery Rules → Courier dispatch within (DEL-10)
@@ -491,7 +491,7 @@ alter table public.delivery_rules
   check (courier_dispatch_working_days between 1 and 30);
 
 comment on column public.delivery_rules.courier_dispatch_working_days is
-  '0677: DEL-10 `Courier dispatch within` {n} working days after the Warehouse confirms the goods can be packed (default 3, range 1–30), counted on the dispatching Warehouse''s calendar.';
+  '0678: DEL-10 `Courier dispatch within` {n} working days after the Warehouse confirms the goods can be packed (default 3, range 1–30), counted on the dispatching Warehouse''s calendar.';
 
 create or replace function public.delivery_set_courier_dispatch_lead(
   p_working_days int,
@@ -544,4 +544,4 @@ revoke all on function public.delivery_set_courier_dispatch_lead(int, bigint, te
 grant execute on function public.delivery_set_courier_dispatch_lead(int, bigint, text) to authenticated;
 
 comment on function public.delivery_set_courier_dispatch_lead(int, bigint, text) is
-  '0677: Delivery Rules → Courier dispatch within {n} working days after the Warehouse confirms the goods can be packed (DEL-10). Settings editor gate; keeps who · when · old → new · effective date · reason.';
+  '0678: Delivery Rules → Courier dispatch within {n} working days after the Warehouse confirms the goods can be packed (DEL-10). Settings editor gate; keeps who · when · old → new · effective date · reason.';

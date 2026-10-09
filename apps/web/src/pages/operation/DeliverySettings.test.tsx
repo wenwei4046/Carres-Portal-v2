@@ -214,7 +214,7 @@ describe("Message Templates and Access", () => {
   });
 });
 
-describe("Delivery Rules → Courier dispatch within (DEL-10, 0677)", () => {
+describe("Delivery Rules → Courier dispatch within (DEL-10, 0678)", () => {
   it("an editor saves it through its own door; a lead saved first hands its new revision on", async () => {
     apiFetch.mockImplementation(async (url: string) =>
       url.endsWith("/rules/assignment-lead") ? { revision: 5 } : {});
@@ -234,7 +234,7 @@ describe("Delivery Rules → Courier dispatch within (DEL-10, 0677)", () => {
     );
   });
 
-  it("before 0677 the default reads in words and is not editable", () => {
+  it("before 0678 the default reads in words and is not editable", () => {
     state.data = response({ rules: { assignmentLeadWorkingDays: 3, courierDispatchWorkingDays: 3, courierDispatchStored: false, revision: 4, stored: true, canEdit: true } });
     renderAt("/operation/settings/delivery/rules");
     expect(screen.getByTestId("delivery-settings-courier-dispatch")).toHaveTextContent("3 working days after Warehouse confirms the goods can be packed");

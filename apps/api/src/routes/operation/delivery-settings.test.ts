@@ -236,7 +236,7 @@ describe("Delivery Rules → Assign logistics by (DEL-04, 0673)", () => {
   it("GET / returns the stored lead and the Settings editor gate", async () => {
     const { rpcCalls } = withRules({ assignment_lead_working_days: 5, revision: 2, changed_at: null, changed_by: null }, true);
     const body = (await (await call("", "operation")).json()) as { rules: Record<string, unknown> };
-    // Before 0677 the row has no courier column: its default answers, not editable.
+    // Before 0678 the row has no courier column: its default answers, not editable.
     expect(body.rules).toEqual({ assignmentLeadWorkingDays: 5, courierDispatchWorkingDays: 3, courierDispatchStored: false, revision: 2, stored: true, canEdit: true });
     expect(rpcCalls.find((c) => c.fn === "settings_can_edit")?.args).toEqual({ p_section: "delivery" });
   });
@@ -247,7 +247,7 @@ describe("Delivery Rules → Assign logistics by (DEL-04, 0673)", () => {
     expect(body.rules).toEqual({ assignmentLeadWorkingDays: 3, courierDispatchWorkingDays: 3, courierDispatchStored: false, revision: null, stored: false, canEdit: false });
   });
 
-  it("DEL-10 · a stored courier lead reads back (0677), and its door refuses 0 or 31 before SQL", async () => {
+  it("DEL-10 · a stored courier lead reads back (0678), and its door refuses 0 or 31 before SQL", async () => {
     withRules({ assignment_lead_working_days: 3, courier_dispatch_working_days: 4, revision: 7, changed_at: null, changed_by: null }, true);
     const body = (await (await call("", "operation")).json()) as { rules: Record<string, unknown> };
     expect(body.rules).toMatchObject({ courierDispatchWorkingDays: 4, courierDispatchStored: true, revision: 7 });

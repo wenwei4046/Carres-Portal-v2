@@ -1,6 +1,6 @@
 /**
  * THE RESPONSIBLE PERSON'S WORKING WEEK, read for an action day (owner
- * correction 9 Oct 2026). People/HR owns `hr_employees.work_days` (0677);
+ * correction 9 Oct 2026). People/HR owns `hr_employees.work_days` (0678);
  * this reads ONLY the working days of the named people through the narrow
  * definer read `workspace_person_work_days` — nothing else of the HR file.
  *

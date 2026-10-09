@@ -15,7 +15,7 @@
  *
  * It is a Warehouse dispatch target, not a customer-delivery guarantee. The
  * lead is the ONE stored Delivery Rules value (`courier_dispatch_working_days`,
- * 0677); no screen keeps its own 3.
+ * 0678); no screen keeps its own 3.
  *
  * PURE — no I/O, no clock.
  */

@@ -144,7 +144,7 @@ export function officeOwnerCalendar(cal: OfficeCalendar): OwnerCalendar {
 /**
  * THE RESPONSIBLE PERSON'S CALENDAR for an action day (owner correction
  * 9 Oct 2026): the person's own recorded working weekdays (People/HR,
- * `hr_employees.work_days`, 0677) combined with the Office holidays — the
+ * `hr_employees.work_days`, 0678) combined with the Office holidays — the
  * module calendar of Operation's work. No week recorded ⇒ the Office working
  * weekdays.
  *

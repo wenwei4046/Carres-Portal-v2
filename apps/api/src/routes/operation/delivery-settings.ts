@@ -97,7 +97,7 @@ deliverySettingsRouter.get("/", requireOperationOrPrincipal, async (c) => {
        not installed: the default answers and Edit is not offered. */
     rules: {
       assignmentLeadWorkingDays: rules.assignmentLeadWorkingDays,
-      /* DEL-10 · `Courier dispatch within` (0677); `courierDispatchStored:
+      /* DEL-10 · `Courier dispatch within` (0678); `courierDispatchStored:
          false` until the column exists — the default 3 shows, no Edit. */
       courierDispatchWorkingDays: rules.courierDispatchWorkingDays,
       courierDispatchStored: rules.courierDispatchStored,
@@ -151,7 +151,7 @@ deliverySettingsRouter.get("/calendar", async (c) => {
   });
 });
 
-/** DEL-10 · Delivery Rules → `Courier dispatch within` (0677's door; the
+/** DEL-10 · Delivery Rules → `Courier dispatch within` (0678's door; the
  *  same editor gate, revision and change record as `Assign logistics by`). */
 deliverySettingsRouter.put("/rules/courier-dispatch", requireOperationOrPrincipal, async (c) => {
   const body = await parseJsonBody(c, deliveryAssignmentLeadInput);

@@ -58,7 +58,7 @@ import { DELIVERY_SETTINGS_SECTIONS } from "@carres/shared";
 const SECTIONS = [
   /* Personal · Appearance — each person's own theme and focus outline (01 §9,
      COPY "Personal Appearance"). Personal · Lunch time — each person's own
-     lunch start, read by the activity check (owner order 9 Oct 2026, 0676;
+     lunch start, read by the activity check (owner order 9 Oct 2026, 0677;
      COPY "Settings → Personal → Lunch time"). */
   {
     group: "Personal",

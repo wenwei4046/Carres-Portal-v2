@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 
 /**
- * 0676 ON A REAL POSTGRESQL RUNNING THE WHOLE MIGRATION CHAIN.
+ * 0677 ON A REAL POSTGRESQL RUNNING THE WHOLE MIGRATION CHAIN.
  *
  *   The activity check reads the stored Office hours and each person's own
  *   lunch (owner order, 9 Oct 2026): nobody's work moves while they are at
@@ -16,7 +16,7 @@ import pg from "pg";
  * a throwaway local cluster:
  *
  *   LC_ALL=en_US.UTF-8 node scripts/dry-run-migrations.mjs --baseline scripts/migration-replay-baseline.json --keep
- *   CARRES_TEST_DATABASE_URL=postgres://postgres@localhost:<port>/<db> npx vitest run src/test/activity-lunch-window-0676.integration.test.ts
+ *   CARRES_TEST_DATABASE_URL=postgres://postgres@localhost:<port>/<db> npx vitest run src/test/activity-lunch-window-0677.integration.test.ts
  *
  * Without the URL every case is SKIPPED — reported as skipped, never as passed.
  */
@@ -24,7 +24,7 @@ const URL = process.env.CARRES_TEST_DATABASE_URL ?? "";
 const LOCAL = /^postgres(ql)?:\/\/[^@/]*@?(localhost|127\.0\.0\.1|\[::1\])(:\d+)?\//.test(URL);
 const RUN = Date.now() % 100000;
 const HEX = RUN.toString(16).padStart(5, "0");
-const uid = (tail: string) => `eeeeeeee-0676-4000-8000-${HEX}${tail.padStart(7, "0")}`;
+const uid = (tail: string) => `eeeeeeee-0677-4000-8000-${HEX}${tail.padStart(7, "0")}`;
 
 // Staff codes fix the duty candidate order: A holds GRN Duty, then B, then C.
 const U = { jess: uid("1"), a: uid("2"), b: uid("3"), c: uid("4"), hr: uid("5") };
@@ -35,7 +35,7 @@ const SAT = "2026-10-17";
 
 type J = Record<string, unknown>;
 
-describe.skipIf(!URL)("the activity check follows the Office hours and each person's lunch (real PostgreSQL, 0676)", () => {
+describe.skipIf(!URL)("the activity check follows the Office hours and each person's lunch (real PostgreSQL, 0677)", () => {
   let db: pg.Client;
   const q = (sql: string, params: unknown[] = []) => db.query(sql, params);
   const as = (sub: string | null, role = "authenticated") =>
@@ -125,7 +125,7 @@ describe.skipIf(!URL)("the activity check follows the Office hours and each pers
     }
     await q(
       `insert into workspace_duty_assignments (duty_key, holder_id, effective_from, effective_until, assigned_by, note)
-       values ('grn_duty', $1, date '2026-01-01', null, $2, 'it 0676')`,
+       values ('grn_duty', $1, date '2026-01-01', null, $2, 'it 0677')`,
       [U.a, U.jess],
     );
     // The owner-confirmed Office calendar and check times (OFF-02 · OFF-04 · WS-02 · WS-03).

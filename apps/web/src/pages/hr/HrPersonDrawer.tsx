@@ -406,7 +406,7 @@ function ExitBlock({
 
 // ── the drawer ───────────────────────────────────────────────────────────────
 
-/** 0677 · the normal working week, Monday first (0 = Sunday … 6 = Saturday). */
+/** 0678 · the normal working week, Monday first (0 = Sunday … 6 = Saturday). */
 const WORK_DAY_CHOICES: ReadonlyArray<readonly [number, string]> = [
   [1, "Mon"], [2, "Tue"], [3, "Wed"], [4, "Thu"], [5, "Fri"], [6, "Sat"], [0, "Sun"],
 ];

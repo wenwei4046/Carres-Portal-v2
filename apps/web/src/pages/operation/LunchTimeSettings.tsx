@@ -1,7 +1,7 @@
 /**
  * Settings → Personal → Lunch time — each person sets when their own one
  * hour lunch starts (owner order 9 Oct 2026: "each person's personal lunch
- * setting; no work is transferred during lunch"; migration 0676). Same grammar
+ * setting; no work is transferred during lunch"; migration 0677). Same grammar
  * as its sibling Personal → Appearance: pick, then one header `Save changes`.
  *
  *   Lunch time                                              [Save changes]

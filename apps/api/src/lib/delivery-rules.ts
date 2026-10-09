@@ -12,9 +12,9 @@ import { DEFAULT_ASSIGNMENT_LEAD_WORKING_DAYS, DEFAULT_COURIER_DISPATCH_WORKING_
 
 export interface StoredDeliveryRules {
   assignmentLeadWorkingDays: number;
-  /** DEL-10 · `Courier dispatch within` (0677), default 3. */
+  /** DEL-10 · `Courier dispatch within` (0678), default 3. */
   courierDispatchWorkingDays: number;
-  /** False until 0677 adds the column — the default answers and Edit is not offered. */
+  /** False until 0678 adds the column — the default answers and Edit is not offered. */
   courierDispatchStored: boolean;
   revision: number | null;
   changedAt: string | null;
@@ -36,7 +36,7 @@ export async function readDeliveryRules(sb: SupabaseClient): Promise<StoredDeliv
   try {
     const { data, error } = await sb
       .from("delivery_rules")
-      /* `*` so the row still reads before 0677 adds the courier column: a
+      /* `*` so the row still reads before 0678 adds the courier column: a
          missing column answers its default instead of failing the row. */
       .select("*")
       .eq("id", 1)

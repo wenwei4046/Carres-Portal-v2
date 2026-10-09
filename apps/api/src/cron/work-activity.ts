@@ -22,7 +22,7 @@ interface Scope {
   previousReceiptId: number | null;
   checked: WorkspaceCheckpointIdentity[];
   candidateUserIds: string[];
-  /** The assigned person's own window (0676); the Office lunch when nobody. */
+  /** The assigned person's own window (0677); the Office lunch when nobody. */
   window: WorkspaceActivityWindow;
 }
 interface Snapshot {
@@ -31,10 +31,10 @@ interface Snapshot {
   settings: { morning: string; afternoon: string; revision: number };
   evidence: { status: "healthy"; events: { userId: string; observedAt: string }[] };
   scopes: Scope[];
-  /** Every assigned person's and candidate's own window (0676). */
+  /** Every assigned person's and candidate's own window (0677). */
   windows: Record<string, WorkspaceActivityWindow>;
 }
-/* A snapshot without the per-person windows (a database before 0676) is an
+/* A snapshot without the per-person windows (a database before 0677) is an
    unreadable snapshot: no default window substitutes for it. */
 const snapshotWindows = z.object({
   scopes: z.array(z.object({ window: workspaceActivityWindowSchema }).passthrough()),
@@ -47,7 +47,7 @@ const snapshotWindows = z.object({
  * result. Morning is committed before a fresh afternoon snapshot is obtained.
  *
  * Each scope is evaluated on its ASSIGNED person's own window (Office hours
- * and that person's lunch, 0676): it is not due until that person's cutoff
+ * and that person's lunch, 0677): it is not due until that person's cutoff
  * has passed, so no work moves while they are at lunch. */
 export async function runWorkActivityCron(env: Bindings, today: string = todayIsoMYT()): Promise<void> {
   const sb = adminClient(env);
@@ -55,7 +55,7 @@ export async function runWorkActivityCron(env: Bindings, today: string = todayIs
      working weekdays decide whether a period is checked at all, and its
      holidays are the ones the commit door is told about. Fails safe to the
      owner defaults (Monday–Friday, the built-in holidays). The commit SQL
-     (`workspace_commit_activity_checkpoint`, 0676) reads the same stored
+     (`workspace_commit_activity_checkpoint`, 0677) reads the same stored
      working weekdays and recorded holidays itself, so the two agree. */
   const office = officeWorkingDayOptions((await readOfficeCalendar(sb)).calendar);
   const officeHolidays = office.holidays as ReadonlySet<string>;

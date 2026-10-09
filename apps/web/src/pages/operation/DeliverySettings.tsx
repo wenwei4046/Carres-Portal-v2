@@ -139,7 +139,7 @@ const DS = {
   assignByRule:
     "Counts Monday to Saturday, skipping the public holidays set in Settings, Warehouse, Public Holidays (the built-in Selangor list until a calendar is imported there). Uses Requested delivery until the delivery is scheduled. Assign logistics opens on the day the PO is issued.",
   assignByRange: "Choose between 1 and 30 working days.",
-  /* DEL-10 · Delivery Rules (0677) */
+  /* DEL-10 · Delivery Rules (0678) */
   courierDispatch: "Courier dispatch within",
   courierDispatchValue: (n: number) =>
     n === 1
@@ -962,7 +962,7 @@ function RulesPage({ data }: { data: DeliverySettingsResponse }) {
   const leadN = Number(lead);
   const leadDirty = canEditLead && leadSaved != null && lead.trim() !== "" && leadN !== leadSaved;
   const leadGap = leadDirty && (!Number.isInteger(leadN) || leadN < 1 || leadN > 30) ? DS.assignByRange : null;
-  /* DEL-10 · `Courier dispatch within` (0677) — the same row, gate and record. */
+  /* DEL-10 · `Courier dispatch within` (0678) — the same row, gate and record. */
   const courierSaved = rules?.courierDispatchWorkingDays ?? null;
   const canEditCourier = canEditLead && rules?.courierDispatchStored === true;
   const [courier, setCourier] = useState(courierSaved != null ? String(courierSaved) : "");

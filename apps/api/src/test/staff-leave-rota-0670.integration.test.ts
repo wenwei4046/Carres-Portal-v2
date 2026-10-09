@@ -311,7 +311,7 @@ describe.skipIf(!URL)("leave feeds cover, PO/GRN rotate monthly, Saturday on-cal
     });
   });
 
-  // 0676: the floor is the stored Office start (9:00 AM by default), no longer
+  // 0677: the floor is the stored Office start (9:00 AM by default), no longer
   // a fixed 10:00 AM, so the refused probe is a minute before Office start.
   it("the owner default 10:00 AM morning check is storable; before Office start is not", async () => {
     await scoped(async () => {

@@ -63,7 +63,7 @@ describe("two-period activity API", () => {
   });
 });
 
-describe("the check times follow the stored Office calendar (0676)", () => {
+describe("the check times follow the stored Office calendar (0677)", () => {
   const put = (body: unknown) => app().request("/activity/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   it("refuses a morning check before Office start before the writer", async () => {
     const res = await put({ morning: "08:59", afternoon: "15:00", revision: 1 });
@@ -77,7 +77,7 @@ describe("the check times follow the stored Office calendar (0676)", () => {
   });
 });
 
-describe("Settings → Personal → Lunch time (0676)", () => {
+describe("Settings → Personal → Lunch time (0677)", () => {
   const view = { userId: "11111111-1111-4111-8111-111111111111", saved: "12:00", savedFits: true,
     lunchStart: "12:00", lunchEnd: "13:00", earliest: "12:00", latest: "14:00",
     officeLunchStart: "13:00", officeLunchEnd: "14:00", morningCheck: "10:00", afternoonCheck: "13:01", canEdit: true };

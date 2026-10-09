@@ -11,7 +11,7 @@ import {
 /* The owner-confirmed Office calendar (OFF-02 · OFF-04, 9 Oct 2026). */
 const office = { start: "09:00", end: "18:00", lunchStart: "13:00", lunchEnd: "14:00" };
 
-describe("the two check times follow the stored Office calendar (0676)", () => {
+describe("the two check times follow the stored Office calendar (0677)", () => {
   it("stores the owner default 10:00 AM morning and 2:01 PM afternoon (WS-02/WS-03)", () => {
     expect(workspaceActivityTimesFit({ morning: "10:00", afternoon: "14:01" }, office)).toBe(true);
   });

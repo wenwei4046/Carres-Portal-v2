@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 
 /**
- * 0677 ON A REAL POSTGRESQL RUNNING THE WHOLE MIGRATION CHAIN.
+ * 0678 ON A REAL POSTGRESQL RUNNING THE WHOLE MIGRATION CHAIN.
  *
  *   §1  the SQL doors count the STORED Office calendar (weekdays + recorded
  *       holidays) through `_office_is_working_day` — 0584's reply due door
@@ -15,7 +15,7 @@ import pg from "pg";
  * Everything runs inside ONE transaction that is rolled back at the end.
  *
  *   LC_ALL=en_US.UTF-8 node scripts/dry-run-migrations.mjs --keep
- *   CARRES_TEST_DATABASE_URL=postgres://postgres@localhost:<port>/<db> pnpm --filter @carres/api test -- calendars-0677
+ *   CARRES_TEST_DATABASE_URL=postgres://postgres@localhost:<port>/<db> pnpm --filter @carres/api test -- calendars-0678
  *
  * Without the URL every case is SKIPPED — reported as skipped, never as passed.
  */
@@ -23,7 +23,7 @@ const URL = process.env.CARRES_TEST_DATABASE_URL ?? "";
 const LOCAL = /^postgres(ql)?:\/\/[^@/]*@?(localhost|127\.0\.0\.1|\[::1\])(:\d+)?\//.test(URL);
 const RUN = Date.now() % 100000;
 const HEX = RUN.toString(16).padStart(5, "0");
-const uid = (tail: string) => `eeeeeeee-0677-4000-8000-${HEX}${tail.padStart(7, "0")}`;
+const uid = (tail: string) => `eeeeeeee-0678-4000-8000-${HEX}${tail.padStart(7, "0")}`;
 
 const U = { principal: uid("1"), operation: uid("2"), hrPerson: uid("3") };
 const EMPLOYEE = uid("e1");
@@ -33,7 +33,7 @@ const SAT = "2030-01-05";
 const MON = "2030-01-07";
 const TUE = "2030-01-08";
 
-describe.skipIf(!URL)("0677 — the stored calendars in SQL (real PostgreSQL)", () => {
+describe.skipIf(!URL)("0678 — the stored calendars in SQL (real PostgreSQL)", () => {
   let db: pg.Client;
   const q = (sql: string, params: unknown[] = []) => db.query(sql, params);
   async function attempt(sql: string, params: unknown[] = []): Promise<string> {
@@ -71,7 +71,7 @@ describe.skipIf(!URL)("0677 — the stored calendars in SQL (real PostgreSQL)", 
     await db.connect();
     await q("begin");
     for (const [id, role] of [[U.principal, "principal"], [U.operation, "operation"], [U.hrPerson, "operation"]] as const) {
-      const email = `it-0677-${role}-${id.slice(-7)}@carres.test`;
+      const email = `it-0678-${role}-${id.slice(-7)}@carres.test`;
       await q("insert into auth.users (id, email) values ($1, $2)", [id, email]);
       await q("insert into app_users (id, email, name, role, status) values ($1, $2, $3, $4, 'active')", [id, email, `IT ${role}`, role]);
     }

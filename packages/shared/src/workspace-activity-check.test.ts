@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { evaluateWorkspaceActivityCheck as evaluate } from "./workspace-activity-check";
 
-/* Windows are the database's answer (0676); these are written in Office local
+/* Windows are the database's answer (0677); these are written in Office local
  * time exactly as `_workspace_activity_window` returns them. */
 const at = (day: string, hhmm: string) => `${day}T${hhmm}:00+08:00`;
 const win = (day: string, start: string, cutoff: string, lunchStart = "13:00", lunchEnd = "14:00") => ({
@@ -63,7 +63,7 @@ describe("office checkpoint evidence", () => {
   });
 });
 
-describe("each person's own lunch (owner order 9 Oct 2026, 0676)", () => {
+describe("each person's own lunch (owner order 9 Oct 2026, 0677)", () => {
   it("a 2:00 PM lunch: nothing is due at 2:01 PM, the check comes at 3:01 PM", () => {
     const late = win(D, "15:00", "15:01", "14:00", "15:00");
     const input = { ...base, window: late, windows: { a: late }, evidence: { status: "healthy" as const, events: [] } };

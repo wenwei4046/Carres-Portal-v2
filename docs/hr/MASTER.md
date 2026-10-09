@@ -31,7 +31,7 @@ HrPeopleCostTab 556   HrSetupTab 962
 
 **HR lands on an OVERVIEW — *what needs me today*, not a dashboard.**
 
-**A person's working week (built on branch `build/settings-completion`, 9 Oct 2026; 0677 not
+**A person's working week (built on branch `build/settings-completion`, 9 Oct 2026; 0678 not
 applied).** People/HR owns each employee's normal working weekdays (Workspace MASTER: "People/HR also
 owns each employee's normal working-week eligibility"): `hr_employees.work_days`, edited only by HR /
 principal in the person drawer's Employment panel as `Working days` (`Mon` … `Sun`; none ticked =

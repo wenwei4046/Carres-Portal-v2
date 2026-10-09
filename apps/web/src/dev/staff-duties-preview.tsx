@@ -27,7 +27,7 @@ window.fetch = async (input, init) => {
   if (init?.method === "PUT") settings = { ...settings, ...JSON.parse(String(init.body)), revision: settings.revision + 1 };
   return json(settings);
  }
- /* Settings → Personal → Lunch time (0676): the fixture answers like the
+ /* Settings → Personal → Lunch time (0677): the fixture answers like the
     database at the owner defaults (Office lunch 1:00 to 2:00 PM, may move one
     hour, afternoon check one minute after lunch). */
  if (url.pathname.endsWith("/work-activity/lunch")) {

@@ -120,7 +120,7 @@ export interface OfficeDays {
 }
 
 /**
- * THE RESPONSIBLE PERSONS' WORKING WEEKS (People/HR, 0677) as owner
+ * THE RESPONSIBLE PERSONS' WORKING WEEKS (People/HR, 0678) as owner
  * calendars: `ownerOf(userId)` is that person's recorded working days with
  * the Office holidays, else the Office working weekdays. It moves only WHEN
  * staff act — never a payment fact. A refused or failed read answers the

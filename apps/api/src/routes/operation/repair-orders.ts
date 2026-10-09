@@ -475,7 +475,7 @@ router.post("/:id/supplier-receipt", repairOrderWorkCompletion([REPAIR_ORDER_WOR
   const setting = await sb.from("purchasing_settings").select("repair_return_working_days").order("id").limit(1).maybeSingle();
   const period = (setting.data?.repair_return_working_days as number | undefined) ?? REPAIR_ORDER_DEFAULT_WORKING_DAYS;
   /* 14 OFFICE working days on the STORED Office calendar (Settings → Office:
-     weekdays + holidays); the 0677 door refuses a target that calendar does
+     weekdays + holidays); the 0678 door refuses a target that calendar does
      not work. Fails safe to the owner defaults. */
   const office = (await readOfficeCalendar(sb)).calendar;
   const target = repairOrderReturnTarget(p.data.received_at, period, officeWorkingDayOptions(office));

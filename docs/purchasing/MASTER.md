@@ -1403,13 +1403,13 @@ window is visually composed remains a UI decision, not a reason to falsify its d
 setting in Purchasing Settings **decides which days a PO window opens**. "Purchasing working day"
 above means a day ticked in `PO Days` that is also an Office working day (Office calendar and
 holidays). Work follows it: a PO window occurrence exists only on a PO Day. **Built on branch
-`build/settings-completion` (9 Oct 2026; 0677 not applied):** "Office working day" is the STORED
+`build/settings-completion` (9 Oct 2026; 0678 not applied):** "Office working day" is the STORED
 Office calendar (Settings → Office weekdays + holidays) everywhere Purchasing counts — the PO window
 days and the Safety-days margin (`/purchase/demands`), the supplier claim, purchase return and
 repair order record pages and their Work items (`purchasingOfficeDays`), the PO register's
 day-before check and the Supplier card, the MRP Chase list's days late (which once dropped its
 Monday–Friday week and counted Saturdays), the Repair Order return target, and the two SQL doors
-(0584 reply due, 0602 RO target) through `_office_is_working_day` (0677). SQL sees recorded Office
+(0584 reply due, 0602 RO target) through `_office_is_working_day` (0678). SQL sees recorded Office
 holidays only; the app computes every default date with the full calendar, including the built-in
 list for a year nobody recorded. The supplier production week (PUR-03) is unchanged: the purchase
 planning engine still uses the built-in holiday list for the supplier's lead. Jess sets `PO Days` to

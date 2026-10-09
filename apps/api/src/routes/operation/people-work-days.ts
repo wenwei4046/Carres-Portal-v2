@@ -5,7 +5,7 @@ import type { AppEnv } from "../../types";
 
 /**
  * GET /api/operation/people/work-days?ids=<uuid>,<uuid> — the recorded
- * normal working weekdays of the named people (People/HR, 0677), for screens
+ * normal working weekdays of the named people (People/HR, 0678), for screens
  * that step an action day back on the responsible person's own week (the
  * Payment Monitor, Pay by, the collection workspace). Read-only: the week is
  * edited only in People (HR person drawer). A person not in the answer has

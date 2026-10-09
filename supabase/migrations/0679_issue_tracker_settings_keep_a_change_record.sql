@@ -1,4 +1,4 @@
--- 0678 — Issue Tracker Settings keep a change record, and today's leave
+-- 0679 — Issue Tracker Settings keep a change record, and today's leave
 -- starts cover on a STORED Office working day.
 --
 -- §1 Issue Tracker Settings keep a change record (Carres Settings List
@@ -44,7 +44,7 @@ create trigger issue_related_parties_record_change
 -- §2 Today's leave starts cover on a stored Office working day (owner 9 Oct
 -- 2026: database working-day calculations connect to their own calendar).
 -- staff_leave_submit is 0670's body with one line changed: the immediate-cover
--- test reads _office_is_working_day (0677) instead of isodow 1–5.
+-- test reads _office_is_working_day (0678) instead of isodow 1–5.
 create or replace function public.staff_leave_submit(
   p_type text,
   p_starts_on date,
@@ -115,8 +115,8 @@ begin
   returning * into v_row;
 
   -- Today's leave starts cover now, on an Office working day — the STORED
-  -- Office calendar (0669 work_days + recorded holidays, 0677
-  -- _office_is_working_day), never a fixed Monday to Friday (0678). Future
+  -- Office calendar (0669 work_days + recorded holidays, 0678
+  -- _office_is_working_day), never a fixed Monday to Friday (0679). Future
   -- leave waits for its own day; a day off is answered by the resolver at read
   -- time. Only Operation people and the principal carry routine work, so only
   -- their leave can move an assignment.

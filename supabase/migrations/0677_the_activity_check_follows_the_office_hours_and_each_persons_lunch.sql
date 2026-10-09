@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0676 — the activity check follows the Office hours and each person's lunch
+-- 0677 — the activity check follows the Office hours and each person's lunch
 -- =============================================================================
 -- OWNER ORDER (Jess, 9 Oct 2026): "The activity check must read the effective
 -- Office time and each person's personal lunch setting; no work is transferred
@@ -183,7 +183,7 @@ end;
 $fn$;
 revoke all on function public._workspace_person_lunch(uuid) from public, anon, authenticated, service_role;
 comment on function public._workspace_person_lunch(uuid) is
-  '0676: THE one lunch arithmetic — the person''s saved lunch start when the Office range allows it, else the Office lunch; the Office lunch length; minutes since local midnight.';
+  '0677: THE one lunch arithmetic — the person''s saved lunch start when the Office range allows it, else the Office lunch; the Office lunch length; minutes since local midnight.';
 
 -- ── 4 · THE one window arithmetic ──────────────────────────────────────────
 create or replace function public._workspace_activity_window(p_user uuid, p_day date, p_period text)
@@ -237,7 +237,7 @@ end;
 $fn$;
 revoke all on function public._workspace_activity_window(uuid, date, text) from public, anon, authenticated, service_role;
 comment on function public._workspace_activity_window(uuid, date, text) is
-  '0676: THE one activity window — morning Office start to the morning check (never into the person''s lunch); afternoon the person''s lunch end to lunch end plus (afternoon check minus Office lunch end), at least one minute, never after Office end.';
+  '0677: THE one activity window — morning Office start to the morning check (never into the person''s lunch); afternoon the person''s lunch end to lunch end plus (afternoon check minus Office lunch end), at least one minute, never after Office end.';
 
 create or replace function public._workspace_activity_window_json(p_user uuid, p_day date, p_period text)
 returns jsonb
@@ -424,7 +424,7 @@ begin
   if v_settings.revision is distinct from p_settings_revision then
     raise exception 'settings changed' using errcode = '40001', detail = 'settings_changed';
   end if;
-  -- The assigned person's own cutoff (0676): nobody's check falls in their lunch.
+  -- The assigned person's own cutoff (0677): nobody's check falls in their lunch.
   select w.window_cutoff into strict v_cutoff
     from public._workspace_activity_window(p_from_user_id, p_office_day, p_period) w;
   if public._workspace_activity_clock() < v_cutoff then
@@ -621,22 +621,22 @@ begin
               where table_schema = 'public'
                 and table_name in ('workspace_staff_lunch', 'workspace_staff_lunch_changes')
                 and grantee in ('authenticated', 'anon') and privilege_type in ('INSERT', 'UPDATE', 'DELETE')) then
-    raise exception '0676 sanity: lunch tables must be written through the door only';
+    raise exception '0677 sanity: lunch tables must be written through the door only';
   end if;
   if has_table_privilege('authenticated', 'public.workspace_staff_lunch_changes', 'select') then
-    raise exception '0676 sanity: the lunch change record is not an authenticated read';
+    raise exception '0677 sanity: the lunch change record is not an authenticated read';
   end if;
   if has_function_privilege('authenticated', 'public._workspace_activity_window(uuid, date, text)', 'execute')
      or has_function_privilege('authenticated', 'public._workspace_person_lunch(uuid)', 'execute')
      or has_function_privilege('authenticated', 'public._workspace_staff_lunch_can_set(uuid)', 'execute')
      or has_function_privilege('authenticated', 'public._workspace_activity_window_json(uuid, date, text)', 'execute') then
-    raise exception '0676 sanity: a private helper is executable by authenticated';
+    raise exception '0677 sanity: a private helper is executable by authenticated';
   end if;
   if exists (select 1 from public._workspace_activity_window(null, current_date, 'morning') w
               where w.window_cutoff < w.window_start)
      or exists (select 1 from public._workspace_activity_window(null, current_date, 'afternoon') w
               where w.window_cutoff < w.window_start or w.window_start < w.lunch_until) then
-    raise exception '0676 sanity: an activity window runs backwards or starts inside lunch';
+    raise exception '0677 sanity: an activity window runs backwards or starts inside lunch';
   end if;
 end $$;
 

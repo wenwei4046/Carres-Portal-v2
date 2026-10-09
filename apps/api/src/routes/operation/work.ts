@@ -147,7 +147,7 @@ export interface OperationWorkStaff {
  *   owner     the Office calendar as the payment clock's action owner when no
  *             person is resolved; `ownerOf(userId)` is the RESPONSIBLE
  *             PERSON's calendar — their recorded working week (People/HR,
- *             0677), Office weekdays when none is recorded, with the Office
+ *             0678), Office weekdays when none is recorded, with the Office
  *             holidays (`personOwnerCalendar`). It decides only WHEN staff
  *             act, never a payment fact.
  *   delivery  the Delivery calendar (`readDeliveryCalendar`): Monday–Saturday
@@ -1952,7 +1952,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   const ownerRows = await establishAndReadCollectionOwners(c, [...actionable], deliveryOwned, today);
   const collectionOwnerFor = (orderId: string) =>
     collectionOwnerResolution(ownerRows.get(orderId) ?? null, today);
-  /* ⭐ The responsible person's own working week (People/HR, 0677) — the
+  /* ⭐ The responsible person's own working week (People/HR, 0678) — the
      collection ACTION day steps back on it (Office weekdays when none is
      recorded). The probe above admitted orders on the Office calendar; the
      payment FACTS never read a person calendar. */

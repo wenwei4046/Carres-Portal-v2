@@ -55,7 +55,7 @@ describe("check time settings", () => {
     expect(screen.getByLabelText("Morning check time", { exact: false, selector: "input" })).toHaveValue("10:30");
     expect(screen.getByRole("alert")).toHaveTextContent("could not be refreshed");
   });
-  it("the bounds follow the stored Office hours, not fixed times (0676)", () => {
+  it("the bounds follow the stored Office hours, not fixed times (0677)", () => {
     render(<ActivitySettings />);
     const morning = screen.getByLabelText("Morning check time", { exact: false, selector: "input" });
     expect(morning).toHaveAttribute("min", "09:00");

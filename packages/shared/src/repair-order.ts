@@ -481,7 +481,7 @@ export function repairOrderDocumentState(row: RepairOrderListRow): string {
  *  not name its calendar is not finished). Snapshotted onto the RO. Since
  *  9 Oct 2026 it is the STORED Office calendar (Settings → Office: its
  *  weekdays and its holidays; the built-in list for a year nobody recorded),
- *  which the 0677 door checks the target against. */
+ *  which the 0678 door checks the target against. */
 export const REPAIR_ORDER_TARGET_CALENDAR = "office-calendar";
 export const REPAIR_ORDER_DEFAULT_WORKING_DAYS = 14;
 

@@ -4,7 +4,7 @@ vi.mock("../lib/supabase", () => ({ adminClient: () => ({ rpc, from }) }));
 import { runWorkActivityCron } from "./work-activity";
 import type { Bindings } from "../types";
 const env = {} as Bindings;
-/* Windows are the database's answer (0676), in Office local time. */
+/* Windows are the database's answer (0677), in Office local time. */
 const at = (hhmm: string) => `2026-09-29T${hhmm}:00+08:00`;
 const win = (start: string, cutoff: string, lunchStart = "13:00", lunchEnd = "14:00") =>
   ({ start: at(start), cutoff: at(cutoff), lunchStart: at(lunchStart), lunchEnd: at(lunchEnd) });
@@ -79,7 +79,7 @@ describe("two-period Work scheduler", () => {
   });
 });
 
-describe("each assigned person's own lunch (owner order 9 Oct 2026, 0676)", () => {
+describe("each assigned person's own lunch (owner order 9 Oct 2026, 0677)", () => {
   const twoPm = win("15:00", "15:01", "14:00", "15:00");
   // The owner default check 2:01 PM: one minute after the Office lunch.
   const lateLunch = { ...snapshot, now: at("14:01"), evidence: { status: "healthy", events: [] },

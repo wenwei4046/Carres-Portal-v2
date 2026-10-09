@@ -70,7 +70,7 @@ router.put("/settings", requireOperation, requireSettingsEditor("staff_duties"),
   return c.json(settings(data as Record<string, unknown>, true, office));
 });
 /* GET/PUT /lunch — Settings → Personal → Lunch time (owner order 9 Oct 2026,
- * 0676). The database computes every time (the one lunch and window
+ * 0677). The database computes every time (the one lunch and window
  * arithmetic) and decides who may change whose lunch: the person, or a
  * Staff & Duties editor for anyone. */
 router.get("/lunch", requireOperation, async (c) => {

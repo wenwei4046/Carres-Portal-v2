@@ -391,7 +391,7 @@ effective-dated rule row (default ask 4 · deadline 3; n > m in each pair) and e
 (the live Sales Invoice's issue day, else today), so the Work right panel, the Order Route, the Logistics
 card, the Monitor and Work's payment items read one arithmetic. One `isOutstation` reading: a company is
 assigned and it is not the Klang Valley default. **Calendars (built on branch
-`build/settings-completion`, 9 Oct 2026; 0677 not applied):** the payment-due and ask-day FACTS count
+`build/settings-completion`, 9 Oct 2026; 0678 not applied):** the payment-due and ask-day FACTS count
 on THE Delivery calendar — Monday–Saturday with the Selangor public holidays Warehouse Settings stores
 for the dispatching Site, else the built-in list (`delivery-working-calendar.ts`); the ACTION day follows
 the responsible person's working days (Office weekdays when none are recorded) with the Office holidays
@@ -431,7 +431,7 @@ derived rules, each with its sources, not new law:
   Shared Duty Resolver combines the person calendar with the module calendar for the resolved
   actor"); `docs/ACTION-FLOW-STANDARD.md:154` (Operation's module calendar is Office); Settings List
   OFF-05 (Office holidays = Kuala Lumpur).
-- The person's week is People/HR's fact (`hr_employees.work_days`, 0677), edited only in the HR
+- The person's week is People/HR's fact (`hr_employees.work_days`, 0678), edited only in the HR
   person drawer (`Working days`); Workspace and Payment read it and never edit it. The resolved
   person is the collection owner's acting person today (the cover when covered), else the normal
   owner — the "resolved person's effective working/cover calendar" above.

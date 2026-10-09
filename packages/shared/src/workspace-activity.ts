@@ -4,7 +4,7 @@ import { z } from "zod";
  * must never stand in for an unreadable server configuration. */
 const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 /* The SHAPE of the two shared check times. Where they may sit follows the
- * stored Office calendar (`workspaceActivityTimesFit`, 0676): a stored value
+ * stored Office calendar (`workspaceActivityTimesFit`, 0677): a stored value
  * that an Office change has since moved outside that range must still be
  * readable, so the range is not part of the shape. */
 export const workspaceActivitySettingsSchema = z.object({
@@ -28,7 +28,7 @@ export type WorkspaceActivityOfficeHours = z.infer<typeof workspaceActivityOffic
 
 /** Morning: from Office start and before the Office lunch. Afternoon: after
  * the Office lunch and before Office end. The SQL door
- * `workspace_set_activity_times` (0676) asks the same four comparisons. */
+ * `workspace_set_activity_times` (0677) asks the same four comparisons. */
 export function workspaceActivityTimesFit(
   settings: WorkspaceActivitySettings,
   office: WorkspaceActivityOfficeHours,
@@ -42,7 +42,7 @@ export function workspaceActivityTimesFit(
 }
 
 /* One person's activity window for one period, computed ONLY by the database
- * (`_workspace_activity_window`, 0676 — the one arithmetic): morning from
+ * (`_workspace_activity_window`, 0677 — the one arithmetic): morning from
  * Office start to the morning check (never into the person's lunch);
  * afternoon from the person's lunch end. The Worker reads it from the
  * checkpoint snapshot; it never recomputes it. */
@@ -67,7 +67,7 @@ export const workspaceActivitySettingsResponseSchema = workspaceActivitySettings
 export type WorkspaceActivitySettingsResponse = z.infer<typeof workspaceActivitySettingsResponseSchema>;
 
 /* ── LUNCH TIME — each person's standing lunch start (owner order 9 Oct 2026;
- * Settings → Personal → Lunch time; 0676). Empty = the Office lunch. The
+ * Settings → Personal → Lunch time; 0677). Empty = the Office lunch. The
  * length is the Office lunch length; the allowed start is the Office lunch
  * start moved by up to the Office shift either way. Every time below is
  * computed by the database, never here. */

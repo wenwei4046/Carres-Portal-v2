@@ -1,5 +1,5 @@
 /**
- * Settings → Personal → Lunch time (owner order 9 Oct 2026, migration 0676).
+ * Settings → Personal → Lunch time (owner order 9 Oct 2026, migration 0677).
  * Every time comes from the database's one lunch and window arithmetic; the
  * screen only prints it. Saving a lunch moves the person's afternoon check, so
  * the Team list is refreshed too.

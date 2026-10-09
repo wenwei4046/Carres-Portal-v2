@@ -168,9 +168,9 @@ export const hrEmployeeDetailSchema = z.object({
   exitNote: z.string().nullable(),
   employment: employmentStatusSchema,
   filled: z.number().int(),
-  /** 0677 · the person's normal working weekdays (0 = Sunday … 6 =
+  /** 0678 · the person's normal working weekdays (0 = Sunday … 6 =
    *  Saturday); null = not recorded, the Office working weekdays apply.
-   *  Absent from a database before 0677. */
+   *  Absent from a database before 0678. */
   workDays: z.array(z.number().int().min(0).max(6)).nullable().optional(),
 
   /**
@@ -221,7 +221,7 @@ export const hrEmployeePatchInput = z
     employment_type: z.enum(["full_time", "part_time", "contract", "intern"]).nullable(),
     join_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
     confirm_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
-    /** 0677 · the normal working week; null clears it (Office weekdays apply). */
+    /** 0678 · the normal working week; null clears it (Office weekdays apply). */
     work_days: z.array(z.number().int().min(0).max(6)).min(1).max(7).nullable(),
   })
   .partial()
