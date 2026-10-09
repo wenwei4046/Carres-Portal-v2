@@ -36,6 +36,7 @@ import { useSaveKey } from "../save-key";
 import { DepartmentName, DepartmentPicker } from "../department";
 import { FactRow, Facts, FilesCard, HistoryCard, ReadFailed, ReasonModal } from "./PayablesParts";
 import { asCredit, attachPages, formLines, ReadPaperButton, readPaperNotes } from "./ReadPaper";
+import { CreditNoteSettlesCard } from "./NoteFollowUpParts";
 import type { BillReadAnswer } from "@carres/shared/bill-reading";
 import { ADVANCE_APPLICATION_STATUS_WORD, BILL_STATUS_WORD, cents, creditorKindWord, money, num, refusal, word } from "./payables-words";
 
@@ -230,6 +231,8 @@ function CreditNoteDetail() {
                 </p>
               ))}
           </Facts>
+          {/* 0676: the credit notes its supplier owes, settled by this one. */}
+          {n.status !== "cancelled" && <CreditNoteSettlesCard noteId={id} confirmed={n.status === "confirmed"} />}
           <FilesCard kind="credit-notes" id={id} files={doc.files} canAdd={doc.can.add_file} />
           <HistoryCard events={doc.events} />
         </div>

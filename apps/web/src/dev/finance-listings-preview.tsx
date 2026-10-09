@@ -14,7 +14,7 @@
  * credit-note-new · forecast (last month, so the actual is a whole month) ·
  * posting-accounts · item-groups (long lists under their tables, 0657–0659) ·
  * dealer-commission · dealer-statement (one made-up dealer, 0664; pick it on
- * the Statement view).
+ * the Statement view) · notes-to-follow-up · note-to-follow-up (0676).
  * `?role=principal` draws the area titles, to see an area fold.
  * Every listing carries at least one 60+ character party name so wrapping and
  * truncation are visible. Fixture evidence is not production evidence.
@@ -405,6 +405,50 @@ const GENERAL_LEDGER = (from: string, to: string) => ({
   ],
 });
 
+// ── Payables → Notes to follow up (0676) ────────────────────────────────────
+const noteRow = (over: Record<string, unknown>) => ({
+  id: "nf-1", supplier_id: "s-1", supplier_name: LONG_SUPPLIER, kind: "CREDIT", reason: "PRICE",
+  amount: "150.00", settled: "0.00", left: "150.00", status: "waiting", remark: "Billed RM 100.00 a unit, the PO says RM 25.00",
+  noted_on: soon(-3), next_follow_up_on: null, last_contact: null,
+  bill_id: "b-1", bill_no: "SB-20261006-1822", supplier_invoice_no: "OH-INV-8812", bill_status: "confirmed",
+  line_no: 1, line_item: "Queen bedframe, walnut", line_qty: "2.00", line_unit_price: "100.00", po_unit_cost: "25.00",
+  grn_no: "GRN-20261002-4410", po_id: "PO-2054", purchase_return_id: null, pr_no: null,
+  closed_at: null, closed_by_name: null, close_reason: null, created_at: at(-3), created_by_name: "Aina", ...over,
+});
+const NOTES = {
+  today: TODAY,
+  rows: [
+    noteRow({}),
+    noteRow({ id: "nf-2", supplier_name: "Nice Future", reason: "RETURN", bill_id: null, bill_no: null, line_no: null,
+      line_item: null, line_qty: null, line_unit_price: null, po_unit_cost: null, remark: null, pr_no: "PR-20261005-0012",
+      amount: "60.00", left: "60.00", next_follow_up_on: soon(-1), created_by_name: null,
+      last_contact: { contacted_on: soon(-4), said: "The supplier will send the credit note after they receive the goods back" } }),
+    noteRow({ id: "nf-3", supplier_name: "Dorsettloft", amount: "320.00", settled: "120.00", left: "200.00", status: "part",
+      bill_no: "SB-20260928-5926", line_no: 3, next_follow_up_on: soon(5),
+      last_contact: { contacted_on: soon(-2), said: "Part credited; the rest next month" } }),
+    noteRow({ id: "nf-4", supplier_name: "Hooka", kind: "DEBIT", reason: "OTHER", bill_id: null, bill_no: null, line_no: null,
+      remark: "Transport charge they will bill", amount: "30.00", left: "30.00", next_follow_up_on: soon(12) }),
+    noteRow({ id: "nf-5", supplier_name: "Nice Future", amount: "80.00", settled: "80.00", left: "0.00", status: "settled",
+      bill_no: "SB-20260915-0412", line_no: 2, next_follow_up_on: null }),
+    noteRow({ id: "nf-6", supplier_name: "Hooka", kind: "DEBIT", reason: "PRICE", amount: "45.00", left: "45.00",
+      status: "closed", close_reason: "Supplier kept the lower price", bill_no: "SB-20260910-7731", line_no: 1 }),
+  ],
+};
+const NOTE_DOC = {
+  today: TODAY,
+  followup: noteRow({ next_follow_up_on: soon(4), settled: "50.00", left: "100.00", status: "part",
+    last_contact: { contacted_on: soon(-1), said: "Credit note for the difference next week" } }),
+  contacts: [
+    { id: "c-2", contacted_on: soon(-1), said: "Credit note for the difference next week", created_at: at(-1), created_by_name: "Aina" },
+    { id: "c-1", contacted_on: soon(-3), said: "Sent the PO and the bill to the supplier's account manager", created_at: at(-3), created_by_name: "Aina" },
+  ],
+  settlements: [
+    { id: "st-1", credit_note_id: "cn-1", note_no: "SCN-20261001-4821", supplier_note_no: "OH-CN-2210", note_date: soon(-2),
+      note_status: "confirmed", amount: "50.00", counts: true, created_at: at(-2), created_by_name: "Aina",
+      taken_off_at: null, taken_off_by_name: null, take_off_reason: null },
+  ],
+};
+
 // ── Payables → Credit Notes (0642) ──────────────────────────────────────────
 const CREDIT_NOTES = [
   { id: "cn-1", note_no: "SCN-20261001-4821", status: "confirmed", supplier_id: "s-1", supplier_name: LONG_SUPPLIER,
@@ -718,6 +762,12 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/finance/payables/vouchers")) return json({ rows: VOUCHERS });
   if (url.includes("/api/finance/payables/outstanding")) return json({ rows: OUTSTANDING });
   if (url.includes("/api/finance/payables/bill-outstanding")) return json({ rows: BILL_OUTSTANDING });
+  if (url.includes("/api/finance/payables/notes-to-follow-up/owed"))
+    return json({ credit_count: 2, credit_left: "350.00", debit_count: 1, debit_left: "30.00" });
+  if (url.includes("/api/finance/payables/notes-to-follow-up/nf-")) return json(NOTE_DOC);
+  if (url.includes("/api/finance/payables/notes-to-follow-up")) return json(NOTES);
+  if (url.includes("/api/finance/payables/credit-notes/cn-1/notes-to-follow-up"))
+    return json({ settled: "50.00", left_to_settle: "1600.00", settlements: [], owed: NOTES.rows.slice(0, 1) });
   if (url.includes("/api/finance/payables/credit-notes/cn-1")) return json(CREDIT_NOTE);
   if (url.includes("/api/finance/payables/credit-notes")) return json({ rows: CREDIT_NOTES });
   if (url.includes("/api/finance/payables/accounts")) return json({ rows: AP_ACCOUNT_CHOICES });
@@ -788,6 +838,8 @@ const ROUTES: Record<string, string> = {
   "credit-notes": "/finance/credit-notes",
   "credit-note": "/finance/credit-notes/cn-1",
   "credit-note-new": "/finance/credit-notes/new",
+  "notes-to-follow-up": "/finance/notes-to-follow-up",
+  "note-to-follow-up": "/finance/notes-to-follow-up/nf-1",
   "stock-value": "/finance/reports/stock-value",
   collection: "/finance/reports/collection",
   "payment-requests": "/finance/payment-requests",

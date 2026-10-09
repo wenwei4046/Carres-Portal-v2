@@ -724,3 +724,164 @@ export interface PaymentVoucherDocument {
     cancel_money_back: boolean;
   };
 }
+
+// ── credit and debit notes to follow up (0676; Chew 2026-10-06/07/09, Finance MASTER §3.2) ──
+/**
+ * A credit or debit note a supplier still owes, followed up by Finance. A
+ * reminder only: it posts nothing. PRICE comes from a confirmed bill's line
+ * priced off its PO price; RETURN is added by a purchase return on billed
+ * goods; OTHER is typed by hand.
+ */
+export type SupplierNoteKind = "CREDIT" | "DEBIT";
+export type SupplierNoteReason = "PRICE" | "RETURN" | "OTHER";
+/** waiting: nothing settled · part: some settled · settled: all · closed: closed with a reason. */
+export type SupplierNoteStatus = "waiting" | "part" | "settled" | "closed";
+
+export interface SupplierNoteFollowup {
+  id: string;
+  supplier_id: string;
+  supplier_name: string;
+  kind: SupplierNoteKind;
+  reason: SupplierNoteReason;
+  amount: ApMoney;
+  settled: ApMoney;
+  left: ApMoney;
+  status: SupplierNoteStatus;
+  remark: string | null;
+  noted_on: string;
+  next_follow_up_on: string | null;
+  last_contact: { contacted_on: string; said: string } | null;
+  bill_id: string | null;
+  bill_no: string | null;
+  supplier_invoice_no: string | null;
+  bill_status: "draft" | "confirmed" | "cancelled" | null;
+  line_no: number | null;
+  line_item: string | null;
+  line_qty: ApMoney | null;
+  line_unit_price: ApMoney | null;
+  po_unit_cost: ApMoney | null;
+  grn_no: string | null;
+  po_id: string | null;
+  purchase_return_id: string | null;
+  pr_no: string | null;
+  closed_at: string | null;
+  closed_by_name: string | null;
+  close_reason: string | null;
+  created_at: string;
+  /** Null when a purchase return added it by itself. */
+  created_by_name: string | null;
+}
+
+export interface SupplierNoteFollowupList {
+  today: string;
+  rows: SupplierNoteFollowup[];
+}
+
+export interface SupplierNoteContact {
+  id: string;
+  contacted_on: string;
+  said: string;
+  created_at: string;
+  created_by_name: string | null;
+}
+
+export interface SupplierNoteSettlement {
+  id: string;
+  credit_note_id: string;
+  note_no: string | null;
+  supplier_note_no: string;
+  note_date: string;
+  note_status: "draft" | "confirmed" | "cancelled";
+  amount: ApMoney;
+  /** On, and its credit note confirmed. */
+  counts: boolean;
+  created_at: string;
+  created_by_name: string | null;
+  taken_off_at: string | null;
+  taken_off_by_name: string | null;
+  take_off_reason: string | null;
+}
+
+export interface SupplierNoteFollowupDocument {
+  today: string;
+  followup: SupplierNoteFollowup;
+  contacts: SupplierNoteContact[];
+  settlements: SupplierNoteSettlement[];
+}
+
+/** A bill's lines and their notes owed. */
+export interface SupplierBillLineFollowup {
+  line_no: number;
+  id: string;
+  kind: SupplierNoteKind;
+  status: SupplierNoteStatus;
+  amount: ApMoney;
+  left: ApMoney;
+}
+
+/** A credit note's settlements, and its supplier's credit notes still owed. */
+export interface SupplierCreditNoteFollowups {
+  settled: ApMoney;
+  left_to_settle: ApMoney;
+  settlements: Array<{
+    id: string;
+    followup_id: string;
+    amount: ApMoney;
+    reason: SupplierNoteReason;
+    remark: string | null;
+    bill_no: string | null;
+    pr_no: string | null;
+    created_at: string;
+    created_by_name: string | null;
+    taken_off_at: string | null;
+    taken_off_by_name: string | null;
+    take_off_reason: string | null;
+  }>;
+  owed: SupplierNoteFollowup[];
+}
+
+/** What a supplier still owes, for the voucher's reminder. */
+export interface SupplierNotesOwed {
+  credit_count: number;
+  credit_left: ApMoney;
+  debit_count: number;
+  debit_left: ApMoney;
+}
+
+/** A note owed: from a confirmed bill's line (PRICE) or by hand (OTHER). */
+export const supplierNoteFollowupAddInput = z.discriminatedUnion("reason", [
+  z.object({
+    reason: z.literal("PRICE"),
+    kind: z.enum(["CREDIT", "DEBIT"]),
+    billId: z.string().uuid(),
+    lineNo: z.number().int().positive(),
+    amount: moneyAbove0,
+    remark: z.string().trim().max(500).nullable().optional(),
+    nextOn: isoDate.nullable().optional(),
+  }).strict(),
+  z.object({
+    reason: z.literal("OTHER"),
+    kind: z.enum(["CREDIT", "DEBIT"]),
+    supplierId: z.string().uuid(),
+    amount: moneyAbove0,
+    remark: z.string().trim().min(1, "Say what the note is for").max(500),
+    nextOn: isoDate.nullable().optional(),
+  }).strict(),
+]);
+export type SupplierNoteFollowupAddInput = z.infer<typeof supplierNoteFollowupAddInput>;
+
+/** A follow-up: the day, what the supplier said, the next day (none ends it). */
+export const supplierNoteContactInput = z
+  .object({
+    contactedOn: isoDate,
+    said: z.string().trim().min(1, "Say what the supplier said").max(1000),
+    nextOn: isoDate.nullable(),
+  })
+  .strict();
+export type SupplierNoteContactInput = z.infer<typeof supplierNoteContactInput>;
+
+/** A confirmed credit note settling a credit note owed. */
+export const supplierNoteSettleInput = z
+  .object({ creditNoteId: z.string().uuid(), amount: moneyAbove0 })
+  .strict();
+export type SupplierNoteSettleInput = z.infer<typeof supplierNoteSettleInput>;

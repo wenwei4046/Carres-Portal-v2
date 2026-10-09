@@ -27,6 +27,7 @@ import {
   useApAccounts,
   useApSuppliers,
   useBillAct,
+  useBillNotesToFollowUp,
   useCreateOtherCreditor,
   useGrnCandidates,
   useSaveBill,
@@ -54,6 +55,7 @@ import { attachPages, formLines, ReadPaperButton, readPaperNotes } from "./ReadP
 import { answerPaymentRequest, usePaymentRequest } from "@/lib/payment-request-queries";
 import type { BillReadAnswer } from "@carres/shared/bill-reading";
 import { AdvanceModal, AmountField } from "./VoucherAdvance";
+import { LineFollowUp } from "./NoteFollowUpParts";
 import { useSaveKey } from "../save-key";
 
 /**
@@ -407,6 +409,8 @@ function ApplyToBillModal({ billId, supplierId, apAccountCode, leftToPay, onClos
 }
 
 function BillLinesCard({ doc }: { doc: SupplierBillDocument }) {
+  // 0676: a confirmed bill's line priced off its PO price can be followed up.
+  const notes = useBillNotesToFollowUp(doc.bill.id, doc.bill.status !== "draft");
   return (
     <Facts title="Lines">
       <div className="overflow-x-auto">
@@ -433,7 +437,14 @@ function BillLinesCard({ doc }: { doc: SupplierBillDocument }) {
                 <td className="py-1 pr-3">{l.account_code} {l.account_name ?? ""}</td>
                 <td className="py-1 pr-3 text-right">{l.qty ?? ""}</td>
                 <td className="py-1 pr-3 text-right">{money(l.unit_price)}</td>
-                <td className="py-1 pr-3">{l.po_line_id ? priceDiffWord(num(l.price_diff)) : "No PO price"}</td>
+                <td className="py-1 pr-3">
+                  {l.po_line_id ? priceDiffWord(num(l.price_diff)) : "No PO price"}
+                  {l.po_line_id && (
+                    <span className="ml-2">
+                      <LineFollowUp billId={doc.bill.id} billStatus={doc.bill.status} line={l} notes={notes.data} />
+                    </span>
+                  )}
+                </td>
                 <td className="py-1 pr-3"><DepartmentName type={l.department_type} id={l.department_id} /></td>
                 <td className="py-1 text-right">{money(l.amount)}</td>
               </tr>
