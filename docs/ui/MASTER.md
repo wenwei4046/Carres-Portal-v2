@@ -143,6 +143,8 @@ table loading/filtering, the listing interactions, record-to-panel opening, Info
 authorised edit/preview/result, source scope and retained return state. Record verified and missing
 coverage per module (§4.3, §6.1). Tests or shared-component imports alone do not prove adoption.
 
+**Current SO composition exception — owner 9 Oct 2026:** the supplied Outright list opens the full SO on row click, with Sales Order / Order Route / Timeline. Its Summary and Tasks are independently collapsible. This replaces the previous SO default compact-card opening and visual rail example; other modules’ source-owned work and document doors are not silently changed. CompactModuleCard remains the reusable work/embedded adapter where that purpose applies.
+
 ## §0.3 · Every new chat — before acting
 
 1. **State the authority and its version:** this MASTER, the owning module MASTER and COPY entries,
@@ -520,7 +522,7 @@ Never copy reference HTML or CSS into a page; never draw a lookalike panel.
   hand-off (`orders.proceeded_at`) and never appears on this card. Name only: the card reads the same
   date. On a card wider than 440px the longer label wraps to two lines in its `1fr` column, so the four
   labels share one row and the four values the next (CSS subgrid; sizes and fractions unchanged, +16px
-  on the 560px card); ≤440px is unchanged. BUILT on branch, not yet deployed.
+  on the then-current card); these historical dimensions are not the new visual target. BUILT on branch, not yet deployed.
 
 ### §4.3.1 · The panel opens on the current page's own main work tab — owner-approved 2026-10-05
 
