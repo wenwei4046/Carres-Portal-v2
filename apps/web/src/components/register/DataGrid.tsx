@@ -2343,6 +2343,15 @@ function DataGridInner<T>({
                   type="button"
                   title="Filter this column"
                   aria-label={`Filter ${col.label}`}
+                  className={styles.thFilter}
+                  data-active={
+                    (filters[col.key]?.length ?? 0) > 0 ||
+                    dateFilters[col.key] ||
+                    numberFilters[col.key] ||
+                    dateRangeFilters[col.key]
+                      ? "yes"
+                      : undefined
+                  }
                   onClick={(e) => {
                     e.stopPropagation();
                     filterOrigin.current = e.currentTarget;
@@ -2362,8 +2371,8 @@ function DataGridInner<T>({
                       dateFilters[col.key] ||
                       numberFilters[col.key] ||
                       dateRangeFilters[col.key]
-                        ? "var(--c-orange)"
-                        : "var(--fg-soft)",
+                        ? "var(--c-select-fg)"
+                        : "var(--c-muted)",
                   }}
                 >
                   <Filter size={14} strokeWidth={1.75} aria-hidden />

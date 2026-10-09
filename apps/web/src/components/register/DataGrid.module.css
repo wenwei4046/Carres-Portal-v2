@@ -1528,3 +1528,21 @@ div:first-child > .columnsMenuGroup {
     padding: 4px 6px 4px 14px;
   }
 }
+
+/* Header filter icons on hover only (owner ruling 2026-09-27): shown on the
+   hovered header, on keyboard focus, and always while that column is
+   filtered; a touch screen has no hover, so it keeps them visible. */
+.root .thFilter {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.root .th:hover .thFilter,
+.root .thFilter:focus-visible,
+.root .thFilter[data-active="yes"] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .root .thFilter {
+    opacity: 1;
+  }
+}
