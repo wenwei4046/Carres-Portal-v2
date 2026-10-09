@@ -58,6 +58,23 @@ export const EVENT_WORD: Record<string, string> = {
   month_close: "Raised by the month close",
 };
 
+/** 0676: the credit and debit notes suppliers still owe. */
+export const NOTE_KIND_WORD: Record<string, string> = {
+  CREDIT: "Credit note",
+  DEBIT: "Debit note",
+};
+export const NOTE_REASON_WORD: Record<string, string> = {
+  PRICE: "Price differs from PO",
+  RETURN: "Purchase return",
+  OTHER: "Other",
+};
+export const NOTE_STATUS_WORD: Record<string, string> = {
+  waiting: "Waiting",
+  part: "Part settled",
+  settled: "Settled",
+  closed: "Closed",
+};
+
 /** One knock-off of an advance against a bill (migration 0485). */
 export const ADVANCE_APPLICATION_STATUS_WORD: Record<string, string> = {
   applied: "Applied",

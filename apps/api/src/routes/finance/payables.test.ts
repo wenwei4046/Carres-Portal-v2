@@ -342,6 +342,119 @@ describe("supplier credit notes (0642, Chew 2026-10-03)", () => {
   });
 });
 
+describe("credit and debit notes to follow up (0676, Chew 2026-10-09)", () => {
+  const NOTE_ID = "99999999-0000-4000-8000-000000000009";
+  const FOLLOWUP_ID = "12121212-0000-4000-8000-000000000012";
+
+  it("GET /notes-to-follow-up reads the list", async () => {
+    const sb = mockRpc({ data: { today: "2026-10-09", rows: [{ id: FOLLOWUP_ID }] }, error: null });
+    const res = await call("/notes-to-follow-up");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_note_followups_read");
+    expect(await res.json()).toEqual({ today: "2026-10-09", rows: [{ id: FOLLOWUP_ID }] });
+  });
+
+  it("GET /notes-to-follow-up/owed needs the supplier", async () => {
+    const sb = mockRpc({ data: { credit_count: 1, credit_left: 60, debit_count: 0, debit_left: 0 }, error: null });
+    expect((await call(`/notes-to-follow-up/owed?supplierId=${SUPPLIER_ID}`)).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_note_followups_owed", { p_supplier_id: SUPPLIER_ID });
+    expect((await call("/notes-to-follow-up/owed")).status).toBe(422);
+    expect((await call("/notes-to-follow-up/owed?supplierId=nope")).status).toBe(422);
+  });
+
+  it("GET /notes-to-follow-up/:id reads one; a bad id is refused, a missing one is 404", async () => {
+    const sb = mockRpc({ data: { followup: { id: FOLLOWUP_ID } }, error: null });
+    expect((await call(`/notes-to-follow-up/${FOLLOWUP_ID}`)).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_note_followup_document", { p_id: FOLLOWUP_ID });
+    expect((await call("/notes-to-follow-up/nope")).status).toBe(422);
+    mockRpc({ data: null, error: null });
+    expect((await call(`/notes-to-follow-up/${FOLLOWUP_ID}`)).status).toBe(404);
+  });
+
+  it("POST /notes-to-follow-up marks a bill line, or adds one by hand", async () => {
+    let sb = mockRpc({ data: { id: FOLLOWUP_ID }, error: null });
+    const res = await call("/notes-to-follow-up", {
+      method: "POST",
+      body: { reason: "PRICE", kind: "CREDIT", billId: BILL_ID, lineNo: 1, amount: 150, remark: "Billed above PO", nextOn: "2026-10-12" },
+    });
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_note_followup_add", {
+      p_reason: "PRICE", p_kind: "CREDIT", p_supplier_id: null, p_bill_id: BILL_ID, p_line_no: 1,
+      p_amount: 150, p_remark: "Billed above PO", p_next_on: "2026-10-12",
+    });
+    sb = mockRpc({ data: { id: FOLLOWUP_ID }, error: null });
+    expect((await call("/notes-to-follow-up", {
+      method: "POST", body: { reason: "OTHER", kind: "DEBIT", supplierId: SUPPLIER_ID, amount: 30, remark: "Transport charge" },
+    })).status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_note_followup_add", {
+      p_reason: "OTHER", p_kind: "DEBIT", p_supplier_id: SUPPLIER_ID, p_bill_id: null, p_line_no: null,
+      p_amount: 30, p_remark: "Transport charge", p_next_on: null,
+    });
+  });
+
+  it("refuses a purchase return by hand, a note with no remark and half a sen before the database", async () => {
+    const sb = mockRpc({ data: { id: FOLLOWUP_ID }, error: null });
+    expect((await call("/notes-to-follow-up", { method: "POST", body: { reason: "RETURN", kind: "CREDIT", supplierId: SUPPLIER_ID, amount: 10, remark: "x" } })).status).toBe(422);
+    expect((await call("/notes-to-follow-up", { method: "POST", body: { reason: "OTHER", kind: "CREDIT", supplierId: SUPPLIER_ID, amount: 10, remark: " " } })).status).toBe(422);
+    expect((await call("/notes-to-follow-up", { method: "POST", body: { reason: "OTHER", kind: "CREDIT", supplierId: SUPPLIER_ID, amount: 10.005, remark: "x" } })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("a follow-up, closing, settling and taking off each call their door", async () => {
+    let sb = mockRpc({ data: "contact-1", error: null });
+    expect((await call(`/notes-to-follow-up/${FOLLOWUP_ID}/contacts`, {
+      method: "POST", body: { contactedOn: "2026-10-08", said: "Credit note next week", nextOn: "2026-10-16" },
+    })).status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_note_followup_contact_add", {
+      p_id: FOLLOWUP_ID, p_contacted_on: "2026-10-08", p_said: "Credit note next week", p_next_on: "2026-10-16",
+    });
+    sb = mockRpc({ data: FOLLOWUP_ID, error: null });
+    expect((await call(`/notes-to-follow-up/${FOLLOWUP_ID}/close`, { method: "POST", body: { reason: "Supplier refused" } })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_note_followup_close", { p_id: FOLLOWUP_ID, p_reason: "Supplier refused" });
+    sb = mockRpc({ data: "settlement-1", error: null });
+    expect((await call(`/notes-to-follow-up/${FOLLOWUP_ID}/settlements`, {
+      method: "POST", body: { creditNoteId: NOTE_ID, amount: 80 },
+    })).status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_note_followup_settle", { p_id: FOLLOWUP_ID, p_credit_note_id: NOTE_ID, p_amount: 80 });
+    sb = mockRpc({ data: FOLLOWUP_ID, error: null });
+    expect((await call(`/note-settlements/${FOLLOWUP_ID}/take-off`, { method: "POST", body: { reason: "Wrong amount" } })).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_note_followup_settlement_take_off", { p_settlement_id: FOLLOWUP_ID, p_reason: "Wrong amount" });
+  });
+
+  it("a follow-up needs what the supplier said; closing needs a reason", async () => {
+    const sb = mockRpc({ data: null, error: null });
+    expect((await call(`/notes-to-follow-up/${FOLLOWUP_ID}/contacts`, { method: "POST", body: { contactedOn: "2026-10-08", said: " ", nextOn: null } })).status).toBe(422);
+    expect((await call(`/notes-to-follow-up/${FOLLOWUP_ID}/close`, { method: "POST", body: { reason: " " } })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("the database's refusal comes back as it is", async () => {
+    mockRpc({ data: null, error: { code: "P0001", message: "Line 1 of bill SB-1 already has a note to follow up.", details: "already_followed_up" } });
+    const res = await call("/notes-to-follow-up", {
+      method: "POST", body: { reason: "PRICE", kind: "CREDIT", billId: BILL_ID, lineNo: 1, amount: 10 },
+    });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(JSON.stringify(await res.json())).toContain("already has a note to follow up");
+  });
+
+  it("a bill's and a credit note's notes owed", async () => {
+    let sb = mockRpc({ data: [{ line_no: 1, id: FOLLOWUP_ID }], error: null });
+    const res = await call(`/bills/${BILL_ID}/notes-to-follow-up`);
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_note_followups_of_bill", { p_bill_id: BILL_ID });
+    expect(await res.json()).toEqual({ rows: [{ line_no: 1, id: FOLLOWUP_ID }] });
+    sb = mockRpc({ data: { settled: 0, left_to_settle: 200, settlements: [], owed: [] }, error: null });
+    expect((await call(`/credit-notes/${NOTE_ID}/notes-to-follow-up`)).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("supplier_note_followups_of_credit_note", { p_note_id: NOTE_ID });
+    mockRpc({ data: null, error: null });
+    expect((await call(`/credit-notes/${NOTE_ID}/notes-to-follow-up`)).status).toBe(404);
+  });
+
+  it("refuses operation (finance and principal only)", async () => {
+    expect((await call("/notes-to-follow-up", { role: "operation" })).status).toBe(403);
+  });
+});
+
 describe("AP aging (0640, Chew 2026-10-03)", () => {
   const AGING = {
     as_at: "2026-09-30", go_live_on: "2026-06-01",

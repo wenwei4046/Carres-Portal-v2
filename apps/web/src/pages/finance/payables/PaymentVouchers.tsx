@@ -48,6 +48,7 @@ import {
 } from "./payables-words";
 import { FactRow, Facts, FilesCard, HistoryCard, ReadFailed, ReasonModal } from "./PayablesParts";
 import { VoucherAdvanceCard } from "./VoucherAdvance";
+import { NotesOwedHint } from "./NoteFollowUpParts";
 import { paymentVoucherPrint } from "./voucher-print";
 import { paysOut } from "@carres/shared/money-accounts";
 import { useMoneyAccounts } from "../settings/api";
@@ -719,6 +720,8 @@ function VoucherForm() {
                       : payToWords(formPayTo)}
                   </span>
                 )}
+                {/* 0676: the notes this supplier still owes (Chew 2026-10-09). */}
+                <NotesOwedHint supplierId={supplierId || null} />
               </label>
               <label className="block">
                 Payee

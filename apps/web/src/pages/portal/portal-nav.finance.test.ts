@@ -10,7 +10,8 @@ import { PORTAL_MODULES, PORTAL_NAV, navBlocks, navItemHref, visibleItems } from
  *
  *     Dashboard
  *     Payments            Monitor · Payment Records          (unchanged)
- *     Payables            AP · Payables · Payment Vouchers · Bills · Payment Requests · Credit Notes · Suppliers
+ *     Payables            AP · Payables · Payment Vouchers · Bills · Payment Requests · Credit Notes ·
+ *                         Notes to follow up (0676) · Suppliers
  *     Receivables         AR · Receivables · Other debtors · Other receipts
  *     Bank & Cards        Daily Bank · Card settlement · Card money waiting · Money moves
  *     Ledger              Journal · General Ledger · Trial Balance · Self-check
@@ -37,7 +38,7 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
     expect(shape("finance")).toEqual([
       "Dashboard",
       "Payments: Monitor · Payment Records",
-      "Payables: AP · Payables · Payment Vouchers · Bills · Payment Requests · Credit Notes · Suppliers",
+      "Payables: AP · Payables · Payment Vouchers · Bills · Payment Requests · Credit Notes · Notes to follow up · Suppliers",
       "Receivables: AR · Receivables · Other debtors · Other receipts",
       "Bank & Cards: Daily Bank · Card settlement · Card money waiting · Money moves",
       "Ledger: Journal · General Ledger · Trial Balance · Self-check",
@@ -79,6 +80,7 @@ describe("the Finance modules (Chew, 2026-10-03)", () => {
       "payment-vouchers": "/finance/payment-vouchers",
       "payment-requests": "/finance/payment-requests",
       "credit-notes": "/finance/credit-notes",
+      "notes-to-follow-up": "/finance/notes-to-follow-up",
       "supplier-finance": "/finance/suppliers",
       payments: "/finance/monitor",
       "payment-records": "/finance/payments",

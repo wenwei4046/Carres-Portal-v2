@@ -23,6 +23,14 @@ import {
   type SupplierCreditNoteRegisterRow,
   type SupplierFinanceFormInput,
   type SupplierFinanceRow,
+  type SupplierBillLineFollowup,
+  type SupplierCreditNoteFollowups,
+  type SupplierNoteContactInput,
+  type SupplierNoteFollowupAddInput,
+  type SupplierNoteFollowupDocument,
+  type SupplierNoteFollowupList,
+  type SupplierNoteSettleInput,
+  type SupplierNotesOwed,
 } from "@carres/shared/schemas/finance-ap";
 import { apiFetch, ApiError } from "./api";
 import { withDepartment } from "@/pages/finance/department";
@@ -60,6 +68,12 @@ export const payablesKeys = {
   supplierFinance: () => ["finance", "payables", "supplier-finance"] as const,
   creditNotes: () => ["finance", "payables", "credit-notes"] as const,
   creditNote: (id: string) => ["finance", "payables", "credit-note", id] as const,
+  /** 0676: the credit and debit notes suppliers still owe. */
+  notes: () => ["finance", "payables", "notes-to-follow-up"] as const,
+  note: (id: string) => ["finance", "payables", "note-to-follow-up", id] as const,
+  billNotes: (billId: string) => ["finance", "payables", "bill-notes", billId] as const,
+  creditNoteNotes: (noteId: string) => ["finance", "payables", "credit-note-notes", noteId] as const,
+  notesOwed: (supplierId: string) => ["finance", "payables", "notes-owed", supplierId] as const,
 };
 
 type Rows<T> = { rows: T[] };
@@ -409,4 +423,96 @@ export function useUploadApFile(kind: ApDocKind, id: string) {
 export async function openApFile(path: string): Promise<void> {
   const { url } = await apiFetch<{ url: string }>(`${BASE}/files/url?path=${encodeURIComponent(path)}`);
   window.open(url, "_blank", "noopener");
+}
+
+// ── credit and debit notes to follow up (0676) ──────────────────────────────
+
+export function useNotesToFollowUp() {
+  return useQuery({
+    queryKey: payablesKeys.notes(),
+    queryFn: () => apiFetch<SupplierNoteFollowupList>(`${BASE}/notes-to-follow-up`),
+    staleTime: 15_000,
+  });
+}
+
+export function useNoteToFollowUp(id: string | undefined) {
+  return useQuery({
+    queryKey: payablesKeys.note(id ?? ""),
+    queryFn: () => apiFetch<SupplierNoteFollowupDocument>(`${BASE}/notes-to-follow-up/${id}`),
+    enabled: !!id,
+  });
+}
+
+/** A confirmed bill's lines and their notes owed. */
+export function useBillNotesToFollowUp(billId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: payablesKeys.billNotes(billId ?? ""),
+    queryFn: async () => (await apiFetch<Rows<SupplierBillLineFollowup>>(`${BASE}/bills/${billId}/notes-to-follow-up`)).rows,
+    enabled: !!billId && enabled,
+  });
+}
+
+/** A credit note's settlements, and its supplier's credit notes still owed. */
+export function useCreditNoteNotesToFollowUp(noteId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: payablesKeys.creditNoteNotes(noteId ?? ""),
+    queryFn: () => apiFetch<SupplierCreditNoteFollowups>(`${BASE}/credit-notes/${noteId}/notes-to-follow-up`),
+    enabled: !!noteId && enabled,
+  });
+}
+
+/** What a supplier still owes, for the voucher's reminder. */
+export function useSupplierNotesOwed(supplierId: string | null) {
+  return useQuery({
+    queryKey: payablesKeys.notesOwed(supplierId ?? ""),
+    queryFn: () => apiFetch<SupplierNotesOwed>(`${BASE}/notes-to-follow-up/owed?supplierId=${supplierId}`),
+    enabled: !!supplierId,
+    staleTime: 15_000,
+  });
+}
+
+export function useAddNoteToFollowUp() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, SupplierNoteFollowupAddInput>({
+    mutationFn: (input) =>
+      apiFetch<{ id: string }>(`${BASE}/notes-to-follow-up`, { method: "POST", body: JSON.stringify(input) }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+export function useAddNoteContact() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { id: string; input: SupplierNoteContactInput }>({
+    mutationFn: ({ id, input }) =>
+      apiFetch<{ id: string }>(`${BASE}/notes-to-follow-up/${id}/contacts`, { method: "POST", body: JSON.stringify(input) }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+export function useCloseNoteToFollowUp() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { id: string; reason: string }>({
+    mutationFn: ({ id, reason }) =>
+      apiFetch<{ id: string }>(`${BASE}/notes-to-follow-up/${id}/close`, { method: "POST", body: JSON.stringify({ reason }) }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+/** A confirmed credit note settles a credit note owed. Posts nothing. */
+export function useSettleNoteToFollowUp() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { id: string; input: SupplierNoteSettleInput }>({
+    mutationFn: ({ id, input }) =>
+      apiFetch<{ id: string }>(`${BASE}/notes-to-follow-up/${id}/settlements`, { method: "POST", body: JSON.stringify(input) }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
+export function useTakeNoteSettlementOff() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ id: string }, ApiError, { settlementId: string; reason: string }>({
+    mutationFn: ({ settlementId, reason }) =>
+      apiFetch<{ id: string }>(`${BASE}/note-settlements/${settlementId}/take-off`, { method: "POST", body: JSON.stringify({ reason }) }),
+    onSuccess: () => { void refresh(); },
+  });
 }

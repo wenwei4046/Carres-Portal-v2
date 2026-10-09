@@ -351,7 +351,7 @@ Dealer commission rules:
 - 0647 fixes a fault 0642 shipped with: a credit note's two account columns did not follow a renumbered account (0570 says every key that names the chart must), so renumbering an account a credit note used was refused. Both now follow, and the file refuses to apply while any key onto the chart still does not. A test renumbers an account under a confirmed credit note.
 - Falsifier: in Chew's test, a supplier's `Unpaid After Advance and Credit` differs from its balance in the books, or a bill shows a credit note Chew did not knock off.
 
-**Credit and debit notes to follow up — Chew 2026-10-06, 2026-10-07 and 2026-10-09; APPROVED / BUILD IN PROGRESS.**
+**Credit and debit notes to follow up — Chew 2026-10-06, 2026-10-07 and 2026-10-09; APPROVED; BUILT 2026-10-09; 0676 NOT APPLIED: it waits for Chew's OK.**
 - Chew needs one list of the credit and debit notes suppliers still owe, so he can follow each one up (「我需要有一个listing 关于supplier 那边要follow up 的cn」). It is a reminder only and posts nothing, because there is no supplier claims account (Chew 2026-10-06).
 - Where one starts (「就是我转grn 去pi 时会对比我的po price， 然后提醒我，我会remark pending supplier cn or dn / 同时也有可能是开了pi, 然后要purchase return， 就要让他pending cn」):
   - when a bill is made from its GRN, each line is compared with its PO price and a difference is pointed out; Chew marks it pending a supplier credit note or debit note, with a remark;
@@ -366,6 +366,8 @@ Dealer commission rules:
   - The reasons are "Price differs from PO", "Purchase return" and "Other".
   - Preparing a voucher for a supplier says what notes it still owes.
   - Finance and principal only. It posts nothing.
+  - Built as Payables → `Notes to follow up` (`/finance/notes-to-follow-up`), with `Follow up` on a confirmed bill's lines, `Notes it settles` on a confirmed credit note and the reminder on a voucher's supplier. The list, a credit note's card and the reminder each first add the notes owed for purchase returns, so a return shows the next time any of them is read.
+  - Measured before applying (production, rolled back, 2026-10-09; a bill, a purchase return and a credit note made inside the test): a confirmed bill's line above its PO price was marked and a second mark refused; a draft bill, a line with no PO price, a return by hand, a note by hand with no remark, half a sen and a next day in the past were refused; a purchase return of one billed Unit added one credit note owed at the bill's price, once however often the list was read; a follow-up moved the next day, and a day after today, a next day before it and nothing said were refused; a draft credit note could not settle; a confirmed one settled part, then all, refused a second settlement, a debit note and another supplier's note, and taking it off made the note owed again; a settled note could not be closed; cancelling the credit note made its note owed again; a closed note took no follow-up; Operation could neither read nor write, and the tables could not be written around the doors.
 - Falsifier: in Chew's test, a note he is waiting for is not on the list, or one the supplier already sent still shows as owed.
 
 **Bill scanning approach — PROPOSAL / NOT LAW, built for Chew's test (no migration).**
