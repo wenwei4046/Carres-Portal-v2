@@ -1377,10 +1377,11 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
     const select = () => screen.getByTestId("so-batch-product-select") as HTMLSelectElement;
     expect(select().value).toBe("");
     /* At rest the control is quiet; narrowed, it wears the rail's own active
-       treatment — a narrowed section must not read as an unset one. */
-    expect(select().className).not.toContain("bg-kit-blue-3");
+       treatment — a narrowed section must not read as an unset one. The
+       active treatment is the theme's select wash since the v4 kit. */
+    expect(select().className).not.toContain("bg-c-select-bg");
     pick("so-batch-product-select", "mattress");
-    expect(select().className).toContain("bg-kit-blue-3");
+    expect(select().className).toContain("bg-c-select-bg");
     pick("so-batch-product-select", "");
     expect(select().value).toBe("");
     expect(screen.getByTestId("so-batch-row-o5")).toBeInTheDocument();

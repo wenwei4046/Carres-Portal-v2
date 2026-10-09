@@ -930,7 +930,7 @@ export function Fact({
         data-testid={testId ?? id}
         className={
           framed
-            ? `${automatic ? CONTROL_BASE.replace("bg-white", "bg-kit-slate-3") : CONTROL_BASE} ${CONTROL_BORDER.rest} rounded-control min-h-8 min-w-0 break-words px-2 py-1`
+            ? `${automatic ? CONTROL_BASE.replace("bg-c-card ", "bg-c-search-bg ") : CONTROL_BASE} ${CONTROL_BORDER.rest} rounded-control min-h-8 min-w-0 break-words px-2 py-1`
             : "flex min-h-8 min-w-0 items-center break-words px-0 py-1 text-body text-base-900"
         }
       >
