@@ -2,6 +2,11 @@ import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppEnv } from "../../types";
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
+/* The Settings editor gate has its own tests (settings-core.test.ts). */
+vi.mock("../../lib/settings-editor", () => ({
+  canEditSettings: vi.fn(async () => true),
+  requireSettingsEditor: () => async (_c: unknown, next: () => Promise<void>) => { await next(); },
+}));
 import { userClient } from "../../lib/supabase";
 import router from "./saturday-on-call";
 

@@ -6,6 +6,7 @@ import {
   saturdayOnCallWindowInput,
 } from "@carres/shared/workspace-saturday-on-call";
 import { requireOperation } from "../../lib/auth-guards";
+import { requireSettingsEditor } from "../../lib/settings-editor";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -84,7 +85,7 @@ router.get("/", requireOperation, async (c) => {
   }));
 });
 
-router.put("/window", requireOperation, async (c) => {
+router.put("/window", requireOperation, requireSettingsEditor("staff_duties"), async (c) => {
   const body = await parseJsonBody(c, saturdayOnCallWindowInput);
   if (!body.ok) return c.json(body.body, body.status);
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -101,7 +102,7 @@ router.put("/window", requireOperation, async (c) => {
   return c.json({ startsAt: w.starts_at.slice(0, 5), endsAt: w.ends_at.slice(0, 5), revision: w.revision });
 });
 
-router.put("/:saturday", requireOperation, async (c) => {
+router.put("/:saturday", requireOperation, requireSettingsEditor("staff_duties"), async (c) => {
   const saturday = c.req.param("saturday");
   if (!isSaturdayIso(saturday)) {
     return c.json({ error: "not_saturday", code: "not_saturday", message: "not_saturday" }, 422);
