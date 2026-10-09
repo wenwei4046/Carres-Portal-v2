@@ -14,8 +14,9 @@
  * schedules are separate calendars and are NOT this one.
  *
  * Holidays: until an authorised editor records the Office (Kuala Lumpur)
- * holidays for a year, the built-in list (`my-holidays.ts`) stays in force
- * and `holidaySource` says so — no Kuala Lumpur date is invented.
+ * holidays for a YEAR, the built-in list (`my-holidays.ts`) stays in force for
+ * that year and `recordedYears` / `holidaySource` say so — no Kuala Lumpur
+ * date is invented, and recording 2026 never empties early 2027.
  */
 import { MY_HOLIDAYS_2026, MY_HOLIDAYS_2027_EARLY } from "./my-holidays";
 import type { OwnerCalendar } from "./collection-clock";
@@ -40,10 +41,13 @@ export interface OfficeCalendar {
   lunchShiftMinutes: number;
   /** The calendar's holiday region word (owner default `Kuala Lumpur`). */
   holidayRegion: string;
-  /** The Office holidays in force. */
+  /** The Office holidays in force: recorded years from Settings, the built-in list for every other year. */
   holidays: OfficeHoliday[];
-  /** `office` = recorded in Settings · `built_in` = the built-in list is still in use. */
-  holidaySource: "office" | "built_in";
+  /** `office` = every year in force was recorded in Settings · `built_in` = no year was ·
+   *  `mixed` = some years recorded, others still on the built-in list. */
+  holidaySource: "office" | "built_in" | "mixed";
+  /** The years whose holidays an editor recorded in Settings → Office. */
+  recordedYears: number[];
 }
 
 const BUILT_IN: OfficeHoliday[] = [...MY_HOLIDAYS_2026, ...MY_HOLIDAYS_2027_EARLY].map((h) => ({
@@ -63,15 +67,19 @@ export const DEFAULT_OFFICE_CALENDAR: OfficeCalendar = Object.freeze({
   holidayRegion: "Kuala Lumpur",
   holidays: BUILT_IN,
   holidaySource: "built_in",
+  recordedYears: [],
 }) as OfficeCalendar;
+
+/** The years the built-in list covers (2026 and early 2027 today). */
+export const BUILT_IN_HOLIDAY_YEARS: readonly number[] = [...new Set(BUILT_IN.map((h) => Number(h.date.slice(0, 4))))];
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * Build the calendar from stored rows. A stored holiday list that is empty
- * keeps the built-in list (and says so); anything unreadable falls back to the
- * owner default for that field, never to a guess.
+ * Build the calendar from stored rows. A year with no recorded holidays keeps
+ * the built-in list for that year (and says so); anything unreadable falls
+ * back to the owner default for that field, never to a guess.
  */
 export function officeCalendarOf(
   stored: Partial<{
@@ -96,6 +104,10 @@ export function officeCalendarOf(
     .filter((h) => ISO.test(String(h.holiday_date).slice(0, 10)))
     .map((h) => ({ date: String(h.holiday_date).slice(0, 10), name: (h.name ?? "").trim() || "Public holiday" }))
     .sort((a, b) => a.date.localeCompare(b.date));
+  const recordedYears = [...new Set(recorded.map((h) => Number(h.date.slice(0, 4))))].sort((a, b) => a - b);
+  const kept = d.holidays.filter((h) => !recordedYears.includes(Number(h.date.slice(0, 4))));
+  const inForce = [...recorded, ...kept].sort((a, b) => a.date.localeCompare(b.date));
+  const builtInYearsLeft = BUILT_IN_HOLIDAY_YEARS.filter((y) => !recordedYears.includes(y));
   return {
     workDays: days.length > 0 ? [...new Set(days)].sort() : d.workDays,
     start: time(stored?.start_time, d.start),
@@ -105,8 +117,9 @@ export function officeCalendarOf(
     lunchEnd: time(stored?.lunch_end, d.lunchEnd),
     lunchShiftMinutes: Number.isFinite(stored?.lunch_shift_minutes) ? Number(stored!.lunch_shift_minutes) : d.lunchShiftMinutes,
     holidayRegion: (stored?.holiday_region ?? "").trim() || d.holidayRegion,
-    holidays: recorded.length > 0 ? recorded : d.holidays,
-    holidaySource: recorded.length > 0 ? "office" : "built_in",
+    holidays: inForce,
+    holidaySource: recordedYears.length === 0 ? "built_in" : builtInYearsLeft.length === 0 ? "office" : "mixed",
+    recordedYears,
   };
 }
 

@@ -3387,6 +3387,7 @@ export { evaluateWorkspaceActivityCheck, type WorkspaceActivityEvidence, type Wo
 export type { OutrightOrderFacts, OutrightFactsFailed } from "./outright-order-facts";
 export {
   DEFAULT_OFFICE_CALENDAR,
+  BUILT_IN_HOLIDAY_YEARS,
   officeCalendarOf,
   officeOffDays,
   officeWorkingDayOptions,
@@ -3395,6 +3396,32 @@ export {
   type OfficeCalendar,
   type OfficeHoliday,
 } from "./office-calendar";
+export {
+  SETTINGS_EDITOR_SECTIONS,
+  COMPANY_PROFILE_FIELDS,
+  VERIFIED_COMPANY_PROFILE,
+  companyAddressLines,
+  companyProfileValuesSchema,
+  companyProfileSaveInput,
+  companyProfileResponseSchema,
+  officeCalendarValuesSchema,
+  officeCalendarSaveInput,
+  officeHolidaysSaveInput,
+  officeCalendarResponseSchema,
+  settingsChangeSchema,
+  settingsEditorGrantInput,
+  settingsEditorsResponseSchema,
+  type SettingsEditorSection,
+  type CompanyProfileField,
+  type CompanyProfileValues,
+  type CompanyProfileSaveInput,
+  type CompanyProfileResponse,
+  type OfficeCalendarValues,
+  type OfficeHolidaysSaveInput,
+  type OfficeCalendarResponse,
+  type SettingsChange,
+  type SettingsEditorsResponse,
+} from "./settings-core";
 
 export { decideWorkspaceReassignment, type WorkspaceCheckpointIdentity, type WorkspaceReassignmentDecision } from "./workspace-reassignment";
 

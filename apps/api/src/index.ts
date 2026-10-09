@@ -41,6 +41,7 @@ import repairOrdersRouter from "./routes/operation/repair-orders";
 // the ONE receive engine (0302).
 import warehouseReceiptsRouter from "./routes/operation/warehouse-receipts";
 import workActivityRouter from "./routes/operation/work-activity";
+import settingsCoreRouter, { companyProfileReadRouter } from "./routes/operation/settings-core";
 import workspaceDutiesRouter from "./routes/operation/workspace-duties";
 import operationWorkRouter from "./routes/operation/work";
 import procurementTabsRouter from "./routes/operation/procurement-tabs";
@@ -254,6 +255,11 @@ api.route("/operation/purchasing/requests", manualPurchaseRouter);
 // P1 (0303) — Purchasing → Settings: the numbers the ordering engine reads.
 api.route("/operation/purchasing/settings", purchasingSettingsRouter);
 api.route("/operation/warehouse-settings", warehouseSettingsRouter);
+// 0668 + 0669 — Settings → Company · Office · Settings editors (Carres Settings
+// List COM · OFF · TEAM-02). The company identity read is open to every
+// signed-in account because every printed document carries it.
+api.route("/operation/settings", settingsCoreRouter);
+api.route("/company-profile", companyProfileReadRouter);
 // 0232 staff assignment pool — GET / + PUT /:userId
 api.route("/operation/staff", opsStaffRouter);
 api.route("/operation/partners", operationPartnersRouter);
