@@ -91,7 +91,7 @@ function NotesRegister() {
   const today = query.data?.today ?? appTodayIso();
   const rows = query.data?.rows ?? [];
   const columns = useMemo<DataGridColumn<SupplierNoteFollowup>[]>(() => [
-    { key: "supplier", label: "Supplier", width: 200, accessor: (r) => r.supplier_name,
+    { key: "supplier", label: "Supplier", width: 200, accessor: (r) => r.supplier_name, overflowText: (r) => r.supplier_name,
       searchValue: (r) => r.supplier_name, filterType: "enum" },
     { key: "kind", label: "Note", width: 110, accessor: (r) => word(NOTE_KIND_WORD, r.kind),
       filterValue: (r) => word(NOTE_KIND_WORD, r.kind), filterType: "enum" },

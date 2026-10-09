@@ -96,7 +96,7 @@ function BillRegister() {
       searchValue: (r) => r.bill_no ?? "", exportValue: (r) => r.bill_no ?? "Draft, no number yet" },
     { key: "date", label: "Bill Date", width: 130, accessor: (r) => fmtDate(r.bill_date),
       dateValue: (r) => r.bill_date, filterType: "date", exportValue: (r) => fmtDate(r.bill_date) },
-    { key: "supplier", label: "Supplier", width: 220, accessor: (r) => r.supplier_name,
+    { key: "supplier", label: "Supplier", width: 220, accessor: (r) => r.supplier_name, overflowText: (r) => r.supplier_name,
       searchValue: (r) => r.supplier_name, filterType: "enum" },
     { key: "kind", label: "Creditor Type", width: 140, accessor: (r) => creditorKindWord(r.supplier_kind),
       filterValue: (r) => creditorKindWord(r.supplier_kind), filterType: "enum" },

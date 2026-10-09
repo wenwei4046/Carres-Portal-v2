@@ -94,7 +94,7 @@ export default function ApAging() {
   const notStarted = (query.error as { status?: number } | null)?.status === 409;
 
   const gridColumns = useMemo<DataGridColumn<ApAgingRow>[]>(() => [
-    { key: "supplier", label: "Supplier", width: 240, accessor: (r) => r.name,
+    { key: "supplier", label: "Supplier", width: 240, accessor: (r) => r.name, overflowText: (r) => r.name,
       searchValue: (r) => r.name, exportValue: (r) => r.name },
     { key: "kind", label: "Creditor Type", width: 140, accessor: (r) => creditorKindWord(r.kind),
       filterValue: (r) => creditorKindWord(r.kind), filterType: "enum", defaultHidden: true },

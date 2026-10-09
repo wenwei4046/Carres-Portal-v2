@@ -96,7 +96,7 @@ function DebitNoteRegister() {
       searchValue: (r) => r.note_no ?? "", exportValue: noteNo },
     { key: "date", label: "Date", width: W.date, accessor: (r) => fmtDate(r.note_date),
       dateValue: (r) => r.note_date, filterType: "date", exportValue: (r) => r.note_date },
-    { key: "supplier", label: "Supplier", width: 220, accessor: (r) => r.supplier_name,
+    { key: "supplier", label: "Supplier", width: 220, accessor: (r) => r.supplier_name, overflowText: (r) => r.supplier_name,
       searchValue: (r) => r.supplier_name, filterType: "enum" },
     { key: "paper", label: "Supplier's debit note", headerLines: ["Supplier's", "debit note"], width: 130, accessor: (r) => r.supplier_note_no,
       searchValue: (r) => r.supplier_note_no },
