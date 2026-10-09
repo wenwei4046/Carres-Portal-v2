@@ -1841,6 +1841,20 @@ for Pontian, Kota Tinggi, Kulai Tesco and Sedenak. §5.3's backward calculation 
 calendars; assigning such a partner raises the dated Warehouse and Purchasing Work computed from
 them. Staff never memorise a pickup weekday.
 
+**Outstation carrier handover buffer — OWNER-APPROVED TARGET / NOT BUILT, Jess 2026-10-09.**
+For the current outstation planning check, handing goods to the relevant carrier before the
+customer date meets the owner-defined handover deadline; no additional buffer is required.
+Every carrier defaults to 0 buffer working days. Future `Settings → Outstation routes` may set
+the buffer per carrier: EU = 2 would require handover to EU at least two applicable working days
+before the customer date; a later handover shows the amber deadline risk. This is handover
+timeliness, not evidence of final customer delivery or a promise that final arrival is on time.
+Preserve the final-arrival fact separately. This current check replaces the prior requirement
+for a proven final-arrival estimate when judging this handover deadline; unknown final arrival
+still cannot be presented as confirmed delivery. The exact working calendar, same-day handling
+at zero, change authority and effective treatment are not decided. Do not guess them.
+The Settings screen and runtime remain unverified/not built; permission to use the current
+default does not mean a hardcoded value or Task engine has been implemented.
+
 **Equal-cost logistics suggestion — OWNER-APPROVED TARGET / NOT BUILT, Jess 2026-10-09.**
 In the Johor TEOW/TT cost-comparison discussion, Jess selected A: when eligible logistics
 options have the same complete total cost and can meet the customer delivery date, recommend

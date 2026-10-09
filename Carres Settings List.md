@@ -158,6 +158,10 @@ This is capability coverage, not approval of a new tab set or sidebar placement.
 | DEL-10 | Courier stock items dispatch within | Warehouse dispatch target; Ops follows batches | 3 | Not set | Warehouse confirms received/checked/packable dispatch scope | Working | Not set | Authorised staff | Not set | Who · when · old → new · effective date · reason | Tasks#14 · Route remaining accessories | OWNER-CLARIFICATIONS.md:114 · owner8Oct | Confirmed |
 | DEL-11 | Sofa loan rules | Eligible loan and each action contract | Not set | Not set | Not set | Not a day | Not set | Not set | Not set | Who · when · old → new · effective date · reason | Tasks#15 | 25-MODULE-DESIGN-WORKLIST.md current dispatch review#15 | To check |
 
+| DEL-13 | Outstation carrier handover buffer | Per-carrier handover deadline and amber late-handover risk; not customer-delivery completion | 0 for every carrier | Not set | Before customer delivery date; same-day zero boundary Not set | Working | Not set | Not set | Not set | Who · when · old → new · effective date · reason | Planned handover deadline · Order Route risk; final arrival separate; no new reminder approved | docs/delivery/MASTER.md §11 · owner9Oct carrier buffer ruling | Confirmed |
+
+Default and per-carrier configurability are approved targets only; UI/runtime are not built or verified. EU = 2 is an illustrative future setting, not a current saved value. Exact calendar, zero-buffer same-day treatment, editor qualification and effective treatment remain Not set. This planning check cannot substitute for actual handover, customer receipt, final arrival or existing release gates.
+
 ## Customer Care
 
 | ID | Setting | Purpose | Default | Range | Starts from | Day type | Calendar | Who can change | Takes effect | History | Affects Tasks / Order Route | Source | Status |
