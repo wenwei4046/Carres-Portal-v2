@@ -1424,8 +1424,8 @@ window is visually composed remains a UI decision, not a reason to falsify its d
 **WINDOW DAYS — OWNER CORRECTION (Jess, 2026-09-25) · APPROVED / NOT BUILT.** The `PO Days`
 setting in Purchasing Settings **decides which days a PO window opens**. "Purchasing working day"
 above means a day ticked in `PO Days` that is also an Office working day (Office calendar and
-holidays). Work follows it: a PO window occurrence exists only on a PO Day. **Built on branch
-`build/settings-completion` (9 Oct 2026; 0678 not applied):** "Office working day" is the STORED
+holidays). Work follows it: a PO window occurrence exists only on a PO Day. **Built and deployed
+10 Oct 2026 (#1996; 0678 APPLIED):** "Office working day" is the STORED
 Office calendar (Settings → Office weekdays + holidays) everywhere Purchasing counts — the PO window
 days and the Safety-days margin (`/purchase/demands`), the supplier claim, purchase return and
 repair order record pages and their Work items (`purchasingOfficeDays`), the PO register's

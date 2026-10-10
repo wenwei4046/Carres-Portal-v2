@@ -1404,8 +1404,8 @@ The working-day calendar is the **dispatching Warehouse's own** (owner, 9 Oct 20
 working days, adjustable, reading the dispatching Warehouse's calendar): its Collection days, special
 dates and holiday policy, with the explicit fallback of Sunday off + the Selangor holidays — never
 Office, never a mixed Delivery/Warehouse calendar, and no due date before Warehouse confirms the
-scope (`courierDispatchDueIso`, built on branch `build/settings-completion`; the setting is stored
-on Delivery Rules by 0678, not applied). The dispatch workflow itself is a BUILD GAP, not built. Each batch retains quantity,
+scope (`courierDispatchDueIso`, deployed 10 Oct 2026 by #1996; the setting is stored
+on Delivery Rules by 0678, APPLIED). The dispatch workflow itself is a BUILD GAP, not built. Each batch retains quantity,
 tracking and actual handover evidence; remaining quantity stays visible until the entire dispatch
 scope is handed over. Customer delivery remains a separate completion fact. A delay records an
 expected dispatch and customer notification without resetting the original target or deleting

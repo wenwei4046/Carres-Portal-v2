@@ -221,7 +221,7 @@ admission makes the person available for the governed rotation; it does not mean
 must be the PO holder on that first day. Existing approval capability and receiving-posting rules
 remain separate.
 
-**MONTHLY ROTATION ORDER — OWNER-APPROVED 2026-09-29 / BUILT ON BRANCH 2026-10-09 (0671, `build/settings-completion`; not applied, not deployed — see §4.4 "Leave, rota and Saturday on-call build").**
+**MONTHLY ROTATION ORDER — OWNER-APPROVED 2026-09-29 / BUILT 2026-10-09, DEPLOYED 10 Oct 2026 (#1996 `b437c2293`; production at `b21f32683`), 0671 APPLIED — see §4.4 "Leave, rota and Saturday on-call build".**
 Maintain a stable cyclic order of eligible routine Operation staff. Each month one person owns PO
 Duty and the next person in that order owns GRN Duty; advance the PO position by one each month.
 For three eligible people A/B/C, the cycle is PO A / GRN B → PO B / GRN C → PO C / GRN A.
@@ -638,7 +638,7 @@ leave policy defaults to `Approval required = No`; Jess or a section-authorised 
 it later, with effective date and treatment of existing submissions explicitly defined. No
 retroactive refusal is assumed and required evidence is not waived.
 
-**Leave recorded for a colleague — owner ruling 9 Oct 2026 (Jess, corrected the same day).** Every signed-in active staff member may record leave for a colleague (for example, one who is ill and cannot log in); this is not limited to the owner or Settings editors, and recording leave is a separate permission from changing Settings. Workspace → Leave → Record leave: the person defaults to me and may be changed to a colleague; choose MC, Emergency leave or Planned leave and the dates; Submit takes effect at once with no approval; MC proof is optional. The system keeps whose leave it is, who recorded it, when, and the change history (recorded, cancelled). Today's leave starts the existing cover; future leave starts on its day. Whole days only; half-day leave is not decided. Built on branch `build/settings-completion` (0680, not applied): `staff_leave.recorded_by`, `staff_leave_changes`, doors `staff_leave_submit` / `staff_leave_record_for` / `staff_leave_cancel` (unchanged 0670 rule: only the person whose leave it is cancels its future days; recording a colleague's leave gives no right to cancel it — owner correction 9 Oct 2026).
+**Leave recorded for a colleague — owner ruling 9 Oct 2026 (Jess, corrected the same day).** Every signed-in active staff member may record leave for a colleague (for example, one who is ill and cannot log in); this is not limited to the owner or Settings editors, and recording leave is a separate permission from changing Settings. Workspace → Leave → Record leave: the person defaults to me and may be changed to a colleague; choose MC, Emergency leave or Planned leave and the dates; Submit takes effect at once with no approval; MC proof is optional. The system keeps whose leave it is, who recorded it, when, and the change history (recorded, cancelled). Today's leave starts the existing cover; future leave starts on its day. Whole days only; half-day leave is not decided. Built and DEPLOYED 10 Oct 2026 (#1996 `b437c2293`; production at `b21f32683`), 0680 APPLIED: `staff_leave.recorded_by`, `staff_leave_changes`, doors `staff_leave_submit` / `staff_leave_record_for` / `staff_leave_cancel` (unchanged 0670 rule: only the person whose leave it is cancels its future days; recording a colleague's leave gives no right to cancel it — owner correction 9 Oct 2026).
 
 A submission covering today activates qualified available cover immediately, without waiting for
 approval or an activity checkpoint. Future leave activates cover on the absence date, not the
@@ -661,9 +661,9 @@ responsibility. Subsequent cover changes are recorded; no silent task ping-pong.
 cover or unreadable evidence stays a visible exception, never fabricated assignment. Approver
 qualifications do not inherit ordinary-work help rights.
 
-**Leave, rota and Saturday on-call build — BUILT ON BRANCH 2026-10-09 (`build/settings-completion`,
-migrations 0670/0671 NOT APPLIED, NOT DEPLOYED; owner walk owed).** Measured implementation, not a
-production claim:
+**Leave, rota and Saturday on-call build — DEPLOYED 10 Oct 2026 (#1996 `b437c2293`; production at `b21f32683`); migrations 0670/0671 APPLIED 10 Oct 2026;
+owner authenticated walk owed.** Production acceptance (synthetic people, rolled back) passed: leave
+for a colleague, no approval, MC without proof, history, today's cover to the next person:
 - *Leave (0670).* `staff_leave` (People-owned dated absence; one row per submission; cancel stamps
   `cancelled_from/by/at`, never deletes) and `workspace_leave_policies` (one row per type,
   `approval_required` stored false and held false by a CHECK until an approval change with its
@@ -749,7 +749,7 @@ database's or the network's own text.
 Client validation may guide early, but the server returns the same business refusal and remains
 authoritative. No message says `Invalid`, `Error` or `Something went wrong` without the repair.
 
-### 4.4.9 · Settings editors, Company and Office — BUILT ON BRANCH 2026-10-09 (`build/settings-completion`; 0669 · 0674 not applied, not deployed)
+### 4.4.9 · Settings editors, Company and Office — DEPLOYED 10 Oct 2026 (#1996 `b437c2293`; production at `b21f32683`); 0669 · 0674 APPLIED
 
 Owner rules TEAM-02 · SET-01 · COM · OFF (Carres Settings List, 9 Oct 2026). **Who edits Settings:**
 the owner (principal) edits every section; she names a person per section in Settings → Team and

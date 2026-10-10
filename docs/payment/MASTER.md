@@ -367,7 +367,7 @@ Payment must be complete           {m} working days before Scheduled delivery   
 ```
 
 **Outstation row — owner ruling 2026-09-24 (BUILT ON BRANCH `build/settings-completion` 9 Oct 2026,
-0672 not applied; `../ERP-ARCHITECTURE.md` §6.5):** an outstation order's `Payment must be complete` is **3 working days before Scheduled
+0672 APPLIED 10 Oct 2026; `../ERP-ARCHITECTURE.md` §6.5):** an outstation order's `Payment must be complete` is **3 working days before Scheduled
 Delivery** (the customer's delivery date). Its ask day follows the same n > m rule; the default
 ask day is an engineering setting, not an owner ruling. Same one clock, same calendar.
 
@@ -385,13 +385,13 @@ fact, never `Hold delivery` — beside the doors `Record payment` and, for Finan
 is this module's own record; Delivery, Warehouse and Work read it. Money completion and Finance hold clearance are independent requirements: RM 0 never clears
 a Finance hold, and removing a hold never settles money. Only when both and all other Delivery
 gates pass may the system issue the DO; each surface reads the same source facts. **Built on branch
-`build/settings-completion` (9 Oct 2026; 0672 not applied):** the outstation pair is stored in the same
+#1996 (deployed 10 Oct 2026; 0672 APPLIED):** the outstation pair is stored in the same
 effective-dated rule row (default ask 4 · deadline 3; n > m in each pair) and edited in Settings → Payments;
 `paymentDeadlineOf` counts through `collectionClock` with the rule in force on the order's clock start
 (the live Sales Invoice's issue day, else today), so the Work right panel, the Order Route, the Logistics
 card, the Monitor and Work's payment items read one arithmetic. One `isOutstation` reading: a company is
 assigned and it is not the Klang Valley default. **Calendars (built on branch
-`build/settings-completion`, 9 Oct 2026; 0678 not applied):** the payment-due and ask-day FACTS count
+#1996, deployed 10 Oct 2026; 0678 APPLIED):** the payment-due and ask-day FACTS count
 on THE Delivery calendar — Monday–Saturday with the Selangor public holidays Warehouse Settings stores
 for the dispatching Site, else the built-in list (`delivery-working-calendar.ts`); the ACTION day follows
 the responsible person's working days (Office weekdays when none are recorded) with the Office holidays
