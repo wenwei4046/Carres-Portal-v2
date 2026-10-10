@@ -52,6 +52,8 @@ subscription (「同一套」). Everything in §0 is **APPROVED / NOT BUILT** un
   the RM 1 sale, termination and loss. They are made automatically; Chew looks them over and sends
   them from accounts@carresofficial.com, until the agreement ends or is paid off. Rental builds no
   second invoice.
+- The monthly invoice is made on the 1st and falls due in that same month, on its 7th (Chew
+  2026-10-10, 「subscription一号开单，当月到期」).
 - Recording a payment asks for the day it was received, today by default. A payment pays the
   oldest unpaid month first.
 
