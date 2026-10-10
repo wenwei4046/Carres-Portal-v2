@@ -96,7 +96,7 @@ function BillRegister() {
       searchValue: (r) => r.bill_no ?? "", exportValue: (r) => r.bill_no ?? "Draft, no number yet" },
     { key: "date", label: "Bill Date", width: 130, accessor: (r) => fmtDate(r.bill_date),
       dateValue: (r) => r.bill_date, filterType: "date", exportValue: (r) => fmtDate(r.bill_date) },
-    { key: "supplier", label: "Supplier", width: 220, accessor: (r) => r.supplier_name,
+    { key: "supplier", label: "Supplier", width: 220, accessor: (r) => r.supplier_name, overflowText: (r) => r.supplier_name,
       searchValue: (r) => r.supplier_name, filterType: "enum" },
     { key: "kind", label: "Creditor Type", width: 140, accessor: (r) => creditorKindWord(r.supplier_kind),
       filterValue: (r) => creditorKindWord(r.supplier_kind), filterType: "enum" },
@@ -217,10 +217,12 @@ function BillDetail() {
             {doc.can.edit && <Button onClick={() => navigate(`/finance/bills/${id}/edit`)} icon="edit">Edit</Button>}
             {doc.can.cancel && <Button onClick={() => setCancelling(true)}>Cancel bill</Button>}
             {doc.can.confirm && <Button variant="primary" onClick={() => setConfirming(true)}>Confirm bill</Button>}
+            {/* Paying is a confirmed bill's next step: the kit's primary button, as on a debit note. */}
             {b.status === "confirmed" && num(doc.unpaid) !== null && (num(doc.unpaid) ?? 0) > 0 && (
-              <Link className="btn-secondary" to={`/finance/payment-vouchers/new?supplier=${b.supplier_id}&bill=${b.id}`}>
+              <Button variant="primary" data-testid="pay-bill"
+                onClick={() => navigate(`/finance/payment-vouchers/new?supplier=${b.supplier_id}&bill=${b.id}`)}>
                 New Payment Voucher
-              </Link>
+              </Button>
             )}
           </span>
         }

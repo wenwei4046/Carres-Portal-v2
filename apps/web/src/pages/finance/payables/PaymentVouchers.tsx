@@ -127,7 +127,7 @@ function VoucherRegister() {
     { key: "date", label: "Voucher Date", width: 130, accessor: (r) => fmtDate(r.voucher_date),
       dateValue: (r) => r.voucher_date, filterType: "date", exportValue: (r) => fmtDate(r.voucher_date) },
     { key: "payee", label: "Payee", width: 200, accessor: (r) => r.payee_name, searchValue: (r) => r.payee_name },
-    { key: "supplier", label: "Supplier", width: 200, accessor: (r) => r.supplier_name ?? "No supplier",
+    { key: "supplier", label: "Supplier", width: 200, accessor: (r) => r.supplier_name ?? "No supplier", overflowText: (r) => r.supplier_name ?? "No supplier",
       searchValue: (r) => r.supplier_name ?? "", filterType: "enum" },
     { key: "purpose", label: "Purpose", width: 160, accessor: (r) => word(VOUCHER_PURPOSE_WORD, r.purpose),
       filterValue: (r) => word(VOUCHER_PURPOSE_WORD, r.purpose), filterType: "enum" },

@@ -27,7 +27,7 @@ export default function SupplierFinancePage() {
   // menu open; the tax facts after it. A detail nobody keyed is an empty cell
   // (UI MASTER §6.0: no glyph, no absence word for an optional fact).
   const columns = useMemo<DataGridColumn<SupplierFinanceRow>[]>(() => [
-    { key: "supplier", label: "Supplier", width: 240, accessor: (r) => r.name,
+    { key: "supplier", label: "Supplier", width: 240, accessor: (r) => r.name, overflowText: (r) => r.name,
       searchValue: (r) =>
         [r.name, r.tax_no, r.registration_no, r.bank_name, r.bank_account_no, r.bank_account_holder].filter(Boolean).join(" ") },
     { key: "bank", label: "Bank", width: 130, accessor: (r) => r.bank_name ?? "",

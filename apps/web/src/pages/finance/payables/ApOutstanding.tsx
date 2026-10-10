@@ -31,7 +31,7 @@ export default function ApOutstanding() {
   const query = useApOutstanding();
   const rows = query.data ?? [];
   const columns = useMemo<DataGridColumn<ApOutstandingRow>[]>(() => [
-    { key: "supplier", label: "Supplier", width: 240, accessor: (r) => r.supplier_name,
+    { key: "supplier", label: "Supplier", width: 240, accessor: (r) => r.supplier_name, overflowText: (r) => r.supplier_name,
       searchValue: (r) => r.supplier_name },
     { key: "kind", label: "Creditor Type", width: 140, accessor: (r) => creditorKindWord(r.supplier_kind),
       filterValue: (r) => creditorKindWord(r.supplier_kind), filterType: "enum" },
