@@ -30,7 +30,7 @@ lands here. Source shown by ref prefix (CR/TCF/DL = AutoCount, SO = salesperson)
 ────────────────────────────────────────────────────────────────────
 单号       客户          货品            交期    库存    物流    状态
 ────────────────────────────────────────────────────────────────────
-CR0418     Felix Koh     床垫×2 床架×1    06-30  ✅备货   NETS   备货中
+CR0418     TEST customer 002     床垫×2 床架×1    06-30  ✅备货   NETS   备货中
            012-639…      +枕头×6
 ────────────────────────────────────────────────────────────────────
 TCF0449    CC            沙发×1 set       —      ⏳缺货   —      新单
@@ -46,10 +46,10 @@ SO-1052    Ali(销售)    床垫×1           07-15  ✅备货   NETS   已排�
 
 ### Order drawer (click a row) — full control = one row of the Master Sheet
 ```
-CR0418 · Felix Koh                                              [×]
+CR0418 · TEST customer 002                                              [×]
 ──────────────────────────────────────────────────────────────────
-客户   Felix Koh · 012-6399285
-地址   18, Jalan Cempaka Sari 5, … Muar, Johor
+客户   TEST customer 002 · 012-0000002
+地址   2, Jalan TEST 2 … Muar, Johor
 货品   床垫 Breeze FirmCare-K ×2 · 床架 ×1 · 枕头 ×6
 PO     PO/2604-006   (来自 AutoCount)
 ──────────────────────────────────────────────────────────────────
@@ -118,7 +118,7 @@ SKU 列表(料号/名称/供应商/成本) · 供应商列表(NETS/Nice Future/O
 [ 今日送货 3 ]  [ 待处理 12 ]  [ 缺货 5 ]  [ 逾期 2 ]
 
 今日排期:
-- CR0418 · Felix Koh · Muar · NETS · 上午
+- CR0418 · TEST customer 002 · Muar · NETS · 上午
 - TCF0410 · ENG · Seri Kembangan · HOUZS · 下午
 ```
 

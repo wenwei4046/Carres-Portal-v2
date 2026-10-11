@@ -64,9 +64,9 @@ describe("listingRowToImportRow", () => {
     "Qty": "1",
     "Detail Description": "Breeze FirmCare-B1201F-K",
     "PO Doc No.": "PO/2604-006",
-    "Debtor Name": "Felix Koh",
-    "Phone": "012-6399285",
-    "Delivery Address 1": "18 Jalan Cempaka",
+    "Debtor Name": "TEST customer 002",
+    "Phone": "012-0000002",
+    "Delivery Address 1": "2, Jalan TEST 2",
     "Delivery Address 2": "",
     "Delivery Address 3": "",
     "Delivery Address 4": "",
@@ -89,7 +89,7 @@ describe("listingRowToImportRow", () => {
       expect(r.row.qty).toBe(1);
       expect(r.row.detailDescription).toBe("Breeze FirmCare-B1201F-K");
       expect(r.row.poDocNo).toBe("PO/2604-006");
-      expect(r.row.debtorName).toBe("Felix Koh");
+      expect(r.row.debtorName).toBe("TEST customer 002");
       expect(r.row.balance).toBe("RM3322 Paid");
     }
   });

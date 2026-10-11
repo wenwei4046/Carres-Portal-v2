@@ -88,7 +88,7 @@ The two machines do not share `Downloads/`. Canonical copies live in-repo:
 | File | Repo path | What it is |
 |---|---|---|
 | SKU master | `scripts/ops-seed/carres-sku-master.xlsx` | Authoritative 1159-SKU catalog (`Carress - SKU with Supplier Code & Name-Updated.xlsx`, 2026-05-15) |
-| Sample listing | `scripts/ops-seed/sample-autocount-listing.xlsx` | Real AutoCount export sample (`listing 18 may.xlsx`, 272 rows) — the import-contract fixture |
+| Sample listing | `scripts/ops-seed/sample-autocount-listing.xlsx` | AutoCount export layout sample (from `listing 18 may.xlsx`, 272 rows) — the import-contract fixture. Since 11 Oct 2026 the customer name, phone and delivery address lines 1 and 2 are TEST values; every other column is as exported |
 
 Both are the locked reference. Re-export/replace only with a new dated commit.
 
