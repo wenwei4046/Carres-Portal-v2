@@ -1,167 +1,295 @@
 # 01 · Design tokens
 
-**Current shared visual target · owner instruction 9 Oct 2026 · supplied v8.** This replaces the previous visual values in this file. Source: `Sales Order.zip`, `UI Kit.md`, `carres-tokens.css`, `Carres UI Kit.dc.html` and `Sales Order Outright Layout v8.dc.html`. This is a design adoption, not a claim that the React kit or production has migrated.
+**Current shared visual target · owner instruction 11 Oct 2026 · supplied v12.** This replaces every earlier value in this file; there is no second version. Source: `Sales Order_11 Oct.zip` (`README.md`, `UX-FLOWS.md`, `docs/Carres Layout Standard.md`, `carres-theme.js`, `carres-check.js`, `Carres UI Kit.dc.html`, `Carres Shell.dc.html`, `Carres Table.dc.html`, `Sales Order Outright v12.dc.html`, `Purchasing v2.dc.html`). This is a design adoption, not a claim that the React kit or production has migrated.
 
-Business facts, permissions, completion gates, document formats and exact words remain owned by module MASTERs and COPY-STANDARD. The downloaded Ops Rules are not imported as business authority.
+Business facts, permissions, completion gates, document formats and exact words remain owned by module MASTERs and COPY-STANDARD. Where the package conflicts with COPY-STANDARD or a module MASTER, its value is PROPOSAL / NOT LAW (§10). The supplied Ops Rules are not stored in this repository. The specimen's sample pages use TEST customer details.
 
 ## 0 · One kit and implementation boundary
 
 | Home | Purpose | Status |
 |---|---|---|
 | This file | Shared visual values | Current target |
-| `docs/ui/carres-tokens.css` | Machine-readable source token values | Current target; not wired into application |
+| `docs/ui/carres-tokens.css` | Machine-readable target token values | Current target; not wired into the application |
 | `docs/02-components.md` | Shared component contracts | Current target |
 | `docs/03-page-patterns.md` | Shared page compositions | Current target |
 | `docs/ui/MASTER.md` | Interaction, ownership and acceptance | Current authority |
-| `apps/web/src/components/kit/` and `components/register/` | Existing reusable implementation | Migration required; preserve APIs and behaviour |
-| `docs/ui-reference/sales-order-design/` | Imported prototype and component specimen | Reference only; not production code or business law |
+| `apps/web/src/styles/carres-tokens.css`, `components/kit/`, `components/register/` | Running implementation | Still draws the previous kit; migration required; preserve APIs and behaviour |
+| `docs/ui-reference/sales-order-design/` | Supplied v12 specimen | Reference only; not production code or business law |
 
-Use tokens, not page-local numbers. Change existing components once; do not clone the prototype into every module. Existing runtime tokens are migration evidence, not a competing visual standard. Git keeps the old values; no archive or second kit is created.
+Use tokens, not page-local numbers. Change the shared components once; never clone the specimen into a module. The frame, sizes, widths and cell formats never change per module; a module only chooses its content. Git keeps the old values; no archive or second kit is created.
 
-**Measurement context:** values are CSS pixels. Shell dimensions describe the desktop composition (1280–1920px viewport; primary comparison 1440px). Register heights are minima inside the table canvas; compact facts have their own §5.1 recipe. Responsive decisions use available canvas after navigation/Summary/Tasks, not viewport alone. Mobile/partner hit areas use §3, not glyph dimensions. No supplied phone breakpoint is claimed approved or verified.
+**Measurement context:** values are CSS pixels. The specimen is measured at 1164 × 715 and must pass at 1025, 1164 and 1440 wide. Desktop only; no phone breakpoint is supplied or claimed. Hit areas are at least 32 on desktop and 44 on mobile and partner surfaces.
 
 ## 1 · Colour
 
-| Role | Value |
-|---|---|
-| Ink / body / tab | `#221F20` / `#3A3F47` / `#4A4F57` |
-| Secondary / muted / menu | `#6B7178` / `#8A9099` / `#5C6168` |
-| Canvas / surface / hover | `#F5F3F0` / `#FFFFFF` / `#EFECE8` |
-| Selected background / text | `#FBE6DB` / `#A33A14` |
-| Main button | Ink background, white text |
-| Card / control / header border | `#E9EBEE` / `#E4E1DC` / `#E4E1DC` |
-| Input / chip / header-icon border | `#E1E4E8` |
-| Search background | `#F0F1F3` |
-| Footer border | `#EEF0F2` |
-| Row / section border | `#EEECE8` / `#EEECE8` |
-| Done background / text | `#E7F6EC` / `#1E7A40` |
-| Warning background / text | `#FBF0D6` / `#7A5A00` |
-| Problem background / text | `#FDECEC` / `#B42318` |
-| Neutral background / text | `#F0F1F3` / `#3A3F47` |
-| Hold background / text | `#221F20` / `#FFFFFF` |
-| Online | `#1E8A47` |
+**Three fixed layers, the same in every theme.** All text sits on white.
 
-Selected orange is selection, not a warning. Status colour follows the actual condition, never the action verb. Always show the status word. No solid white-text status rule remains except Hold. Source disagreement: Layout Standard says errors amber, while the supplied token file includes a red Problem pair; use amber for form errors, reserve Problem pair for an evidenced problem. Do not use red merely because an amount is unpaid.
+| Layer | Value |
+|---|---|
+| Page ground | `#F6F7F9` |
+| Card / surface | `#FFFFFF`, 1px `#E5E7EB`, radius 8, no shadow |
+| Table header, item sub-header, group band | `#F8F9FA` |
+| Neutral tint (tags, due chip) | `#F1F2F4` |
+| Task card footer band | `#F5F6F8` |
+
+| Text and lines | Value |
+|---|---|
+| Ink (titles, identifiers, values) | `#1F2937` |
+| Secondary ink (neutral pill text) | `#374151` |
+| Quiet (unpicked tab, Summary label, plain status, menu icon) | `#4B5563` |
+| Label grey (labels, second lines, table headers, Not recorded) | `#6B7280` |
+| Row chevron at rest (icon only) | `#9CA3AF` |
+| Header line, card border, footer line, button border | `#E5E7EB` |
+| Row line, menu group hairline | `#F1F2F4` |
+| Open or expanded frame, map connector | `#CBD0D6` |
+| Choice chip border, Tasks divider | `#D5D9DE` |
+| Search and top-bar button border | `#E1E4E8` |
+
+`#6B7280` is the one grey for all small text. `#9CA3AF` is never used for text.
+
+| Selection (default theme Blue) | Value |
+|---|---|
+| Selected text, ticked box, current-step frame | `#2F55E0` |
+| Selected item on the grey ground (menu, tab) | white `#FFFFFF` pill, selected text, soft lift `0 1px 2px rgba(16,24,40,.10)` |
+| Ticked row, selected chip fill | `#EEF4FF` |
+| Segmented track | `#E2E4E8`, hover `#EEF0F3` |
+| Hover on the grey ground | `#E2E4E8` |
+| Table row hover | `#F2F3F5` |
+| Link and keyboard focus | `#3965FA` |
+
+The selection colour only marks something picked: tab, chip, menu item, ticked row, focus. A button whose menu, form or panel is open is never blue. No saturated colour fills. Other themes are in §9.
+
+| Buttons | Value |
+|---|---|
+| Main button (one per area) | `#1B1B39`, white text, hover `#2B2B55` (hover is PROPOSAL, §10.1) |
+| White or grey button | white, 1px `#E5E7EB`; hover and open `#EDEFF2` |
+| Icon-only button | no fill, no border; hover `rgba(31,41,55,.10)`, pressed and open `rgba(31,41,55,.16)` |
+| Disabled | 45% opacity, no hover, no click |
+
+| Status (never changes with the theme) | Background / text |
+|---|---|
+| Done | `#E7F6EC` / `#1E7A40` |
+| Needs action now | `#FBF0D6` / `#7A5A00`, frame `#E8C77A` |
+| Neutral pill | `#E5E7EB` / `#374151` |
+| Hold | `#1F2937` / `#FFFFFF` |
+| None | `#F1F2F4` / `#6B7280` |
+| Online dot | `#1E8A47` |
+| Toast | `#1F2937` / `#FFFFFF` |
+
+Calm rules: amber only when something needs action now, never because data is missing. Green only for done. Red is not used; errors are amber. A card that needs action gets an amber frame, never an amber fill. The one amber row fill is `Balance due` above 0 on the SO detail and SO PDF. Status colour follows the condition, never the action verb. Always show the status word.
 
 ## 2 · Typography
 
-Inter, tabular numerals, weights 400 / 500 / 600. No 700. Long text wraps where needed; dates, amounts, document numbers and status words must remain readable.
+Inter only, tabular numbers in tables. **Only these size / weight pairs exist.**
 
-| Role | Size / weight |
+| Pair | Use |
 |---|---|
-| Page title | 20 / 500, tracking −.02em |
-| Breadcrumb | 14 / 400 |
-| Card / drawer title | 15 / 600 |
-| Menu | 14 / 500; selected 600 |
-| Body / table | 13 / 400 |
-| Label / second fact | 12 / 400 or 500 |
-| Small / group in source | 11 / 400 and 10 / 600 respectively |
+| 20 / 600, tracking −.01em | Page title, or the record number on a detail. Once per page; the one boldest text |
+| 15 / 500 | Card and panel titles (Summary, Tasks, Customer); section title inside a card |
+| 14 / 400 | Breadcrumb |
+| 13 / 400 | Body, table values, menu items |
+| 13 / 500 | Field values, buttons, selected menu item, selected tab, task title |
+| 13 / 600 | Table identifier, text on the main button, selection count |
+| 12 / 400 | Labels, second lines |
+| 12 / 500 | Pills, table headers, chips |
+| 11 / 500, caps, tracking .06em | Every caps label: menu groups, Summary sections, pop-up group heads, task fact labels, tags |
+| 11 / 700 | Count badges |
 
-Current source source allows group headings 10 and small text 11; essential body and label facts remain 13 / 12. Use source sizes by role, not miniature body text. Staff avatars use a fixed per-person colour, initials and an accessible full-name/role label; tooltip gives full identity and cover context. Colour alone never identifies the person. Names needed for an action remain reachable by keyboard and touch.
+Nothing else uses 600 at 15 or above. Never below 11; 11 only for caps labels, tags and badges. In a table row only the identifier is 600. Same job, same size in every panel. No value is cut with an ellipsis: text wraps inside its own cell or column.
 
 ## 3 · Controls and surfaces
 
-| Token / part | Target |
+| Part | Target |
 |---|---|
-| Corner / pill radius | 8 / 999 px |
-| Main/header button | Height 34, horizontal padding 14, text 13 |
-| Toolbar button | Height 32, horizontal padding 12, text 13 |
-| Toolbar icon button | 36 × 36, icon 21 |
-| Header icon button | 34 × 34, icon 20 |
-| Tabs | Padding 5 × 12, text 13, gap 2 |
-| Switch segment | Padding 4 × 10, text 12 |
-| Status pill | Padding 3 × 10, text 12 / 500, no truncation |
-| Choice chip | Padding 4 × 10, text 12 / 600 |
-| Input / inline edit | Height 32 / 30, horizontal padding 10 |
-| Global search | Height 34, horizontal padding 12, round |
-| Checkbox drawing | 16 × 16; enlarge hit area on touch |
-| Card | Padding 14 × 16, border, no shadow |
-| Popup | Padding 6, item padding 7 × 10, radius 8 |
-| Popup shadow | `0 8px 28px rgba(22,24,29,.1)` |
-| Drawer shadow | `0 12px 40px rgba(34,31,32,.18)` |
-| Backdrop | `rgba(34,31,32,.18)` |
+| Corner radius | 8 for cards, rows, inputs, buttons, menu items; 10 for the segmented track; pills and avatars fully round |
+| Word button | Box, radius 8, height 34 (toolbar 32, panel 30, small 28), 13 / 500, main 13 / 600, 1 to 2 words, icon only when the icon alone is the button |
+| Icon-only button | Round, 34 (toolbar 36, small 28 to 32), no border, no fill, icon 20 |
+| Top-bar utility (team, bell) and search | 34 high, white, 1px `#E1E4E8`, round; bell badge charcoal, team badge white with green dot |
+| Segmented control (list tabs, view switches, Settings tabs) | Track `#E2E4E8`, radius 10, padding 3; segment padding 5 × 12, 13; selected white, theme text, 500, soft lift; others 400 `#4B5563` |
+| Status pill | 12 / 500, padding 3 × 10, fully round, colour plus one word |
+| Choice chip | 28 high, 12 / 500, radius 8; unselected `#F2F3F5` fill (PROPOSAL, §10.1), `#4B5563` text; selected soft selection fill, theme text and 1px theme border; icon 16 |
+| Theme chip (Appearance) | 32 high, radius 8, 12 dot and name 13 / 500 |
+| Item-row control | 24 high, bordered, value and chevron, radius 8, tone colours as the pill; one per item row |
+| Input / search | Height 32 / 34, radius 8 |
+| Record link | Ink 600, dotted grey underline (`#6B7280`, offset 3), solid on hover; no arrow, no icon; the whole number is the target |
+| Card | Padding 14 × 16, 12 between cards, no shadow, no box in a box |
+| Pop-up menu | 250 wide, white, 1px `#E5E7EB`, radius 8, padding 6, shadow `0 8px 24px rgba(17,24,39,.12)` |
+| Menu group label | 11 / 500 caps `#6B7280`, padding 8 10 4, hairline `#F1F2F4` between groups |
+| Menu item | 32 high, padding 7 × 10, gap 10, icon 18 `#6B7280`, text 13 / 400; short hint right in 12 grey; long hint as a 12 grey second line; selected 500 with check |
+| Dialog shadow | `0 12px 40px rgba(22,24,29,.22)` |
+| Toast | Bottom centre, `#1F2937`, white 13, 2.2 to 2.6 seconds |
+| Avatar | Round, initials, one fixed colour per person, name in the tooltip; header avatars 24, stacked, PIC first |
+| Keyboard focus | 2px `#3965FA`, 2 outside, radius 8; fields no gap; Tab key only; never the browser ring |
 
-One main button per active action area. Read-only facts are text, not disabled inputs. Icons in supplied prototype use Material Symbols Rounded, outlined, weight 300, sizes 16–21. Migrate through the existing shared Icon adapter; preserve accessible names and icon meaning IDs. Do not load a separate icon system per page. Hit areas are at least 32px on desktop and 44px on mobile/partner surfaces. A small visual glyph or 28px compact button is not permission for a smaller touch target.
+One main button per card or area; other actions sit in the ⋮ menu. Going to another record or page is never a button: the record number or page name is the link. A menu item without a working function is left out. Menus, dialogs and toasts are fixed to the screen and never clipped by a parent. Every clickable thing shows a hover state. Read-only facts are text, not disabled inputs. Every date field uses a calendar picker.
+
+Icons: Material Symbols Rounded, outline, weight 300; 18 in buttons and menus, 20 for icon buttons and panel icons, 16 in chips. Same thing, same icon. Warning icons only for real alerts. Migrate through the existing shared Icon adapter and keep accessible names.
 
 ## 4 · Shell
 
 | Part | Target |
 |---|---|
-| Global header | Height 56, horizontal padding 18, gap 14 |
-| Navigation | Open 220, collapsed 64 |
-| Navigation item | Padding 7 × 10, gap 10, radius 8, icon 20 |
-| Logo | Wordmark height 20 open; mark 34 collapsed; never recolour or distort |
-| Summary rail | 240, collapsible when relevant |
-| Tasks rail | 320, collapsible |
-| Drawer | Width 400; top/bottom/right inset 12 |
+| Menu | 220 open, 64 closed (remembered), right hairline |
+| Menu item | 13 / 400 ink, icon 18 `#4B5563`, padding 7 × 10, radius 8; selected white pill, theme text, 500; group label caps with 18 above and 6 below |
+| Logo | Wordmark 20 high open; mark 34 closed; never recolour or distort |
+| Top bar | 56 high, bottom hairline; `[Module] / [Page]` with the path 14 / 400 and the title 20 / 600; search, team, bell at the right |
+| Toolbar row | 36 high, one line, never wraps; Summary title, toolbar and Tasks title share this line |
+| Summary | 264, left; title row on the ground, then one white card per section, 8 apart; row exactly 32 high; label 13 / 400 `#4B5563`, value 13 / 500 ink, amber 500 when it needs action; 1px line on its right |
+| Tasks | 320, right; title row on the ground, white task cards 8 apart; 1px `#E5E7EB` line separates it from the middle with 12 on both sides |
+| Zones | 12 between zones |
 
-Panels are conditional on the page's purpose and available width. Never force all panels to stay open at narrow widths. Scroll the table inside its region, never the whole page sideways. Footer, tasks and overlays must not obscure actions.
+The page never scrolls; panels and table bodies scroll inside with thin scrollbars. Summary and Tasks collapse and reopen from ghost buttons in the toolbar row. Opening or closing a panel never changes a column width. A detail opens in the middle in place of the list: Summary and the toolbar hide, Tasks stays, Back returns to the same scroll position. There is no list plus detail three-panel view.
 
 ## 5 · Register
 
 | Part | Target |
 |---|---|
-| Header | Minimum 40, cell padding 6 × 14, text 12 / 500 |
-| Parent row | Minimum 54, cell padding 6 × 14, text 13 |
-| Second fact | Text 12, secondary, source-defined meaning |
-| Row gap / horizontal outer margin | 10 / 6 |
-| Footer | Height 44, text 13 |
-| Lines | Header bottom `--c-head-line` #E4E1DC; body rows `--c-row-line` #EEECE8; footer top `--c-footer-line` #EEF0F2; no vertical cell lines |
+| Table card | White, 1px `#E5E7EB`, radius 8 |
+| Header | 40, ground `#F8F9FA`, 12 / 500 `#6B7280`, bottom line `#E5E7EB`, stays on top |
+| List row and group row | 54, cell padding 6 × 14, line `#F1F2F4` |
+| Item, order-line and total row | 44 minimum; a long item name wraps and the row grows |
+| Footer | 44, white, top line `#E5E7EB`: count, totals, rows per page, pager |
+| Expanded row | One box: 1px `#CBD0D6` frame, corners 8, 8 above and below; parent stays white; item sub-header `#F8F9FA`; parent and sub-header stick together under the table header |
+| Ticked row or item | Soft selection fill; text stays ink |
+| Selection bar | Replaces the toolbar; white, 1px `#E5E7EB`; count 13 / 600 ink, totals grey; only the tick and Clear use the theme colour |
 
-Height is a minimum, not a clipping mechanism. Module-approved expanded goods and long identities may grow. Governed quantities and statuses remain unchanged. Column widths must be remeasured in Inter 13 with current padding; old 12px measurements are evidence only. Keep shared resize/filter/sort/selection/expansion/grouping capabilities.
+**Five cell formats.** Identifier (13 / 600 ink plus one 12 grey line) · Text (13 / 400 ink plus optional 12 grey line) · Number (right, tabular) · Date (`7 Oct` plus grey weekday) · Status (pill for amber and green; a status that needs no action is plain text `#4B5563`). At most two lines per cell, except the item name. When one cell in a row has a second line, every cell keeps two line slots so first lines align.
 
-### 5.1 Compact facts and object density
+**Item text, one rule everywhere:** line 1 model 13 / 400 ink, line 2 spec 12 / 400 `#6B7280`. Never model and spec joined on one line.
 
-Key/value rows: minimum 32px, padding 4px × 14px, text 13px; labels secondary/400 and values ink/400. Document identity may use 600. Compact section header 38px; card gap 12px; compact card padding 14px. Small action control 28px, text 12px/500, with the hit areas in §3. Source-specific compact facts are not 54px Register rows. Label/value grids collapse on narrow widths without losing fields.
+**Column order:** expand · tick · identifier · description · quantities · dates, most important first · status last · ⋮ only if the row has actions. No buttons in list rows.
+
+**Column widths by type.** New columns pick one of these; no other widths.
+
+| Type | Width |
+|---|---|
+| Expand, tick | 24 each |
+| Identifier | Minimum 180; takes spare width; frozen on the left when the table scrolls |
+| Number (Items) | 96 right |
+| Count plus document (Sales orders) | 140 left |
+| Qty on item rows | 48 right |
+| Money | 110 right |
+| Date | 120 |
+| Status | 150 |
+| Document number | 130 |
+| Short text | 160 |
+| Category | 110 |
+| Address | 170 |
+
+A text column of 150 or more is flexible: minimum three quarters of its width, then it shares spare space. Date, number and status columns stay fixed. Alignment belongs to the column: right only for columns that hold numbers alone; a left column right after a right one gets 14 extra. A view has at most 6 data columns, except Overview and Payment with 8. When columns do not fit, the whole table scrolls sideways with the identifier frozen; nothing is cut and rows do not grow to fit columns. Keep the shared sort, filter, resize, select, group and expand capabilities.
+
+### 5.1 Detail cards and compact facts
+
+| Part | Target |
+|---|---|
+| Detail header | Back icon button 34 · record number 20 / 600 with the party 13 `#6B7280` under it · status pill · chips 24 white 1px `#E5E7EB` · avatars 24 · word buttons 34 · ⋮ 34. Buttons wrap to a second line only when narrow |
+| Field row | 36 minimum; label 150 left 12 / 400 `#6B7280`; value 13 / 500 ink beside it; a long value wraps and the row grows |
+| Summary strip | One full-width card, equal columns on one row; label 12 grey, 6 gap, value 13 / 500; a long value wraps inside its own column |
+| Card title | 15 / 500 with 6 below; a section title inside a card has 18 above |
+| Order-line table in a card | Header 40 on `#F8F9FA`, rows 44, item on two lines |
+| Missing value | `Not recorded` in `#6B7280`; never invented, never a dash alone |
+
+Source-specific compact facts are not 54 register rows. Two cards side by side stack when narrow without losing fields.
 
 ## 6 · Settings
 
-Plain grouped rows: name and purpose on left, value on right; no box around every setting. Read-only values are plain text. Edit controls appear only during editing. Authorized staff can fill a missing approved setting; `Not set` does not itself remove edit permission. Unapproved business rules remain visibly unresolved. IDs, source, permission, effective treatment and history belong in the detail/disclosure, not repeated in every row. Timing changes do not silently rewrite existing deadlines.
+Plain grouped rows: name and purpose on the left, value on the right; no box around every setting. Read-only values are plain text. Edit controls appear only during editing. Authorized staff can fill a missing approved setting; `Not set` does not itself remove edit permission. Unapproved business rules remain visibly unresolved. IDs, source, permission, effective treatment and history belong in the detail or disclosure, not repeated in every row. Timing changes do not silently rewrite existing deadlines. Settings sections use the same segmented control as list tabs.
 
 ## 7 · Canonical component measurements — one lookup
 
-Sections 1–6 are the single current measurement lookup. Old dense-grid, blue selection, solid white-text status and module-local geometry have been removed. Existing code may still render them while migration proceeds; do not copy them into a new page.
+Sections 1 to 6 are the single current measurement lookup. The earlier warm ground, orange default selection, per-theme page ground, Focus chooser, 240 Summary and 32 key-value density are removed. Existing code may still render them while migration proceeds; do not copy them into a new page.
 
 ### 7.1 Shell and controls
 Use §§3–4.
 ### 7.2 Inputs and toolbar
 Use §3.
 ### 7.3 Surfaces
-Use §3.
+Use §§1 and 3.
 ### 7.4 Goods tables
-Use §5 and the owning module's quantity contract; remeasure content.
+Use §5 and the owning module's quantity contract.
 ### 7.5 Accepted SO-derived template — measurement lookup
 Use §§4–5.
 ### 7.6 Compact module card — CompactModuleCard
-Use §3 for surface and control values; preserve the card's host identity, facts, source ownership and action contracts. Its old HTML is behaviour evidence, not a competing visual palette.
+Use §§1 and 3 for surface and control values; preserve the card's host identity, facts, source ownership and action contracts. Its old HTML is behaviour evidence, not a competing visual palette.
 
 ## 8 · Verification and migration gaps
 
-| Item | Required evidence before completion claim |
+| Item | Required evidence before a completion claim |
 |---|---|
-| Runtime token migration | Shared tokens, CSS, component examples and consumers match §§1–5 |
-| Register and full object | Same component family; realistic long records and document links |
-| Working Panel / Tasks | Existing authorised actions, retained draft, module-owned results |
-| Settings | Authorized missing-value setup, effective treatment, history and denied state |
+| Runtime token migration | Shared tokens, CSS, component examples and consumers match §§1–5; the application token file equals `docs/ui/carres-tokens.css` |
+| Measured rules | `carres-check.js` ported to automated tests and passing at 1025, 1164 and 1440 wide on every state in `UX-FLOWS.md` |
+| Type | Only the §2 pairs appear; 20 / 600 once per page |
+| Rows | 40 / 54 / 44 / 36 exactly; no cut text; no side scroll except the two 8-column views |
+| Overlays | Menus, dialogs and toasts never clipped |
+| Theme | A theme change alters only the selection values |
+| Shared pieces | Shell, Table and detail page are shared components; Sales Order and Purchasing use them with no copied layout code |
+| Register and full object | Realistic long records and document links |
 | Desktop / narrow / keyboard | UI MASTER §2.2 full-page checks, zoom, focus, scrolling |
-| Typography | Current source role sizes; essential facts remain readable |
-| Imported prototype | Demonstrates design only; test facts and simulated permissions do not prove production |
+| Specimen | Demonstrates design only; sample facts and simulated permissions do not prove production |
 
-Source archive SHA-256: `bafd9111a239c2c8f0ca7b54bf5622321b04a4739b64a267c07610ea4b2e388f`.
+Source archive SHA-256: `1140ffde825dcd573f05467b49f2201d02331241dbc4f7cb0ef4275957efae16`.
 
-## 9 · Settings → Appearance · current target owner instruction 9 Oct 2026
+## 9 · Settings → Appearance · current target owner instruction 11 Oct 2026
 
-Every signed-in person chooses their own theme and focus; save `appearance: { theme, focus }` in their own Auth user profile metadata. This is not company configuration or an approval. No reason is required. Default `carres` / `soft`; invalid or absent profile values fall back safely. Use `<html data-theme="carres" data-focus="soft">` and the exact selectors in `carres-tokens.css`.
+Every signed-in person picks their own theme. It is not company configuration or an approval, and needs no reason. Default `blue`; an invalid or absent value falls back to `blue`. Use `<html data-theme="blue">` and the selectors in `carres-tokens.css`. The Focus chooser is removed: keyboard focus is the one rule in §3.
 
-| Group | Theme identifiers / display words |
-|---|---|
-| Brand · Recommended | carres / Carres |
-| Cool · Calm and crisp | slate / Cool Slate · blue / Blue · teal / Teal · violet / Violet |
-| Warm · Soft and homely | honey / Warm Honey · olive / Olive · rose / Rose · latte / Latte |
-| Focus | soft / Soft grey · theme / Theme colour · strong / Strong |
+**A theme changes only the selection values.** Page ground, charcoal buttons, greys, borders and status colours are fixed.
 
-Theme changes only canvas, selected background and selected text/checkbox accent. Ink, charcoal main button, status pairs and borders stay fixed. Focus: soft 1px #C9CED6; theme 1.5px selected text; strong 2px #221F20; offset −2px. Selection uses a 12px theme dot and a 2px ink ring, with a readable selected name. Save failure retains the selection for retry; switching accounts never applies the previous person's preference.
+| Group | Theme | Dot | Selected fill | Selected text | Hover |
+|---|---|---|---|---|---|
+| Cool | Cool Slate `slate` | `#64748B` | `#E6E9EE` | `#1F2937` | `#F4F5F7` |
+| Cool | Blue `blue` · Default | `#3965FA` | `#FFFFFF` pill, soft `#EEF4FF` | `#2F55E0` | `#E2E4E8`, rows `#F2F3F5` |
+| Cool | Teal `teal` | `#14857C` | `#DDF0EE` | `#0F5F59` | `#F0F8F7` |
+| Cool | Violet `violet` | `#6E58C4` | `#ECE8F7` | `#4C3A8F` | `#F6F5FB` |
+| Brand | Carres `carres` | `#D64F20` | `#FBE6DB` | `#A33A14` | `#FDF4EF` |
+| Warm | Warm Honey `honey` | `#D9A21B` | `#FBEFC9` | `#7A5300` | `#FDF8E7` |
+| Warm | Olive `olive` | `#6E8A3E` | `#E6ECD9` | `#3F5A2A` | `#F4F6EE` |
+| Warm | Rose `rose` | `#C2546A` | `#F7E1E4` | `#8A2E40` | `#FBF2F3` |
+| Warm | Latte `latte` | `#8B6B4A` | `#ECE3D8` | `#5A4632` | `#F6F2ED` |
 
-Theme swatch dots (12px): Carres `#D64F20`, Cool Slate `#64748B`, Blue `#3B6FE0`, Teal
-`#14857C`, Violet `#6E58C4`, Warm Honey `#D9A21B`, Olive `#6E8A3E`, Rose `#C2546A`, Latte
-`#8B6B4A`. These identify personal themes; they are not additional status or main-button colours.
+Hover is the selected fill at 45% over white. Page layout: top bar `Settings / Appearance`; tabs as the segmented control; `THEME` caps label; one white card with rows Cool, Brand, Warm. Picked chip: its soft selection fill, 1px border and text in its selection colour, 16 check; never 600, never a black ring. Blue carries the label `Default`. A note under the card says a theme changes only the selection colour.
+
+Storage: the supplied specimen keeps the choice in the browser (`localStorage` key `carres.theme`). The application keeps it in the signed-in person's own profile so it follows them between devices; that implementation stays. Save failure keeps the selection for retry; switching accounts never applies the previous person's choice.
+
+## 10 · Where the supplied files disagree, and the status of each value
+
+The supplied Layout Standard still carries older lines beside its 10 and 11 Oct lines. A value is **TAKEN** when the supplied README (the package's final statement), an owner-dated line or the package's own `carres-check.js` states it; the older line is simply stale and is not reopened. A value is **PROPOSAL / NOT LAW** when the package does not settle it, or when it conflicts with COPY-STANDARD or a module MASTER. A PROPOSAL is challenged, never obeyed; it becomes kit law only by an owner ruling.
+
+### 10.1 Inside the package
+
+| Topic | Older line | Value in this kit | Status |
+|---|---|---|---|
+| Default theme and ground | Carres theme, ground `#FAFAF9` or per theme | Blue; ground fixed `#F6F7F9` | TAKEN · owner 11 Oct |
+| Main button colour | `#1F2937` | `#1B1B39` | TAKEN · README |
+| Main button hover | README `#111827` | `#2B2B55` as drawn | **PROPOSAL / NOT LAW** · overturned when the owner names the hover |
+| Keyboard focus | 2px `#1F2937` | 2px `#3965FA` | TAKEN · owner palette 10 Oct |
+| Summary width | 240 | 264 | TAKEN · README |
+| Panel title | 17 / 500 | 15 / 500 | TAKEN · README and check |
+| Menu item | 14 / 500 grey, selected 600 | 13 / 400 ink, selected 500 | TAKEN · check |
+| Tabs | Selected 600 | Segmented control, selected 500 | TAKEN · check |
+| Caps labels | 10 / 500 or 12 / 600 | 11 / 500, tracking .06em | TAKEN · README |
+| Menu group label | 11 / 600 | 11 / 500 | TAKEN · README |
+| Table header ground | White | `#F8F9FA` | TAKEN · README and check |
+| Row line | `#E5E7EB` or `#F0F1F3` | `#F1F2F4` | TAKEN · README |
+| Identifier minimum | 220 | 180 | TAKEN · Standard §0, 10 Oct |
+| Stretching columns | Only the identifier | Identifier, plus text columns of 150 or more down to three quarters | TAKEN · README |
+| Item row | Two lines, cut with an ellipsis | 44 minimum, never cut, wraps and grows | TAKEN · README, owner 11 Oct |
+| Pop-up menu | 230 wide; shadow `0 8px 28px rgba(22,24,29,.16)` | 250 wide; shadow `0 8px 24px rgba(17,24,39,.12)` | TAKEN · README |
+| Open group frame | `#D6D2CC` | `#CBD0D6` | TAKEN · README |
+| Field density | Key-value rows 32 | Field rows 36, label 150 | TAKEN · README |
+| Choice chip, unselected | White with 1px `#D5D9DE` | `#F2F3F5` fill as drawn | **PROPOSAL / NOT LAW** · overturned when the owner names the chip |
+| Summary rows | Information only, never filter | Drawn as pressable rows | **PROPOSAL / NOT LAW** · whether a number filters stays the module's choice until ruled |
+
+Measured on the supplied pages, unchanged by the TEST data: the SO detail's third order line is 59 high where `carres-check.js` wants 44 to 56, and `Purchasing v2.dc.html` logs one script error (`STOCK_R` declared twice) while still drawing its rows. Both are facts about the supplied files, not rulings.
+
+### 10.2 Against existing authority
+
+Everything in this table is **PROPOSAL / NOT LAW**. Pages are built on the v12 visual frame with COPY words and MASTER rules.
+
+| Topic | The package says | Authority that stands |
+|---|---|---|
+| Visible words and capitals | Sentence-case list headers (`SO no.`, `Proceed date`); `Customer’s original requested delivery`, `Log contact`, `Request amendment`, `Waiting for Jess`, `Staff and duties`; its date, time and money formats | COPY-STANDARD |
+| Amendment approval | Contact changes save at once; other changes go to one approver; a stair carry fee formula | Orders MASTER |
+| Purchasing and delivery timing | Batch cut-off times, outstation logistics order, PO sending steps | Purchasing and Delivery MASTERs |
+| Task completion | `Mark done`, an undo window, follow-up attempt counts | Workspace MASTER and the owning module |
+| Appearance storage | Browser only | The person's profile in the application |

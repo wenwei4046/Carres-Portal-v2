@@ -4857,13 +4857,13 @@ was read and holds nothing, a read that failed, and a record this person may not
 | A read still running | **`Loading`** | a blank · a spinner alone |
 | A document that does not exist yet (Supplier DO · GRN · Receipt · DO · Loading) | **`Not yet`** | `Not recorded` (a document not issued is not a missing record) |
 | Customer confirmed delivery date | the day (`20 Oct 26` over `Tue · {time}`), **`Delivered`** under the delivered day, else **`Not scheduled`** | `To confirm` · TBC |
-| Appointment | **`Scheduled`** (green, time below when recorded) · **`Not scheduled`** · **`Delivered`** | `Confirmed` · `To confirm` · `Done` (v8 mock words, not dictionary) |
+| Appointment | **`Scheduled`** (green, time below when recorded) · **`Not scheduled`** · **`Delivered`** | `Confirmed` · `To confirm` · `Done` (mock words, not dictionary) |
 | Logistics | the company name · **`Not assigned`** | `Logistics not assigned` (the Work card's sentence, too long for a cell) |
 | Loading | **`Ready for handover`** · **`Handed over`** · **`Received by logistics`** (Delivery §4 record words) · `Not yet` | Loaded · Shipped |
 | Location | the Stock Location site name · **`Fully delivered`** once every piece is delivered · `Not yet` while no Unit is reserved | Customer · With customer |
 | Pay by | Payments' deadline day (amber when late) · **`Paid`** · Payments' own fact when it has no day (`No delivery date`) | a second arithmetic · `Overdue` |
 | Finance hold | **`Hold delivery`** over **`Finance hold · {reason}`** · **`No Finance hold`** | `On hold` (Stock's word) · `None` · `No Finance hold` from a failed read |
-| Order Route status card (latest owner handoff v8, 2026-10-09) | title **`Delivery date`**; facts **`Customer original delivery date`** (or **`Customer new delivery date`** with `Originally {day}`) · **`Customer confirmed delivery date`** with `Same` / `{n} days later` / `{n} days earlier` under it, else **`Not scheduled`** · **`Days left`** (`{n} days left` · `Today` · `Passed {n} days ago · not delivered` · `Delivered {day}`) · **`Status`** (`On track` · `{Goods} · problem` · `Delivered`) | `Not confirmed yet` (retired 2026-09-16) · two 20px dates with an arrow (the 2026-10-08 card) |
+| Order Route status card (owner handoff 2026-10-09) | title **`Delivery date`**; facts **`Customer original delivery date`** (or **`Customer new delivery date`** with `Originally {day}`) · **`Customer confirmed delivery date`** with `Same` / `{n} days later` / `{n} days earlier` under it, else **`Not scheduled`** · **`Days left`** (`{n} days left` · `Today` · `Passed {n} days ago · not delivered` · `Delivered {day}`) · **`Status`** (`On track` · `{Goods} · problem` · `Delivered`) | `Not confirmed yet` (retired 2026-09-16) · two 20px dates with an arrow (the 2026-10-08 card) |
 
 
 ## An old version's own sentences — owner ruling 2026-09-23
@@ -5500,16 +5500,16 @@ Receiving placement; UI MASTER owns Calendar. No posting/permission change is im
 
 `The list could not be exported. Try again.` — A failed full-population read or file render produces no partial export. Retry remains the same Export action. Technical error details never replace this operator sentence.
 
-## Personal Appearance · owner v4 instruction 9 Oct 2026
+## Personal Appearance · owner instruction 11 Oct 2026 · v12
 
 | Situation | Exact words | Source |
 |---|---|---|
-| Personal Settings destination | Personal · Appearance | Current v4 UI Kit §9 |
-| Theme groups | Brand · Recommended · Cool · Calm and crisp · Warm · Soft and homely | Current v4 UI Kit §9 |
-| Theme choices | Carres · Cool Slate · Blue · Teal · Violet · Warm Honey · Olive · Rose · Latte | Current v4 UI Kit §9 |
-| Focus setting / choices | Focus outline · Soft grey · Theme colour · Strong, each with its note `Quiet. Default.` · `Thin line in your theme` · `Easy to see` | Current v4 UI Kit §9 · v8 |
+| Personal Settings destination | Personal · Appearance | 01 §9 |
+| Section label | THEME | v12 Shell |
+| Theme groups, in this order | Cool · Calm and crisp · Blue is the default · Brand · Carres orange · Warm · Soft and homely | v12 Shell |
+| Theme choices | Cool Slate · Blue · Teal · Violet · Carres · Warm Honey · Olive · Rose · Latte; Blue carries the label `Default` | v12 Shell |
 | Personal scope explanation | Choose how your portal looks. This changes only your profile. | Implementation explanatory copy |
-| Fixed status explanation | Theme changes the page background and selection. Status colours stay the same. | Current v4 UI Kit §9 meaning |
+| Fixed explanation under the card | A theme changes only the selected colour (tabs, ticked rows, links, focus). Page ground, buttons (charcoal), greys and status colours (amber, green) never change. | v12 Shell |
 | Save / result / failure | Save changes · Saved · Could not save. Try again. | Existing save/retry grammar |
 
 ## Settings → Personal → Lunch time · owner order 9 Oct 2026 (Settings List OFF-04 · WS-04; migration 0677) · BUILT ON BRANCH, NOT DEPLOYED

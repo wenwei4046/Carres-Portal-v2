@@ -1,35 +1,59 @@
-/* Carres design tokens. Every value copied from Sales Order Outright Layout v8 (line numbers in UI Kit.md). Use only these; never the UI library's defaults. */
+/* Carres design tokens · v12 · supplied 11 Oct 2026.
+   Source: Sales Order_11 Oct.zip (README token table, carres-theme.js, Carres Shell, Carres Table, Sales Order Outright v12).
+   Resolved in docs/01-design-tokens.md. Use only these; never a UI library's defaults.
+   This file is the target. The application still reads apps/web/src/styles/carres-tokens.css until it is migrated. */
 :root{
-  --c-ink:#221F20; --c-body:#3A3F47; --c-tab:#4A4F57; --c-secondary:#6B7178; --c-muted:#8A9099; --c-menu:#5C6168;
-  --c-ground:#F5F3F0; --c-card:#FFFFFF; --c-hover:#EFECE8;
-  --c-card-border:#E9EBEE; --c-btn-border:#E4E1DC; --c-head-line:#E4E1DC; --c-row-line:#EEECE8; --c-footer-line:#EEF0F2; --c-section-line:#EEECE8; --c-input-border:#E1E4E8; --c-search-bg:#F0F1F3;
-  --c-select-bg:#FBE6DB; --c-select-fg:#A33A14; --c-focus:1px solid #C9CED6;
-  --c-ok-bg:#E7F6EC; --c-ok-fg:#1E7A40; --c-warn-bg:#FBF0D6; --c-warn-fg:#7A5A00; --c-err-bg:#FDECEC; --c-err-fg:#B42318; --c-info-bg:#F0F1F3; --c-info-fg:#3A3F47; --c-hold-bg:#221F20; --c-hold-fg:#FFFFFF; --c-online:#1E8A47;
+  /* text */
+  --c-ink:#1F2937; --c-body:#374151; --c-quiet:#4B5563; --c-secondary:#6B7280; --c-icon-rest:#9CA3AF;
+  /* grounds: three fixed layers, the same in every theme */
+  --c-ground:#F6F7F9; --c-card:#FFFFFF; --c-band:#F8F9FA; --c-neutral-tint:#F1F2F4; --c-task-foot:#F5F6F8;
+  /* lines */
+  --c-border:#E5E7EB; --c-head-line:#E5E7EB; --c-row-line:#F1F2F4; --c-open-frame:#CBD0D6; --c-chip-border:#D5D9DE; --c-search-border:#E1E4E8;
+  /* selection: the only values a theme changes (default theme: blue) */
+  --c-select-bg:#FFFFFF; --c-select-fg:#2F55E0; --c-select-soft:#EEF4FF; --c-hover:#E2E4E8; --c-row-hover:#F2F3F5;
+  /* fixed in every theme */
+  --c-track:#E2E4E8; --c-track-hover:#EEF0F3; --c-select-bar:#FFFFFF; --c-link:#3965FA; --c-focus:2px solid #3965FA;
+  /* buttons */
+  --c-main:#1B1B39; --c-main-hover:#2B2B55; --c-main-fg:#FFFFFF; --c-btn-hover:#EDEFF2; --c-icon-hover:rgba(31,41,55,.10); --c-icon-press:rgba(31,41,55,.16); --disabled-opacity:.45;
+  /* status: never changes with the theme */
+  --c-ok-bg:#E7F6EC; --c-ok-fg:#1E7A40; --c-warn-bg:#FBF0D6; --c-warn-fg:#7A5A00; --c-warn-frame:#E8C77A;
+  --c-info-bg:#E5E7EB; --c-info-fg:#374151; --c-hold-bg:#1F2937; --c-hold-fg:#FFFFFF; --c-none-bg:#F1F2F4; --c-none-fg:#6B7280; --c-online:#1E8A47;
+  --c-toast-bg:#1F2937; --c-toast-fg:#FFFFFF;
+  /* type: Inter, tabular numbers. Allowed pairs only: 20/600 · 15/500 · 14/400 · 13/400 · 13/500 · 13/600 · 12/400 · 12/500 · 11/500 · 11/700 */
   --font:'Inter',system-ui,sans-serif;
-  --fs-page:20px; --fs-crumb:14px; --fs-menu:14px; --fs-card:15px; --fs-body:13px; --fs-label:12px; --fs-small:11px; --fs-group:10px;
-  --radius:8px; --radius-round:999px;
-  --btn-h-header:34px; --btn-h:32px; --btn-pad-header:0 14px; --btn-pad:0 12px; --icon-btn:36px; --icon-btn-header:34px;
-  --input-h:32px; --input-h-row:30px; --search-h:34px;
-  --tab-pad:5px 12px; --switch-pad:4px 10px; --pill-pad:3px 10px; --chip-pad:4px 10px;
-  --table-head-h:40px; --table-row-h:54px; --table-row-pad:6px 14px; --table-gap:10px; --table-foot-h:44px;
-  --card-pad:14px 16px; --menu-item-pad:7px 10px;
-  --menu-w:220px; --menu-w-closed:64px; --tasks-w:320px; --header-h:56px; --drawer-w:400px;
-  --shadow-drawer:0 12px 40px rgba(34,31,32,.18); --shadow-menu:0 8px 28px rgba(22,24,29,.1); --backdrop:rgba(34,31,32,.18);
+  --fs-page:20px; --fs-card:15px; --fs-crumb:14px; --fs-body:13px; --fs-label:12px; --fs-caps:11px; --caps-tracking:.06em; --page-tracking:-.01em;
+  /* shape */
+  --radius:8px; --radius-track:10px; --radius-round:999px;
+  /* controls */
+  --btn-h:34px; --btn-h-toolbar:32px; --btn-h-panel:30px; --btn-h-small:28px; --btn-pad:0 14px; --btn-pad-toolbar:0 12px;
+  --icon-btn:34px; --icon-btn-toolbar:36px; --icon:18px; --icon-lg:20px;
+  --chip-h:28px; --theme-chip-h:32px; --row-control-h:24px; --input-h:32px; --search-h:34px;
+  --pill-pad:3px 10px; --track-pad:3px; --tab-pad:5px 12px;
+  /* rows: one set for every table and card */
+  --table-head-h:40px; --table-row-h:54px; --item-row-h:44px; --field-row-h:36px; --summary-row-h:32px; --table-foot-h:44px; --toolbar-h:36px; --header-h:56px;
+  --cell-pad:6px 14px; --field-label-w:150px;
+  /* layout */
+  --menu-w:220px; --menu-w-closed:64px; --summary-w:264px; --tasks-w:320px; --zone-gap:12px; --card-pad:14px 16px; --card-gap:12px; --task-gap:8px;
+  /* pop-up menu */
+  --popup-w:250px; --popup-pad:6px; --popup-item-h:32px; --popup-item-pad:7px 10px; --popup-gap:10px;
+  --shadow-menu:0 8px 24px rgba(17,24,39,.12); --shadow-dialog:0 12px 40px rgba(22,24,29,.22); --shadow-lift:0 1px 2px rgba(16,24,40,.10);
 }
 body{font-family:var(--font);font-variant-numeric:tabular-nums;background:var(--c-ground);color:var(--c-ink)}
 
-/* Appearance: set data-theme on <html> from the user's saved choice. Only these 3 variables change. */
-[data-theme="carres"]{--c-ground:#F5F3F0;--c-select-bg:#FBE6DB;--c-select-fg:#A33A14}
-[data-theme="slate"]{--c-ground:#F4F5F7;--c-select-bg:#E6E9EE;--c-select-fg:#1F2937}
-[data-theme="blue"]{--c-ground:#F4F6F9;--c-select-bg:#E3ECFB;--c-select-fg:#1D4ED8}
-[data-theme="teal"]{--c-ground:#F3F6F6;--c-select-bg:#DDF0EE;--c-select-fg:#0F5F59}
-[data-theme="violet"]{--c-ground:#F5F4F8;--c-select-bg:#ECE8F7;--c-select-fg:#4C3A8F}
-[data-theme="honey"]{--c-ground:#F7F4EC;--c-select-bg:#FBEFC9;--c-select-fg:#7A5300}
-[data-theme="olive"]{--c-ground:#F4F4EE;--c-select-bg:#E6ECD9;--c-select-fg:#3F5A2A}
-[data-theme="rose"]{--c-ground:#F8F3F3;--c-select-bg:#F7E1E4;--c-select-fg:#8A2E40}
-[data-theme="latte"]{--c-ground:#F5F2EE;--c-select-bg:#ECE3D8;--c-select-fg:#5A4632}
-/* Focus outline: set data-focus on <html>. */
-[data-focus="soft"]{--c-focus:1px solid #C9CED6}
-[data-focus="theme"]{--c-focus:1.5px solid var(--c-select-fg)}
-[data-focus="strong"]{--c-focus:2px solid #221F20}
-:focus-visible{outline:var(--c-focus);outline-offset:-2px}
+/* Appearance: set data-theme on <html> from the person's saved choice. Default blue.
+   A theme changes only the selection values below. Ground, greys, charcoal buttons and status colours stay fixed.
+   Hover = the theme's selected background at 45% over white (carres-theme.js). */
+[data-theme="blue"]{--c-select-bg:#FFFFFF;--c-select-fg:#2F55E0;--c-select-soft:#EEF4FF;--c-hover:#E2E4E8;--c-row-hover:#F2F3F5}
+[data-theme="carres"]{--c-select-bg:#FBE6DB;--c-select-fg:#A33A14;--c-select-soft:#FBE6DB;--c-hover:#FDF4EF;--c-row-hover:#FDF4EF}
+[data-theme="slate"]{--c-select-bg:#E6E9EE;--c-select-fg:#1F2937;--c-select-soft:#E6E9EE;--c-hover:#F4F5F7;--c-row-hover:#F4F5F7}
+[data-theme="teal"]{--c-select-bg:#DDF0EE;--c-select-fg:#0F5F59;--c-select-soft:#DDF0EE;--c-hover:#F0F8F7;--c-row-hover:#F0F8F7}
+[data-theme="violet"]{--c-select-bg:#ECE8F7;--c-select-fg:#4C3A8F;--c-select-soft:#ECE8F7;--c-hover:#F6F5FB;--c-row-hover:#F6F5FB}
+[data-theme="honey"]{--c-select-bg:#FBEFC9;--c-select-fg:#7A5300;--c-select-soft:#FBEFC9;--c-hover:#FDF8E7;--c-row-hover:#FDF8E7}
+[data-theme="olive"]{--c-select-bg:#E6ECD9;--c-select-fg:#3F5A2A;--c-select-soft:#E6ECD9;--c-hover:#F4F6EE;--c-row-hover:#F4F6EE}
+[data-theme="rose"]{--c-select-bg:#F7E1E4;--c-select-fg:#8A2E40;--c-select-soft:#F7E1E4;--c-hover:#FBF2F3;--c-row-hover:#FBF2F3}
+[data-theme="latte"]{--c-select-bg:#ECE3D8;--c-select-fg:#5A4632;--c-select-soft:#ECE3D8;--c-hover:#F6F2ED;--c-row-hover:#F6F2ED}
+
+/* Keyboard focus: one rule, Tab key only. Mouse clicks show no outline. Never the browser ring, never a black ring. */
+:focus{outline:none}
+:focus-visible{outline:var(--c-focus);outline-offset:2px;border-radius:var(--radius)}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:var(--c-focus);outline-offset:0}

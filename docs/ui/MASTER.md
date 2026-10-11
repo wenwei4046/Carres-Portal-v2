@@ -20,15 +20,19 @@
 | Reference research (FACT, binds nobody) | [`../research/houzs-ui-reference.md`](../research/houzs-ui-reference.md) · [`../research/grid-findings.md`](../research/grid-findings.md) |
 | Shared page flow, shared contracts, exceptions and the status of every shared capability | **this MASTER** |
 
-**Current shared UI target — Jess, 9 Oct 2026:** `Sales Order.zip` (SHA-256
-`bafd9111a239c2c8f0ca7b54bf5622321b04a4739b64a267c07610ea4b2e388f`) replaces
-superseded visual values through the existing 01 / 02 / 03 and this MASTER. Source specimens live
-at `docs/ui-reference/sales-order-design/`; tokens mirror at `docs/ui/carres-tokens.css`.
-Read `UI Kit.md` + `Carres UI Kit.dc.html` for source component fidelity, then source screenshots,
-CSS and the v8 HTML; the canonical resolved values are in 01, not another kit document.
-The embedded README/Ops Rules are supplied material, not independent approval of business law.
-The shared visual target covers shell/menu, tables, controls, object facts, Tasks, Route, Timeline
-and density. Modules supply their own identities, columns, authorised actions and source facts.
+**Current shared UI target — owner, 11 Oct 2026 · v12:** `Sales Order_11 Oct.zip` (SHA-256
+`1140ffde825dcd573f05467b49f2201d02331241dbc4f7cb0ef4275957efae16`) replaces every earlier kit
+value through the existing 01 / 02 / 03 and this MASTER; the earlier specimen folders are deleted. The
+specimen lives at `docs/ui-reference/sales-order-design/`; tokens mirror at
+`docs/ui/carres-tokens.css`. The canonical resolved values are in 01, including 01 §10 where the
+supplied files disagree with each other; the specimen is not another kit document.
+Its README, flows and Layout Standard are supplied material, not independent approval of business
+law. Where the package conflicts with COPY-STANDARD or a module MASTER, its value is PROPOSAL / NOT LAW
+(01 §10, §7.4 here). Its sample pages run on TEST customer details because the repository is public;
+the designer's Ops Rules are not stored.
+The shared visual target covers shell/menu, one shared table, controls, object facts, Tasks, Route,
+Timeline, Settings → Appearance and density, checked on Sales Order and Purchasing. Modules supply
+their own identities, columns, authorised actions and source facts.
 
 **Current work split — owner 9 Oct 2026:** Claude Code owns application implementation, tests and
 deployment. This UI owner updates governance documents only. Neither this document update nor a
@@ -143,7 +147,7 @@ table loading/filtering, the listing interactions, record-to-panel opening, Info
 authorised edit/preview/result, source scope and retained return state. Record verified and missing
 coverage per module (§4.3, §6.1). Tests or shared-component imports alone do not prove adoption.
 
-**Current SO composition exception — owner 9 Oct 2026:** the supplied Outright list opens the full SO on row click, with Sales Order / Order Route / Timeline. Its Summary and Tasks are independently collapsible. This replaces the previous SO default compact-card opening and visual rail example; other modules’ source-owned work and document doors are not silently changed. CompactModuleCard remains the reusable work/embedded adapter where that purpose applies.
+**Current SO composition exception — owner 9 Oct 2026:** the supplied Outright list opens the full SO on row click, with Sales Order / Order Route / Timeline. Its Summary and Tasks are independently collapsible. In v12 (11 Oct 2026) the full SO opens in the middle in place of the list: Summary and the toolbar hide and Tasks stays. This replaces the previous SO default compact-card opening and visual rail example; other modules’ source-owned work and document doors are not silently changed. CompactModuleCard remains the reusable work/embedded adapter where that purpose applies.
 
 ## §0.3 · Every new chat — before acting
 
@@ -294,9 +298,9 @@ object/recipient/result + actual working date** (§2.1, §5.1). When the owner a
 decision, overwrite this MASTER or the owning module MASTER immediately (PLAN may update governing
 documents; it may not implement application code).
 
-## §1.3 · Reference direction — current owner instruction 9 Oct 2026
+## §1.3 · Reference direction — current owner instruction 11 Oct 2026
 
-The supplied Sales Order design is the current visual reference. Adapt it through the shared kit, not by copying page-local CSS or its simulated backend. Its full-page SO, Route and Timeline establish the visual family; module content and doors still come from their MASTERs. Houzs and other products may supply capabilities and organisation, but do not become another token authority. Five compositions share one kit: Register, Object, Task, Form and Overview/Settings.
+The supplied Sales Order design (v12), checked against Purchasing on the same template, is the current visual reference. Adapt it through the shared kit, not by copying page-local CSS or its simulated backend. Its full-page SO, Route and Timeline establish the visual family; module content and doors still come from their MASTERs. Houzs and other products may supply capabilities and organisation, but do not become another token authority. Five compositions share one kit: Register, Object, Task, Form and Overview/Settings.
 
 ---
 
@@ -412,7 +416,7 @@ business result decides completion.
 
 Appearance and dimensions are defined once in 01; component use and states in 02; page compositions in 03. Reuse existing kit components and the DataGrid engine. Preserve component APIs, source-owned facts, accessible names and permissions. No page-local status, button, drawer, field or grid replacement.
 
-Soft status pairs replace the previous solid-white status styling; Hold is dark. A condition determines tone, never the verb. Counts are not record status. Main action is charcoal, selection is orange. Business status words still come from COPY and the owning module. See 01 for every value and migration gap.
+Soft status pairs replace the previous solid-white status styling; Hold is dark. A condition determines tone, never the verb. Counts are not record status. Main action is charcoal `#1B1B39`; selection follows the person's theme, default Blue. Business status words still come from COPY and the owning module. See 01 for every value and migration gap.
 
 # §4 · Shell and page composition
 
@@ -648,7 +652,7 @@ PAYMENT     the customer-facing 50/50 composition is used only while editing a c
 
 # §5 · The Tasks panel (right) — owner rulings 2026-10-08 · BUILT ON BRANCH, NOT DEPLOYED
 
-**Current supplied shell target — owner 9 Oct 2026.** A collapsible Tasks region (01 §4)
+**Current supplied shell target — owner 9 Oct 2026, kept in v12 of 11 Oct.** Task card and open-card composition: 03 §8. A collapsible Tasks region (01 §4)
 is opened by the labelled Tasks/count control; Summary collapses independently. Do not add the old
 permanent right icon column to the supplied SO composition. Tasks uses the signed-in person's
 cross-module work from the one Work source; Workspace keeps its formal My Task/Team Work purpose.
@@ -747,7 +751,7 @@ seconds, or the record fails.
 
 ## §6.0 · Listing template — every Portal listing
 
-Read 01 §§4–5 and 03 §2. Current visual reference: `docs/ui-reference/sales-order-design/Sales Order Outright Layout v8.dc.html`; shared runtime adapter: DataGrid. The old dense-row/blue/vertical-separator recipe is removed.
+Read 01 §§4–5 and 03 §2. Current visual reference: `docs/ui-reference/sales-order-design/Carres Table.dc.html` and `Sales Order Outright v12.dc.html`; shared runtime adapter: DataGrid. The old dense-row and vertical-separator recipe is removed.
 
 1. Module views, shared search/tools, source-owned table, footer; contextual summary and Tasks may collapse.
 2. Columns, quantities, meanings and opening doors come from the owning module MASTER. Linked document numbers open their own records.
@@ -999,7 +1003,7 @@ approval`). *Falsifier: a browser where a sticky
 
 ## §6.11 · Field-width registry — one number per field
 
-**Migration note 9 Oct:** the table below is prior implementation measurement evidence. Re-measure all adopted fields with 01 typography/padding before using them as new target widths. Preserve stable registry keys; do not copy literal old widths into pages.
+**Migration note 11 Oct:** target widths by column type are 01 §5 (v12). The table below is prior implementation measurement evidence. Re-measure all adopted fields with 01 typography/padding before using them as new target widths. Preserve stable registry keys; do not copy literal old widths into pages.
 
 A page MASTER never carries its own width for a registry field; it records its MEASUREMENT as evidence.
 **The registry number is the WIDEST measured requirement across the pages showing the field.**
@@ -1092,6 +1096,10 @@ into the section it belongs to, and this list loses it.
 
 ## §7.3 · KIT GAPs — admit once, never draw locally
 
+- **v12 pieces with no shared component yet** — choice chip, theme chip, one shared record link,
+  item-row control and staff avatar; the segmented look for Tabs and the selection bar on the
+  shared toolbar are restyles of existing components (02 "v12 shared pieces").
+
 - **Mission rail composition** — `.so-template-rail` + SO selectors are not a kit export (§6.1).
 - **Generic ObjectHeader / ObjectPage** — `SalesOrderTabs` and `FullFact` are page-owned (§4.1).
 - **Expansion columns in the Columns menu** — PROPOSAL `expandable.columns` (§6.3); Purchasing's demo
@@ -1121,6 +1129,9 @@ into the section it belongs to, and this list loses it.
 | "Several SOs → list first, then one" inside a host panel | Purchasing 2026-10-05 | Owner decision |
 | PO working panel and round panel content layouts; SO Batch round rail; `Match Ready Stock` placement; SO Batch optional goods columns replacing the details table | Purchasing lane, localhost | Owner review in the Purchasing lane |
 | Purchasing fit review — four cross-module contracts: linked sections distinguish loading/error/empty/present/denied; current, last-sent and goods completion are separate facts; blocker summaries point to the exact row/field and keep the draft; source/Unit evidence stays traceable | Purchasing PLAN 2026-10-01 | Verify against existing components; Purchasing owns its sample |
+| v12 specimen words: sentence-case list headers (`SO no.`, `Proceed date`), `Customer’s original requested delivery`, `Log contact`, `Request amendment`, `Waiting for Jess`, `Staff and duties`, and its date, time and money formats | `Sales Order_11 Oct.zip` · 01 §10.2 | COPY-STANDARD stands; any word change goes through COPY |
+| v12 specimen business rules: which amendment changes skip approval, the stair carry fee formula, batch cut-off times, outstation logistics order, task completion and undo | `Sales Order_11 Oct.zip` · 01 §10.2 | The owning module MASTER stands; owner ruling in that module |
+| v12 values the package does not settle: main button hover `#2B2B55`, choice chip unselected fill `#F2F3F5`, pressable Summary rows | 01 §10.1 | Overturned when the owner names the other value |
 | Inventory top-filter placement (instead of a rail) | research file §4 | Complete compact-top versus rail analysis |
 
 ## §7.5 · Approved targets not yet built (shared)
