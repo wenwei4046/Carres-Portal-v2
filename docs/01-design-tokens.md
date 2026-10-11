@@ -1,6 +1,6 @@
 # 01 · Design tokens
 
-**Current shared visual target · owner instruction 11 Oct 2026 · supplied v12.** This replaces every earlier value in this file; there is no second version. Source: `Sales Order_11 Oct.zip` (`README.md`, `UX-FLOWS.md`, `docs/Carres Layout Standard.md`, `carres-theme.js`, `carres-check.js`, `Carres UI Kit.dc.html`, `Carres Shell.dc.html`, `Carres Table.dc.html`, `Sales Order Outright v12.dc.html`, `Purchasing v2.dc.html`). This is a design adoption, not a claim that the React kit or production has migrated.
+**Current shared visual target · owner instruction 11 Oct 2026 · supplied v12.** This replaces every earlier value in this file; there is no second version. Source: `Sales Order_11 Oct.zip` and its design update of the same day, `Sales Order_11 Oct(2).zip` (`README.md`, `UX-FLOWS.md`, `docs/Carres Layout Standard.md`, `carres-theme.js`, `carres-check.js`, `Carres UI Kit.dc.html`, `Carres Shell.dc.html`, `Carres Table.dc.html`, `Sales Order Outright v12.dc.html`, `Purchasing v2.dc.html`). This is a design adoption, not a claim that the React kit or production has migrated.
 
 Business facts, permissions, completion gates, document formats and exact words remain owned by module MASTERs and COPY-STANDARD. Where the package conflicts with COPY-STANDARD or a module MASTER, its value is PROPOSAL / NOT LAW (§10). The supplied Ops Rules are not stored in this repository. The specimen's sample pages use TEST customer details.
 
@@ -110,6 +110,8 @@ Nothing else uses 600 at 15 or above. Never below 11; 11 only for caps labels, t
 | Choice chip | 28 high, 12 / 500, radius 8; unselected `#F2F3F5` fill (PROPOSAL, §10.1), `#4B5563` text; selected soft selection fill, theme text and 1px theme border; icon 16 |
 | Theme chip (Appearance) | 32 high, radius 8, 12 dot and name 13 / 500 |
 | Item-row control | 24 high, bordered, value and chevron, radius 8, tone colours as the pill; one per item row |
+| View button | White word button, 32 high, radius 8: icon of the current view 18 grey, the view's name 13 / 500, chevron; always names the current view; pressed grey while its menu is open; the same button on every module |
+| Pick pop-up | 320 wide, padding 6, menu surface. Head is a facts card: caps label, 10, item block (model 13 / 500, spec 12 grey), 10, facts in two columns (11 / 500 caps label over 13 / 500 value, gap 8 × 14), 12, hairline. Options 32 high: icon 18 grey, name 13 / 400, a short hint 12 grey at the right; picked is soft selection fill, 500 and a check. Never several facts joined on one grey line |
 | Input / search | Height 32 / 34, radius 8 |
 | Record link | Ink 600, dotted grey underline (`#6B7280`, offset 3), solid on hover; no arrow, no icon; the whole number is the target |
 | Card | Padding 14 × 16, 12 between cards, no shadow, no box in a box |
@@ -147,7 +149,7 @@ The page never scrolls; panels and table bodies scroll inside with thin scrollba
 | Table card | White, 1px `#E5E7EB`, radius 8 |
 | Header | 40, ground `#F8F9FA`, 12 / 500 `#6B7280`, bottom line `#E5E7EB`, stays on top |
 | List row and group row | 54, cell padding 6 × 14, line `#F1F2F4` |
-| Item, order-line and total row | 44 minimum; a long item name wraps and the row grows |
+| Item row in an expanded list row, and total row | 44 minimum; a long item name wraps and the row grows |
 | Footer | 44, white, top line `#E5E7EB`: count, totals, rows per page, pager |
 | Expanded row | One box: 1px `#CBD0D6` frame, corners 8, 8 above and below; parent stays white; item sub-header `#F8F9FA`; parent and sub-header stick together under the table header |
 | Ticked row or item | Soft selection fill; text stays ink |
@@ -186,7 +188,7 @@ A text column of 150 or more is flexible: minimum three quarters of its width, t
 | Field row | 36 minimum; label 150 left 12 / 400 `#6B7280`; value 13 / 500 ink beside it; a long value wraps and the row grows |
 | Summary strip | One full-width card, equal columns on one row; label 12 grey, 6 gap, value 13 / 500; a long value wraps inside its own column |
 | Card title | 15 / 500 with 6 below; a section title inside a card has 18 above |
-| Order-line table in a card | Header 40 on `#F8F9FA`, rows 44, item on two lines |
+| Order-line table in a card | Header 40 on `#F8F9FA`; rows exactly 44; item on two lines, model then spec, neither wraps; on a narrow middle the card scrolls sideways inside itself instead of growing |
 | Missing value | `Not recorded` in `#6B7280`; never invented, never a dash alone |
 
 Source-specific compact facts are not 54 register rows. Two cards side by side stack when narrow without losing fields.
@@ -227,7 +229,7 @@ Use §§1 and 3 for surface and control values; preserve the card's host identit
 | Desktop / narrow / keyboard | UI MASTER §2.2 full-page checks, zoom, focus, scrolling |
 | Specimen | Demonstrates design only; sample facts and simulated permissions do not prove production |
 
-Source archive SHA-256: `1140ffde825dcd573f05467b49f2201d02331241dbc4f7cb0ef4275957efae16`.
+Source archive SHA-256: `1140ffde825dcd573f05467b49f2201d02331241dbc4f7cb0ef4275957efae16`; design update `23850ef44e0a3fc1932743f7523a2ff8b4cd4b1460427d22aa87e888cb1d6ef8`.
 
 ## 9 · Settings → Appearance · current target owner instruction 11 Oct 2026
 
@@ -273,14 +275,23 @@ The supplied Layout Standard still carries older lines beside its 10 and 11 Oct 
 | Row line | `#E5E7EB` or `#F0F1F3` | `#F1F2F4` | TAKEN · README |
 | Identifier minimum | 220 | 180 | TAKEN · Standard §0, 10 Oct |
 | Stretching columns | Only the identifier | Identifier, plus text columns of 150 or more down to three quarters | TAKEN · README |
-| Item row | Two lines, cut with an ellipsis | 44 minimum, never cut, wraps and grows | TAKEN · README, owner 11 Oct |
+| Item row in a list | Two lines, cut with an ellipsis | 44 minimum, never cut, wraps and grows | TAKEN · README, owner 11 Oct |
+| Order line in a detail card | Wraps and grows | Exactly 44, never wraps, card scrolls inside itself when narrow | TAKEN · design update 11 Oct |
 | Pop-up menu | 230 wide; shadow `0 8px 28px rgba(22,24,29,.16)` | 250 wide; shadow `0 8px 24px rgba(17,24,39,.12)` | TAKEN · README |
 | Open group frame | `#D6D2CC` | `#CBD0D6` | TAKEN · README |
 | Field density | Key-value rows 32 | Field rows 36, label 150 | TAKEN · README |
 | Choice chip, unselected | White with 1px `#D5D9DE` | `#F2F3F5` fill as drawn | **PROPOSAL / NOT LAW** · overturned when the owner names the chip |
 | Summary rows | Information only, never filter | Drawn as pressable rows | **PROPOSAL / NOT LAW** · whether a number filters stays the module's choice until ruled |
 
-Measured on the supplied pages, unchanged by the TEST data: the SO detail's third order line is 59 high where `carres-check.js` wants 44 to 56, and `Purchasing v2.dc.html` logs one script error (`STOCK_R` declared twice) while still drawing its rows. Both are facts about the supplied files, not rulings.
+**Measured 11 Oct on the updated supplied pages** with the package's own `carres-check.js`, 21 page states at each width. The untouched supplied files and this repository's TEST-data copy give the same result, so these are facts about the design, not rulings and not effects of the TEST data.
+
+| Width | States that pass | What the others report |
+|---|---|---|
+| 1164 | 13 of 21 | Order-line table scrolls sideways inside its card on the SO detail; selection-bar buttons are 12 / 600; the 8-column Overview view and the SO PDF page are measured although the Standard allows them |
+| 1025 | 5 of 21 | The above, and on every list the default view is wider than the middle, so the last column and the footer totals fall outside; the Order Route details table scrolls sideways |
+| 1440 | 11 of 21 | On lists, with Summary and Tasks both open the middle is narrower than at 1164, so right-hand columns and the footer totals fall outside; the SO PDF page is measured. Every other SO detail state passes |
+
+The package's acceptance line (pass on every state at 1025, 1164 and 1440) is therefore not met by the supplied pages themselves. The earlier 59-high order line and the Purchasing script error are gone.
 
 ### 10.2 Against existing authority
 
@@ -289,6 +300,7 @@ Everything in this table is **PROPOSAL / NOT LAW**. Pages are built on the v12 v
 | Topic | The package says | Authority that stands |
 |---|---|---|
 | Visible words and capitals | Sentence-case list headers (`SO no.`, `Proceed date`); `Customer’s original requested delivery`, `Log contact`, `Request amendment`, `Waiting for Jess`, `Staff and duties`; its date, time and money formats | COPY-STANDARD |
+| Purchasing list words | `Order PO deadline`, `Supplier ready by`, `Delivery ETA`, its countdown words | COPY-STANDARD and Purchasing MASTER |
 | Amendment approval | Contact changes save at once; other changes go to one approver; a stair carry fee formula | Orders MASTER |
 | Purchasing and delivery timing | Batch cut-off times, outstation logistics order, PO sending steps | Purchasing and Delivery MASTERs |
 | Task completion | `Mark done`, an undo window, follow-up attempt counts | Workspace MASTER and the owning module |

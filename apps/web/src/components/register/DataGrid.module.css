@@ -1,8 +1,8 @@
 /* DataGrid — THE REGISTER ENGINE's stylesheet (2990 RG-2 origin).
 
-   ⭐ THE ONE KIT · v4 TABLE (owner instruction 9 Oct 2026; docs/01-design-tokens.md
-   §3 Controls · §5 Register; docs/ui-reference/carres-template-2026-10-08/UI-KIT.md
-   "Table (list page)", "Buttons", "Inputs", "Tabs"). Every DataGrid listing on
+   ⭐ THE ONE KIT TABLE (built from the owner handoff of 9 Oct 2026). The current
+   kit is docs/01-design-tokens.md §3 Controls · §5 Register (v12, 11 Oct 2026);
+   this stylesheet is not migrated to it yet. Every DataGrid listing on
    every page draws the template table: the toolbar row sits on the page, and the
    table plus its status footer sit in ONE white card. The finished reference is
    pages/operation/so-outright/SalesOrdersOutright.tsx.

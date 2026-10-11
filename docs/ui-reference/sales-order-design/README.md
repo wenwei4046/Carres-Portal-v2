@@ -13,27 +13,30 @@
 > differences and the values the package itself leaves unsettled.
 >
 > Source archive: `Sales Order_11 Oct.zip`, SHA-256
-> `1140ffde825dcd573f05467b49f2201d02331241dbc4f7cb0ef4275957efae16`. The owner keeps the
-> original archive. Earlier specimens are deleted; Git keeps the history.
+> `1140ffde825dcd573f05467b49f2201d02331241dbc4f7cb0ef4275957efae16`, plus the design update
+> `Sales Order_11 Oct(2).zip`, SHA-256
+> `23850ef44e0a3fc1932743f7523a2ff8b4cd4b1460427d22aa87e888cb1d6ef8`, which replaced
+> `Carres Shell.dc.html`, `Carres Table.dc.html`, `Sales Order Outright v12.dc.html`,
+> `Purchasing v2.dc.html`, `purchasing-data.js` and the Layout Standard. The owner keeps the
+> original archives. Earlier specimens are deleted; Git keeps the history.
 >
 > **TEST customer details (this repository is public).**
 >
 > | File here | What differs from the supplied archive |
 > |---|---|
 > | `sales-test.js` | Replaces `sales-real.js`. Customer name, phone and address in all 20 orders are TEST values (`TEST customer A` to `TEST customer T`, `012-00000xx`, `Jalan TEST`). SO numbers, delivery area, postcode, dates, items, suppliers, PO numbers, balances and remarks are kept |
-> | `purchasing-data.js` | Reads `sales-test.js`. Supplier contact emails and WhatsApp group links are TEST placeholders |
-> | `Sales Order Outright v12.dc.html`, `Purchasing v2.dc.html` | One line each: they load `sales-test.js` |
-> | `screens/SO-*`, `PO-*`, `SH-01` | Retaken on 11 Oct from these pages with the TEST details, 924 × 540. `SH-01` now shows Settings → Appearance. `KIT-*` are the supplied pictures |
+> | `purchasing-data.js` | Customer names in its 20 SO Batch orders are TEST values; an order that is also in `sales-test.js` keeps the same TEST customer. Supplier contact emails and WhatsApp group links are TEST placeholders |
+> | `Sales Order Outright v12.dc.html` | One line: it loads `sales-test.js`. `Purchasing v2.dc.html` is as supplied |
+> | `screens/SO-*`, `PO-*`, `SH-01` | Retaken on 11 Oct from these pages with the TEST details, 924 × 540; `PO-04` is the pop-up alone. `SH-01` shows Settings → Appearance. `KIT-*` are the supplied pictures |
 > | `UX-FLOWS.md` | The example customer and phone are the TEST values |
 > | `docs/Carres Ops Rules.md` | Not stored. It is the designer's business-rule notes; the module MASTERs hold the rules |
 >
 > The signed-in Portal is unaffected: it reads real records by permission and never reads
 > these files.
 >
-> Every page opens with its rows. Measured with the supplied `carres-check.js` at 1164 wide:
-> Sales Order list, SO Batch Purchase and Purchase Orders pass; the SO detail reports its
-> third order line at 59 high; `Purchasing v2.dc.html` logs one script error (`STOCK_R`
-> declared twice). The untouched supplied files give the same results.
+> Every page opens with its rows and no script error. The supplied `carres-check.js` was run on
+> 21 page states at 1025, 1164 and 1440 wide: 5, 13 and 11 states pass. The untouched supplied
+> files give the same result. `docs/01-design-tokens.md` §10.1 lists what the others report.
 
 ---
 
