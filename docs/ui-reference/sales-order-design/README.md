@@ -17,8 +17,12 @@
 > `Sales Order_11 Oct(2).zip`, SHA-256
 > `23850ef44e0a3fc1932743f7523a2ff8b4cd4b1460427d22aa87e888cb1d6ef8`, which replaced
 > `Carres Shell.dc.html`, `Carres Table.dc.html`, `Sales Order Outright v12.dc.html`,
-> `Purchasing v2.dc.html`, `purchasing-data.js` and the Layout Standard. The owner keeps the
-> original archives. Earlier specimens are deleted; Git keeps the history.
+> `Purchasing v2.dc.html`, `purchasing-data.js` and the Layout Standard, and the second design
+> update `Sales Order_11 Oct(3).zip`, SHA-256
+> `b34ddbc82e16b9d99a786340061abb188db0768c3bde2d90e974696a8b54c1f9`, which replaced
+> `Carres Shell.dc.html`, `Carres Table.dc.html`, `Sales Order Outright v12.dc.html`,
+> `Purchasing v2.dc.html`, `carres-check.js` and the Layout Standard and added
+> `carres-tasks.js`. The owner keeps the original archives. Earlier specimens are deleted; Git keeps the history.
 >
 > **TEST customer details (this repository is public).**
 >
@@ -35,7 +39,7 @@
 > these files.
 >
 > Every page opens with its rows and no script error. The supplied `carres-check.js` was run on
-> 21 page states at 1025, 1164 and 1440 wide: 5, 13 and 11 states pass. The untouched supplied
+> 21 page states at 1025, 1164 and 1440 wide: 14, 20 and 20 states pass. The untouched supplied
 > files give the same result. `docs/01-design-tokens.md` §10.1 lists what the others report.
 
 ---
