@@ -1,6 +1,7 @@
 /**
- * Sales Orders → Outright — the list (owner-confirmed handoff, Jess 2026-10-08:
- * `screenshots/1-list.png`, UI Kit "Table (list page)", v8 list markup).
+ * Sales Orders → Outright — the list (owner-confirmed handoff, Jess 2026-10-08).
+ * Current kit: docs/01-design-tokens.md §5 and docs/03-page-patterns.md §2 (v12,
+ * 11 Oct 2026); this page is not migrated to it yet.
  *
  *   [Summary 240] [ Open Delivered All · Sales Order view  chips ····· ▥ ⋮ Tasks 5 ]
  *                 [ ┌ table card: sticky head · 54px rows · footer 44 ───────────┐ ]

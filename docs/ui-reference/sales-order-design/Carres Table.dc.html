@@ -163,7 +163,7 @@ class Component extends DCLogic {
         out.push(i + 1 === PIN ? { l: 'Unfreeze', n: '', bg: 'transparent', sep: true, go: () => setPin(i) } : { l: 'Freeze up to here', n: (i + 1) + (i ? ' columns' : ' column'), bg: 'transparent', sep: true, go: () => setPin(i + 1) });
         if (cols.length > 1) out.push({ l: 'Hide column', n: '', bg: 'transparent', sep: false, go: () => setHidden([...HID, gi]) });
         return out; })(),
-      canClear: !!P.onClear, clearAll: P.onClear || (() => {}),
+      canClear: !!P.onClear && !!P.hasFilter, clearAll: P.onClear || (() => {}),
       rowsV, empty: !rows.length, emptyT: P.empty || 'Nothing to show.',
       allSel: rows.length > 0 && n === rows.length, toggleAll: () => { const s = {}; if (!(rows.length && n === rows.length)) rows.forEach(r => { s[r.id] = true; }); onSel(s); },
       expAll: () => { const e = {}; if (!anyEx) rows.forEach(r => { e[r.id] = true; }); this.setState({ ex: e }); }, expAllIc: anyEx ? 'unfold_less' : 'unfold_more', expAllT: anyEx ? 'Hide all items' : 'Show all items',

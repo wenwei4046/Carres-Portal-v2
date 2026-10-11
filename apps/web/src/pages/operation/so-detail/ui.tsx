@@ -1,6 +1,6 @@
 /**
  * The Sales Order detail's small parts, drawn to the owner-confirmed handoff
- * (`UI Kit.md`, Sales Order Outright Layout v8, 2026-10-08). Every colour is a
+ * of 2026-10-08 (current kit: docs/01-design-tokens.md, v12). Every colour is a
  * `c-*` token from `carres-tokens.css`; nothing here borrows a kit colour.
  *
  *   Card      white · 1px card border · radius 8 · pad 14 16 · no shadow

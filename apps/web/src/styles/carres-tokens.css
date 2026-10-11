@@ -1,4 +1,4 @@
-/* Carres design tokens. Every value copied from Sales Order Outright Layout v8 (line numbers in UI Kit.md). Use only these; never the UI library's defaults. */
+/* Carres design tokens, as built from the owner handoff of 9 Oct 2026. Target values: docs/ui/carres-tokens.css (v12, 11 Oct 2026), not migrated here yet. Use only these; never the UI library's defaults. */
 :root{
   --c-ink:#221F20; --c-body:#3A3F47; --c-tab:#4A4F57; --c-secondary:#6B7178; --c-muted:#8A9099; --c-menu:#5C6168;
   --c-ground:#F5F3F0; --c-card:#FFFFFF; --c-hover:#EFECE8;
