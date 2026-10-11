@@ -8,7 +8,7 @@ describe("phoneSearchDigits — is the typed term a phone?", () => {
     ["(012) 345-6789", "0123456789"],
     ["+60123456789", "60123456789"],
     ["+60 12-345 6789", "60123456789"],
-    ["  019-83372393 ", "01983372393"],
+    ["  019-00000075 ", "01900000075"],
   ])("reads %s as the digits %s", (term, digits) => {
     expect(phoneSearchDigits(term)).toBe(digits);
   });
@@ -31,7 +31,7 @@ describe("phoneMatches — the same number however it was written", () => {
       });
 
   it("finds a number by the part the operator remembers", () => {
-    expect(phoneMatches("019-83372393", phoneSearchDigits("83372393")!)).toBe(true);
+    expect(phoneMatches("019-00000075", phoneSearchDigits("00000075")!)).toBe(true);
   });
 
   it.each([

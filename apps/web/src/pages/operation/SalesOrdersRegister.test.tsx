@@ -122,7 +122,7 @@ const order = (over: Partial<operationOrderListRow>): operationOrderListRow =>
     operation_stage: "confirmed",
     warehouse_id: null,
     customer_name: "Kimmy",
-    customer_phone: "019-3478913",
+    customer_phone: "019-0000074",
     placed_at: "2026-08-09T02:00:00Z",
     delivery_date: "2026-08-30",
     delivery_date_tbd: false,
@@ -232,8 +232,8 @@ describe("FIX 1 · the register asks the SERVER", () => {
   });
 
   it("asks the server with the phone exactly as the Existing customer link carries it", () => {
-    mount(`/operation/orders?search=${encodeURIComponent("019-83372393")}`);
-    expect(useOperationOrdersSpy).toHaveBeenCalledWith({ stage: "proceeded", search: "019-83372393" });
+    mount(`/operation/orders?search=${encodeURIComponent("019-00000075")}`);
+    expect(useOperationOrdersSpy).toHaveBeenCalledWith({ stage: "proceeded", search: "019-00000075" });
   });
 
   it.each(["loading", "error"])("never calls %s expansion data Not allocated", (state) => {
@@ -900,8 +900,8 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     mount();
     const row = screen.getByTestId("grid-parent-row");
     const customer = within(row).getByText("Kimmy");
-    expect(customer).not.toHaveTextContent("019-3478913");
-    expect(row).not.toHaveTextContent("019-3478913");
+    expect(customer).not.toHaveTextContent("019-0000074");
+    expect(row).not.toHaveTextContent("019-0000074");
   });
 
   it("renders six goods columns with separate SKU, Stock Unit IDs and Purchasing Deliver To", () => {

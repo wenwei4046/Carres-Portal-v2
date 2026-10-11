@@ -30,7 +30,7 @@ vi.mock("@/lib/pdf/render", async () => {
 });
 
 const ID = "11111111-1111-1111-1111-111111111111";
-const PHONE = "019-8337 2393";
+const PHONE = "019-0000 0075";
 /* An invented, dial-able number — never a real customer's. */
 const ORDER = {
   id: ID, so: 1319, status: "proceed_order", operation_stage: "proceed_order",

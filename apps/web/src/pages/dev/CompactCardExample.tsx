@@ -64,7 +64,7 @@ const SAMPLE_ITEMS = {
 /** One embedded SO, as the module adapter passes it (sample facts, real kit and item table). */
 function embeddedSample(reference: string, full: string, door: { orderId: string; path?: string }): CompactModuleCardProps {
   return {
-    presentation: "embedded", name: "Jimmy", reference, phone: "019-83372393",
+    presentation: "embedded", name: "Jimmy", reference, phone: "019-00000075",
     document: { label: `Sales Order ${reference}`, preview: (onClose) => <SalesOrderCardDocument orderId={door.orderId} reference={reference} onClose={onClose} /> },
     sales: { orderDate: "30 Sep 2026", proceedDate: "30 Sep 2026", salesLocation: "Carres Kota Damansara", salesperson: "Alvin" },
     address: { area: "Ampang", hideArea: true, full, facts: [{ kind: "building", label: "Building", value: "Condo · Floor 1" }, { kind: "access", label: "Access", value: "No lift" }] },
@@ -239,7 +239,7 @@ export default function CompactCardExample() {
           key={`${preset}-${width}`}
           name="Jimmy"
           reference={preset === "infoLong" ? "SO2609-4827(1)" : "SO-1368"}
-          phone="019-83372393"
+          phone="019-00000075"
           sales={{ orderDate: "30 Sep 2026", proceedDate: "30 Sep 2026", salesLocation: "Carres Kota Damansara", salesperson: "Alvin" }}
           address={{ area: "Ampang", hideArea: true, full: preset === "infoLong" ? LONG_ADDRESS : "1888. jalan Pillow, 68000 Ampang, Selangor", facts: [{ kind: "building", label: "Building", value: "Condo · Floor 1" }, { kind: "access", label: "Access", value: "No lift" }] }}
           target={{ date: "Sat, 31 Oct", badge: `${days}d`, label: "Customer’s original requested delivery", labelLines: ["Customer’s original", "requested delivery"] }}
@@ -301,7 +301,7 @@ export default function CompactCardExample() {
             },
           ]}
           communication={{
-            recipients: [{ value: "Jimmy · +601983372393", label: "Customer", phone: "+601983372393" }],
+            recipients: [{ value: "Jimmy · +601900000075", label: "Customer", phone: "+601900000075" }],
             templates: [
               { key: "confirmation", label: "Confirm delivery date", body: "Hi, please contact the customer for SO-1368 and confirm the delivery date. Please record the customer’s response." },
               { key: "followup", label: "Follow up with logistics", body: "Hi, please provide the latest customer contact result and next follow-up for SO-1368." },

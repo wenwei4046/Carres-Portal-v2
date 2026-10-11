@@ -294,12 +294,12 @@ describe("GET /api/operation/orders", () => {
     const searchClause = (calls: Call[]) => listOr(calls).find((v) => v.includes("customer_name")) ?? "";
 
     it.each([
-      ["019-83372393", "019-83372393"],
-      ["01983372393", "019-83372393"],
-      ["019 8337 2393", "019-83372393"],
-      ["(019) 8337-2393", "019-83372393"],
-      ["+60198337 2393", "019-83372393"],
-      ["+60 19-8337 2393", "019-83372393"],
+      ["019-00000075", "019-00000075"],
+      ["01900000075", "019-00000075"],
+      ["019 0000 0075", "019-00000075"],
+      ["(019) 0000-0075", "019-00000075"],
+      ["+60190000 0075", "019-00000075"],
+      ["+60 19-0000 0075", "019-00000075"],
       ["0123456789", "+60123456789"],
       ["012-345 6789", "+60 12-345 6789"],
       ["+60123456789", "0123456789"],
@@ -320,11 +320,11 @@ describe("GET /api/operation/orders", () => {
 
     it("reads the phones of the list's OWN population, through the caller's RLS client", async () => {
       const calls = mockPhoneRead({ phones: [] });
-      await search("019-8337 2393");
+      await search("019-0000 0075");
       const phoneCalls = calls.filter((c) => c.cols === PHONE_COLS).map((c) => ({ method: c.method, args: c.args }));
       expect(phoneCalls).toContainEqual({ method: "not", args: ["status", "in", "(place,cancelled)"] });
       expect(phoneCalls).toContainEqual({ method: "or", args: ["source_system.is.null,source_system.neq.rental"] });
-      expect(phoneCalls).toContainEqual({ method: "ilike", args: ["customer_phone", "%1%9%8%3%3%7%2%3%9%3%"] });
+      expect(phoneCalls).toContainEqual({ method: "ilike", args: ["customer_phone", "%1%9%0%0%0%0%0%0%7%5%"] });
       expect(phoneCalls).toContainEqual({ method: "range", args: [0, 999] });
       /* No phone matched: no id clause, and the rest of the search is unchanged. */
       expect(searchClause(calls)).not.toContain("id.in.");
@@ -347,7 +347,7 @@ describe("GET /api/operation/orders", () => {
 
     it("fails the search when the phones cannot be read — never a silent `no order`", async () => {
       const calls = mockPhoneRead({ phoneError: { code: "42501", message: "permission denied for table orders" } });
-      const res = await search("019-8337 2393");
+      const res = await search("019-0000 0075");
       expect(res.status).toBe(403);
       /* The list itself was never answered with a phone-less search. */
       expect(listOr(calls).some((v) => v.includes("customer_name"))).toBe(false);
