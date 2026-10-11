@@ -1,6 +1,8 @@
+> Supplied with `Sales Order_11 Oct.zip`. The example customer and phone are TEST values. Words follow COPY-STANDARD and business rules follow the module MASTERs; where a flow below differs, it is PROPOSAL / NOT LAW (`docs/01-design-tokens.md` §10).
+
 # UX flows — Sales Order Outright (and every module on the template)
 
-Each flow is written as **steps → expected result**. Every line is a test. Build it in the code, then automate it (Playwright). The reference behaviour is the HTML in this folder: open `Sales Order Outright v12.dc.html` and click through it; the code must behave the same. Data: `sales-real.js` (examples use CR0284, customer {customer name}, phone {customer phone}, ETA Mon 10 Aug, balance RM 1,000).
+Each flow is written as **steps → expected result**. Every line is a test. Build it in the code, then automate it (Playwright). The reference behaviour is the HTML in this folder: open `Sales Order Outright v12.dc.html` and click through it; the code must behave the same. Data: `sales-test.js` (examples use CR0284, customer TEST customer B, phone 012-0000002, ETA Mon 10 Aug, balance RM 1,000).
 
 Screenshots of each state: `screens/` (file name given after each flow).
 
@@ -50,7 +52,7 @@ Screenshots of each state: `screens/` (file name given after each flow).
 ## B. Order detail — header and menu
 
 **B1 Header** · `SO-10`
-→ ← (round, no border) · **CR0284** 20/600 with "{customer name}" under it · status pill **Late** (ETA passed, not delivered) · grey avatar (tooltip "SO PIC not recorded") …… Log contact · **Request amendment** (charcoal) · ⋮. The only 20/600 text on the page is the SO no.
+→ ← (round, no border) · **CR0284** 20/600 with "TEST customer B" under it · status pill **Late** (ETA passed, not delivered) · grey avatar (tooltip "SO PIC not recorded") …… Log contact · **Request amendment** (charcoal) · ⋮. The only 20/600 text on the page is the SO no.
 
 **B2 Detail ⋮** · `SO-11`
 1. Click ⋮. → Menu is **visible** above the content (never clipped): SALES ORDER Preview SO PDF · Print SO · Download PDF | COPY SO no. · Customer phone. (OTHER Withdraw amendment only while one is pending.)

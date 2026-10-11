@@ -1,3 +1,5 @@
+> Supplied with `Sales Order_11 Oct.zip`, unchanged below this note. The resolved kit values are in `docs/01-design-tokens.md`; its §10 lists which lines here are stale and which are PROPOSAL / NOT LAW. Words follow COPY-STANDARD and business rules follow the module MASTERs.
+
 # Carres Operations — Layout Standard
 Last updated: 11 Oct 2026 (v12 on the 20 real cases; SO detail aligned to v10 + PO detail).
 

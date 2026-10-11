@@ -5,32 +5,35 @@
 > This folder is the design specimen behind the ONE KIT. It is not a second kit and not
 > business law. The resolved values live in `docs/01-design-tokens.md`,
 > `docs/02-components.md`, `docs/03-page-patterns.md` and `docs/ui/MASTER.md`; the token
-> mirror is `docs/ui/carres-tokens.css`. Business rules, permissions and exact words stay
-> with the module MASTERs and `docs/COPY-STANDARD.md`.
+> mirror is `docs/ui/carres-tokens.css`.
+>
+> **Words follow `docs/COPY-STANDARD.md`. Business rules follow the module MASTERs.** Where
+> anything below, in `UX-FLOWS.md` or in `docs/Carres Layout Standard.md` differs from them,
+> the value here is **PROPOSAL / NOT LAW**. `docs/01-design-tokens.md` §10 lists the
+> differences and the values the package itself leaves unsettled.
 >
 > Source archive: `Sales Order_11 Oct.zip`, SHA-256
-> `1140ffde825dcd573f05467b49f2201d02331241dbc4f7cb0ef4275957efae16`. It replaces the v8
-> specimen of 9 Oct 2026, which is deleted. Git keeps the history.
+> `1140ffde825dcd573f05467b49f2201d02331241dbc4f7cb0ef4275957efae16`. The owner keeps the
+> original archive. Earlier specimens are deleted; Git keeps the history.
 >
-> **Left out of this repository on purpose (the repository is public):**
+> **TEST customer details (this repository is public).**
 >
-> | Supplied file | Why it is not here |
+> | File here | What differs from the supplied archive |
 > |---|---|
-> | `sales-real.js` | 20 real orders with customer names, phone numbers and home addresses |
-> | `purchasing-data.js` | Reads the real orders above; holds supplier contact emails and WhatsApp group links |
-> | `screens/SO-*`, `screens/PO-*`, `screens/SH-01` | Pictures of pages that show real customer names |
-> | `docs/Carres Ops Rules.md` | Designer's business-rule notes. Not business authority here, and it lists bank account numbers |
+> | `sales-test.js` | Replaces `sales-real.js`. Customer name, phone and address in all 20 orders are TEST values (`TEST customer A` to `TEST customer T`, `012-00000xx`, `Jalan TEST`). SO numbers, delivery area, postcode, dates, items, suppliers, PO numbers, balances and remarks are kept |
+> | `purchasing-data.js` | Reads `sales-test.js`. Supplier contact emails and WhatsApp group links are TEST placeholders |
+> | `Sales Order Outright v12.dc.html`, `Purchasing v2.dc.html` | One line each: they load `sales-test.js` |
+> | `screens/SO-*`, `PO-*`, `SH-01` | Retaken on 11 Oct from these pages with the TEST details, 924 × 540. `SH-01` now shows Settings → Appearance. `KIT-*` are the supplied pictures |
+> | `UX-FLOWS.md` | The example customer and phone are the TEST values |
+> | `docs/Carres Ops Rules.md` | Not stored. It is the designer's business-rule notes; the module MASTERs hold the rules |
 >
-> `UX-FLOWS.md` is the supplied file with one customer's name and phone replaced by
-> `{customer name}` and `{customer phone}`. Nothing else in it is changed.
+> The signed-in Portal is unaffected: it reads real records by permission and never reads
+> these files.
 >
-> Because the two data files are absent, `Sales Order Outright v12.dc.html` and
-> `Purchasing v2.dc.html` open without rows here. `Carres UI Kit.dc.html`,
-> `Carres Shell.dc.html` and `Carres Table.dc.html` open as supplied. The complete viewable
-> package is the owner's ZIP.
->
-> Where the supplied files disagree with each other, `docs/01-design-tokens.md` §10 records
-> which value was taken and why.
+> Every page opens with its rows. Measured with the supplied `carres-check.js` at 1164 wide:
+> Sales Order list, SO Batch Purchase and Purchase Orders pass; the SO detail reports its
+> third order line at 59 high; `Purchasing v2.dc.html` logs one script error (`STOCK_R`
+> declared twice). The untouched supplied files give the same results.
 
 ---
 
@@ -170,7 +173,7 @@ Theme = per person (`carres-theme.js`, localStorage `carres.theme`, default `blu
 `view` (open/done/all) · `layout` (column view) · `f` (filters) · `sel` (ticked rows) · `det` (open record, mirrored in `#so=`) · `dTab` · `rv` (route view) · `fe` (amendment edit: open fields, reasons, proof, confirm) · `edits` (applied contact changes) · `pend` (waiting for Jess) · `rev` (revision count) · `logs` (timeline events) · `tasks` · `more` / `docOpen` / `toast`.
 
 ## Data
-`sales-real.js` (`window.SO_REAL`): the 20 real sample orders (customer, phone, address, items with model/spec/qty/supplier/PO/stock status, ETA, logistics, balance, payment status). `purchasing-data.js`: the POs derived from the same orders. These are fixtures; the real build reads the ERP. Proceed Date = Sales Portal "Planned production start" (same fact; only the name Proceed Date is shown).
+`sales-test.js` (`window.SO_REAL`): the 20 sample orders, with TEST customer details in this repository (customer, phone, address, items with model/spec/qty/supplier/PO/stock status, ETA, logistics, balance, payment status). `purchasing-data.js`: the POs derived from the same orders. These are fixtures; the real build reads the ERP. Proceed Date = Sales Portal "Planned production start" (same fact; only the name Proceed Date is shown).
 
 ## Assets
 `assets/carres-mark.png`, `assets/carres-wordmark.png` (Carres brand). Icons: Google Material Symbols Rounded (web font).
@@ -180,7 +183,7 @@ Theme = per person (`carres-theme.js`, localStorage `carres.theme`, default `blu
 - `Carres Shell.dc.html`, `Carres Table.dc.html`: shared template pieces
 - `Sales Order Outright v12.dc.html`: reference module (list + detail + PDF + amendment)
 - `Purchasing v2.dc.html`: second module on the same template
-- `carres-theme.js`, `carres-check.js`, `sales-real.js`, `purchasing-data.js`, `support.js` (DC runtime for viewing only)
+- `carres-theme.js`, `carres-check.js`, `sales-test.js`, `purchasing-data.js`, `support.js` (DC runtime for viewing only)
 - `docs/Carres Layout Standard.md`, `docs/Carres Ops Rules.md`
 - `UX-FLOWS.md` (behaviour), `screens/` (pictures of every state)
 

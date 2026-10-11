@@ -63,7 +63,7 @@ On a conflict, Business wins.
 
 - **The current page is Version N, never automatically final.** Studying it, finding it wrong
   and proposing better is your DUTY. Building before approval is the only thing forbidden.
-- **Current kit adoption — owner 11 Oct 2026 · supplied v12:** `Sales Order_11 Oct.zip` is the shared visual target, consolidated into the existing 01/02/03 and UI MASTER. The v8 values and both v8 specimen folders are removed; runtime migration and complete-page verification are still owed, so the running app still draws v8. `docs/ui/carres-tokens.css` mirrors the target; imported HTML under `docs/ui-reference/sales-order-design/` is a specimen only. Do not import its mock business rules or clone its page CSS.
+- **Current kit adoption — owner 11 Oct 2026 · supplied v12:** `Sales Order_11 Oct.zip` is the shared visual target, consolidated into the existing 01/02/03 and UI MASTER. Every earlier kit value and specimen folder is removed; runtime migration and complete-page verification are still owed, so the running app still draws the previous kit. `docs/ui/carres-tokens.css` mirrors the target; imported HTML under `docs/ui-reference/sales-order-design/` is a specimen only, shown with TEST customer details. Where the package conflicts with COPY-STANDARD or a module MASTER its value is PROPOSAL / NOT LAW (01 §10). Do not import its mock business rules or clone its page CSS.
 - **Token VALUES are locked** — spacing, colour, typography, icons live in
   `docs/01-design-tokens.md` and are not design opinions. **Composition is yours.**
 - **A component that does not exist: STOP and ask for it to join the kit.** Never draw one

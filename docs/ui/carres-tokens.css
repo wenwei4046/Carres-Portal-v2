@@ -1,7 +1,7 @@
 /* Carres design tokens · v12 · supplied 11 Oct 2026.
    Source: Sales Order_11 Oct.zip (README token table, carres-theme.js, Carres Shell, Carres Table, Sales Order Outright v12).
    Resolved in docs/01-design-tokens.md. Use only these; never a UI library's defaults.
-   This file is the target. The application still reads apps/web/src/styles/carres-tokens.css (v8) until it is migrated. */
+   This file is the target. The application still reads apps/web/src/styles/carres-tokens.css until it is migrated. */
 :root{
   /* text */
   --c-ink:#1F2937; --c-body:#374151; --c-quiet:#4B5563; --c-secondary:#6B7280; --c-icon-rest:#9CA3AF;

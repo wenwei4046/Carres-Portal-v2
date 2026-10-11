@@ -1,8 +1,8 @@
 # 01 · Design tokens
 
-**Current shared visual target · owner instruction 11 Oct 2026 · supplied v12.** This replaces the v8 values of 9 Oct in this file; nothing of v8 remains as a second version. Source: `Sales Order_11 Oct.zip` (`README.md`, `UX-FLOWS.md`, `docs/Carres Layout Standard.md`, `carres-theme.js`, `carres-check.js`, `Carres UI Kit.dc.html`, `Carres Shell.dc.html`, `Carres Table.dc.html`, `Sales Order Outright v12.dc.html`, `Purchasing v2.dc.html`). This is a design adoption, not a claim that the React kit or production has migrated.
+**Current shared visual target · owner instruction 11 Oct 2026 · supplied v12.** This replaces every earlier value in this file; there is no second version. Source: `Sales Order_11 Oct.zip` (`README.md`, `UX-FLOWS.md`, `docs/Carres Layout Standard.md`, `carres-theme.js`, `carres-check.js`, `Carres UI Kit.dc.html`, `Carres Shell.dc.html`, `Carres Table.dc.html`, `Sales Order Outright v12.dc.html`, `Purchasing v2.dc.html`). This is a design adoption, not a claim that the React kit or production has migrated.
 
-Business facts, permissions, completion gates, document formats and exact words remain owned by module MASTERs and COPY-STANDARD. The supplied Ops Rules are not imported as business authority and are not stored in this repository.
+Business facts, permissions, completion gates, document formats and exact words remain owned by module MASTERs and COPY-STANDARD. Where the package conflicts with COPY-STANDARD or a module MASTER, its value is PROPOSAL / NOT LAW (§10). The supplied Ops Rules are not stored in this repository. The specimen's sample pages use TEST customer details.
 
 ## 0 · One kit and implementation boundary
 
@@ -13,7 +13,7 @@ Business facts, permissions, completion gates, document formats and exact words 
 | `docs/02-components.md` | Shared component contracts | Current target |
 | `docs/03-page-patterns.md` | Shared page compositions | Current target |
 | `docs/ui/MASTER.md` | Interaction, ownership and acceptance | Current authority |
-| `apps/web/src/styles/carres-tokens.css`, `components/kit/`, `components/register/` | Running implementation | Still draws v8; migration required; preserve APIs and behaviour |
+| `apps/web/src/styles/carres-tokens.css`, `components/kit/`, `components/register/` | Running implementation | Still draws the previous kit; migration required; preserve APIs and behaviour |
 | `docs/ui-reference/sales-order-design/` | Supplied v12 specimen | Reference only; not production code or business law |
 
 Use tokens, not page-local numbers. Change the shared components once; never clone the specimen into a module. The frame, sizes, widths and cell formats never change per module; a module only chooses its content. Git keeps the old values; no archive or second kit is created.
@@ -61,7 +61,7 @@ The selection colour only marks something picked: tab, chip, menu item, ticked r
 
 | Buttons | Value |
 |---|---|
-| Main button (one per area) | `#1B1B39`, white text, hover `#2B2B55` |
+| Main button (one per area) | `#1B1B39`, white text, hover `#2B2B55` (hover is PROPOSAL, §10.1) |
 | White or grey button | white, 1px `#E5E7EB`; hover and open `#EDEFF2` |
 | Icon-only button | no fill, no border; hover `rgba(31,41,55,.10)`, pressed and open `rgba(31,41,55,.16)` |
 | Disabled | 45% opacity, no hover, no click |
@@ -107,7 +107,7 @@ Nothing else uses 600 at 15 or above. Never below 11; 11 only for caps labels, t
 | Top-bar utility (team, bell) and search | 34 high, white, 1px `#E1E4E8`, round; bell badge charcoal, team badge white with green dot |
 | Segmented control (list tabs, view switches, Settings tabs) | Track `#E2E4E8`, radius 10, padding 3; segment padding 5 × 12, 13; selected white, theme text, 500, soft lift; others 400 `#4B5563` |
 | Status pill | 12 / 500, padding 3 × 10, fully round, colour plus one word |
-| Choice chip | 28 high, 12 / 500, radius 8; unselected `#F2F3F5` fill, `#4B5563` text; selected soft selection fill, theme text and 1px theme border; icon 16 |
+| Choice chip | 28 high, 12 / 500, radius 8; unselected `#F2F3F5` fill (PROPOSAL, §10.1), `#4B5563` text; selected soft selection fill, theme text and 1px theme border; icon 16 |
 | Theme chip (Appearance) | 32 high, radius 8, 12 dot and name 13 / 500 |
 | Item-row control | 24 high, bordered, value and chevron, radius 8, tone colours as the pill; one per item row |
 | Input / search | Height 32 / 34, radius 8 |
@@ -197,7 +197,7 @@ Plain grouped rows: name and purpose on the left, value on the right; no box aro
 
 ## 7 · Canonical component measurements — one lookup
 
-Sections 1 to 6 are the single current measurement lookup. The v8 warm ground, orange default selection, per-theme page ground, Focus chooser, 240 Summary and 32 key-value density are removed. Existing code may still render them while migration proceeds; do not copy them into a new page.
+Sections 1 to 6 are the single current measurement lookup. The earlier warm ground, orange default selection, per-theme page ground, Focus chooser, 240 Summary and 32 key-value density are removed. Existing code may still render them while migration proceeds; do not copy them into a new page.
 
 ### 7.1 Shell and controls
 Use §§3–4.
@@ -251,31 +251,45 @@ Hover is the selected fill at 45% over white. Page layout: top bar `Settings / A
 
 Storage: the supplied specimen keeps the choice in the browser (`localStorage` key `carres.theme`). The application keeps it in the signed-in person's own profile so it follows them between devices; that implementation stays. Save failure keeps the selection for retry; switching accounts never applies the previous person's choice.
 
-## 10 · Where the supplied files disagree, and the value taken
+## 10 · Where the supplied files disagree, and the status of each value
 
-The supplied Layout Standard still carries older lines beside its 10 and 11 Oct rulings. Order used: measured specimen pages and `carres-theme.js` / `carres-check.js`, then the README token table and lines dated 11 Oct, then older lines. Do not reopen these from the older text.
+The supplied Layout Standard still carries older lines beside its 10 and 11 Oct lines. A value is **TAKEN** when the supplied README (the package's final statement), an owner-dated line or the package's own `carres-check.js` states it; the older line is simply stale and is not reopened. A value is **PROPOSAL / NOT LAW** when the package does not settle it, or when it conflicts with COPY-STANDARD or a module MASTER. A PROPOSAL is challenged, never obeyed; it becomes kit law only by an owner ruling.
 
-| Topic | Older line | Value taken |
+### 10.1 Inside the package
+
+| Topic | Older line | Value in this kit | Status |
+|---|---|---|---|
+| Default theme and ground | Carres theme, ground `#FAFAF9` or per theme | Blue; ground fixed `#F6F7F9` | TAKEN · owner 11 Oct |
+| Main button colour | `#1F2937` | `#1B1B39` | TAKEN · README |
+| Main button hover | README `#111827` | `#2B2B55` as drawn | **PROPOSAL / NOT LAW** · overturned when the owner names the hover |
+| Keyboard focus | 2px `#1F2937` | 2px `#3965FA` | TAKEN · owner palette 10 Oct |
+| Summary width | 240 | 264 | TAKEN · README |
+| Panel title | 17 / 500 | 15 / 500 | TAKEN · README and check |
+| Menu item | 14 / 500 grey, selected 600 | 13 / 400 ink, selected 500 | TAKEN · check |
+| Tabs | Selected 600 | Segmented control, selected 500 | TAKEN · check |
+| Caps labels | 10 / 500 or 12 / 600 | 11 / 500, tracking .06em | TAKEN · README |
+| Menu group label | 11 / 600 | 11 / 500 | TAKEN · README |
+| Table header ground | White | `#F8F9FA` | TAKEN · README and check |
+| Row line | `#E5E7EB` or `#F0F1F3` | `#F1F2F4` | TAKEN · README |
+| Identifier minimum | 220 | 180 | TAKEN · Standard §0, 10 Oct |
+| Stretching columns | Only the identifier | Identifier, plus text columns of 150 or more down to three quarters | TAKEN · README |
+| Item row | Two lines, cut with an ellipsis | 44 minimum, never cut, wraps and grows | TAKEN · README, owner 11 Oct |
+| Pop-up menu | 230 wide; shadow `0 8px 28px rgba(22,24,29,.16)` | 250 wide; shadow `0 8px 24px rgba(17,24,39,.12)` | TAKEN · README |
+| Open group frame | `#D6D2CC` | `#CBD0D6` | TAKEN · README |
+| Field density | Key-value rows 32 | Field rows 36, label 150 | TAKEN · README |
+| Choice chip, unselected | White with 1px `#D5D9DE` | `#F2F3F5` fill as drawn | **PROPOSAL / NOT LAW** · overturned when the owner names the chip |
+| Summary rows | Information only, never filter | Drawn as pressable rows | **PROPOSAL / NOT LAW** · whether a number filters stays the module's choice until ruled |
+
+Measured on the supplied pages, unchanged by the TEST data: the SO detail's third order line is 59 high where `carres-check.js` wants 44 to 56, and `Purchasing v2.dc.html` logs one script error (`STOCK_R` declared twice) while still drawing its rows. Both are facts about the supplied files, not rulings.
+
+### 10.2 Against existing authority
+
+Everything in this table is **PROPOSAL / NOT LAW**. Pages are built on the v12 visual frame with COPY words and MASTER rules.
+
+| Topic | The package says | Authority that stands |
 |---|---|---|
-| Default theme and ground | Carres theme, ground `#FAFAF9` or per theme | Blue; ground fixed `#F6F7F9` |
-| Main button | `#1F2937`; hover `#111827` | `#1B1B39`; hover `#2B2B55` as drawn |
-| Keyboard focus | 2px `#1F2937` | 2px `#3965FA` |
-| Summary width | 240 | 264 |
-| Panel title | 17 / 500 | 15 / 500 |
-| Menu item | 14 / 500 grey, selected 600 | 13 / 400 ink, selected 500 |
-| Tabs | Selected 600 | Segmented control, selected 500 |
-| Caps labels | 10 / 500 or 12 / 600 | 11 / 500, tracking .06em |
-| Menu group label | 11 / 600 | 11 / 500 |
-| Table header ground | White | `#F8F9FA` |
-| Row line | `#E5E7EB` or `#F0F1F3` | `#F1F2F4` |
-| Identifier minimum | 220 | 180 |
-| Stretching columns | Only the identifier | Identifier, plus text columns of 150 or more down to three quarters |
-| Item row | Two lines, cut with an ellipsis | 44 minimum, never cut, wraps and grows |
-| Pop-up menu | 230 wide; shadow `0 8px 28px rgba(22,24,29,.16)` | 250 wide; shadow `0 8px 24px rgba(17,24,39,.12)` |
-| Open group frame | `#D6D2CC` | `#CBD0D6` |
-| Choice chip | White with 1px `#D5D9DE` | `#F2F3F5` fill as drawn; selected soft fill with theme border |
-| Field density | Key-value rows 32 | Field rows 36, label 150 |
-| Summary rows | Information only, never filter | Drawn as pressable rows; whether a number filters is the module's choice |
-| Appearance storage | Browser only | Person's profile in the application |
-
-**Words are not settled by this file.** The specimen writes list headers in sentence case (`SO no.`, `Proceed date`) and uses `Customer’s original requested delivery`, `Log contact`, `Request amendment`, `Waiting for Jess`. COPY-STANDARD owns every visible word; where it differs, COPY stands until COPY is changed.
+| Visible words and capitals | Sentence-case list headers (`SO no.`, `Proceed date`); `Customer’s original requested delivery`, `Log contact`, `Request amendment`, `Waiting for Jess`, `Staff and duties`; its date, time and money formats | COPY-STANDARD |
+| Amendment approval | Contact changes save at once; other changes go to one approver; a stair carry fee formula | Orders MASTER |
+| Purchasing and delivery timing | Batch cut-off times, outstation logistics order, PO sending steps | Purchasing and Delivery MASTERs |
+| Task completion | `Mark done`, an undo window, follow-up attempt counts | Workspace MASTER and the owning module |
+| Appearance storage | Browser only | The person's profile in the application |

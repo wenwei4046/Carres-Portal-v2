@@ -21,13 +21,15 @@
 | Shared page flow, shared contracts, exceptions and the status of every shared capability | **this MASTER** |
 
 **Current shared UI target — owner, 11 Oct 2026 · v12:** `Sales Order_11 Oct.zip` (SHA-256
-`1140ffde825dcd573f05467b49f2201d02331241dbc4f7cb0ef4275957efae16`) replaces the 9 Oct v8 target
-through the existing 01 / 02 / 03 and this MASTER. The v8 specimen folders are deleted. The
+`1140ffde825dcd573f05467b49f2201d02331241dbc4f7cb0ef4275957efae16`) replaces every earlier kit
+value through the existing 01 / 02 / 03 and this MASTER; the earlier specimen folders are deleted. The
 specimen lives at `docs/ui-reference/sales-order-design/`; tokens mirror at
 `docs/ui/carres-tokens.css`. The canonical resolved values are in 01, including 01 §10 where the
 supplied files disagree with each other; the specimen is not another kit document.
 Its README, flows and Layout Standard are supplied material, not independent approval of business
-law. Its Ops Rules and real-order sample data are not stored here because the repository is public.
+law. Where the package conflicts with COPY-STANDARD or a module MASTER, its value is PROPOSAL / NOT LAW
+(01 §10, §7.4 here). Its sample pages run on TEST customer details because the repository is public;
+the designer's Ops Rules are not stored.
 The shared visual target covers shell/menu, one shared table, controls, object facts, Tasks, Route,
 Timeline, Settings → Appearance and density, checked on Sales Order and Purchasing. Modules supply
 their own identities, columns, authorised actions and source facts.
@@ -1087,8 +1089,6 @@ into the section it belongs to, and this list loses it.
 | Card editable `To` vs Work recorded channels | `CompactModuleCard` Communication offers an editable `To`; Work's `WorkCommunication` allows recorded channels only (owner ruling 2026-09-17) | Owner decision |
 | `Jump to…` empty word | The locked contract prints `No results`; COPY-STANDARD rule 5 lists `No results` as the ✘ empty-state example. Reconcilable (a search matched nothing; a worklist is empty) but COPY does not yet carry that split | COPY ruling |
 | Facet counts spelt three ways | PO §9.3 (whole register), Purchase Returns §9.6 (respect other dimensions), Supplier Claims §9.5 (complete searched/filtered set) versus §6.7's one reading | Converge each page in its own round |
-| Specimen words vs COPY | v12 writes list headers in sentence case (`SO no.`, `Proceed date`) and uses `Customer’s original requested delivery`, `Log contact`, `Request amendment`, `Waiting for Jess`, `Staff and duties`; COPY records `SO No`, `Proceed Date`, `Staff & Duties` | COPY ruling; COPY stands until COPY is changed |
-| Specimen amendment rule vs Orders | v12 saves contact changes at once and sends other changes to one approver | Orders ruling; the sample rule is not imported |
 | Shared Select long option at 390px | measured right edge 420.72px beyond the viewport (research file §9) | Kit fix |
 | WarehouseIncoming modal close | focus lands on the page, not the Count trigger (research file §9) | Adopt `DialogFrame` focus return |
 | Picker inside a dialog renders UNDER it | a real P1 defect, approved, not built | Kit fix |
@@ -1129,6 +1129,9 @@ into the section it belongs to, and this list loses it.
 | "Several SOs → list first, then one" inside a host panel | Purchasing 2026-10-05 | Owner decision |
 | PO working panel and round panel content layouts; SO Batch round rail; `Match Ready Stock` placement; SO Batch optional goods columns replacing the details table | Purchasing lane, localhost | Owner review in the Purchasing lane |
 | Purchasing fit review — four cross-module contracts: linked sections distinguish loading/error/empty/present/denied; current, last-sent and goods completion are separate facts; blocker summaries point to the exact row/field and keep the draft; source/Unit evidence stays traceable | Purchasing PLAN 2026-10-01 | Verify against existing components; Purchasing owns its sample |
+| v12 specimen words: sentence-case list headers (`SO no.`, `Proceed date`), `Customer’s original requested delivery`, `Log contact`, `Request amendment`, `Waiting for Jess`, `Staff and duties`, and its date, time and money formats | `Sales Order_11 Oct.zip` · 01 §10.2 | COPY-STANDARD stands; any word change goes through COPY |
+| v12 specimen business rules: which amendment changes skip approval, the stair carry fee formula, batch cut-off times, outstation logistics order, task completion and undo | `Sales Order_11 Oct.zip` · 01 §10.2 | The owning module MASTER stands; owner ruling in that module |
+| v12 values the package does not settle: main button hover `#2B2B55`, choice chip unselected fill `#F2F3F5`, pressable Summary rows | 01 §10.1 | Overturned when the owner names the other value |
 | Inventory top-filter placement (instead of a rail) | research file §4 | Complete compact-top versus rail analysis |
 
 ## §7.5 · Approved targets not yet built (shared)
