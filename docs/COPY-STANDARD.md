@@ -5500,16 +5500,16 @@ Receiving placement; UI MASTER owns Calendar. No posting/permission change is im
 
 `The list could not be exported. Try again.` — A failed full-population read or file render produces no partial export. Retry remains the same Export action. Technical error details never replace this operator sentence.
 
-## Personal Appearance · owner v4 instruction 9 Oct 2026
+## Personal Appearance · owner instruction 11 Oct 2026 · v12
 
 | Situation | Exact words | Source |
 |---|---|---|
 | Personal Settings destination | Personal · Appearance | Current v4 UI Kit §9 |
-| Theme groups | Brand · Recommended · Cool · Calm and crisp · Warm · Soft and homely | Current v4 UI Kit §9 |
-| Theme choices | Carres · Cool Slate · Blue · Teal · Violet · Warm Honey · Olive · Rose · Latte | Current v4 UI Kit §9 |
-| Focus setting / choices | Focus outline · Soft grey · Theme colour · Strong, each with its note `Quiet. Default.` · `Thin line in your theme` · `Easy to see` | Current v4 UI Kit §9 · v8 |
+| Section label | THEME | v12 Shell |
+| Theme groups, in this order | Cool · Calm and crisp · Blue is the default · Brand · Carres orange · Warm · Soft and homely | v12 Shell |
+| Theme choices | Cool Slate · Blue · Teal · Violet · Carres · Warm Honey · Olive · Rose · Latte; Blue carries the label `Default` | v12 Shell |
 | Personal scope explanation | Choose how your portal looks. This changes only your profile. | Implementation explanatory copy |
-| Fixed status explanation | Theme changes the page background and selection. Status colours stay the same. | Current v4 UI Kit §9 meaning |
+| Fixed explanation under the card | A theme changes only the selected colour (tabs, ticked rows, links, focus). Page ground, buttons (charcoal), greys and status colours (amber, green) never change. | v12 Shell |
 | Save / result / failure | Save changes · Saved · Could not save. Try again. | Existing save/retry grammar |
 
 ## Settings → Personal → Lunch time · owner order 9 Oct 2026 (Settings List OFF-04 · WS-04; migration 0677) · BUILT ON BRANCH, NOT DEPLOYED

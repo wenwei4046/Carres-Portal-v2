@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0">
+  <script src="./carres-theme.js"></script>
+  <script src="./purchasing-data.js"></script>
+  <style>.material-symbols-rounded{font-variation-settings:'FILL' 0,'wght' 300,'GRAD' 0,'opsz' 20}body{margin:0;background:#FAFAF9;font-family:Inter,system-ui,sans-serif;color:#1F2937;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}a{color:#1F2937}a:hover{color:#3965FA}*{box-sizing:border-box}</style>
+</helmet>
+<dc-import name="Carres Shell" crumb="Purchasing" title="{{ title }}" nav="{{ navKey }}" alerts="{{ 6 }}" team-on="{{ 8 }}" det="{{ isDet }}" summary="{{ summary }}" tabs="{{ tabs }}" showing="{{ showing }}" chips="{{ chips }}" views="{{ views }}" views-head="{{ viewsHead }}" view-name="{{ viewName }}" more="{{ more }}" sel="{{ selBar }}" tasks="{{ tasks }}" search="{{ search }}" hint-size="100%,100vh">
+  <sc-if value="{{ isList }}"><dc-import name="Carres Table" label="{{ tblLabel }}" cols="{{ cols }}" rows="{{ rows }}" sel="{{ sel }}" on-sel="{{ onSel }}" on-clear="{{ onClear }}" sub-heads="{{ subHeads }}" ticks="{{ ticks }}" footer="{{ footer }}" footer-sum="{{ footerSum }}" empty="{{ emptyT }}" hint-size="100%,100%" style="display:block;min-height:0;height:100%"></dc-import></sc-if>
+  <sc-if value="{{ isDet }}">
+    <div style="display:grid;grid-template-rows:auto minmax(0,1fr);gap:10px;min-height:0;min-width:0">
+      <div style="position:relative;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;min-width:0;min-height:36px">
+        <button onClick="{{ back }}" aria-label="Back to the list" title="Back to the list" style="width:34px;height:34px;border:0;background:transparent;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#1F2937;flex:none;padding:0" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:20px;line-height:1;font-style:normal">arrow_back</i></button>
+        <span style="display:flex;flex-direction:column;line-height:1.25;min-width:0"><span style="font-size:20px;font-weight:600;letter-spacing:-.01em;color:#1F2937;white-space:nowrap">{{ dv.no }}</span><span style="font-size:13px;color:#6B7280;white-space:nowrap">{{ dv.supLine }}</span></span>
+        <span style="display:inline-flex;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:500;white-space:nowrap;background:{{ dv.bg }};color:{{ dv.fg }}">{{ dv.pill }}</span>
+        <span style="margin-left:auto;display:flex;gap:6px;align-items:center;flex:none;max-width:100%">
+          <button onClick="{{ dv.pdf }}" title="Open the PO as PDF" style="height:34px;border:1px solid #E5E7EB;background:#FFFFFF;color:#1F2937;border-radius:8px;padding:0 12px 0 10px;font:inherit;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px" style-hover="background:#EDEFF2"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;line-height:1;font-style:normal;color:#6B7280">picture_as_pdf</i>PO PDF</button>
+          <button onClick="{{ dv.send }}" title="Opens the Send PO task in Tasks" style="height:34px;border:0;background:#1B1B39;color:#FFFFFF;border-radius:8px;padding:0 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#2B2B55">{{ dv.sendT }}</button>
+          <span title="{{ dv.ownerTip }}" style="width:28px;height:28px;border-radius:50%;background:#6B7A8F;color:#FFFFFF;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none">SH</span>
+        </span>
+      </div>
+      <div style="overflow:auto;min-height:0;display:flex;flex-direction:column;gap:12px;scrollbar-width:thin;padding-bottom:4px">
+        <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:12px">
+          <span style="font-size:13px;color:{{ dv.sFg }};line-height:1.45">{{ dv.sentence }}</span>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px 14px;border-top:1px solid #F1F2F4;padding-top:12px">
+            <sc-for list="{{ dv.dates }}" as="d" hint-placeholder-count="6"><span style="display:flex;flex-direction:column;gap:3px"><span style="font-size:11px;font-weight:500;letter-spacing:.06em;color:#6B7280">{{ d.k }}</span><span style="font-size:13px;color:{{ d.fg }}">{{ d.v }}</span></span></sc-for>
+          </div>
+        </div>
+        <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:0 14px 6px;display:flex;flex-direction:column">
+          <div style="display:flex;align-items:center;gap:8px;height:38px"><span style="font-size:15px;font-weight:500;color:#1F2937">Items</span><span style="font-size:12px;color:#6B7280">{{ dv.itemSum }}</span></div>
+          <sc-for list="{{ dv.groups }}" as="g" hint-placeholder-count="2">
+            <div style="display:flex;flex-direction:column;border-top:1px solid #F1F2F4;padding:8px 0 4px">
+              <span style="display:flex;align-items:baseline;gap:8px;min-height:28px;align-items:center"><span style="font-size:13px;font-weight:600;color:#1F2937">{{ g.so }}</span><span style="font-size:12px;color:#6B7280">{{ g.cust }}</span></span>
+              <sc-for list="{{ g.lines }}" as="l" hint-placeholder-count="2"><div style="display:grid;grid-template-columns:minmax(0,1fr) 48px 150px;gap:10px;align-items:center;min-height:44px;padding:4px 0;border-top:1px solid #F1F2F4"><span style="display:flex;flex-direction:column;line-height:1.3;min-width:0"><span style="font-size:13px;color:#1F2937">{{ l.item }}</span><sc-if value="{{ l.spec }}"><span style="font-size:12px;color:#6B7280">{{ l.spec }}</span></sc-if></span><span style="font-size:13px;color:#1F2937;text-align:right">{{ l.qty }}</span><span><span style="display:inline-flex;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:500;white-space:nowrap;background:{{ l.bg }};color:{{ l.fg }}">{{ l.st }}</span></span></div></sc-for>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
+          <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:0 14px 8px;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;height:38px"><span style="font-size:15px;font-weight:500;color:#1F2937">Documents</span></div>
+            <sc-for list="{{ dv.docs }}" as="d" hint-placeholder-count="2"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:32px;border-top:1px solid #F1F2F4"><span style="font-size:13px;color:#6B7280">{{ d.k }}</span><span style="font-size:13px;font-weight:500;color:#1F2937">{{ d.v }}</span></div></sc-for>
+            <sc-if value="{{ dv.hasMissing }}"><span style="font-size:12px;color:#6B7280;min-height:32px;display:flex;align-items:center;border-top:1px solid #F1F2F4">{{ dv.missing }}</span></sc-if>
+          </div>
+          <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:0 14px 8px;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;height:38px"><span style="font-size:15px;font-weight:500;color:#1F2937">History</span></div>
+            <sc-for list="{{ dv.hist }}" as="h" hint-placeholder-count="2"><div style="display:grid;grid-template-columns:56px minmax(0,1fr);gap:10px;align-items:start;padding:7px 0;border-top:1px solid #F1F2F4"><span style="font-size:12px;color:#6B7280;padding-top:1px">{{ h.d }}</span><span style="display:flex;flex-direction:column;gap:1px;min-width:0;line-height:1.3"><span style="font-size:13px;color:#1F2937">{{ h.t }}</span><span style="font-size:12px;color:#6B7280">{{ h.by }}</span></span></div></sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</dc-import>
+<sc-if value="{{ popOpen }}"><div onClick="{{ pop.close }}" style="position:fixed;inset:0;z-index:60"></div>
+  <div role="dialog" aria-label="{{ pop.title }}" style="position:fixed;top:{{ pop.top }};left:{{ pop.left }};z-index:61;width:360px;max-width:calc(100vw - 16px);max-height:{{ pop.mh }};overflow:auto;background:#FFFFFF;border-radius:8px;box-shadow:0 8px 28px rgba(22,24,29,.16);padding:12px;display:flex;flex-direction:column;gap:8px">
+    <div style="display:flex;align-items:flex-start;gap:8px">
+      <span style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0;line-height:1.3"><span style="font-size:13px;font-weight:600;color:#1F2937">{{ pop.title }}</span><span style="font-size:13px;color:#1F2937">{{ pop.t1 }}</span><span style="font-size:12px;color:#6B7280">{{ pop.t2 }}</span></span>
+      <button onClick="{{ pop.close }}" aria-label="Close" style="width:28px;height:28px;border:0;border-radius:50%;background:transparent;color:#6B7280;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;flex:none" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;line-height:1;font-style:normal">close</i></button>
+    </div>
+    <sc-if value="{{ pop.note }}"><span style="font-size:12px;color:{{ pop.noteFg }};line-height:1.4">{{ pop.note }}</span></sc-if>
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <sc-for list="{{ pop.opts }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.pick }}" aria-pressed="{{ o.on }}" style="display:flex;align-items:center;gap:8px;border:0;border-radius:8px;padding:6px 8px;text-align:left;font:inherit;cursor:pointer;background:{{ o.bg }};color:{{ o.fg }}"><span style="flex:1;display:flex;flex-direction:column;line-height:1.3;min-width:0"><span style="font-size:13px;font-weight:500">{{ o.l }}</span><sc-if value="{{ o.sub }}"><span style="font-size:12px;color:{{ o.subFg }}">{{ o.sub }}</span></sc-if></span><sc-if value="{{ o.on }}"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;line-height:1;font-style:normal">check</i></sc-if></button></sc-for>
+    </div>
+    <sc-if value="{{ pop.hasBtn }}"><button onClick="{{ pop.act }}" disabled="{{ pop.off }}" style="height:32px;border:0;background:#1B1B39;color:#FFFFFF;border-radius:8px;padding:0 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;align-self:flex-end;opacity:{{ pop.op }}">{{ pop.btn }}</button></sc-if>
+  </div>
+</sc-if>
+<sc-if value="{{ crOpen }}"><div style="position:fixed;inset:0;z-index:70;background:rgba(31,41,55,.28);display:flex;align-items:center;justify-content:center;padding:24px">
+  <div role="dialog" aria-label="{{ cr.title }}" style="width:520px;max-width:100%;max-height:100%;overflow:auto;background:#FFFFFF;border-radius:8px;box-shadow:0 12px 40px rgba(22,24,29,.22);padding:16px;display:flex;flex-direction:column;gap:12px">
+    <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:15px;font-weight:500;color:#1F2937">{{ cr.title }}</span><span style="font-size:12px;color:#6B7280">{{ cr.sub }}</span></span>
+    <sc-for list="{{ cr.groups }}" as="g" hint-placeholder-count="2">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="display:flex;gap:8px;align-items:baseline;padding:0 8px"><span style="font-size:13px;font-weight:600;color:#1F2937">{{ g.sup }}</span><span style="font-size:12px;color:#6B7280">{{ g.n }}</span></span>
+        <sc-for list="{{ g.files }}" as="f" hint-placeholder-count="2"><button onClick="{{ f.view }}" title="Open to view" style="display:grid;grid-template-columns:18px minmax(0,1fr) 18px;gap:10px;align-items:center;padding:6px 8px;border:0;border-radius:8px;background:transparent;text-align:left;font:inherit;cursor:pointer;color:#1F2937" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;line-height:1;font-style:normal;color:#6B7280">picture_as_pdf</i><span style="display:flex;flex-direction:column;line-height:1.3;min-width:0"><span style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.name }}</span><span style="font-size:12px;color:#6B7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.sub }}</span></span><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;line-height:1;font-style:normal;color:#6B7280">open_in_new</i></button></sc-for>
+      </div>
+    </sc-for>
+    <div style="display:flex;justify-content:flex-end;gap:6px;border-top:1px solid #F1F2F4;padding-top:12px">
+      <button onClick="{{ cr.close }}" style="height:32px;border:1px solid #E5E7EB;background:#FFFFFF;color:#1F2937;border-radius:8px;padding:0 14px;font:inherit;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#EDEFF2">Close</button>
+      <button onClick="{{ cr.goTasks }}" style="height:32px;border:0;background:#1B1B39;color:#FFFFFF;border-radius:8px;padding:0 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#2B2B55">Go to Tasks</button>
+    </div>
+  </div>
+</div></sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const FALL = { key: 'carres', page: '#FAFAF9', selBg: '#FBE6DB', selFg: '#A33A14', hov: '#FDF5F0' };
+const pl = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+const pageOf = () => /^#po/.test(location.hash || '') ? 'po' : 'batch';
+const selOf = () => { const m = (location.hash || '').match(/po=([^&]+)/); return m ? decodeURIComponent(m[1]) : null; };
+const CATS5 = ['Mattress', 'Bedframe', 'Sofa', 'Pillow', 'Mattress protector'];
+const CHASE = ['On time confirmed', 'Production delay', 'Shipping delay', 'No reply'];
+const EMPTY = { search: () => [], title: 'SO Batch Purchase', navKey: 'batch', isList: false, isDet: false, summary: [], tabs: [], chips: [], views: [], more: [], selBar: null, tasks: {}, popOpen: false, crOpen: false, dv: {}, pop: {}, cr: {}, cols: [], rows: [], sel: {}, subHeads: [] };
+
+class Component extends DCLogic {
+  state = { page: pageOf(), sel: selOf(), view: 'open', bview: 'buy', bmode: 'sup', mon: new Date().getMonth(), f: {}, tick: {}, wh: {}, pickBy: {}, pos: null, sos: null, review: false, created: null, sent: {}, got: {}, tkOpen: null, pop: null, tres: {}, hidden: [], done: [], post: [], copied: null, psel: {}, tk: 0 };
+  componentDidMount() {
+    this._h = () => this.setState({ page: pageOf(), sel: selOf(), review: false, f: {}, pop: null });
+    window.addEventListener('hashchange', this._h);
+    this._t = () => this.setState(s => ({ tk: s.tk + 1 })); window.addEventListener('carres-theme', this._t);
+    if (!window.PurchDataReady) this._p = setInterval(() => { if (window.PurchDataReady) { clearInterval(this._p); this._t(); } }, 50);
+  }
+  componentWillUnmount() { window.removeEventListener('hashchange', this._h); window.removeEventListener('carres-theme', this._t); clearInterval(this._p); }
+
+  renderVals() {
+    if (!window.PurchDataReady) return EMPTY;
+    const S = this.state, set = o => this.setState(o);
+    const POS = S.pos || POS0, SOS = S.sos || SOS0;
+    const isPo = S.page === 'po';
+    const TX = (t, sub, o) => ({ t, sub: sub || '', ...(o || {}) });
+    const TONEK = c => c === AMB ? 'warn' : c === GRN ? 'ok' : 'neutral';
+    const PLc = st => ({ t: st.pill, tone: TONEK(st.c), sub: st.sub || '', subFg: st.subFg || '#6B7280' });
+    const DCl = (d, extra) => !isD(d) ? { t: 'Not recorded', fg: '#6B7280' } : ({ t: fY(d), sub: WD[d.getDay()] + (extra ? ' · ' + extra : '') });
+    const NRc = { t: 'Not recorded', fg: '#6B7280' };
+    const monCtl = { label: MO[S.mon] + ' 26', prev: () => set({ mon: Math.max(0, S.mon - 1) }), next: () => set({ mon: Math.min(T0.getMonth(), S.mon + 1) }) };
+    const inMon = d => !!d && d.getMonth() === S.mon && d.getFullYear() === T0.getFullYear();
+    const applyF = (rows0, cols, fcols) => { const F = S.f || {}; const idx = l => cols.findIndex(c => c.l === l);
+      const pass = (r, skip) => Object.keys(F).every(l => l === skip || idx(l) < 0 || (r.cells[idx(l)] || {}).t === F[l]);
+      const rows = rows0.filter(r => pass(r, null));
+      cols.forEach(c => { if (!fcols.includes(c.l)) return; const i = idx(c.l), base = rows0.filter(r => pass(r, c.l));
+        c.opts = [...new Set(base.map(r => (r.cells[i] || {}).t))].filter(Boolean).map(v => ({ l: v, n: String(base.filter(r => (r.cells[i] || {}).t === v).length), on: F[c.l] === v, pick: () => { const n = { ...F }; if (n[c.l] === v) delete n[c.l]; else n[c.l] = v; set({ f: n }); } })); c.on = F[c.l] != null; });
+      return { rows, chips: Object.keys(F).map(l => ({ l: l + ': ' + F[l], x: () => { const n = { ...F }; delete n[l]; set({ f: n }); } })) }; };
+    const more = [{ h: 'EXPORT', items: [{ l: 'Download Excel', ic: 'table_view', k: '.xlsx' }, { l: 'Download PDF', ic: 'picture_as_pdf' }] }, { h: 'VIEW', items: [{ l: 'Save as my view', ic: 'bookmark_add' }] }, { h: 'DATA', items: [{ l: 'Sync from Sales Portal now', ic: 'sync', k: 'Last sync not recorded' }] }];
+    const lineOf = p => { const cs = [...new Set(p.lines.map(l => cat(l.item)))]; const q = p.lines.reduce((m, l) => m + l.qty, 0); return cs.join(' + ') + ' · ' + (cs.length === 1 ? unitTxt(cs[0], q) : pcsTxt(q)); };
+
+    // ---------- Purchase Orders ----------
+    const all = POS.map(p => ({ p, s: stat(p) }));
+    const detail = p => { const s = stat(p);
+      const sentence = s.k === 'claim' ? (isD(p.got) ? 'Received on ' + f1(p.got) : 'Received, date not recorded') + '. 1 bed frame damaged; claim ' + p.claim.no + ' is open, waiting for the replacement.'
+        : s.k === 'rec' && !isD(s.dl) ? 'Received. Received date and deadline not recorded.'
+        : s.k === 'rec' ? (isD(p.got) ? 'Received on ' + f1(p.got) : 'Received, date not recorded') + '. ' + (s.res.fg === '#1E7A40' ? s.res.t + '.' : s.res.t + ' after the deadline. Counted in Reports → Suppliers.')
+        : s.k === 'late' && s.eta ? s.res.t[0].toUpperCase() + s.res.t.slice(1) + '. New ETA ' + f2(p.eta) + '; still counted late.'
+        : s.k === 'late' ? s.res.t[0].toUpperCase() + s.res.t.slice(1) + ', no new ETA. Chase the supplier today.'
+        : !isD(s.dl) ? (p.eta ? 'Waiting for the supplier. Stock ETA ' + f2(p.eta) + ' (sheet). PO date and deadline not recorded.' : 'Waiting for the supplier. PO date, deadline and ETA not recorded.') : s.left <= 1 ? 'Arrives ' + (s.left === 0 ? 'today' : 'tomorrow') + '. Ask the supplier for the Supplier DO today.' : dys(s.left) + ' left to the deadline.';
+      const dates = [{ k: 'PO DATE', v: f2(p.d), fg: isD(p.d) ? '#1F2937' : '#6B7280' }, { k: 'PRODUCTION', v: [...new Set(p.lines.map(l => CD(cat(l.item), p.sup)))].join(' / ') + ' working days', fg: '#1F2937' }, { k: 'DEADLINE', v: f2(s.dl), fg: isD(s.dl) ? '#1F2937' : '#6B7280' }, { k: isD(s.dl) ? 'NEW ETA' : 'STOCK ETA', v: p.eta ? f2(p.eta) : 'Not given', fg: p.eta ? '#1F2937' : '#6B7280' }, { k: 'RECEIVED', v: p.got ? f2(p.got) : 'Not yet', fg: isD(p.got) ? '#1F2937' : '#6B7280' }, { k: 'RESULT', v: s.res.t, fg: s.res.fg }];
+      const bySo = {}; p.lines.forEach(l => { (bySo[l.so] = bySo[l.so] || { so: l.so, cust: l.cust, lines: [] }).lines.push(l); });
+      const groups = Object.values(bySo).map(g => ({ so: g.so, cust: g.cust === 'Not recorded' ? '' : g.cust, lines: g.lines.map(l => { const bad = p.claim && p.claim.so === l.so; const st = bad ? ['Damaged · claim', AMB] : p.got ? ['Received', GRN] : s.k === 'late' ? ['Late', AMB] : ['Waiting', GREY]; const parts = String(l.item).split(' · '); return { item: parts[1] || l.item, spec: parts.slice(2).join(' · '), qty: String(l.qty), st: st[0], bg: st[1][0], fg: st[1][1] }; }) }));
+      const docs = [['PO', p.no + ' ' + (p.ver || 'V1')], ['Supplier DO', p.sdo], ['GRN', p.grn], ['Claim', p.claim && p.claim.no]], has = docs.filter(x => x[1]), miss = docs.filter(x => !x[1]).map(x => x[0]);
+      const hist = [{ d: f2(p.d), t: 'PO sent to ' + SHORT(p.sup), by: p.isNew ? 'You · SO Batch Purchase' : 'Ops sheet · sender not recorded' }];
+      if (p.etaOn) hist.push({ d: f2(p.etaOn), t: 'Production delay · new ETA ' + f2(p.eta), by: 'Logged by Shasha · Call' });
+      if (s.k === 'late' && !p.eta) hist.push({ d: f2(addWd(s.dl, 1)), t: 'Deadline passed · task Chase supplier', by: 'System · auto' });
+      if (p.got) hist.push({ d: f2(p.got), t: 'Goods received · ' + (p.grn || 'GRN not recorded'), by: p.real ? 'Ops sheet · Stock Status Received' : 'Warehouse' });
+      if (p.claim) hist.push({ d: f2(p.got), t: p.claim.no + ' opened · ' + p.claim.note, by: 'Warehouse A · 2 photos' });
+      const qty = p.lines.reduce((a, l) => a + l.qty, 0), nSo = Object.keys(bySo).length, isSent = !p.isNew || !!S.sent[p.no];
+      return { no: p.no, pill: s.pill, bg: s.c[0], fg: s.c[1], sFg: s.k === 'late' ? '#7A5A00' : '#1F2937', supLine: SHORT(p.sup) + ' · ' + (p.ver || 'V1') + ' · to ' + String(p.wh || WH_DEF).split('\n')[0], sentence, dates, groups, itemSum: pcsTxt(qty) + ' · ' + nSo + (nSo === 1 ? ' SO' : ' SOs'), docs: has.map(([k, v]) => ({ k, v })), hasMissing: miss.length > 0, missing: 'Not yet: ' + miss.join(', '), hist: hist.reverse(), sendT: isSent ? 'Send again' : 'Send PO', send: () => set({ tkOpen: 'send:' + p.sup }), pdf: () => openPdf(p), ownerTip: 'Shasha · issues POs' }; };
+    const selP = isPo && S.sel ? POS.find(p => p.no === S.sel) : null;
+
+    // ---------- Tasks (same on both pages) ----------
+    const sent = S.sent, got = S.got;
+    const unsentSup = [...new Set(POS.filter(p => p.isNew && !sent[p.no]).map(p => p.sup))];
+    const sendTasks = unsentSup.map(sup => { const ps = POS.filter(p => p.sup === sup && p.isNew && !sent[p.no]), sp = SUP[sup] || {}, ch = sp.pref || 'WhatsApp', to = ch === 'Email' ? sp.email || '' : sp.wa || '', sn = SHORT(sup), allGot = ps.every(p => got[p.no]), key = 'send:' + sup, on = S.tkOpen === key;
+      const msg = 'Dear ' + sn + ',\nPlease find attached ' + (ps.length > 1 ? ps.length + ' purchase orders:' : 'our purchase order:') + '\n' + ps.map(p => '• ' + p.no + ' ' + (p.ver || 'V1') + ' · ' + lineOf(p)).join('\n') + '\nThank you.\nCarres Sdn Bhd';
+      return { key, mod: 'Purchasing', t: 'Send PO to ' + sn + ' · ' + pl(ps.length, 'PO'), sub: 'Not sent · ' + ch + (to ? '' : ' · contact not saved'), ref: ps.map(p => p.no + ' ' + (p.ver || 'V1')).join(', '), who: '', due: '', isNew: true, kind: 'steps', on, open: () => set({ tkOpen: on ? null : key }),
+        facts: [{ l: 'Channel', v: ch }, { l: 'Contact', v: to ? (ch === 'Email' ? to : 'WhatsApp group') : 'Not saved', muted: !to }],
+        files: ps.map(p => ({ name: p.no + ' ' + (p.ver || 'V1') + '.pdf', sub: lineOf(p), done: !!got[p.no], dl: () => { dlPdf(p); set({ got: { ...got, [p.no]: true } }); } })), dlAll: () => { ps.forEach(p => dlPdf(p)); set({ got: { ...got, ...Object.fromEntries(ps.map(p => [p.no, true])) } }); },
+        steps: [{ t: S.copied === sup ? 'Copied' : 'Copy message', ic: S.copied === sup ? 'check' : 'content_copy', f: () => { try { navigator.clipboard.writeText(msg); } catch (x) {} set({ copied: sup }); } },
+          { t: ch === 'Email' ? 'Open email' : 'Open WhatsApp', ic: ch === 'Email' ? 'mail' : 'chat', off: !to, tip: to ? 'Paste the message, attach the PDFs, send' : 'Save the contact in Supplier Settings first', f: () => { if (!to) return; if (ch === 'Email') window.open('mailto:' + to + '?subject=' + encodeURIComponent('Purchase Orders · Carres Sdn Bhd') + '&body=' + encodeURIComponent(msg)); else window.open(/^https?:/.test(to) ? to : 'https://wa.me/' + String(to).replace(/\D/g, ''), '_blank'); } }],
+        mark: () => { if (!allGot) return; set({ sent: { ...sent, ...Object.fromEntries(ps.map(p => [p.no, { ch, at: new Date() }])) }, tkOpen: null, done: [...S.done, { t: 'Send PO to ' + sn + ' · ' + pl(ps.length, 'PO') }] }); }, markOff: !allGot, markT: 'Mark ' + pl(ps.length, 'PO') + ' sent', hint: allGot ? '' : 'Download the PDFs first.' }; });
+    const rT = (key, t, sub, ref, who, o) => { const on = S.tkOpen === key, R = S.tres[key] || {}, upd = x => set({ tres: { ...S.tres, [key]: { ...R, ...x } } });
+      return { key, mod: 'Purchasing', t, sub, ref, who, on, late: !!o.late, dueDay: o.dueDay || '', due: o.due || '', open: () => set({ tkOpen: on ? null : key }), kind: 'result', reasons: o.reasons, res: R.res || '', onRes: e => upd({ res: e.target.value, err: '' }), needNext: !!R.res && !o.fin.includes(R.res), nextHint: 'Not finished yet · when to follow up?', qOpts: ['Tomorrow', 'In 2 days', 'In 3 days'].map(l => ({ l, on: R.next === l, pick: () => upd({ next: l }) })), facts: [...(/^PO[\/-]/.test(String(ref)) ? [{ l: 'PO no.', v: ref, go: () => { set({ tkOpen: null }); location.hash = 'po=' + encodeURIComponent(ref); } }] : []), ...(o.facts || [])],
+        save: () => { if (!R.res) return upd({ err: 'Choose a result first.' }); set({ done: [...S.done, { t: t + ' · ' + R.res }], hidden: [...S.hidden, key], tkOpen: null }); }, err: R.err || '' }; };
+    const navT = (key, mod, t, sub, ref, o) => { const on = S.tkOpen === key; return { key, mod, t, sub, ref, who: o.who || '', due: o.due || '', late: !!o.late, dueDay: o.dueDay || '', on, open: () => set({ tkOpen: on ? null : key }), kind: 'steps', facts: [{ l: 'Page', v: ref, go: () => { set({ tkOpen: null, page: 'batch', review: false, ...(o.state || {}) }); if (location.hash !== '#batch') location.hash = 'batch'; } }, ...(o.facts || [])], files: [], steps: [], mark: () => set({ done: [...S.done, { t }], hidden: [...S.hidden, key], tkOpen: null }), markOff: false, markT: 'Mark done', hint: '' }; };
+    const late = all.filter(x => x.s.k === 'late');
+    const sAll = SOS.map(s => ({ s, st: soStat(s) }));
+    const openIt = i => !i.stock && !i.res && !i.po;
+    const obToday = [].concat(...SOS.map(s => s.items.filter(i => openIt(i) && ['over', 'd0'].includes(obKey(s, i))))).length;
+    const amN = sAll.filter(x => x.st.k !== 'done' && x.st.due && sameDay(x.st.due, NOW) && x.st.due.getHours() === 10).length, pmN = sAll.filter(x => x.st.k !== 'done' && x.st.due && sameDay(x.st.due, NOW) && x.st.due.getHours() === 16).length, msN = sAll.filter(x => x.st.k === 'missed').length, amLate = NOW > DT(T0.getMonth(), T0.getDate(), 10, 15);
+    const TKrows = [
+      ...sendTasks,
+      ...(obToday ? [navT('placeToday', 'Purchasing', "Place today's POs", 'Order deadline today or passed', pl(obToday, 'item'), { due: '', go: 'Open SO Batch Purchase', ic: 'shopping_cart', state: { bmode: 'date', bview: 'buy' } })] : []),
+      ...(amN || msN ? [navT('am', 'Purchasing', 'Place morning POs', pl(amN + msN, 'sales order') + ' not ordered · cut-off 10:15 AM', 'SO Batch Purchase', { due: amLate ? '' : '10:15 AM', late: amLate, dueDay: 'today 10:15 AM', go: 'Open SO Batch Purchase', ic: 'shopping_cart', state: { bmode: 'so', bview: 'buy' } })] : []),
+      ...(pmN ? [navT('pm', 'Purchasing', 'Place afternoon POs', pl(pmN, 'sales order') + ' so far · cut-off 4:00 PM', 'SO Batch Purchase', { due: '4:00 PM', go: 'Open SO Batch Purchase', ic: 'shopping_cart', state: { bmode: 'so', bview: 'buy' } })] : []),
+      ...late.filter(x => !x.p.eta).map(x => rT('chase:' + x.p.no, 'Chase supplier', SHORT(x.p.sup) + ' · ' + x.s.res.t + ', no ETA', x.p.no, SHORT(x.p.sup), { reasons: CHASE, fin: ['On time confirmed'], late: true, dueDay: f2(x.s.dl), facts: [{ l: 'Deadline', v: f2(x.s.dl), late: true }, { l: 'PO date', v: f2(x.p.d) }] })),
+      ...late.filter(x => x.p.eta).map(x => rT('eta:' + x.p.no, 'Check new ETA', SHORT(x.p.sup) + ' · ETA ' + f1(x.p.eta), x.p.no, SHORT(x.p.sup), { reasons: ['Goods arrived', 'ETA kept', 'Delayed again', 'No reply'], fin: ['Goods arrived', 'ETA kept'], facts: [{ l: 'New ETA', v: f2(x.p.eta) }, { l: 'Deadline', v: f2(x.s.dl), late: true }] })),
+      ...all.filter(x => x.s.k === 'wait' && x.s.left <= 1).map(x => rT('sdo:' + x.p.no, 'Ask for Supplier DO', SHORT(x.p.sup) + ' · arrives ' + f1(x.s.dl), x.p.no, SHORT(x.p.sup), { reasons: ['DO received', 'Promised today', 'No reply'], fin: ['DO received'], facts: [{ l: 'Deadline', v: f2(x.s.dl) }] })),
+      ...all.filter(x => x.s.k === 'claim').map(x => rT('clm:' + x.p.no, 'Follow up supplier claim', SHORT(x.p.sup) + ' · replacement bed frame', x.p.claim.no + ' · ' + x.p.no, SHORT(x.p.sup), { reasons: ['Replacement confirmed', 'Supplier rejected', 'No reply'], fin: ['Replacement confirmed'], facts: [{ l: 'Claim', v: x.p.claim.no }, { l: 'Received', v: f2(x.p.got) }] })),
+      ...S.post.map((t, k) => navT('post:' + k, t.mod, t.act, t.sub, t.ref, { due: '', go: 'Open Purchase Orders', ic: 'local_shipping', state: {} })),
+    ].filter(t => !S.hidden.includes(t.key));
+    const LG = S.lc, setL = p => set({ lc: { ...S.lc, ...p, err: null } });
+    const lf = LG ? { on: true, so: LG.so, sos: POS.map(p => ({ v: p.no, l: p.no + ' · ' + SHORT(p.sup) })), onSo: e => setL({ so: e.target.value }), who: LG.who,
+      chs: [['WhatsApp', 'chat'], ['Call', 'call']].map(([c, ic]) => ({ l: c, ic, on: LG.ch === c, pick: () => setL({ ch: c }) })), whos: ['Supplier', 'Warehouse', 'Logistics'].map(w => ({ l: w, on: LG.who === w, pick: () => setL({ who: w, what: '' }) })),
+      what: LG.what, whats: (({ Supplier: ['On time confirmed', 'Production delay', 'Shipping delay', 'Goods damaged', 'Ready to ship', 'No reply'], Warehouse: ['Received OK', 'Short quantity', 'Damaged', 'Wrong item', 'No reply'], Logistics: ['Booked', 'Collected', 'Lorry full', 'No reply'] })[LG.who] || []).map(v => ({ v })), onWhat: e => setL({ what: e.target.value }),
+      nextTxt: LG.what ? (/delay|shortage/i.test(LG.what) ? 'Check new ETA · Purchasing' : /damaged|wrong/i.test(LG.what) ? 'Open supplier claim · Purchasing' : /no reply/i.test(LG.what) ? 'Chase again · Purchasing' : 'no new task · saved to the PO history') : '', dets: [],
+      note: LG.note || '', onNote: e => setL({ note: e.target.value }), noteReq: false, files: (LG.files || []).map((x, i) => ({ ic: x.k === 'video' ? 'videocam' : x.k === 'shot' ? 'screenshot' : 'image', n: x.name || (x.k === 'video' ? 'Video ' : x.k === 'shot' ? 'Screenshot ' : 'Photo ') + (i + 1), del: () => setL({ files: S.lc.files.filter((_, j) => j !== i) }) })),
+      addShot: name => setL({ files: [...(S.lc.files || []), { k: 'shot', name }] }), addPhoto: name => setL({ files: [...(S.lc.files || []), { k: 'photo', name }] }), addVideo: name => setL({ files: [...(S.lc.files || []), { k: 'video', name }] }), shotHint: '', err: LG.err || '', cancel: () => set({ lc: null }),
+      save: () => { const g = S.lc; if (!g.so) return set({ lc: { ...g, err: 'Choose the PO no.' } }); if (!g.who || !g.what) return set({ lc: { ...g, err: 'Choose who and what happened.' } }); set({ lc: null, done: [...S.done, { t: 'Logged ' + g.ch + ' with ' + g.who.toLowerCase() + ' · ' + g.so + ' · ' + g.what.toLowerCase() }] }); } } : { on: false };
+    const tasks = { head: f1(T0) + ' · ' + TKrows.length + ' to do', left: TKrows.length, rows: TKrows, lf, log: () => set({ lc: S.lc ? null : { so: S.sel || '', who: '', what: '', ch: 'WhatsApp', note: '', files: [], err: null } }), done: S.done.map(d => ({ t: d.t, canUndo: false, canCorrect: false })), coming: [] };
+
+    let out;
+    if (isPo) {
+      const VP = { open: x => isOpen(x.p), rec: x => !isOpen(x.p), all: () => true };
+      const list = all.filter(VP[S.view]).sort((a, b) => (b.p.d - a.p.d) || String(b.p.no).localeCompare(String(a.p.no)));
+      const cols = [{ l: 'PO no.', w: 'minmax(180px,1fr)' }, { l: 'Items', w: '120px' }, { l: 'Sales orders', w: '140px' }, { l: 'PO date', w: '120px' }, { l: 'Supplier deadline', w: '120px' }, { l: 'Status', w: '150px' }];
+      const rows0 = list.map(({ p, s }) => { const qty = p.lines.reduce((a, l) => a + l.qty, 0), cats = [...new Set(p.lines.map(l => cat(l.item)))], sos = [...new Set(p.lines.map(l => l.so))];
+        return { id: p.no, open: () => { location.hash = 'po=' + p.no; }, cells: [TX(p.no, SHORT(p.sup) + (p.isNew && sameDay(p.d, T0) ? ' · New' : ''), { fw: '600' }), TX(pcsTxt(qty), cats.join(', ')), TX(String(sos.length), sos[0] + (sos.length > 1 ? ' +' + (sos.length - 1) : '')), DCl(p.d), DCl(s.dl), { t: s.pill, tone: TONEK(s.c), sub: p.got ? (isD(p.got) ? fY(p.got) + (p.grn ? ' · ' + p.grn : '') : s.sub) : s.sub, subFg: p.got ? '#6B7280' : s.subFg }],
+          items: p.lines.map(l => { const bad = p.claim && p.claim.so === l.so; const st = bad ? ['Damaged · claim', 'warn'] : p.got ? ['Received', 'ok'] : s.k === 'late' ? ['Late', 'warn'] : ['Waiting', 'neutral']; const parts = String(l.item).split(' · ');
+            return [TX(parts[1] || l.item, parts.slice(2).join(' · ')), TX(String(l.qty)), TX(l.so, l.cust === 'Not recorded' ? '' : l.cust), TX(String((p.whBy && p.whBy[l.so]) || p.wh || WH_DEF).split('\n')[0]), TX(''), { t: st[0], tone: st[1] }]; }) }; });
+      const { rows, chips } = applyF(rows0, cols, ['Status']);
+      const qb = {}; rows.forEach(r => { const p = POS.find(x => x.no === r.id); p && p.lines.forEach(l => { qb[cat(l.item)] = (qb[cat(l.item)] || 0) + l.qty; }); });
+      const inM = all.filter(x => inMon(x.p.d)), recM = all.filter(x => inMon(x.p.got)), onT = recM.filter(x => x.s.res.fg === '#1E7A40').length;
+      const openPcs = {}; all.filter(x => !x.p.got).forEach(({ p }) => p.lines.forEach(l => { openPcs[cat(l.item)] = (openPcs[cat(l.item)] || 0) + l.qty; }));
+      const lateN = late.length, weekN = all.filter(x => x.s.k === 'wait' && x.s.left <= 7).length, clmN = all.filter(x => x.s.k === 'claim').length;
+      const selIds = Object.keys(S.psel).filter(k => S.psel[k] && rows.some(r => r.id === k));
+      out = { title: 'Purchase Orders', navKey: 'po', isList: !selP, isDet: !!selP, dv: selP ? detail(selP) : {}, back: () => { location.hash = 'po'; }, tblLabel: 'Purchase orders', cols, rows, sel: S.psel, onSel: m => set({ psel: m }), onClear: () => set({ f: {} }), ticks: true, subHeads: ['Item', 'Qty', 'Sales order', 'Supplier delivers to', '', 'Status'], footer: pl(rows.length, 'PO'), footerSum: '· Qty: ' + (Object.entries(qb).map(([k, v]) => k + ' ' + v).join(' · ') || 'none'), emptyT: 'No purchase orders match.',
+        summary: [{ h: 'THIS MONTH', mon: monCtl, rows: [{ k: 'POs sent', v: String(inM.length) }, { k: 'Received', v: String(recM.length) }, { k: 'Received on time', v: recM.length ? onT + ' of ' + recM.length : 'Not yet' }] }, { h: 'NEEDS ATTENTION', rows: [{ k: 'Late', v: String(lateN), warn: lateN > 0 }, { k: 'Due in 7 days', v: String(weekN) }, { k: 'Claims open', v: String(clmN), warn: clmN > 0 }] }, { h: 'OPEN PIECES', rows: CATS5.map(l => ({ k: l, v: String(openPcs[l] || 0) })) }],
+        tabs: [['open', 'Open'], ['rec', 'Received'], ['all', 'All']].map(([k, l]) => ({ l, on: S.view === k, click: () => set({ view: k, f: {}, psel: {} }) })), showing: ({ open: 'open POs', rec: 'received POs', all: 'all POs' })[S.view] + ' · ' + pl(rows.length, 'PO'), chips,
+        views: [{ l: 'Purchasing', ic: 'shopping_cart', on: true }], viewsHead: 'Show columns for', viewName: 'Purchasing', more,
+        selBar: selIds.length ? { n: selIds.length + ' selected', sum: '· ' + pcsTxt(selIds.reduce((a, k) => a + POS.find(p => p.no === k).lines.reduce((m, l) => m + l.qty, 0), 0)), acts: [{ l: 'Export', ic: 'download' }, { l: 'Print PO', ic: 'print', fn: () => dlPdf(selIds.map(k => POS.find(p => p.no === k))) }], clear: () => set({ psel: {} }) } : null };
+    } else {
+      // ---------- SO Batch Purchase ----------
+      const tick = S.tick, canTick = i => openIt(i) && !!i.sup;
+      const collect = i => !!(SUP[i.sup] && SUP[i.sup].method === 'We collect');
+      const whOf = i => collect(i) ? WH_DEF : (i.wh || S.wh[i.id] || i.whDefault || WH_DEF), pickOf = i => S.pickBy[i.id] || PICKERS[0];
+      const list0 = sAll.filter(x => S.bview === 'all' || (S.bview === 'buy' ? x.st.k !== 'done' : x.st.k === 'done' && inMon(x.s.proc)));
+      const list = list0.slice().sort((a, b) => S.bview === 'buy' ? (a.s.proc || 0) - (b.s.proc || 0) : (b.s.proc || 0) - (a.s.proc || 0));
+      const itemsOf = x => x.s.items.filter(i => !i.stock && (S.bview === 'all' || (S.bview === 'buy' ? !i.po : !!i.po)));
+      const sortItems = g => g.slice().sort((a, b) => String(a.i.model).localeCompare(String(b.i.model)) || ['King', 'Queen', 'Super Single', 'Single'].indexOf(sizeKey(a.i.model + ' ' + (a.i.spec || ''))) - ['King', 'Queen', 'Super Single', 'Single'].indexOf(sizeKey(b.i.model + ' ' + (b.i.spec || ''))) || String(a.s.so).localeCompare(String(b.s.so)));
+      const at = e => { const r = e.currentTarget.getBoundingClientRect(), W = window.innerWidth, H = window.innerHeight; return { top: Math.max(12, Math.min(r.bottom + 4, H - 340)) + 'px', left: Math.max(8, Math.min(r.left, W - 368)) + 'px', mh: (H - 24) + 'px' }; };
+      const reserve = (s, i, r) => { if (i.res) (i.res.units || [i.res.unit]).forEach(u => TAKEN.delete(u)); if (r) r.units.forEach(u => TAKEN.add(u)); set({ sos: SOS.map(x => x.so !== s.so ? x : { ...x, items: x.items.map(y => y.id !== i.id ? y : { ...y, res: r }) }), tick: { ...tick, [i.id]: false }, pop: null }); };
+      const stockCell = (i, s) => {
+        if (i.stock) return { t: 'Warehouse stock', fg: '#6B7280' };
+        const t1 = i.model + (i.spec ? ' · ' + i.spec : ''), t2 = s.so + ' · needs ' + unitTxt(i.cat, i.qty);
+        if (i.res) { const us = i.res.units || [i.res.unit]; return { t: (i.res.pending ? 'Waiting customer OK · ' : 'Reserved · ') + i.res.loc, tone: i.res.pending ? 'warn' : 'ok', tip: us.join(', '), act: e => set({ pop: { ...at(e), title: 'Reserved stock', t1, t2, note: pcsTxt(us.length) + ' · ' + us.join(', ') + ' · ' + i.res.loc + (i.res.pending ? ' · display unit, waiting for the customer\'s OK (task with the Salesperson)' : ''), noteFg: '#6B7280', opts: [], hasBtn: true, btn: 'Undo · buy new instead', off: false, act: () => reserve(s, i, null) } }) }; }
+        if (i.po) return { t: '' };
+        const m = matchStock(i); if (!m || !m.n) return { t: 'None', fg: '#6B7280' };
+        const ok = m.exact && m.n >= i.qty;
+        return { t: (ok ? 'In stock · ' : 'Possible · ') + m.n, tone: ok ? 'ok' : 'warn', tip: m.u ? m.u.loc : '', act: e => set({ pop: { ...at(e), kind: 'stk', so: s.so, id: i.id, title: 'Choose stock', t1, t2, sel: m.u ? m.u.id : null, units: m.list, qty: i.qty, exact: m.exact } }) };
+      };
+      const delCell = (i, s) => {
+        if (i.stock || i.res) return { t: 'No PO', fg: '#6B7280' };
+        if (i.po) return { t: collect(i) ? 'Pickup · ' + WH_DEF.replace('Carres ', '') : 'To ' + String(i.wh || WH_DEF).replace('Carres ', '') };
+        if (collect(i)) { const pk = pickOf(i); return { t: 'Pickup · ' + pk, tip: 'We collect · ' + pk + ' brings the goods to ' + WH_DEF, act: e => set({ pop: { ...at(e), title: 'Who picks up', t1: SHORT(i.sup) + ' · ' + i.model, t2: s.so + ' · goods go to ' + WH_DEF, opts: PICKERS.map(o => ({ l: o, sub: o === PICKERS[0] ? 'Default' : '', on: o === pk, pick: () => set({ pickBy: { ...S.pickBy, [i.id]: o }, pop: null }) })) } }) }; }
+        const w = whOf(i), def = i.whDefault || WH_DEF;
+        return { t: 'To ' + w.replace('Carres ', ''), sub: w !== def ? 'changed' : '', subFg: '#6B7280', tip: 'Supplier delivers to ' + w, act: e => set({ pop: { ...at(e), title: 'Supplier delivers to', t1: i.model + (i.spec ? ' · ' + i.spec : ''), t2: s.so, opts: WHS.map(o => ({ l: o, sub: o === def ? 'Default' : '', on: o === w, pick: () => set({ wh: { ...S.wh, [i.id]: o }, pop: null }) })) } }) };
+      };
+      const soCell = (i, s) => { const ob = canTick(i) ? orderByOf(s, i) : null, ar = areaOf(s.loc); return { t: s.so, sub: ob ? 'Order by ' + f2(ob.d) : canTick(i) && !s.cdate ? 'No customer date' : '', subFg: ob && ob.d < T0 ? '#7A5A00' : '#6B7280', tag: ar.out ? 'Outstation' : '', tagTip: ar.out ? ar.state : '' }; };
+      const supCell = i => ({ t: i.sup ? SHORT(i.sup) : 'Supplier not set', fg: i.sup ? '#1F2937' : '#6B7280' });
+      const itemRow = (i, s, mode) => { const on = !!tick[i.id], can = canTick(i), nm = { t: i.model, sub: i.spec || '', wrap: true }, q = { t: unitTxt(i.cat, i.qty) }, poC = i.po ? { t: i.po, fw: '500' } : { t: '' }, last = S.bview === 'buy' ? { t: '' } : poC;
+        const cells = mode === 'sup' ? [nm, q, soCell(i, s), stockCell(i, s), delCell(i, s), last] : mode === 'so' ? [nm, q, stockCell(i, s), supCell(i), delCell(i, s), last] : [nm, q, soCell(i, s), supCell(i), stockCell(i, s)];
+        return { ck: { on, can, tick: () => set({ tick: { ...tick, [i.id]: !on } }) }, cells }; };
+      const grp = (id, cells, g, mode) => { const ids = g.filter(x => canTick(x.i)).map(x => x.i.id); return { id, cells, canCk: ids.length > 0, ids, items: g.map(x => itemRow(x.i, x.s, mode)) }; };
+      const hasMissed = g => g.some(x => openIt(x.i) && x.s.proc && cutoffAfter(x.s.proc) < NOW);
+      const afterCust = s => !!s.cdate && s.items.some(i => openIt(i) && i.sup && addWd(T0, CD(i.cat, i.sup)) > s.cdate);
+      let cols, rows0, subHeads, footer, fcols = ['Status'], ticks = true, tblLabel, viewName = ({ sup: 'By supplier', so: 'By sales order', cat: 'By category', date: 'By order deadline' })[S.bmode];
+      if (S.bmode === 'sup') {
+        cols = [{ l: 'Supplier', w: 'minmax(180px,1fr)' }, { l: 'Items', w: '120px' }, { l: 'Sales orders', w: '140px' }, { l: 'Order by', w: '120px' }, { l: 'Ready by', w: '120px' }, { l: 'Status', w: '150px' }];
+        subHeads = ['Item', 'Qty', 'Sales order', 'From stock', 'Delivery', S.bview === 'buy' ? '' : 'PO no.'];
+        const G = {}; list.forEach(x => itemsOf(x).forEach(i => { const k = (i.sup || 'Supplier not set') + '|' + i.cat; (G[k] = G[k] || []).push({ i, s: x.s }); }));
+        const keys = Object.keys(G).sort((a, b) => (hasMissed(G[b]) - hasMissed(G[a])) || a.localeCompare(b));
+        rows0 = keys.map(k => { const [sup, gc] = k.split('|'), g = sortItems(G[k]), open = g.filter(x => openIt(x.i)), sos = [...new Set(g.map(x => x.s.so))], gq = g.reduce((n, x) => n + x.i.qty, 0), oq = open.reduce((n, x) => n + x.i.qty, 0), models = new Set(g.map(x => x.i.model)).size;
+          const st = !open.length ? { pill: 'Ordered', c: GRN, sub: [...new Set(g.map(x => x.i.po))].filter(Boolean).join(', ') } : hasMissed(g) ? { pill: 'Missed cut-off', c: AMB, sub: unitTxt(gc, oq) + ' to buy', subFg: '#7A5A00' } : { pill: 'To buy', c: GREY, sub: unitTxt(gc, oq) };
+          const outs = {}; g.forEach(x => { const a = areaOf(x.s.loc); if (a.out) outs[x.s.so] = a.state; }); const nOut = Object.keys(outs).length;
+          const d0 = open.map(x => (orderByOf(x.s, x.i) || {}).d).filter(Boolean).sort((p, q) => p - q)[0];
+          const rb = open.length ? (SUP[sup] ? addWd(T0, daysOf(open.map(x => x.i), sup)) : null) : g.filter(x => x.i.pod).map(x => addWd(x.i.pod, CD(gc, sup))).sort((p, q) => q - p)[0];
+          const supSub = SUP[sup] ? (SUP[sup].method === 'We collect' ? 'Pickup' : 'Supplier delivers') + ' · ' + gc + ' · ' + CD(gc, sup) + ' days' : gc + ' · set the supplier in Catalog';
+          return grp('sup:' + k, [{ t: SHORT(sup), fw: '600', sub: supSub, tag: nOut ? 'Outstation ' + nOut + '/' + sos.length : '', tagTip: [...new Set(Object.values(outs))].join(', ') }, { t: unitTxt(gc, gq), sub: pl(models, 'model') }, { t: String(sos.length), sub: sos[0] + (sos.length > 1 ? ' +' + (sos.length - 1) : '') }, d0 ? { ...DCl(d0, d0 < T0 ? 'Late' : sameDay(d0, T0) ? 'Today' : ''), fg: d0 < T0 ? '#7A5A00' : '#1F2937', subFg: d0 < T0 ? '#7A5A00' : '#6B7280' } : { t: open.length ? 'No customer date' : 'Ordered', fg: '#6B7280' }, rb ? DCl(rb, open.length ? 'if sent today' : '') : { t: 'Supplier not set', fg: '#6B7280' }, PLc(st)], g, 'sup'); });
+        footer = pl(keys.length, 'group') + ' · ' + pl(new Set(keys.map(k => k.split('|')[0])).size, 'supplier');
+      } else if (S.bmode === 'so') {
+        cols = [{ l: 'SO no.', w: 'minmax(180px,1fr)' }, { l: 'Items', w: '120px' }, { l: 'Order type', w: '160px' }, { l: 'Proceed date', w: '120px' }, { l: 'Customer original delivery date', w: '120px' }, { l: 'Status', w: '150px' }];
+        subHeads = ['Item', 'Qty', 'From stock', 'Supplier', 'Supplier delivers to', S.bview === 'buy' ? '' : 'PO no.']; fcols = ['Order type', 'Status'];
+        rows0 = list.map(x => { const s = x.s, g = sortItems(s.items.map(i => ({ i, s }))), buy = s.items.filter(i => !i.stock && !i.res), nOpen = buy.filter(i => !i.po).length, nPo = buy.length - nOpen, nStk = s.items.length - buy.length, ar = areaOf(s.loc), q = s.items.reduce((n, i) => n + i.qty, 0);
+          return grp('so:' + s.so, [{ t: s.so, fw: '600', sub: s.cust, tag: ar.out ? 'Outstation' : '', tagTip: ar.state }, { t: pcsTxt(q), sub: [nOpen ? nOpen + ' to buy' : '', nPo ? nPo + ' ordered' : '', nStk ? nStk + ' from stock' : ''].filter(Boolean).join(' · ') }, { t: s.type || 'Outright' }, s.proc ? DCl(s.proc, ago(s.proc)) : NRc, s.cdate ? DCl(s.cdate) : NRc, PLc(x.st)], g, 'so'); });
+        footer = pl(list.length, 'sales order');
+      } else {
+        const byDate = S.bmode === 'date';
+        cols = [{ l: byDate ? 'Order deadline' : 'Category', w: 'minmax(180px,1fr)' }, { l: 'Items', w: '120px' }, { l: 'Sales orders', w: '140px' }, { l: 'Suppliers', w: '160px' }, { l: 'Status', w: '150px' }];
+        subHeads = ['Item', 'Qty', 'Sales order', 'Supplier', 'From stock'];
+        const G = {}; list.forEach(x => itemsOf(x).forEach(i => { if (byDate && !openIt(i)) return; const k = byDate ? obKey(x.s, i) : i.cat; (G[k] = G[k] || []).push({ i, s: x.s }); }));
+        const keys = Object.keys(G).sort(byDate ? (a, b) => obRank(a) - obRank(b) : (a, b) => CATS5.indexOf(a) - CATS5.indexOf(b));
+        rows0 = keys.map(k => { const g = sortItems(G[k]), open = g.filter(x => openIt(x.i)), sos = [...new Set(g.map(x => x.s.so))], sups = [...new Set(g.map(x => SHORT(x.i.sup || 'Supplier not set')))], q = g.reduce((n, x) => n + x.i.qty, 0), oq = open.reduce((n, x) => n + x.i.qty, 0), over = k === 'over';
+          const st = !open.length ? { pill: 'Ordered', c: GRN, sub: '' } : over ? { pill: 'Late to order', c: AMB, sub: pcsTxt(oq) + ' to buy', subFg: '#7A5A00' } : hasMissed(g) ? { pill: 'Missed cut-off', c: AMB, sub: pcsTxt(oq) + ' to buy', subFg: '#7A5A00' } : { pill: 'To buy', c: GREY, sub: pcsTxt(oq) };
+          return grp((byDate ? 'date:' : 'cat:') + k, [{ t: byDate ? obLabel(k) : k, fw: '600', fg: over ? '#7A5A00' : '#1F2937' }, { t: pcsTxt(q), sub: pl(new Set(g.map(x => x.i.model)).size, 'model') }, { t: String(sos.length), sub: sos[0] + (sos.length > 1 ? ' +' + (sos.length - 1) : '') }, { t: sups[0], sub: sups.length > 1 ? '+ ' + sups.slice(1).join(', ') : '' }, PLc(st)], g, 'cat'); });
+        footer = byDate ? pl(keys.length, 'group') : keys.length + (keys.length === 1 ? ' category' : ' categories');
+      }
+      tblLabel = 'SO Batch Purchase · ' + viewName;
+      // ticked items → POs
+      const selL = []; SOS.forEach(s => s.items.forEach(i => { if (canTick(i) && tick[i.id]) selL.push({ ...i, so: s.so, cust: s.cust, whTo: whOf(i), pickBy: collect(i) ? pickOf(i) : '', key: poKey(i, s.so) + (collect(i) ? '|pk:' + pickOf(i) : '') }); }));
+      const selSup = [...new Set(selL.map(b => b.key))], tickedSos = new Set(selL.map(b => b.so));
+      const yymm = String(T0.getFullYear()).slice(2) + String(T0.getMonth() + 1).padStart(2, '0'), poStart = S.poSeq || 1, unitStart = S.unitSeq || 252; let uN = unitStart; const uid = n => 'U1-000-' + String(n).padStart(3, '0');
+      const rvPOs = selSup.map((key, k) => { const ls = selL.filter(b => b.key === key), sup = ls[0].sup, days = daysOf(ls, sup), unitMap = {}, whs = [...new Set(ls.map(b => b.whTo))]; let rn = 0;
+        const pages = whs.map(wh => { const lw = ls.filter(b => b.whTo === wh), groups = [];
+          lw.forEach(b => { const d = b.model + (b.spec ? ' — ' + b.spec : ''); let g = groups.find(x => x.desc === d); if (!g) { g = { desc: d, remark: b.remark || '', parts: [] }; groups.push(g); } g.parts.push(b); });
+          const rows = groups.map(g => { const q = g.parts.reduce((a, b) => a + b.qty, 0), from = uN; uN += q; g.parts.forEach(b => { unitMap[b.id] = uid(from) + (b.qty > 1 ? ' to ' + uid(from + b.qty - 1) : ''); }); const perSo = {}; g.parts.forEach(b => { perSo[b.so] = (perSo[b.so] || 0) + b.qty; });
+            return { n: String(++rn), sos: Object.entries(perSo).map(([so, n2]) => Object.keys(perSo).length > 1 || n2 > 1 ? so + ' × ' + n2 : so), units: q > 1 ? uid(from) + ' to ' + uid(from + q - 1) : uid(from), desc: g.desc, remark: g.remark, qty: String(q) }; });
+          return { wh, rows, total: lw.reduce((a, b) => a + b.qty, 0) }; });
+        return { key, no: 'PO-' + yymm + '-' + String(poStart + k).padStart(4, '0'), sup, wh: whs[0], whs, pages, days, dlx: SUP[sup] && days ? addWd(T0, days) : null, method: SUP[sup] ? SUP[sup].method : 'Not set', pickups: [...new Set(ls.map(b => b.pickBy).filter(Boolean))], items: ls, unitMap, total: ls.reduce((a, b) => a + b.qty, 0), cats: [...new Set(ls.map(b => b.cat))] }; });
+      const create = () => { const ids = new Set(selL.map(b => b.id)), map = {}; rvPOs.forEach(p => p.items.forEach(b => { map[b.id] = p.no; }));
+        const newPos = rvPOs.map(p => ({ no: p.no, ver: 'V1', d: T0, sup: p.sup, wh: p.wh, dlx: p.dlx, isNew: true, units: p.unitMap, pages: p.pages, days: p.days, pickups: p.pickups, lines: p.items.map(b => L(b.so, b.cust, b.cat + ' · ' + b.model + (b.spec ? ' · ' + b.spec : ''), b.qty)) }));
+        const sos = SOS.map(s => ({ ...s, items: s.items.map(i => ids.has(i.id) ? { ...i, po: map[i.id], pod: NOW, wh: whOf(i) } : i) }));
+        const post = [].concat(...rvPOs.map(p => p.method === 'We collect' ? [{ mod: 'Delivery', act: 'Arrange ' + (p.pickups[0] || 'NETS') + ' pickup at ' + SHORT(p.sup), ref: p.no + ' V1', sub: 'Ready ' + (p.dlx ? f1(p.dlx) : 'date not set') + ' · bring back to ' + WH_DEF }] : []));
+        set({ pos: [...newPos, ...POS], sos, tick: {}, review: false, created: rvPOs.map(p => p.no), post: [...post, ...S.post], unitSeq: uN, poSeq: poStart + rvPOs.length, exp: null }); };
+      const canStock = selL.filter(b => { const m = matchStock(b); return !!m && m.exact && m.n >= b.qty; });
+      const useStock = () => { const sos = autoReserve(SOS, new Set(canStock.map(b => b.id))); const t = { ...tick }; canStock.forEach(b => { delete t[b.id]; }); set({ sos, tick: t }); };
+      const review = S.review && selL.length > 0;
+      if (review) {
+        cols = [{ l: 'PO no.', w: 'minmax(180px,1fr)' }, { l: 'Items', w: '120px' }, { l: 'Supplier delivers to', w: '170px' }, { l: 'Ready by', w: '120px' }, { l: 'Status', w: '150px' }];
+        subHeads = ['Item', 'Qty', 'Sales order', 'Supplier delivers to']; ticks = false; fcols = []; tblLabel = 'Review POs'; viewName = 'Review POs';
+        rows0 = rvPOs.map(p => ({ id: 'rv:' + p.no, ids: [], canCk: false, open: () => openPdf(p), cells: [{ t: p.no + ' V1', fw: '600', sub: SHORT(p.sup) + ' · click to view the PDF' }, { t: p.cats.length === 1 ? unitTxt(p.cats[0], p.total) : pcsTxt(p.total), sub: p.cats.join(', ') }, { t: p.method === 'We collect' ? 'Pickup · ' + p.pickups.join(', ') : 'To ' + String(p.wh).replace('Carres ', ''), sub: p.whs.length > 1 ? '+ ' + (p.whs.length - 1) + ' more page' : (p.method === 'We collect' ? 'to ' + WH_DEF.replace('Carres ', '') : '') }, p.dlx ? DCl(p.dlx) : { t: 'Not set', fg: '#6B7280' }, { t: 'Draft', tone: 'neutral' }],
+          items: p.items.map(b => [{ t: b.model, sub: b.spec || '', wrap: true }, { t: unitTxt(b.cat, b.qty) }, { t: b.so, sub: b.cust === 'Not recorded' ? '' : b.cust }, { t: String(b.whTo).split('\n')[0] }]) }));
+        footer = pl(rvPOs.length, 'PO') + ' · draft';
+      }
+      const { rows, chips } = applyF(rows0, cols, fcols);
+      const selMap = {}; rows0.forEach(r => { if (r.ids.length) selMap[r.id] = r.ids.every(id => tick[id]); });
+      const onSel = m => { const n = { ...tick }; rows0.forEach(r => { const v = !!m[r.id]; if (v !== !!selMap[r.id]) r.ids.forEach(id => { n[id] = v; }); }); set({ tick: n }); };
+      const tb = {}; if (!review) list.forEach(x => x.s.items.forEach(i => { if (openIt(i)) tb[i.cat] = (tb[i.cat] || 0) + i.qty; }));
+      // Summary
+      const buyIt = []; sAll.forEach(x => x.s.items.forEach(i => { if (openIt(i)) buyIt.push({ s: x.s, i, k: obKey(x.s, i) }); }));
+      const q = Ls => Ls.reduce((n, x) => n + x.i.qty, 0), cutAm = DT(T0.getMonth(), T0.getDate(), 10, 15), cutPm = DT(T0.getMonth(), T0.getDate(), 16, 0);
+      const over = buyIt.filter(x => x.k === 'over'), tod = buyIt.filter(x => x.k === 'd0'), amL = tod.filter(x => !x.s.proc || cutoffAfter(x.s.proc) <= cutAm), pmL = tod.filter(x => !amL.includes(x));
+      const batchRow = (l, cut, Ls) => { const n = q(Ls), past = NOW > cut; return { k: l + ' · ' + tm(cut), tip: past ? (n ? 'Cut-off passed, still not ordered' : 'Cut-off passed, all ordered') : 'Order by ' + tm(cut), v: pcsTxt(n), warn: past && n > 0 }; };
+      const lateCust = sAll.filter(x => x.st.k !== 'done' && afterCust(x.s)).length, partN = sAll.filter(x => x.st.k === 'part' || !!x.st.part).length;
+      const wk = []; for (let n = 0, c = 0; c < 5 && n < 10; n++) { const d = new Date(T0.getFullYear(), T0.getMonth(), T0.getDate() + n); if (d.getDay() === 0) continue; c++; const qq = q(buyIt.filter(x => x.k === 'd' + n)); wk.push({ l: n ? WD[d.getDay()] : 'Today', n: qq ? pcsTxt(qq) : '0', zero: !qq, warn: !n && qq > 0 && NOW > cutPm, tip: f1(d) + ' · ' + pcsTxt(qq) + ' to order' }); }
+      const lastPod = s => s.items.filter(i => !i.stock && i.po).reduce((m, i) => !m || i.pod > m ? i.pod : m, null);
+      const mIn = sAll.filter(x => inMon(x.s.proc)), mOrd = sAll.filter(x => x.st.k === 'done' && inMon(lastPod(x.s))), mOnT = mOrd.filter(x => x.s.proc && lastPod(x.s) <= cutoffAfter(x.s.proc)).length;
+      const mMiss = sAll.filter(x => inMon(x.st.due) && (x.st.k === 'done' ? !!x.st.due && lastPod(x.s) > x.st.due : x.st.due < NOW)).length;
+      const pcM = {}; sAll.forEach(x => x.s.items.forEach(i => { if (!i.stock && i.po && inMon(i.pod)) pcM[i.cat] = (pcM[i.cat] || 0) + i.qty; }));
+      const summary = [
+        { h: 'TODAY · ' + f1(NOW).toUpperCase(), rows: [...(over.length ? [{ k: 'Late to order', v: pcsTxt(q(over)), warn: true, tip: 'Order deadline already passed · order now' }] : []), batchRow('Morning batch', cutAm, amL), batchRow('Afternoon batch', cutPm, pmL), { k: 'Missed cut-off', v: String(msN), warn: msN > 0 }, { k: 'Too late for customer date', v: String(lateCust), warn: lateCust > 0 }, { k: 'Partly ordered', v: String(partN) }], foot: 'Now ' + tm(NOW) + ' · pieces to order' },
+        { h: 'NEXT 5 DAYS', week: wk, rows: [] },
+        { h: 'THIS MONTH', mon: monCtl, rows: [{ k: 'Sales orders in', v: String(mIn.length) }, { k: 'Ordered', v: String(mOrd.length) }, { k: 'Ordered before cut-off', v: mOrd.length ? mOnT + ' of ' + mOrd.length : 'Not yet' }, { k: 'Missed cut-off', v: String(mMiss), warn: mMiss > 0 }] },
+        { h: 'PIECES ORDERED · ' + MO[S.mon].toUpperCase(), rows: CATS5.map(l => ({ k: l, v: String(pcM[l] || 0) })) }];
+      const selBar = review ? { n: 'Review ' + pl(selSup.length, 'PO'), sum: '· ' + pl(selL.length, 'item') + ' from ' + pl(tickedSos.size, 'sales order') + ' · one PO per supplier and category, sofa per sales order', acts: [{ l: 'Back', ic: 'arrow_back', fn: () => set({ review: false }) }, { l: 'Place ' + pl(selSup.length, 'PO'), ic: 'check', pri: true, fn: create }], clear: () => set({ review: false, tick: {} }) }
+        : selL.length ? { n: pl(selL.length, 'item') + ' selected', sum: '· from ' + pl(tickedSos.size, 'sales order') + ' · ' + pl(selSup.length, 'PO'), acts: [...(canStock.length ? [{ l: 'Use stock · ' + canStock.length, ic: 'inventory_2', fn: useStock, tip: 'Reserves the suggested free unit for each ticked item that has stock; the rest stay to buy' }] : []), { l: 'Create ' + pl(selSup.length, 'PO'), ic: 'shopping_cart', pri: true, fn: () => set({ review: true }) }], clear: () => set({ tick: {} }) } : null;
+      out = { title: 'SO Batch Purchase', navKey: 'batch', isList: true, isDet: false, dv: {}, tblLabel, cols, rows, sel: selMap, onSel, onClear: () => set({ f: {} }), ticks, subHeads, footer, footerSum: review ? '' : '· To buy: ' + (Object.entries(tb).map(([k, v]) => k + ' ' + unitTxt(k, v)).join(' · ') || 'none'), emptyT: S.bview === 'buy' ? 'Nothing to buy.' : 'No sales orders match.',
+        summary, tabs: [['buy', 'To buy'], ['done', 'Ordered'], ['all', 'All']].map(([k, l]) => ({ l, on: S.bview === k, click: () => set({ bview: k, f: {}, review: false }) })), showing: ({ buy: 'to buy', done: 'ordered · ' + MO[S.mon], all: 'all' })[S.bview] + ' · ' + pl(list.length, 'sales order'), chips,
+        views: [['sup', 'By supplier', 'factory'], ['so', 'By sales order', 'receipt_long'], ['cat', 'By category', 'category'], ['date', 'By order deadline', 'event']].map(([k, l, ic]) => ({ l, ic, on: S.bmode === k, pick: () => set({ bmode: k, f: {} }) })), viewsHead: 'Group by', viewName, more, selBar };
+    }
+    // popover + created dialog
+    const P0 = S.pop, pop = P0 ? (P0.kind === 'stk' ? (() => { const s = SOS.find(x => x.so === P0.so), i = s && s.items.find(y => y.id === P0.id); const enough = P0.units.length >= P0.qty;
+      return { ...P0, note: !enough ? 'Only ' + pcsTxt(P0.units.length) + ' free · not enough for this item' : P0.exact ? 'Free units · Operations decides' : 'Display units need the customer\'s OK · a task goes to the Salesperson', noteFg: !enough ? '#7A5A00' : '#6B7280',
+        opts: P0.units.map(u => ({ l: u.sku + (u.size ? ' · ' + u.size : ''), sub: u.loc + ' · ' + (u.cond || 'Condition not recorded') + (u.since ? ' · in since ' + u.since : ''), subFg: '#6B7280', on: u.id === P0.sel, bg: u.id === P0.sel ? FALL.selBg : 'transparent', fg: u.id === P0.sel ? FALL.selFg : '#1F2937', pick: () => set({ pop: { ...P0, sel: u.id } }) })),
+        hasBtn: true, btn: 'Use this unit', off: !enough || !P0.sel, op: !enough || !P0.sel ? '.45' : '1', act: () => { if (!enough || !P0.sel || !i) return; const units = [P0.sel, ...P0.units.filter(u => u.id !== P0.sel).slice(0, P0.qty - 1).map(u => u.id)]; const locs = [...new Set(units.map(id => (P0.units.find(u => u.id === id) || {}).loc))]; if (i.res) (i.res.units || [i.res.unit]).forEach(u => TAKEN.delete(u)); units.forEach(u => TAKEN.add(u)); set({ sos: SOS.map(x => x.so !== s.so ? x : { ...x, items: x.items.map(y => y.id !== i.id ? y : { ...y, res: { loc: locs.join(', '), unit: units[0], units, pending: !P0.exact } }) }), tick: { ...S.tick, [i.id]: false }, pop: null }); }, close: () => set({ pop: null }) }; })()
+      : { ...P0, opts: (P0.opts || []).map(o => ({ ...o, bg: o.on ? FALL.selBg : 'transparent', fg: o.on ? FALL.selFg : '#1F2937', subFg: '#6B7280' })), hasBtn: !!P0.btn, off: false, op: '1', note: P0.note || '', noteFg: P0.noteFg || '#6B7280', close: () => set({ pop: null }) }) : {};
+    if (P0 && window.CarresTheme) { const th = window.CarresTheme.get(); pop.opts = pop.opts.map(o => ({ ...o, bg: o.on ? th.selBg : 'transparent', fg: o.on ? th.selFg : '#1F2937' })); }
+    const cr = (() => { const nos = S.created; if (!nos || !nos.length) return { open: false, groups: [] }; const ps = nos.map(no => POS.find(p => p.no === no)).filter(Boolean), sups = [...new Set(ps.map(p => p.sup))];
+      return { open: true, title: pl(ps.length, 'PO') + ' created', sub: pl(sups.length, 'supplier') + ' · not sent yet · sending is done in Tasks', groups: sups.map(s => { const g = ps.filter(p => p.sup === s); return { sup: SHORT(s), n: pl(g.length, 'PDF'), files: g.map(p => ({ name: p.no + ' ' + (p.ver || 'V1') + '.pdf', sub: lineOf(p), view: () => openPdf(p) })) }; }), close: () => set({ created: null }), goTasks: () => set({ created: null, tkOpen: 'send:' + sups[0] }) }; })();
+    const search = q => { const t = q.toLowerCase(), pos = POS.filter(x => [x.no, x.sup, ...x.lines.map(l => l.so)].join(' ').toLowerCase().includes(t)).map(x => { const s = stat(x); return { h: 'Purchase orders', ic: 'shopping_cart', t: x.no + ' ' + (x.ver || 'V1'), sub: SHORT(x.sup) + ' · ' + pcsTxt(x.lines.reduce((a, l) => a + l.qty, 0)), pill: s.pill, tone: TONEK(s.c), go: () => { location.hash = 'po=' + x.no; } }; });
+      const sos = SOS.filter(s => [s.so, s.cust, s.loc || ''].join(' ').toLowerCase().includes(t)).map(s => { const st = soStat(s); return { h: 'Sales orders', ic: 'receipt_long', t: s.so, sub: s.cust + (s.loc ? ' · ' + s.loc : ''), pill: st.pill, tone: TONEK(st.c), go: () => { set({ bmode: 'so', bview: 'all', f: {} }); if (location.hash !== '#batch') location.hash = 'batch'; } }; });
+      const sups = Object.keys(SUP).filter(n => n.toLowerCase().includes(t) || String(SUP[n].aka || '').toLowerCase().includes(t)).map(n => ({ h: 'Suppliers', ic: 'factory', t: SHORT(n), sub: SUP[n].method + (SUP[n].aka ? ' · also ' + SUP[n].aka : ''), go: () => { set({ bmode: 'sup', bview: 'buy', f: {} }); if (location.hash !== '#batch') location.hash = 'batch'; } }));
+      return [...pos, ...sos, ...sups]; };
+    return { ...out, tasks, search, popOpen: !!P0, pop, crOpen: cr.open, cr };
+  }
+}
+</script>
+</body>
+</html>

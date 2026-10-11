@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0">
+  <script src="./carres-theme.js"></script>
+  <style>.material-symbols-rounded{font-variation-settings:'FILL' 0,'wght' 300,'GRAD' 0,'opsz' 20}body{margin:0;background:#FAFAF9;font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;color:#1F2937;font-size:14px;font-variant-numeric:tabular-nums}a{color:#1F2937}a:hover{color:#3965FA}*{box-sizing:border-box;scrollbar-width:thin;scrollbar-color:#E5E7EB transparent}button{font-family:inherit}:focus{outline:none}:focus-visible{outline:2px solid #3965FA;outline-offset:2px;border-radius:8px}input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid #3965FA;outline-offset:0}</style>
+</helmet>
+<div style="height:{{ rootH }};display:grid;grid-template-columns:{{ railW }} minmax(0,1fr);overflow:hidden;background:{{ th.page }}">
+
+  <nav aria-label="Modules" style="display:flex;flex-direction:column;padding:12px 10px;gap:2px;min-height:0;overflow:hidden;border-right:1px solid #E5E7EB">
+    <div style="display:flex;flex-direction:{{ logoDir }};align-items:center;gap:10px;min-height:44px;padding:0 6px 0 10px;margin-bottom:12px">
+      <sc-if value="{{ railClosed }}"><img src="assets/carres-mark.png" alt="Carres" style="width:34px;height:34px;object-fit:contain;flex:none"></sc-if>
+      <sc-if value="{{ railOpen }}"><img src="assets/carres-wordmark.png" alt="Carres" style="height:20px;width:auto;display:block"></sc-if>
+      <button onClick="{{ toggleRail }}" aria-label="{{ railAria }}" title="{{ railAria }}" style="margin-left:{{ railBtnMl }};width:28px;height:28px;border:0;border-radius:50%;background:transparent;color:#6B7280;cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;font-style:normal">{{ railIc }}</i></button>
+    </div>
+    <div style="flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:3px;scrollbar-width:none">
+      <sc-for list="{{ nav }}" as="n" hint-placeholder-count="12">
+        <sc-if value="{{ n.isHead }}"><sc-if value="{{ railOpen }}"><span style="font-size:11px;font-weight:500;letter-spacing:.06em;color:#6B7280;padding:18px 10px 6px">{{ n.l }}</span></sc-if></sc-if>
+        <sc-if value="{{ n.isItem }}">
+          <button onClick="{{ n.click }}" title="{{ n.l }}" aria-current="{{ n.on }}" onMouseEnter="{{ n.hin }}" onMouseLeave="{{ n.hout }}" style="display:flex;align-items:center;gap:10px;border:0;border-radius:8px;padding:8px 10px;cursor:pointer;text-align:left;font-size:13px;flex:none;font-weight:{{ n.fw }};background:{{ n.bg }};color:{{ n.fg }};box-shadow:{{ n.sh }}">
+            <i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;line-height:1;font-style:normal;flex:none;color:{{ n.icFg }}">{{ n.ic }}</i>
+            <sc-if value="{{ railOpen }}"><span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ n.l }}</span><sc-if value="{{ n.hasSubs }}"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;line-height:1;font-style:normal;color:#6B7280">{{ n.caret }}</i></sc-if></sc-if>
+          </button>
+          <sc-if value="{{ n.showSubs }}">
+            <div style="display:flex;flex-direction:column;gap:2px;margin-left:19px;padding-left:10px;border-left:1px solid #E5E7EB">
+              <sc-for list="{{ n.subs }}" as="s" hint-placeholder-count="2"><button onClick="{{ s.click }}" aria-current="{{ s.on }}" onMouseEnter="{{ s.hin }}" onMouseLeave="{{ s.hout }}" style="display:flex;align-items:center;border:0;border-radius:8px;padding:7px 10px;cursor:pointer;text-align:left;font-size:13px;font-weight:{{ s.fw }};background:{{ s.bg }};color:{{ s.fg }};white-space:nowrap">{{ s.l }}</button></sc-for>
+            </div>
+          </sc-if>
+        </sc-if>
+      </sc-for>
+    </div>
+    <div style="flex:none;display:flex;flex-direction:column;gap:2px;border-top:1px solid #E5E7EB;padding-top:8px">
+      <button onClick="{{ goSettings }}" aria-current="{{ isSet }}" onMouseEnter="{{ setHin }}" onMouseLeave="{{ setHout }}" style="display:flex;align-items:center;gap:10px;border:0;border-radius:8px;padding:7px 10px;background:{{ setBg }};color:{{ setFg }};font-size:13px;font-weight:{{ setFw }};cursor:pointer;text-align:left"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;line-height:1;font-style:normal;flex:none;color:#6B7280">settings</i><sc-if value="{{ railOpen }}"><span>Settings</span></sc-if></button>
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 6px">
+        <span title="TEST · Staff A · Operations" style="position:relative;width:32px;height:32px;border-radius:50%;background:#E5E7EB;color:#1F2937;font-weight:600;font-size:12px;display:flex;align-items:center;justify-content:center;flex:none">SA<span style="position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;background:#1E8A47;border:2px solid #FFFFFF"></span></span>
+        <sc-if value="{{ railOpen }}"><span style="display:flex;flex-direction:column;line-height:1.25"><span style="color:#1F2937;font-size:13px;font-weight:500">TEST · Staff A</span><span style="font-size:12px;color:#6B7280">Operations · online</span></span></sc-if>
+      </div>
+    </div>
+  </nav>
+
+  <div style="display:grid;grid-template-rows:56px minmax(0,1fr);min-width:0;min-height:0">
+    <header style="display:flex;align-items:center;gap:14px;padding:0 18px;min-width:0;border-bottom:1px solid #E5E7EB">
+      <div style="display:flex;align-items:baseline;gap:8px;white-space:nowrap;min-width:0">
+        <span style="font-size:14px;color:#6B7280">{{ crumbT }}</span>
+        <span style="font-size:14px;color:#CBD0D6">/</span>
+        <h1 style="margin:0;font-size:20px;font-weight:600;letter-spacing:-.02em;color:#1F2937">{{ titleT }}</h1>
+      </div>
+      <div style="margin-left:auto;position:relative;flex:0 1 300px;min-width:140px">
+      <label style="display:flex;align-items:center;gap:8px;background:#FFFFFF;border:1px solid {{ qBd }};border-radius:999px;padding:0 12px;height:34px;color:#6B7280;font-size:13px"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;line-height:1;font-style:normal;flex:none">search</i><input value="{{ q }}" onInput="{{ onQ }}" onKeyDown="{{ onQKey }}" placeholder="Search SO, PO, supplier, customer" aria-label="Search everything" style="border:0;outline:0;background:transparent;font:inherit;flex:1;min-width:0;color:#1F2937"><sc-if value="{{ qHas }}"><button onClick="{{ qClear }}" aria-label="Clear search" style="width:20px;height:20px;border:0;border-radius:50%;background:transparent;color:#6B7280;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:16px;font-style:normal">close</i></button></sc-if></label>
+      <sc-if value="{{ qOpen }}"><div onClick="{{ qClear }}" style="position:fixed;inset:0;z-index:59"></div>
+        <div role="listbox" aria-label="Search results" style="position:absolute;left:0;right:0;top:40px;z-index:60;min-width:340px;background:#FFFFFF;border-radius:8px;box-shadow:0 8px 28px rgba(22,24,29,.16);padding:6px;max-height:420px;overflow:auto;scrollbar-width:thin">
+          <sc-for list="{{ qGroups }}" as="g" hint-placeholder-count="2">
+            <div style="font-size:11px;font-weight:500;letter-spacing:.06em;color:#6B7280;padding:8px 10px 4px">{{ g.h }}</div>
+            <sc-for list="{{ g.items }}" as="r" hint-placeholder-count="3"><button role="option" onClick="{{ r.go }}" style="width:100%;display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:10px;align-items:center;border:0;background:transparent;border-radius:8px;padding:7px 10px;font:inherit;cursor:pointer;text-align:left;color:#1F2937" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;line-height:1;font-style:normal;color:#6B7280">{{ r.ic }}</i><span style="display:flex;flex-direction:column;line-height:1.3;min-width:0"><span style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.t }}</span><span style="font-size:12px;color:#6B7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.sub }}</span></span><sc-if value="{{ r.pill }}"><span style="display:inline-flex;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:500;white-space:nowrap;background:{{ r.pbg }};color:{{ r.pfg }}">{{ r.pill }}</span></sc-if></button></sc-for>
+          </sc-for>
+          <sc-if value="{{ qNone }}"><div style="padding:12px 10px;font-size:13px;color:#6B7280">No match for “{{ q }}”.</div></sc-if>
+          <div style="font-size:11px;color:#6B7280;padding:6px 10px 2px;border-top:1px solid #F1F2F4;margin-top:4px">Enter opens the first result.</div>
+        </div>
+      </sc-if>
+      </div>
+      <div style="position:relative;flex:none">
+        <button onClick="{{ teamToggle }}" aria-expanded="{{ teamOpen }}" aria-label="Team · {{ teamN }} online" title="Team · {{ teamN }} online" style="position:relative;width:34px;height:34px;border:1px solid #E1E4E8;background:{{ teamBg }};border-radius:50%;cursor:pointer;flex:none;display:flex;align-items:center;justify-content:center;color:#1F2937" style-hover="background:#EDEFF2"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:20px;line-height:1;font-style:normal">group</i><span style="position:absolute;top:-3px;right:-3px;background:#FFFFFF;color:#1F2937;border:1px solid #E5E7EB;border-radius:999px;font-size:11px;font-weight:700;padding:0 5px 0 4px;line-height:14px;display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:50%;background:#1E8A47"></span>{{ teamN }}</span></button>
+        <sc-if value="{{ teamOpen }}"><div onClick="{{ popClose }}" style="position:fixed;inset:0;z-index:59"></div>
+          <div role="dialog" aria-label="Team today" style="position:absolute;right:0;top:42px;z-index:60;width:300px;background:#FFFFFF;border-radius:8px;box-shadow:0 8px 28px rgba(22,24,29,.16);padding:8px;display:flex;flex-direction:column">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 8px 8px;font-size:13px"><span style="font-weight:600;color:#1F2937">Team today</span><span style="color:#6B7280;font-size:12px">{{ teamN }} online · {{ todayT }}</span></div>
+            <label style="display:flex;align-items:center;gap:6px;margin:0 4px 6px;background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:0 10px;height:30px;color:#6B7280"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:16px;font-style:normal">search</i><input value="{{ teamQ }}" onInput="{{ setTeamQ }}" placeholder="Find staff" aria-label="Find staff" style="border:0;background:transparent;font:inherit;font-size:13px;color:#1F2937;outline:none;flex:1;min-width:0"></label>
+            <div style="max-height:360px;overflow:auto;scrollbar-width:thin">
+              <sc-for list="{{ teamGroups }}" as="g" hint-placeholder-count="3"><sc-if value="{{ g.has }}">
+                <div style="position:sticky;top:0;background:#FFFFFF;z-index:1;padding:8px 8px 4px;font-size:11px;font-weight:500;letter-spacing:.06em;color:#6B7280">{{ g.h }}</div>
+                <sc-for list="{{ g.ps }}" as="p" hint-placeholder-count="3"><div style="display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 8px;border-top:1px solid #F1F2F4">
+                  <span style="position:relative;width:28px;height:28px;border-radius:50%;background:{{ p.av }};color:#FFFFFF;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ p.ini }}<span style="position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:{{ p.dot }};border:2px solid #FFFFFF"></span></span>
+                  <span style="display:flex;flex-direction:column;line-height:1.3;min-width:0"><span style="font-size:13px;font-weight:500;color:#1F2937">{{ p.name }}</span><span style="font-size:12px;color:#6B7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.sub }}</span></span>
+                  <span style="display:flex;flex-direction:column;align-items:flex-end;line-height:1.3"><span style="font-size:12px;font-weight:500;color:{{ p.whenFg }}">{{ p.when }}</span><span style="font-size:12px;color:#6B7280">{{ p.jobs }}</span></span>
+                </div></sc-for>
+              </sc-if></sc-for>
+              <sc-if value="{{ teamNone }}"><div style="padding:10px 8px;font-size:13px;color:#6B7280">No staff match.</div></sc-if>
+            </div>
+            <span style="font-size:11px;color:#6B7280;padding:8px 8px 2px;border-top:1px solid #F1F2F4;margin-top:4px">Jobs move to online staff automatically at 10:00 AM and 2:00 PM.</span>
+          </div>
+        </sc-if>
+      </div>
+      <div style="position:relative;flex:none">
+        <button onClick="{{ ntToggle }}" aria-expanded="{{ ntOpen }}" aria-label="Notifications" title="Notifications" style="position:relative;width:34px;height:34px;border:1px solid #E1E4E8;background:{{ ntBg }};border-radius:50%;cursor:pointer;flex:none;display:flex;align-items:center;justify-content:center;color:#1F2937" style-hover="background:#EDEFF2"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:20px;line-height:1;font-style:normal">notifications</i><sc-if value="{{ hasAlerts }}"><span style="position:absolute;top:-3px;right:-3px;background:#1B1B39;color:#FFFFFF;border-radius:999px;font-size:11px;font-weight:600;padding:0 5px;line-height:16px">{{ alertsT }}</span></sc-if></button>
+        <sc-if value="{{ ntOpen }}"><div onClick="{{ popClose }}" style="position:fixed;inset:0;z-index:59"></div>
+          <div role="dialog" aria-label="Notifications" style="position:absolute;right:0;top:42px;z-index:60;width:380px;max-width:calc(100vw - 24px);background:#FFFFFF;border-radius:8px;box-shadow:0 8px 28px rgba(22,24,29,.16);display:flex;flex-direction:column;overflow:hidden">
+            <div style="display:flex;align-items:center;gap:8px;padding:12px 14px 8px"><span style="font-size:15px;font-weight:500;flex:1;color:#1F2937">Notifications</span><button onClick="{{ ntMarkAll }}" style="border:0;background:transparent;color:#1F2937;font:inherit;font-size:12px;font-weight:500;cursor:pointer;padding:4px 8px;border-radius:8px" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)">Mark all read</button></div>
+            <div role="tablist" aria-label="Notification types" style="display:flex;gap:2px;padding:0 10px 8px;border-bottom:1px solid #F1F2F4"><sc-for list="{{ ntTabs }}" as="t" hint-placeholder-count="3"><button role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" onMouseEnter="{{ t.hin }}" onMouseLeave="{{ t.hout }}" style="border:0;border-radius:8px;background:{{ t.bg }};color:{{ t.fg }};font:inherit;font-size:13px;font-weight:{{ t.fw }};padding:5px 10px;cursor:pointer">{{ t.l }}</button></sc-for></div>
+            <div style="max-height:420px;overflow:auto;scrollbar-width:thin">
+              <sc-for list="{{ ntItems }}" as="n" hint-placeholder-count="4"><div onClick="{{ n.read }}" onMouseEnter="{{ n.hin }}" onMouseLeave="{{ n.hout }}" style="display:grid;grid-template-columns:8px minmax(0,1fr);gap:10px;padding:10px 14px;border-bottom:1px solid #F1F2F4;background:{{ n.bg }};cursor:pointer">
+                <span style="width:8px;height:8px;border-radius:50%;margin-top:5px;background:{{ n.dot }}"></span>
+                <span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;font-weight:500;color:{{ n.tagFg }};background:{{ n.tagBg }};border-radius:999px;padding:1px 8px">{{ n.tag }}</span><span style="font-size:12px;color:#6B7280;margin-left:auto">{{ n.when }}</span></span><span style="font-size:13px;font-weight:{{ n.fw }};color:#1F2937;text-wrap:pretty">{{ n.t }}</span><span style="font-size:12px;color:#6B7280;text-wrap:pretty">{{ n.d }}</span></span>
+              </div></sc-for>
+              <sc-if value="{{ ntNone }}"><div style="padding:20px 14px;font-size:13px;color:#6B7280">Nothing here.</div></sc-if>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </header>
+
+    <sc-if value="{{ isSet }}">
+      <div style="overflow:auto;padding:4px 18px 24px;min-height:0">
+        <div style="max-width:1100px;display:flex;flex-direction:column;gap:14px">
+          <span style="font-size:13px;color:#6B7280">Everyone can choose their own look. It applies on every page.</span>
+          <div role="tablist" aria-label="Settings" style="align-self:flex-start;display:flex;gap:2px;padding:3px;background:#E2E4E8;border-radius:10px">
+            <button role="tab" aria-selected="{{ true }}" style="border:0;border-radius:8px;padding:5px 12px;font:inherit;font-size:13px;font-weight:500;cursor:pointer;background:#FFFFFF;color:{{ th.selFg }};box-shadow:0 1px 2px rgba(16,24,40,.10)">Appearance</button>
+            <button role="tab" aria-selected="{{ false }}" onClick="{{ goStaff }}" style="border:0;border-radius:8px;padding:5px 12px;font:inherit;font-size:13px;font-weight:400;cursor:pointer;background:transparent;color:#4B5563" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)">Staff and duties</button>
+          </div>
+          <span style="font-size:11px;font-weight:500;letter-spacing:.06em;color:#6B7280;padding-top:6px">THEME</span>
+          <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;display:flex;flex-direction:column">
+            <sc-for list="{{ themeGroups }}" as="g" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr);gap:16px;align-items:center;padding:12px 14px;border-top:1px solid {{ g.bt }}">
+                <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;font-weight:500;color:#1F2937">{{ g.g }}</span><span style="font-size:12px;color:#6B7280">{{ g.sub }}</span></span>
+                <span style="display:flex;gap:8px;flex-wrap:wrap">
+                  <sc-for list="{{ g.items }}" as="t" hint-placeholder-count="4"><button onClick="{{ t.pick }}" aria-pressed="{{ t.on }}" onMouseEnter="{{ t.hin }}" onMouseLeave="{{ t.hout }}" style="display:flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:8px;border:1px solid {{ t.bd }};background:{{ t.bg }};cursor:pointer;font:inherit;font-size:13px;font-weight:{{ t.fw }};color:{{ t.fg }}"><span style="width:12px;height:12px;border-radius:50%;background:{{ t.dot }}"></span>{{ t.name }}<sc-if value="{{ t.isDef }}"><span style="font-size:11px;font-weight:500;color:#6B7280">Default</span></sc-if><sc-if value="{{ t.on }}"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:16px;line-height:1;font-style:normal">check</i></sc-if></button></sc-for>
+                </span>
+              </div>
+            </sc-for>
+          </div>
+          <span style="font-size:12px;color:#6B7280">A theme changes only the selected colour (tabs, ticked rows, links, focus). Page ground, buttons (charcoal), greys and status colours (amber, green) never change.</span>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ notSet }}">
+    <div style="display:grid;grid-template-columns:{{ cols3 }};gap:12px;padding:12px;min-height:0;min-width:0">
+
+      <sc-if value="{{ leftOpen }}">
+      <aside aria-label="Summary" style="display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0;overflow:hidden;border-right:1px solid #E5E7EB;padding:12px 12px 12px 0;margin:-12px 0;scrollbar-width:none">
+        <div style="display:flex;align-items:center;gap:8px;height:36px;padding:0 4px;margin-bottom:10px">
+          <span style="font-size:15px;font-weight:500;flex:1;color:#1F2937">Summary</span>
+          <button onClick="{{ toggleLeft }}" aria-label="Hide summary" title="Hide summary" style="width:28px;height:28px;border:0;border-radius:50%;background:transparent;color:{{ actFg }};cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:20px;line-height:1;font-style:normal">chevron_left</i></button>
+        </div>
+        <div style="overflow:auto;min-height:0;padding:0 0 10px;display:flex;flex-direction:column;gap:8px;scrollbar-width:none">
+        <sc-for list="{{ sumSecs }}" as="s" hint-placeholder-count="4">
+          <div style="flex:none;background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:8px 12px;display:flex;flex-direction:column;gap:0">
+            <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
+              <span style="font-size:11px;font-weight:500;letter-spacing:.06em;color:#6B7280;flex:1">{{ s.h }}</span>
+              <sc-if value="{{ s.hasMon }}">
+                <button onClick="{{ s.mon.prev }}" aria-label="Previous month" style="width:24px;height:24px;border:0;border-radius:50%;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#6B7280" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;line-height:1;font-style:normal">chevron_left</i></button>
+                <span style="font-size:13px;font-weight:500;color:#4B5563;white-space:nowrap">{{ s.mon.label }}</span>
+                <button onClick="{{ s.mon.next }}" aria-label="Next month" style="width:24px;height:24px;border:0;border-radius:50%;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#6B7280" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;line-height:1;font-style:normal">chevron_right</i></button>
+              </sc-if>
+            </div>
+            <sc-if value="{{ s.hasWeek }}"><div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin:4px 0 2px"><sc-for list="{{ s.week }}" as="w" hint-placeholder-count="5"><span title="{{ w.tip }}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;height:44px;border:1px solid #E5E7EB;border-radius:8px;background:#FFFFFF"><span style="font-size:12px;font-weight:{{ w.lfw }};color:{{ w.lfg }}">{{ w.l }}</span><span style="font-size:13px;font-weight:500;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.n }}</span></span></sc-for></div></sc-if>
+            <sc-for list="{{ s.rows }}" as="r" hint-placeholder-count="3"><button onClick="{{ r.pick }}" aria-pressed="{{ r.on }}" title="{{ r.tip }}" onMouseEnter="{{ r.hin }}" onMouseLeave="{{ r.hout }}" style="display:flex;align-items:center;gap:8px;min-height:30px;border:0;border-radius:8px;padding:2px 8px;margin:0 -8px;background:{{ r.bg }};color:{{ r.fg }};font:inherit;font-size:13px;font-weight:400;text-align:left;cursor:{{ r.cur }}"><span style="flex:1;display:flex;flex-direction:column;line-height:1.3;min-width:0"><span>{{ r.k }}</span><sc-if value="{{ r.note }}"><span style="font-size:12px;color:{{ r.noteFg }}">{{ r.note }}</span></sc-if></span><span style="flex:none;display:flex;align-items:center;gap:4px;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:500;color:{{ r.vfg }}">{{ r.v }}</span></button></sc-for>
+            <sc-if value="{{ s.foot }}"><span style="font-size:12px;color:{{ s.footFg }};margin-top:6px;padding-top:6px;border-top:1px solid #F1F2F4">{{ s.foot }}</span></sc-if>
+          </div>
+        </sc-for>
+        </div>
+      </aside>
+      </sc-if>
+
+      <main style="display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:{{ mainRows }};gap:10px;min-width:0;min-height:0">
+        <sc-if value="{{ selShow }}">
+        <div role="toolbar" aria-label="Selected rows" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:36px;background:{{ selBarBg }};border:1px solid {{ selBarBd }};border-radius:999px;padding:0 6px 0 14px">
+          <i class="material-symbols-rounded" aria-hidden="true" style="font-size:19px;font-style:normal;color:{{ th.selFg }}">check_box</i>
+          <span style="font-size:13px;font-weight:600;color:#1F2937;white-space:nowrap">{{ selN }}</span>
+          <span style="font-size:13px;color:#6B7280;white-space:nowrap">{{ selSum }}</span>
+          <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+            <sc-for list="{{ selActs }}" as="a" hint-placeholder-count="2"><button onClick="{{ a.fn }}" disabled="{{ a.off }}" title="{{ a.tip }}" style="height:28px;border:1px solid {{ a.bd }};background:{{ a.bg }};color:{{ a.fg }};border-radius:8px;padding:0 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;opacity:{{ a.op }}"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:16px;font-style:normal">{{ a.ic }}</i>{{ a.l }}</button></sc-for>
+            <button onClick="{{ selClear }}" style="height:28px;border:0;background:transparent;color:{{ th.selFg }};border-radius:8px;padding:0 10px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px" style-hover="background:rgba(255,255,255,.6)">Clear<i class="material-symbols-rounded" aria-hidden="true" style="font-size:16px;font-style:normal">close</i></button>
+          </span>
+        </div>
+        </sc-if>
+        <sc-if value="{{ barShow }}">
+        <div style="display:flex;align-items:center;gap:8px;height:36px;min-width:0">
+          <sc-if value="{{ leftClosed }}"><button onClick="{{ toggleLeft }}" title="Show summary" style="height:32px;border:0;background:transparent;border-radius:8px;padding:0 10px 0 8px;cursor:pointer;color:#6B7280;font:inherit;font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;flex:none" style-hover="background:rgba(31,41,55,.10);color:#1F2937" style-active="background:rgba(31,41,55,.16)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;font-style:normal">left_panel_open</i>Summary</button></sc-if>
+          <div role="tablist" aria-label="Views" style="display:flex;gap:2px;padding:3px;flex:none;background:#E2E4E8;border-radius:10px">
+            <sc-for list="{{ tabsV }}" as="v" hint-placeholder-count="3"><button role="tab" aria-selected="{{ v.on }}" onClick="{{ v.click }}" onMouseEnter="{{ v.hin }}" onMouseLeave="{{ v.hout }}" style="border:0;border-radius:8px;padding:5px 12px;font:inherit;font-size:13px;font-weight:{{ v.fw }};cursor:pointer;background:{{ v.bg }};color:{{ v.fg }};box-shadow:{{ v.sh }};white-space:nowrap">{{ v.l }}</button></sc-for>
+          </div>
+          <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis"><sc-if value="{{ hasChip }}"><button onClick="{{ chipX }}" title="Remove filter" style="border:1px solid {{ th.selFg }};background:{{ th.selBg }};color:{{ th.selFg }};border-radius:8px;padding:4px 10px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">{{ chipL }} ×</button></sc-if></span>
+          <sc-for list="{{ chips }}" as="c" hint-placeholder-count="0"><button onClick="{{ c.x }}" style="border:1px solid #E1E4E8;background:#F1F2F4;color:#374151;border-radius:8px;padding:4px 10px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap" style-hover="background:#EDEFF2">{{ c.l }} ×</button></sc-for>
+          <span style="margin-left:auto;display:flex;gap:6px;align-items:center;flex:none">
+            <button onClick="{{ openViews }}" aria-expanded="{{ vmOpen }}" aria-label="{{ viewTitle }}" title="{{ viewTitle }}" style="width:36px;height:36px;border:0;background:{{ vmBg }};border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;color:{{ actFg }}" style-hover="background:#EDEFF2"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:20px;line-height:1;font-style:normal">view_column</i></button>
+            <button onClick="{{ openMore }}" aria-expanded="{{ mmOpen }}" aria-label="More actions" title="More actions" style="width:36px;height:36px;border:0;background:{{ mmBg }};border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;color:{{ actFg }}" style-hover="background:#EDEFF2"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:20px;line-height:1;font-style:normal">more_vert</i></button>
+          </span>
+          <sc-if value="{{ workClosed }}"><span style="width:1px;height:20px;background:#D5D9DE;flex:none"></span><button onClick="{{ toggleWork }}" title="Show tasks" style="height:32px;border:0;background:transparent;border-radius:8px;padding:0 10px 0 8px;cursor:pointer;color:#6B7280;font:inherit;font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;flex:none" style-hover="background:rgba(31,41,55,.10);color:#1F2937" style-active="background:rgba(31,41,55,.16)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;font-style:normal">right_panel_open</i>Tasks<span style="color:#6B7280;font-size:12px;font-weight:500">{{ taskN }}</span></button></sc-if>
+        </div>
+        </sc-if>
+        <div style="min-height:0;min-width:0;display:grid;grid-template-rows:minmax(0,1fr)">{{ children }}</div>
+        <sc-if value="{{ anyMenu }}"><div onClick="{{ closeMenus }}" style="position:fixed;inset:0;z-index:55"></div></sc-if>
+        <sc-if value="{{ vmOpen }}">
+          <div role="menu" aria-label="Views" style="position:fixed;top:{{ mTop }};right:{{ mRight }};z-index:56;width:250px;background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 8px 24px rgba(17,24,39,.12);padding:6px">
+            <div style="font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:#6B7280;padding:8px 10px 4px">{{ viewsHeadT }}</div>
+            <sc-for list="{{ viewOpts }}" as="o" hint-placeholder-count="6"><button role="menuitemradio" aria-checked="{{ o.on }}" onClick="{{ o.go }}" style="width:100%;display:flex;align-items:center;gap:10px;border:0;background:transparent;border-radius:8px;padding:7px 10px;font:inherit;font-size:13px;font-weight:{{ o.fw }};cursor:pointer;color:#1F2937;text-align:left" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;line-height:1;font-style:normal;color:#6B7280">{{ o.ic }}</i><span style="flex:1">{{ o.l }}</span><sc-if value="{{ o.on }}"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;line-height:1;font-style:normal">check</i></sc-if></button></sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ mmOpen }}">
+          <div role="menu" aria-label="More actions" style="position:fixed;top:{{ mTop }};right:{{ mRight }};z-index:56;width:250px;background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 8px 24px rgba(17,24,39,.12);padding:6px">
+            <sc-for list="{{ moreGroups }}" as="g" hint-placeholder-count="3">
+              <div style="font-size:11px;font-weight:500;color:#6B7280;padding:8px 10px 4px;letter-spacing:.06em;border-top:1px solid {{ g.bt }}">{{ g.h }}</div>
+              <sc-for list="{{ g.items }}" as="o" hint-placeholder-count="3"><button role="menuitem" onClick="{{ o.go }}" style="width:100%;display:flex;align-items:center;gap:10px;border:0;background:transparent;border-radius:8px;padding:7px 10px;font:inherit;font-size:13px;cursor:pointer;color:#1F2937;text-align:left" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;line-height:1;font-style:normal;color:#6B7280">{{ o.ic }}</i><span style="flex:1;display:flex;flex-direction:column;gap:1px;min-width:0"><span>{{ o.l }}</span><sc-if value="{{ o.kLong }}"><span style="font-size:12px;color:#6B7280">{{ o.k }}</span></sc-if></span><sc-if value="{{ o.kShort }}"><span style="font-size:12px;color:#6B7280">{{ o.k }}</span></sc-if></button></sc-for>
+            </sc-for>
+          </div>
+        </sc-if>
+      </main>
+
+      <sc-if value="{{ workOpen }}">
+      <aside aria-label="Tasks" style="display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0;overflow:hidden;border-left:1px solid #E5E7EB;padding:12px 0 12px 12px;margin:-12px 0">
+        <div style="display:flex;align-items:center;gap:8px;height:36px;padding:0 4px;margin-bottom:10px">
+          <span style="display:flex;align-items:baseline;gap:8px;flex:1;min-width:0"><span style="font-size:15px;font-weight:500;color:#1F2937">Tasks</span><span style="font-size:12px;color:#6B7280;white-space:nowrap">{{ taskHeadT }}</span></span>
+          <button onClick="{{ tkLog }}" aria-pressed="{{ lfOn }}" onMouseEnter="{{ tkLogHin }}" onMouseLeave="{{ tkLogHout }}" title="Log a call or WhatsApp" style="height:30px;border:1px solid {{ tkLogBd }};background:{{ tkLogBg }};color:{{ tkLogFg }};border-radius:8px;padding:0 10px 0 8px;font:inherit;font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:17px;line-height:1;font-style:normal;color:{{ tkLogFg }}">call</i>Log call</button>
+          <button onClick="{{ toggleWork }}" aria-label="Hide tasks" title="Hide tasks" style="width:28px;height:28px;border:0;border-radius:50%;background:transparent;color:{{ actFg }};cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:20px;font-style:normal">chevron_right</i></button>
+        </div>
+        <div style="overflow:auto;min-height:0;padding:0 0 10px;display:flex;flex-direction:column;gap:8px;scrollbar-width:none">
+          <sc-if value="{{ tkTabsOn }}"><div role="tablist" aria-label="Task lists" style="display:flex;gap:2px;flex:none;margin:-4px 0 0"><sc-for list="{{ tkTabs }}" as="v" hint-placeholder-count="2"><button role="tab" aria-selected="{{ v.on }}" onClick="{{ v.click }}" onMouseEnter="{{ v.hin }}" onMouseLeave="{{ v.hout }}" style="border:0;border-radius:8px;padding:5px 10px;font:inherit;font-size:13px;font-weight:{{ v.fw }};cursor:pointer;background:{{ v.bg }};color:{{ v.fg }};white-space:nowrap;display:flex;align-items:center;gap:6px">{{ v.l }}<span style="font-size:12px;font-weight:400;color:{{ v.nfg }}">{{ v.n }}</span></button></sc-for></div></sc-if>
+          <sc-if value="{{ lfOn }}">
+            <div role="form" aria-label="Log a call or WhatsApp" style="flex:none;display:flex;flex-direction:column;gap:8px;background:#FFFFFF;border:1px solid #CBD0D6;border-radius:8px;padding:12px">
+              <span style="font-size:13px;font-weight:600;color:#1F2937">Log a call or WhatsApp</span>
+              <select value="{{ lf.so }}" onChange="{{ lf.onSo }}" aria-label="Sales order" style="height:32px;border:1px solid #D5D9DE;border-radius:8px;font:inherit;font-size:13px;background:#FFFFFF;color:#1F2937;padding:0 8px"><option value="">SO no.…</option><sc-for list="{{ lf.sos }}" as="o" hint-placeholder-count="4"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><sc-for list="{{ lf.chs }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.pick }}" aria-pressed="{{ o.on }}" style="height:28px;border:1px solid {{ o.bd }};border-radius:8px;background:{{ o.bg }};color:{{ o.fg }};font:inherit;font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;font-style:normal">{{ o.ic }}</i>{{ o.l }}</button></sc-for></div>
+              <span style="font-size:12px;font-weight:500;color:#6B7280">1 · Who did you talk to?</span>
+              <div style="display:flex;gap:4px;flex-wrap:wrap"><sc-for list="{{ lf.whos }}" as="o" hint-placeholder-count="4"><button onClick="{{ o.pick }}" aria-pressed="{{ o.on }}" style="border:1px solid {{ o.bd }};background:{{ o.bg }};color:{{ o.fg }};border-radius:8px;height:28px;padding:0 10px;font:inherit;font-size:12px;font-weight:500;cursor:pointer">{{ o.l }}</button></sc-for></div>
+              <span style="font-size:12px;font-weight:500;color:#6B7280">2 · What happened</span>
+              <select value="{{ lf.what }}" onChange="{{ lf.onWhat }}" disabled="{{ lf.noWho }}" aria-label="What happened" style="height:32px;border:1px solid #D5D9DE;border-radius:8px;font:inherit;font-size:13px;background:{{ lf.whatBg }};color:{{ lf.whatFg }};padding:0 8px"><option value="">{{ lf.whatPh }}</option><sc-for list="{{ lf.whats }}" as="o" hint-placeholder-count="3"><option value="{{ o.v }}">{{ o.v }}</option></sc-for></select>
+              <sc-if value="{{ lf.hasNext }}"><span style="font-size:12px;color:#1F2937;display:flex;align-items:center;gap:4px"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:15px;font-style:normal;color:#6B7280">subdirectory_arrow_right</i>Creates: {{ lf.nextTxt }}</span></sc-if>
+              <sc-if value="{{ lf.hasDet }}"><sc-for list="{{ lf.dets }}" as="x" hint-placeholder-count="1"><div style="display:flex;flex-direction:column;gap:3px;padding-left:10px;border-left:2px solid #E5E7EB"><span style="font-size:12px;color:#6B7280">{{ x.l }}</span><sc-if value="{{ x.isInput }}"><input type="{{ x.type }}" value="{{ x.v }}" onInput="{{ x.on }}" aria-label="{{ x.l }}" style="height:32px;border:1px solid #D5D9DE;border-radius:8px;font:inherit;font-size:13px;background:#FFFFFF;padding:0 8px;min-width:0"></sc-if><sc-if value="{{ x.isFile }}"><button onClick="{{ x.add }}" style="align-self:flex-start;border:0;background:transparent;color:#1F2937;font:inherit;font-size:12px;font-weight:500;cursor:pointer;padding:0;display:flex;align-items:center;gap:3px" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:16px;font-style:normal">{{ x.fileIc }}</i>{{ x.fileTxt }}</button></sc-if></div></sc-for></sc-if>
+              <span style="font-size:12px;font-weight:500;color:#6B7280">{{ lf.noteLbl }}</span>
+              <input value="{{ lf.note }}" onInput="{{ lf.onNote }}" placeholder="{{ lf.notePh }}" aria-label="Remark" style="height:32px;border:1px solid {{ lf.noteBd }};border-radius:8px;font:inherit;font-size:13px;background:#FFFFFF;padding:0 8px;min-width:0">
+              <span style="font-size:12px;font-weight:500;color:#6B7280">4 · Proof: screenshot, photo or video (optional)</span>
+              <sc-if value="{{ lf.shotHint }}"><span style="font-size:12px;color:#7A5A00;background:#FBF0D6;border-radius:8px;padding:4px 8px">{{ lf.shotHint }}</span></sc-if>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button onClick="{{ lf.addShot }}" style="height:30px;border:1px dashed #CBD0D6;border-radius:8px;background:#FFFFFF;color:#1F2937;padding:0 10px;font:inherit;font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:4px" style-hover="background:#EDEFF2"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:16px;font-style:normal">screenshot</i>Screenshot</button>
+                <button onClick="{{ lf.addPhoto }}" style="height:30px;border:1px dashed #CBD0D6;border-radius:8px;background:#FFFFFF;color:#1F2937;padding:0 10px;font:inherit;font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:4px" style-hover="background:#EDEFF2"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:16px;font-style:normal">photo_camera</i>Photo</button>
+                <button onClick="{{ lf.addVideo }}" style="height:30px;border:1px dashed #CBD0D6;border-radius:8px;background:#FFFFFF;color:#1F2937;padding:0 10px;font:inherit;font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:4px" style-hover="background:#EDEFF2"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:16px;font-style:normal">videocam</i>Video</button>
+              </div>
+              <sc-if value="{{ lf.hasFiles }}"><div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ lf.files }}" as="x" hint-placeholder-count="1"><span style="display:flex;align-items:center;gap:4px;background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:3px 4px 3px 8px;font-size:12px;color:#1F2937"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:15px;font-style:normal;color:#6B7280">{{ x.ic }}</i>{{ x.n }}<button onClick="{{ x.del }}" aria-label="Remove" style="width:20px;height:20px;border:0;background:transparent;cursor:pointer;color:#6B7280;display:flex;align-items:center;justify-content:center;padding:0" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:15px;font-style:normal">close</i></button></span></sc-for></div></sc-if>
+              <sc-if value="{{ lf.err }}"><span role="alert" style="font-size:12px;color:#7A5A00;background:#FBF0D6;border-radius:8px;padding:4px 8px">{{ lf.err }}</span></sc-if>
+              <div style="display:flex;gap:6px;justify-content:flex-end">
+                <button onClick="{{ lf.cancel }}" style="height:32px;border:1px solid #E5E7EB;background:#FFFFFF;color:#1F2937;border-radius:8px;padding:0 12px;font:inherit;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#EDEFF2">Cancel</button>
+                <button onClick="{{ lf.save }}" style="height:32px;border:0;background:#1B1B39;color:#FFFFFF;border-radius:8px;padding:0 16px;font:inherit;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#2B2B55">Save</button>
+              </div>
+            </div>
+          </sc-if>
+          <sc-for list="{{ taskRows }}" as="t" hint-placeholder-count="5">
+            <div onMouseEnter="{{ t.hin }}" onMouseLeave="{{ t.hout }}" style="flex:none;background:{{ t.cbg }};border:1px solid {{ t.bd }};border-radius:8px;overflow:hidden;box-shadow:0 1px 2px rgba(34,31,32,.04)"><button onClick="{{ t.open }}" aria-expanded="{{ t.on }}" style="width:100%;background:transparent;border:0;padding:0;display:flex;flex-direction:column;font:inherit;text-align:left;cursor:pointer;line-height:1.35" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)">
+              <span style="display:flex;flex-direction:column;gap:5px;padding:8px 10px;width:100%;box-sizing:border-box">
+                <span style="display:flex;align-items:center;gap:6px"><span style="display:inline-flex;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:500;background:#F1F2F4;color:#6B7280;white-space:nowrap">{{ t.mod }}</span><sc-if value="{{ t.isNew }}"><span style="display:inline-flex;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:500;background:#E7F6EC;color:#1E7A40">New</span></sc-if><span style="margin-left:auto;display:inline-flex;align-items:center;gap:4px;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:500;background:{{ t.dueBg }};color:{{ t.dueFg }};white-space:nowrap"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:12px;font-style:normal">{{ t.dueIc }}</i>{{ t.dueT }}</span></span>
+                <span style="display:flex;align-items:flex-start;gap:8px"><span style="display:flex;flex-direction:column;gap:1px;min-width:0;flex:1"><span style="font-size:13px;font-weight:500;color:#1F2937;line-height:17px">{{ t.t }}</span><sc-if value="{{ t.sub }}"><span style="font-size:12px;color:#6B7280">{{ t.sub }}</span></sc-if></span></span>
+                
+              </span>
+              <span style="width:100%;display:flex;align-items:center;gap:8px;border-top:1px solid #F0F1F3;padding:6px 10px 7px;font-size:11px;color:#6B7280"><span style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="font-weight:500;color:#374151">{{ t.ref }}</span>{{ t.whoT }}</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:8px;white-space:nowrap"><sc-if value="{{ t.nFiles }}"><span style="display:inline-flex;align-items:center;gap:2px"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:13px;font-style:normal">attach_file</i>{{ t.nFiles }}</span></sc-if><i class="material-symbols-rounded" aria-hidden="true" style="font-size:14px;font-style:normal;color:#6B7280">{{ t.arrowIc }}</i></span></span>
+            </button><sc-if value="{{ t.on }}"><div style="padding:12px;display:flex;flex-direction:column;gap:10px;border-top:1px solid #F1F2F4">
+          
+          <sc-if value="{{ t.O.hasFacts }}"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 14px"><sc-for list="{{ t.O.facts }}" as="f" hint-placeholder-count="4"><span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:11px;font-weight:500;letter-spacing:.06em;color:#6B7280;line-height:14px">{{ f.l }}</span><sc-if value="{{ f.isLink }}"><button onClick="{{ f.go }}" title="Open {{ f.v }}" style="align-self:flex-start;border:0;background:transparent;padding:0;font:inherit;font-size:13px;font-weight:500;color:#1F2937;cursor:pointer;text-align:left;text-decoration:underline dotted;text-underline-offset:3px;text-decoration-color:#9CA3AF" style-hover="text-decoration:underline solid;text-decoration-color:#1F2937">{{ f.v }}</button></sc-if><sc-if value="{{ f.noLink }}"><span style="font-size:13px;color:{{ f.fg }};font-weight:{{ f.fw }}">{{ f.v }}</span></sc-if></span></sc-for></div></sc-if>
+          <sc-if value="{{ t.O.isResult }}">
+            <select value="{{ t.O.res }}" onChange="{{ t.O.onRes }}" aria-label="Result" style="height:34px;border:1px solid #D5D9DE;border-radius:8px;font:inherit;font-size:13px;background:#FFFFFF;color:#1F2937;padding:0 10px"><option value="">Result…</option><sc-for list="{{ t.O.reasons }}" as="o" hint-placeholder-count="3"><option value="{{ o }}">{{ o }}</option></sc-for></select>
+            <sc-if value="{{ t.O.needNext }}"><div style="display:flex;flex-direction:column;gap:6px;background:#FBF0D6;border-radius:8px;padding:8px 10px">
+              <span style="font-size:12px;font-weight:500;color:#7A5A00">{{ t.O.nextHint }}</span>
+              <div style="display:flex;gap:4px;flex-wrap:wrap"><sc-for list="{{ t.O.qOpts }}" as="q" hint-placeholder-count="4"><button onClick="{{ q.pick }}" title="{{ q.title }}" aria-pressed="{{ q.on }}" style="border:1px solid {{ q.bd }};background:{{ q.bg }};color:{{ q.fg }};border-radius:8px;height:28px;padding:0 10px;font:inherit;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap">{{ q.l }}</button></sc-for></div>
+              <sc-if value="{{ t.O.picking }}"><input type="date" value="{{ t.O.nextV }}" onChange="{{ t.O.onNext }}" aria-label="Next follow-up date" style="height:30px;border:1px solid #D9A23A;border-radius:8px;font:inherit;font-size:13px;padding:0 8px;background:#FFFFFF;align-self:flex-start"></sc-if>
+              <sc-if value="{{ t.O.nextWarn }}"><span style="font-size:12px;color:#7A5A00">{{ t.O.nextWarn }}</span></sc-if>
+              <sc-if value="{{ t.O.tries }}"><span style="font-size:12px;color:{{ t.O.triesFg }}">{{ t.O.tries }}</span></sc-if>
+            </div></sc-if>
+            <div style="display:flex;align-items:center;gap:10px">
+              <button onClick="{{ t.O.addShot }}" title="{{ t.O.shotTip }}" aria-label="{{ t.O.shotTip }}" style="width:30px;height:30px;border:1px solid {{ t.O.shotBd }};background:{{ t.O.shotBg }};color:{{ t.O.shotFg }};border-radius:50%;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:17px;font-style:normal">{{ t.O.shotIc }}</i></button>
+              <span style="font-size:12px;color:#6B7280;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.O.shotTxt }}</span>
+              <button onClick="{{ t.O.save }}" style="height:32px;border:0;background:#1B1B39;color:#FFFFFF;border-radius:8px;padding:0 16px;font:inherit;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#2B2B55">Save</button>
+            </div>
+            <sc-if value="{{ t.O.err }}"><span role="alert" style="font-size:12px;color:#7A5A00;background:#FBF0D6;border-radius:8px;padding:4px 8px">{{ t.O.err }}</span></sc-if>
+          </sc-if>
+          <sc-if value="{{ t.O.isSteps }}">
+            <sc-if value="{{ t.O.hasFiles }}"><div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:11px;color:#6B7280">{{ t.O.filesN }}</span><button onClick="{{ t.O.dlAll }}" style="border:0;background:transparent;color:#1F2937;font:inherit;font-size:12px;font-weight:500;cursor:pointer;padding:0;display:flex;align-items:center;gap:4px" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:16px;font-style:normal">download</i>Download all</button></div>
+              <sc-for list="{{ t.O.files }}" as="f" hint-placeholder-count="2"><div style="display:grid;grid-template-columns:18px minmax(0,1fr) 28px;gap:8px;align-items:center;padding:4px 0"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;font-style:normal;color:#6B7280">picture_as_pdf</i><span style="display:flex;flex-direction:column;line-height:1.3;min-width:0"><span style="font-size:13px;color:#1F2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.name }}</span><span style="font-size:12px;color:#6B7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.sub }}</span></span><button onClick="{{ f.dl }}" aria-label="Download {{ f.name }}" title="Download" style="width:28px;height:28px;border:0;border-radius:50%;background:transparent;color:{{ f.fg }};cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;font-style:normal">{{ f.ic }}</i></button></div></sc-for>
+            </div></sc-if>
+            <sc-if value="{{ t.O.hasSteps }}"><div style="display:flex;gap:6px;flex-wrap:wrap">
+              <sc-for list="{{ t.O.steps }}" as="b" hint-placeholder-count="3"><button onClick="{{ b.f }}" disabled="{{ b.off }}" title="{{ b.tip }}" style="height:30px;border:1px solid #E5E7EB;background:#FFFFFF;color:#1F2937;border-radius:8px;padding:0 10px;font:inherit;font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:4px;opacity:{{ b.op }}" style-hover="background:#EDEFF2"><sc-if value="{{ b.ic }}"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:16px;font-style:normal">{{ b.ic }}</i></sc-if>{{ b.t }}</button></sc-for>
+            </div></sc-if>
+            <button onClick="{{ t.O.mark }}" disabled="{{ t.O.markOff }}" style="height:32px;border:0;background:#1B1B39;color:#FFFFFF;border-radius:8px;padding:0 16px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;opacity:{{ t.O.markOp }};align-self:flex-start">{{ t.O.markT }}</button>
+            <sc-if value="{{ t.O.hint }}"><span style="font-size:12px;color:#6B7280">{{ t.O.hint }}</span></sc-if>
+          </sc-if>
+        </div></sc-if></div>
+          </sc-for>
+          <sc-if value="{{ noTasks }}"><span style="font-size:13px;color:#6B7280;padding:8px 2px">Nothing left today.</span></sc-if>
+          <sc-if value="{{ tkHasDone }}"><div style="display:flex;flex-direction:column;gap:4px;padding:4px 2px 0"><span style="font-size:12px;color:#6B7280">{{ tkDoneN }}</span>
+            <sc-for list="{{ tkDone }}" as="d" hint-placeholder-count="1"><div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#6B7280;padding:3px 0"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:16px;font-style:normal;color:#1E7A40">check_circle</i><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ d.t }}</span><sc-if value="{{ d.canUndo }}"><button onClick="{{ d.undo }}" style="border:0;background:transparent;color:#1F2937;font:inherit;font-size:12px;font-weight:500;cursor:pointer;padding:0" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)">Undo</button></sc-if><sc-if value="{{ d.canCorrect }}"><button onClick="{{ d.correct }}" style="border:0;background:transparent;color:#1F2937;font:inherit;font-size:12px;font-weight:500;cursor:pointer;padding:0" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)">Correct</button></sc-if></div></sc-for>
+          </div></sc-if>
+          <sc-for list="{{ tkComing }}" as="c" hint-placeholder-count="0">
+            <div style="display:flex;flex-direction:column;gap:6px;flex:none">
+              <button onClick="{{ c.toggle }}" aria-expanded="{{ c.open }}" style="display:flex;align-items:center;gap:8px;border:0;background:transparent;padding:8px 4px 2px;font:inherit;cursor:pointer;text-align:left;width:100%" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)"><span style="font-size:11px;font-weight:500;letter-spacing:.06em;color:#6B7280">{{ c.dayU }}</span><span style="font-size:11px;color:#6B7280">{{ c.n }}</span><i class="material-symbols-rounded" aria-hidden="true" style="margin-left:auto;font-size:16px;font-style:normal;color:#6B7280">{{ c.ic }}</i></button>
+              <sc-if value="{{ c.open }}"><sc-for list="{{ c.rows }}" as="t" hint-placeholder-count="2"><div style="flex:none;background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:9px 12px;display:flex;flex-direction:column;gap:3px"><span style="display:flex;align-items:center;gap:6px"><span style="display:inline-flex;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:500;background:#F1F2F4;color:#6B7280;white-space:nowrap">{{ t.mod }}</span><sc-if value="{{ t.due }}"><span style="margin-left:auto;font-size:11px;color:#6B7280">{{ t.due }}</span></sc-if></span><span style="font-size:13px;font-weight:500;color:#4B5563">{{ t.t }}</span><span style="font-size:11px;color:#6B7280">{{ t.ref }}{{ t.whoT }}</span></div></sc-for></sc-if>
+            </div>
+          </sc-for>
+          <a href="Workspace and Team Settings.dc.html" style="display:flex;align-items:center;gap:6px;padding:6px 2px;font-size:12px;font-weight:500;color:#6B7280;text-decoration:none">All my tasks in Workspace<i class="material-symbols-rounded" aria-hidden="true" style="font-size:15px;font-style:normal">arrow_forward</i></a>
+        </div>
+        
+      </aside>
+      </sc-if>
+    </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;crumb&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Sales Order&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;title&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Outright&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;nav&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;outright&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;alerts&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:6,&quot;tsType&quot;:&quot;number&quot;},&quot;teamOn&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:8,&quot;tsType&quot;:&quot;number&quot;},&quot;summary&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;Array&lt;{h:string,mon?:object,rows:object[]}&gt;&quot;},&quot;tabs&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;Array&lt;{l:string,on:boolean,click:Function}&gt;&quot;},&quot;chip&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;{l:string,x:Function}|null&quot;},&quot;sel&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;{n:string,sum:string,acts:object[],clear:Function}|null&quot;},&quot;tasks&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;{head:string,left:number,mods:object[],rows:object[]}&quot;},&quot;children&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;ReactNode&quot;}}">
+const NAV = [
+  ['h', 'OVERVIEW'], ['i', 'dash', 'Dashboard', 'dashboard'], ['i', 'ws', 'Workspace', 'home', 'Workspace and Team Settings.dc.html'],
+  ['h', 'SALES LOCATIONS'], ['i', 'show', 'Showroom', 'storefront'],
+  ['h', 'SALES'], ['i', 'so', 'Sales Orders', 'receipt_long', null, [['outright', 'Outright', 'Sales Order Outright v12.dc.html'], ['subscr', 'Subscription']]],
+  ['h', 'SUPPLY CHAIN'], ['i', 'purch', 'Purchasing', 'shopping_cart', null, [['batch', 'SO Batch Purchase', 'Purchasing v2.dc.html#batch'], ['mpr', 'Manual Purchase Request'], ['po', 'Purchase Orders', 'Purchasing v2.dc.html#po'], ['rcv', 'Receiving'], ['clm', 'Supplier Claims'], ['ret', 'Purchase Returns'], ['rep', 'Repair Orders']]],
+  ['i', 'wh', 'Warehouse', 'warehouse'], ['i', 'pay', 'Payments', 'payments'], ['i', 'del', 'Delivery', 'local_shipping'],
+  ['h', 'SERVICE'], ['i', 'case', 'Service Case', 'support_agent'], ['i', 'issue', 'Issue Tracker', 'assignment_late'],
+  ['h', 'DATA'], ['i', 'reports', 'Reports', 'bar_chart'], ['i', 'sup', 'Suppliers', 'factory'], ['i', 'cat', 'Catalog', 'menu_book'],
+];
+const FALL = { key: 'carres', page: '#FAFAF9', selBg: '#FBE6DB', selFg: '#A33A14', hov: '#FDF5F0' };
+const go = href => () => { if (href) location.href = href; };
+// Team and notifications are the same on every page (TEST data until the staff list and the notification feed are connected).
+const TEAM = [['Staff A', 'on', 'Sales Orders · SO-1368', 'Now', 12], ['Staff B', 'off', 'MC today · jobs moved to Staff D', 'Off', 0], ['Staff C', 'away', 'SO Amendments', '34m idle', 7], ['Staff D', 'on', 'Delivery · covering Staff B', 'Now', 9], ['Staff E', 'off', 'MC', 'Off', 0], ['Shasha', 'on', 'Purchasing · SO Batch Purchase', 'Now', 6], ['Staff F', 'on', 'Warehouse A', 'Now', 4], ['Staff G', 'on', 'Payments', '5m ago', 3], ['Staff H', 'on', 'Service Case', 'Now', 2], ['Jess', 'on', 'COO', 'Now', 0]];
+const DOT = { on: '#1E8A47', away: '#D98A00', off: '#CBD0D6' };
+const AV = n => ['#6B7A8F', '#7A6A58', '#5E7D6E', '#8A6670', '#6A6F9A', '#8C7A4E'][(String(n).split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % 6];
+const NT0 = [['a1', 'ann', 'Announcement', '1h ago', 'Warehouse closed Sat 10 Oct', 'TEST · No pickups or deliveries. Plan Friday runs early.'], ['s1', 'sys', 'Amendment', '2h ago', 'AMD-0040 waiting for approval', 'TEST · SO-1352 · Phone changed by Staff C'], ['s2', 'sys', 'Payment', '5h ago', 'SO-1368 payment needs checking', 'TEST · Bank slip uploaded, amount differs by RM 50.00'], ['a2', 'ann', 'Announcement', '1d ago', 'New stair carry fee from 1 Nov', 'TEST · RM 30 per floor above 3rd floor, no lift.'], ['s3', 'sys', 'Delivery', '1d ago', 'SO-1371 delivery date moved', 'TEST · Customer asked · now 12 Oct'], ['s4', 'sys', 'Jobs', '1d ago', '4 jobs moved to you at 2:00 PM', 'TEST · Staff E on MC']];
+const pickFile = (accept, cb) => { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = accept; inp.onchange = () => { if (inp.files && inp.files[0]) cb(inp.files[0].name, inp.files[0]); }; inp.click(); };
+const todayTxt = () => { const d = new Date(); return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()] + ', ' + d.getDate() + ' ' + ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()]; };
+
+class Component extends DCLogic {
+  state = { rail: (() => { try { const v = localStorage.getItem('carres.rail'); return v == null ? true : v === '1'; } catch (e) { return true; } })(), left: null, work: null, set: false, open: {}, q: '', tk: 0 };
+  componentDidMount() {
+    const w = window.innerWidth; this.setState({ left: w >= 1250, work: w >= 1280 });
+    this._t = () => this.setState(s => ({ tk: s.tk + 1 })); window.addEventListener('carres-theme', this._t);
+    if (!window.CarresTheme) this._p = setInterval(() => { if (window.CarresTheme) { clearInterval(this._p); this._t(); } }, 50);
+  }
+  componentWillUnmount() { window.removeEventListener('carres-theme', this._t); clearInterval(this._p); }
+  renderVals() {
+    const P = this.props, S = this.state, CT = window.CarresTheme, th = CT ? CT.get() : FALL, hov = th.hov || '#F3F4F6';
+    const actFg = ({ quiet: '#6B7280', standard: '#6B7280', strong: '#374151' })[P.actionIcons || 'standard'] || '#6B7280';
+    const act = P.nav || '';
+    const open0 = id => S.open[id] ?? true;
+    const HV = S.hv || '', hv = (k, baseBg, on) => ({ hin: () => this.setState({ hv: k }), hout: () => this.setState({ hv: null }), bg: on ? th.selBg : HV === k ? hov : baseBg });
+    const nav = NAV.map(([k, id, l, ic, href, subs]) => {
+      if (k === 'h') return { isHead: true, isItem: false, l: id };
+      const subOn = !!(subs && subs.some(s => s[0] === act)), on = id === act || (subOn && !(S.rail && open0(id))), open = subs ? (S.open[id] ?? subOn) : false;
+      return { isHead: false, isItem: true, l, ic, on, hasSubs: !!subs, caret: open ? 'expand_less' : 'expand_more', showSubs: !!subs && open && S.rail,
+        fw: on ? '500' : '400', ...hv('nav:' + id, 'transparent', on), fg: on ? th.selFg : '#1F2937', icFg: on ? th.selFg : '#4B5563', sh: on ? '0 1px 2px rgba(16,24,40,.10)' : 'none',
+        click: subs ? () => this.setState({ open: { ...S.open, [id]: !open }, rail: S.rail || true }) : go(href),
+        subs: (subs || []).map(([sid, sl, sh]) => { const so = sid === act && !S.set; return { l: sl, on: so, fw: so ? '500' : '400', ...hv('sub:' + sid, 'transparent', so), fg: so ? th.selFg : '#1F2937', click: so ? () => this.setState({ set: false }) : go(sh) }; }) };
+    });
+    const lfOnNow = !!(P.tasks && P.tasks.lf && P.tasks.lf.on), tkOpenNow = !!(P.tasks && (P.tasks.rows || []).some(r => r.on));
+    const bare = !!P.bare, det = !!P.det, left = (S.left ?? true) && !bare && !det && !((lfOnNow || tkOpenNow) && window.innerWidth < 1280), work = !bare && (det || lfOnNow || tkOpenNow || (S.work ?? true));
+    const sumSecs = (P.summary || []).map(s => ({ h: s.h, foot: s.foot || '', footFg: s.footFg || '#6B7280', hasMon: !!s.mon, mon: s.mon || { label: '', prev: null, next: null }, hasWeek: !!(s.week && s.week.length), week: (s.week || []).map((w, i) => ({ l: w.l, n: w.n, tip: w.tip || '', lfw: i ? '400' : '500', lfg: i ? '#6B7280' : '#1F2937', fg: w.warn ? '#7A5A00' : w.zero ? '#6B7280' : '#1F2937' })),
+      rows: (s.rows || []).map(r => { const can = !!r.pick || !!r.go; return { k: r.k, v: r.v, note: r.note || '', noteFg: r.noteFg || '#7A5A00', canGo: !!r.go, tip: r.tip || (r.go ? 'Open in ' + r.go : ''), on: !!r.on, pick: r.pick || (r.go ? go(r.go === 'Reports' ? 'Reports.dc.html' : r.go) : () => {}), cur: can ? 'pointer' : 'default',
+        ...hv('sum:' + s.h + ':' + r.k, 'transparent', r.on), fg: r.on ? th.selFg : '#4B5563', vfg: r.on ? th.selFg : r.warn ? '#7A5A00' : '#1F2937' }; }) }));
+    const sel = P.sel || null, tk = P.tasks || {};
+    const mods = (tk.mods || []).map(m => ({ ...m, has: m.n > 0, bg: m.on ? th.selBg : 'transparent', fg: m.on ? th.selFg : m.n > 0 ? '#4B5563' : '#CBD0D6', hov: m.on ? th.selBg : hov, pick: m.pick || (() => {}) }));
+    const groups = [['Cool', 'Calm and crisp · Blue is the default'], ['Brand', 'Carres orange'], ['Warm', 'Soft and homely']];
+    const team = TEAM.map(([n, st, sub, when, jobs]) => ({ av: AV(n), name: n, ini: n.startsWith('Staff') ? 'S' + n.slice(-1) : n.slice(0, 2).toUpperCase(), st, dot: DOT[st], sub, when, whenFg: st === 'on' ? '#1E7A40' : '#6B7280', jobs: jobs ? jobs + (jobs === 1 ? ' job' : ' jobs') : '' }));
+    const tq = (S.teamQ || '').trim().toLowerCase(), teamF = team.filter(p => !tq || p.name.toLowerCase().includes(tq) || p.sub.toLowerCase().includes(tq));
+    const teamGroups = [['on', 'ONLINE'], ['away', 'AWAY'], ['off', 'OFF TODAY']].map(([k, l]) => { const ps = teamF.filter(p => p.st === k); return { h: l + ' · ' + ps.length, ps, has: ps.length > 0 }; });
+    const NT = (P.notices || []).concat(NT0), ntRd = S.ntRead || {}, ntTab = S.ntTab || 'all', ntUnreadOf = k => NT.filter(n => (k === 'all' || n[1] === k) && !ntRd[n[0]]).length, ntUnread = ntUnreadOf('all');
+    return {
+      selBarBg: th.selBar || th.selSoft || th.selBg, selBarBd: th.selLine || th.selBg, th, hov, rootH: P.height || '100vh', railW: S.rail ? '220px' : '64px', railOpen: S.rail, railClosed: !S.rail, logoDir: S.rail ? 'row' : 'column', railBtnMl: S.rail ? 'auto' : '0', railIc: S.rail ? 'left_panel_close' : 'left_panel_open', railAria: S.rail ? 'Close menu' : 'Open menu',
+      toggleRail: () => { const v = !S.rail; try { localStorage.setItem('carres.rail', v ? '1' : '0'); } catch (e) {} this.setState({ rail: v }); },
+      nav, actFg, hovC: hov, crumbT: S.set ? 'Settings' : P.crumb || '', titleT: S.set ? 'Appearance' : P.title || '',
+      q: S.q, onQ: e => this.setState({ q: e.target.value }), ...(() => { const qq = (S.q || '').trim(), res = qq.length >= 2 && P.search ? P.search(qq) || [] : [], TONE = { ok: ['#E7F6EC', '#1E7A40'], warn: ['#FBF0D6', '#7A5A00'], neutral: ['#E5E7EB', '#374151'] };
+        const clear = () => this.setState({ q: '' }), hd = [...new Set(res.map(r => r.h))];
+        const groups = hd.map(h => ({ h: String(h).toUpperCase(), items: res.filter(r => r.h === h).slice(0, 6).map(r => ({ ic: r.ic || 'description', t: r.t, sub: r.sub || '', pill: r.pill || '', pbg: (TONE[r.tone] || TONE.neutral)[0], pfg: (TONE[r.tone] || TONE.neutral)[1], go: () => { clear(); r.go && r.go(); } })) }));
+        return { qHas: !!qq, qOpen: qq.length >= 2, qGroups: groups, qNone: qq.length >= 2 && !res.length, qClear: clear, qBd: qq.length >= 2 ? '#CBD0D6' : '#E1E4E8', onQKey: e => { if (e.key === 'Escape') clear(); if (e.key === 'Enter' && res[0]) { clear(); res[0].go && res[0].go(); } } }; })(), teamN: String(TEAM.filter(p => p[1] === 'on').length), hasAlerts: ntUnread > 0, alertsT: ntUnread > 99 ? '99+' : String(ntUnread),
+      todayT: todayTxt(), teamOpen: S.pop === 'team', ntOpen: S.pop === 'nt', popClose: () => this.setState({ pop: null }), teamToggle: () => this.setState({ pop: S.pop === 'team' ? null : 'team' }), ntToggle: () => this.setState({ pop: S.pop === 'nt' ? null : 'nt' }), teamBg: S.pop === 'team' ? '#F3F4F6' : '#FFFFFF', ntBg: S.pop === 'nt' ? '#F3F4F6' : '#FFFFFF',
+      teamQ: S.teamQ || '', setTeamQ: e => this.setState({ teamQ: e.target.value }), teamGroups, teamNone: !teamF.length,
+      ntMarkAll: () => { const r = { ...ntRd }; NT.forEach(n => { r[n[0]] = true; }); this.setState({ ntRead: r }); },
+      ntTabs: [['all', 'All'], ['ann', 'Announcements'], ['sys', 'System']].map(([k, l]) => { const on = ntTab === k, u = ntUnreadOf(k); return { l: l + (u ? ' ' + u : ''), on, fw: on ? '500' : '400', ...hv('nttab:' + k, 'transparent', on), fg: on ? th.selFg : '#4B5563', pick: () => this.setState({ ntTab: k }) }; }),
+      ntItems: NT.filter(n => ntTab === 'all' || n[1] === ntTab).map(([id, k, tag, when, t, d]) => { const r = !!ntRd[id]; return { tag, when, t, d, fw: r ? '400' : '500', dot: r ? 'transparent' : '#1F2937', ...hv('nt:' + id, r ? '#FFFFFF' : '#F5F6F8', false), tagBg: k === 'ann' ? '#FBF0D6' : '#F1F2F4', tagFg: k === 'ann' ? '#7A5A00' : '#374151', read: () => this.setState({ ntRead: { ...ntRd, [id]: true } }) }; }),
+      ntNone: !NT.some(n => ntTab === 'all' || n[1] === ntTab),
+      isSet: S.set, notSet: !S.set, goSettings: () => this.setState({ set: !S.set }), ...(() => { const h = hv('set', 'transparent', S.set); return { setBg: h.bg, setHin: h.hin, setHout: h.hout }; })(), setFg: S.set ? th.selFg : '#4B5563', setFw: S.set ? '500' : '400',
+      goStaff: go('Settings Staff and Duties.dc.html'),
+      themeGroups: groups.map(([g, sub], gi) => ({ g, sub, bt: gi ? '#F1F2F4' : 'transparent', items: CT ? Object.entries(CT.THEMES).filter(([, v]) => v.grp === g).map(([k, v]) => ({ name: v.name, dot: v.dot, on: k === th.key, isDef: k === 'blue', bd: k === th.key ? v.selFg : '#E5E7EB', fg: k === th.key ? v.selFg : '#1F2937', fw: '500', ...(() => { const h = hv('theme:' + k, '#FFFFFF', false); return { hin: h.hin, hout: h.hout, bg: k === th.key ? (v.selSoft || v.selBg) : h.bg }; })(), pick: () => CT.set(k) })) : [] })),
+      cols3: (left ? '277px ' : '') + 'minmax(0,1fr)' + (work ? ' 332px' : ''),
+      leftOpen: left, leftClosed: !left, workOpen: work, workClosed: !work,
+      toggleLeft: () => this.setState(!left && window.innerWidth < 1280 ? { left: true, work: false } : { left: !left }),
+      toggleWork: () => this.setState(!work && window.innerWidth < 1280 ? { work: true, left: false } : { work: !work }),
+      sumSecs, hasSel: !!sel, noSel: !sel, selShow: !!sel && !bare && !det, barShow: !sel && !bare && !det, mainRows: bare || det ? 'minmax(0,1fr)' : 'auto minmax(0,1fr)', viewsHeadT: P.viewsHead || 'Show columns for',
+      noChip: !P.chip, showTxt: P.showing || '', chips: P.chips || [],
+      anyMenu: !!S.tm, closeMenus: () => this.setState({ tm: null }), vmOpen: S.tm === 'views', mmOpen: S.tm === 'more', vmBg: S.tm === 'views' ? '#EEF0F2' : 'transparent', mmBg: S.tm === 'more' ? '#EEF0F2' : 'transparent',
+      mTop: (S.tmPos ? S.tmPos.t : 0) + 'px', mRight: (S.tmPos ? S.tmPos.r : 0) + 'px', viewTitle: P.viewName ? 'View: ' + P.viewName : 'Columns',
+      openViews: e => { const r = e.currentTarget.getBoundingClientRect(); this.setState({ tm: S.tm === 'views' ? null : 'views', tmPos: { t: r.bottom + 6, r: Math.max(8, window.innerWidth - r.right) } }); },
+      openMore: e => { const r = e.currentTarget.getBoundingClientRect(); this.setState({ tm: S.tm === 'more' ? null : 'more', tmPos: { t: r.bottom + 6, r: Math.max(8, window.innerWidth - r.right) } }); },
+      viewOpts: (P.views || []).map(o => ({ ...o, fw: o.on ? '500' : '400', go: () => { this.setState({ tm: null }); if (o.pick) o.pick(); } })),
+      moreGroups: (P.more || []).map((g, gi) => ({ h: g.h, bt: gi ? '#F1F2F4' : 'transparent', items: (g.items || []).map(o => ({ ...o, k: o.k || '', kShort: !!o.k && o.k.length <= 8, kLong: !!o.k && o.k.length > 8, go: () => { this.setState({ tm: null }); if (o.fn) o.fn(); } })) })), selN: sel ? sel.n : '', selSum: sel ? sel.sum : '', selActs: sel ? (sel.acts || []).map(a => ({ ...a, off: !!a.off, tip: a.tip || '', op: a.off ? '.45' : '1', bd: a.pri ? '#1B1B39' : '#E5E7EB', bg: a.pri ? '#1B1B39' : '#FFFFFF', fg: a.pri ? '#FFFFFF' : '#1F2937' })) : [], selClear: sel ? sel.clear : null,
+      tabsV: (P.tabs || []).map((v, i) => { const h = S.hv === 'tab:' + i; return { ...v, fw: v.on ? '500' : '400', hin: () => this.setState({ hv: 'tab:' + i }), hout: () => this.setState({ hv: null }), bg: v.on ? '#FFFFFF' : h ? '#EEF0F3' : 'transparent', sh: v.on ? '0 1px 2px rgba(16,24,40,.10)' : 'none', fg: v.on ? th.selFg : h ? '#1F2937' : '#4B5563' }; }),
+      hasChip: !!(P.chip), chipL: P.chip ? P.chip.l : '', chipX: P.chip ? P.chip.x : null,
+      taskN: String(tk.left ?? 0), taskHead: tk.head || '', taskHeadT: tk.head || ((tk.left ?? 0) + ' today'), tkLog: tk.log || (() => {}),
+      ...(() => { const lf = tk.lf || {}, on = !!lf.on; const sel = (o, base) => ({ ...o, bd: o.on ? th.selFg : '#F2F3F5', bg: o.on ? (th.selSoft || th.selBg) : '#F2F3F5', fg: o.on ? th.selFg : '#374151' });
+        return { lfOn: on, tkLogBd: '#E5E7EB', tkLogBg: on || S.hv === 'tklog' ? '#EDEFF2' : '#FFFFFF', tkLogFg: '#1F2937', tkLogHin: () => this.setState({ hv: 'tklog' }), tkLogHout: () => this.setState({ hv: null }),
+          lf: on ? { ...lf, addShot: lf.addShot ? () => pickFile('image/*', lf.addShot) : (() => {}), addPhoto: lf.addPhoto ? () => pickFile('image/*', lf.addPhoto) : (() => {}), addVideo: lf.addVideo ? () => pickFile('video/*', lf.addVideo) : (() => {}), sos: lf.sos || [], chs: (lf.chs || []).map(o => sel(o, '#E5E7EB')), whos: (lf.whos || []).map(o => sel(o)), whats: lf.whats || [], dets: lf.dets || [], files: lf.files || [], hasFiles: !!(lf.files && lf.files.length), hasDet: !!(lf.dets && lf.dets.length), noWho: !lf.who, whatPh: lf.who ? 'Choose what happened…' : 'Choose who first', whatBg: lf.who ? '#FFFFFF' : '#F3F4F6', whatFg: lf.who ? '#1F2937' : '#6B7280', noteBd: lf.noteReq ? '#D9A23A' : '#D5D9DE', noteLbl: lf.noteReq ? '3 · Remark (required for Other)' : '3 · Remark (optional)', notePh: lf.noteReq ? 'What happened?' : 'Anything else to add', note: lf.note || '', what: lf.what || '', so: lf.so || '', err: lf.err || '', shotHint: lf.shotHint || '', hasNext: !!lf.nextTxt, nextTxt: lf.nextTxt || '' } : {},
+          tkTabsOn: !!(tk.tabs && tk.tabs.length), tkTabs: (tk.tabs || []).map((v, i) => ({ ...v, n: v.n || '', fw: v.on ? '500' : '400', ...hv('tktab:' + i, 'transparent', v.on), fg: v.on ? th.selFg : '#4B5563', nfg: v.on ? th.selFg: '#6B7280', click: v.click || (() => {}) })) }; })(),
+      ...(() => { const rows = (tk.rows || []).slice().sort((a, b) => (b.late ? 1 : 0) - (a.late ? 1 : 0) || ((b.due ? 1 : 0) - (a.due ? 1 : 0))); const mk = (t, i) => ({ ...t, on: !!t.on, hin: () => this.setState({ th: i }), hout: () => this.setState({ th: null }), cbg: S.th === i && !t.on ? hov : '#FFFFFF', bd: t.on || S.th === i ? '#CBD0D6' : '#E5E7EB', isNew: !!t.isNew, mod: t.mod || '', ref: t.ref || '', whoT: t.who ? (t.ref ? ' · ' : '') + t.who : '', dueT: t.late ? 'Overdue · ' + (t.dueDay || '') : t.due ? 'Today ' + t.due : 'Today', dueBg: t.late ? '#FBF0D6' : '#F1F2F4', dueFg: t.late ? '#7A5A00' : '#4B5563', dueIc: t.late ? 'schedule' : 'calendar_today', nFiles: t.files && t.files.length ? String(t.files.length) : '', arrowIc: t.on ? 'expand_less' : 'expand_more', open: t.open || (() => {}) });
+        const o = rows.find(t => t.on);
+        const O = o ? { t: o.t, late: !!o.late, isResult: o.kind === 'result', isSteps: o.kind === 'steps', hasSteps: !!(o.steps && o.steps.length), hasFacts: !!(o.facts && o.facts.length), facts: (o.facts || []).map(f => ({ l: String(f.l).toUpperCase(), v: f.v, go: f.go || null, isLink: !!f.go, noLink: !f.go, fg: f.late ? '#7A5A00' : f.muted ? '#6B7280' : '#1F2937', fw: '500' })),
+          reasons: o.reasons || [], res: o.res || '', onRes: o.onRes || (() => {}), needNext: !!o.needNext, nextHint: o.nextHint || '', tries: o.tries || '', triesFg: o.triesFg || '#6B7280', qOpts: (o.qOpts || []).map(q => ({ ...q, bd: q.on ? th.selFg : '#F2F3F5', bg: q.on ? (th.selSoft || th.selBg) : '#F2F3F5', fg: q.on ? th.selFg : '#4B5563' })), picking: !!o.picking, nextV: o.nextV || '', onNext: o.onNext || (() => {}), nextWarn: o.nextWarn || '',
+          addShot: o.addShot ? () => pickFile('image/*,video/*', o.addShot) : (() => {}), shotTip: o.shot ? 'Proof attached' + (o.shotName ? ' · ' + o.shotName : '') : o.shotReq ? 'Proof required · choose a photo, screenshot or video' : 'Add proof · photo, screenshot or video', shotIc: o.shot ? 'check' : 'attach_file', shotBd: o.shot ? '#B9E2C6' : o.shotReq ? '#D9A23A' : '#E5E7EB', shotBg: o.shot ? '#E7F6EC' : o.shotReq ? '#FBF0D6' : '#FFFFFF', shotFg: o.shot ? '#1E7A40' : o.shotReq ? '#7A5A00' : '#6B7280', shotTxt: o.shot ? 'Proof attached' + (o.shotName ? ' · ' + o.shotName : '') : o.shotReq ? 'Proof required' : 'Proof optional', save: o.save || (() => {}), err: o.err || '',
+          hasFiles: !!(o.files && o.files.length), filesN: (o.files || []).length + ' PDF' + ((o.files || []).length === 1 ? '' : 's'), files: (o.files || []).map(f => ({ ...f, ic: f.done ? 'check' : 'download', fg: f.done ? '#1E7A40' : '#1F2937' })), dlAll: o.dlAll || (() => {}), steps: (o.steps || []).map(b => ({ ...b, op: b.off ? '.45' : '1' })), mark: o.mark || (() => {}), markOff: !!o.markOff, markOp: o.markOff ? '.45' : '1', markT: o.markT || 'Mark done', hint: o.hint || '' } : null;
+        return { taskRows: rows.map((t, i) => ({ ...mk(t, i), O: t.on ? O : {} })), noTasks: !rows.length }; })(),
+      tkHasDone: !!(tk.done && tk.done.length), tkDoneN: (tk.done || []).length + ' done today', tkDone: tk.done || [],
+      ...(() => { const list = tk.coming || (tk.next && tk.next.rows && tk.next.rows.length ? [tk.next] : []); const op = S.coming || {};
+        return { tkHasComing: list.length > 0, tkComing: list.map((c, i) => ({ dayU: String(c.day || '').toUpperCase(), n: String((c.rows || []).length), open: !!op[i], ic: op[i] ? 'expand_less' : 'expand_more', toggle: () => this.setState({ coming: { ...op, [i]: !op[i] } }),
+          rows: (c.rows || []).map(t => ({ mod: t.mod || '', t: t.t, due: t.due || '', ref: t.ref || '', whoT: t.who ? ' · ' + t.who : '' })) })) }; })(),
+      children: P.children,
+    };
+  }
+}
+</script>
+</body>
+</html>

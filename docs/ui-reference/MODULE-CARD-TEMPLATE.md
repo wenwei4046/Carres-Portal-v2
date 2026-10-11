@@ -1,6 +1,6 @@
 # Compact module card — contract
 
-**9 Oct visual adoption:** retain the source-owned facts, host identity and action behaviour below. All appearance and dimensions now come from current 01; the old reference HTML and parity measurements are historical behaviour/build evidence, not a second visual target.
+**Visual adoption (9 Oct, values now v12 of 11 Oct):** retain the source-owned facts, host identity and action behaviour below. All appearance and dimensions now come from current 01; the old reference HTML and parity measurements are historical behaviour/build evidence, not a second visual target.
 
 The one card contract for the right Working Panel (owner rules 2026-10-03 / 10-04 / 10-05): one shared
 card structure and style for every module, with the owner's Stock and Customer corrections. **The outer

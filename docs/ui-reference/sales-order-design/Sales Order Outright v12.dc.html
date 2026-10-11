@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0">
+  <script src="./carres-theme.js"></script>
+  <script src="./sales-real.js"></script>
+  <style>.material-symbols-rounded{font-variation-settings:'FILL' 0,'wght' 300,'GRAD' 0,'opsz' 20}body{margin:0;background:#FAFAF9;font-family:Inter,system-ui,sans-serif;color:#1F2937;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}a{color:#1F2937}a:hover{color:#3965FA}*{box-sizing:border-box}</style>
+</helmet>
+<dc-import name="Carres Shell" crumb="Sales Order" title="Outright" nav="outright" alerts="{{ 6 }}" team-on="{{ 8 }}" det="{{ isDet }}" summary="{{ summary }}" tabs="{{ tabs }}" showing="{{ showing }}" chips="{{ chips }}" views="{{ views }}" view-name="{{ viewName }}" more="{{ more }}" sel="{{ selBar }}" tasks="{{ tasks }}" search="{{ search }}" hint-size="100%,100vh">
+  <sc-if value="{{ isList }}"><dc-import name="Carres Table" label="Sales orders" cols="{{ cols }}" rows="{{ rows }}" sel="{{ sel }}" on-sel="{{ onSel }}" on-clear="{{ onClear }}" sub-heads="{{ subHeads }}" sub-cols="{{ subCols }}" footer="{{ footer }}" footer-sum="{{ footerSum }}" empty="{{ emptyT }}" hint-size="100%,100%" style="display:block;min-height:0;height:100%"></dc-import></sc-if>
+  <sc-if value="{{ isDet }}">
+    <div style="display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:10px;min-height:0;min-width:0">
+      <div style="position:relative;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;min-width:0;min-height:36px">
+        <button onClick="{{ back }}" aria-label="Back to the list" title="Back to the list" style="width:34px;height:34px;border:0;background:transparent;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#1F2937;flex:none;padding:0" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:20px;line-height:1;font-style:normal">arrow_back</i></button>
+        <span style="display:flex;flex-direction:column;line-height:1.25;min-width:0"><span style="font-size:20px;font-weight:600;letter-spacing:-.01em;color:#1F2937;white-space:nowrap">{{ dv.so }}</span><span style="font-size:13px;color:#6B7280;white-space:nowrap">{{ dv.cust }}</span></span>
+        <span style="display:inline-flex;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:500;white-space:nowrap;background:{{ dv.pbg }};color:{{ dv.pfg }}">{{ dv.pill }}</span>
+        <sc-if value="{{ dv.revOn }}"><span title="Revision history" style="display:inline-flex;align-items:center;gap:4px;height:24px;border:1px solid #E5E7EB;background:#FFFFFF;border-radius:8px;padding:0 8px;font-size:12px;font-weight:500;color:#1F2937;white-space:nowrap;flex:none"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:15px;font-style:normal">history</i>{{ dv.revT }}</span></sc-if>
+        <sc-if value="{{ dv.pendOn }}"><span title="{{ dv.pendTip }}" style="display:inline-flex;align-items:center;height:24px;border:1px solid #E5E7EB;background:#FFFFFF;border-radius:8px;padding:0 8px;font-size:12px;font-weight:500;color:#1F2937;white-space:nowrap;flex:none">Waiting for Jess</span></sc-if>
+        <span title="SO PIC not recorded" style="display:flex;align-items:center;flex:none"><span style="width:24px;height:24px;border-radius:50%;background:#E5E7EB;color:#6B7280;display:flex;align-items:center;justify-content:center;border:2px solid #FFFFFF"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:14px;font-style:normal">person</i></span></span>
+        <span style="margin-left:auto;display:flex;gap:6px;align-items:center;flex:none;max-width:100%">
+          <button onClick="{{ dv.log }}" style="height:34px;border:1px solid #E5E7EB;background:#FFFFFF;color:#1F2937;border-radius:8px;padding:0 12px 0 10px;font:inherit;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px" style-hover="background:#EDEFF2"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;line-height:1;font-style:normal;color:#6B7280">call</i>Log contact</button>
+          <button onClick="{{ dv.amOpen }}" style="height:34px;border:0;background:#1B1B39;color:#FFFFFF;border-radius:8px;padding:0 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#2B2B55">Request amendment</button>
+          <span style="position:relative;display:flex">
+            <button onClick="{{ dv.toggleMore }}" aria-label="More actions" title="More actions" aria-expanded="{{ dv.moreOpen }}" style="width:34px;height:34px;border:0;background:{{ dv.moreBg }};border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#6B7280;padding:0" style-hover="background:rgba(31,41,55,.10)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:20px;line-height:1;font-style:normal">more_vert</i></button>
+            <sc-if value="{{ dv.moreOpen }}">
+              <div onClick="{{ dv.closeMore }}" style="position:fixed;inset:0;z-index:60"></div>
+              <div role="menu" aria-label="Order actions" style="position:absolute;right:0;top:40px;z-index:61;width:250px;background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 8px 24px rgba(17,24,39,.12);padding:6px;display:flex;flex-direction:column">
+                <span style="font-size:11px;font-weight:500;letter-spacing:.06em;color:#6B7280;padding:8px 10px 4px">SALES ORDER</span><button onClick="{{ dv.openDoc }}" role="menuitem" style="width:100%;border:0;background:transparent;border-radius:8px;padding:7px 10px;font:inherit;font-size:13px;color:#1F2937;cursor:pointer;display:flex;align-items:center;gap:10px;text-align:left" style-hover="background:#F3F4F6"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;font-style:normal;color:#6B7280">visibility</i>Preview SO PDF</button><button onClick="{{ dv.printDoc }}" role="menuitem" style="width:100%;border:0;background:transparent;border-radius:8px;padding:7px 10px;font:inherit;font-size:13px;color:#1F2937;cursor:pointer;display:flex;align-items:center;gap:10px;text-align:left" style-hover="background:#F3F4F6"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;font-style:normal;color:#6B7280">print</i>Print SO</button><button onClick="{{ dv.printDoc }}" role="menuitem" style="width:100%;border:0;background:transparent;border-radius:8px;padding:7px 10px;font:inherit;font-size:13px;color:#1F2937;cursor:pointer;display:flex;align-items:center;gap:10px;text-align:left" style-hover="background:#F3F4F6"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;font-style:normal;color:#6B7280">download</i>Download PDF</button>
+                <span style="font-size:11px;font-weight:500;letter-spacing:.06em;color:#6B7280;padding:8px 10px 4px;border-top:1px solid #F1F2F4">COPY</span><button onClick="{{ dv.copySo }}" role="menuitem" style="width:100%;border:0;background:transparent;border-radius:8px;padding:7px 10px;font:inherit;font-size:13px;color:#1F2937;cursor:pointer;display:flex;align-items:center;gap:10px;text-align:left" style-hover="background:#F3F4F6"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;font-style:normal;color:#6B7280">content_copy</i>SO no.</button><button onClick="{{ dv.copyPhone }}" role="menuitem" style="width:100%;border:0;background:transparent;border-radius:8px;padding:7px 10px;font:inherit;font-size:13px;color:#1F2937;cursor:pointer;display:flex;align-items:center;gap:10px;text-align:left" style-hover="background:#F3F4F6"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;font-style:normal;color:#6B7280">content_copy</i>Customer phone</button>
+                <sc-if value="{{ dv.canWithdraw }}"><span style="font-size:11px;font-weight:500;letter-spacing:.06em;color:#6B7280;padding:8px 10px 4px;border-top:1px solid #F1F2F4">OTHER</span></sc-if><sc-if value="{{ dv.canWithdraw }}"><button onClick="{{ dv.withdraw }}" role="menuitem" style="width:100%;border:0;background:transparent;border-radius:8px;padding:7px 10px;font:inherit;font-size:13px;color:#1F2937;cursor:pointer;display:flex;align-items:center;gap:10px;text-align:left" style-hover="background:#F3F4F6"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;font-style:normal;color:#6B7280">undo</i>Withdraw amendment</button></sc-if>
+              </div>
+            </sc-if>
+          </span>
+        </span>
+      </div>
+      <sc-if value="{{ dv.docOpen }}">
+        <div onClick="{{ dv.closeDoc }}" style="position:fixed;inset:0;z-index:70;background:rgba(22,24,29,.45)"></div>
+        <div role="dialog" aria-label="Sales Order PDF preview" style="position:fixed;inset:24px 0;z-index:71;display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none">
+          <div style="width:min(794px,calc(100vw - 32px));display:flex;align-items:center;gap:8px;pointer-events:auto">
+            <span style="color:#FFFFFF;font-size:14px;font-weight:600;flex:1">{{ dv.doc.so }}.pdf</span>
+            <button onClick="{{ dv.printDoc }}" style="height:32px;border:0;border-radius:8px;background:#FFFFFF;color:#1F2937;padding:0 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px" style-hover="background:#F3F4F6"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;font-style:normal">download</i>Download</button>
+            <button onClick="{{ dv.printDoc }}" style="height:32px;border:0;border-radius:8px;background:#FFFFFF;color:#1F2937;padding:0 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px" style-hover="background:#F3F4F6"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;font-style:normal">print</i>Print</button>
+            <button onClick="{{ dv.closeDoc }}" aria-label="Close preview" style="width:32px;height:32px;border:0;border-radius:50%;background:#FFFFFF;color:#1F2937;cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:#F3F4F6"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:20px;font-style:normal">close</i></button>
+          </div>
+          <div style="width:min(794px,calc(100vw - 32px));flex:1;min-height:0;overflow:auto;pointer-events:auto;border-radius:8px">
+            <div data-so-doc="1" style="background:#FFFFFF;padding:40px 44px;display:flex;flex-direction:column;gap:20px;color:#1F2937;font-size:12px;line-height:1.45;font-family:Inter,sans-serif">
+              <div style="display:flex;justify-content:space-between;gap:20px;align-items:flex-start">
+                <div style="display:flex;gap:12px;align-items:flex-start"><img src="assets/carres-mark.png" alt="Carres" style="width:36px;height:36px;object-fit:contain;flex:none"><span style="display:flex;flex-direction:column"><b style="font-size:13px">CARRES SDN. BHD.</b><span style="color:#6B7280">SSM 20201055306 (1601150-X)</span><span style="color:#6B7280">E-28-02, and E-28-03, Menara SUEZCAP 2, KL Gateway,</span><span style="color:#6B7280">No.2, Jalan Kerinchi, Gerbang Kerinchi Lestari, 59200 Kuala Lumpur, Wilayah Persekutuan KL.</span></span></div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;flex:none"><span style="font-size:20px;font-weight:700">{{ dv.doc.so }}</span><span style="font-size:11px;letter-spacing:.3em;color:#6B7280">SALES ORDER</span></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+                <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#6B7280">BILL TO</span>
+                  <sc-for list="{{ dv.doc.bill }}" as="x" hint-placeholder-count="5"><div style="display:grid;grid-template-columns:72px 1fr;gap:8px"><span style="color:#6B7280">{{ x.k }}</span><span style="white-space:pre-line">{{ x.v }}</span></div></sc-for>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#6B7280">SALES ORDER INFO</span>
+                  <sc-for list="{{ dv.doc.info }}" as="x" hint-placeholder-count="6"><div style="display:grid;grid-template-columns:150px 1fr;gap:8px"><span style="color:#6B7280">{{ x.k }}</span><span>{{ x.v }}</span></div></sc-for>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column">
+                <div style="display:grid;grid-template-columns:22px 130px minmax(0,1fr) 36px 72px 60px 80px;gap:8px;padding:6px 0;border-top:1.5px solid #1F2937;border-bottom:1px solid #1F2937;font-size:10px;font-weight:700;letter-spacing:.04em"><span>#</span><span>ITEM CODE</span><span>DESCRIPTION</span><span style="text-align:right">QTY</span><span style="text-align:right">UNIT (RM)</span><span style="text-align:right">DISC (RM)</span><span style="text-align:right">AMOUNT (RM)</span></div>
+                <sc-for list="{{ dv.doc.groups }}" as="g" hint-placeholder-count="1">
+                  <div style="padding:8px 0 2px;font-size:10px;font-weight:700;color:#6B7280;letter-spacing:.04em">{{ g.h }}</div>
+                  <sc-for list="{{ g.rows }}" as="it" hint-placeholder-count="1"><div style="display:grid;grid-template-columns:22px 130px minmax(0,1fr) 36px 72px 60px 80px;gap:8px;padding:5px 0;border-bottom:1px solid #E6E8EB;font-variant-numeric:tabular-nums"><span>{{ it.no }}</span><span style="overflow-wrap:anywhere">{{ it.code }}</span><span style="overflow-wrap:anywhere">{{ it.desc }}</span><span style="text-align:right">{{ it.qty }}</span><span style="text-align:right;color:#6B7280">{{ it.nr }}</span><span style="text-align:right;color:#6B7280">{{ it.nr }}</span><span style="text-align:right;color:#6B7280">{{ it.nr }}</span></div></sc-for>
+                </sc-for>
+                <div style="display:grid;grid-template-columns:22px 130px minmax(0,1fr) 36px 72px 60px 80px;gap:8px;padding:6px 0;border-bottom:1.5px solid #1F2937;font-weight:700;font-variant-numeric:tabular-nums"><span></span><span>TOTAL PAYABLE</span><span></span><span style="text-align:right">{{ dv.doc.qty }}</span><span></span><span></span><span style="text-align:right;color:#6B7280;font-weight:400">Not recorded</span></div>
+              </div>
+              <div style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:24px;align-items:start">
+                <div style="display:flex;flex-direction:column">
+                  <div style="display:grid;grid-template-columns:78px minmax(0,1fr) 70px 64px 70px;gap:6px;padding:5px 0;border-bottom:1px solid #1F2937;font-size:9px;font-weight:700;letter-spacing:.03em"><span>DATE</span><span>PAYMENT RECEIVED</span><span>APPROVAL CODE</span><span>COLLECTED BY</span><span style="text-align:right">AMOUNT (RM)</span></div>
+                  <span style="padding:5px 0;color:#6B7280">Payments not recorded.</span>
+                  <span style="margin-top:28px;border-top:1px solid #1F2937;padding-top:4px;width:200px;color:#6B7280">Customer signature · {{ dv.doc.cust }}</span>
+                </div>
+                <div style="display:flex;flex-direction:column">
+                  <sc-for list="{{ dv.doc.sum }}" as="t" hint-placeholder-count="5"><div style="display:flex;justify-content:space-between;padding:4px 8px;font-variant-numeric:tabular-nums;background:{{ t.bg }}"><span style="font-weight:{{ t.fw }}">{{ t.k }}</span><span style="font-weight:{{ t.fw }};color:{{ t.fg }}">{{ t.v }}</span></div></sc-for>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:3px;font-size:10px;color:#374151"><b style="font-size:11px;color:#1F2937">Terms &amp; Conditions</b>
+                <span>1. This sales order records your purchase agreement with Carres. The sales invoice is a separate document issued upon delivery.</span>
+                <span>2. Balance due is payable in full on or before delivery. Cash, bank transfer, DuitNow QR, and cheque accepted.</span>
+                <span>3. Delivery date is best-effort and may shift ±3 working days subject to operation confirmation.</span>
+                <span>4. Stair-carry surcharges (if any) are billed on this sales order and are not invoiced separately on the DO.</span>
+                <span>5. Once the delivery date has been confirmed, any subsequent request to change or extend the date will incur a rescheduling surcharge.</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;border-top:1px solid #E6E8EB;padding-top:8px;font-size:10px;color:#6B7280"><span>{{ dv.doc.so }} · Issued by Not recorded</span><span>Computer-generated document · No company signature required. Page 1 of 1</span></div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ dv.toast }}"><div role="status" style="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:80;background:#1F2937;color:#FFFFFF;border-radius:8px;padding:8px 14px;font-size:13px;box-shadow:0 8px 24px rgba(17,24,39,.2)">{{ dv.toast }}</div></sc-if>
+      <div role="tablist" aria-label="Sales order sections" style="display:flex;gap:2px">
+        <sc-for list="{{ dv.tabs }}" as="t" hint-placeholder-count="3"><button role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="border:0;border-radius:8px;padding:6px 14px;font:inherit;font-size:13px;font-weight:{{ t.fw }};cursor:pointer;background:{{ t.bg }};color:{{ t.fg }}">{{ t.l }}</button></sc-for>
+      </div>
+      <div style="overflow:auto;min-height:0;display:flex;flex-direction:column;gap:12px;scrollbar-width:thin;padding-bottom:4px">
+        <sc-if value="{{ dv.tSo }}">
+          <sc-if value="{{ dv.feOn }}">
+          <div style="position:sticky;top:0;z-index:5;display:flex;flex-direction:column;gap:8px;background:#FFFFFF;border:1px solid #CBD0D6;border-radius:8px;padding:8px 12px">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="font-size:13px;font-weight:500;color:#1F2937">Amendment</span><span style="font-size:12px;color:#6B7280">{{ dv.feN }}</span><span style="font-size:12px;color:#6B7280;flex:1;min-width:120px">Click the pencil next to a detail to change it.</span>
+              <button onClick="{{ dv.whyT }}" aria-expanded="{{ dv.whyOpen }}" style="height:32px;border:1px solid {{ dv.whyBd }};background:#FFFFFF;color:#1F2937;border-radius:8px;padding:0 10px 0 12px;font:inherit;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:4px" style-hover="background:#EDEFF2">{{ dv.whyTxt }}<i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;font-style:normal;color:#6B7280">expand_more</i></button>
+              <button onClick="{{ dv.proof }}" style="height:32px;border:1px solid #E5E7EB;background:#FFFFFF;color:#1F2937;border-radius:8px;padding:0 12px 0 10px;font:inherit;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px" style-hover="background:#EDEFF2"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;font-style:normal;color:#6B7280">{{ dv.proofIc }}</i>{{ dv.proofTxt }}</button>
+              <button onClick="{{ dv.feCancel }}" style="height:32px;border:1px solid #E5E7EB;background:#FFFFFF;color:#1F2937;border-radius:8px;padding:0 12px;font:inherit;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#EDEFF2">Cancel</button>
+              <button onClick="{{ dv.feSubmit }}" disabled="{{ dv.feNo }}" style="height:32px;border:0;background:#1B1B39;color:#FFFFFF;border-radius:8px;padding:0 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;opacity:{{ dv.feOp }}" style-hover="background:#2B2B55">Submit for approval</button>
+            </div>
+            <sc-if value="{{ dv.whyOpen }}"><div style="display:flex;flex-direction:column;gap:6px;border-top:1px solid #F1F2F4;padding-top:8px"><span style="font-size:12px;color:#6B7280">Why? Choose all that apply</span><sc-for list="{{ dv.rGroups }}" as="g" hint-placeholder-count="2"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-size:11px;font-weight:500;letter-spacing:.06em;color:#6B7280;width:110px">{{ g.h }}</span><sc-for list="{{ g.opts }}" as="c" hint-placeholder-count="3"><button onClick="{{ c.pick }}" aria-pressed="{{ c.on }}" style="height:28px;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.fg }};border-radius:999px;padding:0 10px;font:inherit;font-size:12px;cursor:pointer">{{ c.l }}</button></sc-for></div></sc-for></div></sc-if>
+            <sc-if value="{{ dv.feErr }}"><span style="font-size:12px;color:#7A5A00">{{ dv.feErr }}</span></sc-if>
+            <sc-if value="{{ dv.feConfirm }}"><div style="display:flex;align-items:center;gap:8px;border-top:1px solid #F1F2F4;padding-top:8px"><span style="font-size:13px;color:#1F2937;flex:1">Discard {{ dv.feN }}?</span><button onClick="{{ dv.feKeep }}" style="height:32px;border:1px solid #E5E7EB;background:#FFFFFF;color:#1F2937;border-radius:8px;padding:0 12px;font:inherit;font-size:13px;font-weight:500;cursor:pointer">Keep editing</button><button onClick="{{ dv.feDiscard }}" style="height:32px;border:0;background:#1B1B39;color:#FFFFFF;border-radius:8px;padding:0 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer">Discard</button></div></sc-if>
+          </div>
+          </sc-if>
+          <section style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px"><span style="font-size:15px;font-weight:500;color:#1F2937;flex:1">{{ dv.top.h }}</span><span style="font-size:12px;color:#6B7280">{{ dv.top.note }}</span></div>
+            <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px 16px;border-top:1px solid #F1F2F4;padding-top:12px">
+              <sc-for list="{{ dv.top.rows }}" as="x" hint-placeholder-count="5"><span style="display:flex;flex-direction:column;gap:6px;min-width:0"><span style="font-size:12px;color:#6B7280">{{ x.k }}</span><span style="font-size:13px;font-weight:500;color:{{ x.fg }};overflow-wrap:anywhere">{{ x.v }}</span></span></sc-for>
+            </div>
+          </section>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px;align-items:stretch">
+            <sc-for list="{{ dv.cols }}" as="c" hint-placeholder-count="2">
+              <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:18px;min-width:0">
+                <sc-for list="{{ c.secs }}" as="s" hint-placeholder-count="2">
+                  <section style="display:flex;flex-direction:column">
+                    <div style="display:flex;align-items:center;gap:8px;padding-bottom:6px"><span style="font-size:15px;font-weight:500;color:#1F2937;flex:1">{{ s.h }}</span></div>
+                    <sc-for list="{{ s.rows }}" as="r" hint-placeholder-count="4"><div style="display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px;align-items:center;min-height:36px;padding:4px 0;box-sizing:border-box;border-top:1px solid #F1F2F4;font-size:13px"><span style="color:#6B7280">{{ r.k }}</span><sc-if value="{{ r.input }}"><input value="{{ r.ev }}" onInput="{{ r.on }}" aria-label="{{ r.k }}" autoFocus="{{ true }}" style="height:30px;border:1px solid {{ r.bd }};border-radius:8px;font:inherit;font-size:13px;color:#1F2937;padding:0 10px;background:#FFFFFF;width:100%;min-width:0"></sc-if><sc-if value="{{ r.show }}"><span style="font-weight:500;color:{{ r.fg }};white-space:pre-line;overflow-wrap:anywhere;display:flex;align-items:flex-start;gap:6px"><span style="flex:1;min-width:0">{{ r.v }}</span><sc-if value="{{ r.canEdit }}"><button onClick="{{ r.pencil }}" aria-label="Edit {{ r.key }}" title="Edit" style="width:26px;height:26px;border:0;border-radius:50%;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#6B7280;flex:none;margin-top:-4px;padding:0" style-hover="background:#F3F4F6"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:16px;font-style:normal">edit</i></button></sc-if></span></sc-if></div></sc-for>
+                  </section>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+          <section aria-label="Items and payment" style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:14px 16px;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;gap:8px;padding-bottom:6px"><span style="font-size:15px;font-weight:500;color:#1F2937;flex:1">Items</span></div>
+            <div style="overflow-x:auto"><div role="table" style="min-width:520px;font-size:13px;font-variant-numeric:tabular-nums">
+              <div role="row" style="display:grid;grid-template-columns:24px minmax(0,1fr) 40px 96px 96px;gap:12px;align-items:center;height:40px;padding:0 8px;background:#F8F9FA;border-top:1px solid #F1F2F4;border-bottom:1px solid #E5E7EB;font-size:12px;font-weight:500;color:#6B7280"><span>#</span><span>Item</span><span style="text-align:right">Qty</span><span style="text-align:right">Unit price</span><span style="text-align:right">Amount</span></div>
+              <sc-for list="{{ dv.items }}" as="it" hint-placeholder-count="2"><div role="row" style="display:grid;grid-template-columns:24px minmax(0,1fr) 40px 96px 96px;gap:12px;align-items:center;min-height:44px;padding:4px 8px;border-bottom:1px solid #F1F2F4"><span style="color:#6B7280">{{ it.no }}</span><span style="display:flex;flex-direction:column;gap:1px;line-height:1.3;min-width:0"><span style="font-size:13px;color:#1F2937;overflow-wrap:anywhere">{{ it.model }}</span><sc-if value="{{ it.spec }}"><span style="font-size:12px;color:#6B7280;overflow-wrap:anywhere">{{ it.spec }}</span></sc-if></span><span style="text-align:right;color:#1F2937">{{ it.qty }}</span><span style="text-align:right;color:#6B7280">Not recorded</span><span style="text-align:right;color:#6B7280">Not recorded</span></div></sc-for>
+              <sc-for list="{{ dv.totals }}" as="t" hint-placeholder-count="3"><div role="row" style="display:grid;grid-template-columns:24px minmax(0,1fr) 40px 96px 96px;gap:12px;align-items:center;min-height:44px;padding:0 8px;border-bottom:1px solid #F1F2F4;background:{{ t.bg }}"><span></span><span style="color:#6B7280;font-weight:{{ t.fw }}">{{ t.k }}</span><span style="text-align:right;color:#1F2937">{{ t.q }}</span><span></span><span style="text-align:right;font-weight:{{ t.fw }};color:{{ t.fg }}">{{ t.v }}</span></div></sc-for>
+            </div></div>
+            <span style="font-size:15px;font-weight:500;color:#1F2937;padding:18px 0 6px">Payment</span>
+            <sc-for list="{{ dv.payMeta }}" as="x" hint-placeholder-count="3"><div style="display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px;align-items:center;min-height:36px;padding:4px 0;box-sizing:border-box;border-top:1px solid #F1F2F4;font-size:13px"><span style="color:#6B7280">{{ x.k }}</span><span style="font-weight:500;color:{{ x.fg }};overflow-wrap:anywhere">{{ x.v }}</span></div></sc-for>
+          </section>
+        </sc-if>
+        <sc-if value="{{ dv.tRoute }}">
+          <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:15px;font-weight:500;color:#1F2937;flex:1">Delivery date</span><div role="tablist" aria-label="Route view" style="display:flex;gap:2px;padding:3px;background:#E2E4E8;border-radius:10px"><sc-for list="{{ dv.rviews }}" as="v" hint-placeholder-count="3"><button role="tab" aria-selected="{{ v.on }}" onClick="{{ v.pick }}" style="border:0;border-radius:8px;padding:4px 12px;font:inherit;font-size:13px;font-weight:{{ v.fw }};cursor:pointer;background:{{ v.bg }};color:{{ v.fg }};box-shadow:{{ v.sh }}">{{ v.l }}</button></sc-for></div></div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 16px;border-top:1px solid #F1F2F4;padding-top:10px">
+              <sc-for list="{{ dv.rtop }}" as="x" hint-placeholder-count="3"><span style="display:flex;flex-direction:column;gap:3px;min-width:0;align-items:flex-start"><span style="font-size:12px;color:#6B7280">{{ x.k }}</span><span style="font-size:13px;font-weight:500;color:{{ x.fg }}">{{ x.v }}</span></span></sc-for>
+            </div>
+            <sc-if value="{{ dv.rvOv }}">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px;border-top:1px solid #F1F2F4;padding-top:12px">
+              <sc-for list="{{ dv.tracks }}" as="r" hint-placeholder-count="3">
+                <div style="display:flex;flex-direction:column;gap:8px;border:1px solid {{ r.bd }};border-radius:8px;padding:12px 14px;min-width:0;background:#FFFFFF">
+                  <div style="display:flex;align-items:center;gap:8px"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;line-height:1;font-style:normal;color:#6B7280">{{ r.ic }}</i><span style="font-size:15px;font-weight:500;color:#1F2937;flex:1">{{ r.t }}</span><span style="display:inline-flex;border-radius:999px;padding:1px 10px;font-size:12px;font-weight:500;white-space:nowrap;background:{{ r.pbg }};color:{{ r.pfg }}">{{ r.word }}</span></div>
+                  <span style="font-size:13px;color:#1F2937;line-height:1.45">{{ r.line }}</span>
+                  <div style="display:flex;flex-direction:column;border-top:1px solid #F1F2F4;padding-top:6px"><sc-for list="{{ r.facts }}" as="x" hint-placeholder-count="4"><div style="display:grid;grid-template-columns:64px minmax(0,1fr);gap:8px;padding:3px 0;font-size:12px"><span style="color:#6B7280">{{ x.k }}</span><span style="color:{{ x.fg }};font-weight:500;overflow-wrap:anywhere">{{ x.v }}</span></div></sc-for></div>
+                  <sc-if value="{{ r.hasItems }}"><div style="display:flex;flex-direction:column;gap:4px;border-top:1px solid #F1F2F4;padding-top:6px"><span style="font-size:11px;font-weight:500;letter-spacing:.06em;color:#6B7280">ITEMS</span><sc-for list="{{ r.items }}" as="it" hint-placeholder-count="2"><span style="display:flex;gap:8px;line-height:1.3"><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-size:13px;color:#1F2937">{{ it.n }}</span><sc-if value="{{ it.sp }}"><span style="font-size:12px;color:#6B7280">{{ it.sp }}</span></sc-if></span><span style="font-size:12px;color:#6B7280;white-space:nowrap">{{ it.q }}</span></span></sc-for></div></sc-if>
+                  <div style="display:flex;flex-direction:column;gap:1px;border-top:1px solid #F1F2F4;padding-top:6px"><span style="font-size:11px;font-weight:500;letter-spacing:.06em;color:#6B7280;padding-bottom:2px">STEPS</span><sc-for list="{{ r.steps }}" as="p" hint-placeholder-count="3"><div style="display:grid;grid-template-columns:16px minmax(0,1fr);gap:8px;align-items:center;padding:4px 6px;margin:0 -6px;border-radius:8px;background:{{ p.rowBg }};font-size:12px"><span style="width:14px;height:14px;border-radius:50%;border:1.5px solid {{ p.ring }};background:{{ p.fill }};box-sizing:border-box"></span><span style="color:{{ p.fg }};font-weight:{{ p.fw }}">{{ p.name }}</span></div></sc-for></div>
+                </div>
+              </sc-for>
+            </div>
+            </sc-if>
+            <sc-if value="{{ dv.rvDt }}">
+            <div style="border-top:1px solid #F1F2F4"><div>
+              <div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 84px 84px 96px minmax(0,1fr);gap:10px;align-items:center;height:40px;padding:0 8px;background:#F8F9FA;border-bottom:1px solid #E5E7EB;font-size:12px;font-weight:500;color:#6B7280"><span>Step</span><span>Who</span><span>Planned</span><span>Actual</span><span>Status</span><span>Document</span></div>
+              <sc-for list="{{ dv.route }}" as="r" hint-placeholder-count="6"><div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 84px 84px 96px minmax(0,1fr);gap:10px;align-items:center;min-height:44px;padding:4px 8px;box-sizing:border-box;border-bottom:1px solid #F1F2F4;font-size:13px;font-variant-numeric:tabular-nums"><span style="color:#1F2937">{{ r.name }}</span><span style="color:{{ r.whoFg }}">{{ r.who }}</span><span style="color:{{ r.planFg }}">{{ r.plan }}</span><span style="color:{{ r.actFg }}">{{ r.act }}</span><span style="justify-self:start;background:{{ r.pbg }};color:{{ r.pfg }};border-radius:999px;padding:3px 10px;font-size:12px;font-weight:500;white-space:nowrap">{{ r.st }}</span><span style="color:{{ r.docFg }};overflow-wrap:anywhere">{{ r.doc }}</span></div></sc-for>
+            </div></div>
+            </sc-if>
+            <sc-if value="{{ dv.rvSt }}">
+            <div style="overflow-x:auto;border-top:1px solid #F1F2F4;padding-top:14px;scrollbar-width:thin">
+              <div style="min-width:{{ dv.mapMin }};display:flex;flex-direction:column;align-items:center">
+                <div style="width:240px;max-width:100%;background:{{ dv.root.bg }};border:1px solid {{ dv.root.bd }};border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:3px;min-width:0"><span style="display:flex;align-items:center;gap:6px"><span style="flex:1;font-size:13px;font-weight:500;color:#1F2937">{{ dv.root.name }}</span><span style="display:inline-flex;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:500;white-space:nowrap;background:{{ dv.root.pbg }};color:{{ dv.root.pfg }}">{{ dv.root.st }}</span></span><span style="font-size:12px;color:#6B7280;line-height:1.4">{{ dv.root.line }}</span></div>
+                <span style="width:1px;height:16px;background:#CBD0D6"></span>
+                <div style="position:relative;display:flex;gap:16px;justify-content:center;align-items:stretch;padding-top:16px">
+                  <sc-for list="{{ dv.branches }}" as="br" hint-placeholder-count="2">
+                    <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:0;flex:1 1 0;min-width:180px;max-width:240px">
+                      <span style="position:absolute;top:-16px;left:{{ br.barL }};right:{{ br.barR }};height:1px;background:#CBD0D6"></span>
+                      <span style="position:absolute;top:-16px;left:50%;width:1px;height:16px;background:#CBD0D6"></span>
+                      <div style="width:100%;background:{{ br.bg }};border:1px solid {{ br.bd }};border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-width:0">
+                        <span style="display:flex;align-items:center;gap:6px"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:16px;line-height:1;font-style:normal;color:#6B7280">{{ br.ic }}</i><span style="flex:1;font-size:13px;font-weight:500;color:#1F2937">{{ br.name }}</span><span style="display:inline-flex;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:500;white-space:nowrap;background:{{ br.pbg }};color:{{ br.pfg }}">{{ br.st }}</span></span>
+                        <span style="font-size:12px;color:#6B7280">{{ br.line }}</span>
+                        <div style="display:flex;flex-direction:column;gap:2px;border-top:1px solid #F1F2F4;padding-top:6px"><sc-for list="{{ br.items }}" as="it" hint-placeholder-count="2"><span style="display:flex;gap:8px;line-height:1.3"><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-size:13px;color:#1F2937">{{ it.n }}</span><sc-if value="{{ it.sp }}"><span style="font-size:12px;color:#6B7280">{{ it.sp }}</span></sc-if></span><span style="font-size:12px;color:#6B7280;white-space:nowrap">{{ it.q }}</span></span></sc-for></div>
+                      </div>
+                      <span style="width:1px;flex:1 0 16px;background:#CBD0D6"></span>
+                      <span style="position:absolute;bottom:0;left:{{ br.barL }};right:{{ br.barR }};height:1px;background:#CBD0D6"></span>
+                    </div>
+                  </sc-for>
+                </div>
+                <span style="width:1px;height:16px;background:#CBD0D6"></span>
+                <sc-for list="{{ dv.tail }}" as="p" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;align-items:center"><div style="width:240px;max-width:100%;background:{{ p.bg }};border:1px solid {{ p.bd }};border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:3px;min-width:0"><span style="display:flex;align-items:center;gap:6px"><span style="flex:1;font-size:13px;font-weight:500;color:#1F2937">{{ p.name }}</span><span style="display:inline-flex;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:500;white-space:nowrap;background:{{ p.pbg }};color:{{ p.pfg }}">{{ p.st }}</span></span><span style="font-size:12px;color:#6B7280;line-height:1.4">{{ p.line }}</span></div><sc-if value="{{ p.more }}"><span style="width:1px;height:16px;background:#CBD0D6"></span></sc-if></div></sc-for>
+              </div>
+            </div>
+            </sc-if>
+          </div>
+        </sc-if>
+        <sc-if value="{{ dv.tTime }}">
+          <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:0 14px 8px;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;height:38px"><span style="font-size:15px;font-weight:500;color:#1F2937">Timeline</span></div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;padding-bottom:8px"><sc-for list="{{ dv.tf }}" as="f" hint-placeholder-count="4"><button onClick="{{ f.pick }}" aria-pressed="{{ f.on }}" style="border:1px solid {{ f.bd }};background:{{ f.bg }};color:{{ f.fg }};border-radius:8px;height:28px;padding:0 10px;font:inherit;font-size:12px;font-weight:500;cursor:pointer">{{ f.l }}</button></sc-for></div>
+            <sc-for list="{{ dv.time }}" as="h" hint-placeholder-count="2"><div style="display:grid;grid-template-columns:72px minmax(0,1fr);gap:10px;align-items:start;padding:8px 0;border-top:1px solid #F1F2F4"><span style="display:flex;flex-direction:column;line-height:1.3"><span style="font-size:12px;color:#1F2937">{{ h.d }}</span><span style="font-size:12px;color:#6B7280">{{ h.tm }}</span></span><span style="display:flex;flex-direction:column;gap:1px;min-width:0;line-height:1.3"><span style="font-size:13px;color:#1F2937">{{ h.t }}</span><span style="font-size:12px;color:#6B7280">{{ h.by }}</span></span></div></sc-for>
+            <span style="font-size:12px;color:#6B7280;padding:8px 0 2px;border-top:1px solid #F1F2F4">Calls, payments, deliveries and amendments are not recorded in the sheet. New ones logged here are added above.</span>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+</dc-import>
+<sc-if value="{{ amOn }}"><div style="position:fixed;inset:0;z-index:70;background:rgba(31,41,55,.28);display:flex;align-items:center;justify-content:center;padding:24px">
+  <div role="dialog" aria-label="Request amendment" style="width:440px;max-width:100%;background:#FFFFFF;border-radius:8px;box-shadow:0 12px 40px rgba(22,24,29,.22);padding:16px;display:flex;flex-direction:column;gap:10px">
+    <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:15px;font-weight:500;color:#1F2937">Request amendment</span><span style="font-size:12px;color:#6B7280">{{ am.so }} · sent to the SO PIC for approval</span></span>
+    <span style="font-size:12px;font-weight:500;color:#6B7280">Reason</span>
+    <select value="{{ am.r }}" onChange="{{ am.onR }}" aria-label="Reason" style="height:32px;border:1px solid #D5D9DE;border-radius:8px;font:inherit;font-size:13px;background:#FFFFFF;color:#1F2937;padding:0 8px"><option value="">Choose a reason…</option><sc-for list="{{ am.opts }}" as="o" hint-placeholder-count="6"><option value="{{ o.v }}">{{ o.v }}</option></sc-for></select>
+    <span style="font-size:12px;font-weight:500;color:#6B7280">What should change</span>
+    <input value="{{ am.note }}" onInput="{{ am.onNote }}" placeholder="e.g. new phone 012-…" aria-label="What should change" style="height:32px;border:1px solid #D5D9DE;border-radius:8px;font:inherit;font-size:13px;background:#FFFFFF;padding:0 8px;min-width:0">
+    <sc-if value="{{ am.err }}"><span role="alert" style="font-size:12px;color:#7A5A00;background:#FBF0D6;border-radius:8px;padding:4px 8px">{{ am.err }}</span></sc-if>
+    <div style="display:flex;justify-content:flex-end;gap:6px;border-top:1px solid #F1F2F4;padding-top:12px">
+      <button onClick="{{ am.cancel }}" style="height:32px;border:1px solid #E5E7EB;background:#FFFFFF;color:#1F2937;border-radius:8px;padding:0 14px;font:inherit;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#EDEFF2">Cancel</button>
+      <button onClick="{{ am.send }}" style="height:32px;border:0;background:#1B1B39;color:#FFFFFF;border-radius:8px;padding:0 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#2B2B55">Send request</button>
+    </div>
+  </div>
+</div></sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const NR = 'Not recorded';
+const MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const YMD = a => a ? new Date(a[0], a[1], a[2]) : null;
+const f1 = d => d.getDate() + ' ' + MO[d.getMonth()], fW = d => WD[d.getDay()] + ', ' + f1(d);
+const T0 = (() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); })();
+const dLeft = d => Math.round((d - T0) / 864e5);
+const pl = (n, w) => n + ' ' + w + (n === 1 ? '' : 's'), pcsTxt = q => q + (q === 1 ? ' pc' : ' pcs'), ordN = n => pl(n, 'order');
+const SHORT = s => String(s || '').replace(/ (Sdn\.? Bhd\.?|Enterprise|Trading|Industries)$/i, '').replace(/ Furniture$/, '');
+const TONE = { ok: ['#E7F6EC', '#1E7A40'], warn: ['#FBF0D6', '#7A5A00'], neutral: ['#E5E7EB', '#374151'] };
+const CATS = ['Mattress', 'Bedframe', 'Sofa', 'Pillow', 'Mattress protector'];
+const LC_RULES = {
+  Customer: [['Agreed / confirmed', '', ''], ['Wants later date', '', ''], ['Postponed, no date yet', 'Follow up new date · tell storage fee', 'Delivery'], ['Wants earlier date', 'Check early delivery', 'Delivery'], ['Changed phone / address', 'Request amendment', 'Sales Orders'], ['Says payment made', 'Check payment', 'Payments'], ['Payment pending', 'Collect payment', 'Payments'], ['Wants disposal', 'Add disposal', 'Sales Orders'], ['Complaint / damaged item', 'Open service case', 'Service'], ['Wants to cancel', 'Cancellation review', 'Sales Orders'], ['Asked delivery status', '', '']],
+  Supplier: [['On time confirmed', '', ''], ['Production delay', 'Update ETA · tell customer', 'Purchasing'], ['Material shortage', 'Update ETA · tell customer', 'Purchasing'], ['Shipping delay', 'Update ETA · tell customer', 'Purchasing'], ['Goods damaged', 'Open supplier claim', 'Purchasing'], ['Ready to ship', 'Chase warehouse', 'Warehouse'], ['No reply', 'Chase supplier again', 'Purchasing']],
+  Warehouse: [['Received OK', '', ''], ['Short quantity', 'Chase supplier · short qty', 'Purchasing'], ['Damaged', 'Open supplier claim', 'Purchasing'], ['Wrong item', 'Open supplier claim', 'Purchasing'], ['Ready for loading', 'Confirm loading list', 'Delivery'], ['No reply', 'Chase warehouse again', 'Warehouse']],
+  Logistics: [['Booked', '', ''], ['Customer confirmed delivery date with customer', '', ''], ['Customer postponed (new date)', '', ''], ['Customer postponed, no date yet', 'Follow up new date · tell storage fee', 'Delivery'], ['Lorry full', 'Rebook delivery date', 'Delivery'], ['No driver', 'Rebook delivery date', 'Delivery'], ['Customer not reachable', 'Call customer', 'Delivery'], ['Wrong phone / address', 'Request amendment', 'Sales Orders'], ['Delivered with issue', 'Open service case', 'Service'], ['No reply', 'Chase logistics again', 'Delivery']],
+  Salesperson: [['Gave new phone number', 'Request amendment', 'Sales Orders'], ['Customer will pay later', 'Collect payment', 'Payments'], ['Customer asked to change item', 'New SO needed', 'Sales Orders']],
+  Finance: [['Payment received', '', ''], ['Payment amount wrong', 'Check payment', 'Payments'], ['Refund needed', 'Process refund', 'Payments']],
+};
+const LC_FIELD = { date: ['New date', 'date'], eta: ['New ETA', 'date'], contact: ['New phone / address', 'text'], amount: ['Amount (RM)', 'number'], item: ['Which item', 'text'], slip: ['Bank slip', 'file'], photo: ['Photo', 'file'] };
+const LC_DET = { 'Customer confirmed delivery date with customer': ['date'], 'Customer postponed (new date)': ['date'], 'Wants later date': ['date'], 'Wants earlier date': ['date'], 'Changed phone / address': ['contact'], 'Says payment made': ['amount', 'slip'], 'Complaint / damaged item': ['item', 'photo'], 'Production delay': ['eta'], 'Material shortage': ['eta'], 'Shipping delay': ['eta'], 'Goods damaged': ['item', 'photo'], 'Short quantity': ['item'], 'Damaged': ['item', 'photo'], 'Wrong item': ['item', 'photo'], 'Lorry full': ['date'], 'No driver': ['date'], 'Wrong phone / address': ['contact'], 'Delivered with issue': ['item', 'photo'], 'Gave new phone number': ['contact'], 'Payment amount wrong': ['amount'], 'Refund needed': ['amount'] };
+const AMR_DEF = { cust: ['Changed phone', 'Moved / new address', 'Changed email', 'Changed delivery date', 'Floor or lift changed', 'Other customer request'], ours: ['Key-in error (Sales)', 'Salesperson asked', 'Delivery team found wrong info'] };
+const STATES = [['Singapore', /singapore|\bsg\b/i], ['Perlis', /perlis|kangar/i], ['Kedah', /kedah|alor setar|sungai petani/i], ['Penang', /penang|pulau pinang|georgetown|butterworth/i], ['Perak', /perak|ipoh|pangkor|taiping/i], ['Kelantan', /kelantan|kota bharu/i], ['Terengganu', /terengganu/i], ['Pahang', /pahang|kuantan/i], ['Negeri Sembilan', /negeri sembilan|seremban|nilai/i], ['Melaka', /melaka|malacca/i], ['Johor', /johor|skudai|muar|batu pahat|kulai/i], ['Sabah', /sabah|kota kinabalu/i], ['Sarawak', /sarawak|kuching|miri/i]];
+const areaOf = loc => { const t = String(loc || ''); if (!t.trim()) return { known: false, out: false, state: '' }; const st = STATES.find(([, re]) => re.test(t)); return st ? { known: true, out: true, state: st[0] } : { known: true, out: false, state: 'Klang Valley' }; };
+// Short forms from the owner's sheet (Delivery_Sum "MS / BF / SOF", "Pillow / M.P / Service"); full names on hover.
+const CAT_SH = { Mattress: 'MS', Bedframe: 'BF', Sofa: 'SOF', 'Mattress protector': 'M.P' };
+const pcsOf = o => o.items.reduce((a, i) => a + i.qty, 0);
+const catsOf = o => [...new Set(o.items.map(i => i.cat))];
+const stOf = o => { const d = YMD(o.eta), n = d ? dLeft(d) : null, ready = /^ready/i.test(o.stock || '');
+  if (ready) return { t: 'Ready', tone: 'ok', sub: '' };
+  if (!o.stock) return { t: NR, tone: 'neutral', sub: '' };
+  if (n != null && n < 0) return { t: 'Not ready', tone: 'warn', sub: 'ETA passed' };
+  if (n != null && n <= 7) return { t: 'Not ready', tone: 'warn', sub: n === 0 ? 'ETA today' : 'ETA in ' + n + 'd' };
+  return { t: 'Not ready', tone: 'neutral', sub: n != null ? 'ETA in ' + n + 'd' : '' }; };
+const DC = d => d ? { t: f1(d), sub: WD[d.getDay()] } : { t: NR, fg: '#6B7280' };
+const C = {
+  order: ['SO no.', '200px', o => ({ t: o.so, fw: '600', sub: o.cust })],
+  proceed: ['Proceed date', '120px', o => DC(YMD(o.imp))],
+  items: ['Items', '120px', o => ({ t: (() => { const sf = o.items.filter(i => i.cat === 'Sofa').reduce((a, i) => a + i.qty, 0), pc = pcsOf(o) - sf; return [pc ? pcsTxt(pc) : '', sf ? sf + (sf === 1 ? ' set' : ' sets') : ''].filter(Boolean).join(' + '); })(), sub: catsOf(o).map(c => CAT_SH[c] || c).join(', '), tip: catsOf(o).join(', ') })],
+  stock: ['Stock', '150px', o => { const s = stOf(o); return s.tone === 'warn' ? { t: s.t, tone: 'warn', sub: s.sub, subFg: '#7A5A00' } : s.tone === 'ok' ? { t: s.t, tone: 'ok' } : { t: s.t, fg: '#4B5563', sub: s.sub, subFg: '#6B7280' }; }, true],
+  delivery: ['Customer confirmed delivery date', '140px', o => o.logiEta ? { t: o.logiEta } : { t: 'Not confirmed yet', fg: '#6B7280' }],
+  payment: ['Payment', '150px', o => o.payStatus ? (() => { const p = o.payStatus.split(/,\s*/); return { t: p[0], sub: p.slice(1).map(x => x.charAt(0).toUpperCase() + x.slice(1)).join(' · ') }; })() : { t: NR, fg: '#6B7280' }],
+  pic: ['SO PIC', '120px', () => ({ t: NR, fg: '#6B7280' })],
+  problems: ['Problems', '120px', () => ({ t: NR, fg: '#6B7280' })],
+  channel: ['Sales location', '160px', o => o.salesLoc ? { t: o.salesLoc, sub: o.salesperson || '' } : { t: NR, fg: '#6B7280' }],
+  dloc: ['Delivery location', 'minmax(170px,1fr)', o => { const p = String(o.loc).split(',').map(x => x.trim()).filter(Boolean); const ar0 = areaOf(o.loc); const a = p.length > 1 ? p.slice(0, -1).join(', ') : p[0]; let b = p.length > 1 ? p[p.length - 1] : (ar0.out ? ar0.state : ''); if (b && b.toLowerCase() === String(a).toLowerCase()) b = ''; return { t: a, sub: b, tagEnd: true, tag: ar0.out ? 'Outstation' : '', tagTip: ar0.out ? 'Outside the Klang Valley · ' + ar0.state : '' }; }, true],
+  reqDate: ['ETA', '140px', o => { const d = YMD(o.eta); if (!d) return DC(null); const n = dLeft(d); return { t: f1(d), sub: WD[d.getDay()] + (n < 0 ? ' · passed' : ''), subFg: n < 0 ? '#7A5A00' : '#6B7280' }; }],
+  po: ['PO no.', '150px', o => o.po.length ? { t: o.po[0], fw: '500', sub: o.po.length > 1 ? '+ ' + (o.po.length - 1) + ' more' : '' } : { t: NR, fg: '#6B7280' }],
+  eta: ['Supplier ETA', '120px', () => ({ t: NR, fg: '#6B7280' })],
+  sdo: ['Supplier DO', '130px', () => ({ t: NR, fg: '#6B7280' })],
+  grnNo: ['GRN No.', '130px', () => ({ t: NR, fg: '#6B7280' })],
+  loc: ['Location', '120px', o => o.stockLoc ? { t: o.stockLoc } : { t: NR, fg: '#6B7280' }],
+  load: ['Loading', '120px', () => ({ t: NR, fg: '#6B7280' })],
+  value: ['Order value', '110px', () => ({ t: NR, fg: '#6B7280' })],
+  paid: ['Paid', '110px', () => ({ t: NR, fg: '#6B7280' })],
+  balance: ['Balance', '110px', o => o.bal ? { t: o.bal } : { t: NR, fg: '#6B7280' }],
+  rcpt: ['Receipt No.', '130px', () => ({ t: NR, fg: '#6B7280' })],
+  payDue: ['Pay by', '120px', () => ({ t: NR, fg: '#6B7280' })],
+  hold: ['Finance hold', '120px', () => ({ t: NR, fg: '#6B7280' })],
+  logi: ['Logistics', '110px', o => o.logi ? { t: o.logi } : { t: NR, fg: '#6B7280' }, true],
+  area: ['Area', '160px', o => ({ t: String(o.loc).split(',')[0].trim() || NR }), true],
+  appt: ['Appointment', '120px', o => o.logiEta ? { t: 'Confirmed', tone: 'ok' } : { t: 'To confirm', fg: '#4B5563' }, true],
+  doNo: ['DO No.', '130px', () => ({ t: NR, fg: '#6B7280' })],
+};
+const LAYOUTS = [['general', 'Overview', 'dashboard', ['order', 'proceed', 'items', 'stock', 'delivery', 'payment', 'pic', 'problems']], ['so', 'Sales Order', 'receipt_long', ['proceed', 'order', 'items', 'channel', 'dloc', 'reqDate']], ['purchasing', 'Purchasing', 'shopping_cart', ['order', 'items', 'po', 'eta', 'sdo', 'grnNo', 'stock']], ['warehouse', 'Warehouse', 'warehouse', ['order', 'items', 'grnNo', 'loc', 'load', 'delivery']], ['payment', 'Payment', 'payments', ['order', 'value', 'paid', 'balance', 'rcpt', 'payDue', 'payment', 'hold']], ['delivery', 'Delivery', 'local_shipping', ['order', 'logi', 'area', 'delivery', 'appt', 'doNo', 'payment']], ['service', 'Service', 'support_agent', ['order', 'items', 'problems', 'pic', 'reqDate']]];
+const fromOf = i => i.stock ? ['Warehouse stock', '#6B7280'] : i.sup ? [SHORT(i.sup), '#1F2937'] : ['Supplier ' + NR.toLowerCase(), '#6B7280'];
+
+class Component extends DCLogic {
+  state = { mon: new Date().getMonth(), view: 'open', f: {}, sel: {}, layout: 'so', det: null, dTab: 'so', lc: null, am: null, logs: {}, done: [], tasks: [], tk: 0 };
+  componentDidMount() {
+    this._t = () => this.setState(s => ({ tk: s.tk + 1 })); window.addEventListener('carres-theme', this._t);
+    const go = () => { const m = (location.hash || '').match(/so=([^&]+)/); if (m && window.SO_REAL) { const so = decodeURIComponent(m[1]); if (window.SO_REAL.some(x => x.so === so)) this.setState({ det: so }); } };
+    if (!window.SO_REAL) this._p = setInterval(() => { if (window.SO_REAL) { clearInterval(this._p); go(); this._t(); } }, 50); else go();
+  }
+  componentWillUnmount() { window.removeEventListener('carres-theme', this._t); clearInterval(this._p); }
+  renderVals() {
+    const S = this.state, set = p => this.setState(p), R = window.SO_REAL || [];
+    const th = window.CarresTheme ? window.CarresTheme.get() : { selBg: '#FBE6DB', selFg: '#A33A14' };
+    const LY = LAYOUTS.find(l => l[0] === S.layout) || LAYOUTS[0], keys = LY[3];
+    const val = (o, k) => C[k][2](o).t;
+    const VIEWS = [['open', 'Open', o => !o.done], ['done', 'Delivered', o => !!o.done], ['all', 'All', () => true]];
+    const vf = VIEWS.find(v => v[0] === S.view)[2];
+    const base = R.filter(vf);
+    const list = base.filter(o => Object.entries(S.f).every(([k, v]) => val(o, k) === v)).sort((a, b) => (YMD(a.eta) || 0) - (YMD(b.eta) || 0));
+    const cols = keys.map(k => { const can = !!C[k][3]; const opts = can ? [...new Set(base.map(o => val(o, k)))].map(v => ({ l: v, n: String(base.filter(o => val(o, k) === v).length), on: S.f[k] === v, pick: () => { const f = { ...S.f }; if (f[k] === v) delete f[k]; else f[k] = v; set({ f }); } })) : [];
+      const px = parseInt(C[k][1], 10); return { l: C[k][0], w: px >= 150 ? 'minmax(' + Math.round(px * 0.75) + 'px,1fr)' : C[k][1], al: R[0] && C[k][2](R[0]).al === 'right' ? 'right' : undefined, opts, on: S.f[k] != null }; });
+    const open = so => () => { set({ det: so, dTab: 'so' }); try { history.replaceState(null, '', '#so=' + encodeURIComponent(so)); } catch (e) {} };
+    const rows = list.map(o => ({ id: o.so, open: open(o.so), cells: keys.map(k => C[k][2](o)),
+      items: o.items.map(i => [{ t: i.model, sub: i.spec, span: 3 }, { t: i.cat === 'Sofa' ? i.qty + (i.qty === 1 ? ' set' : ' sets') : pcsTxt(i.qty) }, i.stock ? { t: 'Warehouse stock', fg: '#6B7280' } : i.sup ? { t: SHORT(i.sup) } : { t: NR, fg: '#6B7280' }]) }));
+    const cnt = {}; list.forEach(o => o.items.forEach(i => { cnt[i.cat] = (cnt[i.cat] || 0) + i.qty; }));
+    const nNot = R.filter(o => stOf(o).t === 'Not ready').length, near = R.filter(o => { const d = YMD(o.eta); return d && dLeft(d) >= 0 && dLeft(d) <= 7; }).length, passed = R.filter(o => { const d = YMD(o.eta); return d && dLeft(d) < 0; }).length, outN = R.filter(o => areaOf(o.loc).out).length;
+    const mk = MO[S.mon], mO = R.filter(o => { const d = YMD(o.imp); return d && d.getMonth() === S.mon && d.getFullYear() === T0.getFullYear(); }), pcM = {}; mO.forEach(o => o.items.forEach(i => { pcM[i.cat] = (pcM[i.cat] || 0) + i.qty; }));
+    const summary = [
+      { h: 'THIS MONTH', mon: { label: mk + ' 26', prev: S.mon > 0 ? () => set({ mon: S.mon - 1 }) : null, next: S.mon < T0.getMonth() ? () => set({ mon: S.mon + 1 }) : null }, rows: [{ k: 'Orders', v: String(mO.length) }, { k: 'Value', v: NR }, { k: 'Delivered', v: NR }, { k: 'Avg days to deliver', v: NR }], foot: mO.length ? '' : 'No orders proceeded in ' + mk + ' 26.', footFg: '#6B7280' },
+      { h: 'NEEDS ATTENTION', rows: [{ k: 'Late supply', v: NR }, { k: 'Payment due', v: NR }, { k: 'Finance hold', v: NR }, { k: 'Problems', v: NR }] },
+      { h: 'PIECES ORDERED · ' + mk.toUpperCase(), rows: CATS.map(l => ({ k: l, v: String(pcM[l] || 0) })) }];
+    // Log form (Shell) + tasks it creates
+    const LR = LC_RULES, whatsOf = w => [...(LR[w] || []), ['Other', '', '']], L = S.lc, rule = L && L.who && L.what ? whatsOf(L.who).find(r => r[0] === L.what) : null, detKeys = L && L.what ? LC_DET[L.what] || [] : [];
+    const setL = p => set({ lc: { ...S.lc, ...p, err: null } }), nowTm = () => { const n = new Date(); return (n.getHours() % 12 || 12) + ':' + String(n.getMinutes()).padStart(2, '0') + (n.getHours() >= 12 ? ' PM' : ' AM'); };
+    const lf = L ? { on: true, so: L.so, sos: R.map(o => ({ v: o.so, l: o.so + ' · ' + o.cust })), onSo: e => setL({ so: e.target.value }), who: L.who,
+      chs: [['WhatsApp', 'chat'], ['Call', 'call']].map(([c, ic]) => ({ l: c, ic, on: L.ch === c, pick: () => setL({ ch: c }) })), whos: Object.keys(LR).map(w => ({ l: w, on: L.who === w, pick: () => setL({ who: w, what: '', d: {} }) })),
+      what: L.what, whats: L.who ? whatsOf(L.who).map(r => ({ v: r[0] })) : [], onWhat: e => setL({ what: e.target.value, d: {} }), nextTxt: rule ? (rule[1] ? rule[1] + ' · ' + rule[2] : 'no new task · saved to Timeline') : '',
+      dets: detKeys.map(k => { const [l, ty] = LC_FIELD[k], v = (L.d || {})[k]; return { l, isFile: ty === 'file', isInput: ty !== 'file', type: ty, v: ty === 'file' ? '' : v || '', fileTxt: v ? String(v) : 'Add ' + l.toLowerCase(), fileIc: v ? 'check_circle' : 'attach_file', on: e => setL({ d: { ...S.lc.d, [k]: e.target.value } }), add: () => setL({ d: { ...S.lc.d, [k]: 'Attached' } }) }; }),
+      note: L.note || '', onNote: e => setL({ note: e.target.value }), noteReq: L.what === 'Other' && !(L.note || '').trim(),
+      files: (L.files || []).map((x, i) => ({ ic: x.k === 'video' ? 'videocam' : x.k === 'shot' ? 'screenshot' : 'image', n: x.name || x.k, del: () => setL({ files: S.lc.files.filter((_, j) => j !== i) }) })),
+      addShot: name => setL({ files: [...(S.lc.files || []), { k: 'shot', name }] }), addPhoto: name => setL({ files: [...(S.lc.files || []), { k: 'photo', name }] }), addVideo: name => setL({ files: [...(S.lc.files || []), { k: 'video', name }] }),
+      shotHint: L.ch === 'WhatsApp' && L.who && !(L.files || []).some(x => x.k === 'shot') ? 'Add a screenshot of the WhatsApp chat so others can see what was said.' : '', err: L.err || '', cancel: () => set({ lc: null }),
+      save: () => { const g = S.lc; if (!g.so) return set({ lc: { ...g, err: 'Choose the SO no.' } }); if (!g.who || !g.what) return set({ lc: { ...g, err: 'Choose who and what happened.' } });
+        const note = (g.note || '').trim(); if (g.what === 'Other' && !note) return set({ lc: { ...g, err: 'Add a remark for Other.' } });
+        const r = whatsOf(g.who).find(x => x[0] === g.what), ev = { k: 'Contacts', d: f1(T0), tm: nowTm(), t: g.ch + ' with ' + g.who.toLowerCase() + ' · ' + g.what + (note ? ' · “' + note + '”' : ''), by: 'Logged by you' + ((g.files || []).length ? ' · ' + pl(g.files.length, 'file') : '') };
+        const tasks = r && r[1] ? [...S.tasks, { key: 't' + Date.now(), so: g.so, act: r[1], mod: r[2], sub: 'From ' + g.who + ' (' + g.ch + ') · ' + g.what.toLowerCase() }] : S.tasks;
+        set({ lc: null, tasks, logs: { ...S.logs, [g.so]: [ev, ...(S.logs[g.so] || [])] } }); } } : { on: false };
+    const tRows = S.tasks.map(t => { const on = S.tkOpen === t.key, o = R.find(x => x.so === t.so) || {};
+      return { key: t.key, mod: t.mod, t: t.act, sub: t.sub, ref: t.so, who: o.cust || '', isNew: true, due: '', on, open: () => set({ tkOpen: on ? null : t.key }), kind: 'steps', facts: [{ l: 'Sales order', v: t.so, go: open(t.so) }, { l: 'Customer', v: o.cust || NR }, { l: 'ETA', v: o.eta ? fW(YMD(o.eta)) : NR }], files: [],
+        steps: [], mark: () => set({ tasks: S.tasks.filter(x => x.key !== t.key), done: [...S.done, { t: t.act + ' · ' + t.so }], tkOpen: null }), markOff: false, markT: 'Mark done', hint: '' }; });
+    const tasks = { head: fW(T0) + ' · ' + tRows.length + ' to do', left: tRows.length, log: () => set({ lc: S.lc ? null : { so: S.det || '', who: '', what: '', ch: 'WhatsApp', d: {}, note: '', files: [], err: null } }), lf, rows: tRows, done: S.done.map(d => ({ t: d.t, canUndo: false, canCorrect: false })), coming: [] };
+    // Detail
+    const o = S.det ? R.find(x => x.so === S.det) : null;
+    const dv = (() => { if (!o) return {}; const st = stOf(o), d = YMD(o.eta), imp = YMD(o.imp), q = pcsOf(o), V = (v, fg) => v ? { v, fg: fg || '#1F2937', fw: '400' } : { v: NR, fg: '#6B7280', fw: '400' };
+      const tab = (k, l) => ({ l, on: S.dTab === k, fw: S.dTab === k ? '500' : '400', bg: S.dTab === k ? th.selBg : 'transparent', fg: S.dTab === k ? th.selFg : '#4B5563', pick: () => set({ dTab: k }) });
+      const pc = (o.addr.join(' ').match(/\b\d{5}\b/) || [])[0];
+      const cards = [
+        { h: 'Sales', gc: '1 / -1', note: '', rows: [{ k: 'SO Doc Date', ...V(null) }, { k: 'Proceed Date', ...V(imp ? fW(imp) : null) }, { k: 'Sales Location', ...V(o.salesLoc) }, { k: 'Salesperson', ...V(o.salesperson) }, { k: 'Dealer', ...V(null) }] },
+        { h: 'Customer', gc: 'auto', note: '', rows: [{ k: 'Full name', ...V(o.cust) }, { k: 'Phone', ...V(o.phone ? o.phone.split('/').join('\n') : null) }, { k: 'Email', ...V(null) }, { k: 'Customer type', ...V(null) }, { k: 'Race', ...V(null) }, { k: 'Gender', ...V(null) }, { k: 'Birthday', ...V(null) }] },
+        { h: 'Delivery', gc: 'auto', note: '', rows: [{ k: 'Customer’s original requested delivery', ...V(null) }, { k: 'ETA', ...V(d ? fW(d) : null) }, { k: 'Floor', ...V(null) }, { k: 'Lift', ...V(null) }, { k: 'Stair carry fee', ...V(null) }] },
+        { h: 'Emergency contact', gc: 'auto', note: '', rows: [{ k: 'Contact name', ...V(null) }, { k: 'Relationship', ...V(null) }, { k: 'Phone', ...V(null) }] },
+        { h: 'Address', gc: 'auto', note: '', rows: [{ k: 'Address line 1', ...V(o.addr[0] || null) }, { k: 'Address line 2', ...V(o.addr.slice(1).join('\n') || null) }, { k: 'City / state', ...V(o.loc) }, { k: 'Postcode', ...V(pc || null) }, { k: 'Building type', ...V(null) }, { k: 'Billing address', ...V(null) }] }];
+      const FE = S.fe && S.fe.so === o.so ? S.fe : null, setFe = p => set({ fe: { ...FE, ...p, err: '' } });
+      const chg = []; cards.forEach((c, ci) => { const ed = ci > 0; c.rows = c.rows.map(r0 => { const ED = (S.edits || {})[o.so] || {}, k0 = c.h + '.' + r0.k, r = ED[k0] != null ? { ...r0, v: ED[k0] || NR, fg: ED[k0] ? '#1F2937' : '#6B7280' } : r0; const key = k0, cur = r.v === NR ? '' : String(r.v), lock = r.k === 'ETA' || r.k === 'Stair carry fee', op = !!FE && ed && FE.open[key] !== undefined, val = op ? FE.open[key] : cur, changed = op && val.trim() !== cur; if (changed) chg.push(key);
+        return { ...r, key, show: !op, input: op, canEdit: !!FE && ed && !lock, ev: val, bd: changed ? '#2F55E0' : '#D5D9DE', on: e => setFe({ open: { ...FE.open, [key]: e.target.value } }), pencil: () => setFe({ open: { ...FE.open, [key]: cur } }) }; }); });
+      const rs = FE ? FE.rs : [], feN = chg.length + (chg.length === 1 ? ' change' : ' changes');
+      const feBits = FE ? { feOn: true, feN, feNo: !chg.length, feOp: chg.length ? '1' : '.45', whyOpen: !!FE.why, whyT: () => setFe({ why: !FE.why }), whyTxt: rs.length ? 'Why: ' + rs.length + ' chosen' : 'Why? Choose', whyBd: FE.err && !rs.length ? '#D9A23A' : '#E5E7EB',
+        rGroups: [['FROM CUSTOMER', AMR_DEF.cust], ['OUR SIDE', AMR_DEF.ours]].map(([h, opts]) => ({ h, opts: opts.map(l => { const on = rs.includes(l); return { l, on, bd: on ? th.selFg : '#F2F3F5', bg: on ? (th.selSoft || th.selBg) : '#F2F3F5', fg: on ? th.selFg : '#374151', pick: () => setFe({ rs: on ? rs.filter(x => x !== l) : [...rs, l] }) }; }) })),
+        proofIc: FE.file ? 'check_circle' : 'attach_file', proofTxt: FE.file ? 'Proof added' : 'Add proof', proof: () => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*,application/pdf'; i.onchange = () => i.files[0] && setFe({ file: i.files[0].name }); i.click(); },
+        feErr: FE.err || '', feConfirm: !!FE.confirm, feKeep: () => setFe({ confirm: false }), feDiscard: () => set({ fe: null }), feCancel: () => (chg.length ? setFe({ confirm: true }) : set({ fe: null })),
+        feSubmit: () => { if (!chg.length) return; if (!rs.length) return set({ fe: { ...FE, why: true, err: 'Choose why.' } });
+          const direct = k => /^(Customer\.(Phone|Email)|Address\.|Emergency contact\.)/.test(k), dK = chg.filter(direct), aK = chg.filter(k => !direct(k));
+          const ED = { ...((S.edits || {})[o.so] || {}) }; dK.forEach(k => { ED[k] = FE.open[k].trim(); });
+          const now = { d: f1(T0), tm: nowTm(), k: 'Amendments', by: 'You' }, evs = [];
+          if (dK.length) evs.push({ ...now, t: 'Updated ' + dK.map(k => k.split('.')[1]).join(', ') + ' · ' + rs.join(', ') + (FE.file ? ' · proof ' + FE.file : '') + ' · no approval needed' });
+          if (aK.length) evs.push({ ...now, t: 'Amendment requested · ' + aK.map(k => k.split('.')[1]).join(', ') + ' · ' + rs.join(', ') + ' · waiting for Jess (COO)', by: 'Requested by you' });
+          const pd = { ...(S.pend || {}) }; if (aK.length) pd[o.so] = { n: aK.length + (aK.length === 1 ? ' change' : ' changes'), why: rs.join(', '), keys: aK, vals: Object.fromEntries(aK.map(k => [k, FE.open[k].trim()])) };
+          set({ fe: null, edits: { ...(S.edits || {}), [o.so]: ED }, rev: { ...(S.rev || {}), [o.so]: ((S.rev || {})[o.so] || 0) + (dK.length ? 1 : 0) }, pend: pd, logs: { ...S.logs, [o.so]: [...evs, ...(S.logs[o.so] || [])] }, toast: aK.length ? (dK.length ? 'Saved ' + dK.length + ' · ' + aK.length + ' sent to Jess (COO)' : 'Sent to Jess (COO) for approval') : 'Saved · no approval needed' }); clearTimeout(this._tt); this._tt = setTimeout(() => set({ toast: '' }), 2600); } } : { feOn: false };
+      const step = (name, line, done, stT, tone) => ({ name, line, done, st: stT, tone, pbg: TONE[tone][0], pfg: TONE[tone][1], dot: done ? '#1E8A47' : '#FFFFFF', ring: done ? '#1E8A47' : tone === 'warn' ? '#D9A23A' : '#CBD0D6' });
+      const ready = /^ready/i.test(o.stock || '');
+      const box = (name, line, done, stT, tone, now) => ({ name, line, st: stT, pbg: TONE[tone][0], pfg: TONE[tone][1], bg: done ? '#FFFFFF' : '#FFFFFF', bd: now ? '#2F55E0' : done ? '#E5E7EB' : '#E5E7EB' });
+      const bySup = {}; o.items.forEach(i => { const k = i.stock ? 'Warehouse stock' : i.sup ? SHORT(i.sup) : 'Supplier not recorded'; (bySup[k] = bySup[k] || []).push(i); });
+      const branches = Object.entries(bySup).map(([k, its]) => { const stk = k === 'Warehouse stock'; return { name: k, ic: stk ? 'inventory_2' : 'factory', line: stk ? 'Taken from ' + (o.stockLoc || 'warehouse') : (() => { const ps = [...new Set(its.map(i => { const p = [...(i.po || [])].sort(); return p.length > 1 ? (i.sup === 'Nice Future Sdn Bhd' ? p[0] : p[p.length - 1]) : p[0]; }).filter(Boolean))]; return ps.length ? ps.join(', ') : 'PO ' + NR.toLowerCase(); })(), st: ready ? 'Ready' : 'Not ready', pbg: TONE[ready ? 'ok' : st.tone][0], pfg: TONE[ready ? 'ok' : st.tone][1], bg: '#FFFFFF', bd: '#E5E7EB', items: its.map(i => ({ n: i.model, sp: i.spec || '', q: pcsTxt(i.qty) })) }; });
+      const nowK = !ready ? 'goods' : !o.logi ? 'logi' : !o.logiEta ? 'slot' : 'del';
+      const rootB = box('Sales order ' + o.so, (imp ? 'Proceeded ' + fW(imp) : 'Proceed date ' + NR.toLowerCase()) + ' · ' + pcsTxt(q), !!imp, imp ? 'Done' : NR, imp ? 'ok' : 'neutral', false);
+      const tail = [
+        box('Goods in warehouse', 'Stock: ' + (o.stock || NR) + (o.stockLoc ? ' · ' + o.stockLoc : ''), ready, ready ? 'Ready' : o.stock ? 'Not ready' : NR, ready ? 'ok' : st.tone, nowK === 'goods'),
+        box('Logistics', o.logi ? o.logi + (o.logiRemark ? ' · ' + o.logiRemark : '') : NR, !!o.logi, o.logi ? 'Assigned' : NR, o.logi ? 'ok' : 'neutral', nowK === 'logi'),
+        box('Delivery slot', [o.logiEta, o.delTime].filter(Boolean).join(' · ') || 'Not booked yet', !!o.logiEta, o.logiEta ? 'Booked' : 'Not booked', 'neutral', nowK === 'slot'),
+        box('Delivered', NR, false, NR, 'neutral', nowK === 'del')].map((x, i, a) => ({ ...x, more: i < a.length - 1 }));
+      const nB = branches.length, mapMin = Math.max(260, nB * 180 + (nB - 1) * 16) + 'px'; branches.forEach((b, i) => { b.barL = i === 0 ? '50%' : '-8px'; b.barR = i === nB - 1 ? '50%' : '-8px'; if (nB === 1) { b.barL = '50%'; b.barR = '50%'; } }); const barL = 'calc(120px)';
+      const dl = d ? dLeft(d) : null;
+      const rtop = [{ k: 'Customer’s original requested delivery', v: NR, fg: '#6B7280' }, { k: 'Customer confirmed delivery date', v: 'Not confirmed yet', fg: '#6B7280' }, { k: 'Days to ETA', v: dl == null ? NR : dl < 0 ? 'Passed ' + (-dl) + 'd' : dl === 0 ? 'Today' : dl + ' days', fg: dl != null && dl <= 7 ? '#7A5A00' : '#1F2937' }, { k: 'Now at', v: ({ goods: 'Waiting for goods', logi: 'Assign logistics', slot: 'Book delivery slot', del: 'Delivery' })[nowK], fg: '#1F2937' }];
+      const route = [
+        step('Sales order proceeded', imp ? fW(imp) + ' · from Sales Portal' : NR, !!imp, imp ? 'Done' : NR, imp ? 'ok' : 'neutral'),
+        step('Purchase order', o.po.length ? o.po.join(', ') : NR, o.po.length > 0, o.po.length ? pl(o.po.length, 'PO') : NR, o.po.length ? 'ok' : 'neutral'),
+        step('Goods in warehouse', 'Stock: ' + (o.stock || NR) + (o.stockLoc ? ' · stock location ' + o.stockLoc : ''), ready, ready ? 'Ready' : o.stock ? 'Not ready' : NR, ready ? 'ok' : st.tone),
+        step('Logistics assigned', o.logi ? o.logi + (o.logiRemark ? ' · ' + o.logiRemark : '') : NR, !!o.logi, o.logi ? 'Assigned' : NR, o.logi ? 'ok' : 'neutral'),
+        step('Delivery slot', o.logiEta || o.delTime ? [o.logiEta, o.delTime].filter(Boolean).join(' · ') : 'ETA ' + (d ? fW(d) : NR), !!o.logiEta, o.logiEta ? 'Booked' : 'Not booked', 'neutral'),
+        step('Delivered', NR, false, NR, 'neutral')];
+      { const G = '#6B7280', I = '#1F2937', meta = [
+          ['Sales Portal', imp ? fW(imp) : null, imp ? fW(imp) : null, o.so],
+          ['Purchasing', null, null, o.po.length ? o.po.join(', ') : null],
+          ['Warehouse', null, null, null],
+          ['Operations', null, null, null],
+          [o.logi || null, d ? fW(d) : null, o.logiEta || null, null],
+          [o.logi || null, o.logiEta || null, null, null]];
+        route.forEach((r, i) => { const [who, plan, act, doc] = meta[i] || []; Object.assign(r, { who: who || NR, whoFg: who ? G : G, plan: plan || NR, planFg: plan ? I : G, act: act || (r.done ? NR : 'Not yet'), actFg: act ? I : G, doc: doc || 'No document', docFg: doc ? I : G }); }); }
+      const curI = route.findIndex(r => !r.done); route.forEach((r, i) => { r.isDone = r.done; r.isNow = i === curI; r.isLater = !r.done && i !== curI; r.nameFw = i === curI ? '600' : '500'; r.nameFg = r.isLater ? '#6B7280' : '#1F2937'; if (r.isLater && r.st === r.line) r.st = ''; });
+      const time0 = [...(S.logs[o.so] || []), { k: 'System', d: imp ? f1(imp) : NR, tm: 'Time ' + NR.toLowerCase(), t: 'Proceeded · ' + pcsTxt(q) + (o.po.length ? ' · ' + o.po.join(', ') : ''), by: 'System · Delivery_Sum' }];
+      const tfk = S.tFilt || 'All', time = time0.filter(e => tfk === 'All' || (e.k || 'Contacts') === tfk), tf = ['All', 'Contacts', 'Amendments', 'System'].map(l => ({ l, on: tfk === l, bd: tfk === l ? th.selFg : '#F2F3F5', bg: tfk === l ? (th.selSoft || th.selBg) : '#F2F3F5', fg: tfk === l ? th.selFg : '#374151', pick: () => set({ tFilt: l }) }));
+      const payBits = [o.bal ? 'Balance ' + o.bal : '', o.payStatus || ''].filter(Boolean);
+      return { payLine: payBits.length ? payBits.join(' · ') : NR, payFg: payBits.length ? '#1F2937' : '#6B7280', so: o.so, cust: o.cust, ...(() => { const late = !o.done && d && dLeft(d) < 0, k = o.done ? ['Delivered', 'ok'] : late ? ['Late', 'warn'] : ['Open', 'neutral']; return { pill: k[0], pbg: TONE[k[1]][0], pfg: TONE[k[1]][1] }; })(),
+        tabs: [tab('so', 'Sales Order'), tab('route', 'Order Route'), tab('time', 'Timeline')], tSo: S.dTab === 'so', tRoute: S.dTab === 'route', tTime: S.dTab === 'time',
+        top: cards[0], cols: [[cards[1], cards[3]], [cards[2], cards[4]]].map(secs => ({ secs })), totals: [{ k: 'Total', q: String(o.items.reduce((s, i) => s + i.qty, 0)), v: NR, fw: '600', fg: '#6B7280', bg: 'transparent' }, { k: 'Received', q: '', v: NR, fw: '400', fg: '#6B7280', bg: 'transparent' }, { k: 'Balance due', q: '', v: o.bal || NR, fw: '600', fg: o.bal ? '#7A5A00' : '#6B7280', bg: o.bal ? '#FBF0D6' : 'transparent' }],
+        payMeta: [{ k: 'Method', v: NR, fg: '#6B7280' }, { k: 'Bank reference', v: NR, fg: '#6B7280' }, { k: 'Bank slip', v: NR, fg: '#6B7280' }],
+        items: o.items.map((i, n) => { const fr = fromOf(i); return { no: String(n + 1), desc: [i.cat, i.spec].filter(Boolean).join(' · '), model: i.model, spec: i.spec, specT: i.spec ? ' · ' + i.spec : '', cat: i.cat, qty: String(i.qty), from: fr[0], fromFg: fr[1] }; }), qtyT: String(q), itemSum: pcsTxt(q) + ' · ' + catsOf(o).join(', '), sheetItems: (() => { const nz = x => String(x).toLowerCase().replace(/[^a-z0-9]/g, ''); const have = o.items.map(i => nz(i.model)); const ent = [...String(o.itemText || '').matchAll(/\[([^\]]+?)\s+x\s*(\d+)\s*pcs?\]/gi)].map(m => ({ n: m[1].trim(), q: +m[2] })); const extra = ent.filter(e => { const k = nz(e.n); return !have.some(h => h && (k.includes(h) || h.includes(k.slice(0, Math.max(6, h.length))))); }); return extra.map(e => e.n + ' × ' + e.q).join(' · '); })(),
+        route, routeSum: route.filter(r => r.dot !== '#FFFFFF').length + ' of ' + route.length + ' done', root: rootB, branches, tail, mapMin, barL, rtop, ...(() => { const rv = S.rv || 'ov', vw = (k, l) => ({ l, on: rv === k, fw: rv === k ? '500' : '400', bg: rv === k ? '#FFFFFF' : 'transparent', fg: rv === k ? th.selFg : '#4B5563', sh: rv === k ? '0 1px 2px rgba(16,24,40,.10)' : 'none', pick: () => set({ rv: k }) });
+        const W = { now: ['Now', 'neutral'], ok: ['Done', 'ok'], wait: ['Waiting', 'neutral'], warn: ['Needs action', 'warn'], nr: [NR, 'neutral'] };
+        const stp = (name, k) => ({ name, rowBg: k === 'now' ? '#F2F3F5' : 'transparent', ring: k === 'done' ? '#1E7A40' : k === 'now' ? '#1F2937' : '#CBD0D6', fill: k === 'done' ? '#1E7A40' : k === 'now' ? '#1F2937' : '#FFFFFF', fg: k === 'later' ? '#6B7280' : '#1F2937', fw: k === 'now' ? '500' : '400' });
+        const F = (k, v, muted) => ({ k, v: v || NR, fg: v && !muted ? '#1F2937' : '#6B7280' });
+        const urgent = d && dLeft(d) <= 7;
+        const gW = ready ? W.ok : urgent ? W.warn : W.now;
+        const goods = { t: 'Goods', ic: 'inventory_2', word: gW[0], pbg: TONE[gW[1]][0], pfg: TONE[gW[1]][1], bd: urgent && !ready ? '#E8C77A' : '#E5E7EB',
+          line: ready ? 'Goods are in the warehouse' + (o.stockLoc ? ' (' + o.stockLoc + ')' : '') + '.' : o.po.length ? 'Ordered on ' + o.po.join(', ') + '. Waiting for the supplier.' : 'No purchase order recorded.',
+          facts: [F('Now at', ready ? 'Warehouse' : o.po.length ? 'Supplier' : 'Purchasing'), F('Next', ready ? 'Load for delivery' : 'Goods received'), F('Due', null), F('Doc', o.po.join(', ') || null)],
+          hasItems: true, items: o.items.map(i => ({ n: i.model, sp: i.spec || '', q: pcsTxt(i.qty) + ' · ' + (i.st ? i.st + (i.st === 'Received' ? (i.sloc ? ' · ' + i.sloc : '') : i.seta ? ' · stock ETA ' + i.seta : '') : fromOf(i)[0]) })),
+          steps: [stp('Purchasing', o.po.length ? 'done' : 'now'), stp('Supplier', ready ? 'done' : o.po.length ? 'now' : 'later'), stp('Receiving', ready ? 'done' : 'later'), stp('Stock', ready ? 'done' : 'later')] };
+        const dW = o.logiEta ? W.ok : W.now;
+        const deliv = { t: 'Delivery', ic: 'local_shipping', word: dW[0], pbg: TONE[dW[1]][0], pfg: TONE[dW[1]][1], bd: '#E5E7EB',
+          line: o.logi ? 'Assigned to ' + o.logi + '. ' + (o.logiEta ? 'Slot ' + o.logiEta + '.' : 'Delivery slot not booked.') : 'Logistics not assigned.',
+          facts: [F('Now at', o.logi ? 'Delivery date' : 'Logistics'), F('Next', o.logi ? 'Book delivery slot' : 'Assign logistics'), F('Due', null), F('Doc', null), ...[['ETA', d ? fW(d) : null], ['Customer asks', o.custReq], ['Logistics', o.logiRemark], ['Pending ETA', o.pendEta], ['Carres remark', o.remark], ['Action', o.action]].filter(x => x[1]).map(x => F(x[0], x[1]))], hasItems: false, items: [],
+          steps: [stp('Logistics', o.logi ? 'done' : 'now'), stp('Delivery date', o.logi && !o.logiEta ? 'now' : o.logiEta ? 'done' : 'later'), stp('Delivered', 'later')] };
+        const pay = { t: 'Payment', ic: 'payments', word: NR, pbg: TONE.neutral[0], pfg: TONE.neutral[1], bd: '#E5E7EB', line: o.bal ? 'Balance ' + o.bal + ' (Balance sheet).' : 'Balance not recorded.', facts: [F('Now at', null), F('Next', null), F('Due', null), F('Doc', null), ...[['Balance', o.bal], ['Payment status', o.payStatus], ['Storage fee MS/BF', o.feeMB], ['Storage fee sofa', o.feeSof]].filter(x => x[1]).map(x => F(x[0], x[1]))], hasItems: false, items: [], steps: [stp('Payment', 'later')] };
+        return { rviews: [vw('ov', 'Overview'), vw('st', 'Steps'), vw('dt', 'Details')], rvOv: rv === 'ov', rvSt: rv === 'st', rvDt: rv === 'dt', tracks: [goods, deliv, pay] }; })(), routeSum: [rootB, ...tail].filter(x => ['Done', 'Ready', 'Assigned', 'Booked'].includes(x.st)).length + (ready ? 1 : 0) + ' of ' + (tail.length + 2) + ' done', time,
+        log: () => set({ lc: { so: o.so, who: '', what: '', ch: 'WhatsApp', d: {}, note: '', files: [], err: null } }), amOpen: () => set({ dTab: 'so', more: false, fe: FE || { so: o.so, open: {}, rs: [], file: null, why: false, confirm: false, err: '' } }), ...feBits,
+        moreOpen: !!S.more, moreBg: S.more ? 'rgba(31,41,55,.16)' : 'transparent', toggleMore: () => set({ more: !S.more }), closeMore: () => set({ more: false }), docOpen: !!S.docOpen, openDoc: () => set({ more: false, docOpen: true }), closeDoc: () => set({ docOpen: false }), printDoc: () => { const run = () => { const pg = document.querySelector('[aria-label="Sales Order PDF preview"] [data-so-doc]'); if (!pg) return; let f = document.getElementById('so-print-frame'); if (f) f.remove(); f = document.createElement('iframe'); f.id = 'so-print-frame'; f.setAttribute('aria-hidden', 'true'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden'; document.body.appendChild(f); const w = f.contentWindow; w.document.open(); w.document.write('<!doctype html><html><head><title>' + o.so + '</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"><style>body{margin:0;font-family:Inter,sans-serif}@page{size:A4;margin:12mm}</style></head><body>' + pg.outerHTML.replace(/src="assets\//g, 'src="' + location.href.replace(/[^/]*$/, '') + 'assets/') + '</body></html>'); w.document.close(); setTimeout(() => { try { w.focus(); w.print(); } catch (e) { window.print(); } }, 400); }; if (S.docOpen) run(); else { set({ more: false, docOpen: true }); setTimeout(run, 300); } },
+        toast: S.toast || '', withdraw: () => { const ev = { d: f1(T0), tm: nowTm(), k: 'Amendments', t: 'Amendment withdrawn', by: 'Withdrawn by you' }; const pd = { ...(S.pend || {}) }; delete pd[o.so]; set({ more: false, logs: { ...S.logs, [o.so]: [ev, ...(S.logs[o.so] || [])] }, pend: pd, toast: 'Amendment withdrawn' }); clearTimeout(this._tt); this._tt = setTimeout(() => set({ toast: '' }), 2200); },
+        canWithdraw: !!(S.pend || {})[o.so], pendOn: !!(S.pend || {})[o.so], pendTip: (S.pend || {})[o.so] ? (S.pend[o.so].n + ' · ' + S.pend[o.so].why + ' · waiting for Jess (COO)') : '', revOn: !!(S.rev || {})[o.so], revT: 'Rev ' + ((S.rev || {})[o.so] || 0),
+        copySo: () => { try { navigator.clipboard.writeText(o.so); } catch (e) {} set({ more: false, toast: 'Copied ' + o.so }); clearTimeout(this._tt); this._tt = setTimeout(() => set({ toast: '' }), 2200); }, copyPhone: () => { if (!o.phone) { set({ more: false, toast: 'Phone not recorded' }); } else { try { navigator.clipboard.writeText(o.phone); } catch (e) {} set({ more: false, toast: 'Copied ' + o.phone }); } clearTimeout(this._tt); this._tt = setTimeout(() => set({ toast: '' }), 2200); },
+        doc: (() => { const VV = x => x || NR; const ORD = ['Mattress', 'Bedframe', 'Sofa', 'Pillow', 'Mattress protector', 'Service']; let n = 0;
+          const groups = ORD.filter(c => o.items.some(i => i.cat === c)).map(c => ({ h: c.toUpperCase(), rows: o.items.filter(i => i.cat === c).map(i => ({ no: String(++n), code: i.model, desc: [i.cat, i.spec].filter(Boolean).join(' · '), qty: String(i.qty), nr: NR })) }));
+          return { so: o.so, cust: o.cust, qty: String(o.items.reduce((s, i) => s + i.qty, 0)), groups,
+            bill: [['Name', o.cust], ['Address', o.addr.join('\n')], ['Tel', o.phone], ['Email', null], ['Emergency', null]].map(([k, x]) => ({ k, v: VV(x) })),
+            info: [['SO No', o.so], ['SO Doc Date', null], ['Proceed Date', imp ? fW(imp) : null], ['Customer’s original requested delivery', null], ['Sales Location', o.salesLoc], ['Salesperson', o.salesperson]].map(([k, x]) => ({ k, v: VV(x) })),
+            sum: [['Goods', null], ['Services', null], ['Total payable', null], ['Paid to date', null]].map(([k]) => ({ k, v: NR, fw: '500', fg: '#6B7280', bg: 'transparent' })).concat([{ k: 'Balance due', v: o.bal || NR, fw: '700', fg: o.bal ? '#7A5A00' : '#6B7280', bg: o.bal ? '#FBF0D6' : '#F4F5F7' }]) }; })() }; })();
+    const A = S.am, am = A ? { ...A, opts: [...AMR_DEF.cust, ...AMR_DEF.ours].map(v => ({ v })), onR: e => set({ am: { ...A, r: e.target.value, err: '' } }), onNote: e => set({ am: { ...A, note: e.target.value, err: '' } }), cancel: () => set({ am: null }),
+      send: () => { if (!A.r) return set({ am: { ...A, err: 'Choose a reason.' } }); const ev = { d: f1(T0), tm: nowTm(), k: 'Amendments', t: 'Amendment requested · ' + A.r + (A.note ? ' · “' + A.note.trim() + '”' : ''), by: 'Requested by you · waiting for approval' }; set({ am: null, logs: { ...S.logs, [A.so]: [ev, ...(S.logs[A.so] || [])] }, tasks: [...S.tasks, { key: 'a' + Date.now(), so: A.so, act: 'Approve amendment', mod: 'Sales Orders', sub: A.r }] }); } } : {};
+    const selL = list.filter(x => S.sel[x.so]);
+    return {
+      search: qq => { const t = qq.toLowerCase(); return R.filter(x => [x.so, x.cust, x.phone || '', x.loc, ...x.po].join(' ').toLowerCase().includes(t)).map(x => { const s = stOf(x); return { h: 'Sales orders', ic: 'receipt_long', t: x.so, sub: x.cust + ' · ' + x.loc, pill: s.t === 'Ready' ? 'Stock ready' : 'Stock not ready', tone: s.tone, go: open(x.so) }; }); },
+      isDet: !!o, isList: !o, back: () => { set({ det: null }); try { history.replaceState(null, '', location.pathname); } catch (e) {} }, dv, amOn: !!A, am,
+      summary, showing: ({ open: 'open orders', done: 'delivered orders', all: 'all orders' })[S.view] + ' · ' + ordN(list.length),
+      tabs: VIEWS.map(([k, l]) => ({ l, on: S.view === k, click: () => set({ view: k, f: {} }) })),
+      chips: Object.entries(S.f).map(([k, v]) => ({ l: C[k][0] + ': ' + v, x: () => { const f = { ...S.f }; delete f[k]; set({ f }); } })),
+      views: LAYOUTS.map(([k, l, ic]) => ({ l, ic, on: S.layout === k, pick: () => set({ layout: k, f: {} }) })), viewName: LY[1],
+      more: [{ h: 'EXPORT', items: [{ l: 'Download Excel', ic: 'table_view', k: '.xlsx' }, { l: 'Download PDF', ic: 'picture_as_pdf' }] }, { h: 'VIEW', items: [{ l: 'Save as my view', ic: 'bookmark_add' }] }, { h: 'DATA', items: [{ l: 'Sync from Sales Portal now', ic: 'sync', k: 'Last sync not recorded' }] }],
+      selBar: selL.length ? { n: selL.length + ' selected', sum: '· ' + pcsTxt(selL.reduce((a, x) => a + pcsOf(x), 0)), acts: [{ l: 'Export', ic: 'download' }, { l: 'Print SO', ic: 'print' }], clear: () => set({ sel: {} }) } : null,
+      tasks, cols, rows, sel: S.sel, onSel: s => set({ sel: s }), onClear: () => set({ f: {} }),
+      subHeads: ['Item', '', '', 'Qty', 'Supplier'], subCols: 'minmax(150px,1fr) 76px 48px 104px',
+      footer: ordN(list.length), footerSum: '· Qty: ' + (Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([k, q]) => k + ' ' + (k === 'Sofa' ? q + (q === 1 ? ' set' : ' sets') : q)).join(' · ') || 'none'),
+      emptyT: S.view === 'done' ? 'No delivered orders recorded.' : 'No orders match.',
+    };
+  }
+}
+</script>
+</body>
+</html>
