@@ -448,8 +448,8 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
         return c.json(mapped.body, mapped.status);
       }
     }
-    /* A PHONE typed any way — `019-8337 2393`, `(019) 83372393`,
-       `+6019 83372393` — finds the orders whose phone carries those digits.
+    /* A PHONE typed any way — `019-0000 0075`, `(019) 00000075`,
+       `+6019 00000075` — finds the orders whose phone carries those digits.
        The read is the caller's RLS over the list's own scope; the Worker
        decides the match on digits (sales-order-phone-search.ts). A failed
        read fails the search, exactly like the document read above: an

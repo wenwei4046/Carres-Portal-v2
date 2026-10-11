@@ -59,7 +59,7 @@ function card(extra: Partial<Parameters<typeof CompactModuleCard>[0]> = {}) {
 
 describe("draftLink — opens a draft, never sends", () => {
   it("builds wa.me from a local number and refuses non-numbers", () => {
-    expect(draftLink("whatsapp", "019-8337 2393", "hi")).toBe("https://wa.me/601983372393?text=hi");
+    expect(draftLink("whatsapp", "019-0000 0075", "hi")).toBe("https://wa.me/601900000075?text=hi");
     expect(draftLink("whatsapp", "not a phone", "hi")).toBe("");
   });
   it("builds mailto only for a valid address, with subject", () => {

@@ -4,7 +4,7 @@ import { phoneKey, phoneKeyMy } from "@carres/shared";
    when a customer calls, the Register's first job is finding their orders).
 
    Stored phones are typed by people, so one number lives in several shapes:
-   `019-83372393`, `0123456789`, `123456789` (trunk 0 dropped), `+60123456789`,
+   `019-00000075`, `0123456789`, `123456789` (trunk 0 dropped), `+60123456789`,
    `012-3456789/013-9876543`. A PostgREST filter cannot compare digits, and this
    needs no migration: the read below narrows on the server with a pattern that
    can only widen the answer, and the Worker decides the match on DIGITS.

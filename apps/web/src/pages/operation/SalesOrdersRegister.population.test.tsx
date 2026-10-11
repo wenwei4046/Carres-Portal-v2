@@ -38,7 +38,7 @@ const ORDERS: operationOrderListRow[] = Array.from({ length: POPULATION }, (_, n
   operation_stage: "confirmed",
   warehouse_id: null,
   customer_name: n % 2 === 0 ? "Kimmy Tan" : "Ahmad",
-  customer_phone: "019-3478913",
+  customer_phone: "019-0000074",
   placed_at: new Date(Date.UTC(2026, 9, 1) - n * 3_600_000).toISOString(),
   delivery_date: "2026-11-30",
   delivery_date_tbd: false,

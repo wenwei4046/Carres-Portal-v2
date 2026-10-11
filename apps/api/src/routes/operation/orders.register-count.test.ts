@@ -40,11 +40,11 @@ const order = (id: string, so: number, status: string, customer_phone: string | 
 
 /* One customer, stored the way people typed it, across every status. */
 const ORDERS: Row[] = [
-  order("01", 5001, "proceed_order", "019-83372393"), // Register ✓ · probe ✓
-  order("02", 5002, "delivered", "+6019 8337 2393", "native"), // Register ✓ (digits) · probe ✗ (not exact)
-  order("03", 5003, "cancelled", "019-83372393"), // Register ✗ · probe ✓
-  order("04", 5004, "place", "019-83372393"), // Register ✗ (not handed over) · probe ✓
-  order("05", 5005, "proceed_order", "019-83372393", "rental"), // Register ✗ · probe ✓
+  order("01", 5001, "proceed_order", "019-00000075"), // Register ✓ · probe ✓
+  order("02", 5002, "delivered", "+6019 0000 0075", "native"), // Register ✓ (digits) · probe ✗ (not exact)
+  order("03", 5003, "cancelled", "019-00000075"), // Register ✗ · probe ✓
+  order("04", 5004, "place", "019-00000075"), // Register ✗ (not handed over) · probe ✓
+  order("05", 5005, "proceed_order", "019-00000075", "rental"), // Register ✗ · probe ✓
   order("06", 5006, "proceed_order", "012-345 6789"), // another customer
 ];
 const REGISTER_HITS = [ORDERS[0]!.id, ORDERS[1]!.id];
@@ -190,7 +190,7 @@ beforeEach(() => {
 afterAll(() => _setJwksForTesting(null));
 
 describe("count=only — the Register's own rows for the same phone and caller, counted", () => {
-  it.each(["019-83372393", "01983372393", "+60 19-8337 2393", "(019) 8337 2393"])(
+  it.each(["019-00000075", "01900000075", "+60 19-0000 0075", "(019) 0000 0075"])(
     "typed %s: the count equals the rows the Register lists",
     async (phone) => {
       fakeDb(ORDERS);
@@ -208,7 +208,7 @@ describe("count=only — the Register's own rows for the same phone and caller, 
 
   it("counts through the caller's own RLS client, one head-only read, and never loads the rows", async () => {
     const reads = fakeDb(ORDERS);
-    const { res, jwt, body } = await get(registerPath("019-83372393", true));
+    const { res, jwt, body } = await get(registerPath("019-00000075", true));
     expect(res.status).toBe(200);
     expect(body).toEqual({ count: 2 });
     expect(vi.mocked(userClient).mock.calls.every(([, token]) => token === jwt)).toBe(true);
@@ -227,20 +227,20 @@ describe("count=only — the Register's own rows for the same phone and caller, 
 
   it("a failed count is an error, never a number", async () => {
     fakeDb(ORDERS, { headCountError: { code: "42501", message: "permission denied for table orders" } });
-    const { res, body } = await get(registerPath("019-83372393", true));
+    const { res, body } = await get(registerPath("019-00000075", true));
     expect(res.status).toBe(403);
     expect(body).not.toHaveProperty("count");
   });
 
   it("refuses any other count word", async () => {
     fakeDb(ORDERS);
-    const { res } = await get(`${registerPath("019-83372393")}&count=all`);
+    const { res } = await get(`${registerPath("019-00000075")}&count=all`);
     expect(res.status).toBe(422);
   });
 
   it("is behind the Register's own guard — a dealer gets no count", async () => {
     fakeDb(ORDERS);
-    const { res } = await get(registerPath("019-83372393", true), "dealer");
+    const { res } = await get(registerPath("019-00000075", true), "dealer");
     expect(res.status).toBe(403);
   });
 });
@@ -250,7 +250,7 @@ describe("count=only — the Register's own rows for the same phone and caller, 
 describe("GET /api/orders/customer-type — unchanged", () => {
   it("still answers exact phone matches over every status", async () => {
     fakeDb(ORDERS);
-    const { res, body } = await get("/api/orders/customer-type?phone=019-83372393");
+    const { res, body } = await get("/api/orders/customer-type?phone=019-00000075");
     expect(res.status).toBe(200);
     expect(body).toEqual({ existing: true, matches: 4 });
   });

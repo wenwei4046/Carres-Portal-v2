@@ -62,11 +62,11 @@ describe("useSalesOrderRegisterOrders", () => {
   });
 
   it("carries the search on every page", async () => {
-    const { result } = renderHook(() => useSalesOrderRegisterOrders({ stage: "proceeded", search: "019-833 72393" }), { wrapper });
+    const { result } = renderHook(() => useSalesOrderRegisterOrders({ stage: "proceeded", search: "019-000 00075" }), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     for (const [url] of apiFetch.mock.calls) {
       const params = new URL(url as string, "http://t").searchParams;
-      expect(params.get("search")).toBe("019-833 72393");
+      expect(params.get("search")).toBe("019-000 00075");
       expect(params.get("stage")).toBe("proceeded");
       expect(params.get("paged")).toBe("1");
     }
