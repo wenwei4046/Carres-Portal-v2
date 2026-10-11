@@ -923,6 +923,11 @@ Carres has no-refund policy. The single known mattress-sagging refund was except
 Case/Operation handled customer/application, Management decided, Finance transferred externally,
 Operation informed customer. Payment may show linked read-only history; it does not generalise it.
 
+**Refund amount — OWNER RULING 2026-10-11 / TARGET NOT BUILT.** Payments does not decide a refund
+amount. The approval of a refund states the exact amount and the basis for it. Payments pays the
+approved amount, no more and no less. A refund whose amount is not recorded cannot become payable:
+it does not reach Payments as work to pay.
+
 ## 14 · Current build truth
 
 ### BUILD — PAYMENTS CARD 01 · Monitor rail = the Monday–Friday follow-up plan, 2026-09-16

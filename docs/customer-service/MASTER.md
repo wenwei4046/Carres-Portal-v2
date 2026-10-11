@@ -610,6 +610,13 @@ approval.
 
 > I'll pass your replacement request to our team to check.
 
+### 10.6 · Legal claim reported by a customer — OWNER RULING 2026-10-11 / TARGET NOT BUILT
+
+When a customer reports a legal claim, the claim is recorded and the notification goes out at once,
+**with or without an attachment**. A lawyer's letter, court paper or other document is added to the
+record when Carres has it; its absence never blocks the record. A save that cannot complete must
+say so on screen. It must never fail silently, and it must never look saved when it is not.
+
 ## 11 · Human Handover Law
 
 Customer Service must hand over when:
