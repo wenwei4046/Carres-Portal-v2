@@ -22,7 +22,10 @@
 > `b34ddbc82e16b9d99a786340061abb188db0768c3bde2d90e974696a8b54c1f9`, which replaced
 > `Carres Shell.dc.html`, `Carres Table.dc.html`, `Sales Order Outright v12.dc.html`,
 > `Purchasing v2.dc.html`, `carres-check.js` and the Layout Standard and added
-> `carres-tasks.js`. The owner keeps the original archives. Earlier specimens are deleted; Git keeps the history.
+> `carres-tasks.js`, and the third design update `Sales Order_11 Oct(4).zip`, SHA-256
+> `d0f402425acbbf7144af43d7ddf69f6d9e1ecb320848b2f1be56c292c4f64a72`, which replaced
+> `Carres Shell.dc.html`, `Carres UI Kit.dc.html`, `Purchasing v2.dc.html`, `carres-check.js`
+> and the Layout Standard. The owner keeps the original archives. Earlier specimens are deleted; Git keeps the history.
 >
 > **TEST customer details (this repository is public).**
 >
@@ -39,8 +42,8 @@
 > these files.
 >
 > Every page opens with its rows and no script error. The supplied `carres-check.js` was run on
-> 21 page states at 1025, 1164 and 1440 wide: 14, 20 and 20 states pass. The untouched supplied
-> files give the same result. `docs/01-design-tokens.md` §10.1 lists what the others report.
+> 21 page states at 1025, 1164 and 1440 wide: all 21 states pass at each width. The untouched supplied
+> files give the same result. `docs/01-design-tokens.md` §10.1 records the measurement.
 
 ---
 

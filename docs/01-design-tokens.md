@@ -1,6 +1,6 @@
 # 01 · Design tokens
 
-**Current shared visual target · owner instruction 11 Oct 2026 · supplied v12.** This replaces every earlier value in this file; there is no second version. Source: `Sales Order_11 Oct.zip` and its design updates of the same day, `Sales Order_11 Oct(2).zip` and `Sales Order_11 Oct(3).zip` (`README.md`, `UX-FLOWS.md`, `docs/Carres Layout Standard.md`, `carres-theme.js`, `carres-check.js`, `Carres UI Kit.dc.html`, `Carres Shell.dc.html`, `Carres Table.dc.html`, `Sales Order Outright v12.dc.html`, `Purchasing v2.dc.html`). This is a design adoption, not a claim that the React kit or production has migrated.
+**Current shared visual target · owner instruction 11 Oct 2026 · supplied v12.** This replaces every earlier value in this file; there is no second version. Source: `Sales Order_11 Oct.zip` and its design updates of the same day, `Sales Order_11 Oct(2).zip`, `Sales Order_11 Oct(3).zip` and `Sales Order_11 Oct(4).zip` (`README.md`, `UX-FLOWS.md`, `docs/Carres Layout Standard.md`, `carres-theme.js`, `carres-check.js`, `Carres UI Kit.dc.html`, `Carres Shell.dc.html`, `Carres Table.dc.html`, `Sales Order Outright v12.dc.html`, `Purchasing v2.dc.html`). This is a design adoption, not a claim that the React kit or production has migrated.
 
 Business facts, permissions, completion gates, document formats and exact words remain owned by module MASTERs and COPY-STANDARD. Where the package conflicts with COPY-STANDARD or a module MASTER, its value is PROPOSAL / NOT LAW (§10). The supplied Ops Rules are not stored in this repository. The specimen's sample pages use TEST customer details.
 
@@ -111,7 +111,7 @@ Nothing else uses 600 at 15 or above. Never below 11; 11 only for caps labels, t
 | Theme chip (Appearance) | 32 high, radius 8, 12 dot and name 13 / 500 |
 | Item-row control | 24 high, bordered, value and chevron, radius 8, tone colours as the pill; one per item row |
 | View button | White word button, 32 high, radius 8: icon of the current view 18 grey, the view's name 13 / 500, chevron; always names the current view; pressed grey while its menu is open; the same button on every module |
-| Pick pop-up | 320 wide, padding 6, menu surface. Head is a facts card: caps label, 10, item block (model 13 / 500, spec 12 grey), 10, facts in two columns (11 / 500 caps label over 13 / 500 value, gap 8 × 14), 12, hairline. Options 32 high: icon 18 grey, name 13 / 400, a short hint 12 grey at the right; picked is soft selection fill, 500 and a check. Never several facts joined on one grey line |
+| Pick pop-up | Two sizes by the number of options, never draggable. Up to 6 options: a popover 320 wide under the clicked cell; it closes on pick, outside click or Esc. More than 6: a side sheet 380 wide on the right, full height (top 64, 12 from the bottom), with a search box, a scrolling list and the action button pinned at the bottom; the table stays visible. Every pop-up fits the window: it moves up when there is no room below and its list scrolls inside. Padding 6, menu surface. Head is a facts card: caps label, 10, item block (model 13 / 500, spec 12 grey), 10, facts in two columns (11 / 500 caps label over 13 / 500 value, gap 8 × 14), 12, hairline. Options 32 high: icon 18 grey, name 13 / 400, a short hint 12 grey at the right; picked is soft selection fill, 500 and a check. Never several facts joined on one grey line |
 | Input / search | Height 32 / 34, radius 8 |
 | Record link | Ink 600, dotted grey underline (`#6B7280`, offset 3), solid on hover; no arrow, no icon; the whole number is the target |
 | Card | Padding 14 × 16, 12 between cards, no shadow, no box in a box |
@@ -140,7 +140,7 @@ Icons: Material Symbols Rounded, outline, weight 300; 18 in buttons and menus, 2
 | Tasks | 320, right; title row on the ground, white task cards 8 apart; 1px `#E5E7EB` line separates it from the middle with 12 on both sides |
 | Zones | 12 between zones |
 
-The page never scrolls; panels and table bodies scroll inside with thin scrollbars. Summary and Tasks collapse and reopen from ghost buttons in the toolbar row. They open by window width: at 1600 or wider, both; from 1280 to 1599, Tasks only, with Summary closed until the person opens it; under 1280, both closed. Opening or closing a panel never changes a column width. A detail opens in the middle in place of the list: Summary and the toolbar hide, Tasks stays, Back returns to the same scroll position. There is no list plus detail three-panel view.
+The page never scrolls; panels and table bodies scroll inside with thin scrollbars. Summary and Tasks collapse and reopen from ghost buttons in the toolbar row. They open by window width: at 1600 or wider, both; from 1280 to 1599, Tasks only, with Summary closed until the person opens it; under 1280, both closed. Opening or closing a panel never changes a column width. A detail page under 1100 wide collapses the menu to 64 by itself; the person's own choice returns on the list. A detail opens in the middle in place of the list: Summary and the toolbar hide, Tasks stays, Back returns to the same scroll position. There is no list plus detail three-panel view.
 
 ## 5 · Register
 
@@ -229,7 +229,7 @@ Use §§1 and 3 for surface and control values; preserve the card's host identit
 | Desktop / narrow / keyboard | UI MASTER §2.2 full-page checks, zoom, focus, scrolling |
 | Specimen | Demonstrates design only; sample facts and simulated permissions do not prove production |
 
-Source archive SHA-256: `1140ffde825dcd573f05467b49f2201d02331241dbc4f7cb0ef4275957efae16`; design updates `23850ef44e0a3fc1932743f7523a2ff8b4cd4b1460427d22aa87e888cb1d6ef8` and `b34ddbc82e16b9d99a786340061abb188db0768c3bde2d90e974696a8b54c1f9`.
+Source archive SHA-256: `1140ffde825dcd573f05467b49f2201d02331241dbc4f7cb0ef4275957efae16`; design updates `23850ef44e0a3fc1932743f7523a2ff8b4cd4b1460427d22aa87e888cb1d6ef8`, `b34ddbc82e16b9d99a786340061abb188db0768c3bde2d90e974696a8b54c1f9` and `d0f402425acbbf7144af43d7ddf69f6d9e1ecb320848b2f1be56c292c4f64a72`.
 
 ## 9 · Settings → Appearance · current target owner instruction 11 Oct 2026
 
@@ -283,15 +283,15 @@ The supplied Layout Standard still carries older lines beside its 10 and 11 Oct 
 | Choice chip, unselected | White with 1px `#D5D9DE` | `#F2F3F5` fill as drawn | **PROPOSAL / NOT LAW** · overturned when the owner names the chip |
 | Summary rows | Information only, never filter | Drawn as pressable rows | **PROPOSAL / NOT LAW** · whether a number filters stays the module's choice until ruled |
 
-**Measured 11 Oct on the supplied pages of the third archive** with the package's own `carres-check.js`, 21 page states at each width. The untouched supplied files and this repository's TEST-data copy give the same result, so these are facts about the design, not rulings and not effects of the TEST data. No page script errors.
+**Measured 11 Oct on the supplied pages of the fourth archive** with the package's own `carres-check.js`, 21 page states at each width. The untouched supplied files and this repository's TEST-data copy give the same result. No page script errors.
 
-| Width | States that pass | What the others report |
-|---|---|---|
-| 1025 | 14 of 21 | The SO PDF preview; the order-line table scrolling sideways inside its card on the five SO detail states; the Order Route details card scrolling sideways |
-| 1164 | 20 of 21 | The SO PDF preview only |
-| 1440 | 20 of 21 | The SO PDF preview only |
+| Width | States that pass |
+|---|---|
+| 1025 | 21 of 21 |
+| 1164 | 21 of 21 |
+| 1440 | 21 of 21 |
 
-The SO PDF preview fails at every width because the check skips it for cut text but still applies the type ladder, the item-text rule and the field-row height inside the document page. Every list, the selection bar, Settings → Appearance and all Purchasing states pass at all three widths. The package's acceptance line (pass on every state at 1025, 1164 and 1440) is not yet met by the supplied pages.
+The package's acceptance line (pass on every state at 1025, 1164 and 1440) is met by the supplied pages. The check treats the SO PDF preview as a print page and skips it, and ignores text inside a list's own side-scroll box; both are stated in the Layout Standard.
 
 ### 10.2 Against existing authority
 
@@ -300,7 +300,7 @@ Everything in this table is **PROPOSAL / NOT LAW**. Pages are built on the v12 v
 | Topic | The package says | Authority that stands |
 |---|---|---|
 | Visible words and capitals | Sentence-case list headers (`SO no.`, `Proceed date`); `Customer’s original requested delivery`, `Log contact`, `Request amendment`, `Waiting for Jess`, `Staff and duties`; its date, time and money formats | COPY-STANDARD |
-| Purchasing list words | `Order PO deadline`, `Supplier ready by`, `Delivery ETA`, its countdown words | COPY-STANDARD and Purchasing MASTER |
+| Purchasing list words | `Order PO deadline`, `Supplier ready by`, `Delivery ETA`, its countdown words, `Use stock`, `Using stock` | COPY-STANDARD and Purchasing MASTER |
 | Amendment approval | Contact changes save at once; other changes go to one approver; a stair carry fee formula | Orders MASTER |
 | Purchasing and delivery timing | Batch cut-off times, outstation logistics order, PO sending steps | Purchasing and Delivery MASTERs |
 | Task completion | `Mark done`, an undo window, follow-up attempt counts, tasks that close by themselves when the work is done on their page | Workspace MASTER and the owning module |
