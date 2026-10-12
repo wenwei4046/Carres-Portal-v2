@@ -48,7 +48,7 @@ Finance must show clearly where each sum of money comes in and goes out, channel
 6. Debtors follow the channel in two levels for dealers (「Dealer 一个overall 母账，然后每个dealer under 这个母账 … 就是两层了」): Dealer Debtors, then each dealer, then that dealer's customers or orders. Showroom and Subscription each have one control account with their customers under it.
 7. Goods bought without an order must not leave money paid to suppliers outside every channel in Receipts & Payments (「这样我看receipt & payment 就不太对了」); Chew confirmed how such a purchase is placed on 2026-10-06 ("A purchase without an order" below).
 
-Status (2026-10-12): ruling 3 holds (a line can be set to Office). Ruling 2 and "A purchase without an order" are BUILT for a bill's goods lines (0683, "Splitting the money by channel" step 1); ruling 1 is BUILT in Cash Flow (0684, step 2). Rulings 4, 5 and 6 are APPROVED / NOT BUILT. The plan for all of them, "Splitting the money by channel" at the end of this section, was approved by Chew on 2026-10-12.
+Status (2026-10-12): ruling 3 holds (a line can be set to Office). Ruling 2 and "A purchase without an order" are BUILT for a bill's goods lines (0683, "Splitting the money by channel" step 1); ruling 1 is BUILT in Cash Flow (0684, step 2). Rulings 4 and 6 are BUILT and not yet applied (0685, step 3). Ruling 5 is APPROVED / NOT BUILT. The plan for all of them, "Splitting the money by channel" at the end of this section, was approved by Chew on 2026-10-12.
 
 **Chart of accounts (Chew's, AutoCount, dated 22 Sep 2026; kept by Chew, not in this repository).** It has one debtor control (Trade Debtors) and one Other Debtor control, so dealer and subscription customers are not separated (「本身里面没有分dealer customer 和 subscription customer」). Measured: the ledger already accepts its code shape (`ledgerAccountCodeShape`, for example 300-0000 and 900-A001). Customers sit under a control account as parties on each line (`gl_entry_lines.party_type` / `party_id`), not as accounts, so a control account holds any number of customers.
 
@@ -155,7 +155,7 @@ Two Finance Settings pages keep the mapping in Chew's hands (「其他的收入�
 - How a bill does this is in "Splitting the money by channel" step 1 (built in 0683). The Showroom Display rule holds while Carres has one showroom.
 - The KPI allowance is accrued like the renovation rebate (900-C009 / 410-0065).
 
-**Splitting the money by channel — the plan; APPROVED by Chew 2026-10-12 (「分渠道做」, after it was explained to him) / NOT BUILT. He tests it all at once when it is done (「到时我要测试的全部一次过做」).** It builds Chew's rulings 1, 2, 4, 5 and 6 above and "A purchase without an order". Measured first (2026-10-10, read only):
+**Splitting the money by channel — the plan; APPROVED by Chew 2026-10-12 (「分渠道做」, after it was explained to him). Steps 1 and 2 BUILT and applied; step 3 BUILT, not applied; step 4 NOT BUILT. He tests it all at once when it is done (「到时我要测试的全部一次过做」).** It builds Chew's rulings 1, 2, 4, 5 and 6 above and "A purchase without an order". Measured first (2026-10-10, read only):
 - Customer money: a payment, a deposit and an invoice each post to the one trade debtors account (`300-0000`) through `gl_ar_control_account()`, which allows exactly one customer control account; a second one makes every customer payment fail to post. These postings run inside Payment's own recording (Jess's), with no fallback, so a fault there would stop staff recording payments. No customer posting stores a department: the reports work it out from the order when they read (0578).
 - Supplier bills: a GRN line's department is filled in from its sales order (`fin_po_line_departments`), but it can be changed by hand; a PO line bought for orders in two channels gets none. A Manual Purchase Request keeps its purpose; a Showroom Display destination is not tied to a showroom outlet.
 - Cash Flow has no channel filter. A supplier payment carries no department (only the bill lines it paid do); a card payout carries none.
@@ -200,7 +200,21 @@ Recommended, in this order:
      - A bill of RM 80 Office and RM 20 showroom, paid by one voucher of RM 100, showed as RM 80 and RM 20.
      - An advance whose bill line had no department stayed in no channel.
      - Office with an id and an unknown department were refused, and Operation could not read Cash Flow.
-3. **Debtors by channel** (rulings 4 and 6): `300-1000` Showroom, `300-2000` Dealer with one account per dealer under it (`300-2001` and on, a new dealer getting its own), `300-3000` Subscription, all under `300-0000`. Each posting picks the account from its order's channel. The test balances already on `300-0000` stay there; go-live starts clean. This rewrites the posting step inside Payment's recording: Chew approved it (2026-10-12, §1 Exceptions) and tells Jess, and it is measured on production and rolled back before it goes live, because a fault there would stop staff recording payments.
+3. **Debtors by channel** (rulings 4 and 6). **BUILT 2026-10-12 (0685), probed on production and rolled back; NOT APPLIED. It is applied when Chew says Jess has been told** (Chew approved the change to Payment's recording on 2026-10-12, §1 Exceptions, and tells Jess himself).
+   - The accounts: `300-1000` SHOWROOM DEBTORS, `300-2000` DEALER DEBTORS (a heading) and `300-3000` SUBSCRIPTION DEBTORS. Three posting roles name them, so a renumber carries through; Posting accounts lists them under "Kept by the system".
+   - Each dealer gets its own account under `300-2000`: `300-2001` and on, named after the dealer, opened the first time one of its customers is invoiced or pays. `fin_dealer_debtor_accounts` records which account is whose.
+   - The customer payment (every door into Payment's recording) and the sales or storage invoice take the account from the order's channel (`fin_order_channels`). An order that view leaves out is a showroom order whose outlet it cannot name, so it goes to Showroom Debtors. The customer stays the party on the line.
+   - A reversal copies the lines it reverses, so a payment or invoice posted before 0685 goes back to `300-0000` when voided. The test balances on `300-0000` stay there.
+   - The Ledger self-check's receivables reads every customer account together.
+   - Ruling 6 puts the three under `300-0000`. They sit beside it under ASSETS for now, because `300-0000` holds test postings and an account with postings never becomes a heading (0580). Go-live starts with clean books; then `300-0000` takes them under it (Chart of accounts, `Under`).
+   - Measured before applying (production, rolled back, 2026-10-12):
+     - A showroom cash payment recorded by the principal posted Dr cash, Cr `300-1000` with its customer.
+     - A dealer recording a top-up on its own order opened `300-2001`, named after the dealer, under `300-2000`, and posted to it. A second order of the same dealer used the same account; another dealer's order opened `300-2002`.
+     - Invoices issued by Operation posted Dr `300-1000` (showroom) and Dr `300-2001` (dealer). A subscription order's account is `300-3000`.
+     - Voiding the new payment reversed on `300-1000`; voiding a payment posted before 0685 reversed on `300-0000`.
+     - The receivables check read all five customer accounts: the ledger and invoices less payments agreed, difference RM 0.00, as before. The Balance Sheet balanced.
+     - The two new functions and the dealer account list cannot be reached by a signed-in user directly.
+   - Not built: an order whose channel changes after money was posted leaves its earlier entries on the earlier account; a journal moves them.
 4. **Transport on each order** (ruling 5): a logistics partner's bill names the delivery orders it covers; its amount is split over them (equally when it gives only a total); each part posts to `900-T002` with its order's channel.
 - Falsifier: in Chew's test, a channel's money in or out differs from what its orders, bills and vouchers show, or a customer payment fails to post after step 3.
 
@@ -394,7 +408,7 @@ Dealer commission rules:
   - The subscription invoice is Finance's (「invoice 那边算我这里」). Rental keeps the agreement and its billing schedule.
   - APPROVED / NOT BUILT (measured 2026-10-10). The plan follows.
 - **Subscription money — the plan, PROPOSAL / NOT LAW (2026-10-10, for Chew's review).** It builds the Rental MASTER §0 rules and the bullets above. Measured first (2026-10-10, read only):
-  - Today each collected month posts Dr the money account, Cr `500-2000` on the day it is paid: no invoice, no subscription debtor, no customer on the line (0475). Accounts `300-3000`, `401-0000`, `610-0090` and `900-B002` exist but nothing posts to them.
+  - Today each collected month posts Dr the money account, Cr `500-2000` on the day it is paid: no invoice, no subscription debtor, no customer on the line (0475). Accounts `401-0000`, `610-0090` and `900-B002` exist but nothing posts to them. `300-3000` was not in the chart (measured 2026-10-12); 0685 adds it, and a subscription order's invoice or payment through Payment posts to it once 0685 is applied.
   - The schedule starts on the signing day and Stripe charges month 1 at signing (POS checkout); later months fall on the 7th. Nothing ties the first month to delivery.
   - `Record transfer` can mark any month paid, takes the day the button is pressed, and closes a whole month for any amount. A month counts as late until someone records it.
   - Late interest is 8% a month from the due date, typed in the code, charged by hand, never invoiced or posted. Paying off works (months left plus interest charged), but its interest never posts. Default, repossession and bad debt are statuses with no door. Diglant's share and the commission are worked out per month and stored, never paid or posted.
