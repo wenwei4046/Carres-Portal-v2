@@ -217,4 +217,24 @@ describe("Other debtors — the party Register", () => {
     await waitFor(() => expect(sent("POST /parties")).toHaveLength(1));
     expect(sent("POST /parties")[0].body).toMatchObject({ name: "Example Landlord Sdn Bhd", kind: "company" });
   });
+
+  /* 0691 (Chew 2026-10-12, 「A 可以」): a party's code, first; Finance may change it. */
+  it("shows each party's code first, and a changed code is sent before the party", async () => {
+    net.routes["GET /parties"] = PARTIES.map((p, i) => ({ ...p, code: i === 0 ? "305-E001" : "305-E002" }));
+    net.routes[`PUT /parties/${P1}/code`] = { code: "305-S001" };
+    net.routes[`PATCH /parties/${P1}`] = { id: P1 };
+    show("/finance/other-debtors?view=parties");
+    await screen.findByText("Example Sister Sdn Bhd");
+    const heads = screen.getAllByRole("columnheader").map((h) => h.textContent?.trim()).filter(Boolean);
+    expect(heads[0]).toBe("Code");
+    expect(screen.getByText("305-E001")).toBeInTheDocument();
+    fireEvent.doubleClick(screen.getByText("Example Sister Sdn Bhd"));
+    const dialog = await screen.findByRole("dialog");
+    const code = within(dialog).getByLabelText("Code");
+    expect(code).toHaveValue("305-E001");
+    fireEvent.change(code, { target: { value: "305-s001" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save party" }));
+    await waitFor(() => expect(sent(`PATCH /parties/${P1}`)).toHaveLength(1));
+    expect(sent(`PUT /parties/${P1}/code`)[0].body).toEqual({ code: "305-S001" });
+  });
 });

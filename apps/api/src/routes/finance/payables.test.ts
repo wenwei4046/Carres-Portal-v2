@@ -228,13 +228,48 @@ describe("GET readers", () => {
 });
 
 describe("a supplier's finance details (0636, Chew 2026-10-03)", () => {
-  it("GET /supplier-finance calls finance_supplier_list and wraps rows", async () => {
+  it("GET /supplier-finance calls finance_supplier_list and wraps rows, each with its code (0691)", async () => {
     const row = { supplier_id: SUPPLIER_ID, name: "Test Factory", kind: "factory_pickup", bank_account_no: null };
     const sb = mockRpc({ data: [row], error: null });
+    sb.rpc.mockImplementation(async (fn: string) => (fn === "fin_party_codes"
+      ? { data: [{ supplier_id: SUPPLIER_ID, party_id: null, code: "400-T001" }], error: null }
+      : { data: [row], error: null }));
     const res = await call("/supplier-finance");
     expect(res.status).toBe(200);
     expect(sb.rpc).toHaveBeenCalledWith("finance_supplier_list");
-    expect(await res.json()).toEqual({ rows: [row] });
+    expect(sb.rpc).toHaveBeenCalledWith("fin_party_codes");
+    expect(await res.json()).toEqual({ rows: [{ ...row, code: "400-T001" }] });
+  });
+
+  it("GET /supplier-finance still lists the rows when the codes cannot be read (before 0691)", async () => {
+    const row = { supplier_id: SUPPLIER_ID, name: "Test Factory", kind: "factory_pickup", bank_account_no: null };
+    const sb = mockRpc({ data: [row], error: null });
+    sb.rpc.mockImplementation(async (fn: string) => (fn === "fin_party_codes"
+      ? { data: null, error: { code: "PGRST202", message: "function not found" } }
+      : { data: [row], error: null }));
+    const res = await call("/supplier-finance");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ rows: [{ ...row, code: null }] });
+  });
+
+  /* 0691 (Chew 2026-10-12): Finance changes a creditor's code. */
+  it("PUT /supplier-finance/:id/code sends the code in capitals through fin_party_code_set", async () => {
+    const sb = mockRpc({ data: "400-T009", error: null });
+    const res = await call(`/supplier-finance/${SUPPLIER_ID}/code`, { method: "PUT", body: { code: " 400-t009 " } });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_party_code_set", { p_supplier_id: SUPPLIER_ID, p_party_id: null, p_code: "400-T009" });
+    expect(await res.json()).toEqual({ code: "400-T009" });
+  });
+
+  it("PUT /supplier-finance/:id/code refuses a code of the wrong shape before the database, and passes the database's refusal on", async () => {
+    const sb = mockRpc({ data: null, error: null });
+    const bad = await call(`/supplier-finance/${SUPPLIER_ID}/code`, { method: "PUT", body: { code: "ABC" } });
+    expect(bad.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+    mockRpc({ data: null, error: { code: "22023", message: "400-T001 is already the code of Test Factory.", details: "code_exists" } });
+    const taken = await call(`/supplier-finance/${SUPPLIER_ID}/code`, { method: "PUT", body: { code: "400-T001" } });
+    expect(taken.status).toBeGreaterThanOrEqual(400);
+    expect(JSON.stringify(await taken.json())).toContain("400-T001 is already the code of Test Factory.");
   });
 
   it("PUT /supplier-finance/:id sends trimmed values, drops spaces and dashes from the account number, and blanks become null", async () => {
@@ -652,12 +687,18 @@ describe("AP aging (0640, Chew 2026-10-03)", () => {
         due_date: null, total: 4000, open: 4000 }] }],
   };
 
-  it("asks for the day and passes the answer through whole", async () => {
+  it("asks for the day and passes the answer through whole, each supplier with its code (0691)", async () => {
     const sb = mockRpc({ data: AGING, error: null });
+    sb.rpc.mockImplementation(async (fn: string) => (fn === "fin_party_codes"
+      ? { data: [{ supplier_id: AGING.suppliers[0]!.supplier_id, party_id: null, code: "400-A001" }], error: null }
+      : { data: AGING, error: null }));
     const res = await call("/aging?asAt=2026-09-30");
     expect(res.status).toBe(200);
     expect(sb.rpc).toHaveBeenCalledWith("fin_ap_aging", { p_as_at: "2026-09-30" });
-    expect(await res.json()).toEqual(AGING);
+    expect(await res.json()).toEqual({
+      ...AGING,
+      suppliers: AGING.suppliers.map((s, i) => ({ ...s, code: i === 0 ? "400-A001" : null })),
+    });
   });
 
   it("asks for today in Malaysia when no day is given", async () => {

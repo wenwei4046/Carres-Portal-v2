@@ -46,7 +46,8 @@ export interface ApAgingAnswer {
   as_at: string;
   go_live_on: string;
   controls: Array<{ account_code: string; name: string; balance: Wire }>;
-  suppliers: Array<{ supplier_id: string; name: string | null; kind: string | null; balance: Wire; bills: ApAgingBill[] }>;
+  /** 0691: `code` is Finance's AutoCount-style code (400-A001), added by the API; absent before 0691. */
+  suppliers: Array<{ supplier_id: string; name: string | null; kind: string | null; code?: string | null; balance: Wire; bills: ApAgingBill[] }>;
 }
 
 /** Age a bill by its own date or by its due date. */
@@ -94,6 +95,8 @@ export interface ApAgingRow {
   supplierId: string;
   name: string;
   kind: string | null;
+  /** 0691: Finance's code, like 400-A001; null when it has none. */
+  code: string | null;
   balance: number;
   /** The open bills, added up by column. */
   cells: number[];
@@ -135,7 +138,7 @@ export function apAgingReport(a: ApAgingAnswer, basis: AgingBasis, columns: Agin
     totalNotTied += notTied;
     cells.forEach((c, i) => { totalCells[i]! += c; });
     return {
-      supplierId: s.supplier_id, name: s.name ?? "Name not available", kind: s.kind,
+      supplierId: s.supplier_id, name: s.name ?? "Name not available", kind: s.kind, code: s.code ?? null,
       balance: balance / 100, cells: cells.map((c) => c / 100), notTied: notTied / 100, bills,
     };
   });

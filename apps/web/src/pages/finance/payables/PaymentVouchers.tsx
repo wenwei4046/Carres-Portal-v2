@@ -10,6 +10,7 @@ import {
   type PaymentVoucherRegisterRow,
   type SupplierBillRegisterRow,
   type SupplierDebitNoteRegisterRow,
+  partyLabel,
   supplierPayTo,
 } from "@carres/shared/schemas/finance-ap";
 import ListPageShell from "@/components/ListPageShell";
@@ -799,7 +800,7 @@ function VoucherForm() {
                   onChange={(e) => { setSupplierId(e.target.value); setPicks({}); }}>
                   <option value="">{purpose === "SUPPLIER_BILLS" ? "Choose the supplier" : "No supplier"}</option>
                   {(suppliers.data ?? []).map((s) => (
-                    <option key={s.id} value={s.id}>{s.name} · {creditorKindWord(s.kind)}</option>
+                    <option key={s.id} value={s.id}>{partyLabel(s)} · {creditorKindWord(s.kind)}</option>
                   ))}
                 </select>
                 {supplierId !== "" && (

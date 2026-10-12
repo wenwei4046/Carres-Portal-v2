@@ -3,6 +3,7 @@ import { Link, Route, Routes, useNavigate, useParams, useSearchParams } from "re
 import { toast } from "sonner";
 import type { DepartmentType } from "@carres/shared";
 import {
+  partyLabel,
   supplierDebitNoteDraftInput,
   type SupplierDebitNoteDocument,
   type SupplierDebitNoteRegisterRow,
@@ -429,7 +430,7 @@ function DebitNoteForm() {
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <Select id="debit-note-supplier" label="Supplier" value={supplierId || undefined} placeholder="Choose who sent this debit note"
                 onValueChange={setSupplierId}
-                options={(suppliers.data ?? []).map((s) => ({ value: s.id, label: `${s.name} · ${creditorKindWord(s.kind)}` }))} />
+                options={(suppliers.data ?? []).map((s) => ({ value: s.id, label: `${partyLabel(s)} · ${creditorKindWord(s.kind)}` }))} />
               <Input id="debit-note-paper" label="Supplier's debit note No" value={paperNo} maxLength={60}
                 onChange={(e) => setPaperNo(e.target.value)} />
               <DatePicker id="debit-note-date" label="Date" value={noteDate} onChange={setNoteDate}

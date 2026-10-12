@@ -90,6 +90,18 @@ describe("AP Aging (0640)", () => {
     expect(row(BAYVIEW)).toHaveTextContent("RM -500.00");
   });
 
+  /* 0691 (Chew 2026-10-12): the creditor's code, first, as AutoCount's aging lists it. */
+  it("shows each supplier's code in the first column", async () => {
+    api.answer = { ...ANSWER, suppliers: ANSWER.suppliers.map((s, i) => ({ ...s, code: i === 0 ? "400-L001" : "405-B001" })) };
+    show();
+    await screen.findByTestId(`ap-aging-row-${LUMEN}`);
+    const heads = screen.getAllByRole("columnheader").map((h) => h.textContent?.trim()).filter(Boolean);
+    expect(heads[0]).toBe("Code");
+    expect(heads[1]).toBe("Supplier");
+    expect(row(LUMEN)).toHaveTextContent("400-L001");
+    expect(row(BAYVIEW)).toHaveTextContent("405-B001");
+  });
+
   it("ties the suppliers to the books in the footer", async () => {
     show();
     await screen.findByTestId(`ap-aging-row-${LUMEN}`);

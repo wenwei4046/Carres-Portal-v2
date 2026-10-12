@@ -14,6 +14,7 @@
  * credit-note-new · debit-notes · debit-note · debit-note-new ·
  * voucher-pays-debit-note (0681) · forecast (last month, so the actual is a whole month) ·
  * posting-accounts · item-groups (long lists under their tables, 0657–0659) ·
+ * money-accounts (0691: accounts out of use hidden until asked for) ·
  * dealer-commission · dealer-statement (one made-up dealer, 0664; pick it on
  * the Statement view) · notes-to-follow-up · note-to-follow-up (0676).
  * `?role=principal` draws the area titles, to see an area fold.
@@ -754,7 +755,7 @@ const ACCOUNT_NAME: Record<string, string> = {
   "300-1000": "SHOWROOM DEBTORS", "300-2000": "DEALER DEBTORS", "300-3000": "SUBSCRIPTION DEBTORS",
   "400-0000": "TRADE CREDITORS", "405-0000": "OTHERS CREDITORS",
   "440-0000": "DEPOSIT RECEIVED", "330-0000": "STOCK", "150-0000": "RETAINED EARNING", "160-0000": "OPENING BALANCE",
-  "310-2000": "HONG LEONG BANK", "320-0000": "CASH IN HAND", "315-5000": "STRIPE", "1130": "CARD - MACHINE NOT KNOWN",
+  "310-2000": "HONG LEONG BANK", "320-0000": "CASH IN HAND", "315-5000": "STRIPE", "315-9000": "CARD - MACHINE NOT KNOWN",
 };
 const named = (code: string | null) => (code ? ACCOUNT_NAME[code] ?? null : null);
 const itemGroup = (id: string, name: string, p: string | null, s: string | null, products: number, categories: string[] = []) => ({
@@ -830,8 +831,26 @@ const PAYMENT_METHODS = {
     { method: "cash", label: "Cash", account_code: "320-0000", account_name: named("320-0000"), active: true, sort: 2 },
   ],
   money_accounts: [{ code: "310-2000", name: named("310-2000") }, { code: "320-0000", name: named("320-0000") }],
-  system_rows: [{ method: "card", source_channel: "*", account_code: "1130" }, { method: "online", source_channel: "stripe_checkout", account_code: "315-5000" }],
+  system_rows: [{ method: "card", source_channel: "*", account_code: "315-9000" }, { method: "online", source_channel: "stripe_checkout", account_code: "315-5000" }],
 };
+
+// 0691: Finance's AutoCount-style codes, as the API adds them. Invented.
+const CODE_OF: Record<string, string> = {
+  "s-1": "400-O001", "s-2": "400-L001", "s-3": "405-B001", "s-4": "405-T001", "s-5": "400-D001", "s-6": "405-P001",
+};
+const PARTY_CODES = ["305-P001", "305-I001", "305-A001", "305-A002"];
+// Finance Settings → Money accounts: two old test accounts out of use, hidden until asked for.
+const MONEY_ACCOUNT_ROWS = [
+  { code: "1120", name: "BANK - CURRENT ACCOUNT (TEST ONLY)", money_kind: "BANK", is_active: false },
+  { code: "1121", name: "Public Bank", money_kind: "BANK", is_active: false },
+  { code: "310-1000", name: "ALLIANCE BANK", money_kind: "BANK", is_active: true },
+  { code: "310-2000", name: "HONG LEONG BANK", money_kind: "BANK", is_active: true },
+  { code: "310-4000", name: "MAYBANK", money_kind: "BANK", is_active: true },
+  { code: "315-1000", name: "MERCHANT - PBB", money_kind: "HOLDING", is_active: true },
+  { code: "315-5000", name: "STRIPE", money_kind: "HOLDING", is_active: true },
+  { code: "315-9000", name: "CARD - MACHINE NOT KNOWN", money_kind: "HOLDING", is_active: true },
+  { code: "320-0000", name: "CASH IN HAND", money_kind: "CASH", is_active: true },
+];
 
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -841,6 +860,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
   if (init?.method && init.method !== "GET") return json({ message: "Local preview does not save records." }, 405);
   const q = new URL(url, window.location.origin).searchParams;
+  if (new URL(url, window.location.origin).pathname === "/api/finance/ledger/money-accounts") return json(MONEY_ACCOUNT_ROWS);
   if (url.includes("/api/finance/invoices/register")) return json({ rows: INVOICES, total: INVOICES.length });
   if (url.includes("/api/finance/payments/register")) return json({ rows: [], total: 0 });
   // 0687: `?role=hr` or `?role=bd` previews an allowed HR or BD person, who sees only their own requests.
@@ -876,9 +896,12 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       { department_type: "SUBSCRIPTION", department_id: null, name: "Subscription" },
       { department_type: "OFFICE", department_id: null, name: "Office" }] });
   if (url.includes("/api/finance/payables/suppliers"))
-    return json({ rows: OUTSTANDING.map((o) => ({ id: o.supplier_id, name: o.supplier_name, kind: o.supplier_kind })) });
-  if (url.includes("/api/finance/payables/supplier-finance")) return json({ rows: SUPPLIER_FINANCE });
-  if (url.includes("/api/finance/payables/aging")) return json(AP_AGING(q.get("asAt") ?? TODAY));
+    return json({ rows: OUTSTANDING.map((o) => ({ id: o.supplier_id, name: o.supplier_name, kind: o.supplier_kind, code: CODE_OF[o.supplier_id] ?? null })) });
+  if (url.includes("/api/finance/payables/supplier-finance")) return json({ rows: SUPPLIER_FINANCE.map((r) => ({ ...r, code: CODE_OF[r.supplier_id] ?? null })) });
+  if (url.includes("/api/finance/payables/aging")) {
+    const a = AP_AGING(q.get("asAt") ?? TODAY);
+    return json({ ...a, suppliers: a.suppliers.map((x) => ({ ...x, code: CODE_OF[x.supplier_id] ?? null })) });
+  }
   if (url.includes("/api/finance/ledger/ar-aging")) return json(AR_AGING(q.get("asAt") ?? TODAY));
   if (url.includes("/api/finance/payables/")) return json({ rows: [] });
   if (url.includes("/api/finance/ledger/daily-bank")) return json(DAILY_BANK(q.get("day") ?? TODAY));
@@ -887,7 +910,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/finance/ledger/stock-value")) return json(STOCK_VALUE(q.get("monthEnd") ?? TODAY));
   if (url.includes("/api/finance/ledger/collection"))
     return json({ from: q.get("from") ?? TODAY, to: q.get("to") ?? TODAY, orders: COLLECTION_ORDERS });
-  if (url.includes("/api/finance/other-money-in/parties")) return json(PARTIES);
+  if (url.includes("/api/finance/other-money-in/parties")) return json(PARTIES.map((x, i) => ({ ...x, code: PARTY_CODES[i] ?? null })));
   if (url.includes("/api/finance/other-money-in/invoices")) return json(DEBTOR_INVOICES);
   if (url.includes("/api/finance/other-money-in/receipts")) return json(RECEIPTS);
   if (url.includes("/api/finance/other-money-in/me")) return json({ mayCancel: true });
@@ -955,6 +978,7 @@ const ROUTES: Record<string, string> = {
   "payment-request-new": "/finance/payment-requests/new",
   "request-access": "/finance/settings?tab=requests",
   "posting-accounts": "/finance/settings?tab=posting",
+  "money-accounts": "/finance/settings?tab=money",
   "item-groups": "/finance/settings?tab=groups",
   "dealer-commission": "/finance/reports/dealer-commission",
   "dealer-statement": "/finance/reports/dealer-commission?view=statement",

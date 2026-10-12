@@ -68,6 +68,12 @@ describe("AP aging (0640, Chew 2026-10-03)", () => {
     expect(r.difference).toBe(-100);
   });
 
+  it("carries each supplier's code (0691), null when the answer has none", () => {
+    const withCode = { ...ANSWER, suppliers: ANSWER.suppliers.map((s, i) => (i === 0 ? { ...s, code: "400-A001" } : s)) };
+    const rows = apAgingReport(withCode, "bill", "month").rows;
+    expect(rows.map((r) => r.code)).toEqual(ANSWER.suppliers.map((_, i) => (i === 0 ? "400-A001" : null)));
+  });
+
   it("refuses a figure it cannot read", () => {
     const broken = structuredClone(ANSWER);
     broken.suppliers[0]!.bills[0]!.open = "four thousand";
