@@ -154,6 +154,10 @@ and uploads that same artifact to both. The web build writes `/__carres_deploy.j
 `GITHUB_SHA`. The same workflow deploys the Worker with `DEPLOY_SHA`, then polls both Pages
 projects, both custom web domains and `/health` until all report the exact merged SHA.
 No convergence means a visible failed production workflow.
+A Pages publish Cloudflare refuses (12 Oct 2026: `carres-pos`, "Unknown internal error", three runs in a
+row while the same files published to `carres-portal`, so the Worker never deployed) is tried up to
+three times, and after each refusal the project is asked what it serves, because a publish can land
+although wrangler reports an error. The proof step is unchanged: every surface must still report the SHA.
 
 **Explicit merge gate:** verify successful CI for the exact current PR head before invoking merge.
 `gh pr merge --auto` does not guarantee waiting when required checks are not enforced; measured

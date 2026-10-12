@@ -56,9 +56,36 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DEPLOY_SHA: ${{ steps.source.outputs.sha }}
+        shell: bash
+        # Cloudflare sometimes answers a Pages publish with "Unknown internal
+        # error" (12 Oct 2026: carres-pos, three runs in a row, while the same
+        # files published to carres-portal). One refusal used to end the run
+        # before the Worker deployed. A refused publish is now tried again,
+        # and because a publish can land although wrangler reports an error,
+        # the project itself is asked what it serves. Nothing is assumed: the
+        # proof step below still requires every surface to report this SHA.
         run: |
-          pnpm exec wrangler pages deploy ../web/dist --project-name carres-portal --branch main --commit-hash "${DEPLOY_SHA}" --commit-message "main ${DEPLOY_SHA}" --commit-dirty=false
-          pnpm exec wrangler pages deploy ../web/dist --project-name carres-pos --branch main --commit-hash "${DEPLOY_SHA}" --commit-message "main ${DEPLOY_SHA}" --commit-dirty=false
+          deploy_pages() {
+            local project="$1" attempt probe served
+            for attempt in 1 2 3; do
+              if pnpm exec wrangler pages deploy ../web/dist --project-name "${project}" --branch main --commit-hash "${DEPLOY_SHA}" --commit-message "main ${DEPLOY_SHA}" --commit-dirty=false; then
+                return 0
+              fi
+              echo "::warning::Pages publish for ${project} was refused on attempt ${attempt}"
+              for probe in 1 2 3 4; do
+                sleep 15
+                served="$(curl -fsS "https://${project}.pages.dev/__carres_deploy.json?proof=${DEPLOY_SHA}" || true)"
+                if [[ "${served}" == *"\"${DEPLOY_SHA}\""* ]]; then
+                  echo "${project} already serves ${DEPLOY_SHA}"
+                  return 0
+                fi
+              done
+            done
+            echo "::error::Pages publish for ${project} was refused three times"
+            return 1
+          }
+          deploy_pages carres-portal
+          deploy_pages carres-pos
       - name: Deploy API Worker from this SHA
         working-directory: apps/api
         env:
