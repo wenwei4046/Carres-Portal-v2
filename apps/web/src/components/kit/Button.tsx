@@ -27,7 +27,7 @@ import Loading from "./Loading";
 type Variant = "primary" | "neutral" | "ghost";
 type Size = "md" | "sm" | "touch";
 
-/* The main button is `--c-main` #1B1B39 (01 §1, owner 11 Oct 2026): one per
+/* The main button is the `--c-main` token (01 §1, owner 11 Oct 2026): one per
  * area, white text. A normal button is white with the grey input edge. */
 const VARIANT: Record<Variant, string> = {
   primary: "bg-c-main text-white border border-c-main hover:brightness-125",
