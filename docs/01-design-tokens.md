@@ -264,6 +264,7 @@ The supplied Layout Standard still carries older lines beside its 10 and 11 Oct 
 | Default theme and ground | Carres theme, ground `#FAFAF9` or per theme | Blue; ground fixed `#F6F7F9` | TAKEN · owner 11 Oct |
 | Main button colour | `#1F2937` | `#1B1B39` | TAKEN · README |
 | Main button hover | README `#111827` | `#2B2B55` as drawn | **PROPOSAL / NOT LAW** · overturned when the owner names the hover |
+| Hover on the grey ground, eight themes other than Blue | §9: the selected fill at 45% over white | The app keeps its shared hover `#EFECE8` for these themes (Blue is migrated, 12 Oct 2026) | **PROPOSAL / NOT LAW** · the §9 hover cannot be seen on the grey ground (Cool Slate `#F4F5F7` on `#F6F7F9`); proposed: `#E2E4E8` on the grey ground in every theme, the §9 value on white surfaces · overturned when the design package names a ground hover per theme |
 | Keyboard focus | 2px `#1F2937` | 2px `#3965FA` | TAKEN · owner palette 10 Oct |
 | Summary width | 240 | 264 | TAKEN · README |
 | Panel title | 17 / 500 | 15 / 500 | TAKEN · README and check |

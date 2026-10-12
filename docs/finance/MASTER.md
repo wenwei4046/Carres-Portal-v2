@@ -48,7 +48,7 @@ Finance must show clearly where each sum of money comes in and goes out, channel
 6. Debtors follow the channel in two levels for dealers (「Dealer 一个overall 母账，然后每个dealer under 这个母账 … 就是两层了」): Dealer Debtors, then each dealer, then that dealer's customers or orders. Showroom and Subscription each have one control account with their customers under it.
 7. Goods bought without an order must not leave money paid to suppliers outside every channel in Receipts & Payments (「这样我看receipt & payment 就不太对了」); Chew confirmed how such a purchase is placed on 2026-10-06 ("A purchase without an order" below).
 
-Status (2026-10-12): ruling 3 holds (a line can be set to Office). Ruling 2 and "A purchase without an order" are BUILT for a bill's goods lines (0683, "Splitting the money by channel" step 1); ruling 1 is BUILT in Cash Flow (0684, step 2). Rulings 4 and 6 are BUILT and not yet applied (0685, step 3). Ruling 5 is APPROVED / NOT BUILT. The plan for all of them, "Splitting the money by channel" at the end of this section, was approved by Chew on 2026-10-12.
+Status (2026-10-12): ruling 3 holds (a line can be set to Office). Ruling 2 and "A purchase without an order" are BUILT for a bill's goods lines (0683, "Splitting the money by channel" step 1); ruling 1 is BUILT in Cash Flow (0684, step 2). Ruling 5 is BUILT for a logistics company's bill, line by delivery order (0689, step 4). Rulings 4 and 6 are BUILT (0685, step 3); Chew told Jess and approved applying it on 2026-10-12 (「可以套用」). The plan for all of them, "Splitting the money by channel" at the end of this section, was approved by Chew on 2026-10-12.
 
 **Chart of accounts (Chew's, AutoCount, dated 22 Sep 2026; kept by Chew, not in this repository).** It has one debtor control (Trade Debtors) and one Other Debtor control, so dealer and subscription customers are not separated (「本身里面没有分dealer customer 和 subscription customer」). Measured: the ledger already accepts its code shape (`ledgerAccountCodeShape`, for example 300-0000 and 900-A001). Customers sit under a control account as parties on each line (`gl_entry_lines.party_type` / `party_id`), not as accounts, so a control account holds any number of customers.
 
@@ -155,7 +155,7 @@ Two Finance Settings pages keep the mapping in Chew's hands (「其他的收入�
 - How a bill does this is in "Splitting the money by channel" step 1 (built in 0683). The Showroom Display rule holds while Carres has one showroom.
 - The KPI allowance is accrued like the renovation rebate (900-C009 / 410-0065).
 
-**Splitting the money by channel — the plan; APPROVED by Chew 2026-10-12 (「分渠道做」, after it was explained to him). Steps 1 and 2 BUILT and applied; step 3 BUILT, not applied; step 4 NOT BUILT. He tests it all at once when it is done (「到时我要测试的全部一次过做」).** It builds Chew's rulings 1, 2, 4, 5 and 6 above and "A purchase without an order". Measured first (2026-10-10, read only):
+**Splitting the money by channel — the plan; APPROVED by Chew 2026-10-12 (「分渠道做」, after it was explained to him). Steps 1, 2 and 4 BUILT and applied; step 3 BUILT, and Chew approved applying it (「可以套用」, 2026-10-12). He tests it all at once when it is done (「到时我要测试的全部一次过做」).** It builds Chew's rulings 1, 2, 4, 5 and 6 above and "A purchase without an order". Measured first (2026-10-10, read only):
 - Customer money: a payment, a deposit and an invoice each post to the one trade debtors account (`300-0000`) through `gl_ar_control_account()`, which allows exactly one customer control account; a second one makes every customer payment fail to post. These postings run inside Payment's own recording (Jess's), with no fallback, so a fault there would stop staff recording payments. No customer posting stores a department: the reports work it out from the order when they read (0578).
 - Supplier bills: a GRN line's department is filled in from its sales order (`fin_po_line_departments`), but it can be changed by hand; a PO line bought for orders in two channels gets none. A Manual Purchase Request keeps its purpose; a Showroom Display destination is not tied to a showroom outlet.
 - Cash Flow has no channel filter. A supplier payment carries no department (only the bill lines it paid do); a card payout carries none.
@@ -200,7 +200,7 @@ Recommended, in this order:
      - A bill of RM 80 Office and RM 20 showroom, paid by one voucher of RM 100, showed as RM 80 and RM 20.
      - An advance whose bill line had no department stayed in no channel.
      - Office with an id and an unknown department were refused, and Operation could not read Cash Flow.
-3. **Debtors by channel** (rulings 4 and 6). **BUILT 2026-10-12 (0685), probed on production and rolled back; NOT APPLIED. It is applied when Chew says Jess has been told** (Chew approved the change to Payment's recording on 2026-10-12, §1 Exceptions, and tells Jess himself).
+3. **Debtors by channel** (rulings 4 and 6). **BUILT 2026-10-12 (0685), probed on production and rolled back. Chew approved the change to Payment's recording (2026-10-12, §1 Exceptions), told Jess, and approved applying it (「可以套用」, 2026-10-12).**
    - The accounts: `300-1000` SHOWROOM DEBTORS, `300-2000` DEALER DEBTORS (a heading) and `300-3000` SUBSCRIPTION DEBTORS. Three posting roles name them, so a renumber carries through; Posting accounts lists them under "Kept by the system".
    - Each dealer gets its own account under `300-2000`: `300-2001` and on, named after the dealer, opened the first time one of its customers is invoiced or pays. `fin_dealer_debtor_accounts` records which account is whose.
    - The customer payment (every door into Payment's recording) and the sales or storage invoice take the account from the order's channel (`fin_order_channels`). An order that view leaves out is a showroom order whose outlet it cannot name, so it goes to Showroom Debtors. The customer stays the party on the line.
@@ -214,8 +214,20 @@ Recommended, in this order:
      - Voiding the new payment reversed on `300-1000`; voiding a payment posted before 0685 reversed on `300-0000`.
      - The receivables check read all five customer accounts: the ledger and invoices less payments agreed, difference RM 0.00, as before. The Balance Sheet balanced.
      - The two new functions and the dealer account list cannot be reached by a signed-in user directly.
+   - Measured again after 0686, 0688 and 0689 were applied (production, rolled back, 2026-10-12): the same results, and AR Aging read all six debtor accounts, its debtors adding up to them exactly.
    - Not built: an order whose channel changes after money was posted leaves its earlier entries on the earlier account; a journal moves them.
-4. **Transport on each order** (ruling 5): a logistics partner's bill names the delivery orders it covers; its amount is split over them (equally when it gives only a total); each part posts to `900-T002` with its order's channel.
+4. **Transport on each order** (ruling 5). **BUILT 2026-10-12 (0689); 0689 APPLIED 2026-10-12 on Chew's 「做」 for the build batch, the tracker holding the file exactly (md5 `5f7ed848c4a6e78cde8520dabe1d54ae`).** A logistics company's bill names the delivery orders it is for, and each becomes a line in its order's channel.
+   - The bill form has `Add delivery orders`. Finance picks the logistics company and ticks its delivery orders, then types each one's amount, or types the bill's total and presses `Split equally` (whole sen; the first lines take the odd sen, so the lines add up to the total).
+   - Each line posts to Posting accounts' `Transport to customers, by delivery order` (`900-T002` today; Finance may change it there), unless Finance chooses another account on the line. Its channel is its order's, never picked. It says its DO No and SO No, and has one amount, no qty or unit price.
+   - A delivery order is on one live bill at most. The picker leaves out the ones on another bill. A voided delivery order, one on another live bill, the same one twice, and a line naming a delivery order and a GRN are refused.
+   - A delivery order belongs to the logistics company its delivery arrangement names, else the one its DO names. Delivery's records are read only.
+   - The bill's creditor is still picked as a supplier or other creditor. Nothing ties it to Delivery's logistics company, so Finance picks both.
+   - Measured before applying (production, rolled back, 2026-10-12):
+     - The picker listed 2 logistics companies with 4 delivery orders between them, each with its order's channel.
+     - A bill of RM 60 and RM 40 on two delivery orders saved two lines on `900-T002` in the showroom, RM 100 in all. Confirmed, it posted Dr `900-T002` RM 60 and RM 40 in the showroom, Cr `400-0000` RM 100.
+     - The picker then left those two out for any other bill and kept them for this one. Saving the bill again kept its own delivery order.
+     - Refused: a delivery order already on a draft bill, the same one twice, one with a GRN, and a control account chosen on the line. A chosen expense account was kept.
+     - Operation could not read the picker. A voided delivery order was not measured: production has none.
 - Falsifier: in Chew's test, a channel's money in or out differs from what its orders, bills and vouchers show, or a customer payment fails to post after step 3.
 
 ## 1 · Boundary: Finance, Subscription and Dealer
@@ -287,14 +299,13 @@ Each changes only what Finance needs on that screen; nothing else on Jess's scre
 | Moving a deposit to another order | **Not built.** It changes payment records, and Payment already has `Correct allocation`. |
 | Old-slip approval window | **Not built.** |
 | Customer credit and debit notes | **Not built.** Customer invoices belong to Payment (Payment MASTER §1). |
-| Deposit invoices | **Built inside Finance and switched OFF.** See the rules below this table. |
+| Deposit invoices | **Not built** (measured 2026-10-12: no page, route, table or function for them was ever committed; this row said "built and switched OFF", which was wrong). Chew confirms them with Jess first (§5). See the rules below this table. |
 | Customer credit pot | **Not built.** |
 | Other debtors and other receipts | Keep. |
 
 Deposit invoice rules:
 - They are made from payment records, which Finance only reads. Payment's recording is not changed.
-- There is no menu entry while they are switched off.
-- Before they are ever switched on, check them against Payment's invoice model, the approved numbering (owner 2026-09-23) and e-invoice.
+- Before they are built, check them against Payment's invoice model, the approved numbering (owner 2026-09-23) and e-invoice.
 
 ### 3.2 Money out
 
@@ -579,7 +590,7 @@ Carres already has a simpler Card settlement. It takes Public Bank, GHL and Mayb
 |---|---|
 | Closed months lock | Keep, but **do not switch it on**. |
 | Month-end stock value: groups | Four groups: warehouse, showroom, in transit (road, transit points and partner legs) and sent for repair. Supplier consignment and dealer stock are excluded; Stock MASTER §12.9 says dealer display stock is the dealer's own. |
-| Month-end stock value: source | The P&L and Balance Sheet show the stock value live each time they are opened, worked out from Stock's Units (reading only) and marked **provisional**. Once Stock's Month-end Stock Confirmation (Stock MASTER §12.10, not built) confirms a month, Finance stores that month's value and it never changes again (Chew 2026-10-12, 「存货价值就不能定成我开P&L 时每次都是live 的，然后当jess 那边月底存货确认就 我这里储存起来不会再改」). **APPROVED / NOT BUILT.** |
+| Month-end stock value: source | The P&L and Balance Sheet show the stock value live each time they are opened, worked out from Stock's Units (reading only) and marked **provisional**. Once Stock's Month-end Stock Confirmation (Stock MASTER §12.10, not built) confirms a month, Finance stores that month's value and it never changes again (Chew 2026-10-12, 「存货价值就不能定成我开P&L 时每次都是live 的，然后当jess 那边月底存货确认就 我这里储存起来不会再改」). **APPROVED. The live part is BUILT and APPLIED 2026-10-12 (0688); storing a confirmed month waits for Stock's confirmation.** See "Stock in the statements" below. |
 | Opening balances | Finance's own account figures at go-live. No old transactions are brought in, because CLAUDE.md §6 stands. **Parked (Chew 2026-10-03)** until every feature is tested: it is data entered at go-live, though each customer's and supplier's opening balance will need a place to be entered. |
 | SST | Carres is not SST-registered, so there is no tax on invoices. |
 | Year-end close | Later, before year end. |
@@ -596,8 +607,29 @@ Carres already has a simpler Card settlement. It takes Public Bank, GHL and Mayb
 - Measured 2026-10-03 on the test data: 344 Units and 10 quantity rows are held, and nearly all have no PO line (opening imports), so nearly all show `No cost recorded`. Go-live starts clean (CLAUDE.md §6), so after it Units come from POs with their cost.
 - Showroom: Stock has no Site type yet, and its own register finds PJ Showroom by its name (Stock MASTER §12.9). This page counts a Unit as Showroom when a showroom party holds it, its Site's profile names one, or its Site is named as a showroom. When Stock adds a Site type, the page reads it instead.
 - Chew 2026-10-03: this page is Finance reading Stock's data, and it is separate from Stock's Month-end Stock Confirmation (Stock MASTER §9), which it neither feeds nor replaces.
-- Not built: posting the value to the ledger (Dr stock on hand, Cr cost of goods sold; bills from a GRN post the goods to cost of goods sold, 0477, so without it the month's cost is every purchase of the month) and valuing the go-live opening stock, which comes in without a PO cost. When posting is built, Stock MASTER §9 applies: Finance values from the confirmation version it acknowledges and saves no month-end Stock total of its own. Both go to Chew.
+- Not built: posting the value to the ledger, and valuing the go-live opening stock, which comes in without a PO cost. Both go to Chew. The statements show the value without posting it (below).
 - Falsifier: in Chew's test, a Unit Chew knows was in the showroom or out for repair at a month end shows in another group, or a value differs from its PO line cost times its quantity.
+
+**Stock in the statements — Chew's ruling (2026-10-12); BUILT 2026-10-12 (0688), probed on production and rolled back; 0688 APPLIED 2026-10-12 on Chew's 「做」 for the build batch, the tracker holding the file exactly (md5 `11e18683b30c3be9a8bd544ecccb5d9d`).** The layout below is PROPOSAL / NOT LAW.
+- Nothing is posted. The statements show stock on hand the way AutoCount's do, from the stock value of the day, on the accounts AutoCount marks for it.
+- **Profit and Loss, All departments:**
+  - the opening stock account (SOS, `600-0000`) carries the stock on hand at the end of the day before the period, which adds to the cost of goods sold;
+  - the closing stock account (SCS, `620-0000`) carries the stock on hand at the end of the period, which takes off it.
+  - Purchases already post to the cost of goods sold (0477), so the period's cost reads opening stock + purchases − closing stock.
+- **Balance Sheet, All departments:** the stock account (SBS, `330-0000`) shows the stock on hand on the day in place of what the books hold on it. The difference joins `Net result not yet closed`, so the sheet still balances. The line's mark says how much it added.
+- **The stock on hand** is the sum of Stock value's Unit values (0643), the one arithmetic both read. A Unit with no cost recorded adds nothing. It is provisional, and each statement says so underneath.
+- **With a department chosen** there is no stock on either statement: stock on hand is not split by channel.
+- Measured before applying (production, rolled back, 2026-10-12):
+  - With the test stock worth RM 0.00, both statements were unchanged.
+  - With two PO lines given a cost for the probe, the stock on hand was RM 1,500.00. October's Profit and Loss showed RM 1,500.00 at the start and −RM 1,500.00 at the end.
+  - The Balance Sheet's stock line showed RM 1,500.00, its result rose by the same, and it balanced.
+  - September's closing stock equalled October's opening stock.
+  - Under Showroom neither statement showed stock, and the Balance Sheet balanced.
+- Not built:
+  - storing a month once Stock's Month-end Stock Confirmation confirms it (that confirmation is not built);
+  - stock on hand by channel;
+  - the go-live opening stock value.
+- Falsifier: in Chew's test, a statement's stock differs from Stock value for the same day, or the Balance Sheet stops balancing.
 
 #### Year-end close — complete review recommendation, 9 Oct 2026
 
@@ -657,7 +689,7 @@ All reports only read. Reports → Payment stays Payment's.
 - Not built: the trade or other payables chips, and a PDF.
 - Falsifier: in Chew's test, a supplier's balance here differs from AP · Payables' net owing today, or the footer's difference is not zero.
 
-**AR Aging — Chew's ruling (2026-10-03; 2026-10-12, 「就根据开了invoice还没还的就出现…包括普通顾客」); BUILT 2026-10-12 (0686) for Chew's test; 0686 APPLIED 2026-10-12 on Chew's 「做」 for the build batch, the tracker holding the file exactly (md5 `66467f6080314aa58d68ab79239159bb`). The layout and the arithmetic below are PROPOSAL / NOT LAW.**
+**AR Aging — Chew's ruling (2026-10-03; 2026-10-12, 「就根据开了invoice还没还的就出现…包括普通顾客」); BUILT 2026-10-12 (0686) for Chew's test; 0686 APPLIED 2026-10-12 on Chew's 「做」 for the build batch, the tracker holding the file exactly (md5 `66467f6080314aa58d68ab79239159bb`). DEPLOYED 2026-10-12 (PR #2014, `e13fd964`): every production surface reports that version. The layout and the arithmetic below are PROPOSAL / NOT LAW.**
 - Reports → AR Aging, after AP Aging. Every invoice issued and not yet fully paid on a chosen day, for ordinary customers (Payment's sales and storage invoices, read and never changed) and other debtors (Finance's own invoices). It is aged as AP Aging is: by month or by 30-day steps, by invoice date or due date.
 - What a customer's invoice still owes is worked out on the books' own window, from the ledger's start to the day:
   - the order's payments fill its earliest invoice first;
@@ -675,7 +707,9 @@ All reports only read. Reports → Payment stays Payment's.
   - An invoice of RM 2,629.00 on an order with a deposit of RM 1,315.00 showed RM 1,314.00 open, in Showroom. The day before the invoice, the deposit was money paid ahead.
   - An other debtor's invoice of RM 500.00 with RM 200.00 received showed RM 300.00 open. The day before the receipt it showed RM 500.00, and nothing before the invoice. The other debtors' account agreed.
   - Operation could not read it.
+- Checked on production after deploying (read only, 2026-10-12): the 7 customers showed their money paid ahead under `Not tied to an invoice`, RM -13,928.00 in all, equal to `300-0000 + 305-0000`, difference RM 0.00.
 - Not built: a customer refund (refunds do not post to the debtor accounts yet), a PDF, and a view by debtor account.
+- Not built, found on production: a row with money paid ahead and no open invoice shows no `Channel`, because the channel is read from the open invoices only. Once "Splitting the money by channel" step 3 (0685) is applied, the debtor account a customer's money sits on names the channel; the row can read it from there (PROPOSAL, for Chew).
 - Falsifier: in Chew's test, a debtor's open invoice differs from what Payment or Other debtors shows for it, or the footer's difference is not zero.
 
 **Collection report approach — PROPOSAL / NOT LAW, built for Chew's test (0644).**
@@ -746,7 +780,7 @@ FINANCE          its title folds the area (§4.1)
 
 1. **YH.** YH changes Finance code almost every day: over 100 commits from 2026-09-19 to 2026-10-01. Agree with YH before any Finance code changes.
 2. **File samples.** Before the readers are built, collect a sample card report and a sample bank statement from each provider. Hong Leong's card report is a secured PDF.
-3. **Deposit invoices.** Chew confirms them with Jess (2026-10-03). Check them against Payment's invoice rules and e-invoice before switching them on.
+3. **Deposit invoices.** Not built (§3.1). Chew confirms them with Jess (2026-10-03). Check them against Payment's invoice rules and e-invoice before building them.
 4. **Dealer commission.** Check the calculation with Chew step by step before anything about it changes.
 5. **Stock confirmation.** Stock's Month-end Stock Confirmation is not built, so every month's stock value stays live and provisional until it is; from then on each confirmed month is stored and never changes (§3.5, Chew 2026-10-12).
 6. **Year-end close.** Complete review recommendation is now in §3.5. Chew must settle the fiscal period, close/correction permissions, accounting treatment and lock activation before build; this proposal is not approval.
@@ -756,7 +790,7 @@ FINANCE          its title folds the area (§4.1)
 
 This pass reconciles documentation boundaries only; it does not change Chew's scoped decisions, Jess's overriding authority, production permissions or existing release status. Finance still owns its own money-out, bank/card reconciliation, ledger/month-end/tax and Finance-report configuration; customer recording, receipts, allocation, customer-facing bank instructions and collection remain Payment-owned (§3.1). The two receiving accounts observed in Payment Settings are not proof of Finance account mapping, settlement or reconciliation completion. `Payment Approver` and `Finance Approver` remain distinct duties resolved through the shared Workspace source (§2), not a second Finance staff rota. Leave/cover and ordinary helpers do not grant either approval right.
 
-Central Reports placement does not remove Finance's approved source-owned report pages (§§3.6,4) or approve a new company-wide formula. Any central summary must consume the Finance-owned definition, date anchor, permissions and coverage; provisional stock valuation remains provisional until Stock's required confirmation (§5). Customer bank messages, accounting money-account codes and bank statement accounts must be reconciled rather than presumed identical. Unverified mappings are not missing database facts. Deposit invoices remain switched off until the existing checks in §3.1 and §5 are met. No notification, sync, import, payout or automatic recovery is activated by this reconciliation. Existing samples, year-end design and release/acceptance gaps in §5 remain open.
+Central Reports placement does not remove Finance's approved source-owned report pages (§§3.6,4) or approve a new company-wide formula. Any central summary must consume the Finance-owned definition, date anchor, permissions and coverage; provisional stock valuation remains provisional until Stock's required confirmation (§5). Customer bank messages, accounting money-account codes and bank statement accounts must be reconciled rather than presumed identical. Unverified mappings are not missing database facts. Deposit invoices are not built, and are not built until the existing checks in §3.1 and §5 are met. No notification, sync, import, payout or automatic recovery is activated by this reconciliation. Existing samples, year-end design and release/acceptance gaps in §5 remain open.
 
 ## 6 · Sources
 

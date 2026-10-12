@@ -8,6 +8,7 @@ import {
   type ApBillOutstandingRow,
   type ApCreditor,
   type ApOutstandingRow,
+  type BillDeliveryPartner,
   type GrnCandidateRow,
   type GrnLineRow,
   type MoneyBackInput,
@@ -65,6 +66,8 @@ export const payablesKeys = {
   grnCandidates: (supplierId: string | null) =>
     ["finance", "payables", "grn-candidates", supplierId ?? "all"] as const,
   grnLines: (receiptId: string) => ["finance", "payables", "grn-lines", receiptId] as const,
+  /** 0689: each logistics partner's delivery orders a bill can still charge for. */
+  billDeliveryOrders: (billId: string | null) => ["finance", "payables", "bill-delivery-orders", billId ?? "new"] as const,
   vouchers: () => ["finance", "payables", "vouchers"] as const,
   voucher: (id: string) => ["finance", "payables", "voucher", id] as const,
   advances: (supplierId: string | null) =>
@@ -165,6 +168,19 @@ export function usePaymentVoucher(id: string | undefined) {
     queryKey: payablesKeys.voucher(id ?? ""),
     queryFn: () => apiFetch<PaymentVoucherDocument>(`${BASE}/vouchers/${id}`),
     enabled: !!id,
+  });
+}
+
+/** 0689: each logistics partner and its delivery orders a bill can still
+ *  charge for; `billId` keeps the ones already on the bill being edited. */
+export function useBillDeliveryOrders(billId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: payablesKeys.billDeliveryOrders(billId),
+    queryFn: async () =>
+      (await apiFetch<Rows<BillDeliveryPartner>>(
+        `${BASE}/bills/delivery-orders${billId ? `?billId=${encodeURIComponent(billId)}` : ""}`,
+      )).rows,
+    enabled,
   });
 }
 

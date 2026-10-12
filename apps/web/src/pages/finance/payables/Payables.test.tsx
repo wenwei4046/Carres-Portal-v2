@@ -579,6 +579,128 @@ describe("Bill form — Convert GRN to bill", () => {
   });
 });
 
+/* 0689 (Chew ruling 5): a logistics company's bill names the delivery orders it
+   is for; each becomes a transport line in its order's channel. Names invented. */
+describe("Bill form — Add delivery orders", () => {
+  const LORRY = "12121212-1212-4212-8212-121212121212";
+  const PARTNER = "14141414-1414-4414-8414-141414141414";
+  const DO1 = "13131313-1313-4313-8313-131313131311";
+  const DO2 = "13131313-1313-4313-8313-131313131312";
+  const DO3 = "13131313-1313-4313-8313-131313131313";
+
+  beforeEach(() => {
+    api.routes[`${B}/suppliers`] = { rows: [...suppliers.rows, { id: LORRY, name: "Swift Haulage", kind: "other_creditor" }] };
+    const chart = api.routes["/api/finance/ledger/accounts"] as { accounts: unknown[]; roles: Record<string, string> };
+    api.routes["/api/finance/ledger/accounts"] = {
+      ...chart,
+      accounts: [...chart.accounts, { code: "900-T002", name: "LORRY HIRE", kind: "EXPENSE", parent_code: null,
+        is_control: false, control_for: null, is_active: true, is_header: false, sort_order: 0 }],
+      roles: { ...chart.roles, DELIVERY_TRANSPORT: "900-T002" },
+    };
+    api.routes[`${B}/bills/delivery-orders`] = { rows: [{ partner_id: PARTNER, name: "Swift Haulage", delivery_orders: [
+      { id: DO1, do_no: "DO-7001", delivery_date: "2026-10-08", order_id: "o1", so: 5101,
+        department_type: "SHOWROOM", department_id: OUTLET },
+      { id: DO2, do_no: "DO-7002", delivery_date: "2026-10-09", order_id: "o2", so: 5102,
+        department_type: "SUBSCRIPTION", department_id: null },
+      { id: DO3, do_no: "DO-7003", delivery_date: null, order_id: "o3", so: null,
+        department_type: null, department_id: null },
+    ] }] };
+  });
+
+  it("splits the bill's total over the ticked delivery orders, each in its order's channel, and saves the DO link", async () => {
+    show(`/finance/bills/new?supplier=${LORRY}`);
+    await waitFor(() => expect(screen.getByLabelText("Supplier")).toHaveValue(LORRY));
+    fireEvent.change(screen.getByLabelText("Supplier invoice No"), { target: { value: "SH-0921" } });
+
+    fireEvent.click(screen.getByTestId("add-delivery-orders"));
+    const modal = await screen.findByRole("dialog");
+    fireEvent.change(await within(modal).findByLabelText("Logistics company"), { target: { value: PARTNER } });
+    const add = within(modal).getByTestId("add-delivery-order-lines");
+    expect(add).toHaveTextContent("Add: tick a delivery order");
+    expect(add).toBeDisabled();
+
+    fireEvent.click(within(modal).getByRole("checkbox", { name: "Charge DO-7001" }));
+    fireEvent.click(within(modal).getByRole("checkbox", { name: "Charge DO-7002" }));
+    expect(add).toHaveTextContent("Add: type each amount, or split the total");
+    // RM 100.01 over two: the first takes the odd sen, so the parts add up to the total.
+    fireEvent.change(within(modal).getByLabelText("Total on the bill"), { target: { value: "100.01" } });
+    fireEvent.click(within(modal).getByRole("button", { name: "Split equally" }));
+    expect(within(modal).getByLabelText("DO-7001 amount")).toHaveValue("50.01");
+    expect(within(modal).getByLabelText("DO-7002 amount")).toHaveValue("50");
+    expect(add).toHaveTextContent("Add 2 lines");
+    fireEvent.click(add);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    expect(screen.getByTestId("line-1-source")).toHaveTextContent("DO-7001");
+    expect(screen.getByTestId("line-2-source")).toHaveTextContent("DO-7002");
+    expect(screen.getByLabelText("Line 1 description")).toHaveValue("Transport · DO-7001 · SO-5101");
+    // The channel is the order's, shown and never picked.
+    await waitFor(() => expect(screen.getByTestId("line-1-channel")).toHaveTextContent("Bangsar showroom"));
+    expect(screen.getByTestId("line-2-channel")).toHaveTextContent("Subscription");
+    expect(screen.queryByLabelText("Line 1 department")).not.toBeInTheDocument();
+    // One amount per delivery order: no qty or unit price to type.
+    expect(screen.queryByLabelText("Line 1 qty")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Line 1 unit price")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText("Line 1 account").querySelector("option")).toHaveTextContent("900-T002 LORRY HIRE (usual)"));
+    expect(screen.getByTestId("bill-form-total")).toHaveTextContent("RM 100.01");
+
+    // A delivery order on the bill is not offered again.
+    fireEvent.click(screen.getByTestId("add-delivery-orders"));
+    const again = await screen.findByRole("dialog");
+    fireEvent.change(await within(again).findByLabelText("Logistics company"), { target: { value: PARTNER } });
+    const offered = within(again).getByTestId("delivery-order-candidates");
+    expect(offered).toHaveTextContent("DO-7003");
+    expect(offered).not.toHaveTextContent("DO-7001");
+    expect(offered).not.toHaveTextContent("DO-7002");
+    fireEvent.click(within(again).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]!.body).toMatchObject({
+      supplierId: LORRY,
+      supplierInvoiceNo: "SH-0921",
+      lines: [
+        { deliveryOrderId: DO1, accountCode: null, description: "Transport · DO-7001 · SO-5101", amount: 50.01,
+          qty: null, unitPrice: null, departmentType: null, departmentId: null },
+        { deliveryOrderId: DO2, accountCode: null, description: "Transport · DO-7002 · SO-5102", amount: 50,
+          qty: null, unitPrice: null, departmentType: null, departmentId: null },
+      ],
+    });
+  });
+
+  it("says so when no delivery order is waiting to be billed", async () => {
+    api.routes[`${B}/bills/delivery-orders`] = { rows: [] };
+    show(`/finance/bills/new?supplier=${LORRY}`);
+    await waitFor(() => expect(screen.getByLabelText("Supplier")).toHaveValue(LORRY));
+    fireEvent.click(screen.getByTestId("add-delivery-orders"));
+    expect(await within(await screen.findByRole("dialog")).findByText("No delivery order is waiting to be billed."))
+      .toBeInTheDocument();
+  });
+
+  it("a saved transport line shows its DO No on the bill", async () => {
+    api.routes[`${B}/bills/${BILL1}`] = {
+      bill: { id: BILL1, bill_no: "BILL-4XK2", status: "confirmed", supplier_id: LORRY, supplier_name: "Swift Haulage",
+        supplier_kind: "other_creditor", supplier_invoice_no: "SH-0921", bill_date: "2026-10-10", due_date: null, po_id: null,
+        ap_account_code: "405-0000", ap_account_name: "OTHER CREDITORS", total_amount: "50.01", narration: null,
+        cancel_reason: null, created_at: "2026-10-10T01:00:00Z", created_by_name: "Aina", confirmed_at: null,
+        confirmed_by_name: null, cancelled_at: null, cancelled_by_name: null, entry_no: "JE-1", reversal_entry_no: null },
+      lines: [{ line_no: 1, warehouse_receipt_id: null, po_line_id: null, grn_no: null, grn_po_id: null, sku: null,
+        description: "Transport · DO-7001 · SO-5101", account_code: "900-T002", account_name: "LORRY HIRE", qty: null,
+        unit_price: null, amount: "50.01", po_unit_cost: null, price_diff: null, department_type: "SHOWROOM",
+        department_id: OUTLET, delivery_order_id: DO1, do_no: "DO-7001" }],
+      payments: [], files: [], events: [], paid_total: "0.00", allocated_total: "0.00", unpaid: "50.01",
+      left_to_pay: "50.01", advance_open: null, go_live_on: "2026-09-10", foreign_amount: null,
+      can: { edit: false, confirm: false, cancel: false, add_file: true, apply_advance: false, take_advance_off: false },
+    };
+    api.routes[`${B}/bills/${BILL1}/notes-to-follow-up`] = { rows: [] };
+    show(`/finance/bills/${BILL1}`);
+    const row = within(await screen.findByTestId("bill-lines")).getAllByRole("row")[1]!;
+    expect(row).toHaveTextContent("DO-7001");
+    expect(row).not.toHaveTextContent("Not from a GRN");
+  });
+});
+
 describe("Payment voucher form", () => {
   it("pays two bills plus a bank charge; the total is added up, never typed", async () => {
     show(`/finance/payment-vouchers/new?supplier=${SUP}`);
