@@ -1260,7 +1260,8 @@ financeLedgerRouter.get("/cash-flow", requireFinance, async (c) => {
   const parsed = cashFlowQuery.safeParse(queryOf(c));
   if (!parsed.success) return invalid(c, parsed.error);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("fin_cash_flow", { p_from: parsed.data.from, p_to: parsed.data.to });
+  // 0684 (Chew ruling 1): one channel's money only, when a department is asked for.
+  const { data, error } = await sb.rpc("fin_cash_flow", { p_from: parsed.data.from, p_to: parsed.data.to, ...departmentRpcArgs(parsed.data) });
   if (error) return ledgerError(c, error, "Cash Flow");
   const answer = data as CashFlowAnswer | null;
   if (!answer || !Array.isArray(answer.accounts) || !Array.isArray(answer.rows) || !answer.card) return failed(c, "Cash Flow");

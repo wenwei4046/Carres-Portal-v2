@@ -5252,6 +5252,28 @@ Chew ruled what is kept (Finance MASTER §3.2 "Foreign currency", 2026-10-03: th
 | History | `Foreign currency {currency} {amount} at {rate}` · `Foreign currency removed` |
 | Refusals (the database's) | `Only Finance records a bill's foreign currency.` · `That bill does not exist.` · `A cancelled bill takes no change.` · `Type the currency as three letters, like USD.` · `A bill in ringgit has no foreign currency. Leave the currency empty.` · `Type the amount on the supplier's invoice, like 1250.00.` · `Type the rate as a number above 0, like 4.215.` |
 
+### PROPOSAL — PENDING CHEW · A bill line's channel (0683)
+
+Chew ruled that a supplier bill's channel comes from the order its goods were bought for, never typed by hand (Finance MASTER §0 ruling 2, 2026-10-06), and approved the plan on 2026-10-12 (「分渠道做」). The words below are proposed with it.
+
+| Where | Words |
+|---|---|
+| Department name | `Not yet in a channel`: goods on a bill that no order has taken yet (Ready Stock). Reports and lists filter by it; no form offers it |
+| Bill form, a goods line's department | The channel's name, shown and never picked. `From its orders` when it is not read yet. A line going to more than one channel lists `{channel}: {qty}` for each, then `Split when saved` |
+| Refusal (the database's) | `Line {n}: {qty} of it is too little to charge at this price. Check the quantity and the unit price.` |
+
+### PROPOSAL — PENDING CHEW · Cash Flow by channel (0684)
+
+Chew ruled that cash flow is split by channel (Finance MASTER §0 ruling 1, 2026-10-06) and approved the plan on 2026-10-12. The words below are proposed with it; Cash Flow keeps its own words otherwise.
+
+| Where | Words |
+|---|---|
+| Filter | `Department`, as on the other reports: `All`, each channel, `Not yet in a channel` |
+| One channel's note | `Only money tied to {channel}. Transfers between Carres's own accounts, supplier advances not knocked off a bill yet, card payouts made by hand and bank charges are in no channel, so they show only under All.` |
+| One channel's summary | Title `Card and online money`: `Card and online payments in this period`. No `Brought forward`, `Carried forward` or `Waiting for card payout at the end`; the By account table has no `Brought forward` or `Carried forward` column |
+| Export | Sheet title `Cash Flow · {channel}`; file `Cash Flow {channel} {period}` |
+| Refusal (the database's) | `Choose the department.` |
+
 ### PROPOSAL — PENDING CHEW · Notes to follow up (0676)
 
 Chew ruled the list and how notes start, are followed up and close (Finance MASTER §3.2 "Credit and debit notes to follow up", 2026-10-06, 2026-10-07 and 2026-10-09 「可以，开始做」); the words below are proposed with them.

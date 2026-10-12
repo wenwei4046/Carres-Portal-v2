@@ -1653,8 +1653,32 @@ describe("GET /cash-flow (0638)", () => {
     const { sb } = fakeClient(() => ok(FLOW));
     const res = await get("/cash-flow?from=2026-09-01&to=2026-09-30");
     expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("fin_cash_flow", { p_from: "2026-09-01", p_to: "2026-09-30" });
+    expect(sb.rpc).toHaveBeenCalledWith("fin_cash_flow", {
+      p_from: "2026-09-01", p_to: "2026-09-30", p_department_type: null, p_department_id: null,
+    });
     expect(await json(res)).toEqual(FLOW);
+  });
+
+  it("0684: asks for one channel's money, and passes that answer through", async () => {
+    const OUTLET = "99999999-0000-4000-8000-000000000001";
+    const one = {
+      ...FLOW,
+      channel: { department_type: "SHOWROOM", department_id: OUTLET },
+      accounts: [{ ...FLOW.accounts[0]!, opening: 0 }],
+      card: { taken: 500, waiting: null },
+    };
+    const { sb } = fakeClient(() => ok(one));
+    const res = await get(`/cash-flow?from=2026-09-01&to=2026-09-30&departmentType=SHOWROOM&departmentId=${OUTLET}`);
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_cash_flow", {
+      p_from: "2026-09-01", p_to: "2026-09-30", p_department_type: "SHOWROOM", p_department_id: OUTLET,
+    });
+    expect(await json(res)).toEqual(one);
+  });
+
+  it("0684: refuses Office with an id before any database call", async () => {
+    expect((await get("/cash-flow?from=2026-09-01&to=2026-09-30&departmentType=OFFICE&departmentId=99999999-0000-4000-8000-000000000001")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
   });
 
   it("refuses a missing or backwards period before any database call", async () => {

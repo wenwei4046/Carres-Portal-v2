@@ -28,6 +28,7 @@ import { appTodayIso, fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { useCashFlow } from "../ledger/ledger-queries";
+import { DepartmentFilter, departmentWord, useDepartmentParam, useDepartments } from "../department";
 import type { PackSheet } from "../month-end-pack";
 import { noOpening } from "../month-end-pack";
 import { ReadFailed } from "../payables/PayablesParts";
@@ -60,21 +61,31 @@ function statementRows(r: CashFlowReport): Row[] {
   return [...part("IN", r.inflow), ...part("OUT", r.outflow)];
 }
 
-/** The statement as sheet rows: the shape the Profit and Loss exports. */
-export function cashFlowSheet(r: CashFlowReport, from: string, to: string, goLive: string): { sheet: PackSheet; stem: string } {
+/** 0684 (Chew ruling 1): what one channel's view leaves out, in words. */
+export const NO_CHANNEL_NOTE =
+  "Transfers between Carres's own accounts, supplier advances not knocked off a bill yet, card payouts made by hand and bank charges are in no channel, so they show only under All.";
+
+/** The statement as sheet rows: the shape the Profit and Loss exports.
+ *  0684: with a channel, its name heads the sheet and no balance is printed. */
+export function cashFlowSheet(r: CashFlowReport, from: string, to: string, goLive: string, channel: string | null = null): { sheet: PackSheet; stem: string } {
   const day = (iso: string) => fmtDate(iso, { year: "always" });
   const ym = from.slice(0, 7);
   const when = from === `${ym}-01` && to === monthEnd(ym) ? fmtMonth(ym) : `${day(from)} to ${day(to)}`;
-  const rows: Array<Array<string | number>> = [["Cash Flow", `${day(from)} to ${day(to)}`], [noOpening(goLive)], [], ["Account", "Amount"]];
+  const title = channel ? `Cash Flow · ${channel}` : "Cash Flow";
+  const rows: Array<Array<string | number>> = [[title, `${day(from)} to ${day(to)}`], [noOpening(goLive)]];
+  if (channel) rows.push([NO_CHANNEL_NOTE]);
+  rows.push([], ["Account", "Amount"]);
   for (const section of ["IN", "OUT"] as const) {
     const lines = section === "IN" ? r.inflow : r.outflow;
     rows.push([SECTION_WORD[section], section === "IN" ? r.totalInflow : r.totalOutflow]);
     if (!lines.length) rows.push([NOTHING[section]]);
     for (const l of lines) rows.push([cashFlowLineWord(l), l.amount]);
   }
-  rows.push(["Net cash flow", r.net], ["Brought forward", r.broughtForward], ["Carried forward", r.carriedForward],
-    ["Card and online payments in this period", r.cardTaken], ["Waiting for card payout at the end", r.cardWaiting]);
-  return { sheet: { name: "Cash Flow", rows }, stem: `Cash Flow ${when}` };
+  rows.push(["Net cash flow", r.net]);
+  if (!r.byChannel) rows.push(["Brought forward", r.broughtForward], ["Carried forward", r.carriedForward]);
+  rows.push(["Card and online payments in this period", r.cardTaken]);
+  if (r.cardWaiting !== null) rows.push(["Waiting for card payout at the end", r.cardWaiting]);
+  return { sheet: { name: "Cash Flow", rows }, stem: channel ? `Cash Flow ${channel} ${when}` : `Cash Flow ${when}` };
 }
 
 function Statement({ report, from, to }: { report: CashFlowReport; from: string; to: string }) {
@@ -104,11 +115,14 @@ function Statement({ report, from, to }: { report: CashFlowReport; from: string;
           { align: "right", content: <span className="font-semibold tabular-nums">{rm(report.net)}</span> },
         ],
       }} />
-    <TotalsSummary label="Cash and bank balances" rows={[
+    {/* 0684: balances are not split by channel, so one channel's view prints none. */}
+    <TotalsSummary label={report.byChannel ? "Card and online money" : "Cash and bank balances"} rows={report.byChannel ? [
+      { key: "taken", label: "Card and online payments in this period", value: rm(report.cardTaken) },
+    ] : [
       { key: "bf", label: "Brought forward", value: rm(report.broughtForward) },
       { key: "cf", label: "Carried forward", value: rm(report.carriedForward), strong: true },
       { key: "taken", label: "Card and online payments in this period", value: rm(report.cardTaken) },
-      { key: "waiting", label: "Waiting for card payout at the end", value: rm(report.cardWaiting) },
+      { key: "waiting", label: "Waiting for card payout at the end", value: rm(report.cardWaiting ?? 0) },
     ]} />
   </div>;
 }
@@ -116,13 +130,15 @@ function Statement({ report, from, to }: { report: CashFlowReport; from: string;
 type AccountRow = CashFlowReport["accounts"][number];
 
 function ByAccount({ report }: { report: CashFlowReport }) {
-  const columns: Column<AccountRow>[] = [
+  const all: Column<AccountRow>[] = [
     { key: "account", label: "Account", width: "auto", cell: (a) => `${a.account.account_code} ${a.account.name}` },
     { key: "bf", label: "Brought forward", width: "150px", align: "right", numeric: true, cell: (a) => rm(a.broughtForward) },
     { key: "in", label: "Inflow", width: "150px", align: "right", numeric: true, cell: (a) => rm(a.inflow) },
     { key: "out", label: "Outflow", width: "150px", align: "right", numeric: true, cell: (a) => rm(a.outflow) },
     { key: "cf", label: "Carried forward", width: "150px", align: "right", numeric: true, cell: (a) => rm(a.carriedForward) },
   ];
+  // 0684: one channel's view has no balances to bring or carry forward.
+  const columns = report.byChannel ? all.filter((c) => c.key !== "bf" && c.key !== "cf") : all;
   return <DataTable label="Cash Flow by account" testId="cash-flow-accounts" rowTestId="cash-flow-account" rows={report.accounts}
     columns={columns} rowId={(a) => a.account.account_code} empty="No bank or cash account yet. Finance adds them in Settings."
     totals={{
@@ -140,7 +156,11 @@ export default function CashFlow() {
   const [params, setParams] = useSearchParams();
   const today = appTodayIso();
   const { from, to } = readPeriod(params, today);
-  const query = useCashFlow(from, to);
+  // 0684 (Chew ruling 1): one channel's money, kept in `?dept=` like the other reports.
+  const [dept, setDept] = useDepartmentParam();
+  const departments = useDepartments();
+  const channel = departmentWord(dept, departments.data ?? []);
+  const query = useCashFlow(from, to, dept);
   const report = useMemo((): CashFlowReport | "unreadable" | null => {
     if (!query.data) return null;
     try {
@@ -184,9 +204,12 @@ export default function CashFlow() {
           </div>
           <div className="w-40"><DatePicker id="cash-flow-from" label="From" value={from} onChange={pickFrom} /></div>
           <div className="w-40"><DatePicker id="cash-flow-to" label="Up to" value={to} minDate={from} onChange={pickTo} /></div>
+          <DepartmentFilter value={dept} onChange={setDept} />
           <ExportStatement testId="cash-flow-export" word="cash flow"
-            build={ready && goLive ? () => cashFlowSheet(ready, from, to, goLive) : null} />
+            build={ready && goLive ? () => cashFlowSheet(ready, from, to, goLive, channel) : null} />
         </div>
+        {channel && <p className="text-body text-kit-slate-11" data-testid="cash-flow-channel-note">
+          Only money tied to {channel}. {NO_CHANNEL_NOTE}</p>}
         {notStarted ? <div role="alert" className="text-body"><p>The ledger has no start date yet. Nothing can be totalled.</p></div>
         : query.isError || report === "unreadable" ? <ReadFailed what="Cash Flow" onRetry={() => void query.refetch()} />
         : beforeStart && goLive ? <p className="text-body" data-testid="cash-flow-before-start">

@@ -16,6 +16,7 @@ import {
   supplierNoteContactInput,
   supplierNoteFollowupAddInput,
   supplierNoteSettleInput,
+  type GoodsLineChannel,
   type PaymentVoucherDraftInput,
   type SupplierBillDraftInput,
   type SupplierCreditNoteDraftInput,
@@ -372,16 +373,23 @@ payablesRouter.get("/bills/grn-lines/:receiptId", requireFinance, async (c) => {
   if (!UUID_RE.test(receiptId)) return badId(c, "goods received note");
   const { data, error } = await sb(c).rpc("supplier_bill_grn_lines", { p_receipt_id: receiptId });
   if (error) return pgFail(c, error);
-  // 0540 (DEPT-6): each GRN line's default department, from its sales orders.
-  const rows = (data ?? []) as Array<{ po_line_id?: string | null }>;
-  const polIds = [...new Set(rows.map((r) => r.po_line_id).filter((x): x is string => !!x))];
-  const dept = new Map<string, Record<string, unknown>>();
-  if (polIds.length) {
-    const d = await sb(c).from("fin_po_line_departments").select("po_line_id, department_type, department_id").in("po_line_id", polIds);
-    if (d.error) return pgFail(c, d.error);
-    for (const r of d.data ?? []) dept.set(r.po_line_id, r);
+  // 0683 (Chew ruling 2): where each GRN line's open quantity goes, from the
+  // orders it was bought for. Saving the bill splits it the same way.
+  const rows = (data ?? []) as Array<{ po_line_id?: string | null; open_qty?: number | string | null }>;
+  const want = rows.filter((r) => r.po_line_id).map((r) => ({ po_line_id: r.po_line_id, qty: Number(r.open_qty ?? 0) }));
+  const channels = new Map<string, GoodsLineChannel[]>();
+  if (want.length) {
+    const ch = await sb(c).rpc("fin_goods_lines_channels", { p_lines: want });
+    if (ch.error) return pgFail(c, ch.error);
+    for (const r of (ch.data ?? []) as Array<{ po_line_id: string; channels: GoodsLineChannel[] }>) channels.set(r.po_line_id, r.channels);
   }
-  return c.json({ rows: rows.map((r) => ({ department_type: null, department_id: null, ...r, ...dept.get(r.po_line_id ?? "") })) });
+  return c.json({
+    rows: rows.map((r) => {
+      const list = channels.get(r.po_line_id ?? "") ?? [];
+      const one = list.length === 1 ? list[0] : null;
+      return { ...r, channels: list, department_type: one?.department_type ?? null, department_id: one?.department_id ?? null };
+    }),
+  });
 });
 
 payablesRouter.get("/bills/:id", requireFinance, async (c) => {

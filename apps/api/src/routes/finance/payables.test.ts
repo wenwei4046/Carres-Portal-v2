@@ -1086,4 +1086,73 @@ describe("departments (0540)", () => {
     mockRpc({ data: [], error: null });
     expect((await call(`/bills?departmentType=OFFICE&departmentId=${BILL_ID}`)).status).toBe(422);
   });
+
+  it("GET /bills?departmentType=STOCK keeps the bills with goods not yet in a channel (0683)", async () => {
+    const eq = vi.fn();
+    const range = vi.fn().mockResolvedValue({ data: [{ bill_id: BILL_ID }], error: null });
+    const q = { eq, order: vi.fn(), range };
+    eq.mockReturnValue(q);
+    q.order.mockReturnValue(q);
+    const sb = {
+      rpc: vi.fn().mockResolvedValue({ data: [{ id: BILL_ID }, { id: VOUCHER_ID }], error: null }),
+      from: vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue(q) }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await call("/bills?departmentType=STOCK");
+    expect(res.status).toBe(200);
+    expect(eq).toHaveBeenCalledWith("department_type", "STOCK");
+  });
+});
+
+describe("a goods line's channel (0683, Chew ruling 2)", () => {
+  const SHOWROOM = "99999999-0000-4000-8000-000000000001";
+  const DEALER = "99999999-0000-4000-8000-000000000002";
+  const grnRow = {
+    receipt_id: RECEIPT_ID, grn_no: "GRN-1", po_id: "PO-1", supplier_id: SUPPLIER_ID, supplier_name: "Lumen",
+    po_line_id: PO_LINE_ID, sku: "SOFA", received_qty: "2.00", billed_qty: "0.00", open_qty: "2.00",
+    po_unit_cost: "100.00", commercial_treatment: null,
+  };
+  function mockGrn(channels: unknown[]) {
+    const sb = {
+      rpc: vi.fn()
+        .mockResolvedValueOnce({ data: [grnRow], error: null })
+        .mockResolvedValueOnce({ data: [{ po_line_id: PO_LINE_ID, channels }], error: null }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    return sb;
+  }
+
+  it("GET /bills/grn-lines/:id says where the open quantity goes, from the orders it was bought for", async () => {
+    const split = [
+      { department_type: "SHOWROOM", department_id: SHOWROOM, qty: 1 },
+      { department_type: "DEALER", department_id: DEALER, qty: 1 },
+    ];
+    const sb = mockGrn(split);
+    const res = await call(`/bills/grn-lines/${RECEIPT_ID}`);
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenNthCalledWith(1, "supplier_bill_grn_lines", { p_receipt_id: RECEIPT_ID });
+    expect(sb.rpc).toHaveBeenNthCalledWith(2, "fin_goods_lines_channels", { p_lines: [{ po_line_id: PO_LINE_ID, qty: 2 }] });
+    const body = (await res.json()) as { rows: Array<Record<string, unknown>> };
+    expect(body.rows[0]!.channels).toEqual(split);
+    expect(body.rows[0]!.department_type).toBeNull();
+  });
+
+  it("names the one channel when the whole line goes there", async () => {
+    mockGrn([{ department_type: "STOCK", department_id: null, qty: 2 }]);
+    const body = (await (await call(`/bills/grn-lines/${RECEIPT_ID}`)).json()) as { rows: Array<Record<string, unknown>> };
+    expect(body.rows[0]).toMatchObject({ department_type: "STOCK", department_id: null });
+  });
+
+  it("passes the database's refusal through", async () => {
+    const sb = {
+      rpc: vi.fn()
+        .mockResolvedValueOnce({ data: [grnRow], error: null })
+        .mockResolvedValueOnce({ data: null, error: { code: "42501", message: "accounts payable is internal", details: "not_internal" } }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    expect((await call(`/bills/grn-lines/${RECEIPT_ID}`)).status).toBe(403);
+  });
 });
