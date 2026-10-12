@@ -162,7 +162,7 @@ Two Finance Settings pages keep the mapping in Chew's hands (「其他的收入�
 - Transport: nothing ties a logistics partner's bill to the delivery orders it covers, and logistics partners are not suppliers in Payables.
 
 Recommended, in this order:
-1. **A bill line takes its order's channel** (ruling 2). **BUILT 2026-10-12 (0683).**
+1. **A bill line takes its order's channel** (ruling 2). **BUILT 2026-10-12 (0683); 0683 APPLIED 2026-10-12 on Chew's 「做」 for the build batch, the tracker holding the file exactly (md5 `f32b2b267e73928d4534471ede7d2b9d`).**
    - A bill's goods line (one from a GRN) has its channel worked out when the bill is saved; the form shows it and nobody picks it. A line not from a GRN still names its department by hand.
    - How it is worked out, earliest order first: the orders the PO line was bought for (`po_line_sources`), else the orders its Units were put aside or sold for, less what earlier bills of that PO line already charged to each.
    - A line going to more than one channel is saved as one line per channel, the quantity split and the price kept. A PO line bought for orders that is charged beyond them keeps the earliest order's channel.
