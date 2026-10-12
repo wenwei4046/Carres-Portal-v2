@@ -126,7 +126,7 @@ export default function FinanceDashboard() {
             <FinanceKpi
               testId="dashboard-overdue"
               valueTestId="dashboard-overdue-amount"
-              label="Late (>30d)"
+              label="Overdue (>30d)"
               value={overdueValue}
               hint={aging ? ordersWord(aging.overdue.orders) : undefined}
               tone={aging && aging.overdue.total > 0 ? "danger" : "ok"}
