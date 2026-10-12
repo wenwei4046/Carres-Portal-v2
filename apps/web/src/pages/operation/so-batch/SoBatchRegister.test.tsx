@@ -377,16 +377,56 @@ it("Quick View issues only its own prepared scope while another SO stays selecte
   expect(screen.getByTestId("so-batch-select-o3")).toBeChecked();
 });
 
-it("Supplier grouping names the exact supplier set and never duplicates a multi-supplier SO", () => {
-  renderRegister({ registerRows: [ORDER_O1, ORDER_O8], rows: [LEAF_O1, LEAF_O8A, LEAF_O8B] });
-  fireEvent.keyDown(screen.getByRole("button", { name: "Page tools" }), { key: "Enter" });
-  fireEvent.click(screen.getByRole("menuitem", { name: "Group by: Supplier" }));
-  expect(screen.getByText("Hooka · Ohana")).toBeInTheDocument();
-  expect(screen.getAllByTestId("so-batch-row-o8")).toHaveLength(1);
-  expect(screen.getByTestId("so-batch-footer")).toHaveTextContent("2 Sales Orders");
-  fireEvent.mouseDown(screen.getByRole("tab", { name: "Cards" }));
-  expect(screen.getAllByTestId("so-batch-card-o8")).toHaveLength(1);
-  expect(screen.getByTestId("so-batch-footer")).toHaveTextContent("2 Sales Orders");
+/* BY SUPPLIER (owner 12 Oct 2026; Purchasing MASTER §9.1): the same demand,
+   one row per supplier and category. It replaces the earlier `Group by:
+   Supplier` page tool, which only regrouped the Sales Order rows. */
+describe("By supplier view", () => {
+  const open = () => fireEvent.mouseDown(screen.getByRole("tab", { name: "By supplier" }));
+
+  it("is a third view beside Table and Cards, kept in the address", () => {
+    renderRegister({ registerRows: [ORDER_O1, ORDER_O8], rows: [LEAF_O1, LEAF_O8A, LEAF_O8B] });
+    const bar = screen.getAllByRole("tablist").find((list) => within(list).queryByRole("tab", { name: "Table" }))!;
+    const views = within(bar).getAllByRole("tab");
+    expect(views.map((tab) => tab.textContent)).toEqual(["Table", "Cards", "By supplier"]);
+    open();
+    expect(screen.getByRole("tab", { name: "By supplier" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByTestId("so-batch-row-o8")).not.toBeInTheDocument();
+    expect(screen.getByTestId("by-supplier-footer")).toBeInTheDocument();
+  });
+
+  it("the old Group by page tool is gone: one way to see demand by supplier", () => {
+    renderRegister({ registerRows: [ORDER_O1, ORDER_O8], rows: [LEAF_O1, LEAF_O8A, LEAF_O8B] });
+    fireEvent.keyDown(screen.getByRole("button", { name: "Page tools" }), { key: "Enter" });
+    expect(screen.getAllByRole("menuitem").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("menuitem", { name: /Group by/ })).toBeNull();
+  });
+
+  it("draws the six columns in order with the kit's widths", () => {
+    renderRegister({ registerRows: [ORDER_O1, ORDER_O8], rows: [LEAF_O1, LEAF_O8A, LEAF_O8B] });
+    open();
+    const heads = screen.getAllByRole("columnheader").map((h) => h.textContent?.replace(/\s+/g, " ").trim()).filter(Boolean);
+    expect(heads.slice(-6)).toEqual(["Supplier", "Items", "Sales orders", "Order PO deadline", "Supplier ready by", "Status"]);
+  });
+
+  it("a row tick ticks every line of it that can be bought, and Issue PO takes them", () => {
+    renderRegister({ registerRows: [ORDER_O1, ORDER_O8], rows: [LEAF_O1, LEAF_O8A, LEAF_O8B] });
+    open();
+    const boxes = screen.getAllByRole("checkbox").filter((box) => /^by-supplier-select-/.test(box.getAttribute("data-testid") ?? ""));
+    expect(boxes.length).toBeGreaterThan(0);
+    fireEvent.click(boxes[0]!);
+    fireEvent.click(screen.getByTestId("so-batch-issue"));
+    expect(onIssue).toHaveBeenCalledTimes(1);
+    expect(onIssue.mock.calls[0]![0].length).toBeGreaterThan(0);
+  });
+
+  it("ticks made here are the same ticks the Table shows", () => {
+    renderRegister({ registerRows: [ORDER_O1], rows: [LEAF_O1] });
+    open();
+    const box = screen.getAllByRole("checkbox").find((b) => /^by-supplier-select-/.test(b.getAttribute("data-testid") ?? ""))!;
+    fireEvent.click(box);
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Table" }));
+    expect(screen.getByTestId("so-batch-select-o1")).toBeChecked();
+  });
 });
 
 it("does not match or recover POs from an unfinished Register load", () => {

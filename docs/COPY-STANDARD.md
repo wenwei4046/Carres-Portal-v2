@@ -2291,6 +2291,16 @@ Other views retain their purpose-specific names, such as `Monthly demand`.
 
 ### Purchasing UI dictionary — APPROVED (Jess, 2026-09-18) · BUILT on SO Batch Purchase 2026-09-18
 
+**SO Batch Purchase · By supplier — owner 12 Oct 2026 · BUILT 12 Oct 2026 (Purchasing MASTER §9.1).** View name
+`By supplier` beside `Table` · `Cards`. Columns `Supplier` · `Items` · `Sales orders` · `Order PO deadline` ·
+`Supplier ready by` · `Status`. Second lines: `Supplier delivers · {n}d` · `We collect · {n}d` · `{n} models` ·
+`1 model` · `SO-{no} +{n}` · `{weekday} · {n} days left` · `{weekday} · Today` · `{weekday} · {n} days late` ·
+`{weekday} · if sent today`. Quantities `{n} pcs` · `1 pc`, a sofa `{n} sets` · `1 set`. Status `Cut-off passed` with
+`{qty} to buy`, or `To buy` with the quantity. No supplier: `Supplier not set` · `Set the supplier in Catalog`.
+Footer `{n} groups · {n} suppliers`. `Order PO deadline` is the Order By date and `Supplier ready by` is a projection
+for demand with no PO yet; neither renames `PO Safety Days` or `PO Delivery Date`, which keep their meaning on the
+Table view.
+
 **PO panel tabs — owner ruling 2026-10-02, APPROVED TARGET / NOT BUILT:** `PO info` ·
 `Communication`. Clicking the PO number opens this shared quick panel. `Open full page` opens
 the 50/50 PO information/edit and PDF surface; communication is shared with Workspace through

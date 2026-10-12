@@ -507,7 +507,8 @@ export type DataGridProps<T> = {
    * 2026-09-26: 8 + 18 + 2 + 14 + 8 + 1px rule), for a register whose cells
    * carry a document over its goods identity (Supplier Claims, §9.5).
    */
-  rowHeight?: 32 | 38 | 40 | 51 | 72;
+  /** 54 is the kit's list row (01 §5); the others are the earlier listings'. */
+  rowHeight?: 32 | 38 | 40 | 51 | 54 | 72;
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
   emptyMessage?: string;

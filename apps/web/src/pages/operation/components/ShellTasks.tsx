@@ -25,9 +25,10 @@ const KEY = "shell-tasks-open";
 
 function readOpen(): boolean {
   try {
-    /* Open on a wide screen unless the person hid it (v8: Tasks from 1100px). */
+    /* Open on a wide screen unless the person chose otherwise (03 §1: Tasks
+       opens by itself from 1280 wide; under 1280 the list keeps the room). */
     const stored = localStorage.getItem(KEY);
-    return stored ? stored === "1" : window.innerWidth >= 1100;
+    return stored ? stored === "1" : window.innerWidth >= 1280;
   } catch {
     return true;
   }

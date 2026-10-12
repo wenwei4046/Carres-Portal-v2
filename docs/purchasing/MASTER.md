@@ -2631,6 +2631,27 @@ Module Register rails remain factual filters and do not copy central Work action
 
 ### 9.1 SO Batch Purchase
 
+**BY SUPPLIER VIEW — owner 12 Oct 2026 (design handoff `Fix now`) · BUILT 12 Oct 2026, not the default view yet.**
+The page has three views of the same demand: `Table` (one row per Sales Order, the default), `Cards` and
+`By supplier`. `By supplier` reads the demand the way a buyer orders it: one row per supplier and category,
+because one PO goes to one supplier for one category. Rows whose PO window has gone by come first.
+
+| Column | Width | What it shows |
+|---|---|---|
+| `Supplier` | takes the room left, never under 150 | Supplier name; under it who brings the goods and the production days (`Supplier delivers · 7d` · `We collect · 7d`). Goods with no supplier in Catalog are their own row: `Supplier not set` · `Set the supplier in Catalog` |
+| `Items` | 80 | What is still to buy, in pieces, a sofa in sets; under it the number of models |
+| `Sales orders` | 96 | How many Sales Orders; under it the first number and how many more |
+| `Order PO deadline` | 120 | The earliest Order By date among the lines still to buy; under it the weekday and `{n} days left` · `Today` · `{n} days late` (amber once the date has passed) |
+| `Supplier ready by` | 120 | The PO Delivery Date a PO issued today would carry (the same projection the Issue PO review shows), marked `if sent today`. It is never the `PO Delivery Date` of an issued PO; that column of the Table view still shows a date only once the PO exists |
+| `Status` | 120 | `Cut-off passed` (amber) with what is still to buy, when a line's PO window has gone by; otherwise `To buy` |
+
+- A row opens to its item lines: tick · item and variant · quantity · Sales Order number (opens the order card) · that line's Order By date.
+- A tick on a row ticks every line of it that may be bought; a line has its own tick. The ticks are the same ticks the Table view holds, and the same `Issue PO` door takes them. Who may tick and issue is unchanged.
+- Every date and number is the server's (`orderBy`, `poDeliveryDate`, `poDeliveryWorkingDays`, `poWindow`, `toBuy`); the PO window times are the Purchasing Settings values, never the specimen's.
+- Status stays in view at 1131 wide with Tasks closed, with no side scroll (measured 12 Oct 2026). Tasks now opens by itself only from 1280 wide (03 §1).
+- The earlier `Group by: Supplier` page tool, which only regrouped the Sales Order rows, is removed: one way to see demand by supplier.
+- **Not built yet, and why it is not the default:** Ready Stock matching, the per-line `Supplier Deliver To` change and the status reasons still live only in the Table view. The specimen's other groupings (`By category` · `By order deadline`), its Summary panel and its `To buy · Ordered · All` tabs are not built.
+
 **PO PLACEMENT UNBLOCK — CORE PRODUCTION-VERIFIED, 2026-10-01.** PRs #1827 / #1832
 merged at `45f43e96b92305583fa176a17d5222152dc5eb9a`. CI `36816676966` passed 13,745
 tests; deployment `36817768266` succeeded and all five canonical ERP/POS/Pages/API probes
