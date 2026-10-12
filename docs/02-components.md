@@ -21,6 +21,7 @@
 | Dialog / drawer | Modal, DialogFrame, Drawer | Focus trap, Escape where safe, focus return; no hidden unsaved loss |
 | Feedback | Toast, EmptyState, Loading | Outcome-specific words; errors beside affected action; no false success |
 | Route / history | RouteStop, QuietRouteRow, ChecklistRow, module history adapters | Actual source-owned facts; parallel paths; immutable recorded events |
+| Task steps | StepList, Step | The numbered steps of one job (owner's 12 Oct 2026 package): a 20px round mark, a 13 / 500 title, one 12 grey line and the step's own controls, a hairline between steps. Done is green with a tick, the step to do now is dark, a later step is white with the chip border. The marks show where the person is and never record anything; the act stays one named button |
 | Settings | Shared page/row/form components | Plain row groups; edit mode, access, current value, treatment and history |
 
 ## Reuse rules

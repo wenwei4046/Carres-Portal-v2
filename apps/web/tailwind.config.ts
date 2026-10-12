@@ -155,6 +155,7 @@ export default {
           "footer-line": "var(--c-footer-line)",
           "section-line": "var(--c-section-line)",
           "input-border": "var(--c-input-border)",
+          "chip-border": "var(--c-chip-border)",
           "search-bg": "var(--c-search-bg)",
           "select-bg": "var(--c-select-bg)",
           "select-fg": "var(--c-select-fg)",

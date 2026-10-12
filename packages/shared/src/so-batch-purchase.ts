@@ -1955,6 +1955,10 @@ export const SO_BATCH_TASK_WORDS = {
   sendHint: "Send the PDF, then press PO sent to supplier.",
   recordSent: (n: number) => `PO sent to supplier (${n})`,
   confirmTitle: "Record as sent by WhatsApp?",
+  /* The three send steps (owner's 12 Oct 2026 package, in the Portal's words). */
+  confirmTitleFor: (channel: "whatsapp" | "email") => channel === "email" ? "Record as sent by Email?" : "Record as sent by WhatsApp?",
+  sendBy: "Send by WhatsApp or Email",
+  downloaded: (done: number, total: number) => done >= total ? "Downloaded" : `${done} of ${total} downloaded`,
   notTicked: "Not ticked: stays in this task.",
   recordN: (n: number) => `Record ${n} ${n === 1 ? "PO" : "POs"}`,
   attached: "Attached",
