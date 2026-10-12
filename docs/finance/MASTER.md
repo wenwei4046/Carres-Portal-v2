@@ -671,7 +671,9 @@ All reports only read. Reports → Payment stays Payment's.
   - An invoice of RM 2,629.00 on an order with a deposit of RM 1,315.00 showed RM 1,314.00 open, in Showroom. The day before the invoice, the deposit was money paid ahead.
   - An other debtor's invoice of RM 500.00 with RM 200.00 received showed RM 300.00 open. The day before the receipt it showed RM 500.00, and nothing before the invoice. The other debtors' account agreed.
   - Operation could not read it.
+- Checked on production after deploying (read only, 2026-10-12): the 7 customers showed their money paid ahead under `Not tied to an invoice`, RM -13,928.00 in all, equal to `300-0000 + 305-0000`, difference RM 0.00.
 - Not built: a customer refund (refunds do not post to the debtor accounts yet), a PDF, and a view by debtor account.
+- Not built, found on production: a row with money paid ahead and no open invoice shows no `Channel`, because the channel is read from the open invoices only. Once "Splitting the money by channel" step 3 (0685) is applied, the debtor account a customer's money sits on names the channel; the row can read it from there (PROPOSAL, for Chew).
 - Falsifier: in Chew's test, a debtor's open invoice differs from what Payment or Other debtors shows for it, or the footer's difference is not zero.
 
 **Collection report approach — PROPOSAL / NOT LAW, built for Chew's test (0644).**
