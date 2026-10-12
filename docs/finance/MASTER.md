@@ -501,9 +501,15 @@ Dealer commission rules:
 - The entry point is **one entry in the shared menu**, visible only to permitted staff. This is the first Jess-side change Chew approved (2026-10-03); the second is the area fold (§4.1).
 
 **Payment requests approach — PROPOSAL / NOT LAW, built for Chew's test (0645).**
-- **Who may ask.** Finance or the boss (the principal) ticks which Operation staff may ask, under Finance Settings → `Payment requests` (Chew 2026-10-03; 0648 — 0645 let only the boss). Only the people ticked see the menu row and can ask. Finance and the principal may always ask. Each grant is kept, with who gave it and who took it back: unticking never deletes it.
+- **Who may ask.** Finance or the boss (the principal) ticks which Operation, HR and BD staff may ask, under Finance Settings → `Payment requests` (Chew 2026-10-03; 0648 — 0645 let only the boss; HR and BD since 0687, Chew 2026-10-12 「hr & BD 也到能申请」). Only the people ticked see the menu row and can ask. Finance and the principal may always ask. Each grant is kept, with who gave it and who took it back: unticking never deletes it.
   - It is a permission per person, kept by Finance, as the warehouse keeps its capability grants. It is not a Workspace duty, which has one holder a day, and it is not an HR position permission.
-  - Today only Operation staff can be ticked, because the Finance pages are open to Finance, the principal and Operation.
+  - A shared login cannot be ticked; only a person's own account can.
+  - **HR and BD: BUILT 2026-10-12 (0687), probed on production and rolled back. It puts a row in their menus (§1 Exceptions): Chew told Jess, and 0687 was APPLIED 2026-10-12 on his 「可以套用」, the tracker holding the file exactly (md5 `d124c8531f5cb2f000ceab138839975d`).**
+    - HR staff who are ticked see `Payment Requests` at the end of the HR rail.
+    - BD staff who are ticked see a `Payment Requests` pill on the POS top bar, after `Accounts`. Their page has `Back to POS`.
+    - Under `/finance`, HR and BD reach Payment Requests and nothing else.
+    - Measured (production, rolled back): with one BD login counted as a person for the probe, Finance's list showed it beside the two Operation staff; the boss ticked it; it asked, and saw its own request. The other BD login, a shared one, could not be ticked and may not ask; a dealer could not be ticked.
+    - Before Chew's test: today there is no HR account, and both BD accounts are shared logins, so one person's HR or BD account is made under HR → Team first.
 - **Asking.** The person fills `Payment Requests → New Payment Request`: who to pay, the amount, what it is for, pay by, the bill's own number and date, the bank details and a note. The bill must be attached before the request is sent. The request takes a number, `PRQ…`, drawn like every formal document.
 - **Finance's answer.** Finance sees the requests waiting for it and answers each with `Make payment voucher` or `Make bill`.
   - The voucher or bill form opens pre-filled from the request. Saving it answers the request.
@@ -515,7 +521,6 @@ Dealer commission rules:
 - **The shared menu** gains one row, `Payment Requests`, under Operations → Workspace. It shows only to the staff allowed, and to the boss, who may always ask; Chew 2026-10-03: it is fine in her menu. Finance and the boss also find it under Finance → Payables.
 - **The files** go to their own private store, so the person can upload without being given Finance's files. That store has two new access rules of its own; no existing rule changed.
 - **Not built:**
-  - HR or BD staff asking: APPROVED / NOT BUILT (Chew 2026-10-12, 「hr & BD 也到能申请」). They cannot open the request page today; it needs the `Payment Requests` row in their menus, a change on Jess's side that Chew tells her about (§1 Exceptions).
   - Asking for the balance of a bill again.
   - The official invoice owed after a proforma.
   - Reading the bill on the request.

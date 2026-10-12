@@ -45,13 +45,13 @@ async function call(path: string, init: { method?: string; body?: unknown; role?
 const good = { payeeName: "Bayview Properties", amount: 3500, purpose: "October rent, PJ showroom", billNo: "BV-1007", billDate: "2026-10-01" };
 
 describe("/api/finance/payment-requests", () => {
-  it("is open to Operation, Finance and the principal only", async () => {
-    for (const role of ["dealer", "supplier", "partner", "hr"]) {
+  it("is open to Operation, Finance, the principal and (0687) HR and BD only", async () => {
+    for (const role of ["dealer", "supplier", "partner", "warehouse", "showroom", "salesperson"]) {
       expect((await call("", { role })).status, role).toBe(403);
     }
     expect(userClient).not.toHaveBeenCalled();
     mockRpc({ data: [], error: null });
-    for (const role of ["operation", "finance", "principal"]) {
+    for (const role of ["operation", "finance", "principal", "hr", "bd"]) {
       expect((await call("", { role })).status, role).toBe(200);
     }
   });

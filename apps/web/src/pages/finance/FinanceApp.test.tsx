@@ -150,6 +150,30 @@ describe("Finance routing", () => {
     expect(screen.getByTestId("payment-monitor-destination-header")).toBeInTheDocument();
     auth.role = "finance";
   });
+  /* 0687 (Chew 2026-10-12, 「hr & BD 也到能申请」): HR and BD staff reach Payment
+     Requests and nothing else under /finance. BD works from the POS, which has
+     no rail, so its page carries one way back. */
+  it("HR and BD staff reach Payment Requests, and every other Finance address lands on it", () => {
+    for (const role of ["hr", "bd"]) {
+      auth.role = role;
+      for (const path of ["/finance/payment-requests", "/finance", "/finance/ar", "/finance/ledger/trial-balance", "/finance/monitor"]) {
+        show(path);
+        expect(screen.getByTestId("payment-requests-destination-header"), `${role} ${path}`).toBeInTheDocument();
+        cleanup();
+      }
+    }
+    auth.role = "finance";
+  });
+  it("BD has Back to POS; HR keeps its own rail and needs none", () => {
+    auth.role = "bd";
+    show("/finance/payment-requests");
+    expect(screen.getByTestId("requests-back-to-pos")).toHaveTextContent("Back to POS");
+    cleanup();
+    auth.role = "hr";
+    show("/finance/payment-requests");
+    expect(screen.queryByTestId("requests-back-to-pos")).not.toBeInTheDocument();
+    auth.role = "finance";
+  });
   it("opens the three Finance Ledger destinations, each on its own route", () => {
     show("/finance/ledger");
     expect(screen.getByTestId("journal-destination-header")).toBeInTheDocument();

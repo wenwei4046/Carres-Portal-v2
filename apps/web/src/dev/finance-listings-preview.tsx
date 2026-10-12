@@ -633,6 +633,9 @@ const REQUEST_GRANTS = [
   { user_id: "u-0", name: "NUR AISYAH BINTI KAMARUL ZAMAN", role: "operation", allowed: true, granted_at: at(-30), granted_by_name: "Jess" },
   { user_id: "u-1", name: "Boon Keat", role: "operation", allowed: true, granted_at: at(-12), granted_by_name: "Jess" },
   { user_id: "u-2", name: "Priya Raman", role: "operation", allowed: false, granted_at: null, granted_by_name: null },
+  // 0687: HR and BD staff beside Operation.
+  { user_id: "u-3", name: "Hana Yusof", role: "hr", allowed: true, granted_at: at(-1), granted_by_name: "Chew" },
+  { user_id: "u-4", name: "Bala Krishnan", role: "bd", allowed: false, granted_at: null, granted_by_name: null },
 ];
 
 // ── Reports → AP Aging (0640): owed to suppliers on a day ───────────────────
@@ -835,7 +838,12 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const q = new URL(url, window.location.origin).searchParams;
   if (url.includes("/api/finance/invoices/register")) return json({ rows: INVOICES, total: INVOICES.length });
   if (url.includes("/api/finance/payments/register")) return json({ rows: [], total: 0 });
-  if (url.includes("/api/finance/payment-requests/me")) return json({ may_request: true, finance: true, boss: true, may_grant: true });
+  // 0687: `?role=hr` or `?role=bd` previews an allowed HR or BD person, who sees only their own requests.
+  if (url.includes("/api/finance/payment-requests/me")) {
+    return json(ROLE === "hr" || ROLE === "bd"
+      ? { may_request: true, finance: false, boss: false, may_grant: false }
+      : { may_request: true, finance: true, boss: true, may_grant: true });
+  }
   if (url.includes("/api/finance/payment-requests/grants")) return json({ rows: REQUEST_GRANTS });
   if (url.includes("/api/finance/payment-requests/prq-")) return json(PAYMENT_REQUEST_DOC);
   if (url.includes("/api/finance/payment-requests")) return json({ rows: PAYMENT_REQUESTS });

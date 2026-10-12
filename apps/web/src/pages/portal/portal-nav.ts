@@ -810,6 +810,18 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // HR-P7 (0278) — the Chairman's cost question. Last in the HR group: it is
       // the only screen carrying salary, and it reads the other tabs' figures.
       { key: "people-cost", label: "People cost", icon: Wallet },
+      /* 0687 — Chew 2026-10-12 (Finance MASTER §3.3, 「hr & BD 也到能申请」): the HR
+       * staff Finance or the boss allows ask Finance to pay a bill. Shown only to
+       * them (`needs`), and to HR only: the principal finds it under Operations. */
+      {
+        key: "payment-requests",
+        label: "Payment Requests",
+        icon: HandCoins,
+        path: "/finance/payment-requests",
+        activeFor: ["path:/finance/payment-requests"],
+        roles: ["hr"],
+        needs: "payment-requester",
+      },
     ],
   },
   {
