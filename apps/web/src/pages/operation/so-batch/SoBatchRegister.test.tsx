@@ -394,6 +394,41 @@ describe("By supplier view", () => {
     expect(screen.getByTestId("so-batch-row-o8")).toBeInTheDocument();
   });
 
+  /* To buy · Ordered · All, the footer totals and the Today card (owner's
+     12 Oct 2026 package). Ordered rows come from the Register's own PO facts. */
+  const showBar = () => screen.getByRole("tablist", { name: "SO Batch Purchase shown" });
+  it("To buy is the first tab; Ordered shows what is on a PO, with its PO No and no tick", () => {
+    renderRegister({ registerRows: [ORDER_O1, ORDER_O3, ORDER_O8], rows: [LEAF_O1, LEAF_O8A, LEAF_O8B] }, true, false, "supplier");
+    expect(within(showBar()).getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["To buy", "Ordered", "All"]);
+    expect(within(showBar()).getByRole("tab", { name: "To buy" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByTestId("by-supplier-row-ordered|s-hooka|mattress")).not.toBeInTheDocument();
+    fireEvent.mouseDown(within(showBar()).getByRole("tab", { name: "Ordered" }));
+    const ordered = screen.getByTestId("by-supplier-row-ordered|s-hooka|mattress");
+    expect(ordered).toHaveTextContent("Hooka");
+    expect(ordered).toHaveTextContent("2 pcs");
+    expect(within(ordered).getByTestId("by-supplier-status-ordered|s-hooka|mattress")).toHaveTextContent("OrderedPO-260820-4827");
+    expect(screen.getByTestId("by-supplier-select-ordered|s-hooka|mattress")).toBeDisabled();
+    expect(screen.queryAllByTestId(/^by-supplier-row-/)).toHaveLength(1);
+    fireEvent.click(screen.getByTestId("by-supplier-expand-ordered|s-hooka|mattress"));
+    expect(screen.getByTestId("by-supplier-ordered-line-l3|PO-20260820-4827")).toHaveTextContent("BooqitKing2 pcsSO-1330PO-260820-4827");
+    fireEvent.mouseDown(within(showBar()).getByRole("tab", { name: "All" }));
+    expect(screen.queryAllByTestId(/^by-supplier-row-/).length).toBeGreaterThan(1);
+  });
+
+  it("the footer adds what is still to buy, by category", () => {
+    renderRegister({ registerRows: [ORDER_O1, ORDER_O8], rows: [LEAF_O1, LEAF_O8A, LEAF_O8B] }, true, false, "supplier");
+    expect(screen.getByTestId("by-supplier-footer")).toHaveTextContent(/ · To buy: Mattress \d+ pcs$/);
+  });
+
+  it("the Today card leads the rail with To order now and its rows", () => {
+    renderRegister({ registerRows: [ORDER_O1, ORDER_O3, ORDER_O8], rows: [LEAF_O1, LEAF_O8A, LEAF_O8B] }, true, false, "supplier");
+    const today = screen.getByTestId("so-batch-today");
+    expect(within(today).getByTestId("so-batch-today-now")).toHaveTextContent(/^\d+ pcs?To order now$/);
+    expect(within(today).getByTestId("so-batch-today-past")).toHaveTextContent(/^Past the order-by date\d+ pcs?$/);
+    expect(within(today).getByTestId("so-batch-today-too-late")).toHaveTextContent(/^Too late for customer date\d+$/);
+    expect(within(today).getByTestId("so-batch-today-partly")).toHaveTextContent("Partly ordered1");
+  });
+
   it("the old Group by page tool is gone: one way to see demand by supplier", () => {
     renderRegister({ registerRows: [ORDER_O1, ORDER_O8], rows: [LEAF_O1, LEAF_O8A, LEAF_O8B] });
     fireEvent.keyDown(screen.getByRole("button", { name: "Page tools" }), { key: "Enter" });

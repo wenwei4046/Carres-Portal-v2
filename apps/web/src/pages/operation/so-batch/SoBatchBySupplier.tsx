@@ -21,9 +21,10 @@ import type { PurchaseDemandRow } from "@carres/shared";
 import Checkbox from "@/components/kit/Checkbox";
 import StatusPill from "@/components/kit/StatusPill";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
+import { documentDisplayNumber } from "@carres/shared";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import TwoLineCell from "@/components/register/TwoLineCell";
-import { BY_SUPPLIER as B, daysBetween, type SupplierGroup } from "./by-supplier";
+import { BY_SUPPLIER as B, daysBetween, toBuyByCategory, type SupplierGroup } from "./by-supplier";
 
 /** The five fixed columns (01 §5) and the grid's own tick and arrow columns. */
 const FIXED = { items: 80, orders: 96, deadline: 120, readyBy: 120, status: 120 } as const;
@@ -35,6 +36,7 @@ const SUPPLIER_MIN = 150;
 
 const soRef = (so: number | null) => (so == null ? B.notRecorded : `SO-${so}`);
 const weekday = (iso: string) => fmtDate(iso).split(",")[0] ?? "";
+const poNo = (id: string) => documentDisplayNumber(id);
 
 export default function SoBatchBySupplier({
   groups, today, isLoading, storageKey, sessionKey, canBuy, isTicked, onToggleLine, onToggleLines,
@@ -88,9 +90,9 @@ export default function SoBatchBySupplier({
   const columns = useMemo<DataGridColumn<SupplierGroup>[]>(() => [
     {
       key: "supplier", label: B.colSupplier, width: supplierWidth, minWidth: SUPPLIER_MIN, sortable: true, wrap: true,
-      accessor: (g) => <TwoLineCell strong top={g.supplier ?? B.supplierNotSet} sub={B.supplierLine(g)} testId={`by-supplier-name-${g.key}`} />,
+      accessor: (g) => <TwoLineCell strong top={g.supplier ?? B.supplierNotSet} sub={g.ordered ? B.category(g.category) : B.supplierLine(g)} testId={`by-supplier-name-${g.key}`} />,
       sortFn: (a, b) => (a.supplier ?? "").localeCompare(b.supplier ?? ""),
-      searchValue: (g) => `${g.supplier ?? B.supplierNotSet} ${g.lines.map((l) => `${l.item} ${l.variant ?? ""} ${soRef(l.so)}`).join(" ")}`,
+      searchValue: (g) => `${g.supplier ?? B.supplierNotSet} ${[...g.lines, ...(g.ordered?.lines ?? [])].map((l) => `${l.item} ${l.variant ?? ""} ${soRef(l.so)}`).join(" ")} ${(g.ordered?.poIds ?? []).map((id) => `${id} ${poNo(id)}`).join(" ")}`,
       filterValue: (g) => g.supplier ?? B.supplierNotSet,
       exportValue: (g) => g.supplier ?? B.supplierNotSet,
     },
@@ -109,6 +111,7 @@ export default function SoBatchBySupplier({
     {
       key: "deadline", label: B.colDeadline, headerLines: ["Order PO", "deadline"], width: FIXED.deadline, minWidth: FIXED.deadline, sortable: true, wrap: true,
       accessor: (g) => {
+        if (g.ordered) return <span className="text-body text-c-secondary">{B.ordered}</span>;
         if (!g.orderBy) return <span className="text-body text-c-secondary">{B.notRecorded}</span>;
         const days = daysBetween(today, g.orderBy);
         return <TwoLineCell warn={days < 0} top={fmtDateShort(g.orderBy)} sub={`${weekday(g.orderBy)} · ${B.deadline(days)}`} testId={`by-supplier-deadline-${g.key}`} />;
@@ -120,14 +123,19 @@ export default function SoBatchBySupplier({
       key: "readyBy", label: B.colReadyBy, headerLines: ["Supplier", "ready by"], width: FIXED.readyBy, minWidth: FIXED.readyBy, sortable: true, wrap: true,
       accessor: (g) =>
         g.readyBy
-          ? <TwoLineCell top={fmtDateShort(g.readyBy)} sub={`${weekday(g.readyBy)} · ${B.ifSentToday}`} />
+          ? <TwoLineCell top={fmtDateShort(g.readyBy)} sub={g.ordered ? weekday(g.readyBy) : `${weekday(g.readyBy)} · ${B.ifSentToday}`} />
           : <span className="text-body text-c-secondary">{g.supplier ? B.notRecorded : B.supplierNotSet}</span>,
       sortFn: (a, b) => (a.readyBy ?? "9999").localeCompare(b.readyBy ?? "9999"),
       exportValue: (g) => g.readyBy ?? "",
     },
     {
       key: "status", label: B.colStatus, width: FIXED.status, minWidth: FIXED.status, sortable: true, wrap: true,
-      accessor: (g) => (
+      accessor: (g) => g.ordered ? (
+        <span className="flex min-w-0 flex-col items-start gap-0.5" data-testid={`by-supplier-status-${g.key}`}>
+          <StatusPill tone="success">{B.ordered}</StatusPill>
+          <span className="break-words text-meta text-c-secondary" title={g.ordered.poIds.map(poNo).join(", ")}>{B.poRefs(g.ordered.poIds, poNo)}</span>
+        </span>
+      ) : (
         <span className="flex min-w-0 flex-col items-start gap-0.5" data-testid={`by-supplier-status-${g.key}`}>
           <StatusPill tone={g.cutOffPassed ? "warning" : "neutral"}>{g.cutOffPassed ? B.cutOffPassed : B.toBuy}</StatusPill>
           <span className={`text-meta ${g.cutOffPassed ? "text-c-warn-fg" : "text-c-secondary"}`}>
@@ -135,9 +143,9 @@ export default function SoBatchBySupplier({
           </span>
         </span>
       ),
-      sortFn: (a, b) => Number(b.cutOffPassed) - Number(a.cutOffPassed),
-      filterValue: (g) => (g.cutOffPassed ? B.cutOffPassed : B.toBuy),
-      exportValue: (g) => (g.cutOffPassed ? B.cutOffPassed : B.toBuy),
+      sortFn: (a, b) => Number(!!a.ordered) - Number(!!b.ordered) || Number(b.cutOffPassed) - Number(a.cutOffPassed),
+      filterValue: (g) => (g.ordered ? B.ordered : g.cutOffPassed ? B.cutOffPassed : B.toBuy),
+      exportValue: (g) => (g.ordered ? B.ordered : g.cutOffPassed ? B.cutOffPassed : B.toBuy),
     },
   ], [today, supplierWidth]);
 
@@ -164,8 +172,11 @@ export default function SoBatchBySupplier({
       rowHeight={54}
       appearance="reference"
       palette="slate"
+      presentationTools
       wrapToolbar
-      searchPresentation="responsive"
+      /* The top bar already searches everything; here search is one icon, so
+         the tabs, the views and Match Ready Stock stay on one line (01 §4). */
+      searchPresentation="icon"
       allowColumnGrouping={false}
       groupBanner={false}
       isLoading={isLoading}
@@ -179,7 +190,38 @@ export default function SoBatchBySupplier({
       expandable={{
         flush: true,
         testId: (g) => `by-supplier-expand-${g.key}`,
-        renderExpansion: (g) => (
+        renderExpansion: (g) => g.ordered ? (
+          <div role="table" aria-label={`${g.supplier ?? B.supplierNotSet} items`} className="-ml-[72px] bg-white" data-testid={`by-supplier-lines-${g.key}`}>
+            <div role="row" className="grid min-h-[32px] items-center bg-c-info-bg text-meta font-medium text-c-secondary" style={{ gridTemplateColumns: lineColumns }}>
+              <span role="columnheader" />
+              <span role="columnheader" />
+              <span role="columnheader" className="px-[5px]">{B.lineItem}</span>
+              <span role="columnheader" className="px-[5px]">{B.lineQty}</span>
+              <span role="columnheader" className="px-[5px]">{B.lineSoNo}</span>
+              <span role="columnheader" className="px-[5px]">{B.linePoNo}</span>
+              <span role="columnheader" />
+            </div>
+            {g.ordered.lines.map((line) => (
+              <div key={line.id} role="row" className="grid min-h-[44px] items-center border-t border-c-row-line py-1.5"
+                style={{ gridTemplateColumns: lineColumns }} data-testid={`by-supplier-ordered-line-${line.id}`}>
+                <span role="cell" />
+                <span role="cell" />
+                <span role="cell" className="flex min-w-0 flex-col px-[5px]">
+                  <span className="break-words text-body text-c-ink">{line.item}</span>
+                  {line.variant ? <span className="break-words text-meta text-c-secondary">{line.variant}</span> : null}
+                </span>
+                <span role="cell" className="px-[5px] text-body text-c-ink">{B.qty(line.category, line.qty)}</span>
+                <span role="cell" className="px-[5px]">
+                  <button type="button" onClick={() => onOpenOrder(line.orderId)}
+                    className="text-body font-semibold text-c-ink underline decoration-c-secondary decoration-dotted underline-offset-[3px] hover:decoration-solid">
+                    {soRef(line.so)}
+                  </button>
+                </span>
+                <span role="cell" className="break-words px-[5px] text-body text-c-ink" style={{ gridColumn: "6 / -1" }}>{poNo(line.poId)}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
           <div role="table" aria-label={`${g.supplier ?? B.supplierNotSet} items`} className="-ml-[72px] bg-white" data-testid={`by-supplier-lines-${g.key}`}>
             <div role="row" className="grid min-h-[32px] items-center bg-c-info-bg text-meta font-medium text-c-secondary" style={{ gridTemplateColumns: lineColumns }}>
               <span role="columnheader" />
@@ -245,8 +287,9 @@ export default function SoBatchBySupplier({
       selectionSummary={() => selectionSummary}
       selectionPrimary={selectionPrimary}
       statusSummary={(filtered) => (
-        <span className="block truncate" data-testid="by-supplier-footer">
+        <span className="block" data-testid="by-supplier-footer">
           {filtered.length === groups.length ? B.footer(groups.length, suppliers) : `${filtered.length} of ${B.footer(groups.length, suppliers)}`}
+          {(() => { const totals = B.toBuyTotals(toBuyByCategory(filtered)); return totals ? ` · ${totals}` : ""; })()}
         </span>
       )}
     />

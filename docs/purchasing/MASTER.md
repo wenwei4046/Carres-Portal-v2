@@ -2677,6 +2677,24 @@ because one PO goes to one supplier for one category. Rows whose PO window has g
 - Every date and number is the server's (`orderBy`, `poDeliveryDate`, `poDeliveryWorkingDays`, `poWindow`, `toBuy`); the PO window times are the Purchasing Settings values, never the specimen's.
 - Status stays in view at 1131 wide with Tasks closed, with no side scroll (measured 12 Oct 2026). Tasks now opens by itself only from 1280 wide (03 §1).
 - The earlier `Group by: Supplier` page tool, which only regrouped the Sales Order rows, is removed: one way to see demand by supplier.
+- **Tabs, totals and the Today card — BUILT 12 Oct 2026 (owner's 12 Oct package).**
+  `To buy` · `Ordered` · `All` sit at the start of the toolbar. `To buy` is the rows above. `Ordered`
+  is what is already on a PO, one row per supplier and category, read from the Register's own PO
+  facts: quantity on POs, Sales Orders, `Ordered` in the deadline column, the latest `PO Delivery
+  Date` under `Supplier ready by`, and `Ordered` (green) with the PO numbers under `Status`; its
+  lines read `Item` · `Qty` · `SO No` · `PO No` and cannot be ticked. `All` shows both. The footer
+  adds `To buy: Mattress {n} pcs · Bedframe {n} pcs · Sofa {n} sets` for the rows shown.
+  The rail opens with a `Today` card: one tile `{n} pcs` · `To order now` (still to buy after its PO
+  window has gone by; amber when above zero), then `Past the order-by date`, one row per PO window
+  of the day (`{time} today`: `{n} pcs to order`, `{n} pcs passed` in amber, or `All ordered`), `Too
+  late for customer date` (the Sales Orders in `Production late`) and `Partly ordered`. It reads
+  every Sales Order, whatever the rail filters, and it only prints: the filters under it are
+  unchanged. Days are counted from the server's date, the same one the rows use.
+  The toolbar is one line at 1025, 1164, 1440 and 1700: search is one icon here (the top bar
+  searches everything) and `Export` and `Columns` are in the ⋮ menu.
+  Not built from the package: `THIS MONTH`, `PIECES ORDERED`, the `{n} outstation` chip, `Group by`
+  category and order deadline, and `Use stock` on the selection bar (Ready Stock results still show
+  in `By sales order`, which is why that view stays).
 - **Kept functions (owner instruction 12 Oct 2026: the kit is the visual source, never permission to drop a working function).** Eligibility, the duplicate-PO protection and the destination rules are the By sales order list's own, read through the same functions: one tick set, one `Issue PO` door, the server's re-check unchanged. `Match Ready Stock` sits in this view's toolbar and opens the By sales order list, where stock is matched per Sales Order; the per-line Ready Stock picker lives there.
 - **Not built yet:** the specimen's other groupings (`By category` · `By order deadline`), its Summary panel and its `To buy · Ordered · All` tabs. The specimen's `Place` and `Send PO` are not Portal words: the act is `Issue PO` (COPY-STANDARD), and sending evidence stays inside the approved issuance lifecycle.
 
