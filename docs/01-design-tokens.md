@@ -119,7 +119,7 @@ Nothing else uses 600 at 15 or above. Never below 11; 11 only for caps labels, t
 | Menu group label | 11 / 500 caps `#6B7280`, padding 8 10 4, hairline `#F1F2F4` between groups |
 | Menu item | 32 high, padding 7 × 10, gap 10, icon 18 `#6B7280`, text 13 / 400; short hint right in 12 grey; long hint as a 12 grey second line; selected 500 with check |
 | Dialog shadow | `0 12px 40px rgba(22,24,29,.22)` |
-| Toast | Bottom centre, `#1F2937`, white 13, 2.2 to 2.6 seconds. After a task closes it stays 12 seconds and may carry `Next: {name} ›`, `Undo` and ✕ (§4); no card and no coloured edge |
+| Toast | Bottom centre, `#1F2937`, white 13, 2.2 to 2.6 seconds. After a task closes it stays 12 seconds and may carry `Next: {name} ›` and ✕ (§4); no timed `Undo` for a saved record (owner 12 Oct evening); no card and no coloured edge |
 | Avatar | Round, initials, one fixed colour per person, name in the tooltip; header avatars 24, stacked, PIC first |
 | Keyboard focus | 2px `#3965FA`, 2 outside, radius 8; fields no gap; Tab key only; never the browser ring |
 
@@ -282,8 +282,8 @@ The supplied Layout Standard still carries older lines beside its 10 and 11 Oct 
 | Task card in the list | Tags row, title, grey line and footer band (11 Oct); tiles, status tag, a Start button, fact icons, `Any time` for a task with no clock time (12 Oct, earlier turns) | Module icon and title and ›, then fact rows with no icon; `Today` for no clock time; amber only on the passed row (§4) | TAKEN · owner 12 Oct, latest line |
 | Tasks tabs | Sections NOW · LATE · TODAY (11 Oct); pills To do · Done with no Waiting, a 14-day strip (12 Oct, earlier turns) | Working-week day strip, then To do · Waiting · Done as the segmented control (§4) | TAKEN · owner 12 Oct, latest line |
 | Words for time | `Overdue`, `Missed cut-off` still stand in older lines of the Layout Standard, the UI Kit page and `purchasing-data.js` | A date or time that has gone by is `passed` on its own row; a party that is slow by a count is `n days late`. Never `Overdue` or `Missed` | TAKEN · owner 12 Oct, README `Fix now`; the words live in COPY-STANDARD |
-| Send PO and contact task cards | One steps form (11 Oct) | Three numbered steps; one Send PO card per supplier and category; Email is the WhatsApp message box with `To` and `Subject` (03 §8) | TAKEN · owner 12 Oct |
-| After a task is saved | A green line in the panel for 6 seconds (12 Oct, earlier turn); a card with a coloured edge | The app's dark toast, 12 seconds, with `Next`, `Undo` and ✕ (§3) | TAKEN · owner 12 Oct, latest line |
+| Sending issued POs and contact task cards | One steps form (11 Oct); a `Place` stage and a separate `Send PO` stage (package, 12 Oct 5:35 PM) | Three numbered steps in the Portal's words: `Download PDFs` · `Send by WhatsApp or Email` · `PO sent to supplier ({n})`; `Issue PO` stays the governed action; Email is the WhatsApp message box with `To` and `Subject` (03 §8) | TAKEN · owner 12 Oct evening |
+| After a task is saved | A green line in the panel for 6 seconds (12 Oct, earlier turn); a card with a coloured edge; a timed `Undo` (package, 12 Oct 5:35 PM) | The app's dark toast, 12 seconds, with `Next` and ✕ (§3); no timed `Undo` for a saved record | TAKEN · owner 12 Oct evening |
 | Reminders, the no-answer count and who is told after the third | Drawn in the package (`Later today` · `Pick date`, `No answer 3 times`) | Not in any module MASTER | **PROPOSAL / NOT LAW** · overturned when the owning MASTER records the rule |
 | Message template words in a contact task | None in the owner's blueprints | The design chat's own wording | **PROPOSAL / NOT LAW** · overturned when the owner confirms or replaces the wording |
 | Purchasing reference page | An earlier second-version page beside it | `Purchasing v3.dc.html`, the only Purchasing page in the package | TAKEN · owner 12 Oct |

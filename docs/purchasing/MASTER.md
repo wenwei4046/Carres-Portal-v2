@@ -1476,6 +1476,21 @@ facts, the one send area and the completion fact below.
   `Open email` · `Download PDF` · `PO sent to supplier`) is the only send control set, shown on the
   SO Batch and Manual Purchase issue review and on the PO object (§8.2). Workspace may embed the same
   component; it may never draw a second set.
+  **After Issue PO on SO Batch Purchase the send area is three numbered steps — BUILT 2026-10-12
+  (owner's 12 Oct package, drawn with the Portal's words; kit `StepList`).** ① `Download PDFs`
+  (`{k} of {n} downloaded`) with the supplier's POs to tick · ② `Send by WhatsApp or Email` with
+  `To`, `Subject`, `Message`, `Copy message` and the channel's own door · ③ `PO sent to supplier
+  ({n})`, which asks `Record as sent by {channel}?` and then writes the SAME `confirm-sent` record,
+  once per ticked PO, at the version shown, with the supplier's saved contact as recipient. The step
+  marks are this visit's guide only: a download or an opened channel records nothing and completes
+  nothing, and step 3 never waits on them. A PO already recorded for its current version is left
+  alone. A refusal names its PO in two lines and the other POs are still recorded. The result
+  panel no longer draws a second per-PO `PO sent to supplier` form beside these steps (one door,
+  Architecture Law C); `Open PDF` still opens each document. No undo is offered: a wrong record is corrected
+  by the PO's own rules. The Tasks working panel for a batch (`BatchPanel`) draws its WhatsApp send
+  as the same three steps (`Download PDFs ({n})` · `Copy message` and `Open WhatsApp group` · `PO sent
+  to supplier ({n})`), so there is one version. Not built from the package: the `Place` stage, a `Send PO` task per
+  supplier and category, the saved toast with `Next` and `Undo`, and the third-no-reply alarm.
 - **Action line for an issued PO whose current version is not marked sent**, by the supplier's
   recorded channel: `Click WhatsApp, send {PO No} to {Supplier}` · `Click Email, send {PO No} to
   {Supplier}` · no channel recorded: `Send {PO No} to {Supplier}`. Several unconfirmed POs name the
@@ -2630,6 +2645,18 @@ Module Register rails remain factual filters and do not copy central Work action
 ## 9 · Page blueprints
 
 ### 9.1 SO Batch Purchase
+
+**OWNER RULING — 12 Oct 2026 (evening), on the 12 Oct 5:35 PM design package.** The package is the
+visual source and never permission to overwrite a business rule. (1) Only SO Batch Purchase,
+Purchase Orders and the PO detail are replaced, each when its replacement reaches the same functions
+and passes verification; Manual Purchase, Receiving, Claims, Returns and Repair are preserved, and no
+working function is removed because the package does not draw it. (2) `Issue PO` is the governed
+action: `Place`, `Send PO` and a separate sending stage are not restored; supplier delivery and
+sending evidence are presented inside the existing issue lifecycle. (3) No timed `Undo`: recorded
+sending evidence and history are preserved, a correction uses the owning module's rules, and opening
+WhatsApp or downloading a PDF is not proof of sending. (4) Reminders and escalation follow what this
+MASTER and ACTION-FLOW already approve; a new alarm or a third-no-reply escalation is not part of
+this release.
 
 **BY SUPPLIER VIEW — owner 12 Oct 2026 (design handoff) · BUILT 12 Oct 2026 · the page's first view.**
 The page has three views of the same demand: `By supplier` (the first view), `By sales order` (one row per Sales

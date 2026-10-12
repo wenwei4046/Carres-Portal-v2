@@ -42,6 +42,7 @@ import Icon from "@/components/kit/Icon";
 import Input from "@/components/kit/Input";
 import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
+import StepList, { Step } from "@/components/kit/StepList";
 import Tabs from "@/components/kit/Tabs";
 import DocumentTable from "@/components/kit/DocumentTable";
 import PdfPreview from "@/components/kit/PdfPreview";
@@ -165,8 +166,6 @@ const itemsOf = (document: PoTemplateData | null) => document ? T.items(document
 
 /** The WhatsApp steps are plain numbered lines (Purchasing correction
  *  2026-10-06): the kit has no step badge, so none is drawn inline. */
-const stepNumber = (n: number) => <span className="w-4 shrink-0 text-meta tabular-nums text-kit-slate-11">{n}.</span>;
-
 export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; windowKey: string; host: WorkPanelHost }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -279,6 +278,13 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  /* This visit's guide for the three step marks (02 "Task steps"): what was
+     downloaded, at which version, and whether WhatsApp was opened. Neither
+     records anything; only `PO sent to supplier` does. */
+  const [held, setHeld] = useState<Record<string, number>>({});
+  const [opened, setOpened] = useState(false);
+  const heldCount = tickedReady.filter((fact) => held[fact.po.id] === fact.document!.version).length;
+  const allHeld = tickedReady.length > 0 && heldCount === tickedReady.length;
   const [historyOpen, setHistoryOpen] = useState(false);
   const [preview, setPreview] = useState<PoFacts | null>(null);
   const [lastEmail, setLastEmail] = useState<string | null>(null);
@@ -339,6 +345,7 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
       const link = document.createElement("a");
       link.href = url; link.download = `Purchase-orders-${supplierName.replace(/[^a-zA-Z0-9._-]/g, "_")}.zip`;
       document.body.appendChild(link); link.click(); link.remove();
+      setHeld((previous) => ({ ...previous, ...Object.fromEntries(prepared.map((document) => [document.id, document.version])) }));
     } catch {
       setError("Could not load the preview. Try again on the document.");
     } finally { if (url) URL.revokeObjectURL(url); setBusy(false); }
@@ -474,16 +481,20 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
             {contact && !contact.poSendChannel ? ` · ${T.defaultNotSet} · ` : null}
             {contact && !contact.poSendChannel ? <Button variant="ghost" size="sm" onClick={() => navigate("/operation/settings/purchasing")}>{T.set}</Button> : null}
           </span>
-          <ol className="flex flex-col gap-2" data-testid="batch-whatsapp-steps">
-            <li className="flex items-center gap-2">{stepNumber(1)}<Button disabled={busy || !tickedReady.length} onClick={() => void download()}><Icon name="download" size={16} />{T.downloadPdfs(tickedReady.length)}</Button></li>
-            <li className="flex items-center gap-2">{stepNumber(2)}<Button disabled={busy || !tickedReady.length} onClick={() => void copy()}><Icon name="copy" size={16} />{T.copyMessage}</Button></li>
-            <li className="flex items-center gap-2">{stepNumber(3)}<Button disabled={busy || !contact || !doorsForIssuedPo(contact, message).whatsapp}
-              onClick={() => { const door = contact ? doorsForIssuedPo(contact, message).whatsapp : null; if (door) window.open(door.url, "_blank", "noopener,noreferrer"); }}><Icon name="message" size={16} />{T.openGroup}</Button></li>
-          </ol>
-          <span className="text-meta text-kit-slate-11" data-testid="batch-send-hint">{T.sendHint}</span>
-          <div className="flex items-center justify-end gap-2" data-testid="batch-whatsapp-step-4">
-            {stepNumber(4)}<Button variant="primary" data-testid="batch-record" onClick={() => setConfirming(true)}><Icon name="confirm" size={16} />{T.recordSent(tickedReady.length)}</Button>
-          </div>
+          <StepList aria-label={T.sendBy} data-testid="batch-whatsapp-steps">
+            <Step n={1} state={allHeld ? "done" : "current"} sub={T.downloaded(heldCount, tickedReady.length)}
+              action={<Button disabled={busy || !tickedReady.length} onClick={() => void download()}><Icon name="download" size={16} />{T.downloadPdfs(tickedReady.length)}</Button>} />
+            <Step n={2} state={opened ? "done" : allHeld ? "current" : "pending"} sub={<span data-testid="batch-send-hint">{T.sendHint}</span>}>
+              <div className="flex flex-wrap gap-2">
+                <Button disabled={busy || !tickedReady.length} onClick={() => void copy()}><Icon name="copy" size={16} />{T.copyMessage}</Button>
+                <Button disabled={busy || !contact || !doorsForIssuedPo(contact, message).whatsapp}
+                  onClick={() => { const door = contact ? doorsForIssuedPo(contact, message).whatsapp : null; if (door) { window.open(door.url, "_blank", "noopener,noreferrer"); setOpened(true); } }}><Icon name="message" size={16} />{T.openGroup}</Button>
+              </div>
+            </Step>
+            <Step n={3} state={allHeld && opened ? "current" : "pending"} data-testid="batch-whatsapp-step-record">
+              <div className="flex"><Button variant="primary" data-testid="batch-record" onClick={() => setConfirming(true)}><Icon name="confirm" size={16} />{T.recordSent(tickedReady.length)}</Button></div>
+            </Step>
+          </StepList>
         </div> : <div className="flex flex-col gap-2" data-testid="batch-email">
           <Input id={`batch-email-to-${item.id}`} label="To" readOnly value={contact?.contactEmail ?? "Not recorded"} />
           <Input id={`batch-email-subject-${item.id}`} label="Subject" value={subject} disabled={busy || unknown} onChange={(event) => setSubject(event.target.value)} />

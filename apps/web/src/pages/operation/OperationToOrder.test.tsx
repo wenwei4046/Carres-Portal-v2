@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { SoBatchOrderRow, SoBatchPurchaseResponse } from "@carres/shared";
@@ -77,12 +77,16 @@ function officialDocument(version = 1) {
     destination: { name: "Carres Klang", address: "Klang" }, issue_date: "2026-08-22",
     delivery_instructions: null, eta_date: "2026-09-18", terms: null };
 }
+/** The issued result: its three steps, with the third (`PO sent to supplier`) ready. */
 async function openIssuedDocument() {
   await screen.findByTestId("po-supplier-result-panel");
-  fireEvent.click(screen.getByRole("button", { name: "Open PDF" }));
-  await screen.findByTestId("so-batch-evidence-PO-2041");
-  await waitFor(() => expect(screen.getByTestId("so-batch-evidence-confirm")).toBeEnabled());
-  fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Close" }));
+  await waitFor(() => expect(screen.getByTestId("po-bundle-record")).toBeEnabled());
+}
+/** The one act: press the third step, then confirm what is recorded. */
+async function recordSent() {
+  expect(screen.getByLabelText("To")).toHaveAttribute("readonly");
+  fireEvent.click(screen.getByTestId("po-bundle-record"));
+  fireEvent.click(await screen.findByTestId("po-bundle-record-confirm"));
 }
 
 
@@ -366,9 +370,8 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     );
     await clickIssue();
     await openIssuedDocument();
-    expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent(
-      "PO-2041 · PO V1 · Sending not confirmed",
-    );
+    expect(screen.getByLabelText("PO-2041-V1")).toBeChecked();
+    expect(screen.getByTestId("po-bundle-state-PO-2041")).toHaveTextContent("Sending not confirmed");
 
     /* The confirm answers `ok`, and the REFETCH that follows answers a real
        payload — the buy is now covered, so the line is gone. */
@@ -402,8 +405,7 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
               }),
             ),
     );
-    expect(screen.getByTestId("so-batch-evidence-recipient")).toHaveAttribute("readonly");
-    fireEvent.click(screen.getByTestId("so-batch-evidence-confirm"));
+    await recordSent();
     // Confirmation retains the result; closing returns to the same register. The
     // ordered Sales Order REMAINS — one permanent row, now carrying its
     // document. (`Status` was retired as a presentation on 2026-09-11: the
@@ -443,11 +445,10 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     await screen.findByTestId("so-batch-issue-workspace");
     await clickIssue();
     await openIssuedDocument();
-    expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent("PO V3");
+    expect(screen.getByLabelText("PO-2041-V3")).toBeChecked();
 
     apiFetch.mockClear();
-    expect(screen.getByTestId("so-batch-evidence-recipient")).toHaveAttribute("readonly");
-    fireEvent.click(screen.getByTestId("so-batch-evidence-confirm"));
+    await recordSent();
     await waitFor(() =>
       expect(
         apiFetch.mock.calls.some((c) => String(c[0]).includes("confirm-sent")),
