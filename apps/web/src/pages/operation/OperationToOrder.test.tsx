@@ -172,7 +172,7 @@ function payload(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRe
   };
 }
 
-function renderPage(initialEntry: string | { pathname: string; search?: string; state?: unknown } = "/operation?tab=purchase") {
+function renderPage(initialEntry: string | { pathname: string; search?: string; state?: unknown } = "/operation?tab=purchase&view=table") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
@@ -223,7 +223,7 @@ describe("the page reads the ONE projection and draws the Register", () => {
 
   it("keeps the Sales Order scope when the direct to-order URL is reloaded", async () => {
     apiFetch.mockResolvedValue(payload());
-    renderPage("/operation/to-order?so=1204");
+    renderPage("/operation/to-order?so=1204&view=table");
     await screen.findByTestId("so-batch-page");
     expect(apiFetch.mock.calls[0]![0]).toBe("/api/operation/purchase/demands");
   });
@@ -307,11 +307,11 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     const pos = [{ id: "PO-2041", supplierId: "s-hooka", supplierName: "Hooka", destinationId: KLANG, destination: "Carres Klang" }];
     apiFetch.mockImplementation(async (path: string) => path.includes("print-data") ? officialDocument()
       : path.endsWith("/sends") ? { sends: [] } : path.endsWith("email-capability") ? { configured: false } : payload());
-    renderPage({ pathname: "/operation", search: "?tab=purchase&time=11%3A00", state: { soBatchIssuedPos: pos } });
+    renderPage({ pathname: "/operation", search: "?tab=purchase&view=table&time=11%3A00", state: { soBatchIssuedPos: pos } });
     await screen.findByTestId("po-supplier-result-panel");
     fireEvent.click(screen.getByRole("button", { name: "Open full page" }));
     expect(navigate).toHaveBeenCalledWith("/operation/procurement?po=PO-2041", {
-      state: { soBatchReturn: { path: "/operation?tab=purchase&time=11%3A00", pos,
+      state: { soBatchReturn: { path: "/operation?tab=purchase&view=table&time=11%3A00", pos,
         preparation: expect.objectContaining({ supplierId: "s-hooka", selectedIds: ["PO-2041"], scope: "round" }) } },
     });
   });
@@ -320,7 +320,7 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     const preparation = { supplierId: "s-hooka", selectedIds: ["PO-2041"], channel: "email", scope: "round", subject: "Prepared", messageIntroduction: "Please confirm." };
     apiFetch.mockImplementation(async (path: string) => path.endsWith("/issue-context") ? pos[0] : path.includes("print-data") ? officialDocument()
       : path.endsWith("/sends") ? { sends: [] } : path.endsWith("email-capability") ? { configured: false } : payload());
-    renderPage({ pathname: "/operation", search: "?tab=purchase&time=11%3A00", state: { soBatchIssuedPos: pos, soBatchPreparation: preparation } });
+    renderPage({ pathname: "/operation", search: "?tab=purchase&view=table&time=11%3A00", state: { soBatchIssuedPos: pos, soBatchPreparation: preparation } });
     await screen.findByTestId("po-supplier-result-panel");
     expect(screen.getByLabelText("Subject")).toHaveValue("Prepared");
     expect(screen.getByLabelText("Message")).toHaveValue("Please confirm.");

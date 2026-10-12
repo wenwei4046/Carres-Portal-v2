@@ -336,13 +336,15 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
   const navigate = useNavigate();
   const [presentationParams, setPresentationParams] = useSearchParams();
   const viewParam = presentationParams.get("view");
-  const presentation = viewParam === "cards" ? "cards" : viewParam === "supplier" ? "supplier" : "table";
+  /* BY SUPPLIER IS THE PAGE'S FIRST VIEW (owner 12 Oct 2026, the kit's default).
+     `view=table` is By sales order, `view=cards` the cards. */
+  const presentation = viewParam === "cards" ? "cards" : viewParam === "table" ? "table" : "supplier";
   const changePresentationParam = (key: string, value: string | null) => setPresentationParams(current => {
     const next = new URLSearchParams(current);
     if (value) next.set(key, value); else next.delete(key);
     return next;
   }, { replace: true });
-  const setPresentation = (value: string) => changePresentationParam("view", value === "cards" || value === "supplier" ? value : null);
+  const setPresentation = (value: string) => changePresentationParam("view", value === "cards" || value === "table" ? value : null);
   const [quickOrderId, setQuickOrderId] = useState<string | null>(null);
   /* R8 — a `display:none` box forgets its scroll offset, and by the time a
      render hides it the offset already reads 0. So the offset is remembered
@@ -423,6 +425,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
   const leafs = data.rows;
   const orders = data.registerRows;
   const leafById = useMemo(() => new Map(leafs.map((r) => [r.id, r])), [leafs]);
+  const orderById = useMemo(() => new Map(orders.map((o) => [o.orderId, o])), [orders]);
   const leafsByOrder = useMemo(() => {
     const m = new Map<string, PurchaseDemandRow[]>();
     for (const r of leafs) {
@@ -1287,7 +1290,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
   };
   const quickOrder = quickOrderId ? orders.find(order => order.orderId === quickOrderId) : null;
   const viewSwitch = <Tabs variant="segmented" label="SO Batch Purchase view" value={presentation} onValueChange={setPresentation}
-    tabs={[{ value: "table", label: "Table", icon: "table" }, { value: "cards", label: "Cards", icon: "cards" }, { value: "supplier", label: BY_SUPPLIER.view }]} />;
+    tabs={[{ value: "supplier", label: BY_SUPPLIER.view }, { value: "table", label: BY_SUPPLIER.bySalesOrder, icon: "table" }, { value: "cards", label: BY_SUPPLIER.cards, icon: "cards" }]} />;
   /* BY SUPPLIER (owner 12 Oct 2026): the demand of the orders this list is
      showing, one row per supplier and category. It reads the same ticks, so
      `Issue PO` takes them from either view. */
@@ -1542,7 +1545,34 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 onToggleLines={setLeafsSelected}
                 selectionSummary={summary.text}
                 selectionPrimary={<>{viewSwitch}{issueActions}</>}
-                toolbarEnd={<div className={`${styles.toolbarTools} flex min-w-0 flex-wrap items-center gap-2`}>{viewSwitch}</div>}
+                toolbarEnd={<div className={`${styles.toolbarTools} flex min-w-0 flex-wrap items-center gap-2`}>
+                  {viewSwitch}
+                  {/* Ready Stock is matched per Sales Order, so the same act opens the By sales order list. */}
+                  <Button loading={stock.busy} disabled={isLoading || data.readyStockPriority == null}
+                    title={data.readyStockPriority == null ? "Not available" : undefined}
+                    data-testid="by-supplier-match-stock"
+                    onClick={() => { setPresentation("table"); void stock.match(shown.filter(order => purchaseStatus(order) !== "Done")); }}>
+                    {BY_SUPPLIER.matchReadyStock}
+                  </Button>
+                </div>}
+                lineExtras={(leaf) => {
+                  const order = orderById.get(leaf.orderId);
+                  if (!order) return {};
+                  const status = statusByOrder.get(leaf.orderId) ?? "blank";
+                  const line = order.lines.find((l) => leaf.lineIds.includes(l.orderLineId));
+                  const why = !selectable(leaf) && line ? soBatchLeafStatusWhy(leaf, status, stateWords, line) : null;
+                  return {
+                    deliverTo: selectable(leaf) ? (
+                      <DestinationAllocationEditor row={leaf} destinations={data.destinations} allocations={leafAllocations(leaf)}
+                        onWholeRow={(destinationId) => changeWholeLeaf(leaf, destinationId)}
+                        onSplit={(allocations) => setLeafAllocations(leaf.id, allocations)} />
+                    ) : null,
+                    why: why ? (
+                      <StatusWhy why={why} testId={`by-supplier-status-why-${leaf.id}`} orderId={leaf.orderId}
+                        onDoor={(door) => navigate(STATUS_DOOR_PATH[door])} />
+                    ) : null,
+                  };
+                }}
                 toolbarStart={!filterRailOpen ? <ShowFiltersButton onShow={() => setFilterRailVisible(true)} testId="so-batch-show-filters" /> : null}
                 onOpenOrder={setQuickOrderId}
                 emptyMessage={orders.length > 0 ? W.noMatch : W.empty}
