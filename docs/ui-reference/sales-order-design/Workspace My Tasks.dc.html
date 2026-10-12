@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0">
+  <script src="./carres-theme.js"></script>
+  <script src="./carres-tasks.js"></script>
+  <script src="./carres-log.js"></script>
+  <style>.material-symbols-rounded{font-variation-settings:'FILL' 0,'wght' 300,'GRAD' 0,'opsz' 20}body{margin:0;background:#F6F7F9;font-family:Inter,system-ui,sans-serif;color:#1F2937;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}a{color:#1F2937}a:hover{color:#2F55E0}*{box-sizing:border-box}</style>
+</helmet>
+<dc-import name="Carres Shell" crumb="Workspace" title="{{ title }}" nav="workspace" alerts="{{ 6 }}" team-on="{{ 8 }}" det="{{ false }}" summary="{{ summary }}" tabs="{{ tabs }}" chips="{{ chips }}" views="{{ views }}" view-name="{{ viewName }}" more="{{ more }}" tasks="{{ tasks }}" hint-size="100%,100vh">
+  <dc-import name="Carres Table" label="{{ title }}" cols="{{ cols }}" rows="{{ rows }}" footer="{{ footer }}" empty="{{ emptyT }}" hint-size="100%,100%" style="display:block;min-height:0;height:100%"></dc-import>
+</dc-import>
+<sc-if value="{{ toast }}"><div role="status" style="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:80;background:#1F2937;color:#FFFFFF;border-radius:8px;padding:8px 14px;font-size:13px;box-shadow:0 8px 24px rgba(17,24,39,.2)">{{ toast }}</div></sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+// Team (owner 11 Oct, Ops Rules §6): anyone sees every job and its owner, and can Take over with no approval.
+// TEST: tasks carry no owner yet, so the prototype shares them over the TEST team (same list as Carres Shell). "You" = TEST · Staff A (avatar SA).
+const CTs = () => window.CarresTasks || { ME: 'Staff A', PEOPLE: [], owners: () => ({}), ownerOf: () => 'Staff A', take: () => {} };
+class Component extends DCLogic {
+  state = { tab: 'today', mod: 'All', tk: 0, ask: null, toast: '' };
+  componentDidMount() { this._seed(); this._t = () => this.setState(s => ({ tk: s.tk + 1 })); window.addEventListener('carres-theme', this._t); window.addEventListener('storage', this._t); }
+  // Prototype: a fresh browser has no published tasks yet; load each module page once, hidden, so its tasks appear here.
+  _seed() { const C = window.CarresTasks; if (!C || C.all('tasks').length) return; ['Purchasing v3.dc.html#po', 'Sales Order Outright v12.dc.html'].forEach((src, i) => { const f = document.createElement('iframe'); f.setAttribute('aria-hidden', 'true'); f.tabIndex = -1; f.style.cssText = 'position:fixed;left:-9999px;top:0;width:1440px;height:800px;opacity:0;pointer-events:none'; f.src = src; document.body.appendChild(f); setTimeout(() => { f.remove(); this.setState(s => ({ tk: s.tk + 1 })); }, 5000 + i * 500); }); }
+  componentWillUnmount() { window.removeEventListener('carres-theme', this._t); window.removeEventListener('storage', this._t); clearTimeout(this._tt); }
+  renderVals() {
+    const S = this.state, set = p => this.setState(p), CT = window.CarresTasks, C = CTs(), ME = C.ME, PEOPLE = C.PEOPLE;
+    const MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const map = C.owners(), all = (CT ? CT.all('tasks') : []).map(r => ({ ...r, own: C.ownerOf(r, map) })), done = CT ? CT.all('done') : [];
+    const todo = all.filter(r => r.own === ME), team = all;
+    const MOI = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 }, T0 = new Date(new Date().toDateString());
+    const lateWd = r => { if (!r.late) return 0; const m = String(r.dueDay || '').match(/(\d{1,2}) (\w{3})/); if (!m || MOI[m[2]] == null) return 1; let d = new Date(T0.getFullYear(), MOI[m[2]], +m[1]), n = 0; if (d > T0) d = new Date(T0.getFullYear() - 1, MOI[m[2]], +m[1]); while (d < T0) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0) n++; } return n; };
+    const whyOf = r => !r.own ? ['Unassigned', 'warn', 0] : lateWd(r) > 1 ? ['Stuck · ' + lateWd(r) + ' days', 'warn', r.own === ME ? 1 : 2] : r.late && r.own === ME ? ['Late', 'warn', 1] : r.own === ME ? ['Today', 'neutral', 3] : null;
+    const today = all.map(r => ({ ...r, why: whyOf(r) })).filter(r => r.why).sort((a, b) => a.why[2] - b.why[2] || lateWd(b) - lateWd(a));
+    const base = S.tab === 'today' ? today : S.tab === 'todo' ? todo : S.tab === 'team' ? team : done, mods = [...new Set([...all, ...done].map(r => r.mod))];
+    const rank = r => (r.own === ME ? 1 : 0);
+    const list = base.filter(r => S.mod === 'All' || r.mod === S.mod).sort((a, b) => S.tab === 'done' ? String(b.at).localeCompare(String(a.at)) : S.tab === 'team' ? (PEOPLE.findIndex(p => p[0] === a.own) - PEOPLE.findIndex(p => p[0] === b.own)) || (b.late ? 1 : 0) - (a.late ? 1 : 0) : (b.late ? 1 : 0) - (a.late ? 1 : 0));
+    const go = r => () => { if (!r.href) return; const ref = String(r.ref || '').split(/[ ,·]/)[0], rec = /^PO-/.test(ref) ? 'po=' + encodeURIComponent(ref) + '&' : /^Sales/.test(r.mod) && ref ? 'so=' + encodeURIComponent(ref) + '&' : ''; location.href = r.href.split('#')[0] + '#' + rec + 'task=' + encodeURIComponent(r.key || ''); };
+    const take = r => { const k = r.mod + '|' + r.key; if (S.ask !== k) return set({ ask: k }); const from = r.own; C.take(r);
+      const at = new Date(), ref = String(r.ref || '').split(/[ ,·]/)[0]; if (window.CarresLog && ref) window.CarresLog.add(ref, { k: 'System', d: at.getDate() + ' ' + MO[at.getMonth()], tm: at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }), t: r.t + ' · taken over by ' + (n => n ? (C.label ? C.label(n) : n) : 'Nobody')(ME) + ' from ' + (n => n ? (C.label ? C.label(n) : n) : 'Nobody')(from), by: (n => n ? (C.label ? C.label(n) : n) : 'Nobody')(ME) });
+      set({ ask: null, toast: 'Taken over from ' + (n => n ? (C.label ? C.label(n) : n) : 'Nobody')(from) + ' · they get a 🔔 note' }); clearTimeout(this._tt); this._tt = setTimeout(() => set({ toast: '' }), 3200); };
+    const due = r => r.late ? { t: 'Overdue', sub: r.dueDay || '', fg: '#7A5A00', subFg: '#7A5A00' } : r.dueDay && !r.late && r.later ? { t: r.dueDay } : { t: 'Today', sub: r.due || '' };
+    const pOf = n => PEOPLE.find(p => p[0] === n) || [n, 'on', ''];
+    const cols = S.tab === 'today' ? [{ l: 'Task', w: 'minmax(220px,2fr)' }, { l: 'Why now', w: '112px' }, { l: 'Owner', w: '126px' }, { l: 'Record', w: 'minmax(110px,1fr)' }, { l: '', w: '160px' }]
+      : S.tab === 'todo' ? [{ l: 'Task', w: 'minmax(320px,2fr)' }, { l: 'Module', w: '110px' }, { l: 'Record', w: 'minmax(130px,1fr)' }, { l: 'Due', w: '120px' }]
+      : S.tab === 'team' ? [{ l: 'Task', w: 'minmax(220px,2fr)' }, { l: 'Owner', w: '130px' }, { l: 'Record', w: 'minmax(110px,1fr)' }, { l: 'Due', w: '96px' }, { l: '', w: '160px' }]
+      : [{ l: 'Task', w: 'minmax(260px,1fr)' }, { l: 'Module', w: '120px' }, { l: 'Done', w: '150px' }];
+    const rows = list.map((r, i) => {
+      if (S.tab === 'today') { const mine = r.own === ME, k = r.mod + '|' + r.key, asking = S.ask === k, p = pOf(r.own);
+        return { id: 'w' + i, open: go(r), cells: [{ t: r.t, fw: '500', sub: r.next || r.sub || '', tip: r.mod + ' · ' + (r.next || r.sub || '') }, { t: r.why[0], fw: r.why[1] === 'warn' ? '500' : '400', fg: r.why[1] === 'warn' ? '#7A5A00' : '#374151' }, { t: mine ? 'You' : (n => n ? (C.label ? C.label(n) : n) : 'Nobody')(r.own), sub: mine ? (n => n ? (C.label ? C.label(n) : n) : 'Nobody')(ME) : (C.ROLES || []).includes(r.owner) ? (r.owner === 'Payments' ? 'Payments team' : 'Sales Approver') : p[2] || (r.own ? 'Working today' : ''), subFg: p[1] === 'away' ? '#7A5A00' : '#6B7280' }, { t: r.ref || '—', fg: r.ref ? '#1F2937' : '#6B7280' }, mine ? { t: 'Open', plain: true, act: go(r), tip: 'Open the task' } : (C.ROLES || []).includes(r.owner) ? { t: r.owner === 'Payments' ? 'Payments only' : 'Sales Approver only', fg: '#6B7280' } : { t: asking ? 'Confirm' : 'Take over', plain: true, act: () => take(r), ...(asking ? { t2: 'Cancel', act2: () => set({ ask: null }) } : {}), tip: 'Take this job from ' + (n => n ? (C.label ? C.label(n) : n) : 'Nobody')(r.own) }] }; }
+      if (S.tab === 'todo') return { id: 't' + i, open: go(r), cells: [{ t: r.t, fw: '500', sub: r.next || r.sub || '' }, { t: r.mod }, { t: r.ref || '—', fg: r.ref ? '#1F2937' : '#6B7280' }, due(r)] };
+      if (S.tab === 'team') { const p = pOf(r.own), mine = r.own === ME, k = r.mod + '|' + r.key, asking = S.ask === k;
+        return { id: 'm' + i, open: go(r), cells: [{ t: r.t, fw: '500', sub: r.next || r.sub || '', tip: r.mod + ' · ' + (r.next || r.sub || '') }, { t: mine ? 'You' : (n => n ? (C.label ? C.label(n) : n) : 'Nobody')(r.own), sub: mine ? (n => n ? (C.label ? C.label(n) : n) : 'Nobody')(ME) : (C.ROLES || []).includes(r.owner) ? (r.owner === 'Payments' ? 'Payments team' : 'Sales Approver') : p[2] || 'Working today', subFg: p[1] === 'away' ? '#7A5A00' : '#6B7280' }, { t: r.ref || '—', fg: r.ref ? '#1F2937' : '#6B7280' }, due(r), mine ? { t: '' } : (C.ROLES || []).includes(r.owner) ? { t: r.owner === 'Payments' ? 'Payments only' : 'Sales Approver only', fg: '#6B7280' } : { t: asking ? 'Confirm' : 'Take over', plain: true, act: () => take(r), ...(asking ? { t2: 'Cancel', act2: () => set({ ask: null }) } : {}), tip: asking ? 'Moves this job to you; ' + (n => n ? (C.label ? C.label(n) : n) : 'Nobody')(r.own) + ' gets a 🔔 note' : 'Take this job from ' + (n => n ? (C.label ? C.label(n) : n) : 'Nobody')(r.own) } ] }; }
+      const d = r.at ? new Date(r.at) : null, ok = d && !isNaN(d);
+      return { id: 'd' + i, open: go(r), cells: [{ t: r.t, fw: '500' }, { t: r.mod }, ok ? { t: d.getDate() + ' ' + MO[d.getMonth()], sub: WD[d.getDay()] + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) } : { t: 'Not recorded', fg: '#6B7280' }] };
+    });
+    const late = todo.filter(r => r.late).length;
+    const per = [...PEOPLE, ...(C.ROLES || []).map(n => [n, 'on', ''])].map(([n, st, note]) => { const js = all.filter(r => r.own === n); return { k: (n === ME ? 'You' : (n => n ? (C.label ? C.label(n) : n) : 'Nobody')(n)) + (st === 'off' ? ' · MC' : st === 'away' ? ' · away' : ''), v: js.length + (js.some(r => r.late) ? ' · ' + js.filter(r => r.late).length + ' late' : ''), warn: js.some(r => r.late) }; });
+    return {
+      title: S.tab === 'today' ? 'Today' : S.tab === 'team' ? 'Team tasks' : 'My tasks', toast: S.toast,
+      tabs: [['today', 'Today · ' + today.length], ['todo', 'To do · ' + todo.length], ['done', 'Done · ' + done.length], ['team', 'Team · ' + team.length]].map(([k, l]) => ({ l, on: S.tab === k, click: () => set({ tab: k, ask: null }) })),
+      views: ['All', ...mods].map(m => ({ l: m, ic: m === 'All' ? 'inbox' : m === 'Purchasing' ? 'shopping_cart' : 'receipt_long', on: S.mod === m, pick: () => set({ mod: m }) })), viewName: S.mod === 'All' ? 'All modules' : S.mod,
+      chips: [], more: [{ h: 'TEST · VIEW AS', items: [['Staff A', 'TEST · Staff A'], ['Jess (COO)', 'Jess (COO) · Sales Approver'], ['Payments', 'Payments']].map(([k, l]) => ({ l: l + (ME === k ? ' · now' : ''), ic: ME === k ? 'check' : 'person', fn: () => { C.setMe(k); this.setState({ tk: S.tk + 1, ask: null }); } })) }], tasks: { head: '', rows: [] },
+      summary: [{ h: 'TODAY', rows: [{ k: 'To do', v: String(todo.length) }, { k: 'Late', v: String(late), warn: late > 0 }, { k: 'Done today', v: String(done.filter(r => r.day === new Date().toDateString()).length) }] },
+        { h: 'TEAM TODAY', rows: [{ k: 'Unassigned', v: String(all.filter(r => !r.own).length), warn: all.some(r => !r.own) }, { k: 'Stuck (late over 1 working day)', v: String(all.filter(r => lateWd(r) > 1).length), warn: all.some(r => lateWd(r) > 1) }, ...per] }],
+      cols, rows, footer: rows.length + (rows.length === 1 ? ' task' : ' tasks') + (S.tab === 'team' ? ' · TEST owners until auto share is connected' : ''),
+      emptyT: S.tab === 'today' ? 'Nothing needs you now. Nothing is stuck or unassigned.' : S.tab === 'done' ? 'Nothing done yet.' : 'Nothing to do. Open a module page once so its tasks appear here.' };
+  }
+}
+</script>
+</body>
+</html>

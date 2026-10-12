@@ -20,11 +20,8 @@
 | Reference research (FACT, binds nobody) | [`../research/houzs-ui-reference.md`](../research/houzs-ui-reference.md) · [`../research/grid-findings.md`](../research/grid-findings.md) |
 | Shared page flow, shared contracts, exceptions and the status of every shared capability | **this MASTER** |
 
-**Current shared UI target — owner, 11 Oct 2026 · v12:** `Sales Order_11 Oct.zip` (SHA-256
-`1140ffde825dcd573f05467b49f2201d02331241dbc4f7cb0ef4275957efae16`), with its design updates of the same day
-`Sales Order_11 Oct(2).zip` (`23850ef44e0a3fc1932743f7523a2ff8b4cd4b1460427d22aa87e888cb1d6ef8`) and
-`Sales Order_11 Oct(3).zip` (`b34ddbc82e16b9d99a786340061abb188db0768c3bde2d90e974696a8b54c1f9`) and
-`Sales Order_11 Oct(4).zip` (`d0f402425acbbf7144af43d7ddf69f6d9e1ecb320848b2f1be56c292c4f64a72`), replaces every earlier kit
+**Current shared UI target — owner, 12 Oct 2026:** `Sales Order.zip` (SHA-256
+`793931a7922b24155b963593139bd13c960fb101072edd8fdc94d5618164fe59`) replaces every earlier kit
 value through the existing 01 / 02 / 03 and this MASTER; the earlier specimen folders are deleted. The
 specimen lives at `docs/ui-reference/sales-order-design/`; tokens mirror at
 `docs/ui/carres-tokens.css`. The canonical resolved values are in 01, including 01 §10 where the
@@ -1101,7 +1098,7 @@ into the section it belongs to, and this list loses it.
 
 - **v12 pieces with no shared component yet** — choice chip, theme chip, one shared record link,
   item-row control and staff avatar; the segmented look for Tabs and the selection bar on the
-  shared toolbar are restyles of existing components (02 "v12 shared pieces").
+  shared toolbar are restyles of existing components (02 "Shared pieces of the current kit").
 
 - **Mission rail composition** — `.so-template-rail` + SO selectors are not a kit export (§6.1).
 - **Generic ObjectHeader / ObjectPage** — `SalesOrderTabs` and `FullFact` are page-owned (§4.1).
@@ -1132,8 +1129,8 @@ into the section it belongs to, and this list loses it.
 | "Several SOs → list first, then one" inside a host panel | Purchasing 2026-10-05 | Owner decision |
 | PO working panel and round panel content layouts; SO Batch round rail; `Match Ready Stock` placement; SO Batch optional goods columns replacing the details table | Purchasing lane, localhost | Owner review in the Purchasing lane |
 | Purchasing fit review — four cross-module contracts: linked sections distinguish loading/error/empty/present/denied; current, last-sent and goods completion are separate facts; blocker summaries point to the exact row/field and keep the draft; source/Unit evidence stays traceable | Purchasing PLAN 2026-10-01 | Verify against existing components; Purchasing owns its sample |
-| v12 specimen words: sentence-case list headers (`SO no.`, `Proceed date`), `Customer’s original requested delivery`, `Log contact`, `Request amendment`, `Waiting for Jess`, `Staff and duties`, `Order PO deadline`, `Supplier ready by`, `Delivery ETA`, and its date, time and money formats | `Sales Order_11 Oct.zip` · 01 §10.2 | COPY-STANDARD stands; any word change goes through COPY |
-| v12 specimen business rules: which amendment changes skip approval, the stair carry fee formula, batch cut-off times, outstation logistics order, task completion and undo | `Sales Order_11 Oct.zip` · 01 §10.2 | The owning module MASTER stands; owner ruling in that module |
+| Specimen words: sentence-case list headers (`SO no.`, `Proceed date`), `Customer’s original requested delivery`, `Log contact`, `Request amendment`, `Waiting for Jess`, `Staff and duties`, `Order PO deadline`, `Supplier ready by`, `Delivery ETA`, and its date, time and money formats | `Sales Order.zip` (12 Oct 2026) · 01 §10.2 | COPY-STANDARD stands; any word change goes through COPY |
+| Specimen business rules: which amendment changes skip approval, the stair carry fee formula, batch cut-off times, outstation logistics order, task completion and undo | `Sales Order.zip` (12 Oct 2026) · 01 §10.2 | The owning module MASTER stands; owner ruling in that module |
 | v12 values the package does not settle: main button hover `#2B2B55`, choice chip unselected fill `#F2F3F5`, pressable Summary rows | 01 §10.1 | Overturned when the owner names the other value |
 | Inventory top-filter placement (instead of a rail) | research file §4 | Complete compact-top versus rail analysis |
 

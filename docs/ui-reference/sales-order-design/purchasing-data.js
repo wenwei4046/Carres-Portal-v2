@@ -1,6 +1,5 @@
-// Customer names in this file are TEST values and supplier contact emails and WhatsApp group links are TEST placeholders, because this repository is public. Order facts are kept as supplied.
 // Loaded as a classic script; top-level names use var so a second load (e.g. two script tags) does not throw "already declared".
-// Purchasing data and business rules (extracted 10 Oct 2026 from Purchasing.dc.html). Loaded by Purchasing v2.dc.html.
+// Purchasing data and business rules (extracted 10 Oct 2026 from Purchasing.dc.html). Loaded by Purchasing v3.dc.html.
 // Top-level consts are global lexical bindings, readable by the module logic class.
 var T0 = (() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); })();
 var WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -23,11 +22,11 @@ var sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === 
 var ago = d => { const n = dd(new Date(d.getFullYear(), d.getMonth(), d.getDate()), T0); return n === 0 ? 'Today' : n === 1 ? 'Yesterday' : n + ' days ago'; };
 var GREY = ['#E5E7EB', '#374151'], AMB = ['#FBF0D6', '#7A5A00'], GRN = ['#E7F6EC', '#1E7A40'];
 var SUP = {
-  'Nice Future Sdn Bhd': { method: 'We collect', days: { Mattress: 7 }, email: 'test-supplier-1@example.com', wa: 'https://chat.whatsapp.com/TEST-GROUP-1', pref: 'WhatsApp' },
-  'Ohana Furniture Sdn Bhd': { method: 'Supplier delivers', aka: 'Hookka', labels: false, days: { Bedframe: 7, Sofa: 14 }, email: 'test-supplier-2@example.com', wa: 'https://chat.whatsapp.com/TEST-GROUP-5', pref: 'Email' },
+  'Nice Future Sdn Bhd': { method: 'We collect', days: { Mattress: 7 }, email: 'TEST-nicefuture@example.com', wa: 'https://chat.whatsapp.com/TEST-GROUP-1', pref: 'WhatsApp' },
+  'Ohana Furniture Sdn Bhd': { method: 'Supplier delivers', aka: 'Hookka', labels: false, days: { Bedframe: 7, Sofa: 14 }, email: 'TEST-ohana@example.com', wa: 'https://chat.whatsapp.com/TEST-GROUP-2', pref: 'Email' },
   'Armani': { method: 'Supplier delivers', days: { Sofa: 14 }, wa: 'https://chat.whatsapp.com/TEST-GROUP-3', pref: 'WhatsApp' },
-  'Dorsettloft Sofa': { method: 'Supplier delivers', days: { Sofa: 14 }, wa: 'https://chat.whatsapp.com/TEST-GROUP-2', pref: 'WhatsApp' },
-  'Todern': { method: 'Supplier delivers', days: { Sofa: 14 }, wa: 'https://chat.whatsapp.com/TEST-GROUP-4', pref: 'WhatsApp' },
+  'Dorsettloft Sofa': { method: 'Supplier delivers', days: { Sofa: 14 }, wa: 'https://chat.whatsapp.com/TEST-GROUP-4', pref: 'WhatsApp' },
+  'Todern': { method: 'Supplier delivers', days: { Sofa: 14 }, wa: 'https://chat.whatsapp.com/TEST-GROUP-5', pref: 'WhatsApp' },
   'Renness': { method: 'Supplier delivers', days: { Bedframe: 7 }, pref: 'WhatsApp' },
   'NB': { method: 'Supplier delivers', days: { Bedframe: 7 }, inactive: true, pref: 'WhatsApp' },
   'Laveo': { method: 'Supplier delivers', days: { Bedframe: 7 }, inactive: true, pref: 'WhatsApp' }
@@ -150,7 +149,7 @@ var areaOf = loc => { const t = String(loc || ''); if (!t.trim()) return { known
 var daysOf = (items, s) => items.reduce((m, i) => Math.max(m, CD(i.cat || (i.item || '').split(' · ')[0], s || i.sup)), 0);
 var supSub = s => SUP[s] ? (SUP[s].inactive ? 'Inactive in Settings · ' : '') + SUP[s].method + ' · ' + (Object.keys(SUP[s].days || {}).length ? Object.entries(SUP[s].days).map(([c, d]) => c + ' ' + d).join(' · ') + ' working days' : 'Production days not set') : 'Set the supplier in Catalog';
 // SO Batch data = the owner-confirmed Purchasing.dc.html data (owner 11 Oct: "use the SO Batch I already did; only standardise the UI"). The 20-real-cases version is kept in purchasing-data.real20.js.txt.
-var CUST = { 'SO-1368': 'TEST customer AM' };
+var CUST = { 'SO-1368': 'Jimmy' };
 var LN = (so, item, qty) => ({ so, cust: CUST[so] || 'Not recorded', item, qty });
 var L = (so, cust, item, qty) => ({ so, cust, item, qty });
 var FORTE = 'Mattress · B1201F-K Forte Mattress · King';
@@ -164,7 +163,7 @@ var SOS0 = (() => { const m = {}; let id = 1;
   POS0.forEach(p => p.lines.forEach(l => { const s = m[l.so] = m[l.so] || { so: l.so, cust: l.cust, type: 'Outright', proc: null, cdate: null, items: [] }; const [c, model, spec] = l.item.split(' · '); s.items.push({ id: id++, cat: c, model, spec: spec || '', qty: l.qty, sup: p.sup, po: p.no, pod: p.d, wh: (p.whBy && p.whBy[l.so]) || p.wh }); }));
   // TEST (owner 11 Oct): one Subscription order that uses Diglant forecast stock, to show how SO Batch treats it (All tab only, no tick, no PO).
   m['TEST-SS-0012'] = { so: 'TEST-SS-0012', cust: 'TEST · Lim Ah Kow', type: 'Subscription', loc: 'Cheras, Kuala Lumpur', proc: D(9, 8), cdate: D(10, 5), items: [{ id: id++, cat: 'Mattress', model: 'FORTE L1202F', spec: 'Queen', qty: 1, sup: 'Diglant', forecast: true, fromLoc: 'Held at Diglant' }] };
-  m['SO-1368'] = { so: 'SO-1368', cust: 'TEST customer AM', type: 'Outright', loc: 'Ampang, Selangor', proc: D(8, 30), cdate: D(9, 31), items: [{ id: id++, cat: 'Mattress', model: 'B1201S-K B1201S', spec: 'King', qty: 1, sup: 'Nice Future Sdn Bhd' }] };
+  m['SO-1368'] = { so: 'SO-1368', cust: 'Jimmy', type: 'Outright', loc: 'Ampang, Selangor', proc: D(8, 30), cdate: D(9, 31), items: [{ id: id++, cat: 'Mattress', model: 'B1201S-K B1201S', spec: 'King', qty: 1, sup: 'Nice Future Sdn Bhd' }] };
   // Source: uploads/Carres_Master_Sample.xlsx · Delivery_Sum · 20 newest orders (Import Date 4–5 Oct). Real items, customers, ETA. Their PO numbers are kept in realPO; shown here as not yet ordered so they can be worked through SO Batch Purchase.
   REAL20.forEach(r => r.items.forEach(i => { if (/^\d{4}(\([A-Z]\))?[A-Za-z]+\//.test(i.model)) { const p = i.model.split('/'); i.cat = 'Bedframe'; i.sup = 'Ohana Furniture Sdn Bhd'; i.model = p[0].replace(/^(\d{4}(?:\([A-Z]\))?)/, '$1 '); i.spec = p.slice(1).join(' · ').replace(/^Fab3 /i, 'Fab3 · ').replace(/COL(OUR)?:/i, ''); const sz = /Super ?Single/i.test(i.spec) ? 'Super Single' : /King/i.test(i.spec) ? 'King' : /Queen/i.test(i.spec) ? 'Queen' : ''; if (sz && !i.spec.includes(' · ' + sz)) i.spec = i.spec.replace(/\s(King|Queen|SuperSingle)\b/i, ' · ' + sz); } }));
   REAL20.forEach(r => { const ar = areaOf(r.loc); r.items.forEach(i => { i.whDefault = 'Carres Klang Warehouse'; }); });

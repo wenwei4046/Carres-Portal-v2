@@ -1,6 +1,6 @@
 # 01 · Design tokens
 
-**Current shared visual target · owner instruction 11 Oct 2026 · supplied v12.** This replaces every earlier value in this file; there is no second version. Source: `Sales Order_11 Oct.zip` and its design updates of the same day, `Sales Order_11 Oct(2).zip`, `Sales Order_11 Oct(3).zip` and `Sales Order_11 Oct(4).zip` (`README.md`, `UX-FLOWS.md`, `docs/Carres Layout Standard.md`, `carres-theme.js`, `carres-check.js`, `Carres UI Kit.dc.html`, `Carres Shell.dc.html`, `Carres Table.dc.html`, `Sales Order Outright v12.dc.html`, `Purchasing v2.dc.html`). This is a design adoption, not a claim that the React kit or production has migrated.
+**Current shared visual target · owner instruction 12 Oct 2026 · supplied 12 Oct.** This replaces every earlier value in this file; there is no second version. Every kit the owner hands over replaces the kit: this file, 02, 03, UI MASTER, the token mirror and the specimen are updated together and whatever the new kit contradicts is deleted (owner 12 Oct 2026). Source: `Sales Order.zip` of 12 Oct 2026 (`README.md` with its `Fix now` list, `UX-FLOWS.md`, `docs/Carres Layout Standard.md`, `carres-theme.js`, `carres-check.js`, `carres-tasks.js`, `Carres UI Kit.dc.html`, `Carres Screen Map.dc.html`, `Carres Shell.dc.html`, `Carres Table.dc.html`, `Sales Order Outright v12.dc.html`, `Purchasing v3.dc.html`, `Settings v2.dc.html`, `Workspace My Tasks.dc.html`). This is a design adoption, not a claim that the React kit or production has migrated.
 
 Business facts, permissions, completion gates, document formats and exact words remain owned by module MASTERs and COPY-STANDARD. Where the package conflicts with COPY-STANDARD or a module MASTER, its value is PROPOSAL / NOT LAW (§10). The supplied Ops Rules are not stored in this repository. The specimen's sample pages use TEST customer details.
 
@@ -14,7 +14,7 @@ Business facts, permissions, completion gates, document formats and exact words 
 | `docs/03-page-patterns.md` | Shared page compositions | Current target |
 | `docs/ui/MASTER.md` | Interaction, ownership and acceptance | Current authority |
 | `apps/web/src/styles/carres-tokens.css`, `components/kit/`, `components/register/` | Running implementation | Still draws the previous kit; migration required; preserve APIs and behaviour |
-| `docs/ui-reference/sales-order-design/` | Supplied v12 specimen | Reference only; not production code or business law |
+| `docs/ui-reference/sales-order-design/` | Supplied 12 Oct specimen | Reference only; not production code or business law |
 
 Use tokens, not page-local numbers. Change the shared components once; never clone the specimen into a module. The frame, sizes, widths and cell formats never change per module; a module only chooses its content. Git keeps the old values; no archive or second kit is created.
 
@@ -29,8 +29,8 @@ Use tokens, not page-local numbers. Change the shared components once; never clo
 | Page ground | `#F6F7F9` |
 | Card / surface | `#FFFFFF`, 1px `#E5E7EB`, radius 8, no shadow |
 | Table header, item sub-header, group band | `#F8F9FA` |
-| Neutral tint (tags, due chip) | `#F1F2F4` |
-| Task card footer band | `#F5F6F8` |
+| Neutral tint (tags, count badge) | `#F1F2F4` |
+| Inner task card (inside its contact card) | `#F7F8FA` |
 
 | Text and lines | Value |
 |---|---|
@@ -139,7 +139,11 @@ Icons: Material Symbols Rounded, outline, weight 300; 18 in buttons and menus, 2
 | Top bar | 56 high, bottom hairline; `[Module] / [Page]` with the path 14 / 400 and the title 20 / 600; search, team, bell at the right |
 | Toolbar row | 36 high, one line, never wraps; Summary title, toolbar and Tasks title share this line |
 | Summary | 264, left; title row on the ground, then one white card per section, 8 apart; row exactly 32 high; label 13 / 400 `#4B5563`, value 13 / 500 ink, amber 500 when it needs action; 1px line on its right |
-| Tasks | 320, right; title row on the ground, white task cards 8 apart; 1px `#E5E7EB` line separates it from the middle with 12 on both sides |
+| Tasks | 320, right; title row on the ground; 1px `#E5E7EB` line separates it from the middle with 12 on both sides. Under the title: the day strip, then the pills `To do n` · `Waiting n` · `Done n`, then one white card per contact or action group, 8 apart |
+| Day strip (owner 12 Oct 2026) | One week per view, Today first, ‹ › move a week, up to 4 weeks ahead. Each day: weekday 11 / 500 · date 12 · task count 11 / 500 in the theme colour, amber when something is late, blank when none. The picked day wears the selection pair |
+| Task group card | Head: name 13 / 500 · count in a small round badge (amber when late) · contact icons 24 · ⋮. No party icon. Late groups first, then groups with a deadline, then contacts, then actions |
+| Task card in the list (owner 12 Oct 2026) | Card in card. The inner card is the title 13 / 500 and ›; the whole card opens the task. Then one 20 row per fact: icon 14 · label 12 grey left · value 12 / 500 right. Amber only on the row whose date or time has passed or whose party is late. No status tag, no button, no steps count, no footer. Due is the clock time when there is one; a task for today with no time reads `Any time`; a past due shows its date |
+| Screen parts | Every module page has the same seven numbered parts (`Carres Screen Map.dc.html`): 1 side menu · 2 top bar · 3 toolbar · 4 main table or detail · 5 Summary · 6 Tasks list · 7 open task. Parts 1, 2, 3, 6 and 7 are the shell: changed once, every module follows |
 | Zones | 12 between zones |
 
 The page never scrolls; panels and table bodies scroll inside with thin scrollbars. Summary and Tasks collapse and reopen from ghost buttons in the toolbar row. They open by window width: at 1600 or wider, both; from 1280 to 1599, Tasks only, with Summary closed until the person opens it; under 1280, both closed. Opening or closing a panel never changes a column width. A detail page under 1100 wide collapses the menu to 64 by itself; the person's own choice returns on the list. A detail opens in the middle in place of the list: Summary and the toolbar hide, Tasks stays, Back returns to the same scroll position. There is no list plus detail three-panel view.
@@ -156,6 +160,8 @@ The page never scrolls; panels and table bodies scroll inside with thin scrollba
 | Expanded row | One box: 1px `#CBD0D6` frame, corners 8, 8 above and below; parent stays white; item sub-header `#F8F9FA`; parent and sub-header stick together under the table header |
 | Ticked row or item | Soft selection fill; text stays ink |
 | Selection bar | Replaces the toolbar; white, 1px `#E5E7EB`; count 13 / 600 ink, totals grey; only the tick and Clear use the theme colour; the text is counts only; bar buttons 32 high, 13 / 500 |
+
+**SO Batch Purchase · By supplier (owner 12 Oct 2026).** Columns: Supplier `minmax(150px,1fr)` · Items 80 · Sales orders 96 · Order PO deadline 120 · Supplier ready by 120 · Status 120. Status stays in view at 1131 wide with Tasks closed, with no side scroll.
 
 **Five cell formats.** Identifier (13 / 600 ink plus one 12 grey line) · Text (13 / 400 ink plus optional 12 grey line) · Number (right, tabular) · Date (`7 Oct` plus grey weekday) · Status (pill for amber and green; a status that needs no action is plain text `#4B5563`). At most two lines per cell, except the item name. When one cell in a row has a second line, every cell keeps two line slots so first lines align.
 
@@ -231,7 +237,7 @@ Use §§1 and 3 for surface and control values; preserve the card's host identit
 | Desktop / narrow / keyboard | UI MASTER §2.2 full-page checks, zoom, focus, scrolling |
 | Specimen | Demonstrates design only; sample facts and simulated permissions do not prove production |
 
-Source archive SHA-256: `1140ffde825dcd573f05467b49f2201d02331241dbc4f7cb0ef4275957efae16`; design updates `23850ef44e0a3fc1932743f7523a2ff8b4cd4b1460427d22aa87e888cb1d6ef8`, `b34ddbc82e16b9d99a786340061abb188db0768c3bde2d90e974696a8b54c1f9` and `d0f402425acbbf7144af43d7ddf69f6d9e1ecb320848b2f1be56c292c4f64a72`.
+Source archive SHA-256: `793931a7922b24155b963593139bd13c960fb101072edd8fdc94d5618164fe59` (`Sales Order.zip`, 12 Oct 2026).
 
 ## 9 · Settings → Appearance · current target owner instruction 11 Oct 2026
 
@@ -272,6 +278,13 @@ The supplied Layout Standard still carries older lines beside its 10 and 11 Oct 
 | Panel title | 17 / 500 | 15 / 500 | TAKEN · README and check |
 | Menu item | 14 / 500 grey, selected 600 · later 13 / 400 ink, selected 500 | Module 13 / 500, page 13 / 400, current 600 (§4) | TAKEN · owner 12 Oct |
 | Menu tree line | One thin straight line, no elbow (10 Oct) | 1.5 line with rounded elbows (§4) | TAKEN · owner 12 Oct |
+| Task card in the list | Tags row, title, grey line and footer band (11 Oct); tiles, status tag and a Start button (12 Oct, earlier turns) | Title and ›, then fact rows; amber only on the passed row (§4) | TAKEN · owner 12 Oct, README `Fix now` |
+| Tasks tabs | Sections NOW · LATE · TODAY (11 Oct); pills To do · Done with no Waiting (12 Oct, earlier turn) | Day strip, then pills To do · Waiting · Done (§4) | TAKEN · owner 12 Oct, later line |
+| Words for time | `Overdue`, `Missed cut-off` still stand in older lines of the Layout Standard, the UI Kit page and `purchasing-data.js` | A date or time that has gone by is `passed` on its own row; a party that is slow by a count is `n days late`. Never `Overdue` or `Missed` | TAKEN · owner 12 Oct, README `Fix now`; the words live in COPY-STANDARD |
+| Send PO and contact task cards | One steps form (11 Oct) | Three numbered steps (03 §8) | TAKEN · owner 12 Oct |
+| Message template words in a contact task | None in the owner's blueprints | The design chat's own wording | **PROPOSAL / NOT LAW** · overturned when the owner confirms or replaces the wording |
+| Purchasing reference page | `Purchasing v2.dc.html` in the package README and menu | `Purchasing v3.dc.html` | TAKEN · owner named v3 on 12 Oct; v2 is not stored |
+| Bottom `Settings` row weight | 500 selected | 600 selected, 500 at rest | TAKEN · the menu rule above; fixed in the stored `Carres Shell.dc.html` |
 | Tabs | Selected 600 | Segmented control, selected 500 | TAKEN · check |
 | Caps labels | 10 / 500 or 12 / 600 | 11 / 500, tracking .06em | TAKEN · README |
 | Menu group label | 11 / 600 | 11 / 500 | TAKEN · README |
@@ -299,7 +312,7 @@ The package's acceptance line (pass on every state at 1025, 1164 and 1440) is me
 
 ### 10.2 Against existing authority
 
-Everything in this table is **PROPOSAL / NOT LAW**. Pages are built on the v12 visual frame with COPY words and MASTER rules.
+Everything in this table is **PROPOSAL / NOT LAW**. Pages are built on the current visual frame with COPY words and MASTER rules.
 
 | Topic | The package says | Authority that stands |
 |---|---|---|

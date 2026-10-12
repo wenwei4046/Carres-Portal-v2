@@ -1,5 +1,3 @@
-> Supplied with `Sales Order_11 Oct.zip`. The example customer and phone are TEST values. Words follow COPY-STANDARD and business rules follow the module MASTERs; where a flow below differs, it is PROPOSAL / NOT LAW (`docs/01-design-tokens.md` §10).
-
 # UX flows — Sales Order Outright (and every module on the template)
 
 Each flow is written as **steps → expected result**. Every line is a test. Build it in the code, then automate it (Playwright). The reference behaviour is the HTML in this folder: open `Sales Order Outright v12.dc.html` and click through it; the code must behave the same. Data: `sales-test.js` (examples use CR0284, customer TEST customer B, phone 012-0000002, ETA Mon 10 Aug, balance RM 1,000).

@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0">
   <script src="./carres-theme.js"></script>
   <script src="./sales-test.js"></script>
+  <script src="./carres-log.js"></script>
   <style>.material-symbols-rounded{font-variation-settings:'FILL' 0,'wght' 300,'GRAD' 0,'opsz' 20}body{margin:0;background:#FAFAF9;font-family:Inter,system-ui,sans-serif;color:#1F2937;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}a{color:#1F2937}a:hover{color:#3965FA}*{box-sizing:border-box}</style>
 </helmet>
 <dc-import name="Carres Shell" crumb="Sales Order" title="Outright" nav="outright" alerts="{{ 6 }}" team-on="{{ 8 }}" det="{{ isDet }}" summary="{{ summary }}" tabs="{{ tabs }}" showing="{{ showing }}" chips="{{ chips }}" views="{{ views }}" view-name="{{ viewName }}" more="{{ more }}" sel="{{ selBar }}" tasks="{{ tasks }}" search="{{ search }}" hint-size="100%,100vh">
@@ -95,8 +96,8 @@
         </div>
       </sc-if>
       <sc-if value="{{ dv.toast }}"><div role="status" style="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:80;background:#1F2937;color:#FFFFFF;border-radius:8px;padding:8px 14px;font-size:13px;box-shadow:0 8px 24px rgba(17,24,39,.2)">{{ dv.toast }}</div></sc-if>
-      <div role="tablist" aria-label="Sales order sections" style="display:flex;gap:2px">
-        <sc-for list="{{ dv.tabs }}" as="t" hint-placeholder-count="3"><button role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="border:0;border-radius:8px;padding:6px 14px;font:inherit;font-size:13px;font-weight:{{ t.fw }};cursor:pointer;background:{{ t.bg }};color:{{ t.fg }}">{{ t.l }}</button></sc-for>
+      <div role="tablist" aria-label="Sales order sections" style="display:flex;gap:2px;padding:3px;background:#E2E4E8;border-radius:10px;align-self:flex-start">
+        <sc-for list="{{ dv.tabs }}" as="t" hint-placeholder-count="3"><button role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="border:0;border-radius:8px;padding:5px 12px;font:inherit;font-size:13px;font-weight:{{ t.fw }};cursor:pointer;background:{{ t.sbg }};color:{{ t.sfg }};box-shadow:{{ t.ssh }};white-space:nowrap">{{ t.l }}</button></sc-for>
       </div>
       <div style="overflow:auto;min-height:0;display:flex;flex-direction:column;gap:12px;scrollbar-width:thin;padding-bottom:4px">
         <sc-if value="{{ dv.tSo }}">
@@ -134,11 +135,7 @@
           </div>
           <section aria-label="Items and payment" style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:14px 16px;display:flex;flex-direction:column">
             <div style="display:flex;align-items:center;gap:8px;padding-bottom:6px"><span style="font-size:15px;font-weight:500;color:#1F2937;flex:1">Items</span></div>
-            <div style="overflow-x:auto"><div role="table" style="min-width:520px;font-size:13px;font-variant-numeric:tabular-nums">
-              <div role="row" style="display:grid;grid-template-columns:20px minmax(max-content,1fr) 32px 80px 80px;gap:10px;align-items:center;height:40px;padding:0 8px;background:#F8F9FA;border-top:1px solid #F1F2F4;border-bottom:1px solid #E5E7EB;font-size:12px;font-weight:500;color:#6B7280"><span>#</span><span>Item</span><span style="text-align:right">Qty</span><span style="text-align:right">Unit price</span><span style="text-align:right">Amount</span></div>
-              <sc-for list="{{ dv.items }}" as="it" hint-placeholder-count="2"><div role="row" style="display:grid;grid-template-columns:20px minmax(max-content,1fr) 32px 80px 80px;gap:10px;align-items:center;min-height:44px;padding:4px 8px;border-bottom:1px solid #F1F2F4"><span style="color:#6B7280">{{ it.no }}</span><span style="display:flex;flex-direction:column;gap:1px;line-height:1.3;min-width:0"><span style="font-size:13px;color:#1F2937;white-space:nowrap">{{ it.model }}</span><sc-if value="{{ it.spec }}"><span style="font-size:12px;color:#6B7280;white-space:nowrap">{{ it.spec }}</span></sc-if></span><span style="text-align:right;color:#1F2937">{{ it.qty }}</span><span style="text-align:right;color:#6B7280">Not recorded</span><span style="text-align:right;color:#6B7280">Not recorded</span></div></sc-for>
-              <sc-for list="{{ dv.totals }}" as="t" hint-placeholder-count="3"><div role="row" style="display:grid;grid-template-columns:20px minmax(max-content,1fr) 32px 80px 80px;gap:10px;align-items:center;min-height:44px;padding:0 8px;border-bottom:1px solid #F1F2F4;background:{{ t.bg }}"><span></span><span style="color:#6B7280;font-weight:{{ t.fw }}">{{ t.k }}</span><span style="text-align:right;color:#1F2937">{{ t.q }}</span><span></span><span style="text-align:right;font-weight:{{ t.fw }};color:{{ t.fg }}">{{ t.v }}</span></div></sc-for>
-            </div></div>
+            <div style="height:{{ dv.itTb.h }};min-width:0"><dc-import name="Carres Table" ticks="{{ false }}" label="{{ dv.itTb.label }}" cols="{{ dv.itTb.cols }}" rows="{{ dv.itTb.rows }}" footer="{{ dv.itTb.footer }}" empty="{{ dv.itTb.empty }}" hint-size="100%,100%" style="display:block;height:100%;min-height:0"></dc-import></div>
             <span style="font-size:15px;font-weight:500;color:#1F2937;padding:18px 0 6px">Payment</span>
             <sc-for list="{{ dv.payMeta }}" as="x" hint-placeholder-count="3"><div style="display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px;align-items:center;min-height:36px;padding:4px 0;box-sizing:border-box;border-top:1px solid #F1F2F4;font-size:13px"><span style="color:#6B7280">{{ x.k }}</span><span style="font-weight:500;color:{{ x.fg }};overflow-wrap:anywhere">{{ x.v }}</span></div></sc-for>
           </section>
@@ -164,8 +161,7 @@
             </sc-if>
             <sc-if value="{{ dv.rvDt }}">
             <div style="border-top:1px solid #F1F2F4"><div>
-              <div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 84px 84px 96px minmax(0,1fr);gap:10px;align-items:center;height:40px;padding:0 8px;background:#F8F9FA;border-bottom:1px solid #E5E7EB;font-size:12px;font-weight:500;color:#6B7280"><span>Step</span><span>Who</span><span>Planned</span><span>Actual</span><span>Status</span><span>Document</span></div>
-              <sc-for list="{{ dv.route }}" as="r" hint-placeholder-count="6"><div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 84px 84px 96px minmax(0,1fr);gap:10px;align-items:center;min-height:44px;padding:4px 8px;box-sizing:border-box;border-bottom:1px solid #F1F2F4;font-size:13px;font-variant-numeric:tabular-nums"><span style="color:#1F2937">{{ r.name }}</span><span style="color:{{ r.whoFg }}">{{ r.who }}</span><span style="color:{{ r.planFg }}">{{ r.plan }}</span><span style="color:{{ r.actFg }}">{{ r.act }}</span><span style="justify-self:start;background:{{ r.pbg }};color:{{ r.pfg }};border-radius:999px;padding:3px 10px;font-size:12px;font-weight:500;white-space:nowrap">{{ r.st }}</span><span style="color:{{ r.docFg }};overflow-wrap:anywhere">{{ r.doc }}</span></div></sc-for>
+              <div style="height:{{ dv.rtTb.h }};min-width:0"><dc-import name="Carres Table" ticks="{{ false }}" label="{{ dv.rtTb.label }}" cols="{{ dv.rtTb.cols }}" rows="{{ dv.rtTb.rows }}" footer="{{ dv.rtTb.footer }}" empty="{{ dv.rtTb.empty }}" hint-size="100%,100%" style="display:block;height:100%;min-height:0"></dc-import></div>
             </div></div>
             </sc-if>
             <sc-if value="{{ dv.rvSt }}">
@@ -293,7 +289,7 @@ class Component extends DCLogic {
   state = { mon: new Date().getMonth(), view: 'open', f: {}, sel: {}, layout: 'so', det: null, dTab: 'so', lc: null, am: null, logs: {}, done: [], tasks: [], tk: 0 };
   componentDidMount() {
     this._t = () => this.setState(s => ({ tk: s.tk + 1 })); window.addEventListener('carres-theme', this._t);
-    const go = () => { const m = (location.hash || '').match(/so=([^&]+)/); if (m && window.SO_REAL) { const so = decodeURIComponent(m[1]); if (window.SO_REAL.some(x => x.so === so)) this.setState({ det: so }); } };
+    const go = () => { const m = (location.hash || '').match(/so=([^&]+)/); if (m && window.SO_REAL) { const so = decodeURIComponent(m[1]); if (window.SO_REAL.some(x => x.so === so)) this.setState({ det: so }); } const t = (location.hash || '').match(/task=([^&]+)/); if (t) this.setState({ tkOpen: decodeURIComponent(t[1]) }); };
     if (!window.SO_REAL) this._p = setInterval(() => { if (window.SO_REAL) { clearInterval(this._p); go(); this._t(); } }, 50); else go();
   }
   componentWillUnmount() { window.removeEventListener('carres-theme', this._t); clearInterval(this._p); }
@@ -317,7 +313,7 @@ class Component extends DCLogic {
     const summary = [
       { h: 'THIS MONTH', mon: { label: mk + ' 26', prev: S.mon > 0 ? () => set({ mon: S.mon - 1 }) : null, next: S.mon < T0.getMonth() ? () => set({ mon: S.mon + 1 }) : null }, rows: [{ k: 'Orders', v: String(mO.length) }, { k: 'Value', v: NR }, { k: 'Delivered', v: NR }, { k: 'Avg days to deliver', v: NR }], foot: mO.length ? '' : 'No orders proceeded in ' + mk + ' 26.', footFg: '#6B7280' },
       { h: 'NEEDS ATTENTION', rows: [{ k: 'Late supply', v: NR }, { k: 'Payment due', v: NR }, { k: 'Finance hold', v: NR }, { k: 'Problems', v: NR }] },
-      { h: 'PIECES ORDERED · ' + mk.toUpperCase(), rows: CATS.map(l => ({ k: l, v: String(pcM[l] || 0) })) }];
+      { h: 'PIECES ORDERED · ' + mk.toUpperCase(), chart: true, rows: CATS.map(l => ({ k: l, v: String(pcM[l] || 0) })) }];
     // Log form (Shell) + tasks it creates
     const LR = LC_RULES, whatsOf = w => [...(LR[w] || []), ['Other', '', '']], L = S.lc, rule = L && L.who && L.what ? whatsOf(L.who).find(r => r[0] === L.what) : null, detKeys = L && L.what ? LC_DET[L.what] || [] : [];
     const setL = p => set({ lc: { ...S.lc, ...p, err: null } }), nowTm = () => { const n = new Date(); return (n.getHours() % 12 || 12) + ':' + String(n.getMinutes()).padStart(2, '0') + (n.getHours() >= 12 ? ' PM' : ' AM'); };
@@ -335,13 +331,13 @@ class Component extends DCLogic {
         const tasks = r && r[1] ? [...S.tasks, { key: 't' + Date.now(), so: g.so, act: r[1], mod: r[2], sub: 'From ' + g.who + ' (' + g.ch + ') · ' + g.what.toLowerCase() }] : S.tasks;
         set({ lc: null, tasks, logs: { ...S.logs, [g.so]: [ev, ...(S.logs[g.so] || [])] } }); } } : { on: false };
     const tRows = S.tasks.map(t => { const on = S.tkOpen === t.key, o = R.find(x => x.so === t.so) || {};
-      return { key: t.key, mod: t.mod, t: t.act, sub: t.sub, ref: t.so, who: o.cust || '', isNew: true, due: '', on, open: () => set({ tkOpen: on ? null : t.key }), kind: 'steps', facts: [{ l: 'Sales order', v: t.so, go: open(t.so) }, { l: 'Customer', v: o.cust || NR }, { l: 'ETA', v: o.eta ? fW(YMD(o.eta)) : NR }], files: [],
+      return { key: t.key, mod: t.mod, t: t.act, sub: t.sub, ref: t.so, who: o.cust || '', isNew: true, due: '', on, open: () => set({ tkOpen: on ? null : t.key }), kind: 'steps', facts: [{ l: 'SO no.', v: t.so, go: open(t.so) }, { l: 'Customer', v: o.cust || NR }, { l: 'ETA', v: o.eta ? fW(YMD(o.eta)) : NR }], files: [],
         steps: [], mark: () => set({ tasks: S.tasks.filter(x => x.key !== t.key), done: [...S.done, { t: t.act + ' · ' + t.so }], tkOpen: null }), markOff: false, markT: 'Mark done', hint: '' }; });
     const tasks = { head: fW(T0) + ' · ' + tRows.length + ' to do', left: tRows.length, log: () => set({ lc: S.lc ? null : { so: S.det || '', who: '', what: '', ch: 'WhatsApp', d: {}, note: '', files: [], err: null } }), lf, rows: tRows, done: S.done.map(d => ({ t: d.t, canUndo: false, canCorrect: false })), coming: [] };
     // Detail
     const o = S.det ? R.find(x => x.so === S.det) : null;
     const dv = (() => { if (!o) return {}; const st = stOf(o), d = YMD(o.eta), imp = YMD(o.imp), q = pcsOf(o), V = (v, fg) => v ? { v, fg: fg || '#1F2937', fw: '400' } : { v: NR, fg: '#6B7280', fw: '400' };
-      const tab = (k, l) => ({ l, on: S.dTab === k, fw: S.dTab === k ? '500' : '400', bg: S.dTab === k ? th.selBg : 'transparent', fg: S.dTab === k ? th.selFg : '#4B5563', pick: () => set({ dTab: k }) });
+      const tab = (k, l) => ({ l, sbg: S.dTab === k ? '#FFFFFF' : 'transparent', sfg: S.dTab === k ? th.selFg : '#374151', ssh: S.dTab === k ? '0 1px 2px rgba(17,24,39,.08)' : 'none', on: S.dTab === k, fw: S.dTab === k ? '500' : '400', bg: S.dTab === k ? th.selBg : 'transparent', fg: S.dTab === k ? th.selFg : '#4B5563', pick: () => set({ dTab: k }) });
       const pc = (o.addr.join(' ').match(/\b\d{5}\b/) || [])[0];
       const cards = [
         { h: 'Sales', gc: '1 / -1', note: '', rows: [{ k: 'SO Doc Date', ...V(null) }, { k: 'Proceed Date', ...V(imp ? fW(imp) : null) }, { k: 'Sales Location', ...V(o.salesLoc) }, { k: 'Salesperson', ...V(o.salesperson) }, { k: 'Dealer', ...V(null) }] },
@@ -396,14 +392,22 @@ class Component extends DCLogic {
           [o.logi || null, o.logiEta || null, null, null]];
         route.forEach((r, i) => { const [who, plan, act, doc] = meta[i] || []; Object.assign(r, { who: who || NR, whoFg: who ? G : G, plan: plan || NR, planFg: plan ? I : G, act: act || (r.done ? NR : 'Not yet'), actFg: act ? I : G, doc: doc || 'No document', docFg: doc ? I : G }); }); }
       const curI = route.findIndex(r => !r.done); route.forEach((r, i) => { r.isDone = r.done; r.isNow = i === curI; r.isLater = !r.done && i !== curI; r.nameFw = i === curI ? '600' : '500'; r.nameFg = r.isLater ? '#6B7280' : '#1F2937'; if (r.isLater && r.st === r.line) r.st = ''; });
-      const time0 = [...(S.logs[o.so] || []), { k: 'System', d: imp ? f1(imp) : NR, tm: 'Time ' + NR.toLowerCase(), t: 'Proceeded · ' + pcsTxt(q) + (o.po.length ? ' · ' + o.po.join(', ') : ''), by: 'System · Delivery_Sum' }];
+      const CL = window.CarresLog, mvs = CL ? CL.moves().filter(m => !m.undone && (m.from === o.so || m.to === o.so)) : [], mvT = mvs.map(m => { const it = m.item.split(' · ').slice(1).join(' · '); return m.to === o.so ? ' Stock moved in: ' + m.qty + ' × ' + it + ' from ' + m.from + '.' : ' ' + m.qty + ' × ' + it + ' given to ' + m.to + '; waits for ' + m.po + ' · ETA ' + f1(new Date(m.eta)) + '.'; }).join('');
+      const time0 = [...(S.logs[o.so] || []), ...(CL ? CL.of(o.so) : []), { k: 'System', d: imp ? f1(imp) : NR, tm: 'Time ' + NR.toLowerCase(), t: 'Proceeded · ' + pcsTxt(q) + (o.po.length ? ' · ' + o.po.join(', ') : ''), by: 'System · Delivery_Sum' }];
       const tfk = S.tFilt || 'All', time = time0.filter(e => tfk === 'All' || (e.k || 'Contacts') === tfk), tf = ['All', 'Contacts', 'Amendments', 'System'].map(l => ({ l, on: tfk === l, bd: tfk === l ? th.selFg : '#F2F3F5', bg: tfk === l ? (th.selSoft || th.selBg) : '#F2F3F5', fg: tfk === l ? th.selFg : '#374151', pick: () => set({ tFilt: l }) }));
       const payBits = [o.bal ? 'Balance ' + o.bal : '', o.payStatus || ''].filter(Boolean);
       return { payLine: payBits.length ? payBits.join(' · ') : NR, payFg: payBits.length ? '#1F2937' : '#6B7280', so: o.so, cust: o.cust, ...(() => { const late = !o.done && d && dLeft(d) < 0, k = o.done ? ['Delivered', 'ok'] : late ? ['Late', 'warn'] : ['Open', 'neutral']; return { pill: k[0], pbg: TONE[k[1]][0], pfg: TONE[k[1]][1] }; })(),
         tabs: [tab('so', 'Sales Order'), tab('route', 'Order Route'), tab('time', 'Timeline')], tSo: S.dTab === 'so', tRoute: S.dTab === 'route', tTime: S.dTab === 'time',
         top: cards[0], cols: [[cards[1], cards[3]], [cards[2], cards[4]]].map(secs => ({ secs })), totals: [{ k: 'Total', q: String(o.items.reduce((s, i) => s + i.qty, 0)), v: NR, fw: '600', fg: '#6B7280', bg: 'transparent' }, { k: 'Received', q: '', v: NR, fw: '400', fg: '#6B7280', bg: 'transparent' }, { k: 'Balance due', q: '', v: o.bal || NR, fw: '600', fg: o.bal ? '#7A5A00' : '#6B7280', bg: o.bal ? '#FBF0D6' : 'transparent' }],
         payMeta: [{ k: 'Method', v: NR, fg: '#6B7280' }, { k: 'Bank reference', v: NR, fg: '#6B7280' }, { k: 'Bank slip', v: NR, fg: '#6B7280' }],
+        itTb: (() => { const its = o.items, tq = its.reduce((s, i) => s + i.qty, 0); return { label: 'Items', h: (40 + 44 + 14 + (its.length + 3) * 46) + 'px', footer: its.length + (its.length === 1 ? ' item' : ' items'), empty: 'No items.', cols: [{ l: '#', w: '28px' }, { l: 'Item', w: 'minmax(170px,1fr)' }, { l: 'Qty', w: '56px', al: 'right' }, { l: 'Unit price', w: '96px', al: 'right' }, { l: 'Amount', w: '96px', al: 'right' }],
+          rows: [...its.map((it, n) => ({ id: 'i' + n, cells: [{ t: String(n + 1), fg: '#6B7280' }, { t: it.model, sub: it.spec || '' }, { t: String(it.qty) }, { t: NR, fg: '#6B7280' }, { t: NR, fg: '#6B7280' }] })),
+            { id: 'tot', cells: [{ t: '' }, { t: 'Total', fw: '600', fg: '#6B7280' }, { t: String(tq) }, { t: '' }, { t: NR, fg: '#6B7280', fw: '600' }] },
+            { id: 'rec', cells: [{ t: '' }, { t: 'Received', fg: '#6B7280' }, { t: '' }, { t: '' }, { t: NR, fg: '#6B7280' }] },
+            { id: 'bal', cells: [{ t: '' }, { t: 'Balance due', fw: '600', fg: '#6B7280' }, { t: '' }, { t: '' }, o.bal ? { t: o.bal, fw: '600', fg: '#7A5A00' } : { t: NR, fg: '#6B7280', fw: '600' }] }] }; })(),
         items: o.items.map((i, n) => { const fr = fromOf(i); return { no: String(n + 1), desc: [i.cat, i.spec].filter(Boolean).join(' · '), model: i.model, spec: i.spec, specT: i.spec ? ' · ' + i.spec : '', cat: i.cat, qty: String(i.qty), from: fr[0], fromFg: fr[1] }; }), qtyT: String(q), itemSum: pcsTxt(q) + ' · ' + catsOf(o).join(', '), sheetItems: (() => { const nz = x => String(x).toLowerCase().replace(/[^a-z0-9]/g, ''); const have = o.items.map(i => nz(i.model)); const ent = [...String(o.itemText || '').matchAll(/\[([^\]]+?)\s+x\s*(\d+)\s*pcs?\]/gi)].map(m => ({ n: m[1].trim(), q: +m[2] })); const extra = ent.filter(e => { const k = nz(e.n); return !have.some(h => h && (k.includes(h) || h.includes(k.slice(0, Math.max(6, h.length))))); }); return extra.map(e => e.n + ' × ' + e.q).join(' · '); })(),
+        rtTb: { label: 'Order Route details', h: (40 + 44 + 14 + Math.max(1, route.length) * 46) + 'px', footer: route.length + ' steps', empty: 'No steps.', cols: [{ l: 'Step', w: 'minmax(140px,1.3fr)' }, { l: 'Who', w: 'minmax(100px,1fr)' }, { l: 'Planned', w: '84px' }, { l: 'Actual', w: '84px' }, { l: 'Status', w: '100px' }, { l: 'Document', w: 'minmax(100px,1fr)' }],
+          rows: route.map((r, n) => ({ id: 'r' + n, cells: [{ t: r.name, fw: '500' }, { t: r.who, fg: r.whoFg }, { t: r.plan, fg: r.planFg }, { t: r.act, fg: r.actFg }, { t: r.st, tone: r.tone === 'ok' || r.pfg === '#1E7A40' ? 'ok' : r.tone === 'warn' || r.pfg === '#7A5A00' ? 'warn' : 'neutral' }, { t: r.doc, fg: r.docFg, wrap: true }] })) },
         route, routeSum: route.filter(r => r.dot !== '#FFFFFF').length + ' of ' + route.length + ' done', root: rootB, branches, tail, mapMin, barL, rtop, ...(() => { const rv = S.rv || 'ov', vw = (k, l) => ({ l, on: rv === k, fw: rv === k ? '500' : '400', bg: rv === k ? '#FFFFFF' : 'transparent', fg: rv === k ? th.selFg : '#4B5563', sh: rv === k ? '0 1px 2px rgba(16,24,40,.10)' : 'none', pick: () => set({ rv: k }) });
         const W = { now: ['Now', 'neutral'], ok: ['Done', 'ok'], wait: ['Waiting', 'neutral'], warn: ['Needs action', 'warn'], nr: [NR, 'neutral'] };
         const stp = (name, k) => ({ name, rowBg: k === 'now' ? '#F2F3F5' : 'transparent', ring: k === 'done' ? '#1E7A40' : k === 'now' ? '#1F2937' : '#CBD0D6', fill: k === 'done' ? '#1E7A40' : k === 'now' ? '#1F2937' : '#FFFFFF', fg: k === 'later' ? '#6B7280' : '#1F2937', fw: k === 'now' ? '500' : '400' });
@@ -411,7 +415,7 @@ class Component extends DCLogic {
         const urgent = d && dLeft(d) <= 7;
         const gW = ready ? W.ok : urgent ? W.warn : W.now;
         const goods = { t: 'Goods', ic: 'inventory_2', word: gW[0], pbg: TONE[gW[1]][0], pfg: TONE[gW[1]][1], bd: urgent && !ready ? '#E8C77A' : '#E5E7EB',
-          line: ready ? 'Goods are in the warehouse' + (o.stockLoc ? ' (' + o.stockLoc + ')' : '') + '.' : o.po.length ? 'Ordered on ' + o.po.join(', ') + '. Waiting for the supplier.' : 'No purchase order recorded.',
+          line: (ready ? 'Goods are in the warehouse' + (o.stockLoc ? ' (' + o.stockLoc + ')' : '') + '.' : o.po.length ? 'Ordered on ' + o.po.join(', ') + '. Waiting for the supplier.' : 'No purchase order recorded.') + mvT,
           facts: [F('Now at', ready ? 'Warehouse' : o.po.length ? 'Supplier' : 'Purchasing'), F('Next', ready ? 'Load for delivery' : 'Goods received'), F('Due', null), F('Doc', o.po.join(', ') || null)],
           hasItems: true, items: o.items.map(i => ({ n: i.model, sp: i.spec || '', q: pcsTxt(i.qty) + ' · ' + (i.st ? i.st + (i.st === 'Received' ? (i.sloc ? ' · ' + i.sloc : '') : i.seta ? ' · stock ETA ' + i.seta : '') : fromOf(i)[0]) })),
           steps: [stp('Purchasing', o.po.length ? 'done' : 'now'), stp('Supplier', ready ? 'done' : o.po.length ? 'now' : 'later'), stp('Receiving', ready ? 'done' : 'later'), stp('Stock', ready ? 'done' : 'later')] };
