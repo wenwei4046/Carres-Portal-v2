@@ -565,7 +565,7 @@ Carres already has a simpler Card settlement. It takes Public Bank, GHL and Mayb
 |---|---|
 | Closed months lock | Keep, but **do not switch it on**. |
 | Month-end stock value: groups | Four groups: warehouse, showroom, in transit (road, transit points and partner legs) and sent for repair. Supplier consignment and dealer stock are excluded; Stock MASTER §12.9 says dealer display stock is the dealer's own. |
-| Month-end stock value: source | The P&L and Balance Sheet show the stock value live each time they are opened, worked out from Stock's Units (reading only) and marked **provisional**. Once Stock's Month-end Stock Confirmation (Stock MASTER §12.10, not built) confirms a month, Finance stores that month's value and it never changes again (Chew 2026-10-12, 「存货价值就不能定成我开P&L 时每次都是live 的，然后当jess 那边月底存货确认就 我这里储存起来不会再改」). **APPROVED. The live part is BUILT 2026-10-12 (0688), not yet applied; storing a confirmed month waits for Stock's confirmation.** See "Stock in the statements" below. |
+| Month-end stock value: source | The P&L and Balance Sheet show the stock value live each time they are opened, worked out from Stock's Units (reading only) and marked **provisional**. Once Stock's Month-end Stock Confirmation (Stock MASTER §12.10, not built) confirms a month, Finance stores that month's value and it never changes again (Chew 2026-10-12, 「存货价值就不能定成我开P&L 时每次都是live 的，然后当jess 那边月底存货确认就 我这里储存起来不会再改」). **APPROVED. The live part is BUILT and APPLIED 2026-10-12 (0688); storing a confirmed month waits for Stock's confirmation.** See "Stock in the statements" below. |
 | Opening balances | Finance's own account figures at go-live. No old transactions are brought in, because CLAUDE.md §6 stands. **Parked (Chew 2026-10-03)** until every feature is tested: it is data entered at go-live, though each customer's and supplier's opening balance will need a place to be entered. |
 | SST | Carres is not SST-registered, so there is no tax on invoices. |
 | Year-end close | Later, before year end. |
@@ -585,7 +585,7 @@ Carres already has a simpler Card settlement. It takes Public Bank, GHL and Mayb
 - Not built: posting the value to the ledger, and valuing the go-live opening stock, which comes in without a PO cost. Both go to Chew. The statements show the value without posting it (below).
 - Falsifier: in Chew's test, a Unit Chew knows was in the showroom or out for repair at a month end shows in another group, or a value differs from its PO line cost times its quantity.
 
-**Stock in the statements — Chew's ruling (2026-10-12); BUILT 2026-10-12 (0688), probed on production and rolled back.** The layout below is PROPOSAL / NOT LAW.
+**Stock in the statements — Chew's ruling (2026-10-12); BUILT 2026-10-12 (0688), probed on production and rolled back; 0688 APPLIED 2026-10-12 on Chew's 「做」 for the build batch, the tracker holding the file exactly (md5 `11e18683b30c3be9a8bd544ecccb5d9d`).** The layout below is PROPOSAL / NOT LAW.
 - Nothing is posted. The statements show stock on hand the way AutoCount's do, from the stock value of the day, on the accounts AutoCount marks for it.
 - **Profit and Loss, All departments:**
   - the opening stock account (SOS, `600-0000`) carries the stock on hand at the end of the day before the period, which adds to the cost of goods sold;
