@@ -1487,7 +1487,9 @@ facts, the one send area and the completion fact below.
   alone. A refusal names its PO in two lines and the other POs are still recorded. The result
   panel no longer draws a second per-PO `PO sent to supplier` form beside these steps (one door,
   Architecture Law C); `Open PDF` still opens each document. No undo is offered: a wrong record is corrected
-  by the PO's own rules. Not built from the package: the `Place` stage, a `Send PO` task per
+  by the PO's own rules. The Tasks working panel for a batch (`BatchPanel`) draws its WhatsApp send
+  as the same three steps (`Download PDFs ({n})` · `Copy message` and `Open WhatsApp group` · `PO sent
+  to supplier ({n})`), so there is one version. Not built from the package: the `Place` stage, a `Send PO` task per
   supplier and category, the saved toast with `Next` and `Undo`, and the third-no-reply alarm.
 - **Action line for an issued PO whose current version is not marked sent**, by the supplier's
   recorded channel: `Click WhatsApp, send {PO No} to {Supplier}` · `Click Email, send {PO No} to

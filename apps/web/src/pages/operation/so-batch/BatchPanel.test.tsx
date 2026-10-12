@@ -179,10 +179,16 @@ describe("BatchPanel — opened by window key from any page", () => {
     expect(within(card).getByRole("button", { name: "Open WhatsApp group" })).toBeEnabled();
     expect(within(card).getByRole("button", { name: "PO sent to supplier (2)" })).toBeEnabled();
     expect(within(card).getByTestId("batch-send-hint")).toHaveTextContent(/^Send the PDF, then press PO sent to supplier\.$/);
-    /* The four WhatsApp steps as plain numbered lines — no badge (Purchasing correction 2026-10-06). */
+    /* The same three numbered steps as the issued result (owner's 12 Oct 2026
+       package, in the Portal's words): download, send, then the one act. */
     const steps = within(card).getByTestId("batch-whatsapp-steps");
-    expect(within(steps).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["1.Download PDFs (2)", "2.Copy message", "3.Open WhatsApp group"]);
-    expect(within(card).getByTestId("batch-whatsapp-step-4")).toHaveTextContent(/^4\.PO sent to supplier \(2\)$/);
+    expect(within(steps).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      "10 of 2 downloadedDownload PDFs (2)",
+      "2Send the PDF, then press PO sent to supplier.Copy messageOpen WhatsApp group",
+      "3PO sent to supplier (2)",
+    ]);
+    expect(within(steps).getAllByRole("listitem").map((li) => li.getAttribute("data-state"))).toEqual(["current", "pending", "pending"]);
+    expect(within(card).getByTestId("batch-whatsapp-step-record")).toHaveTextContent(/^3PO sent to supplier \(2\)$/);
   });
 
   it("records only the ticked PO; the task stays open and the other stays to send", async () => {
