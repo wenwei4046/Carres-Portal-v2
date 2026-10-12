@@ -410,14 +410,50 @@ describe("By supplier view", () => {
     expect(screen.getByTestId("by-supplier-select-ordered|s-hooka|mattress")).toBeDisabled();
     expect(screen.queryAllByTestId(/^by-supplier-row-/)).toHaveLength(1);
     fireEvent.click(screen.getByTestId("by-supplier-expand-ordered|s-hooka|mattress"));
-    expect(screen.getByTestId("by-supplier-ordered-line-l3|PO-20260820-4827")).toHaveTextContent("BooqitKing2 pcsSO-1330PO-260820-4827");
+    /* Item line 1 is the model code as the data spells it, line 2 the size (owner 13 Oct 2026). */
+    expect(screen.getByTestId("by-supplier-ordered-line-l3|PO-20260820-4827")).toHaveTextContent("B1201S-KKing2 pcsSO-1330PO-260820-4827");
     fireEvent.mouseDown(within(showBar()).getByRole("tab", { name: "All" }));
     expect(screen.queryAllByTestId(/^by-supplier-row-/).length).toBeGreaterThan(1);
   });
 
-  it("the footer adds what is still to buy, by category", () => {
+  /* Owner 13 Oct 2026: the footer is the rows' count only; Summary says what is to buy. */
+  it("the footer is the rows' count only", () => {
     renderRegister({ registerRows: [ORDER_O1, ORDER_O8], rows: [LEAF_O1, LEAF_O8A, LEAF_O8B] }, true, false, "supplier");
-    expect(screen.getByTestId("by-supplier-footer")).toHaveTextContent(/ · To buy: Mattress \d+ pcs$/);
+    expect(screen.getByTestId("by-supplier-footer")).toHaveTextContent(/^\d+ groups?$/);
+  });
+
+  /* Owner 13 Oct 2026, points 2 to 4 and 9. */
+  it("a supplier with rows in two categories names the category on each row", () => {
+    const sofaLeaf = { ...LEAF_O8A, id: "build::o8::sofa", category: "sofa" as const, lineIds: ["l81"] };
+    renderRegister({ registerRows: [ORDER_O1, ORDER_O8], rows: [LEAF_O1, sofaLeaf] }, true, false, "supplier");
+    const names = screen.getAllByTestId(/^by-supplier-name-/).map((cell) => cell.firstElementChild?.textContent);
+    expect(names).toEqual(expect.arrayContaining([`${LEAF_O1.supplier} · Mattress`, `${LEAF_O1.supplier} · Sofa`]));
+  });
+
+  it("an item line reads model code then size, under the owner's heads, with the list's own tick", () => {
+    renderRegister({ registerRows: [ORDER_O1], rows: [LEAF_O1] }, true, false, "supplier");
+    const row = screen.getAllByTestId(/^by-supplier-row-/)[0]!;
+    fireEvent.click(within(row).getAllByRole("button")[0]!);
+    const lines = screen.getByTestId(`by-supplier-lines-${row.getAttribute("data-testid")!.replace("by-supplier-row-", "")}`);
+    expect(within(lines).getAllByRole("columnheader").map((h) => h.textContent).filter(Boolean))
+      .toEqual(["Item", "To buy", "Sales order", "Order deadline", "Supplier delivers to"]);
+    const line = screen.getByTestId(`by-supplier-line-${LEAF_O1.id}`);
+    expect(line).toHaveTextContent(/^B1201S-KKing/);
+    const tick = within(line).getByRole("checkbox");
+    expect(tick.tagName).toBe("INPUT");
+    expect(tick).toHaveAttribute("type", "checkbox");
+    expect(tick).not.toBeDisabled();
+  });
+
+  it("a line that cannot be bought has a disabled tick that says why", () => {
+    const onPo = { ...LEAF_O1, fullyOnPo: true, toBuy: 1, poNumbers: ["PO-20260820-4827"] };
+    renderRegister({ registerRows: [ORDER_O1], rows: [onPo] }, true, false, "supplier");
+    const row = screen.getAllByTestId(/^by-supplier-row-/)[0]!;
+    fireEvent.click(within(row).getAllByRole("button")[0]!);
+    const tick = within(screen.getByTestId(`by-supplier-line-${LEAF_O1.id}`)).getByRole("checkbox");
+    expect(tick).toBeDisabled();
+    expect(tick.closest("label")).toHaveAttribute("title");
+    expect(tick.closest("label")!.getAttribute("title")!.length).toBeGreaterThan(3);
   });
 
   it("the Today card leads the rail with To order now and its rows", () => {
@@ -467,7 +503,7 @@ describe("By supplier view", () => {
     const row = screen.getAllByTestId(/^by-supplier-row-/)[0]!;
     fireEvent.click(within(row).getAllByRole("button")[0]!);
     const line = screen.getByTestId(`by-supplier-line-${LEAF_O1.id}`);
-    expect(within(screen.getByTestId(`by-supplier-lines-${row.getAttribute("data-testid")!.replace("by-supplier-row-", "")}`)).getByText("Supplier Deliver To")).toBeInTheDocument();
+    expect(within(screen.getByTestId(`by-supplier-lines-${row.getAttribute("data-testid")!.replace("by-supplier-row-", "")}`)).getByText("Supplier delivers to")).toBeInTheDocument();
     expect(within(line).getByTestId(`by-supplier-deliver-${LEAF_O1.id}`).querySelector("select, button, [role=combobox]")).not.toBeNull();
     expect(within(line).getByRole("checkbox")).not.toBeDisabled();
   });

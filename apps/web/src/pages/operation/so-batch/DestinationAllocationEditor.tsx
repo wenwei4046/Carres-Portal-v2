@@ -89,7 +89,7 @@ export default function DestinationAllocationEditor({
                every editable Deliver To cell, not two that happen to sit
                next to each other (owner correction 2026-09-09). */}
             <select
-              className="w-full min-w-0 appearance-none truncate rounded-control border border-kit-slate-6 bg-white py-0.5 pl-1.5 pr-5 text-meta"
+              className="h-7 w-full min-w-0 appearance-none truncate rounded-control border border-kit-slate-6 bg-white pl-1.5 pr-5 text-meta"
               data-testid={`so-batch-deliver-to-select-${row.id}`}
               value={single.destinationId}
               onClick={(e) => e.stopPropagation()}
@@ -119,7 +119,9 @@ export default function DestinationAllocationEditor({
         {active.length > 1 ? (
           <button
             type="button"
-            className="shrink-0 text-meta text-kit-blue-11 underline-offset-2 hover:underline"
+            /* A grey text button, the height of the select beside it (01 §3
+               buttons; owner 13 Oct 2026): never loose blue text. */
+            className="inline-flex h-7 shrink-0 items-center rounded-control px-2 text-meta font-medium text-c-tab hover:bg-c-hover focus-visible:[outline:var(--c-focus)]"
             data-testid={`so-batch-split-${row.id}`}
             onClick={(e) => {
               e.stopPropagation();

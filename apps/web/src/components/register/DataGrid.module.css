@@ -1448,6 +1448,15 @@ div:first-child > .columnsMenuGroup {
   order: 4;
   flex: none;
 }
+/* A control after the ⋮ button: the button is then not over the last column,
+   so its menu (below, to the left) never covers that column. */
+.afterTools {
+  order: 5;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
 .rootReference[data-presentation-tools] .searchResponsiveIcon {
   display: none;
 }

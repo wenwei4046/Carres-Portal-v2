@@ -2677,13 +2677,37 @@ because one PO goes to one supplier for one category. Rows whose PO window has g
 - Every date and number is the server's (`orderBy`, `poDeliveryDate`, `poDeliveryWorkingDays`, `poWindow`, `toBuy`); the PO window times are the Purchasing Settings values, never the specimen's.
 - Status stays in view at 1131 wide with Tasks closed, with no side scroll (measured 12 Oct 2026). Tasks now opens by itself only from 1280 wide (03 §1).
 - The earlier `Group by: Supplier` page tool, which only regrouped the Sales Order rows, is removed: one way to see demand by supplier.
+- **Owner's 13 Oct 2026 fix list (points 1 to 5 and 8 to 11) — BUILT 13 Oct 2026.**
+  (1) `Hookka Industries` and `Ohana` are one supplier, shown as `Ohana`; the full company name
+  belongs on the PO PDF. **Data note:** production held two supplier records. The 29 SKUs under the
+  `Hookka Industries` record (18 bedframe, 10 sofa, 1 accessory) were moved to the `Ohana` record on
+  13 Oct 2026 (`update product_skus set supplier_id`); both records carried the same production days
+  (bedframe 7, sofa 14). Nothing was deleted: the `Hookka Industries` record, its 55 recorded
+  quotations, its settings row and its Finance party code are untouched and no longer drive buying.
+  Recovery is the same statement the other way for those 29 SKU codes (list kept with the change
+  note). A clean database never has the second record.
+  (2) A supplier with rows in two categories names the category on each row (`Ohana · Bedframe`,
+  `Ohana · Sofa`); one PO per supplier and category is unchanged.
+  (3) An item line is the model code as the data spells it, then the size.
+  (4) Item line heads are `Item` · `To buy` · `Sales order` · `Order deadline` · `Supplier delivers to`.
+  (5) The footer is the rows' count only.
+  (8) The ⋮ menu opens below its button and to the left, above the table, and closes on a click
+  outside; `Match Ready Stock` sits after the button, so the menu never covers `Status`.
+  (9) Item lines use the list's own tick (16, the selection colour), drawn by the shared `RowTick`;
+  a tick is disabled only when the line cannot be bought, and then says why on hover. A reason that
+  has a door (`Open Settings`, `Fix in Catalog`, `Use this PO`) keeps its door in the line's last cell.
+  (10) `Split` is a grey text button the height of the select beside it.
+  (11) Group rows 54, item rows 44, drawn by the shared `ItemRows` under the list's own measured
+  columns, so an item sits exactly under its row's columns at 1025, 1164 and 1440.
+  `carres-check.js` on the fixture preview: PASS at 1025 and 1164; at 1440 its one line is the Tasks
+  title row, which this round does not touch.
 - **Tabs, totals and the Today card — BUILT 12 Oct 2026 (owner's 12 Oct package).**
   `To buy` · `Ordered` · `All` sit at the start of the toolbar. `To buy` is the rows above. `Ordered`
   is what is already on a PO, one row per supplier and category, read from the Register's own PO
   facts: quantity on POs, Sales Orders, `Ordered` in the deadline column, the latest `PO Delivery
   Date` under `Supplier ready by`, and `Ordered` (green) with the PO numbers under `Status`; its
-  lines read `Item` · `Qty` · `SO No` · `PO No` and cannot be ticked. `All` shows both. The footer
-  adds `To buy: Mattress {n} pcs · Bedframe {n} pcs · Sofa {n} sets` for the rows shown.
+  lines read `Item` · `Qty` · `Sales order` · `PO No` and cannot be ticked. `All` shows both. The footer
+  is the rows' count only (`{n} groups`, owner 13 Oct 2026); what is to buy is in the Today card.
   The rail opens with a `Today` card: one tile `{n} pcs` · `To order now` (still to buy after its PO
   window has gone by; amber when above zero), then `Past the order-by date`, one row per PO window
   of the day (`{time} today`: `{n} pcs to order`, `{n} pcs passed` in amber, or `All ordered`), `Too

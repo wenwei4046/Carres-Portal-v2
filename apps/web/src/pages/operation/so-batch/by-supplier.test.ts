@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PurchaseDemandRow, SoBatchOrderRow } from "@carres/shared";
-import { BY_SUPPLIER, daysBetween, orderedSupplierGroups, supplierGroups, toBuyByCategory, todayNumbers } from "./by-supplier";
+import { BY_SUPPLIER, daysBetween, orderedSupplierGroups, supplierGroups, todayNumbers } from "./by-supplier";
 
 /**
  * SO Batch Purchase · By supplier (owner 12 Oct 2026). One row per supplier
@@ -99,9 +99,24 @@ describe("By supplier: the words", () => {
     expect(BY_SUPPLIER.orderRefs([{ orderId: "o-1", so: 1001 }, { orderId: "o-2", so: 1002 }, { orderId: "o-3", so: 1003 }], ref)).toBe("SO-1001 +2");
   });
 
-  it("the footer counts groups and suppliers", () => {
-    expect(BY_SUPPLIER.footer(4, 3)).toBe("4 groups · 3 suppliers");
-    expect(BY_SUPPLIER.footer(1, 1)).toBe("1 group · 1 supplier");
+  /* Owner 13 Oct 2026: the footer is the rows' count only. */
+  it("the footer counts the rows and nothing else", () => {
+    expect(BY_SUPPLIER.footer(4)).toBe("4 groups");
+    expect(BY_SUPPLIER.footer(1)).toBe("1 group");
+  });
+
+  /* Owner 13 Oct 2026: one PO per supplier and category, so a supplier with
+     two rows names the category on each; a supplier with one row does not. */
+  it("names the category only when the supplier has rows in two categories", () => {
+    expect(BY_SUPPLIER.groupName({ supplier: "TEST Supplier Two", category: "bedframe" }, true)).toBe("TEST Supplier Two · Bedframe");
+    expect(BY_SUPPLIER.groupName({ supplier: "TEST Supplier Two", category: "sofa" }, true)).toBe("TEST Supplier Two · Sofa");
+    expect(BY_SUPPLIER.groupName({ supplier: "TEST Supplier One", category: "mattress" }, false)).toBe("TEST Supplier One");
+    expect(BY_SUPPLIER.groupName({ supplier: null, category: "sofa" }, false)).toBe("Supplier not set");
+  });
+
+  it("the item line heads are the owner's sentence-case words", () => {
+    expect([BY_SUPPLIER.lineItem, BY_SUPPLIER.lineToBuy, BY_SUPPLIER.lineSoNo, BY_SUPPLIER.lineOrderBy, BY_SUPPLIER.lineDeliverTo])
+      .toEqual(["Item", "To buy", "Sales order", "Order deadline", "Supplier delivers to"]);
   });
 });
 
@@ -151,24 +166,22 @@ describe("Ordered: what is already on a PO, by supplier and category", () => {
     const [g] = orderedSupplierGroups(orders);
     expect(g!.key.startsWith("ordered|")).toBe(true);
     expect(g!.cutOffPassed).toBe(false);
-    expect(toBuyByCategory([g!])).toEqual([]);
+    expect(g!.qty).toBeGreaterThan(0);
+  });
+
+  it("an ordered line carries the model code the data spells", () => {
+    const [g] = orderedSupplierGroups(orders);
+    expect(g!.ordered!.lines.map((l) => l.sku)).toEqual(["TEST-A", "TEST-A"]);
   });
 });
 
-describe("the footer totals and the Today card read the same lines", () => {
+describe("the Today card reads the same lines as the list", () => {
   const rows = [
     row({ id: "a", toBuy: 2, category: "sofa", supplierId: "s-2", supplier: "TEST Supplier Two", poWindow: "2026-10-12T11:00", orderBy: "2026-10-10" }),
     row({ id: "b", toBuy: 3, category: "mattress", poWindow: "2026-10-12T11:00", orderBy: "2026-10-16" }),
     row({ id: "c", toBuy: 4, category: "mattress", poWindow: "2026-10-12T16:00", orderBy: "2026-10-12" }),
     row({ id: "d", toBuy: 0, category: "bedframe", poWindow: "2026-10-12T11:00", orderBy: "2026-10-01" }),
   ];
-
-  it("totals what is still to buy per category, in the approved order", () => {
-    const totals = toBuyByCategory(supplierGroups(rows, "2026-10-12T09:00"));
-    expect(totals).toEqual([{ category: "mattress", qty: 7 }, { category: "sofa", qty: 2 }]);
-    expect(BY_SUPPLIER.toBuyTotals(totals)).toBe("To buy: Mattress 7 pcs · Sofa 2 sets");
-    expect(BY_SUPPLIER.toBuyTotals([])).toBe("");
-  });
 
   it("To order now is what is still to buy after its PO window has gone by", () => {
     const morning = todayNumbers(rows, "2026-10-12T09:00", "2026-10-12", ["11:00", "16:00"]);

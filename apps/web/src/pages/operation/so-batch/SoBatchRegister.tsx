@@ -1563,14 +1563,15 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 selectionPrimary={<>{viewSwitch}{issueActions}</>}
                 toolbarEnd={<div className={`${styles.toolbarTools} flex min-w-0 flex-wrap items-center gap-2`}>
                   {viewSwitch}
-                  {/* Ready Stock is matched per Sales Order, so the same act opens the By sales order list. */}
-                  <Button loading={stock.busy} disabled={isLoading || data.readyStockPriority == null}
-                    title={data.readyStockPriority == null ? "Not available" : undefined}
-                    data-testid="by-supplier-match-stock"
-                    onClick={() => { setPresentation("table"); void stock.match(shown.filter(order => purchaseStatus(order) !== "Done")); }}>
-                    {BY_SUPPLIER.matchReadyStock}
-                  </Button>
                 </div>}
+                /* Ready Stock is matched per Sales Order, so the same act opens the
+                   By sales order list. It sits after the ⋮ button (owner 13 Oct 2026). */
+                toolbarAfterTools={<Button loading={stock.busy} disabled={isLoading || data.readyStockPriority == null}
+                  title={data.readyStockPriority == null ? "Not available" : undefined}
+                  data-testid="by-supplier-match-stock"
+                  onClick={() => { setPresentation("table"); void stock.match(shown.filter(order => purchaseStatus(order) !== "Done")); }}>
+                  {BY_SUPPLIER.matchReadyStock}
+                </Button>}
                 lineExtras={(leaf) => {
                   const order = orderById.get(leaf.orderId);
                   if (!order) return {};
@@ -1583,10 +1584,17 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                         onWholeRow={(destinationId) => changeWholeLeaf(leaf, destinationId)}
                         onSplit={(allocations) => setLeafAllocations(leaf.id, allocations)} />
                     ) : null,
-                    why: why ? (
-                      <StatusWhy why={why} testId={`by-supplier-status-why-${leaf.id}`} orderId={leaf.orderId}
-                        onDoor={(door) => navigate(STATUS_DOOR_PATH[door])} />
-                    ) : null,
+                    /* Why a line cannot be bought is said by its tick (hover and
+                       screen reader); a reason that has a door keeps the door,
+                       in the cell the editor would take. */
+                    whyText: why?.text ?? null,
+                    door: why?.door === "use_po" && why.usePo ? <UseThisPoButton orderId={leaf.orderId} usePo={why.usePo} />
+                      : why?.door && why.door !== "use_po" ? (
+                        <button type="button" className={STATUS_DOOR_CLASS} data-testid={`by-supplier-door-${leaf.id}`}
+                          onClick={() => navigate(STATUS_DOOR_PATH[why.door as Exclude<SoBatchStatusDoor, "use_po">])}>
+                          {why.door === "catalog" ? W.statusFixInCatalog : W.statusOpenSettings}
+                        </button>
+                      ) : undefined,
                   };
                 }}
                 toolbarStart={<>

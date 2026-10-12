@@ -1435,7 +1435,7 @@ No recorded business date is silently moved to fit a calendar. Purchasing/Operat
 Office calendar (Mon–Fri); Receiving/GRN/Warehouse uses the Warehouse calendar (Mon–Sat); Sunday
 and Selangor public holidays are excluded.
 
-**SO Batch Purchase tabs and Today card — owner's 12 Oct 2026 package.** Tabs `To buy` · `Ordered` · `All`. An ordered row reads `Ordered` under `Order PO deadline` and `Ordered` (green) with its PO numbers under `Status`; its lines read `Item` · `Qty` · `SO No` · `PO No`. Footer `To buy: Mattress {n} pcs · Bedframe {n} pcs · Sofa {n} sets`. Empty lists: `Nothing to buy. Every Sales Order already has its PO.` · `No Sales Order has a PO yet.` Today card: `Today` · `{n} pcs` · `To order now` · `Past the order-by date` · `{time} today` with `{n} pcs to order`, `{n} pcs passed` or `All ordered` · `Too late for customer date` · `Partly ordered`. `Too late for customer date` is the count of the rail's `Production late`; the rail keeps its own word.
+**SO Batch Purchase tabs and Today card — owner's 12 Oct 2026 package.** Tabs `To buy` · `Ordered` · `All`. An ordered row reads `Ordered` under `Order PO deadline` and `Ordered` (green) with its PO numbers under `Status`; its lines read `Item` · `Qty` · `Sales order` · `PO No`. Empty lists: `Nothing to buy. Every Sales Order already has its PO.` · `No Sales Order has a PO yet.` Today card: `Today` · `{n} pcs` · `To order now` · `Past the order-by date` · `{time} today` with `{n} pcs to order`, `{n} pcs passed` or `All ordered` · `Too late for customer date` · `Partly ordered`. `Too late for customer date` is the count of the rail's `Production late`; the rail keeps its own word.
 
 **Purchase Orders Overview — owner's 12 Oct 2026 package.** Display switch `Overview` (first) · `Table` · `Cards`. Tabs `Open` · `Received` · `All`: `Open` is the groups `Confirm PO sent to supplier` and `Waiting for goods from supplier`, `Received` is `Completed`, `All` adds `Cancelled`. Columns `PO No` · `Items` · `SO No / MPR No` · `PO Doc Date` · `PO Delivery Date` · `Status`. `Items` reads `{n} pc` / `{n} pcs` (`{n} set` / `{n} sets` for sofa alone) over the category words. `Status` prints the governed document state and, under it, `Supplier delivery date passed` or `Partly received`. Not Portal words: `PO no.`, `Sales orders` as a heading, `Supplier deadline`.
 
@@ -2296,8 +2296,12 @@ Other views retain their purpose-specific names, such as `Monthly demand`.
 ### Purchasing UI dictionary — APPROVED (Jess, 2026-09-18) · BUILT on SO Batch Purchase 2026-09-18
 
 **SO Batch Purchase · By supplier — owner 12 Oct 2026 · BUILT 12 Oct 2026 (Purchasing MASTER §9.1).** View names
-`By supplier` (first) · `By sales order` (was `Table`) · `Cards`. Item line heads `Item` · `To buy` · `SO No` · `Order By` ·
-`Supplier Deliver To`. Columns `Supplier` · `Items` · `Sales orders` · `Order PO deadline` ·
+`By supplier` (first) · `By sales order` (was `Table`) · `Cards`. Item line heads, sentence case (owner 13 Oct 2026):
+`Item` · `To buy` · `Sales order` · `Order deadline` · `Supplier delivers to`; an ordered line reads `Item` · `Qty` ·
+`Sales order` · `PO No`. These heads are this view's own; `SO No`, `Order By` and `Supplier Deliver To` stay the
+Purchasing dictionary's words on the other pages. An item line is the model code as the data spells it, then the size
+(`CODY-SK` over `Super King`). A supplier with rows in two categories names the category: `{Supplier} · Bedframe`,
+`{Supplier} · Sofa`. The footer is the rows' count only: `{n} groups`. Columns `Supplier` · `Items` · `Sales orders` · `Order PO deadline` ·
 `Supplier ready by` · `Status`. Second lines: `Supplier delivers · {n}d` · `We collect · {n}d` · `{n} models` ·
 `1 model` · `SO-{no} +{n}` · `{weekday} · {n} days left` · `{weekday} · Today` · `{weekday} · {n} days late` ·
 `{weekday} · if sent today`. Quantities `{n} pcs` · `1 pc`, a sofa `{n} sets` · `1 set`. Status `Cut-off passed` with
