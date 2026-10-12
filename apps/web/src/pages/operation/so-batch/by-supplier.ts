@@ -1,4 +1,4 @@
-import type { PurchaseDemandRow } from "@carres/shared";
+import type { PurchaseDemandRow, SoBatchOrderRow } from "@carres/shared";
 
 /**
  * SO BATCH PURCHASE · BY SUPPLIER (owner 12 Oct 2026; 01 §5; Purchasing MASTER
@@ -29,7 +29,24 @@ export interface SupplierGroup {
   /** A line's PO window has gone by and it is still to buy. */
   cutOffPassed: boolean;
   lines: PurchaseDemandRow[];
+  /** Set on a group whose goods are already on a PO (`Ordered`): its PO
+   *  numbers and its lines. Such a group has nothing to buy and no `lines`. */
+  ordered?: { poIds: string[]; lines: OrderedLine[] };
 }
+
+/** One Sales Order line's quantity on one PO, as the `Ordered` tab lists it. */
+export interface OrderedLine {
+  id: string;
+  orderId: string;
+  so: number | null;
+  item: string;
+  variant: string | null;
+  category: PurchaseDemandRow["category"];
+  qty: number;
+  poId: string;
+}
+
+export type SupplierShow = "buy" | "ordered" | "all";
 
 const toBuyOf = (row: PurchaseDemandRow) => row.toBuy ?? 0;
 
@@ -94,6 +111,96 @@ export function supplierGroups(rows: readonly PurchaseDemandRow[], nowKey: strin
   );
 }
 
+/**
+ * Group what is ALREADY on a PO by supplier and category, from the Register's
+ * own order rows (`registerRows`): each line's quantity per PO, and each PO's
+ * supplier and PO Delivery Date. Nothing is computed about buying here; the
+ * to-buy arithmetic stays with `supplierGroups`.
+ */
+export function orderedSupplierGroups(orders: readonly SoBatchOrderRow[]): SupplierGroup[] {
+  const byKey = new Map<string, { supplierId: string | null; supplier: string | null; category: PurchaseDemandRow["category"]; lines: OrderedLine[]; dates: string[] }>();
+  for (const order of orders) {
+    for (const line of order.lines) {
+      for (const onPo of line.pos) {
+        if (!(onPo.qty > 0)) continue;
+        const po = order.pos.find((candidate) => candidate.poId === onPo.poId);
+        const category = (line.category ?? null) as PurchaseDemandRow["category"];
+        const key = `ordered|${po?.supplierId ?? "none"}|${category ?? "other"}`;
+        const bucket = byKey.get(key) ?? { supplierId: po?.supplierId ?? null, supplier: po?.supplierName ?? null, category, lines: [], dates: [] };
+        bucket.lines.push({
+          id: `${line.orderLineId}|${onPo.poId}`, orderId: order.orderId, so: order.so,
+          item: line.item ?? line.sku, variant: line.variant ?? null, category, qty: onPo.qty, poId: onPo.poId,
+        });
+        if (po?.officialDeliveryDate) bucket.dates.push(po.officialDeliveryDate);
+        byKey.set(key, bucket);
+      }
+    }
+  }
+  const groups: SupplierGroup[] = [];
+  for (const [key, bucket] of byKey) {
+    const lines = [...bucket.lines].sort((a, b) =>
+      a.item.localeCompare(b.item) || (a.variant ?? "").localeCompare(b.variant ?? "") ||
+      (a.so ?? Number.MAX_SAFE_INTEGER) - (b.so ?? Number.MAX_SAFE_INTEGER));
+    const orderIds = new Map<string, number | null>();
+    for (const line of lines) if (!orderIds.has(line.orderId)) orderIds.set(line.orderId, line.so);
+    groups.push({
+      key, supplierId: bucket.supplierId, supplier: bucket.supplier, category: bucket.category,
+      kind: null as unknown as SupplierGroup["kind"], productionDays: null,
+      qty: lines.reduce((n, l) => n + l.qty, 0),
+      models: new Set(lines.map((l) => l.item)).size,
+      orders: [...orderIds].map(([orderId, so]) => ({ orderId, so }))
+        .sort((a, b) => (a.so ?? Number.MAX_SAFE_INTEGER) - (b.so ?? Number.MAX_SAFE_INTEGER)),
+      orderBy: null,
+      readyBy: [...bucket.dates].sort().at(-1) ?? null,
+      cutOffPassed: false,
+      lines: [],
+      ordered: { poIds: [...new Set(lines.map((l) => l.poId))].sort(), lines },
+    });
+  }
+  return groups.sort((a, b) =>
+    (a.supplier ?? "\uffff").localeCompare(b.supplier ?? "\uffff") || (a.category ?? "").localeCompare(b.category ?? ""));
+}
+
+/** Quantity still to buy per category, in the approved category order. */
+export function toBuyByCategory(groups: readonly SupplierGroup[]): Array<{ category: PurchaseDemandRow["category"]; qty: number }> {
+  const totals = new Map<string, number>();
+  for (const g of groups) if (!g.ordered && g.qty > 0) totals.set(g.category ?? "other", (totals.get(g.category ?? "other") ?? 0) + g.qty);
+  return ["mattress", "bedframe", "sofa", ...[...totals.keys()].filter((c) => !["mattress", "bedframe", "sofa"].includes(c)).sort()]
+    .filter((c) => totals.has(c))
+    .map((c) => ({ category: c as PurchaseDemandRow["category"], qty: totals.get(c)! }));
+}
+
+/**
+ * THE TODAY CARD'S NUMBERS (owner's 12 Oct 2026 package, Summary · Today).
+ * Every number is read from facts the page already holds: a line's `toBuy`,
+ * its `poWindow` and its `orderBy`. Pieces are counted, never Sales Orders,
+ * except the two rows the page passes in from its own counts.
+ */
+export interface TodayNumbers {
+  /** Pieces still to buy whose PO window has gone by. */
+  toOrderNow: number;
+  /** Pieces still to buy whose Order By date has gone by. */
+  pastOrderBy: number;
+  /** Today's PO windows, earliest first. */
+  windows: Array<{ key: string; time: string; qty: number; passed: boolean }>;
+}
+
+export function todayNumbers(rows: readonly PurchaseDemandRow[], nowKey: string, today: string, windowTimes: readonly string[]): TodayNumbers {
+  /* `today` is the server's Malaysia date, the same one the list's deadlines
+     are counted from, so the card and the rows cannot disagree about a day. */
+  const open = rows.filter(isOpenDemand);
+  const sum = (list: readonly PurchaseDemandRow[]) => list.reduce((n, row) => n + toBuyOf(row), 0);
+  const times = [...new Set([...windowTimes, ...open.map((row) => row.poWindow).filter((w): w is string => !!w && w.startsWith(today)).map((w) => w.slice(11, 16))])].sort();
+  return {
+    toOrderNow: sum(open.filter((row) => !!row.poWindow && row.poWindow < nowKey)),
+    pastOrderBy: sum(open.filter((row) => !!row.orderBy && row.orderBy < today)),
+    windows: times.map((time) => {
+      const key = `${today}T${time}`;
+      return { key, time, qty: sum(open.filter((row) => row.poWindow === key)), passed: key < nowKey };
+    }),
+  };
+}
+
 /** Whole days from `today` to `date` (both `YYYY-MM-DD`): negative = gone by. */
 export function daysBetween(today: string, date: string): number {
   const at = (iso: string) => Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
@@ -126,6 +233,31 @@ export const BY_SUPPLIER = {
   lineDeliverTo: "Supplier Deliver To",
   cards: "Cards",
   matchReadyStock: "Match Ready Stock",
+  /* The three tabs and the `Ordered` rows (owner's 12 Oct 2026 package). */
+  showBuy: "To buy",
+  showOrdered: "Ordered",
+  showAll: "All",
+  ordered: "Ordered",
+  linePoNo: "PO No",
+  lineQty: "Qty",
+  category: (category: PurchaseDemandRow["category"]) =>
+    category === "mattress" ? "Mattress" : category === "bedframe" ? "Bedframe" : category === "sofa" ? "Sofa" : "Other goods",
+  poRefs: (poIds: readonly string[], display: (id: string) => string) =>
+    poIds.length === 0 ? "" : poIds.length === 1 ? display(poIds[0]!) : `${display(poIds[0]!)} +${poIds.length - 1}`,
+  toBuyTotals: (totals: ReadonlyArray<{ category: PurchaseDemandRow["category"]; qty: number }>) =>
+    totals.length === 0 ? "" : `To buy: ${totals.map((t) => `${BY_SUPPLIER.category(t.category)} ${BY_SUPPLIER.qty(t.category, t.qty)}`).join(" · ")}`,
+  nothingToBuy: "Nothing to buy. Every Sales Order already has its PO.",
+  nothingOrdered: "No Sales Order has a PO yet.",
+  /* The Today card. */
+  today: "Today",
+  toOrderNow: "To order now",
+  pastOrderBy: "Past the order-by date",
+  windowToday: (time: string) => `${time} today`,
+  toOrder: (category: PurchaseDemandRow["category"], n: number) => `${BY_SUPPLIER.qty(category, n)} to order`,
+  passed: (category: PurchaseDemandRow["category"], n: number) => `${BY_SUPPLIER.qty(category, n)} passed`,
+  allOrdered: "All ordered",
+  tooLate: "Too late for customer date",
+  partlyOrdered: "Partly ordered",
   qty: (category: PurchaseDemandRow["category"], n: number) =>
     category === "sofa" ? `${n} ${n === 1 ? "set" : "sets"}` : `${n} ${n === 1 ? "pc" : "pcs"}`,
   models: (n: number) => `${n} ${n === 1 ? "model" : "models"}`,

@@ -76,7 +76,8 @@ import {
 import { printSalesOrdersOrSay } from "../record-print";
 import { fmtDate } from "@/lib/fmt-date";
 import SoBatchBySupplier from "./SoBatchBySupplier";
-import { BY_SUPPLIER, supplierGroups } from "./by-supplier";
+import { BY_SUPPLIER, orderedSupplierGroups, supplierGroups, todayNumbers, type SupplierShow } from "./by-supplier";
+import SoBatchTodayCard from "./SoBatchTodayCard";
 import { conciseLocality, NOT_RECORDED } from "@/lib/locality";
 import { avatarColor, personInitials } from "@/lib/staff-avatar";
 import {
@@ -1291,16 +1292,27 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
   };
   const quickOrder = quickOrderId ? orders.find(order => order.orderId === quickOrderId) : null;
   const viewSwitch = <Tabs variant="segmented" label="SO Batch Purchase view" value={presentation} onValueChange={setPresentation}
-    tabs={[{ value: "supplier", label: BY_SUPPLIER.view }, { value: "table", label: BY_SUPPLIER.bySalesOrder, icon: "table" }, { value: "cards", label: BY_SUPPLIER.cards, icon: "cards" }]} />;
+    tabs={[{ value: "supplier", label: BY_SUPPLIER.view }, { value: "table", label: BY_SUPPLIER.bySalesOrder }, { value: "cards", label: BY_SUPPLIER.cards }]} />;
   /* BY SUPPLIER (owner 12 Oct 2026): the demand of the orders this list is
      showing, one row per supplier and category. It reads the same ticks, so
      `Issue PO` takes them from either view. */
   const shownOrderIds = useMemo(() => new Set(shown.map((order) => order.orderId)), [shown]);
   const nowKey = (() => { const now = malaysiaClockOf(new Date().toISOString()); return `${now.date}T${now.time.slice(0, 5)}`; })();
-  const bySupplier = useMemo(
-    () => (presentation === "supplier" ? supplierGroups(leafs.filter((leaf) => shownOrderIds.has(leaf.orderId)), nowKey) : []),
-    [presentation, leafs, shownOrderIds, nowKey],
-  );
+  /* `To buy` · `Ordered` · `All` (owner's 12 Oct 2026 package): what is still to
+     buy, what is already on a PO, or both, for the same shown Sales Orders. */
+  const show: SupplierShow = presentationParams.get("show") === "ordered" ? "ordered" : presentationParams.get("show") === "all" ? "all" : "buy";
+  const bySupplier = useMemo(() => {
+    if (presentation !== "supplier") return [];
+    const buy = show === "ordered" ? [] : supplierGroups(leafs.filter((leaf) => shownOrderIds.has(leaf.orderId)), nowKey);
+    const ordered = show === "buy" ? [] : orderedSupplierGroups(shown);
+    return [...buy, ...ordered];
+  }, [presentation, show, leafs, shown, shownOrderIds, nowKey]);
+  const showTabs = <Tabs variant="segmented" label="SO Batch Purchase shown" value={show}
+    onValueChange={(value) => changePresentationParam("show", value === "ordered" || value === "all" ? value : null)}
+    tabs={[{ value: "buy", label: BY_SUPPLIER.showBuy }, { value: "ordered", label: BY_SUPPLIER.showOrdered }, { value: "all", label: BY_SUPPLIER.showAll }]} />;
+  /* The Today card reads every Sales Order, not the filtered list: it says
+     what the day holds, whatever the rail is showing. */
+  const todayCard = useMemo(() => todayNumbers(leafs, nowKey, data.today, data.poCutoffTimes ?? []), [leafs, nowKey, data.today, data.poCutoffTimes]);
   const issueActions = summary.lines > 0 ? (
     <span className="flex shrink-0 items-center gap-2" data-testid="so-batch-selection-actions">
       <SoBatchPoDutyChip data={data} />
@@ -1358,6 +1370,9 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
               `ORDER TIMING`, the section that answers what to buy today. The
               outstanding arithmetic behind it is untouched and still governs
               the tick and the Ready Stock door. */}
+          <SoBatchTodayCard numbers={todayCard} timeWord={poWindowTimeWord}
+            tooLate={railFacts.filter((fact) => fact.states.has("not_enough_production_time")).length}
+            partlyOrdered={orders.filter((order) => purchaseStatus(order) === "Partial").length} />
           {roundNavigation && <FilterRailGroup title="Order time" icon="date" defaultOpen>
             {data.poWindowsUnavailable && <p className="px-2 py-2 text-meta text-kit-slate-11">Data not loaded</p>}
             {(data.poCutoffTimes ?? [...new Set(roundNavigation.rounds.flatMap(round => {
@@ -1574,9 +1589,12 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                     ) : null,
                   };
                 }}
-                toolbarStart={!filterRailOpen ? <ShowFiltersButton onShow={() => setFilterRailVisible(true)} testId="so-batch-show-filters" /> : null}
+                toolbarStart={<>
+                  {!filterRailOpen ? <ShowFiltersButton onShow={() => setFilterRailVisible(true)} testId="so-batch-show-filters" /> : null}
+                  {showTabs}
+                </>}
                 onOpenOrder={setQuickOrderId}
-                emptyMessage={orders.length > 0 ? W.noMatch : W.empty}
+                emptyMessage={orders.length === 0 ? W.empty : shown.length < orders.length ? W.noMatch : show === "ordered" ? BY_SUPPLIER.nothingOrdered : BY_SUPPLIER.nothingToBuy}
                 initialSearch={initialSearch}
                 searchPlaceholder={W.search}
               />
