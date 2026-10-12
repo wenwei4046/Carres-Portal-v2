@@ -210,6 +210,24 @@ describe("Who may ask, in Finance Settings", () => {
     }
   });
 
+  it("0687: lists HR and BD staff beside Operation, each with where they work", async () => {
+    api.routes[`${B}/me`] = { may_request: true, finance: true, boss: false, may_grant: true };
+    api.routes[`${B}/grants`] = { rows: [
+      ...grants.rows,
+      { user_id: "44444444-4444-4444-8444-444444444444", name: "Hana", role: "hr", allowed: false, granted_at: null, granted_by_name: null },
+      { user_id: "55555555-5555-4555-8555-555555555555", name: "Bala", role: "bd", allowed: true, granted_at: "2026-10-12T02:00:00Z", granted_by_name: "Boss" },
+    ] };
+    show("/finance/settings");
+    await screen.findByRole("checkbox", { name: "Hana may ask Finance to pay" });
+    const table = screen.getByTestId("request-access-table");
+    const rowOf = (name: string) => within(table).getByText(name).closest("tr")!;
+    expect(rowOf("Hana")).toHaveTextContent("HR");
+    expect(rowOf("Bala")).toHaveTextContent("BD");
+    expect(rowOf("Aina")).toHaveTextContent("Operation");
+    expect(screen.getByTestId("request-access")).toHaveTextContent(
+      "Operation, HR and BD staff ticked here may ask Finance to pay a bill, from Payment Requests.");
+  });
+
   it("a login that may not tick only reads", async () => {
     api.routes[`${B}/me`] = { may_request: true, finance: true, boss: false, may_grant: false };
     api.routes[`${B}/grants`] = grants;

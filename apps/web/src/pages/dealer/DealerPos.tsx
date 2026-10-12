@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Bookmark, ListOrdered, LogOut, Menu, ShoppingBag, Users, Wallet } from "lucide-react";
+import { Bookmark, HandCoins, ListOrdered, LogOut, Menu, ShoppingBag, Users, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import type {
   CreateOrderInput,
@@ -19,6 +19,7 @@ import { useStaffSession } from "@/lib/staff";
 import StaffManagePage from "./staff/StaffManagePage";
 import CommissionPage from "./commission/CommissionPage";
 import { seesCommission } from "./commission/commission-door";
+import { useNavCapabilities } from "@/pages/portal/nav-capabilities";
 import StaffSwitchChip from "./staff/StaffSwitchChip";
 import { staffColorHex, staffInitials } from "./staff/staff-ui";
 import {
@@ -208,6 +209,10 @@ export default function DealerPos({
   // (in-flow dealer pick, body dealerId, staff-gate exempt); only its dealer
   // list source + the two BD overlays differ.
   const isBd = role === "bd";
+  // 0687 (Chew 2026-10-12, Finance MASTER §3.3): the BD staff Finance or the
+  // boss allows ask Finance to pay a bill, from their own top-bar pill.
+  const userId = useAuth((s) => s.user?.id ?? null);
+  const navCaps = useNavCapabilities(isBd ? role : null, userId);
   const userEmail = useAuth((s) => s.user?.email ?? "");
   const signOut = useAuth((s) => s.signOut);
   // 0233 — the PIN-verified staff member (null for principal on-behalf / dormant
@@ -1145,6 +1150,21 @@ export default function DealerPos({
             >
               <Users size={13} strokeWidth={1.75} />
               <span>Accounts</span>
+            </button>
+          )}
+          {/* 0687 (Chew 2026-10-12): Payment Requests, for the BD staff Finance
+              or the boss allows. It opens the page in Finance. */}
+          {isBd && navCaps.has("payment-requester") && (
+            <button
+              type="button"
+              onClick={() => navigate("/finance/payment-requests")}
+              className="topbar-pill"
+              aria-label="Payment Requests"
+              title="Payment Requests"
+              data-testid="pos-topbar-payment-requests"
+            >
+              <HandCoins size={13} strokeWidth={1.75} />
+              <span>Payment Requests</span>
             </button>
           )}
           {/* Staff management (Loo 2026-07-19) — the store owner / manager adds

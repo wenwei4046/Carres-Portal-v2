@@ -171,3 +171,27 @@ describe("Payment Requests in the Operations rail", () => {
     expect(withGrant).toEqual(keys());
   });
 });
+
+/**
+ * 0687 (Chew 2026-10-12, Finance MASTER §3.3, 「hr & BD 也到能申请」): the HR
+ * staff Finance or the boss allows see Payment Requests on their own rail.
+ */
+describe("Payment Requests on the HR rail", () => {
+  const HR = PORTAL_NAV.find((g) => g.area === "hr")!;
+  const GRANT = new Set(["payment-requester"] as const);
+  const keys = (role: "hr" | "principal", caps?: ReadonlySet<"payment-requester">) => visibleItems(HR, role, caps).map((i) => i.key);
+
+  it("shows to HR staff with the grant, and to no one else on this rail", () => {
+    expect(keys("hr")).not.toContain("payment-requests");
+    expect(keys("hr", GRANT)).toContain("payment-requests");
+    // The boss already has it under Operations; one row is enough.
+    expect(keys("principal", GRANT)).not.toContain("payment-requests");
+  });
+
+  it("opens the Finance page, last on the rail", () => {
+    const item = HR.items.find((i) => i.key === "payment-requests")!;
+    expect(navItemHref(HR, item)).toBe("/finance/payment-requests");
+    expect(keys("hr", GRANT).at(-1)).toBe("payment-requests");
+    expect(keys("hr", GRANT).filter((k) => k !== "payment-requests")).toEqual(keys("hr"));
+  });
+});

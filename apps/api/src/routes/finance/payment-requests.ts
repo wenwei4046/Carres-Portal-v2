@@ -30,8 +30,8 @@ import type { AppEnv } from "../../types";
  *   GET  /grants · PUT /grants/:userId {allowed}   who may ask; set by the boss
  *
  * Who may do what is the database's (every door checks its caller). This guard
- * only admits the staff the Finance pages are open to: Finance, the
- * principal and Operation.
+ * only admits the staff who may be allowed to ask: Finance, the principal,
+ * Operation, and since 0687 HR and BD (Chew 2026-10-12, 「hr & BD 也到能申请」).
  */
 const router = new Hono<AppEnv>();
 
@@ -44,10 +44,12 @@ const EXT: Record<z.infer<typeof apFileSignInput>["mimeType"], string> = {
   "image/webp": "webp",
 };
 
+const REQUEST_STAFF: ReadonlySet<string> = new Set(["finance", "principal", "operation", "hr", "bd"]);
+
 const requireRequestStaff: MiddlewareHandler<AppEnv> = async (c, next) => {
   const role = c.var.auth?.role;
-  if (role !== "finance" && role !== "principal" && role !== "operation") {
-    throw new HTTPException(403, { message: "Finance, Operation or Principal only" });
+  if (!role || !REQUEST_STAFF.has(role)) {
+    throw new HTTPException(403, { message: "Finance, Operation, HR, BD or Principal only" });
   }
   await next();
 };

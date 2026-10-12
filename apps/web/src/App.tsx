@@ -162,8 +162,10 @@ export default function App() {
               {/* Payment MASTER §12 — the Responsible Delivery Operation
                   (role: operation) do daily collection, so the Payments and
                   Invoices destinations must open for them. FinanceApp itself
-                  bounces operation off the finance-only pages. */}
-              <RequireRole roles={["finance", "principal", "operation"]}>
+                  bounces operation off the finance-only pages. HR and BD reach
+                  Payment Requests only (0687, Chew 2026-10-12, Finance MASTER
+                  §3.3); FinanceApp sends them nowhere else. */}
+              <RequireRole roles={["finance", "principal", "operation", "hr", "bd"]}>
                 <FinanceApp />
               </RequireRole>
             </RequireAuth>

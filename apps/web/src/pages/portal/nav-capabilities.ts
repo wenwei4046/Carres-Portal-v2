@@ -8,8 +8,10 @@ import { apiFetch } from "@/lib/api";
  *
  * ONE use today (Chew 2026-10-03, docs/finance/MASTER.md §3.3 — the one
  * shared-menu change Chew approved): the `Payment Requests` entry shows to the
- * Operation staff Finance or the boss has allowed to ask Finance to pay. Finance and the
- * principal see it in the Finance area by their role.
+ * Operation staff Finance or the boss has allowed to ask Finance to pay, and
+ * since 0687 (Chew 2026-10-12) to the HR and BD staff allowed: a row on the HR
+ * rail, a button on the BD POS. Finance and the principal see it in the
+ * Finance area by their role.
  *
  * Read once per person with a plain request, not a react-query hook: the rail
  * renders in shells (and their tests) that carry no query client. A failed
@@ -19,7 +21,7 @@ import { apiFetch } from "@/lib/api";
 export type NavCapability = "payment-requester";
 
 export const NO_CAPS: ReadonlySet<NavCapability> = new Set();
-const ASKING_ROLES: ReadonlySet<Role> = new Set<Role>(["operation", "principal"]);
+const ASKING_ROLES: ReadonlySet<Role> = new Set<Role>(["operation", "principal", "hr", "bd"]);
 
 let cached: { key: string; caps: ReadonlySet<NavCapability> } | null = null;
 

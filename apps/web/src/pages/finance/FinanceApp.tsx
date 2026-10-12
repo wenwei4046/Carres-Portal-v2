@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import Button from "@/components/kit/Button";
 // Unified Internal Portal (2026-06-30) — shared role-aware rail.
 import PortalSidebar from "@/pages/portal/PortalSidebar";
 import { useAuth } from "@/lib/auth";
@@ -80,6 +81,9 @@ export default function FinanceApp() {
   }, []);
   const financeOnly = (page: React.ReactNode) =>
     role === "operation" ? <Navigate to="/finance/monitor" replace /> : page;
+  // 0687 (Chew 2026-10-12, 「hr & BD 也到能申请」, Finance MASTER §3.3): HR and
+  // BD reach Payment Requests and nothing else here.
+  if (role === "hr" || role === "bd") return <RequestsOnly role={role} />;
   return (
     /* ⭐ A FIXED FRAME, like the Operation shell (Payment Monitor Card 02,
        2026-09-16). With `min-h-screen` the page grew to its content, so a
@@ -183,6 +187,33 @@ export default function FinanceApp() {
           {/* 0512 — the one list of money accounts. */}
           <Route path="settings" element={financeOnly(<FinanceSettings />)} />
           <Route path="*"         element={<Navigate to="." replace />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
+
+/**
+ * HR and BD staff (0687): Payment Requests is the one page they reach under
+ * `/finance`; every other address lands on it. HR keeps its own rail, which
+ * carries the `Payment Requests` row for the staff Finance or the boss allows.
+ * BD works from the POS, which has no rail, so its frame carries one way back.
+ */
+function RequestsOnly({ role }: { role: "hr" | "bd" }) {
+  const navigate = useNavigate();
+  return (
+    <div className="flex h-screen bg-background text-foreground">
+      {role === "hr" && <PortalSidebar />}
+      <main className="flex min-w-0 min-h-0 flex-1 flex-col overflow-y-auto">
+        {role === "bd" && (
+          <div className="flex shrink-0 items-center border-b border-base-200 bg-white px-3 py-1" data-testid="requests-back-to-pos">
+            {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0687). */}
+            <Button variant="ghost" icon="back" onClick={() => navigate("/bd")}>Back to POS</Button>
+          </div>
+        )}
+        <Routes>
+          <Route path="payment-requests/*" element={<PaymentRequests />} />
+          <Route path="*" element={<Navigate to="/finance/payment-requests" replace />} />
         </Routes>
       </main>
     </div>

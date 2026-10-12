@@ -9,11 +9,15 @@ import { refusal } from "../payables/payables-words";
 
 /**
  * Finance Settings → Payment requests (migrations 0645, 0648; Chew 2026-10-03,
- * docs/finance/MASTER.md §3.3): which Operation staff may ask Finance to pay a
- * bill. Finance and the boss tick and untick; a shared login only reads.
- * Finance and the boss may always ask. Every grant is kept: unticking takes it
- * back, never deletes it.
+ * docs/finance/MASTER.md §3.3): which Operation staff, and since 0687 which HR
+ * and BD staff (Chew 2026-10-12), may ask Finance to pay a bill. Finance and
+ * the boss tick and untick; a shared login only reads. Finance and the boss
+ * may always ask. Every grant is kept: unticking takes it back, never deletes it.
  */
+
+// PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0687).
+const WORKS_IN: Record<string, string> = { operation: "Operation", hr: "HR", bd: "BD" };
+export const worksIn = (role: string) => WORKS_IN[role] ?? role;
 export default function RequestAccess() {
   const me = useRequestMe();
   const grants = useRequestGrants();
@@ -30,6 +34,7 @@ export default function RequestAccess() {
         })} />
     ) },
     { key: "name", label: "Staff", width: "280px", cell: (g) => g.name },
+    { key: "works", label: "Works in", width: "120px", cell: (g) => worksIn(g.role) },
     { key: "since", label: "Allowed since", width: "160px", cell: (g) => (g.allowed && g.granted_at ? fmtDate(g.granted_at) : "") },
     { key: "by", label: "Allowed by", width: "auto", cell: (g) => (g.allowed ? g.granted_by_name ?? "" : "") },
   ];
@@ -38,12 +43,12 @@ export default function RequestAccess() {
   return (
     <div className="flex flex-col gap-3 p-6" data-testid="request-access">
       <p className="text-body text-kit-slate-11">
-        Operation staff ticked here may ask Finance to pay a bill, from Payment Requests. Finance and the boss always may.
+        Operation, HR and BD staff ticked here may ask Finance to pay a bill, from Payment Requests. Finance and the boss always may.
         {mayGrant ? "" : " Only Finance and the boss change who may ask."}
       </p>
       <DataTable label="Who may ask Finance to pay" testId="request-access-table" rows={grants.data ?? []} columns={columns}
         rowId={(g) => g.user_id} sizing="content"
-        empty={grants.isSuccess ? "No Operation staff account is active." : "Loading staff…"} />
+        empty={grants.isSuccess ? "No Operation, HR or BD staff account is active." : "Loading staff…"} />
     </div>
   );
 }
