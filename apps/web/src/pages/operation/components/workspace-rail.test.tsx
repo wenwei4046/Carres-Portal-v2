@@ -10,6 +10,7 @@ import {
   FilterRailGroup,
   FilterRailRow,
   FilterRailSelect,
+  FILTER_RAIL_KIT_LIST_BELOW_PX,
   useFilterRailOpen,
 } from "./workspace-rail";
 
@@ -18,6 +19,13 @@ const KEY = "carres.test.rail";
 function Probe() {
   const ref = useRef<HTMLDivElement>(null);
   const [open] = useFilterRailOpen(KEY, ref);
+  return <div ref={ref} data-testid="canvas">{open ? "open" : "hidden"}</div>;
+}
+
+/** A page showing a kit list raises the limit; the page may change it while open. */
+function KitProbe({ kit }: { kit: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [open] = useFilterRailOpen(KEY, ref, kit ? FILTER_RAIL_KIT_LIST_BELOW_PX : undefined);
   return <div ref={ref} data-testid="canvas">{open ? "open" : "hidden"}</div>;
 }
 
@@ -38,6 +46,28 @@ describe("useFilterRailOpen (S3)", () => {
   it("never chosen + a wide canvas → open", () => {
     atWidth(1200);
     render(<Probe />);
+    expect(screen.getByTestId("canvas")).toHaveTextContent("open");
+  });
+
+  /* Kit lists (01 §5) keep their last column in view: at 944 (a 1164 window)
+     the rail would leave the list 680, so it starts hidden there. */
+  it("a kit list raises the limit: never chosen + 944 → hidden, 1200 → open", () => {
+    atWidth(944);
+    const narrow = render(<KitProbe kit />);
+    expect(screen.getByTestId("canvas")).toHaveTextContent("hidden");
+    narrow.unmount();
+    atWidth(1200);
+    render(<KitProbe kit />);
+    expect(screen.getByTestId("canvas")).toHaveTextContent("open");
+  });
+
+  it("switching to a kit list on the same canvas steps the rail aside, and back brings it back", () => {
+    atWidth(944);
+    const view = render(<KitProbe kit={false} />);
+    expect(screen.getByTestId("canvas")).toHaveTextContent("open");
+    view.rerender(<KitProbe kit />);
+    expect(screen.getByTestId("canvas")).toHaveTextContent("hidden");
+    view.rerender(<KitProbe kit={false} />);
     expect(screen.getByTestId("canvas")).toHaveTextContent("open");
   });
 

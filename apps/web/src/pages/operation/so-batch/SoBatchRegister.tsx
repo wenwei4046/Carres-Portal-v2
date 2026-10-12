@@ -84,7 +84,7 @@ import {
   FilterRailGroup,
   FilterRailRow,
   FilterRailSelect,
-  useFilterRailOpen,
+  FILTER_RAIL_KIT_LIST_BELOW_PX, useFilterRailOpen,
   ShowFiltersButton,
 } from "../components/workspace-rail";
 import PurchasingTabs from "../PurchasingTabs";
@@ -488,7 +488,8 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
   /* S3 — below an 896px canvas the rail starts hidden unless this browser
      opened it before (`useFilterRailOpen`). */
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [filterRailOpen, setFilterRailVisible] = useFilterRailOpen(FILTER_RAIL_STORAGE_KEY, canvasRef);
+  const [filterRailOpen, setFilterRailVisible] = useFilterRailOpen(FILTER_RAIL_STORAGE_KEY, canvasRef,
+    presentation === "supplier" ? FILTER_RAIL_KIT_LIST_BELOW_PX : undefined);
   const railFacts = useMemo(() => soBatchRailFacts(orders, leafs), [orders, leafs]);
   const rail = useMemo(() => soBatchRailModel(railFacts, filter), [railFacts, filter]);
   const orderMatchesTime = useCallback((order: SoBatchOrderRow, time: string) =>

@@ -2,11 +2,11 @@
 // Register engine (components/register/DataGrid), which already owns search,
 // filters, columns, export and footer. ListPageShell would add a second set of
 // list chrome around the same register, contrary to the Sales Orders template.
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import "./purchase-order-detail.css";
 import registerStyles from "./PurchaseOrdersRegister.module.css";
 import type { IconName } from "@/components/kit/Icon";
-import { FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, ShowFiltersButton, useFilterRailOpen } from "../components/workspace-rail";
+import { FILTER_RAIL_KIT_LIST_BELOW_PX, FilterRail, FilterRailGroup, FilterRailRow, FilterRailSelect, ShowFiltersButton, useFilterRailOpen } from "../components/workspace-rail";
 import EmbeddedSalesOrders, { linkedSalesOrderIds } from "../components/EmbeddedSalesOrders";
 import { ArrowLeft, ChevronDown, Download, FileCheck2, X } from "lucide-react";
 import {
@@ -45,7 +45,8 @@ import { printPurchaseOrder } from "../record-print";
 import SupplierReplySection, { batchWord } from "./SupplierReplySection";
 import { Modal } from "../components/Modal";
 import { apiFetch } from "@/lib/api";
-import { fmtDate } from "@/lib/fmt-date";
+import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import TwoLineCell from "@/components/register/TwoLineCell";
 import { prepareSelectedPoDocuments, zipPoBundle } from "@/lib/purchasing/po-bundle";
 import { renderPoPdf } from "@/lib/pdf/render";
 import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
@@ -54,6 +55,7 @@ import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
    sister pages read as two apps (YH, 2026-09-04). */
 import Block from "@/components/kit/Block";
 import Tabs from "@/components/kit/Tabs";
+import StatusPill from "@/components/kit/StatusPill";
 import Checkbox from "@/components/kit/Checkbox";
 import Button from "@/components/kit/Button";
 import SalesOrderMonthlyDemand from "../SalesOrderMonthlyDemand";
@@ -137,6 +139,39 @@ const RAIL_ROWS: RailRow[] = RAIL_GROUPS.flatMap((group) => group.rows);
 
 /* The four governed groups, in display order: the two open headings first,
    then the collapsed history. Membership is the shared classifier's. */
+type PoDisplay = "overview" | "table" | "cards";
+type PoStateTab = "open" | "received" | "all";
+
+/**
+ * The Overview display's words (owner's 12 Oct 2026 package, COPY-STANDARD
+ * "Purchase Orders Overview"). The tabs are the four governed groups read
+ * three ways: `Open` is `Confirm PO sent to supplier` and `Waiting for goods
+ * from supplier`, `Received` is `Completed`, `All` adds `Cancelled`. The
+ * column names are the register's own.
+ */
+const PO_OVERVIEW = {
+  view: "Overview",
+  open: "Open",
+  received: "Received",
+  all: "All",
+  qty: (n: number, sets: boolean) => sets ? `${n} ${n === 1 ? "set" : "sets"}` : `${n} ${n === 1 ? "pc" : "pcs"}`,
+} as const;
+const PO_STATE_GROUPS: Record<PoStateTab, ReadonlySet<string>> = {
+  open: new Set(["not_marked_as_sent", "issued"]),
+  received: new Set(["completed"]),
+  all: new Set(["not_marked_as_sent", "issued", "completed", "cancelled"]),
+};
+const weekdayOf = (iso: string) => fmtDate(iso).split(",")[0] ?? "";
+/* The Overview's five fixed columns; `PO No` takes the room they leave and is
+   never under 146, so `Status` stays in view with no side scroll at 1025,
+   1164 and 1440 (01 §5). Measured, not guessed: the status pill `Sending not
+   confirmed` is 151 wide, the `PO Delivery Date` header needs 112, and the
+   tick, the arrow and the content edge take 92. */
+const PO_OVERVIEW_FIXED = { items: 76, source: 102, poDate: 88, delivery: 112, status: 162 } as const;
+const PO_OVERVIEW_FIXED_TOTAL = Object.values(PO_OVERVIEW_FIXED).reduce((sum, width) => sum + width, 0);
+const PO_OVERVIEW_LEAD = 92;
+const PO_OVERVIEW_PO_MIN = 146;
+
 const PO_GROUPS = [
   { key: "not_marked_as_sent", label: "Confirm PO sent to supplier", alwaysOpen: true },
   { key: "issued", label: "Waiting for goods from supplier", alwaysOpen: true },
@@ -440,7 +475,8 @@ export default function PurchaseOrdersPage() {
      the rail starts hidden on a canvas narrower than 896px, where it would
      float over the very rows the operator came to read. */
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [railOpen, setRailVisible] = useFilterRailOpen("carres.purchaseOrders.filterRail", canvasRef);
+  const [railOpen, setRailVisible] = useFilterRailOpen("carres.purchaseOrders.filterRail", canvasRef,
+    params.get("view") == null ? FILTER_RAIL_KIT_LIST_BELOW_PX : undefined);
   const [bundleBusy, setBundleBusy] = useState(false);
   const [facetCandidates, setFacetCandidates] = useState<RegisterRow[]>([]);
   // DataGrid may recompute facet rows when presentation props change. Download
@@ -458,7 +494,24 @@ export default function PurchaseOrdersPage() {
   /* The stored Office calendar (Settings → Office) — Purchasing's week. */
   const officeDays = useOfficeDays();
   const monthly = params.get("view") === "monthly";
-  const cards = params.get("view") === "cards";
+  /* ⭐ THREE DISPLAYS OF THE SAME ROWS (owner's 12 Oct 2026 package; MASTER
+     §9.3). `Overview` is the first: the package's six columns, one flat list
+     with the `Open` · `Received` · `All` tabs. `Table` is the eleven-column
+     grouped register, unchanged, and `Cards` is unchanged. */
+  const display: PoDisplay = params.get("view") === "cards" ? "cards" : params.get("view") === "table" ? "table" : "overview";
+  const cards = display === "cards";
+  const overview = display === "overview";
+  const stateTab: PoStateTab = params.get("state") === "received" ? "received" : params.get("state") === "all" ? "all" : "open";
+  const overviewBox = useRef<HTMLDivElement>(null);
+  const [overviewRoom, setOverviewRoom] = useState(0);
+  useEffect(() => {
+    const el = overviewBox.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => setOverviewRoom(el.clientWidth));
+    observer.observe(el);
+    setOverviewRoom(el.clientWidth);
+    return () => observer.disconnect();
+  });
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const listingReturnParams = useRef<string | null>(null);
   const toggleRow = (id: string) => setSelectedKeys((previous) => {
@@ -468,12 +521,19 @@ export default function PurchaseOrdersPage() {
   });
   const changePresentation = (value: string) => setParams((previous) => {
     const next = new URLSearchParams(previous);
-    if (value === "cards") next.set("view", "cards"); else next.delete("view");
+    if (value === "cards" || value === "table") next.set("view", value); else next.delete("view");
     return next;
   });
-  const presentationTabs = <Tabs variant="segmented" label="Purchase Orders display" value={cards ? "cards" : "table"}
+  const presentationTabs = <Tabs variant="segmented" label="Purchase Orders display" value={display}
     onValueChange={changePresentation}
-    tabs={[{ value: "table", label: "Table", icon: "table" }, { value: "cards", label: "Cards", icon: "cards" }]} />;
+    tabs={[{ value: "overview", label: PO_OVERVIEW.view, icon: "order" }, { value: "table", label: "Table", icon: "table" }, { value: "cards", label: "Cards", icon: "cards" }]} />;
+  const stateTabs = <Tabs variant="segmented" label="Purchase Orders shown" value={stateTab}
+    onValueChange={(value) => setParams((previous) => {
+      const next = new URLSearchParams(previous);
+      if (value === "received" || value === "all") next.set("state", value); else next.delete("state");
+      return next;
+    })}
+    tabs={[{ value: "open", label: PO_OVERVIEW.open }, { value: "received", label: PO_OVERVIEW.received }, { value: "all", label: PO_OVERVIEW.all }]} />;
   const demandQ = useMonthlyDemandFacts(monthly);
   const focusMonth = today.slice(0, 7);
   const demandView = useMemo(() => demandQ.data ? monthlyDemandOf({
@@ -680,7 +740,7 @@ export default function PurchaseOrdersPage() {
   /** The actual receipt, in Receiving, which owns it. */
   const openReceipt = (receiptId: string) =>
     navigate(`/operation?tab=receiving&session=${encodeURIComponent(receiptId)}`);
-  const link = "font-medium text-kit-blue-11 underline-offset-2 hover:underline";
+  const link = "text-left font-medium text-kit-blue-11 underline-offset-2 hover:underline";
   const supporting = "text-[11px] leading-4 text-kit-slate-11";
 
   /**
@@ -1029,6 +1089,96 @@ export default function PurchaseOrdersPage() {
     },
   ];
 
+  /* ── The Overview display: six columns (01 §5 cell formats) ─────────────
+     Every cell reads the same row facts as the eleven-column register, so the
+     two displays can never disagree. Nothing is dropped: the facts this
+     display does not print stay in `Table`, in the goods row and on the PO. */
+  const sourceColumn = columns.find((column) => column.key === "source")!;
+  const dateCell = (iso: string | null | undefined) => iso
+    ? <TwoLineCell top={<span className="tabular-nums">{fmtDateShort(iso)}</span>} sub={weekdayOf(iso)} />
+    : <Absence />;
+  const categoriesOf = (row: RegisterRow) => [...new Set((row.po.purchase_order_lines ?? []).map((line) => {
+    const classified = goodsCategoryOf(line);
+    return (GOODS_CATEGORY_WORDS as readonly string[]).includes(classified) ? classified : "Other goods";
+  }))];
+  const railWord = (key: string) => RAIL_ROWS.find((item) => item.key === key)?.label ?? null;
+  const statusNote = (row: RegisterRow): { text: string; warn: boolean } | null => {
+    if (row.facts.group === "completed") { const arrived = firstArrival(row); return arrived ? { text: fmtDate(arrived), warn: false } : null; }
+    if (row.facts.group === "cancelled") return null;
+    if (row.facts.filters.includes("supplier_date_passed")) return { text: railWord("supplier_date_passed") ?? "", warn: true };
+    if (row.facts.filters.includes("partly_received")) return { text: railWord("partly_received") ?? "", warn: false };
+    return null;
+  };
+  /* Spare room goes to `Items` first (up to 34 more, so two categories fit on
+     one line), then to `PO No`. */
+  const spare = overviewRoom > 0 ? Math.max(0, Math.floor(overviewRoom - PO_OVERVIEW_LEAD - PO_OVERVIEW_FIXED_TOTAL - PO_OVERVIEW_PO_MIN)) : 108;
+  const itemsWidth = PO_OVERVIEW_FIXED.items + Math.min(34, spare);
+  const poWidth = PO_OVERVIEW_PO_MIN + spare - Math.min(34, spare);
+  const overviewColumns: Array<DataGridColumn<RegisterRow>> = [
+    {
+      key: "po", label: "PO No", width: poWidth, minWidth: PO_OVERVIEW_PO_MIN, sortable: true, filterType: "numbering", wrap: true,
+      accessor: (row) => (
+        <TwoLineCell strong testId={`po-overview-po-${row.id}`}
+          top={<button type="button" className="text-left font-semibold text-c-ink hover:underline"
+            onClick={(event) => { event.stopPropagation(); openObject(row); }}>{displayedIdentity(row)}</button>}
+          sub={row.supplierName} />
+      ),
+      searchValue: (row) => `${row.id} ${displayedIdentity(row)} ${row.facts.documentState} ${row.supplierName} ${row.deliverTo}`,
+      filterValue: (row) => displayedIdentity(row),
+      exportValue: (row) => displayedIdentity(row),
+    },
+    {
+      key: "items", label: "Items", width: itemsWidth, minWidth: PO_OVERVIEW_FIXED.items, sortable: true, wrap: true,
+      accessor: (row) => {
+        const categories = categoriesOf(row);
+        return row.facts.quantitiesKnown
+          ? <TwoLineCell top={PO_OVERVIEW.qty(row.facts.quantities.ordered, categories.length === 1 && categories[0] === "Sofa")} sub={categories.join(", ")} />
+          : <TwoLineCell top={<Absence />} sub={categories.join(", ")} />;
+      },
+      searchValue: (row) => [...row.items, ...(row.po.purchase_order_lines ?? []).map((line) => line.sku)].join(" "),
+      filterValue: (row) => categoriesOf(row).join(", "),
+      exportValue: (row) => itemsSummary(row.items),
+      sortFn: (a, b) => a.facts.quantities.ordered - b.facts.quantities.ordered,
+    },
+    { ...sourceColumn, width: PO_OVERVIEW_FIXED.source, minWidth: PO_OVERVIEW_FIXED.source, wrap: true },
+    {
+      key: "po_date", label: "PO Doc Date", headerLines: ["PO", "Doc Date"], width: PO_OVERVIEW_FIXED.poDate, minWidth: PO_OVERVIEW_FIXED.poDate, sortable: true, filterType: "date",
+      accessor: (row) => dateCell(row.poDate),
+      searchValue: (row) => (row.poDate ? fmtDate(row.poDate) : "Not recorded"),
+      exportValue: (row) => row.poDate ?? "Not recorded",
+      dateValue: (row) => row.poDate,
+      sortFn: (a, b) => (a.poDate ?? "").localeCompare(b.poDate ?? ""),
+    },
+    {
+      key: "default_delivery", label: "PO Delivery Date", headerLines: ["PO", "Delivery Date"], width: PO_OVERVIEW_FIXED.delivery, minWidth: PO_OVERVIEW_FIXED.delivery, sortable: true, filterType: "date",
+      accessor: (row) => dateCell(row.po.official_delivery_date),
+      searchValue: (row) => (row.po.official_delivery_date ? fmtDate(row.po.official_delivery_date) : "Not recorded"),
+      exportValue: (row) => row.po.official_delivery_date ?? "Not recorded",
+      dateValue: (row) => row.po.official_delivery_date ?? null,
+      sortFn: (a, b) => (a.po.official_delivery_date ?? "9999").localeCompare(b.po.official_delivery_date ?? "9999"),
+    },
+    {
+      key: "status", label: "Status", width: PO_OVERVIEW_FIXED.status, minWidth: PO_OVERVIEW_FIXED.status, sortable: true, wrap: true,
+      accessor: (row) => {
+        const state = row.facts.documentState;
+        const note = statusNote(row);
+        return (
+          <span className="flex min-w-0 flex-col items-start gap-0.5" data-testid={`po-overview-status-${row.id}`}>
+            {state === "Sending not confirmed" ? <StatusPill tone="warning">{state}</StatusPill>
+              : state === "Completed" ? <StatusPill tone="success">{state}</StatusPill>
+              : <span className="text-body text-c-tab">{state}</span>}
+            {note ? <span className={`break-words text-meta ${note.warn ? "text-c-warn-fg" : "text-c-secondary"}`}>{note.text}</span> : null}
+          </span>
+        );
+      },
+      searchValue: (row) => `${row.facts.documentState} ${statusNote(row)?.text ?? ""}`,
+      filterValue: (row) => row.facts.documentState,
+      exportValue: (row) => row.facts.documentState,
+      sortFn: (a, b) => PO_GROUPS.findIndex((g) => g.key === a.facts.group) - PO_GROUPS.findIndex((g) => g.key === b.facts.group),
+    },
+  ];
+  const overviewRows = visibleRows.filter((row) => PO_STATE_GROUPS[stateTab].has(row.facts.group));
+
   async function downloadSelectedPdfs() {
     if (bundleBusy) return;
     const candidates = new Set(facetCandidates.map(row => row.id));
@@ -1131,7 +1281,8 @@ export default function PurchaseOrdersPage() {
           <SalesOrderMonthlyDemand view={demandView} focusMonth={focusMonth}
           onOpenMonth={openDemandMonth} loading={demandQ.isLoading}
           error={demandQ.isError ? demandQ.error : undefined} onRetry={() => void demandQ.refetch()} /></div> :
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col p-2" data-testid="po-register-content">
+        <div ref={overviewBox} className="flex min-h-0 min-w-0 flex-1 flex-col p-2" data-testid="po-register-content"
+          style={overview ? { ["--table-row-pad" as string]: "6px 5px" } : undefined}>
           {pdfProblem ? (
             <ReadProblem
               problem={pdfProblem}
@@ -1144,10 +1295,10 @@ export default function PurchaseOrdersPage() {
             <DataGrid<RegisterRow>
               appearance="reference"
               presentationTools
-              sessionKey="carres.purchaseOrders.register.v2"
+              sessionKey={overview ? "carres.purchaseOrders.overview.v1" : "carres.purchaseOrders.register.v2"}
               labelledToolbar
-              rowHeight={32}
-              presentationKey={cards ? "cards" : "table"}
+              rowHeight={overview ? 54 : 32}
+              presentationKey={display}
               toolbarEnd={presentationTabs}
               selectionPrimary={<>{presentationTabs}<Button size="sm" loading={bundleBusy} disabled={bundleBusy} onClick={() => void downloadSelectedPdfs()}>Download PDFs</Button></>}
               selectable={{ selectedKeys, onToggle: toggleRow,
@@ -1175,12 +1326,12 @@ export default function PurchaseOrdersPage() {
               </div> : undefined}
               palette="slate"
               searchPresentation="responsive"
-              rows={visibleRows}
+              rows={overview ? overviewRows : visibleRows}
               facetRows={allRows}
               onFacetRowsChange={updateFacetCandidates}
-              columns={columns}
+              columns={overview ? overviewColumns : columns}
               /* v2 — the nine-column date-first register replaces v1's twelve. */
-              storageKey="carres.purchaseOrders.register.v2"
+              storageKey={overview ? "carres.purchaseOrders.overview.v1" : "carres.purchaseOrders.register.v2"}
               rowKey={(row) => row.id}
               rowTestId={(row) => `grid-row-${row.id}`}
               exportName="Purchase Orders"
@@ -1191,10 +1342,10 @@ export default function PurchaseOrdersPage() {
               activeConditions={activeConditions}
               reserveConditionRow
               onClearConditions={() => setFilter(RAIL_CLEAR)}
-              leadingColumns={{ date: "po_date", identity: "po" }}
-              personalLayouts={personalLayouts}
+              leadingColumns={overview ? undefined : { date: "po_date", identity: "po" }}
+              personalLayouts={overview ? undefined : personalLayouts}
               groupBanner={false}
-              fixedGroups={{
+              fixedGroups={overview ? undefined : {
                 groups: PO_GROUPS,
                 groupOf: (row) => row.facts.group,
                 revealMatches: activeConditions.length > 0,
@@ -1205,16 +1356,23 @@ export default function PurchaseOrdersPage() {
               expandTitle="Show goods"
               expandable={{
                 flush: true,
-                alignToColumn: "po_date",
+                alignToColumn: overview ? "po" : "po_date",
+                /* The goods rows are wider than the Overview: they scroll
+                   sideways inside themselves and never widen the list
+                   (01 §6), so `Status` stays in view with a row open. */
+                fitExpansionToViewport: overview,
                 testId: (row) => `po-expand-${row.id}`,
                 renderExpansion: (row) => <OrderedGoods row={row} destinations={destinations} />,
               }}
-              toolbarStart={!railOpen && (
-                <ShowFiltersButton
-                  onShow={() => setRailVisible(true)}
-                  testId="purchase-orders-show-filters"
-                />
-              )}
+              toolbarStart={<>
+                {!railOpen && (
+                  <ShowFiltersButton
+                    onShow={() => setRailVisible(true)}
+                    testId="purchase-orders-show-filters"
+                  />
+                )}
+                {overview && stateTabs}
+              </>}
               statusSummary={(filtered, selectedRows) => {
                 const scope = selectedRows.length ? selectedRows : filtered;
                 const quantities = new Map<string, number>();
