@@ -8,7 +8,7 @@
   /* grounds: three fixed layers, the same in every theme */
   --c-ground:#F6F7F9; --c-card:#FFFFFF; --c-band:#F8F9FA; --c-neutral-tint:#F1F2F4; --c-task-foot:#F5F6F8;
   /* lines */
-  --c-border:#E5E7EB; --c-head-line:#E5E7EB; --c-row-line:#F1F2F4; --c-open-frame:#CBD0D6; --c-chip-border:#D5D9DE; --c-search-border:#E1E4E8;
+  --c-border:#E5E7EB; --c-head-line:#E5E7EB; --c-row-line:#F1F2F4; --c-open-frame:#CBD0D6; --c-chip-border:#D5D9DE; --c-search-border:#E1E4E8; --c-tree-line:#BFC5CD;
   /* selection: the only values a theme changes (default theme: blue) */
   --c-select-bg:#FFFFFF; --c-select-fg:#2F55E0; --c-select-soft:#EEF4FF; --c-hover:#E2E4E8; --c-row-hover:#F2F3F5;
   /* fixed in every theme */

@@ -143,6 +143,8 @@ export default {
           card: "var(--c-card)",
           hover: "var(--c-hover)",
           "row-hover": "var(--c-row-hover)",
+          "select-pill": "var(--c-select-pill)",
+          "tree-line": "var(--c-tree-line)",
           "card-border": "var(--c-card-border)",
           "btn-border": "var(--c-btn-border)",
           "head-line": "var(--c-head-line)",

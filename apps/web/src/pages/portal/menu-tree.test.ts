@@ -1,14 +1,20 @@
 import { describe, it, expect } from "vitest";
-import { PORTAL_NAV, navItemHref, type PortalNavItem } from "./portal-nav";
 import {
+  PORTAL_NAV,
+  PORTAL_MODULES,
+  WAREHOUSE_LANDING_KEY,
+  PAYMENTS_LANDING_KEY,
+  navItemHref,
+  type PortalNavItem,
+} from "./portal-nav";
+import {
+  PAGE_GROUPS,
   PURCHASING_PAGE_GROUPS,
   PURCHASING_LANDING_KEY,
-  purchasingChildBlocks,
-  activePurchasingGroup,
-  parsePurchasingSidebarState,
-  serializePurchasingSidebarState,
-  purchasingSidebarStorageKey,
-} from "./purchasing-sidebar";
+  moduleChildBlocks,
+  activePageGroup,
+  isPageGroupOpen,
+} from "./menu-tree";
 
 /**
  * THE FINAL PURCHASING MAP — FOUR GROUPS, ELEVEN PAGES
@@ -59,7 +65,7 @@ describe("the four groups", () => {
 
 describe("the approved hierarchy", () => {
   it("draws four groups and nothing else — no direct row, no Report", () => {
-    const blocks = purchasingChildBlocks(purchasing);
+    const blocks = moduleChildBlocks(purchasing);
     expect(
       blocks.map((b) => (b.kind === "page" ? b.item.label : b.group.label)),
     ).toEqual(["BUY", "RECEIVE", "PROBLEMS", "SHOWROOM"]);
@@ -67,7 +73,7 @@ describe("the approved hierarchy", () => {
   });
 
   it("fills each group with the approved pages, in the approved order", () => {
-    const blocks = purchasingChildBlocks(purchasing);
+    const blocks = moduleChildBlocks(purchasing);
     const group = (key: string) =>
       blocks
         .filter((b) => b.kind === "group" && b.group.key === key)
@@ -202,87 +208,66 @@ describe("the live destinations keep their exact current addresses", () => {
 
 describe("the group holding the page you are on", () => {
   it("finds the group of a live destination", () => {
-    expect(activePurchasingGroup(purchasing, "receiving")).toBe("purchasing-receive");
-    expect(activePurchasingGroup(purchasing, "claims")).toBe("purchasing-problems");
-    expect(activePurchasingGroup(purchasing, "purchase")).toBe("purchasing-buy");
-    expect(activePurchasingGroup(purchasing, "manual-purchase")).toBe("purchasing-buy");
-    expect(activePurchasingGroup(purchasing, "purchase-orders")).toBe("purchasing-buy");
+    expect(activePageGroup(purchasing, "receiving")).toBe("purchasing-receive");
+    expect(activePageGroup(purchasing, "claims")).toBe("purchasing-problems");
+    expect(activePageGroup(purchasing, "purchase")).toBe("purchasing-buy");
+    expect(activePageGroup(purchasing, "manual-purchase")).toBe("purchasing-buy");
+    expect(activePageGroup(purchasing, "purchase-orders")).toBe("purchasing-buy");
   });
 
   it("a retired key and another module's page belong to no group", () => {
-    expect(activePurchasingGroup(purchasing, "purchasing-report")).toBeNull();
-    expect(activePurchasingGroup(purchasing, "purchase-demands")).toBeNull();
-    expect(activePurchasingGroup(purchasing, null)).toBeNull();
-    expect(activePurchasingGroup(purchasing, "stock")).toBeNull();
+    expect(activePageGroup(purchasing, "purchasing-report")).toBeNull();
+    expect(activePageGroup(purchasing, "purchase-demands")).toBeNull();
+    expect(activePageGroup(purchasing, null)).toBeNull();
+    expect(activePageGroup(purchasing, "stock")).toBeNull();
   });
 });
 
 /**
- * PRESENTATION STATE ONLY, AND PER SIGNED-IN USER. It remembers which drawers
- * the operator likes open — never a route, a count or a business fact.
- *
- * V2 because the allowed group keys changed: the old five-group preference
- * names two drawers that no longer exist, so it is not read as final truth.
+ * WHICH GROUPS ARE OPEN (owner 12 Oct 2026). Nothing is stored: the page
+ * decides, and a chevron worked by hand is kept only for that page.
  */
-describe("the remembered open state", () => {
-  it("keys on the auth user id, at version v2", () => {
-    expect(purchasingSidebarStorageKey("abc-123")).toBe(
-      "carres:portal-sidebar:purchasing:v2:abc-123",
-    );
-    expect(purchasingSidebarStorageKey("abc-123")).not.toContain(":v1:");
+describe("which groups are open", () => {
+  it("only the group holding the current page is open", () => {
+    expect(isPageGroupOpen("purchasing-receive", "purchasing-receive", {})).toBe(true);
+    expect(isPageGroupOpen("purchasing-buy", "purchasing-receive", {})).toBe(false);
+    expect(isPageGroupOpen("purchasing-showroom", "purchasing-receive", {})).toBe(false);
   });
 
-  it("round-trips", () => {
-    const state = {
-      moduleOpen: true,
-      openGroups: ["purchasing-buy", "purchasing-problems"] as const,
-    };
-    expect(parsePurchasingSidebarState(serializePurchasingSidebarState(state))).toEqual({
-      moduleOpen: true,
-      openGroups: ["purchasing-buy", "purchasing-problems"],
-    });
-  });
-
-  it("falls back safely on anything it did not write", () => {
-    for (const raw of [
-      null,
-      "",
-      "{",
-      "null",
-      "[]",
-      '"a string"',
-      "{}",
-      '{"moduleOpen":"yes","openGroups":"buy"}',
-    ]) {
-      expect(parsePurchasingSidebarState(raw), String(raw)).toEqual({
-        moduleOpen: false,
-        openGroups: [],
-      });
+  it("a module that does not hold the current page shows every group open", () => {
+    for (const group of PURCHASING_PAGE_GROUPS) {
+      expect(isPageGroupOpen(group.key, null, {}), group.key).toBe(true);
     }
   });
 
-  it("keeps the half it can read and drops the half it cannot", () => {
-    // The drawers are unreadable, but "the module was open" still is — and
-    // throwing that away would shut a rail the operator left open.
-    expect(parsePurchasingSidebarState('{"moduleOpen":true,"openGroups":[1,2,3]}')).toEqual({
-      moduleOpen: true,
-      openGroups: [],
-    });
+  it("a chevron worked by hand wins, both ways", () => {
+    expect(isPageGroupOpen("purchasing-buy", "purchasing-receive", { "purchasing-buy": true })).toBe(true);
+    expect(isPageGroupOpen("purchasing-buy", null, { "purchasing-buy": false })).toBe(false);
   });
 
-  it("drops a retired group key instead of carrying a name nothing renders", () => {
-    expect(
-      parsePurchasingSidebarState(
-        '{"moduleOpen":true,"openGroups":["purchasing-buy","purchasing-requests","purchasing-consignment","purchasing-ghost"]}',
-      ),
-    ).toEqual({ moduleOpen: true, openGroups: ["purchasing-buy"] });
+  it("the group you are standing in never shuts", () => {
+    expect(isPageGroupOpen("purchasing-receive", "purchasing-receive", { "purchasing-receive": false })).toBe(true);
+  });
+});
+
+describe("one rule for every module", () => {
+  it("the group words come from one registry, and Purchasing's four are in it", () => {
+    for (const group of PURCHASING_PAGE_GROUPS) expect(PAGE_GROUPS).toContainEqual(group);
   });
 
-  it("stores no route, no active key and no count", () => {
-    const raw = serializePurchasingSidebarState({
-      moduleOpen: true,
-      openGroups: ["purchasing-receive"],
-    });
-    expect(Object.keys(JSON.parse(raw)).sort()).toEqual(["moduleOpen", "openGroups"]);
+  it("a module with no groups hangs its pages directly on the tree", () => {
+    const sales = operation.items.filter((item) => item.section === "Sales");
+    const blocks = moduleChildBlocks(sales);
+    expect(blocks.length).toBeGreaterThan(0);
+    expect(blocks.every((b) => b.kind === "page")).toBe(true);
+  });
+
+  it("the landing page and the open-only rule are read from the module's own record", () => {
+    const byLabel = (label: string) => PORTAL_MODULES.find((m) => m.label === label)!;
+    expect(byLabel("Purchasing").landingKey).toBe(PURCHASING_LANDING_KEY);
+    expect(byLabel("Purchasing").handleOnly).toBe(true);
+    expect(byLabel("Warehouse").landingKey).toBe(WAREHOUSE_LANDING_KEY);
+    expect(byLabel("Payments").landingKey).toBe(PAYMENTS_LANDING_KEY);
+    expect(byLabel("Sales Orders").handleOnly).toBeUndefined();
   });
 });

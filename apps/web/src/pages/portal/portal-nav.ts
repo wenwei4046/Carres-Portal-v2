@@ -51,7 +51,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
-import type { PurchasingPageGroupKey } from "./purchasing-sidebar";
+import { PURCHASING_LANDING_KEY, type PageGroupKey } from "./menu-tree";
 import { NO_CAPS, type NavCapability } from "./nav-capabilities";
 
 /**
@@ -165,6 +165,14 @@ export interface PortalModule {
   icon: LucideIcon;
   /** Material Symbols name — the Operations menu draws these (handoff 2026-10-08). */
   mIcon?: string;
+  /** The page the closed menu's module icon opens: a NAMED destination, never
+   *  "the first live row", so the landing cannot move when a page above it
+   *  goes live. A module that names none lands on its first live page. */
+  landingKey?: string;
+  /** The module row only opens and shuts its pages; it does not go anywhere.
+   *  Purchasing: its pages sit in groups, and the row is clicked to LOOK far
+   *  more often than to travel (owner 2026-08-20). */
+  handleOnly?: true;
 }
 
 /** WHERE THE COLLAPSED WAREHOUSE ICON GOES — a NAMED destination, never "the
@@ -187,15 +195,15 @@ export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
    * `Subscription` (`Outright Sales` until the 2026-10-08 template). It is a NAVIGATION ruling: no contract, transaction,
    * permission or calculation is merged by the shared parent. */
   { section: "Sales", label: "Sales Orders", icon: ReceiptText, mIcon: "receipt_long" },
-  { section: "Purchasing", label: "Purchasing", icon: ShoppingCart, mIcon: "shopping_cart" },
+  { section: "Purchasing", label: "Purchasing", icon: ShoppingCart, mIcon: "shopping_cart", landingKey: PURCHASING_LANDING_KEY, handleOnly: true },
   { section: "Showroom", label: "Showroom", icon: Store, mIcon: "storefront" },
   /* THE FOUR-PAGE MAP (CARD-2026-09-04-delivery-01): Monitor → Delivery
    * Orders → Delivery Order → Edit Delivery. The first two are navigation,
    * so Delivery is a module again; the object and the writer stay doors on
    * cards and rows. This overwrites the 2026-08-21 one-page ruling. */
   { section: "Delivery", label: "Delivery", icon: Truck, mIcon: "local_shipping" },
-  { section: "Warehouse", label: "Warehouse", icon: Warehouse, mIcon: "warehouse" },
-  { section: "Payments", label: "Payments", icon: Banknote, mIcon: "payments" },
+  { section: "Warehouse", label: "Warehouse", icon: Warehouse, mIcon: "warehouse", landingKey: WAREHOUSE_LANDING_KEY },
+  { section: "Payments", label: "Payments", icon: Banknote, mIcon: "payments", landingKey: PAYMENTS_LANDING_KEY },
   { section: "Customer Care", label: "Service Case", icon: Headset, mIcon: "support_agent" },
   /* Suppliers left Master Data on 2026-08-21 (YH's placement ruling): it is a
      PARTY the business deals with, not a reference list — the same kind of
@@ -264,22 +272,16 @@ export interface PortalNavItem {
    *  presentation (`navBlocks`), so no page is added, renamed or reordered by
    *  the module rows drawn on top of them. */
   section?: PortalSection;
-  /** THE PURCHASING DRAWER this page hangs in (`purchasing-sidebar.ts`).
-   *
-   *  ⭐ FOUR NAMED GROUPS INSIDE ONE MODULE (Jess, 2026-08-22 —
-   *  CARD-2026-08-22-purchasing-01-final-sidebar-listing). Purchasing holds
-   *  eleven destinations, and a new hire cannot tell from a flat list which
-   *  row holds a buying document, a receipt, a supplier problem or a showroom
-   *  paper. Grouping is PRESENTATION, exactly like `section`: the page is not
-   *  moved, renamed or re-addressed by the drawer drawn around it, and
-   *  `visibleItems` still means "the PAGES this role may open", which is what
-   *  `JumpTo` composes from.
-   *
-   *  EVERY Purchasing page hangs in a drawer — the module has no direct rows
-   *  left. A page with no `pageGroup` would fall back to the module's own
-   *  child indent; nothing uses that today, and no other module's rail
-   *  behaviour moves. */
-  pageGroup?: PurchasingPageGroupKey;
+  /** THE GROUP this page hangs in, inside its module (`menu-tree.ts`; owner
+   *  12 Oct 2026: one rule for every module). Purchasing names four (Jess,
+   *  2026-08-22): a new hire cannot tell from a flat list which row holds a
+   *  buying document, a receipt, a supplier problem or a showroom paper.
+   *  Grouping is PRESENTATION, exactly like `section`: the page is not moved,
+   *  renamed or re-addressed by the group drawn around it, and `visibleItems`
+   *  still means "the PAGES this role may open", which is what `JumpTo`
+   *  composes from. A page with no `pageGroup` is a direct row on its
+   *  module's tree line. */
+  pageGroup?: PageGroupKey;
 
   /** APPROVED, NOT BUILT (sidebar card §2). Renders as a NON-CONTROL saying
    *  `Coming soon` on its own line — no href, out of the tab order. */
