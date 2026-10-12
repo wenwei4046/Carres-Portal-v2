@@ -18,13 +18,16 @@
 
 import { z } from "zod";
 import { sen } from "./daily-bank";
+import { departmentFilterFields, departmentFilterMessage, departmentFilterOk } from "./department";
 import type { MoneyAccountKind } from "./money-accounts";
 
 const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-10-03");
 
-/** `GET /finance/ledger/cash-flow?from=&to=` — both days included. */
-export const cashFlowQuery = z.object({ from: isoDay, to: isoDay }).strict()
-  .refine((v) => v.from <= v.to, { message: "The start date is after the end date", path: ["to"] });
+/** `GET /finance/ledger/cash-flow?from=&to=[&departmentType=&departmentId=]` —
+ *  both days included. 0684 (Chew ruling 1): one channel's money only. */
+export const cashFlowQuery = z.object({ from: isoDay, to: isoDay, ...departmentFilterFields }).strict()
+  .refine((v) => v.from <= v.to, { message: "The start date is after the end date", path: ["to"] })
+  .refine(departmentFilterOk, { message: departmentFilterMessage, path: ["departmentId"] });
 export type CashFlowQuery = z.infer<typeof cashFlowQuery>;
 
 type Wire = number | string;
@@ -54,9 +57,13 @@ export interface CashFlowAnswer {
   from: string;
   to: string;
   go_live_on: string | null;
+  /** 0684: the one channel asked for; null or absent = every channel. With a
+   *  channel, each account's brought forward is 0 and card money still waiting
+   *  is null: balances are not split by channel. */
+  channel?: { department_type: string; department_id: string | null } | null;
   accounts: CashFlowAccount[];
   rows: CashFlowRow[];
-  card: { taken: Wire; waiting: Wire };
+  card: { taken: Wire; waiting: Wire | null };
 }
 
 /** One line of the statement: money from (or to) one account. */
@@ -92,8 +99,10 @@ export interface CashFlowReport {
   carriedForward: number;
   /** Card and online money customers paid in the period. */
   cardTaken: number;
-  /** Card and online money not yet paid out to a bank at the end. */
-  cardWaiting: number;
+  /** Card and online money not yet paid out to a bank at the end; null for one channel. */
+  cardWaiting: number | null;
+  /** 0684: one channel's money only; balances are not split by channel. */
+  byChannel: boolean;
 }
 
 const rm = (s: number) => s / 100;
@@ -141,6 +150,7 @@ export function cashFlowReport(a: CashFlowAnswer): CashFlowReport {
     broughtForward: rm(bf),
     carriedForward: rm(bf + inflow - outflow),
     cardTaken: rm(sen(a.card.taken)),
-    cardWaiting: rm(sen(a.card.waiting)),
+    cardWaiting: a.card.waiting == null ? null : rm(sen(a.card.waiting)),
+    byChannel: a.channel != null,
   };
 }

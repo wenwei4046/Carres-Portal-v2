@@ -40,7 +40,7 @@ export const ledgerKeys = {
   trialBalance: (asOf: string, dept = "") => ["finance", "ledger", "trial-balance", asOf, dept] as const,
   selfCheck: () => ["finance", "ledger", "self-check"] as const,
   dailyBank: (day: string) => ["finance", "ledger", "daily-bank", day] as const,
-  cashFlow: (from: string, to: string) => ["finance", "ledger", "cash-flow", from, to] as const,
+  cashFlow: (from: string, to: string, dept = "") => ["finance", "ledger", "cash-flow", from, to, dept] as const,
   generalLedger: (from: string, to: string, dept = "") => ["finance", "ledger", "general-ledger", from, to, dept] as const,
 };
 
@@ -213,11 +213,13 @@ export function useGeneralLedger(from: string, to: string, dept = "") {
 }
 
 /** Cash Flow (0638): the cash and bank accounts over a period, both days
- *  included. The page works the totals out through the shared arithmetic. */
-export function useCashFlow(from: string, to: string) {
+ *  included. The page works the totals out through the shared arithmetic.
+ *  0684: with a department, that channel's money only. */
+export function useCashFlow(from: string, to: string, dept = "") {
   return useQuery({
-    queryKey: ledgerKeys.cashFlow(from, to),
-    queryFn: () => apiFetch<CashFlowAnswer>(`/api/finance/ledger/cash-flow?${new URLSearchParams({ from, to }).toString()}`),
+    queryKey: ledgerKeys.cashFlow(from, to, dept),
+    queryFn: () => apiFetch<CashFlowAnswer>(
+      `/api/finance/ledger/cash-flow?${new URLSearchParams({ from, to, ...departmentSearch(dept) }).toString()}`),
     retry: (count: number, error: unknown) => (error as { status?: number }).status !== 422 && count < 2,
   });
 }

@@ -17,6 +17,13 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/api", () => ({
   apiFetch: vi.fn(async (url: string) => {
+    // 0684: the department list the channel filter reads.
+    if (url === "/api/finance/ledger/departments") {
+      return { rows: [
+        { department_type: "SHOWROOM", department_id: "99999999-0000-4000-8000-000000000001", name: "Bangsar showroom" },
+        { department_type: "OFFICE", department_id: null, name: "Office" },
+      ] };
+    }
     api.calls.push(url);
     if (api.fail) throw Object.assign(new Error("boom"), { status: api.fail.status, body: {} });
     if (!url.startsWith("/api/finance/ledger/cash-flow?")) throw new Error(`unexpected read ${url}`);
@@ -161,6 +168,52 @@ describe("Cash Flow (0638)", () => {
     api.answer = { ...ANSWER, go_live_on: null };
     show();
     expect(await screen.findByRole("alert")).toHaveTextContent("The ledger has no start date yet. Nothing can be totalled.");
+  });
+});
+
+describe("one channel's money (0684, Chew ruling 1)", () => {
+  const OUTLET = "99999999-0000-4000-8000-000000000001";
+  const ONE: CashFlowAnswer = {
+    ...ANSWER,
+    channel: { department_type: "SHOWROOM", department_id: OUTLET },
+    accounts: [
+      { account_code: "1110", name: "Cash in hand", money_kind: "CASH", is_active: true, opening: 0, receipts: "0.00", payments: "0.00" },
+      { account_code: "1121", name: "Public Bank", money_kind: "BANK", is_active: true, opening: 0, receipts: "6000.00", payments: "1200.00" },
+    ],
+    rows: [
+      { side: "IN", account_code: "1210", name: "Trade receivables", kind: "ASSET", money_kind: null, amount: "6000.00" },
+      { side: "OUT", account_code: "2110", name: "Trade payables", kind: "LIABILITY", money_kind: null, amount: "1200.00" },
+    ],
+    card: { taken: "500.00", waiting: null },
+  };
+
+  it("asks for the channel in the address, and shows its money with no balances", async () => {
+    api.answer = ONE;
+    show(`/finance/reports/cash-flow?from=2026-10-01&to=2026-10-31&dept=SHOWROOM:${OUTLET}`);
+    await screen.findByTestId("cash-flow");
+    expect(api.calls.at(-1)).toBe(`/api/finance/ledger/cash-flow?from=2026-10-01&to=2026-10-31&departmentType=SHOWROOM&departmentId=${OUTLET}`);
+    await waitFor(() => expect(screen.getByTestId("cash-flow-channel-note")).toHaveTextContent("Only money tied to Bangsar showroom."));
+    expect(screen.getByTestId("cash-flow-channel-note")).toHaveTextContent("Transfers between Carres's own accounts");
+    expect(screen.queryByText("Brought forward")).not.toBeInTheDocument();
+    expect(screen.queryByText("Carried forward")).not.toBeInTheDocument();
+    expect(screen.queryByText("Waiting for card payout at the end")).not.toBeInTheDocument();
+    expect(screen.getByText("Card and online payments in this period")).toBeInTheDocument();
+  });
+
+  it("picking a channel keeps it in the address", async () => {
+    show("/finance/reports/cash-flow?from=2026-10-01&to=2026-10-31");
+    await screen.findByTestId("cash-flow");
+    await screen.findByRole("option", { name: "Office" });
+    fireEvent.change(screen.getByLabelText("Department"), { target: { value: "OFFICE" } });
+    await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("dept=OFFICE"));
+  });
+
+  it("the sheet names the channel and prints no balance", () => {
+    const { sheet, stem } = cashFlowSheet(cashFlowReport(ONE), "2026-10-01", "2026-10-31", "2026-09-01", "Bangsar showroom");
+    expect(stem).toBe("Cash Flow Bangsar showroom Oct 2026");
+    expect(sheet.rows[0]).toEqual(["Cash Flow · Bangsar showroom", "Thu, 1 Oct 26 to Sat, 31 Oct 26"]);
+    expect(sheet.rows.some((r) => r[0] === "Brought forward" || r[0] === "Carried forward")).toBe(false);
+    expect(sheet.rows).toContainEqual(["Net cash flow", 4800]);
   });
 });
 

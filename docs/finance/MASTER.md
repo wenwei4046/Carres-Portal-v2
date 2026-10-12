@@ -48,7 +48,7 @@ Finance must show clearly where each sum of money comes in and goes out, channel
 6. Debtors follow the channel in two levels for dealers (「Dealer 一个overall 母账，然后每个dealer under 这个母账 … 就是两层了」): Dealer Debtors, then each dealer, then that dealer's customers or orders. Showroom and Subscription each have one control account with their customers under it.
 7. Goods bought without an order must not leave money paid to suppliers outside every channel in Receipts & Payments (「这样我看receipt & payment 就不太对了」); Chew confirmed how such a purchase is placed on 2026-10-06 ("A purchase without an order" below).
 
-Status (2026-10-12): ruling 3 holds (a line can be set to Office). Ruling 2 and "A purchase without an order" are BUILT for a bill's goods lines (0683, "Splitting the money by channel" step 1). Rulings 1, 4, 5 and 6 are APPROVED / NOT BUILT. The plan for all of them, "Splitting the money by channel" at the end of this section, was approved by Chew on 2026-10-12.
+Status (2026-10-12): ruling 3 holds (a line can be set to Office). Ruling 2 and "A purchase without an order" are BUILT for a bill's goods lines (0683, "Splitting the money by channel" step 1); ruling 1 is BUILT in Cash Flow (0684, step 2). Rulings 4, 5 and 6 are APPROVED / NOT BUILT. The plan for all of them, "Splitting the money by channel" at the end of this section, was approved by Chew on 2026-10-12.
 
 **Chart of accounts (Chew's, AutoCount, dated 22 Sep 2026; kept by Chew, not in this repository).** It has one debtor control (Trade Debtors) and one Other Debtor control, so dealer and subscription customers are not separated (「本身里面没有分dealer customer 和 subscription customer」). Measured: the ledger already accepts its code shape (`ledgerAccountCodeShape`, for example 300-0000 and 900-A001). Customers sit under a control account as parties on each line (`gl_entry_lines.party_type` / `party_id`), not as accounts, so a control account holds any number of customers.
 
@@ -180,7 +180,26 @@ Recommended, in this order:
      - Goods with two of three Units sold for showroom orders split two to the showroom and one to Not yet in a channel.
      - A line not from a GRN with no department, or with Not yet in a channel, was refused; Office was saved.
      - Operation could not read the bill form's preview, and an order's channel could not be read around Finance's doors.
-2. **Cash Flow by channel** (ruling 1): a receipt goes to its order's channel; a supplier payment to the channels of the bill lines it paid, in proportion; a card payout to the channels of the card payments in it; a transfer between Carres's own accounts to none.
+2. **Cash Flow by channel** (ruling 1). **BUILT 2026-10-12 (0684).** Cash Flow has the reports' `Department` filter.
+   - Every share of cash and bank money is shared as since 0638, then split again by channel, in whole sen:
+     - a receipt goes to its order's channel;
+     - a supplier payment goes to the channels of the bill and debit note lines it paid, in proportion; an advance follows the bills it was later knocked off;
+     - a card payout made through Card settlement goes to the orders of the card payments in it;
+     - anything else goes to its line's own department, or the one reports already work out from its order.
+   - What goes to no channel shows only under All: a transfer between Carres's own accounts, an advance not knocked off yet, a card payout made by hand on Money moves, a bank charge.
+   - With a channel, the page prints that channel's money in and out by account. It has no brought or carried forward and no card money still waiting, because balances are not split by channel. It says what it leaves out.
+   - With no department the answer is the same as before, to the sen. Every channel plus what no channel takes adds back to the whole.
+   - Not built:
+     - A goods line that is `Not yet in a channel` stays there when it is paid, even if its goods were allocated to an order before the payment. The ruling's "allocated before the supplier is paid" needs the allocation's date.
+     - Card money still waiting, by channel.
+   - Measured before applying (production, rolled back, 2026-10-12):
+     - Over July to October the unfiltered answer equalled the old one exactly.
+     - The showroom, dealer and no-channel money added back to the whole: in RM 9,725.57, out RM 201.00.
+     - A showroom view's rows equalled its accounts' money in, with no opening balance.
+     - A settled card payout went to its dealer orders.
+     - A bill of RM 80 Office and RM 20 showroom, paid by one voucher of RM 100, showed as RM 80 and RM 20.
+     - An advance whose bill line had no department stayed in no channel.
+     - Office with an id and an unknown department were refused, and Operation could not read Cash Flow.
 3. **Debtors by channel** (rulings 4 and 6): `300-1000` Showroom, `300-2000` Dealer with one account per dealer under it (`300-2001` and on, a new dealer getting its own), `300-3000` Subscription, all under `300-0000`. Each posting picks the account from its order's channel. The test balances already on `300-0000` stay there; go-live starts clean. This rewrites the posting step inside Payment's recording: Chew approved it (2026-10-12, §1 Exceptions) and tells Jess, and it is measured on production and rolled back before it goes live, because a fault there would stop staff recording payments.
 4. **Transport on each order** (ruling 5): a logistics partner's bill names the delivery orders it covers; its amount is split over them (equally when it gives only a total); each part posts to `900-T002` with its order's channel.
 - Falsifier: in Chew's test, a channel's money in or out differs from what its orders, bills and vouchers show, or a customer payment fails to post after step 3.
