@@ -4,19 +4,21 @@ import { toast } from "sonner";
 import type {
   ApAccountChoice,
   ApCreditor,
+  BillDeliveryOrder,
   GoodsLineChannel,
   GrnCandidateRow,
   SupplierBillDocument,
   SupplierBillDraftInput,
   SupplierBillRegisterRow,
 } from "@carres/shared/schemas/finance-ap";
-import { billForeignAmountInput, defaultBillDueDate } from "@carres/shared/schemas/finance-ap";
+import { billForeignAmountInput, defaultBillDueDate, splitEqually } from "@carres/shared/schemas/finance-ap";
 import Input from "@/components/kit/Input";
 import { roleAccount, type LedgerAccount } from "@carres/shared/finance-ledger";
 import { useLedgerChart } from "../ledger/ledger-queries";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import Button from "@/components/kit/Button";
+import Checkbox from "@/components/kit/Checkbox";
 import Modal from "@/components/kit/Modal";
 import { fieldCls } from "@/components/Field";
 import type { DepartmentType } from "@carres/shared";
@@ -37,6 +39,7 @@ import {
   useSupplierBill,
   useSupplierBills,
   useApplyAdvance,
+  useBillDeliveryOrders,
   useSupplierAdvances,
   useTakeAdvanceOff,
 } from "@/lib/payables-queries";
@@ -501,7 +504,7 @@ function BillLinesCard({ doc }: { doc: SupplierBillDocument }) {
           <thead>
             <tr className="text-left text-base-500">
               <th className="py-1 pr-3">#</th>
-              <th className="py-1 pr-3">GRN</th>
+              <th className="py-1 pr-3">From</th>
               <th className="py-1 pr-3">Item</th>
               <th className="py-1 pr-3">Account</th>
               <th className="py-1 pr-3 text-right">Qty</th>
@@ -515,13 +518,16 @@ function BillLinesCard({ doc }: { doc: SupplierBillDocument }) {
             {doc.lines.map((l) => (
               <tr key={l.line_no} className="border-t border-base-100">
                 <td className="py-1 pr-3">{l.line_no}</td>
-                <td className="py-1 pr-3">{l.warehouse_receipt_id ? (l.grn_no ?? `GRN of ${l.grn_po_id ?? "a PO"}`) : "Not from a GRN"}</td>
+                <td className={`py-1 pr-3${l.warehouse_receipt_id || l.delivery_order_id ? " whitespace-nowrap" : ""}`}>
+                  {l.warehouse_receipt_id ? (l.grn_no ?? `GRN of ${l.grn_po_id ?? "a PO"}`)
+                    : l.delivery_order_id ? (l.do_no ?? "Delivery order") : "Not from a GRN"}
+                </td>
                 <td className="py-1 pr-3">{l.description ?? l.sku ?? "No description"}</td>
                 <td className="py-1 pr-3">{l.account_code} {l.account_name ?? ""}</td>
                 <td className="py-1 pr-3 text-right">{l.qty ?? ""}</td>
                 <td className="py-1 pr-3 text-right">{money(l.unit_price)}</td>
                 <td className="py-1 pr-3">
-                  {l.po_line_id ? priceDiffWord(num(l.price_diff)) : "No PO price"}
+                  {l.po_line_id ? priceDiffWord(num(l.price_diff)) : l.delivery_order_id ? "" : "No PO price"}
                   {l.po_line_id && (
                     <span className="ml-2">
                       <LineFollowUp billId={doc.bill.id} billStatus={doc.bill.status} line={l} notes={notes.data} />
@@ -558,6 +564,9 @@ type LineDraft = {
   departmentId: string | null;
   /** 0683: a goods line's channels, worked out from its orders; null = not read yet. */
   channels: GoodsLineChannel[] | null;
+  /** 0689: the delivery order a logistics partner's line charges for, and its number. */
+  deliveryOrderId: string | null;
+  doNo: string | null;
 };
 
 let lineSeq = 0;
@@ -567,7 +576,7 @@ function blankLine(): LineDraft {
   return {
     key: newKey(), warehouseReceiptId: null, poLineId: null, grnNo: null, sku: "", description: "",
     accountCode: "", qty: "", unitPrice: "", amount: "", poUnitCost: null, openQty: null, departmentType: null, departmentId: null,
-    channels: null,
+    channels: null, deliveryOrderId: null, doNo: null,
   };
 }
 
@@ -585,7 +594,8 @@ export function billSaveGap(f: {
   supplierId: string;
   invoiceNo: string;
   billDate: string;
-  lines: Array<Pick<LineDraft, "qty" | "unitPrice" | "amount" | "departmentType"> & { warehouseReceiptId?: string | null }>;
+  lines: Array<Pick<LineDraft, "qty" | "unitPrice" | "amount" | "departmentType">
+    & { warehouseReceiptId?: string | null; deliveryOrderId?: string | null }>;
 }): string | null {
   if (f.supplierId === "") return "Save: pick the supplier";
   if (f.invoiceNo.trim() === "") return "Save: type the supplier invoice No";
@@ -593,8 +603,9 @@ export function billSaveGap(f: {
   if (f.lines.length === 0) return "Save: add a line";
   for (const [i, l] of f.lines.entries()) {
     if ((lineAmount(l) ?? 0) <= 0) return `Save: type the amount on line ${i + 1}`;
-    // 0683: a goods line's channel comes from its orders, so nobody picks it.
-    if (!l.warehouseReceiptId && l.departmentType === null) return `Save: pick the department on line ${i + 1}`;
+    // 0683: a goods line's channel comes from its orders, and (0689) a delivery
+    // order's line from its order, so nobody picks either.
+    if (!l.warehouseReceiptId && !l.deliveryOrderId && l.departmentType === null) return `Save: pick the department on line ${i + 1}`;
   }
   return null;
 }
@@ -608,6 +619,15 @@ function toInput(l: LineDraft): SupplierBillDraftInput["lines"][number] {
       warehouseReceiptId: l.warehouseReceiptId, poLineId: l.poLineId,
       accountCode: l.accountCode || null, sku: l.sku || null, description: l.description || null,
       qty: q, unitPrice: p, departmentType: null, departmentId: null,
+    };
+  }
+  if (l.deliveryOrderId) {
+    // 0689: the database takes a delivery order's channel from its order; none is sent.
+    return {
+      deliveryOrderId: l.deliveryOrderId,
+      accountCode: l.accountCode || null, description: l.description || null,
+      qty: null, unitPrice: null, departmentType: null, departmentId: null,
+      amount: l.amount.trim() === "" ? null : Number(l.amount),
     };
   }
   return {
@@ -640,6 +660,8 @@ function BillForm() {
   const [narration, setNarration] = useState("");
   const [lines, setLines] = useState<LineDraft[]>([]);
   const [grnOpen, setGrnOpen] = useState(params.has("po"));
+  // 0689: a logistics partner's bill, line by delivery order.
+  const [doOpen, setDoOpen] = useState(false);
   const [creditorOpen, setCreditorOpen] = useState(false);
   const [loaded, setLoaded] = useState(!id);
   // Chew 2026-10-03: the pages read with "Read the bill", attached once the
@@ -691,6 +713,9 @@ function BillForm() {
       channels: l.po_line_id && l.department_type
         ? [{ department_type: l.department_type, department_id: l.department_id ?? null, qty: l.qty ?? 0 }]
         : null,
+      // 0689: a saved delivery order line keeps its DO, and its order's channel.
+      deliveryOrderId: l.delivery_order_id ?? null,
+      doNo: l.do_no ?? null,
     })));
     setLoaded(true);
   }, [id, loaded, existing.data]);
@@ -837,16 +862,18 @@ function BillForm() {
           <Facts title="Lines">
             <div className="mb-3 flex flex-wrap gap-2">
               <Button variant="primary" onClick={() => setGrnOpen(true)} data-testid="convert-grn">Convert GRN to bill</Button>
+              {/* 0689 (Chew ruling 5): a logistics partner's bill, charged to each delivery order's order. */}
+              <Button variant="neutral" onClick={() => setDoOpen(true)} data-testid="add-delivery-orders">Add delivery orders</Button>
               <Button variant="ghost" icon="add" onClick={() => setLines((b) => [...b, blankLine()])}>Add line</Button>
             </div>
             {lines.length === 0
-              ? <p>No line yet. Convert a GRN, or add a line for a bill that is not for goods.</p>
+              ? <p>No line yet. Convert a GRN, add the delivery orders a transport bill is for, or add a line for any other bill.</p>
               : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-body" data-testid="bill-form-lines">
                     <thead>
                       <tr className="text-left text-base-500">
-                        <th className="py-1 pr-2">GRN</th>
+                        <th className="py-1 pr-2">From</th>
                         <th className="py-1 pr-2">Item</th>
                         <th className="py-1 pr-2">Account</th>
                         <th className="py-1 pr-2">Qty</th>
@@ -861,6 +888,7 @@ function BillForm() {
                       {lines.map((l, i) => (
                         <BillLineRow key={l.key} line={l} index={i} accounts={lineAccounts}
                           usualGoods={ITEM_GROUP_USUAL}
+                          usualTransport={usualLabel(roleAccount(chart.data, "DELIVERY_TRANSPORT"))}
                           onChange={(patch) => setLine(l.key, patch)}
                           onRemove={() => setLines((b) => b.filter((x) => x.key !== l.key))} />
                       ))}
@@ -882,6 +910,16 @@ function BillForm() {
           setPoTermsDays(poTerms);
           setLines((before) => [...before.filter((l) => lineAmount(l) !== null || l.description !== ""), ...picked]);
           setGrnOpen(false);
+        }}
+      />
+      <DeliveryOrderPicker
+        open={doOpen}
+        billId={id ?? null}
+        onBill={new Set(lines.map((l) => l.deliveryOrderId).filter((d): d is string => !!d))}
+        onClose={() => setDoOpen(false)}
+        onPick={(picked) => {
+          setLines((before) => [...before.filter((l) => lineAmount(l) !== null || l.description !== ""), ...picked]);
+          setDoOpen(false);
         }}
       />
       <OtherCreditorModal open={creditorOpen} onClose={() => setCreditorOpen(false)}
@@ -941,15 +979,18 @@ function GoodsLineChannels({ channels, n }: { channels: GoodsLineChannel[] | nul
   );
 }
 
-function BillLineRow({ line, index, accounts, usualGoods, onChange, onRemove }: {
+function BillLineRow({ line, index, accounts, usualGoods, usualTransport, onChange, onRemove }: {
   line: LineDraft;
   index: number;
   accounts: ApAccountChoice[];
   usualGoods: string;
+  /** 0689: the account a delivery order's line falls back to. */
+  usualTransport: string;
   onChange: (patch: Partial<LineDraft>) => void;
   onRemove: () => void;
 }) {
   const fromGrn = !!line.warehouseReceiptId;
+  const fromDo = !!line.deliveryOrderId;
   const price = num(line.unitPrice.trim() === "" ? null : line.unitPrice);
   const diff = fromGrn && price !== null && line.poUnitCost !== null ? cents(price - line.poUnitCost) : null;
   const amount = lineAmount(line);
@@ -957,7 +998,9 @@ function BillLineRow({ line, index, accounts, usualGoods, onChange, onRemove }: 
   const n = index + 1;
   return (
     <tr className="border-t border-base-100 align-top">
-      <td className="py-1 pr-2">{fromGrn ? (line.grnNo ?? "GRN") : "Not from a GRN"}</td>
+      <td className={`py-1 pr-2${fromGrn || fromDo ? " whitespace-nowrap" : ""}`} data-testid={`line-${n}-source`}>
+        {fromGrn ? (line.grnNo ?? "GRN") : fromDo ? (line.doNo ?? "Delivery order") : "Not from a GRN"}
+      </td>
       <td className="py-1 pr-2">
         {fromGrn
           ? <span>{line.sku}</span>
@@ -967,13 +1010,16 @@ function BillLineRow({ line, index, accounts, usualGoods, onChange, onRemove }: 
       <td className="py-1 pr-2">
         <select aria-label={`Line ${n} account`} className={fieldCls} value={line.accountCode}
           onChange={(e) => onChange({ accountCode: e.target.value })}>
-          <option value="">{fromGrn ? usualGoods : "Choose an account"}</option>
+          <option value="">{fromGrn ? usualGoods : fromDo ? usualTransport : "Choose an account"}</option>
           {accounts.map((a) => <option key={a.code} value={a.code}>{a.code} {a.name}</option>)}
         </select>
       </td>
+      {/* 0689: a delivery order's line is charged as one amount, with no qty or unit price. */}
       <td className="py-1 pr-2">
-        <input aria-label={`Line ${n} qty`} className={`${fieldCls} w-20`} inputMode="decimal" value={line.qty}
-          onChange={(e) => onChange({ qty: e.target.value })} />
+        {!fromDo && (
+          <input aria-label={`Line ${n} qty`} className={`${fieldCls} w-20`} inputMode="decimal" value={line.qty}
+            onChange={(e) => onChange({ qty: e.target.value })} />
+        )}
         {fromGrn && line.openQty !== null && (
           <span className={`block text-meta ${qtyTooMany ? "text-kit-red-11" : "text-base-500"}`}>
             {line.openQty} received, not billed yet
@@ -981,8 +1027,10 @@ function BillLineRow({ line, index, accounts, usualGoods, onChange, onRemove }: 
         )}
       </td>
       <td className="py-1 pr-2">
-        <input aria-label={`Line ${n} unit price`} className={`${fieldCls} w-28`} inputMode="decimal"
-          value={line.unitPrice} onChange={(e) => onChange({ unitPrice: e.target.value })} />
+        {!fromDo && (
+          <input aria-label={`Line ${n} unit price`} className={`${fieldCls} w-28`} inputMode="decimal"
+            value={line.unitPrice} onChange={(e) => onChange({ unitPrice: e.target.value })} />
+        )}
       </td>
       <td className="py-1 pr-2">
         {fromGrn || (line.qty.trim() !== "" && line.unitPrice.trim() !== "")
@@ -990,14 +1038,22 @@ function BillLineRow({ line, index, accounts, usualGoods, onChange, onRemove }: 
           : <input aria-label={`Line ${n} amount`} className={`${fieldCls} w-28`} inputMode="decimal"
               value={line.amount} onChange={(e) => onChange({ amount: e.target.value })} />}
       </td>
+      {/* 0689: transport has no PO to compare, so a delivery order's line says nothing here. */}
       <td className="py-1 pr-2" data-testid={`line-${n}-price-check`}>
-        {fromGrn ? priceDiffWord(diff) : "No PO price"}
+        {fromGrn ? priceDiffWord(diff) : fromDo ? "" : "No PO price"}
       </td>
       <td className="py-1 pr-2">
         {fromGrn
           ? <GoodsLineChannels channels={line.channels} n={n} />
-          : <DepartmentPicker label={`Line ${n} department`} type={line.departmentType} id={line.departmentId}
-              income={accounts.find((a) => a.code === line.accountCode)?.kind === "INCOME"} onChange={onChange} />}
+          : fromDo
+            // 0689: a delivery order's line goes to its order's channel; nobody picks it.
+            ? <span data-testid={`line-${n}-channel`}>
+                {line.departmentType
+                  ? <DepartmentName type={line.departmentType} id={line.departmentId} />
+                  : <span className="text-base-500">From its order</span>}
+              </span>
+            : <DepartmentPicker label={`Line ${n} department`} type={line.departmentType} id={line.departmentId}
+                income={accounts.find((a) => a.code === line.accountCode)?.kind === "INCOME"} onChange={onChange} />}
       </td>
       <td className="py-1">
         <Button variant="ghost" size="sm" onClick={onRemove}>Remove</Button>
@@ -1089,6 +1145,140 @@ function GrnPicker({ open, supplierId, poId, onClose, onPick }: {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+    </Modal>
+  );
+}
+
+/** 0689 (Chew ruling 5, 「虽然是我们出，但是还是要记录运输费用啊，根据订单」): a
+ *  logistics partner's bill names the delivery orders it covers. Pick the
+ *  partner, tick its delivery orders, then type each one's amount, or the
+ *  bill's total and split it equally (「如果一个总数就平除」). Each becomes a
+ *  line on delivery transport, in the channel of the DO's order. */
+function DeliveryOrderPicker({ open, billId, onBill, onClose, onPick }: {
+  open: boolean;
+  billId: string | null;
+  /** The delivery orders already on the form, which are not offered again. */
+  onBill: ReadonlySet<string>;
+  onClose: () => void;
+  onPick: (lines: LineDraft[]) => void;
+}) {
+  const partners = useBillDeliveryOrders(billId, open);
+  const [partnerId, setPartnerId] = useState("");
+  const [picked, setPicked] = useState<Record<string, string>>({});
+  const [total, setTotal] = useState("");
+  const partner = (partners.data ?? []).find((p) => p.partner_id === partnerId) ?? null;
+  const dos = (partner?.delivery_orders ?? []).filter((d) => !onBill.has(d.id));
+  const chosen = dos.filter((d) => d.id in picked);
+  const amountOf = (d: BillDeliveryOrder) => num((picked[d.id] ?? "").trim() === "" ? null : picked[d.id]!);
+  const totalNum = num(total.trim() === "" ? null : total);
+  const reset = () => { setPartnerId(""); setPicked({}); setTotal(""); };
+  const close = () => { reset(); onClose(); };
+  const toggle = (d: BillDeliveryOrder, on: boolean) => setPicked((before) => {
+    const next = { ...before };
+    if (on) next[d.id] = ""; else delete next[d.id];
+    return next;
+  });
+  const split = () => {
+    if (totalNum === null || chosen.length === 0) return;
+    const parts = splitEqually(totalNum, chosen.length);
+    setPicked((before) => ({ ...before, ...Object.fromEntries(chosen.map((d, i) => [d.id, String(parts[i])])) }));
+  };
+  // The Receiving button law: a disabled button names its gap.
+  const gap = chosen.length === 0 ? "Add: tick a delivery order"
+    : chosen.some((d) => (amountOf(d) ?? 0) <= 0) ? "Add: type each amount, or split the total"
+      : null;
+  const add = () => {
+    onPick(chosen.map<LineDraft>((d) => ({
+      ...blankLine(),
+      deliveryOrderId: d.id,
+      doNo: d.do_no,
+      description: `Transport · ${d.do_no}${d.so !== null ? ` · SO-${d.so}` : ""}`,
+      amount: picked[d.id] ?? "",
+      departmentType: (d.department_type ?? null) as DepartmentType | null,
+      departmentId: d.department_id ?? null,
+    })));
+    reset();
+  };
+  return (
+    <Modal open={open} onOpenChange={(o) => { if (!o) close(); }} width="wide"
+      title="Add delivery orders"
+      description="The delivery orders a logistics bill is for. Each becomes a line on delivery transport, in the channel of its order."
+      footer={
+        <span className="flex gap-2">
+          <Button variant="ghost" onClick={close}>Cancel</Button>
+          <Button variant="primary" disabled={gap !== null} onClick={add} data-testid="add-delivery-order-lines">
+            {gap ?? `Add ${chosen.length} ${chosen.length === 1 ? "line" : "lines"}`}
+          </Button>
+        </span>
+      }>
+      {partners.isError
+        ? <p className="text-body">The delivery orders could not be loaded. Close this and try again.</p>
+        : !partners.isSuccess
+          ? <p className="text-body">Loading delivery orders…</p>
+          : partners.data.length === 0
+            ? <p className="text-body">No delivery order is waiting to be billed.</p>
+            : (
+              <div className="flex flex-col gap-3 text-body">
+                <label className="block">
+                  Logistics company
+                  <select aria-label="Logistics company" className={`${fieldCls} mt-1`} value={partnerId}
+                    onChange={(e) => { setPartnerId(e.target.value); setPicked({}); }}>
+                    <option value="">Choose the logistics company</option>
+                    {partners.data.map((p) => <option key={p.partner_id} value={p.partner_id}>{p.name}</option>)}
+                  </select>
+                </label>
+                {partner && (dos.length === 0
+                  ? <p>Every delivery order of {partner.name} is on this bill already.</p>
+                  : (
+                    <>
+                      <div className="overflow-x-auto">
+                        <table className="w-full" data-testid="delivery-order-candidates">
+                          <thead>
+                            <tr className="text-left text-base-500">
+                              <th className="py-1 pr-2" />
+                              <th className="py-1 pr-2">DO No</th>
+                              <th className="py-1 pr-2">Delivery date</th>
+                              <th className="py-1 pr-2">SO No</th>
+                              <th className="py-1 pr-2">Channel</th>
+                              <th className="py-1 pr-2">Amount (RM)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {dos.map((d) => (
+                              <tr key={d.id} className="border-t border-base-100">
+                                <td className="py-1 pr-2">
+                                  <Checkbox id={`do-${d.id}`} ariaLabel={`Charge ${d.do_no}`} checked={d.id in picked}
+                                    onCheckedChange={(on) => toggle(d, on)} />
+                                </td>
+                                <td className="whitespace-nowrap py-1 pr-2">{d.do_no}</td>
+                                <td className="whitespace-nowrap py-1 pr-2">{d.delivery_date ? fmtDate(d.delivery_date) : ""}</td>
+                                <td className="whitespace-nowrap py-1 pr-2">{d.so !== null ? `SO-${d.so}` : ""}</td>
+                                <td className="py-1 pr-2"><DepartmentName type={d.department_type} id={d.department_id} /></td>
+                                <td className="py-1 pr-2">
+                                  {d.id in picked && (
+                                    <input aria-label={`${d.do_no} amount`} className={`${fieldCls} w-28`} inputMode="decimal"
+                                      value={picked[d.id]} onChange={(e) => setPicked((b) => ({ ...b, [d.id]: e.target.value }))} />
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="flex flex-wrap items-end gap-2">
+                        <label className="block">
+                          Total on the bill (RM)
+                          <input aria-label="Total on the bill" className={`${fieldCls} mt-1 w-36`} inputMode="decimal"
+                            value={total} onChange={(e) => setTotal(e.target.value)} />
+                        </label>
+                        <Button variant="neutral" disabled={chosen.length === 0 || (totalNum ?? 0) <= 0} onClick={split}>
+                          Split equally
+                        </Button>
+                      </div>
+                    </>
+                  ))}
               </div>
             )}
     </Modal>

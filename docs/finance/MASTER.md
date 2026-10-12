@@ -48,7 +48,7 @@ Finance must show clearly where each sum of money comes in and goes out, channel
 6. Debtors follow the channel in two levels for dealers (「Dealer 一个overall 母账，然后每个dealer under 这个母账 … 就是两层了」): Dealer Debtors, then each dealer, then that dealer's customers or orders. Showroom and Subscription each have one control account with their customers under it.
 7. Goods bought without an order must not leave money paid to suppliers outside every channel in Receipts & Payments (「这样我看receipt & payment 就不太对了」); Chew confirmed how such a purchase is placed on 2026-10-06 ("A purchase without an order" below).
 
-Status (2026-10-12): ruling 3 holds (a line can be set to Office). Ruling 2 and "A purchase without an order" are BUILT for a bill's goods lines (0683, "Splitting the money by channel" step 1); ruling 1 is BUILT in Cash Flow (0684, step 2). Rulings 4, 5 and 6 are APPROVED / NOT BUILT. The plan for all of them, "Splitting the money by channel" at the end of this section, was approved by Chew on 2026-10-12.
+Status (2026-10-12): ruling 3 holds (a line can be set to Office). Ruling 2 and "A purchase without an order" are BUILT for a bill's goods lines (0683, "Splitting the money by channel" step 1); ruling 1 is BUILT in Cash Flow (0684, step 2). Ruling 5 is BUILT for a logistics company's bill, line by delivery order (0689, step 4). Rulings 4 and 6 are APPROVED / NOT BUILT. The plan for all of them, "Splitting the money by channel" at the end of this section, was approved by Chew on 2026-10-12.
 
 **Chart of accounts (Chew's, AutoCount, dated 22 Sep 2026; kept by Chew, not in this repository).** It has one debtor control (Trade Debtors) and one Other Debtor control, so dealer and subscription customers are not separated (「本身里面没有分dealer customer 和 subscription customer」). Measured: the ledger already accepts its code shape (`ledgerAccountCodeShape`, for example 300-0000 and 900-A001). Customers sit under a control account as parties on each line (`gl_entry_lines.party_type` / `party_id`), not as accounts, so a control account holds any number of customers.
 
@@ -155,7 +155,7 @@ Two Finance Settings pages keep the mapping in Chew's hands (「其他的收入�
 - How a bill does this is in "Splitting the money by channel" step 1 (built in 0683). The Showroom Display rule holds while Carres has one showroom.
 - The KPI allowance is accrued like the renovation rebate (900-C009 / 410-0065).
 
-**Splitting the money by channel — the plan; APPROVED by Chew 2026-10-12 (「分渠道做」, after it was explained to him) / NOT BUILT. He tests it all at once when it is done (「到时我要测试的全部一次过做」).** It builds Chew's rulings 1, 2, 4, 5 and 6 above and "A purchase without an order". Measured first (2026-10-10, read only):
+**Splitting the money by channel — the plan; APPROVED by Chew 2026-10-12 (「分渠道做」, after it was explained to him). Steps 1 and 2 BUILT and applied; step 4 BUILT (0689); step 3 NOT BUILT. He tests it all at once when it is done (「到时我要测试的全部一次过做」).** It builds Chew's rulings 1, 2, 4, 5 and 6 above and "A purchase without an order". Measured first (2026-10-10, read only):
 - Customer money: a payment, a deposit and an invoice each post to the one trade debtors account (`300-0000`) through `gl_ar_control_account()`, which allows exactly one customer control account; a second one makes every customer payment fail to post. These postings run inside Payment's own recording (Jess's), with no fallback, so a fault there would stop staff recording payments. No customer posting stores a department: the reports work it out from the order when they read (0578).
 - Supplier bills: a GRN line's department is filled in from its sales order (`fin_po_line_departments`), but it can be changed by hand; a PO line bought for orders in two channels gets none. A Manual Purchase Request keeps its purpose; a Showroom Display destination is not tied to a showroom outlet.
 - Cash Flow has no channel filter. A supplier payment carries no department (only the bill lines it paid do); a card payout carries none.
@@ -201,7 +201,18 @@ Recommended, in this order:
      - An advance whose bill line had no department stayed in no channel.
      - Office with an id and an unknown department were refused, and Operation could not read Cash Flow.
 3. **Debtors by channel** (rulings 4 and 6): `300-1000` Showroom, `300-2000` Dealer with one account per dealer under it (`300-2001` and on, a new dealer getting its own), `300-3000` Subscription, all under `300-0000`. Each posting picks the account from its order's channel. The test balances already on `300-0000` stay there; go-live starts clean. This rewrites the posting step inside Payment's recording: Chew approved it (2026-10-12, §1 Exceptions) and tells Jess, and it is measured on production and rolled back before it goes live, because a fault there would stop staff recording payments.
-4. **Transport on each order** (ruling 5): a logistics partner's bill names the delivery orders it covers; its amount is split over them (equally when it gives only a total); each part posts to `900-T002` with its order's channel.
+4. **Transport on each order** (ruling 5). **BUILT 2026-10-12 (0689); 0689 NOT APPLIED yet.** A logistics company's bill names the delivery orders it is for, and each becomes a line in its order's channel.
+   - The bill form has `Add delivery orders`. Finance picks the logistics company and ticks its delivery orders, then types each one's amount, or types the bill's total and presses `Split equally` (whole sen; the first lines take the odd sen, so the lines add up to the total).
+   - Each line posts to Posting accounts' `Transport to customers, by delivery order` (`900-T002` today; Finance may change it there), unless Finance chooses another account on the line. Its channel is its order's, never picked. It says its DO No and SO No, and has one amount, no qty or unit price.
+   - A delivery order is on one live bill at most. The picker leaves out the ones on another bill. A voided delivery order, one on another live bill, the same one twice, and a line naming a delivery order and a GRN are refused.
+   - A delivery order belongs to the logistics company its delivery arrangement names, else the one its DO names. Delivery's records are read only.
+   - The bill's creditor is still picked as a supplier or other creditor. Nothing ties it to Delivery's logistics company, so Finance picks both.
+   - Measured before applying (production, rolled back, 2026-10-12):
+     - The picker listed 2 logistics companies with 4 delivery orders between them, each with its order's channel.
+     - A bill of RM 60 and RM 40 on two delivery orders saved two lines on `900-T002` in the showroom, RM 100 in all. Confirmed, it posted Dr `900-T002` RM 60 and RM 40 in the showroom, Cr `400-0000` RM 100.
+     - The picker then left those two out for any other bill and kept them for this one. Saving the bill again kept its own delivery order.
+     - Refused: a delivery order already on a draft bill, the same one twice, one with a GRN, and a control account chosen on the line. A chosen expense account was kept.
+     - Operation could not read the picker. A voided delivery order was not measured: production has none.
 - Falsifier: in Chew's test, a channel's money in or out differs from what its orders, bills and vouchers show, or a customer payment fails to post after step 3.
 
 ## 1 · Boundary: Finance, Subscription and Dealer
