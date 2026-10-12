@@ -16,10 +16,12 @@
  * kind words Cash · Bank account · Card and online holding). A row
  * click opens it; the only new phrases are the page word and the add button.
  *
- * More tabs sit beside it: `?tab=chart` holds the chart of accounts
- * (ChartOfAccounts.tsx), `?tab=posting` the posting accounts (0657),
- * `?tab=groups` the item groups (0659), `?tab=card` the card payout banks
- * (0541) and `?tab=closed` the last closed day (0622).
+ * It is the second tab, `?tab=money` (Chew 2026-10-12: the chart comes first,
+ * at the plain address, ChartOfAccounts.tsx). The list shows the accounts in
+ * use; `Show not active` adds the rest. More tabs: `?tab=posting` the posting
+ * accounts (0657), `?tab=groups` the item groups (0659), `?tab=card` the card
+ * payout banks (0541), `?tab=closed` the last closed day (0622) and
+ * `?tab=requests` who may ask Finance to pay (0645).
  *
  * An opened account's number changes here too (YH, 24 Sep 2026), through the
  * chart's own door: the same request the Chart of accounts form sends
@@ -58,9 +60,11 @@ import ItemGroups from "./ItemGroups";
 import PostingAccounts from "./PostingAccounts";
 import RequestAccess from "./RequestAccess";
 
+// Chew 2026-10-12 (「B 可以」): the chart first, as every other setting is
+// built on it; Money accounts after it.
 const TABS = [
-  { value: "money", label: "Money accounts" },
   { value: "chart", label: "Chart of accounts" },
+  { value: "money", label: "Money accounts" },
   // 0657 (Chew 2026-10-07): the account each posting the system makes goes to.
   { value: "posting", label: "Posting accounts" },
   // 0659 (Chew 2026-10-07): each product's item group and the four accounts it binds.
@@ -80,18 +84,18 @@ const statusWord = (r: MoneyAccountRow) => (r.is_active ? "Active" : "Not active
 
 export default function FinanceSettings() {
   const [params, setParams] = useSearchParams();
-  /* An unknown `?tab=` lands on Money accounts, the page's first tab. */
+  /* An unknown `?tab=` lands on Chart of accounts, the page's first tab. */
   const asked = params.get("tab") ?? "";
-  const tab = TABS.some((t) => t.value === asked) ? asked : "money";
+  const tab = TABS.some((t) => t.value === asked) ? asked : "chart";
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ModuleHeader destinationHeader testId="finance-settings-destination-header" word="Finance Settings" docTitle="Finance Settings · Carres" />
       <div className="px-6">
-        <Tabs tabs={TABS} value={tab} label="Finance Settings" onValueChange={(v) => setParams(v === "money" ? {} : { tab: v })} />
+        <Tabs tabs={TABS} value={tab} label="Finance Settings" onValueChange={(v) => setParams(v === "chart" ? {} : { tab: v })} />
       </div>
       <div className="min-h-0 flex-1">
-        {tab === "chart" ? <ChartOfAccounts /> : tab === "posting" ? <PostingAccounts /> : tab === "groups" ? <ItemGroups /> : tab === "card" ? <CardRoutes /> : tab === "closed" ? <ClosedMonths />
-          : tab === "requests" ? <RequestAccess /> : <MoneyAccounts />}
+        {tab === "money" ? <MoneyAccounts /> : tab === "posting" ? <PostingAccounts /> : tab === "groups" ? <ItemGroups /> : tab === "card" ? <CardRoutes /> : tab === "closed" ? <ClosedMonths />
+          : tab === "requests" ? <RequestAccess /> : <ChartOfAccounts />}
       </div>
     </div>
   );
@@ -101,6 +105,10 @@ function MoneyAccounts() {
   const query = useMoneyAccounts();
   /* `undefined` = closed; `null` = a new account; a row = that account. */
   const [editing, setEditing] = useState<MoneyAccountRow | null | undefined>(undefined);
+  /* Chew 2026-10-12 (「B 可以」): the accounts in use, unless asked for the
+     ones out of use too, so an old test account does not crowd the list. */
+  const [showInactive, setShowInactive] = useState(false);
+  const rows = (query.data ?? []).filter((r) => showInactive || r.is_active);
   const columns = useMemo<DataGridColumn<MoneyAccountRow>[]>(
     () => [
       { key: "code", label: "Account", width: 110, accessor: (r) => r.code, searchValue: (r) => r.code },
@@ -115,7 +123,7 @@ function MoneyAccounts() {
   return (
     <ListPageShell register>
       <DataGrid
-        rows={query.data ?? []}
+        rows={rows}
         columns={columns}
         rowKey={(r) => r.code}
         storageKey="carres.finance.money-accounts.v1"
@@ -124,9 +132,13 @@ function MoneyAccounts() {
         stickyIdentity
         isLoading={!query.isSuccess}
         toolbarStart={
-          <Button variant="primary" size="sm" shape="pill" icon="add" onClick={() => setEditing(null)}>
-            Add a money account
-          </Button>
+          <span className="flex items-center gap-4">
+            <Button variant="primary" size="sm" shape="pill" icon="add" onClick={() => setEditing(null)}>
+              Add a money account
+            </Button>
+            <Checkbox id="money-accounts-show-inactive" label="Show not active" checked={showInactive}
+              onCheckedChange={setShowInactive} />
+          </span>
         }
         onRowClick={(r) => setEditing(r)}
       />

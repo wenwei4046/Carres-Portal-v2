@@ -100,7 +100,8 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-function show(path = "/finance/settings") {
+/* Money accounts is the second tab since Chew's 2026-10-12 order, at `?tab=money`. */
+function show(path = "/finance/settings?tab=money") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
@@ -114,16 +115,29 @@ function show(path = "/finance/settings") {
 const writes = () => net.calls.filter((c) => !c.key.startsWith("GET"));
 
 describe("Finance Settings — the money accounts", () => {
-  it("lists every money account with its kind and whether it is in use", async () => {
+  it("lists the money accounts in use with their kind; Show not active adds the rest (Chew 2026-10-12)", async () => {
     show();
     expect(screen.getByTestId("finance-settings-destination-header")).toHaveTextContent("Finance Settings");
     await screen.findByText("Public Bank");
     expect(screen.getByText("Card and online holding")).toBeInTheDocument();
+    expect(screen.getAllByText("Bank account")).toHaveLength(1);
+    expect(screen.queryByText("RHB")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not active")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Show not active" }));
+    expect(await screen.findByText("RHB")).toBeInTheDocument();
     expect(screen.getAllByText("Bank account")).toHaveLength(2);
     expect(screen.getByText("Not active")).toBeInTheDocument();
     /* The kind has its own word, not a pay method's (YH, 1 Oct 2026). */
     expect(screen.queryByText("Online payment")).not.toBeInTheDocument();
     expect(screen.queryByText("Bank transfer")).not.toBeInTheDocument();
+  });
+
+  it("opens on Chart of accounts, the first tab; Money accounts is second (Chew 2026-10-12)", async () => {
+    show("/finance/settings");
+    const tabs = screen.getAllByRole("tab").map((t) => t.textContent);
+    expect(tabs.slice(0, 2)).toEqual(["Chart of accounts", "Money accounts"]);
+    expect(screen.getByRole("tab", { name: "Chart of accounts" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("button", { name: "Add a money account" })).not.toBeInTheDocument();
   });
 
   it("adds a bank: the name and the kind, never a code", async () => {
@@ -287,6 +301,8 @@ describe("Finance Settings — a money account's number, changed on its own form
   it("Active changed with a new name and number: Active is saved under the old name first, then the chart's door takes the name and number", async () => {
     net.rows = ROWS.map((r) => (r.code === "1121" ? { ...r, is_active: false } : r));
     show();
+    // An account out of use is listed once Show not active is ticked.
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Show not active" }));
     const dialog = await openPublicBank();
     fireEvent.click(within(dialog).getByRole("checkbox", { name: "Active" }));
     fireEvent.change(within(dialog).getByLabelText(/Name/), { target: { value: "Public Bank Berhad" } });

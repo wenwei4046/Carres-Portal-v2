@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import type { SupplierNoteFollowup } from "@carres/shared/schemas/finance-ap";
+import { partyLabel, type SupplierNoteFollowup } from "@carres/shared/schemas/finance-ap";
 import Button from "@/components/kit/Button";
 import DatePicker from "@/components/kit/DatePicker";
 import Input from "@/components/kit/Input";
@@ -194,7 +194,7 @@ function AddNoteModal({ onClose }: { onClose: () => void }) {
       <div className="flex flex-col gap-3" data-testid="add-note-form">
         <Select id="note-supplier" label="Supplier" required value={supplierId || undefined} placeholder="Choose"
           onValueChange={setSupplierId}
-          options={(suppliers.data ?? []).map((s) => ({ value: s.id, label: s.name }))} />
+          options={(suppliers.data ?? []).map((s) => ({ value: s.id, label: partyLabel(s) }))} />
         <Select id="note-kind" label="Note" required value={kind} onValueChange={(v) => setKind(v as "CREDIT" | "DEBIT")}
           options={[{ value: "CREDIT", label: NOTE_KIND_WORD.CREDIT! }, { value: "DEBIT", label: NOTE_KIND_WORD.DEBIT! }]} />
         <Input id="note-amount" label="Amount (RM)" required type="number" inputMode="decimal" value={amount}

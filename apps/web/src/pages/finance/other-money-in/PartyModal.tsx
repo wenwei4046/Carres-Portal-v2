@@ -4,6 +4,7 @@
  */
 import { useState } from "react";
 import { financePartyInput, type FinancePartyKind, type OtherDebtorPartyRow } from "@carres/shared/other-money-in";
+import { partyCodeInput } from "@carres/shared/schemas/finance-ap";
 import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
 import Input from "@/components/kit/Input";
@@ -11,7 +12,7 @@ import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
 import Textarea from "@/components/kit/Textarea";
 import { toast } from "sonner";
-import { useSaveParty } from "./api";
+import { useSaveParty, useSavePartyCode } from "./api";
 import { FieldError } from "@/components/kit/FieldFrame";
 
 const KIND_OPTIONS = [
@@ -32,6 +33,11 @@ export default function PartyModal({
   onSaved?: (id: string) => void;
 }) {
   const save = useSaveParty();
+  const saveCode = useSavePartyCode();
+  // 0691: a saved party's code, made by the system; Finance may type another.
+  // A new party gets its code when the list is next read. A blank one keeps it.
+  const [code, setCode] = useState(party?.code ?? "");
+  const [codeError, setCodeError] = useState<string | undefined>();
   const [name, setName] = useState(party?.name ?? "");
   const [kind, setKind] = useState<FinancePartyKind>(party?.kind ?? "company");
   const [registrationNo, setRegistrationNo] = useState(party?.registration_no ?? "");
@@ -43,8 +49,17 @@ export default function PartyModal({
   const [nameError, setNameError] = useState<string | undefined>();
   const [refusal, setRefusal] = useState<string | null>(null);
 
-  const submit = () => {
+  const submit = async () => {
     setRefusal(null);
+    setCodeError(undefined);
+    const typed = code.trim();
+    const newCode = party && typed !== "" && typed.toUpperCase() !== (party.code ?? "")
+      ? partyCodeInput.safeParse({ code: typed })
+      : null;
+    if (newCode && !newCode.success) {
+      setCodeError(newCode.error.issues[0]?.message);
+      return;
+    }
     const orNull = (s: string) => (s.trim() ? s.trim() : null);
     const input = {
       name,
@@ -62,6 +77,16 @@ export default function PartyModal({
       return;
     }
     setNameError(undefined);
+    // The code first: a code the database refuses is said under its field,
+    // and nothing else is saved.
+    if (party && newCode?.success) {
+      try {
+        await saveCode.mutateAsync({ id: party.party_id, code: newCode.data.code });
+      } catch (e) {
+        setCodeError((e as Error).message);
+        return;
+      }
+    }
     save.mutate(
       party ? { id: party.party_id, input: { ...parsed.data, is_active: active } } : { id: null, input: parsed.data },
       {
@@ -88,13 +113,24 @@ export default function PartyModal({
           <Button variant="ghost" onClick={onClose}>
             Back
           </Button>
-          <Button variant="primary" loading={save.isPending} onClick={submit}>
+          <Button variant="primary" loading={save.isPending || saveCode.isPending} onClick={() => void submit()}>
             Save party
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-3" data-testid="party-form">
+        {party && (
+          <Input
+            id="party-code"
+            label="Code"
+            maxLength={8}
+            value={code}
+            hint="Made by the system in AutoCount's form, like 305-A001. You may change it."
+            error={codeError}
+            onChange={(e) => setCode(e.target.value)}
+          />
+        )}
         <Input
           id="party-name"
           label="Name"

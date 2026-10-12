@@ -268,6 +268,15 @@ function PartyRegister({ onNewInvoice }: { onNewInvoice: (partyId: string | null
   const [editing, setEditing] = useState<OtherDebtorPartyRow | null | undefined>(undefined);
   const columns = useMemo<DataGridColumn<OtherDebtorPartyRow>[]>(
     () => [
+      // 0691 (Chew 2026-10-12): Finance's AutoCount-style code, like 305-A001.
+      {
+        key: "code",
+        label: "Code",
+        width: 110,
+        accessor: (r) => r.code ?? "",
+        searchValue: (r) => r.code ?? "",
+        exportValue: (r) => r.code ?? "",
+      },
       {
         key: "name",
         label: "Party",

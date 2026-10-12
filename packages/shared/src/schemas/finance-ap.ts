@@ -136,6 +136,8 @@ export interface SupplierFinanceRow {
   supplier_id: string;
   name: string;
   kind: string;
+  /** 0691: Finance's AutoCount-style code, like 400-A001. Absent before 0691. */
+  code?: string | null;
   tax_no: string | null;
   registration_no: string | null;
   bank_name: string | null;
@@ -147,6 +149,26 @@ export interface SupplierFinanceRow {
 
 /** Where a payment to this supplier goes, on one line: `Maybank · 514012345678 ·
  *  Ah Seng Trading`. Null while Finance keeps no account number. */
+/** 0691 (Chew 2026-10-12): a supplier's, other creditor's or other debtor's
+ *  code, in AutoCount's form: three digits, a dash, a letter or digit, three
+ *  digits (400-A001). Typed in small letters it is kept in capitals. */
+export const PARTY_CODE_MESSAGE = "Type a code like 400-A001.";
+export const partyCodeInput = z
+  .object({
+    code: z
+      .string()
+      .trim()
+      .transform((s) => s.toUpperCase())
+      .pipe(z.string().regex(/^[0-9]{3}-[0-9A-Z][0-9]{3}$/, PARTY_CODE_MESSAGE)),
+  })
+  .strict();
+export type PartyCodeInput = z.infer<typeof partyCodeInput>;
+
+/** How a creditor reads in a picker: its code first when it has one. */
+export function partyLabel(p: { name: string; code?: string | null }): string {
+  return p.code ? `${p.code} ${p.name}` : p.name;
+}
+
 export function supplierPayTo(
   row: Pick<SupplierFinanceRow, "bank_name" | "bank_account_no" | "bank_account_holder">,
 ): string | null {
@@ -530,6 +552,8 @@ export interface ApCreditor {
   id: string;
   name: string;
   kind: string;
+  /** 0691: Finance's AutoCount-style code, like 400-A001. Absent before 0691. */
+  code?: string | null;
   /** 0530 — days after the bill date the supplier is paid. Null = not set. */
   terms_days: number | null;
 }

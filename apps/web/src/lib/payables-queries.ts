@@ -240,6 +240,20 @@ export function useSaveSupplierFinance() {
   });
 }
 
+/** 0691 (Chew 2026-10-12): Finance changes a supplier's or other creditor's
+ *  code. Every payables read refreshes, so pickers and AP Aging show it. */
+export function useSaveCreditorCode() {
+  const refresh = useInvalidatePayables();
+  return useMutation<{ code: string }, ApiError, { supplierId: string; code: string }>({
+    mutationFn: ({ supplierId, code }) =>
+      apiFetch<{ code: string }>(`${BASE}/supplier-finance/${supplierId}/code`, {
+        method: "PUT",
+        body: JSON.stringify({ code }),
+      }),
+    onSuccess: () => { void refresh(); },
+  });
+}
+
 export function useCreateOtherCreditor() {
   const refresh = useInvalidatePayables();
   return useMutation<{ id: string }, ApiError, OtherCreditorInput>({

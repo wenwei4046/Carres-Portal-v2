@@ -88,13 +88,31 @@ describe("who may use /api/finance/other-money-in", () => {
 });
 
 describe("parties", () => {
-  it("GET /parties lists every party through other_debtor_outstanding", async () => {
+  it("GET /parties lists every party through other_debtor_outstanding, each with its code (0691)", async () => {
     const rows = [{ party_id: PARTY, name: "Sister Co Sdn Bhd", outstanding: 1500 }];
     const sb = stubRpc({ data: rows, error: null });
+    sb.rpc.mockImplementation(async (fn: string) => (fn === "fin_party_codes"
+      ? { data: [{ supplier_id: null, party_id: PARTY, code: "305-S001" }], error: null }
+      : { data: rows, error: null }));
     const res = await call("GET", "/parties");
     expect(res.status).toBe(200);
     expect(sb.rpc).toHaveBeenCalledWith("other_debtor_outstanding", { p_party_id: null });
-    expect(await res.json()).toEqual(rows);
+    expect(await res.json()).toEqual([{ ...rows[0], code: "305-S001" }]);
+  });
+
+  /* 0691 (Chew 2026-10-12): Finance changes a party's code. */
+  it("PUT /parties/:id/code sends the code in capitals through fin_party_code_set", async () => {
+    const sb = stubRpc({ data: "305-S002", error: null });
+    const res = await call("PUT", `/parties/${PARTY}/code`, { code: "305-s002" });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_party_code_set", { p_supplier_id: null, p_party_id: PARTY, p_code: "305-S002" });
+  });
+
+  it("PUT /parties/:id/code refuses a code of the wrong shape before the database", async () => {
+    const sb = stubRpc({ data: null, error: null });
+    const res = await call("PUT", `/parties/${PARTY}/code`, { code: "305-SS02" });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
   });
 
   it("POST /parties trims the name and sends absent fields as null", async () => {

@@ -11,7 +11,7 @@ import type {
   SupplierBillDraftInput,
   SupplierBillRegisterRow,
 } from "@carres/shared/schemas/finance-ap";
-import { billForeignAmountInput, defaultBillDueDate, splitEqually } from "@carres/shared/schemas/finance-ap";
+import { billForeignAmountInput, defaultBillDueDate, partyLabel, splitEqually } from "@carres/shared/schemas/finance-ap";
 import Input from "@/components/kit/Input";
 import { roleAccount, type LedgerAccount } from "@carres/shared/finance-ledger";
 import { useLedgerChart } from "../ledger/ledger-queries";
@@ -934,10 +934,10 @@ function CreditorOptions({ rows }: { rows: ApCreditor[] }) {
   return (
     <>
       <optgroup label="Suppliers">
-        {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        {suppliers.map((s) => <option key={s.id} value={s.id}>{partyLabel(s)}</option>)}
       </optgroup>
       <optgroup label="Other creditors">
-        {others.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        {others.map((s) => <option key={s.id} value={s.id}>{partyLabel(s)}</option>)}
       </optgroup>
     </>
   );

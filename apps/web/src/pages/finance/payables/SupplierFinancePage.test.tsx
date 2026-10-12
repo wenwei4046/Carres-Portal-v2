@@ -37,13 +37,13 @@ const LANDLORD = "44444444-4444-4444-8444-444444444444";
 
 const rows = [
   {
-    supplier_id: SOFA, name: "Lumen Sofa Works", kind: "factory_pickup",
+    supplier_id: SOFA, name: "Lumen Sofa Works", kind: "factory_pickup", code: "400-L001",
     tax_no: "C 2001234567", registration_no: "201901012345",
     bank_name: "Maybank", bank_account_no: "514012345678", bank_account_holder: "Lumen Sofa Works Sdn Bhd",
     updated_at: "2026-10-03T03:15:00Z", updated_by_name: "Chew",
   },
   {
-    supplier_id: LANDLORD, name: "Bayview Properties", kind: "other_creditor",
+    supplier_id: LANDLORD, name: "Bayview Properties", kind: "other_creditor", code: "405-B001",
     tax_no: null, registration_no: null, bank_name: null, bank_account_no: null, bank_account_holder: null,
     updated_at: null, updated_by_name: null,
   },
@@ -84,11 +84,54 @@ describe("Finance → Suppliers (0636)", () => {
     expect(screen.getByTestId("supplier-finance-summary")).toHaveTextContent("2 suppliers · 1 with a bank account");
   });
 
-  it("puts where the money goes before the tax facts", async () => {
+  it("puts the code first (0691), then where the money goes, before the tax facts", async () => {
     show();
     await screen.findByText("Lumen Sofa Works");
     const heads = screen.getAllByRole("columnheader").map((h) => h.textContent?.trim()).filter(Boolean);
-    expect(heads.slice(0, 5)).toEqual(["Supplier", "Bank", "Account No", "Account holder", "Last changed"]);
+    expect(heads.slice(0, 6)).toEqual(["Code", "Supplier", "Bank", "Account No", "Account holder", "Last changed"]);
+    expect(screen.getByTestId(`supplier-finance-row-${SOFA}`)).toHaveTextContent("400-L001");
+    expect(screen.getByTestId(`supplier-finance-row-${LANDLORD}`)).toHaveTextContent("405-B001");
+  });
+
+  /* 0691 (Chew 2026-10-12, 「A 可以」): Finance may change a code. */
+  it("a changed code is sent first, in capitals, then the details", async () => {
+    show();
+    fireEvent.doubleClick(await screen.findByTestId(`supplier-finance-row-${LANDLORD}`));
+    const code = await screen.findByLabelText("Code");
+    expect(code).toHaveValue("405-B001");
+    fireEvent.change(code, { target: { value: "405-b009" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save details" }));
+    await waitFor(() => expect(writes()).toHaveLength(2));
+    expect(writes()[0]).toEqual({ url: `${LIST}/${LANDLORD}/code`, method: "PUT", body: { code: "405-B009" } });
+    expect(writes()[1]!.url).toBe(`${LIST}/${LANDLORD}`);
+  });
+
+  it("an unchanged or blank code sends no code", async () => {
+    show();
+    fireEvent.doubleClick(await screen.findByTestId(`supplier-finance-row-${LANDLORD}`));
+    fireEvent.change(await screen.findByLabelText("Code"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save details" }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]!.url).toBe(`${LIST}/${LANDLORD}`);
+  });
+
+  it("a code of the wrong shape is refused under its field, and nothing is sent", async () => {
+    show();
+    fireEvent.doubleClick(await screen.findByTestId(`supplier-finance-row-${LANDLORD}`));
+    fireEvent.change(await screen.findByLabelText("Code"), { target: { value: "B001" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save details" }));
+    expect(await screen.findByText("Type a code like 400-A001.")).toBeInTheDocument();
+    expect(writes()).toHaveLength(0);
+  });
+
+  it("a code the database refuses is said under its field, and the details are not saved", async () => {
+    api.fail.add(`${LIST}/${LANDLORD}/code`);
+    show();
+    fireEvent.doubleClick(await screen.findByTestId(`supplier-finance-row-${LANDLORD}`));
+    fireEvent.change(await screen.findByLabelText("Code"), { target: { value: "400-L001" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save details" }));
+    expect(await screen.findByText("boom")).toBeInTheDocument();
+    expect(writes().map((w) => w.url)).toEqual([`${LIST}/${LANDLORD}/code`]);
   });
 
   it("saves the details a person typed, as typed (the server tidies them)", async () => {

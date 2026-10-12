@@ -316,9 +316,24 @@ Deposit invoice rules:
 | Supplier advances | Keep. |
 | Supplier credit and debit notes | **Build.** This includes reading the supplier's paper and knocking the note off that supplier's invoices. A **debit note** (the supplier charges more) is its own document, with its own number and list, never mixed with bills; it is paid by a payment voucher and counts in AP and AP Aging (Chew 2026-10-03; **built in 0681**, "Supplier debit notes" below). A supplier never pays a credit back in money: the credit is knocked off the next bill, or a credit or debit note is raised, so no refund-from-supplier door is built. |
 | Supplier finance data (tax numbers, bank account) | **Build** as Finance's own record, linked to Purchasing's supplier. Purchasing screens do not change. |
+| Codes for creditors and other debtors | **Chew 2026-10-12 (「A 可以」): AutoCount's form (`400-A001`), made by the system, changeable by Finance. Built in 0691**, "Codes and the money accounts tidy-up" below. |
 | Bill scanning | **Build.** It sends bill images to an external AI service and costs a little per bill. |
 | Foreign currency | Needed, but rarely used. Record the foreign amount and the rate only; the books stay in RM, and no exchange gain or loss is worked out automatically (Chew 2026-10-03). **Built for a bill in 0682**, "Foreign currency on a bill" below. |
 | Dealer commission | Calculated on money actually received; Finance maintains the rates. See the rules below this table. |
+
+**Codes and the money accounts tidy-up — Chew 2026-10-12 (「A 可以，B 可以，做吧」); BUILT 2026-10-12 (0691), probed on production and rolled back; 0691 APPLIED 2026-10-12 on his word, the tracker holding the file exactly (md5 `44132d63e34921cfaa44cf82270ec32c`): the 11 suppliers have their codes and `1130` is `315-9000`.**
+- Every supplier, other creditor and other debtor has a code in AutoCount's form: the three digits of its control account, a dash, the name's first letter or digit, and a running number. `400-A001` is a supplier (Trade Creditors), `405-N001` an other creditor, `305-A001` an other debtor.
+  - The system makes it, in name order, the first time Finance reads the list after the supplier or party is added. Finance may change it on Suppliers → Edit details or Other debtors → Edit party. It is unique and never a chart account's number; each change is in the audit log.
+  - It is Finance's own record (`fin_party_codes`); Purchasing's supplier record does not change. Customers have no code.
+  - It is shown first on Suppliers, Other debtors → Parties and AP Aging, before the name in every creditor picker, and in their Excel exports.
+- Money accounts:
+  - `1130 CARD - MACHINE NOT KNOWN` is renumbered `315-9000`, beside the merchants under `315-0000`. Every record that named it follows: money accounts, card payout banks, the payment methods' accounts and posted lines.
+  - The list shows the accounts in use; `Show not active` adds the rest. `1121 Public Bank` was already retired in the chart and no longer shows. `1120 (TEST ONLY)` holds test postings, so it stays until the clean start at go-live, and is retired then.
+  - Finance Settings opens on Chart of accounts; Money accounts is the second tab.
+- Measured before applying (production, rolled back, 2026-10-12):
+  - The 11 suppliers got codes in name order, `400-A001` to `400-T001` (two under N: `400-N001`, `400-N002`). No other debtor exists yet; a new one got `305-Z001` on the next read.
+  - After the renumber, `315-9000` held the same 8 posted lines, 3 payment method accounts and 2 card payout routes, and nothing named `1130`.
+  - A changed code was kept in capitals and written to the audit log. Refused: a code another supplier has, a chart account's number, a wrong shape, and a supplier and a party at once. Operation could neither read nor change a code.
 
 Dealer commission rules:
 - Each month a **draft** payment voucher is raised automatically.

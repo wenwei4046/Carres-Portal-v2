@@ -4496,7 +4496,7 @@ this file keep their meaning: `Account` · `Name` · `Kind` and the kind words �
 
 | Group | Word | Meaning |
 |---|---|---|
-| Tabs | **`Money accounts`** · **`Chart of accounts`** | The two tabs of Finance Settings. The second is `?tab=chart`. |
+| Tabs | **`Chart of accounts`** · **`Money accounts`** · `Posting accounts` · `Item groups` · `Card payout banks` · `Closed months` · `Payment requests` | The tabs of Finance Settings, in this order since Chew's 2026-10-12 ruling (「B 可以」): the chart first, at the plain address; Money accounts is `?tab=money`. |
 | Chart | `{code} {name}` | One account, indented under its parent. A heading account (one that other accounts sit under) is bold; nothing is ever posted to it. |
 | Form | `Account` · `{code} · {kind}` | The account form's heading, and the line under it. The name and the number change here, for an account and a heading alike (0570); a heading's accounts stay under it when its number changes. |
 | Refusals (database, 0539) | `Only Finance changes the chart of accounts.` · `That account is not in the chart.` · `An account named {name} is already in the chart.` | Who may rename, a code that is not in the chart (the API says it too for a code that is not four digits), and two accounts with one name. |
@@ -5315,6 +5315,21 @@ Chew ruled that transport is recorded as a cost of each order, a logistics bill 
 | Add delivery orders | Title `Add delivery orders`; `The delivery orders a logistics bill is for. Each becomes a line on delivery transport, in the channel of its order.` Field `Logistics company` (`Choose the logistics company`). Columns `DO No` · `Delivery date` · `SO No` · `Channel` · `Amount (RM)`; each row's tick is named `Charge {DO No}`. `Total on the bill (RM)` with `Split equally`: whole sen, the first lines taking the odd sen. Footer `Cancel` · `Add {n} lines` (`Add 1 line`), or the gap: `Add: tick a delivery order` · `Add: type each amount, or split the total`. `Loading delivery orders…` · `No delivery order is waiting to be billed.` · `Every delivery order of {company} is on this bill already.` · `The delivery orders could not be loaded. Close this and try again.` |
 | Bill page | The lines' first column is `From`: a delivery order's line shows its DO No |
 | Refusals (the database's) | `Line {n}: a line charges for a goods receipt or a delivery order, not both.` · `Line {n}: that delivery order does not exist.` · `Line {n}: delivery order {DO No} is voided.` · `Line {n}: delivery order {DO No} is on this bill twice.` · `Line {n}: delivery order {DO No} is already on {bill No}.` (`on a draft bill` before it has a number) · `Line {n}: the order of delivery order {DO No} has no channel.` · `Only Finance reads the delivery orders a bill can charge for.` |
+
+### PROPOSAL — PENDING CHEW · Codes for creditors and other debtors (0691)
+
+Chew ruled on 2026-10-12 (「A 可以」) that every supplier, other creditor and other debtor has a code in AutoCount's form, made by the system and changeable by Finance (Finance MASTER §3.2 "Codes"). The words below are proposed with it.
+
+| Where | Words |
+|---|---|
+| Suppliers | Column `Code`, first (`400-A001`, an other creditor `405-B001`); the opened row starts `{code} · {name}` |
+| Edit details (a supplier) | Field `Code`, first; hint `Made by the system in AutoCount's form, like 400-A001. You may change it.` A blank one keeps the code |
+| Other debtors → Parties | Column `Code`, first (`305-A001`). Edit party: field `Code` (a saved party only), hint `Made by the system in AutoCount's form, like 305-A001. You may change it.` |
+| Pickers | A creditor reads `{code} {name}` on the bill, the credit and debit notes and Notes to follow up; the payment voucher's reads `{code} {name} · {Supplier or Other creditor}` |
+| AP Aging | Column `Code`, first |
+| Field refusal | `Type a code like 400-A001.` (the page's own, before anything is sent) |
+| Refusals (the database's) | `{code} is an account in the chart. Choose another code.` · `{code} is already the code of {name}.` · `Only Finance changes a code.` · `Only Finance reads the codes.` · `Choose a supplier or an other debtor.` · `That supplier does not exist.` · `That party does not exist.` · `Every code from {NNN-X}001 to {NNN-X}999 is taken. Type a code.` · `There is no account to number the code from.` |
+| Finance Settings → Money accounts | `Show not active`, beside `Add a money account`: the list shows the accounts in use until it is ticked (Chew 2026-10-12, 「B 可以」) |
 
 ### PROPOSAL — PENDING CHEW · Notes to follow up (0676)
 

@@ -114,6 +114,12 @@ export function useSaveParty() {
   );
 }
 
+/** 0691 (Chew 2026-10-12): Finance changes a party's code, like 305-A001. */
+export function useSavePartyCode() {
+  return useInvalidatingMutation((v: { id: string; code: string }) =>
+    apiFetch<{ code: string }>(`${BASE}/parties/${v.id}/code`, { method: "PUT", ...json({ code: v.code }) }));
+}
+
 /** Save a draft — or, with `issue: true`, save and issue in one act. A new
  *  invoice has `id: null`. A refused issue saves nothing. */
 export function useSaveInvoice() {

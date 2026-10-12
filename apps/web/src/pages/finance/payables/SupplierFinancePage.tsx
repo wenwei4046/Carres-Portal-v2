@@ -14,7 +14,8 @@ import SupplierFinanceModal from "./SupplierFinanceModal";
  * Finance → Payables → Suppliers, at `/finance/suppliers` (migration 0636;
  * Chew 2026-10-03, docs/finance/MASTER.md §3.2).
  *
- * Finance's own tax and bank details for every supplier and other creditor.
+ * Finance's own tax and bank details for every supplier and other creditor,
+ * and (0691) its AutoCount-style code, first, like 400-A001.
  * The supplier itself stays Purchasing's record: its name and kind are read
  * here, never changed. Who last changed the bank details, and when, is on the
  * row, because a changed account number is where a payment can go wrong.
@@ -27,6 +28,8 @@ export default function SupplierFinancePage() {
   // menu open; the tax facts after it. A detail nobody keyed is an empty cell
   // (UI MASTER §6.0: no glyph, no absence word for an optional fact).
   const columns = useMemo<DataGridColumn<SupplierFinanceRow>[]>(() => [
+    // 0691 (Chew 2026-10-12): Finance's AutoCount-style code, first, as AutoCount lists creditors.
+    { key: "code", label: "Code", width: 110, accessor: (r) => r.code ?? "", searchValue: (r) => r.code ?? "" },
     { key: "supplier", label: "Supplier", width: 240, accessor: (r) => r.name, overflowText: (r) => r.name,
       searchValue: (r) =>
         [r.name, r.tax_no, r.registration_no, r.bank_name, r.bank_account_no, r.bank_account_holder].filter(Boolean).join(" ") },
@@ -69,7 +72,7 @@ export default function SupplierFinancePage() {
             expandable={{
               renderExpansion: (r) => (
                 <div className="p-4 text-body flex flex-col items-start gap-1">
-                  <p>{r.name} · {creditorKindWord(r.kind)}</p>
+                  <p>{r.code ? `${r.code} · ` : ""}{r.name} · {creditorKindWord(r.kind)}</p>
                   <p>
                     {supplierPayTo(r)
                       ? `Pay to ${supplierPayTo(r)}`

@@ -253,6 +253,27 @@ describe("Bills register", () => {
   });
 });
 
+/* 0691 (Chew 2026-10-12, 「A 可以」): a creditor reads with its code first. */
+describe("Creditor codes in the pickers (0691)", () => {
+  beforeEach(() => {
+    api.routes[`${B}/suppliers`] = { rows: [
+      { id: SUP, name: "Lumen Sofa Works", kind: "supplier", code: "400-L001" },
+      { id: LANDLORD, name: "Bayview Properties", kind: "other_creditor", code: "405-B001" },
+    ] };
+  });
+
+  it("the bill form's supplier picker reads the code first", async () => {
+    show("/finance/bills/new");
+    expect(await screen.findByRole("option", { name: "400-L001 Lumen Sofa Works" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "405-B001 Bayview Properties" })).toBeInTheDocument();
+  });
+
+  it("the payment voucher's supplier picker reads the code first", async () => {
+    show("/finance/payment-vouchers/new");
+    expect(await screen.findByRole("option", { name: "400-L001 Lumen Sofa Works · Supplier" })).toBeInTheDocument();
+  });
+});
+
 describe("Payment vouchers register", () => {
   it("the voucher number is a blue link, not plain text", async () => {
     api.routes[`${B}/vouchers`] = { rows: [{ id: PV, voucher_no: "PV-9M3Q", status: "approved", purpose: "SUPPLIER_BILLS",

@@ -8,6 +8,7 @@ import {
   billForeignAmountInput,
   moneyBackInput,
   otherCreditorInput,
+  partyCodeInput,
   paymentVoucherDraftInput,
   supplierBillDraftInput,
   supplierCreditNoteDraftInput,
@@ -31,6 +32,7 @@ import { todayIsoMYT } from "../../lib/delivery-order-issue";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import { departmentQuery, keepByDepartment, tooManyDepartmentLines, withLineDepartments } from "../../lib/line-departments";
+import { readPartyCodes } from "../../lib/party-codes";
 import type { AppEnv } from "../../types";
 
 /**
@@ -38,7 +40,8 @@ import type { AppEnv } from "../../types";
  * (migration 0477).
  *
  *   Suppliers and accounts
- *     GET  /suppliers                   who can send a bill (suppliers + other creditors)
+ *     GET  /suppliers                   who can send a bill (suppliers + other creditors),
+ *                                       each with its code (0691, fin_party_codes)
  *     POST /other-creditors             supplier_other_creditor_create — a landlord, an advertiser
  *     GET  /accounts                    ap_account_choices — which account fits which box
  *     GET  /outstanding                 ap_outstanding — owed per supplier, zero included
@@ -48,6 +51,7 @@ import type { AppEnv } from "../../types";
  *     GET  /supplier-finance            finance_supplier_list — every supplier with Finance's
  *                                       own tax and bank details (0636)
  *     PUT  /supplier-finance/:supplierId  finance_supplier_profile_save (0636)
+ *     PUT  /supplier-finance/:supplierId/code  fin_party_code_set (0691) — Finance changes a code
  *
  *   Bills (a supplier's invoice, entered)
  *     GET  /bills                       supplier_bill_register
@@ -217,12 +221,16 @@ function voucherArgs(voucherId: string | null, d: PaymentVoucherDraftInput) {
 // ── suppliers, accounts, what is owed ───────────────────────────────────────
 
 payablesRouter.get("/suppliers", requireFinance, async (c) => {
-  const { data, error } = await sb(c)
+  const client = sb(c);
+  const { data, error } = await client
     .from("suppliers")
     .select("id, name, kind, terms_days")
     .order("name", { ascending: true });
   if (error) return pgFail(c, error);
-  return c.json({ rows: data ?? [] });
+  // 0691: each creditor's code, so a picker reads "400-A001 Armani".
+  const codes = await readPartyCodes(client);
+  const rows = (data ?? []).map((r) => ({ ...r, code: codes.bySupplier.get(r.id as string) ?? null }));
+  return c.json({ rows });
 });
 
 payablesRouter.post("/other-creditors", requireFinance, async (c) => {
@@ -284,9 +292,29 @@ payablesRouter.get("/outstanding", requireFinance, async (c) => {
 // number and the bank account a payment goes to.
 
 payablesRouter.get("/supplier-finance", requireFinance, async (c) => {
-  const { data, error } = await sb(c).rpc("finance_supplier_list");
+  const client = sb(c);
+  const { data, error } = await client.rpc("finance_supplier_list");
   if (error) return pgFail(c, error);
-  return c.json({ rows: data ?? [] });
+  const codes = await readPartyCodes(client);
+  const rows = ((data ?? []) as Array<{ supplier_id: string }>)
+    .map((r) => ({ ...r, code: codes.bySupplier.get(r.supplier_id) ?? null }));
+  return c.json({ rows });
+});
+
+// 0691 (Chew 2026-10-12): Finance changes a supplier's or other creditor's
+// code. The database keeps it unique and never a chart account's number.
+payablesRouter.put("/supplier-finance/:supplierId/code", requireFinance, async (c) => {
+  const supplierId = c.req.param("supplierId");
+  if (!UUID_RE.test(supplierId)) return badId(c, "supplier");
+  const body = await parseJsonBody(c, partyCodeInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("fin_party_code_set", {
+    p_supplier_id: supplierId,
+    p_party_id: null,
+    p_code: body.data.code,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ code: data as string });
 });
 
 payablesRouter.put("/supplier-finance/:supplierId", requireFinance, async (c) => {
@@ -330,7 +358,9 @@ payablesRouter.get("/aging", requireFinance, async (c) => {
   } catch {
     return failed();
   }
-  return c.json(answer);
+  // 0691: each creditor's code beside its name.
+  const codes = await readPartyCodes(sb(c));
+  return c.json({ ...answer, suppliers: answer.suppliers.map((s) => ({ ...s, code: codes.bySupplier.get(s.supplier_id) ?? null })) });
 });
 
 payablesRouter.get("/bill-outstanding", requireFinance, async (c) => {
