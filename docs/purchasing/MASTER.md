@@ -2631,9 +2631,9 @@ Module Register rails remain factual filters and do not copy central Work action
 
 ### 9.1 SO Batch Purchase
 
-**BY SUPPLIER VIEW — owner 12 Oct 2026 (design handoff `Fix now`) · BUILT 12 Oct 2026, not the default view yet.**
-The page has three views of the same demand: `Table` (one row per Sales Order, the default), `Cards` and
-`By supplier`. `By supplier` reads the demand the way a buyer orders it: one row per supplier and category,
+**BY SUPPLIER VIEW — owner 12 Oct 2026 (design handoff) · BUILT 12 Oct 2026 · the page's first view.**
+The page has three views of the same demand: `By supplier` (the first view), `By sales order` (one row per Sales
+Order, the list this page always had; `view=table` in the address) and `Cards`. `By supplier` reads the demand the way a buyer orders it: one row per supplier and category,
 because one PO goes to one supplier for one category. Rows whose PO window has gone by come first.
 
 | Column | Width | What it shows |
@@ -2645,12 +2645,13 @@ because one PO goes to one supplier for one category. Rows whose PO window has g
 | `Supplier ready by` | 120 | The PO Delivery Date a PO issued today would carry (the same projection the Issue PO review shows), marked `if sent today`. It is never the `PO Delivery Date` of an issued PO; that column of the Table view still shows a date only once the PO exists |
 | `Status` | 120 | `Cut-off passed` (amber) with what is still to buy, when a line's PO window has gone by; otherwise `To buy` |
 
-- A row opens to its item lines: tick · item and variant · quantity · Sales Order number (opens the order card) · that line's Order By date.
+- A row opens to its item lines under the heads `Item` · `To buy` · `SO No` · `Order By` · `Supplier Deliver To`: tick · item and variant · quantity · Sales Order number (opens the order card) · that line's Order By date · the SAME `Supplier Deliver To` editor the By sales order list uses, Split included. A line that may not be bought has no tick and no editor and states its reason with the same words and the same door (`Use this PO` · `Fix in Catalog`) as the By sales order list.
 - A tick on a row ticks every line of it that may be bought; a line has its own tick. The ticks are the same ticks the Table view holds, and the same `Issue PO` door takes them. Who may tick and issue is unchanged.
 - Every date and number is the server's (`orderBy`, `poDeliveryDate`, `poDeliveryWorkingDays`, `poWindow`, `toBuy`); the PO window times are the Purchasing Settings values, never the specimen's.
 - Status stays in view at 1131 wide with Tasks closed, with no side scroll (measured 12 Oct 2026). Tasks now opens by itself only from 1280 wide (03 §1).
 - The earlier `Group by: Supplier` page tool, which only regrouped the Sales Order rows, is removed: one way to see demand by supplier.
-- **Not built yet, and why it is not the default:** Ready Stock matching, the per-line `Supplier Deliver To` change and the status reasons still live only in the Table view. The specimen's other groupings (`By category` · `By order deadline`), its Summary panel and its `To buy · Ordered · All` tabs are not built.
+- **Kept functions (owner instruction 12 Oct 2026: the kit is the visual source, never permission to drop a working function).** Eligibility, the duplicate-PO protection and the destination rules are the By sales order list's own, read through the same functions: one tick set, one `Issue PO` door, the server's re-check unchanged. `Match Ready Stock` sits in this view's toolbar and opens the By sales order list, where stock is matched per Sales Order; the per-line Ready Stock picker lives there.
+- **Not built yet:** the specimen's other groupings (`By category` · `By order deadline`), its Summary panel and its `To buy · Ordered · All` tabs. The specimen's `Place` and `Send PO` are not Portal words: the act is `Issue PO` (COPY-STANDARD), and sending evidence stays inside the approved issuance lifecycle.
 
 **PO PLACEMENT UNBLOCK — CORE PRODUCTION-VERIFIED, 2026-10-01.** PRs #1827 / #1832
 merged at `45f43e96b92305583fa176a17d5222152dc5eb9a`. CI `36816676966` passed 13,745

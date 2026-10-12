@@ -118,6 +118,14 @@ export const BY_SUPPLIER = {
   cutOffPassed: "Cut-off passed",
   toBuy: "To buy",
   notRecorded: "Not recorded",
+  /* The item lines' headers: the Purchasing dictionary's own words. */
+  lineItem: "Item",
+  lineToBuy: "To buy",
+  lineSoNo: "SO No",
+  lineOrderBy: "Order By",
+  lineDeliverTo: "Supplier Deliver To",
+  cards: "Cards",
+  matchReadyStock: "Match Ready Stock",
   qty: (category: PurchaseDemandRow["category"], n: number) =>
     category === "sofa" ? `${n} ${n === 1 ? "set" : "sets"}` : `${n} ${n === 1 ? "pc" : "pcs"}`,
   models: (n: number) => `${n} ${n === 1 ? "model" : "models"}`,

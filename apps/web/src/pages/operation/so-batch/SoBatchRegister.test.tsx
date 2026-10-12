@@ -320,11 +320,11 @@ function data(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRespo
 const onIssue = vi.fn();
 const onOpenPurchaseOrders = vi.fn();
 
-function renderRegister(over: Partial<SoBatchPurchaseResponse> = {}, expandHistory = true, isLoading = false) {
+function renderRegister(over: Partial<SoBatchPurchaseResponse> = {}, expandHistory = true, isLoading = false, view: "table" | "supplier" = "table") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const rendered = render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={["/operation?tab=purchase"]}>
+      <MemoryRouter initialEntries={[view === "table" ? "/operation?tab=purchase&view=table" : "/operation?tab=purchase"]}>
         <SoBatchRegister sessionKey={expect.getState().currentTestName} data={data(over)} isLoading={isLoading} onIssue={onIssue} onOpenPurchaseOrders={onOpenPurchaseOrders} />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -360,7 +360,7 @@ it("Cards shares the filtered Register and retains buying ticks when returning t
   const card = screen.getByTestId("so-batch-card-o1");
   expect(screen.queryByTestId("so-batch-card-o3")).not.toBeInTheDocument();
   expect(within(card).getByRole("checkbox", { name: "Select SO-1318" })).toHaveAttribute("data-state", "checked");
-  fireEvent.mouseDown(screen.getByRole("tab", { name: "Table" }));
+  fireEvent.mouseDown(screen.getByRole("tab", { name: "By sales order" }));
   expect(screen.getByTestId("so-batch-select-o1")).toBeChecked();
   fireEvent.click(screen.getByTestId("so-batch-select-o1"));
   expect(screen.getByRole("searchbox")).toHaveValue("Kimmy");
@@ -381,17 +381,17 @@ it("Quick View issues only its own prepared scope while another SO stays selecte
    one row per supplier and category. It replaces the earlier `Group by:
    Supplier` page tool, which only regrouped the Sales Order rows. */
 describe("By supplier view", () => {
-  const open = () => fireEvent.mouseDown(screen.getByRole("tab", { name: "By supplier" }));
+  const viewBar = () => screen.getAllByRole("tablist").find((list) => within(list).queryByRole("tab", { name: "By sales order" }))!;
 
-  it("is a third view beside Table and Cards, kept in the address", () => {
-    renderRegister({ registerRows: [ORDER_O1, ORDER_O8], rows: [LEAF_O1, LEAF_O8A, LEAF_O8B] });
-    const bar = screen.getAllByRole("tablist").find((list) => within(list).queryByRole("tab", { name: "Table" }))!;
-    const views = within(bar).getAllByRole("tab");
-    expect(views.map((tab) => tab.textContent)).toEqual(["Table", "Cards", "By supplier"]);
-    open();
-    expect(screen.getByRole("tab", { name: "By supplier" })).toHaveAttribute("aria-selected", "true");
+  it("is the page's first view; By sales order and Cards sit beside it", () => {
+    renderRegister({ registerRows: [ORDER_O1, ORDER_O8], rows: [LEAF_O1, LEAF_O8A, LEAF_O8B] }, true, false, "supplier");
+    const views = within(viewBar()).getAllByRole("tab");
+    expect(views.map((tab) => tab.textContent)).toEqual(["By supplier", "By sales order", "Cards"]);
+    expect(views[0]).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByTestId("so-batch-row-o8")).not.toBeInTheDocument();
     expect(screen.getByTestId("by-supplier-footer")).toBeInTheDocument();
+    fireEvent.mouseDown(within(viewBar()).getByRole("tab", { name: "By sales order" }));
+    expect(screen.getByTestId("so-batch-row-o8")).toBeInTheDocument();
   });
 
   it("the old Group by page tool is gone: one way to see demand by supplier", () => {
@@ -402,15 +402,13 @@ describe("By supplier view", () => {
   });
 
   it("draws the six columns in order with the kit's widths", () => {
-    renderRegister({ registerRows: [ORDER_O1, ORDER_O8], rows: [LEAF_O1, LEAF_O8A, LEAF_O8B] });
-    open();
+    renderRegister({ registerRows: [ORDER_O1, ORDER_O8], rows: [LEAF_O1, LEAF_O8A, LEAF_O8B] }, true, false, "supplier");
     const heads = screen.getAllByRole("columnheader").map((h) => h.textContent?.replace(/\s+/g, " ").trim()).filter(Boolean);
     expect(heads.slice(-6)).toEqual(["Supplier", "Items", "Sales orders", "Order PO deadline", "Supplier ready by", "Status"]);
   });
 
   it("a row tick ticks every line of it that can be bought, and Issue PO takes them", () => {
-    renderRegister({ registerRows: [ORDER_O1, ORDER_O8], rows: [LEAF_O1, LEAF_O8A, LEAF_O8B] });
-    open();
+    renderRegister({ registerRows: [ORDER_O1, ORDER_O8], rows: [LEAF_O1, LEAF_O8A, LEAF_O8B] }, true, false, "supplier");
     const boxes = screen.getAllByRole("checkbox").filter((box) => /^by-supplier-select-/.test(box.getAttribute("data-testid") ?? ""));
     expect(boxes.length).toBeGreaterThan(0);
     fireEvent.click(boxes[0]!);
@@ -419,13 +417,32 @@ describe("By supplier view", () => {
     expect(onIssue.mock.calls[0]![0].length).toBeGreaterThan(0);
   });
 
-  it("ticks made here are the same ticks the Table shows", () => {
-    renderRegister({ registerRows: [ORDER_O1], rows: [LEAF_O1] });
-    open();
+  it("ticks made here are the same ticks By sales order shows", () => {
+    renderRegister({ registerRows: [ORDER_O1], rows: [LEAF_O1] }, true, false, "supplier");
     const box = screen.getAllByRole("checkbox").find((b) => /^by-supplier-select-/.test(b.getAttribute("data-testid") ?? ""))!;
     fireEvent.click(box);
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Table" }));
+    fireEvent.mouseDown(within(viewBar()).getByRole("tab", { name: "By sales order" }));
     expect(screen.getByTestId("so-batch-select-o1")).toBeChecked();
+  });
+
+  /* PARITY (owner instruction 12 Oct 2026): the first view keeps what the By
+     sales order list gives a line. Nothing here is a second rule. */
+  it("an opened row gives each line the same Supplier Deliver To editor", () => {
+    renderRegister({ registerRows: [ORDER_O1], rows: [LEAF_O1] }, true, false, "supplier");
+    const row = screen.getAllByTestId(/^by-supplier-row-/)[0]!;
+    fireEvent.click(within(row).getAllByRole("button")[0]!);
+    const line = screen.getByTestId(`by-supplier-line-${LEAF_O1.id}`);
+    expect(within(screen.getByTestId(`by-supplier-lines-${row.getAttribute("data-testid")!.replace("by-supplier-row-", "")}`)).getByText("Supplier Deliver To")).toBeInTheDocument();
+    expect(within(line).getByTestId(`by-supplier-deliver-${LEAF_O1.id}`).querySelector("select, button, [role=combobox]")).not.toBeNull();
+    expect(within(line).getByRole("checkbox")).not.toBeDisabled();
+  });
+
+  it("Match Ready Stock stays reachable: it opens the By sales order list, where stock is matched per order", () => {
+    renderRegister({ registerRows: [ORDER_O1], rows: [LEAF_O1], readyStockPriority: "customer_delivery" }, true, false, "supplier");
+    expect(screen.getByTestId("by-supplier-match-stock")).toHaveTextContent("Match Ready Stock");
+    expect(screen.getByTestId("by-supplier-match-stock")).not.toBeDisabled();
+    fireEvent.click(screen.getByTestId("by-supplier-match-stock"));
+    expect(within(viewBar()).getByRole("tab", { name: "By sales order" })).toHaveAttribute("aria-selected", "true");
   });
 });
 
@@ -2635,7 +2652,7 @@ describe("a PO window opens pre-ticked (Purchasing §5.6.1, owner ruling 2026-09
     const onClear = vi.fn();
     render(
       <QueryClientProvider client={client}>
-        <MemoryRouter initialEntries={["/operation?tab=purchase&window=2026-09-25T11:30"]}>
+        <MemoryRouter initialEntries={["/operation?tab=purchase&view=table&window=2026-09-25T11:30"]}>
           <SoBatchRegister
             data={data()}
             isLoading={false}

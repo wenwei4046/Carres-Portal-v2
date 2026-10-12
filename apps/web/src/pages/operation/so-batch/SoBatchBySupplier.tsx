@@ -5,6 +5,11 @@
  * on the row ticks every line of it that can be bought, and the same
  * `Issue PO` door takes the ticks.
  *
+ * An item line keeps everything the By sales order list gives it: the same
+ * tick and eligibility rule, the same `Supplier Deliver To` editor (Split
+ * included) and the same stated reason when a line may not be bought. The
+ * register passes those in (`lineExtras`); nothing is recomputed here.
+ *
  * It is the ONE listing engine with six columns (01 §5):
  *   Supplier (takes the room that is left) · Items 80 · Sales orders 96 ·
  *   Order PO deadline 120 · Supplier ready by 120 · Status 120.
@@ -44,7 +49,7 @@ function Two({ top, sub, warn = false, strong = false, testId }: {
 
 export default function SoBatchBySupplier({
   groups, today, isLoading, storageKey, sessionKey, canBuy, isTicked, onToggleLine, onToggleLines,
-  selectionSummary, selectionPrimary, toolbarEnd, toolbarStart, onOpenOrder, emptyMessage, initialSearch, searchPlaceholder,
+  selectionSummary, selectionPrimary, toolbarEnd, toolbarStart, onOpenOrder, emptyMessage, initialSearch, searchPlaceholder, lineExtras,
 }: {
   groups: SupplierGroup[];
   /** The server's Malaysia date, `YYYY-MM-DD`. */
@@ -65,6 +70,9 @@ export default function SoBatchBySupplier({
   emptyMessage: string;
   initialSearch?: string;
   searchPlaceholder?: string;
+  /** The By sales order list's own controls for one demand line: where the
+   *  supplier delivers it, and why it may not be bought. */
+  lineExtras?: (line: PurchaseDemandRow) => { deliverTo?: ReactNode; why?: ReactNode };
 }) {
   const buyable = useMemo(
     () => new Map(groups.map((g) => [g.key, g.lines.filter(canBuy).map((l) => l.id)])),
@@ -145,9 +153,11 @@ export default function SoBatchBySupplier({
   ], [today, supplierWidth]);
 
   const suppliers = new Set(groups.map((g) => g.supplierId ?? "none")).size;
-  /* An item line repeats the row's columns: its tick and name under Supplier,
-     then quantity, sales order and deadline under their own headers. */
-  const lineColumns = `40px ${Math.max(SUPPLIER_MIN, supplierWidth) - 40}px ${FIXED.items + 4}px ${FIXED.orders}px ${FIXED.deadline}px 1fr`;
+  /* An item line repeats the row's columns: its tick under the row's tick,
+     its name under Supplier, then quantity, sales order and deadline under
+     their own headers. The engine starts an opened row at the first data
+     column, so the lines step back over the tick and arrow columns (72). */
+  const lineColumns = `40px 32px ${Math.max(SUPPLIER_MIN, supplierWidth)}px ${FIXED.items + 2}px ${FIXED.orders + 2}px ${FIXED.deadline + 3}px 1fr`;
 
   return (
     /* The kit's table puts 10 between columns and no padding inside a cell
@@ -181,22 +191,34 @@ export default function SoBatchBySupplier({
         flush: true,
         testId: (g) => `by-supplier-expand-${g.key}`,
         renderExpansion: (g) => (
-          <div role="table" aria-label={`${g.supplier ?? B.supplierNotSet} items`} className="bg-white" data-testid={`by-supplier-lines-${g.key}`}>
+          <div role="table" aria-label={`${g.supplier ?? B.supplierNotSet} items`} className="-ml-[72px] bg-white" data-testid={`by-supplier-lines-${g.key}`}>
+            <div role="row" className="grid min-h-[32px] items-center bg-c-info-bg text-meta font-medium text-c-secondary" style={{ gridTemplateColumns: lineColumns }}>
+              <span role="columnheader" />
+              <span role="columnheader" />
+              <span role="columnheader" className="px-[5px]">{B.lineItem}</span>
+              <span role="columnheader" className="px-[5px]">{B.lineToBuy}</span>
+              <span role="columnheader" className="px-[5px]">{B.lineSoNo}</span>
+              <span role="columnheader" className="px-[5px]">{B.lineOrderBy}</span>
+              <span role="columnheader" className="px-[5px]">{B.lineDeliverTo}</span>
+            </div>
             {g.lines.map((line) => {
               const buy = canBuy(line);
               const days = line.orderBy ? daysBetween(today, line.orderBy) : null;
+              const extras = lineExtras?.(line) ?? {};
               return (
                 <div key={line.id} role="row"
                   className="grid min-h-[44px] items-center border-t border-c-row-line py-1.5"
                   style={{ gridTemplateColumns: lineColumns }}
                   data-testid={`by-supplier-line-${line.id}`}>
-                  <span role="cell" className="pl-[5px]">
+                  <span role="cell" className="grid place-items-center">
                     <Checkbox id={`by-supplier-tick-${line.id}`} ariaLabel={`Select ${line.item} for ${soRef(line.so)}`}
                       checked={isTicked(line.id)} disabled={!buy} onCheckedChange={() => onToggleLine(line.id)} />
                   </span>
-                  <span role="cell" className="flex min-w-0 flex-col pr-[5px]">
+                  <span role="cell" />
+                  <span role="cell" className="flex min-w-0 flex-col px-[5px]">
                     <span className="break-words text-body text-c-ink">{line.item}</span>
                     {line.variant ? <span className="break-words text-meta text-c-secondary">{line.variant}</span> : null}
+                    {extras.why ? <span className="mt-0.5 text-meta" data-testid={`by-supplier-why-${line.id}`}>{extras.why}</span> : null}
                   </span>
                   <span role="cell" className="px-[5px] text-body text-c-ink">{B.qty(line.category, line.toBuy ?? 0)}</span>
                   <span role="cell" className="px-[5px]">
@@ -209,6 +231,9 @@ export default function SoBatchBySupplier({
                     {line.orderBy && days != null
                       ? <><span className="text-body text-c-ink">{fmtDateShort(line.orderBy)}</span><span className="text-meta">{B.deadline(days)}</span></>
                       : <span className="text-meta">{B.notRecorded}</span>}
+                  </span>
+                  <span role="cell" className="min-w-0 px-[5px] text-body text-c-ink" data-testid={`by-supplier-deliver-${line.id}`}>
+                    {extras.deliverTo ?? null}
                   </span>
                 </div>
               );
