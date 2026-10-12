@@ -140,6 +140,7 @@ describe("finance ledger — who may read", () => {
     "/stock-value?monthEnd=2026-09-30",
     "/collection?from=2026-09-01&to=2026-09-30",
     "/forecast?month=2026-10",
+    "/ar-aging",
   ];
 
   it.each(["dealer", "operation", "supplier"])("refuses %s on every route before any database call", async (role) => {
@@ -1709,6 +1710,59 @@ describe("GET /cash-flow (0638)", () => {
   it("the database's own refusal stays a refusal", async () => {
     fakeClient(() => refuse("42501", "not_internal", "Cash Flow is internal."));
     expect((await get("/cash-flow?from=2026-09-01&to=2026-09-30", "principal")).status).toBe(403);
+  });
+});
+
+// ── AR Aging (0686, Chew 2026-10-03 and 2026-10-12) ─────────────────────────
+
+describe("GET /ar-aging (0686)", () => {
+  const AGING = {
+    as_at: "2026-10-12",
+    go_live_on: "2026-09-10",
+    controls: [
+      { account_code: "300-1000", name: "SHOWROOM DEBTORS", balance: "1314.00" },
+      { account_code: "305-0000", name: "OTHER DEBTOR", balance: "0.00" },
+    ],
+    debtors: [{
+      party_type: "CUSTOMER", party_id: "c-1", name: "Test Customer", kind: "customer", balance: "1314.00",
+      invoices: [{ invoice_id: "i-1", invoice_no: "INV-1", kind: "sales", order_id: "o-1", so: 1001,
+        invoice_date: "2026-10-12", due_date: null, total: "2629.00", open: "1314.00",
+        department_type: "SHOWROOM", department_id: "out-1" }],
+    }],
+    before_go_live: { count: 0, amount: 0 },
+  };
+
+  it("asks for the day and passes the answer through whole", async () => {
+    const { sb } = fakeClient(() => ok(AGING));
+    const res = await get("/ar-aging?asAt=2026-10-12");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_ar_aging", { p_as_at: "2026-10-12" });
+    expect(await json(res)).toEqual(AGING);
+  });
+
+  it("asks for today when no day is given", async () => {
+    const { sb } = fakeClient(() => ok(AGING));
+    expect((await get("/ar-aging")).status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_ar_aging", { p_as_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
+  });
+
+  it("refuses a day it cannot read before any database call", async () => {
+    expect((await get("/ar-aging?asAt=12/10/2026")).status).toBe(422);
+    expect((await get("/ar-aging?asAt=2026-10-12&x=1")).status).toBe(422);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+
+  it("says the ledger has not started, and fails closed on a figure it cannot read", async () => {
+    fakeClient(() => fail("55000", "gl_config has no go-live date"));
+    expect((await get("/ar-aging")).status).toBe(409);
+    const broken = structuredClone(AGING);
+    broken.debtors[0]!.balance = "abc";
+    fakeClient(() => ok(broken));
+    const res = await get("/ar-aging");
+    expect(res.status).toBe(500);
+    expect((await json(res)).message).toBe("AR aging could not be loaded. Try again.");
+    fakeClient(() => ok({ as_at: "2026-10-12" }));
+    expect((await get("/ar-aging")).status).toBe(500);
   });
 });
 

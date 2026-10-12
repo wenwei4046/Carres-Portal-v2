@@ -31,6 +31,7 @@ import DealerCommission from "./reports/DealerCommission";
 import CardCharges from "./reports/CardCharges";
 import CashFlow from "./reports/CashFlow";
 import ApAging from "./reports/ApAging";
+import ArAging from "./reports/ArAging";
 import StockValue from "./reports/StockValue";
 import Collection from "./reports/Collection";
 import Forecast from "./reports/Forecast";
@@ -148,6 +149,8 @@ export default function FinanceApp() {
           <Route path="reports/cash-flow" element={financeOnly(<CashFlow />)} />
           {/* 0640 — what was owed to suppliers on a day, by age (Chew 2026-10-03). */}
           <Route path="reports/ap-aging" element={financeOnly(<ApAging />)} />
+          {/* 0686 — what customers and other debtors owed on a day, by age (Chew 2026-10-12). */}
+          <Route path="reports/ar-aging" element={financeOnly(<ArAging />)} />
           {/* 0643 — the provisional month-end stock value (Chew 2026-10-03). */}
           <Route path="reports/stock-value" element={financeOnly(<StockValue />)} />
           {/* 0644 — deposit and balance per salesperson (Chew 2026-10-03). */}

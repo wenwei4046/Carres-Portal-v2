@@ -162,7 +162,7 @@ Two Finance Settings pages keep the mapping in Chew's hands (「其他的收入�
 - Transport: nothing ties a logistics partner's bill to the delivery orders it covers, and logistics partners are not suppliers in Payables.
 
 Recommended, in this order:
-1. **A bill line takes its order's channel** (ruling 2). **BUILT 2026-10-12 (0683); 0683 APPLIED 2026-10-12 on Chew's 「做」 for the build batch, the tracker holding the file exactly (md5 `f32b2b267e73928d4534471ede7d2b9d`).**
+1. **A bill line takes its order's channel** (ruling 2). **BUILT 2026-10-12 (0683); 0683 APPLIED 2026-10-12 on Chew's 「做」 for the build batch, the tracker holding the file exactly (md5 `f32b2b267e73928d4534471ede7d2b9d`). DEPLOYED 2026-10-12 (PR #2011, `68f089f6`); checked on production, read only: a draft bill's GRN goods line shows its channel as text, with no picker.**
    - A bill's goods line (one from a GRN) has its channel worked out when the bill is saved; the form shows it and nobody picks it. A line not from a GRN still names its department by hand.
    - How it is worked out, earliest order first: the orders the PO line was bought for (`po_line_sources`), else the orders its Units were put aside or sold for, less what earlier bills of that PO line already charged to each.
    - A line going to more than one channel is saved as one line per channel, the quantity split and the price kept. A PO line bought for orders that is charged beyond them keeps the earliest order's channel.
@@ -180,7 +180,7 @@ Recommended, in this order:
      - Goods with two of three Units sold for showroom orders split two to the showroom and one to Not yet in a channel.
      - A line not from a GRN with no department, or with Not yet in a channel, was refused; Office was saved.
      - Operation could not read the bill form's preview, and an order's channel could not be read around Finance's doors.
-2. **Cash Flow by channel** (ruling 1). **BUILT 2026-10-12 (0684); 0684 APPLIED 2026-10-12 on Chew's 「做」 for the build batch, the tracker holding the file exactly (md5 `53c91ea9fb4e9eed60729f8e6c100868`).** Cash Flow has the reports' `Department` filter.
+2. **Cash Flow by channel** (ruling 1). **BUILT 2026-10-12 (0684); 0684 APPLIED 2026-10-12 on Chew's 「做」 for the build batch, the tracker holding the file exactly (md5 `53c91ea9fb4e9eed60729f8e6c100868`). DEPLOYED 2026-10-12 (PR #2011, `68f089f6`); checked on production, read only: Showroom for 1 to 12 October showed its one receipt, RM 1,315.00, with the note on what one channel leaves out and no balances.** Cash Flow has the reports' `Department` filter.
    - Every share of cash and bank money is shared as since 0638, then split again by channel, in whole sen:
      - a receipt goes to its order's channel;
      - a supplier payment goes to the channels of the bill and debit note lines it paid, in proportion; an advance follows the bills it was later knocked off;
@@ -640,9 +640,29 @@ All reports only read. Reports → Payment stays Payment's.
 - Columns by whole calendar months (`This month` to `4 months and over`) or by 30-day steps, aged by bill date or due date, as Houzs's formal aging is.
 - A voucher pays a bill on the voucher's own date, the date it posts on; an advance knocked off a bill counts from the day of the knock-off until it is cancelled. How much of a bill is paid has one arithmetic, `ap_bill_settled`, which AP · Payables also reads now (its figures do not change).
 - Each row adds up to the supplier's balance in the books, and the footer ties the rows to the control accounts with the difference. A test walks bills, a voucher with an advance and a knock-off through the real doors and reads three days.
-- AR Aging lists every invoice issued and not yet fully paid, for ordinary customers (Payment's invoices, read and never changed) and other debtors (Finance's own invoices), aged the same way as AP Aging (Chew 2026-10-03; 2026-10-12, 「就根据开了invoice还没还的就出现…包括普通顾客」). What an invoice still owes is Payment's own arithmetic, a deposit filling the order's earliest invoice first; money paid ahead of any invoice is not a row. **APPROVED / NOT BUILT.** PROPOSAL / NOT LAW: the footer shows that money paid ahead, so the total still ties to the debtor accounts in the books; falsifier: in Chew's test the footer's difference is not zero.
 - Not built: the trade or other payables chips, and a PDF.
 - Falsifier: in Chew's test, a supplier's balance here differs from AP · Payables' net owing today, or the footer's difference is not zero.
+
+**AR Aging — Chew's ruling (2026-10-03; 2026-10-12, 「就根据开了invoice还没还的就出现…包括普通顾客」); BUILT 2026-10-12 (0686) for Chew's test; 0686 APPLIED 2026-10-12 on Chew's 「做」 for the build batch, the tracker holding the file exactly (md5 `66467f6080314aa58d68ab79239159bb`). The layout and the arithmetic below are PROPOSAL / NOT LAW.**
+- Reports → AR Aging, after AP Aging. Every invoice issued and not yet fully paid on a chosen day, for ordinary customers (Payment's sales and storage invoices, read and never changed) and other debtors (Finance's own invoices). It is aged as AP Aging is: by month or by 30-day steps, by invoice date or due date.
+- What a customer's invoice still owes is worked out on the books' own window, from the ledger's start to the day:
+  - the order's payments fill its earliest invoice first;
+  - a voided invoice or payment never counts, because a void reverses on the document's own date;
+  - Payment keeps no balance per invoice, so this is the aging's own arithmetic over Payment's records. It agrees with the books because the books post the same invoices and payments.
+- An other debtor's invoice still owes its total less the receipts allocated to it by the day.
+- Each row is one debtor:
+  - its balance on the debtor accounts in the books;
+  - its open invoices by age;
+  - `Not tied to an invoice` for the rest; below zero, it is money paid ahead of an invoice, such as a deposit.
+- The footer ties the rows to the debtor accounts and shows the difference.
+- `Channel` names the one channel a debtor's open invoices share. Invoices issued before the ledger started are not aged; the page says how many there are and how much.
+- Measured before applying (production, rolled back, 2026-10-12):
+  - Today's 7 customers each had money paid ahead and no open invoice. Together they equalled `300-0000` exactly.
+  - An invoice of RM 2,629.00 on an order with a deposit of RM 1,315.00 showed RM 1,314.00 open, in Showroom. The day before the invoice, the deposit was money paid ahead.
+  - An other debtor's invoice of RM 500.00 with RM 200.00 received showed RM 300.00 open. The day before the receipt it showed RM 500.00, and nothing before the invoice. The other debtors' account agreed.
+  - Operation could not read it.
+- Not built: a customer refund (refunds do not post to the debtor accounts yet), a PDF, and a view by debtor account.
+- Falsifier: in Chew's test, a debtor's open invoice differs from what Payment or Other debtors shows for it, or the footer's difference is not zero.
 
 **Collection report approach — PROPOSAL / NOT LAW, built for Chew's test (0644).**
 - Reports → Collection, after Houzs Part 10 §6. The sales orders placed in a period (by SO Doc Date, a Kuala Lumpur day), not cancelled and not rental, per salesperson. Two views on a tab bar:
@@ -692,7 +712,7 @@ FINANCE          its title folds the area (§4.1)
 - **Reports.** One row per report. The Profit and Loss and the Balance Sheet are two pages: `/finance/reports/profit-and-loss` and `/finance/reports/balance-sheet`. The old `/finance/reports` opens the one its address asked for, keeping its dates. The old page's list of doors is gone, because every report is on the menu. Reports → Payment stays Payment's own report, unchanged; it is now also a row.
 - **Forecast.** Its own row after Reports. It becomes a group when a second forecasting page exists.
 - **No page repeats the menu** (Chew 2026-10-05). The switch `Bills | Payment Vouchers | Unpaid by Supplier` at the top of those three pages is retired; the menu is the one way between them. Two page switches stay because they lead to no menu page: Other debtors' `Parties`, and Dealer commission's `Commission rates` and `Renovation quotas`. Dealer commission also waits for its calculation check with Chew (§5).
-- **A page joins the menu when it is built.** No `Coming soon` rows. Not built yet, from Chew's picture: Deposit Invoices, Not Yet Billed, Credit / Debit Notes, Official Invoices Owed, Bank Recon, Month-end, AR Aging, Corrections, Performance P&L, Event costs, Sales Report, a forecasting Dashboard, Currencies. Several of them are not decided yet.
+- **A page joins the menu when it is built.** No `Coming soon` rows. Not built yet, from Chew's picture: Deposit Invoices, Not Yet Billed, Credit / Debit Notes, Official Invoices Owed, Bank Recon, Month-end, Corrections, Performance P&L, Event costs, Sales Report, a forecasting Dashboard, Currencies. Several of them are not decided yet.
 - **Where the picture met an existing rule, the rule stays** (Chew agreed, 2026-10-03):
   - No `Money in` / `Money out` group names. Customer `Money In` is Payment's word (Payment MASTER §1).
   - No `Setup` group. The gear in the page header is the one Settings entry (UI MASTER, GLOBAL SETTINGS ENTRY, Loo 2026-08-11). Chart of Accounts and the rest stay in Finance Settings; Item groups is there (0659); Currencies goes there when built.
