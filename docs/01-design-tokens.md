@@ -132,7 +132,9 @@ Icons: Material Symbols Rounded, outline, weight 300; 18 in buttons and menus, 2
 | Part | Target |
 |---|---|
 | Menu | 220 open, 64 closed (remembered), right hairline |
-| Menu item | 13 / 400 ink, icon 18 `#4B5563`, padding 7 × 10, radius 8; selected white pill, theme text, 500; group label caps with 18 above and 6 below |
+| Side menu (owner 12 Oct 2026) | One rule for every module, drawn from data, never coded per module. A module record names its pages; a page may name a group; a page with no address is not built yet. Section label 11 / 600 caps `#6B7280`, 16 above and 4 below · module 13 / 500 ink, icon 18 `#4B5563`, padding 8 × 10, radius 8 · page 13 / 400 `#374151`, padding 7 × 10 · the current page, and the module holding it, 600 in the theme colour on the selected pill (Blue: white with the soft lift). A module with pages shows a chevron and opens on click; opening one closes the others |
+| Menu tree | A module's pages hang 18 in on a 1.5 `#BFC5CD` line with a rounded elbow (radius 7) to each page. The line stops at the last page of each group. The current page's elbow is the theme colour. A group word (Purchasing: BUY · RECEIVE · PROBLEMS · SHOWROOM) is 10 / 600 caps `#6B7280`, aligned with the page text, 24 high, with its own chevron. Only the group holding the current page is open when the page loads; a module opened from another module's page shows every group open. Nothing about open groups is stored |
+| Menu words | A long name wraps to a second line (13 on 17) and is never cut. A page that is not built shows `Coming soon` 11 grey under its name and is not a link. The whole menu has one scrollbar |
 | Logo | Wordmark 20 high open; mark 34 closed; never recolour or distort |
 | Top bar | 56 high, bottom hairline; `[Module] / [Page]` with the path 14 / 400 and the title 20 / 600; search, team, bell at the right |
 | Toolbar row | 36 high, one line, never wraps; Summary title, toolbar and Tasks title share this line |
@@ -268,7 +270,8 @@ The supplied Layout Standard still carries older lines beside its 10 and 11 Oct 
 | Keyboard focus | 2px `#1F2937` | 2px `#3965FA` | TAKEN · owner palette 10 Oct |
 | Summary width | 240 | 264 | TAKEN · README |
 | Panel title | 17 / 500 | 15 / 500 | TAKEN · README and check |
-| Menu item | 14 / 500 grey, selected 600 | 13 / 400 ink, selected 500 | TAKEN · check |
+| Menu item | 14 / 500 grey, selected 600 · later 13 / 400 ink, selected 500 | Module 13 / 500, page 13 / 400, current 600 (§4) | TAKEN · owner 12 Oct |
+| Menu tree line | One thin straight line, no elbow (10 Oct) | 1.5 line with rounded elbows (§4) | TAKEN · owner 12 Oct |
 | Tabs | Selected 600 | Segmented control, selected 500 | TAKEN · check |
 | Caps labels | 10 / 500 or 12 / 600 | 11 / 500, tracking .06em | TAKEN · README |
 | Menu group label | 11 / 600 | 11 / 500 | TAKEN · README |

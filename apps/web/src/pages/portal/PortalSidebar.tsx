@@ -11,7 +11,6 @@ import {
 } from "@/lib/queries";
 import {
   visibleGroups,
-  visibleItems,
   navBlocks,
   menuGroups,
   navItemHref,
@@ -21,33 +20,22 @@ import {
   type PortalNavGroup,
   type PortalNavItem,
   type PortalSection,
-  WAREHOUSE_LANDING_KEY,
-  PAYMENTS_LANDING_KEY,
 } from "./portal-nav";
 import {
-  purchasingChildBlocks,
-  activePurchasingGroup,
-  parsePurchasingSidebarState,
-  serializePurchasingSidebarState,
-  purchasingSidebarStorageKey,
-  PURCHASING_LANDING_KEY,
-  EMPTY_PURCHASING_SIDEBAR_STATE,
-  type PurchasingChildBlock,
-  type PurchasingPageGroupKey,
-  type PurchasingSidebarStateV2,
-} from "./purchasing-sidebar";
+  moduleChildBlocks,
+  activePageGroup,
+  isPageGroupOpen,
+  type ModuleChildBlock,
+  type PageGroupKey,
+} from "./menu-tree";
 
 /* The menu OPENS at 220px with words and group labels (handoff 2026-10-08,
    "Do NOT" 2). Only the person's own « click closes it, and that choice is
    remembered under a new key so an older auto-collapse never carries over. */
 const COLLAPSE_KEY = "carres-menu-collapsed";
 
-/** The module / plain-row icon (Layout Standard §4.4: 16–20px). */
-const MODULE_ICON = 20;
-
-const PURCHASING: PortalSection = "Purchasing";
-const WAREHOUSE: PortalSection = "Warehouse";
-const PAYMENTS: PortalSection = "Payments";
+/** The module / plain-row icon (01 §4 "Side menu": 18). */
+const MODULE_ICON = 18;
 
 /**
  * Unified Internal Portal sidebar (2026-06-30, Loo).
@@ -82,14 +70,17 @@ const PAYMENTS: PortalSection = "Payments";
  * an icon rail is for table room, not for navigating thirteen pages by
  * guessing thirteen icons.
  *
- * Visual: the v17 Operation rail (clean cool-gray), with the governed blue
- * selection treatment on the current destination — 3px `kit-blue-9` active bar
- * + `kit-blue-3` wash (`docs/ui/MASTER.md` PORTAL NAVIGATION ACTIVE COLOUR,
- * APPROVED / LOCKED). Never flame: red in Carres means late / act now, so an
- * "I am on this page" marker may not spend it. Badge counts (orders /
- * procurement / service-notes) + the Approvals pending pill are fetched here,
- * each gated by role so an operation user never calls the principal dashboard
- * API (and vice-versa).
+ * Visual (owner 12 Oct 2026; 01 §4 "Side menu"): one rule for every module,
+ * drawn from data. Section label 11/600 caps · module 13/500 ink with an 18
+ * icon · page 13/400 · the current page, and the module holding it, 600 in
+ * the theme's selection colour on the selected pill. A module's pages hang on
+ * one tree line with a rounded elbow to each page; the line stops at the last
+ * page of each group and the current page's elbow takes the theme colour. A
+ * long name wraps to a second line and is never cut. Never flame: red in
+ * Carres means late / act now, so an "I am on this page" marker may not spend
+ * it. Badge counts (orders / procurement / service-notes) + the Approvals
+ * pending pill are fetched here, each gated by role so an operation user
+ * never calls the principal dashboard API (and vice-versa).
  */
 export default function PortalSidebar({ drawer = false }: {
   /** Below 768px the rail is a slide-in drawer (owner review 2026-09-25):
@@ -285,138 +276,48 @@ export default function PortalSidebar({ drawer = false }: {
     { at: string; section: PortalSection | "" } | null
   >(null);
 
-  /* ── PURCHASING REMEMBERS ITS DRAWERS, PER SIGNED-IN USER ────────────────
-   * (CARD-2026-08-22-purchasing-01-final-sidebar-listing.)
-   *
-   * Eighteen destinations behind five drawers is only kind if the operator
-   * does not have to re-open theirs every morning. So Purchasing's parent and
-   * group choices persist — PRESENTATION ONLY, and keyed on the auth user id,
-   * because two people share a machine in the office.
-   *
-   * What is NOT stored: the active route, the active key, any count, any
-   * business status. Where you are standing is derived from the URL every
-   * render; a rail preference may never become a second source of truth. */
-  const userId = session?.user?.id ?? null;
-  const storageKey = userId ? purchasingSidebarStorageKey(userId) : null;
-  const [purchasingState, setPurchasingState] = useState<PurchasingSidebarStateV2>(
-    EMPTY_PURCHASING_SIDEBAR_STATE,
-  );
-
-  // Signing in, or switching user, LOADS that user's own state — never the
-  // previous one's. No id (not signed in yet) → memory only, never written.
-  useEffect(() => {
-    if (!storageKey) {
-      setPurchasingState(EMPTY_PURCHASING_SIDEBAR_STATE);
-      return;
-    }
-    try {
-      setPurchasingState(parsePurchasingSidebarState(localStorage.getItem(storageKey)));
-    } catch {
-      setPurchasingState(EMPTY_PURCHASING_SIDEBAR_STATE);
-    }
-  }, [storageKey]);
-
-  /** A HUMAN turned this handle — remember it. */
-  function writePurchasingState(next: PurchasingSidebarStateV2) {
-    setPurchasingState(next);
-    if (!storageKey) return;
-    try {
-      localStorage.setItem(storageKey, serializePurchasingSidebarState(next));
-    } catch {
-      /* a full or blocked storage may not break the rail */
-    }
-  }
-
-  /** Another module took the rail. Memory only: the operator did not choose
-   *  to shut Purchasing, so their stored preference is not overwritten. */
-  function closePurchasingForOtherModule() {
-    setPurchasingState((prev) => (prev.moduleOpen ? { ...prev, moduleOpen: false } : prev));
-  }
-
-  // The Purchasing pages this role may open, and which one is showing.
-  const purchasingPages = useMemo(
-    () =>
-      activeGroup
-        ? visibleItems(activeGroup, role, caps).filter((item) => item.section === PURCHASING)
-        : [],
-    [activeGroup, role],
-  );
-  const activePurchasingKey = activeGroup
-    ? purchasingPages.find((page) => isItemActive(activeGroup, page))?.key ?? null
-    : null;
-  /** The drawer holding the page you are on. Derived, forced open, never stored. */
-  const forcedGroup = activePurchasingGroup(purchasingPages, activePurchasingKey);
-
-  /* ARRIVING ON A PURCHASING PAGE OPENS PURCHASING — the safety rule that wins
-   * over a stored closed state. A URL, a ⌘K jump or an in-page link must never
-   * land you on a page the rail is hiding. It is not persisted: the operator
-   * did not choose it, the route did. */
-  //
-  // `storageKey` is a dependency on purpose. Switching user re-runs the LOAD
-  // effect above and replaces the state with the new user's (often empty) one
-  // — so this rule has to run again for the incoming user, or an operator who
-  // signs in while standing on a Purchasing page lands on a rail that is
-  // hiding their own page.
-  useEffect(() => {
-    if (!activePurchasingKey) return;
-    setPurchasingState((prev) => (prev.moduleOpen ? prev : { ...prev, moduleOpen: true }));
-  }, [activePurchasingKey, storageKey]);
-
-  /* THE ONE OPEN MODULE. The shipped location rule still decides for every
-   * other module; Purchasing alone answers to its own remembered handle. The
-   * order matters: a module holding the page you are STANDING on always wins,
-   * so a remembered Purchasing drawer can never hide the row you are on. */
-  const baseOpen: PortalSection | null =
-    override?.at === here ? override.section || null : activeModuleSection;
+  /* THE ONE OPEN MODULE — the same rule for every module. The page decides;
+   * a chevron worked here, on this page, wins until the operator navigates. */
   const openSection: PortalSection | null =
-    baseOpen !== null && baseOpen !== PURCHASING
-      ? baseOpen
-      : purchasingState.moduleOpen
-        ? PURCHASING
-        : null;
+    override?.at === here ? override.section || null : activeModuleSection;
 
-  const isGroupOpen = (key: PurchasingPageGroupKey) =>
-    key === forcedGroup || purchasingState.openGroups.includes(key);
+  /* ── GROUPS INSIDE A MODULE (owner 12 Oct 2026) ─────────────────────────
+   * Only the group holding the current page is open; the others show their
+   * name and open with their own chevron. A chevron worked by hand is kept
+   * for this page only, exactly like the module override above: where you
+   * are standing is read from the URL on every render, and a menu preference
+   * may never become a second source of it. Nothing is stored. */
+  const [groupsByHand, setGroupsByHand] = useState<
+    { at: string; open: Partial<Record<PageGroupKey, boolean>> } | null
+  >(null);
+  const handOpen = groupsByHand?.at === here ? groupsByHand.open : {};
 
-  /** A drawer opens and shuts on its own — opening one never shuts another.
-   *  The drawer you are STANDING in cannot be shut: that would hide the page
-   *  you are on, which is the one thing the rail may not do. */
-  function togglePurchasingGroup(key: PurchasingPageGroupKey) {
-    if (key === forcedGroup) return;
-    const open = purchasingState.openGroups.includes(key);
-    writePurchasingState({
-      moduleOpen: purchasingState.moduleOpen,
-      openGroups: open
-        ? purchasingState.openGroups.filter((g) => g !== key)
-        : [...purchasingState.openGroups, key],
-    });
+  /** The group holding the page you are on, inside this module. */
+  function currentGroupOf(group: PortalNavGroup, pages: ReadonlyArray<PortalNavItem>): PageGroupKey | null {
+    const key = pages.find((page) => isItemActive(group, page))?.key ?? null;
+    return activePageGroup(pages, key);
+  }
+
+  /** A group opens and shuts on its own. The group you are STANDING in cannot
+   *  be shut: that would hide the page you are on. */
+  function togglePageGroup(key: PageGroupKey, current: PageGroupKey | null) {
+    if (key === current) return;
+    const open = isPageGroupOpen(key, current, handOpen);
+    setGroupsByHand({ at: here, open: { ...handOpen, [key]: !open } });
   }
 
   function toggleModule(group: PortalNavGroup, block: Extract<NavBlock, { kind: "module" }>) {
-    /* ⭐ THE PURCHASING ROW IS A DRAWER HANDLE, NOT A DOOR (Jess, 2026-08-20).
-     *
-     * Every other module opens its first live page, because clicking it is how
-     * you GO there. Purchasing cannot: its first row is a DRAWER, not a page,
-     * and eleven destinations in four drawers mean the operator clicks this
-     * row to LOOK — to find which drawer their job is in — far more often than
-     * to travel. So it reveals the map and leaves the URL exactly where it
-     * was. It still shuts whatever other module was open: one module at a time
-     * is the shipped accordion's rule and it holds. */
-    if (block.module.section === PURCHASING) {
-      const next = openSection !== PURCHASING;
-      setOverride({ at: here, section: "" }); // the location rule steps aside
-      writePurchasingState({ ...purchasingState, moduleOpen: next });
-      return;
-    }
     if (openSection === block.module.section) {
       setOverride({ at: here, section: "" }); // shut, on purpose, right here
-      closePurchasingForOtherModule();
       return;
     }
+    // Opening one module shuts the others: there is one open module.
     setOverride({ at: here, section: block.module.section });
-    closePurchasingForOtherModule();
-    // Expanding also OPENS the module — its first live page. An all-unbuilt
-    // module has nothing to open, so it only expands.
+    /* A module whose row only opens its pages stays where you are (the data
+     * says which: `handleOnly`). Every other module also GOES to its first
+     * live page, because clicking it is how you get there. An all-unbuilt
+     * module has nothing to open, so it only expands. */
+    if (block.module.handleOnly) return;
     const first = block.pages.find((p) => !p.soon);
     if (first) {
       fireMarkSeen(first.badge);
@@ -425,43 +326,18 @@ export default function PortalSidebar({ drawer = false }: {
   }
 
   /**
-   * WHERE A COLLAPSED MODULE ICON GOES.
-   *
-   * ⭐ NOT "the first live row" (owner review, 2026-08-20). Deriving the
-   * destination from row order means the module's landing page silently moves
-   * the day a page above it goes live — grouping Purchasing had already
-   * dragged its icon off `SO Batch Purchase` without anyone deciding that.
-   * Purchasing names its landing page instead, and the name is PERMANENT:
-   * there is no Purchasing Home to hand it to (`docs/purchasing/MASTER.md`
-   * §4). Every other module keeps first-live-row until it has a reason not
-   * to.
+   * WHERE A CLOSED MENU'S MODULE ICON GOES: the page the module NAMES
+   * (`landingKey`), never "the first live row" (owner review, 2026-08-20) —
+   * deriving it from row order moves the landing the day a page above it goes
+   * live. A module that names none lands on its first live page.
    */
   function moduleLandingPage(
     block: Extract<NavBlock, { kind: "module" }>,
   ): PortalNavItem | undefined {
-    if (block.module.section === PURCHASING) {
-      const named = block.pages.find(
-        (p) => p.key === PURCHASING_LANDING_KEY && !p.soon,
-      );
-      if (named) return named;
-    }
-    /* Warehouse names its landing too (CARD-2026-09-01-warehouse-01-sidebar):
-     * `Inventory` — the Unit Register — until Dashboard is built. */
-    if (block.module.section === WAREHOUSE) {
-      const named = block.pages.find(
-        (p) => p.key === WAREHOUSE_LANDING_KEY && !p.soon,
-      );
-      if (named) return named;
-    }
-    /* Payments lands on Monitor — the collection desk — by name (owner
-     * ruling 2026-09-12). */
-    if (block.module.section === PAYMENTS) {
-      const named = block.pages.find(
-        (p) => p.key === PAYMENTS_LANDING_KEY && !p.soon,
-      );
-      if (named) return named;
-    }
-    return block.pages.find((p) => !p.soon);
+    const named = block.module.landingKey
+      ? block.pages.find((p) => p.key === block.module.landingKey && !p.soon)
+      : undefined;
+    return named ?? block.pages.find((p) => !p.soon);
   }
 
   /** Work waiting inside a module, for the row that has hidden its children. */
@@ -472,101 +348,121 @@ export default function PortalSidebar({ drawer = false }: {
     );
   }
 
-  /* ── THE DRAWING — Carres UI Kit "Side menu" (owner-confirmed handoff, Jess
-   * 2026-10-08; every number from v8 L20–35). Width 220 open / 64 closed ·
-   * item pad 7 10 · gap 10 · radius 8 · 14/500 menu grey · icon 20 · selected
-   * 600 in the theme select colours · hover c-hover · group label 10/600/.12em.
-   * Sub-items hang 19px in on one thin grey tree line, text 16px from it;
-   * Purchasing's pages are 13px, 28px in. */
-  const ITEM =
-    "relative flex shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-left text-[14px] leading-[18px] font-medium";
-  const ITEM_REST = "text-c-menu hover:bg-c-hover";
-  const ITEM_ON = "bg-c-select-bg text-c-select-fg font-semibold";
-  const SUB = "ml-[19px] rounded-l-none shadow-[inset_1px_0_0_var(--c-btn-border)]";
-  const GROUP_LABEL = "text-[10px] font-semibold uppercase leading-[13px] tracking-[0.12em] text-c-muted";
+  /* ── THE DRAWING — 01 §4 "Side menu" (owner 12 Oct 2026). Width 220 open /
+   * 64 closed. Row: pad 8 10 · gap 10 · radius 8 · 13/17. A module or plain
+   * row is 500 ink with an 18 icon; a page is 400. The current page and the
+   * module holding it are 600 in the theme's selection colour on the selected
+   * pill. Pages hang 18 in on the tree line, their text 46 from the menu edge;
+   * a group word sits on that same 46. */
+  const ROW =
+    "relative flex shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] leading-[17px]";
+  const ROW_REST = "font-medium text-c-ink hover:bg-c-hover";
+  const ROW_ON = "bg-c-select-pill font-semibold text-c-select-fg [box-shadow:var(--shadow-lift)]";
+  const PAGE =
+    "flex min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2.5 py-[7px] text-left text-[13px] leading-[17px]";
+  const PAGE_REST = "font-normal text-c-body hover:bg-c-hover";
+  const PAGE_ON = "bg-c-select-pill font-semibold text-c-select-fg";
+  const SECTION_LABEL = "text-[11px] font-semibold uppercase leading-[14px] tracking-[0.06em] text-c-secondary";
+  const GROUP_LABEL = "text-[10px] font-semibold uppercase leading-[13px] tracking-[0.08em] text-c-secondary";
+  /** A long name wraps to a second line; it is never cut. */
+  const WRAP = "min-w-0 flex-1 break-words [text-wrap:pretty]";
 
   /** The row icon: the Material Symbol when the menu row has one, else the
    *  area's own icon (Finance · People · Admin rows). */
-  const rowIcon = (mIcon: string | undefined, Lucide: PortalNavItem["icon"]) =>
+  const rowIcon = (mIcon: string | undefined, Lucide: PortalNavItem["icon"], on: boolean) =>
     mIcon ? (
-      <MIcon name={mIcon} size={MODULE_ICON} />
+      <MIcon name={mIcon} size={MODULE_ICON} className={on ? undefined : "text-c-tab"} />
     ) : (
-      <Lucide size={MODULE_ICON} strokeWidth={1.5} aria-hidden className="shrink-0" />
+      <Lucide size={MODULE_ICON} strokeWidth={1.5} aria-hidden className={`shrink-0 ${on ? "" : "text-c-tab"}`} />
     );
 
   /**
-   * ONE CHILD PAGE under its module, on the tree line.
+   * ONE PAGE under its module, on the tree line: the trunk beside it and a
+   * rounded elbow reaching it. `last` ends the trunk at this page's elbow, so
+   * the line stops at the last page of each group.
    *
-   * A `soon` child is deliberately NOT A LINK (`03-page-patterns.md:149` bans
-   * a control that opens nothing): a span out of the tab order, `aria-disabled`,
-   * saying `Coming soon` on its own line. It carries no count.
+   * A `soon` page is deliberately NOT A LINK (03: a control that opens
+   * nothing is banned): a span out of the tab order, `aria-disabled`, saying
+   * `Coming soon` under its name. It carries no count.
    */
-  function renderChild(group: PortalNavGroup, child: PortalNavItem, deep = false) {
-    const size = deep ? "text-[13px]" : "";
-    const pad = deep ? "pl-7" : "pl-4";
-    if (child.soon) {
-      return (
-        <span
-          key={child.key}
-          data-testid={`nav-child-${child.key}`}
-          data-soon="1"
-          aria-disabled="true"
-          tabIndex={-1}
-          className={`${ITEM} ${SUB} ${pad} ${size} cursor-default select-none flex-col items-start gap-0 text-c-muted`}
-        >
-          <span className="w-full min-w-0 truncate">{child.label}</span>
-          <span className="text-[11px] font-normal leading-[14px] text-c-muted">Coming soon</span>
-        </span>
-      );
-    }
-    const active = isItemActive(group, child);
+  function renderChild(group: PortalNavGroup, child: PortalNavItem, last: boolean) {
+    const active = !child.soon && isItemActive(group, child);
+    const line = active ? "border-c-select-fg" : "border-c-tree-line";
     return (
-      <Link
-        key={child.key}
-        to={navItemHref(group, child)}
-        onClick={() => fireMarkSeen(child.badge)}
-        data-testid={`nav-child-${child.key}`}
-        aria-current={active ? "page" : undefined}
-        ref={active ? (activeRowRef as Ref<HTMLAnchorElement>) : undefined}
-        title={child.label}
-        className={`${ITEM} ${SUB} ${pad} ${size} ${active ? ITEM_ON : ITEM_REST}`}
-      >
-        <span className="min-w-0 flex-1 truncate">{child.label}</span>
-        {child.badge && <NavBadge count={badgeCount[child.badge] ?? 0} label={child.label} />}
-      </Link>
+      <div key={child.key} data-tree-row={last ? "last" : ""} className="relative flex py-px pl-[18px]">
+        <span
+          aria-hidden
+          data-tree="trunk"
+          className="absolute left-0 top-0 border-l-[1.5px] border-c-tree-line"
+          style={{ height: last ? "calc(50% - 8px)" : "100%" }}
+        />
+        <span
+          aria-hidden
+          data-tree="elbow"
+          className={`absolute left-0 top-[calc(50%-9px)] h-[9px] w-3 rounded-bl-[7px] border-b-[1.5px] border-l-[1.5px] ${line}`}
+        />
+        {child.soon ? (
+          <span
+            data-testid={`nav-child-${child.key}`}
+            data-soon="1"
+            aria-disabled="true"
+            tabIndex={-1}
+            className={`${PAGE} cursor-default select-none font-normal text-c-body`}
+          >
+            <span className="flex min-w-0 flex-1 flex-col gap-px">
+              <span className="break-words [text-wrap:pretty]">{child.label}</span>
+              <span className="text-[11px] leading-[14px] text-c-secondary">Coming soon</span>
+            </span>
+          </span>
+        ) : (
+          <Link
+            to={navItemHref(group, child)}
+            onClick={() => fireMarkSeen(child.badge)}
+            data-testid={`nav-child-${child.key}`}
+            aria-current={active ? "page" : undefined}
+            ref={active ? (activeRowRef as Ref<HTMLAnchorElement>) : undefined}
+            className={`${PAGE} ${active ? PAGE_ON : PAGE_REST}`}
+          >
+            <span className={WRAP}>{child.label}</span>
+            {child.badge && <NavBadge count={badgeCount[child.badge] ?? 0} label={child.label} />}
+          </Link>
+        )}
+      </div>
     );
   }
 
   /**
-   * A DRAWER — one named group of Purchasing pages (Buy · Receive · Problems ·
-   * Showroom): a small uppercase word on the tree line, never a destination.
-   * Each opens and shuts alone; the one holding the current page is forced
-   * open and says so with `aria-disabled`.
+   * A GROUP of a module's pages (Purchasing: Buy · Receive · Problems ·
+   * Showroom): a small caps word aligned with the page text, with its own
+   * chevron, never a destination. The one holding the current page is open
+   * and says so with `aria-disabled`.
    */
-  function renderPurchasingGroup(
+  function renderPageGroup(
     group: PortalNavGroup,
-    block: Extract<PurchasingChildBlock, { kind: "group" }>,
+    block: Extract<ModuleChildBlock, { kind: "group" }>,
+    current: PageGroupKey | null,
+    first: boolean,
   ) {
-    const open = isGroupOpen(block.group.key);
-    const forced = forcedGroup === block.group.key;
+    const open = isPageGroupOpen(block.group.key, current, handOpen);
+    const forced = current === block.group.key;
     return (
-      <div key={block.group.key} className="flex flex-col gap-0.5">
+      <div key={block.group.key} className="flex flex-col">
         <button
           type="button"
           data-testid={`nav-group-${block.group.key}`}
           aria-expanded={open}
           aria-disabled={forced || undefined}
-          onClick={() => togglePurchasingGroup(block.group.key)}
-          className={`${SUB} flex items-center gap-1.5 pb-0.5 pl-4 pr-2.5 pt-2.5 text-left ${GROUP_LABEL} ${
-            forced ? "cursor-default" : "hover:text-c-body"
+          onClick={() => togglePageGroup(block.group.key, current)}
+          className={`flex h-6 items-center rounded-md pl-7 pr-1.5 text-left ${GROUP_LABEL} ${first ? "" : "mt-1.5"} ${
+            forced ? "cursor-default" : "hover:bg-c-hover"
           }`}
         >
-          <span className="flex-1 truncate">{block.group.label}</span>
-          <MIcon name={open ? "expand_more" : "chevron_right"} size={16} className="text-c-muted" />
+          <span className="flex-1">{block.group.label}</span>
+          <MIcon name={open ? "expand_less" : "expand_more"} size={16} />
         </button>
         {open && (
-          <div data-testid={`nav-group-children-${block.group.key}`} className="flex flex-col gap-0.5">
-            {block.pages.map((child) => renderChild(group, child, true))}
+          <div data-testid={`nav-group-children-${block.group.key}`} className="flex flex-col">
+            {block.pages.map((child, i) => renderChild(group, child, i === block.pages.length - 1))}
           </div>
         )}
       </div>
@@ -584,11 +480,10 @@ export default function PortalSidebar({ drawer = false }: {
         data-testid={`nav-child-${item.key}`}
         aria-current={active ? "page" : undefined}
         ref={active ? (activeRowRef as Ref<HTMLAnchorElement>) : undefined}
-        title={item.label}
-        className={`${ITEM} ${active ? ITEM_ON : ITEM_REST}`}
+        className={`${ROW} ${active ? ROW_ON : ROW_REST}`}
       >
-        {rowIcon(item.mIcon, item.icon)}
-        <span className="min-w-0 flex-1 truncate">{item.label}</span>
+        {rowIcon(item.mIcon, item.icon, active)}
+        <span className={WRAP}>{item.label}</span>
         {item.badge && <NavBadge count={badgeCount[item.badge] ?? 0} label={item.label} />}
         {item.pendingPill && pendingCount > 0 && (
           <span className="min-w-[16px] rounded-full bg-c-ink px-[7px] py-px text-center text-[11px] font-semibold tabular-nums text-white">
@@ -599,50 +494,51 @@ export default function PortalSidebar({ drawer = false }: {
     );
   }
 
-  /** A MODULE: icon + name + caret, its pages on the tree line beneath it. */
+  /** A MODULE: icon + name + chevron, its pages on the tree line beneath it. */
   function renderModule(group: PortalNavGroup, block: Extract<NavBlock, { kind: "module" }>) {
     const { module, pages } = block;
     const expanded = openSection === module.section;
+    /* The module holding the page you are on wears the selection, open or
+     * shut: open, its page wears it too; shut, it is the one mark of where
+     * you are. `aria-current` stays on the page alone. */
     const holdsActive = pages.some((p) => isItemActive(group, p));
-    // A COLLAPSED module carries the work waiting inside it; EXPANDED it
-    // carries none — the children say it themselves.
+    // A SHUT module carries the work waiting inside it; OPEN it carries
+    // none — the pages say it themselves.
     const sum = expanded ? 0 : moduleBadgeSum(block);
-    const isPurchasing = module.section === PURCHASING;
-    /* ALWAYS EXACTLY ONE VISIBLE SELECTED ROW: tree open → the exact child;
-     * tree shut → the module row, because it has swallowed your page. */
-    const lit = holdsActive && !expanded;
     const slug = module.section.toLowerCase().replace(/\s+/g, "-");
+    const current = currentGroupOf(group, pages);
+    const blocks = moduleChildBlocks(pages);
     return (
-      <div key={module.section} className="flex flex-col gap-0.5">
+      <div key={module.section} className="flex flex-col gap-[3px]">
         <button
           type="button"
           data-testid={`nav-module-${slug}`}
+          data-holds-current={holdsActive || undefined}
           aria-expanded={expanded}
-          title={module.label}
           onClick={() => toggleModule(group, block)}
-          className={`${ITEM} ${lit ? ITEM_ON : ITEM_REST}`}
+          className={`${ROW} ${holdsActive ? ROW_ON : ROW_REST}`}
         >
-          {rowIcon(module.mIcon, module.icon)}
-          <span className="min-w-0 flex-1 truncate">{module.label}</span>
+          {rowIcon(module.mIcon, module.icon, holdsActive)}
+          <span className={WRAP}>{module.label}</span>
           {sum > 0 && <NavBadge count={sum} label={module.label} />}
-          <MIcon name={expanded ? "expand_more" : "chevron_right"} size={18} className="text-c-muted" />
+          <MIcon name={expanded ? "expand_less" : "expand_more"} size={18} className="text-c-secondary" />
         </button>
         {expanded && (
-          <div data-testid={`nav-children-${slug}`} className="flex flex-col gap-0.5">
-            {isPurchasing
-              ? purchasingChildBlocks(pages).map((b) =>
-                  b.kind === "page" ? renderChild(group, b.item) : renderPurchasingGroup(group, b),
-                )
-              : pages.map((child) => renderChild(group, child))}
+          <div data-testid={`nav-children-${slug}`} className="ml-[18px] flex flex-col">
+            {blocks.map((b, i) =>
+              b.kind === "page"
+                ? renderChild(group, b.item, i === blocks.length - 1 || blocks[i + 1]?.kind === "group")
+                : renderPageGroup(group, b, current, i === 0),
+            )}
           </div>
         )}
       </div>
     );
   }
 
-  /** The small uppercase group word — OVERVIEW · SALES LOCATIONS · … */
+  /** The small caps section word — OVERVIEW · SALES LOCATIONS · … */
   const groupHead = (label: string, key: string) => (
-    <span key={`head-${key}`} data-testid={`nav-group-head-${key}`} className={`px-2.5 pb-1 pt-3.5 ${GROUP_LABEL}`}>
+    <span key={`head-${key}`} data-testid={`nav-group-head-${key}`} className={`px-2.5 pb-1 pt-4 ${SECTION_LABEL}`}>
       {label}
     </span>
   );
@@ -669,7 +565,7 @@ export default function PortalSidebar({ drawer = false }: {
     <aside
       data-testid="portal-sidebar"
       data-collapsed={collapsed || undefined}
-      className="sticky top-0 flex h-screen flex-col gap-0.5 overflow-hidden bg-c-ground px-2.5 py-3 text-c-body"
+      className="sticky top-0 flex h-screen flex-col gap-[3px] overflow-hidden bg-c-ground px-2.5 py-3 text-c-body"
       style={{ width: collapsed ? 64 : 220, transition: "width 0.18s ease" }}
     >
       {/* Logo row — wordmark 20px open, heart mark 34px closed, the « / »
@@ -692,17 +588,18 @@ export default function PortalSidebar({ drawer = false }: {
             onClick={toggleCollapse}
             title={collapsed ? "Expand menu" : "Collapse menu"}
             aria-label={collapsed ? "Expand menu" : "Collapse menu"}
-            className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[16px] text-c-muted hover:bg-c-hover ${collapsed ? "" : "ml-auto"}`}
+            className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[16px] text-c-secondary hover:bg-c-hover ${collapsed ? "" : "ml-auto"}`}
           >
             {collapsed ? "»" : "«"}
           </button>
         )}
       </div>
 
-      <nav aria-label="Modules" className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden [scrollbar-width:thin]">
+      {/* The ONE scroller of the menu: nothing inside it scrolls on its own. */}
+      <nav aria-label="Modules" className="flex min-h-0 flex-1 flex-col gap-[3px] overflow-y-auto overflow-x-hidden [scrollbar-width:thin]">
         {collapsed
           ? // Icon rail — the active area only. A module's icon opens its
-            // landing page; the page you are on keeps its selected wash.
+            // landing page; the page you are on keeps its selected pill.
             (activeGroup ? navBlocks(activeGroup, role, caps) : []).map((block) => {
               const target = block.kind === "plain" ? block.item : moduleLandingPage(block);
               if (!target) return null;
@@ -727,10 +624,10 @@ export default function PortalSidebar({ drawer = false }: {
                   aria-label={label}
                   aria-current={active ? "page" : undefined}
                   className={`relative flex h-[34px] w-full shrink-0 items-center justify-center rounded-lg ${
-                    active ? "bg-c-select-bg text-c-select-fg" : "text-c-menu hover:bg-c-hover"
+                    active ? "bg-c-select-pill text-c-select-fg [box-shadow:var(--shadow-lift)]" : "text-c-tab hover:bg-c-hover"
                   }`}
                 >
-                  {rowIcon(mIcon, Lucide)}
+                  {rowIcon(mIcon, Lucide, true)}
                   {dot && <span className="absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full bg-c-select-fg" />}
                 </Link>
               );
@@ -743,19 +640,19 @@ export default function PortalSidebar({ drawer = false }: {
               const open = group.area === "operation" || isOpen(group.area);
               const areaHead = groups.length > 1 && group.area !== "operation";
               return (
-                <div key={group.area} className="flex flex-col gap-0.5">
+                <div key={group.area} className="flex flex-col gap-[3px]">
                   {areaHead && (
                     <button
                       type="button"
                       data-testid={`nav-area-${group.area}`}
                       aria-expanded={open}
                       onClick={() => toggleGroup(group)}
-                      className={`flex w-full items-center justify-between px-2.5 pb-1 pt-3.5 ${GROUP_LABEL} ${
+                      className={`flex w-full items-center justify-between px-2.5 pb-1 pt-4 ${SECTION_LABEL} ${
                         group.area === activeArea && !open ? "!text-c-select-fg" : "hover:text-c-body"
                       }`}
                     >
                       <span>{group.label}</span>
-                      <MIcon name={open ? "expand_more" : "chevron_right"} size={16} />
+                      <MIcon name={open ? "expand_less" : "expand_more"} size={16} />
                     </button>
                   )}
                   {open &&
@@ -772,8 +669,8 @@ export default function PortalSidebar({ drawer = false }: {
             })}
       </nav>
 
-      {/* Bottom — Settings ⚙ and the person (Layout Standard §2). */}
-      <div className="flex shrink-0 flex-col gap-0.5 border-t border-c-footer-line pt-2">
+      {/* Bottom — Settings and the person (Layout Standard §2). */}
+      <div className="flex shrink-0 flex-col gap-[3px] border-t border-c-head-line pt-2">
         {settingsHref && (
           <Link
             to={settingsHref}
@@ -781,11 +678,9 @@ export default function PortalSidebar({ drawer = false }: {
             title="Settings"
             aria-label={collapsed ? "Settings" : undefined}
             aria-current={onSettings ? "page" : undefined}
-            className={`flex items-center gap-2.5 rounded-[10px] px-2.5 py-[9px] text-[14px] ${
-              collapsed ? "justify-center" : ""
-            } ${onSettings ? "bg-c-select-bg font-semibold text-c-select-fg" : "font-medium text-c-ink hover:bg-c-info-bg"}`}
+            className={`${ROW} ${collapsed ? "justify-center" : ""} ${onSettings ? ROW_ON : ROW_REST}`}
           >
-            <MIcon name="settings" size={20} />
+            <MIcon name="settings" size={MODULE_ICON} className={onSettings ? undefined : "text-c-tab"} />
             {!collapsed && <span>Settings</span>}
           </Link>
         )}
@@ -795,14 +690,14 @@ export default function PortalSidebar({ drawer = false }: {
           aria-label={`${displayName} · Profile · Sign out`}
           className={`flex items-center gap-2.5 rounded-lg px-1.5 py-2 hover:bg-c-hover ${collapsed ? "justify-center" : ""}`}
         >
-          <span className="relative grid h-8 w-8 shrink-0 place-items-center rounded-full bg-c-ink text-[12px] font-semibold text-white">
+          <span className="relative grid h-8 w-8 shrink-0 place-items-center rounded-full bg-c-info-bg text-[12px] font-semibold text-c-ink">
             {initials}
             <span className="absolute -bottom-px -right-px h-2.5 w-2.5 rounded-full border-2 border-white bg-c-online" aria-hidden />
           </span>
           {!collapsed && (
             <span className="flex min-w-0 flex-col leading-[1.25]">
-              <span className="truncate text-[13px] font-semibold text-c-ink">{displayName}</span>
-              <span className="truncate text-[11px] text-c-muted">{(role && roleWord[role]) ?? ""} · online</span>
+              <span className="break-words text-[13px] font-medium text-c-ink">{displayName}</span>
+              <span className="text-[12px] text-c-secondary">{(role && roleWord[role]) ?? ""} · online</span>
             </span>
           )}
         </Link>

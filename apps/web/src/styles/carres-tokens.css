@@ -1,11 +1,13 @@
 /* Carres design tokens, as built from the owner handoff of 9 Oct 2026. Target values: docs/ui/carres-tokens.css (v12, 11 Oct 2026).
-   Taken from the target so far (12 Oct 2026): the Blue theme's hover, table row hover and selection pair; button and header lines.
+   Taken from the target so far (12 Oct 2026): the Blue theme's hover, table row hover and selection pair; button and header lines;
+   the side menu's selected pill (`--c-select-pill` is the kit's `--c-select-bg`; this file's `--c-select-bg` holds the kit's `--c-select-soft`),
+   its tree line and the soft lift.
    Everything else is still the 9 Oct build. Use only these; never the UI library's defaults. */
 :root{
   --c-ink:#221F20; --c-body:#3A3F47; --c-tab:#4A4F57; --c-secondary:#6B7178; --c-muted:#8A9099; --c-menu:#5C6168;
   --c-ground:#F5F3F0; --c-card:#FFFFFF; --c-hover:#EFECE8; --c-row-hover:#EFECE8;
   --c-card-border:#E9EBEE; --c-btn-border:#E5E7EB; --c-head-line:#E5E7EB; --c-row-line:#EEECE8; --c-footer-line:#EEF0F2; --c-section-line:#EEECE8; --c-input-border:#E1E4E8; --c-search-bg:#F0F1F3;
-  --c-select-bg:#FBE6DB; --c-select-fg:#A33A14; --c-focus:1px solid #C9CED6;
+  --c-select-bg:#FBE6DB; --c-select-fg:#A33A14; --c-select-pill:var(--c-select-bg); --c-tree-line:#BFC5CD; --c-focus:1px solid #C9CED6;
   --c-ok-bg:#E7F6EC; --c-ok-fg:#1E7A40; --c-warn-bg:#FBF0D6; --c-warn-fg:#7A5A00; --c-err-bg:#FDECEC; --c-err-fg:#B42318; --c-info-bg:#F0F1F3; --c-info-fg:#3A3F47; --c-hold-bg:#221F20; --c-hold-fg:#FFFFFF; --c-online:#1E8A47;
   --font:'Inter',system-ui,sans-serif;
   --fs-page:20px; --fs-crumb:14px; --fs-menu:14px; --fs-card:15px; --fs-body:13px; --fs-label:12px; --fs-small:11px; --fs-group:10px;
@@ -16,7 +18,7 @@
   --table-head-h:40px; --table-row-h:54px; --table-row-pad:6px 14px; --table-gap:10px; --table-foot-h:44px;
   --card-pad:14px 16px; --menu-item-pad:7px 10px;
   --menu-w:220px; --menu-w-closed:64px; --tasks-w:320px; --header-h:56px; --drawer-w:400px;
-  --shadow-drawer:0 12px 40px rgba(34,31,32,.18); --shadow-menu:0 8px 28px rgba(22,24,29,.1); --backdrop:rgba(34,31,32,.18);
+  --shadow-lift:0 1px 2px rgba(16,24,40,.10); --shadow-drawer:0 12px 40px rgba(34,31,32,.18); --shadow-menu:0 8px 28px rgba(22,24,29,.1); --backdrop:rgba(34,31,32,.18);
 }
 body{font-family:var(--font);font-variant-numeric:tabular-nums;background:var(--c-ground);color:var(--c-ink)}
 
@@ -25,7 +27,7 @@ body{font-family:var(--font);font-variant-numeric:tabular-nums;background:var(--
    shared hover until their page ground is the fixed kit ground: on a tinted ground the kit's hover for them cannot be seen. */
 [data-theme="carres"]{--c-ground:#F5F3F0;--c-select-bg:#FBE6DB;--c-select-fg:#A33A14}
 [data-theme="slate"]{--c-ground:#F4F5F7;--c-select-bg:#E6E9EE;--c-select-fg:#1F2937}
-[data-theme="blue"]{--c-ground:#F4F6F9;--c-select-bg:#EEF4FF;--c-select-fg:#2F55E0;--c-hover:#E2E4E8;--c-row-hover:#F2F3F5}
+[data-theme="blue"]{--c-ground:#F4F6F9;--c-select-bg:#EEF4FF;--c-select-fg:#2F55E0;--c-select-pill:#FFFFFF;--c-hover:#E2E4E8;--c-row-hover:#F2F3F5}
 [data-theme="teal"]{--c-ground:#F3F6F6;--c-select-bg:#DDF0EE;--c-select-fg:#0F5F59}
 [data-theme="violet"]{--c-ground:#F5F4F8;--c-select-bg:#ECE8F7;--c-select-fg:#4C3A8F}
 [data-theme="honey"]{--c-ground:#F7F4EC;--c-select-bg:#FBEFC9;--c-select-fg:#7A5300}
