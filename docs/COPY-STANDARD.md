@@ -5571,7 +5571,7 @@ Each person's own lunch start; the activity check skips that lunch. Times print 
 | Not a staff member | Only a staff member can set a lunch time. | Shared logins record no lunch |
 | Staff & Duties check time bounds | `Morning check from {Office start} to {last minute before the Office lunch}. Afternoon check from {first minute after the Office lunch} to {last minute before Office end}. A person's afternoon check moves with their own lunch.` | WS-02 · WS-03 bounds follow Settings → Office (0677) |
 
-## Settings → Company · Office · Settings editors · owner 9 Oct 2026 (Carres Settings List COM · OFF · TEAM-02) · DEPLOYED 10 Oct 2026 (#1996); confirmed Settings design (rows with one explanation, change record as a disclosure) DEPLOYED 12 Oct 2026 (#2013); signed-in walk owed
+## Settings → Company · Office · Settings editors · owner 9 Oct 2026 (Carres Settings List COM · OFF · TEAM-02) · DEPLOYED 10 Oct 2026 (#1996); confirmed Settings design (rows with one explanation, change record as a disclosure) DEPLOYED 12 Oct 2026 (#2013); signed-in reader walk done 12 Oct 2026, editor save walk owed
 
 | Situation | Exact words | Source |
 |---|---|---|
