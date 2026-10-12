@@ -504,7 +504,7 @@ Dealer commission rules:
 - **Who may ask.** Finance or the boss (the principal) ticks which Operation, HR and BD staff may ask, under Finance Settings → `Payment requests` (Chew 2026-10-03; 0648 — 0645 let only the boss; HR and BD since 0687, Chew 2026-10-12 「hr & BD 也到能申请」). Only the people ticked see the menu row and can ask. Finance and the principal may always ask. Each grant is kept, with who gave it and who took it back: unticking never deletes it.
   - It is a permission per person, kept by Finance, as the warehouse keeps its capability grants. It is not a Workspace duty, which has one holder a day, and it is not an HR position permission.
   - A shared login cannot be ticked; only a person's own account can.
-  - **HR and BD: BUILT 2026-10-12 (0687), probed on production and rolled back; NOT APPLIED and not shipped until Chew has told Jess** (it puts a row in their menus, §1 Exceptions).
+  - **HR and BD: BUILT 2026-10-12 (0687), probed on production and rolled back. It puts a row in their menus (§1 Exceptions): Chew told Jess, and 0687 was APPLIED 2026-10-12 on his 「可以套用」, the tracker holding the file exactly (md5 `d124c8531f5cb2f000ceab138839975d`).**
     - HR staff who are ticked see `Payment Requests` at the end of the HR rail.
     - BD staff who are ticked see a `Payment Requests` pill on the POS top bar, after `Accounts`. Their page has `Back to POS`.
     - Under `/finance`, HR and BD reach Payment Requests and nothing else.
