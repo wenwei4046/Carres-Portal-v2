@@ -544,7 +544,7 @@ There is no generic `Purchasing` main tab. The Sales Orders page's standalone SO
 The Header always describes the **main record that is open**, with the shared structure and style:
 a Sales Order is the customer (name · SO No · phone · `Customer’s original` / `requested delivery`);
 a Purchase Order is the supplier · PO No (with its PO state); a purchasing round is the round time and
-date (with `Missed` / `Done` through `referenceStatus`); a GRN is the supplier and GRN No. **`Info`
+date (with `Passed` / `Done` through `referenceStatus`); a GRN is the supplier and GRN No. **`Info`
 always describes that main record.** No customer, address, amount or date is fabricated where the
 source has none (empty header slots collapse). Module work lives in its own tab; write ownership stays
 with the owning module, and the panel only reaches its existing governed doors. A module tab reads its
@@ -581,7 +581,7 @@ hidden parts, states and entry points: the contract's "Embedded presentation"; n
 | Shared embedded SO component (kit `CompactModuleCard presentation="embedded"`, `EmbeddedSalesOrders`, `sales-order-card`) | one SO builder for standalone and embedded cards | DEPLOYED (PR #1926, `dc631e1a`, production SHA verified 2026-10-05) | UI MASTER §4.3.3 · card contract |
 | Purchase Orders full page | `Sales Order` view = `EmbeddedSalesOrders` (embedded presentation) | DEPLOYED (PR #1926, `dc631e1a`, production SHA verified 2026-10-05); owner acceptance owed | Purchasing MASTER §9.3 |
 | Purchase Orders (PO working panel) | supplier · PO No + PO state; Info · `Purchase Order` (default) · `Sales Order` (embedded, §4.3.3) | APPROVED TARGET / NOT BUILT — tabs owner-approved 2026-10-05; the layout of the work content is PROPOSAL, localhost first; a `GRN` tab is pending owner decision (stale PR #1859 not authorised) | Purchasing MASTER §9.3 |
-| SO Batch Purchase purchasing round | round time/date + `Missed` / `Done`; Info · `SO Batch Purchase` (default) · `Sales Order` (embedded) | APPROVED TARGET / NOT BUILT — tabs owner-approved 2026-10-05; the layout of the work content is PROPOSAL, localhost only | Purchasing MASTER §5.6.1 |
+| SO Batch Purchase purchasing round | round time/date + `Passed` / `Done`; Info · `SO Batch Purchase` (default) · `Sales Order` (embedded) | APPROVED TARGET / NOT BUILT — tabs owner-approved 2026-10-05; the layout of the work content is PROPOSAL, localhost only | Purchasing MASTER §5.6.1 |
 | Manual Purchase Request | Info · `Manual Purchase Request` (default) · related `Sales Order` (embedded) per its approved capability | APPROVED TARGET / NOT BUILT — tabs owner-approved 2026-10-05; the layout of the work content is PROPOSAL | Purchasing MASTER §9.2 |
 | Warehouse | a `Warehouse` tab in the shared panel | APPROVED TARGET / NOT BUILT (§0.2) | Stock MASTER |
 | Workspace Work right panel | Workspace §5.10 composition | Governed by `docs/workspace/MASTER.md` §5.10 (deployed §5.9 Logistics; rest NOT BUILT); not yet aligned to this card | Workspace MASTER |
@@ -591,7 +591,7 @@ hidden parts, states and entry points: the contract's "Embedded presentation"; n
 - **Default work presentation — APPROVED DIRECTION, localhost first, NOT BUILT.** Entering a module
   page, the right Working Panel shows that page's **highest-priority actionable work** from the
   existing Work / module task sources (owner, permissions, completion facts) — no new task engine, and
-  never guessed from the current table filter. Purchasing priority: earliest `Missed` → today's due
+  never guessed from the current table filter. Purchasing priority: earliest `Passed` → today's due
   round → next round. Nothing is ticked, ordered, reserved or sent automatically. A task the operator
   navigates to by hand stays selected across a refresh; a draft is never lost. When there is no work,
   the panel says so plainly (COPY word needed) and record viewing stays available.

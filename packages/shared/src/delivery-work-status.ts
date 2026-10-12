@@ -120,7 +120,7 @@ export const DELIVERY_WORK_STATUS_KINDS: readonly DeliveryWorkStatusKind[] = [
 /**
  * Text colour, never an icon (owner ruling 2026-09-13): green for a settled
  * good fact, orange for a specific fact that needs an act and is not yet late,
- * red for `Overdue` and a failure, none for the goods moving normally and for
+ * red for `Late` and a failure, none for the goods moving normally and for
  * a transfer's schedule (a transfer is never a customer appointment).
  */
 export type DeliveryWorkStatusTone = "green" | "orange" | "red" | "none";
@@ -194,7 +194,7 @@ export function deliveryWorkStatusLabelOf(
     case "in_transit":
       return `In transit to ${stop}`;
     case "overdue":
-      return "Overdue";
+      return "Late";
     case "arrived":
       return `Arrived at ${stop}`;
     case "delivered":

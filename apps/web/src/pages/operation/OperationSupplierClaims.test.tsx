@@ -188,7 +188,7 @@ describe("the claim record — where the supplier reply is recorded (§9.5, 2026
     claimsQuery.mockReturnValue({ data: { claims: [row({ requested_action: "replace", requested_at: "2026-09-28T02:00:00Z", sent: true })] }, isLoading: false });
     recordQuery.mockReturnValue({ data: RECORD({ sends: [{ id: "s1", version: 1, recipient: "Ohana Mr Lee", channel: "whatsapp", note: null, sent_at: "2026-09-28T03:00:00Z", sent_by_name: "Shasha" }] }), isLoading: false });
     const view = show("/operation?tab=claims&claim=c1");
-    expect(screen.getByTestId("claim-reply-state")).toHaveTextContent("Reply overdue · Wed, 30 Sep");
+    expect(screen.getByTestId("claim-reply-state")).toHaveTextContent("Reply expected Wed, 30 Sep · passed");
     expect(screen.getByTestId("claim-send-line")).toHaveTextContent("Claim sent · WhatsApp · Ohana Mr Lee");
     expect(screen.getByTestId("claim-primary")).toHaveTextContent("Record supplier reply");
     view.unmount();

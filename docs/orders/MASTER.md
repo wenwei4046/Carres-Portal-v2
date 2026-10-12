@@ -1999,7 +1999,7 @@ same blindness. This ruling overwrites every source the DELIVERY group read befo
 
 - **`DELIVER` prints Delivery's words, not its own.** Line 1 is the §8.4 rung for the scope —
   `Scheduled` · `Waiting for {partner} pickup` · `Collected by {partner}` · `On the way to customer` ·
-  `Arrived at {stop}` · `Delivered to customer` · `Failed Delivery` · `Overdue` — and line 2 its
+  `Arrived at {stop}` · `Delivered to customer` · `Failed Delivery` · `Late` — and line 2 its
   labelled date, ETA or the one reason. The Route's own `Not delivered yet` survives only for a
   scope with no Delivery Order yet (a dashed future node). A second label function on this surface
   is a Law D defect (the register/card split measured 2026-09-25 is the precedent).
@@ -2105,7 +2105,7 @@ collect before unloading` · `Payment approval waiting for decision`. A pre-clos
 still honoured by the 0362 predicate — a met line then reads `Paid` on the terms recorded, and the
 DO prints its COD instruction (Delivery §3) — but no surface invites a new one. The deadline is
 one arithmetic with the Work right panel and the Logistics card (`paymentDeadlineOf`,
-`packages/shared`); a passed deadline is `Missed` in Work and stays `by {date}` on the map.
+`packages/shared`); a passed deadline is `Late` in Work and stays `by {date}` on the map.
 
 **RE-RULED 2026-09-01 — the exception is CLOSED.** The owner made money-in-full absolute: the
 Delivery Payment Approval door was removed from the screen (PR #1031) and nothing can request
@@ -4891,7 +4891,7 @@ one register in the portal outside the kit.**
 `DEADLINE` · `LOGISTICS` · `SUPPLIER` · `REGION` · `CATEGORY` · `FIX DATA`.
 `FILTERS`, `FIX DATA` and `CATEGORY` start **collapsed**.
 
-**QUEUES holds, in order:** `Overdue` · `Owing` (with the money total) · the four STOCK action
+**QUEUES holds, in order:** `Late` · `Owing` (with the money total) · the four STOCK action
 queues (`Issue PO` · `Confirm ready date` · `Delay planning` · `Arrange new delivery date`) ·
 `Supplier late` · `Follow-up` · `For manager review`. **A row with a count of zero is not
 rendered.** The two delay queues carry a `N · M late` tail from their own office-calendar
@@ -4940,7 +4940,7 @@ FACET COUNTS only, never the rows.
 
 ```
 FACET RAIL     QUEUES (the module's open actions, danger group first) ·
-               DEADLINE (Overdue · Due ≤3d · This week · Next week) ·
+               DEADLINE (Late · Due ≤3d · This week · Next week) ·
                TEAM (per PIC) · LOGISTICS · CATEGORY · FIX DATA · Owing
 TABLE          ☐ · Follow-up · Status(pill + 3 dots) · Order · Customer ·
                Deadline · Stock · Delivery · PIC · Actions(verb-led line + `+N`)
@@ -5763,7 +5763,7 @@ viewport. The footer never contains Reset layout or any action.
 **FOUR columns filter from their header. Four deliberately do not, and that split is this
 module's own frozen rule doing its job**, not a shortcut:
 
-> **Nothing on the list says the same thing twice.** … `Overdue` has exactly ONE home
+> **Nothing on the list says the same thing twice.** … `Late` has exactly ONE home
 > (the QUEUES rail).
 
 2990 puts a funnel on **every** column (`DataGrid.tsx:342-345`, Commander 2026-05-29 —
@@ -5888,7 +5888,7 @@ columns. **Cancelled orders are excluded server-side**, so `All` means every LIV
   them from the table — but with NO facet engaged they stay visible, openable and searchable.
   **A facet may never print a number its own click cannot produce.**
 - **Nothing on the list says the same thing twice.** The `Delivery` cell never repeats the
-  sentence `Actions` already carries; `Overdue` has exactly ONE home (the QUEUES rail);
+  sentence `Actions` already carries; `Late` has exactly ONE home (the QUEUES rail);
   a LOGISTICS row counting zero is not rendered. A current staff member with zero work remains
   visible because a person on the roster is not a filter statistic; a departed staff member does not.
 - **Every money figure is `fmtMoney` from `packages/shared/src/money-format.ts`.** One spelling,

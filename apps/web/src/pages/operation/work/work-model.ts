@@ -16,7 +16,7 @@ export interface WorkFilters {
 
 export interface WorkSection {
   key: "broken" | "overdue" | "today" | "later" | "no_date";
-  label: "Broken commitments" | "Missed" | "Today" | "Later" | "No date";
+  label: "Broken commitments" | "Late" | "Today" | "Later" | "No date";
   items: WorkRow[];
 }
 
@@ -30,7 +30,7 @@ const SECTION_ORDER: readonly WorkSection["key"][] = [
 
 const SECTION_LABEL: Record<WorkSection["key"], WorkSection["label"]> = {
   broken: "Broken commitments",
-  overdue: "Missed",
+  overdue: "Late",
   today: "Today",
   later: "Later",
   no_date: "No date",

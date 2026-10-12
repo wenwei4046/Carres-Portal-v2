@@ -46,7 +46,7 @@ export const TASKS_WORDS = {
   title: "Tasks",
   module: "Module",
   allModules: "All modules",
-  missed: "Missed",
+  missed: "Late",
   nothingDue: "Nothing due",
   noDate: "No date",
   setBy: (module: string) => `set by ${module}`,

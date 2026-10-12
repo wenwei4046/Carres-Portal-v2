@@ -24,7 +24,7 @@ import { useTasksHost } from "./tasks-host";
 
 export const PENDING_WORK_WORDS = {
   title: "Pending work",
-  missed: (n: number) => `${n} missed`,
+  missed: (n: number) => `${n} late`,
   today: (n: number) => `${n} due today`,
   view: "View tasks",
   gotIt: "Got it",

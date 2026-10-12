@@ -1470,7 +1470,7 @@ facts, the one send area and the completion fact below.
   version marked sent (`PO sent to supplier`, `po_sends confirmed_sent`). Issuing alone does not
   complete it. Opening WhatsApp or email never completes it.
 - **Missed window.** An unfinished occurrence keeps its own time — it still reads `Issue the POs by
-  {time}` and Work marks it Missed — and it never silently rolls into the next window. Later demand belongs to the next occurrence, so two
+  {time}` and the Tasks panel prints `Passed` under its time (Work lists it under `Late`) — and it never silently rolls into the next window. Later demand belongs to the next occurrence, so two
   occurrences never share a line.
 - **One send area.** `PoIssueEvidence` (`Copy message` · `Open WhatsApp group` / `Open WhatsApp` ·
   `Open email` · `Download PDF` · `PO sent to supplier`) is the only send control set, shown on the
@@ -1724,7 +1724,7 @@ Evidence [Upload]  ≥1 WhatsApp screenshot · photo · video · PDF        Answ
 - **States, all distinct.** Default `Not confirmed` · `None recorded yet` · Active (Save reads
   `Save — {what is missing}` until complete) · Waiting (date shown; D-1 card the working day
   before) · Completed (`Received · {GRN No}`, the line greyed `All received`, no further answer)
-  · Attention (`· Delayed · {reason}` + `Supplier changed from {date}`) · Missed
+  · Attention (`· Delayed · {reason}` + `Supplier changed from {date}`) · Late
   (`Supplier delivery date passed`) · Loading (three-line skeleton, no button) · Empty (PO not
   sent → the section is absent; `Confirm PO sent to supplier` shows instead) · Error
   (`Supplier answers could not be loaded` + `Try again`, other sections unaffected) · Permission
@@ -5793,7 +5793,7 @@ Completion:   supplier_response stored with scope, date and evidence; the Work o
   document-agnostic send ledger §9.7 already requires (lift `po_sends` into a shared component and
   table); the claim pack PDF stays optional (§3.3) — a WhatsApp message plus evidence is a valid
   request.
-- **States on the record:** `Not recorded` → `Reply expected {date}` → `Reply overdue · {date}` →
+- **States on the record:** `Not recorded` → `Reply expected {date}` → `Reply expected {date} · passed` →
   `Escalated to {name}` → the recorded answer line `{answer} · {scope} · by {date} · recorded {date}
   · {recorder}` with `Evidence {n}` and History. Missing evidence or a missing note names itself
   beside the button; a timeout re-reads the record and never prints a refusal it did not receive.
@@ -6197,7 +6197,7 @@ Chain:        Supplier reply (§9.5) → `Record what Carres does next` → `Iss
   document-agnostic send ledger §9.7 requires); 50/50 during issue/revision, full width after.
 - **Pickup:** one Office working day before `Confirmed Pickup Date`, Work
   `Confirm tomorrow's pickup · {Supplier}` (same rule as the PO day-before check); a passed date
-  with nothing collected reads `Pickup missed · Follow up supplier`. The physical handover is
+  with nothing collected reads `Pickup date passed · Follow up supplier`. The physical handover is
   Stock's Outbound `Return to supplier` (Stock §12.8) — collector, time, exact Units, proof —
   read here as `Not picked up` · `Partly picked up` · `Fully picked up`. `Supplier Received Date`
   is recorded from supplier evidence; fully picked up never implies it.
@@ -6219,7 +6219,7 @@ Chain:        Supplier reply (§9.5) → `Record what Carres does next` → `Iss
   claim hold was released reads `Hold released` and is not offered ("this claim's HELD tracked
   Units"). (d) A Confirmed Pickup date in the past is refused, and a confirmation must say who
   confirmed (`Who confirmed`). (e) The day-before check closes only on a confirmation for that date
-  recorded on or after the day before; a date confirmed at issue is re-checked. (f) `Pickup missed`
+  recorded on or after the day before; a date confirmed at issue is re-checked. (f) `Pickup date passed`
   reads only when NOTHING was collected (the ruling's words); a partial pickup after the date raises
   no Work. (g) The PR paper prints Supplier, Return To, PR details and the Units table; it prints no
   `Reason` box (the claim note may hold internal fault review, §9.5 claim pack exclusions).
@@ -6300,7 +6300,7 @@ view; 50/50 remains reserved for issuing/revising. No application build is claim
 | `Repair Quotation`: photo or PDF, recorded at create or once later on the object (`repair_order_record_quotation`); the upload slot admits PDF for the `repair_quotation` purpose only and the `issue-evidence` bucket admits `application/pdf` | 0602, `routes/ops/issues.ts` |
 | Pickup: the `Hand {n} Units` door opens Stock's arrival-source form with `?ro=`; the pickup itself is Stock's existing `arrival_source_handover` (the ONE custody writer) and the return is Receiving's `receiving_arrival_post` with a GRN — proven end to end on a replayed chain | `ArrivalSourceWorkspace.tsx`, integration test |
 | **Slice B · the A4 `REPAIR ORDER` — MERGED (#1773).** PO chrome (full header every page, `RO…(n)` hero); Supplier · Supplier Pickup/Return Location · RO Details (`Supplier Claim No` only when present); `Reason` box = each Unit's recorded sentence verbatim; goods `Category · PO No / Unit ID · Items · Qty · Problem · Repair Requirement` + `TOTAL`; `DAMAGE PHOTOS · {Unit ID}` pages (4 per sheet) from the Unit/Claim evidence read through; no photo = one sentence. Payload `GET /:id/print-data` carries no figure; Cost Responsibility is omitted from the supplier paper (DOCUMENT-KIT §4 names goods, never value). Object header `Open PDF`; Issue is the 50/50 with the paper | `repair-order-template.tsx`, `repair-order-pdf.ts`, `RepairOrderObject.tsx`, `repair-orders.ts` |
-| **Slice B · Work — MERGED (#1773).** `repairOrderWorkItems` projects four rules into the ONE feed (PO Duty, Office calendar, deep link = RO object): `repair_order.issue` (due next Office working day after RO Doc Date; closes on confirmed send) · `repair_order.confirm_receipt` (due next Office working day after the send; closes on evidenced receipt) · `repair_order.return_date_passed` (opens the day after the Carres target; closes only when every Unit is back on a posted GRN or the RO is cancelled; a Supplier reply never closes it) · `repair_order.owner_consent` (no date; closes on `given` for every non-Carres Unit, refusal keeps it open). The 0584 Completed writer wraps issue, supplier-receipt, owner-consent, cancel and Receiving's arrival post. Route: the `Returned` stop is grey while the Supplier holds the goods, `Missed` after the target | `repair-order-work.ts` (shared + api), `work.ts`, `warehouse-receipts.ts` |
+| **Slice B · Work — MERGED (#1773).** `repairOrderWorkItems` projects four rules into the ONE feed (PO Duty, Office calendar, deep link = RO object): `repair_order.issue` (due next Office working day after RO Doc Date; closes on confirmed send) · `repair_order.confirm_receipt` (due next Office working day after the send; closes on evidenced receipt) · `repair_order.return_date_passed` (opens the day after the Carres target; closes only when every Unit is back on a posted GRN or the RO is cancelled; a Supplier reply never closes it) · `repair_order.owner_consent` (no date; closes on `given` for every non-Carres Unit, refusal keeps it open). The 0584 Completed writer wraps issue, supplier-receipt, owner-consent, cancel and Receiving's arrival post. Route: the `Returned` stop is grey while the Supplier holds the goods, `Late` after the target | `repair-order-work.ts` (shared + api), `work.ts`, `warehouse-receipts.ts` |
 
 **Owner rulings on the slice A report (2026-09-28):** pickup only from Carres Sites (accepted); a
 Unit on an active RO is NOT sellable (decision 1 rejected, built as above); the held-for-inspection,

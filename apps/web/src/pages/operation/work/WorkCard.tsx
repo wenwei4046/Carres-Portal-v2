@@ -40,7 +40,7 @@ const MODULE_ICON: Record<OperationWorkModule, LucideIcon> = {
 export type WorkDateStatus = "missed" | "today" | "upcoming" | "no_date";
 
 const STATUS_WORD: Record<WorkDateStatus, string> = {
-  missed: "Missed",
+  missed: "Late",
   today: "Today",
   /* COPY-STANDARD Work timing bans `Upcoming`: a future day is its own
      weekday + date, and needs no word beside it. The badge keeps its height

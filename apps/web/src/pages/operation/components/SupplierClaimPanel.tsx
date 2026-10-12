@@ -266,7 +266,7 @@ function SupplierSection({ claim, record, today, onAsk, onReply, open, inlineFor
   const state = supplierClaimReplyState(claim, today, useOfficeDays().office);
   const stateLine = state.kind === "not_recorded" ? `Supplier Response: ${absent}`
     : state.kind === "expected" ? `Reply expected ${fmtDate(state.date)}`
-    : state.kind === "overdue" ? `Reply overdue · ${fmtDate(state.date)}`
+    : state.kind === "overdue" ? `Reply expected ${fmtDate(state.date)} · passed`
     : state.kind === "escalated" ? `Escalated to ${data?.approver_name ?? "Purchasing Approver"}`
     : null;
   const current = data?.replies.find((r) => r.current) ?? null;

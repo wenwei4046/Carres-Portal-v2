@@ -488,7 +488,7 @@ function requestedNarrowingOf(value: string | null): RequestedNarrowing | null {
 }
 
 function requestedNarrowingWord(n: RequestedNarrowing): string {
-  if (n.kind === "overdue") return "Overdue";
+  if (n.kind === "overdue") return "Late";
   if (n.kind === "unconfirmed") return "Date not confirmed";
   if (n.kind === "range") return n.month.split(":").map(d => fmtDate(d)).join(" – ");
   const month = fmtMonth(n.month);
@@ -515,7 +515,7 @@ function requestedPresets() {
   const month = today.slice(0, 7);
   const end = new Date(`${shiftMonth(month, 3)}-01T00:00:00Z`); end.setUTCDate(0);
   return [
-    { label: "Overdue", value: "overdue" },
+    { label: "Late", value: "overdue" },
     { label: "This week", value: `range:${day(-offset)}:${day(6-offset)}` },
     { label: "Next week", value: `range:${day(7-offset)}:${day(13-offset)}` },
     { label: "This month", value: month },

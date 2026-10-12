@@ -117,7 +117,7 @@ describe("the Purchase Return record", () => {
   it("a passed date with nothing collected reads `Pickup missed · Follow up supplier`", () => {
     const passed = PR({ confirmed_pickup_date: "2026-10-01", sends: [{ id: "d", channel: "email", recipient: "x", sent_at: "2026-09-29T03:00:00Z", sent_by_name: null }] });
     render(<MemoryRouter><PurchaseReturnPanel pr={passed} today="2026-10-02" /></MemoryRouter>);
-    expect(screen.getByTestId("purchase-return-current-action")).toHaveTextContent("Pickup missed");
+    expect(screen.getByTestId("purchase-return-current-action")).toHaveTextContent("Pickup date passed");
     expect(screen.getByTestId("purchase-return-current-action")).toHaveTextContent("Follow up supplier");
   });
 });

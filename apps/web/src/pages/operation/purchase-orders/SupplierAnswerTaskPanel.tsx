@@ -80,7 +80,7 @@ export default function SupplierAnswerTaskPanel({ item, host }: { item: Supplier
       <CompactModuleCard
         name={supplierName}
         reference={reference}
-        referenceStatus={item.timingBucket === "overdue" ? "Missed" : undefined}
+        referenceStatus={item.timingBucket === "overdue" ? "Late" : undefined}
         openLabel={`Open ${documentDisplayNumber(po.id)}`}
         onOpen={() => navigate(`/operation/procurement?po=${encodeURIComponent(po.id)}`)}
         closeLabel="Close panel"

@@ -715,7 +715,7 @@ describe("expired planned time", () => {
     // Not failed — the calendar passing records no result; it records that
     // the partner still owes one, in red.
     expect(out[0]!.statusKey).toBe("overdue");
-    expect(out[0]!.statusLabel).toBe("Overdue");
+    expect(out[0]!.statusLabel).toBe("Late");
     expect(out[0]!.statusTone).toBe("red");
     expect(out[0]!.statusSecond).toBe("Ask NETS for the result");
     expect(out[0]!.missingProof).toEqual(NO_PROOF_MISSING);
@@ -1324,7 +1324,7 @@ describe("the No confirmed date chase", () => {
       scopeId: "late-trip",
       confirmedDate: "2026-08-20",
       statusKey: "overdue",
-      statusLabel: "Overdue",
+      statusLabel: "Late",
       statusTone: "red",
     });
     const soon = datedCard({ scopeId: "soon", confirmedDate: "2026-09-30" });
@@ -1733,7 +1733,7 @@ describe("the contact deadline — three working days, counted once", () => {
     expect(contactDeadlinePlacementOf({ ...base, statusKey: "details_incomplete" })).toBe("title");
     expect(contactDeadlineSentenceOf({ ...base, statusKey: "details_incomplete" }, fmt)).toBe("Contact deadline D(2026-09-08)");
     expect(contactDeadlineSentenceOf({ ...base, statusKey: "details_incomplete", contactOverdue: true }, fmt)).toBe(
-      "Contact deadline D(2026-09-08) · overdue, the deadline does not move",
+      "Contact deadline D(2026-09-08) · passed, the deadline does not move",
     );
     /* Anywhere else no deadline is drawn — `Asked {date}` keeps its line. */
     expect(contactDeadlinePlacementOf({ ...base, statusKey: "waiting_customer_reply" })).toBeNull();
@@ -1871,7 +1871,7 @@ describe("Card 23 · the work order — overdue first, incomplete last", () => {
       scopeId: "late",
       confirmedDate: "2026-08-20",
       statusKey: "overdue",
-      statusLabel: "Overdue",
+      statusLabel: "Late",
       statusTone: "red",
     });
   const today = () => datedCard({ scopeId: "today", confirmedDate: TODAY });

@@ -116,15 +116,17 @@ export const MONITOR_COPY = {
   getDeliveryDate: "Get delivery date",
   noConfirmedDate: "No confirmed date",
   /**
-   * ⭐ TWO DIFFERENT OVERDUE POPULATIONS, TWO DIFFERENT WORDS (owner ruling
-   * 2026-09-11). The rail's `Overdue delivery` is a confirmed trip whose day
-   * has passed with no result; the contact strip's `Overdue contact` is a
-   * customer conversation that missed its T−3 deadline. They answer different
-   * questions, they are worked by different people, and two bare `Overdue`
-   * counts on one screen read as one number that disagrees with itself.
+   * ⭐ TWO DIFFERENT LATE POPULATIONS, TWO DIFFERENT WORDS (owner ruling
+   * 2026-09-11; re-worded by the owner's 12 Oct 2026 time-word ruling: a date
+   * that has gone by is `passed`, never `Overdue`). The rail's
+   * `Delivery date passed` is a confirmed trip whose day has passed with no
+   * result; the contact strip's `Contact deadline passed` is a customer
+   * conversation whose T−3 deadline has passed. They answer different
+   * questions, they are worked by different people, and two bare counts under
+   * one word on one screen read as one number that disagrees with itself.
    */
-  overdue: "Overdue delivery",
-  overdueContact: "Overdue contact",
+  overdue: "Delivery date passed",
+  overdueContact: "Contact deadline passed",
   failed: "Failed Delivery",
   /** Owner correction 2026-09-07 — the queue names the JOB; each row then
    *  names the exact missing file (`DOR_COPY.uploadPhoto` / `uploadSignedDo`). */
@@ -311,7 +313,7 @@ export const MONITOR_COPY = {
    */
   contactDueSentence: (date: string) => `Contact deadline ${date}`,
   contactLateSentence: (date: string) =>
-    `Contact deadline ${date} · overdue, the deadline does not move`,
+    `Contact deadline ${date} · passed, the deadline does not move`,
   /** The contact strip's day button, for a screen reader: the day, then how
    *  many conversations are due on it. */
   contactDayLabel: (date: string, count: number) => `Contact deadline ${date} · ${count}`,

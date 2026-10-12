@@ -49,7 +49,7 @@ export const WORK_PAGE_COPY = {
   module: "Module",
   allModules: "All modules",
   broken: "Broken commitment",
-  missed: "Missed",
+  missed: "Late",
   waiting: "Waiting for answer",
   noDate: "No date",
   previousMonth: "Previous month",
@@ -60,9 +60,9 @@ export const WORK_PAGE_COPY = {
   clear: "No open work. Every track is clear.",
   seeTeam: "See Team Work",
   nothingDue: (date: string) => `Nothing due on ${date}`,
-  noMissed: "No missed work",
+  noMissed: "No late work",
   openDay: (date: string) => `Open ${date}`,
-  openMissed: "Open Missed",
+  openMissed: "Open Late",
 } as const;
 
 const MODULE_LABEL: Record<OperationWorkModule, string> = {

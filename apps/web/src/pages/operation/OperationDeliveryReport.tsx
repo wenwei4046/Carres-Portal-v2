@@ -512,7 +512,7 @@ export default function OperationDeliveryReport() {
                 {/* 10 · Exception Ageing */}
                 <SectionCard>
                   <div className="p-3" data-testid="report-ageing">
-                    <Head note="Today's facts. An exception has no month. The same three queues Monitor counts as Exceptions (Overdue · Failed Delivery · proof missing), aged from the day the fact became true.">
+                    <Head note="Today's facts. An exception has no month. The same three queues Monitor counts as Exceptions (Late · Failed Delivery · proof missing), aged from the day the fact became true.">
                       {DR.ageing}
                     </Head>
                     <Counts items={ageingBuckets(ageing).map((b) => ({ word: b.bucket, count: b.count }))} />

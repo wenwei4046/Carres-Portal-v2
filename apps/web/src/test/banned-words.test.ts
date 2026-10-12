@@ -162,7 +162,18 @@ describe("the scanner reads what a human reads", () => {
   });
 
   it("carries the whole banned list, so a rule cannot be quietly dropped", () => {
-    expect(BANNED.length).toBe(14);
+    expect(BANNED.length).toBe(16);
     expect(BANNED.map(([re]) => re.source)).toContain("\\bchase[ds]?\\b");
+  });
+
+  it("bans Overdue and Missed as words, and leaves the keys alone (owner ruling 12 Oct 2026)", () => {
+    const hits = (s: string) => BANNED.filter(([re]) => re.test(s)).map(([, why]) => why);
+    for (const word of ["Overdue", "Reply overdue · 9 Oct", "Deadline: 9 Oct (overdue)", "Missed", "3 working days missed", "No missed work"]) {
+      expect(hits(word), word).toHaveLength(1);
+    }
+    // Keys, class names and identifiers a capture may carry are not words.
+    for (const key of ['r.urgency === "overdue").length;', "pill pill-overdue", "p.overdue ? 1 : 0", "timing.missedAge.state", 'day === "missed" || day === "focus"']) {
+      expect(hits(key), key).toEqual([]);
+    }
   });
 });

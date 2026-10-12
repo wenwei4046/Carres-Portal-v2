@@ -891,7 +891,7 @@ Team Work   the same actions grouped by normal owner
 - My Work is the default for everyone, including managers, and omits their repeated avatar.
 - Team Work groups under owner avatar/name; cover appears only when today's actor differs.
 - No manual `Take it`, `Release`, generic assignment or `Mark done` exists for deterministic work.
-- The working week is explicit: `Missed`, the working days admitted by each owning module and
+- The working week is explicit: `Late`, the working days admitted by each owning module and
   resolved owner's calendar, and `No working date`; blockers never hide the original required
   working day or missed age.
 - Completed/History is read-only source evidence and preserves the actual actor.
@@ -900,7 +900,7 @@ Team Work   the same actions grouped by normal owner
 
 Work is one page with two scopes over one open set. It is an operator workspace, not a Dashboard,
 Kanban board or second module record. Owner-approved 2026-09-16: large desktop uses three working
-panels inside the existing global shell. My Work opens with a focus list containing `Missed`
+panels inside the existing global shell. My Work opens with a focus list containing `Late`
 followed by the actual current governed weekday/date. On a public holiday with no authorised
 holiday operation, the holiday remains named in Panel 1 and the focus list uses the next eligible
 governed working day; an authorised holiday operation remains on the named holiday. The complete
@@ -912,12 +912,12 @@ the reference review surface is https://claude.ai/artifact/HcREkf3UTPj35gYj339mC
 records, people, dates and simulated saves remain fixtures and are not authority.
 
 ```text
-┌ 📅 Date   ‹ Sep 2026 › ┬ Missed {n} · Thu, {date} {n}┬ SELECTED ACTION ─────────────┐
-│ ⟲ Missed     {count}   │ BROKEN COMMITMENT  (red)    │ {object} · {module}          │
+┌ 📅 Date   ‹ Sep 2026 › ┬ Late {n} · Thu, {date} {n}  ┬ SELECTED ACTION ─────────────┐
+│ ⟲ Late       {count}   │ BROKEN COMMITMENT  (red)    │ {object} · {module}          │
 │ [14 MON]               │▌{object} · {module}         │ {recipient, when applicable} │
 │ [15 TUE]     {count}   │▌{fact}                      │                              │
 │ [16 WED] {holiday}  {n}│▌{action} · {contact} {when} │ CURRENT FACT                 │
-│ [17 THU] ← solid blue  │ MISSED                      │ {fact or problem}            │
+│ [17 THU] ← solid blue  │ LATE                        │ {fact or problem}            │
 │ [18 FRI]     {count}   │ {object} · {module}         │                              │
 │ [19 SAT] when admitted │ {fact}                      │ ACTION                       │
 │ ⊘ No date {n}          │ {action} · {contact} {when} │ {specific action}            │
@@ -936,10 +936,10 @@ records, people, dates and simulated saves remain fixtures and are not authority
 ```
 
 Panel 1 chooses the working day and module. Panel 2 lists the matching authorised actions; on first
-open it shows `Missed` followed by the actual current or next eligible governed weekday/date under
+open it shows `Late` followed by the actual current or next eligible governed weekday/date under
 the holiday law above. Panel 3 shows one selected action's fact, specific act, source-owned
 communication where admitted, required result, admitted owning-module action and exact
-owning-object door. `Missed` contains actions whose governed working day has passed;
+owning-object door. `Late` contains actions whose governed working day has passed;
 the original day and working-day age remain visible. Previous/next controls move the selected week
 without changing scope or filters. Monday through Friday always show. Saturday appears only when an
 authoritative module action remains scheduled on Saturday after applying that module's rule and the
@@ -975,8 +975,8 @@ a complete accessible name and a visible keyboard focus ring. Top to bottom:
   bold with its left line, never washed; the only washed row on the page is the chosen work. Today,
   closed and chosen are independent states. A day can be chosen whether or not it is closed and
   counts the work dated on it.
-- **The fixed rows** `Missed {n}` and `No date {n}` — `0` printed. `Missed`, one tile and `No date`
-  are one mutually exclusive Date choice. A missed occurrence counts once, under `Missed`, never
+- **The fixed rows** `Late {n}` and `No date {n}` — `0` printed. `Late`, one tile and `No date`
+  are one mutually exclusive Date choice. A missed occurrence counts once, under `Late`, never
   again under its past weekday.
 - **`Status`** — the three former middle tabs, now rail rows: `To do` · `Waiting for answer` ·
   `Done today`, each with its count over the chosen Date's rows. **More than one may be on**; a row
@@ -1000,15 +1000,15 @@ The opening focus list (no `day`) rings the focus day's tile. `day=all`, reached
 filter or a Dashboard link, lists every open action and highlights no Date option.
 
 Panel 2 draws no heading of its own (the rail names the day). Panel 2 groups appear in this order: `BROKEN COMMITMENT` →
-`MISSED` → the selected day. A broken commitment is shown in the `BROKEN COMMITMENT` group with a red
+`LATE` → the selected day. A broken commitment is shown in the `BROKEN COMMITMENT` group with a red
 group heading and a thin red row edge; the row carries no badge, and its accessible name still says
-`Broken commitment`. It still counts under its own working day in Panel 1 (for example `Missed`) and
+`Broken commitment`. It still counts under its own working day in Panel 1 (for example `Late`) and
 is never counted twice. There is no `Blocked` group: a blocked occurrence stays in its own group
-(`BROKEN COMMITMENT`, `MISSED` or its day), keeps its date and missed age, and prints `Blocked by {dependency}`, so blocked
+(`BROKEN COMMITMENT`, `LATE` or its day), keeps its date and missed age, and prints `Blocked by {dependency}`, so blocked
 missed work is never hidden.
 
 Every action belongs to exactly one working-day count. Once its governed action day is before today,
-it moves into `Missed`; the row retains and prints the original required date, but that occurrence is
+it moves into `Late`; the row retains and prints the original required date, but that occurrence is
 not counted again under the past weekday. Module and owner totals count the same occurrence once.
 Day selection never creates a second copy.
 
@@ -1066,7 +1066,7 @@ Each visible item uses the approved three-line row grammar (owner ruling 2026-09
 ```text
 OBJECT LABEL · MODULE OR SITE CONTEXT                       line 1
 FACT OR PROBLEM                                             line 2
-ACTION · CONTACT (when applicable) · TIMING / MISSED AGE    line 3
+ACTION · CONTACT (when applicable) · TIMING / DAYS LATE     line 3
 Blocked by {dependency} · exceptional state (only when true) wraps below
 ```
 
@@ -1201,7 +1201,7 @@ Jess reviewed the live page in an 829px window and approved 24 fixes as written 
   **The left rail is the rail every page follows — the Payment Monitor's grammar (Jess,
   2026-09-26) with her same-day correction:** the shared 240px `FilterRail` with `Hide filters`;
   the one-line header `‹ Sep 2026 ›`; the Monday–Saturday month grid of day tiles; the fixed rows
-  `Missed {n}` and `No date {n}`; the `Status` rows; the `Page` group (`All pages` + each page with
+  `Late {n}` and `No date {n}`; the `Status` rows; the `Page` group (`All pages` + each page with
   its count) and, in Team Work, the `Owner` select — exactly as §5.2 Panel 1 writes it. Hidden, it
   leaves the 44px `Show filters` strip; the choice is remembered per browser; on one stage it
   floats over the list. The three-panel page is rail · list · detail. **The rail runs from the page header to the bottom; the toolbar belongs to the
@@ -1221,10 +1221,10 @@ Search matches the authorised open set by object number/label, customer, supplie
 problem and action. It never broadens permission scope and never searches a separately cached copy.
 
 The toolbar `Filters` door is governed for Work. It lives in the toolbar only and is never a Panel 1
-or rail heading. Filters are: `Scope` (`My Work` · `Team Work`), `Week`, `Working day` (`Missed` · admitted weekdays ·
+or rail heading. Filters are: `Scope` (`My Work` · `Team Work`), `Week`, `Working day` (`Late` · admitted weekdays ·
 Saturday when generated · `No date`), `Status`, `Page`, `Owner` (Team only),
 `Blocked` and `Source failed`. `Broken commitment` is an attention filter, not a synonym for
-`Missed`. Multiple filters combine and every active filter is
+`Late`. Multiple filters combine and every active filter is
 visible, individually removable and represented in the URL so Dashboard and module doors can open
 the exact same result. `Clear all` preserves the current scope. Refresh re-reads the one feed and
 does not change business state.
@@ -1233,7 +1233,7 @@ The Module filter lists only currently admitted projections: `Sales Orders` · `
 `Receiving` · `Delivery` · `Payment` · `Issue Tracker`. `Service Case`, `Warehouse Outbound` and
 `Claims` do not appear until their admission gates and live projection close.
 
-Panel 2 group order is `BROKEN COMMITMENT` → `MISSED` → selected day (§5.1). Default ordering inside
+Panel 2 group order is `BROKEN COMMITMENT` → `LATE` → selected day (§5.1). Default ordering inside
 a group is module-governed materiality, oldest opened occurrence, then object label. Users may narrow
 the view but cannot manually reprioritise authoritative due facts. Search and filter results keep
 the same group and item grammar; zero matches is not the same as zero work.
@@ -1246,7 +1246,7 @@ the same group and item grammar; zero matches is not the same as zero work.
 | Empty My Work | `Nothing assigned to you` · `Open Team Work` for authorised supervisors; source freshness remains visible |
 | Empty Team Work | `No open work` only when every admitted source is healthy; otherwise show the failed source state |
 | No search/filter match | `No work matches these filters` · `Clear filters`; never imply the source set is empty |
-| Missed | `Required {weekday, date} · {n} working day(s) missed`; colour supports the words and is never the only signal |
+| Late | `Required {weekday, date} · {n} working day(s) late`, or `Required {weekday, date} · passed` when the count cannot be worked out; colour supports the words and is never the only signal |
 | Saturday | Appears only when an admitted action remains on Saturday after module and resolved-owner calendar law; retains the Saturday business date |
 | Public holiday | Day remains visible and names the holiday; only an authorised holiday operation may remain assigned there |
 | Calendar not configured | Name the affected Site/owner calendar and correction door; do not invent off-days or missed age |
@@ -1263,7 +1263,7 @@ the same group and item grammar; zero matches is not the same as zero work.
 ### 5.5 · Responsive and accessibility contract
 
 - **THE WORK DENSITY — owner ruling 2026-09-25, APPROVED / BUILT. Exact values, not a direction.**
-  Header: ONE white row, `Work` 28/34/600 with the count `{n} actions to do · {m} missed` 13/18/400
+  Header: ONE white row, `Work` 28/34/600 with the count `{n} actions to do · {m} late` 13/18/400
   on the right, 72px tall with 24px sides from 768px wide; below 768px 24/30/600, 12/16/400, 64px,
   16px sides. No breadcrumb row, no second title, KPI band or card header.
 - **THE WORK SHELL — owner ruling 2026-09-27, APPROVED TARGET.** Work is one continuous white
@@ -1279,8 +1279,8 @@ the same group and item grammar; zero matches is not the same as zero work.
   search, Filters, the Monday–Saturday month and the action list. It defaults to the whole month;
   pressing `{Mon YYYY}` contracts it to the selected week, and the last choice is remembered.
   Its fixed area is no more than 246px: 36px scope, 8px, 36px search/Filters, 8px, 32px month head,
-  about 126px month grid and 36px `Missed`/`No date`. `Missed`, one chosen date and `No date` are
-  mutually exclusive. With Missed work, first open selects Missed and lists only Missed; otherwise
+  about 126px month grid and 36px `Late`/`No date`. `Late`, one chosen date and `No date` are
+  mutually exclusive. With Late work, first open selects Late and lists only Late; otherwise
   it selects today (or the next admitted day with work). Filters open from one door and contain
   Page, Owner and cover facts; active choices are removable chips below Search. They do not create
   a second permanent toolbar.
@@ -1288,7 +1288,7 @@ the same group and item grammar; zero matches is not the same as zero work.
   occurrence and one action; an order with Payment, Purchasing and Delivery actions has separate
   rows and may have different owners. The row is 76px, edge-to-edge with a 1px divider, 12px sides,
   no radius, shadow, chips or card gap. Line 1 is `{document}` 12/16/500 and the date 12/16 on the
-  right (red when Missed); line 2 is the action 14/20/600; line 3 is the short context 12/18,
+  right (red when Late); line 2 is the action 14/20/600; line 3 is the short context 12/18,
   normally `{page} · {fact or party}`. Every line truncates with `…` and exposes the whole string
   on hover/focus. Selection is a 3px blue left edge plus pale-blue wash and never changes height.
   The month already names the selected date, so there is no repeated list heading or list tab bar.
@@ -1366,7 +1366,7 @@ order from module truth:
 
 1. `Broken commitment` — an explicit customer, supplier, payment or delivery promise is past and
    its completion fact is absent.
-2. `Missed` — the governed working day is before today on that rule's calendar.
+2. `Late` — the governed working day is before today on that rule's calendar.
 3. The selected calendar-admitted working day, with `Today` marked explicitly only when today is a
    working day for that action's authoritative calendar.
 4. A later working day in the selected or a later week.
@@ -1394,7 +1394,7 @@ identity; it never changes the owner, due date or completion fact.
 |---|---|
 | My Work / Team Work use one server-composed open feed | Retain; make all admitted modules use the same transport contract and source health |
 | My Work defaults correctly and Team groups by normal owner | Retain; add complete cover/handover and unresolved-Duty evidence everywhere |
-| The Right Rail My Work slot (HF-3, 2026-09-17: one identity, one focus day `workFocusDay`, one `Missed` + `Today` count `myMissedAndToday`) is built and still mounted | Retire it under §7 (owner 2026-09-24); Work keeps the one identity, focus day and count; all supported filters stay URL-visible |
+| The Right Rail My Work slot (HF-3, 2026-09-17: one identity, one focus day `workFocusDay`, one `Late` + `Today` count `myMissedAndToday`) is built and still mounted | Retire it under §7 (owner 2026-09-24); Work keeps the one identity, focus day and count; all supported filters stay URL-visible |
 | Current main Work page has scope toggles and limited time filtering | Add governed search, visible filter controls, module/owner/cover/blocker/source filters and no-match state |
 | Current rows show object, problem, action and due; Delivery/Warehouse show required result | Make required result accessible on every item and visible whenever completion would otherwise be ambiguous |
 | Current rows use truncation on narrow content | Replace with wrapping under 1024px; prove object/problem/action/result/due remain readable at 390px |
@@ -1422,11 +1422,11 @@ Work is ready for owner acceptance only when all are demonstrable:
   deep links without broadening permission scope;
 - every row exposes object, fact/problem, concrete action, recipient when applicable, required result,
   due/late fact and exact owning door without repeating owner/object in sentence prose;
-- first open shows `Missed` followed by the actual current or next eligible governed weekday/date,
+- first open shows `Late` followed by the actual current or next eligible governed weekday/date,
   names a public holiday and never duplicates an occurrence or hides the complete working week;
 - the `Date` section counts the visible week and prints no zero; `All modules` equals the Panel 2 row
-  count before the module choice and the module rows sum to it; the heading reads `Missed {n} · {weekday, date} {n}` (single day `{weekday, date} {n}`);
-- Panel 2 orders `BROKEN COMMITMENT` → `MISSED` → selected day; a broken commitment has a red group
+  count before the module choice and the module rows sum to it; the heading reads `Late {n} · {weekday, date} {n}` (single day `{weekday, date} {n}`);
+- Panel 2 orders `BROKEN COMMITMENT` → `LATE` → selected day; a broken commitment has a red group
   heading and red row edge with no badge and still counts once under its own working day; a blocked
   job stays in its own group with `Blocked by {dependency}`;
 - rows are at least 64px and never truncate; after a confirmed completion the receipt stays in place,
@@ -1658,7 +1658,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
 **A · The page (settled direction, revision 5 wording).**
 1. Three columns: Inbox 280 · Mission (rest, ≥560) · Communication 340; narrower and drawer rules
    as in "THE WORK SHELL" above. The global right rail is separate and not in this build.
-2. Inbox: one row = one act (76px, three lines); Missed first on open; one date choice at a time.
+2. Inbox: one row = one act (76px, three lines); Late first on open; one date choice at a time.
 3. **What the Mission's top shows.** The top is ALWAYS a summary of the record the act belongs to,
    and no step detail ever replaces it:
    - an act on a Sales Order, or on anything that resolves to exactly one Sales Order (a Delivery
@@ -1730,7 +1730,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
       given a guessed date.
    3. No grey line under each step: the step name already says what it is (the proposed
       `Sales Order` / `Supplier confirmation` / … lines are withdrawn).
-   4. `Missed {n}` and `No date {n}` under the Inbox month are two pressable boxes, not text rows.
+   4. `Late {n}` and `No date {n}` under the Inbox month are two pressable boxes, not text rows.
    5. Delivery first, money last: with no Order header (A4) the Requested date sits on Proceed,
       the Scheduled date on Customer delivery and the balance on the Payment step
       (`RM {amount} unpaid` / `Must be paid by {date}`), the money only while owed.
@@ -1802,7 +1802,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      `SUPPLIER` · `RECEIVING` · `STOCK`), `DELIVERY` (`LOGISTICS` · `DELIVERY DATE`), `PAYMENT`, then
      `DELIVERY ORDER` · `DELIVER` · `DELIVERY PHOTO`. No `Order Route · To do {n}` row and no
      band labels (`GOODS` …) are drawn (Jess 2026-09-28: "remove order route and to do 4 · remove goods
-     word"). The stop label is small grey uppercase (11/500) with `Missed` / `Due` only; the ONE
+     word"). The stop label is small grey uppercase (11/500) with `Late` / `Due` only; the ONE
      progress count is each card's own `{n} of {m} done`, never a second count on the stop ("confused"); the card title (15/600) is what to do,
      else the node's who + object sentence from the resolver (`Warehouse has not received the goods`);
      the second line says why. Every card carries its checklist: a square box per step, ✓ filled when
@@ -1887,7 +1887,7 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
      MASTER "THE WORK ROUTE KIT":**
      1. **Route stop** — the vertical line with a 24px dot (red `!` missed · amber due · dark ✓ all
         done · grey otherwise), the stop label 11/500 uppercase slate-11 letter-spacing .06em, and
-        `Missed` / `Due` beside it; line 1.5px dashed slate-6, solid once done.
+        `Late` / `Due` beside it; line 1.5px dashed slate-6, solid once done.
      2. **Checklist row** — a 16px square mark, radius 4: filled dark with ✓ (done), empty with a
         1.5px border (not yet), filled red / amber with `!` (the step that is the act now); then the
         step 13/400 (13/600 when it is the act), its value 12/400 slate-11 (red/amber for the act), the
@@ -1940,12 +1940,12 @@ checklist. Revisions 2 to 5 carry her corrections of the same day, made on the d
 8b. **The left column copies the ChatGPT order-desk rail (Jess, 2026-09-27: "i want the left nav
    rail, follow" / "i asked you copy").** Top to bottom: search and `Filters` · the month · the Mon
    to Sat grid with each day's count printed under its number (today ringed, the chosen day a
-   grey chip, never blue; a past day's work counts once, under `Missed`) · `ATTENTION`: `! Missed {n}` ·
+   grey chip, never blue; a past day's work counts once, under `Late`) · `ATTENTION`: `! Late {n}` ·
    `○ No date {n}` · `MODULE`: `All modules {n}`, then the list, then `Sales Orders` ·
    `Purchasing` · `Warehouse` · `Delivery` · `Payment`, each with its icon and count. **The list
    is one row per order** showing only the SO number and right-aligned numeric task count
    (`SO-1333` / `2`; owner correction 2026-09-28). No customer name, `actions` suffix, or repeated
-   `Missed` status appears in the row; Attention already supplies the selected status. Counts retain
+   `Late` status appears in the row; Attention already supplies the selected status. Counts retain
    the selected Attention/day and module scope. The order row opens directly under
    the chosen module, and it overwrites the earlier one-act-per-row Inbox ruling: the order's acts
    are the numbered `To do` list (A6). A chosen row is the pale-blue wash with the 3px blue edge.
@@ -2235,7 +2235,7 @@ requires a new date, governed reason and WhatsApp screenshot; it appends evidenc
 original date and updates Purchasing, Work and Route from the same source facts. One Office working
 day before arrival, missing Supplier DO/confirmation yields `Confirmation needed today`; a sent
 request yields `Waiting for supplier`; a passed arrival without receipt yields
-`Arrival missed · Follow up supplier`.
+`Arrival date passed · Follow up supplier`.
 
 **Alignment with Purchasing's owner-approved answer model (2026-09-25; Purchasing §5.4, §5.7).**
 `Record supplier delay` is the same act as Purchasing's ONE `Record supplier answer` form — per PO
@@ -2486,7 +2486,7 @@ are fixtures, and production keeps the current page until each admitted projecti
 | Purchasing · `purchase_return.issue` | **BUILT ON BRANCH 2026-09-29 (Purchasing §9.6 creation door, slice C2; 0609 not applied).** Open claim records `Return to supplier` and no Purchase Return is issued for it · fact `Not issued` · `Issue the purchase return to {Supplier}` · deep link: the claim record (`/operation?tab=claims&claim={id}`) → `Issue Purchase Return` | PO Duty through the Shared Duty Resolver; Buddy cover acts | Office calendar: next Office working day after `Return to supplier` was recorded | A Purchase Return issued for the claim (`purchase_returns`, through the one 0548/0609 door) · `purchase_return.send` opens |
 | Purchasing · `purchase_return.send` | **BUILT ON BRANCH 2026-09-29.** A Purchase Return has no confirmed `Return document sent to supplier` · fact `Sending not confirmed` · `Send the return document to {Supplier}` · deep link: the PR record (`/operation?tab=purchase-returns&pr={id}`) | PO Duty through the Shared Duty Resolver; any active Operation person may record the send | Office calendar: next Office working day after the PR Doc Date | Confirmed send recorded (`document_sends` kind `purchase_return`, 0609) |
 | Purchasing · `purchase_return.confirm_tomorrows_pickup` | **BUILT ON BRANCH 2026-09-29.** `Confirmed Pickup Date` is the next Office working day and the return is not fully picked up · `Confirm tomorrow's pickup · {Supplier}` (action · recipient) · deep link: the PR record → `Confirmed Pickup` | PO Duty through the Shared Duty Resolver; any active Operation person may record the supplier's confirmation | One Office working day before Confirmed Pickup Date (the PO day-before rule) | An evidenced pickup confirmation FOR THAT DATE recorded on or after the day before (`purchase_return_pickup_confirmations`, 0609); a confirmation taken at issue does not replace the check |
-| Purchasing · `purchase_return.pickup_missed` | **BUILT ON BRANCH 2026-09-29.** Confirmed Pickup Date passed and Stock's Outbound `Return to supplier` handover recorded no Unit collected · `Pickup missed · Follow up supplier` (fact · action) · deep link: the PR record | PO Duty through the Shared Duty Resolver; Buddy cover acts | The Confirmed Pickup Date | A Unit collected (Stock Outbound actual pickup, Stock §12.8 — writer NOT BUILT) or a new confirmed pickup date not yet passed |
+| Purchasing · `purchase_return.pickup_missed` | **BUILT ON BRANCH 2026-09-29.** Confirmed Pickup Date passed and Stock's Outbound `Return to supplier` handover recorded no Unit collected · `Pickup date passed · Follow up supplier` (fact · action) · deep link: the PR record | PO Duty through the Shared Duty Resolver; Buddy cover acts | The Confirmed Pickup Date | A Unit collected (Stock Outbound actual pickup, Stock §12.8 — writer NOT BUILT) or a new confirmed pickup date not yet passed |
 | Purchasing · `repair_order.issue` | **BUILT ON BRANCH 2026-09-29 (Purchasing §9.7 slice B).** Repair Order exists and its current version is not marked sent · `Issue repair order to {supplier}` · deep link: the RO object (`/operation?tab=repair-orders&ro={id}`) | PO Duty through the Shared Duty Resolver; Buddy cover acts | Office calendar: next Office working day after the RO Doc Date | Confirmed send of the current RO version (`document_sends`) recorded through `Issue repair order` · the receipt follow-up opens |
 | Purchasing · `repair_order.confirm_receipt` | **BUILT ON BRANCH 2026-09-29.** Current version sent, Supplier receipt not recorded · `Ask {Supplier} to confirm they received {RO No}` · deep link: the RO object | PO Duty through the Shared Duty Resolver; Buddy cover acts | Office calendar: next Office working day after the first confirmed send of the current version | Evidenced Supplier receipt recorded (`repair_orders.supplier_received_at`, with the snapshotted 14-working-day Carres return target) |
 | Purchasing · `repair_order.return_date_passed` | **BUILT ON BRANCH 2026-09-29.** Carres return target passed and a Unit is not back · `Ask {Supplier} when {Unit ID} will return` (several: `{first Unit ID} + {n} more`) · deep link: the RO object | PO Duty through the Shared Duty Resolver; Buddy cover acts | Office calendar: the Carres return target (14 Office working days from evidenced Supplier receipt) | Every Unit received back on the RO's return leg (posted GRN through Receiving's arrival post) or the RO cancelled; a Supplier reply or new Supplier date is recorded but NEVER closes it |
@@ -2680,7 +2680,7 @@ meaning; it does not mean the source has passed the production gate.
 | Material customer cases | Service Case: open Significant/Critical cases under its governed materiality | Filtered Service Cases | Held until Service Case source/owner admission is complete |
 | Material goods exposure | Stock/Receiving: governed shortages, quarantine or blocked Units/quantity above owning thresholds | Filtered Warehouse/Receiving surface | Held until threshold, Site scope and one drill-down are verified |
 | Material cash exposure | Payment/Finance: overdue customer balance or approved recovery exposure, shown without netting distinct tracks | Filtered Payment/Finance register | Eligible after definition/threshold proof |
-| Work health | Shared Work: open, Missed, blocked, unresolved owner/cover and failed source by normal owner | Team Work with exact URL filters | Eligible per admitted source; partial health required |
+| Work health | Shared Work: open, Late, blocked, unresolved owner/cover and failed source by normal owner | Team Work with exact URL filters | Eligible per admitted source; partial health required |
 | Recent material change | Durable owning-module/Work transition crossing one admitted measure's state or threshold | Exact owning object | Held until durable idempotent receipts exist |
 
 Counts of active Orders, open POs, GMV, generic low stock and unreviewed annotations are explicitly
@@ -2712,7 +2712,7 @@ unreviewed annotation · `Upcoming` · `Take it` · `Release`.
 
 | Current production | Decision |
 |---|---|
-| `Today`, `Open POs`, `Overdue` KPI tiles | Replace with governed intervention facts; an open PO is not itself a problem |
+| `Today`, `Open POs`, `Late` KPI tiles | Replace with governed intervention facts; an open PO is not itself a problem |
 | Active orders and GMV hero | Remove unless a governed comparison/threshold proves management relevance |
 | Five-column order pipeline with recent order cards | Remove from Dashboard; Sales Orders owns its Register and flow views |
 | Open Purchase Orders card | Remove; show only broken supplier promise/no-answer commitments from Purchasing truth |
@@ -2800,7 +2800,7 @@ honest Work for admitted modules.
   holiday is a choosable date with its own count); the focus day is today when it is a working day, else the next working day
   (Saturday only when something is due that Saturday), and the focus list also keeps work dated
   between today and that day; empty states run failed source → no filter match → `No work on
-  {weekday, date}` with `Open Missed` / `Open {weekday, date}` → true empty; module counts ignore only
+  {weekday, date}` with `Open Late` / `Open {weekday, date}` → true empty; module counts ignore only
   the module filter; panels follow the measured Work area. Proof: `OperationWork.truth.test.tsx`
   9 red on main → 10/10 green; web gate 347 files / 4960 tests; CI verify success; deploy run
   35202239240; carres-portal Pages, carres-pos Pages, erp, pos and the API Worker all report

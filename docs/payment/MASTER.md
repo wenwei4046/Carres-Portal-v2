@@ -241,7 +241,7 @@ SO No | Customer | Balance due | Items & Stock | Storage | Requested Delivery Da
 
   ```text
   Status
-  今天要动手 (Needs action)     Missed (red) · Ask customer today · Payment due today ·
+  今天要动手 (Needs action)     Payment should have been received (red) · Ask customer today · Payment due today ·
                                 Customer promised to pay today · Storage Invoice not paid*
   不用动，在等 (Waiting)        Payment due later · No delivery date · Waiting for goods
   别人的事 (Someone else's)     Finance hold · Needs review
@@ -251,10 +251,11 @@ SO No | Customer | Balance due | Items & Stock | Storage | Requested Delivery Da
   ```
 
   - Picking a row narrows the listing to those Sales Orders (`?status=`); the count and the listing
-    are one set by construction. Default = `Missed` when it is above 0, else `Ask customer today`,
+    are one set by construction. Default = `Payment should have been received` when it is above 0, else `Ask customer today`,
     else `All unpaid orders`. A count is ORDERS; every row prints its number, `0` included.
-  - `Missed` = `Payment should have been received` (the deadline, or the customer's promised day,
-    has passed with money still owed). `Payment due later` = a clock exists but the ask day has not
+  - `Payment should have been received` = the deadline, or the customer's promised day,
+    has passed with money still owed (the cell's own fact names the row; the row word `Missed` is
+    retired by the owner time-word ruling of 12 Oct 2026, and `Late` stays banned on this rail). `Payment due later` = a clock exists but the ask day has not
     come. `Waiting for goods` = `Arrival not confirmed` (催钱前先看货). `Finance hold` and `Needs
     review` are other people's work shown so the desk is complete; they carry no Operation action.
     `Paid orders` = `Pay before delivery` RM 0 (goods and every storage paper paid) — the row that gives a paid Sales Order its home: the listing

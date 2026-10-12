@@ -3,8 +3,8 @@
  * kit admission Jess 2026-09-28 "kit ok").
  *
  * A 24px dot on a line, the stop label in small grey uppercase and, beside it,
- * `Missed` or `Due` only. The dot says the stop's state and never a number:
- * red `!` missed · amber `!` due · dark tick when every step is done · grey
+ * `Late` or `Due` only. The dot says the stop's state and never a number:
+ * red `!` late · amber `!` due · dark tick when every step is done · grey
  * otherwise. The line under the dot is dashed ahead and solid once the stop is
  * done; the last stop draws no line.
  *
@@ -36,7 +36,7 @@ const DOT: Record<RouteStopTone, string> = {
 };
 
 export const ROUTE_STOP_WORD: Partial<Record<RouteStopTone, string>> = {
-  missed: "Missed",
+  missed: "Late",
   due: "Due",
 };
 

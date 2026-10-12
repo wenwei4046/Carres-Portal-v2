@@ -16,8 +16,8 @@ function timingText(item: OperationWorkItem): string {
   if (item.timing.placement === "missed") {
     const age = item.timing.missedAge;
     return age.state === "counted"
-      ? `Required ${fmtDate(item.timing.actionOn)} · ${age.workingDays} working ${age.workingDays === 1 ? "day" : "days"} missed`
-      : `Required ${fmtDate(item.timing.actionOn)} · Missed age unavailable`;
+      ? `Required ${fmtDate(item.timing.actionOn)} · ${age.workingDays} working ${age.workingDays === 1 ? "day" : "days"} late`
+      : `Required ${fmtDate(item.timing.actionOn)} · passed`;
   }
   return fmtDate(item.timing.actionOn);
 }

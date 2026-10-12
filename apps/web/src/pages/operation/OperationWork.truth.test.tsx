@@ -204,7 +204,7 @@ describe("HF-1 · Work truth on the Kuala Lumpur clock", () => {
     expect(holiday).toHaveTextContent(/^16$/);
     expect(holiday).toHaveAttribute("aria-label", "Wed, 16 Sep · Malaysia Day · 0 actions");
     expect(screen.getByTestId("work-rail-broken")).toHaveTextContent("Broken commitment0");
-    expect(screen.getByTestId("work-rail-missed")).toHaveTextContent("Missed0");
+    expect(screen.getByTestId("work-rail-missed")).toHaveTextContent("Late0");
     expect(screen.getByTestId("work-rail-waiting")).toHaveTextContent("Waiting for answer0");
     expect(screen.getByTestId("work-rail-no-date")).toHaveTextContent("No date0");
   });

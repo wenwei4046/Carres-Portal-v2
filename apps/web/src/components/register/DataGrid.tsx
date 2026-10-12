@@ -748,7 +748,7 @@ const DATE_PRESETS: { key: DatePreset; label: string }[] = [
   { key: "thisWeek", label: "This week" },
   { key: "thisMonth", label: "This month" },
   { key: "lastMonth", label: "Last month" },
-  { key: "overdue", label: "Overdue" },
+  { key: "overdue", label: "Passed" },
 ];
 /** Exported so a page's rail answers `Today` / `This week` / `This month` with
  *  the engine's ONE date arithmetic (Mon to Sun week, Malaysia time). */

@@ -93,7 +93,7 @@ const TABLE: Array<{
   {
     facts: "scheduled day passed with no result",
     input: { confirmedDate: "2026-09-10", hasDeliveryOrder: true, handoverEvents: at("received_by_logistics"), todayIso: "2026-09-12" },
-    line1: "Overdue", tone: "red", line2: "Ask NETS for the result",
+    line1: "Late", tone: "red", line2: "Ask NETS for the result",
   },
   {
     facts: "attempt delivered on an intermediate Journey leg",

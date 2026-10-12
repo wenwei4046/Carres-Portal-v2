@@ -58,7 +58,7 @@ const WORDS: Record<OperationWorkModule, Words[]> = {
   ],
   receiving: [{ problem: "Supplier date passed · nothing received yet", action: "Check in", recipient: "Warehouse Klang", ref: "PO2609-1031" }],
   delivery: [
-    { problem: "Overdue delivery", action: "Call NETS", recipient: "NETS" },
+    { problem: "Delivery date passed", action: "Call NETS", recipient: "NETS" },
     { problem: "Delivery proof not reviewed", action: "Check delivery proof", recipient: "AL Logistics", ref: "DO2609-20411" },
   ],
   payment: [{ problem: "Payment due today", action: "Ask customer to pay", recipient: "Wong Kah Wai" }],

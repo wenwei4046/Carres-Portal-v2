@@ -243,7 +243,7 @@ function PointButton({
   refIfCurrent?: React.Ref<HTMLButtonElement>;
   onClick: () => void;
 }) {
-  const toneWord = point.tone === "done" ? "done" : point.tone === "current" ? "act now" : point.tone === "attention" ? "needs attention" : point.tone === "missed" ? "missed" : "not yet";
+  const toneWord = point.tone === "done" ? "done" : point.tone === "current" ? "act now" : point.tone === "attention" ? "needs attention" : point.tone === "missed" ? "late" : "not yet";
   return (
     <button
       ref={refIfCurrent}

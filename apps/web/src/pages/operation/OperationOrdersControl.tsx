@@ -557,14 +557,14 @@ export function slackDays(o: operationOrderListRow): number {
 // DEADLINE filter buckets (Jess 2026-07-19, B redesign) — the CUSTOMER deadline
 // (delivery_date) is the single shared spine; SUPPLIER + LOGISTIC both filter by
 // it. Multi-select. "Next week" caps at 14d; further-out orders are unbucketed
-// (the filter is opt-in). "Overdue" is ALSO the QUEUES Overdue row (same state).
-const DUE_BUCKETS = ["Overdue", "Due ≤3d", "This week", "Next week"] as const;
+// (the filter is opt-in). "Late" is ALSO the QUEUES Late row (same state).
+const DUE_BUCKETS = ["Late", "Due ≤3d", "This week", "Next week"] as const;
 type DueBucket = (typeof DUE_BUCKETS)[number];
 function dueBucketOf(o: operationOrderListRow): DueBucket | null {
   if (controlTabOf(o) === "completed") return null;
   const diff = daysToDue(o);
   if (diff === null) return null;
-  if (diff < 0) return "Overdue";
+  if (diff < 0) return "Late";
   if (diff <= 3) return "Due ≤3d";
   if (diff <= 7) return "This week";
   if (diff <= 14) return "Next week";
@@ -3620,7 +3620,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
       label: "Follow-up",
       headerContent: <KitIcon name="flag" size={14} />,
       width: FOLLOW_UP_WIDTH,
-      headerTitle: "Flag an order for follow-up. Amber while open, red once overdue",
+      headerTitle: "Flag an order for follow-up. Amber while open, red once late",
       cell: (r) => <FollowUpFlag order={r.o} tasks={r.tasks} onFlag={openFollowUp} />,
     },
     {
@@ -3943,15 +3943,15 @@ export default function OperationOrdersControl({ onImport }: Props) {
                     top, then the action queues — the row's queue IS its action,
                     so the numbers match the Actions column by construction.
                     States live in FILTERS; no-logistics = Assign logistics. */}
-                {(dueEntries.find((e) => e.bucket === "Overdue")?.count ?? 0) > 0 && (
+                {(dueEntries.find((e) => e.bucket === "Late")?.count ?? 0) > 0 && (
                   <KanbanRow
-                    label="Overdue"
-                    count={dueEntries.find((e) => e.bucket === "Overdue")?.count ?? 0}
+                    label="Late"
+                    count={dueEntries.find((e) => e.bucket === "Late")?.count ?? 0}
                     tone="danger"
-                    active={dueFilter.has("Overdue")}
+                    active={dueFilter.has("Late")}
                     chip={emptyQueueChip}
                     title="Past the delivery date and not delivered yet. Who to call = the row's Actions cell"
-                    onClick={() => setDueFilter((p) => toggleInSet(p, "Overdue"))}
+                    onClick={() => setDueFilter((p) => toggleInSet(p, "Late"))}
                   />
                 )}
                 {owing.n > 0 && (
@@ -4262,7 +4262,8 @@ export default function OperationOrdersControl({ onImport }: Props) {
                         a permanent `Overdue 0` on a page that has one.
 
                     `DUE_BUCKETS` and `dueBucketOf` are UNCHANGED — the
-                    classifier must still return "Overdue" or the QUEUES row
+                    classifier must still return "Late" (the word since the
+                    owner's 12 Oct 2026 time-word ruling) or the QUEUES row
                     would have nothing to count and nothing to filter. Only
                     this band's render drops the pill. */}
                 <KanbanGroup
@@ -4272,7 +4273,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
                   onToggle={() => toggleGroup("DEADLINE")}
                 >
                   <div className="flex flex-wrap items-center gap-1.5 px-2.5 py-1">
-                    {DUE_BUCKETS.filter((b) => b !== "Overdue").map((b) => {
+                    {DUE_BUCKETS.filter((b) => b !== "Late").map((b) => {
                       const count = dueEntries.find((e) => e.bucket === b)?.count ?? 0;
                       // No `pill-overdue` branch: Overdue left this band (above).
                       const cls = b === "Due ≤3d" ? "pill-warning" : "pill-neutral";
@@ -4685,7 +4686,7 @@ function OrdersBulkBar({
             <BulkMenuItem
               icon={MessageCircle}
               label="Call suppliers: confirm ready date"
-              hint="overdue"
+              hint="deadline passed"
               tone="wa"
               onClick={() => onChaseSupplier("chase")}
             />
@@ -4726,7 +4727,7 @@ function OrdersBulkBar({
             <BulkMenuItem
               icon={MessageCircle}
               label="Call logistics: confirm delivery date"
-              hint="overdue"
+              hint="delivery day passed"
               tone="wa"
               onClick={() => onChasePartner("chase")}
             />
@@ -5796,7 +5797,7 @@ function FollowUpFlag({
   const word = !lead
     ? "Flag for follow-up"
     : u === "overdue"
-      ? "Follow-up overdue"
+      ? "Follow-up late"
       : "Follow-up open";
   return (
     /* Icon-only in the CELL (Jess 2026-06-29): no "Flag" / "Late" text — the

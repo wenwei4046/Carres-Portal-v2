@@ -344,7 +344,7 @@ export function purchaseReturnWorkItems(
     if (today > date && pickup === "Not picked up") {
       out.push({
         item: make(PURCHASE_RETURN_WORK_RULE.pickupMissed, "Follow up supplier", date),
-        problem: "Pickup missed",
+        problem: "Pickup date passed",
         requiredResult: "The goods are picked up, or a new pickup date is confirmed",
       });
     }
