@@ -180,7 +180,7 @@ Recommended, in this order:
      - Goods with two of three Units sold for showroom orders split two to the showroom and one to Not yet in a channel.
      - A line not from a GRN with no department, or with Not yet in a channel, was refused; Office was saved.
      - Operation could not read the bill form's preview, and an order's channel could not be read around Finance's doors.
-2. **Cash Flow by channel** (ruling 1). **BUILT 2026-10-12 (0684).** Cash Flow has the reports' `Department` filter.
+2. **Cash Flow by channel** (ruling 1). **BUILT 2026-10-12 (0684); 0684 APPLIED 2026-10-12 on Chew's 「做」 for the build batch, the tracker holding the file exactly (md5 `53c91ea9fb4e9eed60729f8e6c100868`).** Cash Flow has the reports' `Department` filter.
    - Every share of cash and bank money is shared as since 0638, then split again by channel, in whole sen:
      - a receipt goes to its order's channel;
      - a supplier payment goes to the channels of the bill and debit note lines it paid, in proportion; an advance follows the bills it was later knocked off;
