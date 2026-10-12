@@ -5102,7 +5102,7 @@ The Finance area of the Portal sidebar groups Finance's own pages into modules. 
 | `Receivables` | `AR · Receivables` · `Other debtors` · `Other receipts` |
 | `Bank & Cards` | `Daily Bank` · `Card settlement` · `Card money waiting` · `Money moves` |
 | `Ledger` | `Journal` · `General Ledger` · `Trial Balance` · `Self-check` |
-| `Reports` | `Profit and Loss` · `Balance Sheet` · `Cash Flow` · `AP Aging` · `Collection` · `Card charges` · `Dealer commission` · `Stock value` · `Payment` (Payment's own report, unchanged) |
+| `Reports` | `Profit and Loss` · `Balance Sheet` · `Cash Flow` · `AP Aging` · `AR Aging` (0686) · `Collection` · `Card charges` · `Dealer commission` · `Stock value` · `Payment` (Payment's own report, unchanged) |
 
 - `Dashboard` stays a plain row at the top. `Forecast` is a plain row after `Reports` (Chew, 3 Oct 2026).
 - A menu row's word is its page's title; the one exception is `AP · Payables`, which opens `Unpaid by Supplier` (RULING YH 2026-09-14). The Profit and Loss and the Balance Sheet are two pages, titled `Profit and Loss` and `Balance Sheet`; the browser tab reads `{title} · Carres`. The Reports page's door cards (`Open →`) are retired, because every report is a row.
@@ -5184,6 +5184,21 @@ These words are on screen in the branch and are not approved yet.
 | Opened row | Toggle hover `Show bills`. Columns `Bill No` · `Supplier invoice` · `Bill date` · `Due date` · `Bill total` · `Still owed` · `Age`. Empty: `No bill is open. The balance is money not tied to a bill.` |
 | Footer | `{n} suppliers · In the books ({account codes}) on {date}: {money} · Difference {money}`; while it is not zero, above the table: `⚠ The suppliers differ from the books by {money}.` and `Open Self-check` |
 | States | `AP aging could not be loaded. Try again.` · `Try again` · `The ledger has no start date yet. Nothing can be totalled.` · `Nothing was owed to a supplier on {date}.` |
+
+### PROPOSAL — PENDING CHEW · AR Aging (0686)
+
+Chew asked for it on 2026-10-12 (「就根据开了invoice还没还的就出现…包括普通顾客」). These words are on screen in the branch and are not approved yet. A word AP Aging uses keeps its meaning here.
+
+| Where | Words |
+|---|---|
+| Menu | `AR Aging`, a row under `Reports` after `AP Aging` |
+| Page | Title `AR Aging`. `As of` · `Age by` with `Invoice date` · `Due date` · `Columns` with `By month` · `By days` · `Search debtors…` |
+| Columns | `Debtor` · `Debtor Type` (hidden until asked for; `Customer` · `Other debtor`) · `Channel` (the one channel its open invoices share: a showroom's or dealer's name, `Showroom`, `Dealer`, `Subscription`; `Several channels`; or empty) · `Balance` · the age columns as AP Aging's · `Not tied to an invoice` |
+| Meaning | `Balance` is what the debtor's accounts hold in the books on the day. The age columns are its invoices still owed that day: a customer's sales and storage invoices, the order's money filling its earliest invoice first; an other debtor's invoices, less what was received against them. `Not tied to an invoice` is the rest of the balance: below zero, money paid ahead of an invoice, such as a deposit; above zero, money owed with no invoice behind it. A customer's invoice has no due date and ages by its invoice date. |
+| Opened row | Toggle hover `Show invoices`. Columns `Invoice No` (an other debtor's opens its invoice) · `Invoice Type` (`Sales Invoice` · `Storage Invoice` · `Additional Storage Invoice` · `Other debtor invoice`) · `SO No` (`SO-{n}`) · `Invoice date` · `Due date` · `Invoice total` · `Still owed` · `Age`. Empty: `No invoice is open. The balance is money not tied to an invoice.` |
+| Above the table | `{n} invoice(s) worth {money} was/were issued before the books started. The books do not hold it/them, so it is/they are not aged here.` |
+| Footer | `{n} debtors · In the books ({account codes}) on {date}: {money} · Difference {money}`; while it is not zero, above the table: `⚠ The debtors differ from the books by {money}.` and `Open Self-check` |
+| States | `AR aging could not be loaded. Try again.` · `Try again` · `The ledger has no start date yet. Nothing can be totalled.` · `No customer or other debtor owed money on {date}.` |
 
 ### PROPOSAL — PENDING CHEW · Card money waiting (0641)
 
