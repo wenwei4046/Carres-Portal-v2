@@ -1,4 +1,4 @@
-# Sales Order UI kit specimen · supplied 12 Oct 2026
+# Sales Order UI kit specimen · supplied 12 Oct 2026, 5:35 PM
 
 > **Repository note. Read before the supplied README below.**
 >
@@ -12,10 +12,10 @@
 > the value here is **PROPOSAL / NOT LAW**. `docs/01-design-tokens.md` §10 lists the
 > differences and the values the package itself leaves unsettled.
 >
-> Source archive: `Sales Order.zip`, handed over by the owner on 12 Oct 2026, SHA-256
-> `793931a7922b24155b963593139bd13c960fb101072edd8fdc94d5618164fe59`. It replaces the 11 Oct specimen
-> completely: every kit the owner hands over replaces the kit, and one version is kept (owner
-> 12 Oct 2026). The owner keeps the original archive; Git keeps the history.
+> Source: the folder `design_handoff_sales_order_ui_kit`, handed over by the owner on 12 Oct 2026 at
+> 5:35 PM. It replaces the package of the same morning completely: every kit the owner hands over
+> replaces the kit, and one version is kept (owner 12 Oct 2026). The owner keeps the original; Git
+> keeps the history.
 >
 > **What differs from the supplied archive (this repository is public).**
 >
@@ -23,10 +23,7 @@
 > |---|---|
 > | `sales-test.js` | Replaces `sales-real.js`. Customer name, phone and address in all 20 orders are TEST values (`TEST customer A` to `TEST customer T`, `012-00000xx`, `Jalan TEST`). SO numbers, delivery area, postcode, dates, items, suppliers, PO numbers, balances and remarks are kept. The supplied 20 orders are the same as in the 11 Oct package |
 > | `purchasing-data.js` | Customer names in its 20 SO Batch orders are TEST values; an order that is also in `sales-test.js` keeps the same TEST customer. Supplier WhatsApp group links are TEST placeholders. The supplier emails arrive as TEST addresses |
-> | `Sales Order Outright v12.dc.html` | One line: it loads `sales-test.js` |
-> | `Purchasing v2.dc.html` | Not stored. `Purchasing v3.dc.html` is the Purchasing picture the owner named on 12 Oct, and it holds the 12 Oct task cards. The links to the v2 page in `Carres Shell.dc.html`, `Workspace My Tasks.dc.html`, `purchasing-data.js`, the Layout Standard and the README below now point at v3 |
-> | `Workspace v2.dc.html` | Not stored. Nothing in the package links to it or describes it; `Workspace My Tasks.dc.html` is the Workspace page |
-> | `Carres Shell.dc.html` | The bottom `Settings` row is 600 when it is the current page and 500 otherwise. It was fixed at 500, which was the one line `carres-check.js` reported |
+> | `Sales Order Outright v12.dc.html` | One line: it loads `sales-test.js`. Every other page is as supplied; `Purchasing v3.dc.html` is the only Purchasing page in the package |
 > | `screens/SO-*`, `PO-*`, `SH-01` | Retaken on 12 Oct from these pages with the TEST details, 924 × 540; `PO-*` from `Purchasing v3.dc.html`; `PO-04` is the pop-up alone. `KIT-*` are the supplied pictures |
 > | `UX-FLOWS.md` | The example customer and phone are the TEST values |
 > | `docs/Carres Ops Rules.md`, `docs/Carres Handoff.md`, `CHANGES-after-*.md` | Not stored. The Ops Rules are the designer's business-rule notes (the module MASTERs hold the rules). The Handoff and the change notes are the design chat's own working log |
@@ -35,8 +32,7 @@
 > these files.
 >
 > Every page opens with its rows and no script error. The supplied `carres-check.js` was run on
-> 21 page states at 1025, 1164 and 1440 wide: all 21 states pass at each width, after the
-> `Settings` row line above. `docs/01-design-tokens.md` §10.1 records the measurement.
+> 21 page states at 1025, 1164 and 1440 wide: all 21 states pass at each width, as supplied. `docs/01-design-tokens.md` §10.1 records the measurement.
 
 ---
 
@@ -142,8 +138,16 @@ A4 page: Carres mark + legal name/SSM/address · SO no. + "SALES ORDER" right ·
 ### 4. Tasks panel (Shell, every page)
 Card: tags row (module tag 11/500 on #F1F2F4, due chip) · title 13/500 · grey line · footer. Open card: facts as **11/500 caps labels over 13/500 values** (two columns). **A record number in the facts is the link** that opens it (dotted underline, solid on hover): no "Open …" buttons. One charcoal main button per card ("Mark done").
 
-### 5. Purchasing (`Purchasing v3.dc.html`, `#batch` / `#po` / `#po=<PO no.>`)
-Same Shell, Table and detail header pattern (PO no. 20/600 with supplier line). Use it to verify the template is module-agnostic.
+### 5. Purchasing (`Purchasing v3.dc.html`, `#batch` / `#po` / `#po=<PO no.>`) — SO Batch Purchase DONE (owner 12 Oct)
+Same Shell, Table and detail header pattern (PO no. 20/600 with supplier line). SO Batch Purchase is approved; build it exactly:
+- Summary · Today: ONE tile "{n} pcs · To order now" + rows "Past the order-by date" (amber) · 10:15 AM today · 4:00 PM today · Too late for customer date · Partly ordered.
+- Cut-off = last time an SO joins a batch (10:15 AM · 4:00 PM; after 4:00 PM → next working day 10:15 AM). Send POs within 30 min after the cut-off (Settings → Purchasing). Past it: "· passed" amber, never blocked.
+- One Place = POs + one Send PO task per supplier AND category ("Send Sofa PO to Ohana · 2 POs"). Nothing opens by itself.
+- Send PO card: ① Download n PDFs ("0 of n downloaded") ② Send by WhatsApp or Email ③ Mark n POs sent. Email = same box as WhatsApp (template · Edit · Copy) + To and Subject rows.
+- After Mark sent / Save: dark toast bottom centre "Saved · {task} · {record} · Done today | Next: {supplier} › | Undo | ✕" (12 s). PO and each SO get a Timeline line.
+- Chase supplier: Send · Record the answer · Save; No reply → "Later today" (time) or "Pick date" (Mon–Fri) with alarm.
+- Tasks panel: day strip Mon–Fri only (tap a day to see its tasks; nothing from other days under today) · To do / Waiting / Done (Done = same card format) · cards grouped by party, module icon before each title, rows icon · label ⟷ value, amber only on the passed row. No category colours.
+- Settings → Purchasing → Suppliers: one number row per category ("Production days · Mattress · 7 working days").
 
 ### 6. Settings → Appearance (Shell)
 Top bar "Settings / Appearance" (the page title is the only 20/600). Tabs Appearance · Staff and duties as the segmented control. "THEME" 11/500 caps. One white card, rows: Cool (Cool Slate · Blue **Default** · Teal · Violet) · Brand (Carres) · Warm (Warm Honey · Olive · Rose · Latte). Chip 32 high, radius 8, 12-px dot + name 13/500; picked = soft selection fill + 1px border and text in its colour + check. Note under the card explains a theme changes only the selection colour. Saved per person in localStorage `carres.theme`, default `blue`.
@@ -201,10 +205,11 @@ Theme = per person (`carres-theme.js`, localStorage `carres.theme`, default `blu
 - `Carres UI Kit.dc.html`: master kit picture
 - `Carres Shell.dc.html`, `Carres Table.dc.html`: shared template pieces
 - `Sales Order Outright v12.dc.html`: reference module (list + detail + PDF + amendment)
-- `Purchasing v3.dc.html`: second module on the same template
+- `Purchasing v3.dc.html`: second module on the same template (only Purchasing file; v2 deleted)
+- `carres-log.js` (Timeline events), `carres-tasks.js` (Tasks store)
 - `carres-theme.js`, `carres-check.js`, `sales-test.js`, `purchasing-data.js`, `support.js` (DC runtime for viewing only)
 - `docs/Carres Layout Standard.md`, `docs/Carres Ops Rules.md`
 - `UX-FLOWS.md` (behaviour), `screens/` (pictures of every state)
 
 ## Suggested Claude Code prompt
-> COPY ONLY, do not redesign. Read README.md (the COPY ONLY rules first), UX-FLOWS.md and docs/Carres Layout Standard.md in full, and look at every file in screens/. Build (1) a master UI kit: tokens as CSS variables and components Button, IconButton, Pill, Chip, Menu, Link, Card, FieldRow, Toast, Avatar, Table (header/row/item row/group row/footer), Tabs, SegmentedControl; (2) a template: AppShell (menu, top bar, toolbar, Summary, Tasks) + ListPage + DetailPage. Recreate Sales Order Outright (list, detail with 3 tabs, amendment flow, SO PDF) on it, then Purchasing on the same template. Port carres-check.js into automated tests and make every screen pass at 1025, 1164 and 1440 px wide.
+> COPY ONLY, do not redesign. Read README.md (the COPY ONLY rules first), UX-FLOWS.md and docs/Carres Layout Standard.md in full, and look at every file in screens/. Build (1) a master UI kit: tokens as CSS variables and components Button, IconButton, Pill, Chip, Menu, Link, Card, FieldRow, Toast, Avatar, Table (header/row/item row/group row/footer), Tabs, SegmentedControl; (2) a template: AppShell (menu, top bar, toolbar, Summary, Tasks) + ListPage + DetailPage. Recreate Sales Order Outright (list, detail with 3 tabs, amendment flow, SO PDF) on it, then Purchasing (Purchasing v3.dc.html: SO Batch Purchase, Purchase Orders, PO detail, Tasks flows) on the same template. Delete any older Purchasing screens in the codebase; v3 replaces them. Port carres-check.js into automated tests and make every screen pass at 1025, 1164 and 1440 px wide.

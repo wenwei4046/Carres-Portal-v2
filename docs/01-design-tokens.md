@@ -1,6 +1,6 @@
 # 01 · Design tokens
 
-**Current shared visual target · owner instruction 12 Oct 2026 · supplied 12 Oct.** This replaces every earlier value in this file; there is no second version. Every kit the owner hands over replaces the kit: this file, 02, 03, UI MASTER, the token mirror and the specimen are updated together and whatever the new kit contradicts is deleted (owner 12 Oct 2026). Source: `Sales Order.zip` of 12 Oct 2026 (`README.md` with its `Fix now` list, `UX-FLOWS.md`, `docs/Carres Layout Standard.md`, `carres-theme.js`, `carres-check.js`, `carres-tasks.js`, `Carres UI Kit.dc.html`, `Carres Screen Map.dc.html`, `Carres Shell.dc.html`, `Carres Table.dc.html`, `Sales Order Outright v12.dc.html`, `Purchasing v3.dc.html`, `Settings v2.dc.html`, `Workspace My Tasks.dc.html`). This is a design adoption, not a claim that the React kit or production has migrated.
+**Current shared visual target · owner instruction 12 Oct 2026 · supplied 12 Oct, 5:35 PM.** This replaces every earlier value in this file; there is no second version. Every kit the owner hands over replaces the kit: this file, 02, 03, UI MASTER, the token mirror and the specimen are updated together and whatever the new kit contradicts is deleted (owner 12 Oct 2026). Source: the folder `design_handoff_sales_order_ui_kit` handed over on 12 Oct 2026 at 5:35 PM, which replaced that morning's `Sales Order.zip` (`README.md` with its `Fix now` list and its section 5 on Purchasing, `UX-FLOWS.md`, `docs/Carres Layout Standard.md`, `carres-theme.js`, `carres-check.js`, `carres-tasks.js`, `Carres UI Kit.dc.html`, `Carres Screen Map.dc.html`, `Carres Shell.dc.html`, `Carres Table.dc.html`, `Sales Order Outright v12.dc.html`, `Purchasing v3.dc.html`, `Settings v2.dc.html`, `Workspace My Tasks.dc.html`). This is a design adoption, not a claim that the React kit or production has migrated.
 
 Business facts, permissions, completion gates, document formats and exact words remain owned by module MASTERs and COPY-STANDARD. Where the package conflicts with COPY-STANDARD or a module MASTER, its value is PROPOSAL / NOT LAW (§10). The supplied Ops Rules are not stored in this repository. The specimen's sample pages use TEST customer details.
 
@@ -30,7 +30,7 @@ Use tokens, not page-local numbers. Change the shared components once; never clo
 | Card / surface | `#FFFFFF`, 1px `#E5E7EB`, radius 8, no shadow |
 | Table header, item sub-header, group band | `#F8F9FA` |
 | Neutral tint (tags, count badge) | `#F1F2F4` |
-| Inner task card (inside its contact card) | `#F7F8FA` |
+| Inner task card (inside its contact card) | `#F6F7F9`, no border, radius 8; hover `#ECEEF1` |
 
 | Text and lines | Value |
 |---|---|
@@ -119,7 +119,7 @@ Nothing else uses 600 at 15 or above. Never below 11; 11 only for caps labels, t
 | Menu group label | 11 / 500 caps `#6B7280`, padding 8 10 4, hairline `#F1F2F4` between groups |
 | Menu item | 32 high, padding 7 × 10, gap 10, icon 18 `#6B7280`, text 13 / 400; short hint right in 12 grey; long hint as a 12 grey second line; selected 500 with check |
 | Dialog shadow | `0 12px 40px rgba(22,24,29,.22)` |
-| Toast | Bottom centre, `#1F2937`, white 13, 2.2 to 2.6 seconds |
+| Toast | Bottom centre, `#1F2937`, white 13, 2.2 to 2.6 seconds. After a task closes it stays 12 seconds and may carry `Next: {name} ›`, `Undo` and ✕ (§4); no card and no coloured edge |
 | Avatar | Round, initials, one fixed colour per person, name in the tooltip; header avatars 24, stacked, PIC first |
 | Keyboard focus | 2px `#3965FA`, 2 outside, radius 8; fields no gap; Tab key only; never the browser ring |
 
@@ -138,11 +138,11 @@ Icons: Material Symbols Rounded, outline, weight 300; 18 in buttons and menus, 2
 | Logo | Wordmark 20 high open; mark 34 closed; never recolour or distort |
 | Top bar | 56 high, bottom hairline; `[Module] / [Page]` with the path 14 / 400 and the title 20 / 600; search, team, bell at the right |
 | Toolbar row | 36 high, one line, never wraps; Summary title, toolbar and Tasks title share this line |
-| Summary | 264, left; title row on the ground, then one white card per section, 8 apart; row exactly 32 high; label 13 / 400 `#4B5563`, value 13 / 500 ink, amber 500 when it needs action; 1px line on its right |
-| Tasks | 320, right; title row on the ground; 1px `#E5E7EB` line separates it from the middle with 12 on both sides. Under the title: the day strip, then the pills `To do n` · `Waiting n` · `Done n`, then one white card per contact or action group, 8 apart |
-| Day strip (owner 12 Oct 2026) | One week per view, Today first, ‹ › move a week, up to 4 weeks ahead. Each day: weekday 11 / 500 · date 12 · task count 11 / 500 in the theme colour, amber when something is late, blank when none. The picked day wears the selection pair |
-| Task group card | Head: name 13 / 500 · count in a small round badge (amber when late) · contact icons 24 · ⋮. No party icon. Late groups first, then groups with a deadline, then contacts, then actions |
-| Task card in the list (owner 12 Oct 2026) | Card in card. The inner card is the title 13 / 500 and ›; the whole card opens the task. Then one 20 row per fact: icon 14 · label 12 grey left · value 12 / 500 right. Amber only on the row whose date or time has passed or whose party is late. No status tag, no button, no steps count, no footer. Due is the clock time when there is one; a task for today with no time reads `Any time`; a past due shows its date |
+| Summary | 264, left; a section has ONE headline tile with its breakdown rows under it, never two tiles that mean the same thing (owner 12 Oct 2026); title row on the ground, then one white card per section, 8 apart; row exactly 32 high; label 13 / 400 `#4B5563`, value 13 / 500 ink, amber 500 when it needs action; 1px line on its right |
+| Tasks | 320, right; title row on the ground: `Tasks` · `Log call` · ⤢ (all tasks in Workspace) · › hide, and no footer link; 1px `#E5E7EB` line separates it from the middle with 12 on both sides. Under the title: the day strip, then `To do` · `Waiting` · `Done` as the same grey segmented control as the page tabs, equal widths, then one white card per contact or action group, 8 apart |
+| Day strip (owner 12 Oct 2026) | On the panel ground with one hairline under it, no box. Office working days only (Monday to Friday by default), 5 days per page, ‹ › move a working week; a task dated on a weekend shows on the next Monday. Each day: weekday 11 / 500 · date 12 · task count 11 / 500 in the theme colour, amber when something is late, blank when none. The picked day wears the selection pair. Today's list shows only today's tasks; another day's tasks are seen by picking that day |
+| Task group card | Head: name 13 / 600 · count in plain grey 12, no pill · contact icons 24. No party icon. ⋮ only when one party has two or more tasks of the same kind. Late groups first, then groups with a deadline, then contacts, then actions |
+| Task card in the list (owner 12 Oct 2026) | Card in card, one border only: the inner card has no border. Its title 13 / 500 starts with the grey 16 icon of its module (the side menu's icon; never a colour per module) and ends with ›; the whole card opens the task. Then one 20 row per fact: label 12 grey left · value 12 / 500 right, no icon. Amber only on the row whose date or time has passed or whose party is late. No status tag, no button, no steps count, no footer. Due is the clock time when there is one; a task for today with no clock time reads `Today`; a past due shows its date. `Done` uses the same card format |
 | Screen parts | Every module page has the same seven numbered parts (`Carres Screen Map.dc.html`): 1 side menu · 2 top bar · 3 toolbar · 4 main table or detail · 5 Summary · 6 Tasks list · 7 open task. Parts 1, 2, 3, 6 and 7 are the shell: changed once, every module follows |
 | Zones | 12 between zones |
 
@@ -203,7 +203,7 @@ Source-specific compact facts are not 54 register rows. Two cards side by side s
 
 ## 6 · Settings
 
-Plain grouped rows: name and purpose on the left, value on the right; no box around every setting. Read-only values are plain text. Edit controls appear only during editing. Authorized staff can fill a missing approved setting; `Not set` does not itself remove edit permission. Unapproved business rules remain visibly unresolved. IDs, source, permission, effective treatment and history belong in the detail or disclosure, not repeated in every row. Timing changes do not silently rewrite existing deadlines. The Settings sections are a left section list, never a row of top tabs that wraps (owner 11 Oct 2026); the segmented control is used only for the groups inside one section. A group is its title and one line above one bordered list; each row is the setting's name with one short explanation on the left and its value on the right.
+Plain grouped rows: name and purpose on the left, value on the right; no box around every setting. Read-only values are plain text. Edit controls appear only during editing. Authorized staff can fill a missing approved setting; `Not set` does not itself remove edit permission. Unapproved business rules remain visibly unresolved. IDs, source, permission, effective treatment and history belong in the detail or disclosure, not repeated in every row. Timing changes do not silently rewrite existing deadlines. The Settings sections are a left section list, never a row of top tabs that wraps (owner 11 Oct 2026); the segmented control is used only for the groups inside one section. Never two facts in one box: a number per category is its own row with its unit (`Production days · Mattress`, a number, `working days`; owner 12 Oct 2026). A group is its title and one line above one bordered list; each row is the setting's name with one short explanation on the left and its value on the right.
 
 ## 7 · Canonical component measurements — one lookup
 
@@ -238,7 +238,7 @@ Use §§1 and 3 for surface and control values; preserve the card's host identit
 | Desktop / narrow / keyboard | UI MASTER §2.2 full-page checks, zoom, focus, scrolling |
 | Specimen | Demonstrates design only; sample facts and simulated permissions do not prove production |
 
-Source archive SHA-256: `793931a7922b24155b963593139bd13c960fb101072edd8fdc94d5618164fe59` (`Sales Order.zip`, 12 Oct 2026).
+Source: the folder handed over on 12 Oct 2026 at 5:35 PM (it replaced `Sales Order.zip`, SHA-256 `793931a7922b24155b963593139bd13c960fb101072edd8fdc94d5618164fe59`, of that morning).
 
 ## 9 · Settings → Appearance · current target owner instruction 11 Oct 2026
 
@@ -279,13 +279,15 @@ The supplied Layout Standard still carries older lines beside its 10 and 11 Oct 
 | Panel title | 17 / 500 | 15 / 500 | TAKEN · README and check |
 | Menu item | 14 / 500 grey, selected 600 · later 13 / 400 ink, selected 500 | Module 13 / 500, page 13 / 400, current 600 (§4) | TAKEN · owner 12 Oct |
 | Menu tree line | One thin straight line, no elbow (10 Oct) | 1.5 line with rounded elbows (§4) | TAKEN · owner 12 Oct |
-| Task card in the list | Tags row, title, grey line and footer band (11 Oct); tiles, status tag and a Start button (12 Oct, earlier turns) | Title and ›, then fact rows; amber only on the passed row (§4) | TAKEN · owner 12 Oct, README `Fix now` |
-| Tasks tabs | Sections NOW · LATE · TODAY (11 Oct); pills To do · Done with no Waiting (12 Oct, earlier turn) | Day strip, then pills To do · Waiting · Done (§4) | TAKEN · owner 12 Oct, later line |
+| Task card in the list | Tags row, title, grey line and footer band (11 Oct); tiles, status tag, a Start button, fact icons, `Any time` for a task with no clock time (12 Oct, earlier turns) | Module icon and title and ›, then fact rows with no icon; `Today` for no clock time; amber only on the passed row (§4) | TAKEN · owner 12 Oct, latest line |
+| Tasks tabs | Sections NOW · LATE · TODAY (11 Oct); pills To do · Done with no Waiting, a 14-day strip (12 Oct, earlier turns) | Working-week day strip, then To do · Waiting · Done as the segmented control (§4) | TAKEN · owner 12 Oct, latest line |
 | Words for time | `Overdue`, `Missed cut-off` still stand in older lines of the Layout Standard, the UI Kit page and `purchasing-data.js` | A date or time that has gone by is `passed` on its own row; a party that is slow by a count is `n days late`. Never `Overdue` or `Missed` | TAKEN · owner 12 Oct, README `Fix now`; the words live in COPY-STANDARD |
-| Send PO and contact task cards | One steps form (11 Oct) | Three numbered steps (03 §8) | TAKEN · owner 12 Oct |
+| Send PO and contact task cards | One steps form (11 Oct) | Three numbered steps; one Send PO card per supplier and category; Email is the WhatsApp message box with `To` and `Subject` (03 §8) | TAKEN · owner 12 Oct |
+| After a task is saved | A green line in the panel for 6 seconds (12 Oct, earlier turn); a card with a coloured edge | The app's dark toast, 12 seconds, with `Next`, `Undo` and ✕ (§3) | TAKEN · owner 12 Oct, latest line |
+| Reminders, the no-answer count and who is told after the third | Drawn in the package (`Later today` · `Pick date`, `No answer 3 times`) | Not in any module MASTER | **PROPOSAL / NOT LAW** · overturned when the owning MASTER records the rule |
 | Message template words in a contact task | None in the owner's blueprints | The design chat's own wording | **PROPOSAL / NOT LAW** · overturned when the owner confirms or replaces the wording |
-| Purchasing reference page | `Purchasing v2.dc.html` in the package README and menu | `Purchasing v3.dc.html` | TAKEN · owner named v3 on 12 Oct; v2 is not stored |
-| Bottom `Settings` row weight | 500 selected | 600 selected, 500 at rest | TAKEN · the menu rule above; fixed in the stored `Carres Shell.dc.html` |
+| Purchasing reference page | An earlier second-version page beside it | `Purchasing v3.dc.html`, the only Purchasing page in the package | TAKEN · owner 12 Oct |
+| Bottom `Settings` row weight | 500 selected | 600 selected, 500 at rest | TAKEN · the menu rule above; the package now draws it so |
 | Tabs | Selected 600 | Segmented control, selected 500 | TAKEN · check |
 | Caps labels | 10 / 500 or 12 / 600 | 11 / 500, tracking .06em | TAKEN · README |
 | Menu group label | 11 / 600 | 11 / 500 | TAKEN · README |
