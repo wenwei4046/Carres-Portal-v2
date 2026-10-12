@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import type {
   ApAccountChoice,
   ApCreditor,
+  GoodsLineChannel,
   GrnCandidateRow,
   SupplierBillDocument,
   SupplierBillDraftInput,
@@ -555,6 +556,8 @@ type LineDraft = {
   openQty: number | null;
   departmentType: DepartmentType | null;
   departmentId: string | null;
+  /** 0683: a goods line's channels, worked out from its orders; null = not read yet. */
+  channels: GoodsLineChannel[] | null;
 };
 
 let lineSeq = 0;
@@ -564,6 +567,7 @@ function blankLine(): LineDraft {
   return {
     key: newKey(), warehouseReceiptId: null, poLineId: null, grnNo: null, sku: "", description: "",
     accountCode: "", qty: "", unitPrice: "", amount: "", poUnitCost: null, openQty: null, departmentType: null, departmentId: null,
+    channels: null,
   };
 }
 
@@ -581,7 +585,7 @@ export function billSaveGap(f: {
   supplierId: string;
   invoiceNo: string;
   billDate: string;
-  lines: Array<Pick<LineDraft, "qty" | "unitPrice" | "amount" | "departmentType">>;
+  lines: Array<Pick<LineDraft, "qty" | "unitPrice" | "amount" | "departmentType"> & { warehouseReceiptId?: string | null }>;
 }): string | null {
   if (f.supplierId === "") return "Save: pick the supplier";
   if (f.invoiceNo.trim() === "") return "Save: type the supplier invoice No";
@@ -589,7 +593,8 @@ export function billSaveGap(f: {
   if (f.lines.length === 0) return "Save: add a line";
   for (const [i, l] of f.lines.entries()) {
     if ((lineAmount(l) ?? 0) <= 0) return `Save: type the amount on line ${i + 1}`;
-    if (l.departmentType === null) return `Save: pick the department on line ${i + 1}`;
+    // 0683: a goods line's channel comes from its orders, so nobody picks it.
+    if (!l.warehouseReceiptId && l.departmentType === null) return `Save: pick the department on line ${i + 1}`;
   }
   return null;
 }
@@ -598,10 +603,11 @@ function toInput(l: LineDraft): SupplierBillDraftInput["lines"][number] {
   const q = l.qty.trim() === "" ? null : Number(l.qty);
   const p = l.unitPrice.trim() === "" ? null : Number(l.unitPrice);
   if (l.warehouseReceiptId && l.poLineId) {
+    // 0683: the database works out a goods line's channel; none is sent.
     return {
       warehouseReceiptId: l.warehouseReceiptId, poLineId: l.poLineId,
       accountCode: l.accountCode || null, sku: l.sku || null, description: l.description || null,
-      qty: q, unitPrice: p, departmentType: l.departmentType, departmentId: l.departmentId,
+      qty: q, unitPrice: p, departmentType: null, departmentId: null,
     };
   }
   return {
@@ -681,6 +687,10 @@ function BillForm() {
       openQty: null,
       departmentType: (l.department_type ?? null) as DepartmentType | null,
       departmentId: l.department_id ?? null,
+      // 0683: a saved goods line already went to one channel.
+      channels: l.po_line_id && l.department_type
+        ? [{ department_type: l.department_type, department_id: l.department_id ?? null, qty: l.qty ?? 0 }]
+        : null,
     })));
     setLoaded(true);
   }, [id, loaded, existing.data]);
@@ -908,6 +918,29 @@ function usualLabel(a: LedgerAccount | undefined): string {
   return a ? `${a.code} ${a.name} (usual)` : "The usual account";
 }
 
+/** 0683 (Chew ruling 2): a goods line's channel is worked out from the orders
+ *  it was bought for, never picked. A line going to more than one channel is
+ *  saved as one line per channel. */
+function GoodsLineChannels({ channels, n }: { channels: GoodsLineChannel[] | null; n: number }) {
+  if (!channels || channels.length === 0) {
+    return <span className="text-base-500" data-testid={`line-${n}-channel`}>From its orders</span>;
+  }
+  if (channels.length === 1) {
+    const c = channels[0]!;
+    return <span data-testid={`line-${n}-channel`}><DepartmentName type={c.department_type} id={c.department_id} /></span>;
+  }
+  return (
+    <span data-testid={`line-${n}-channel`}>
+      {channels.map((c) => (
+        <span key={`${c.department_type}:${c.department_id ?? ""}`} className="block">
+          <DepartmentName type={c.department_type} id={c.department_id} />: {num(c.qty)}
+        </span>
+      ))}
+      <span className="block text-meta text-base-500">Split when saved</span>
+    </span>
+  );
+}
+
 function BillLineRow({ line, index, accounts, usualGoods, onChange, onRemove }: {
   line: LineDraft;
   index: number;
@@ -961,8 +994,10 @@ function BillLineRow({ line, index, accounts, usualGoods, onChange, onRemove }: 
         {fromGrn ? priceDiffWord(diff) : "No PO price"}
       </td>
       <td className="py-1 pr-2">
-        <DepartmentPicker label={`Line ${n} department`} type={line.departmentType} id={line.departmentId}
-          income={accounts.find((a) => a.code === line.accountCode)?.kind === "INCOME"} onChange={onChange} />
+        {fromGrn
+          ? <GoodsLineChannels channels={line.channels} n={n} />
+          : <DepartmentPicker label={`Line ${n} department`} type={line.departmentType} id={line.departmentId}
+              income={accounts.find((a) => a.code === line.accountCode)?.kind === "INCOME"} onChange={onChange} />}
       </td>
       <td className="py-1">
         <Button variant="ghost" size="sm" onClick={onRemove}>Remove</Button>
@@ -1004,6 +1039,7 @@ function GrnPicker({ open, supplierId, poId, onClose, onPick }: {
           openQty: num(l.open_qty),
           departmentType: (l.department_type ?? null) as DepartmentType | null,
           departmentId: l.department_id ?? null,
+          channels: l.channels ?? null,
         }));
       if (picked.length === 0) toast.error("Everything on that GRN is already billed.");
       else onPick(picked, g.supplier_id, g.po_terms_days ?? null);

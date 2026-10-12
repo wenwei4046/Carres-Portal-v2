@@ -462,8 +462,18 @@ export interface GrnLineRow {
   open_qty: ApMoney;
   po_unit_cost: ApMoney | null;
   commercial_treatment: string | null;
-  /** 0540 (DEPT-6): the default department, from the PO line's sales orders. */
+  /** 0683 (Chew ruling 2): where the line's open quantity goes, worked out from
+   *  the orders it was bought for. The bill splits it this way when saved. */
+  channels?: GoodsLineChannel[];
+  /** The one channel, when the line goes to exactly one; else null. */
   department_type?: string | null; department_id?: string | null;
+}
+
+/** 0683: a part of a goods line and the channel it goes to. */
+export interface GoodsLineChannel {
+  department_type: string;
+  department_id: string | null;
+  qty: ApMoney;
 }
 
 export interface ApAccountChoice {

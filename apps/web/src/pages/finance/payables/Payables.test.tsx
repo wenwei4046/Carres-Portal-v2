@@ -157,10 +157,12 @@ beforeEach(() => {
     [`${B}/bills/grn-lines/${GRN}`]: { rows: [
       { receipt_id: GRN, grn_no: "GRN-A1", po_id: "PO-3001", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
         po_line_id: POL1, sku: "SOFA-3S", received_qty: "1", billed_qty: "0", open_qty: "1", po_unit_cost: "520.00",
-        commercial_treatment: null, department_type: "SHOWROOM", department_id: OUTLET },
+        commercial_treatment: null, department_type: "SHOWROOM", department_id: OUTLET,
+        channels: [{ department_type: "SHOWROOM", department_id: OUTLET, qty: 1 }] },
       { receipt_id: GRN, grn_no: "GRN-A1", po_id: "PO-3001", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
         po_line_id: POL2, sku: "STOOL-1", received_qty: "2", billed_qty: "0", open_qty: "2", po_unit_cost: "250.00",
-        commercial_treatment: null },
+        commercial_treatment: null, department_type: null, department_id: null,
+        channels: [{ department_type: "SHOWROOM", department_id: OUTLET, qty: 1 }, { department_type: "STOCK", department_id: null, qty: 1 }] },
     ] },
     [`${B}/bill-outstanding`]: { rows: [
       { bill_id: BILL1, bill_no: "BILL-4XK2", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
@@ -324,9 +326,13 @@ describe("Bill form — Convert GRN to bill", () => {
     expect(screen.getByTestId("bill-form-total")).toHaveTextContent("RM 1,025.00");
 
     fireEvent.change(screen.getByLabelText("Supplier invoice No"), { target: { value: "LSW-901" } });
-    // Line 1 took its department from the PO's sales order (DEPT-6); line 2 is picked.
-    expect(screen.getByLabelText("Line 1 department")).toHaveValue(`SHOWROOM:${OUTLET}`);
-    await pickDept("Line 2 department", "OFFICE");
+    // 0683 (Chew ruling 2): a goods line's channel comes from its orders, shown, never picked.
+    expect(screen.queryByLabelText("Line 1 department")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("line-1-channel")).toHaveTextContent("Bangsar showroom"));
+    // Line 2 was bought for a showroom order and for stock: split when saved.
+    expect(screen.getByTestId("line-2-channel")).toHaveTextContent("Bangsar showroom: 1");
+    expect(screen.getByTestId("line-2-channel")).toHaveTextContent("Not yet in a channel: 1");
+    expect(screen.getByTestId("line-2-channel")).toHaveTextContent("Split when saved");
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(writes()).toHaveLength(1));
@@ -336,8 +342,8 @@ describe("Bill form — Convert GRN to bill", () => {
       supplierId: SUP,
       supplierInvoiceNo: "LSW-901",
       lines: [
-        { warehouseReceiptId: GRN, poLineId: POL1, qty: 1, unitPrice: 525, departmentType: "SHOWROOM", departmentId: OUTLET },
-        { warehouseReceiptId: GRN, poLineId: POL2, qty: 2, unitPrice: 250, departmentType: "OFFICE", departmentId: null },
+        { warehouseReceiptId: GRN, poLineId: POL1, qty: 1, unitPrice: 525, departmentType: null, departmentId: null },
+        { warehouseReceiptId: GRN, poLineId: POL2, qty: 2, unitPrice: 250, departmentType: null, departmentId: null },
       ],
     });
     // The database computes a GRN line's amount; the page never sends one.
@@ -536,6 +542,9 @@ describe("Bill form — Convert GRN to bill", () => {
     await waitFor(() => expect(screen.getByLabelText("Line 2 account")).toHaveValue("5100"));
     expect(screen.getByLabelText("Line 1 account")).toHaveValue("");
     expect(screen.getByLabelText("Line 1 account").querySelector("option")).toHaveTextContent("The item group's account (usual)");
+    // 0683: a saved goods line shows the channel it went to; nobody picks it.
+    expect(screen.getByTestId("line-1-channel")).toHaveTextContent("Office");
+    expect(screen.queryByLabelText("Line 1 department")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(writes()).toHaveLength(1));
     expect(writes()[0]!.body).toMatchObject({

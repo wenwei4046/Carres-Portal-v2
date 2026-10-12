@@ -14,6 +14,8 @@ export interface DepartmentChoice { departmentType?: DepartmentType; departmentI
 
 const TYPE_WORD: Record<DepartmentType, string> = {
   SHOWROOM: "Showroom", DEALER: "Dealer", SUBSCRIPTION: "Subscription", OFFICE: "Office",
+  // 0683 (Chew ruling 2): goods on a bill no order has taken yet. Reports filter by it; no form offers it.
+  STOCK: "Not yet in a channel",
 };
 
 export function useDepartments() {

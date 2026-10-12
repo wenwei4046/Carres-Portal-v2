@@ -48,7 +48,7 @@ Finance must show clearly where each sum of money comes in and goes out, channel
 6. Debtors follow the channel in two levels for dealers (「Dealer 一个overall 母账，然后每个dealer under 这个母账 … 就是两层了」): Dealer Debtors, then each dealer, then that dealer's customers or orders. Showroom and Subscription each have one control account with their customers under it.
 7. Goods bought without an order must not leave money paid to suppliers outside every channel in Receipts & Payments (「这样我看receipt & payment 就不太对了」); Chew confirmed how such a purchase is placed on 2026-10-06 ("A purchase without an order" below).
 
-Status (measured 2026-10-10): ruling 3 holds today (a line can be set to Office). Rulings 1, 2, 4, 5 and 6 and "A purchase without an order" are APPROVED / NOT BUILT; the plan for them, "Splitting the money by channel" at the end of this section, was approved by Chew on 2026-10-12.
+Status (2026-10-12): ruling 3 holds (a line can be set to Office). Ruling 2 and "A purchase without an order" are BUILT for a bill's goods lines (0683, "Splitting the money by channel" step 1). Rulings 1, 4, 5 and 6 are APPROVED / NOT BUILT. The plan for all of them, "Splitting the money by channel" at the end of this section, was approved by Chew on 2026-10-12.
 
 **Chart of accounts (Chew's, AutoCount, dated 22 Sep 2026; kept by Chew, not in this repository).** It has one debtor control (Trade Debtors) and one Other Debtor control, so dealer and subscription customers are not separated (「本身里面没有分dealer customer 和 subscription customer」). Measured: the ledger already accepts its code shape (`ledgerAccountCodeShape`, for example 300-0000 and 900-A001). Customers sit under a control account as parties on each line (`gl_entry_lines.party_type` / `party_id`), not as accounts, so a control account holds any number of customers.
 
@@ -152,6 +152,7 @@ Two Finance Settings pages keep the mapping in Chew's hands (「其他的收入�
 **A purchase without an order** takes its channel from the Manual Purchase Request's required purpose (Purchasing §5.2), so nothing extra is marked on the PO. Confirmed by Chew 2026-10-06 (「1 对，2 对，3 可以」):
 - Showroom Display → that showroom; Ready Stock → stock not yet in a channel; Service Case → the case's order; Internal Staff Purchase and Other Purchase → Office; Subsidiary Purchase → the amount due from that related company (350-00xx). The approved Diglant advance PO, when built → Subscription; a dealer display request, when built → that dealer.
 - When Purchasing allocates such stock or PO quantity to a Sales Order, the goods take that order's channel. Allocated before the supplier is paid: the bill and the payment carry the order's channel. Allocated after: that month's Receipts & Payments keeps it under stock and does not change, and the cost reaches the order's channel when the goods are sold. A PO split between orders is split unit by unit.
+- How a bill does this is in "Splitting the money by channel" step 1 (built in 0683). The Showroom Display rule holds while Carres has one showroom.
 - The KPI allowance is accrued like the renovation rebate (900-C009 / 410-0065).
 
 **Splitting the money by channel — the plan; APPROVED by Chew 2026-10-12 (「分渠道做」, after it was explained to him) / NOT BUILT. He tests it all at once when it is done (「到时我要测试的全部一次过做」).** It builds Chew's rulings 1, 2, 4, 5 and 6 above and "A purchase without an order". Measured first (2026-10-10, read only):
@@ -161,7 +162,24 @@ Two Finance Settings pages keep the mapping in Chew's hands (「其他的收入�
 - Transport: nothing ties a logistics partner's bill to the delivery orders it covers, and logistics partners are not suppliers in Payables.
 
 Recommended, in this order:
-1. **A bill line takes its order's channel** (ruling 2). A GRN line bought for one channel takes it and cannot be changed. A PO line bought for orders in different channels is split by quantity, one line per channel. A purchase without an order takes its channel from its request's purpose: Showroom Display needs Purchasing's destination tied to a showroom (Jess's data); Ready Stock needs the "not yet in a channel" place, whose cost reaches the order's channel when the goods are sold.
+1. **A bill line takes its order's channel** (ruling 2). **BUILT 2026-10-12 (0683).**
+   - A bill's goods line (one from a GRN) has its channel worked out when the bill is saved; the form shows it and nobody picks it. A line not from a GRN still names its department by hand.
+   - How it is worked out, earliest order first: the orders the PO line was bought for (`po_line_sources`), else the orders its Units were put aside or sold for, less what earlier bills of that PO line already charged to each.
+   - A line going to more than one channel is saved as one line per channel, the quantity split and the price kept. A PO line bought for orders that is charged beyond them keeps the earliest order's channel.
+   - A purchase without an order follows its request's purpose:
+     - Showroom Display goes to the showroom while Carres has exactly one; otherwise it is Not yet in a channel until Purchasing records which showroom (Jess's data).
+     - Internal Staff, Other and Subsidiary Purchase go to Office. A Subsidiary Purchase's account (the related company's 350-00xx) is still picked by hand.
+     - Service Case goes to the case's order.
+     - Ready Stock, or a PO line with no request, is `Not yet in a channel` (STOCK, a department only a goods line gets). Units already put aside or sold for an order take that order's channel.
+   - A showroom order with no outlet now belongs to the showroom while Carres has exactly one, for bills and for every report reading an order's channel (`fin_order_channels`; before, such an order had no department).
+   - Not built: moving a Not yet in a channel line to its order's channel when the goods are allocated or sold after the bill is confirmed (Cash Flow, step 2, reads that at payment time).
+   - Measured before applying (production, rolled back, 2026-10-12, test data made inside the test):
+     - A PO line bought for a showroom order and a dealer order, one each, saved a bill of two as two lines, the showroom first (the earlier order), at the same price. The department the form sent was ignored, and saving the draft again from its own lines gave the same two.
+     - Charging three split them one, one and the extra one to the showroom.
+     - A PO line bought for no order posted `Not yet in a channel` on the purchases line, and its cancellation reversed it the same way.
+     - Goods with two of three Units sold for showroom orders split two to the showroom and one to Not yet in a channel.
+     - A line not from a GRN with no department, or with Not yet in a channel, was refused; Office was saved.
+     - Operation could not read the bill form's preview, and an order's channel could not be read around Finance's doors.
 2. **Cash Flow by channel** (ruling 1): a receipt goes to its order's channel; a supplier payment to the channels of the bill lines it paid, in proportion; a card payout to the channels of the card payments in it; a transfer between Carres's own accounts to none.
 3. **Debtors by channel** (rulings 4 and 6): `300-1000` Showroom, `300-2000` Dealer with one account per dealer under it (`300-2001` and on, a new dealer getting its own), `300-3000` Subscription, all under `300-0000`. Each posting picks the account from its order's channel. The test balances already on `300-0000` stay there; go-live starts clean. This rewrites the posting step inside Payment's recording: Chew approved it (2026-10-12, §1 Exceptions) and tells Jess, and it is measured on production and rolled back before it goes live, because a fault there would stop staff recording payments.
 4. **Transport on each order** (ruling 5): a logistics partner's bill names the delivery orders it covers; its amount is split over them (equally when it gives only a total); each part posts to `900-T002` with its order's channel.
