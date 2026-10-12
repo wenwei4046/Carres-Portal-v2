@@ -27,11 +27,10 @@ import Loading from "./Loading";
 type Variant = "primary" | "neutral" | "ghost";
 type Size = "md" | "sm" | "touch";
 
-/* The main button is CHARCOAL (Carres Layout Standard §4.1, owner-confirmed
- * template 2026-10-08): one per area, white text. A normal button is white
- * with the grey input edge. */
+/* The main button is `--c-main` #1B1B39 (01 §1, owner 11 Oct 2026): one per
+ * area, white text. A normal button is white with the grey input edge. */
 const VARIANT: Record<Variant, string> = {
-  primary: "bg-c-ink text-white border border-c-ink hover:brightness-125",
+  primary: "bg-c-main text-white border border-c-main hover:brightness-125",
   neutral: "bg-white text-c-ink border border-c-input-border hover:bg-c-info-bg",
   ghost: "bg-transparent text-kit-slate-11 border border-transparent hover:bg-kit-slate-3",
 };
