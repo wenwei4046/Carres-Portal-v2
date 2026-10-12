@@ -18,13 +18,14 @@
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { PurchaseDemandRow } from "@carres/shared";
-import Checkbox from "@/components/kit/Checkbox";
 import StatusPill from "@/components/kit/StatusPill";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { documentDisplayNumber } from "@carres/shared";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import TwoLineCell from "@/components/register/TwoLineCell";
-import { BY_SUPPLIER as B, daysBetween, toBuyByCategory, type SupplierGroup } from "./by-supplier";
+import RowTick from "@/components/register/RowTick";
+import ItemRows from "@/components/register/ItemRows";
+import { BY_SUPPLIER as B, daysBetween, type SupplierGroup } from "./by-supplier";
 
 /** The five fixed columns (01 §5) and the grid's own tick and arrow columns. */
 const FIXED = { items: 80, orders: 96, deadline: 120, readyBy: 120, status: 120 } as const;
@@ -37,10 +38,13 @@ const SUPPLIER_MIN = 150;
 const soRef = (so: number | null) => (so == null ? B.notRecorded : `SO-${so}`);
 const weekday = (iso: string) => fmtDate(iso).split(",")[0] ?? "";
 const poNo = (id: string) => documentDisplayNumber(id);
+/* Item line 1 is the model code as the data spells it (`CODY-SK`); the size
+   is line 2 (owner 13 Oct 2026). A line with no code keeps its model name. */
+const modelCode = (line: PurchaseDemandRow) => (line.skus?.length ? line.skus.join(" + ") : line.item);
 
 export default function SoBatchBySupplier({
   groups, today, isLoading, storageKey, sessionKey, canBuy, isTicked, onToggleLine, onToggleLines,
-  selectionSummary, selectionPrimary, toolbarEnd, toolbarStart, onOpenOrder, emptyMessage, initialSearch, searchPlaceholder, lineExtras,
+  selectionSummary, selectionPrimary, toolbarEnd, toolbarAfterTools, toolbarStart, onOpenOrder, emptyMessage, initialSearch, searchPlaceholder, lineExtras,
 }: {
   groups: SupplierGroup[];
   /** The server's Malaysia date, `YYYY-MM-DD`. */
@@ -56,6 +60,8 @@ export default function SoBatchBySupplier({
   selectionSummary: string;
   selectionPrimary: ReactNode;
   toolbarEnd: ReactNode;
+  /** Drawn after the ⋮ menu button, at the toolbar's end. */
+  toolbarAfterTools?: ReactNode;
   toolbarStart?: ReactNode;
   onOpenOrder: (orderId: string) => void;
   emptyMessage: string;
@@ -63,7 +69,7 @@ export default function SoBatchBySupplier({
   searchPlaceholder?: string;
   /** The By sales order list's own controls for one demand line: where the
    *  supplier delivers it, and why it may not be bought. */
-  lineExtras?: (line: PurchaseDemandRow) => { deliverTo?: ReactNode; why?: ReactNode };
+  lineExtras?: (line: PurchaseDemandRow) => { deliverTo?: ReactNode; whyText?: string | null; door?: ReactNode };
 }) {
   const buyable = useMemo(
     () => new Map(groups.map((g) => [g.key, g.lines.filter(canBuy).map((l) => l.id)])),
@@ -77,24 +83,44 @@ export default function SoBatchBySupplier({
      measured here. */
   const box = useRef<HTMLDivElement>(null);
   const [room, setRoom] = useState(0);
+  /* The list's own column widths as it drew them (tick, arrow, then the six
+     columns), so an item row sits exactly under its row's columns at every
+     width. Measured, because the engine sizes its tick column by the canvas. */
+  const [drawn, setDrawn] = useState<number[]>([]);
   useEffect(() => {
     const el = box.current;
     if (!el || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => setRoom(el.clientWidth));
+    const measure = () => {
+      setRoom(el.clientWidth);
+      const widths = [...el.querySelectorAll("thead th")].map((th) => Math.round(th.getBoundingClientRect().width * 10) / 10);
+      setDrawn((previous) => (previous.join() === widths.join() ? previous : widths));
+    };
+    const observer = new ResizeObserver(measure);
     observer.observe(el);
-    setRoom(el.clientWidth);
+    const table = el.querySelector("table");
+    if (table) observer.observe(table);
+    measure();
     return () => observer.disconnect();
-  }, []);
+  });
   const supplierWidth = room > 0 ? Math.max(SUPPLIER_MIN, Math.floor(room - GRID_LEAD - FIXED_TOTAL - 2)) : 260;
+
+  /* A supplier with rows in two categories (one PO per supplier and category)
+     names the category on each of them: `Ohana · Bedframe`, `Ohana · Sofa`. */
+  const twoCategories = useMemo(() => {
+    const seen = new Map<string, Set<string>>();
+    for (const g of groups) { const id = g.supplierId ?? "none"; (seen.get(id) ?? seen.set(id, new Set()).get(id)!).add(g.category ?? "other"); }
+    return new Set([...seen].filter(([, categories]) => categories.size > 1).map(([id]) => id));
+  }, [groups]);
+  const nameOf = (g: SupplierGroup) => B.groupName(g, twoCategories.has(g.supplierId ?? "none"));
 
   const columns = useMemo<DataGridColumn<SupplierGroup>[]>(() => [
     {
       key: "supplier", label: B.colSupplier, width: supplierWidth, minWidth: SUPPLIER_MIN, sortable: true, wrap: true,
-      accessor: (g) => <TwoLineCell strong top={g.supplier ?? B.supplierNotSet} sub={g.ordered ? B.category(g.category) : B.supplierLine(g)} testId={`by-supplier-name-${g.key}`} />,
-      sortFn: (a, b) => (a.supplier ?? "").localeCompare(b.supplier ?? ""),
+      accessor: (g) => <TwoLineCell strong top={nameOf(g)} sub={g.ordered ? B.category(g.category) : B.supplierLine(g)} testId={`by-supplier-name-${g.key}`} />,
+      sortFn: (a, b) => nameOf(a).localeCompare(nameOf(b)),
       searchValue: (g) => `${g.supplier ?? B.supplierNotSet} ${[...g.lines, ...(g.ordered?.lines ?? [])].map((l) => `${l.item} ${l.variant ?? ""} ${soRef(l.so)}`).join(" ")} ${(g.ordered?.poIds ?? []).map((id) => `${id} ${poNo(id)}`).join(" ")}`,
-      filterValue: (g) => g.supplier ?? B.supplierNotSet,
-      exportValue: (g) => g.supplier ?? B.supplierNotSet,
+      filterValue: (g) => nameOf(g),
+      exportValue: (g) => nameOf(g),
     },
     {
       key: "items", label: B.colItems, width: FIXED.items, minWidth: FIXED.items, sortable: true, wrap: true,
@@ -147,14 +173,16 @@ export default function SoBatchBySupplier({
       filterValue: (g) => (g.ordered ? B.ordered : g.cutOffPassed ? B.cutOffPassed : B.toBuy),
       exportValue: (g) => (g.ordered ? B.ordered : g.cutOffPassed ? B.cutOffPassed : B.toBuy),
     },
-  ], [today, supplierWidth]);
+  ], [today, supplierWidth, twoCategories]);
 
-  const suppliers = new Set(groups.map((g) => g.supplierId ?? "none")).size;
   /* An item line repeats the row's columns: its tick under the row's tick,
      its name under Supplier, then quantity, sales order and deadline under
      their own headers. The engine starts an opened row at the first data
      column, so the lines step back over the tick and arrow columns (72). */
-  const lineColumns = `40px 32px ${Math.max(SUPPLIER_MIN, supplierWidth)}px ${FIXED.items + 2}px ${FIXED.orders + 2}px ${FIXED.deadline + 3}px 1fr`;
+  const lineColumns = drawn.length >= 6
+    ? `${drawn.slice(0, 6).map((width) => `${width}px`).join(" ")} 1fr`
+    : `40px 32px ${Math.max(SUPPLIER_MIN, supplierWidth)}px ${FIXED.items + 2}px ${FIXED.orders + 2}px ${FIXED.deadline + 3}px 1fr`;
+  const stepBack = drawn.length >= 2 ? drawn[0]! + drawn[1]! : 72;
 
   return (
     /* The kit's table puts 10 between columns and no padding inside a cell
@@ -173,6 +201,10 @@ export default function SoBatchBySupplier({
       appearance="reference"
       palette="slate"
       presentationTools
+      /* The ⋮ menu opens below its button and to the left. With Match Ready
+         Stock after it, the button is no longer over the Status column, so
+         its menu never covers that column (owner 13 Oct 2026). */
+      toolbarAfterTools={toolbarAfterTools}
       wrapToolbar
       /* The top bar already searches everything; here search is one icon, so
          the tabs, the views and Match Ready Stock stay on one line (01 §4). */
@@ -191,7 +223,7 @@ export default function SoBatchBySupplier({
         flush: true,
         testId: (g) => `by-supplier-expand-${g.key}`,
         renderExpansion: (g) => g.ordered ? (
-          <div role="table" aria-label={`${g.supplier ?? B.supplierNotSet} items`} className="-ml-[72px] bg-white" data-testid={`by-supplier-lines-${g.key}`}>
+          <ItemRows label={`${nameOf(g)} items`} stepBack={stepBack} testId={`by-supplier-lines-${g.key}`}>
             <div role="row" className="grid min-h-[32px] items-center bg-c-info-bg text-meta font-medium text-c-secondary" style={{ gridTemplateColumns: lineColumns }}>
               <span role="columnheader" />
               <span role="columnheader" />
@@ -202,12 +234,12 @@ export default function SoBatchBySupplier({
               <span role="columnheader" />
             </div>
             {g.ordered.lines.map((line) => (
-              <div key={line.id} role="row" className="grid min-h-[44px] items-center border-t border-c-row-line py-1.5"
+              <div key={line.id} role="row" className="grid min-h-[44px] items-center border-t border-c-row-line py-1"
                 style={{ gridTemplateColumns: lineColumns }} data-testid={`by-supplier-ordered-line-${line.id}`}>
                 <span role="cell" />
                 <span role="cell" />
                 <span role="cell" className="flex min-w-0 flex-col px-[5px]">
-                  <span className="break-words text-body text-c-ink">{line.item}</span>
+                  <span className="break-words text-body text-c-ink">{line.sku}</span>
                   {line.variant ? <span className="break-words text-meta text-c-secondary">{line.variant}</span> : null}
                 </span>
                 <span role="cell" className="px-[5px] text-body text-c-ink">{B.qty(line.category, line.qty)}</span>
@@ -220,9 +252,9 @@ export default function SoBatchBySupplier({
                 <span role="cell" className="break-words px-[5px] text-body text-c-ink" style={{ gridColumn: "6 / -1" }}>{poNo(line.poId)}</span>
               </div>
             ))}
-          </div>
+          </ItemRows>
         ) : (
-          <div role="table" aria-label={`${g.supplier ?? B.supplierNotSet} items`} className="-ml-[72px] bg-white" data-testid={`by-supplier-lines-${g.key}`}>
+          <ItemRows label={`${nameOf(g)} items`} stepBack={stepBack} testId={`by-supplier-lines-${g.key}`}>
             <div role="row" className="grid min-h-[32px] items-center bg-c-info-bg text-meta font-medium text-c-secondary" style={{ gridTemplateColumns: lineColumns }}>
               <span role="columnheader" />
               <span role="columnheader" />
@@ -238,18 +270,17 @@ export default function SoBatchBySupplier({
               const extras = lineExtras?.(line) ?? {};
               return (
                 <div key={line.id} role="row"
-                  className="grid min-h-[44px] items-center border-t border-c-row-line py-1.5"
+                  className="grid min-h-[44px] items-center border-t border-c-row-line py-1"
                   style={{ gridTemplateColumns: lineColumns }}
                   data-testid={`by-supplier-line-${line.id}`}>
                   <span role="cell" className="grid place-items-center">
-                    <Checkbox id={`by-supplier-tick-${line.id}`} ariaLabel={`Select ${line.item} for ${soRef(line.so)}`}
-                      checked={isTicked(line.id)} disabled={!buy} onCheckedChange={() => onToggleLine(line.id)} />
+                    <RowTick testId={`by-supplier-tick-${line.id}`} label={`Select ${modelCode(line)} for ${soRef(line.so)}`}
+                      checked={isTicked(line.id)} disabled={!buy} why={extras.whyText} onChange={() => onToggleLine(line.id)} />
                   </span>
                   <span role="cell" />
                   <span role="cell" className="flex min-w-0 flex-col px-[5px]">
-                    <span className="break-words text-body text-c-ink">{line.item}</span>
+                    <span className="break-words text-body text-c-ink">{modelCode(line)}</span>
                     {line.variant ? <span className="break-words text-meta text-c-secondary">{line.variant}</span> : null}
-                    {extras.why ? <span className="mt-0.5 text-meta" data-testid={`by-supplier-why-${line.id}`}>{extras.why}</span> : null}
                   </span>
                   <span role="cell" className="px-[5px] text-body text-c-ink">{B.qty(line.category, line.toBuy ?? 0)}</span>
                   <span role="cell" className="px-[5px]">
@@ -264,12 +295,12 @@ export default function SoBatchBySupplier({
                       : <span className="text-meta">{B.notRecorded}</span>}
                   </span>
                   <span role="cell" className="min-w-0 px-[5px] text-body text-c-ink" data-testid={`by-supplier-deliver-${line.id}`}>
-                    {extras.deliverTo ?? null}
+                    {extras.deliverTo ?? extras.door ?? null}
                   </span>
                 </div>
               );
             })}
-          </div>
+          </ItemRows>
         ),
       }}
       selectable={{
@@ -288,8 +319,7 @@ export default function SoBatchBySupplier({
       selectionPrimary={selectionPrimary}
       statusSummary={(filtered) => (
         <span className="block" data-testid="by-supplier-footer">
-          {filtered.length === groups.length ? B.footer(groups.length, suppliers) : `${filtered.length} of ${B.footer(groups.length, suppliers)}`}
-          {(() => { const totals = B.toBuyTotals(toBuyByCategory(filtered)); return totals ? ` · ${totals}` : ""; })()}
+          {filtered.length === groups.length ? B.footer(groups.length) : `${filtered.length} of ${B.footer(groups.length)}`}
         </span>
       )}
     />

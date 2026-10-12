@@ -39,6 +39,8 @@ export interface OrderedLine {
   id: string;
   orderId: string;
   so: number | null;
+  /** The model code as the data spells it (`CODY-SK`). */
+  sku: string;
   item: string;
   variant: string | null;
   category: PurchaseDemandRow["category"];
@@ -129,7 +131,7 @@ export function orderedSupplierGroups(orders: readonly SoBatchOrderRow[]): Suppl
         const bucket = byKey.get(key) ?? { supplierId: po?.supplierId ?? null, supplier: po?.supplierName ?? null, category, lines: [], dates: [] };
         bucket.lines.push({
           id: `${line.orderLineId}|${onPo.poId}`, orderId: order.orderId, so: order.so,
-          item: line.item ?? line.sku, variant: line.variant ?? null, category, qty: onPo.qty, poId: onPo.poId,
+          sku: line.sku, item: line.item ?? line.sku, variant: line.variant ?? null, category, qty: onPo.qty, poId: onPo.poId,
         });
         if (po?.officialDeliveryDate) bucket.dates.push(po.officialDeliveryDate);
         byKey.set(key, bucket);
@@ -159,15 +161,6 @@ export function orderedSupplierGroups(orders: readonly SoBatchOrderRow[]): Suppl
   }
   return groups.sort((a, b) =>
     (a.supplier ?? "\uffff").localeCompare(b.supplier ?? "\uffff") || (a.category ?? "").localeCompare(b.category ?? ""));
-}
-
-/** Quantity still to buy per category, in the approved category order. */
-export function toBuyByCategory(groups: readonly SupplierGroup[]): Array<{ category: PurchaseDemandRow["category"]; qty: number }> {
-  const totals = new Map<string, number>();
-  for (const g of groups) if (!g.ordered && g.qty > 0) totals.set(g.category ?? "other", (totals.get(g.category ?? "other") ?? 0) + g.qty);
-  return ["mattress", "bedframe", "sofa", ...[...totals.keys()].filter((c) => !["mattress", "bedframe", "sofa"].includes(c)).sort()]
-    .filter((c) => totals.has(c))
-    .map((c) => ({ category: c as PurchaseDemandRow["category"], qty: totals.get(c)! }));
 }
 
 /**
@@ -228,9 +221,9 @@ export const BY_SUPPLIER = {
   /* The item lines' headers: the Purchasing dictionary's own words. */
   lineItem: "Item",
   lineToBuy: "To buy",
-  lineSoNo: "SO No",
-  lineOrderBy: "Order By",
-  lineDeliverTo: "Supplier Deliver To",
+  lineSoNo: "Sales order",
+  lineOrderBy: "Order deadline",
+  lineDeliverTo: "Supplier delivers to",
   cards: "Cards",
   matchReadyStock: "Match Ready Stock",
   /* The three tabs and the `Ordered` rows (owner's 12 Oct 2026 package). */
@@ -244,8 +237,6 @@ export const BY_SUPPLIER = {
     category === "mattress" ? "Mattress" : category === "bedframe" ? "Bedframe" : category === "sofa" ? "Sofa" : "Other goods",
   poRefs: (poIds: readonly string[], display: (id: string) => string) =>
     poIds.length === 0 ? "" : poIds.length === 1 ? display(poIds[0]!) : `${display(poIds[0]!)} +${poIds.length - 1}`,
-  toBuyTotals: (totals: ReadonlyArray<{ category: PurchaseDemandRow["category"]; qty: number }>) =>
-    totals.length === 0 ? "" : `To buy: ${totals.map((t) => `${BY_SUPPLIER.category(t.category)} ${BY_SUPPLIER.qty(t.category, t.qty)}`).join(" · ")}`,
   nothingToBuy: "Nothing to buy. Every Sales Order already has its PO.",
   nothingOrdered: "No Sales Order has a PO yet.",
   /* The Today card. */
@@ -275,6 +266,9 @@ export const BY_SUPPLIER = {
   orderRefs: (orders: SupplierGroup["orders"], ref: (so: number | null) => string) =>
     orders.length === 0 ? "" : orders.length === 1 ? ref(orders[0]!.so) : `${ref(orders[0]!.so)} +${orders.length - 1}`,
   toBuyLine: (category: PurchaseDemandRow["category"], n: number) => `${BY_SUPPLIER.qty(category, n)} to buy`,
-  footer: (groups: number, suppliers: number) =>
-    `${groups} ${groups === 1 ? "group" : "groups"} · ${suppliers} ${suppliers === 1 ? "supplier" : "suppliers"}`,
+  /* The rows' count only (owner 13 Oct 2026); what is to buy is in Summary. */
+  footer: (groups: number) => `${groups} ${groups === 1 ? "group" : "groups"}`,
+  /* A supplier with rows in two categories names the category on each row. */
+  groupName: (g: Pick<SupplierGroup, "supplier" | "category">, withCategory: boolean) =>
+    !g.supplier ? BY_SUPPLIER.supplierNotSet : withCategory ? `${g.supplier} · ${BY_SUPPLIER.category(g.category)}` : g.supplier,
 } as const;

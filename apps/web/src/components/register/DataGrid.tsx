@@ -236,6 +236,10 @@ export type DataGridProps<T> = {
   rows: T[];
   /** Opt-in shared-template toolbar and numeric recipe for the first adopter. */
   presentationTools?: boolean;
+  /** Drawn AFTER the page tools (⋮), at the toolbar's end. The menu opens below
+   *  its button and to the left; with a control after it, the button is not
+   *  over the last column and its menu never covers that column. */
+  toolbarAfterTools?: ReactNode;
   /** Module-owned presentation commands in the existing shared tools menu. */
   pageToolsItems?: React.ComponentProps<typeof DropdownMenu>["items"];
   toolbarSummary?: (rows: T[]) => ReactNode;
@@ -784,7 +788,7 @@ function DataGridInner<T>({
   onSearchChange,
   serverColumns,
   initialSearch,
-  renderResults, presentationTools = false, pageToolsItems, toolbarSummary, searchScope, facetRows, onFacetRowsChange, sessionKey, presentationKey = "table",
+  renderResults, presentationTools = false, toolbarAfterTools, pageToolsItems, toolbarSummary, searchScope, facetRows, onFacetRowsChange, sessionKey, presentationKey = "table",
   appearance = "default",
   palette,
   headerTone,
@@ -2679,7 +2683,15 @@ function DataGridInner<T>({
                          token the sheet already speaks, not a new literal. */
                       color: "var(--fg-muted)",
                       fontSize: 14,
-                      lineHeight: 1,
+                      /* A square box, so the arrow is whole when it turns
+                         (measured 13 Oct 2026: the 6 × 14 box turned to
+                         14 × 6 and clipped the glyph by 2). The negative
+                         margins keep it exactly where it was. */
+                      width: 18,
+                      height: 18,
+                      lineHeight: "18px",
+                      textAlign: "center",
+                      margin: "-2px -6px",
                       display: "inline-block",
                       transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
                       transition: "transform 120ms ease",
@@ -3353,6 +3365,7 @@ function DataGridInner<T>({
               } },
             ]} />
         </div>}
+        {isReference && toolbarAfterTools ? <div className={styles.afterTools} data-testid="toolbar-after-tools">{toolbarAfterTools}</div> : null}
       </div>
       ) : (
         <div className={`${styles.toolbar} ${styles.selectionBar}`} data-testid="selection-bar">
