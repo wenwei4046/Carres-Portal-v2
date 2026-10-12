@@ -56,10 +56,23 @@ export const paidBeforeInvoiceNote = (line: Pick<StatementLine, "reclassified" |
       return added
         ? `Includes ${money} paid to suppliers before their bill.`
         : `Leaves out ${money} paid to suppliers before their bill.`;
+    // 0688: the stock line shows the stock on hand from Stock's Units, not what the books hold on it.
+    case "STOCK":
+      return `Shows the stock on hand from Stock's Units, ${money} ${added ? "more" : "less"} than the books hold. It is provisional until Stock confirms the month.`;
     default:
       return null;
   }
 };
+
+/** 0688: under a statement, where its stock figures come from. Under All the
+ *  stock is worked out from Stock's Units; under a department there is none,
+ *  because stock on hand is not split by channel. */
+export function stockNote(statement: "pl" | "bs", byDepartment: boolean): string {
+  if (byDepartment) return "Stock on hand is shown under All only: it is not split by channel.";
+  return statement === "pl"
+    ? "Stock at the start and at the end of the period is worked out from Stock's Units. It is provisional until Stock confirms the month, and a Unit with no cost recorded is not counted. Stock value under Reports lists the Units."
+    : "Stock is worked out from Stock's Units on this day. It is provisional until Stock confirms the month, and a Unit with no cost recorded is not counted. Stock value under Reports lists the Units.";
+}
 
 export type StatementRow =
   | { id: string; section: string; kind: "group"; name: string; amount: number; depth: number }

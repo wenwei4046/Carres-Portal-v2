@@ -707,12 +707,12 @@ describe("bills", () => {
       p_bill_date: "2026-09-10",
       p_lines: [
         {
-          warehouse_receipt_id: RECEIPT_ID, po_line_id: PO_LINE_ID, account_code: null,
+          warehouse_receipt_id: RECEIPT_ID, po_line_id: PO_LINE_ID, delivery_order_id: null, account_code: null,
           description: null, sku: null, qty: 5, unit_price: 105, amount: null,
           department_type: null, department_id: null,
         },
         {
-          warehouse_receipt_id: null, po_line_id: null, account_code: "6200",
+          warehouse_receipt_id: null, po_line_id: null, delivery_order_id: null, account_code: "6200",
           description: "Rent", sku: null, qty: null, unit_price: null, amount: 3000,
           department_type: null, department_id: null,
         },
@@ -721,6 +721,35 @@ describe("bills", () => {
       p_ap_account_code: null,
       p_narration: null,
     });
+  });
+
+  // 0689 (Chew ruling 5): a logistics partner's bill line names its delivery order.
+  it("POST /bills sends each line's delivery order, and no department for it", async () => {
+    const DO_ID = "99999999-0000-4000-8000-0000000000d1";
+    const sb = mockRpc({ data: BILL_ID, error: null });
+    const res = await call("/bills", { method: "POST", body: {
+      ...goodBill, lines: [{ deliveryOrderId: DO_ID, amount: 60 }],
+    } });
+    expect(res.status).toBe(201);
+    expect(sb.rpc.mock.calls[0]?.[1]).toMatchObject({ p_lines: [{
+      delivery_order_id: DO_ID, warehouse_receipt_id: null, po_line_id: null, account_code: null,
+      amount: 60, department_type: null, department_id: null,
+    }] });
+  });
+
+  it("GET /bills/delivery-orders reads each partner's delivery orders, for a bill or none", async () => {
+    const rows = [{ partner_id: "p-1", name: "Test Logistics", delivery_orders: [{ id: "d-1", do_no: "DO-1", so: 1001 }] }];
+    let sb = mockRpc({ data: rows, error: null });
+    let res = await call("/bills/delivery-orders");
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_bill_delivery_orders", { p_bill_id: null });
+    expect(await res.json()).toEqual({ rows });
+    sb = mockRpc({ data: rows, error: null });
+    res = await call(`/bills/delivery-orders?billId=${BILL_ID}`);
+    expect(sb.rpc).toHaveBeenCalledWith("fin_bill_delivery_orders", { p_bill_id: BILL_ID });
+    sb = mockRpc({ data: rows, error: null });
+    expect((await call("/bills/delivery-orders?billId=nope")).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
   });
 
   it("PUT /bills/:id rewrites that draft", async () => {

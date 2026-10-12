@@ -54,6 +54,9 @@ export const supplierBillLineInput = z
   .object({
     warehouseReceiptId: z.string().uuid().nullable().optional(),
     poLineId: z.string().uuid().nullable().optional(),
+    /** 0689: the delivery order a logistics partner's bill line charges for.
+     *  Its channel is the DO's order's; the form sends none. */
+    deliveryOrderId: z.string().uuid().nullable().optional(),
     accountCode: optText(10),
     description: optText(300),
     sku: optText(120),
@@ -394,6 +397,9 @@ export interface SupplierBillDocument {
     /** 0659: a person chose this line's account. A goods line nobody chose an
      *  account for takes its item group's purchase account when confirmed. */
     account_chosen?: boolean;
+    /** 0689: the delivery order this line charges for, and its number. Absent before 0689. */
+    delivery_order_id?: string | null;
+    do_no?: string | null;
   }>;
   /** A voucher that pays the bill, (0485) an advance knocked off it, or
    *  (0642) a supplier credit note knocked off it. For a credit note,
@@ -432,6 +438,35 @@ export interface SupplierBillDocument {
     apply_advance: boolean;
     take_advance_off: boolean;
   };
+}
+
+/** 0689: a delivery order a logistics partner's bill can charge for. */
+export interface BillDeliveryOrder {
+  id: string;
+  do_no: string;
+  delivery_date: string | null;
+  order_id: string;
+  so: number | null;
+  /** The order's channel (fin_order_channels). */
+  department_type: string | null;
+  department_id: string | null;
+}
+
+/** 0689: a logistics partner and its live delivery orders not on another live bill. */
+export interface BillDeliveryPartner {
+  partner_id: string;
+  name: string;
+  delivery_orders: BillDeliveryOrder[];
+}
+
+/** 0689: a total split equally over n delivery orders, in whole sen, the first
+ *  ones taking the odd sen so the parts always add up to the total. */
+export function splitEqually(total: number, n: number): number[] {
+  if (!Number.isFinite(total) || n <= 0) return [];
+  const sen = Math.round(total * 100);
+  const each = Math.floor(sen / n);
+  const odd = sen - each * n;
+  return Array.from({ length: n }, (_, i) => (each + (i < odd ? 1 : 0)) / 100);
 }
 
 export interface GrnCandidateRow {

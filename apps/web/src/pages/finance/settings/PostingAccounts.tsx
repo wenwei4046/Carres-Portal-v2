@@ -12,7 +12,8 @@
  *   Sales                 an invoice's goods, add-ons and storage: the income
  *                         map (0466). An add-on with no account yet says so:
  *                         its invoices cannot be issued until it has one.
- *   Purchases and charges three roles Finance may change (0657).
+ *   Purchases and charges the roles Finance may change (0657), and (0689)
+ *                         transport charged by delivery order.
  *   Dealers               the dealer commission month close's six accounts
  *                         (0666): each expense and what is owed for it until
  *                         the dealer is paid, a liability (0675, Chew
@@ -62,6 +63,8 @@ export const ROLE_WORD: Record<string, string> = {
   COST_OF_GOODS_SOLD: "Goods bought that are not in the catalog",
   BANK_AND_PAYMENT_CHARGES: "Bank and card charges",
   OTHER_INCOME: "Money the bank pays in",
+  // 0689: a logistics partner's bill, line by delivery order (Chew ruling 5).
+  DELIVERY_TRANSPORT: "Transport to customers, by delivery order",
   // 0675: the dealer commission month close (0666).
   DEALER_COMMISSION: "Dealer commission",
   DEALER_COMMISSION_ACCRUED: "Dealer commission owed",
@@ -85,6 +88,7 @@ const ROLE_KIND: Record<string, PostingKind> = {
   COST_OF_GOODS_SOLD: "EXPENSE",
   BANK_AND_PAYMENT_CHARGES: "EXPENSE",
   OTHER_INCOME: "INCOME",
+  DELIVERY_TRANSPORT: "EXPENSE",
   // 0675: what a dealer is owed is a liability until it is paid.
   DEALER_COMMISSION: "EXPENSE",
   DEALER_COMMISSION_ACCRUED: "LIABILITY",
