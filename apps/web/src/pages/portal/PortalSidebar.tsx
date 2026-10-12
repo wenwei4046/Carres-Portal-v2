@@ -562,10 +562,11 @@ export default function PortalSidebar({ drawer = false }: {
   };
 
   return (
-    <aside
+    <nav
+      aria-label="Modules"
       data-testid="portal-sidebar"
       data-collapsed={collapsed || undefined}
-      className="sticky top-0 flex h-screen flex-col gap-[3px] overflow-hidden bg-c-ground px-2.5 py-3 text-c-body"
+      className="sticky top-0 flex h-screen flex-col gap-[3px] overflow-hidden border-r border-c-head-line bg-c-ground px-2.5 py-3 text-c-body"
       style={{ width: collapsed ? 64 : 220, transition: "width 0.18s ease" }}
     >
       {/* Logo row — wordmark 20px open, heart mark 34px closed, the « / »
@@ -596,7 +597,7 @@ export default function PortalSidebar({ drawer = false }: {
       </div>
 
       {/* The ONE scroller of the menu: nothing inside it scrolls on its own. */}
-      <nav aria-label="Modules" className="flex min-h-0 flex-1 flex-col gap-[3px] overflow-y-auto overflow-x-hidden [scrollbar-width:thin]">
+      <div data-testid="portal-sidebar-list" className="flex min-h-0 flex-1 flex-col gap-[3px] overflow-y-auto overflow-x-hidden [scrollbar-width:thin]">
         {collapsed
           ? // Icon rail — the active area only. A module's icon opens its
             // landing page; the page you are on keeps its selected pill.
@@ -667,7 +668,7 @@ export default function PortalSidebar({ drawer = false }: {
                 </div>
               );
             })}
-      </nav>
+      </div>
 
       {/* Bottom — Settings and the person (Layout Standard §2). */}
       <div className="flex shrink-0 flex-col gap-[3px] border-t border-c-head-line pt-2">
@@ -702,6 +703,6 @@ export default function PortalSidebar({ drawer = false }: {
           )}
         </Link>
       </div>
-    </aside>
+    </nav>
   );
 }

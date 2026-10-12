@@ -11,6 +11,7 @@
  */
 import { useEffect, useRef, type ReactNode } from "react";
 import MIcon from "@/components/carres/MIcon";
+import { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 
 export const NOT_RECORDED = "Not recorded";
@@ -465,7 +466,7 @@ export function PillTabs<K extends string>({
   label: string;
 }) {
   return (
-    <div role="tablist" aria-label={label} className="flex gap-0.5">
+    <div role="tablist" aria-label={label} className={SEGMENTED_TRACK}>
       {tabs.map((t) => {
         const on = t.key === value;
         return (
@@ -476,9 +477,7 @@ export function PillTabs<K extends string>({
             aria-selected={on}
             onClick={() => onChange(t.key)}
             data-testid={`so-tab-${t.key}`}
-            className={`rounded-lg px-3 py-[5px] text-[13px] leading-5 focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] ${
-              on ? "bg-c-select-bg font-semibold text-c-select-fg" : "font-medium text-c-tab hover:bg-c-hover"
-            }`}
+            className={`${SEGMENT} focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] ${on ? SEGMENT_ON : SEGMENT_OFF}`}
           >
             {t.label}
           </button>
@@ -488,7 +487,7 @@ export function PillTabs<K extends string>({
   );
 }
 
-/** The view switch inside a card: ground track, round, small buttons. */
+/** The view switch inside a card: the same segmented control (01 §3). */
 export function ViewSwitch<K extends string>({
   views,
   value,
@@ -501,7 +500,7 @@ export function ViewSwitch<K extends string>({
   label: string;
 }) {
   return (
-    <div role="tablist" aria-label={label} className="flex gap-0.5 rounded-full bg-c-ground p-[3px]">
+    <div role="tablist" aria-label={label} className={SEGMENTED_TRACK}>
       {views.map((v) => {
         const on = v.key === value;
         return (
@@ -512,9 +511,7 @@ export function ViewSwitch<K extends string>({
             aria-selected={on}
             onClick={() => onChange(v.key)}
             data-testid={`route-view-${v.key}`}
-            className={`rounded-lg px-3 py-1 text-[12px] leading-4 focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] ${
-              on ? "bg-c-select-bg font-semibold text-c-select-fg" : "font-medium text-c-tab"
-            }`}
+            className={`${SEGMENT} focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] ${on ? SEGMENT_ON : SEGMENT_OFF}`}
           >
             {v.label}
           </button>

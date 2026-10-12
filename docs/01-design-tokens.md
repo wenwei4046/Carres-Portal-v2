@@ -227,6 +227,7 @@ Use §§1 and 3 for surface and control values; preserve the card's host identit
 | Item | Required evidence before a completion claim |
 |---|---|
 | Runtime token migration | Shared tokens, CSS, component examples and consumers match §§1–5; the application token file equals `docs/ui/carres-tokens.css` |
+| Shell frame in the running app (12 Oct 2026) | Follows the kit: side menu (§4), menu right hairline, top bar bottom hairline, the segmented control for every `Tabs` and the Sales Order tab bars, type pairs 20 / 600 and 15 / 500 (the old 24 / 600 and 15 / 600 are gone), Blue hover and selection. Still on the previous build: the Tasks title row and task cards, the Summary panel, the shared table (rows, header band) and the other token values |
 | Measured rules | `carres-check.js` ported to automated tests and passing at 1025, 1164 and 1440 wide on every state in `UX-FLOWS.md` |
 | Type | Only the §2 pairs appear; 20 / 600 once per page |
 | Rows | 40 / 54 / 44 / 36 exactly; no cut text; no side scroll except the two 8-column views |
