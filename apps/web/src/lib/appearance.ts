@@ -15,9 +15,9 @@
  * one person's colours for the next (01 §9 · UI MASTER Settings pattern):
  *
  *   first frame   the profile inside the login session this browser keeps for
- *                 the person (Supabase's own persisted session) — else Carres
+ *                 the person (Supabase's own persisted session) — else Blue
  *   signed in     the session's profile, re-applied whenever it changes
- *   signed out    Carres (default), at once
+ *   signed out    Blue (default), at once
  *   Save changes  the page changes only once the profile holds the choice
  *   a save fails  nothing changes on screen and nothing else is sent; the
  *                 picker keeps the choice so `Save changes` retries it
@@ -34,7 +34,7 @@ export const FOCUS_KEYS = ["soft", "theme", "strong"] as const;
 export type FocusKey = (typeof FOCUS_KEYS)[number];
 export type Appearance = { theme: ThemeKey; focus: FocusKey };
 
-export const DEFAULT_APPEARANCE: Appearance = { theme: "carres", focus: "soft" };
+export const DEFAULT_APPEARANCE: Appearance = { theme: "blue", focus: "soft" };
 
 /** The picker's words. Each theme's identity dot is the CSS variable
  *  `--theme-dot-{key}` in `index.css` (UI Kit theme table). */

@@ -124,8 +124,8 @@ describe("WorkActionPanel", () => {
     const act = screen.getByTestId("work-detail-primary-act");
     expect(act).toHaveTextContent("Contact logistics today");
     // The kit primary is CHARCOAL since 2026-10-08 (Layout Standard §4.1).
-    expect(act.className).toContain("bg-c-ink");
-    expect(screen.getByRole("button", { name: "Open DO-140926-0007" }).className).not.toContain("bg-c-ink");
+    expect(act.className).toContain("bg-c-main");
+    expect(screen.getByRole("button", { name: "Open DO-140926-0007" }).className).not.toContain("bg-c-main");
     fireEvent.click(act);
     expect(onClick).toHaveBeenCalled();
   });

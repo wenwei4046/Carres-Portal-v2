@@ -4,10 +4,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
- * The hover fill follows the person's theme (01 §1 · §9). In Blue a pointed-at
- * menu item is the kit's grey and a pointed-at row its lighter grey; neither
- * is the shared warm fill the 9 Oct build gave every theme. The values are
- * read from the kit's own token file so the app and the kit cannot disagree.
+ * The app's colours follow the kit (01 §1 · §9): Blue is the default, the page
+ * ground is one grey in every theme, a theme changes only the selection
+ * colours, and red is not used. Blue's values are read from the kit's own
+ * token file so the app and the kit cannot disagree.
  */
 const here = dirname(fileURLToPath(import.meta.url));
 const app = readFileSync(join(here, "carres-tokens.css"), "utf8");
@@ -19,22 +19,39 @@ const value = (block: string, name: string) => block.match(new RegExp(`--c-${nam
 
 describe("Carres tokens: hover follows the theme", () => {
   it("Blue takes the kit's hover, row hover and selection pair", () => {
+    const root = app.slice(app.indexOf(":root{"), app.indexOf("}", app.indexOf(":root{")));
     const [mine, theirs] = [theme(app, "blue"), theme(kit, "blue")];
-    expect(value(mine, "hover")).toBe(value(theirs, "hover"));
-    expect(value(mine, "row-hover")).toBe(value(theirs, "row-hover"));
+    expect(value(root, "hover")).toBe(value(theirs, "hover"));
+    expect(value(root, "row-hover")).toBe(value(theirs, "row-hover"));
     expect(value(mine, "select-fg")).toBe(value(theirs, "select-fg"));
-    // The app's selected fill is the kit's soft selection fill.
+    // The app's selected fill is the kit's soft selection fill; its pill is the kit's selected fill.
     expect(value(mine, "select-bg")).toBe(value(theirs, "select-soft"));
-    expect(value(mine, "hover")).toBe("#E2E4E8");
-    expect(value(mine, "row-hover")).toBe("#F2F3F5");
+    expect(value(mine, "select-pill")).toBe(value(theirs, "select-bg"));
   });
 
-  it("Blue never falls back to the shared warm hover", () => {
+  it("Blue is the default: the root holds its values, and no warm value is left", () => {
     const root = app.slice(app.indexOf(":root{"), app.indexOf("}", app.indexOf(":root{")));
-    for (const name of ["hover", "row-hover"]) {
-      expect(value(theme(app, "blue"), name), name).toBeDefined();
-      expect(value(theme(app, "blue"), name), name).not.toBe(value(root, name));
+    expect(value(root, "hover")).toBe("#E2E4E8");
+    expect(value(root, "row-hover")).toBe("#F2F3F5");
+    expect(value(root, "select-fg")).toBe("#2F55E0");
+    expect(value(root, "ground")).toBe("#F6F7F9");
+    expect(value(root, "ink")).toBe("#1F2937");
+    expect(value(root, "main")).toBe("#1B1B39");
+    expect(app).not.toMatch(/#F5F3F0|#EFECE8|#EEECE8|#221F20/i);
+  });
+
+  it("the page ground is one grey in every theme: a theme changes only the selection colours", () => {
+    for (const key of ["blue", "slate", "teal", "violet", "carres", "honey", "olive", "rose", "latte"]) {
+      const block = theme(app, key);
+      expect(block, key).not.toMatch(/--c-ground|--c-hover|--c-row-hover/);
+      expect(block.match(/--c-[a-z-]+/g), key).toEqual(["--c-select-bg", "--c-select-fg", "--c-select-pill"]);
     }
+  });
+
+  it("red is not used: an error is the amber pair", () => {
+    const root = app.slice(app.indexOf(":root{"), app.indexOf("}", app.indexOf(":root{")));
+    expect(value(root, "err-bg")).toBe(value(root, "warn-bg"));
+    expect(value(root, "err-fg")).toBe(value(root, "warn-fg"));
   });
 
   it("every hover class reads a theme token, never a fixed colour", () => {

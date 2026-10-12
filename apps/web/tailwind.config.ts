@@ -134,6 +134,7 @@ export default {
          * restyled page is one of these; nothing else. */
         c: {
           ink: "var(--c-ink)",
+          main: "var(--c-main)",
           body: "var(--c-body)",
           tab: "var(--c-tab)",
           secondary: "var(--c-secondary)",

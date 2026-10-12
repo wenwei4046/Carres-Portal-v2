@@ -38,7 +38,7 @@
     --dial-red: #e24b4a;    --dial-red-soft: #fcebeb;
     --dial-green: #639922;  --dial-green-soft: #eaf3de;
     --dial-check: #3b6d11;
-    --background: 36 20% 95%;          /* #F5F3F0 — the ONE canvas, Carres cream (Layout Standard §4.0, Jess 2026-10-08); #F7F8FA retired */
+    --background: 220 20% 97%;          /* #F6F7F9 — the ONE page ground, the same grey in every theme (01 §1, owner 11 Oct 2026) */
     /* ===== WORK MIDDLE-CARD KIT (owner-approved Work kit 2026-09-24,
      * docs/workspace/MASTER.md §5.5) — the Work page's section
      * edge, card ink ladder and date-status fills. Read ONLY through the
@@ -56,30 +56,30 @@
        them need no edit, and they carry the v4 values of
        styles/carres-tokens.css (as HSL, because they are read as
        `hsl(var(--x))`). Theme-aware colours (ground, selection) are the `c-*`
-       classes; these legacy names hold the Carres theme's values. */
-    --foreground: 340 5% 13%;          /* ink */
+       classes; these legacy names hold the Blue (default) theme's values. */
+    --foreground: 215 28% 17%;          /* ink */
 
     --card: 0 0% 100%;
-    --card-foreground: 340 5% 13%;     /* ink */
+    --card-foreground: 215 28% 17%;     /* ink */
 
     --popover: 0 0% 100%;
-    --popover-foreground: 340 5% 13%;
+    --popover-foreground: 215 28% 17%;
 
-    --primary: 340 5% 13%;             /* the main button is charcoal ink */
+    --primary: 240 33% 16%;             /* the main button, #1B1B39 */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 34 18% 92%;           /* hover */
-    --secondary-foreground: 340 5% 13%;
+    --secondary: 220 13% 95%;           /* quiet fill */
+    --secondary-foreground: 215 28% 17%;
 
     --muted: 216 13% 92%;              /* card border */
     --muted-foreground: 212 6% 45%;    /* secondary text */
 
-    --accent: 34 18% 92%;              /* hover */
-    --accent-foreground: 340 5% 13%;
+    --accent: 220 13% 95%;              /* quiet fill */
+    --accent-foreground: 215 28% 17%;
 
-    --destructive: 4 76% 40%;          /* problem text */
+    --destructive: 44 100% 24%;          /* problem text: amber, red is not used (01 §1) */
     --destructive-foreground: 0 0% 100%;
-    --danger: 4 76% 40%;
+    --danger: 44 100% 24%;
     --danger-foreground: 0 0% 100%;
 
     --border: 216 13% 92%;             /* card border */
@@ -90,22 +90,22 @@
 
     /* Neutral ramp → the v4 ladder: ground · hover · card border · input
        border · muted · secondary · tab · body · ink. */
-    --base-50:  36 20% 95%;   /* ground */
-    --base-100: 34 18% 92%;   /* hover */
+    --base-50:  220 20% 97%;   /* ground */
+    --base-100: 220 13% 95%;   /* quiet fill · row hover */
     --base-200: 216 13% 92%;  /* card border */
     --base-300: 214 13% 90%;  /* input border */
     --base-400: 216 7% 57%;   /* muted */
     --base-500: 212 6% 45%;   /* secondary */
     --base-600: 217 8% 32%;   /* unselected tab */
     --base-700: 217 10% 25%;  /* body */
-    --base-800: 340 5% 13%;   /* ink */
-    --base-900: 340 5% 13%;   /* ink */
+    --base-800: 215 28% 17%;   /* ink */
+    --base-900: 215 28% 17%;   /* ink */
 
-    /* The former flame accent → the Carres select pair. */
-    --terracotta: 16 78% 36%;          /* select text */
-    --signature-50:  21 80% 92%;       /* select wash */
-    --signature-100: 21 80% 92%;
-    --signature-700: 16 78% 36%;
+    /* The former flame accent → the default (Blue) selection pair. */
+    --terracotta: 227 74% 53%;          /* selection text (Blue, the default theme) */
+    --signature-50:  219 100% 97%;       /* selection wash */
+    --signature-100: 219 100% 97%;
+    --signature-700: 227 74% 53%;
 
     /* Status → the v4 pairs (soft fill · dark text). */
     --success:        142 61% 30%;
@@ -119,7 +119,7 @@
     --info-foreground: 0 0% 100%;
     /* Hover tint (hover:bg-hovertint) is the token `--c-row-hover` in
        styles/carres-tokens.css, so it follows the person's theme. */
-    --error-soft:      0 81% 96%;   /* problem wash */
+    --error-soft:      42 82% 91%;   /* problem wash: amber */
   }
 }
 
