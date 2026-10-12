@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"><style>body{margin:0;background:#FFFFFF;font-family:Inter,system-ui,sans-serif;color:#1F2937}a{color:#2F55E0}a:hover{color:#1B1B39}</style></helmet>
+<div style="padding:28px 32px;display:flex;flex-direction:column;gap:18px;max-width:1200px">
+  <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:20px;font-weight:600">Carres screen map · every module uses the same 7 parts</span><span style="font-size:13px;color:#4B5563;line-height:1.5">You never draw. To tell me something, say the module + the number, e.g. "Purchasing 4 太乱" or "Sales Order 6 看不懂". I fix that part in every module at once.</span></div>
+  <div data-screen-label="Map" style="display:grid;grid-template-columns:200px minmax(0,1fr) 260px;grid-template-rows:52px 40px minmax(0,1fr);gap:8px;height:520px;padding:8px;background:#F6F7F9;border:1px solid #E5E7EB;border-radius:12px">
+    <div style="grid-row:1 / 4;border:1.5px dashed #9CA3AF;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px;background:#FFFFFF"><span style="width:28px;height:28px;border-radius:50%;background:#1B1B39;color:#FFFFFF;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center">1</span><span style="font-size:14px;font-weight:600">Side menu</span><span style="font-size:12px;color:#4B5563;line-height:1.5">Modules · groups (BUY, RECEIVE…) · pages on a tree line · Settings · you</span></div>
+    <div style="grid-column:2 / 4;border:1.5px dashed #9CA3AF;border-radius:10px;padding:0 12px;display:flex;align-items:center;gap:10px;background:#FFFFFF"><span style="width:28px;height:28px;border-radius:50%;background:#1B1B39;color:#FFFFFF;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none">2</span><span style="font-size:14px;font-weight:600">Top bar</span><span style="font-size:12px;color:#4B5563">Module / page title · search · team · bell</span></div>
+    <div style="border:1.5px dashed #9CA3AF;border-radius:10px;padding:0 12px;display:flex;align-items:center;gap:10px;background:#FFFFFF"><span style="width:28px;height:28px;border-radius:50%;background:#1B1B39;color:#FFFFFF;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none">3</span><span style="font-size:14px;font-weight:600">Toolbar</span><span style="font-size:12px;color:#4B5563">Summary · tabs (To buy · Ordered · All) · view · ⋮</span></div>
+    <div style="grid-row:2 / 4;grid-column:3;display:grid;grid-template-rows:auto minmax(0,1fr);gap:8px">
+      <div style="border:1.5px dashed #9CA3AF;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;background:#FFFFFF"><div style="display:flex;align-items:center;gap:10px"><span style="width:28px;height:28px;border-radius:50%;background:#1B1B39;color:#FFFFFF;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center">6</span><span style="font-size:14px;font-weight:600">Tasks list</span></div><span style="font-size:12px;color:#4B5563;line-height:1.5">Day strip · To do / Waiting / Done · cards per contact</span></div>
+      <div style="border:1.5px dashed #9CA3AF;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;background:#FFFFFF"><div style="display:flex;align-items:center;gap:10px"><span style="width:28px;height:28px;border-radius:50%;background:#1B1B39;color:#FFFFFF;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center">7</span><span style="font-size:14px;font-weight:600">Open task</span></div><span style="font-size:12px;color:#4B5563;line-height:1.5">Facts · steps 1 2 3 · message · Result · Save</span></div>
+    </div>
+    <div style="display:grid;grid-template-columns:200px minmax(0,1fr);gap:8px;min-height:0">
+      <div style="border:1.5px dashed #9CA3AF;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;background:#FFFFFF"><div style="display:flex;align-items:center;gap:10px"><span style="width:28px;height:28px;border-radius:50%;background:#1B1B39;color:#FFFFFF;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center">5</span><span style="font-size:14px;font-weight:600">Summary</span></div><span style="font-size:12px;color:#4B5563;line-height:1.5">Today · This month · Pieces ordered</span></div>
+      <div style="border:1.5px dashed #9CA3AF;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;background:#FFFFFF"><div style="display:flex;align-items:center;gap:10px"><span style="width:28px;height:28px;border-radius:50%;background:#1B1B39;color:#FFFFFF;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center">4</span><span style="font-size:14px;font-weight:600">Main table / detail</span></div><span style="font-size:12px;color:#4B5563;line-height:1.5">List rows · item rows · footer · or the record detail (SO, PO) in the same place</span></div>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;color:#374151;line-height:1.6">
+    <span style="font-weight:600;color:#1F2937">Which modules use it</span>
+    <span>Sales Order · Purchasing · Workspace · Settings (and every new module). Parts 1, 2, 3, 6 and 7 are one shared file, so a fix there changes every module. Parts 4 and 5 are each module's own content.</span>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

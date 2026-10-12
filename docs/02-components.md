@@ -1,6 +1,6 @@
 # 02 · Components
 
-**Current shared target · owner instruction 11 Oct 2026 · supplied v12.** Appearance comes exclusively from `01-design-tokens.md` and `ui/carres-tokens.css`. Replace existing kit internals; never create page-local copies. Existing component APIs and business contracts remain until deliberately migrated. Prototype HTML is a specimen, not application implementation.
+**Current shared target · owner instruction 12 Oct 2026 · supplied 12 Oct.** Appearance comes exclusively from `01-design-tokens.md` and `ui/carres-tokens.css`. Replace existing kit internals; never create page-local copies. Existing component APIs and business contracts remain until deliberately migrated. Prototype HTML is a specimen, not application implementation.
 
 ## Component register
 
@@ -66,7 +66,7 @@ The shared Button exposes its existing variant as `data-variant`; the current pr
 | Documents | PdfPreview/SavedEvidenceViewer with Drawer or Modal | Real saved version, loading/failure/retry, focus return; document is not an editor. |
 | Compact facts | Existing property-row/field compositions | 01 §5.1 density, labelled text until Edit; one shared recipe, no module-local skin. |
 
-## v12 shared pieces — where each lives
+## Shared pieces of the current kit — where each lives
 
 The 11 Oct specimen names three shared pieces and a component list. Each has one home. A piece marked KIT GAP has no shared component in `components/kit` on 11 Oct; it is admitted once with its `/ui` example, never drawn inside a page.
 

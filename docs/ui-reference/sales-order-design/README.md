@@ -1,4 +1,4 @@
-# Sales Order UI kit specimen · v12 · supplied 11 Oct 2026
+# Sales Order UI kit specimen · supplied 12 Oct 2026
 
 > **Repository note. Read before the supplied README below.**
 >
@@ -12,38 +12,31 @@
 > the value here is **PROPOSAL / NOT LAW**. `docs/01-design-tokens.md` §10 lists the
 > differences and the values the package itself leaves unsettled.
 >
-> Source archive: `Sales Order_11 Oct.zip`, SHA-256
-> `1140ffde825dcd573f05467b49f2201d02331241dbc4f7cb0ef4275957efae16`, plus the design update
-> `Sales Order_11 Oct(2).zip`, SHA-256
-> `23850ef44e0a3fc1932743f7523a2ff8b4cd4b1460427d22aa87e888cb1d6ef8`, which replaced
-> `Carres Shell.dc.html`, `Carres Table.dc.html`, `Sales Order Outright v12.dc.html`,
-> `Purchasing v2.dc.html`, `purchasing-data.js` and the Layout Standard, and the second design
-> update `Sales Order_11 Oct(3).zip`, SHA-256
-> `b34ddbc82e16b9d99a786340061abb188db0768c3bde2d90e974696a8b54c1f9`, which replaced
-> `Carres Shell.dc.html`, `Carres Table.dc.html`, `Sales Order Outright v12.dc.html`,
-> `Purchasing v2.dc.html`, `carres-check.js` and the Layout Standard and added
-> `carres-tasks.js`, and the third design update `Sales Order_11 Oct(4).zip`, SHA-256
-> `d0f402425acbbf7144af43d7ddf69f6d9e1ecb320848b2f1be56c292c4f64a72`, which replaced
-> `Carres Shell.dc.html`, `Carres UI Kit.dc.html`, `Purchasing v2.dc.html`, `carres-check.js`
-> and the Layout Standard. The owner keeps the original archives. Earlier specimens are deleted; Git keeps the history.
+> Source archive: `Sales Order.zip`, handed over by the owner on 12 Oct 2026, SHA-256
+> `793931a7922b24155b963593139bd13c960fb101072edd8fdc94d5618164fe59`. It replaces the 11 Oct specimen
+> completely: every kit the owner hands over replaces the kit, and one version is kept (owner
+> 12 Oct 2026). The owner keeps the original archive; Git keeps the history.
 >
-> **TEST customer details (this repository is public).**
+> **What differs from the supplied archive (this repository is public).**
 >
 > | File here | What differs from the supplied archive |
 > |---|---|
-> | `sales-test.js` | Replaces `sales-real.js`. Customer name, phone and address in all 20 orders are TEST values (`TEST customer A` to `TEST customer T`, `012-00000xx`, `Jalan TEST`). SO numbers, delivery area, postcode, dates, items, suppliers, PO numbers, balances and remarks are kept |
-> | `purchasing-data.js` | Customer names in its 20 SO Batch orders are TEST values; an order that is also in `sales-test.js` keeps the same TEST customer. Supplier contact emails and WhatsApp group links are TEST placeholders |
-> | `Sales Order Outright v12.dc.html` | One line: it loads `sales-test.js`. `Purchasing v2.dc.html` is as supplied |
-> | `screens/SO-*`, `PO-*`, `SH-01` | Retaken on 11 Oct from these pages with the TEST details, 924 × 540; `PO-04` is the pop-up alone. `SH-01` shows Settings → Appearance. `KIT-*` are the supplied pictures |
+> | `sales-test.js` | Replaces `sales-real.js`. Customer name, phone and address in all 20 orders are TEST values (`TEST customer A` to `TEST customer T`, `012-00000xx`, `Jalan TEST`). SO numbers, delivery area, postcode, dates, items, suppliers, PO numbers, balances and remarks are kept. The supplied 20 orders are the same as in the 11 Oct package |
+> | `purchasing-data.js` | Customer names in its 20 SO Batch orders are TEST values; an order that is also in `sales-test.js` keeps the same TEST customer. Supplier WhatsApp group links are TEST placeholders. The supplier emails arrive as TEST addresses |
+> | `Sales Order Outright v12.dc.html` | One line: it loads `sales-test.js` |
+> | `Purchasing v2.dc.html` | Not stored. `Purchasing v3.dc.html` is the Purchasing picture the owner named on 12 Oct, and it holds the 12 Oct task cards. The links to the v2 page in `Carres Shell.dc.html`, `Workspace My Tasks.dc.html`, `purchasing-data.js`, the Layout Standard and the README below now point at v3 |
+> | `Workspace v2.dc.html` | Not stored. Nothing in the package links to it or describes it; `Workspace My Tasks.dc.html` is the Workspace page |
+> | `Carres Shell.dc.html` | The bottom `Settings` row is 600 when it is the current page and 500 otherwise. It was fixed at 500, which was the one line `carres-check.js` reported |
+> | `screens/SO-*`, `PO-*`, `SH-01` | Retaken on 12 Oct from these pages with the TEST details, 924 × 540; `PO-*` from `Purchasing v3.dc.html`; `PO-04` is the pop-up alone. `KIT-*` are the supplied pictures |
 > | `UX-FLOWS.md` | The example customer and phone are the TEST values |
-> | `docs/Carres Ops Rules.md` | Not stored. It is the designer's business-rule notes; the module MASTERs hold the rules |
+> | `docs/Carres Ops Rules.md`, `docs/Carres Handoff.md`, `CHANGES-after-*.md` | Not stored. The Ops Rules are the designer's business-rule notes (the module MASTERs hold the rules). The Handoff and the change notes are the design chat's own working log |
 >
 > The signed-in Portal is unaffected: it reads real records by permission and never reads
 > these files.
 >
 > Every page opens with its rows and no script error. The supplied `carres-check.js` was run on
-> 21 page states at 1025, 1164 and 1440 wide: all 21 states pass at each width. The untouched supplied
-> files give the same result. `docs/01-design-tokens.md` §10.1 records the measurement.
+> 21 page states at 1025, 1164 and 1440 wide: all 21 states pass at each width, after the
+> `Settings` row line above. `docs/01-design-tokens.md` §10.1 records the measurement.
 
 ---
 
@@ -96,6 +89,22 @@ See `UX-FLOWS.md`: every interaction written as steps → expected result, with 
 
 Words on screen come from the owner's COPY standard; do not rename labels.
 
+## Fix now (owner 12 Oct, live screenshot)
+- Side menu — one rule for EVERY module (Purchasing today; Warehouse, Payments, Delivery, Service … later). Code it once from data, never per module:
+  - Data shape per module: `{ id, label, icon, pages: [ { group?: 'BUY' }, { id, label, href? } ... ] }`. A page without `href` = not built yet.
+  - A module with pages shows a ▾ and opens on click; opening one module closes the others (Shopify admin).
+  - Pages hang on a tree line: 1.5-px #BFC5CD vertical line with a rounded elbow (radius 7) to each page; the line stops at the last page of each group; the current page's elbow is the theme colour.
+  - Group labels (BUY · RECEIVE · PROBLEMS · SHOWROOM) 10/600 caps #6B7280, aligned with the page text, each with its own chevron. Only the group holding the current page is open; the others show their name only.
+  - Type: section label 11/600 caps #6B7280 · module 13/500 #1F2937 + icon 18 · page 13/400 #374151 · current module / page 600 in the theme colour (white pill on the page).
+  - A long label wraps to 2 lines (13 / line-height 17, text-wrap pretty). Never "…". Menu stays 220.
+  - Not-built page: "Coming soon" 11 grey under the name (owner's live words).
+  - One scrollbar for the whole menu only.
+  - Reference: Carres Shell.dc.html (NAV + subs) and Layout Standard §2 "Side menu type".
+- SO Batch Purchase · By supplier columns: Supplier minmax(150px,1fr) · Items 80 · Sales orders 96 · Order PO deadline 120 · Supplier ready by 120 · Status 120 (Status visible at 1131 with Tasks closed, no side scroll).
+- Task cards (Tasks panel list): title + › only, whole card opens the task; rows icon · label left, value right; amber only on the passed row ("Cut-off · 10:15 AM · passed", "Supplier · 3 days late"). No tag, no buttons on the card.
+- Words: "passed" / "n days late" only; never "Overdue" or "Missed".
+- Send PO card: 3 steps (Download n PDFs · Send by WhatsApp or Email · Mark n POs sent); Chase / Check ETA / Ask for DO: 3 steps (Send · Record the answer · Save). Supplier answer reasons = the 8 from Purchasing MASTER §5.7.
+
 ## Template structure (three shared pieces)
 - **Shell** (`Carres Shell.dc.html`): left menu (220 open / 64 closed), top bar 56 ("Sales Order / Outright", search, team, bell), toolbar row 36 (view tabs Open · Delivered · All, active filter chips, columns menu, ⋮), Summary panel 264 (left), Tasks panel 320 (right), Settings → Appearance. Props: `det` (opens a detail in the middle: Summary and toolbar hide, Tasks stays), `summary`, `tabs`, `chips`, `views`, `more`, `sel` (selection bar), `tasks`, `search`.
 - **Table** (`Carres Table.dc.html`): sticky header 40, list rows 54, expandable item rows 44, ticks, group rows, footer 44 ("n orders · Qty: MS 30 · Pillow 20 · BF 20 · M.P 7 · Sofa 3 sets"), sideways scroll with the identifier column frozen.
@@ -133,7 +142,7 @@ A4 page: Carres mark + legal name/SSM/address · SO no. + "SALES ORDER" right ·
 ### 4. Tasks panel (Shell, every page)
 Card: tags row (module tag 11/500 on #F1F2F4, due chip) · title 13/500 · grey line · footer. Open card: facts as **11/500 caps labels over 13/500 values** (two columns). **A record number in the facts is the link** that opens it (dotted underline, solid on hover): no "Open …" buttons. One charcoal main button per card ("Mark done").
 
-### 5. Purchasing (`Purchasing v2.dc.html`, `#batch` / `#po` / `#po=<PO no.>`)
+### 5. Purchasing (`Purchasing v3.dc.html`, `#batch` / `#po` / `#po=<PO no.>`)
 Same Shell, Table and detail header pattern (PO no. 20/600 with supplier line). Use it to verify the template is module-agnostic.
 
 ### 6. Settings → Appearance (Shell)
@@ -183,7 +192,7 @@ Theme = per person (`carres-theme.js`, localStorage `carres.theme`, default `blu
 `view` (open/done/all) · `layout` (column view) · `f` (filters) · `sel` (ticked rows) · `det` (open record, mirrored in `#so=`) · `dTab` · `rv` (route view) · `fe` (amendment edit: open fields, reasons, proof, confirm) · `edits` (applied contact changes) · `pend` (waiting for Jess) · `rev` (revision count) · `logs` (timeline events) · `tasks` · `more` / `docOpen` / `toast`.
 
 ## Data
-`sales-test.js` (`window.SO_REAL`): the 20 sample orders, with TEST customer details in this repository (customer, phone, address, items with model/spec/qty/supplier/PO/stock status, ETA, logistics, balance, payment status). `purchasing-data.js`: the POs derived from the same orders. These are fixtures; the real build reads the ERP. Proceed Date = Sales Portal "Planned production start" (same fact; only the name Proceed Date is shown).
+`sales-test.js` (`window.SO_REAL`): the 20 real sample orders (customer, phone, address, items with model/spec/qty/supplier/PO/stock status, ETA, logistics, balance, payment status). `purchasing-data.js`: the POs derived from the same orders. These are fixtures; the real build reads the ERP. Proceed Date = Sales Portal "Planned production start" (same fact; only the name Proceed Date is shown).
 
 ## Assets
 `assets/carres-mark.png`, `assets/carres-wordmark.png` (Carres brand). Icons: Google Material Symbols Rounded (web font).
@@ -192,7 +201,7 @@ Theme = per person (`carres-theme.js`, localStorage `carres.theme`, default `blu
 - `Carres UI Kit.dc.html`: master kit picture
 - `Carres Shell.dc.html`, `Carres Table.dc.html`: shared template pieces
 - `Sales Order Outright v12.dc.html`: reference module (list + detail + PDF + amendment)
-- `Purchasing v2.dc.html`: second module on the same template
+- `Purchasing v3.dc.html`: second module on the same template
 - `carres-theme.js`, `carres-check.js`, `sales-test.js`, `purchasing-data.js`, `support.js` (DC runtime for viewing only)
 - `docs/Carres Layout Standard.md`, `docs/Carres Ops Rules.md`
 - `UX-FLOWS.md` (behaviour), `screens/` (pictures of every state)
