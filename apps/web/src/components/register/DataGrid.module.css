@@ -864,7 +864,7 @@ div:first-child > .columnsMenuGroup {
   cursor: pointer;
 }
 .groupRow:hover {
-  background: var(--c-hover);
+  background: var(--c-row-hover);
 }
 .groupRowCell {
   padding: var(--table-row-pad);

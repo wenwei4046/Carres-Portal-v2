@@ -68,7 +68,7 @@ describe("DocumentTable", () => {
     expect(door.className).toContain("max-md:min-h-10");
     fireEvent.click(door);
     expect(onOpen).toHaveBeenCalledTimes(1);
-    expect(screen.getAllByRole("row")[1]!.className).toContain("hover:bg-c-hover");
+    expect(screen.getAllByRole("row")[1]!.className).toContain("hover:bg-c-row-hover");
   });
 
   it("a row with no door has no control and no hover", () => {
