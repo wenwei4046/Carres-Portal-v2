@@ -161,7 +161,7 @@ The page never scrolls; panels and table bodies scroll inside with thin scrollba
 | Ticked row or item | Soft selection fill; text stays ink |
 | Selection bar | Replaces the toolbar; white, 1px `#E5E7EB`; count 13 / 600 ink, totals grey; only the tick and Clear use the theme colour; the text is counts only; bar buttons 32 high, 13 / 500 |
 
-**SO Batch Purchase · By supplier (owner 12 Oct 2026).** Columns: Supplier `minmax(150px,1fr)` · Items 80 · Sales orders 96 · Order PO deadline 120 · Supplier ready by 120 · Status 120. Status stays in view at 1131 wide with Tasks closed, with no side scroll.
+**SO Batch Purchase · By supplier (owner 12 Oct 2026).** Columns: Supplier `minmax(150px,1fr)` · Items 80 · Sales orders 96 · Order PO deadline 120 · Supplier ready by 120 · Status 120. Status stays in view at 1131 wide with Tasks closed, with no side scroll. Built in the app on the one listing engine on 12 Oct 2026; the engine pads every cell, so that view sets 5 a side to keep the kit's 10 between columns.
 
 **Five cell formats.** Identifier (13 / 600 ink plus one 12 grey line) · Text (13 / 400 ink plus optional 12 grey line) · Number (right, tabular) · Date (`7 Oct` plus grey weekday) · Status (pill for amber and green; a status that needs no action is plain text `#4B5563`). At most two lines per cell, except the item name. When one cell in a row has a second line, every cell keeps two line slots so first lines align.
 

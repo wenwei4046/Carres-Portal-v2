@@ -36,6 +36,7 @@ import {
   soBatchOrderSafetyDays,
   soBatchPurchaseStatus,
   soBatchOrderByAbsenceWord,
+  malaysiaClockOf,
   soBatchOrderSupplierNames,
   soBatchRailFacts,
   soBatchRailModel,
@@ -74,6 +75,8 @@ import {
 } from "@/components/register/po-number-links";
 import { printSalesOrdersOrSay } from "../record-print";
 import { fmtDate } from "@/lib/fmt-date";
+import SoBatchBySupplier from "./SoBatchBySupplier";
+import { BY_SUPPLIER, supplierGroups } from "./by-supplier";
 import { conciseLocality, NOT_RECORDED } from "@/lib/locality";
 import { avatarColor, personInitials } from "@/lib/staff-avatar";
 import {
@@ -332,15 +335,14 @@ export interface SoBatchRegisterProps {
 export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurchaseOrders, purchaseOrdersLoading = false, initialSearch, hidden = false, scope, roundNavigation, sessionKey = "carres.soBatchPurchase.register" }: SoBatchRegisterProps) {
   const navigate = useNavigate();
   const [presentationParams, setPresentationParams] = useSearchParams();
-  const presentation = presentationParams.get("view") === "cards" ? "cards" : "table";
-  const supplierGrouping = presentationParams.get("group") === "supplier";
+  const viewParam = presentationParams.get("view");
+  const presentation = viewParam === "cards" ? "cards" : viewParam === "supplier" ? "supplier" : "table";
   const changePresentationParam = (key: string, value: string | null) => setPresentationParams(current => {
     const next = new URLSearchParams(current);
     if (value) next.set(key, value); else next.delete(key);
     return next;
   }, { replace: true });
-  const setPresentation = (value: string) => changePresentationParam("view", value === "cards" ? "cards" : null);
-  const setSupplierGrouping = (value: boolean) => changePresentationParam("group", value ? "supplier" : null);
+  const setPresentation = (value: string) => changePresentationParam("view", value === "cards" || value === "supplier" ? value : null);
   const [quickOrderId, setQuickOrderId] = useState<string | null>(null);
   /* R8 — a `display:none` box forgets its scroll offset, and by the time a
      render hides it the offset already reads 0. So the offset is remembered
@@ -696,6 +698,25 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
       });
     },
     [eligibleByOrder, leafById, tickDestinationId],
+  );
+
+  /** By supplier's row tick: every line of the row that can be bought. */
+  const setLeafsSelected = useCallback(
+    (ids: readonly string[], on: boolean) => {
+      setSelected((prev) => {
+        const next = new Map(prev);
+        for (const id of ids) {
+          const row = leafById.get(id);
+          if (!row || !selectable(row)) continue;
+          if (!on) next.delete(id);
+          else if (!next.has(id) && tickDestinationId) {
+            next.set(id, { toBuy: row.toBuy ?? 0, allocations: defaultAllocations(row, tickDestinationId) });
+          }
+        }
+        return next;
+      });
+    },
+    [leafById, selectable, tickDestinationId],
   );
 
   const setLeafAllocations = useCallback(
@@ -1239,7 +1260,6 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
   );
 
   const supplierOf = (o: SoBatchOrderRow) => summaryText(soBatchCellSummary(soBatchOrderSupplierNames(o)), n => `${n} suppliers`) ?? "Supplier not set";
-  const supplierGroupOf = (o: SoBatchOrderRow) => [...new Set(soBatchOrderSupplierNames(o).filter(Boolean))].sort().join(" · ") || "Supplier not set";
   const compactView = (o: SoBatchOrderRow, close?: () => void) => {
     const ownSelections = selections.filter(selection => leafById.get(selection.demandId)?.orderId === o.orderId);
     const stockSelected = stockIds(o.orderId).some(id => stock.chosen.has(id));
@@ -1267,7 +1287,29 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
   };
   const quickOrder = quickOrderId ? orders.find(order => order.orderId === quickOrderId) : null;
   const viewSwitch = <Tabs variant="segmented" label="SO Batch Purchase view" value={presentation} onValueChange={setPresentation}
-    tabs={[{ value: "table", label: "Table", icon: "table" }, { value: "cards", label: "Cards", icon: "cards" }]} />;
+    tabs={[{ value: "table", label: "Table", icon: "table" }, { value: "cards", label: "Cards", icon: "cards" }, { value: "supplier", label: BY_SUPPLIER.view }]} />;
+  /* BY SUPPLIER (owner 12 Oct 2026): the demand of the orders this list is
+     showing, one row per supplier and category. It reads the same ticks, so
+     `Issue PO` takes them from either view. */
+  const shownOrderIds = useMemo(() => new Set(shown.map((order) => order.orderId)), [shown]);
+  const nowKey = (() => { const now = malaysiaClockOf(new Date().toISOString()); return `${now.date}T${now.time.slice(0, 5)}`; })();
+  const bySupplier = useMemo(
+    () => (presentation === "supplier" ? supplierGroups(leafs.filter((leaf) => shownOrderIds.has(leaf.orderId)), nowKey) : []),
+    [presentation, leafs, shownOrderIds, nowKey],
+  );
+  const issueActions = summary.lines > 0 ? (
+    <span className="flex shrink-0 items-center gap-2" data-testid="so-batch-selection-actions">
+      <SoBatchPoDutyChip data={data} />
+      {data.mayIssue ? (
+        /* An undecided stock change is a change to the very quantity this
+           act would buy. The warning band above says why; the door does not
+           fail at the click. */
+        <Button variant="primary" size="md" data-testid="so-batch-issue" disabled={selectionHasPendingStock} onClick={() => onIssue(selections)}>
+          {W.issuePo}
+        </Button>
+      ) : <span className="text-meta text-kit-slate-11">{W.issueNeedsPoDuty}</span>}
+    </span>
+  ) : null;
 
   /* ── The page ─────────────────────────────────────────────────────────── */
   return (
@@ -1487,16 +1529,32 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
             className="flex min-h-0 flex-1 flex-col"
             data-testid="so-batch-grid"
           >
+            {presentation === "supplier" ? (
+              <SoBatchBySupplier
+                groups={bySupplier}
+                today={data.today}
+                isLoading={isLoading}
+                storageKey={`${STORAGE_KEY}.bySupplier`}
+                sessionKey={`${sessionKey}.bySupplier`}
+                canBuy={selectable}
+                isTicked={(id) => live.has(id)}
+                onToggleLine={toggleLeaf}
+                onToggleLines={setLeafsSelected}
+                selectionSummary={summary.text}
+                selectionPrimary={<>{viewSwitch}{issueActions}</>}
+                toolbarEnd={<div className={`${styles.toolbarTools} flex min-w-0 flex-wrap items-center gap-2`}>{viewSwitch}</div>}
+                toolbarStart={!filterRailOpen ? <ShowFiltersButton onShow={() => setFilterRailVisible(true)} testId="so-batch-show-filters" /> : null}
+                onOpenOrder={setQuickOrderId}
+                emptyMessage={orders.length > 0 ? W.noMatch : W.empty}
+                initialSearch={initialSearch}
+                searchPlaceholder={W.search}
+              />
+            ) : (
             <DataGrid<SoBatchOrderRow>
               presentationTools
               allowColumnGrouping={false}
               sessionKey={sessionKey}
               presentationKey={presentation}
-              pageToolsItems={[
-                { key: "group-none", label: `Group by: None${!supplierGrouping ? " ✓" : ""}`, separatorBefore: true, onSelect: () => setSupplierGrouping(false) },
-                { key: "group-supplier", label: `Group by: Supplier${supplierGrouping ? " ✓" : ""}`, onSelect: () => setSupplierGrouping(true) },
-              ]}
-              fixedGroups={supplierGrouping ? { groups: [...new Set(displayRows.map(supplierGroupOf))].sort().map(label => ({ key: label, label })), groupOf: supplierGroupOf } : undefined}
               renderResults={presentation === "cards" ? visible => <div className="grid grid-cols-1 gap-3 p-3 xl:grid-cols-2" data-testid="so-batch-cards">
                 {visible.map(o => <div key={o.orderId} data-row-key={o.orderId}>{compactView(o)}</div>)}
               </div> : undefined}
@@ -1609,28 +1667,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
               }}
               selectionSummary={(count) => stock.active ? `${count} Sales Order${count === 1 ? "" : "s"} · Ready Stock` : summary.text}
               selectionPrimary={<>{viewSwitch}{stock.active ? <Button variant="primary" loading={stock.busy} disabled={stock.unknown || stock.chosen.size === 0}
-                onClick={() => void stock.proceed(new Set(visibleOrders.current.filter(order => shown.some(row => row.orderId === order.orderId)).map(order => order.orderId)))}>Proceed</Button> : summary.lines > 0 ? (
-                <span
-                  className="flex shrink-0 items-center gap-2"
-                  data-testid="so-batch-selection-actions"
-                >
-                  <SoBatchPoDutyChip data={data} />
-                  {data.mayIssue ? (
-                    <Button
-                      variant="primary" size="md"
-                      data-testid="so-batch-issue"
-                      /* An undecided stock change is a change to the very
-                         quantity this act would buy. The button states the
-                         reason in the warning band above rather than failing
-                         at the door. */
-                      disabled={selectionHasPendingStock}
-                      onClick={() => onIssue(selections)}
-                    >
-                      {W.issuePo}
-                    </Button>
-                  ) : <span className="text-meta text-kit-slate-11">{W.issueNeedsPoDuty}</span>}
-                </span>
-              ) : null}</>}
+                onClick={() => void stock.proceed(new Set(visibleOrders.current.filter(order => shown.some(row => row.orderId === order.orderId)).map(order => order.orderId)))}>Proceed</Button> : issueActions}</>}
               statusSummary={(filtered) => {
                 /* ⭐ THE FOOTER ANSWERS *WHAT AM I LOOKING AT* — owner
                    correction 2026-09-11. It used to tally `0 Partial ·
@@ -1652,6 +1689,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 );
               }}
             />
+            )}
           </div>
         </div>
       </div>
