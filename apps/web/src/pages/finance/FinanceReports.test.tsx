@@ -737,6 +737,54 @@ describe("Reports — By month", () => {
   });
 });
 
+// 0688 (Chew 2026-10-12, Finance MASTER §3.5): the statements show stock on
+// hand worked out from Stock's Units, provisional until Stock confirms a month.
+describe("Reports — stock on hand", () => {
+  const stockedBody = (): Row[] => [
+    account("ASSET", "1100", "Cash and bank", "1120", "Bank — current account", 5200),
+    subtotal("ASSET", "1100", "Cash and bank", 5200),
+    { ...account("ASSET", "1300", "Stock", "330-0000", "STOCK", 1500), reclassified: 1500, reclassified_for: "STOCK" },
+    subtotal("ASSET", "1300", "Stock", 1500),
+    total("ASSET", 6700),
+    account("LIABILITY", "2100", "Payables", "2110", "Trade payables — suppliers", 2800),
+    subtotal("LIABILITY", "2100", "Payables", 2800),
+    total("LIABILITY", 2800),
+    account("EQUITY", "3000", "Equity", "3100", "Share capital", 0),
+    subtotal("EQUITY", "3000", "Equity", 0),
+    { section: "EQUITY", row_kind: "DERIVED", header_name: "Result not yet closed to equity", amount: 3900 },
+    total("EQUITY", 3900),
+    { section: "CHECK", row_kind: "EQUATION", amount: 0 },
+  ];
+  const STOCK_LINE = "Shows the stock on hand from Stock's Units, RM 1,500.00 more than the books hold. It is provisional until Stock confirms the month.";
+
+  it("the stock line says it shows the stock on hand from Stock's Units", async () => {
+    serve({ bs: (a) => bs(a, stockedBody()) });
+    show(BS_AT);
+    const table = screen.getByTestId("balance-sheet");
+    const row = (await within(table).findByRole("link", { name: "330-0000 STOCK" })).closest("tr")!;
+    expect(row).toHaveTextContent("RM 1,500.00");
+    expect(within(row).getByRole("button", { name: STOCK_LINE })).toBeInTheDocument();
+    expect(paidBeforeInvoiceNote({ reclassified: -200, reclassifiedFor: "STOCK" }))
+      .toBe("Shows the stock on hand from Stock's Units, RM 200.00 less than the books hold. It is provisional until Stock confirms the month.");
+  });
+
+  it("under each statement, says where its stock comes from and where its Units are listed", async () => {
+    serve();
+    show(PL_AT);
+    const plNote = await screen.findByTestId("profit-and-loss-stock-note");
+    expect(plNote).toHaveTextContent("Stock at the start and at the end of the period is worked out from Stock's Units. It is provisional until Stock confirms the month");
+    expect(plNote).toHaveTextContent("Stock value under Reports lists the Units.");
+  });
+
+  it("under a department, says stock on hand is in All only", async () => {
+    serve();
+    show(`${BS_AT}?dept=OFFICE`);
+    const note = await screen.findByTestId("balance-sheet-stock-note");
+    expect(note).toHaveTextContent("Stock on hand is shown under All only: it is not split by channel.");
+    expect(within(note).queryByRole("link")).toBeNull();
+  });
+});
+
 describe("Reports words", () => {
   const here = dirname(fileURLToPath(import.meta.url));
   itSaysNoBannedWord(join(here, "FinanceReports.tsx"), { minStrings: 12, expectString: "No opening balances" });
