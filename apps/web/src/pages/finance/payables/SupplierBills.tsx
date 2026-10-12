@@ -1096,6 +1096,8 @@ function GrnPicker({ open, supplierId, poId, onClose, onPick }: {
           departmentType: (l.department_type ?? null) as DepartmentType | null,
           departmentId: l.department_id ?? null,
           channels: l.channels ?? null,
+          deliveryOrderId: null,
+          doNo: null,
         }));
       if (picked.length === 0) toast.error("Everything on that GRN is already billed.");
       else onPick(picked, g.supplier_id, g.po_terms_days ?? null);
