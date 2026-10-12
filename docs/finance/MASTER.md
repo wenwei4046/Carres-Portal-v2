@@ -284,14 +284,13 @@ Each changes only what Finance needs on that screen; nothing else on Jess's scre
 | Moving a deposit to another order | **Not built.** It changes payment records, and Payment already has `Correct allocation`. |
 | Old-slip approval window | **Not built.** |
 | Customer credit and debit notes | **Not built.** Customer invoices belong to Payment (Payment MASTER §1). |
-| Deposit invoices | **Built inside Finance and switched OFF.** See the rules below this table. |
+| Deposit invoices | **Not built** (measured 2026-10-12: no page, route, table or function for them was ever committed; this row said "built and switched OFF", which was wrong). Chew confirms them with Jess first (§5). See the rules below this table. |
 | Customer credit pot | **Not built.** |
 | Other debtors and other receipts | Keep. |
 
 Deposit invoice rules:
 - They are made from payment records, which Finance only reads. Payment's recording is not changed.
-- There is no menu entry while they are switched off.
-- Before they are ever switched on, check them against Payment's invoice model, the approved numbering (owner 2026-09-23) and e-invoice.
+- Before they are built, check them against Payment's invoice model, the approved numbering (owner 2026-09-23) and e-invoice.
 
 ### 3.2 Money out
 
@@ -743,7 +742,7 @@ FINANCE          its title folds the area (§4.1)
 
 1. **YH.** YH changes Finance code almost every day: over 100 commits from 2026-09-19 to 2026-10-01. Agree with YH before any Finance code changes.
 2. **File samples.** Before the readers are built, collect a sample card report and a sample bank statement from each provider. Hong Leong's card report is a secured PDF.
-3. **Deposit invoices.** Chew confirms them with Jess (2026-10-03). Check them against Payment's invoice rules and e-invoice before switching them on.
+3. **Deposit invoices.** Not built (§3.1). Chew confirms them with Jess (2026-10-03). Check them against Payment's invoice rules and e-invoice before building them.
 4. **Dealer commission.** Check the calculation with Chew step by step before anything about it changes.
 5. **Stock confirmation.** Stock's Month-end Stock Confirmation is not built, so every month's stock value stays live and provisional until it is; from then on each confirmed month is stored and never changes (§3.5, Chew 2026-10-12).
 6. **Year-end close.** Complete review recommendation is now in §3.5. Chew must settle the fiscal period, close/correction permissions, accounting treatment and lock activation before build; this proposal is not approval.
@@ -753,7 +752,7 @@ FINANCE          its title folds the area (§4.1)
 
 This pass reconciles documentation boundaries only; it does not change Chew's scoped decisions, Jess's overriding authority, production permissions or existing release status. Finance still owns its own money-out, bank/card reconciliation, ledger/month-end/tax and Finance-report configuration; customer recording, receipts, allocation, customer-facing bank instructions and collection remain Payment-owned (§3.1). The two receiving accounts observed in Payment Settings are not proof of Finance account mapping, settlement or reconciliation completion. `Payment Approver` and `Finance Approver` remain distinct duties resolved through the shared Workspace source (§2), not a second Finance staff rota. Leave/cover and ordinary helpers do not grant either approval right.
 
-Central Reports placement does not remove Finance's approved source-owned report pages (§§3.6,4) or approve a new company-wide formula. Any central summary must consume the Finance-owned definition, date anchor, permissions and coverage; provisional stock valuation remains provisional until Stock's required confirmation (§5). Customer bank messages, accounting money-account codes and bank statement accounts must be reconciled rather than presumed identical. Unverified mappings are not missing database facts. Deposit invoices remain switched off until the existing checks in §3.1 and §5 are met. No notification, sync, import, payout or automatic recovery is activated by this reconciliation. Existing samples, year-end design and release/acceptance gaps in §5 remain open.
+Central Reports placement does not remove Finance's approved source-owned report pages (§§3.6,4) or approve a new company-wide formula. Any central summary must consume the Finance-owned definition, date anchor, permissions and coverage; provisional stock valuation remains provisional until Stock's required confirmation (§5). Customer bank messages, accounting money-account codes and bank statement accounts must be reconciled rather than presumed identical. Unverified mappings are not missing database facts. Deposit invoices are not built, and are not built until the existing checks in §3.1 and §5 are met. No notification, sync, import, payout or automatic recovery is activated by this reconciliation. Existing samples, year-end design and release/acceptance gaps in §5 remain open.
 
 ## 6 · Sources
 
