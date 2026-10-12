@@ -20,8 +20,8 @@
 | Reference research (FACT, binds nobody) | [`../research/houzs-ui-reference.md`](../research/houzs-ui-reference.md) · [`../research/grid-findings.md`](../research/grid-findings.md) |
 | Shared page flow, shared contracts, exceptions and the status of every shared capability | **this MASTER** |
 
-**Current shared UI target — owner, 12 Oct 2026:** `Sales Order.zip` (SHA-256
-`793931a7922b24155b963593139bd13c960fb101072edd8fdc94d5618164fe59`) replaces every earlier kit
+**Current shared UI target — owner, 12 Oct 2026, 5:35 PM:** the folder
+`design_handoff_sales_order_ui_kit` handed over that afternoon replaces every earlier kit
 value through the existing 01 / 02 / 03 and this MASTER; the earlier specimen folders are deleted. The
 specimen lives at `docs/ui-reference/sales-order-design/`; tokens mirror at
 `docs/ui/carres-tokens.css`. The canonical resolved values are in 01, including 01 §10 where the
