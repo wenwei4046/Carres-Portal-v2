@@ -22,6 +22,7 @@ import Checkbox from "@/components/kit/Checkbox";
 import StatusPill from "@/components/kit/StatusPill";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import TwoLineCell from "@/components/register/TwoLineCell";
 import { BY_SUPPLIER as B, daysBetween, type SupplierGroup } from "./by-supplier";
 
 /** The five fixed columns (01 §5) and the grid's own tick and arrow columns. */
@@ -34,18 +35,6 @@ const SUPPLIER_MIN = 150;
 
 const soRef = (so: number | null) => (so == null ? B.notRecorded : `SO-${so}`);
 const weekday = (iso: string) => fmtDate(iso).split(",")[0] ?? "";
-
-/** Two lines in one cell: the value, then one grey line (01 §5 cell formats). */
-function Two({ top, sub, warn = false, strong = false, testId }: {
-  top: ReactNode; sub?: ReactNode; warn?: boolean; strong?: boolean; testId?: string;
-}) {
-  return (
-    <span className="flex min-w-0 flex-col" data-testid={testId}>
-      <span className={`text-body ${strong ? "font-semibold" : ""} ${warn ? "text-c-warn-fg" : "text-c-ink"}`}>{top}</span>
-      {sub ? <span className={`break-words text-meta ${warn ? "text-c-warn-fg" : "text-c-secondary"}`}>{sub}</span> : null}
-    </span>
-  );
-}
 
 export default function SoBatchBySupplier({
   groups, today, isLoading, storageKey, sessionKey, canBuy, isTicked, onToggleLine, onToggleLines,
@@ -99,7 +88,7 @@ export default function SoBatchBySupplier({
   const columns = useMemo<DataGridColumn<SupplierGroup>[]>(() => [
     {
       key: "supplier", label: B.colSupplier, width: supplierWidth, minWidth: SUPPLIER_MIN, sortable: true, wrap: true,
-      accessor: (g) => <Two strong top={g.supplier ?? B.supplierNotSet} sub={B.supplierLine(g)} testId={`by-supplier-name-${g.key}`} />,
+      accessor: (g) => <TwoLineCell strong top={g.supplier ?? B.supplierNotSet} sub={B.supplierLine(g)} testId={`by-supplier-name-${g.key}`} />,
       sortFn: (a, b) => (a.supplier ?? "").localeCompare(b.supplier ?? ""),
       searchValue: (g) => `${g.supplier ?? B.supplierNotSet} ${g.lines.map((l) => `${l.item} ${l.variant ?? ""} ${soRef(l.so)}`).join(" ")}`,
       filterValue: (g) => g.supplier ?? B.supplierNotSet,
@@ -107,13 +96,13 @@ export default function SoBatchBySupplier({
     },
     {
       key: "items", label: B.colItems, width: FIXED.items, minWidth: FIXED.items, sortable: true, wrap: true,
-      accessor: (g) => <Two top={B.qty(g.category, g.qty)} sub={B.models(g.models)} />,
+      accessor: (g) => <TwoLineCell top={B.qty(g.category, g.qty)} sub={B.models(g.models)} />,
       sortFn: (a, b) => a.qty - b.qty,
       exportValue: (g) => B.qty(g.category, g.qty),
     },
     {
       key: "orders", label: B.colOrders, headerLines: ["Sales", "orders"], width: FIXED.orders, minWidth: FIXED.orders, sortable: true, wrap: true,
-      accessor: (g) => <Two top={String(g.orders.length)} sub={<span title={g.orders.map((o) => soRef(o.so)).join(", ")}>{B.orderRefs(g.orders, soRef)}</span>} />,
+      accessor: (g) => <TwoLineCell top={String(g.orders.length)} sub={<span title={g.orders.map((o) => soRef(o.so)).join(", ")}>{B.orderRefs(g.orders, soRef)}</span>} />,
       sortFn: (a, b) => a.orders.length - b.orders.length,
       exportValue: (g) => g.orders.map((o) => soRef(o.so)).join(", "),
     },
@@ -122,7 +111,7 @@ export default function SoBatchBySupplier({
       accessor: (g) => {
         if (!g.orderBy) return <span className="text-body text-c-secondary">{B.notRecorded}</span>;
         const days = daysBetween(today, g.orderBy);
-        return <Two warn={days < 0} top={fmtDateShort(g.orderBy)} sub={`${weekday(g.orderBy)} · ${B.deadline(days)}`} testId={`by-supplier-deadline-${g.key}`} />;
+        return <TwoLineCell warn={days < 0} top={fmtDateShort(g.orderBy)} sub={`${weekday(g.orderBy)} · ${B.deadline(days)}`} testId={`by-supplier-deadline-${g.key}`} />;
       },
       sortFn: (a, b) => (a.orderBy ?? "9999").localeCompare(b.orderBy ?? "9999"),
       exportValue: (g) => g.orderBy ?? "",
@@ -131,7 +120,7 @@ export default function SoBatchBySupplier({
       key: "readyBy", label: B.colReadyBy, headerLines: ["Supplier", "ready by"], width: FIXED.readyBy, minWidth: FIXED.readyBy, sortable: true, wrap: true,
       accessor: (g) =>
         g.readyBy
-          ? <Two top={fmtDateShort(g.readyBy)} sub={`${weekday(g.readyBy)} · ${B.ifSentToday}`} />
+          ? <TwoLineCell top={fmtDateShort(g.readyBy)} sub={`${weekday(g.readyBy)} · ${B.ifSentToday}`} />
           : <span className="text-body text-c-secondary">{g.supplier ? B.notRecorded : B.supplierNotSet}</span>,
       sortFn: (a, b) => (a.readyBy ?? "9999").localeCompare(b.readyBy ?? "9999"),
       exportValue: (g) => g.readyBy ?? "",

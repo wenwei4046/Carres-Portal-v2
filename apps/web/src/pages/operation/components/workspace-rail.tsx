@@ -19,7 +19,7 @@
  * counts 12px muted; groups part on the thin section line. No box inside the
  * box, no coloured edge marker. Icons are Material Symbols through `MIcon`.
  */
-import {
+import { useRef,
   createContext,
   useCallback,
   useContext,
@@ -586,6 +586,12 @@ export function FilterRailSelect({
  *  shared purchasing responsive pattern) — and, since S3, starts hidden. */
 export const FILTER_RAIL_FLOAT_BELOW_PX = 896;
 
+/** A kit list (01 §5: fixed columns and one flexible first column) needs about
+ *  790 for itself beside the 264 rail, or its last column leaves the screen.
+ *  A page showing one passes this so the rail steps aside sooner; the
+ *  person's own choice to open it is still kept. */
+export const FILTER_RAIL_KIT_LIST_BELOW_PX = 1056;
+
 /**
  * ⭐ S3 · THE RAIL'S OPEN STATE, REMEMBERED PER BROWSER (owner follow-up
  * 2026-09-16, SO Batch Purchase + Manual Purchase).
@@ -606,7 +612,10 @@ export const FILTER_RAIL_FLOAT_BELOW_PX = 896;
 export function useFilterRailOpen(
   storageKey: string,
   canvasRef: RefObject<HTMLElement | null>,
+  /** The canvas width under which the rail steps aside. A wider list raises it. */
+  floatBelow: number = FILTER_RAIL_FLOAT_BELOW_PX,
 ): [boolean, (open: boolean) => void] {
+  const limit = useRef(floatBelow);
   const [stored] = useState<string | null>(() => {
     try {
       return localStorage.getItem(storageKey);
@@ -624,17 +633,25 @@ export function useFilterRailOpen(
   useLayoutEffect(() => {
     if (stored != null) return;
     const width = canvasRef.current?.clientWidth ?? 0;
-    if (width > 0 && width < FILTER_RAIL_FLOAT_BELOW_PX) setOpen(false);
+    if (width > 0 && width < floatBelow) setOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  /* The page changed what it shows (a wider list, or back): judge the same
+     canvas against the new limit, once, without touching the stored choice. */
+  useEffect(() => {
+    if (limit.current === floatBelow) return;
+    limit.current = floatBelow;
+    const width = canvasRef.current?.clientWidth ?? 0;
+    if (width > 0) setNarrowHidden(width < floatBelow);
+  }, [floatBelow, canvasRef]);
   useEffect(() => {
     const el = canvasRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
-    let wasNarrow = el.clientWidth > 0 && el.clientWidth < FILTER_RAIL_FLOAT_BELOW_PX;
+    let wasNarrow = el.clientWidth > 0 && el.clientWidth < limit.current;
     const observer = new ResizeObserver(() => {
       const width = el.clientWidth;
       if (width <= 0) return;
-      const narrow = width < FILTER_RAIL_FLOAT_BELOW_PX;
+      const narrow = width < limit.current;
       if (narrow && !wasNarrow) setNarrowHidden(true);
       if (!narrow && wasNarrow) setNarrowHidden(false);
       wasNarrow = narrow;

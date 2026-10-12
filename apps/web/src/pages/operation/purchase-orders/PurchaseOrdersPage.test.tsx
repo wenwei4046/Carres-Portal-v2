@@ -291,7 +291,9 @@ const renderOpen = ((...args: Parameters<typeof render>) => {
   return result;
 }) as typeof render;
 
-function renderPage(path: string | { pathname: string; search?: string; state?: unknown } = "/operation/procurement") {
+/* The eleven-column `Table` display is what most of this file measures; the
+   page's first display, `Overview`, has its own block at the end. */
+function renderPage(path: string | { pathname: string; search?: string; state?: unknown } = "/operation/procurement?view=table") {
   return renderOpen(
     <MemoryRouter initialEntries={[path]}>
       <PurchaseOrdersPage />
@@ -1239,5 +1241,54 @@ describe("Purchase Order object", () => {
     fireEvent.click(screen.getByRole("button", { name: "Download PDF" }));
     expect(await screen.findByText("The official PDF could not be downloaded")).toBeInTheDocument();
     expect(screen.getByText("Use Download PDF again. If it still fails, ask the system owner to check the PO document.")).toBeInTheDocument();
+  });
+});
+
+/* ⭐ THE OVERVIEW DISPLAY (owner's 12 Oct 2026 package; MASTER §9.3). The
+   page's first display: six columns over the SAME rows and facts as `Table`,
+   one flat list, and the four governed groups read as `Open` · `Received` ·
+   `All`. Nothing is removed: `Table` and `Cards` stay one click away. */
+describe("Purchase Orders Overview", () => {
+  const OVERVIEW = "/operation/procurement";
+  it("is the first display and draws the six columns in order, with no groups", () => {
+    renderPage(OVERVIEW);
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    expect(within(screen.getByRole("tablist", { name: "Purchase Orders display" })).getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Overview", "Table", "Cards"]);
+    expect(screen.getByTestId("register-columns")).toHaveTextContent(
+      /^PO No \| Items \| SO No \/ MPR No \| PO Doc Date \| PO Delivery Date \| Status$/,
+    );
+    const grid = screen.getByTestId("register-grid");
+    expect(grid).not.toHaveAttribute("data-groups");
+    expect(grid).not.toHaveAttribute("data-leading");
+  });
+  it("prints the PO with its supplier, the quantity with its category, and the governed status", () => {
+    renderPage(OVERVIEW);
+    const row = screen.getByTestId("grid-row-PO-20260828-4827");
+    expect(within(row).getByTestId("po-overview-po-PO-20260828-4827")).toHaveTextContent(/^PO-260828-4827-V2Hooka$/);
+    expect(row).toHaveTextContent("3 pcs");
+    expect(row).toHaveTextContent("28 Aug");
+    expect(within(row).getByTestId("po-overview-status-PO-20260828-4827")).toHaveTextContent("Sending not confirmed");
+  });
+  it("the PO number still opens the PO", () => {
+    renderPage(OVERVIEW);
+    fireEvent.click(screen.getByRole("button", { name: /^PO-260828-4827-V2$/ }));
+    expect(screen.getByTestId("purchase-order-object")).toBeInTheDocument();
+  });
+  it("Open hides completed and cancelled POs; Received and All read the same governed groups", () => {
+    Object.assign(queryData.pos[0]!, { status: "cancelled" });
+    const open = renderPage(OVERVIEW);
+    expect(screen.queryByTestId("grid-row-PO-20260828-4827")).not.toBeInTheDocument();
+    open.unmount();
+    const all = renderPage(`${OVERVIEW}?state=all`);
+    expect(within(screen.getByTestId("grid-row-PO-20260828-4827")).getByTestId("po-overview-status-PO-20260828-4827")).toHaveTextContent(/^Cancelled$/);
+    all.unmount();
+    renderPage(`${OVERVIEW}?state=received`);
+    expect(screen.queryByTestId("grid-row-PO-20260828-4827")).not.toBeInTheDocument();
+    for (const row of screen.queryAllByTestId(/^grid-row-/)) expect(row).toHaveTextContent("Completed");
+  });
+  it("Table keeps the eleven columns and the four groups", () => {
+    renderPage(`${OVERVIEW}?view=table`);
+    expect(screen.getByRole("tab", { name: "Table" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("register-grid")).toHaveAttribute("data-groups", "not_marked_as_sent,issued,completed,cancelled");
   });
 });

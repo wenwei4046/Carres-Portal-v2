@@ -4176,6 +4176,38 @@ a layout and pressing `PO sent to supplier` on production.
 PO; source is approved demand. The listing answers to whom, what, and when goods should arrive.
 Quantity progress belongs to Warehouse Inbound / Receiving and PO detail.
 
+**OVERVIEW DISPLAY — owner's 12 Oct 2026 package · BUILT 12 Oct 2026 · the page's first display.**
+The page opens on `Overview`; the display switch reads `Overview` · `Table` · `Cards`. `Table` is the
+eleven-column grouped register below, unchanged, and `Cards` is unchanged: the three displays read
+the SAME rows and the same register facts, so they cannot disagree, and nothing was removed.
+
+```text
+PO No (supplier under it) · Items (quantity, category under it) · SO No / MPR No ·
+PO Doc Date · PO Delivery Date · Status
+```
+
+- One flat list with the tabs `Open` · `Received` · `All` in place of the four group headings. They
+  are the governed groups read three ways: `Open` = `Confirm PO sent to supplier` and `Waiting for
+  goods from supplier`; `Received` = `Completed`; `All` adds `Cancelled`. Each PO still belongs to
+  exactly one group, by the same classification.
+- `Status` prints the governed document state: `Sending not confirmed` (amber pill), `Waiting for
+  goods from supplier` (plain), `Completed` (green pill), `Cancelled` (plain). One line under it,
+  from the same rail facts: `Supplier delivery date passed` (amber) or `Partly received`; a
+  completed PO shows its first goods received date. Amber appears only on the row that needs action.
+- `PO No` opens the PO, as in `Table`. `SO No / MPR No` is the same cell as `Table`: one reference
+  is its own door, several open their list in place. The arrow opens the same ordered-goods rows.
+- The facts this display does not print (`Supplier` as its own column, `Supplier Deliver To`,
+  `Supplier Confirmed Delivery Date`, `Goods Received Date`, `GRN No`, `PO Version`) stay in
+  `Table`, in the goods rows and on the PO. The package's `Supplier deadline` is the Portal's `PO
+  Delivery Date`; its `PO no.` and `Sales orders` headings are not Portal words.
+- Widths: five fixed columns and `PO No` taking the rest, never under 146, so `Status` stays in
+  view with no side scroll at 1025, 1164 and 1440 (measured 12 Oct 2026 on the fixture preview).
+  The filter rail steps aside under a 1056 canvas while a kit list is shown (a person's own choice
+  to open it is kept); SO Batch Purchase's `By supplier` follows the same rule, which closes its
+  side scroll at 1164.
+- Owed: a signed-in look on production, and the package's Summary panel (`THIS MONTH` · `NEEDS
+  ATTENTION` · `OPEN PIECES`), which is not built; the rail keeps the approved filters.
+
 **Columns — APPROVED / LOCKED (Jess, 2026-09-18) · BUILT 2026-09-18, exactly in order:**
 
 ```text
