@@ -36,7 +36,7 @@ Recorded date/time → actor → event/result → source document/evidence. Dist
 
 ## 7 · Settings
 
-Group by purpose and owning module. Sections are a segmented tab row under the title. Plain rows show name, short explanation and value; detail reveals stable ID, access, source, effective treatment and history. Repeated entities such as companies, brands, bank accounts and staff use tables. Authorized users can fill approved missing settings. Rules awaiting a business decision cannot be activated by the prototype. Do not add a box or status pill to every row. A change must show its effect on open records without silently restarting clocks.
+Group by purpose and owning module. Sections are a left section list (owner 11 Oct 2026); a segmented tab row is only for the groups inside one section. Plain rows show name, short explanation and value; detail reveals stable ID, access, source, effective treatment and history. Repeated entities such as companies, brands, bank accounts and staff use tables. Authorized users can fill approved missing settings. Rules awaiting a business decision cannot be activated by the prototype. Do not add a box or status pill to every row. A change must show its effect on open records without silently restarting clocks.
 
 ## 8 · Tasks and field screens
 
