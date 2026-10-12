@@ -13,6 +13,7 @@
     "migrations:replay": "node scripts/dry-run-migrations.mjs --baseline scripts/migration-replay-baseline.json",
     "ci:smoke": "node scripts/verify-production.mjs",
     "test:e2e": "playwright test",
+    "kit:check": "playwright test --config playwright.kit.config.ts",
     "test:e2e:install": "playwright install chromium",
     "seed:test-users": "tsx scripts/seed-test-users.ts",
     "seed:e2e-fixtures": "supabase db query --linked --file scripts/seed-e2e-fixtures.sql",
