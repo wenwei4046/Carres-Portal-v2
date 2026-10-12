@@ -1,13 +1,13 @@
 /* Carres design tokens, as built from the owner handoff of 9 Oct 2026. Target values: docs/ui/carres-tokens.css (v12, 11 Oct 2026).
    Taken from the target so far (12 Oct 2026): the Blue theme's hover, table row hover and selection pair; button and header lines;
    the side menu's selected pill (`--c-select-pill` is the kit's `--c-select-bg`; this file's `--c-select-bg` holds the kit's `--c-select-soft`),
-   its tree line and the soft lift.
+   its tree line and the soft lift; the segmented control's track.
    Everything else is still the 9 Oct build. Use only these; never the UI library's defaults. */
 :root{
   --c-ink:#221F20; --c-body:#3A3F47; --c-tab:#4A4F57; --c-secondary:#6B7178; --c-muted:#8A9099; --c-menu:#5C6168;
   --c-ground:#F5F3F0; --c-card:#FFFFFF; --c-hover:#EFECE8; --c-row-hover:#EFECE8;
   --c-card-border:#E9EBEE; --c-btn-border:#E5E7EB; --c-head-line:#E5E7EB; --c-row-line:#EEECE8; --c-footer-line:#EEF0F2; --c-section-line:#EEECE8; --c-input-border:#E1E4E8; --c-search-bg:#F0F1F3;
-  --c-select-bg:#FBE6DB; --c-select-fg:#A33A14; --c-select-pill:var(--c-select-bg); --c-tree-line:#BFC5CD; --c-focus:1px solid #C9CED6;
+  --c-select-bg:#FBE6DB; --c-select-fg:#A33A14; --c-select-pill:var(--c-select-bg); --c-tree-line:#BFC5CD; --c-track:#E2E4E8; --c-track-hover:#EEF0F3; --c-focus:1px solid #C9CED6;
   --c-ok-bg:#E7F6EC; --c-ok-fg:#1E7A40; --c-warn-bg:#FBF0D6; --c-warn-fg:#7A5A00; --c-err-bg:#FDECEC; --c-err-fg:#B42318; --c-info-bg:#F0F1F3; --c-info-fg:#3A3F47; --c-hold-bg:#221F20; --c-hold-fg:#FFFFFF; --c-online:#1E8A47;
   --font:'Inter',system-ui,sans-serif;
   --fs-page:20px; --fs-crumb:14px; --fs-menu:14px; --fs-card:15px; --fs-body:13px; --fs-label:12px; --fs-small:11px; --fs-group:10px;

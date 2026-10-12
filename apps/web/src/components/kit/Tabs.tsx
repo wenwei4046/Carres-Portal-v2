@@ -35,6 +35,16 @@ export interface TabDef {
   icon?: IconName;
 }
 
+/**
+ * The segmented control's drawing, for the few tab bars that are plain buttons
+ * with `role="tab"` rather than this component. One drawing, written once:
+ * a page takes these and adds nothing of its own.
+ */
+export const SEGMENTED_TRACK = "inline-flex items-center gap-0 rounded-[10px] bg-c-track p-[3px]";
+export const SEGMENT = "whitespace-nowrap rounded-lg px-3 py-[5px] text-body";
+export const SEGMENT_ON = "bg-c-select-pill font-medium text-c-select-fg [box-shadow:var(--shadow-lift)]";
+export const SEGMENT_OFF = "font-normal text-c-tab hover:bg-c-track-hover";
+
 export default function Tabs({
   tabs,
   value,
@@ -55,14 +65,14 @@ export default function Tabs({
   orientation?: "horizontal" | "vertical";
   variant?: "underline" | "segmented";
 }) {
-  /* v4 UI kit (01 §3 · UI-KIT "Tabs"). Two shapes, one grammar:
-   *   tabs   · pad 5 × 12 · 13 · radius 8 · gap 2 · selected 600 in the theme
-   *            select colours · others 500 transparent tab grey · hover grey.
-   *   switch · a view switch inside a card: the ground-colour round track,
-   *            pad 3, buttons pad 4 × 10 at 12.
-   * No underline and no indicator bar: the selected wash IS the indicator.
+  /* THE SEGMENTED CONTROL (01 §3, owner 11 Oct 2026: tabs are the shell's one
+   * shared control). List tabs, view switches and Settings tabs are all this
+   * one drawing: track `--c-track`, radius 10, pad 3 · segment pad 5 × 12 at
+   * 13 · selected the theme's pill with its text at 500 and the soft lift ·
+   * others 400 in the quiet grey. No underline and no indicator bar.
+   * `variant` is kept so callers need no edit; both values draw the same.
    * Keyboard focus is the shell's one outline (`--c-focus`, offset −2). */
-  const segmented = variant === "segmented";
+  void variant;
   return (
     <RadixTabs.Root orientation={orientation} value={value} onValueChange={onValueChange}>
       <RadixTabs.List
@@ -70,10 +80,8 @@ export default function Tabs({
         data-kit="tabs"
         data-variant={variant}
         className={
-          (segmented
-            ? "inline-flex items-center rounded-full bg-c-ground p-[3px] "
-            : "flex items-center ") +
-          `${fill ? "gap-0" : "gap-0.5"} data-[orientation=vertical]:flex-col data-[orientation=vertical]:items-stretch`
+          `${fill ? "flex" : "inline-flex"} items-center rounded-[10px] bg-c-track p-[3px] ` +
+          "gap-0 data-[orientation=vertical]:flex-col data-[orientation=vertical]:items-stretch"
         }
       >
         {tabs.map((t) => (
@@ -83,11 +91,10 @@ export default function Tabs({
             disabled={t.disabled}
             data-kit="tab"
             className={
-              `relative flex items-center gap-1.5 whitespace-nowrap rounded-lg font-medium ${fill ? "flex-auto justify-center" : ""} ` +
-              (segmented ? "px-2.5 py-1 text-meta " : "px-3 py-[5px] text-body ") +
+              `relative flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-[5px] text-body ${fill ? "flex-auto justify-center" : ""} ` +
               "data-[orientation=vertical]:justify-start " +
-              "data-[state=inactive]:text-c-tab data-[state=inactive]:hover:bg-c-hover " +
-              "data-[state=active]:bg-c-select-bg data-[state=active]:font-semibold data-[state=active]:text-c-select-fg " +
+              "data-[state=inactive]:font-normal data-[state=inactive]:text-c-tab data-[state=inactive]:hover:bg-c-track-hover " +
+              "data-[state=active]:bg-c-select-pill data-[state=active]:font-medium data-[state=active]:text-c-select-fg data-[state=active]:[box-shadow:var(--shadow-lift)] " +
               "disabled:opacity-40 disabled:cursor-not-allowed"
             }
           >

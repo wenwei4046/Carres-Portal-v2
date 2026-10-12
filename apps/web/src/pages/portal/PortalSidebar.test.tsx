@@ -260,7 +260,7 @@ describe("PortalSidebar — narrow desktop", () => {
 
     try {
       renderAt("/operation?tab=delivery");
-      expect(screen.getByRole("complementary")).toHaveStyle({ width: "220px" });
+      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "220px" });
       expect(screen.getByRole("button", { name: "Collapse menu" })).toBeInTheDocument();
     } finally {
       Object.defineProperty(window, "matchMedia", { configurable: true, value: previous });
@@ -272,19 +272,19 @@ describe("PortalSidebar — narrow desktop", () => {
     const toggle = screen.getByRole("button", { name: "Collapse menu" });
     expect(toggle).toHaveTextContent("«");
     fireEvent.click(toggle);
-    expect(screen.getByRole("complementary")).toHaveStyle({ width: "64px" });
+    expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "64px" });
     expect(screen.getByRole("button", { name: "Expand menu" })).toHaveTextContent("»");
     expect(localStorage.getItem(COLLAPSE_KEY)).toBe("1");
     view.unmount();
     // The next load keeps the person's choice.
     renderAt("/operation?tab=delivery");
-    expect(screen.getByRole("complementary")).toHaveStyle({ width: "64px" });
+    expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "64px" });
   });
 
   it("an older stored collapse never carries over — only the new key counts", () => {
     localStorage.setItem("ops-sidebar-collapsed", "1");
     renderAt("/operation?tab=delivery");
-    expect(screen.getByRole("complementary")).toHaveStyle({ width: "220px" });
+    expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "220px" });
   });
 });
 
@@ -688,7 +688,7 @@ describe("the active page — theme select colours, never flame", () => {
     localStorage.setItem(COLLAPSE_KEY, "1");
     try {
       renderAt("/operation/orders");
-      expect(screen.getByRole("complementary")).toHaveStyle({ width: "64px" });
+      expect(screen.getByTestId("portal-sidebar")).toHaveStyle({ width: "64px" });
       // Collapsed, the children disappear and the MODULE's one icon remains.
       const icon = screen.getByTitle("Sales Orders") as HTMLAnchorElement;
       expect(icon).toHaveAttribute("href", "/operation/orders");
@@ -1618,10 +1618,11 @@ describe("the one Settings row, at the bottom of the menu", () => {
       expect(screen.getAllByTestId("nav-settings"), path).toHaveLength(1);
       expect(settings).toHaveAttribute("href", "/operation/settings");
       expect(settings).toHaveTextContent("Settings");
-      // Below the module list, never inside it.
-      const nav = screen.getByRole("navigation", { name: "Modules" });
-      expect(nav.contains(settings)).toBe(false);
-      expect(nav.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      // Below the module list, never inside it; inside the one Modules landmark.
+      const list = screen.getByTestId("portal-sidebar-list");
+      expect(list.contains(settings)).toBe(false);
+      expect(list.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(screen.getByRole("navigation", { name: "Modules" }).contains(settings)).toBe(true);
       // ...and no module grows a Settings page of its own.
       expect(screen.queryByTestId("nav-child-purchasing-settings")).not.toBeInTheDocument();
       view.unmount();
@@ -1664,9 +1665,29 @@ it("Settings does not select Dashboard or restore a permanent Staff & Duties men
   // The one selected row is Settings itself.
   expect(screen.getByTestId("nav-settings")).toHaveAttribute("aria-current", "page");
   expect(screen.getByTestId("nav-settings").className).toContain(SELECTED);
-  expect(document.querySelectorAll("nav [aria-current='page']")).toHaveLength(0);
+  // No module or page in the list is selected with it.
+  expect(screen.getByTestId("portal-sidebar-list").querySelectorAll("[aria-current='page']")).toHaveLength(0);
+  expect(document.querySelectorAll("[aria-current='page']")).toHaveLength(1);
 });
 
+
+describe("the menu frame (01 §4)", () => {
+  it("the whole menu is the one Modules landmark and carries the right hairline", () => {
+    renderAt("/operation");
+    const menu = screen.getByRole("navigation", { name: "Modules" });
+    expect(menu).toBe(screen.getByTestId("portal-sidebar"));
+    expect(menu.className).toContain("border-r");
+    expect(menu.className).toContain("border-c-head-line");
+    expect(screen.getAllByRole("navigation", { name: "Modules" })).toHaveLength(1);
+  });
+
+  it("only the list scrolls: one scroller for the whole menu", () => {
+    renderAt("/operation?tab=purchase");
+    const scrollers = Array.from(screen.getByTestId("portal-sidebar").querySelectorAll<HTMLElement>("*"))
+      .filter((el) => /overflow-y-auto|overflow-auto|overflow-y-scroll/.test(el.className));
+    expect(scrollers).toEqual([screen.getByTestId("portal-sidebar-list")]);
+  });
+});
 
 describe("Showroom operator destinations", () => {
   it("opens Carres and leaves Dealer non-clickable beneath the Showroom parent", () => {
