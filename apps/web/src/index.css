@@ -117,9 +117,8 @@
     --info:           217 10% 25%;
     --info-soft:      220 11% 95%;
     --info-foreground: 0 0% 100%;
-    /* Hover tint — THE single hover fill for every clickable row/nav/chip
-       (hover:bg-hovertint): the v4 hover. Selection is the select wash. */
-    --hover-tint:     34 18% 92%;
+    /* Hover tint (hover:bg-hovertint) is the token `--c-row-hover` in
+       styles/carres-tokens.css, so it follows the person's theme. */
     --error-soft:      0 81% 96%;   /* problem wash */
   }
 }

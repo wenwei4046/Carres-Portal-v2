@@ -122,7 +122,7 @@ export default {
           foreground: "hsl(var(--info-foreground))",
         },
         // THE hover tint — hover:bg-hovertint on every clickable row/nav/chip.
-        hovertint: "hsl(var(--hover-tint))",
+        hovertint: "var(--c-row-hover)",
         error: {
           // --error shares its hue/saturation with --destructive to keep
           // shadcn primitives (alerts, toasts) untouched. The *-soft variant
@@ -142,6 +142,7 @@ export default {
           ground: "var(--c-ground)",
           card: "var(--c-card)",
           hover: "var(--c-hover)",
+          "row-hover": "var(--c-row-hover)",
           "card-border": "var(--c-card-border)",
           "btn-border": "var(--c-btn-border)",
           "head-line": "var(--c-head-line)",
@@ -210,7 +211,7 @@ export default {
             12: "var(--c-ink)", // primary text
           },
           blue: {
-            2: "var(--c-hover)", // row hover
+            2: "var(--c-row-hover)", // row hover
             3: "var(--c-select-bg)", // selected row · active choice
             6: "var(--c-btn-border)", // edge of a selected surface
             9: "var(--c-ink)", // the one action fill — the charcoal main button
