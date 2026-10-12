@@ -643,7 +643,7 @@ All reports only read. Reports → Payment stays Payment's.
 - Not built: the trade or other payables chips, and a PDF.
 - Falsifier: in Chew's test, a supplier's balance here differs from AP · Payables' net owing today, or the footer's difference is not zero.
 
-**AR Aging — Chew's ruling (2026-10-03; 2026-10-12, 「就根据开了invoice还没还的就出现…包括普通顾客」); BUILT 2026-10-12 (0686) for Chew's test. The layout and the arithmetic below are PROPOSAL / NOT LAW.**
+**AR Aging — Chew's ruling (2026-10-03; 2026-10-12, 「就根据开了invoice还没还的就出现…包括普通顾客」); BUILT 2026-10-12 (0686) for Chew's test; 0686 APPLIED 2026-10-12 on Chew's 「做」 for the build batch, the tracker holding the file exactly (md5 `66467f6080314aa58d68ab79239159bb`). The layout and the arithmetic below are PROPOSAL / NOT LAW.**
 - Reports → AR Aging, after AP Aging. Every invoice issued and not yet fully paid on a chosen day, for ordinary customers (Payment's sales and storage invoices, read and never changed) and other debtors (Finance's own invoices). It is aged as AP Aging is: by month or by 30-day steps, by invoice date or due date.
 - What a customer's invoice still owes is worked out on the books' own window, from the ledger's start to the day:
   - the order's payments fill its earliest invoice first;
