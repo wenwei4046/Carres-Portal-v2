@@ -72,7 +72,7 @@ export default function SettingsEditors() {
 
   return (
     <PageShell variant="settings" title="Settings editors">
-      <div className="mx-auto grid w-full max-w-4xl gap-5 overflow-auto p-5" data-testid="settings-editors">
+      <div className="mx-auto grid w-full max-w-[1100px] gap-5 overflow-auto p-5" data-testid="settings-editors">
         {!data.stored && <Notice testId="settings-editors-not-installed">{W.notInstalled}</Notice>}
         {data.stored && !data.canManage && (
           <Notice testId="settings-editors-read-only">You can read this page. Only the owner names Settings editors.</Notice>
