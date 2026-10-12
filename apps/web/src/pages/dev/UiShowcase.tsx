@@ -30,6 +30,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Badge from "@/components/kit/Badge";
 import Block from "@/components/kit/Block";
 import ChecklistRow from "@/components/kit/ChecklistRow";
+import StepList, { Step } from "@/components/kit/StepList";
 import QuietRouteRow from "@/components/kit/QuietRouteRow";
 import RouteStop from "@/components/kit/RouteStop";
 import Button from "@/components/kit/Button";
@@ -996,6 +997,24 @@ export default function UiShowcase() {
           </div>
           <div className="max-w-[640px]">
             <ChecklistRow mark="open" step="{Step not yet}" value="{state}" stacked />
+          </div>
+        </Section>
+
+        <Section
+          id="step-list"
+          title="StepList — the numbered steps of one job"
+          note="A 20px round mark, a 13 / 500 title, one 12 grey line and the step's own controls. Done is green with a tick, the step to do now is dark, a later step is white. The marks say where the person is; they never record anything."
+        >
+          <div className="max-w-[420px]">
+            <Block title="{Job}">
+              <StepList aria-label="{Job}">
+                <Step n={1} state="done" title="{Step done}" sub="{What was done}" />
+                <Step n={2} state="current" title="{Step to do now}" sub="{What to do}" action={<Button variant="neutral" size="sm">{"{Do it}"}</Button>} />
+                <Step n={3} state="pending">
+                  <div className="flex"><Button variant="primary" size="sm" disabled>{"{The one act}"}</Button></div>
+                </Step>
+              </StepList>
+            </Block>
           </div>
         </Section>
 

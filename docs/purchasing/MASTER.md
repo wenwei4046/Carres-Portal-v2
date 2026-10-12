@@ -1476,6 +1476,19 @@ facts, the one send area and the completion fact below.
   `Open email` · `Download PDF` · `PO sent to supplier`) is the only send control set, shown on the
   SO Batch and Manual Purchase issue review and on the PO object (§8.2). Workspace may embed the same
   component; it may never draw a second set.
+  **After Issue PO on SO Batch Purchase the send area is three numbered steps — BUILT 2026-10-12
+  (owner's 12 Oct package, drawn with the Portal's words; kit `StepList`).** ① `Download PDFs`
+  (`{k} of {n} downloaded`) with the supplier's POs to tick · ② `Send by WhatsApp or Email` with
+  `To`, `Subject`, `Message`, `Copy message` and the channel's own door · ③ `PO sent to supplier
+  ({n})`, which asks `Record as sent by {channel}?` and then writes the SAME `confirm-sent` record,
+  once per ticked PO, at the version shown, with the supplier's saved contact as recipient. The step
+  marks are this visit's guide only: a download or an opened channel records nothing and completes
+  nothing, and step 3 never waits on them. A PO already recorded for its current version is left
+  alone. A refusal names its PO in two lines and the other POs are still recorded. The result
+  panel no longer draws a second per-PO `PO sent to supplier` form beside these steps (one door,
+  Architecture Law C); `Open PDF` still opens each document. No undo is offered: a wrong record is corrected
+  by the PO's own rules. Not built from the package: the `Place` stage, a `Send PO` task per
+  supplier and category, the saved toast with `Next` and `Undo`, and the third-no-reply alarm.
 - **Action line for an issued PO whose current version is not marked sent**, by the supplier's
   recorded channel: `Click WhatsApp, send {PO No} to {Supplier}` · `Click Email, send {PO No} to
   {Supplier}` · no channel recorded: `Send {PO No} to {Supplier}`. Several unconfirmed POs name the

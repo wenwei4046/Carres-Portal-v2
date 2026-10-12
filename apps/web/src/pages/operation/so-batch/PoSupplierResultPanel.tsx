@@ -5,13 +5,11 @@ import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
 import Drawer from "@/components/kit/Drawer";
 import Modal from "@/components/kit/Modal";
-import Block from "@/components/kit/Block";
-import Button from "@/components/kit/Button";
 import PdfPreview from "@/components/kit/PdfPreview";
 import { apiFetch } from "@/lib/api";
 import { renderPoPdf } from "@/lib/pdf/render";
 import type { PoTemplateData } from "@/lib/pdf/types";
-import PoIssueEvidence, { type IssuedPo, type PoSendEvidence } from "../components/PoIssueEvidence";
+import type { IssuedPo } from "../components/PoIssueEvidence";
 import PoSupplierBundle, { type PoSupplierPreparation } from "./PoSupplierBundle";
 
 /** Recover exact Register lineage after a reload. One failed or mismatched
@@ -48,9 +46,10 @@ export default function PoSupplierResultPanel({ open, onOpenChange, pos, roundWi
 }
 
 /**
- * The supplier send area — `PoSupplierBundle`, the chosen PO's own evidence
- * (`PO sent to supplier`) and its PDF — without a container, so the round
- * panel can hold the very same controls (§5.6.1 "one send area").
+ * The supplier send area: `PoSupplierBundle` (its three steps hold the one
+ * `PO sent to supplier` act) and the chosen PO's PDF, without a container, so
+ * the round panel can hold the very same controls (§5.6.1 "one send area").
+ * A PDF opened here counts as held for the first step, at the version shown.
  */
 export function PoSupplierResultContent({ open, onClose, pos, roundWindow, onChanged, initialPreparation, title }: {
   open: boolean;
@@ -65,47 +64,34 @@ export function PoSupplierResultContent({ open, onClose, pos, roundWindow, onCha
   const location = useLocation();
   const [current, setCurrent] = useState<IssuedPo | null>(null);
   const [document, setDocument] = useState<PoTemplateData | null>(null);
-  const [evidence, setEvidence] = useState<PoSendEvidence[]>([]);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfOpen, setPdfOpen] = useState(false);
-  const [pdfReady, setPdfReady] = useState(false);
+  const [reviewed, setReviewed] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
-  const [refresh, setRefresh] = useState(0);
   useEffect(() => {
     if (!current || !open) return;
     let cancelled = false;
     let url: string | undefined;
-    setDocument(null); setEvidence([]); setPdfUrl(null); setPdfReady(false); setError(null);
-    void Promise.all([
-      apiFetch<PoTemplateData>(`/api/operation/pos/${encodeURIComponent(current.id)}/print-data`),
-      apiFetch<{ sends: PoSendEvidence[] }>(`/api/operation/pos/${encodeURIComponent(current.id)}/sends`),
-    ]).then(async ([data, sends]) => {
+    setDocument(null); setPdfUrl(null); setError(null);
+    void apiFetch<PoTemplateData>(`/api/operation/pos/${encodeURIComponent(current.id)}/print-data`).then(async (data) => {
       if (data.draft || data.po_id !== current.id || !Number.isInteger(data.version) || data.version < 1) throw new Error("invalid_po_document");
       const pdf = await renderPoPdf(data);
       if (cancelled) return;
       url = URL.createObjectURL(pdf);
-      setDocument(data); setEvidence(sends.sends); setPdfUrl(url);
+      setDocument(data); setPdfUrl(url);
     }).catch(() => { if (!cancelled) setError("Could not load the preview. Try again on the document."); });
     return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
-  }, [current, open, refresh]);
-  function changed() { setRefresh(previous => previous + 1); onChanged(); }
+  }, [current, open]);
   return <>
     <div className="flex flex-col gap-3" data-testid="po-supplier-result-panel">
-      <PoSupplierBundle pos={pos} roundWindow={roundWindow} onEvidenceChanged={changed} initialPreparation={initialPreparation} title={title}
+      <PoSupplierBundle pos={pos} roundWindow={roundWindow} onEvidenceChanged={onChanged} initialPreparation={initialPreparation} title={title} reviewed={reviewed}
         onOpenSettings={() => { onClose(); navigate("/operation/settings/purchasing"); }}
         onOpenObject={(id, preparation, sourcePos) => { onClose(); navigate(`/operation/procurement?po=${encodeURIComponent(id)}`, { state: { soBatchReturn: { path: `${location.pathname}${location.search}`, pos: sourcePos, preparation } } }); }} onPreview={(_id, po) => { setCurrent(po); setPdfOpen(true); }} />
-      {current && <Block title={document ? documentDisplayNumber(`${document.po_number}-V${document.version}`) : documentDisplayNumber(current.id)}>
-        {document && <><div className="text-body">{document.supplier.name} · {document.destination.name}</div>
-          {document.so_refs?.length ? <div className="text-body">SO {document.so_refs.join(", ")}</div> : null}
-        </>}
-        <Button disabled={!pdfUrl} onClick={() => setPdfOpen(true)}>Open PDF</Button>
-        {document && <PoIssueEvidence key={`${current.id}-${document.version}`} po={current} version={document.version}
-          evidence={evidence} onConfirmed={changed} hidePreparationTools mayConfirm={pdfReady} recordedRecipient />}
-        {error && <div role="alert" className="text-meta text-kit-red-11">{error}</div>}
-      </Block>}
+      {current && error && <div role="alert" className="text-meta text-kit-red-11">{error}</div>}
     </div>
     <Modal open={open && pdfOpen} onOpenChange={setPdfOpen} title={document ? documentDisplayNumber(`${document.po_number}-V${document.version}`) : current ? documentDisplayNumber(current.id) : "Purchase Orders"} width="viewer">
-      {pdfUrl ? <PdfPreview src={pdfUrl} title={document?.po_number ?? current?.id ?? "Purchase Orders"} onReady={setPdfReady} />
+      {pdfUrl ? <PdfPreview src={pdfUrl} title={document?.po_number ?? current?.id ?? "Purchase Orders"}
+        onReady={ready => { if (ready && current && document) setReviewed(previous => ({ ...previous, [current.id]: document.version })); }} />
         : <div className="text-body">{error ?? "Loading PDF…"}</div>}
     </Modal>
   </>;

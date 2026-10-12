@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { documentDisplayNumber } from "@carres/shared";
+import { SO_BATCH_TASK_WORDS as T, documentDisplayNumber, purchasingRefusal } from "@carres/shared";
 import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
+import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
+import StepList, { Step, type StepState } from "@/components/kit/StepList";
+import Tabs from "@/components/kit/Tabs";
 import Input from "@/components/kit/Input";
 import Textarea from "@/components/kit/Textarea";
 import { apiFetch } from "@/lib/api";
@@ -15,7 +18,7 @@ import { Block } from "../SalesOrderWorkspace";
 import { CHANNEL_WORD, confirmedSendFor, doorsForIssuedPo, refreshPurchasingReads, type IssuedPo, type PoSendEvidence } from "../components/PoIssueEvidence";
 
 import {
-  dispatchSupplierEmail, documentFailureOf, emailAttemptsKeyOf, loadPoDocument, loadPoSendFacts, mergeEmailAttempts,
+  confirmPoSent, dispatchSupplierEmail, documentFailureOf, emailAttemptsKeyOf, loadPoDocument, loadPoSendFacts, mergeEmailAttempts,
   readEmailAttempts, recordEmailEvidence, SupplierEmailFailure, type EmailAttempt,
 } from "./po-supplier-send";
 
@@ -36,8 +39,10 @@ export function readPoSupplierPreparation(value: unknown): PoSupplierPreparation
 }
 
 /** Same issued POs, grouped for supplier preparation and human-triggered dispatch. */
-export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEvidenceChanged, onOpenObject, initialPreparation, title = "Purchase orders", onOpenSettings }: {
+export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEvidenceChanged, onOpenObject, initialPreparation, title = "Purchase orders", onOpenSettings, reviewed }: {
   pos: readonly IssuedPo[];
+  /** PO id to the version whose PDF the person has opened beside this area. It counts as held, like a download. */
+  reviewed?: Readonly<Record<string, number>>;
   /** The Purchasing Settings door for a PDF blocked by a missing Supplier Deliver To address. */
   onOpenSettings?: () => void;
   /** The containing step's name (the round panel's `Send PDFs`). */
@@ -83,6 +88,13 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [resend, setResend] = useState(false);
+  /* The three steps (02 "Task steps"). `held` and `opened` are this visit's memory and only
+     move the step marks; the third step's mark reads the saved send record. */
+  const [held, setHeld] = useState<Record<string, number>>({});
+  const [opened, setOpened] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recordOpen, setRecordOpen] = useState(false);
+  const [recordFailures, setRecordFailures] = useState<Array<{ id: string; wrong: string; todo: string }>>([]);
   const [emailConfigured, setEmailConfigured] = useState(false);
   const [subject, setSubject] = useState(initialPreparation?.subject ?? "Carres · Purchase Orders");
   const [messageIntroduction, setMessageIntroduction] = useState(initialPreparation?.messageIntroduction ?? "");
@@ -99,6 +111,20 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
   const alreadySent = emailOutcome === "dispatched" || picked.some(po => documents[po.id] && confirmedSendFor(sendHistory[po.id] ?? [], documents[po.id].version));
   const sendBlocked = emailOutcome === "unknown" || (alreadySent && !resend);
   useEffect(() => { setResend(false); }, [supplier, scope, [...selected].sort().join("|")]);
+  useEffect(() => { setOpened(false); setRecordFailures([]); }, [supplier, scope]);
+  const versionOf = (po: IssuedPo) => documents[po.id]?.version;
+  const holds = (po: IssuedPo) => versionOf(po) != null && (held[po.id] === versionOf(po) || reviewed?.[po.id] === versionOf(po));
+  const sentAlready = (po: IssuedPo) => versionOf(po) != null && Boolean(confirmedSendFor(sendHistory[po.id] ?? [], versionOf(po)!));
+  const toRecord = picked.filter(po => versionOf(po) != null && !sentAlready(po));
+  const allSent = picked.length > 0 && !historyLoading && picked.every(sentAlready);
+  const heldCount = picked.filter(holds).length;
+  const allHeld = picked.length > 0 && heldCount === picked.length;
+  const channelOpened = opened || emailOutcome === "dispatched";
+  const recipient = (channel === "email" ? contact?.contactEmail : contact?.whatsappGroupUrl?.trim() || contact?.contact)?.trim() ?? "";
+  const stepOne: StepState = allSent || allHeld ? "done" : "current";
+  const stepTwo: StepState = allSent || channelOpened ? "done" : allHeld ? "current" : "pending";
+  const stepThree: StepState = allSent ? "done" : allHeld && channelOpened ? "current" : "pending";
+  const mayRecord = ready && !recording && !historyLoading && historyFailed.length === 0 && toRecord.length > 0 && recipient.length > 0;
 
   useEffect(() => {
     if (attemptsStorageKey.current !== attemptsKey) {
@@ -256,6 +282,7 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
       document.body.appendChild(link);
       link.click();
       link.remove();
+      setHeld(previous => ({ ...previous, ...Object.fromEntries(prepared.map(document => [document.id, document.version])) }));
     } catch (failure) {
       setError(failure instanceof Error && (failure.message === "stale_po_version" || failure.message === "Purchase order changed")
         ? "Purchase order changed. Open the latest PDF and send it again."
@@ -299,6 +326,29 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
     setBusy(false);
   }
 
+  /** `PO sent to supplier` for the ticked POs: the shared writer, once per PO, at the version shown. */
+  async function recordSent() {
+    if (!mayRecord) return;
+    setRecording(true);
+    setError(null);
+    const failures: Array<{ id: string; wrong: string; todo: string }> = [];
+    for (const po of toRecord) {
+      try { await confirmPoSent(po.id, versionOf(po)!, channel === "email" ? "email" : "whatsapp", recipient); }
+      catch (failure) {
+        const body = (failure as { body?: { message?: string; action?: string; code?: string } }).body;
+        const fallback = purchasingRefusal(body?.code, { po: po.id, supplier: po.supplierName, version: versionOf(po) });
+        failures.push({ id: po.id, wrong: body?.message ?? fallback.wrong, todo: body?.action ?? fallback.todo });
+      }
+    }
+    setRecordFailures(failures);
+    setRecordOpen(false);
+    setRecording(false);
+    setHistoryRefresh(previous => previous + 1);
+    refreshPurchasingReads();
+    onEvidenceChanged?.();
+  }
+
+  const supplierName = contact?.supplierName ?? "the supplier";
   return <Block title={title}>
     <div className="flex flex-col gap-3" data-testid="po-supplier-bundle">
       <Select id="po-bundle-scope" label="Purchase orders" value={scope} disabled={busy || scopeLoading} onValueChange={value => void changeScope(value === "today" ? "today" : "round")} options={[{ value: "round", label: roundWindow ? "This round" : "Purchase orders" }, { value: "today", label: "Today" }]} />
@@ -316,83 +366,121 @@ export default function PoSupplierBundle({ pos, onPreview, roundWindow, onEviden
         <div className="text-meta text-kit-red-11">Evidence could not be loaded</div>
         <Button disabled={scopeLoading || busy} onClick={() => void changeScope("today", true)}>Try again</Button>
       </div>}
-      <Checkbox id="po-bundle-all" label="Select all" disabled={busy || scopeLoading || !supplierPos.length} checked={supplierPos.length > 0 && picked.length === supplierPos.length ? true : picked.length ? "indeterminate" : false}
-        onCheckedChange={checked => { setSelected(new Set(checked ? supplierPos.map(po => po.id) : [])); setCopied(false); }} />
-      {supplierPos.map(po => <div key={po.id} className="flex flex-col gap-2 border-t border-kit-slate-5 pt-3">
-        <div className="flex items-center justify-between gap-2">
-        <Checkbox id={`po-bundle-${po.id}`} label={documents[po.id] ? documentDisplayNumber(`${documents[po.id].po_number}-V${documents[po.id].version}`) : documentDisplayNumber(po.id)}
-          disabled={busy} checked={selected.has(po.id)} onCheckedChange={checked => {
-            setSelected(previous => { const next = new Set(previous); if (checked) next.add(po.id); else next.delete(po.id); return next; }); setCopied(false);
-          }} />
-        <div className="flex items-center gap-2"><Button variant="neutral" size="sm" onClick={() => onPreview(po.id, po)}>Open PDF</Button>
-        {onOpenObject && <Button variant="neutral" size="sm" onClick={() => onOpenObject(po.id, {
-          supplierId: supplier, selectedIds: picked.map(po => po.id), channel: channel === "email" ? "email" : "whatsapp",
-          subject, messageIntroduction, scope, roundWindow,
-        }, activePos)}>Open full page</Button>}</div>
-        </div>
-        <div className="text-body">{documents[po.id]?.destination?.name ?? po.destination}</div>
-        {documents[po.id]?.so_refs?.length ? <div className="text-meta text-kit-slate-11">SO {documents[po.id].so_refs!.join(", ")}</div> : null}
-        {sendHistory[po.id] && documents[po.id] && <div className="text-meta text-kit-slate-11">
-          {confirmedSendFor(sendHistory[po.id], documents[po.id].version) ? "PO sent to supplier" : "Sending not confirmed"}
-        </div>}
-      </div>)}
-      {documentFailures.length > 0 && <div role="alert" className="flex flex-col gap-2">
-        {documentFailures.map(failure => <div key={failure.id} className="text-meta text-kit-red-11">{documentDisplayNumber(failure.id)} · {failure.message}</div>)}
-        <div className="flex flex-wrap gap-2">
-          <Button disabled={documentsLoading || busy} onClick={() => setDocumentRefresh(value => value + 1)}>Try again</Button>
-          {onOpenSettings && documentFailures.some(failure => failure.settings) && <Button onClick={onOpenSettings}>Open Settings</Button>}
-        </div>
-      </div>}
-      <Select id="po-bundle-channel" label="Communication channel" value={channel} onValueChange={value => setChannel(value === "email" ? "email" : "whatsapp")}
-        disabled={busy}
-        options={[{ value: "whatsapp", label: "WhatsApp" }, { value: "email", label: "Email" }]} />
-      <Input id="po-bundle-recipient" label="To" readOnly value={channel === "email" ? contact?.contactEmail ?? "" : contact?.whatsappGroupUrl ?? contact?.contact ?? ""} />
-      {channel === "email" && <>
-        <Input id="po-bundle-subject" label="Subject" value={subject} disabled={busy || sendBlocked} onChange={event => setSubject(event.target.value)} />
-      </>}
-      <Textarea id="po-bundle-introduction" label="Message" value={messageIntroduction} disabled={busy || sendBlocked} onChange={event => { setMessageIntroduction(event.target.value); setCopied(false); }} />
-      <Textarea id="po-bundle-message" label="PO No" value={message} readOnly />
-      {channel === "email" && picked.map(po => documents[po.id] && <div key={po.id} className="text-meta text-kit-slate-11">{documents[po.id].po_number.replace(/[^a-zA-Z0-9._-]/g, "_")}-V{documents[po.id].version}.pdf</div>)}
-      {channel === "email" && alreadySent && <Checkbox id="po-bundle-resend" label="Send again" checked={resend}
-        disabled={busy || historyLoading || historyFailed.length > 0 || emailOutcome === "unknown"}
-        onCheckedChange={checked => setResend(checked === true)} />}
-      <div className="flex flex-wrap gap-2">
-        <Button variant="neutral" size="sm" disabled={!ready} loading={busy} onClick={() => void download()}>Download PDFs</Button>
-        <Button variant="neutral" size="sm" disabled={!ready} onClick={() => {
-          void navigator.clipboard.writeText(preparedMessage).then(() => setCopied(true)).catch(() => setError("Select the message and copy it."));
-        }}>Copy message</Button>
-        {channel === "whatsapp" ? <Button variant="neutral" size="sm" disabled={!ready || !doors?.whatsapp}
-          onClick={() => { if (doors?.whatsapp) window.open(doors.whatsapp.url, "_blank", "noopener,noreferrer"); }}>Open WhatsApp</Button>
-          : <>
-            {/* ⭐ EMAIL IS ALWAYS A WAY TO SEND (owner correction 2026-10-05: Ohana
-                sends POs by Email today). Portal dispatch needs its provider;
-                without it the operator emails from their own mail with the
-                downloaded PDFs and records `PO sent to supplier` on the PO. */}
-            {!emailConfigured && <Button variant="neutral" size="sm" disabled={!ready || !contact?.contactEmail}
-              onClick={() => { if (contact?.contactEmail) window.location.href = `mailto:${encodeURIComponent(contact.contactEmail.trim())}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(preparedMessage)}`; }}>Open email</Button>}
-            <Button variant="primary" size="sm" disabled={!ready || !emailConfigured || !contact?.contactEmail || !subject.trim() || sendBlocked || historyLoading || historyFailed.length > 0} loading={busy}
-              title={!emailConfigured ? "Not available" : undefined} onClick={() => void sendEmail()}>Send Email</Button>
+      {/* ⭐ THREE STEPS, ONE SEND AREA (owner's 12 Oct 2026 package; Purchasing
+          MASTER §5.6). The marks only say where the person is. Downloading a
+          PDF or opening WhatsApp or Email records nothing: the third step is
+          the one act, and it writes the same `PO sent to supplier` record as
+          everywhere else. */}
+      <StepList aria-label="Send to supplier" data-testid="po-bundle-steps">
+        <Step n={1} state={stepOne} data-testid="po-bundle-step-download"
+          sub={picked.length > 0 ? T.downloaded(heldCount, picked.length) : undefined}
+          action={<Button variant="neutral" size="sm" icon="download" disabled={!ready} loading={busy} onClick={() => void download()}>Download PDFs</Button>}>
+          <Checkbox id="po-bundle-all" label="Select all" disabled={busy || scopeLoading || !supplierPos.length} checked={supplierPos.length > 0 && picked.length === supplierPos.length ? true : picked.length ? "indeterminate" : false}
+            onCheckedChange={checked => { setSelected(new Set(checked ? supplierPos.map(po => po.id) : [])); setCopied(false); }} />
+          {supplierPos.map(po => <div key={po.id} className="flex flex-col gap-1 border-t border-c-row-line pt-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Checkbox id={`po-bundle-${po.id}`} label={documents[po.id] ? documentDisplayNumber(`${documents[po.id].po_number}-V${documents[po.id].version}`) : documentDisplayNumber(po.id)}
+                disabled={busy} checked={selected.has(po.id)} onCheckedChange={checked => {
+                  setSelected(previous => { const next = new Set(previous); if (checked) next.add(po.id); else next.delete(po.id); return next; }); setCopied(false);
+                }} />
+              <div className="flex items-center gap-2"><Button variant="neutral" size="sm" onClick={() => onPreview(po.id, po)}>Open PDF</Button>
+              {onOpenObject && <Button variant="neutral" size="sm" onClick={() => onOpenObject(po.id, {
+                supplierId: supplier, selectedIds: picked.map(po => po.id), channel: channel === "email" ? "email" : "whatsapp",
+                subject, messageIntroduction, scope, roundWindow,
+              }, activePos)}>Open full page</Button>}</div>
+            </div>
+            <div className="text-body">{documents[po.id]?.destination?.name ?? po.destination}</div>
+            {documents[po.id]?.so_refs?.length ? <div className="text-meta text-c-secondary">SO {documents[po.id].so_refs!.join(", ")}</div> : null}
+            {sendHistory[po.id] && documents[po.id] && <div className="text-meta text-c-secondary" data-testid={`po-bundle-state-${po.id}`}>
+              {confirmedSendFor(sendHistory[po.id], documents[po.id].version) ? "PO sent to supplier" : "Sending not confirmed"}
+            </div>}
+          </div>)}
+          {documentFailures.length > 0 && <div role="alert" className="flex flex-col gap-2">
+            {documentFailures.map(failure => <div key={failure.id} className="text-meta text-kit-red-11">{documentDisplayNumber(failure.id)} · {failure.message}</div>)}
+            <div className="flex flex-wrap gap-2">
+              <Button disabled={documentsLoading || busy} onClick={() => setDocumentRefresh(value => value + 1)}>Try again</Button>
+              {onOpenSettings && documentFailures.some(failure => failure.settings) && <Button onClick={onOpenSettings}>Open Settings</Button>}
+            </div>
+          </div>}
+        </Step>
+        <Step n={2} state={stepTwo} title={T.sendBy} data-testid="po-bundle-step-send"
+          sub={!allSent && channelOpened ? T.sendHint : undefined}>
+          <Tabs variant="segmented" label="Communication channel" value={channel} onValueChange={value => { setChannel(value === "email" ? "email" : "whatsapp"); setRecordFailures([]); }}
+            tabs={[{ value: "whatsapp", label: "WhatsApp", icon: "message" }, { value: "email", label: "Email", icon: "mail" }]} />
+          <Input id="po-bundle-recipient" label="To" readOnly value={channel === "email" ? contact?.contactEmail ?? "" : contact?.whatsappGroupUrl ?? contact?.contact ?? ""} />
+          {channel === "email" && <>
+            <Input id="po-bundle-subject" label="Subject" value={subject} disabled={busy || sendBlocked} onChange={event => setSubject(event.target.value)} />
           </>}
-      </div>
-      {emailOutcome === "unknown" && <div role="status" className="text-meta text-kit-amber-11">Sending not confirmed</div>}
-      {emailAttempts.filter(attempt => attempt.status === "dispatched").map(emailEvidence => <div key={emailEvidence.id} className="flex flex-col gap-2">
-        <div className="text-strong">PO sent to supplier · Email</div>
-        {emailEvidence.documents.map(document => <div key={document.id} className="text-meta text-kit-slate-11">{documentDisplayNumber(`${document.id}-V${document.version}`)} · {document.recorded ? "PO sent to supplier" : "Not confirmed · Try again"}</div>)}
-        {emailEvidence.documents.some(document => !document.recorded) && <Button disabled={busy} onClick={() => void recordDispatchedEmail(emailEvidence)}>Save</Button>}
-      </div>)}
-      {copied && <div className="text-meta text-kit-slate-11">Copied. Contact result is unchanged.</div>}
+          <Textarea id="po-bundle-introduction" label="Message" value={messageIntroduction} disabled={busy || sendBlocked} onChange={event => { setMessageIntroduction(event.target.value); setCopied(false); }} />
+          <Textarea id="po-bundle-message" label="PO No" value={message} readOnly />
+          {channel === "email" && picked.map(po => documents[po.id] && <div key={po.id} className="text-meta text-c-secondary">{documents[po.id].po_number.replace(/[^a-zA-Z0-9._-]/g, "_")}-V{documents[po.id].version}.pdf</div>)}
+          {channel === "email" && alreadySent && <Checkbox id="po-bundle-resend" label="Send again" checked={resend}
+            disabled={busy || historyLoading || historyFailed.length > 0 || emailOutcome === "unknown"}
+            onCheckedChange={checked => setResend(checked === true)} />}
+          <div className="flex flex-wrap gap-2">
+            <Button variant="neutral" size="sm" icon="copy" disabled={!ready} onClick={() => {
+              void navigator.clipboard.writeText(preparedMessage).then(() => setCopied(true)).catch(() => setError("Select the message and copy it."));
+            }}>Copy message</Button>
+            {channel === "whatsapp" ? <Button variant="neutral" size="sm" icon="message" disabled={!ready || !doors?.whatsapp}
+              onClick={() => { if (doors?.whatsapp) { window.open(doors.whatsapp.url, "_blank", "noopener,noreferrer"); setOpened(true); } }}>{doors?.whatsapp?.isGroup ? T.openGroup : "Open WhatsApp"}</Button>
+              : <>
+                {/* ⭐ EMAIL IS ALWAYS A WAY TO SEND (owner correction 2026-10-05: Ohana
+                    sends POs by Email today). Portal dispatch needs its provider;
+                    without it the operator emails from their own mail with the
+                    downloaded PDFs and records `PO sent to supplier` in step 3. */}
+                {!emailConfigured && <Button variant="neutral" size="sm" icon="mail" disabled={!ready || !contact?.contactEmail}
+                  onClick={() => { if (contact?.contactEmail) { setOpened(true); window.location.href = `mailto:${encodeURIComponent(contact.contactEmail.trim())}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(preparedMessage)}`; } }}>Open email</Button>}
+                <Button variant="primary" size="sm" disabled={!ready || !emailConfigured || !contact?.contactEmail || !subject.trim() || sendBlocked || historyLoading || historyFailed.length > 0} loading={busy}
+                  title={!emailConfigured ? "Not available" : undefined} onClick={() => void sendEmail()}>Send Email</Button>
+              </>}
+          </div>
+          {emailOutcome === "unknown" && <div role="status" className="text-meta text-kit-amber-11">Sending not confirmed</div>}
+          {emailAttempts.filter(attempt => attempt.status === "dispatched").map(emailEvidence => <div key={emailEvidence.id} className="flex flex-col gap-2">
+            <div className="text-strong">PO sent to supplier · Email</div>
+            {emailEvidence.documents.map(document => <div key={document.id} className="text-meta text-c-secondary">{documentDisplayNumber(`${document.id}-V${document.version}`)} · {document.recorded ? "PO sent to supplier" : "Not confirmed · Try again"}</div>)}
+            {emailEvidence.documents.some(document => !document.recorded) && <Button disabled={busy} onClick={() => void recordDispatchedEmail(emailEvidence)}>Save</Button>}
+          </div>)}
+          {copied && <div className="text-meta text-c-secondary">Copied. Contact result is unchanged.</div>}
+        </Step>
+        <Step n={3} state={stepThree} title={allSent ? "PO sent to supplier" : undefined} data-testid="po-bundle-step-record">
+          {!allSent && <div className="flex flex-col items-start gap-1">
+            <Button variant="primary" size="sm" icon="confirm" disabled={!mayRecord} loading={recording} data-testid="po-bundle-record"
+              onClick={() => setRecordOpen(true)}>{T.recordSent(toRecord.length)}</Button>
+            {contact && !recipient && <span className="text-meta text-c-secondary" data-testid="po-bundle-no-recipient">
+              {channel === "email" ? `No email on file for ${supplierName}` : `No WhatsApp on file for ${supplierName}`}
+            </span>}
+          </div>}
+          {recordFailures.length > 0 && <div role="alert" className="flex flex-col gap-1" data-testid="po-bundle-record-failures">
+            {recordFailures.map(failure => <span key={failure.id} className="flex flex-col">
+              <span className="text-meta text-kit-red-11">{documentDisplayNumber(failure.id)} · {failure.wrong}</span>
+              <span className="text-meta text-c-secondary">{failure.todo}</span>
+            </span>)}
+          </div>}
+        </Step>
+      </StepList>
       {error && <div role="alert" className="text-meta text-kit-red-11">{error}</div>}
-      {historyFailed.length > 0 && <Block title="History">
+      {/* History sits under a hairline in the same card: never a box inside a box. */}
+      {historyFailed.length > 0 && <div className="flex flex-col items-start gap-2 border-t border-c-row-line pt-3">
+        <div className="text-body font-medium text-c-ink">History</div>
         {historyFailed.map(id => <div key={id} role="alert" className="text-meta text-kit-red-11">{id} · Evidence could not be loaded</div>)}
         <Button onClick={() => setHistoryRefresh(value => value + 1)}>Try again</Button>
-      </Block>}
-      {supplierPos.some(po => sendHistory[po.id]?.length) && <Block title="History">
+      </div>}
+      {supplierPos.some(po => sendHistory[po.id]?.length) && <div className="flex flex-col gap-2 border-t border-c-row-line pt-3" data-testid="po-bundle-history">
+        <div className="text-body font-medium text-c-ink">History</div>
         {supplierPos.flatMap(po => (sendHistory[po.id] ?? []).map((event, index) => <div key={`${po.id}-${index}`} className="flex flex-col gap-1">
-          <div className="text-strong">{event.kind === "confirmed_sent" ? "PO sent to supplier" : `${CHANNEL_WORD[event.channel] ?? event.channel} opened`}</div>
-          <div className="text-body">{documentDisplayNumber(`${po.id}${event.po_version ? `-V${event.po_version}` : ""}`)} · {CHANNEL_WORD[event.channel] ?? event.channel}</div>
-          <div className="text-meta text-kit-slate-11">{fmtDate(event.sent_at, { time: true })}{event.sent_by_name ? ` · ${event.sent_by_name}` : ""}</div>
+          <div className="text-body text-c-ink">{event.kind === "confirmed_sent" ? "PO sent to supplier" : `${CHANNEL_WORD[event.channel] ?? event.channel} opened`}</div>
+          <div className="text-meta text-c-body">{documentDisplayNumber(`${po.id}${event.po_version ? `-V${event.po_version}` : ""}`)} · {CHANNEL_WORD[event.channel] ?? event.channel}</div>
+          <div className="text-meta text-c-secondary">{fmtDate(event.sent_at, { time: true })}{event.sent_by_name ? ` · ${event.sent_by_name}` : ""}</div>
         </div>))}
-      </Block>}
+      </div>}
     </div>
+    <Modal open={recordOpen} onOpenChange={setRecordOpen} title={T.confirmTitleFor(channel === "email" ? "email" : "whatsapp")}
+      footer={<><Button onClick={() => setRecordOpen(false)}>Cancel</Button>
+        <Button variant="primary" loading={recording} disabled={!mayRecord} data-testid="po-bundle-record-confirm" onClick={() => void recordSent()}>{T.recordN(toRecord.length)}</Button></>}>
+      <div className="flex flex-col gap-1" data-testid="po-bundle-record-list">
+        {toRecord.map(po => <span key={po.id} className="text-body">{documentDisplayNumber(`${documents[po.id]!.po_number}-V${documents[po.id]!.version}`)}</span>)}
+        <span className="text-meta text-c-secondary">{channel === "email" ? "Email" : "WhatsApp"} · {recipient}</span>
+      </div>
+    </Modal>
   </Block>;
 }

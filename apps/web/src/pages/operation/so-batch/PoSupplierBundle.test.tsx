@@ -300,6 +300,110 @@ describe("issued supplier bundle", () => {
 });
 
 
+/**
+ * THE THREE STEPS (owner's 12 Oct 2026 package; Purchasing MASTER §5.6).
+ * Download and send are tools: they move the step marks and write nothing.
+ * The third step is the one act, through the shared `confirm-sent` writer.
+ */
+describe("the three send steps", () => {
+  const wrote = () => api.mock.calls.filter(call => String(call[0]).includes("confirm-sent"));
+  it("draws Download, Send and PO sent to supplier in order, and counts what was downloaded", async () => {
+    render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
+    await ready();
+    const steps = screen.getByTestId("po-bundle-steps").querySelectorAll(":scope > li");
+    expect([...steps].map(step => step.getAttribute("data-testid"))).toEqual(["po-bundle-step-download", "po-bundle-step-send", "po-bundle-step-record"]);
+    expect(steps[0]).toHaveAttribute("data-state", "current");
+    expect(steps[0]).toHaveTextContent("0 of 2 downloaded");
+    expect(steps[1]).toHaveTextContent("Send by WhatsApp or Email");
+    fireEvent.click(screen.getByRole("button", { name: "Download PDFs" }));
+    await waitFor(() => expect(steps[0]).toHaveAttribute("data-state", "done"));
+    expect(steps[0]).toHaveTextContent("Downloaded");
+    expect(steps[1]).toHaveAttribute("data-state", "current");
+    expect(wrote()).toHaveLength(0);
+  });
+  it("a PDF opened beside the area counts as held, at that version only", async () => {
+    const { rerender } = render(<PoSupplierBundle pos={pos} onPreview={() => {}} reviewed={{ "PO-001": 1 }} />);
+    await ready();
+    expect(screen.getByTestId("po-bundle-step-download")).toHaveTextContent("1 of 2 downloaded");
+    rerender(<PoSupplierBundle pos={pos} onPreview={() => {}} reviewed={{ "PO-001": 7 }} />);
+    expect(screen.getByTestId("po-bundle-step-download")).toHaveTextContent("0 of 2 downloaded");
+  });
+  it("records PO sent to supplier for every ticked PO at the version shown, with the saved recipient", async () => {
+    const changed = vi.fn();
+    render(<PoSupplierBundle pos={pos} onPreview={() => {}} onEvidenceChanged={changed} />);
+    await ready();
+    const record = screen.getByTestId("po-bundle-record");
+    await waitFor(() => expect(record).toBeEnabled());
+    expect(record).toHaveTextContent("PO sent to supplier (2)");
+    fireEvent.click(record);
+    expect(await screen.findByRole("dialog")).toHaveTextContent("Record as sent by Email?");
+    expect(screen.getByTestId("po-bundle-record-list")).toHaveTextContent("PO-001-V1");
+    expect(wrote()).toHaveLength(0);
+    fireEvent.click(screen.getByTestId("po-bundle-record-confirm"));
+    await waitFor(() => expect(wrote()).toHaveLength(2));
+    expect(wrote().map(call => [call[0], JSON.parse((call[1] as { body: string }).body)])).toEqual([
+      ["/api/operation/pos/PO-001/confirm-sent", { channel: "email", recipient: "supplier@example.invalid", poVersion: 1 }],
+      ["/api/operation/pos/PO-002/confirm-sent", { channel: "email", recipient: "supplier@example.invalid", poVersion: 1 }],
+    ]);
+    expect(changed).toHaveBeenCalledOnce();
+  });
+  it("cannot record without a saved recipient, and names what is missing", async () => {
+    render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
+    await ready();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "WhatsApp" }), { button: 0 });
+    await waitFor(() => expect(screen.getByRole("tab", { name: "WhatsApp" })).toHaveAttribute("aria-selected", "true"));
+    expect(screen.getByTestId("po-bundle-record")).toBeDisabled();
+    expect(screen.getByTestId("po-bundle-no-recipient")).toHaveTextContent("No WhatsApp on file for Hooka");
+  });
+  it("opening WhatsApp records nothing and only earns the reminder", async () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    render(<PoSupplierBundle pos={pos.map(po => ({ ...po, poSendChannel: "whatsapp", whatsappGroupUrl: "https://chat.whatsapp.com/test-supplier" }))} onPreview={() => {}} />);
+    await ready();
+    fireEvent.click(screen.getByRole("button", { name: "Open WhatsApp group" }));
+    expect(open).toHaveBeenCalledOnce();
+    expect(screen.getByTestId("po-bundle-step-send")).toHaveTextContent("Send the PDF, then press PO sent to supplier.");
+    expect(wrote()).toHaveLength(0);
+    open.mockRestore();
+  });
+  it("leaves a PO that is already marked sent alone, and shows the step done when all are", async () => {
+    let sent = ["PO-001"];
+    api.mockImplementation(async (path: string, init?: { method?: string }) => {
+      if (path.includes("confirm-sent")) { sent = [...sent, path.split("/").at(-2)!]; return { ok: true }; }
+      if (path.endsWith("/sends")) return { sends: sent.some(id => path.includes(id)) ? [{ kind: "confirmed_sent", channel: "email", po_version: 1, sent_at: "2026-10-05T02:20:00Z" }] : [] };
+      if (path.endsWith("email-capability")) return { configured: false };
+      void init;
+      return data(path.split("/").at(-2)!);
+    });
+    render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
+    await ready();
+    await waitFor(() => expect(screen.getByTestId("po-bundle-record")).toHaveTextContent("PO sent to supplier (1)"));
+    fireEvent.click(screen.getByTestId("po-bundle-record"));
+    fireEvent.click(await screen.findByTestId("po-bundle-record-confirm"));
+    await waitFor(() => expect(screen.getByTestId("po-bundle-step-record")).toHaveAttribute("data-state", "done"));
+    expect(wrote().map(call => call[0])).toEqual(["/api/operation/pos/PO-002/confirm-sent"]);
+    expect(screen.queryByTestId("po-bundle-record")).not.toBeInTheDocument();
+    expect(screen.getByTestId("po-bundle-step-download")).toHaveAttribute("data-state", "done");
+  });
+  it("a refused PO says why in two lines while the others are still recorded", async () => {
+    api.mockImplementation(async (path: string) => {
+      if (path.includes("PO-001/confirm-sent")) throw new ApiError(409, "Purchase order changed", { message: "Purchase order changed", action: "Open the latest PDF and send it again." });
+      if (path.includes("confirm-sent")) return { ok: true };
+      if (path.endsWith("/sends")) return { sends: [] };
+      if (path.endsWith("email-capability")) return { configured: false };
+      return data(path.split("/").at(-2)!);
+    });
+    render(<PoSupplierBundle pos={pos} onPreview={() => {}} />);
+    await ready();
+    await waitFor(() => expect(screen.getByTestId("po-bundle-record")).toBeEnabled());
+    fireEvent.click(screen.getByTestId("po-bundle-record"));
+    fireEvent.click(await screen.findByTestId("po-bundle-record-confirm"));
+    const failures = await screen.findByTestId("po-bundle-record-failures");
+    expect(failures).toHaveTextContent("PO-001 · Purchase order changed");
+    expect(failures).toHaveTextContent("Open the latest PDF and send it again.");
+    expect(wrote()).toHaveLength(2);
+  });
+});
+
 describe("human-triggered supplier email", () => {
   function configured(outcome: unknown) {
     api.mockImplementation(async (path: string, init?: RequestInit) => {
