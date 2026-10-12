@@ -22,9 +22,10 @@
  *                         Payment settings owns the method; Finance sets this
  *                         one setting here (0658, Chew 2026-10-07), through a
  *                         door that writes Payment settings' own record.
- *   Kept by the system    the payables, customer deposits, stock and equity
- *                         accounts: shown, and renamed or renumbered on Chart
- *                         of accounts, never swapped for another here.
+ *   Kept by the system    the debtors by channel (0685), payables, customer
+ *                         deposits, stock and equity accounts: shown, and
+ *                         renamed or renumbered on Chart of accounts, never
+ *                         swapped for another here.
  * A row Finance may change opens its window on a click; the window sends the
  * account the screen showed (`was`), and a change someone made meanwhile is
  * refused rather than overwritten.
@@ -72,6 +73,11 @@ export const ROLE_WORD: Record<string, string> = {
   RENOVATION_REBATE_ACCRUED: "Renovation rebate owed",
   KPI_ALLOWANCE: "KPI allowance",
   KPI_ALLOWANCE_ACCRUED: "KPI allowance owed",
+  // 0685: what customers owe, one account per channel (each dealer its own
+  // under the Dealer Debtors heading). Kept by the system.
+  SHOWROOM_DEBTORS: "Owed by showroom customers",
+  DEALER_DEBTORS_HEADING: "Owed by dealers' customers · one account per dealer under it",
+  SUBSCRIPTION_DEBTORS: "Owed by subscription customers",
   TRADE_PAYABLE: "Suppliers owed for goods",
   OTHER_PAYABLE: "Suppliers owed for other bills",
   CUSTOMER_DEPOSITS_HELD: "Customer deposits",

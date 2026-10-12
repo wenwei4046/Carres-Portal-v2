@@ -45,6 +45,10 @@ const POSTINGS = {
     // 0675: the dealer commission month close's accounts.
     { role: "DEALER_COMMISSION", changeable: true, accountCode: "900-C007", accountName: "COMMISSION - DEALER", changedAt: null, changedBy: null },
     { role: "DEALER_COMMISSION_ACCRUED", changeable: true, accountCode: "410-0061", accountName: "ACCRUALS - COMMISSION DEALER", changedAt: null, changedBy: null },
+    // 0685: the debtor accounts by channel, kept by the system.
+    { role: "SUBSCRIPTION_DEBTORS", changeable: false, accountCode: "300-3000", accountName: "SUBSCRIPTION DEBTORS", changedAt: null, changedBy: null },
+    { role: "DEALER_DEBTORS_HEADING", changeable: false, accountCode: "300-2000", accountName: "DEALER DEBTORS", changedAt: null, changedBy: null },
+    { role: "SHOWROOM_DEBTORS", changeable: false, accountCode: "300-1000", accountName: "SHOWROOM DEBTORS", changedAt: null, changedBy: null },
   ],
   changes: [
     { id: "P8", what: "PAYMENT", key: "bank/*", name: "Bank transfer", fromCode: "310-1000", fromName: "PUBLIC BANK", toCode: "310-2000", toName: "HONG LEONG BANK", changedAt: "2026-10-07T10:00:00Z", changedBy: "Chew" },
@@ -245,6 +249,21 @@ describe("Posting accounts (0657)", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(net.calls).toHaveLength(1));
     expect(net.calls[0]!.body).toEqual({ what: "ROLE", key: "DEALER_COMMISSION_ACCRUED", accountCode: "410-0099", was: "410-0061" });
+  });
+
+  it("lists the debtor accounts by channel among those the system keeps, in order (0685)", async () => {
+    show();
+    await ready();
+    expect(row("ROLE/SHOWROOM_DEBTORS")).toHaveTextContent("Owed by showroom customers");
+    expect(row("ROLE/SHOWROOM_DEBTORS")).toHaveTextContent("300-1000 SHOWROOM DEBTORS");
+    expect(row("ROLE/DEALER_DEBTORS_HEADING")).toHaveTextContent("Owed by dealers' customers · one account per dealer under it");
+    expect(row("ROLE/SUBSCRIPTION_DEBTORS")).toHaveTextContent("300-3000 SUBSCRIPTION DEBTORS");
+    const order = ["ROLE/SHOWROOM_DEBTORS", "ROLE/DEALER_DEBTORS_HEADING", "ROLE/SUBSCRIPTION_DEBTORS", "ROLE/TRADE_PAYABLE"]
+      .map((id) => Array.from(document.querySelectorAll("tr[data-row-key]")).indexOf(row(id)));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    fireEvent.click(within(row("ROLE/SHOWROOM_DEBTORS")).getByText("Owed by showroom customers"));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("lists transport by delivery order under Purchases and charges; it takes an expense account (0689)", async () => {
