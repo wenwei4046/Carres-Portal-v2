@@ -32,6 +32,15 @@ import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { useOfficeSettings, useSaveOfficeCalendar, useSaveOfficeHolidays } from "@/lib/settings-queries";
 import { ChangeList, Notice, Row, Section, Value, W, clock12, minutesWord, refusalOf } from "./parts";
 
+/** One short explanation per setting (COPY-STANDARD "Office row explanations"). */
+const HINT = {
+  hours: "The normal office day, before flexi.",
+  flexi: "Staff may start and finish this much earlier or later.",
+  lunch: "Lunch is not leave. Work stays with the person.",
+  lunchShift: "Each person may start lunch this much earlier or later.",
+  region: "Office public holidays follow this region.",
+} as const;
+
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
 
@@ -85,7 +94,7 @@ export default function OfficeSettings() {
   const editable = data.stored && data.canEdit;
   return (
     <PageShell variant="settings" title="Office">
-      <div className="mx-auto grid w-full max-w-4xl gap-5 overflow-auto p-5" data-testid="office-settings">
+      <div className="mx-auto grid w-full max-w-[1100px] gap-5 overflow-auto p-5" data-testid="office-settings">
         {!data.stored && <Notice testId="office-not-installed">{W.notInstalled}</Notice>}
         {data.stored && !data.canEdit && <Notice testId="office-read-only">{W.readOnly}</Notice>}
         <OfficeCalendarSection values={data.values as OfficeCalendarValues} revision={data.revision} editable={editable} />
@@ -145,11 +154,11 @@ function OfficeCalendarSection({ values, revision, editable }: {
       {view ? (
         <>
           <Row label="Office working days"><Value value={daysWord(values.work_days)} /></Row>
-          <Row label="Office hours"><Value value={`${clock12(values.start_time)} to ${clock12(values.end_time)}`} /></Row>
-          <Row label="Flexi allowance"><Value value={minutesWord(values.flexi_minutes)} /></Row>
-          <Row label="Lunch"><Value value={`${clock12(values.lunch_start)} to ${clock12(values.lunch_end)}`} /></Row>
-          <Row label="Lunch may move by"><Value value={minutesWord(values.lunch_shift_minutes)} /></Row>
-          <Row label="Holiday region"><Value value={values.holiday_region} /></Row>
+          <Row label="Office hours" hint={HINT.hours}><Value value={`${clock12(values.start_time)} to ${clock12(values.end_time)}`} /></Row>
+          <Row label="Flexi allowance" hint={HINT.flexi}><Value value={minutesWord(values.flexi_minutes)} /></Row>
+          <Row label="Lunch" hint={HINT.lunch}><Value value={`${clock12(values.lunch_start)} to ${clock12(values.lunch_end)}`} /></Row>
+          <Row label="Lunch may move by" hint={HINT.lunchShift}><Value value={minutesWord(values.lunch_shift_minutes)} /></Row>
+          <Row label="Holiday region" hint={HINT.region}><Value value={values.holiday_region} /></Row>
         </>
       ) : (
         <>
@@ -167,7 +176,7 @@ function OfficeCalendarSection({ values, revision, editable }: {
               ))}
             </div>
           </Row>
-          <Row label="Office opens" htmlFor="office-start">
+          <Row label="Office opens" hint={HINT.hours} htmlFor="office-start">
             <Input id="office-start" type="time" value={draft.start_time} disabled={step === "review"}
               onChange={(e) => setDraft({ ...draft, start_time: e.target.value.slice(0, 5) })} />
           </Row>
@@ -176,11 +185,11 @@ function OfficeCalendarSection({ values, revision, editable }: {
               error={step === "edit" && draft.end_time <= draft.start_time ? "The office must close after it opens." : undefined}
               onChange={(e) => setDraft({ ...draft, end_time: e.target.value.slice(0, 5) })} />
           </Row>
-          <Row label="Flexi allowance (minutes)" htmlFor="office-flexi">
+          <Row label="Flexi allowance (minutes)" hint={HINT.flexi} htmlFor="office-flexi">
             <Input id="office-flexi" type="number" min={0} max={180} value={String(draft.flexi_minutes)} disabled={step === "review"}
               onChange={(e) => setDraft({ ...draft, flexi_minutes: Number(e.target.value) })} />
           </Row>
-          <Row label="Lunch starts" htmlFor="office-lunch-start">
+          <Row label="Lunch starts" hint={HINT.lunch} htmlFor="office-lunch-start">
             <Input id="office-lunch-start" type="time" value={draft.lunch_start} disabled={step === "review"}
               onChange={(e) => setDraft({ ...draft, lunch_start: e.target.value.slice(0, 5) })} />
           </Row>
@@ -189,16 +198,16 @@ function OfficeCalendarSection({ values, revision, editable }: {
               error={step === "edit" && !(draft.lunch_start < draft.lunch_end && draft.lunch_start >= draft.start_time && draft.lunch_end <= draft.end_time) ? "Lunch must sit inside office hours." : undefined}
               onChange={(e) => setDraft({ ...draft, lunch_end: e.target.value.slice(0, 5) })} />
           </Row>
-          <Row label="Lunch may move by (minutes)" htmlFor="office-lunch-shift">
+          <Row label="Lunch may move by (minutes)" hint={HINT.lunchShift} htmlFor="office-lunch-shift">
             <Input id="office-lunch-shift" type="number" min={0} max={120} value={String(draft.lunch_shift_minutes)} disabled={step === "review"}
               onChange={(e) => setDraft({ ...draft, lunch_shift_minutes: Number(e.target.value) })} />
           </Row>
-          <Row label="Holiday region" htmlFor="office-region">
+          <Row label="Holiday region" hint={HINT.region} htmlFor="office-region">
             <Input id="office-region" value={draft.holiday_region} maxLength={80} disabled={step === "review"}
               onChange={(e) => setDraft({ ...draft, holiday_region: e.target.value })} />
           </Row>
           {step === "review" && (
-            <ul className="grid gap-0.5 pt-2" data-testid="office-review">
+            <ul className="grid gap-0.5 border-t border-kit-slate-4 py-2.5" data-testid="office-review">
               {changedFields.map((f) => (
                 <li key={f} className="text-body">
                   {FIELD_LABEL[f]}: {valueWord(f, (values as Record<string, unknown>)[f])} → {valueWord(f, (draft as Record<string, unknown>)[f])}
@@ -210,7 +219,7 @@ function OfficeCalendarSection({ values, revision, editable }: {
           <Row label={W.reason} htmlFor="office-reason">
             <Input id="office-reason" value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} />
           </Row>
-          <div className="flex flex-wrap gap-2 pt-2">
+          <div className="flex flex-wrap gap-2 border-t border-kit-slate-4 py-3">
             {step === "edit" ? (
               <Button variant="primary" disabled={gap !== null} onClick={() => setStep("review")}>
                 {gap ? `${W.reviewChanges}: ${gap}` : W.reviewChanges}
@@ -296,17 +305,17 @@ function OfficeHolidaysSection({ holidays, editable }: {
       <Row label="List in force"><Value value={source} /></Row>
       {step === "view" ? (
         inForce.length === 0 ? null : (
-          <ul className="divide-y divide-kit-slate-4" data-testid="office-holiday-list">
+          <ul className="divide-y divide-kit-slate-4 border-t border-kit-slate-4" data-testid="office-holiday-list">
             {inForce.map((h) => (
-              <li key={h.date} className="grid grid-cols-1 gap-1 py-1.5 text-body md:grid-cols-[220px_minmax(0,1fr)] md:gap-3">
-                <span className="text-kit-slate-11">{fmtDate(h.date)}</span>
-                <span className="text-kit-slate-12">{h.name}</span>
+              <li key={h.date} className="grid grid-cols-1 gap-1 py-2 text-body md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:gap-4">
+                <span className="text-c-secondary">{fmtDate(h.date)}</span>
+                <span className="text-c-ink">{h.name}</span>
               </li>
             ))}
           </ul>
         )
       ) : (
-        <div className="grid gap-2" data-testid="office-holiday-form">
+        <div className="grid gap-2 border-t border-kit-slate-4 pt-3" data-testid="office-holiday-form">
           {rows.map((r, i) => (
             <div key={r.key} className="grid grid-cols-1 items-end gap-2 md:grid-cols-[180px_minmax(0,1fr)_auto]">
               <DatePicker id={`holiday-date-${r.key}`} label={i === 0 ? "Date" : undefined}
@@ -336,7 +345,7 @@ function OfficeHolidaysSection({ holidays, editable }: {
           <Row label={W.reason} htmlFor="office-holiday-reason">
             <Input id="office-holiday-reason" value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} />
           </Row>
-          <div className="flex flex-wrap gap-2 pt-2">
+          <div className="flex flex-wrap gap-2 py-3">
             {step === "edit" ? (
               <Button variant="primary" disabled={gap !== null} onClick={() => setStep("review")}>
                 {gap ? `${W.reviewChanges}: ${gap}` : W.reviewChanges}

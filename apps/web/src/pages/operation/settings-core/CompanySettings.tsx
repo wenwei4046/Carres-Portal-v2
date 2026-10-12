@@ -123,7 +123,7 @@ export default function CompanySettings() {
 
   return (
     <PageShell variant="settings" title="Company">
-      <div className="mx-auto grid w-full max-w-4xl gap-5 overflow-auto p-5" data-testid="company-settings">
+      <div className="mx-auto grid w-full max-w-[1100px] gap-5 overflow-auto p-5" data-testid="company-settings">
         {!data.stored && <Notice testId="company-not-installed">{W.notInstalled}</Notice>}
         {data.stored && !data.canEdit && <Notice testId="company-read-only">{W.readOnly}</Notice>}
 

@@ -9,6 +9,10 @@ import { VERIFIED_COMPANY_PROFILE } from "@carres/shared";
  * confirmed 9 Oct 2026): plain rows, Edit only for a named editor, Review
  * changes names its gap, the save goes to the audited door, and the change
  * record shows who · when · old → new.
+ *
+ * Confirmed Settings design (owner 11 Oct 2026, 01 §6 · 03 §7): a row is the
+ * setting's name with one short explanation and its value; the change record
+ * is a disclosure that says how many changes it holds and opens on request.
  */
 const apiFetch = vi.fn();
 vi.mock("@/lib/api", () => ({
@@ -61,6 +65,11 @@ describe("Settings → Company", () => {
     expect(await screen.findByText("202401055306 (1601150-X)")).toBeInTheDocument();
     expect(screen.getAllByText("Not set").length).toBeGreaterThan(0);
     const changes = screen.getByTestId("company-changes");
+    // History is a disclosure: closed it shows only how many changes it holds.
+    expect(within(changes).getByTestId("company-changes-header-toggle")).toHaveAttribute("aria-expanded", "false");
+    expect(within(changes).getByTestId("company-changes-header")).toHaveTextContent("Changes1");
+    expect(within(changes).queryByText(/Shasha/)).toBeNull();
+    fireEvent.click(within(changes).getByTestId("company-changes-header-toggle"));
     expect(within(changes).getByText(/Shasha/)).toBeInTheDocument();
     expect(within(changes).getByText(/Customer support telephone: Not set → 011-6133 8862/)).toBeInTheDocument();
   });
@@ -105,6 +114,37 @@ describe("Settings → Office", () => {
     expect(screen.getByText("9:00 AM to 6:00 PM")).toBeInTheDocument();
     expect(screen.getByText("1:00 PM to 2:00 PM")).toBeInTheDocument();
     expect(screen.getByText(/Built-in list\. Not yet checked for Kuala Lumpur/)).toBeInTheDocument();
+  });
+
+  it("each setting is its name, one explanation and its value; the change record opens on request", async () => {
+    mount(<OfficeSettings />);
+    const calendar = await screen.findByTestId("office-calendar");
+    const row = (name: string) => within(calendar).getByText(name).closest("div")!.parentElement!;
+    expect(row("Office hours")).toHaveTextContent("The normal office day, before flexi.");
+    expect(row("Office hours")).toHaveTextContent("9:00 AM to 6:00 PM");
+    expect(row("Flexi allowance")).toHaveTextContent("Staff may start and finish this much earlier or later.");
+    expect(row("Lunch")).toHaveTextContent("Lunch is not leave. Work stays with the person.");
+    expect(row("Lunch may move by")).toHaveTextContent("Each person may start lunch this much earlier or later.");
+    expect(row("Holiday region")).toHaveTextContent("Office public holidays follow this region.");
+    // one explanation at most, and the group's own line already explains the working days
+    expect(row("Office working days").querySelectorAll("[data-settings-hint]")).toHaveLength(0);
+    expect(calendar.querySelectorAll("[data-settings-hint]")).toHaveLength(5);
+
+    const changes = screen.getByTestId("office-changes");
+    expect(within(changes).queryByText("No changes recorded yet.")).toBeNull();
+    fireEvent.click(within(changes).getByTestId("office-changes-header-toggle"));
+    expect(within(changes).getByText("No changes recorded yet.")).toBeInTheDocument();
+    fireEvent.click(within(changes).getByTestId("office-changes-header-toggle"));
+    expect(within(changes).queryByText("No changes recorded yet.")).toBeNull();
+  });
+
+  it("the explanations stay beside the fields while editing", async () => {
+    mount(<OfficeSettings />);
+    fireEvent.click(await screen.findByTestId("office-edit"));
+    const calendar = screen.getByTestId("office-calendar");
+    expect(within(calendar).getByLabelText("Flexi allowance (minutes)")).toBeInTheDocument();
+    expect(within(calendar).getByText("Staff may start and finish this much earlier or later.")).toBeInTheDocument();
+    expect(within(calendar).getByText("Lunch is not leave. Work stays with the person.")).toBeInTheDocument();
   });
 
   it("ticking Saturday reviews as a weekday change and saves through the door", async () => {

@@ -104,7 +104,7 @@ export default function DocumentTable({
               className={[
                 ROW,
                 row.total ? "font-semibold text-c-ink" : "text-c-ink",
-                row.onOpen ? "group hover:bg-c-hover" : "",
+                row.onOpen ? "group hover:bg-c-row-hover" : "",
               ].join(" ")}
             >
               {columns.map((column, index) => {
@@ -115,7 +115,7 @@ export default function DocumentTable({
                   <td
                     key={column.key}
                     className={`${CELL} ${column.numeric ? SO_AMOUNT : "whitespace-nowrap text-left"} ${
-                      index === 0 ? `${PINNED} ${row.onOpen ? "group-hover:bg-c-hover" : ""}` : ""
+                      index === 0 ? `${PINNED} ${row.onOpen ? "group-hover:bg-c-row-hover" : ""}` : ""
                     }`}
                   >
                     {door ? (

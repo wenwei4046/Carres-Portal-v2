@@ -10,7 +10,7 @@
  * `?page=` ar · bills · payment-vouchers · ap-outstanding · suppliers ·
  * other-debtors · other-debtor-parties · other-receipts · daily-bank ·
  * journal · general-ledger · trial-balance · reports · profit-and-loss ·
- * balance-sheet · cash-flow · ap-aging · credit-notes · credit-note ·
+ * balance-sheet · cash-flow · ap-aging · ar-aging (0686) · credit-notes · credit-note ·
  * credit-note-new · debit-notes · debit-note · debit-note-new ·
  * voucher-pays-debit-note (0681) · forecast (last month, so the actual is a whole month) ·
  * posting-accounts · item-groups (long lists under their tables, 0657–0659) ·
@@ -642,6 +642,37 @@ const AP_AGING = (asAt: string) => ({
   ],
 });
 
+// ── Reports → AR Aging (0686): owed by customers and other debtors on a day ──
+const AR_AGING = (asAt: string) => ({
+  as_at: asAt, go_live_on: GO_LIVE,
+  controls: [
+    { account_code: "300-1000", name: "SHOWROOM DEBTORS", balance: 4114 },
+    { account_code: "300-2001", name: "TEST DEALER", balance: 2950 },
+    { account_code: "305-0000", name: "OTHER DEBTOR", balance: 1800 },
+  ],
+  debtors: [
+    { party_type: "CUSTOMER", party_id: "c-1", name: LONG_CUSTOMER, kind: "customer", balance: 3314, invoices: [
+      { invoice_id: "ci-1", invoice_no: "INV-0001", kind: "sales", order_id: "o-1", so: 1401, invoice_date: soon(-2),
+        due_date: null, total: 2629, open: 1314, department_type: "SHOWROOM", department_id: null },
+      { invoice_id: "ci-2", invoice_no: "INV-0002", kind: "storage", order_id: "o-1", so: 1401, invoice_date: soon(-35),
+        due_date: null, total: 2000, open: 2000, department_type: "SHOWROOM", department_id: null },
+    ] },
+    { party_type: "CUSTOMER", party_id: "c-2", name: "NURUL AIN BINTI ISMAIL", kind: "customer", balance: 800, invoices: [
+      { invoice_id: "ci-3", invoice_no: "INV-0003", kind: "sales", order_id: "o-2", so: 1402, invoice_date: soon(-70),
+        due_date: null, total: 2400, open: 1600, department_type: "SHOWROOM", department_id: null },
+    ] },
+    { party_type: "CUSTOMER", party_id: "c-3", name: "LIM KUAN YANG", kind: "customer", balance: 2950, invoices: [
+      { invoice_id: "ci-4", invoice_no: "INV-0004", kind: "sales", order_id: "o-3", so: 1403, invoice_date: soon(-130),
+        due_date: null, total: 2950, open: 2950, department_type: "DEALER", department_id: "d-1" },
+    ] },
+    { party_type: "OTHER", party_id: "p-1", name: LONG_PARTY, kind: "company", balance: 1800, invoices: [
+      { invoice_id: "oi-1", invoice_no: "ARI-0001", kind: "other", order_id: null, so: null, invoice_date: soon(-20),
+        due_date: soon(10), total: 2000, open: 1800, department_type: null, department_id: null },
+    ] },
+  ],
+  before_go_live: { count: 1, amount: 2499 },
+});
+
 // ── Forecast (0646): a plan on the live chart's accounts, and that month's
 // Profit and Loss in the statement's own rows. Figures are invented.
 const FORECAST_ACCOUNTS = ([
@@ -822,6 +853,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     return json({ rows: OUTSTANDING.map((o) => ({ id: o.supplier_id, name: o.supplier_name, kind: o.supplier_kind })) });
   if (url.includes("/api/finance/payables/supplier-finance")) return json({ rows: SUPPLIER_FINANCE });
   if (url.includes("/api/finance/payables/aging")) return json(AP_AGING(q.get("asAt") ?? TODAY));
+  if (url.includes("/api/finance/ledger/ar-aging")) return json(AR_AGING(q.get("asAt") ?? TODAY));
   if (url.includes("/api/finance/payables/")) return json({ rows: [] });
   if (url.includes("/api/finance/ledger/daily-bank")) return json(DAILY_BANK(q.get("day") ?? TODAY));
   if (url.includes("/api/finance/ledger/cash-flow")) return json(CASH_FLOW(q.get("from") ?? TODAY, q.get("to") ?? TODAY));
@@ -879,6 +911,7 @@ const ROUTES: Record<string, string> = {
   "cash-flow": "/finance/reports/cash-flow",
   "general-ledger": "/finance/ledger/general-ledger",
   "ap-aging": "/finance/reports/ap-aging",
+  "ar-aging": "/finance/reports/ar-aging",
   "credit-notes": "/finance/credit-notes",
   "credit-note": "/finance/credit-notes/cn-1",
   "credit-note-new": "/finance/credit-notes/new",

@@ -1,13 +1,16 @@
 /**
  * The shared pieces of Settings → Company · Office · Settings editors. They
- * follow the Settings grammar of 01 §6 and the existing Delivery / Payment
- * Settings pages: plain grouped rows (name left, value right), read-only
- * values as text, edit controls only while editing, and the change record
- * (who · when · old → new · reason) below. Words: COPY-STANDARD
- * "Settings → Company · Office · Settings editors".
+ * follow the Settings grammar of 01 §6 and 03 §7 (confirmed Settings design,
+ * owner 11 Oct 2026): a group is its title and one line above ONE bordered
+ * list; a row is the setting's name with one short explanation on the left and
+ * its value on the right; read-only values are text; edit controls appear only
+ * while editing; and the change record (who · when · old → new · reason) sits
+ * in a disclosure under the page, closed until it is asked for. Words:
+ * COPY-STANDARD "Settings → Company · Office · Settings editors".
  */
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { SettingsChange } from "@carres/shared";
+import SectionHeader from "@/components/kit/SectionHeader";
 import { fmtDate } from "@/lib/fmt-date";
 
 export const W = {
@@ -37,29 +40,41 @@ export function Section({ title, lead, children, testId, action }: {
   testId?: string;
   action?: ReactNode;
 }) {
+  /* The group's name and its one line sit on the ground; the settings are one
+   * bordered list under them (no box around each setting). */
   return (
-    <section className="rounded-card border border-kit-slate-5 bg-white p-5" data-testid={testId}>
-      <div className="flex items-start justify-between gap-3">
+    <section data-testid={testId}>
+      <div className="flex items-start justify-between gap-3 px-1 pb-2">
         <div className="min-w-0">
-          <h2 className="text-strong text-kit-slate-12">{title}</h2>
-          {lead ? <p className="mt-1 text-body text-kit-slate-11">{lead}</p> : null}
+          <h2 className="text-strong text-c-ink">{title}</h2>
+          {lead ? <p className="mt-0.5 text-body text-c-secondary">{lead}</p> : null}
         </div>
         {action}
       </div>
-      <div className="mt-3 grid gap-1">{children}</div>
+      <div className="grid rounded-card border border-kit-slate-5 bg-white px-4 py-1.5">{children}</div>
     </section>
   );
 }
 
-export function Row({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
+/**
+ * One setting: its name and, when it helps, one short explanation on the left;
+ * the value (or, while editing, its control) on the right. Rows of one group
+ * are parted by a hairline; the name wraps rather than being cut.
+ */
+export function Row({ label, hint, htmlFor, children }: {
+  label: string; hint?: string; htmlFor?: string; children: ReactNode;
+}) {
   return (
-    <div className="grid grid-cols-1 items-start gap-1 py-1.5 md:grid-cols-[220px_minmax(0,1fr)] md:gap-3">
-      {htmlFor ? (
-        <label htmlFor={htmlFor} className="text-body text-kit-slate-11">{label}</label>
-      ) : (
-        <span className="text-body text-kit-slate-11">{label}</span>
-      )}
-      <div className="min-w-0 text-body text-kit-slate-12">{children}</div>
+    <div className="grid grid-cols-1 items-start gap-1 border-kit-slate-4 py-2.5 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:gap-4 [&:not(:first-child)]:border-t">
+      <div className="min-w-0">
+        {htmlFor ? (
+          <label htmlFor={htmlFor} className="block text-body font-medium text-c-ink">{label}</label>
+        ) : (
+          <span className="block text-body font-medium text-c-ink">{label}</span>
+        )}
+        {hint ? <p className="text-meta text-c-secondary" data-settings-hint>{hint}</p> : null}
+      </div>
+      <div className="min-w-0 text-body text-c-ink">{children}</div>
     </div>
   );
 }
@@ -94,7 +109,12 @@ export function Notice({ children, testId }: { children: ReactNode; testId?: str
   return <p className="text-meta text-kit-slate-11" data-testid={testId}>{children}</p>;
 }
 
-/** The change record: who · when · reason, and each changed field old → new. */
+/**
+ * The change record: who · when · reason, and each changed field old → new.
+ * History belongs in a disclosure (01 §6): the header says how many changes
+ * are recorded and the list opens on request, so it never pushes the settings
+ * themselves down the page.
+ */
 export function ChangeList({ changes, labelOf, fieldLabel, valueOf, testId }: {
   changes: SettingsChange[];
   labelOf: (what: string) => string;
@@ -102,12 +122,21 @@ export function ChangeList({ changes, labelOf, fieldLabel, valueOf, testId }: {
   valueOf: (field: string, value: unknown) => string;
   testId?: string;
 }) {
+  const [open, setOpen] = useState(false);
   return (
-    <Section title={W.changes} testId={testId}>
-      {changes.length === 0 ? (
-        <p className="text-body text-kit-slate-11">{W.noChanges}</p>
+    <section className="rounded-card border border-kit-slate-5 bg-white" data-testid={testId}>
+      <SectionHeader
+        title={W.changes}
+        collapsible
+        open={open}
+        onToggle={() => setOpen((v) => !v)}
+        meta={changes.length > 0 ? String(changes.length) : undefined}
+        testId={testId ? `${testId}-header` : undefined}
+      />
+      {!open ? null : changes.length === 0 ? (
+        <p className="border-t border-kit-slate-4 px-4 py-3 text-body text-c-secondary">{W.noChanges}</p>
       ) : (
-        <ul className="divide-y divide-kit-slate-4">
+        <ul className="divide-y divide-kit-slate-4 border-t border-kit-slate-4 px-4">
           {changes.map((c) => (
             <li key={c.id} className="py-2 text-body">
               <p className="font-medium text-kit-slate-12">{labelOf(c.what)}</p>
@@ -120,7 +149,7 @@ export function ChangeList({ changes, labelOf, fieldLabel, valueOf, testId }: {
           ))}
         </ul>
       )}
-    </Section>
+    </section>
   );
 }
 

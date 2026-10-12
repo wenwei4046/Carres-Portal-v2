@@ -50,6 +50,7 @@ import {
 } from "@carres/shared/finance-ledger";
 import { CUSTOMERS, SUPPLIERS } from "@carres/shared/tables";
 import { dailyBankQuery, dailyBankRow, sen, type DailyBankDay } from "@carres/shared/daily-bank";
+import { arAgingQuery, arAgingReport, type ArAgingAnswer } from "@carres/shared/ar-aging";
 import { cashFlowQuery, cashFlowReport, type CashFlowAnswer } from "@carres/shared/cash-flow";
 import { generalLedgerBlocks, generalLedgerQuery, type GeneralLedgerAnswer } from "@carres/shared/general-ledger";
 import { stockValueQuery, stockValueReport, type StockValueAnswer } from "@carres/shared/stock-value";
@@ -114,6 +115,8 @@ import financeMoneyAccountsRouter from "./money-accounts";
  *   GET /self-check         books · control accounts · receivables · payables · rental months · health
  *   GET /profit-and-loss    gl_profit_and_loss, passed through
  *   GET /balance-sheet      gl_balance_sheet, passed through
+ *   GET /ar-aging           what each customer and other debtor owed on a day, with its invoices
+ *                           still open then (fin_ar_aging, 0686), passed through
  *   GET /books-closed       the last closed day, or null (gl_config, 0622)
  *   PUT /books-closed       set or clear it: principal only (gl_set_books_closed_through, 0622)
  *
@@ -1269,6 +1272,30 @@ financeLedgerRouter.get("/cash-flow", requireFinance, async (c) => {
     cashFlowReport(answer);
   } catch {
     return failed(c, "Cash Flow");
+  }
+  return c.json(answer);
+});
+
+// ── AR Aging (0686, Chew 2026-10-03 and 2026-10-12) ─────────────────────────
+
+/** What each customer and other debtor owed on a day, with its invoices still
+ *  open then. Read once through the shared arithmetic, which refuses a figure
+ *  it cannot read; passed through as it came. */
+financeLedgerRouter.get("/ar-aging", requireFinance, async (c) => {
+  const parsed = arAgingQuery.safeParse(queryOf(c));
+  if (!parsed.success) return invalid(c, parsed.error);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("fin_ar_aging", { p_as_at: parsed.data.asAt ?? todayIsoMYT() });
+  if (error) return ledgerError(c, error, "AR aging");
+  const answer = data as ArAgingAnswer | null;
+  if (!answer || typeof answer.as_at !== "string" || !Array.isArray(answer.debtors) || !Array.isArray(answer.controls)
+      || !answer.before_go_live) {
+    return failed(c, "AR aging");
+  }
+  try {
+    arAgingReport(answer, "invoice", "month");
+  } catch {
+    return failed(c, "AR aging");
   }
   return c.json(answer);
 });
