@@ -1286,6 +1286,17 @@ describe("Purchase Orders Overview", () => {
     expect(screen.queryByTestId("grid-row-PO-20260828-4827")).not.toBeInTheDocument();
     for (const row of screen.queryAllByTestId(/^grid-row-/)) expect(row).toHaveTextContent("Completed");
   });
+  /* Measured 12 Oct 2026: an open row's goods table is wider than the list
+     and pushed `Status` out of view. It now scrolls inside itself. */
+  it("an open row's goods stay inside the visible width in Overview only", () => {
+    const overview = renderPage(OVERVIEW);
+    expect(lastGridProps.expandable.fitExpansionToViewport).toBe(true);
+    expect(lastGridProps.expandable.alignToColumn).toBe("po");
+    overview.unmount();
+    renderPage(`${OVERVIEW}?view=table`);
+    expect(lastGridProps.expandable.fitExpansionToViewport).toBe(false);
+    expect(lastGridProps.expandable.alignToColumn).toBe("po_date");
+  });
   it("Table keeps the eleven columns and the four groups", () => {
     renderPage(`${OVERVIEW}?view=table`);
     expect(screen.getByRole("tab", { name: "Table" })).toHaveAttribute("aria-selected", "true");

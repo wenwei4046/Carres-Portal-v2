@@ -4229,6 +4229,8 @@ PO Doc Date · PO Delivery Date · Status
   Delivery Date`; its `PO no.` and `Sales orders` headings are not Portal words.
 - Widths: five fixed columns and `PO No` taking the rest, never under 146, so `Status` stays in
   view with no side scroll at 1025, 1164 and 1440 (measured 12 Oct 2026 on the fixture preview).
+  An open row's goods table is wider than the list: it scrolls sideways inside itself and never
+  widens the list, so `Status` stays in view with a row open (measured at the same three widths).
   The filter rail steps aside under a 1056 canvas while a kit list is shown (a person's own choice
   to open it is kept); SO Batch Purchase's `By supplier` follows the same rule, which closes its
   side scroll at 1164.

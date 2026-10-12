@@ -1357,6 +1357,10 @@ export default function PurchaseOrdersPage() {
               expandable={{
                 flush: true,
                 alignToColumn: overview ? "po" : "po_date",
+                /* The goods rows are wider than the Overview: they scroll
+                   sideways inside themselves and never widen the list
+                   (01 §6), so `Status` stays in view with a row open. */
+                fitExpansionToViewport: overview,
                 testId: (row) => `po-expand-${row.id}`,
                 renderExpansion: (row) => <OrderedGoods row={row} destinations={destinations} />,
               }}
