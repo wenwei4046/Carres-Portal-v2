@@ -2644,6 +2644,18 @@ Module Register rails remain factual filters and do not copy central Work action
 
 ### 9.1 SO Batch Purchase
 
+**OWNER RULING — 12 Oct 2026 (evening), on the 12 Oct 5:35 PM design package.** The package is the
+visual source and never permission to overwrite a business rule. (1) Only SO Batch Purchase,
+Purchase Orders and the PO detail are replaced, each when its replacement reaches the same functions
+and passes verification; Manual Purchase, Receiving, Claims, Returns and Repair are preserved, and no
+working function is removed because the package does not draw it. (2) `Issue PO` is the governed
+action: `Place`, `Send PO` and a separate sending stage are not restored; supplier delivery and
+sending evidence are presented inside the existing issue lifecycle. (3) No timed `Undo`: recorded
+sending evidence and history are preserved, a correction uses the owning module's rules, and opening
+WhatsApp or downloading a PDF is not proof of sending. (4) Reminders and escalation follow what this
+MASTER and ACTION-FLOW already approve; a new alarm or a third-no-reply escalation is not part of
+this release.
+
 **BY SUPPLIER VIEW — owner 12 Oct 2026 (design handoff) · BUILT 12 Oct 2026 · the page's first view.**
 The page has three views of the same demand: `By supplier` (the first view), `By sales order` (one row per Sales
 Order, the list this page always had; `view=table` in the address) and `Cards`. `By supplier` reads the demand the way a buyer orders it: one row per supplier and category,
