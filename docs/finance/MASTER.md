@@ -565,7 +565,7 @@ Carres already has a simpler Card settlement. It takes Public Bank, GHL and Mayb
 |---|---|
 | Closed months lock | Keep, but **do not switch it on**. |
 | Month-end stock value: groups | Four groups: warehouse, showroom, in transit (road, transit points and partner legs) and sent for repair. Supplier consignment and dealer stock are excluded; Stock MASTER §12.9 says dealer display stock is the dealer's own. |
-| Month-end stock value: source | The P&L and Balance Sheet show the stock value live each time they are opened, worked out from Stock's Units (reading only) and marked **provisional**. Once Stock's Month-end Stock Confirmation (Stock MASTER §12.10, not built) confirms a month, Finance stores that month's value and it never changes again (Chew 2026-10-12, 「存货价值就不能定成我开P&L 时每次都是live 的，然后当jess 那边月底存货确认就 我这里储存起来不会再改」). **APPROVED / NOT BUILT.** |
+| Month-end stock value: source | The P&L and Balance Sheet show the stock value live each time they are opened, worked out from Stock's Units (reading only) and marked **provisional**. Once Stock's Month-end Stock Confirmation (Stock MASTER §12.10, not built) confirms a month, Finance stores that month's value and it never changes again (Chew 2026-10-12, 「存货价值就不能定成我开P&L 时每次都是live 的，然后当jess 那边月底存货确认就 我这里储存起来不会再改」). **APPROVED. The live part is BUILT and APPLIED 2026-10-12 (0688); storing a confirmed month waits for Stock's confirmation.** See "Stock in the statements" below. |
 | Opening balances | Finance's own account figures at go-live. No old transactions are brought in, because CLAUDE.md §6 stands. **Parked (Chew 2026-10-03)** until every feature is tested: it is data entered at go-live, though each customer's and supplier's opening balance will need a place to be entered. |
 | SST | Carres is not SST-registered, so there is no tax on invoices. |
 | Year-end close | Later, before year end. |
@@ -582,8 +582,29 @@ Carres already has a simpler Card settlement. It takes Public Bank, GHL and Mayb
 - Measured 2026-10-03 on the test data: 344 Units and 10 quantity rows are held, and nearly all have no PO line (opening imports), so nearly all show `No cost recorded`. Go-live starts clean (CLAUDE.md §6), so after it Units come from POs with their cost.
 - Showroom: Stock has no Site type yet, and its own register finds PJ Showroom by its name (Stock MASTER §12.9). This page counts a Unit as Showroom when a showroom party holds it, its Site's profile names one, or its Site is named as a showroom. When Stock adds a Site type, the page reads it instead.
 - Chew 2026-10-03: this page is Finance reading Stock's data, and it is separate from Stock's Month-end Stock Confirmation (Stock MASTER §9), which it neither feeds nor replaces.
-- Not built: posting the value to the ledger (Dr stock on hand, Cr cost of goods sold; bills from a GRN post the goods to cost of goods sold, 0477, so without it the month's cost is every purchase of the month) and valuing the go-live opening stock, which comes in without a PO cost. When posting is built, Stock MASTER §9 applies: Finance values from the confirmation version it acknowledges and saves no month-end Stock total of its own. Both go to Chew.
+- Not built: posting the value to the ledger, and valuing the go-live opening stock, which comes in without a PO cost. Both go to Chew. The statements show the value without posting it (below).
 - Falsifier: in Chew's test, a Unit Chew knows was in the showroom or out for repair at a month end shows in another group, or a value differs from its PO line cost times its quantity.
+
+**Stock in the statements — Chew's ruling (2026-10-12); BUILT 2026-10-12 (0688), probed on production and rolled back; 0688 APPLIED 2026-10-12 on Chew's 「做」 for the build batch, the tracker holding the file exactly (md5 `11e18683b30c3be9a8bd544ecccb5d9d`).** The layout below is PROPOSAL / NOT LAW.
+- Nothing is posted. The statements show stock on hand the way AutoCount's do, from the stock value of the day, on the accounts AutoCount marks for it.
+- **Profit and Loss, All departments:**
+  - the opening stock account (SOS, `600-0000`) carries the stock on hand at the end of the day before the period, which adds to the cost of goods sold;
+  - the closing stock account (SCS, `620-0000`) carries the stock on hand at the end of the period, which takes off it.
+  - Purchases already post to the cost of goods sold (0477), so the period's cost reads opening stock + purchases − closing stock.
+- **Balance Sheet, All departments:** the stock account (SBS, `330-0000`) shows the stock on hand on the day in place of what the books hold on it. The difference joins `Net result not yet closed`, so the sheet still balances. The line's mark says how much it added.
+- **The stock on hand** is the sum of Stock value's Unit values (0643), the one arithmetic both read. A Unit with no cost recorded adds nothing. It is provisional, and each statement says so underneath.
+- **With a department chosen** there is no stock on either statement: stock on hand is not split by channel.
+- Measured before applying (production, rolled back, 2026-10-12):
+  - With the test stock worth RM 0.00, both statements were unchanged.
+  - With two PO lines given a cost for the probe, the stock on hand was RM 1,500.00. October's Profit and Loss showed RM 1,500.00 at the start and −RM 1,500.00 at the end.
+  - The Balance Sheet's stock line showed RM 1,500.00, its result rose by the same, and it balanced.
+  - September's closing stock equalled October's opening stock.
+  - Under Showroom neither statement showed stock, and the Balance Sheet balanced.
+- Not built:
+  - storing a month once Stock's Month-end Stock Confirmation confirms it (that confirmation is not built);
+  - stock on hand by channel;
+  - the go-live opening stock value.
+- Falsifier: in Chew's test, a statement's stock differs from Stock value for the same day, or the Balance Sheet stops balancing.
 
 #### Year-end close — complete review recommendation, 9 Oct 2026
 

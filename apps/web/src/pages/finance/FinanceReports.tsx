@@ -38,7 +38,7 @@ import Tabs from "@/components/kit/Tabs";
 import { appTodayIso, fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
-import StatementTable, { indent, nothingInPeriod, nothingOnDay, paidBeforeInvoiceNote } from "./reports/StatementTable";
+import StatementTable, { indent, nothingInPeriod, nothingOnDay, paidBeforeInvoiceNote, stockNote } from "./reports/StatementTable";
 import { packMonths, statementExport } from "./month-end-pack";
 import ExportStatement from "./reports/ExportStatement";
 import { monthChoices, monthEnd, readDay, readPeriod, wholeMonth } from "./reports/period";
@@ -212,6 +212,15 @@ const NotStarted = () => <div role="alert" className="text-body">
   <p>The ledger has no start date yet. Nothing can be totalled.</p>
 </div>;
 
+/** 0688 (Chew 2026-10-12, Finance MASTER §3.5): where the statement's stock
+ *  figures come from. It names Stock value without a link: this page keeps
+ *  no doors to the other reports, which are rows on the rail. */
+function StockLine({ statement, dept }: { statement: Statement; dept: string }) {
+  return <p className="text-label text-kit-slate-11" data-testid={`${STATEMENT_ID[statement]}-stock-note`}>
+    {stockNote(statement, dept !== "")}
+  </p>;
+}
+
 const GoLiveLine = ({ goLive }: { goLive: string }) =>
   <p className="text-body text-kit-slate-11" data-testid="reports-go-live">Since {fmtDate(goLive)} · No opening balances</p>;
 
@@ -304,6 +313,7 @@ function ProfitAndLossPage() {
           accountHref={(code) => ledgerAccountHref(code, from, to)}
           bottomLine={plReport?.status === "ok" ? { label: "Net result", amount: plReport.net } : null} />}
         </>}
+        <StockLine statement="pl" dept={dept} />
       </div>
     </Panel>
 
@@ -359,6 +369,7 @@ function BalanceSheetPage() {
           lineNote={paidBeforeInvoiceNote}
           bottomLine={null} />}
         </>}
+        <StockLine statement="bs" dept={dept} />
       </div>
     </Panel>
   </div>;
