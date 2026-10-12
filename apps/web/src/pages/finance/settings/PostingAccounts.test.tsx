@@ -40,6 +40,8 @@ const POSTINGS = {
     { role: "TRADE_PAYABLE", changeable: false, accountCode: "400-0000", accountName: "TRADE CREDITORS", changedAt: null, changedBy: null },
     { role: "COST_OF_GOODS_SOLD", changeable: true, accountCode: "610-0000", accountName: "PURCHASES", changedAt: null, changedBy: null },
     { role: "OTHER_INCOME", changeable: true, accountCode: "580-0000", accountName: "ADDITIONAL INCOME", changedAt: null, changedBy: null },
+    // 0689: a logistics bill's lines, by delivery order.
+    { role: "DELIVERY_TRANSPORT", changeable: true, accountCode: "900-T002", accountName: "LORRY HIRE", changedAt: null, changedBy: null },
     // 0675: the dealer commission month close's accounts.
     { role: "DEALER_COMMISSION", changeable: true, accountCode: "900-C007", accountName: "COMMISSION - DEALER", changedAt: null, changedBy: null },
     { role: "DEALER_COMMISSION_ACCRUED", changeable: true, accountCode: "410-0061", accountName: "ACCRUALS - COMMISSION DEALER", changedAt: null, changedBy: null },
@@ -68,6 +70,7 @@ const CHART = [
   acc("610-0020", "PURCHASE - MATTRESS", "EXPENSE", { parent_code: "5000" }),
   acc("310-2000", "HONG LEONG BANK", "ASSET", { parent_code: "310-0000" }),
   acc("900-C007", "COMMISSION - DEALER", "EXPENSE", { parent_code: "900-C001" }),
+  acc("900-T002", "LORRY HIRE", "EXPENSE", { parent_code: "900-T001" }),
   acc("400-0000", "TRADE CREDITORS", "LIABILITY", { parent_code: "400", is_control: true, control_for: "SUPPLIER" }),
   acc("410-0061", "ACCRUALS - COMMISSION DEALER", "LIABILITY", { parent_code: "410-0000" }),
   acc("410-0099", "ACCRUALS - OTHER", "LIABILITY", { parent_code: "410-0000" }),
@@ -242,6 +245,21 @@ describe("Posting accounts (0657)", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(net.calls).toHaveLength(1));
     expect(net.calls[0]!.body).toEqual({ what: "ROLE", key: "DEALER_COMMISSION_ACCRUED", accountCode: "410-0099", was: "410-0061" });
+  });
+
+  it("lists transport by delivery order under Purchases and charges; it takes an expense account (0689)", async () => {
+    show();
+    await ready();
+    expect(screen.getByTestId("grid-group-toggle-costs")).toHaveTextContent("Purchases and charges");
+    expect(row("ROLE/DELIVERY_TRANSPORT")).toHaveTextContent("Transport to customers, by delivery order900-T002 LORRY HIRE");
+    fireEvent.click(within(row("ROLE/DELIVERY_TRANSPORT")).getByText("Transport to customers, by delivery order"));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Account/ }), { key: "Enter" });
+    expect(screen.queryByRole("option", { name: "500-0000 SALES" })).toBeNull();
+    fireEvent.click(screen.getByRole("option", { name: "610-0020 PURCHASE - MATTRESS" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(net.calls).toHaveLength(1));
+    expect(net.calls[0]!.body).toEqual({ what: "ROLE", key: "DELIVERY_TRANSPORT", accountCode: "610-0020", was: "900-T002" });
   });
 
   it("never opens an account the system keeps", async () => {

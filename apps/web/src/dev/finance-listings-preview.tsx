@@ -7,7 +7,7 @@
  * and every API read answered by a local fixture. A separate vite entry — it
  * cannot reach production, and nothing leaves the browser.
  *
- * `?page=` ar · bills · payment-vouchers · ap-outstanding · suppliers ·
+ * `?page=` ar · bills · bill-new (0689: Add delivery orders) · payment-vouchers · ap-outstanding · suppliers ·
  * other-debtors · other-debtor-parties · other-receipts · daily-bank ·
  * journal · general-ledger · trial-balance · reports · profit-and-loss ·
  * balance-sheet · cash-flow · ap-aging · ar-aging (0686) · credit-notes · credit-note ·
@@ -106,6 +106,18 @@ const BILLS = [
     po_id: "PO-20260826-2210", grn_nos: "GRN-20260829-3001, GRN-20260901-3022", ap_account_code: "2100",
     total_amount: "9760.00", paid_total: "0.00", unpaid: "9760.00", price_flags: 1, file_count: 2, created_at: at(-18) },
 ];
+
+// 0689: a logistics company's delivery orders a bill can still charge for.
+const DELIVERY_PARTNERS = { rows: [
+  { partner_id: "lp-1", name: "Pos Laju Malaysia Berhad", delivery_orders: [
+    { id: "do-1", do_no: "DO-071026-4410", delivery_date: soon(-5), order_id: "o-1", so: 1401,
+      department_type: "SHOWROOM", department_id: "out-1" },
+    { id: "do-2", do_no: "DO-081026-4417", delivery_date: soon(-4), order_id: "o-2", so: 1402,
+      department_type: "DEALER", department_id: "dl-1" },
+    { id: "do-3", do_no: "DO-091026-4423", delivery_date: soon(-3), order_id: "o-3", so: 1403,
+      department_type: "SUBSCRIPTION", department_id: null },
+  ] },
+] };
 
 const VOUCHERS = [
   { id: "v-1", voucher_no: "PV-2609-0031", status: "approved", purpose: "SUPPLIER_BILLS", supplier_id: "s-1",
@@ -827,6 +839,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/finance/payment-requests/grants")) return json({ rows: REQUEST_GRANTS });
   if (url.includes("/api/finance/payment-requests/prq-")) return json(PAYMENT_REQUEST_DOC);
   if (url.includes("/api/finance/payment-requests")) return json({ rows: PAYMENT_REQUESTS });
+  if (url.includes("/api/finance/payables/bills/delivery-orders")) return json(DELIVERY_PARTNERS);
   if (url.includes("/api/finance/payables/bills")) return json({ rows: BILLS });
   if (url.includes("/api/finance/payables/vouchers")) return json({ rows: VOUCHERS });
   if (url.includes("/api/finance/payables/outstanding")) return json({ rows: OUTSTANDING });
@@ -845,7 +858,9 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/finance/payables/debit-notes")) return json({ rows: DEBIT_NOTES });
   if (url.includes("/api/finance/payables/accounts")) return json({ rows: AP_ACCOUNT_CHOICES });
   if (url.includes("/api/finance/ledger/departments"))
-    return json({ rows: [{ department_type: "SUBSCRIPTION", department_id: null, name: "Subscription" },
+    return json({ rows: [{ department_type: "SHOWROOM", department_id: "out-1", name: "Bangsar showroom" },
+      { department_type: "DEALER", department_id: "dl-1", name: "Ace Furniture" },
+      { department_type: "SUBSCRIPTION", department_id: null, name: "Subscription" },
       { department_type: "OFFICE", department_id: null, name: "Office" }] });
   if (url.includes("/api/finance/payables/suppliers"))
     return json({ rows: OUTSTANDING.map((o) => ({ id: o.supplier_id, name: o.supplier_name, kind: o.supplier_kind })) });
@@ -893,6 +908,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
 const ROUTES: Record<string, string> = {
   ar: "/finance/ar",
   bills: "/finance/bills",
+  "bill-new": "/finance/bills/new?supplier=s-6",
   "payment-vouchers": "/finance/payment-vouchers",
   "ap-outstanding": "/finance/ap-outstanding",
   suppliers: "/finance/suppliers",

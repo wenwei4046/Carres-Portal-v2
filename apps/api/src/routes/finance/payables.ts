@@ -16,6 +16,7 @@ import {
   supplierNoteContactInput,
   supplierNoteFollowupAddInput,
   supplierNoteSettleInput,
+  type BillDeliveryPartner,
   type GoodsLineChannel,
   type PaymentVoucherDraftInput,
   type SupplierBillDraftInput,
@@ -52,6 +53,8 @@ import type { AppEnv } from "../../types";
  *     GET  /bills                       supplier_bill_register
  *     GET  /bills/grn-candidates        supplier_bill_grn_candidates — GRNs with something left to bill
  *     GET  /bills/grn-lines/:receiptId  supplier_bill_grn_lines
+ *     GET  /bills/delivery-orders?billId=  fin_bill_delivery_orders (0689) — each logistics partner's
+ *                                       delivery orders a bill can still charge for
  *     GET  /bills/:id                   supplier_bill_document
  *     POST /bills                       supplier_bill_save_draft (new draft)
  *     PUT  /bills/:id                   supplier_bill_save_draft (rewrite a draft)
@@ -158,6 +161,7 @@ function billLinesToJson(lines: SupplierBillDraftInput["lines"]) {
   return lines.map((l) => ({
     warehouse_receipt_id: l.warehouseReceiptId ?? null,
     po_line_id: l.poLineId ?? null,
+    delivery_order_id: l.deliveryOrderId ?? null,   // 0689
     account_code: l.accountCode ?? null,
     description: l.description ?? null,
     sku: l.sku ?? null,
@@ -390,6 +394,16 @@ payablesRouter.get("/bills/grn-lines/:receiptId", requireFinance, async (c) => {
       return { ...r, channels: list, department_type: one?.department_type ?? null, department_id: one?.department_id ?? null };
     }),
   });
+});
+
+// 0689 (Chew ruling 5): each logistics partner and its delivery orders a bill
+// can still charge for. `billId` keeps the DOs already on the bill being edited.
+payablesRouter.get("/bills/delivery-orders", requireFinance, async (c) => {
+  const raw = c.req.query("billId");
+  if (raw !== undefined && raw !== "" && !UUID_RE.test(raw)) return badId(c, "bill");
+  const { data, error } = await sb(c).rpc("fin_bill_delivery_orders", { p_bill_id: raw ? raw : null });
+  if (error) return pgFail(c, error);
+  return c.json({ rows: (data ?? []) as BillDeliveryPartner[] });
 });
 
 payablesRouter.get("/bills/:id", requireFinance, async (c) => {
