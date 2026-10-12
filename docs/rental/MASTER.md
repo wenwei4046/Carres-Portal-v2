@@ -111,7 +111,8 @@ subscription (「同一套」). Everything in §0 is **APPROVED / NOT BUILT** un
 - Chew approved two changes, to be read by a lawyer first (「这个没有问题」): the Commencement
   Date becomes the 7th of the month after delivery, and a new clause lets the customer pay off the
   balance at any time and then buy the goods for RM 1. Caution, not checked: goods that may pass to
-  the customer can make the agreement a hire purchase agreement.
+  the customer can make the agreement a hire purchase agreement. The changes are with the lawyer
+  (Chew 2026-10-12, 「已经给律师了」).
 - Interest from month end needs no change: the agreement's non-waiver clause keeps the right to
   charge from the due date.
 - Suppliers and whoever earns the commission should see their subscriptions' status; external

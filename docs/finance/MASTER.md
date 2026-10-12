@@ -48,7 +48,7 @@ Finance must show clearly where each sum of money comes in and goes out, channel
 6. Debtors follow the channel in two levels for dealers (「Dealer 一个overall 母账，然后每个dealer under 这个母账 … 就是两层了」): Dealer Debtors, then each dealer, then that dealer's customers or orders. Showroom and Subscription each have one control account with their customers under it.
 7. Goods bought without an order must not leave money paid to suppliers outside every channel in Receipts & Payments (「这样我看receipt & payment 就不太对了」); Chew confirmed how such a purchase is placed on 2026-10-06 ("A purchase without an order" below).
 
-Status (measured 2026-10-10): ruling 3 holds today (a line can be set to Office). Rulings 1, 2, 4, 5 and 6 and "A purchase without an order" are APPROVED / NOT BUILT; the plan is "Splitting the money by channel" at the end of this section.
+Status (measured 2026-10-10): ruling 3 holds today (a line can be set to Office). Rulings 1, 2, 4, 5 and 6 and "A purchase without an order" are APPROVED / NOT BUILT; the plan for them, "Splitting the money by channel" at the end of this section, was approved by Chew on 2026-10-12.
 
 **Chart of accounts (Chew's, AutoCount, dated 22 Sep 2026; kept by Chew, not in this repository).** It has one debtor control (Trade Debtors) and one Other Debtor control, so dealer and subscription customers are not separated (「本身里面没有分dealer customer 和 subscription customer」). Measured: the ledger already accepts its code shape (`ledgerAccountCodeShape`, for example 300-0000 and 900-A001). Customers sit under a control account as parties on each line (`gl_entry_lines.party_type` / `party_id`), not as accounts, so a control account holds any number of customers.
 
@@ -154,7 +154,7 @@ Two Finance Settings pages keep the mapping in Chew's hands (「其他的收入�
 - When Purchasing allocates such stock or PO quantity to a Sales Order, the goods take that order's channel. Allocated before the supplier is paid: the bill and the payment carry the order's channel. Allocated after: that month's Receipts & Payments keeps it under stock and does not change, and the cost reaches the order's channel when the goods are sold. A PO split between orders is split unit by unit.
 - The KPI allowance is accrued like the renovation rebate (900-C009 / 410-0065).
 
-**Splitting the money by channel — the plan, PROPOSAL / NOT LAW (2026-10-10, for Chew's review).** It builds Chew's rulings 1, 2, 4, 5 and 6 above and "A purchase without an order". Measured first (2026-10-10, read only):
+**Splitting the money by channel — the plan; APPROVED by Chew 2026-10-12 (「分渠道做」, after it was explained to him) / NOT BUILT. He tests it all at once when it is done (「到时我要测试的全部一次过做」).** It builds Chew's rulings 1, 2, 4, 5 and 6 above and "A purchase without an order". Measured first (2026-10-10, read only):
 - Customer money: a payment, a deposit and an invoice each post to the one trade debtors account (`300-0000`) through `gl_ar_control_account()`, which allows exactly one customer control account; a second one makes every customer payment fail to post. These postings run inside Payment's own recording (Jess's), with no fallback, so a fault there would stop staff recording payments. No customer posting stores a department: the reports work it out from the order when they read (0578).
 - Supplier bills: a GRN line's department is filled in from its sales order (`fin_po_line_departments`), but it can be changed by hand; a PO line bought for orders in two channels gets none. A Manual Purchase Request keeps its purpose; a Showroom Display destination is not tied to a showroom outlet.
 - Cash Flow has no channel filter. A supplier payment carries no department (only the bill lines it paid do); a card payout carries none.
@@ -163,7 +163,7 @@ Two Finance Settings pages keep the mapping in Chew's hands (「其他的收入�
 Recommended, in this order:
 1. **A bill line takes its order's channel** (ruling 2). A GRN line bought for one channel takes it and cannot be changed. A PO line bought for orders in different channels is split by quantity, one line per channel. A purchase without an order takes its channel from its request's purpose: Showroom Display needs Purchasing's destination tied to a showroom (Jess's data); Ready Stock needs the "not yet in a channel" place, whose cost reaches the order's channel when the goods are sold.
 2. **Cash Flow by channel** (ruling 1): a receipt goes to its order's channel; a supplier payment to the channels of the bill lines it paid, in proportion; a card payout to the channels of the card payments in it; a transfer between Carres's own accounts to none.
-3. **Debtors by channel** (rulings 4 and 6): `300-1000` Showroom, `300-2000` Dealer with one account per dealer under it (`300-2001` and on, a new dealer getting its own), `300-3000` Subscription, all under `300-0000`. Each posting picks the account from its order's channel. The test balances already on `300-0000` stay there; go-live starts clean. This rewrites the posting step inside Payment's recording, so it waits for Chew's go-ahead and Jess is told before it is built.
+3. **Debtors by channel** (rulings 4 and 6): `300-1000` Showroom, `300-2000` Dealer with one account per dealer under it (`300-2001` and on, a new dealer getting its own), `300-3000` Subscription, all under `300-0000`. Each posting picks the account from its order's channel. The test balances already on `300-0000` stay there; go-live starts clean. This rewrites the posting step inside Payment's recording: Chew approved it (2026-10-12, §1 Exceptions) and tells Jess, and it is measured on production and rolled back before it goes live, because a fault there would stop staff recording payments.
 4. **Transport on each order** (ruling 5): a logistics partner's bill names the delivery orders it covers; its amount is split over them (equally when it gives only a total); each part posts to `900-T002` with its order's channel.
 - Falsifier: in Chew's test, a channel's money in or out differs from what its orders, bills and vouchers show, or a customer payment fails to post after step 3.
 
@@ -199,7 +199,9 @@ Chew, 2026-10-03: 「总之jess 的功能，ui 等等都别动到。我只专做
 - the payment method settings of order entry and Payment (「直接改」, 2026-10-07, §0);
 - the item group field on the catalog's new model and SKU forms (「jess 那边我会通知他，你直接做」, 2026-10-07, §0);
 - the machine picker after `Merchant` on Operation's balance form (「要做，直接做」, 2026-10-07, §0; built with 0660);
-- Finance setting the money account each way of being paid lands in, from Finance Settings → Posting accounts, although Payment MASTER §12 leaves Payment settings to the manager (「1 可以」, 2026-10-07, §0 "Automatic posting accounts").
+- Finance setting the money account each way of being paid lands in, from Finance Settings → Posting accounts, although Payment MASTER §12 leaves Payment settings to the manager (「1 可以」, 2026-10-07, §0 "Automatic posting accounts");
+- the debtor account chosen by the order's channel when Payment records money (「分渠道做」, 2026-10-12, §0 "Splitting the money by channel" step 3);
+- HR and BD staff asking Finance to pay through Payment Requests, which puts its row in their menus (「hr & BD 也到能申请」, 2026-10-12, §3.3).
 
 Each changes only what Finance needs on that screen; nothing else on Jess's screens moves (Chew: 「别碰到其他的view哦」).
 
@@ -211,7 +213,7 @@ Each changes only what Finance needs on that screen; nothing else on Jess's scre
 |---|---|
 | Finance user | Prepares payment vouchers. Keys supplier bills, other debtors and other receipts. Runs card and bank reconciliation and month-end. Reads the reports. |
 | Checker | Any Finance user except the one who prepared the voucher. |
-| Finance Approver | The existing Workspace duty `finance_approver` (Workspace MASTER §4 Staff & Duties). It takes Finance users only, allows a cover, and the principal can always approve. Approves vouchers and money moves, and cancels confirmed Finance documents. |
+| Finance Approver | The existing Workspace duty `finance_approver` (Workspace MASTER §4 Staff & Duties). It takes Finance users only, allows a cover, and the principal can always approve. Approves vouchers and money moves, and cancels confirmed Finance documents. Measured 2026-10-12: no person holds it yet, so a Finance user whose position carries the duty approves (the Finance test login does). Chew assigns it to a person when he creates the real users (「到时我创建了用户才指派」, 2026-10-12). |
 | Staff with permission | Raise a payment request with the bill attached (§3.3). Finance or the boss gives the permission. |
 | The boss | Sets permissions and assigns duties. |
 
@@ -230,7 +232,7 @@ Each changes only what Finance needs on that screen; nothing else on Jess's scre
 | Topic | Decision |
 |---|---|
 | Recording, receipts and corrections | **Payment's rules stand.** Each recorded payment reaches the Finance ledger automatically, and Finance does not re-enter it. Payment's rules are: one collection owner; the receipt is made at recording; void or correct allocation is done by the Payment Approver. |
-| Refunds | **Jess's no-refund policy stands** (Payment MASTER §13). The exceptional refund (Service Case → Management → Finance pays) is paid with a Finance **Customer Refund** voucher, so that it is in the ledger. Where it shows: on Finance's own AR page, the refunded amount stands on its own beside the customer's outstanding; Payment's figures and pages do not change (Chew 2026-10-03). **Not built.** An order already invoiced is refunded through a credit note to `520-0000 DISCOUNT ALLOWED` (Chew 2026-10-10, 「已开的进 discount allowed(cn）」). PROPOSAL / NOT LAW for an order not yet invoiced (the money was paid ahead of the invoice): Dr Trade Debtors with the customer as the party, Cr the bank, so the customer's balance returns to nothing; falsifier: Chew's auditor books it another way. That credit note is Finance's own record: it posts only in Finance and is not sent to the customer, so Payment's pages and figures do not change and customer invoices stay Payment's (row below) (Chew 2026-10-10, 「A，Finance 自己记录就好」). |
+| Refunds | **Jess's no-refund policy stands** (Payment MASTER §13). The exceptional refund (Service Case → Management → Finance pays) is paid with a Finance **Customer Refund** voucher, so that it is in the ledger. Where it shows: on Finance's own AR page, the refunded amount stands on its own beside the customer's outstanding; Payment's figures and pages do not change (Chew 2026-10-03). **Not built.** An order already invoiced is refunded through a credit note to `520-0000 DISCOUNT ALLOWED` (Chew 2026-10-10, 「已开的进 discount allowed(cn）」). An order not yet invoiced (the money was paid ahead of the invoice) is refunded Dr Trade Debtors with the customer as the party, Cr the bank, taking it back off that customer's account (Chew 2026-10-12, 「可以，就扣回相对应的顾客账目」). That credit note is Finance's own record: it posts only in Finance and is not sent to the customer, so Payment's pages and figures do not change and customer invoices stay Payment's (row below) (Chew 2026-10-10, 「A，Finance 自己记录就好」). |
 | Moving a deposit to another order | **Not built.** It changes payment records, and Payment already has `Correct allocation`. |
 | Old-slip approval window | **Not built.** |
 | Customer credit and debit notes | **Not built.** Customer invoices belong to Payment (Payment MASTER §1). |
@@ -466,7 +468,7 @@ Dealer commission rules:
 - **The shared menu** gains one row, `Payment Requests`, under Operations → Workspace. It shows only to the staff allowed, and to the boss, who may always ask; Chew 2026-10-03: it is fine in her menu. Finance and the boss also find it under Finance → Payables.
 - **The files** go to their own private store, so the person can upload without being given Finance's files. That store has two new access rules of its own; no existing rule changed.
 - **Not built:**
-  - HR or BD staff asking. They cannot open the Finance pages today; letting them would need Jess's routes to change. Whether they should, and where the menu row sits, waits for Chew (2026-10-03).
+  - HR or BD staff asking: APPROVED / NOT BUILT (Chew 2026-10-12, 「hr & BD 也到能申请」). They cannot open the request page today; it needs the `Payment Requests` row in their menus, a change on Jess's side that Chew tells her about (§1 Exceptions).
   - Asking for the balance of a bill again.
   - The official invoice owed after a proforma.
   - Reading the bill on the request.
@@ -526,7 +528,7 @@ Carres already has a simpler Card settlement. It takes Public Bank, GHL and Mayb
 |---|---|
 | Closed months lock | Keep, but **do not switch it on**. |
 | Month-end stock value: groups | Four groups: warehouse, showroom, in transit (road, transit points and partner legs) and sent for repair. Supplier consignment and dealer stock are excluded; Stock MASTER §12.9 says dealer display stock is the dealer's own. |
-| Month-end stock value: source | Use Stock MASTER §12.10's Month-end Stock Confirmation once it exists. Until then, Finance works out a **provisional** value from Stock's Units, reading only, and marks it provisional. |
+| Month-end stock value: source | The P&L and Balance Sheet show the stock value live each time they are opened, worked out from Stock's Units (reading only) and marked **provisional**. Once Stock's Month-end Stock Confirmation (Stock MASTER §12.10, not built) confirms a month, Finance stores that month's value and it never changes again (Chew 2026-10-12, 「存货价值就不能定成我开P&L 时每次都是live 的，然后当jess 那边月底存货确认就 我这里储存起来不会再改」). **APPROVED / NOT BUILT.** |
 | Opening balances | Finance's own account figures at go-live. No old transactions are brought in, because CLAUDE.md §6 stands. **Parked (Chew 2026-10-03)** until every feature is tested: it is data entered at go-live, though each customer's and supplier's opening balance will need a place to be entered. |
 | SST | Carres is not SST-registered, so there is no tax on invoices. |
 | Year-end close | Later, before year end. |
@@ -601,7 +603,7 @@ All reports only read. Reports → Payment stays Payment's.
 - Columns by whole calendar months (`This month` to `4 months and over`) or by 30-day steps, aged by bill date or due date, as Houzs's formal aging is.
 - A voucher pays a bill on the voucher's own date, the date it posts on; an advance knocked off a bill counts from the day of the knock-off until it is cancelled. How much of a bill is paid has one arithmetic, `ap_bill_settled`, which AP · Payables also reads now (its figures do not change).
 - Each row adds up to the supplier's balance in the books, and the footer ties the rows to the control accounts with the difference. A test walks bills, a voucher with an advance and a knock-off through the real doors and reads three days.
-- AR Aging is built the same way as AP Aging, reading Payment's invoices and receipts and changing none (Chew 2026-10-03). **Not built yet.**
+- AR Aging lists every invoice issued and not yet fully paid, for ordinary customers (Payment's invoices, read and never changed) and other debtors (Finance's own invoices), aged the same way as AP Aging (Chew 2026-10-03; 2026-10-12, 「就根据开了invoice还没还的就出现…包括普通顾客」). What an invoice still owes is Payment's own arithmetic, a deposit filling the order's earliest invoice first; money paid ahead of any invoice is not a row. **APPROVED / NOT BUILT.** PROPOSAL / NOT LAW: the footer shows that money paid ahead, so the total still ties to the debtor accounts in the books; falsifier: in Chew's test the footer's difference is not zero.
 - Not built: the trade or other payables chips, and a PDF.
 - Falsifier: in Chew's test, a supplier's balance here differs from AP · Payables' net owing today, or the footer's difference is not zero.
 
@@ -675,7 +677,7 @@ FINANCE          its title folds the area (§4.1)
 2. **File samples.** Before the readers are built, collect a sample card report and a sample bank statement from each provider. Hong Leong's card report is a secured PDF.
 3. **Deposit invoices.** Chew confirms them with Jess (2026-10-03). Check them against Payment's invoice rules and e-invoice before switching them on.
 4. **Dealer commission.** Check the calculation with Chew step by step before anything about it changes.
-5. **Stock confirmation.** Stock's Month-end Stock Confirmation is not built, so Finance's stock value stays provisional until it is.
+5. **Stock confirmation.** Stock's Month-end Stock Confirmation is not built, so every month's stock value stays live and provisional until it is; from then on each confirmed month is stored and never changes (§3.5, Chew 2026-10-12).
 6. **Year-end close.** Complete review recommendation is now in §3.5. Chew must settle the fiscal period, close/correction permissions, accounting treatment and lock activation before build; this proposal is not approval.
 7. **New words.** New Finance screen words go through COPY-STANDARD before UI work.
 
