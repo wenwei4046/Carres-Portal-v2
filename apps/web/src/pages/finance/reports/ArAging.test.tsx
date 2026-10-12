@@ -103,6 +103,17 @@ describe("AR Aging (0686)", () => {
     expect(row(`OTHER:${COMPANY}`)).toHaveTextContent("RM 300.00");
   });
 
+  /* 0690 (Chew 2026-10-12): a deposit paid ahead of an invoice names its
+     order's channel, read from where the debtor's balance sits. */
+  it("names the channel of money paid ahead of an invoice (0690)", async () => {
+    api.answer = { ...ANSWER, debtors: ANSWER.debtors.map((d) => d.party_id === AHEAD
+      ? { ...d, channels: [{ department_type: "SHOWROOM", department_id: OUTLET, amount: -200 }] }
+      : d) };
+    show();
+    await screen.findByTestId(`ar-aging-row-CUSTOMER:${AHEAD}`);
+    await waitFor(() => expect(row(`CUSTOMER:${AHEAD}`)).toHaveTextContent("Test Showroom"));
+  });
+
   it("keeps Debtor Type out of sight at first, as AP Aging keeps Creditor Type", async () => {
     show();
     await screen.findByTestId(`ar-aging-row-CUSTOMER:${CUSTOMER}`);

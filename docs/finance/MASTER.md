@@ -706,7 +706,7 @@ All reports only read. Reports → Payment stays Payment's.
   - its open invoices by age;
   - `Not tied to an invoice` for the rest; below zero, it is money paid ahead of an invoice, such as a deposit.
 - The footer ties the rows to the debtor accounts and shows the difference.
-- `Channel` names the one channel a debtor's open invoices share. Invoices issued before the ledger started are not aged; the page says how many there are and how much.
+- `Channel` names the one channel a debtor's balance sits in, or `Several channels`. Invoices issued before the ledger started are not aged; the page says how many there are and how much.
 - Measured before applying (production, rolled back, 2026-10-12):
   - Today's 7 customers each had money paid ahead and no open invoice. Together they equalled `300-0000` exactly.
   - An invoice of RM 2,629.00 on an order with a deposit of RM 1,315.00 showed RM 1,314.00 open, in Showroom. The day before the invoice, the deposit was money paid ahead.
@@ -714,7 +714,10 @@ All reports only read. Reports → Payment stays Payment's.
   - Operation could not read it.
 - Checked on production after deploying (read only, 2026-10-12): the 7 customers showed their money paid ahead under `Not tied to an invoice`, RM -13,928.00 in all, equal to `300-0000 + 305-0000`, difference RM 0.00.
 - Not built: a customer refund (refunds do not post to the debtor accounts yet), a PDF, and a view by debtor account.
-- Not built, found on production: a row with money paid ahead and no open invoice shows no `Channel`, because the channel is read from the open invoices only. Since "Splitting the money by channel" step 3 (0685) was applied, the debtor account a customer's new money sits on names the channel; the row can read it from there (PROPOSAL, for Chew). Money posted before 0685 stays on `300-0000`, which names none.
+- **The channel of money paid ahead — Chew 2026-10-12 (「可以，补上 AR Aging 的 Channel」); BUILT 2026-10-12 (0690), probed on production and rolled back; NOT APPLIED yet.** Found on production: a row with money paid ahead and no open invoice showed no `Channel`, because the channel was read from the open invoices only.
+  - Now the channel is where the debtor's balance sits: its lines on the debtor accounts, added up by the department the reports already give each line (`gl_line_departments`: an invoice's or a payment's order, or the department its entry names). A channel at RM 0.00 is left out.
+  - So a deposit names its order's channel, including money posted before step 3 (0685) on `300-0000`. A debtor with an open showroom invoice and a deposit on a dealer order shows `Several channels`.
+  - Measured before applying (production, rolled back, 2026-10-12): the 7 customers with money paid ahead each named one channel (3 showroom, 4 dealer), its amount equal to their balance; everything else in the answer was unchanged; Operation could not read it.
 - Falsifier: in Chew's test, a debtor's open invoice differs from what Payment or Other debtors shows for it, or the footer's difference is not zero.
 
 **Collection report approach — PROPOSAL / NOT LAW, built for Chew's test (0644).**

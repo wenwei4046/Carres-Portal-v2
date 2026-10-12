@@ -66,7 +66,7 @@ describe("AR aging (0686)", () => {
     expect(arAgingReport(broken, "invoice", "month").difference).toBe(414);
   });
 
-  it("names the one channel a row's invoices share, or several", () => {
+  it("an answer made before 0690 names the one channel a row's invoices share, or several", () => {
     const r = arAgingReport(ANSWER, "invoice", "month");
     expect(r.rows[0]!.channel).toEqual({ type: "SHOWROOM", id: "out-1" });
     expect(r.rows[1]!.channel).toBeNull();
@@ -75,6 +75,28 @@ describe("AR aging (0686)", () => {
       inv({}), inv({ invoice_id: "i-2", invoice_no: "INV-2", department_type: "DEALER", department_id: "d-1" }),
     ] }] }, "invoice", "month");
     expect(two.rows[0]!.channel).toBe("several");
+  });
+
+  /* 0690 (Chew 2026-10-12, 「可以，补上 AR Aging 的 Channel」): the channel is
+     where the debtor's balance sits, so a deposit names its order's channel. */
+  it("names the channel a debtor's balance sits in, money paid ahead included (0690)", () => {
+    const withChannels: ArAgingAnswer = { ...ANSWER, debtors: [
+      { ...ANSWER.debtors[0]!, channels: [{ department_type: "SHOWROOM", department_id: "out-1", amount: "1314.00" }] },
+      { ...ANSWER.debtors[1]!, channels: [{ department_type: "DEALER", department_id: "d-1", amount: "-200.00" }] },
+      // An open showroom invoice and a dealer order's deposit: two channels.
+      { ...ANSWER.debtors[0]!, party_id: "c-3", balance: "1114.00", channels: [
+        { department_type: "DEALER", department_id: "d-1", amount: "-200.00" },
+        { department_type: "SHOWROOM", department_id: "out-1", amount: "1314.00" },
+      ] },
+      // A channel at RM 0.00 is no channel; with none left, the row names none.
+      { ...ANSWER.debtors[2]!, channels: [{ department_type: "OFFICE", department_id: null, amount: "0.00" }] },
+    ] };
+    const r = arAgingReport(withChannels, "invoice", "month");
+    expect(r.rows[0]!.channel).toEqual({ type: "SHOWROOM", id: "out-1" });
+    expect(r.rows[1]!.channel).toEqual({ type: "DEALER", id: "d-1" });
+    expect(r.rows[1]!.notTied).toBe(-200);
+    expect(r.rows[2]!.channel).toBe("several");
+    expect(r.rows[3]!.channel).toBeNull();
   });
 
   it("carries the invoices issued before the ledger started", () => {

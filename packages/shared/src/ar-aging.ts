@@ -6,7 +6,8 @@
  * `fin_ar_aging` serves the parts: the debtor control accounts' balances on
  * the day, each debtor's balance on them, and its invoices still open that
  * day (a customer's order money fills its earliest invoice first; an other
- * debtor's receipts count by allocation). Everything else is worked out here
+ * debtor's receipts count by allocation). Since 0690 it also gives each
+ * debtor's balance by channel, so money paid ahead names its order's channel. Everything else is worked out here
  * and nowhere else (Law D), in whole sen, the way AP Aging is (`ap-aging`,
  * whose columns this reuses):
  *
@@ -67,6 +68,10 @@ export interface ArAgingAnswer {
     kind: string | null;
     balance: Wire;
     invoices: ArAgingInvoice[];
+    /** 0690: the debtor's balance by the department the reports give each of
+     *  its lines (gl_line_departments); a channel at RM 0.00 is left out.
+     *  Absent from an answer made before 0690. */
+    channels?: Array<{ department_type: string; department_id: string | null; amount: Wire }>;
   }>;
   /** Live invoices issued before the ledger started: the books never held them. */
   before_go_live: { count: number; amount: Wire };
@@ -87,7 +92,7 @@ export interface ArAgingInvoiceLine {
   departmentId: string | null;
 }
 
-/** The one channel a row's open invoices share, `several`, or null when it has none. */
+/** The one channel a debtor's balance sits in, `several`, or null when it has none. */
 export type ArAgingChannel = { type: string; id: string | null } | "several" | null;
 
 export interface ArAgingRow {
@@ -116,11 +121,21 @@ export interface ArAgingReport {
   beforeGoLive: { count: number; amount: number };
 }
 
-function rowChannel(invoices: readonly ArAgingInvoiceLine[]): ArAgingChannel {
+/** 0690: the channels the debtor's balance sits in, so money paid ahead of an
+ *  invoice names its order's channel too. An answer made before 0690 has no
+ *  `channels`, and then the open invoices name it, as before. */
+function rowChannel(
+  channels: ArAgingAnswer["debtors"][number]["channels"],
+  invoices: readonly ArAgingInvoiceLine[],
+): ArAgingChannel {
   const seen = new Map<string, { type: string; id: string | null }>();
-  for (const i of invoices) {
-    if (!i.departmentType) continue;
-    seen.set(`${i.departmentType}:${i.departmentId ?? ""}`, { type: i.departmentType, id: i.departmentId });
+  const add = (type: string | null, id: string | null) => {
+    if (type) seen.set(`${type}:${id ?? ""}`, { type, id });
+  };
+  if (channels) {
+    for (const c of channels) if (sen(c.amount) !== 0) add(c.department_type, c.department_id);
+  } else {
+    for (const i of invoices) add(i.departmentType, i.departmentId);
   }
   if (seen.size === 0) return null;
   return seen.size === 1 ? [...seen.values()][0]! : "several";
@@ -153,7 +168,7 @@ export function arAgingReport(a: ArAgingAnswer, basis: ArAgingBasis, columns: Ag
       key: `${d.party_type}:${d.party_id ?? "none"}`, partyType: d.party_type, partyId: d.party_id,
       name: d.name ?? "Name not available", kind: d.kind,
       balance: balance / 100, cells: cells.map((c) => c / 100), notTied: notTied / 100,
-      channel: rowChannel(invoices), invoices,
+      channel: rowChannel(d.channels, invoices), invoices,
     };
   });
   const controls = a.controls.map((c) => ({ code: c.account_code, name: c.name, balance: sen(c.balance) }));

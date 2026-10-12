@@ -57,7 +57,8 @@ const KIND_WORD: Record<ArInvoiceKind, string> = {
 };
 export const debtorTypeWord = (r: Pick<ArAgingRow, "partyType">) => (r.partyType === "CUSTOMER" ? "Customer" : "Other debtor");
 
-/** The one channel a row's open invoices share, in words; `Several channels`; or nothing. */
+/** The one channel a debtor's balance sits in (0690: money paid ahead too), in
+ *  words; `Several channels`; or nothing. */
 export function channelWord(r: Pick<ArAgingRow, "channel">, departments: readonly DepartmentRow[]): string {
   if (r.channel === null) return "";
   if (r.channel === "several") return "Several channels";
@@ -115,7 +116,7 @@ export default function ArAging() {
   const gridColumns = useMemo<DataGridColumn<ArAgingRow>[]>(() => [
     // Hidden at first, as AP Aging's Creditor Type is, so every age column
     // and Not tied to an invoice fit a 1440 screen beside Channel.
-    { key: "debtor", label: "Debtor", width: 220, accessor: (r) => r.name, overflowText: (r) => r.name,
+    { key: "debtor", label: "Debtor", width: 204, accessor: (r) => r.name, overflowText: (r) => r.name,
       searchValue: (r) => r.name, exportValue: (r) => r.name },
     { key: "type", label: "Debtor Type", width: 130, accessor: debtorTypeWord,
       filterValue: debtorTypeWord, filterType: "enum", defaultHidden: true },
@@ -134,7 +135,9 @@ export default function ArAging() {
         footerTotal: (v) => sum(v, (r) => r.cells[i]!),
       };
     }),
-    { key: "notTied", label: "Not tied to an invoice", headerLines: ["Not tied to", "an invoice"], width: AMOUNT, align: "right",
+    // Money paid ahead totals below zero, one character wider than an age
+    // column's: the Debtor column gives up the 16px it needs.
+    { key: "notTied", label: "Not tied to an invoice", headerLines: ["Not tied to", "an invoice"], width: AMOUNT + 16, align: "right",
       accessor: (r) => money(r.notTied), numberValue: (r) => r.notTied, exportValue: (r) => r.notTied,
       footerTotal: (v) => sum(v, (r) => r.notTied) },
   ], [columns, departments]);
