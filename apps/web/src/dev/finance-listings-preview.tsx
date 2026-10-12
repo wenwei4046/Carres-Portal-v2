@@ -662,7 +662,7 @@ const AR_AGING = (asAt: string) => ({
   as_at: asAt, go_live_on: GO_LIVE,
   controls: [
     { account_code: "300-1000", name: "SHOWROOM DEBTORS", balance: 4114 },
-    { account_code: "300-2001", name: "TEST DEALER", balance: 2950 },
+    { account_code: "300-2001", name: "TEST DEALER", balance: 2450 },
     { account_code: "305-0000", name: "OTHER DEBTOR", balance: 1800 },
   ],
   debtors: [
@@ -680,6 +680,9 @@ const AR_AGING = (asAt: string) => ({
       { invoice_id: "ci-4", invoice_no: "INV-0004", kind: "sales", order_id: "o-3", so: 1403, invoice_date: soon(-130),
         due_date: null, total: 2950, open: 2950, department_type: "DEALER", department_id: "d-1" },
     ] },
+    // 0690: a deposit on a dealer order not invoiced yet names the order's channel.
+    { party_type: "CUSTOMER", party_id: "c-4", name: "WONG MEI LING", kind: "customer", balance: -500, invoices: [],
+      channels: [{ department_type: "DEALER", department_id: "dl-1", amount: -500 }] },
     { party_type: "OTHER", party_id: "p-1", name: LONG_PARTY, kind: "company", balance: 1800, invoices: [
       { invoice_id: "oi-1", invoice_no: "ARI-0001", kind: "other", order_id: null, so: null, invoice_date: soon(-20),
         due_date: soon(10), total: 2000, open: 1800, department_type: null, department_id: null },
