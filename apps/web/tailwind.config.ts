@@ -145,6 +145,8 @@ export default {
           "row-hover": "var(--c-row-hover)",
           "select-pill": "var(--c-select-pill)",
           "tree-line": "var(--c-tree-line)",
+          track: "var(--c-track)",
+          "track-hover": "var(--c-track-hover)",
           "card-border": "var(--c-card-border)",
           "btn-border": "var(--c-btn-border)",
           "head-line": "var(--c-head-line)",
@@ -234,9 +236,13 @@ export default {
        * class names — `.t-body` is already the retired v17 ramp's 14px/400 in
        * index.css and is live in 5 files. UI-KIT §2.1 records the mapping. */
       fontSize: {
-        page: ["24px", { lineHeight: "32px", fontWeight: "600" }],
+        /* THE KIT PAIRS (01 §2): 20/600 is the page title or record number,
+           the one boldest text on a page; card and panel titles are 15/500.
+           Nothing else is 600 at 15 or above. `page` was 24/600 and `strong`
+           15/600 before the 12 Oct kit. */
+        page: ["20px", { lineHeight: "28px", fontWeight: "600" }],
         title: ["20px", { lineHeight: "28px", fontWeight: "600" }],
-        strong: ["15px", { lineHeight: "22px", fontWeight: "600" }],
+        strong: ["15px", { lineHeight: "22px", fontWeight: "500" }],
         body: ["13px", { lineHeight: "18px", fontWeight: "400" }],
         meta: ["12px", { lineHeight: "16px", fontWeight: "400" }],
         label: ["11px", { lineHeight: "14px", fontWeight: "500" }],

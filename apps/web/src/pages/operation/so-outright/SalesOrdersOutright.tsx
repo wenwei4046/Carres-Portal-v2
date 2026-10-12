@@ -26,6 +26,7 @@ import { paymentStatusOf, skuKey, useCatalogNames } from "../SalesOrdersRegister
 import SalesOrderReadFailure from "../SalesOrderReadFailure";
 import { printSalesOrdersOrSay } from "../record-print";
 import ModuleHeader from "../components/ModuleHeader";
+import { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
 import { TasksPill } from "../components/ShellTasks";
 import {
   COLUMNS,
@@ -365,7 +366,7 @@ export default function SalesOrdersOutright() {
                 <MIcon name="left_panel_open" size={18} />Summary
               </button>
             )}
-            <div role="tablist" aria-label="Views" className="flex gap-0.5 p-[3px]">
+            <div role="tablist" aria-label="Views" className={SEGMENTED_TRACK}>
               {TABS.map((t) => (
                 <button
                   key={t.key}
@@ -373,9 +374,7 @@ export default function SalesOrdersOutright() {
                   role="tab"
                   aria-selected={tab === t.key}
                   onClick={() => chooseTab(t.key)}
-                  className={`whitespace-nowrap rounded-lg px-3 py-[5px] text-[13px] ${
-                    tab === t.key ? "bg-c-select-bg font-semibold text-c-select-fg" : "font-medium text-c-tab hover:bg-c-hover"
-                  }`}
+                  className={`${SEGMENT} ${tab === t.key ? SEGMENT_ON : SEGMENT_OFF}`}
                 >
                   {t.label}
                 </button>
@@ -747,7 +746,7 @@ function SummaryPanel({
   return (
     <aside aria-label="Summary" className="flex w-[240px] shrink-0 flex-col gap-3.5 overflow-auto rounded-lg border border-c-card-border bg-c-card px-3.5 py-3 [scrollbar-width:thin]" data-testid="outright-summary">
       <div className="flex items-center gap-1.5">
-        <span className="flex-1 text-[17px] font-medium tracking-[-0.01em]">Summary</span>
+        <span className="flex-1 text-strong">Summary</span>
         <button type="button" onClick={onHide} aria-label="Hide summary" className="flex text-c-muted">
           <MIcon name="chevron_left" size={20} />
         </button>
@@ -756,7 +755,7 @@ function SummaryPanel({
         <button type="button" onClick={onPrev} aria-label="Previous month" className="flex text-c-body">
           <MIcon name="chevron_left" size={20} />
         </button>
-        <span className="text-[14px] font-semibold">{monthWord(month)}</span>
+        <span className="text-body font-semibold">{monthWord(month)}</span>
         <button type="button" onClick={onNext} aria-label="Next month" disabled={!canNext} className="flex text-c-body disabled:text-c-head-line">
           <MIcon name="chevron_right" size={20} />
         </button>

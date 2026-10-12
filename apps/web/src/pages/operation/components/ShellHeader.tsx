@@ -46,7 +46,7 @@ export default function ShellHeader({
 }): ReactNode {
   return (
     <header
-      className="flex h-14 min-w-0 shrink-0 items-center gap-3.5 bg-c-ground px-[18px]"
+      className="flex h-14 min-w-0 shrink-0 items-center gap-3.5 border-b border-c-head-line bg-c-ground px-[18px]"
       data-testid="shell-header"
     >
       {!claimed && <ShellTitle crumb={crumb} title={title} />}

@@ -155,7 +155,7 @@ export default function SettingsWorkspace() {
 
           <div>
             <div className="flex items-center px-1.5">
-              <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
+              <span className="text-label uppercase tracking-wide text-kit-slate-9">
                 Settings
               </span>
             </div>
@@ -168,7 +168,7 @@ export default function SettingsWorkspace() {
                     text — the shipped navigation test selects on it. */}
                 <span
                   data-settings-group
-                  className="text-label font-semibold uppercase tracking-wide text-kit-slate-9"
+                  className="text-label uppercase tracking-wide text-kit-slate-9"
                 >
                   {s.group}
                 </span>
