@@ -34,7 +34,7 @@ describe("WorkCard", () => {
     expect(card.className).toContain("h-[104px]");
     expect(card.className).toContain("grid-cols-[60px_minmax(0,1fr)]");
     expect(card.className).not.toMatch(/shadow/);
-    expect(card).toHaveTextContent("Tue15Missed");
+    expect(card).toHaveTextContent("Tue15Late");
     expect(card).toHaveTextContent("Delivery· NETS");
     expect(card.getAttribute("aria-label")).toContain("Tuesday, 15 September 2026");
     fireEvent.click(screen.getByRole("button", { name: "Open SO-1318 in Delivery" }));
@@ -56,7 +56,7 @@ describe("WorkCard", () => {
     expect(weekday.className).toContain("leading-[14px]");
     expect(day.className).toContain("text-[22px]");
     expect(day.className).toContain("leading-6");
-    const badge = screen.getByText("Missed");
+    const badge = screen.getByText("Late");
     expect(badge.className).toContain("text-[9px]");
     expect(badge.className).toContain("max-h-[17px]");
     expect(badge.className).toContain("px-1.5");

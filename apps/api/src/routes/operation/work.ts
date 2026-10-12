@@ -922,7 +922,7 @@ export function projectPaymentCollectionWork(input: {
         label: invoice.invoice_no ?? `SO-${invoice.orders.so} invoice`,
       },
       problem: broken
-        ? "Customer promise was missed"
+        ? "Customer's promised payment date passed"
         : timing.kind === "late" ? "Customer payment should have been received" : "Customer balance due",
       recipient: invoice.orders.customer_name,
       requiredResult: `Outstanding balance reduced from RM ${money.outstanding.toFixed(2)} to RM 0`,

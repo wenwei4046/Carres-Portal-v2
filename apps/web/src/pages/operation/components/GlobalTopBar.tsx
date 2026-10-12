@@ -212,11 +212,11 @@ function TopBarIconsBody({ inShell }: { inShell: boolean }) {
             </div>
             <div className="max-h-[380px] overflow-auto">
               <AlertGroup
-                title="Overdue"
+                title="Late"
                 tone="text-danger"
                 rows={alerts.overdue}
                 onOpen={goOrders}
-                empty="Nothing overdue"
+                empty="Nothing late"
               />
               <AlertGroup
                 title="Confirm delivery date: no date yet"

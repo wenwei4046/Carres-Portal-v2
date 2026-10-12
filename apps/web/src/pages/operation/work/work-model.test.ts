@@ -50,7 +50,7 @@ describe("Work presentation model", () => {
     ]);
     expect(sections.map((section) => section.label)).toEqual([
       "Broken commitments",
-      "Missed",
+      "Late",
       "Later",
       "No date",
     ]);

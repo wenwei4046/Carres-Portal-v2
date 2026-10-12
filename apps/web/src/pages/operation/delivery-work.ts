@@ -111,12 +111,11 @@ export const DW = {
   noConfirmedDate: "No confirmed date",
   /**
    * A confirmed date that is already behind us and has produced no result.
-   * Renamed from `Date passed` by owner ruling 2026-08-24: `Overdue` is the
-   * word the operator uses for it, and the rail is a work queue rather than a
-   * description of the calendar. (Both 2026-08-24 lanes made this rename
-   * independently; the KEY follows the word here.)
+   * The rail is a work queue rather than a description of the calendar, so
+   * it carries the one-word status `Late` (owner time-word ruling 12 Oct
+   * 2026: never `Overdue`). The KEY keeps its 2026-08-24 spelling.
    */
-  overdue: "Overdue",
+  overdue: "Late",
   /** No Logistics Partner on the scope yet — a fact, never `Unassigned`. */
   noLogistics: "Logistics not assigned",
   /**

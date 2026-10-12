@@ -24,7 +24,7 @@ const ageWord = (days: number | null) =>
 
 /** The words for an age scope — the same words the Dashboard's tile and A/R Aging rows print. */
 export function ageScopeWord(scope: AgeScope): string {
-  return scope === "over-30" ? "Overdue (>30d)" : `${scope} days`;
+  return scope === "over-30" ? "Late (>30d)" : `${scope} days`;
 }
 
 /**

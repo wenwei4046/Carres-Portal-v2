@@ -170,10 +170,10 @@ function mount(ui: React.ReactNode, qc = client(), url = "/operation?tab=work") 
 
 const railButton = () => screen.getByRole("button", { name: /^Tasks/ });
 
-/** `Tasks · {n} missed · {n} today` → [missed, today]. */
+/** `Tasks · {n} late · {n} today` → [late, today]. */
 function badgeCounts(): [number, number] {
   const name = railButton().getAttribute("aria-label") ?? "";
-  const match = /^Tasks · (\d+) missed · (\d+) today$/.exec(name);
+  const match = /^Tasks · (\d+) late · (\d+) today$/.exec(name);
   if (!match) throw new Error(`badge accessible name does not state the counts: "${name}"`);
   return [Number(match[1]), Number(match[2])];
 }
@@ -184,7 +184,7 @@ function badgeNumber(): number | null {
   return text === null ? null : Number(text);
 }
 
-function panelCount(label: "Missed" | "Today"): number {
+function panelCount(label: "Late" | "Today"): number {
   const panel = screen.getByTestId("my-work-panel");
   const row = within(panel).queryByRole("link", { name: new RegExp(`^Open My Work · ${label} · `) });
   return row ? Number(/ · (\d+) action/.exec(row.getAttribute("aria-label") ?? "")?.[1]) : 0;
@@ -248,7 +248,7 @@ describe("HF-3 · one count definition", () => {
     const [missed, today] = badgeCounts();
 
     await screen.findByTestId("my-work-panel");
-    expect([panelCount("Missed"), panelCount("Today")]).toEqual([missed, today]);
+    expect([panelCount("Late"), panelCount("Today")]).toEqual([missed, today]);
     /* The rail's Tasks door opens the ONE Tasks list; its Missed section
        carries the badge's own Missed number. */
     fireEvent.click(railButton());
@@ -287,7 +287,7 @@ describe("HF-3 · one count definition", () => {
 describe("HF-3 · failure and loading are never zero", () => {
   it("4 · success, then a refresh failure keeps the previous counts and says so", async () => {
     const { qc } = mount(<TasksPanel />);
-    await waitFor(() => expect(panelCount("Missed")).toBe(1));
+    await waitFor(() => expect(panelCount("Late")).toBe(1));
     expect(panelCount("Today")).toBe(1);
 
     net.mode = "fail";
@@ -297,7 +297,7 @@ describe("HF-3 · failure and loading are never zero", () => {
 
     await screen.findByText(/My Work could not be refreshed/);
     expect(screen.getByText(/^Last updated /)).toBeTruthy();
-    expect(panelCount("Missed")).toBe(1);
+    expect(panelCount("Late")).toBe(1);
     expect(panelCount("Today")).toBe(1);
     expect(screen.queryByText("My Work could not be loaded.")).toBeNull();
     expect(screen.queryByText("No work due now")).toBeNull();
@@ -312,7 +312,7 @@ describe("HF-3 · failure and loading are never zero", () => {
       </>,
     );
     const panel = await screen.findByTestId("my-work-panel");
-    expect(within(panel).getByText("Missed")).toBeTruthy();
+    expect(within(panel).getByText("Late")).toBeTruthy();
     expect(within(panel).getByText("Today")).toBeTruthy();
     expect(within(panel).queryByText("0")).toBeNull();
     expect(screen.queryByText("No work due now")).toBeNull();

@@ -823,7 +823,7 @@ DELIVERY STATUS narrowing.
 counts computed over the rows the other groups already narrowed (Law D):
 
 - **`WORK TO DO`**, rows in this order: `All delivery work` · `Logistics not assigned` · `Get
-  delivery date` (owner ruling 2026-09-25; `Call customer` retired) · `Overdue delivery` · `Failed Delivery` · `Upload delivery proof` · `Check delivery
+  delivery date` (owner ruling 2026-09-25; `Call customer` retired) · `Delivery date passed` (owner time-word ruling 12 Oct 2026; was `Overdue delivery`) · `Failed Delivery` · `Upload delivery proof` · `Check delivery
   proof` (joined 2026-09-13 with the §6.1 record) · **`Order details incomplete`** (joined
   2026-09-14). Every queue comes from recorded facts, never a clock inference. The group belongs
   to `Work to do` and is not drawn on the schedule tab.
@@ -852,9 +852,9 @@ without its act); its one button is `See delivery details`.
 **`Get delivery date` and the contact week.** Under `Get delivery date`, and under no other queue, a
 Monday-to-Saturday strip lists the six operating days with the count of contact deadlines due on
 each, its own arrows, and the caption `Contact deadlines — not supplier or delivery dates`. An
-`Overdue contact` chip beside the six days answers across every date. `Overdue delivery` (the rail
-queue: a confirmed trip whose day has passed with no result) and `Overdue contact` (a conversation
-that missed its deadline) are two populations and never share one bare `Overdue` count. `Get
+`Contact deadline passed` chip beside the six days answers across every date. `Delivery date passed` (the rail
+queue: a confirmed trip whose day has passed with no result) and `Contact deadline passed` (a conversation
+whose deadline has passed) are two populations and never share one bare count under one word. `Get
 delivery date` lists earliest `Requested Delivery Date` first; a row with no requested date sorts last.
 
 **The calendar writes nothing.** The four view words are governed and a layout NEVER wears a word
@@ -1056,7 +1056,7 @@ joins an act to a party or to an explanation**, in the cell or in its tooltip.
 **The deadline is stated ONCE, and it is stated in Work.** `Call by {date}` is retired from every
 visible line: it printed the verb column 3 had just said, and it printed the same day twice on
 one row — once under the status and again under `Scheduled delivery`. The words did not
-disappear. `Contact deadline {date}`, and `Contact deadline {date} · overdue, the deadline does
+disappear. `Contact deadline {date}`, and `Contact deadline {date} · passed, the deadline does
 not move` once it has passed, are the cell's `title` and its accessible name, and they are what
 Search matches and what the Excel export prints. A row whose customer named no day owes no
 deadline and shows none: a step with no anchor can never be late.
@@ -1068,7 +1068,7 @@ and are two options, and a pick narrows by the label rather than by the internal
 **Colour law.** Semantic status uses clear words and text colour; colour never replaces the word.
 Green: `Paid`, `Ready`, `Confirmed`, `Delivered`. Orange: a specific fact that needs an act and is
 not yet late (`Not scheduled`, `Not ready`, `Logistics not assigned`, `No delivery date`, `Order
-details incomplete`, an actor-first status word). Red: `Overdue`, `Failed Delivery`, `Hold delivery`,
+details incomplete`, an actor-first status word). Red: `Late`, `Failed Delivery`, `Hold delivery`,
 a contact deadline that has passed. No generic attention label exists.
 
 **Icon law.** No emoji, tick, checkmark, warning mark or decorative progress icon appears inside
@@ -1374,7 +1374,7 @@ what is actually most urgent, never by document number:
 4  everything else             then the governed customer-name + row-id tie-break
 ```
 
-**`Order details incomplete` never hides `Overdue`.** Those rows sort into their own band beneath
+**`Order details incomplete` never hides `Late`.** Those rows sort into their own band beneath
 live work and carry the §8.2 rail queue of the same name. The status word keeps its §8.4 rung;
 what changes is that a data problem can no longer occupy the top of the operator's day.
 
@@ -1446,7 +1446,7 @@ and is not restored. `Booked` stays banned.
 | Warehouse handed over and the partner's receipt is recorded — a TRANSFER leg | `Collected for transfer` | none | `Collected {date} {time}` |
 | collected, and the partner recorded departure or an ETA — a CUSTOMER leg | `On the way to customer` | none | `ETA {time}` |
 | collected, and the partner recorded departure or an ETA — a TRANSFER leg | `In transit to {stop}` | none | `ETA {time}` |
-| confirmed day passed with no result | `Overdue` | red | `Ask {partner} for the result` |
+| confirmed day passed with no result | `Late` | red | `Ask {partner} for the result` |
 | attempt `delivered` on an intermediate Journey leg — the goods reached the named partner warehouse (Card 20) | `Arrived at {stop}` | green | the stop, `JB transit warehouse`; no proof line, the customer leg owes the proof |
 | attempt `delivered` on the CUSTOMER leg | `Delivered to customer` | green | `Proof accepted {date}`, or `Delivery photo not uploaded` in orange |
 | attempt `partial` or `failed` — a CUSTOMER leg | `Failed Delivery` | red | the one reason |
@@ -1798,7 +1798,7 @@ number.
 
 ## 10 · Daily operator journey, Work and Quick Rail
 
-Operation starts in Monitor and works the rail in order: `Failed Delivery`, `Overdue delivery`,
+Operation starts in Monitor and works the rail in order: `Failed Delivery`, `Delivery date passed`,
 `Upload delivery proof`, `Logistics not assigned`, `Get delivery date`, then the calendar for the days
 ahead. From assignment through confirmation, Warehouse preparation, handover, delivery day,
 result, proof and return, every row states one concrete next fact and one resolved owner.

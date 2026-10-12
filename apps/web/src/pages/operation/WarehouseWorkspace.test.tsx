@@ -96,7 +96,7 @@ describe("work outside the operating columns", () => {
     setSchedule({ cards: [card({ id: "earlier", date: "2026-09-10", overdue: true })] });
     mount();
     const list = screen.getByTestId("ws-earlier");
-    fireEvent.click(within(list).getByText(/Earlier work still overdue/));
+    fireEvent.click(within(list).getByText(/Earlier work still late/));
     expect(within(list).getByRole("link", { name: "PO-2609-0001" })).toHaveAttribute("href", "/operation?tab=warehouse-inbound&po=po-1");
     expect(list).toHaveTextContent(/10/);
     expect(screen.queryByTestId("ws-card-earlier")).toBeNull();
@@ -442,7 +442,7 @@ describe("the card's own anatomy", () => {
     setSchedule({ cards: [card({ dateStatus: "expected", overdue: true })] });
     mount();
     expect(screen.getByTestId("ws-card-c1").className).toContain("kit-amber-6");
-    expect(screen.getByTestId("ws-card-exception-overdue")).toHaveTextContent("Overdue");
+    expect(screen.getByTestId("ws-card-exception-overdue")).toHaveTextContent("Late");
   });
 
   it("the header is separated from the body by a divider", () => {
@@ -730,7 +730,7 @@ describe("the findings the production walk raised", () => {
     expect(
       screen.getByTestId("ws-undated-list").querySelectorAll("li"),
     ).toHaveLength(2);
-    expect(screen.getByTestId("ws-undated")).not.toHaveTextContent(/overdue/i);
+    expect(screen.getByTestId("ws-undated")).not.toHaveTextContent(/overdue|\blate\b/i);
   });
 
   it("the SO appears ONCE, as a link, and not again at the foot of the card", () => {

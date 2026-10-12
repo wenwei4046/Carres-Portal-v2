@@ -119,7 +119,7 @@ function OrderHeader({ orderId, label, customer, missed, requestedDate, schedule
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1" data-testid="work-mission-header">
       <div className="flex min-w-0 items-center gap-2">
         <h2 className="truncate text-[20px] font-semibold leading-[26px] text-kit-slate-12" data-testid="work-mission-title">{label}</h2>
-        {missed ? <span className="shrink-0 text-[12px] font-semibold leading-4 text-danger">Missed</span> : null}
+        {missed ? <span className="shrink-0 text-[12px] font-semibold leading-4 text-danger">Late</span> : null}
       </div>
       <Link
           to={`/operation/orders/so/${encodeURIComponent(orderId)}`}

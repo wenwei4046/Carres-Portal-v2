@@ -169,7 +169,7 @@ describe("BatchPanel — opened by window key from any page", () => {
     expect(within(card).getByText("Nice Future")).toBeInTheDocument();
     /* The date through the one date home: the year only when it is not this year. */
     expect(within(card).getByText(`11:00 AM · ${fmtDate("2026-09-01")}`)).toBeInTheDocument();
-    expect(within(card).getByText("Missed")).toBeInTheDocument();
+    expect(within(card).getByText("Passed")).toBeInTheDocument();
     expect(card.textContent).not.toMatch(/round|PO window/i);
     expect(within(card).getByRole("button", { name: "SO Batch Purchase" })).toHaveAttribute("aria-current", "page");
     expect(within(card).getByRole("button", { name: "Info" })).toBeInTheDocument();

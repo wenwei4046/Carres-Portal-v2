@@ -67,8 +67,8 @@ function PanelState({ text, alert = false }: { text: string; alert?: boolean }) 
   return <p role={alert ? "alert" : "status"} className="p-3.5 text-body text-kit-slate-11">{text}</p>;
 }
 
-/** `Missed` in the card's status slot, only for the exceptional state. */
-const missedWord = (item: WorkRow) => (item.timingBucket === "overdue" ? "Missed" : undefined);
+/** `Late` in the card's status slot, only for the exceptional state. */
+const missedWord = (item: WorkRow) => (item.timingBucket === "overdue" ? "Late" : undefined);
 
 /* ── PO Duty — the exact PO, with the Work page's own `Record supplier answer`
    (Purchasing §2.4). Receiving is never asked to chase. ─────────────────── */

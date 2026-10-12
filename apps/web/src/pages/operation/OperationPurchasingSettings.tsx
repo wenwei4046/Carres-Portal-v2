@@ -1121,7 +1121,7 @@ export default function OperationPurchasingSettings({
         {/* ⭐ SUPPLIER CLAIMS (Purchasing MASTER §9.5, owner-approved / LOCKED
             2026-09-06; storage 0606): the two reply-timing numbers, Office
             working days. The Supplier Claims lane reads them for `Reply
-            expected`, `Reply overdue` and the escalation Work; a change never
+            expected`, its `passed` state and the escalation Work; a change never
             moves an existing claim's dated obligation. */}
         {data.claimReplyWaitingDays != null && data.claimEscalationExtraDays != null && (
           <div className="mt-8 max-w-[860px]" data-testid="supplier-claims-settings">
@@ -1143,7 +1143,7 @@ export default function OperationPurchasingSettings({
                 </NumberRow>
                 <NumberRow
                   label="Extra days before escalation"
-                  hint="After a missed reply, before the Purchasing Approver is asked to decide."
+                  hint="After the reply date has passed, before the Purchasing Approver is asked to decide."
                   unit="Office working days"
                   value={data.claimEscalationExtraDays}
                   min={PURCHASING_NUMBER_RANGE.claim_escalation_extra_days.min}

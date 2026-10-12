@@ -889,7 +889,7 @@ actions. Dependencies are `blocked by`, `starts after` or `parallel`. Primary Ac
 overdue blocker → overdue external wait → missing key fact → responsibility → money → Weekly Review
 decision → learning/closure. Listing shows it plus `+N actions`.
 
-States are `Ready · In Progress · Waiting for Reply · Blocked · Overdue · Result Review · Completed ·
+States are `Ready · In Progress · Waiting for Reply · Blocked · Late · Result Review · Completed ·
 Cancelled`. `Start` records actual actor/time. `Do Action` opens the owning tool: Communication,
 Evidence, Money, Responsibility, Weekly Review, Learning or linked record.
 
@@ -900,7 +900,7 @@ refused with an exact missing-items list until the Completion Rule passes. Part 
 confirmed results and leaves/refines the remaining action.
 
 Sending/opening/copying a message never completes a wait. Waiting starts only from recorded outbound
-evidence and ends only when a reviewed reply result exists. Due expiry makes the action Overdue,
+evidence and ends only when a reviewed reply result exists. Due expiry makes the action Late,
 retains the original due, notifies Owner and escalates by rule. A due change appends old/new/reason/
 actor/approval; it cannot erase lateness.
 

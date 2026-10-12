@@ -220,7 +220,7 @@ export const TO_ORDER_WORDS = {
    * bought and the operator can do nothing with them here.
    */
   colOnPo: "On PO",
-  filterOverdue: "Overdue",
+  filterOverdue: "Late",
   /**
    * The empty state while a FILTER is narrowing — §8.2's law: no reachable
    * click may blank the table into a dead end, so the blank names its cause

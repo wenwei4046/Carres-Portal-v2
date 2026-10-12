@@ -263,7 +263,7 @@ describe("one cache key per read — both mounting orders, real QueryClient", ()
     await waitFor(() => expect(screen.getByTestId("work-feed")).toHaveTextContent("items:2"));
     expect(screen.getByTestId("legacy-tasks")).toHaveTextContent("tasks:1");
     // The Quick Rail counted MY late item from the feed, not from `{ tasks }`.
-    expect(within(screen.getByTestId("my-work-panel")).getByText("Missed").nextElementSibling).toHaveTextContent("1");
+    expect(within(screen.getByTestId("my-work-panel")).getByText("Late").nextElementSibling).toHaveTextContent("1");
     expectIsolatedShapes(qc);
     expect(state.workCalls).toBe(1);
     expect(state.tasksCalls).toBe(1);
@@ -288,7 +288,7 @@ describe("one cache key per read — both mounting orders, real QueryClient", ()
     mount(client(), <TasksPanel />);
     const panel = await screen.findByTestId("my-work-panel");
     // The panel renders while loading (count placeholders), so wait for the counts.
-    expect(await within(panel).findByRole("link", { name: "Open My Work · Missed · 1 action" }))
+    expect(await within(panel).findByRole("link", { name: "Open My Work · Late · 1 action" }))
       .toHaveAttribute("href", "/operation?tab=work&scope=mine&day=missed");
     expect(within(panel).getByRole("link", { name: "Open My Work · Today · 1 action" }))
       .toHaveAttribute("href", "/operation?tab=work&scope=mine&day=2026-09-14");
@@ -330,7 +330,7 @@ describe("one cache key per read — both mounting orders, real QueryClient", ()
     const timing = await screen.findByTestId("monitor-timing-1302");
     await waitFor(() => expect(within(timing).getByTestId("monitor-owner-unassigned")).toBeInTheDocument());
     expect(timing).toHaveTextContent("Ask customer to pay");
-    expect(within(screen.getByTestId("my-work-panel")).getByText("Missed").nextElementSibling).toHaveTextContent("1");
+    expect(within(screen.getByTestId("my-work-panel")).getByText("Late").nextElementSibling).toHaveTextContent("1");
     expectIsolatedShapes(qc);
     expect(state.workCalls).toBe(1);
     expect(state.tasksCalls).toBe(1);

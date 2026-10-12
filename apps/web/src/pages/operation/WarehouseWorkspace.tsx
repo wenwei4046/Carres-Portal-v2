@@ -248,7 +248,7 @@ export default function WarehouseWorkspace({
           linking to a filtered register, because the register cannot ask for
           "undated" without inventing a filter word, while these exact records
           are already in this page's own result. */}
-      <UnplacedWork cards={earlier} label="Earlier work still overdue" testId="ws-earlier" />
+      <UnplacedWork cards={earlier} label="Earlier work still late" testId="ws-earlier" />
       <UnplacedWork cards={offDays} label="Scheduled on other dates in this period" testId="ws-off-days" />
       {stranded.length > 0 && (
         <details

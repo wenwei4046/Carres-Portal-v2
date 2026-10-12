@@ -161,7 +161,7 @@ describe("date agreement is a QUIET badge, never the card's surface", () => {
     /* and the word survives the colour change */
     expect(exceptionLinesOf(card({ overdue: true }))[0]).toEqual({
       key: "overdue",
-      text: "Overdue",
+      text: "Late",
       tone: "warning",
     });
   });
@@ -222,7 +222,7 @@ describe("exception lines", () => {
   it("an overdue card says the governed word, and leads with it", () => {
     expect(exceptionLinesOf(card({ overdue: true }))[0]).toEqual({
       key: "overdue",
-      text: "Overdue",
+      text: "Late",
       tone: "warning",
     });
     expect(exceptionLinesOf(card({ overdue: false }))).toEqual([]);

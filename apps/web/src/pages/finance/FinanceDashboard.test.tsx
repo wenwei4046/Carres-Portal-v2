@@ -230,7 +230,7 @@ describe("Finance Dashboard", () => {
 
     show(<FinanceAR />, "/finance/ar?age=over-30");
     expect(await screen.findByTestId("ar-summary")).toHaveTextContent("1 order · RM 758.00 outstanding");
-    expect(screen.getByText("Overdue (>30d)")).toBeInTheDocument();
+    expect(screen.getByText("Late (>30d)")).toBeInTheDocument();
     expect(screen.getByText("31 days")).toBeInTheDocument();
   });
 
@@ -468,7 +468,7 @@ describe("Finance Dashboard", () => {
     const row1 = ["dashboard-outstanding", "dashboard-overdue", "dashboard-unpaid", "dashboard-net-cash"].map((id) => screen.getByTestId(id));
     expect(new Set(row1.map((el) => el.parentElement)).size).toBe(1);
     expect(row1.map((el) => within(el).getAllByText(/./)[0]!.textContent)).toEqual(
-      ["Outstanding", "Overdue (>30d)", "Unpaid", "Net cash · 12 wks"],
+      ["Outstanding", "Late (>30d)", "Unpaid", "Net cash · 12 wks"],
     );
     const cashflow = panel("Cashflow · Last 12 weeks");
     const aging = panel("A/R Aging · Outstanding by age");

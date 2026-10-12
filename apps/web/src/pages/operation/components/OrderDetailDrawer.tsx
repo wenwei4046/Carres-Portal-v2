@@ -1022,8 +1022,8 @@ function CallsPanel({
                 r.urgency === "overdue" ? "bg-danger" : "bg-warning"
               }`}
               /* "Attention" is a banned word — it names a mood, not the work. */
-              title={r.urgency === "overdue" ? "Overdue" : "Due soon"}
-              aria-label={r.urgency === "overdue" ? "Overdue" : "Due soon"}
+              title={r.urgency === "overdue" ? "Late" : "Due soon"}
+              aria-label={r.urgency === "overdue" ? "Late" : "Due soon"}
             />
             <span className="min-w-0 flex-1">
               <span
@@ -1796,12 +1796,12 @@ function DrawerBody({
     deliveryMs !== null && Date.now() > deliveryMs - 7 * 86_400_000;
   // Payment status dial family (STATUS-STANDARD §1): Unpaid / Deposit /
   // Overdue / Paid. "Sent" is omitted — no invoice-sent signal exists today.
-  const payStatus: "Unpaid" | "Deposit" | "Overdue" | "Paid" | null = !totalSet
+  const payStatus: "Unpaid" | "Deposit" | "Late" | "Paid" | null = !totalSet
     ? null
     : balanceDue <= 0
       ? "Paid"
       : collectByPast
-        ? "Overdue"
+        ? "Late"
         : collectedAll > 0
           ? "Deposit"
           : "Unpaid";
@@ -1810,7 +1810,7 @@ function DrawerBody({
   const payToneCls =
     payStatus === "Paid"
       ? "text-success"
-      : payStatus === "Overdue"
+      : payStatus === "Late"
         ? "text-danger"
         : "text-info";
   // Dial state (§8 — NO blue): Unpaid=gray · Deposit=amber · Overdue=red ·
@@ -1818,7 +1818,7 @@ function DrawerBody({
   const payDialState: DialState =
     payStatus === "Paid"
       ? "green"
-      : payStatus === "Overdue"
+      : payStatus === "Late"
         ? "red"
         : payStatus === "Deposit"
           ? "amber"
@@ -2228,7 +2228,7 @@ function DrawerBody({
       : groups.length === 0
         ? "no PO"
         : groups[0].overdue
-          ? `${groups[0].label} · overdue`
+          ? `${groups[0].label} · ETA passed`
           : groups[0].eta
             ? `${groups[0].label} · ETA ${fmtDate(groups[0].eta).split(",")[0]}`
             : `${groups[0].label} · no ETA`;
@@ -4090,7 +4090,7 @@ function DrawerBody({
                   if (daysToDelivery !== null && daysToDelivery < 0)
                     return (
                       <span className="inline-flex items-center gap-1 text-meta font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-[#FCEBEB] text-[#A32D2D]">
-                        overdue {-daysToDelivery}d
+                        {-daysToDelivery} {daysToDelivery === -1 ? "day" : "days"} late
                       </span>
                     );
                   // D1 (0277, Loo): the chip states FACTS. Green is reserved
@@ -4160,7 +4160,7 @@ function DrawerBody({
                   : onHold
                     ? "On hold"
                     : late
-                      ? `Overdue ${-(daysToDelivery ?? 0)}d`
+                      ? `${-(daysToDelivery ?? 0)} ${daysToDelivery === -1 ? "day" : "days"} late`
                       : bookingConfirmed
                         ? "Confirmed"
                         : eta
@@ -4208,7 +4208,7 @@ function DrawerBody({
                               the header keeps only the urgency badge + DO. */}
                           {late && !deliveredDone && (
                             <span className="text-label font-semibold rounded-[5px] px-1.5 py-0.5 bg-[#FCEBEB] text-[#A32D2D]">
-                              overdue {-(daysToDelivery ?? 0)}d
+                              {-(daysToDelivery ?? 0)} {daysToDelivery === -1 ? "day" : "days"} late
                             </span>
                           )}
                           <button

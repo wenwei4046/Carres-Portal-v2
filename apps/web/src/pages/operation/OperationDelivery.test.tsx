@@ -356,7 +356,7 @@ describe("the shape", () => {
       /* ⭐ NOT a bare `Overdue` (owner ruling 2026-09-11): the contact strip
          counts a DIFFERENT overdue population, and two identical words on one
          screen read as one number that disagrees with itself. */
-      "Overdue delivery",
+      "Delivery date passed",
       "Failed Delivery",
       "Upload delivery proof",
     ]) {
@@ -1814,7 +1814,7 @@ describe("Get delivery date — the contact week", () => {
     expect(late[0]!.className).toContain("text-kit-red-11");
     /* The words did not disappear — they moved, and no dash joins them. */
     const sentence = late[0]!.getAttribute("title")!;
-    expect(sentence).toBe("Contact deadline Mon, 24 Aug · overdue, the deadline does not move");
+    expect(sentence).toBe("Contact deadline Mon, 24 Aug · passed, the deadline does not move");
     expect(late[0]!.getAttribute("aria-label")).toBe(sentence);
     expect(sentence).not.toMatch(/[—–]/);
     /* The kit's LATE glyph, not the phone, and not a bare colour. */

@@ -919,7 +919,7 @@ describe("payment.missed_promise — the promise outranks the window", () => {
     expect(item).toMatchObject({
       id: "payment:invoice-9:payment.missed_promise",
       module: "payment",
-      problem: "Customer promise was missed",
+      problem: "Customer's promised payment date passed",
       action: "Ask customer to pay",
       // Due on the promised day — not the delivery window's day.
       timing: { actionOn: "2026-09-05", placement: "missed" },

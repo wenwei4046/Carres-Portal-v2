@@ -74,7 +74,7 @@ export default function OperationRightRail() {
     return null;
   };
   const nameFor = (tab: (typeof TABS)[number]): string =>
-    tab.key === "tasks" && hasData ? `Tasks · ${missed} missed · ${today} today` : tab.label;
+    tab.key === "tasks" && hasData ? `Tasks · ${missed} late · ${today} today` : tab.label;
 
   const doorTab = active && active !== "tasks" ? TABS.find((t) => t.key === active) : undefined;
 

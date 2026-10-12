@@ -52,7 +52,7 @@ describe("SupplierAnswerTaskPanel — PO Duty asks the supplier, on the exact PO
     const host = mount();
     await waitFor(() => expect(panel()).toBeInTheDocument());
     expect(within(panel()).getByText("Nice Future")).toBeInTheDocument();
-    expect(within(panel()).getByText("Missed")).toBeInTheDocument();
+    expect(within(panel()).getByText("Late")).toBeInTheDocument();
     const table = within(panel()).getByRole("table", { name: "Goods lines" });
     expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Item", "Order Qty", "Received Qty", "Pending Delivery Qty"]);
     expect(within(table).getAllByRole("cell").map((c) => c.textContent)).toEqual(["Mattress M1401F183X190CM", "2", "1", "1"]);

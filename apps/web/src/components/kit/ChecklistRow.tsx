@@ -47,7 +47,7 @@ const VALUE: Record<ChecklistMark, string> = {
 export const CHECKLIST_MARK_WORD: Record<ChecklistMark, string | null> = {
   done: "Done",
   open: "Not yet",
-  missed: "Missed",
+  missed: "Late",
   due: "Due",
   none: null,
 };

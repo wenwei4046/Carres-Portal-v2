@@ -35,7 +35,7 @@ export const SUPPLIER_CARD_COPY = {
   datesReady: (d: number, n: number) => `${d} of ${n} dates ready`,
   received: (r: number, n: number) => `${r} of ${n} received`,
   delayed: (k: number) => `${k} delayed`,
-  arrivalMissed: (k: number) => `${k} arrival missed`,
+  arrivalMissed: (k: number) => `${k} arrival ${k === 1 ? "date" : "dates"} passed`,
   confirmationNeeded: (k: number) => `${k} confirmation needed`,
   arriving: (k: number, date: string) => `${k} arriving ${date}`,
   /* row states (§5.10) */
@@ -47,7 +47,7 @@ export const SUPPLIER_CARD_COPY = {
     arrivingToday: "Arriving today",
     received: "Received",
     shortReceived: "Short received",
-    arrivalMissed: "Arrival missed · Follow up supplier",
+    arrivalMissed: "Arrival date passed · Follow up supplier",
   },
   confirmationToday: "Confirmation needed today",
   recordDelay: "Record supplier delay",

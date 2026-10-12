@@ -100,7 +100,7 @@ export const DR = {
   receivedAtInbound: "Received at Inbound",
   noInboundArrival: "No Inbound arrival recorded",
   inboundNotAvailable: "Inbound not available",
-  overdue: "Overdue",
+  overdue: "Late",
   failedDelivery: "Failed Delivery",
   proofMissing: "Proof missing",
   ageToday: "Today",

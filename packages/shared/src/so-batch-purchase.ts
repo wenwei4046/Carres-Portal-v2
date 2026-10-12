@@ -1918,7 +1918,8 @@ export function soBatchLineReservedWhy(line: SoBatchOrderLineFact): SoBatchStatu
 /** Words the Tasks `BatchPanel` and the shared supplier send operations use.
  *  Never `round` or `PO window` in a task-facing line. */
 export const SO_BATCH_PANEL_WORDS = {
-  missed: "Missed",
+  /* The batch time has gone by: printed under `{time} · {date}` (owner 12 Oct 2026). */
+  missed: "Passed",
   info: "Info",
   /* The panel's module tab is the page's own name (owner ruling 2026-10-05);
      `Purchasing` is never a page's main tab. */
