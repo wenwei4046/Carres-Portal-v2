@@ -5106,7 +5106,7 @@ The Finance area of the Portal sidebar groups Finance's own pages into modules. 
 | `Receivables` | `AR · Receivables` · `Other debtors` · `Other receipts` |
 | `Bank & Cards` | `Daily Bank` · `Card settlement` · `Card money waiting` · `Money moves` |
 | `Ledger` | `Journal` · `General Ledger` · `Trial Balance` · `Self-check` |
-| `Reports` | `Profit and Loss` · `Balance Sheet` · `Cash Flow` · `AP Aging` · `Collection` · `Card charges` · `Dealer commission` · `Stock value` · `Payment` (Payment's own report, unchanged) |
+| `Reports` | `Profit and Loss` · `Balance Sheet` · `Cash Flow` · `AP Aging` · `AR Aging` (0686) · `Collection` · `Card charges` · `Dealer commission` · `Stock value` · `Payment` (Payment's own report, unchanged) |
 
 - `Dashboard` stays a plain row at the top. `Forecast` is a plain row after `Reports` (Chew, 3 Oct 2026).
 - A menu row's word is its page's title; the one exception is `AP · Payables`, which opens `Unpaid by Supplier` (RULING YH 2026-09-14). The Profit and Loss and the Balance Sheet are two pages, titled `Profit and Loss` and `Balance Sheet`; the browser tab reads `{title} · Carres`. The Reports page's door cards (`Open →`) are retired, because every report is a row.
@@ -5188,6 +5188,21 @@ These words are on screen in the branch and are not approved yet.
 | Opened row | Toggle hover `Show bills`. Columns `Bill No` · `Supplier invoice` · `Bill date` · `Due date` · `Bill total` · `Still owed` · `Age`. Empty: `No bill is open. The balance is money not tied to a bill.` |
 | Footer | `{n} suppliers · In the books ({account codes}) on {date}: {money} · Difference {money}`; while it is not zero, above the table: `⚠ The suppliers differ from the books by {money}.` and `Open Self-check` |
 | States | `AP aging could not be loaded. Try again.` · `Try again` · `The ledger has no start date yet. Nothing can be totalled.` · `Nothing was owed to a supplier on {date}.` |
+
+### PROPOSAL — PENDING CHEW · AR Aging (0686)
+
+Chew asked for it on 2026-10-12 (「就根据开了invoice还没还的就出现…包括普通顾客」). These words are on screen in the branch and are not approved yet. A word AP Aging uses keeps its meaning here.
+
+| Where | Words |
+|---|---|
+| Menu | `AR Aging`, a row under `Reports` after `AP Aging` |
+| Page | Title `AR Aging`. `As of` · `Age by` with `Invoice date` · `Due date` · `Columns` with `By month` · `By days` · `Search debtors…` |
+| Columns | `Debtor` · `Debtor Type` (hidden until asked for; `Customer` · `Other debtor`) · `Channel` (the one channel its open invoices share: a showroom's or dealer's name, `Showroom`, `Dealer`, `Subscription`; `Several channels`; or empty) · `Balance` · the age columns as AP Aging's · `Not tied to an invoice` |
+| Meaning | `Balance` is what the debtor's accounts hold in the books on the day. The age columns are its invoices still owed that day: a customer's sales and storage invoices, the order's money filling its earliest invoice first; an other debtor's invoices, less what was received against them. `Not tied to an invoice` is the rest of the balance: below zero, money paid ahead of an invoice, such as a deposit; above zero, money owed with no invoice behind it. A customer's invoice has no due date and ages by its invoice date. |
+| Opened row | Toggle hover `Show invoices`. Columns `Invoice No` (an other debtor's opens its invoice) · `Invoice Type` (`Sales Invoice` · `Storage Invoice` · `Additional Storage Invoice` · `Other debtor invoice`) · `SO No` (`SO-{n}`) · `Invoice date` · `Due date` · `Invoice total` · `Still owed` · `Age`. Empty: `No invoice is open. The balance is money not tied to an invoice.` |
+| Above the table | `{n} invoice(s) worth {money} was/were issued before the books started. The books do not hold it/them, so it is/they are not aged here.` |
+| Footer | `{n} debtors · In the books ({account codes}) on {date}: {money} · Difference {money}`; while it is not zero, above the table: `⚠ The debtors differ from the books by {money}.` and `Open Self-check` |
+| States | `AR aging could not be loaded. Try again.` · `Try again` · `The ledger has no start date yet. Nothing can be totalled.` · `No customer or other debtor owed money on {date}.` |
 
 ### PROPOSAL — PENDING CHEW · Card money waiting (0641)
 
@@ -5556,7 +5571,7 @@ Each person's own lunch start; the activity check skips that lunch. Times print 
 | Not a staff member | Only a staff member can set a lunch time. | Shared logins record no lunch |
 | Staff & Duties check time bounds | `Morning check from {Office start} to {last minute before the Office lunch}. Afternoon check from {first minute after the Office lunch} to {last minute before Office end}. A person's afternoon check moves with their own lunch.` | WS-02 · WS-03 bounds follow Settings → Office (0677) |
 
-## Settings → Company · Office · Settings editors · owner 9 Oct 2026 (Carres Settings List COM · OFF · TEAM-02) · BUILT ON BRANCH, NOT DEPLOYED
+## Settings → Company · Office · Settings editors · owner 9 Oct 2026 (Carres Settings List COM · OFF · TEAM-02) · DEPLOYED 10 Oct 2026 (#1996); confirmed Settings design (rows with one explanation, change record as a disclosure) DEPLOYED 12 Oct 2026 (#2013); signed-in walk owed
 
 | Situation | Exact words | Source |
 |---|---|---|
@@ -5565,9 +5580,10 @@ Each person's own lunch start; the activity check skips that lunch. Times print 
 | Company rows, in order | Legal company name · Former company name · SSM registration number · Registered address line 1 · Registered address line 2 · Registered address line 3 · Postcode · City · Country · Company telephone · Company email · Printed address · Customer support name · Customer support telephone · Customer support WhatsApp · Customer support email | Settings List Company field breakdown |
 | Office sections | Office working days and hours (`Every Office deadline counts these days. Saturday on-call is set in Staff & Duties and does not make Saturday an Office working day.`) · Office public holidays (`Office deadlines skip these days. Warehouse keeps its own holidays.`) | OFF-01..05 · Saturday on-call boundary |
 | Office rows | Office working days · Office hours · Flexi allowance · Lunch · Lunch may move by · Holiday region · Year · List in force; editing: Office opens · Office closes · Flexi allowance (minutes) · Lunch starts · Lunch ends · Lunch may move by (minutes) · Date · Holiday name · Add holiday · Remove | OFF-01..05 |
+| Office row explanations (one grey line under the setting's name, 01 §6 · 03 §7; shown in view and while editing) | Office hours / Office opens: `The normal office day, before flexi.` · Flexi allowance: `Staff may start and finish this much earlier or later.` · Lunch / Lunch starts: `Lunch is not leave. Work stays with the person.` · Lunch may move by: `Each person may start lunch this much earlier or later.` · Holiday region: `Office public holidays follow this region.` · Office working days has none: the section's own line already explains it | Settings List OFF-02 · OFF-03 · OFF-04 · OFF-05 purposes; owner instruction 12 Oct 2026 (implement the confirmed Settings design, starting with Office) |
 | Office values | `Monday to Friday` · `9:00 AM to 6:00 PM` · `1 hour` · `None` · `Recorded in Settings` · `Built-in list. Not yet checked for Kuala Lumpur. Record this year to replace it.` · `No holidays recorded for this year.` | OFF-05: no Kuala Lumpur date invented |
 | Office review notes | `Deadlines from now on count the new days. Dates already recorded do not move.` · `An empty list returns this year to the built-in list.` | 01 §6 timing changes never silently rewrite |
-| Shared Settings words | Edit · Review changes · `Review changes: {gap}` · Save changes · Back · Cancel · Reason (optional) · Changes · `No changes recorded yet.` · `Not set` · `Staff identity not recorded` | Existing Settings grammar |
+| Shared Settings words | Edit · Review changes · `Review changes: {gap}` · Save changes · Back · Cancel · Reason (optional) · Changes · `No changes recorded yet.` · `Not set` · `Staff identity not recorded`. `Changes` is a disclosure under the page: closed it shows the word and the number of changes recorded (no number when there is none); it opens on request | Existing Settings grammar; 01 §6 (history belongs in a disclosure) |
 | Read-only / not installed | `You can read these settings. Only the owner and the people named in Settings editors can change them.` · `These settings are not saved in the system yet. The values below are the confirmed defaults.` · `These settings could not be loaded. Try again.` · `Someone else saved these settings. Reload to see them.` | TEAM-02 · GLOBAL OWNER LAW (no hard-coded person name) |
 | Settings editors | Who may change each section (`The owner may change every section. A person named here may change that section's settings only. It gives no approval, no Duty and no money rights.`) · `{name} · owner` · Add person · Person · Remove · `named by {name} · {date}` · `removed by {name} on {date}` · `Name not recorded` · `You can read this page. Only the owner names Settings editors.` | TEAM-02 |
 | Saved toasts | `Company settings saved` · `Office settings saved` · `Office public holidays {year} saved` · `{Section} editor added` · `{name} no longer edits {Section}` | Existing save grammar |
