@@ -2720,9 +2720,18 @@ replaced by one row per Sales Order on the same kit list as `By supplier`, so no
 - **Not drawn from the package:** its `Order type` column. The SO Batch read carries no order type, and a column that
   says the same word on every row adds nothing; it joins when a second order type is recorded. Its `Outstation` mark
   needs the same.
+- **The list fits the room it is given (Layout Standard, 13 Oct 2026), in all four views.** The first column takes
+  what the fixed columns leave. When that would push it under its floor (1164 wide with the Tasks panel opened), the
+  fixed columns give way together, only as far as needed and never under their own floors: 60, `Status` 112, the
+  first column 100, `Customer’s original requested delivery` 122 so its header stays on two lines. Words wrap inside a
+  narrower column and nothing is cut. Short of room, the middle columns keep their sort and give up their header
+  filter button (it needs 24 of the column); the first column and `Status` keep theirs, and the rail, the tabs and
+  the search still narrow the list. At 1025 with Tasks opened by hand the floors no longer fit and the list scrolls
+  sideways, as any list must below its floors.
 - **Measured 13 Oct 2026 on the fixture preview:** the package's `carres-check.js` and the page's own measures (no page
   or list side scroll, nothing cut) PASS at 1025, 1164 and 1440 with rows closed, one row open, a row ticked with
-  `Use stock` showing, and after the press. `pnpm kit:check` runs all of it for the four views on every pull request.
+  `Use stock` showing, and after the press; and at 1164 with the Tasks panel opened, rows closed and one row open.
+  `pnpm kit:check` runs all of it for the four views on every pull request.
   The Tasks title row is 36 high (01 §4), which the check measures at 1440.
 
 **By category and By order deadline — owner 13 Oct 2026 · BUILT 13 Oct 2026.** The same lines and the same arithmetic

@@ -122,6 +122,35 @@ for (const list of LISTS) {
   }
 }
 
+/* THE LIST FITS THE ROOM IT IS GIVEN (Layout Standard, 13 Oct 2026): at 1164
+   with the Tasks panel OPEN the fixed columns give way, so all four SO Batch
+   views still show Status with no side scroll. Below 1280 the panel is closed
+   until its button is pressed; this presses it. */
+for (const list of LISTS.filter((candidate) => candidate.kitCheck)) {
+  test(`${list.name} fits 1164 with the Tasks panel open`, async ({ page }) => {
+    await page.setViewportSize({ width: 1164, height: 900 });
+    await page.goto(list.page, { waitUntil: "networkidle" });
+    await page.locator(list.last).first().waitFor();
+    await expect(page.locator('aside[aria-label="Tasks"]')).toHaveCount(0);
+    await page.getByRole("button", { name: /^Tasks/ }).first().click();
+    await expect(page.locator('aside[aria-label="Tasks"]')).toBeVisible();
+    await page.waitForTimeout(700);
+    for (const state of ["rows closed", "one row open"] as const) {
+      if (state === "one row open") {
+        await page.locator(list.expand).first().click();
+        await page.waitForTimeout(600);
+      }
+      await page.mouse.move(4, 4);
+      const m = await measure(page, list.box, list.last);
+      expect(m!.pageScroll, `${state}: the page scrolls sideways`).toBeLessThanOrEqual(0);
+      expect(m!.listSpare, `${state}: the list scrolls sideways`).toBeLessThanOrEqual(1);
+      expect(m!.lastPastEdge, `${state}: the last column passes the list's edge`).toBeLessThanOrEqual(0);
+      expect(m!.cut, `${state}: values cut with "..."`).toBe(0);
+      expect(await carresCheck(page), `${state}: carres-check.js`).toEqual(PASS);
+    }
+  });
+}
+
 /* `Use stock · n` is on the selection bar only while a ticked line has a free
    Unit, and never on the toolbar (owner's round 3 brief, point 1). The preview
    holds TEST Units for SO-1301. The same measures and the kit's check run
