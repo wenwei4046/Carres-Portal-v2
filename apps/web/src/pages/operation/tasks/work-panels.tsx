@@ -14,10 +14,12 @@
  *                    (`purchasing.confirm_tomorrows_delivery`) opens
  *                    `PoDutyTaskPanel` with the Work page's own
  *                    `Record supplier answer` form.
+ *   delivery         `assign_logistics` and `confirm_delivery_date` about one
+ *                    order open Delivery's own form (`Assign logistics` ·
+ *                    `Update date and time`), as the Workspace page does.
  *   everything else  the act itself: what is wrong, what finishes it and
  *                    `Open {object}`, the module destination exactly as the
- *                    Work page opens it. Delivery, Receiving and Payment
- *                    panels are not part of this slice.
+ *                    Work page opens it.
  *
  * Every panel is drawn in the ONE task view (`TaskFrame`, owner's round 3
  * brief of 13 Oct 2026): the panel supplies its steps and what only its module
@@ -37,7 +39,7 @@ import { useOperationSuppliers, type operationPosListResponse, type SupplierRow 
 import type { WorkRow } from "../use-open-work";
 import DeliveryProofReviewWork from "../components/DeliveryProofReviewWork";
 import EmbeddedSalesOrders from "../components/EmbeddedSalesOrders";
-import { SupplierAnswerForm } from "../work/WorkActForms";
+import { AssignLogisticsForm, DeliveryDateForm, SupplierAnswerForm, useRefreshWork } from "../work/WorkActForms";
 import { BatchPanel } from "../so-batch/BatchPanel";
 import { poTaskHistory, poTaskOrders } from "../purchase-orders/po-task-parts";
 import PoTaskGoods from "../purchase-orders/PoTaskGoods";
@@ -155,8 +157,20 @@ function PoDutyTaskPanel({ item, host }: { item: WorkRow; host: WorkPanelHost })
 
 const ORDER_KINDS = new Set(["sales_order", "delivery_scope"]);
 
-function GenericTaskPanel({ item }: { item: WorkRow; host: WorkPanelHost }) {
+/**
+ * Delivery's two acts that are done in place (Workspace §5.10 A7 registry):
+ * the task's one button opens Delivery's OWN form, the same component the
+ * Delivery page mounts, so a save writes the same one record. The form says
+ * its own result; the task leaves the list when the Work feed closes it.
+ */
+const DELIVERY_ACTS: Record<string, { button: string; form: (orderId: string, onDone: () => void) => ReactNode }> = {
+  assign_logistics: { button: "Assign logistics", form: (orderId, onDone) => <AssignLogisticsForm orderId={orderId} onDone={onDone} /> },
+  confirm_delivery_date: { button: "Update date and time", form: (orderId, onDone) => <DeliveryDateForm orderId={orderId} onDone={onDone} /> },
+};
+
+function GenericTaskPanel({ item, host }: { item: WorkRow; host: WorkPanelHost }) {
   const navigate = useNavigate();
+  const refresh = useRefreshWork();
   const work = item.source;
   const embedded = work.interaction.mode === "embedded";
   /* An admitted embedded action (Delivery proof review) is done here. */
@@ -167,6 +181,17 @@ function GenericTaskPanel({ item }: { item: WorkRow; host: WorkPanelHost }) {
   /* A Sales Order task and a delivery task with no DO yet are both about one
      order, by its id (`operation/work.ts`): they have a Route and its document. */
   const orders = ORDER_KINDS.has(work.object.kind) ? [{ orderId: work.object.id, label: work.object.label }] : [];
+  const deliveryAct = orders.length ? DELIVERY_ACTS[item.ruleKey] ?? null : null;
+  /* Delivery's forms are field grids wider than the panel: they open on the
+     host's full surface and close back to the task, saved or cancelled. */
+  const openDeliveryAct = () => {
+    if (!deliveryAct) return;
+    host.openReview((close) => (
+      <TaskWideSurface title={deliveryAct.button} about={work.object.label}>
+        {deliveryAct.form(work.object.id, () => { close(); refresh(); })}
+      </TaskWideSurface>
+    ));
+  };
   return (
     <div className="p-3" data-testid="task-panel-generic">
       <TaskFrame
@@ -181,7 +206,9 @@ function GenericTaskPanel({ item }: { item: WorkRow; host: WorkPanelHost }) {
                 /* One sentence, said once: the finish line only when it adds to the title. */
                 sub={finish !== work.requiredResult ? <span data-testid="task-generic-finish">{V.finishWhen}: {finish}</span> : undefined}>
                 {owningForm}
-                {embedded && owningForm ? null : (
+                {embedded && owningForm ? null : deliveryAct ? (
+                  <div><Button variant="primary" size="sm" onClick={openDeliveryAct} data-testid="task-generic-act">{deliveryAct.button}</Button></div>
+                ) : (
                   <div><Button variant="primary" size="sm" onClick={() => navigate(item.destination)} data-testid="task-generic-open">{V.open(work.object.label)}</Button></div>
                 )}
               </Step>
