@@ -4,8 +4,9 @@
  * and input classes from `DataGrid.module.css` (16 × 16, the selection
  * colour), so a group row and its item lines cannot differ (owner 13 Oct 2026).
  *
- * A tick is disabled only when the row cannot be chosen, and then it says why
- * on hover and to a screen reader.
+ * A tick is disabled only when the row cannot be chosen, and then it is greyed
+ * to 45% and says why on hover and to a screen reader (the design file's
+ * `ck.tip`).
  */
 import styles from "./DataGrid.module.css";
 
@@ -21,7 +22,7 @@ export default function RowTick({ checked, disabled = false, onChange, label, wh
 }) {
   const reason = disabled ? why ?? undefined : undefined;
   return (
-    <label className={styles.checkHit} title={reason}>
+    <label className={`${styles.checkHit}${reason ? ` ${styles.checkRefused}` : ""}`} title={reason}>
       <input type="checkbox" aria-label={reason ? `${label}. ${reason}` : label} data-testid={testId}
         checked={checked} disabled={disabled} onChange={onChange} />
     </label>

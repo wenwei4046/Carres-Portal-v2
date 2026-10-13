@@ -8,7 +8,7 @@
   --c-ink:#1F2937; --c-body:#374151; --c-tab:#4B5563; --c-secondary:#6B7280; --c-muted:#8A9099; --c-menu:#5C6168; --c-main:#1B1B39;
   --c-ground:#F6F7F9; --c-card:#FFFFFF; --c-hover:#E2E4E8; --c-row-hover:#F2F3F5;
   --c-card-border:#E5E7EB; --c-btn-border:#E5E7EB; --c-head-line:#E5E7EB; --c-row-line:#F1F2F4; --c-footer-line:#E5E7EB; --c-section-line:#E5E7EB; --c-input-border:#E1E4E8; --c-chip-border:#D5D9DE; --c-search-bg:#F1F2F4;
-  --c-select-bg:#EEF4FF; --c-select-fg:#2F55E0; --c-select-pill:#FFFFFF; --c-tree-line:#BFC5CD; --c-track:#E2E4E8; --c-track-hover:#EEF0F3; --c-focus:1px solid #C9CED6;
+  --c-select-bg:#EEF4FF; --c-select-fg:#2F55E0; --c-select-pill:#FFFFFF; --c-tree-line:#BFC5CD; --c-track:#E2E4E8; --c-track-hover:#EEF0F3; --c-column-band:#EEF0F3; --c-focus:1px solid #C9CED6;
   --c-ok-bg:#E7F6EC; --c-ok-fg:#1E7A40; --c-warn-bg:#FBF0D6; --c-warn-fg:#7A5A00; --c-err-bg:#FBF0D6; --c-err-fg:#7A5A00; --c-info-bg:#F0F1F3; --c-info-fg:#374151; --c-hold-bg:#1F2937; --c-hold-fg:#FFFFFF; --c-online:#1E8A47;
   --font:'Inter',system-ui,sans-serif;
   --fs-page:20px; --fs-crumb:14px; --fs-menu:14px; --fs-card:15px; --fs-body:13px; --fs-label:12px; --fs-small:11px; --fs-group:10px;

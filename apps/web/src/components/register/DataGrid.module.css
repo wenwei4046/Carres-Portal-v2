@@ -1163,6 +1163,25 @@ div:first-child > .columnsMenuGroup {
   white-space: nowrap;
   line-height: inherit;
 }
+/* A grey second header line (`headerSub`, 01 §5): the label over a date's
+   weekday, 12 / 400 in the secondary grey. A right-aligned column keeps both
+   lines on its right edge. */
+.headerSub {
+  font-weight: 400;
+  color: var(--c-secondary);
+}
+.thAlignRight.thTwoLine .sortBtn {
+  text-align: right;
+}
+/* The neutral column band (`band`, 01 §5): one fixed grey down the whole
+   column, header and rows. It holds through row hover and a ticked row, so
+   the column reads as one piece; it is never the theme colour. */
+.root .thBand,
+.root .tr > .tdBand,
+.root .tr:hover > .tdBand,
+.root .trSelected > .tdBand {
+  background: var(--c-column-band);
+}
 
 /* ── RESPONSIVE REGISTER SEARCH — owner ruling R4, 2026-09-16 ─────────────
    Opt-in (`searchPresentation="responsive"`). The toolbar's OWN width
@@ -1427,11 +1446,14 @@ div:first-child > .columnsMenuGroup {
 }
 
 /* A disabled input must not swallow the existing row-fact tooltip. */
+/* A tick that cannot be taken (01 §5): greyed to the kit's disabled 45%, and
+   its reason shows on hover and is read out. */
 .checkRefused {
-  cursor: help;
+  cursor: not-allowed;
 }
 .checkRefused input:disabled {
   pointer-events: none;
+  opacity: 0.45;
 }
 .checkRefused:focus-visible {
   outline: var(--c-focus);
