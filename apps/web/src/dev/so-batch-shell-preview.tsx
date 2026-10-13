@@ -69,7 +69,7 @@ if (state !== "empty") {
   for (let i = 1; i <= 27; i += 1) {
     const [city, st] = CITIES[i % CITIES.length]!;
     const kind = state === "nothing" ? (i % 2 ? "stock" : "ordered")
-      : i <= 12 ? "buy" : i <= 14 ? "blocked" : i === 15 ? "pool" : i <= 17 ? "partial" : i <= 21 ? "stock" : "ordered";
+      : i <= 12 ? "buy" : i === 13 ? "blocked" : i === 14 ? "pool" : i === 15 ? "offer" : i <= 17 ? "partial" : i <= 21 ? "stock" : "ordered";
     const po = { poId: `PO-202609${String(10 + (i % 18)).padStart(2, "0")}-${4000 + i}`, status: "open" as const,
       supplierId: "s1", supplierName: SUPPLIERS[i % SUPPLIERS.length]!, destinationId: i % 3 ? KLANG : BULOH,
       officialDeliveryDate: `2026-10-${String(1 + (i % 27)).padStart(2, "0")}`, sentCurrentVersion: true };
@@ -85,14 +85,18 @@ if (state !== "empty") {
       pos: linked ? [po] : [],
       lines: [{ orderLineId: `l${i}`, sku: "B1201S-K", qty, stockTaken: kind === "stock" ? 2 : 0,
         item: "Booqit", variant: "King", category: "mattress",
+        /* SO-1315: an open PO holds free goods of this item. The line can
+           still be bought, and offers `Use this PO` beside its editor. */
+        ...(kind === "offer" ? { poOffer: { poId: "PO-20260926-4099", qty: 2 } } : {}),
         pos: linked ? [{ poId: po.poId, qty: linked }] : [] }],
-      outstandingSuppliers: kind === "buy" || kind === "blocked" || kind === "partial" || kind === "pool" ? [SUPPLIERS[i % SUPPLIERS.length]!] : [],
+      outstandingSuppliers: kind === "buy" || kind === "blocked" || kind === "partial" || kind === "pool" || kind === "offer" ? [SUPPLIERS[i % SUPPLIERS.length]!] : [],
     });
     const orderBy = `2026-09-${String(16 + (i % 14)).padStart(2, "0")}`;
     if (kind === "buy") rows.push(leaf(i, { orderBy, state: i % 4 ? "can_order_early" : "safety_days_low" }));
     if (kind === "partial") rows.push(leaf(i, { orderBy, toBuy: 1, onPo: 1, poNumbers: [po.poId] }));
     if (kind === "blocked") rows.push(leaf(i, { state: "no_production_days", toBuy: null, issueRef: null, goodsMustArrive: null }));
     if (kind === "pool") rows.push(leaf(i, { orderBy, fullyOnPo: true }));
+    if (kind === "offer") rows.push(leaf(i, { orderBy, poolOnly: true }));
   }
 }
 

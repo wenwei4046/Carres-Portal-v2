@@ -2692,8 +2692,11 @@ replaced by one row per Sales Order on the same kit list as `By supplier`, so no
   over the size, the customer's quantity, the Ready Stock cell and its picker under the same line, the supplier, then
   the `Supplier Deliver To` editor (Split included) while the line is to buy. A line already on a PO reads where that
   PO sends it and its PO numbers as links. A line that may not be bought has a disabled tick that says why, and the
-  same reason with its door (`Use this PO` · `Fix in Catalog` · `Open Settings`) in the last cell. A missing-setup
-  blocker is stated above the lines in amber.
+  same reason with its door (`Fix in Catalog` · `Open Settings`) in the last cell. A missing-setup blocker is stated
+  above the lines in amber. **An offer has its own line under its item:** `{PO No} has {n} {Item} available.` with
+  `Use this PO` (owner ruling 2026-09-28: the offer shows and never blocks buying) is longer than a cell, so it sits
+  under the item across the row's width; the item row keeps its two lines (44) at every width and the sentence is
+  never cut. Measured on production 13 Oct 2026: inside the cell it made the row 69 high at 1025.
 - **`Use stock · {n}` on the selection bar, never on the toolbar.** While item lines are ticked, the page reads Ready
   Stock for their Sales Orders (at most five orders at a time) and counts the ticked lines that have a free Unit. The
   button shows only when that count is above zero, in all four views. One press reserves the suggested Unit for each
@@ -2711,7 +2714,8 @@ replaced by one row per Sales Order on the same kit list as `By supplier`, so no
   in every grouping and the grouping can still be changed. One line at 1164 and 1440.
 - **Kept from the old list:** eligibility and the duplicate-PO protection, the one tick set and the one `Issue PO` door,
   the PO Duty chip, `Export Excel (n)` for the ticked rows, Export in ⋮, the rail and its counts, the quick card,
-  `Purchase Orders` on the toolbar (supplier preparation for the Sales Orders in view), the pending-stock warning.
+  `Purchase Orders` in the ⋮ menu (supplier preparation for the Sales Orders in view: this tab, the rail and the
+  list's own search; on the toolbar it pushed the toolbar to two lines at 1025), the pending-stock warning.
 - **Facts that left the row, and where each is read:** `PO Safety Days` in the rail's own group and the quick card;
   `Customer Delivery Location` in the quick card and the Sales Order; `Supplier` and `Supplier Deliver To` on each item
   line; `PO Delivery Date` on the PO (each number is its door) and under `Supplier ready by` in `By supplier`. `Columns`

@@ -246,11 +246,15 @@ export function todayNumbers(rows: readonly PurchaseDemandRow[], nowKey: string,
  * list scrolls sideways, as any list must.
  */
 export const COLUMN_FLOOR = { fixed: 60, status: 112, first: 100 } as const;
+const LEAD_SLACK = 10;
 export function fitColumns(room: number, lead: number, firstMin: number, base: readonly number[], floors: readonly number[]): { first: number; fixed: number[]; tight: boolean } {
   const total = (widths: readonly number[]) => widths.reduce((sum, width) => sum + width, 0);
   if (room <= 0) return { first: Math.max(firstMin, 260), fixed: [...base], tight: false };
   const spare = room - lead - 2;
-  if (spare - total(base) >= firstMin) return { first: Math.floor(spare - total(base)), fixed: [...base], tight: false };
+  /* `lead` carries 8 of slack beside the tick and the arrow (72). The full
+     widths are kept while the first column still has its floor without that
+     slack, which is the list at 1025 wide. */
+  if (spare + LEAD_SLACK - total(base) >= firstMin) return { first: Math.max(firstMin, Math.floor(spare - total(base))), fixed: [...base], tight: false };
   const first = Math.min(firstMin, COLUMN_FLOOR.first);
   let fixed = [...base];
   for (let factor = 0.99; factor >= 0.3; factor -= 0.01) {
