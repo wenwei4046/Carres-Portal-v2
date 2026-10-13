@@ -234,6 +234,32 @@ export function todayNumbers(rows: readonly PurchaseDemandRow[], nowKey: string,
   };
 }
 
+/**
+ * ⭐ THE LIST FITS THE ROOM IT IS GIVEN (Layout Standard, 13 Oct 2026: "below
+ * 1440 wide the fixed columns shrink ... so all four views fit 1164 with the
+ * Tasks panel open, no side scroll").
+ *
+ * The first column takes what the fixed columns leave. When that would push
+ * it under its floor, the fixed columns give way together, only as far as is
+ * needed and never under their own floors (60; Status 112; first column 100).
+ * Words wrap inside a narrower column; nothing is cut. Below the floors the
+ * list scrolls sideways, as any list must.
+ */
+export const COLUMN_FLOOR = { fixed: 60, status: 112, first: 100 } as const;
+export function fitColumns(room: number, lead: number, firstMin: number, base: readonly number[], floors: readonly number[]): { first: number; fixed: number[]; tight: boolean } {
+  const total = (widths: readonly number[]) => widths.reduce((sum, width) => sum + width, 0);
+  if (room <= 0) return { first: Math.max(firstMin, 260), fixed: [...base], tight: false };
+  const spare = room - lead - 2;
+  if (spare - total(base) >= firstMin) return { first: Math.floor(spare - total(base)), fixed: [...base], tight: false };
+  const first = Math.min(firstMin, COLUMN_FLOOR.first);
+  let fixed = [...base];
+  for (let factor = 0.99; factor >= 0.3; factor -= 0.01) {
+    fixed = base.map((width, index) => Math.max(Math.min(width, floors[index] ?? COLUMN_FLOOR.fixed), Math.round(width * factor)));
+    if (total(fixed) <= spare - first) break;
+  }
+  return { first: Math.max(first, Math.floor(spare - total(fixed))), fixed, tight: true };
+}
+
 /** Whole days from `today` to `date` (both `YYYY-MM-DD`): negative = gone by. */
 export function daysBetween(today: string, date: string): number {
   const at = (iso: string) => Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));

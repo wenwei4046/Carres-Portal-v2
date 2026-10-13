@@ -25,11 +25,10 @@ import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import TwoLineCell from "@/components/register/TwoLineCell";
 import RowTick from "@/components/register/RowTick";
 import ItemRows from "@/components/register/ItemRows";
-import { BY_SUPPLIER as B, daysBetween, type GroupBy, type SupplierGroup } from "./by-supplier";
+import { BY_SUPPLIER as B, COLUMN_FLOOR, daysBetween, fitColumns, type GroupBy, type SupplierGroup } from "./by-supplier";
 
 /** The five fixed columns (01 §5) and the grid's own tick and arrow columns. */
 const FIXED = { items: 80, orders: 96, deadline: 120, readyBy: 120, status: 120 } as const;
-const FIXED_TOTAL = FIXED.items + FIXED.orders + FIXED.deadline + FIXED.readyBy + FIXED.status;
 /* 72 for the tick and the arrow, and 8 because the engine gives a sortable
    header a few pixels more than its column asks for. */
 const GRID_LEAD = 80;
@@ -39,7 +38,6 @@ const SUPPLIER_MIN = 150;
    holds the room the design leaves empty before Status, so an item line's
    Supplier delivers to has space for its select. */
 const GROUPED = { items: 80, orders: 96, suppliers: 230, status: 124 } as const;
-const GROUPED_TOTAL = GROUPED.items + GROUPED.orders + GROUPED.suppliers + GROUPED.status;
 const LINE_SUPPLIER = 110;
 
 const soRef = (so: number | null) => (so == null ? B.notRecorded : `SO-${so}`);
@@ -117,8 +115,21 @@ export default function SoBatchBySupplier({
     measure();
     return () => observer.disconnect();
   });
-  const fixedTotal = by === "supplier" ? FIXED_TOTAL : GROUPED_TOTAL;
-  const supplierWidth = room > 0 ? Math.max(SUPPLIER_MIN, Math.floor(room - GRID_LEAD - fixedTotal - 2)) : 260;
+  /* The fixed columns give way when the room is short (Tasks open on a
+     narrow screen), so Status stays in view with no side scroll. */
+  const F = COLUMN_FLOOR.fixed;
+  const fit = by === "supplier"
+    ? fitColumns(room, GRID_LEAD, SUPPLIER_MIN, [FIXED.items, FIXED.orders, FIXED.deadline, FIXED.readyBy, FIXED.status], [F, F, F, F, COLUMN_FLOOR.status])
+    : fitColumns(room, GRID_LEAD, SUPPLIER_MIN, [GROUPED.items, GROUPED.orders, GROUPED.suppliers, GROUPED.status], [F, F, F, COLUMN_FLOOR.status]);
+  const supplierWidth = fit.first;
+  const supplierFloor = fit.tight ? COLUMN_FLOOR.first : SUPPLIER_MIN;
+  /* A header's filter button needs 24 of its column. Short of room, the
+     middle columns keep their sort and give the filter up; the first column
+     and Status keep theirs. */
+  const roomy = !fit.tight;
+  const W5 = by === "supplier"
+    ? { items: fit.fixed[0]!, orders: fit.fixed[1]!, deadline: fit.fixed[2]!, readyBy: fit.fixed[3]!, status: fit.fixed[4]!, suppliers: GROUPED.suppliers }
+    : { items: fit.fixed[0]!, orders: fit.fixed[1]!, deadline: FIXED.deadline, readyBy: FIXED.readyBy, status: fit.fixed[3]!, suppliers: fit.fixed[2]! };
 
   /* A supplier with rows in two categories (one PO per supplier and category)
      names the category on each of them: `Ohana · Bedframe`, `Ohana · Sofa`. */
@@ -155,7 +166,7 @@ export default function SoBatchBySupplier({
 
   const supplierColumns = useMemo<DataGridColumn<SupplierGroup>[]>(() => [
     {
-      key: "supplier", label: B.colSupplier, width: supplierWidth, minWidth: SUPPLIER_MIN, sortable: true, wrap: true,
+      key: "supplier", label: B.colSupplier, width: supplierWidth, minWidth: supplierFloor, sortable: true, wrap: true,
       accessor: (g) => <TwoLineCell strong top={nameOf(g)} sub={g.ordered ? B.category(g.category) : B.supplierLine(g)} testId={`by-supplier-name-${g.key}`} />,
       sortFn: (a, b) => nameOf(a).localeCompare(nameOf(b)),
       searchValue: (g) => `${g.supplier ?? B.supplierNotSet} ${[...g.lines, ...(g.ordered?.lines ?? [])].map((l) => `${l.item} ${l.variant ?? ""} ${soRef(l.so)}`).join(" ")} ${(g.ordered?.poIds ?? []).map((id) => `${id} ${poNo(id)}`).join(" ")}`,
@@ -163,19 +174,19 @@ export default function SoBatchBySupplier({
       exportValue: (g) => nameOf(g),
     },
     {
-      key: "items", label: B.colItems, width: FIXED.items, minWidth: FIXED.items, sortable: true, wrap: true,
+      key: "items", label: B.colItems, width: W5.items, minWidth: W5.items, sortable: true, wrap: true, filterable: roomy,
       accessor: (g) => <TwoLineCell top={B.qty(g.category, g.qty)} sub={B.models(g.models)} />,
       sortFn: (a, b) => a.qty - b.qty,
       exportValue: (g) => B.qty(g.category, g.qty),
     },
     {
-      key: "orders", label: B.colOrders, headerLines: ["Sales", "orders"], width: FIXED.orders, minWidth: FIXED.orders, sortable: true, wrap: true,
+      key: "orders", label: B.colOrders, headerLines: ["Sales", "orders"], width: W5.orders, minWidth: W5.orders, sortable: true, wrap: true, filterable: roomy,
       accessor: (g) => <TwoLineCell top={String(g.orders.length)} sub={<span title={g.orders.map((o) => soRef(o.so)).join(", ")}>{B.orderRefs(g.orders, soRef)}</span>} />,
       sortFn: (a, b) => a.orders.length - b.orders.length,
       exportValue: (g) => g.orders.map((o) => soRef(o.so)).join(", "),
     },
     {
-      key: "deadline", label: B.colDeadline, headerLines: ["Order PO", "deadline"], width: FIXED.deadline, minWidth: FIXED.deadline, sortable: true, wrap: true,
+      key: "deadline", label: B.colDeadline, headerLines: ["Order PO", "deadline"], width: W5.deadline, minWidth: W5.deadline, sortable: true, wrap: true, filterable: roomy,
       accessor: (g) => {
         if (g.ordered) return <span className="text-body text-c-secondary">{B.ordered}</span>;
         if (!g.orderBy) return <span className="text-body text-c-secondary">{B.notRecorded}</span>;
@@ -186,7 +197,7 @@ export default function SoBatchBySupplier({
       exportValue: (g) => g.orderBy ?? "",
     },
     {
-      key: "readyBy", label: B.colReadyBy, headerLines: ["Supplier", "ready by"], width: FIXED.readyBy, minWidth: FIXED.readyBy, sortable: true, wrap: true,
+      key: "readyBy", label: B.colReadyBy, headerLines: ["Supplier", "ready by"], width: W5.readyBy, minWidth: W5.readyBy, sortable: true, wrap: true, filterable: roomy,
       accessor: (g) =>
         g.readyBy
           ? <TwoLineCell top={fmtDateShort(g.readyBy)} sub={g.ordered ? weekday(g.readyBy) : `${weekday(g.readyBy)} · ${B.ifSentToday}`} />
@@ -195,13 +206,13 @@ export default function SoBatchBySupplier({
       exportValue: (g) => g.readyBy ?? "",
     },
     {
-      key: "status", label: B.colStatus, width: FIXED.status, minWidth: FIXED.status, sortable: true, wrap: true,
+      key: "status", label: B.colStatus, width: W5.status, minWidth: W5.status, sortable: true, wrap: true,
       accessor: statusCell,
       sortFn: (a, b) => Number(!!a.ordered) - Number(!!b.ordered) || Number(b.cutOffPassed) - Number(a.cutOffPassed),
       filterValue: statusWord,
       exportValue: statusWord,
     },
-  ], [today, supplierWidth, twoCategories, by]);
+  ], [today, roomy, supplierWidth, supplierFloor, W5.items, W5.orders, W5.deadline, W5.readyBy, W5.status, twoCategories, by]);
 
   /* `By category` and `By order deadline`: the same rows of lines, grouped
      another way. The first column names the group; Suppliers lists who makes
@@ -217,13 +228,13 @@ export default function SoBatchBySupplier({
       return { top: fmtDateShort(g.orderBy), sub: `${weekday(g.orderBy)} · ${B.deadline(daysBetween(today, g.orderBy))}`, warn: false };
     };
     const first: DataGridColumn<SupplierGroup> = by === "category" ? {
-      key: "category", label: B.colCategory, width: supplierWidth, minWidth: SUPPLIER_MIN, sortable: true, wrap: true,
+      key: "category", label: B.colCategory, width: supplierWidth, minWidth: supplierFloor, sortable: true, wrap: true,
       accessor: (g) => <TwoLineCell strong top={B.category(g.category)} testId={`by-supplier-name-${g.key}`} />,
       searchValue: (g) => `${B.category(g.category)} ${g.suppliers.join(" ")} ${search ? search(g) : ""}`,
       filterValue: (g) => B.category(g.category),
       exportValue: (g) => B.category(g.category),
     } : {
-      key: "deadlineGroup", label: B.colDeadline, width: supplierWidth, minWidth: SUPPLIER_MIN, sortable: true, wrap: true,
+      key: "deadlineGroup", label: B.colDeadline, headerLines: ["Order PO", "deadline"], width: supplierWidth, minWidth: supplierFloor, sortable: true, wrap: true,
       accessor: (g) => { const label = deadlineLabel(g); return <TwoLineCell strong warn={label.warn} top={label.top} sub={label.sub} testId={`by-supplier-name-${g.key}`} />; },
       sortFn: (a, b) => (a.orderBy ?? "9999").localeCompare(b.orderBy ?? "9999"),
       searchValue: (g) => `${deadlineLabel(g).top} ${g.suppliers.join(" ")} ${search ? search(g) : ""}`,
@@ -235,28 +246,33 @@ export default function SoBatchBySupplier({
       { ...pick("items"), accessor: (g) => <TwoLineCell top={B.qty(unitOf(g), g.qty)} sub={B.models(g.models)} />, exportValue: (g) => B.qty(unitOf(g), g.qty) },
       pick("orders"),
       {
-        key: "suppliers", label: B.colSuppliers, width: GROUPED.suppliers, minWidth: GROUPED.suppliers, sortable: true, wrap: true,
+        key: "suppliers", label: B.colSuppliers, width: W5.suppliers, minWidth: W5.suppliers, sortable: true, wrap: true, filterable: roomy,
         accessor: (g) => <TwoLineCell top={g.suppliers[0] ?? B.supplierNotSet} sub={B.moreSuppliers(g.suppliers)} />,
         sortFn: (a, b) => (a.suppliers[0] ?? "").localeCompare(b.suppliers[0] ?? ""),
         filterValue: (g) => g.suppliers[0] ?? B.supplierNotSet,
         exportValue: (g) => g.suppliers.join(", ") || B.supplierNotSet,
       },
-      { ...pick("status"), width: GROUPED.status, minWidth: GROUPED.status },
+      pick("status"),
     ];
-  }, [by, supplierColumns, supplierWidth, today]);
+  }, [by, roomy, supplierColumns, supplierWidth, supplierFloor, W5.suppliers, today]);
 
   /* An item line repeats the row's columns: its tick under the row's tick,
      its name under Supplier, then quantity, sales order and deadline under
      their own headers. The engine starts an opened row at the first data
      column, so the lines step back over the tick and arrow columns (72). */
   const grouped = by !== "supplier";
-  const lineColumns = grouped
+  /* Short of room, a grouped view's item line keeps its own proportions, so
+     the Sales Order, the supplier and the Deliver To editor each stay on
+     their lines (item rows 44). */
+  const lineColumns = grouped && fit.tight
+    ? `${drawn[0] ?? 40}px ${drawn[1] ?? 32}px minmax(90px,1fr) 52px 80px ${LINE_SUPPLIER}px 150px`
+    : grouped
     ? (drawn.length >= 5
       ? `${drawn.slice(0, 5).map((width) => `${width}px`).join(" ")} ${LINE_SUPPLIER}px 1fr`
-      : `40px 32px ${Math.max(SUPPLIER_MIN, supplierWidth)}px ${GROUPED.items + 2}px ${GROUPED.orders + 2}px ${LINE_SUPPLIER}px 1fr`)
+      : `40px 32px ${Math.max(supplierFloor, supplierWidth)}px ${W5.items + 2}px ${W5.orders + 2}px ${LINE_SUPPLIER}px 1fr`)
     : drawn.length >= 6
       ? `${drawn.slice(0, 6).map((width) => `${width}px`).join(" ")} 1fr`
-      : `40px 32px ${Math.max(SUPPLIER_MIN, supplierWidth)}px ${FIXED.items + 2}px ${FIXED.orders + 2}px ${FIXED.deadline + 3}px 1fr`;
+      : `40px 32px ${Math.max(supplierFloor, supplierWidth)}px ${W5.items + 2}px ${W5.orders + 2}px ${W5.deadline + 3}px 1fr`;
   const stepBack = drawn.length >= 2 ? drawn[0]! + drawn[1]! : 72;
 
   return (
@@ -280,7 +296,7 @@ export default function SoBatchBySupplier({
          one Status column short (where the design file has its Tasks button),
          so the button is not over Status and its menu never covers that
          column (owner 13 Oct 2026). */
-      toolbarAfterTools={toolbarAfterTools ?? <span aria-hidden className="block" style={{ width: (by === "supplier" ? FIXED.status : GROUPED.status) + 8 }} />}
+      toolbarAfterTools={toolbarAfterTools ?? (fit.tight ? undefined : <span aria-hidden className="block" style={{ width: W5.status + 8 }} />)}
       wrapToolbar
       /* The top bar already searches everything; here search is one icon, so
          the tabs and the view button stay on one line (01 §4). */

@@ -23,12 +23,11 @@ import RowTick from "@/components/register/RowTick";
 import ItemRows from "@/components/register/ItemRows";
 import PoNumberLinks from "@/components/register/PoNumberLinks";
 import type { PoNumberLink } from "@/components/register/po-number-links";
-import { BY_SUPPLIER as B, daysBetween } from "./by-supplier";
+import { BY_SUPPLIER as B, COLUMN_FLOOR, daysBetween, fitColumns } from "./by-supplier";
 import { BY_SALES_ORDER as O, type OrderRowFacts } from "./by-sales-order";
 
 /** The four fixed columns and the grid's own tick and arrow columns. */
 const FIXED = { items: 150, proceed: 104, requested: 150, status: 132 } as const;
-const FIXED_TOTAL = FIXED.items + FIXED.proceed + FIXED.requested + FIXED.status;
 /* 72 for the tick and the arrow, and 8 because the engine gives a sortable
    header a few pixels more than its column asks for. */
 const GRID_LEAD = 80;
@@ -36,6 +35,9 @@ const SO_MIN = 150;
 /* An item line under the row: Qty, Stock you can use and Supplier are fixed;
    Supplier delivers to takes what is left, so its select has room. */
 const LINE = { qty: 64, stock: 124, supplier: 110 } as const;
+const LINE_TIGHT = { qty: 52, stock: 92, supplier: 84 } as const;
+/* `Customer’s original` on one header line, never cut: its own floor. */
+const REQUESTED_FLOOR = 122;
 
 const soRef = (so: number | null) => (so == null ? O.notRecorded : `SO-${so}`);
 const weekday = (iso: string) => fmtDate(iso).split(",")[0] ?? "";
@@ -193,9 +195,21 @@ export default function SoBatchBySalesOrder({
     measure();
     return () => observer.disconnect();
   });
-  const soWidth = room > 0 ? Math.max(SO_MIN, Math.floor(room - GRID_LEAD - FIXED_TOTAL - 2)) : 260;
-  const lead = drawn.length >= 3 ? drawn.slice(0, 3).map((width) => `${width}px`).join(" ") : `40px 32px ${Math.max(SO_MIN, soWidth)}px`;
-  const lineColumns = `${lead} ${LINE.qty}px ${LINE.stock}px ${LINE.supplier}px 1fr`;
+  /* The fixed columns give way when the room is short (Tasks open on a
+     narrow screen), so Status stays in view with no side scroll. */
+  const fit = fitColumns(room, GRID_LEAD, SO_MIN, [FIXED.items, FIXED.proceed, FIXED.requested, FIXED.status],
+    [COLUMN_FLOOR.fixed, COLUMN_FLOOR.fixed, REQUESTED_FLOOR, COLUMN_FLOOR.status]);
+  /* A header's filter button needs 24 of its column. Short of room, Items
+     and the two dates keep their sort and give the filter up; Status keeps
+     its filter, and the rail, the tabs and the search still narrow the list. */
+  const roomy = !fit.tight;
+  const soWidth = fit.first;
+  const [itemsWidth, proceedWidth, requestedWidth, statusWidth] = fit.fixed as [number, number, number, number];
+  const soFloor = fit.tight ? COLUMN_FLOOR.first : SO_MIN;
+  const lead = drawn.length >= 3 ? drawn.slice(0, 3).map((width) => `${width}px`).join(" ") : `40px 32px ${Math.max(soFloor, soWidth)}px`;
+  /* The item line gives way with them, so Supplier delivers to keeps room. */
+  const line = fit.tight ? LINE_TIGHT : LINE;
+  const lineColumns = `${lead} ${line.qty}px ${line.stock}px ${line.supplier}px 1fr`;
   const stepBack = drawn.length >= 2 ? drawn[0]! + drawn[1]! : 72;
 
   const statusCell = (order: SoBatchOrderRow) => {
@@ -229,7 +243,7 @@ export default function SoBatchBySalesOrder({
 
   const columns = useMemo<DataGridColumn<SoBatchOrderRow>[]>(() => [
     {
-      key: "soNo", label: O.colSoNo, width: soWidth, minWidth: SO_MIN, sortable: true, wrap: true,
+      key: "soNo", label: O.colSoNo, width: soWidth, minWidth: soFloor, sortable: true, wrap: true,
       accessor: (order) => (
         <TwoLineCell strong testId={`so-batch-so-${order.orderId}`}
           top={order.so == null ? O.notRecorded : (
@@ -246,40 +260,40 @@ export default function SoBatchBySalesOrder({
       exportValue: (order) => soRef(order.so),
     },
     {
-      key: "items", label: O.colItems, width: FIXED.items, minWidth: FIXED.items, sortable: true, wrap: true,
+      key: "items", label: O.colItems, width: itemsWidth, minWidth: itemsWidth, sortable: true, wrap: true, filterable: roomy,
       accessor: (order) => { const facts = factsOf(order); return <TwoLineCell top={B.qty(facts.unit, facts.pieces)} sub={O.itemsLine(facts)} testId={`so-batch-items-${order.orderId}`} />; },
       sortFn: (a, b) => factsOf(a).pieces - factsOf(b).pieces,
       exportValue: (order) => { const facts = factsOf(order); return [B.qty(facts.unit, facts.pieces), O.itemsLine(facts)].filter(Boolean).join(" · "); },
     },
     {
-      key: "proceededAt", label: O.colProceedDate, headerLines: ["Proceed", "date"], width: FIXED.proceed, minWidth: FIXED.proceed, sortable: true, wrap: true,
+      key: "proceededAt", label: O.colProceedDate, headerLines: ["Proceed", "date"], width: proceedWidth, minWidth: proceedWidth, sortable: true, wrap: true,
       accessor: (order) => order.proceededAt
         ? <TwoLineCell top={fmtDateShort(order.proceededAt)} sub={weekday(order.proceededAt)} testId={`so-batch-proceed-${order.orderId}`} />
         : <span className="text-body text-c-secondary" data-testid={`so-batch-proceed-${order.orderId}`}>{O.notRecorded}</span>,
       dateValue: (order) => order.proceededAt,
-      filterType: "date",
+      filterType: "date", filterable: roomy,
       sortFn: (a, b) => (a.proceededAt ?? "").localeCompare(b.proceededAt ?? ""),
       exportValue: (order) => order.proceededAt ?? "",
     },
     {
       key: "requestedDelivery", label: O.colRequestedDelivery, headerLines: ["Customer’s original", "requested delivery"],
-      width: FIXED.requested, minWidth: FIXED.requested, sortable: true, wrap: true,
+      width: requestedWidth, minWidth: requestedWidth, sortable: true, wrap: true,
       accessor: (order) => order.originalRequestedDeliveryDate
         ? <TwoLineCell top={fmtDateShort(order.originalRequestedDeliveryDate)} sub={weekday(order.originalRequestedDeliveryDate)} testId={`so-batch-requested-${order.orderId}`} />
         : <span className="text-body text-c-secondary" data-testid={`so-batch-requested-${order.orderId}`}>{O.notRecorded}</span>,
       dateValue: (order) => order.originalRequestedDeliveryDate ?? null,
-      filterType: "date",
+      filterType: "date", filterable: roomy,
       sortFn: (a, b) => (a.originalRequestedDeliveryDate ?? "").localeCompare(b.originalRequestedDeliveryDate ?? ""),
       exportValue: (order) => order.originalRequestedDeliveryDate ?? "",
     },
     {
-      key: "status", label: O.colStatus, width: FIXED.status, minWidth: FIXED.status, sortable: true, wrap: true,
+      key: "status", label: O.colStatus, width: statusWidth, minWidth: statusWidth, sortable: true, wrap: true,
       accessor: statusCell,
       sortFn: (a, b) => O.status(factsOf(a).status).localeCompare(O.status(factsOf(b).status)),
       filterValue: (order) => O.status(factsOf(order).status),
       exportValue: (order) => [O.status(factsOf(order).status), poLinksOf(order).map((po) => po.display).join(", ")].filter(Boolean).join(" · "),
     },
-  ], [today, soWidth, factsOf, blockedReason, searchOf, onOpenOrder, poLinksOf, onOpenPo]);
+  ], [today, roomy, soWidth, soFloor, itemsWidth, proceedWidth, requestedWidth, statusWidth, factsOf, blockedReason, searchOf, onOpenOrder, poLinksOf, onOpenPo]);
 
   return (
     /* The kit's table puts 10 between columns and no padding inside a cell
@@ -297,7 +311,7 @@ export default function SoBatchBySalesOrder({
         appearance="reference"
         palette="slate"
         presentationTools
-        toolbarAfterTools={toolbarAfterTools ?? <span aria-hidden className="block" style={{ width: FIXED.status + 8 }} />}
+        toolbarAfterTools={toolbarAfterTools ?? (fit.tight ? undefined : <span aria-hidden className="block" style={{ width: FIXED.status + 8 }} />)}
         wrapToolbar
         searchPresentation="icon"
         allowColumnGrouping={false}
