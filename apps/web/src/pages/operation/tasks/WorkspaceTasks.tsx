@@ -27,7 +27,6 @@ import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import TwoLineCell from "@/components/register/TwoLineCell";
 import { fmtDate } from "@/lib/fmt-date";
 import { useShellTasks } from "../components/ShellTasks";
-import { fitColumns } from "../so-batch/by-supplier";
 import WorkCommunication, { type CommParty } from "../work/WorkCommunication";
 import { useOpenWorkSet, type WorkRow } from "../use-open-work";
 import { sameWeekday } from "./TasksArea";
@@ -38,15 +37,16 @@ import { TASK_MODULE_SYMBOL, TASK_MODULE_WORD, TASKS_WORDS as T, myTasks } from 
 import { usePoWindowFacts } from "./use-po-window-facts";
 import { useTaskDesk } from "./use-task-desk";
 import { panelFor } from "./work-panels";
-import { WORKSPACE_WORDS as W, workspaceTable, type WorkspaceRow, type WorkspaceTone } from "./workspace-table";
+import { WORKSPACE_WORDS as W, workspaceTable, workspaceWidths, type WorkspaceRow, type WorkspaceTone } from "./workspace-table";
 
 const MODULES = Object.keys(TASK_MODULE_WORD) as OperationWorkModule[];
 /* The kit's Workspace widths (Layout Standard): `Task` takes what the fixed
    columns leave; short of room they give way together, never under their
    floors, so the table fits 1025 to 1440 with the Module rail open. */
-const BASE = { due: 96, contact: 130, lastContact: 150, owner: 120, status: 124 } as const;
-const FLOOR = { due: 88, contact: 100, lastContact: 112, owner: 96, status: 112 } as const;
-const TASK_MIN = 200;
+const BASE = { due: 100, contact: 130, lastContact: 150, owner: 120, status: 132 } as const;
+/* A date (`Wed, 7 Oct`) and a late pill (`12 days late`) each stay on one line at their floor. */
+const FLOOR = { due: 100, contact: 96, lastContact: 112, owner: 96, status: 118 } as const;
+const TASK_MIN = 240;
 /** Under this much room Team Work leaves `Contact` to the task view, where it
  *  is the task's own fact row, so `Owner` and `Status` stay in view. */
 const TEAM_NARROW = 700;
@@ -86,7 +86,8 @@ function TaskCommunication({ task }: { task: WorkRow }) {
 }
 
 function StatusPill({ row }: { row: WorkspaceRow }) {
-  return <span className={`inline-flex max-w-full items-center whitespace-nowrap rounded-full px-2 py-0.5 text-meta font-medium ${TONE[row.tone]}`} data-tone={row.tone}>{row.status}</span>;
+  /* Two words (`Broken commitment`) may take two lines in a narrow column; nothing is cut. */
+  return <span className={`inline-block max-w-full rounded-[10px] px-2 py-0.5 text-meta font-medium ${TONE[row.tone]}`} data-tone={row.tone}>{row.status}</span>;
 }
 
 export default function WorkspaceTasks() {
@@ -158,10 +159,9 @@ export default function WorkspaceTasks() {
   const showContact = !(team && room > 0 && room < TEAM_NARROW);
   const showLast = !(room > 0 && room < NO_LAST_CONTACT);
   const keys = (["due", ...(showContact ? ["contact"] : []), ...(showLast ? ["lastContact"] : []), ...(team ? ["owner"] : []), "status"]) as Array<keyof typeof BASE>;
-  /* 16: the list engine keeps a little of its width for itself (measured 12). */
-  const fit = fitColumns(room, 16, TASK_MIN, keys.map((key) => BASE[key]), keys.map((key) => FLOOR[key]));
+  const fit = workspaceWidths(room, keys.map((key) => BASE[key]), keys.map((key) => FLOOR[key]), TASK_MIN);
   const widthOf = (key: keyof typeof BASE) => fit.fixed[keys.indexOf(key)] ?? BASE[key];
-  const taskWidth = fit.first;
+  const taskWidth = fit.task;
   const roomy = !fit.tight;
 
   const columns = useMemo<DataGridColumn<WorkspaceRow>[]>(() => [

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { OperationWorkCompleted } from "@carres/shared";
 import type { WorkRow } from "../use-open-work";
 import { taskTabs } from "./task-cards";
-import { workspaceTable } from "./workspace-table";
+import { workspaceTable, workspaceWidths } from "./workspace-table";
 
 /**
  * The Workspace table (owner's round 3 brief of 13 Oct 2026, points 3 and 4).
@@ -103,5 +103,26 @@ describe("a row of the table", () => {
 
   it("nobody assigned: no owner is invented", () => {
     expect(table({ scoped: [row({ id: "x" }, { owner: { acting: null } })] }).rows[0]!.owner).toBeNull();
+  });
+});
+
+describe("the table fits its room", () => {
+  const BASE = [100, 130, 150, 132], FLOORS = [100, 96, 112, 118];
+  it("with room to spare the fixed columns keep their widths and Task takes the rest", () => {
+    expect(workspaceWidths(1100, BASE, FLOORS, 240)).toEqual({ task: 1100 - 18 - 512, fixed: BASE, tight: false });
+  });
+  it("short of room the fixed columns give way together, never under their floors, so Task keeps its minimum", () => {
+    const fit = workspaceWidths(760, BASE, FLOORS, 240);
+    expect(fit.tight).toBe(true);
+    expect(fit.fixed.every((width, index) => width >= FLOORS[index]! && width <= BASE[index]!)).toBe(true);
+    expect(fit.fixed[0]).toBe(100);
+    expect(fit.task).toBeGreaterThanOrEqual(239);
+    expect(fit.task + fit.fixed.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(760 - 18);
+  });
+  it("with every column at its floor Task takes what is left", () => {
+    expect(workspaceWidths(600, BASE, FLOORS, 240)).toEqual({ task: 600 - 18 - 426, fixed: FLOORS, tight: true });
+  });
+  it("before the room is measured it guesses wide, never zero", () => {
+    expect(workspaceWidths(0, BASE, FLOORS, 240).task).toBeGreaterThanOrEqual(240);
   });
 });

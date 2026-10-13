@@ -173,3 +173,22 @@ export function workspaceTable(input: {
     modules: (Object.keys(TASK_MODULE_WORD) as OperationWorkModule[]).map((m) => ({ module: m, count: byModule.get(m) ?? 0 })),
   };
 }
+
+/**
+ * THE TABLE FITS ITS ROOM. `Task` is the instruction, so it takes everything
+ * the fixed columns leave; short of `taskMin`, the fixed columns give way
+ * together, each in proportion to what it can spare and never under its
+ * floor. Only when every column is at its floor does `Task` go under
+ * `taskMin`. The caller leaves a column out before this point is reached.
+ */
+export function workspaceWidths(room: number, base: readonly number[], floors: readonly number[], taskMin: number, gutter = 18): { task: number; fixed: number[]; tight: boolean } {
+  const sum = (widths: readonly number[]) => widths.reduce((total, width) => total + width, 0);
+  if (room <= 0) return { task: Math.max(taskMin, 320), fixed: [...base], tight: false };
+  const spare = room - gutter;
+  const short = taskMin - (spare - sum(base));
+  if (short <= 0) return { task: Math.floor(spare - sum(base)), fixed: [...base], tight: false };
+  const canGive = sum(base) - sum(floors);
+  const give = Math.min(short, canGive);
+  const fixed = base.map((width, index) => (canGive > 0 ? Math.round(width - give * ((width - floors[index]!) / canGive)) : width));
+  return { task: Math.max(100, Math.floor(spare - sum(fixed))), fixed, tight: true };
+}
