@@ -51,7 +51,7 @@ const modelCode = (line: PurchaseDemandRow) => (line.skus?.length ? line.skus.jo
 
 export default function SoBatchBySupplier({
   groups, by = "supplier", today, isLoading, storageKey, sessionKey, canBuy, isTicked, onToggleLine, onToggleLines,
-  selectionSummary, selectionPrimary, toolbarEnd, toolbarAfterTools, toolbarStart, onOpenOrder, emptyMessage, initialSearch, searchPlaceholder, lineExtras, warning,
+  selectionSummary, selectionPrimary, toolbarEnd, toolbarAfterTools, toolbarStart, onOpenOrder, emptyMessage, noMatchMessage, onClearConditions, initialSearch, searchPlaceholder, lineExtras, warning,
 }: {
   groups: SupplierGroup[];
   /** How the rows are grouped. The columns follow it. */
@@ -74,6 +74,10 @@ export default function SoBatchBySupplier({
   toolbarStart?: ReactNode;
   onOpenOrder: (orderId: string) => void;
   emptyMessage: string;
+  /** What a search or a filter that finds nothing says: never the empty sentence. */
+  noMatchMessage?: string;
+  /** `Clear filters` also clears what the page itself narrowed by. */
+  onClearConditions?: () => void;
   initialSearch?: string;
   searchPlaceholder?: string;
   /** The By sales order list's own controls for one demand line: where the
@@ -286,7 +290,8 @@ export default function SoBatchBySupplier({
       isLoading={isLoading}
       warning={warning}
       emptyMessage={emptyMessage}
-      noMatchMessage={emptyMessage}
+      noMatchMessage={noMatchMessage ?? emptyMessage}
+      onClearConditions={onClearConditions}
       initialSearch={initialSearch}
       searchPlaceholder={searchPlaceholder}
       toolbarStart={toolbarStart}

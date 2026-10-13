@@ -2679,8 +2679,9 @@ replaced by one row per Sales Order on the same kit list as `By supplier`, so no
   `To buy` with the governed reason under it (`Production days not set`, `Already on a PO`, ...): amber when a fact is
   missing and must be set, grey when another PO already covers the goods. The left-edge stripe of the old list is gone;
   the reason is in view on the row and on the item line.
-- **Every PO number stays on the row (owner ruling 2026-10-05).** Under Status, every linked PO, comma-separated, each
-  its own link to that PO; a list wraps inside the column and is never cut or counted. Search finds the order by the
+- **Every PO number stays on the row (owner ruling 2026-10-05).** Under Status, every PO that holds the order's goods
+  (its own POs, and a PO whose Units are reserved for it with `Use this PO`), comma-separated, each its own link to
+  that PO; a list wraps inside the column and is never cut or counted. Search finds the order by the
   stored or the printed number, and Export writes them after the status word.
 - **Tabs.** `To buy` (first) · `Ordered` · `All`, as on the other three views. `To buy` lists the Sales Orders with an
   item line still to buy; `Ordered` those on a PO; `All` every proceeded Sales Order the rail is showing. The Register
@@ -2699,8 +2700,13 @@ replaced by one row per Sales Order on the same kit list as `By supplier`, so no
   of those lines through the existing reservation door (`so_batch_reserve_ready_units`); the lines with no stock stay
   ticked to buy. The suggestion is the shared matcher's: Carres-owned exact Units at Carres Klang, oldest first, the
   order chosen by the `Ready Stock priority` setting first. A tick on a line the press answers is dropped before the
-  write, so a stale quantity can never be issued; a lost response is read back, never sent twice. A refusal says
-  `Not confirmed · Try again` above the list.
+  write, so a stale quantity can never be issued; a lost response is read back, never sent twice. The press stops at
+  the first Sales Order that is refused or cannot be confirmed: what was reserved before it is said
+  (`{n} Units reserved from stock`), `Not confirmed · Try again` stands above the list until the next tick, and an
+  order whose answer could not be confirmed offers no stock until its record has been read again.
+- **While lines are ticked** the selection bar stands where the toolbar was: the count, `Clear`, `Use stock`, the PO
+  Duty chip, `Issue PO`, `Export Excel (n)`, and the view button as one small button, because the ticks are the same
+  in every grouping and the grouping can still be changed. One line at 1164 and 1440.
 - **Kept from the old list:** eligibility and the duplicate-PO protection, the one tick set and the one `Issue PO` door,
   the PO Duty chip, `Export Excel (n)` for the ticked rows, Export in ⋮, the rail and its counts, the quick card,
   `Purchase Orders` on the toolbar (supplier preparation for the Sales Orders in view), the pending-stock warning.

@@ -368,17 +368,19 @@ function searchFor(query: string) {
 }
 
 /**
- * While a line is ticked the selection bar stands where the toolbar was, and
- * the view button is on the toolbar (owner 13 Oct 2026, round 3). The rail is
- * still in reach: narrowing to a product nothing here has takes the ticked
- * rows off the list, the toolbar returns, the grouping is changed, and the
- * rail is cleared again. The ticks are kept all the way.
+ * While a line is ticked the selection bar stands where the toolbar was. The
+ * ticks are the same in every grouping, so the view button is on the bar too,
+ * as one small button (owner 13 Oct 2026, round 3): the grouping is changed
+ * there and every tick is kept.
  */
 function pickViewWhileTicked(name: string) {
-  fireEvent.change(screen.getByTestId("so-batch-product-select"), { target: { value: "bedframe" } });
+  expect(within(screen.getByTestId("selection-bar")).getByTestId("so-batch-view")).toBeInTheDocument();
   pickView(name);
-  fireEvent.change(screen.getByTestId("so-batch-product-select"), { target: { value: "" } });
 }
+
+/** The selection bar's buttons by their words; the small view button has none. */
+const barButtons = () => within(screen.getByTestId("selection-bar")).getAllByRole("button")
+  .filter((button) => button.getAttribute("data-testid") !== "so-batch-view").map((button) => button.textContent);
 
 /** The words under and beside a row's Status pill, without its PO numbers. */
 const statusLines = (orderId: string) =>
@@ -441,8 +443,7 @@ it("the search and the buying ticks stay when the grouping changes", async () =>
   searchFor("Kimmy");
   await waitFor(() => expect(screen.queryByTestId("so-batch-row-o3")).not.toBeInTheDocument());
   fireEvent.click(screen.getByTestId("so-batch-select-o1"));
-  /* The view button is on the toolbar, and the selection bar stands there now. */
-  expect(screen.queryByTestId("so-batch-view")).not.toBeInTheDocument();
+  /* The selection bar stands where the toolbar was, with the view button on it. */
   pickViewWhileTicked("By category");
   /* The category list is drawn, with the same tick on its row. */
   expect(screen.queryByTestId("so-batch-row-o1")).not.toBeInTheDocument();
@@ -1216,16 +1217,13 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     );
     expect(within(bar).getByTestId("so-batch-issue")).toBeEnabled();
     expect(bar).not.toHaveTextContent("Yu Jun holds PO duty");
-    /* The bar holds the selection's own acts only (owner 13 Oct 2026, round 3):
-       the view button stays on the toolbar, and `Use stock` joins only while
-       a ticked line has a free Unit. */
-    expect(within(bar).getAllByRole("button").map((button) => button.textContent)).toEqual([
-      "Clear",
-      "Issue PO",
-      "Export Excel (1)",
-    ]);
-    expect(within(bar).queryByTestId("so-batch-view")).toBeNull();
-    expect(screen.queryByTestId("so-batch-view")).toBeNull();
+    /* The bar holds the selection's own acts (owner 13 Oct 2026, round 3);
+       `Use stock` joins only while a ticked line has a free Unit. The view
+       button is there once, small, after the acts: the ticks are the same in
+       every grouping, so the grouping can still be changed. */
+    expect(barButtons()).toEqual(["Clear", "Issue PO", "Export Excel (1)"]);
+    expect(screen.getAllByTestId("so-batch-view")).toHaveLength(1);
+    expect(within(bar).getByTestId("so-batch-view")).toHaveAccessibleName("View: By sales order");
     expect(screen.queryByTestId("so-batch-selection-bar")).not.toBeInTheDocument();
   });
 
@@ -3570,8 +3568,7 @@ describe("Use stock on the selection bar (owner 13 Oct 2026, round 3)", () => {
     await waitFor(() => expect(reads()).toEqual(["/api/operation/purchase/demands/o1/ready-stock"]));
     await settle();
     /* The selection bar is there, with its usual acts and nothing more. */
-    expect(within(screen.getByTestId("selection-bar")).getAllByRole("button").map((button) => button.textContent))
-      .toEqual(["Clear", "Issue PO", "Export Excel (1)"]);
+    expect(barButtons()).toEqual(["Clear", "Issue PO", "Export Excel (1)"]);
     expect(screen.queryByTestId("so-batch-use-stock")).toBeNull();
     expect(posts()).toEqual([]);
   });
@@ -3587,8 +3584,7 @@ describe("Use stock on the selection bar (owner 13 Oct 2026, round 3)", () => {
     expect(useStock().textContent).toBe("Use stock · 2");
     expect([...screen.getByTestId("so-batch-selection-actions").children].map((el) => el.getAttribute("data-testid")))
       .toEqual(["so-batch-use-stock", "so-batch-duty-chip", "so-batch-issue"]);
-    expect(within(screen.getByTestId("selection-bar")).getAllByRole("button").map((button) => button.textContent))
-      .toEqual(["Clear", "Use stock · 2", "Issue PO", "Export Excel (2)"]);
+    expect(barButtons()).toEqual(["Clear", "Use stock · 2", "Issue PO", "Export Excel (2)"]);
     /* Only the ticked Sales Orders were read, and reading reserved nothing. */
     expect([...new Set(reads())]).toEqual([
       "/api/operation/purchase/demands/o1/ready-stock",
@@ -3656,7 +3652,8 @@ describe("Use stock on the selection bar (owner 13 Oct 2026, round 3)", () => {
     expect(screen.queryByTestId("so-batch-use-stock")).toBeNull();
     fireEvent.click(screen.getAllByRole("checkbox").find((box) => /^by-supplier-select-/.test(box.getAttribute("data-testid") ?? ""))!);
     await waitFor(() => expect(useStock()).toHaveTextContent("Use stock · 1"));
-    expect(within(screen.getByTestId("selection-bar")).queryByTestId("so-batch-view")).toBeNull();
+    /* The view button is on the bar as one small button, named for a screen reader. */
+    expect(within(screen.getByTestId("selection-bar")).getByTestId("so-batch-view")).toHaveAccessibleName("View: By supplier");
   });
 });
 

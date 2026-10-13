@@ -831,12 +831,12 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
      `GROUP BY` chooses how the lines are grouped. `SHOW COLUMNS FOR` names the
      modules; this page holds its own facts only, so the others say
      `Coming soon` and cannot be chosen until their facts are read here. */
-  const viewSwitch = (
+  const viewMenu = (compact: boolean) => (
     <CPopover label="SO Batch Purchase view" role="menu" width={236} open={viewOpen} onOpenChange={setViewOpen}
       trigger={
-        <Button data-testid="so-batch-view" aria-label={`View: ${SO_BATCH_VIEWS[presentation].label}`}>
+        <Button data-testid="so-batch-view" aria-label={`View: ${SO_BATCH_VIEWS[presentation].label}`} title={compact ? SO_BATCH_VIEWS[presentation].label : undefined}>
           <MIcon name={SO_BATCH_VIEWS[presentation].icon} size={18} className="text-c-secondary" />
-          {SO_BATCH_VIEWS[presentation].label}
+          {compact ? null : SO_BATCH_VIEWS[presentation].label}
           <MIcon name="expand_more" size={18} className="text-c-secondary" />
         </Button>
       }>
@@ -853,6 +853,11 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         : <CMenuItem key={set.label} icon={set.icon} disabled note={BY_SUPPLIER.comingSoon} onSelect={() => {}}>{set.label}</CMenuItem>)}
     </CPopover>
   );
+  const viewSwitch = viewMenu(false);
+  /* While lines are ticked the selection bar takes the toolbar's place. The
+     ticks are the same in every grouping, so the view can still be changed
+     there: one small button, so the bar keeps to one line. */
+  const viewSwitchCompact = viewMenu(true);
   /* BY SUPPLIER (owner 12 Oct 2026): the demand of the orders this list is
      showing, one row per supplier and category. It reads the same ticks, so
      `Issue PO` takes them from either view. */
@@ -895,19 +900,25 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
       && !order.lines.some((line) => line.poOfferUnread && soBatchOrderLineOutstandingQty(line) > 0);
     return text ? { text, tick, fix: tick != null && !held } : null;
   }, [leafsByOrder, stateWords]);
+  /* `Clear filters` in a list also clears what the page narrowed by: the rail and the PO window. */
+  const clearPageFilters = () => { setFilter(SO_BATCH_RAIL_CLEAR); if (roundNavigation?.selected) roundNavigation.onSelect(roundNavigation.selected); };
   const visibleOrders = useRef<SoBatchOrderRow[]>([]);
   const rememberVisibleOrders = useCallback((rows: SoBatchOrderRow[]) => { visibleOrders.current = rows; }, []);
   const orderSearch = useCallback((o: SoBatchOrderRow) => [
     o.so == null ? "" : `SO-${o.so} ${o.so}`, o.customer ?? "", ...o.lines.map((l) => `${l.sku} ${l.item} ${l.variant ?? ""}`), ...o.outstandingSuppliers,
     ...o.pos.map((p) => `${p.poId} ${documentDisplayNumber(p.poId)} ${p.supplierName ?? ""}`), poNumberLinksSearch(poNumberLinks(o.pos)),
   ].join(" "), []);
-  const poLinksOf = useCallback((o: SoBatchOrderRow) => poNumberLinks(o.pos), []);
+  /* Every PO that holds the order's goods: its own POs, and a PO whose Units
+     are reserved for it (`Use this PO`). */
+  const poLinksOf = useCallback((o: SoBatchOrderRow) => poNumberLinks([
+    ...o.pos, ...o.lines.flatMap((line) => (line.poReserved ?? []).filter((held) => held.qty > 0).map((held) => ({ poId: held.poId }))),
+  ]), []);
   const openPo = useCallback((poId: string) => navigate(poObjectPath(poId)), [navigate]);
   /* `Use stock · n` sits before `Issue PO`, and only while a ticked line has a
      free Unit (owner 13 Oct 2026, round 3): never on the toolbar. */
   const useStock = tickedStock.lines > 0 ? (
     <Button size="md" data-testid="so-batch-use-stock" loading={tickedStock.busy} title={BY_SALES_ORDER.useStockWhy}
-      onClick={() => void tickedStock.use().then((units) => { if (units) toast.success(BY_SALES_ORDER.useStockDone(units)); })}>
+      onClick={() => void tickedStock.use().then((outcome) => { if (outcome?.reserved) toast.success(BY_SALES_ORDER.useStockDone(outcome.reserved)); })}>
       <MIcon name="inventory_2" size={18} className="text-c-secondary" />
       {BY_SALES_ORDER.useStock(tickedStock.lines)}
     </Button>
@@ -1163,7 +1174,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 onToggleLine={toggleLeaf}
                 onToggleLines={setLeafsSelected}
                 selectionSummary={summary.text}
-                selectionPrimary={issueActions}
+                selectionPrimary={<>{issueActions}{viewSwitchCompact}</>}
                 warning={stockWarning}
                 toolbarEnd={<div className={`${styles.toolbarTools} flex min-w-0 flex-wrap items-center gap-2`}>
                   {viewSwitch}
@@ -1199,6 +1210,8 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 </>}
                 onOpenOrder={setQuickOrderId}
                 emptyMessage={orders.length === 0 ? W.empty : shown.length < orders.length ? W.noMatch : show === "ordered" ? BY_SUPPLIER.nothingOrdered : BY_SUPPLIER.nothingToBuy}
+                noMatchMessage={W.noMatch}
+                onClearConditions={clearPageFilters}
                 initialSearch={initialSearch}
                 searchPlaceholder={W.search}
               />
@@ -1216,7 +1229,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 isTicked={(id) => live.has(id)}
                 onToggleOrder={setOrderSelected}
                 selectionSummary={summary.text}
-                selectionPrimary={issueActions}
+                selectionPrimary={<>{issueActions}{viewSwitchCompact}</>}
                 toolbarEnd={<div className={`${styles.toolbarTools} flex min-w-0 flex-wrap items-center gap-2`}>
                   {viewSwitch}
                   {onOpenPurchaseOrders ? <Button loading={purchaseOrdersLoading} disabled={isLoading} data-testid="so-batch-open-pos" onClick={() => {
@@ -1240,7 +1253,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 emptyMessage={orders.length === 0 ? W.empty : shown.length < orders.length ? W.noMatch : show === "ordered" ? BY_SALES_ORDER.nothingOrdered : BY_SALES_ORDER.nothingToBuy}
                 noMatchMessage={W.noMatch}
                 onVisibleChange={rememberVisibleOrders}
-                onClearConditions={() => { setFilter(SO_BATCH_RAIL_CLEAR); if (roundNavigation?.selected) roundNavigation.onSelect(roundNavigation.selected); }}
+                onClearConditions={clearPageFilters}
                 initialSearch={initialSearch}
                 searchPlaceholder={W.search}
               />

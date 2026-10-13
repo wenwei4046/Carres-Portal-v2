@@ -54,7 +54,11 @@ const changed = vi.fn();
  */
 function Harness({ initial, priority, keepTicks = false }: { initial: TickedLine[]; priority?: "customer_delivery" | "proceed_date"; keepTicks?: boolean }) {
   const [ticked, setTicked] = useState<TickedLine[]>(initial);
+  /* `result` is the Units reserved by a press that finished; a press that
+     stopped early is `null`, with what it held before stopping in `held`. */
   const [result, setResult] = useState<number | null | "not pressed">("not pressed");
+  const [held, setHeld] = useState<number | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
   const orderOf = useCallback((orderId: string) => ORDERS[orderId], []);
   const onReserved = useCallback((orderId: string, orderLineIds: readonly string[]) => {
     events.push(`reserved:${orderId}:${orderLineIds.join("+")}`);
@@ -64,11 +68,13 @@ function Harness({ initial, priority, keepTicks = false }: { initial: TickedLine
   const model = useTickedReadyStock({ ticked, orderOf, priority, onReserved });
   return (
     <>
-      <button onClick={() => void model.use().then(setResult)}>Use</button>
+      <button onClick={() => void model.use().then((outcome) => {
+        setResult(outcome == null || outcome.failed ? null : outcome.reserved);
+        setHeld(outcome?.reserved ?? null); setFailed(outcome?.failed ?? null);
+      })}>Use</button>
       <button onClick={() => setTicked([])}>Untick</button>
       <button onClick={() => setTicked(initial)}>Tick again</button>
-      <button onClick={model.clearError}>Clear error</button>
-      <output data-testid="state">{JSON.stringify({ lines: model.lines, units: model.units, busy: model.busy, error: model.error, result, ticked: ticked.length })}</output>
+      <output data-testid="state">{JSON.stringify({ lines: model.lines, units: model.units, busy: model.busy, error: model.error, result, held, failed, ticked: ticked.length })}</output>
     </>
   );
 }
@@ -80,7 +86,7 @@ function draw(initial: TickedLine[], options: { priority?: "customer_delivery" |
   );
 }
 const state = () => JSON.parse(screen.getByTestId("state").textContent!) as {
-  lines: number; units: number; busy: boolean; error: boolean; result: number | null | "not pressed"; ticked: number;
+  lines: number; units: number; busy: boolean; error: boolean; result: number | null | "not pressed"; held: number | null; failed: string | null; ticked: number;
 };
 const isPost = (options: unknown) => (options as { method?: string } | undefined)?.method === "POST";
 const reads = () => api.mock.calls.filter(([, options]) => !isPost(options)).map(([path]) => String(path));
@@ -349,9 +355,11 @@ describe("when the door refuses, or its answer is lost", () => {
     await settle();
     expect(posts()).toHaveLength(1);
     expect(state().ticked).toBe(1);
-    /* `clearError` puts the flag away. */
-    fireEvent.click(screen.getByText("Clear error"));
-    expect(state().error).toBe(false);
+    expect(state().failed).toBe("refused");
+    expect(state().held).toBe(0);
+    /* The band answers that press. A new tick is a new decision, so it goes. */
+    fireEvent.click(screen.getByText("Tick again"));
+    await waitFor(() => expect(state().error).toBe(false));
   });
 
   it("a refusal on a later Sales Order keeps what was already reserved and stops there", async () => {
@@ -397,8 +405,31 @@ describe("when the door refuses, or its answer is lost", () => {
     await waitFor(() => expect(state().error && !state().busy).toBe(true));
     expect(posted).toBe(true);
     expect(state().result).toBeNull();
+    expect(state().failed).toBe("unknown");
     expect(posts()).toHaveLength(1);
     /* The tick was dropped before the write, so a second press has nothing to send. */
+    fireEvent.click(screen.getByText("Use"));
+    await settle();
+    expect(posts()).toHaveLength(1);
+  });
+
+  it("after an answer that could not be confirmed, that Sales Order offers nothing until its record is read again", async () => {
+    let posted = false, readable = true;
+    api.mockImplementation(async (path: unknown, options?: { method?: string }) => {
+      if (options?.method === "POST") { posted = true; readable = false; throw new Error("response_lost"); }
+      if (!readable) throw new Error("read_unavailable");
+      /* Once it can be read again, the record shows the lost write DID hold the Unit. */
+      return stock(orderIdOf(path), [LINE], [posted ? { ...unit(UNIT, []), reservedForLineId: LINE } : unit(UNIT, [LINE])]);
+    });
+    draw(O1_TICK);
+    await waitFor(() => expect(state().lines).toBe(1));
+    fireEvent.click(screen.getByText("Use"));
+    await waitFor(() => expect(state().failed).toBe("unknown"));
+    /* Ticked again while the record cannot be read: the reading taken BEFORE
+       the write still names the Unit as free, and it is not offered from it. */
+    fireEvent.click(screen.getByText("Tick again"));
+    await settle();
+    expect(state().lines).toBe(0);
     fireEvent.click(screen.getByText("Use"));
     await settle();
     expect(posts()).toHaveLength(1);
