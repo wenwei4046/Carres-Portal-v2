@@ -169,7 +169,12 @@ export default function ChartOfAccounts() {
 
   const accounts = useMemo(() => query.data?.accounts ?? [], [query.data]);
   const sections = useMemo(() => query.data?.sections ?? [], [query.data]);
-  const moneyHeading = query.data?.roles?.MONEY_ACCOUNTS_HEADING;
+  /* The headings that hold money accounts only: banks and cash (310-0000) and,
+     since 0693, card and online holding (315-0000). Read by role. */
+  const moneyHeadings = useMemo(
+    () => [query.data?.roles?.MONEY_ACCOUNTS_HEADING, query.data?.roles?.CLEARING_ACCOUNTS_HEADING].filter((c): c is string => !!c),
+    [query.data],
+  );
   const moneyAccounts = useMemo(() => new Set(query.data?.money_accounts ?? []), [query.data]);
   const rows = useMemo(
     () => chartBySection(accounts, sections, { showRetired, folded, notActive }),
@@ -363,7 +368,7 @@ export default function ChartOfAccounts() {
           startWithRetire={editing.retire}
           accounts={accounts}
           sections={sections}
-          moneyHeading={moneyHeading}
+          moneyHeadings={moneyHeadings}
           moneyAccounts={moneyAccounts}
           onClose={() => setEditing(null)}
         />
@@ -373,7 +378,7 @@ export default function ChartOfAccounts() {
         <MoneyAccountModal key={moneyEditing?.code ?? "new"} account={moneyEditing} onClose={() => setMoneyEditing(undefined)} />
       )}
       {adding && (
-        <AddAccountModal accounts={accounts} sections={sections} moneyHeading={moneyHeading} onClose={() => setAdding(false)} />
+        <AddAccountModal accounts={accounts} sections={sections} moneyHeadings={moneyHeadings} onClose={() => setAdding(false)} />
       )}
     </ListPageShell>
   );
@@ -390,18 +395,19 @@ function upFrom(code: string | null, accounts: readonly LedgerAccount[]): string
 /**
  * The headings an account may sit under in `section`: headings in use of that
  * section, never the account itself or a heading inside it (gl_account_move),
- * and inside the bank and cash heading only when the account and everything
- * under it are bank and cash accounts (0580). `account` null = a new account,
- * which never goes there: bank and cash accounts are added with Add a money account.
+ * and inside a money heading (bank and cash, or card and online holding, 0693)
+ * only when the account and everything under it are money accounts (0580).
+ * `account` null = a new account, which never goes there: money accounts are
+ * added with Add a money account.
  */
 export function headingsIn(
   section: string,
   account: LedgerAccount | null,
   accounts: readonly LedgerAccount[],
-  money: { heading: string | undefined; accounts: ReadonlySet<string> },
+  money: { headings: readonly string[]; accounts: ReadonlySet<string> },
 ): LedgerAccount[] {
   const inside = (h: LedgerAccount) => !!account && upFrom(h.code, accounts).includes(account.code);
-  const inMoney = (code: string) => !!money.heading && upFrom(code, accounts).includes(money.heading);
+  const inMoney = (code: string) => upFrom(code, accounts).some((c) => money.headings.includes(c));
   const subtree = account ? accounts.filter((x) => upFrom(x.code, accounts).includes(account.code)) : [];
   const allMoney = subtree.length > 0 && subtree.every((x) => x.is_header || money.accounts.has(x.code));
   return accounts
@@ -445,7 +451,7 @@ function AccountModal({
   startWithRetire,
   accounts,
   sections,
-  moneyHeading,
+  moneyHeadings,
   moneyAccounts,
   onClose,
 }: {
@@ -453,7 +459,7 @@ function AccountModal({
   startWithRetire: boolean;
   accounts: readonly LedgerAccount[];
   sections: readonly LedgerSection[];
-  moneyHeading: string | undefined;
+  moneyHeadings: readonly string[];
   moneyAccounts: ReadonlySet<string>;
   onClose: () => void;
 }) {
@@ -471,7 +477,7 @@ function AccountModal({
   const sectionOptions = sections
     .filter((s) => s.kind === account.kind)
     .map((s) => ({ value: s.section, label: s.section }));
-  const headings = section ? headingsIn(section, account, accounts, { heading: moneyHeading, accounts: moneyAccounts }) : [];
+  const headings = section ? headingsIn(section, account, accounts, { headings: moneyHeadings, accounts: moneyAccounts }) : [];
   const underOptions = [
     // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0656).
     { value: TOP_OF_SECTION, label: "Top of the section" },
@@ -594,18 +600,18 @@ function AccountModal({
 /**
  * Add an account, or a heading, in one of AutoCount's sections (0656): at the
  * top of the section or under one of its headings. The kind follows the
- * section. Bank and cash accounts are added with Add a money account, so the
- * bank and cash heading is never offered.
+ * section. Money accounts are added with Add a money account, so neither money
+ * heading (bank and cash, card and online holding) is offered.
  */
 function AddAccountModal({
   accounts,
   sections,
-  moneyHeading,
+  moneyHeadings,
   onClose,
 }: {
   accounts: readonly LedgerAccount[];
   sections: readonly LedgerSection[];
-  moneyHeading: string | undefined;
+  moneyHeadings: readonly string[];
   onClose: () => void;
 }) {
   const add = useAddAccountInSection();
@@ -615,7 +621,7 @@ function AddAccountModal({
   const [name, setName] = useState("");
   const [isHeading, setIsHeading] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
-  const headings = section ? headingsIn(section, null, accounts, { heading: moneyHeading, accounts: new Set() }) : [];
+  const headings = section ? headingsIn(section, null, accounts, { headings: moneyHeadings, accounts: new Set() }) : [];
   const gap = accountSaveGap({ section, code, name, isHeading });
 
   const submit = () => {
