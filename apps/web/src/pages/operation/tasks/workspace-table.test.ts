@@ -73,12 +73,13 @@ describe("a row of the table", () => {
       due: "Tue, 29 Sep", dueSub: null, title: "Ask TEST Supplier A when the goods will arrive", record: "Purchasing · PO-261001-9001",
       contact: "TEST Supplier A", contactSub: null, lastContact: null, owner: "TEST · Staff A", status: "4 days late", tone: "warn",
     });
-    expect(rows[2]).toMatchObject({ due: "Today", status: "To do", tone: "neutral" });
+    /* A date, never a relative word. */
+    expect(rows[2]).toMatchObject({ due: "Mon, 5 Oct", status: "To do", tone: "neutral" });
     expect(rows[3]).toMatchObject({ due: "No date", record: "Sales Orders · SO-9106", contact: "TEST customer D" });
   });
 
   it("a purchase batch is named by its page and its cut-off, never by a key; its contact is its suppliers", () => {
-    expect(table().rows[1]).toMatchObject({ due: "Today", dueSub: "11:00 AM", record: "SO Batch Purchase", contact: "2 suppliers", status: "Cut-off passed", tone: "warn" });
+    expect(table().rows[1]).toMatchObject({ due: "Mon, 5 Oct", dueSub: "11:00 AM", record: "SO Batch Purchase", contact: "2 suppliers", status: "Cut-off passed", tone: "warn" });
   });
 
   it("Waiting: who was asked, how and when; a passed answer day is back in To do and says so", () => {

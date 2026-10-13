@@ -158,7 +158,7 @@ function PoDutyTaskPanel({ item, host }: { item: WorkRow; host: WorkPanelHost })
 const ORDER_KINDS = new Set(["sales_order", "delivery_scope"]);
 
 /**
- * Delivery's two acts that are done in place (Workspace §5.10 A7 registry):
+ * Delivery's two acts that are done in place (Workspace §5.10 "Acts done in place"):
  * the task's one button opens Delivery's OWN form, the same component the
  * Delivery page mounts, so a save writes the same one record. The form says
  * its own result; the task leaves the list when the Work feed closes it.

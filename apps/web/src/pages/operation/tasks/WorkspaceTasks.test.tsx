@@ -88,7 +88,7 @@ describe("Workspace: the table", () => {
     expect(screen.getAllByRole("columnheader").map((th) => th.textContent).filter(Boolean)).toEqual(["Due", "Task", "Contact", "Last contact", "Status"]);
     expect(screen.getByTestId("workspace-task-late")).toHaveTextContent("Ask TEST Supplier A when the goods will arrivePurchasing · PO-261001-9001");
     expect(screen.getByTestId("workspace-status-late")).toHaveTextContent("4 days late");
-    expect(screen.getByTestId("workspace-due-now")).toHaveTextContent("Today");
+    expect(screen.getByTestId("workspace-due-now")).toHaveTextContent("Mon, 5 Oct");
     expect(screen.getByTestId("workspace-last-now")).toHaveTextContent("Not recorded");
     /* The Module rail counts the chosen tab and sums to it. */
     expect(moduleCount("all")).toBe("3");
@@ -106,6 +106,8 @@ describe("Workspace: the table", () => {
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Done 1" }));
     expect(rows()).toEqual(["d1"]);
     expect(screen.getByTestId("workspace-status-d1")).toHaveTextContent("Done");
+    /* On Done the first column is when the work was finished, and says so. */
+    expect(screen.getAllByRole("columnheader").map((th) => th.textContent).filter(Boolean)[0]).toBe("Done");
   });
 
   it("a module narrows the rows and changes no number", () => {
@@ -121,7 +123,7 @@ describe("Workspace: the table", () => {
   it("Team Work lists everyone's work and says whose each is", () => {
     mount("/operation?tab=work&scope=team");
     expect(rows()).toEqual(["late", "now", "theirs", "call"]);
-    expect(screen.getAllByRole("columnheader").map((th) => th.textContent).filter(Boolean)).toContain("Owner");
+    expect(screen.getAllByRole("columnheader").map((th) => th.textContent).filter(Boolean)).toContain("Assigned to");
     expect(screen.getByTestId("workspace-owner-theirs")).toHaveTextContent("TEST · Staff B");
     expect(tabWords().slice(2)).toEqual(["To do 4", "Waiting 1", "Done 2"]);
   });

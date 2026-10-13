@@ -69,7 +69,7 @@ const ORDER_KINDS = new Set(["sales_order", "delivery_scope"]);
 /**
  * The owning modules' governed messages for the task's order or PO: recorded
  * channels, templates, `Copy message`, the WhatsApp and Email doors and the
- * message history (Workspace §5.10 A8). Opening a channel or copying text
+ * message history (Workspace §5.10). Opening a channel or copying text
  * completes nothing; Work writes no message of its own.
  */
 function TaskCommunication({ task }: { task: WorkRow }) {
@@ -124,7 +124,7 @@ export default function WorkspaceTasks() {
   const desk = useTaskDesk({ order, factsOf });
   const { task, openTask } = desk;
 
-  /* The chosen task is in the address (Workspace MASTER §5.4): a link opens
+  /* The chosen task is in the address (Workspace MASTER §5.3): a link opens
      it once the Work read has answered; from then on the address follows the
      desk, which stays the one owner of what is open. */
   const taskParam = params.get("task");
@@ -166,7 +166,7 @@ export default function WorkspaceTasks() {
 
   const columns = useMemo<DataGridColumn<WorkspaceRow>[]>(() => [
     {
-      key: "due", label: W.col.due, width: widthOf("due"), minWidth: widthOf("due"), sortable: true, wrap: true,
+      key: "due", label: tab === "done" ? W.col.done : W.col.due, width: widthOf("due"), minWidth: widthOf("due"), sortable: true, wrap: true,
       accessor: (row) => <TwoLineCell top={<span className={row.late ? "font-medium text-c-warn-fg" : undefined}>{row.due}</span>} sub={row.dueSub ?? undefined} testId={`workspace-due-${row.id}`} />,
       sortFn: (a, b) => a.sortKey.localeCompare(b.sortKey),
       exportValue: (row) => [row.due, row.dueSub].filter(Boolean).join(" "),
@@ -198,7 +198,7 @@ export default function WorkspaceTasks() {
       exportValue: (row: WorkspaceRow) => row.lastContact ?? "",
     } satisfies DataGridColumn<WorkspaceRow>] : []),
     ...(team ? [{
-      key: "owner", label: W.col.owner, width: widthOf("owner"), minWidth: widthOf("owner"), sortable: true, wrap: true, filterable: roomy,
+      key: "owner", label: tab === "done" ? W.col.doneBy : W.col.owner, width: widthOf("owner"), minWidth: widthOf("owner"), sortable: true, wrap: true, filterable: roomy,
       accessor: (row: WorkspaceRow) => <span className={`text-body ${row.owner ? "text-c-ink" : "text-c-secondary"}`} data-testid={`workspace-owner-${row.id}`}>{row.owner ?? W.notAssigned}</span>,
       sortFn: (a: WorkspaceRow, b: WorkspaceRow) => (a.owner ?? "").localeCompare(b.owner ?? ""),
       filterValue: (row: WorkspaceRow) => row.owner ?? W.notAssigned,
@@ -213,7 +213,7 @@ export default function WorkspaceTasks() {
     },
     // The measured widths are numbers: the columns follow them.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [team, showContact, showLast, roomy, taskWidth, fit.fixed.join()]);
+  ], [team, tab, showContact, showLast, roomy, taskWidth, fit.fixed.join()]);
 
   const failedBanner = (error || refreshFailed || unhealthySources.length > 0) ? (
     <div role="alert" className="flex items-start gap-2 rounded-lg bg-c-err-bg px-3 py-2 text-meta text-c-err-fg" data-testid="workspace-failed">
@@ -259,7 +259,7 @@ export default function WorkspaceTasks() {
                     className={`flex h-[30px] w-full items-center gap-2 rounded-lg px-2 text-left text-body outline-none focus-visible:[outline:var(--c-focus)] ${on ? "bg-c-select-bg font-medium text-c-select-fg" : "text-c-ink hover:bg-c-hover"}`}>
                     <MIcon name={row.icon} size={18} className={on ? "shrink-0" : "shrink-0 text-c-secondary"} />
                     <span className="min-w-0 flex-1 truncate">{row.word}</span>
-                    {/* Loading or failed never prints 0 (Workspace §5.7). */}
+                    {/* Loading or failed never prints 0 (Workspace §5.4). */}
                     <span className="tabular-nums" data-testid="workspace-module-count">{row.count ?? ""}</span>
                   </button>
                 </li>
@@ -288,6 +288,7 @@ export default function WorkspaceTasks() {
       groupBanner={false}
       isLoading={!hasData && !error}
       emptyMessage={emptyWord(tab, chosen === today)}
+      noMatchMessage={W.noMatch}
       exportName="Workspace"
       onRowClick={(row) => { if (row.work) openTask(row.work); }}
       statusSummary={(filtered) => <span className="block" data-testid="workspace-footer">{filtered.length === table.rows.length ? W.footer(table.rows.length) : `${filtered.length} of ${W.footer(table.rows.length)}`}</span>}

@@ -317,6 +317,11 @@ Work deep-links to the same collection workspace the Monitor row opens (`/financ
 
 ### Payment inside Work — owner ruling 2026-09-25 · APPROVED / LOCKED (composition), NOT BUILT
 
+**FACT, 13 Oct 2026:** the Work page this composition was drawn for was replaced by the Workspace
+task table and the one task view (Workspace MASTER §5.10, owner's round 3 brief). The business
+rules below stand. Where they sit in the task view is not designed, so the composition named in
+this heading is no longer a drawing to build from.
+
 Staff finish collection from Work OR from the Monitor; both open the same Work item, the same
 Payment components and the same completion fact (`Balance due` = RM 0). Work's standard right
 panel (`../workspace/MASTER.md` §5.10) is not changed; Payment occupies exactly three places in it,

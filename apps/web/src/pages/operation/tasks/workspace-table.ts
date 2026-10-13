@@ -7,8 +7,8 @@
  * row, so the Workspace's three numbers and the Tasks panel's three numbers
  * are the same arithmetic, never two that happen to agree (Law D).
  *
- *   Due            `Today` · the date · `No date`; a purchase batch adds its
- *                  cut-off time
+ *   Due            the date · `No date`; a purchase batch adds its cut-off
+ *                  time. On `Done` the column is `Done`: when it was finished
  *   Task           the task, in its list card's own words, over page · record
  *   Contact        who is asked (a purchase batch: its suppliers), and how
  *                  once a request is recorded
@@ -31,11 +31,14 @@ import type { WorkRow } from "../use-open-work";
 import { TASK_CARD_WORDS, doneCard, doneOn, doneOnDay, taskCard, todoOn, waitingRows, type TaskTab } from "./task-cards";
 import { TASK_MODULE_WORD, type PoWindowFacts } from "./tasks-model";
 
-/** The words. COPY-STANDARD "The Workspace page". */
+/** The words. COPY-STANDARD "The Workspace page words". */
 export const WORKSPACE_WORDS = {
-  col: { due: "Due", task: "Task", contact: "Contact", lastContact: "Last contact", owner: "Owner", status: "Status" },
-  today: "Today",
+  /* `Assigned to` is the Portal's word for who is responsible now (Workspace
+     MASTER §3); on `Done` the first column is when the work was finished and
+     the person column is who recorded it. */
+  col: { due: "Due", done: "Done", task: "Task", contact: "Contact", lastContact: "Last contact", owner: "Assigned to", doneBy: "Completed by", status: "Status" },
   noDate: "No date",
+  noMatch: "No work matches these filters",
   notRecorded: "Not recorded",
   notAssigned: "Not assigned",
   broken: "Broken commitment",
@@ -76,7 +79,7 @@ export interface WorkspaceRow {
   sortKey: string;
 }
 
-function openRow(row: WorkRow, today: string, facts: PoWindowFacts | null): WorkspaceRow {
+function openRow(row: WorkRow, facts: PoWindowFacts | null): WorkspaceRow {
   const card = taskCard(row, facts);
   const lifecycle = workLifecycleOrToDo(row.source);
   const isBatch = row.source.object.kind === "po_window";
@@ -93,7 +96,8 @@ function openRow(row: WorkRow, today: string, facts: PoWindowFacts | null): Work
     id: row.id,
     module: row.module,
     work: row,
-    due: row.dueIso === null ? W.noDate : row.dueIso === today ? W.today : fmtDate(row.dueIso),
+    /* A date, never a relative word (COPY "NO RELATIVE DATE WORDS"). */
+    due: row.dueIso === null ? W.noDate : fmtDate(row.dueIso),
     dueSub: window ? poWindowTimeWord(window.time) : null,
     title: card.title,
     record: isBatch ? "SO Batch Purchase" : `${TASK_MODULE_WORD[row.module]} · ${row.source.object.label}`,
@@ -161,7 +165,7 @@ export function workspaceTable(input: {
   const todo = todoOn(scoped, today, chosen);
   const waiting = waitingRows(scoped);
   const done = input.team ? doneOnDay(completed, chosen) : doneOn(completed, input.doneBy, chosen);
-  const open = (rows: readonly WorkRow[]) => rows.map((row) => openRow(row, today, factsOf(row)))
+  const open = (rows: readonly WorkRow[]) => rows.map((row) => openRow(row, factsOf(row)))
     .sort((a, b) => Number(b.late) - Number(a.late) || a.sortKey.localeCompare(b.sortKey));
   const tabRows = tab === "todo" ? open(todo) : tab === "waiting" ? open(waiting) : done.map(doneRow);
   const byModule = new Map<OperationWorkModule, number>();

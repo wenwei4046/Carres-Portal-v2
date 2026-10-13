@@ -541,6 +541,12 @@ time, recorded time and original evidence.
 A logistics company WITHOUT a Portal login answers one delivery through one link. NETS keeps its
 individual-login portal (§5.4) and never gets a link.
 
+**FACT, measured 13 Oct 2026:** the rules, the storage and the API below are built, but no Portal
+screen draws the Operation-side card that offers `Create link` · `Copy link` · `Revoke link`
+(`work/LogisticsCard.tsx` has no screen that mounts it, and had none before the Workspace page was
+rebuilt that day). Until that card has a place (Workspace MASTER §5.9), Operation cannot make or
+revoke a link from the Portal.
+
 ```
 ONE active link per delivery scope (order, leg). Active shows `Copy link` · `Revoke link`;
 none or revoked shows `Create link`. A new link is an explicit act after a revoke; a change of
