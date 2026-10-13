@@ -96,6 +96,11 @@ describe("a row of the table", () => {
     expect(team.counts.done).toBe(2);
   });
 
+  it("a broken commitment is the status, before lateness", () => {
+    expect(table({ scoped: [row({ id: "b", dueIso: "2026-09-29", timingBucket: "overdue" }, { broken: true, timing: { missedAge: { state: "counted", workingDays: 4 } } })] }).rows[0])
+      .toMatchObject({ status: "Broken commitment", tone: "warn", late: true });
+  });
+
   it("nobody assigned: no owner is invented", () => {
     expect(table({ scoped: [row({ id: "x" }, { owner: { acting: null } })] }).rows[0]!.owner).toBeNull();
   });

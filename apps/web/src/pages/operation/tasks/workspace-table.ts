@@ -13,8 +13,8 @@
  *   Contact        who is asked (a purchase batch: its suppliers), and how
  *                  once a request is recorded
  *   Last contact   the request or its answer day, from the Work record
- *   Status         `{n} days late` · `passed` (amber) · `To do` · `Waiting` ·
- *                  `Done`
+ *   Status         `Broken commitment` · `{n} days late` · `Cut-off passed`
+ *                  (amber) · `To do` · `Waiting` · `Done`
  *
  * The Module rail counts the rows of the chosen tab: its rows sum to the tab.
  */
@@ -38,6 +38,7 @@ export const WORKSPACE_WORDS = {
   noDate: "No date",
   notRecorded: "Not recorded",
   notAssigned: "Not assigned",
+  broken: "Broken commitment",
   asked: (date: string) => `Asked ${date}`,
   noAnswerBy: (date: string) => `No answer by ${date}`,
   answered: (date: string) => `Answer recorded ${date}`,
@@ -101,8 +102,9 @@ function openRow(row: WorkRow, today: string, facts: PoWindowFacts | null): Work
     contactSub: row.recipient && lifecycle.channel ? CHANNEL_WORD[lifecycle.channel] : null,
     lastContact,
     owner: row.source.owner.acting?.name ?? null,
-    status: late ? lateWord : lifecycle.state === "waiting" ? TASK_CARD_WORDS.tab.waiting : TASK_CARD_WORDS.tab.todo,
-    tone: late ? "warn" : "neutral",
+    /* A broken commitment is said before lateness: it is the reason to act. */
+    status: row.source.broken ? W.broken : late ? lateWord : lifecycle.state === "waiting" ? TASK_CARD_WORDS.tab.waiting : TASK_CARD_WORDS.tab.todo,
+    tone: row.source.broken || late ? "warn" : "neutral",
     late,
     sortKey: card.sortKey,
   };

@@ -28,6 +28,7 @@ import TwoLineCell from "@/components/register/TwoLineCell";
 import { fmtDate } from "@/lib/fmt-date";
 import { useShellTasks } from "../components/ShellTasks";
 import { fitColumns } from "../so-batch/by-supplier";
+import WorkCommunication, { type CommParty } from "../work/WorkCommunication";
 import { useOpenWorkSet, type WorkRow } from "../use-open-work";
 import { sameWeekday } from "./TasksArea";
 import { TaskOpenContext } from "./TaskFrame";
@@ -57,6 +58,32 @@ const TONE: Record<WorkspaceTone, string> = {
   neutral: "bg-c-info-bg text-c-info-fg",
   ok: "bg-c-ok-bg text-c-ok-fg",
 };
+
+/** Who a task's message usually goes to: the tab the Communication card opens on. */
+const PARTY_OF: Record<OperationWorkModule, CommParty> = {
+  purchasing: "supplier", receiving: "warehouse", delivery: "logistics", orders: "customer", payment: "customer", issue_tracker: "customer",
+};
+/** A task about one order by its id (`operation/work.ts`). */
+const ORDER_KINDS = new Set(["sales_order", "delivery_scope"]);
+
+/**
+ * The owning modules' governed messages for the task's order or PO: recorded
+ * channels, templates, `Copy message`, the WhatsApp and Email doors and the
+ * message history (Workspace §5.10 A8). Opening a channel or copying text
+ * completes nothing; Work writes no message of its own.
+ */
+function TaskCommunication({ task }: { task: WorkRow }) {
+  const [party, setParty] = useState<CommParty>(PARTY_OF[task.module]);
+  const kind = task.source.object.kind;
+  const orderId = ORDER_KINDS.has(kind) ? task.source.object.id : null;
+  const supplierName = kind === "purchase_order" ? task.recipient : null;
+  if (!orderId && !supplierName) return null;
+  return (
+    <section className="mx-3 mb-3 flex min-h-0 flex-col overflow-hidden rounded-lg border border-c-card-border bg-white" data-testid="workspace-communication">
+      <WorkCommunication orderId={orderId} supplierName={supplierName} party={party} onParty={setParty} sendAct={false} />
+    </section>
+  );
+}
 
 function StatusPill({ row }: { row: WorkspaceRow }) {
   return <span className={`inline-flex max-w-full items-center whitespace-nowrap rounded-full px-2 py-0.5 text-meta font-medium ${TONE[row.tone]}`} data-tone={row.tone}>{row.status}</span>;
@@ -298,6 +325,7 @@ export default function WorkspaceTasks() {
         </div>
         <div className="mx-auto w-full max-w-[720px]">
           <TaskOpenContext.Provider value={desk.opened}>{panelFor(task, desk.host)}</TaskOpenContext.Provider>
+          <TaskCommunication key={task.id} task={task} />
         </div>
       </div>
     </div>
