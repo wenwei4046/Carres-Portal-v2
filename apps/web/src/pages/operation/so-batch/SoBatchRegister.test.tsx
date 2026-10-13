@@ -378,6 +378,12 @@ function pickViewWhileTicked(name: string) {
   pickView(name);
 }
 
+/** `Purchase Orders` is in the ⋮ menu (the toolbar keeps one line at 1025). */
+function purchaseOrdersItem(): HTMLElement {
+  fireEvent.keyDown(screen.getByRole("button", { name: "Page tools" }), { key: "Enter" });
+  return screen.getByRole("menuitem", { name: "Purchase Orders" });
+}
+
 /** The selection bar's buttons by their words; the small view button has none. */
 const barButtons = () => within(screen.getByTestId("selection-bar")).getAllByRole("button")
   .filter((button) => button.getAttribute("data-testid") !== "so-batch-view").map((button) => button.textContent);
@@ -651,8 +657,9 @@ describe("By supplier view", () => {
 
 it("does not recover POs from an unfinished Register load", () => {
   renderRegister({ readyStockPriority: "customer_delivery" }, false, true);
-  const pos = screen.getByRole("button", { name: "Purchase Orders" });
-  expect(pos).toBeDisabled();
+  expect(screen.queryByRole("button", { name: "Purchase Orders" })).toBeNull();
+  const pos = purchaseOrdersItem();
+  expect(pos).toHaveAttribute("aria-disabled", "true");
   fireEvent.click(pos);
   expect(apiFetch).not.toHaveBeenCalled();
   expect(onOpenPurchaseOrders).not.toHaveBeenCalled();
@@ -675,7 +682,7 @@ it("recovers only visible linked POs for supplier preparation after a fresh moun
   renderRegister({ registerRows: [ORDER_O3, ORDER_O5] });
   searchFor("ANNE");
   await waitFor(() => expect(screen.queryByTestId("so-batch-row-o5")).toBeNull());
-  fireEvent.click(screen.getByRole("button", { name: /^Purchase Orders$/ }));
+  fireEvent.click(purchaseOrdersItem());
   expect(onOpenPurchaseOrders).toHaveBeenCalledWith(["PO-20260820-4827"]);
   expect(apiFetch.mock.calls.some(([path]) => String(path).includes("issue-batch"))).toBe(false);
 });
@@ -3480,15 +3487,15 @@ describe("By sales order — To buy · Ordered · All (owner 13 Oct 2026, round 
   it("`Purchase Orders` opens the POs of the orders the tab is showing", () => {
     renderOn("buy");
     const opened = () => [...(onOpenPurchaseOrders.mock.calls.at(-1)![0] as string[])].sort();
-    fireEvent.click(screen.getByTestId("so-batch-open-pos"));
+    fireEvent.click(purchaseOrdersItem());
     /* `To buy`: o3 is the one listed order with a PO. */
     expect(opened()).toEqual(["PO-20260820-4827"]);
     press("All");
-    fireEvent.click(screen.getByTestId("so-batch-open-pos"));
+    fireEvent.click(purchaseOrdersItem());
     expect(opened()).toEqual(["PO-20260820-1111", "PO-20260820-4827", "PO-20260821-2222", "PO-20260822-3333"]);
     /* The rail narrows the same scope. */
     fireEvent.change(screen.getByTestId("so-batch-supplier-select"), { target: { value: "Ohana" } });
-    fireEvent.click(screen.getByTestId("so-batch-open-pos"));
+    fireEvent.click(purchaseOrdersItem());
     expect(opened()).toEqual(["PO-20260820-1111", "PO-20260821-2222"]);
     expect(onOpenPurchaseOrders).toHaveBeenCalledTimes(3);
   });
