@@ -37,6 +37,13 @@ const TOP_OF: Record<string, string> = { ASSET: "0000", LIABILITY: "2000", EXPEN
 vi.mock("@/lib/api", () => ({
   apiFetch: vi.fn(async (path: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
+    // 0692: the money accounts, marked on the chart; the window opens from their rows.
+    if (method === "GET" && path.includes("money-accounts")) {
+      return [
+        { code: "310-1000", name: "ALLIANCE BANK", money_kind: "BANK", is_active: true, is_card_account: false },
+        { code: "310-2000", name: "HONG LEONG BANK", money_kind: "BANK", is_active: true, is_card_account: false },
+      ];
+    }
     if (method === "GET") {
       return {
         go_live_on: "2026-09-10",
@@ -182,7 +189,7 @@ describe("Chart of accounts — AutoCount's sections (0656)", () => {
     show();
     await ready();
     expect(codesOnScreen()).not.toContain("1230");
-    fireEvent.click(screen.getByLabelText("Show retired accounts"));
+    fireEvent.click(screen.getByLabelText("Show not active"));
     await waitFor(() => expect(codesOnScreen()).toContain("1230"));
     expect(within(row("1230")).getByText("Retired")).toBeInTheDocument();
   });
@@ -192,17 +199,37 @@ describe("Chart of accounts — edit and retire from the row (0656)", () => {
   it("the edit icon opens the account; Save is one call with its name, number, section and heading", async () => {
     show();
     await ready();
-    fireEvent.click(screen.getByTestId("chart-edit-310-1000"));
+    fireEvent.click(screen.getByTestId("chart-edit-200-2000"));
     const dialog = await screen.findByRole("dialog");
-    fireEvent.change(within(dialog).getByLabelText(/^Name/), { target: { value: " ALLIANCE BANK BERHAD " } });
+    fireEvent.change(within(dialog).getByLabelText(/^Name/), { target: { value: " OFFICE EQUIPMENT AND FURNITURE " } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(net.calls).toHaveLength(1));
     expect(net.calls[0]).toEqual({
       method: "PUT",
-      path: "/api/finance/ledger/accounts/310-1000",
-      body: { name: "ALLIANCE BANK BERHAD", code: "310-1000", section: "CURRENT ASSETS", under: "310-0000" },
+      path: "/api/finance/ledger/accounts/200-2000",
+      body: { name: "OFFICE EQUIPMENT AND FURNITURE", code: "200-2000", section: "FIXED ASSETS", under: "200-0000" },
     });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("a money account reads its kind in words and opens its own window: name, Active, number (0692)", async () => {
+    show();
+    await ready();
+    expect(await within(row("310-1000")).findAllByText("Bank account")).toHaveLength(1);
+    expect(within(row("310-1000")).queryByText("SBK")).toBeNull();
+    fireEvent.click(screen.getByTestId("chart-edit-310-1000"));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Money account")).toBeInTheDocument();
+    expect(within(dialog).getByRole("checkbox", { name: "Active" })).toBeChecked();
+    expect(within(dialog).queryByLabelText(/Section/)).toBeNull();
+  });
+
+  it("Add a money account opens the money account's own window (0692)", async () => {
+    show();
+    await ready();
+    fireEvent.click(await screen.findByRole("button", { name: "Add a money account" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("combobox", { name: /Kind/ })).toBeInTheDocument();
   });
 
   it("a row click opens the same window; Top of the section sends no heading", async () => {
@@ -269,7 +296,7 @@ describe("Chart of accounts — edit and retire from the row (0656)", () => {
   it("brings a retired account back from its window", async () => {
     show();
     await ready();
-    fireEvent.click(screen.getByLabelText("Show retired accounts"));
+    fireEvent.click(screen.getByLabelText("Show not active"));
     await waitFor(() => expect(row("1230")).toBeTruthy());
     expect(screen.queryByTestId("chart-retire-1230")).toBeNull();
     fireEvent.click(screen.getByTestId("chart-edit-1230"));
@@ -303,7 +330,7 @@ describe("Chart of accounts — Add account in a section (0656)", () => {
     await waitFor(() => expect(codesOnScreen()).toContain("900-C010"));
   });
 
-  it("never offers the bank and cash heading: those accounts are added in Money accounts", async () => {
+  it("never offers the bank and cash heading: those accounts are added with Add a money account", async () => {
     show();
     await ready();
     fireEvent.click(screen.getByRole("button", { name: "Add account" }));

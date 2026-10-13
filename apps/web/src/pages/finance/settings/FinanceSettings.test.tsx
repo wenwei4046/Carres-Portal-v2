@@ -84,7 +84,11 @@ const CHART = [
   acc("2000", "Liabilities", null, true),
   acc("2100", "Payables", "2000", true),
   acc("1100", "Bank and cash", null, true, "ASSET"),
+  // 0692: the money accounts are rows of the chart.
+  acc("1110", "Cash on hand", "1100", false, "ASSET"),
   acc("1121", "Public Bank", "1100", false, "ASSET"),
+  acc("1124", "RHB", "1100", false, "ASSET"),
+  acc("1131", "GHL", "1100", false, "ASSET"),
 ];
 
 beforeEach(() => {
@@ -100,8 +104,9 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-/* Money accounts is the second tab since Chew's 2026-10-12 order, at `?tab=money`. */
-function show(path = "/finance/settings?tab=money") {
+/* 0692 (Chew 2026-10-13): the money accounts are kept on Chart of accounts,
+   the first tab, at the plain address. */
+function show(path = "/finance/settings") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
@@ -114,12 +119,13 @@ function show(path = "/finance/settings?tab=money") {
 
 const writes = () => net.calls.filter((c) => !c.key.startsWith("GET"));
 
-describe("Finance Settings — the money accounts", () => {
-  it("lists the money accounts in use with their kind; Show not active adds the rest (Chew 2026-10-12)", async () => {
+describe("Finance Settings — the money accounts, on Chart of accounts (0692)", () => {
+  it("marks each money account with its kind under Type; Show not active adds the rest", async () => {
     show();
     expect(screen.getByTestId("finance-settings-destination-header")).toHaveTextContent("Finance Settings");
     await screen.findByText("Public Bank");
-    expect(screen.getByText("Card and online holding")).toBeInTheDocument();
+    // The kind reads under Type, once a row.
+    expect(await screen.findAllByText("Card and online holding")).toHaveLength(1);
     expect(screen.getAllByText("Bank account")).toHaveLength(1);
     expect(screen.queryByText("RHB")).not.toBeInTheDocument();
     expect(screen.queryByText("Not active")).not.toBeInTheDocument();
@@ -132,12 +138,13 @@ describe("Finance Settings — the money accounts", () => {
     expect(screen.queryByText("Bank transfer")).not.toBeInTheDocument();
   });
 
-  it("opens on Chart of accounts, the first tab; Money accounts is second (Chew 2026-10-12)", async () => {
-    show("/finance/settings");
+  it("has no Money accounts tab: an old link lands on Chart of accounts, which adds them (Chew 2026-10-13)", async () => {
+    show("/finance/settings?tab=money");
     const tabs = screen.getAllByRole("tab").map((t) => t.textContent);
-    expect(tabs.slice(0, 2)).toEqual(["Chart of accounts", "Money accounts"]);
+    expect(tabs).not.toContain("Money accounts");
+    expect(tabs[0]).toBe("Chart of accounts");
     expect(screen.getByRole("tab", { name: "Chart of accounts" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.queryByRole("button", { name: "Add a money account" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Add a money account" })).toBeInTheDocument();
   });
 
   it("adds a bank: the name and the kind, never a code", async () => {
@@ -182,7 +189,7 @@ describe("Finance Settings — the money accounts", () => {
   it("a list that could not be read says so, never an empty list", async () => {
     net.failList = true;
     show();
-    expect(await screen.findByText("The accounts could not be loaded. Try again.")).toBeInTheDocument();
+    expect(await screen.findByText("The money accounts could not be loaded. Try again.")).toBeInTheDocument();
   });
 });
 
@@ -194,13 +201,12 @@ describe("Finance Settings — a money account's number, changed on its own form
   };
   const numberField = (dialog: HTMLElement) => within(dialog).getByRole("textbox", { name: /Number/ });
 
-  it("renumbers through the chart's own door, and the list, the payout banks and the chart read the new number", async () => {
+  it("renumbers through the chart's own door, and the payout banks and the chart read the new number", async () => {
     // The chart is read first and kept, so only a refresh after the save can
     // put the new number on it.
-    show("/finance/settings?tab=chart");
+    show();
     const chartRow = (code: string) => document.querySelector(`tr[data-row-key="${code}"]`);
     await waitFor(() => expect(chartRow("1121")).toHaveTextContent("Public Bank"));
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Money accounts" }), { button: 0, ctrlKey: false });
 
     const dialog = await openPublicBank();
     expect(numberField(dialog)).toHaveValue("1121");
@@ -211,7 +217,7 @@ describe("Finance Settings — a money account's number, changed on its own form
     // One write, the Chart of accounts form's own request; the letter goes up in capitals.
     expect(writes()).toEqual([{ key: CHART_DOOR, body: { name: "Public Bank", code: "310-A000" } }]);
 
-    expect(await screen.findByText("310-A000")).toBeInTheDocument();
+    await waitFor(() => expect(chartRow("310-A000")).toHaveTextContent("Public Bank"));
     // The payout banks live on their own tab.
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Card payout banks" }), { button: 0, ctrlKey: false });
     await waitFor(() =>
