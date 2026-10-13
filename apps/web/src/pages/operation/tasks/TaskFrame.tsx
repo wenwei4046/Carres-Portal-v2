@@ -21,6 +21,7 @@ import MIcon from "@/components/carres/MIcon";
 import TaskView, { type TaskViewFact } from "@/components/kit/TaskView";
 import type { WorkRow } from "../use-open-work";
 import TaskFiles from "./TaskFiles";
+import TaskRequest, { canRecordRequest } from "./TaskRequest";
 import TaskRoute, { type TaskOrder } from "./TaskRoute";
 import type { TaskCard } from "./task-cards";
 import {
@@ -29,7 +30,12 @@ import {
 } from "./task-view";
 
 /** The opened task, as the Tasks area lists it. */
-export const TaskOpenContext = createContext<{ row: WorkRow; card: TaskCard } | null>(null);
+export const TaskOpenContext = createContext<{
+  row: WorkRow;
+  card: TaskCard;
+  /** The desk's way to say a result and return to the list (`WorkPanelHost.result`). */
+  result?: (words: string) => void;
+} | null>(null);
 
 function History({ events }: { events: readonly TaskHistoryEvent[] }) {
   if (events.length === 0) return <p className="text-body text-c-secondary" data-testid="task-history-none">{W.noHistory}</p>;
@@ -96,9 +102,16 @@ export default function TaskFrame({ head, steps, facts = [], orders = [], salesO
   const openOrder = (orderId: string) => navigate(`/operation/orders/so/${orderId}`);
   const destination = shown.destination;
 
+  /* `Record as sent`: only for the opened open work of the Tasks area, where
+     the desk can say the result and return to the list. */
+  const request = opened?.result && canRecordRequest(opened.row)
+    ? <TaskRequest key={opened.row.id} row={opened.row} onRecorded={opened.result} />
+    : null;
+
   return (
     <TaskView
       data-testid={testId}
+      afterFacts={request}
       title={shown.title}
       moduleIcon={shown.moduleIcon}
       page={shown.page}

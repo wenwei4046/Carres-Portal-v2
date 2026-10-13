@@ -3889,8 +3889,10 @@ an action line: it prints only on or after the check's own date, beside that dat
 The three-column Work page and its right panel are removed (Workspace MASTER §5.10). This table
 keeps the words of the models the task view still reads: the Order Route (`mission-route.ts`, drawn
 in the task view's `Route` tab) and the Customer and Supplier models (`customer-card.ts`,
-`supplier-card.ts`; their cards are drawn on no screen, Workspace MASTER §5.9). `Record as sent` and
-the words beside it are APPROVED / NOT BUILT. The Logistics vocabulary is the section above.
+`supplier-card.ts`; their cards are drawn on no screen, Workspace MASTER §5.9). `Record as sent` is
+drawn by the one task view (the Tasks panel words, below); `Not sent` · `Waiting for customer` ·
+`Waiting for supplier` · `No answer · Follow up today` stay APPROVED / NOT BUILT, and the built
+page says `Waiting` and `No answer by {date}`. The Logistics vocabulary is the section above.
 
 | Meaning | Use exactly | Do not use |
 |---|---|---|
@@ -5080,6 +5082,7 @@ party); this section holds the panel's frame and the card rows.
 | History | `Asked {party}` with `{channel} · Next contact {date}` · `No answer` with `No answer by {date}` · `Answer recorded` · a PO: `PO sent to supplier` with `{PO No}-V{n} · {channel}` · `{channel} opened` · `Supplier answer recorded` with `Supplier date {date}, {date}` and `Delayed` · `Supplier DO {number} recorded` · `Email · Sending not confirmed` · each with `{weekday, date} {HH:MM}` and who recorded it · `No history yet` | `sent` for opening a channel · an invented time |
 | Files | stages `Sales Order` · `Purchase Order` with `{n} Sales Orders` · `{n} Purchase Orders` when more than one · a file `{SO No}.pdf` · `{PO No}-V{n}.pdf` with its kind under it · `View {file}` · `Download {file}` · `No file yet` · `No file is recorded for this task` · `Loading PDF` · `This file could not be opened. Try again.` | `Sent and received` · `Customer not recorded` under a file |
 | A form wider than the panel, on the full surface | the act as its title and `{party} · {record}` beside it (`Record supplier answer` · `Nice Future · PO-2609-0042-V2`), then the owning module's own form with its own `Cancel` and saving button | a second `Close` or `Back` beside the form's `Cancel` · the form inside the 320 panel |
+| `Record as sent`, between the facts and the tabs | `After you asked {party}` · `Communication channel` with `WhatsApp` · `Email` · `Phone` · `In person` · the button `Record as sent` · the toast `Asked {party} · {channel} · Next contact {date}` · a refusal in the door's own sentence (`This work changed. Refresh and try again.` · `This work is no longer open.`) · a lost answer `Not recorded · Try again` | `Mark sent` · `Sent` for opening WhatsApp or copying a message · `Not now` · a free-text contact |
 | Toast after a task is saved | the owning module's own success words · `Next: {party}` when another task of the same kind waits · `Close message` | `Undo` · `Saved` with nothing after it · a green line in the panel |
 | Failure | `Tasks could not be refreshed` · `Last updated {time}` · `Could not refresh {source}` · `Try again` | a silent empty list |
 
