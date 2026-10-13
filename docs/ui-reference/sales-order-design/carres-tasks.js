@@ -18,8 +18,8 @@ window.CarresTasks = {
     try { if (localStorage.getItem(k) !== v) localStorage.setItem(k, v); if (href) localStorage.setItem(k + '.href', href); } catch (e) {}
   },
   publishDone(mod, href, rows) {
-    const k = 'carres.done.' + mod, old = (() => { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { return []; } })(), seen = new Set(old.map(r => r.t));
-    const day = new Date().toDateString(), add = (rows || []).filter(r => r && r.t && !seen.has(r.t)).map(r => ({ t: r.t, mod, href, at: new Date().toISOString(), day, by: this.ME || '' }));
+    const k = 'carres.done.' + mod, old = (() => { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { return []; } })(), seen = new Set(old.map(r => r.t + '|' + r.day));
+    const day = new Date().toDateString(), add = (rows || []).filter(r => r && r.t && !seen.has(r.t + '|' + day)).map(r => ({ t: r.t, mod, href, at: new Date().toISOString(), day, by: this.ME || '' }));
     if (add.length) try { localStorage.setItem(k, JSON.stringify([...add, ...old].slice(0, 200))); } catch (e) {}
   },
   all(prefix) {

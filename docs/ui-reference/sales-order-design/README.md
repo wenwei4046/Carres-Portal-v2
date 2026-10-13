@@ -1,4 +1,4 @@
-# Sales Order UI kit specimen · supplied 13 Oct 2026 (SO Batch round 2)
+# Sales Order UI kit specimen · supplied 13 Oct 2026 (round 3: Tasks panel, Workspace, SO Batch By sales order)
 
 > **Repository note. Read before the supplied README below.**
 >
@@ -8,34 +8,44 @@
 > mirror is `docs/ui/carres-tokens.css`.
 >
 > **Words follow `docs/COPY-STANDARD.md`. Business rules follow the module MASTERs.** Where
-> anything below, in `UX-FLOWS.md` or in `docs/Carres Layout Standard.md` differs from them,
+> anything below, in `UX-FLOWS.md`, in `docs/Carres Layout Standard.md` or in `docs/CODE-BRIEF-13-Oct-round3.md` differs from them,
 > the value here is **PROPOSAL / NOT LAW**. `docs/01-design-tokens.md` §10 lists the
 > differences and the values the package itself leaves unsettled.
 >
-> Source: the folder `design_handoff_sales_order_ui_kit` in `Sales Order (6).zip`, handed over by the owner on 13 Oct 2026
-> with `docs/CODE-FIX-13-Oct-round2.md`. It replaces the 12 Oct, 5:35 PM package completely: every kit the owner hands
+> Source: the folder `design_handoff_sales_order_ui_kit` in `Sales Order (7).zip`, handed over by the owner on 13 Oct 2026
+> with `docs/CODE-BRIEF-13-Oct-round3.md`. It replaces the earlier 13 Oct package completely: every kit the owner hands
 > over replaces the kit, and one version is kept (owner 12 Oct 2026). No colour, type or size token changed in this
-> package (`Carres UI Kit.dc.html` and `carres-theme.js` are the same files); the table and shell pages, the Purchasing
-> page and its data changed. The owner keeps the original; Git keeps the history.
+> package (`Carres UI Kit.dc.html`, `carres-theme.js` and `carres-check.js` are the same files); the shell and table pages,
+> the Purchasing page and its data, `carres-tasks.js` and two lines of the Layout Standard changed, and
+> `Workspace v3.dc.html` is new. The owner keeps the original; Git keeps the history.
+>
+> **Removed with this package (owner's brief: "delete them in the repo too").** `Workspace v2.dc.html`,
+> `Workspace My Tasks.dc.html` and the two earlier fix lists (`docs/CODE-FIX-13-Oct.md`,
+> `docs/CODE-FIX-13-Oct-round2.md`). Workspace is `Workspace v3.dc.html` only.
 >
 > **What differs from the supplied archive (this repository is public).**
 >
 > | File here | What differs from the supplied archive |
 > |---|---|
 > | `sales-test.js` | Replaces `sales-real.js`. Customer name, phone and address in all 20 orders are TEST values (`TEST customer A` to `TEST customer T`, `012-00000xx`, `Jalan TEST`). SO numbers, delivery area, postcode, dates, items, suppliers, PO numbers, balances and remarks are kept. The supplied 20 orders are the same as in the 11 Oct package |
-> | `purchasing-data.js` | Customer names in its 20 SO Batch orders are TEST values; an order that is also in `sales-test.js` keeps the same TEST customer. Supplier WhatsApp group links are TEST placeholders. The supplier emails arrive as TEST addresses |
-> | `Sales Order Outright v12.dc.html` | One line: it loads `sales-test.js`. Every other page is as supplied; `Purchasing v3.dc.html` is the only Purchasing page in the package |
-> | `screens/SO-*`, `PO-*`, `SH-01` | Retaken on 12 Oct from these pages with the TEST details, 924 × 540; `PO-*` from `Purchasing v3.dc.html`; `PO-04` is the pop-up alone. `KIT-*` are the supplied pictures |
+> | `purchasing-data.js` | Customer names in its 20 SO Batch orders are TEST values; an order that is also in `sales-test.js` keeps the same TEST customer. Supplier WhatsApp group links and supplier emails arrive as TEST values |
+> | `Sales Order Outright v12.dc.html` | One line: it loads `sales-test.js`. Every other page is as supplied; `Purchasing v3.dc.html` is the only Purchasing page and `Workspace v3.dc.html` the only Workspace page in the package |
+> | `screens/SO-*`, `PO-*`, `SH-01` | Retaken on 13 Oct from these pages with the TEST details, 924 × 540; `PO-*` from `Purchasing v3.dc.html`. `KIT-*` are the supplied pictures |
 > | `UX-FLOWS.md` | The example customer and phone are the TEST values |
-> | `docs/Carres Ops Rules.md`, `docs/Carres Handoff.md`, `CHANGES-after-*.md` | Not stored (`docs/CODE-FIX-13-Oct.md` and `docs/CODE-FIX-13-Oct-round2.md`, the owner's two fix lists for Code, are stored). The Ops Rules are the designer's business-rule notes (the module MASTERs hold the rules). The Handoff and the change notes are the design chat's own working log |
+> | `docs/Carres Ops Rules.md`, `docs/Carres Handoff.md` | Not stored (`docs/CODE-BRIEF-13-Oct-round3.md`, the owner's brief for Code, is stored). The Ops Rules are the designer's business-rule notes (the module MASTERs hold the rules). The Handoff is the design chat's own working log |
 >
 > The signed-in Portal is unaffected: it reads real records by permission and never reads
 > these files.
 >
 > Every page opens with its rows and no script error. The supplied `carres-check.js` was run on
-> 21 page states at 1025, 1164 and 1440 wide: all 21 states pass at each width, as supplied. `docs/01-design-tokens.md` §10.1 records the measurement.
+> 21 page states at 1025, 1164 and 1440 wide: all 21 states pass at each width (`SO-02` at 1164
+> reported one cut value on the first run and passed on the rerun). The package's SO Batch
+> `By sales order` (rows closed, one row open, one row ticked) and `Workspace v3.dc.html` also pass at the three widths.
+> `docs/01-design-tokens.md` §10.1 records the measurement.
 
 ---
+
+Start here: docs/CODE-BRIEF-13-Oct-round3.md
 
 # Handoff: Carres Operations Portal — Sales Order UI kit (master template)
 
