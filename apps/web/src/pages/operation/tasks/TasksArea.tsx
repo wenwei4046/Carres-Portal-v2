@@ -28,6 +28,7 @@ import {
   type SoBatchPurchaseResponse,
 } from "@carres/shared";
 import Icon from "@/components/kit/Icon";
+import MIcon from "@/components/carres/MIcon";
 import Modal from "@/components/kit/Modal";
 import Button from "@/components/kit/Button";
 import { Z_DIALOG } from "@/components/kit/overlay-layer";
@@ -244,6 +245,10 @@ export default function TasksArea({ onClose, fill = false, bare = false }: {
     </div>
   );
 
+  /* The open work of the tab the task was opened from, in the list's order. */
+  const taskOrder = useMemo(() => (tabs ? tabs[tab].groups.flatMap((group) => group.cards.flatMap((card) => (card.work ? [card.work] : []))) : []), [tabs, tab]);
+  const taskAt = task ? taskOrder.findIndex((row) => row.id === task.id) + 1 : 0;
+
   const taskView = task ? (
     <div
       className="flex min-h-0 flex-1 flex-col"
@@ -251,11 +256,29 @@ export default function TasksArea({ onClose, fill = false, bare = false }: {
       data-task={task.id}
       onInput={() => setDirty(true, task.source.object.label)}
     >
-      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-kit-slate-4 px-3">
-        <button type="button" onClick={() => guard(closeTask)} className="flex items-center gap-1.5 text-meta font-semibold text-c-ink hover:underline" data-testid="tasks-back">
+      <div className="flex h-10 shrink-0 items-center gap-1 border-b border-kit-slate-4 px-3">
+        <button type="button" onClick={() => guard(closeTask)} className="flex items-center gap-1.5 text-meta font-medium text-c-ink hover:underline" data-testid="tasks-back">
           <ArrowLeft size={14} aria-hidden />
           {TASK_CARD_WORDS.allTasks}
         </button>
+        <span className="flex-1" />
+        {/* `1 of 4` and the two arrows walk the list the task was opened from,
+            in its own order; unsaved input is asked about first. */}
+        {taskAt > 0 && taskOrder.length > 1 ? (
+          <>
+            <span className="text-meta text-c-secondary tabular-nums" data-testid="tasks-position">{TASK_CARD_WORDS.position(taskAt, taskOrder.length)}</span>
+            <button type="button" aria-label={TASK_CARD_WORDS.previousTask} title={TASK_CARD_WORDS.previousTask} disabled={taskAt <= 1}
+              onClick={() => openTask(taskOrder[taskAt - 2]!)} data-testid="tasks-previous"
+              className="grid h-7 w-7 place-items-center rounded-full text-c-secondary hover:bg-c-hover disabled:opacity-45 disabled:hover:bg-transparent">
+              <MIcon name="chevron_left" size={18} />
+            </button>
+            <button type="button" aria-label={TASK_CARD_WORDS.nextTask} title={TASK_CARD_WORDS.nextTask} disabled={taskAt >= taskOrder.length}
+              onClick={() => openTask(taskOrder[taskAt]!)} data-testid="tasks-next"
+              className="grid h-7 w-7 place-items-center rounded-full text-c-secondary hover:bg-c-hover disabled:opacity-45 disabled:hover:bg-transparent">
+              <MIcon name="chevron_right" size={18} />
+            </button>
+          </>
+        ) : null}
       </div>
       {result && result.taskId === task.id ? resultLine : null}
       <div className="min-h-0 flex-1 overflow-y-auto">{panelFor(task, host)}</div>
