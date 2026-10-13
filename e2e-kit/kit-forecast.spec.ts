@@ -9,7 +9,9 @@ import { expect, test, type Page } from "@playwright/test";
  * The page is measured at the kit's three widths with its panels where the
  * page itself puts them, then at 1164 with the Summary open and with the
  * Tasks panel open. Each state is measured with rows closed, one model open,
- * and a size ticked (the selection bar showing). Numbers, not pictures:
+ * and a size ticked (the selection bar showing). `Ordered`, where a size
+ * carries its request line, is measured at the three widths too, and
+ * `Send for approval` is walked once. Numbers, not pictures:
  *
  *   page     the page never scrolls sideways
  *   list     the list's own scroll box holds its table (0 to spare)
@@ -75,7 +77,7 @@ async function walk(page: Page, label: string) {
     if (state === "one size ticked") {
       await page.locator('[data-testid^="forecast-size-tick-"]:not([disabled])').first().click({ force: true });
       await expect(page.getByTestId("selection-bar")).toContainText("1 item selected");
-      await expect(page.getByTestId("forecast-create")).toHaveText(/Create 1 PO/);
+      await expect(page.getByTestId("forecast-review-open")).toHaveText(/Review 1 PO/);
       await page.waitForTimeout(300);
     }
     await page.mouse.move(4, 4);
@@ -125,15 +127,74 @@ test("Forecast Purchase fits 1164 with the Tasks panel open", async ({ page }) =
   await walk(page, "1164 Tasks open");
 });
 
-test("Forecast Purchase: the review lists what is ticked and writes nothing", async ({ page }) => {
+/* THE ONE WRITE (owner ruling 2026-10-14, A): `Send for approval` raises a
+   Manual Purchase Request through the existing door. The page never issues a
+   PO; the size then reads where its request stands. The preview keeps the
+   TEST requests in the page; nothing is written anywhere. */
+test("Forecast Purchase: Send for approval, then the size waits for approval", async ({ page }) => {
   await open(page, 1440);
   await page.locator('[data-testid^="forecast-select-"]:not([disabled])').first().click({ force: true });
-  await page.getByTestId("forecast-create").click();
+  await page.getByTestId("forecast-review-open").click();
   const review = page.getByRole("dialog");
   await expect(review).toContainText(/Review \d+ POs?/);
-  await expect(review.getByTestId("forecast-review-place")).toBeDisabled();
-  await expect(review.getByTestId("forecast-review-skip")).toBeDisabled();
+  await expect(review.getByTestId("forecast-review-requests")).toContainText(/Delivery Date \w{3}, \d{1,2} \w{3}/);
+  await expect(review.getByTestId("forecast-review-deliver-to")).toHaveText("TEST Warehouse");
+  await expect(review.getByTestId("forecast-review-who")).toHaveText("TEST · Approver approves. TEST · Staff A then issues the PO and sends it to the supplier.");
+  await expect(review.getByText(/Place|Issue PO|Skip|Undo/)).toHaveCount(0);
+  const send = review.getByTestId("forecast-review-send");
+  await expect(send).toHaveText("Send for approval");
+  await expect(send).toBeEnabled();
   await shot(page, "1440 · review");
-  await review.getByTestId("forecast-review-back").click();
+  await send.click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByTestId("selection-bar")).toHaveCount(0);
+
+  /* `Ordered` now holds the model: its sizes read the request, and cannot be
+     asked for again. */
+  await page.getByRole("tab", { name: "Ordered" }).click();
+  await page.locator('[data-testid^="forecast-expand-"]').first().click();
+  await expect(page.locator('[data-testid^="forecast-size-request-"]').first()).toContainText("Waiting for approval");
+  await page.mouse.move(4, 4);
+  const m = await measure(page);
+  expect(m!.listSpare, "after sending: the list scrolls sideways").toBeLessThanOrEqual(1);
+  expect(m!.cut, 'after sending: values cut with "..."').toBe(0);
+  expect(m!.lineDrift, "after sending: a size line's numbers sit under the model's").toBeLessThanOrEqual(1);
+  expect(await carresCheck(page), "after sending: carres-check.js").toEqual(PASS);
+  await shot(page, "1440 · Ordered after sending");
+});
+
+/* A request line under a size is longer than the size's name: at every width
+   it wraps inside the Model column and is never cut. */
+for (const width of WIDTHS) {
+  test(`Forecast Purchase · Ordered keeps its request lines whole at ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`${PAGE}?show=ordered`, { waitUntil: "networkidle" });
+    await page.locator(LAST).first().waitFor();
+    await page.waitForTimeout(600);
+    for (const expand of await page.locator('[data-testid^="forecast-expand-"]').all()) await expand.click();
+    await page.waitForTimeout(600);
+    await expect(page.locator('[data-testid^="forecast-size-request-"]').first()).toBeVisible();
+    await page.mouse.move(4, 4);
+    const m = await measure(page);
+    expect(m!.pageScroll, "the page scrolls sideways").toBeLessThanOrEqual(0);
+    expect(m!.listSpare, "the list scrolls sideways").toBeLessThanOrEqual(1);
+    expect(m!.cut, 'values cut with "..."').toBe(0);
+    expect(m!.lineDrift, "a size line's numbers sit under the model's").toBeLessThanOrEqual(1);
+    expect(await carresCheck(page), "carres-check.js").toEqual(PASS);
+    await shot(page, `${width} · Ordered`);
+  });
+}
+
+test("Forecast Purchase: a request cannot be sent while production days are not set", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${PAGE}?state=nolead`, { waitUntil: "networkidle" });
+  await page.locator(LAST).first().waitFor();
+  await page.waitForTimeout(600);
+  for (const box of await page.locator('[data-testid^="forecast-select-"]:not([disabled])').all()) await box.click({ force: true });
+  await page.getByTestId("forecast-review-open").click();
+  const review = page.getByRole("dialog");
+  await expect(review).toContainText("Production days are not set");
+  await expect(review).toContainText("Add production days for TEST Supplier Two · Bedframe in Settings");
+  await expect(review.getByTestId("forecast-review-send")).toBeDisabled();
+  await shot(page, "1440 · review, production days not set");
 });

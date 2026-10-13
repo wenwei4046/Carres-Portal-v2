@@ -28,7 +28,9 @@
 > `carres-tasks.js` and `purchasing-data.js` are that package's newer copies (the table gains `sortDefault`, column `l2`,
 > column `hl` and `ckTip`). `purchasing-data.js` keeps this repository's TEST customer names and TEST WhatsApp links.
 > `carres-check.js`, `carres-theme.js`, `carres-log.js` and `support.js` are the same files. Business rules are Purchasing
-> MASTER §9.14; the handoff's `Place PO`, `Undo` and supplier-by-category lines differ from it and are PROPOSAL / NOT LAW.
+> MASTER §9.14 and the owner's 14 Oct 2026 ruling (A): the page sends for approval and never issues a PO. The handoff's
+> `Create PO`, `Place PO`, `Skip this week`, `Undo`, weekly task and supplier-by-category lines differ from that and are
+> PROPOSAL / NOT LAW.
 >
 > **Removed with this package (owner's brief: "delete them in the repo too").** `Workspace v2.dc.html`,
 > `Workspace My Tasks.dc.html` and the two earlier fix lists (`docs/CODE-FIX-13-Oct.md`,

@@ -15,7 +15,7 @@ type Call = { table: string; method: string; args: unknown[] };
 
 /** A read-only stand-in for the database: each table answers with its rows,
  *  and every filter the route applies is recorded. */
-function fakeDb(tables: Record<string, unknown[] | { error: { message: string } }>, poFree: unknown[] = []) {
+function fakeDb(tables: Record<string, unknown[] | { error: { message: string } }>, poFree: unknown[] = [], duties: Record<string, string | null> = {}) {
   const calls: Call[] = [];
   const from = (table: string) => {
     let range: [number, number] | null = null;
@@ -27,13 +27,20 @@ function fakeDb(tables: Record<string, unknown[] | { error: { message: string } 
     const chain: Record<string, unknown> = {
       then: (resolve: (value: unknown) => unknown) => Promise.resolve(answer()).then(resolve),
     };
+    chain.maybeSingle = () => Promise.resolve({ data: (answer().data as unknown[] | null)?.[0] ?? null, error: answer().error });
     for (const method of ["select", "in", "eq", "is", "not", "or", "gte", "order"]) {
       chain[method] = (...args: unknown[]) => { calls.push({ table, method, args }); return chain; };
     }
     chain.range = (a: number, b: number) => { calls.push({ table, method: "range", args: [a, b] }); range = [a, b]; return chain; };
     return chain;
   };
-  return { sb: { from, rpc: vi.fn().mockResolvedValue({ data: poFree, error: null }) }, calls };
+  const rpc = vi.fn(async (name: string, args?: Record<string, unknown>) => {
+    if (name === "purchasing_po_free_units") return { data: poFree, error: null };
+    if (name === "workspace_resolve_duty") return { data: { actor_user_id: duties[String(args?.p_duty_key)] ?? null }, error: null };
+    if (name === "actor_display_names") return { data: ((args?.p_ids as string[]) ?? []).map((id) => ({ id, name: `TEST ${id}` })), error: null };
+    return { data: null, error: null };
+  });
+  return { sb: { from, rpc }, calls };
 }
 
 const MODELS = [
@@ -59,6 +66,23 @@ const ORDERS = [
   { id: "o4", placed_at: "2026-09-30T03:00:00Z", order_lines: [{ sku: "A-K", qty: 3 }, { sku: "NOT-IN-CATALOG", qty: 9 }] },
   { id: "o5", placed_at: "2026-10-13T02:00:00Z", order_lines: [{ sku: "A-K", qty: 1 }, { sku: "J-Q", qty: 2 }] },
 ];
+const REQUESTS = [
+  { id: "r1", req_no: "MPR-TEST-1", approved_at: null, sent_back_at: null, created_at: "2026-10-12T02:00:00Z" },
+  { id: "r2", req_no: "MPR-TEST-2", approved_at: "2026-10-12T05:00:00Z", sent_back_at: null, created_at: "2026-10-12T03:00:00Z" },
+];
+const DEMANDS = [
+  { request_id: "r1", sku: "A-K", qty: 3, approved_qty: null, issued_qty: 0, cancelled_at: null },
+  // Approved for 4, 1 already on its PO: 3 still to issue.
+  { request_id: "r2", sku: "A-K", qty: 5, approved_qty: 4, issued_qty: 1, cancelled_at: null },
+  { request_id: "r2", sku: "A-Q", qty: 2, approved_qty: null, issued_qty: 0, cancelled_at: "2026-10-12T06:00:00Z" },
+  { request_id: "r2", sku: "J-Q", qty: 2, approved_qty: null, issued_qty: 2, cancelled_at: null },
+];
+const DESTINATIONS = [
+  { id: "d0", name: "TEST old default", is_default: true, active: false },
+  { id: "d1", name: "TEST Warehouse", is_default: true, active: true },
+  { id: "d2", name: "TEST other", is_default: false, active: true },
+];
+const SETTINGS = [{ id: 1, order_by_buffer_days: 2, earliest_sell_days: 0, logistics_call_working_days: 1, po_days: [1, 2, 3, 4, 5], manual_purchase_min_delivery_days: 3 }];
 const UNITS = [
   { id: "u1", sku: "A-K", qty: 1 }, { id: "u2", sku: "A-K", qty: 1 }, { id: "u3", sku: "J-Q", qty: null }, { id: "u4", sku: "X-Q", qty: 1 },
 ];
@@ -95,6 +119,45 @@ describe("GET /api/operation/purchase/forecast", () => {
     expect(king.supplier).toBe("TEST supplier");
     expect(king.model).toBe("TEST model A");
     expect(king.size).toBe("King");
+  });
+
+  it("counts what open Ready Stock requests still ask for, by request and state", async () => {
+    const db = fakeDb({ product_models: MODELS, product_skus: SKUS, suppliers: SUPPLIERS, orders: ORDERS, stock_unit_register_v: UNITS,
+      purchase_requests: REQUESTS, purchase_demands: DEMANDS, purchasing_destinations: DESTINATIONS, purchasing_settings: SETTINGS });
+    const body = (await (await read(db)).json()) as ForecastPurchaseResponse;
+    const king = body.sizes.find((s) => s.sku === "A-K")!;
+    expect(king.requested).toBe(6);
+    expect(king.requests).toEqual([
+      { id: "r1", no: "MPR-TEST-1", qty: 3, state: "waiting" },
+      { id: "r2", no: "MPR-TEST-2", qty: 3, state: "ready" },
+    ]);
+    // A cancelled line and a line already on its PO ask for nothing.
+    expect(body.sizes.find((s) => s.sku === "A-Q")).toMatchObject({ requested: 0, requests: [] });
+    expect(body.sizes.find((s) => s.sku === "J-Q")).toMatchObject({ requested: 0, requests: [] });
+    // Only requests that buy extra Ready Stock and are still open are read.
+    const asked = db.calls.filter((call) => call.table === "purchase_requests").map((call) => [call.method, ...call.args]);
+    expect(asked).toContainEqual(["eq", "purpose", "ready_stock"]);
+    expect(asked).toContainEqual(["eq", "fulfilment_intent", "additional_stock"]);
+    expect(asked).toContainEqual(["is", "refused_at", null]);
+    expect(asked).toContainEqual(["is", "withdrawn_at", null]);
+  });
+
+  it("hands over what Send for approval needs: the active default Deliver To, the date floor, and who acts next", async () => {
+    const db = fakeDb({ product_models: MODELS, product_skus: SKUS, suppliers: SUPPLIERS, orders: ORDERS, stock_unit_register_v: UNITS,
+      purchasing_destinations: DESTINATIONS, purchasing_settings: SETTINGS }, [], { purchasing_approver: "approver-1", po_duty: "duty-1" });
+    const body = (await (await read(db)).json()) as ForecastPurchaseResponse;
+    expect(body.deliverTo).toEqual({ id: "d1", name: "TEST Warehouse" });
+    expect(body.minDeliveryDays).toBe(3);
+    expect(body.approver).toEqual({ id: "approver-1", name: "TEST approver-1" });
+    expect(body.poDuty).toEqual({ id: "duty-1", name: "TEST duty-1" });
+  });
+
+  it("names nobody, and still answers, when no duty holder or default Deliver To is set", async () => {
+    const db = fakeDb({ product_models: MODELS, product_skus: SKUS, suppliers: SUPPLIERS, orders: ORDERS, stock_unit_register_v: UNITS });
+    const res = await read(db);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ForecastPurchaseResponse;
+    expect(body).toMatchObject({ deliverTo: null, minDeliveryDays: 0, approver: null, poDuty: null });
   });
 
   it("a size with no supplier, or one pointing at an other creditor, has no supplier", async () => {

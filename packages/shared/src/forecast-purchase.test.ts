@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   forecastPurchaseAddDays,
+  forecastPurchaseDeliveryDate,
   forecastPurchaseInScope,
   forecastPurchaseModels,
   forecastPurchasePoGroups,
+  forecastPurchaseRequestGroups,
   forecastPurchaseSuggestion,
   forecastPurchaseWindow,
   type ForecastPurchaseSize,
@@ -11,7 +13,7 @@ import {
 
 const size = (over: Partial<ForecastPurchaseSize>): ForecastPurchaseSize => ({
   sku: "TEST-A-Q", modelId: "m-a", model: "TEST model A", category: "mattress", size: "Queen",
-  supplierId: "s1", supplier: "TEST supplier", sold: [0, 0, 0], sold14: 0, free: 0, onPo: 0, ...over,
+  supplierId: "s1", supplier: "TEST supplier", sold: [0, 0, 0], sold14: 0, free: 0, onPo: 0, requested: 0, requests: [], ...over,
 });
 
 describe("forecastPurchaseWindow", () => {
@@ -49,6 +51,12 @@ describe("forecastPurchaseSuggestion", () => {
 
   it("counts what is already on a PO for stock as stock", () => {
     expect(forecastPurchaseSuggestion({ sold14: 6, free: 2, onPo: 4 }).weeks[0]).toBe(0);
+  });
+
+  it("counts what is already asked for on an open request, so a size is never asked for twice", () => {
+    // Level 6, nothing here, 4 already asked for: at most 2 more.
+    expect(forecastPurchaseSuggestion({ sold14: 6, free: 0, onPo: 0, requested: 4 }).weeks[0]).toBe(2);
+    expect(forecastPurchaseSuggestion({ sold14: 6, free: 0, onPo: 0, requested: 6 }).weeks[0]).toBe(0);
   });
 
   it("nothing sold in 14 days suggests nothing, now or later", () => {
@@ -94,6 +102,52 @@ describe("forecastPurchaseModels", () => {
     expect(row!.sizes.map((s) => s.block)).toEqual(["enough", "no_supplier"]);
     expect(row!.block).toBe("no_supplier");
     expect(row!.suggestedSizes).toBe(0);
+  });
+});
+
+describe("requests in progress", () => {
+  const waiting = [{ id: "r1", no: "MPR-TEST-1", qty: 6, state: "waiting" as const }];
+
+  it("a size fully asked for cannot be ticked, and says it is requested; what is asked for is not counted as stock", () => {
+    const [row] = forecastPurchaseModels({ sizes: [
+      size({ sku: "A-K", size: "King", sold: [0, 6, 6], sold14: 6, free: 1, onPo: 2, requested: 6, requests: waiting }),
+      size({ sku: "A-Q", size: "Queen", sold: [0, 2, 2], sold14: 2, free: 9 }),
+    ] });
+    expect(row!.sizes.map((s) => s.block)).toEqual(["requested", "enough"]);
+    expect(row!.block).toBe("requested");
+    expect(row!.sizes[0]!.have).toBe(3);
+    expect(row!.have).toBe(12);
+    expect(row!.requested).toBe(6);
+    expect(row!.onPo).toBe(2);
+  });
+
+  it("groups the ticked sizes into one request per supplier and category, with the suggested pieces", () => {
+    const [a, c] = forecastPurchaseModels({ sizes: [
+      size({ sku: "A-K", size: "King", sold: [0, 6, 6], sold14: 6 }),
+      size({ sku: "A-Q", size: "Queen", sold: [0, 4, 4], sold14: 4 }),
+      size({ sku: "C-Q", modelId: "c", model: "TEST model C", category: "bedframe", supplierId: "s2", supplier: "TEST supplier two", sold: [0, 2, 2], sold14: 2 }),
+    ] });
+    expect(forecastPurchaseRequestGroups([...a!.sizes, ...c!.sizes])).toEqual([
+      { key: "s1|mattress", supplierId: "s1", supplier: "TEST supplier", category: "mattress", pieces: 5,
+        lines: [{ sku: "A-K", qty: 3, model: "TEST model A", size: "King" }, { sku: "A-Q", qty: 2, model: "TEST model A", size: "Queen" }] },
+      { key: "s2|bedframe", supplierId: "s2", supplier: "TEST supplier two", category: "bedframe", pieces: 1,
+        lines: [{ sku: "C-Q", qty: 1, model: "TEST model C", size: "Queen" }] },
+    ]);
+  });
+
+  it("a size with no supplier or no suggestion is never put on a request", () => {
+    const [row] = forecastPurchaseModels({ sizes: [
+      size({ sku: "A-K", size: "King", sold: [0, 6, 6], sold14: 6, supplierId: null, supplier: null }),
+      size({ sku: "A-Q", size: "Queen", sold: [0, 4, 4], sold14: 4, free: 9 }),
+    ] });
+    expect(forecastPurchaseRequestGroups(row!.sizes)).toEqual([]);
+  });
+
+  it("the Delivery Date is the plan's, never before the Settings floor, and none when the plan has none", () => {
+    expect(forecastPurchaseDeliveryDate("2026-10-20", "2026-10-13", 0)).toBe("2026-10-20");
+    expect(forecastPurchaseDeliveryDate("2026-10-20", "2026-10-13", 3)).toBe("2026-10-20");
+    expect(forecastPurchaseDeliveryDate("2026-10-20", "2026-10-13", 14)).toBe("2026-10-27");
+    expect(forecastPurchaseDeliveryDate(null, "2026-10-13", 14)).toBeNull();
   });
 });
 

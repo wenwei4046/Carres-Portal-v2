@@ -997,6 +997,19 @@ KEEP §5.1's one source-line demand calculation. ADAPT a transparent readout wit
 
 Recommended acceptance / PROPOSAL where extending the reader: open a shortage to its exact SO/MPR source and coverage contributors; show why a line cannot be bought; recheck demand, approved supplier/configuration and existing coverage at governed issue. Refreshing or regenerating a view completes no purchase, changes no allocation/custody and creates no duplicate PO. A changed source invalidates the old preview rather than issuing yesterday's shortage. Reference calculation, allocation and persistence remain unverified; do not introduce a new editable MRP ledger, independent demand page or warehouse-rebinding shortcut.
 
+**Forecast Purchase approval and issuance — OWNER-APPROVED, Jess 2026-10-14 (A) · BUILT ON BRANCH
+(§9.14; not deployed).** Jess approves Forecast Purchase; after her persisted approval, PO Duty
+issues the PO and sends it to the supplier. Approval and issuance/sending are separate actions
+and retain their own actual actor/time/version evidence. Do not implement a combined approver
+“approve + issue PO” click or permit PO Duty to bypass approval within Suggested quantity.
+Resolve the roles through the shared owner/Duty authority, not a hardcoded person or new roster.
+No additional forecast-approval cover/delegation permission was granted by this ruling.
+Revalidate the approved quantities, existing stock/PO coverage and source version before issuance;
+material changes cannot silently reuse a decision on a different request scope. Reuse the existing
+governed issuance and sending doors; do not infer a new independent purchasing writer.
+This ruling resolves the owner decision raised by Forecast implementation PR #2052; it does not
+approve an algorithm, weekly task cadence, timed Undo, Skip policy or production readiness.
+
 ### 5.2 Two input doors
 
 `SO Batch Purchase` is system demand from customer Sales Orders. `Manual Purchase Request` is conscious
@@ -8003,7 +8016,7 @@ credit and payment remain distinct owning facts. No sale-notice matching interfa
   cross-module contract are required before `PLAN MISSION COMPLETE`. No application implementation,
   Card, production migration or rendered UI acceptance is claimed by this synthesis.
 
-### 9.14 Forecast Purchase · Outright — owner-approved 13 Oct 2026 · read side BUILT ON BRANCH (not deployed) · `Place PO` NOT BUILT
+### 9.14 Forecast Purchase · Outright — owner-approved 13 Oct 2026 · approval ruling 14 Oct 2026 (A) · BUILT ON BRANCH (not deployed)
 
 **RULING (owner, design handoff of 13 Oct 2026; `docs/ui-reference/sales-order-design/docs/FORECAST-PURCHASE-HANDOFF-13-Oct.md`).**
 A weekly page in Purchasing → BUY, directly under `SO Batch Purchase`. Per model and size it shows
@@ -8037,6 +8050,8 @@ records nothing and re-derives nothing its owner already holds.
 | Free, in the warehouse | Stock: `stock_unit_register_v`, `availability = available` and `condition = new` |
 | Free, on a PO | Purchasing: `purchasing_po_free_units`, the arithmetic behind `Use this PO` |
 | Supplier | Catalog: `product_skus.supplier_id`. None, or an other creditor: `Supplier not set` |
+| Asked for, not yet on a PO | Purchasing: open `Ready Stock` requests that buy extra (`purchase_requests` not refused or withdrawn), by what each line has still to issue (`purchase_demands`) |
+| Deliver To, Delivery Date floor, who acts next | Purchasing: the default active destination and `manual_purchase_min_delivery_days`; the ONE duty resolver for `purchasing_approver` and `po_duty` |
 
 A source that cannot be read fails the whole read: the list shows its error state, never a number
 nobody read. A model that sold nothing in the three months shown is not listed.
@@ -8050,31 +8065,60 @@ fixed order Super King, King, Queen, Super Single, Single. A model tick takes ev
 that has a suggestion; a size that cannot be ordered keeps a greyed tick that says why
 (`Enough stock · nothing to buy` · `Supplier not set`). The Summary holds two cards: `Weekly forecast`
 (this Monday's suggested pieces that can be ordered, then the next two Mondays) and `By supplier`.
-The selection bar reads `{n} items selected · {pcs} · {n} PO` with `Create {n} PO`, which opens the
-review: the ticked sizes, one PO per supplier and category.
+The selection bar reads `{n} items selected · {pcs} · {n} PO` with `Review {n} PO`, which opens the
+review: the ticked sizes, one request per supplier and category with its Delivery Date, the
+`Supplier Deliver To`, and who acts next.
+
+**Buying — RULING, Jess 2026-10-14 (A); §5 "Forecast Purchase approval and issuance". BUILT.**
+The page asks and never issues. `Send for approval` raises one Manual Purchase Request per supplier
+and category through the EXISTING door (`POST /api/operation/purchasing/requests`,
+`purchasing_create_request_with_lines`): purpose `Ready Stock`, intent `additional_stock` (buying
+extra; the suggestion has already netted free stock), the default active `Deliver To`, the ticked
+sizes at their suggested quantity, and `Forecast Purchase · week of {Monday}` as its Purchase
+requirement. Its Delivery Date is the existing plan's own proposal (production days from today, the
+read the request form makes), never earlier than the Settings floor; a supplier with no production
+days cannot be sent and the review names the fix. From there nothing is new: the Purchasing Approver
+decides the request on the request (no self-approval, as for every request), PO Duty issues the PO
+and sends it there, and the existing approval, issue and sending Work carries each step. The two
+acts keep their own actor and time; no quantity skips approval. The page adds no approval door, no
+issue door and no purchasing writer.
+
+**Recheck before issuing — FACT, read 14 Oct 2026 (`manual-purchase.ts` `POST /issue`).** The
+existing issue door refuses a request that is unknown, refused, withdrawn, not approved or sent
+back, re-reads what each line still has to issue on the locked row (a stale tab is refused) and
+refuses when nothing is left. A request changed and sent again needs its approval again. 🟡 It does
+NOT re-net free stock for a request that buys extra (§9.2: `additional_stock` never nets shelf
+stock), so stock that arrives between the request and the PO is seen by the person issuing, on the
+request's `Free Stock · Already On PO · Still Needed`, and is not refused by the door. The 14 Oct
+ruling asks for coverage to be revalidated before issuance and also forbids a new writer; whether
+the existing door should gain that refusal is the Manual Purchase door's decision, not built here.
+
+**A size is never asked for twice.** What an open `Ready Stock` request that buys extra still has to
+put on a PO counts as stock on its way: the suggestion nets free stock, PO stock and that. `Free
+stock` on the page stays what is here or on a PO; a size shows each request under it
+(`{MPR No} · {pcs} · {state}`, opening the request) and what a PO holds (`On PO · {pcs}`). A size
+fully asked for cannot be ticked and its tick says where the request stands. `Ordered` lists the
+models with stock on its way. A refused or withdrawn request asks for nothing, so its size is
+suggested again.
 
 **Measured 13 Oct 2026 on the TEST shell preview** (`e2e-kit/kit-forecast.spec.ts`): 1025, 1164 and
 1440 wide, then 1164 with the Summary open and with the Tasks panel open; rows closed, one model
 open, one size ticked. No sideways scroll, nothing cut, a size line's numbers under its model's, and
 `carres-check.js` answers PASS in every state. Fixture evidence is not production evidence.
 
-**NOT BUILT, and why.**
+**NOT BUILT, and why (the 14 Oct ruling says it approves none of these).**
 
 | Item | State |
 |---|---|
-| `Place PO` | **OPEN OWNER DECISION: who may press it.** The review shows what would be ordered and writes nothing. Today's law is §5.2 and §9.2: stock is bought through a Manual Purchase request and every request needs the Purchasing Approver. A direct PO from this page would be a second door for the same act (ERP-ARCHITECTURE Law C), so it is not built until the owner rules |
-| `Skip this week` | Needs a shared record (a skip by one person must hold for everyone until next Monday). Built with `Place PO` |
-| `Ordered` tab, `Already ordered`, `Skipped this week` | Follow `Place PO` and `Skip this week`. The tab is on the page and is empty |
-| Weekly task per supplier and category, owner PO Duty | Not built. It needs one Work rule and one line in the Work feed, which the Tasks work in progress owns; the owner's 6 Oct 2026 direction was "no new Work rule" |
-| `Send PO` after Place | The existing PO sending Work, once a PO exists |
+| `Place PO` on this page | **Ruled out, 2026-10-14 (A).** The page sends for approval; the PO is issued on the request by PO Duty after approval |
+| `Skip this week` | Not approved (no Skip policy). Not built; a size nobody asks for simply stays suggested |
+| Timed `Undo` | Not approved. Before approval the requester withdraws the request; after a PO is issued the correction is `Cancel goods not received` (§5.8.1) |
+| Weekly task per supplier and category, owner PO Duty | Not approved (no weekly task cadence). Not built. The request's own approval and issue Work exists and is unchanged |
 
-**CONFLICTS between the handoff and current law — PROPOSAL / NOT LAW until the owner rules.**
+**Where the handoff differs from law — the design file's version is PROPOSAL / NOT LAW.**
 
-- **Undo within 15 minutes of Place.** §5 and §9 say no timed Undo is offered after a PO is issued;
-  the correction is `Cancel goods not received` (§5.8.1). The handoff's Undo is not built.
-- **`Place {n} PO` and `Create {n} PO`.** COPY-STANDARD's verb for making a PO is `Issue PO`
-  everywhere. The handoff's words are on the page as handed over and are marked there as awaiting
-  the owner's choice.
+- **`Create {n} PO` · `Place {n} PO` · `Skip this week`.** Superseded by the 14 Oct ruling. The page
+  says `Review {n} PO` and `Send for approval`, the Manual Purchase Request's own verb.
 - **Supplier by product.** The handoff names the supplier by category (mattress Nice Future,
   bedframe Ohana). The Portal reads Catalog's supplier per SKU, which is the one owner of that fact;
   no category rule is written into code.

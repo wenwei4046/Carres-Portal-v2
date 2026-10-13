@@ -2282,7 +2282,7 @@ Use `Listing` consistently for module list-view navigation. The page title ident
 do not repeat SO/PO in the tab. This is the shared navigation label.
 Other views retain their purpose-specific names, such as `Monthly demand`.
 
-### Forecast Purchase · Outright — owner-approved 13 Oct 2026 · BUILT ON BRANCH 13 Oct 2026 (Purchasing MASTER §9.14)
+### Forecast Purchase · Outright — owner-approved 13 Oct 2026 · approval ruling 14 Oct 2026 (A) · BUILT ON BRANCH (Purchasing MASTER §9.14)
 
 The page suggests and never tells the person to buy. It says `Suggested` and `Forecast`; it never
 says `Buy` or `To buy`. Quantities are pieces: `1 pc` · `{n} pcs`.
@@ -2295,23 +2295,30 @@ says `Buy` or `To buy`. Quantities are pieces: `1 pc` · `{n} pcs`.
 | Column headers | `Model` · the month alone (`Aug` · `Sep` · `Oct`) · `Free` over `stock` · the Monday as `12 Oct` over `Mon` |
 | Model row, grey line | `{supplier} · {n} sizes` · `1 size`; no supplier: `Supplier not set · {n} sizes` |
 | Opened row header | `Size`, then the three months |
-| A tick that cannot be taken | `Enough stock · nothing to buy` · `Supplier not set` · `Already ordered` · `Skipped this week` (the last two are not shown until `Place PO` and `Skip this week` are built) |
-| Selection bar | `{n} items selected · {pcs} · {n} PO` (`1 item`, `2 POs`); button `Create 1 PO` · `Create {n} POs` |
+| A tick that cannot be taken | `Enough stock · nothing to buy` · `Supplier not set` · a size already asked for says its request's own state: `Waiting for approval` · `Ready to order` · `Sent back for changes` |
+| Under a size, stock on its way | `{MPR No} · {pcs} · {state}` (opens the request; hover `Open {MPR No}`) · `On PO · {pcs}` |
+| Selection bar | `{n} items selected · {pcs} · {n} PO` (`1 item`, `2 POs`); button `Review 1 PO` · `Review {n} POs` |
 | Summary | Title `Summary`. Card `Weekly forecast` with the Monday as `Mon, 12 Oct`; headline `{n} pcs` over `Suggested`; rows `Mon, 19 Oct` → `{n} pcs`. Group `By supplier`, one row per supplier → `{n} pcs` |
 | Footer | `{n} models · in pcs · suggestion only, you decide` · `1 model`; filtered: `{shown} of {n} models · in pcs · suggestion only, you decide` |
-| Review | Title `Review 1 PO` · `Review {n} POs`; line `{pcs} · Outright · back to stock level`; heads `Item` · `Qty` · `Supplier`; note `Outright stock: buys each size back to its stock level. One PO per supplier and category. Sales orders take this stock first; SO Batch only buys what stock cannot cover.`; buttons `Back` · `Skip this week` · `Place 1 PO` · `Place {n} POs` |
+| Review | Title `Review 1 PO` · `Review {n} POs`; line `{pcs} · Outright · back to stock level`; heads `Item` · `Qty` · `Supplier`; one row per request `{supplier} · {Category}` → `Delivery Date {date}`; row `Supplier Deliver To` → the default destination; note `Outright stock: buys each size back to its stock level. One PO per supplier and category. Sales orders take this stock first; SO Batch only buys what stock cannot cover.`; who acts next `{name} approves. {PO Duty name} then issues the PO and sends it to the supplier.` (nobody holding the duty: `Nobody holds Purchasing Approver.`); buttons `Back` · `Send for approval` (sending: `Sending`) |
+| Review, cannot be sent | `Production days are not set` over `Add production days for {supplier} · {category} in Settings`, button hover `Send: lead days are not set` (the Manual Purchase Request's words) · `No default Deliver To is set. Set one in Purchasing → Settings.` · `Working out the Delivery Date` · `The Delivery Date could not be worked out. Try again.` |
+| After sending | Toast `1 request sent for approval` · `{n} requests sent for approval`; a refusal keeps the review open: `{sent} of {n} requests sent for approval. The rest were not sent.` then the door's own sentence; nothing sent and no sentence: `The request was not sent. Try again.` |
+| On the request | Purchase requirement `Forecast Purchase · week of {Mon, 12 Oct 26}` |
 
 Dates follow the one date rule: `Mon, 12 Oct` in text; a column header splits it into `12 Oct` over `Mon`.
 
-**PROPOSAL — awaiting the owner.** (1) `Place {n} PO` and `Create {n} PO` are the handoff's words;
-the rule above ("mix send / raise / place" becomes `Issue PO` everywhere) says `Issue PO`. They stay
-as handed over until the owner chooses. (2) The handoff gives no words for these states; these are
-proposed: empty list `No Outright mattress or Jager bedframe was sold in the last 3 months, so there is
-nothing to suggest.` · `Suggested` with nothing `Nothing is suggested this week. Free stock covers the
-last 14 days of sales.` · `Ordered` with nothing `No forecast PO this week.` · a search with no match
+**The owner's 14 Oct 2026 ruling (A) changed three of the handoff's words.** The page asks and never
+issues, so `Create {n} PO`, `Place {n} PO` and `Skip this week` are not on it. `Send for approval` is
+the Manual Purchase Request's own verb and the request states are its own state words.
+
+**PROPOSAL — awaiting the owner.** The handoff gives no words for these, so these are proposed:
+the bar button `Review {n} PO` (the handoff's task button says `Review PO`) · empty list `No Outright
+mattress or Jager bedframe was sold in the last 3 months, so there is nothing to suggest.` ·
+`Suggested` with nothing `Nothing is suggested this week. Free stock covers the last 14 days of
+sales.` · `Ordered` with nothing `Nothing is waiting for approval or on a PO.` · a search with no match
 `No model matches. Clear the search to see every model.` · a failed read `The forecast could not be
-read. Try again.` · in the review, while placing is not built: `Placing a PO and skipping a week from
-this page are not switched on yet. Raise the purchase in Manual Purchase Request for now.`
+read. Try again.` · and the review and after-sending sentences in the table above that are not the
+Manual Purchase Request's own.
 
 ### Purchasing UI dictionary — APPROVED (Jess, 2026-09-18) · BUILT on SO Batch Purchase 2026-09-18
 

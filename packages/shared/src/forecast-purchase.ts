@@ -19,6 +19,15 @@
  * Sales Orders' (`orders.placed_at`, the proceeded Outright population), the
  * free stock is Stock's (New Units no order holds, plus open PO Units no
  * order holds), the supplier is Catalog's (`product_skus.supplier_id`).
+ *
+ * ── BUYING IS THE MANUAL PURCHASE REQUEST'S (owner ruling 2026-10-14, A) ────
+ *
+ * The page issues no PO. `Send for approval` raises a Manual Purchase Request
+ * (`Ready Stock`, buying extra) per supplier and category through the existing
+ * door; the Purchasing Approver decides it; PO Duty then issues the PO and
+ * sends it, each act with its own actor and time. What is already asked for
+ * and not yet on a PO counts as stock on its way, so a size is never asked
+ * for twice.
  */
 
 /** The one order sizes are listed in, on every model. */
@@ -69,6 +78,22 @@ export interface ForecastPurchaseSize {
   free: number;
   /** Units on an open PO, not arrived, that no order holds. */
   onPo: number;
+  /** Pieces on an open Ready Stock request (buying extra) not yet on a PO. */
+  requested: number;
+  /** The requests those pieces are on, oldest first. */
+  requests: ForecastPurchaseRequestRef[];
+}
+
+/** Where a request stands. `waiting` = for the approver; `ready` = approved,
+ *  PO Duty issues next; `sent_back` = returned to its requester. */
+export type ForecastPurchaseRequestState = "waiting" | "ready" | "sent_back";
+
+export interface ForecastPurchaseRequestRef {
+  id: string;
+  /** The MPR No. Null when the request carries none. */
+  no: string | null;
+  qty: number;
+  state: ForecastPurchaseRequestState;
 }
 
 /** `GET /api/operation/purchase/forecast` */
@@ -80,6 +105,15 @@ export interface ForecastPurchaseResponse {
   /** This week's Monday and the next two: `YYYY-MM-DD`. */
   mondays: [string, string, string];
   sizes: ForecastPurchaseSize[];
+  /** The default Deliver To a request is raised for. Null = none is set. */
+  deliverTo: { id: string; name: string } | null;
+  /** Purchasing Settings: a request's Delivery Date is at least this many
+   *  calendar days from today. 0 = no floor. */
+  minDeliveryDays: number;
+  /** Today's Purchasing Approver (holder or cover). Null = nobody resolved. */
+  approver: { id: string; name: string | null } | null;
+  /** Today's PO Duty (holder or cover). Null = nobody resolved. */
+  poDuty: { id: string; name: string | null } | null;
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -130,16 +164,16 @@ export interface ForecastPurchaseSuggestion {
 }
 
 /**
- * The suggestion for one size. `have` is free stock plus what is already on a
- * PO for stock. `skipped` leaves this Monday at 0 (`Skip this week`); the
- * shortfall then shows on the next Monday.
+ * The suggestion for one size. `have` is free stock, what is already on a PO
+ * for stock, and what is already asked for on an open request. `skipped`
+ * leaves this Monday at 0; the shortfall then shows on the next Monday.
  */
-export function forecastPurchaseSuggestion(input: { sold14: number; free: number; onPo: number; skipped?: boolean }): ForecastPurchaseSuggestion {
+export function forecastPurchaseSuggestion(input: { sold14: number; free: number; onPo: number; requested?: number; skipped?: boolean }): ForecastPurchaseSuggestion {
   const sold14 = Math.max(0, input.sold14);
   const rate = sold14 / FORECAST_PURCHASE_RATE_DAYS;
   const level = Math.ceil(rate * FORECAST_PURCHASE_LEVEL_DAYS);
   const cap = Math.max(1, Math.ceil(rate * FORECAST_PURCHASE_WEEK_DAYS));
-  let have = Math.max(0, input.free) + Math.max(0, input.onPo);
+  let have = Math.max(0, input.free) + Math.max(0, input.onPo) + Math.max(0, input.requested ?? 0);
   const first = input.skipped ? 0 : Math.min(Math.max(0, level - have), cap);
   have += first;
   const weeks: number[] = [first];
@@ -152,11 +186,13 @@ export function forecastPurchaseSuggestion(input: { sold14: number; free: number
   return { level, cap, weeks: weeks as [number, number, number] };
 }
 
-/** Why a size cannot be ticked. `null` = it has a suggestion and a supplier. */
-export type ForecastPurchaseBlock = "enough" | "no_supplier" | null;
+/** Why a size cannot be ticked. `null` = it has a suggestion and a supplier.
+ *  `requested` = nothing more is suggested because a request already asks. */
+export type ForecastPurchaseBlock = "enough" | "no_supplier" | "requested" | null;
 
 export interface ForecastPurchaseSizeRow extends ForecastPurchaseSize {
-  /** Free stock as the page prints it: in the warehouse plus on a PO. */
+  /** Free stock as the page prints it: in the warehouse plus on a PO. What
+   *  is only asked for is not stock yet and is not in this number. */
   have: number;
   suggestion: ForecastPurchaseSuggestion;
   /** This Monday's suggested pieces. */
@@ -177,6 +213,10 @@ export interface ForecastPurchaseModelRow {
   weeks: [number, number, number];
   /** Sizes that can be ticked. */
   suggestedSizes: number;
+  /** Pieces asked for on open requests, not yet on a PO. */
+  requested: number;
+  /** Pieces on an open PO for stock, not arrived. */
+  onPo: number;
   block: ForecastPurchaseBlock;
   sizes: ForecastPurchaseSizeRow[];
 }
@@ -203,7 +243,7 @@ export function forecastPurchaseModels(data: Pick<ForecastPurchaseResponse, "siz
       .map((s) => {
         const suggestion = forecastPurchaseSuggestion(s);
         const suggested = suggestion.weeks[0];
-        const block: ForecastPurchaseBlock = suggested <= 0 ? "enough" : s.supplierId ? null : "no_supplier";
+        const block: ForecastPurchaseBlock = suggested > 0 ? (s.supplierId ? null : "no_supplier") : s.requested > 0 ? "requested" : "enough";
         return { ...s, have: s.free + s.onPo, suggestion, suggested, block };
       })
       .sort((a, b) => sizeRank(a.size) - sizeRank(b.size) || a.size.localeCompare(b.size));
@@ -220,7 +260,9 @@ export function forecastPurchaseModels(data: Pick<ForecastPurchaseResponse, "siz
       have: sizes.reduce((n, s) => n + s.have, 0),
       weeks: [0, 1, 2].map((i) => sizes.reduce((n, s) => n + s.suggestion.weeks[i]!, 0)) as [number, number, number],
       suggestedSizes,
-      block: suggestedSizes > 0 ? null : sizes.some((s) => s.block === "no_supplier") ? "no_supplier" : "enough",
+      requested: sizes.reduce((n, s) => n + s.requested, 0),
+      onPo: sizes.reduce((n, s) => n + s.onPo, 0),
+      block: suggestedSizes > 0 ? null : sizes.some((s) => s.block === "no_supplier") ? "no_supplier" : sizes.some((s) => s.block === "requested") ? "requested" : "enough",
       sizes,
     });
   }
@@ -230,4 +272,39 @@ export function forecastPurchaseModels(data: Pick<ForecastPurchaseResponse, "siz
 /** One PO per supplier and category: how many POs a set of ticked sizes makes. */
 export function forecastPurchasePoGroups(sizes: ReadonlyArray<Pick<ForecastPurchaseSize, "supplierId" | "category">>): number {
   return new Set(sizes.map((s) => `${s.supplierId ?? ""}|${s.category}`)).size;
+}
+
+/** One request, and later one PO, per supplier and category. */
+export interface ForecastPurchaseRequestGroup {
+  key: string;
+  supplierId: string;
+  supplier: string;
+  category: string;
+  lines: Array<{ sku: string; qty: number; model: string; size: string }>;
+  pieces: number;
+}
+
+/** The ticked sizes as the requests they become, in the order ticked. */
+export function forecastPurchaseRequestGroups(sizes: ReadonlyArray<ForecastPurchaseSizeRow>): ForecastPurchaseRequestGroup[] {
+  const groups = new Map<string, ForecastPurchaseRequestGroup>();
+  for (const s of sizes) {
+    if (!s.supplierId || s.suggested <= 0) continue;
+    const key = `${s.supplierId}|${s.category}`;
+    const group = groups.get(key) ?? { key, supplierId: s.supplierId, supplier: s.supplier ?? "", category: s.category, lines: [], pieces: 0 };
+    group.lines.push({ sku: s.sku, qty: s.suggested, model: s.model, size: s.size });
+    group.pieces += s.suggested;
+    groups.set(key, group);
+  }
+  return [...groups.values()];
+}
+
+/**
+ * The Delivery Date a request asks for: the plan's own proposal (production
+ * days from today), never earlier than the Settings floor. Null = the plan
+ * proposes none (production days are not set), and the request cannot be sent.
+ */
+export function forecastPurchaseDeliveryDate(planDate: string | null, today: string, minDeliveryDays: number): string | null {
+  if (!planDate) return null;
+  const earliest = minDeliveryDays > 0 ? forecastPurchaseAddDays(today, minDeliveryDays) : today;
+  return planDate > earliest ? planDate : earliest;
 }

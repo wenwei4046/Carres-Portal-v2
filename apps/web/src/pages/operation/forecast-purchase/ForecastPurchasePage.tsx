@@ -17,23 +17,31 @@
  * of it that has a suggestion; a size that cannot be ordered keeps a greyed
  * tick that says why.
  *
- * ── WHAT IS NOT SWITCHED ON ─────────────────────────────────────────────────
+ * ── THE PAGE ASKS; IT NEVER ISSUES (owner ruling 2026-10-14, A) ────────────
  *
- * `Place PO` and `Skip this week` wait for the owner's ruling on who may
- * place a PO from this page (Purchasing MASTER §9.14, open decisions). Until
- * then the review shows what would be ordered and writes nothing.
+ * `Send for approval` raises one Manual Purchase Request per supplier and
+ * category through the existing door (`Ready Stock`, buying extra). The
+ * Purchasing Approver decides it on the request; PO Duty then issues the PO
+ * and sends it, on the request too. Approval and issuing stay two acts with
+ * their own actor and time, and no quantity skips approval. This page writes
+ * nothing else: no PO, no skip, no undo.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { Link, useSearchParams } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  forecastPurchaseDeliveryDate,
   forecastPurchaseModels,
   forecastPurchasePoGroups,
+  forecastPurchaseRequestGroups,
   type ForecastPurchaseModelRow,
   type ForecastPurchaseResponse,
   type ForecastPurchaseSizeRow,
 } from "@carres/shared";
 import { apiFetch } from "@/lib/api";
+import { useCreatePurchaseRequest, type ManualPurchasePlanPayload } from "@/lib/queries";
+import { fmtDate } from "@/lib/fmt-date";
+import { notify } from "@/components/kit/Toast";
 import Button from "@/components/kit/Button";
 import Modal from "@/components/kit/Modal";
 import Tabs from "@/components/kit/Tabs";
@@ -99,10 +107,11 @@ export default function ForecastPurchasePage() {
 
   const models = useMemo(() => (data ? forecastPurchaseModels(data) : []), [data]);
   /* `Suggested` is the models with a suggestion this Monday, one with no
-     supplier included: the person must see it to set the supplier. Nothing
-     is `Ordered` until a PO can be placed from this page. */
+     supplier included: the person must see it to set the supplier.
+     `Ordered` is the models with stock on its way: asked for on a request,
+     or already on a PO that has not arrived. */
   const shown = useMemo(
-    () => (show === "all" ? models : show === "suggested" ? models.filter((m) => m.weeks[0] > 0) : []),
+    () => (show === "all" ? models : show === "suggested" ? models.filter((m) => m.weeks[0] > 0) : models.filter((m) => m.requested > 0 || m.onPo > 0)),
     [models, show],
   );
 
@@ -214,10 +223,20 @@ export default function ForecastPurchasePage() {
     <div key={s.sku} role="row" className="grid min-h-[44px] items-stretch border-t border-c-row-line" style={{ gridTemplateColumns: lineColumns }} data-testid={`forecast-size-${s.sku}`}>
       <span role="cell" className="grid place-items-center">
         <RowTick testId={`forecast-size-tick-${s.sku}`} label={W.selectSize(m.model, s.size)} checked={live.has(s.sku)}
-          disabled={s.block !== null} why={W.block(s.block)} onChange={() => setSizes([s.sku], !live.has(s.sku))} />
+          disabled={s.block !== null} why={W.block(s.block, s.requests[0]?.state)} onChange={() => setSizes([s.sku], !live.has(s.sku))} />
       </span>
       <span role="cell" />
-      <span role="cell" className="flex min-w-0 items-center break-words px-[5px] text-body text-c-ink">{s.size || W.notRecorded}</span>
+      <span role="cell" className="flex min-w-0 flex-col justify-center px-[5px] py-1">
+        <span className="break-words text-body text-c-ink">{s.size || W.notRecorded}</span>
+        {/* Stock on its way: each request still asking, then what a PO holds. */}
+        {s.requests.map((request) => (
+          <Link key={request.id} to={`/operation?tab=manual-purchase&mp=${encodeURIComponent(request.id)}`} title={W.openRequest(request.no)}
+            className="break-words text-meta text-c-secondary underline decoration-dotted underline-offset-[3px] hover:decoration-solid" data-testid={`forecast-size-request-${s.sku}-${request.id}`}>
+            {W.requestLine(request.no, request.qty, request.state)}
+          </Link>
+        ))}
+        {s.onPo > 0 ? <span className="break-words text-meta text-c-secondary" data-testid={`forecast-size-onpo-${s.sku}`}>{W.onPoLine(s.onPo)}</span> : null}
+      </span>
       {[0, 1, 2].map((i) => (
         <span key={i} role="cell" className={`${cell} ${i === 2 ? "bg-c-column-band font-semibold" : ""} ${s.sold[i]! > 0 ? "text-c-ink" : "text-c-secondary"}`}>{s.sold[i]}</span>
       ))}
@@ -251,8 +270,64 @@ export default function ForecastPurchasePage() {
     </CPopover>
   );
 
+  /* ── The review, and the one write: `Send for approval`. ────────────────── */
   const [reviewOpen, setReviewOpen] = useState(false);
   useEffect(() => { if (chosen.length === 0) setReviewOpen(false); }, [chosen.length]);
+  const groups = useMemo(() => forecastPurchaseRequestGroups(chosen), [chosen]);
+  const planSkus = useMemo(() => groups.flatMap((g) => g.lines.map((l) => l.sku)).sort(), [groups]);
+  /* The Delivery Date is the server's own plan (production days from today),
+     the same read the Manual Purchase Request form makes. The browser never
+     guesses a date. */
+  const plan = useQuery({
+    queryKey: ["operation", "purchasing", "requests", "plan", planSkus.join("|")],
+    queryFn: () => apiFetch<ManualPurchasePlanPayload>("/api/operation/purchasing/requests/plan", { method: "POST", body: JSON.stringify({ skus: planSkus }) }),
+    enabled: reviewOpen && planSkus.length > 0,
+    staleTime: 30_000,
+  });
+  const arrivalBySku = useMemo(() => new Map((plan.data?.lines ?? []).map((line) => [line.sku, line.arrival])), [plan.data]);
+  const dated = groups.map((group) => {
+    const arrivals = group.lines.map((line) => arrivalBySku.get(line.sku) ?? null);
+    const latest = arrivals.some((a) => a == null) ? null : arrivals.reduce<string | null>((max, a) => (max == null || a! > max ? a : max), null);
+    return { group, deliveryDate: data ? forecastPurchaseDeliveryDate(latest, data.today, data.minDeliveryDays) : null };
+  });
+  const leadMissing = plan.isSuccess && dated.some((d) => d.deliveryDate == null);
+  const createRequest = useCreatePurchaseRequest();
+  const queryClient = useQueryClient();
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  useEffect(() => { if (!reviewOpen) setSendError(null); }, [reviewOpen]);
+  const canSend = !!data?.deliverTo && plan.isSuccess && !leadMissing && groups.length > 0 && !sending;
+  async function send() {
+    if (!data?.deliverTo || !canSend) return;
+    setSending(true);
+    setSendError(null);
+    let sent = 0;
+    try {
+      /* One request per supplier and category, one after another: each is its
+         own approval and becomes its own PO. A refusal stops the rest, and
+         the page says how many went. */
+      for (const { group, deliveryDate } of dated) {
+        await createRequest.mutateAsync({
+          purpose: "ready_stock",
+          destinationId: data.deliverTo.id,
+          requiredBy: deliveryDate,
+          fulfilmentIntent: "additional_stock",
+          purchaseRequirement: W.requirement(data.mondays[0]),
+          lines: group.lines.map((line) => ({ sku: line.sku, qty: line.qty, requiredBy: deliveryDate })),
+        });
+        sent += 1;
+      }
+      notify("success", W.sent(sent));
+      setTicked(new Set());
+      setReviewOpen(false);
+    } catch (e) {
+      const word = e instanceof Error && e.message ? e.message : W.sendFailed;
+      setSendError(sent > 0 ? `${W.sentSome(sent, dated.length)} ${word}` : word);
+    } finally {
+      setSending(false);
+      void queryClient.invalidateQueries({ queryKey: ["forecast-purchase"] });
+    }
+  }
 
   const emptyMessage = isError ? W.couldNotRead : models.length === 0 ? W.empty : show === "suggested" ? W.nothingSuggested : show === "ordered" ? W.nothingOrdered : W.empty;
 
@@ -364,16 +439,16 @@ export default function ForecastPurchasePage() {
                 },
                 onToggleAll: (keys, allSelected) => setSizes(shown.filter((m) => keys.includes(m.key)).flatMap(tickable), !allSelected),
                 isSelectable: (m: Row) => m.suggestedSizes > 0,
-                unselectableReason: (m: Row) => W.block(m.block),
+                unselectableReason: (m: Row) => W.block(m.block, m.sizes.find((size) => size.block === "requested")?.requests[0]?.state),
                 isIndeterminate: (m: Row) => { const n = tickedIn(m); return n > 0 && n < tickable(m).length; },
                 testId: (m: Row) => `forecast-select-${m.modelId}`,
               }}
               selectionSummary={() => W.selected(chosen.length, chosenPcs, chosenPos)}
               selectionPrimary={chosen.length > 0 ? (
                 <span className="flex shrink-0 items-center gap-2" data-testid="forecast-selection-actions">
-                  <Button variant="primary" size="md" data-testid="forecast-create" onClick={() => setReviewOpen(true)}>
+                  <Button variant="primary" size="md" data-testid="forecast-review-open" onClick={() => setReviewOpen(true)}>
                     <MIcon name="shopping_cart" size={18} />
-                    {W.create(chosenPos)}
+                    {W.reviewButton(chosenPos)}
                   </Button>
                   {viewMenu(true)}
                 </span>
@@ -391,9 +466,11 @@ export default function ForecastPurchasePage() {
 
       <Modal open={reviewOpen} onOpenChange={setReviewOpen} title={W.review(chosenPos)} description={W.reviewLine(chosenPcs)}
         footer={<>
-          <Button data-testid="forecast-review-back" onClick={() => setReviewOpen(false)}>{W.back}</Button>
-          <Button data-testid="forecast-review-skip" disabled title={W.placeNotOn}>{W.skipWeek}</Button>
-          <Button variant="primary" data-testid="forecast-review-place" disabled title={W.placeNotOn}>{W.place(chosenPos)}</Button>
+          <Button data-testid="forecast-review-back" disabled={sending} onClick={() => setReviewOpen(false)}>{W.back}</Button>
+          <Button variant="primary" data-testid="forecast-review-send" disabled={!canSend} loading={sending}
+            title={leadMissing ? W.sendLeadNotSet : !data?.deliverTo ? W.noDeliverTo : undefined} onClick={() => void send()}>
+            {sending ? W.sending : W.send}
+          </Button>
         </>}>
         <div className="flex flex-col gap-3" data-testid="forecast-review">
           <div role="table" aria-label={W.review(chosenPos)} className="rounded-lg border border-c-card-border">
@@ -413,8 +490,35 @@ export default function ForecastPurchasePage() {
               </div>
             ))}
           </div>
+          {/* One request per supplier and category: when it is asked to arrive, and where. */}
+          <div className="flex flex-col" data-testid="forecast-review-requests">
+            {dated.map(({ group, deliveryDate }) => (
+              <div key={group.key} className="flex min-h-9 items-start justify-between gap-3 py-1.5" data-testid={`forecast-review-group-${group.key}`}>
+                <span className="min-w-0 break-words text-body text-c-ink">{W.group(group.supplier, group.category)}</span>
+                <span className="flex shrink-0 flex-col items-end text-right">
+                  {deliveryDate ? (
+                    <span className="text-body text-c-ink">{W.deliveryDate} {fmtDate(deliveryDate)}</span>
+                  ) : plan.isSuccess ? (
+                    <>
+                      <span className="text-body text-c-warn-fg">{W.leadNotSet}</span>
+                      <span className="max-w-[240px] break-words text-meta text-c-warn-fg">{W.leadFix(group.supplier, group.category)}</span>
+                    </>
+                  ) : (
+                    <span className="text-body text-c-secondary" role={plan.isError ? "alert" : "status"}>{plan.isError ? W.planFailed : W.planLoading}</span>
+                  )}
+                </span>
+              </div>
+            ))}
+            <div className="flex min-h-9 items-center justify-between gap-3 border-t border-c-row-line py-1.5">
+              <span className="text-body text-c-tab">{W.deliverTo}</span>
+              <span className={`min-w-0 break-words text-right text-body ${data?.deliverTo ? "text-c-ink" : "text-c-warn-fg"}`} data-testid="forecast-review-deliver-to">
+                {data?.deliverTo ? data.deliverTo.name : W.noDeliverTo}
+              </span>
+            </div>
+          </div>
           <p className="text-meta text-c-secondary">{W.reviewNote}</p>
-          <p className="text-meta text-c-warn-fg" data-testid="forecast-review-not-on">{W.placeNotOn}</p>
+          <p className="text-meta text-c-secondary" data-testid="forecast-review-who">{W.whoNext(data?.approver?.name ?? null, data?.poDuty?.name ?? null)}</p>
+          {sendError ? <p className="text-meta text-c-warn-fg" role="alert" data-testid="forecast-review-error">{sendError}</p> : null}
         </div>
       </Modal>
     </div>
