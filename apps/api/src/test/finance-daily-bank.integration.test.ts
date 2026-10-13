@@ -162,19 +162,19 @@ describe.skipIf(!URL)("Daily Bank (real PostgreSQL, 0637)", () => {
     expect(order).toEqual([...order].sort());
   });
 
-  it("a money account that has become a heading leaves the board, as it does on the Dashboard", async () => {
+  it("a money account marked on the chart is on the board, and never becomes a heading (0692)", async () => {
     const heading = `IT${HEX}H`;
     await q(
-      `insert into gl_accounts (code, name, kind, parent_code, is_control, is_active)
-       select $1, 'IT heading', 'ASSET', parent_code, false, true from gl_accounts where code = $2`,
+      `insert into gl_accounts (code, name, kind, parent_code, is_control, is_active, special, money_in_use)
+       select $1, 'IT bank', 'ASSET', parent_code, false, true, 'SBK', true from gl_accounts where code = $2`,
       [heading, bank],
     );
-    await q("insert into gl_money_accounts (account_code, money_kind) values ($1, 'BANK')", [heading]);
     expect((await daily(onDate)).accounts.some((a) => a.account_code === heading)).toBe(true);
-    await q("insert into gl_accounts (code, name, kind, parent_code, is_control, is_active) values ($1, 'IT under it', 'ASSET', $2, false, true)", [
-      `IT${HEX}C`, heading,
-    ]);
-    expect((await daily(onDate)).accounts.some((a) => a.account_code === heading)).toBe(false);
+    await expect(
+      q("insert into gl_accounts (code, name, kind, parent_code, is_control, is_active) values ($1, 'IT under it', 'ASSET', $2, false, true)", [
+        `IT${HEX}C`, heading,
+      ]),
+    ).rejects.toThrow();
   });
 
   it("the day's money in and out land on the day, name who it was, and carry into the next day", async () => {

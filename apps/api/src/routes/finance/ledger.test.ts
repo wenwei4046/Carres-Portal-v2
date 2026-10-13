@@ -896,12 +896,12 @@ describe("Posting accounts (0657)", () => {
   });
 
   it("forwards the database's refusal of an account that is not money as 422 with its tag (0658)", async () => {
-    fakeClient(() => refuse("22023", "account_not_money", "Account 500-0000 is not a bank, cash or card account in use. Choose one from Money accounts."));
+    fakeClient(() => refuse("22023", "account_not_money", "Account 500-0000 is not a bank, cash or card account in use. Choose one in use."));
     const res = await call("PUT", { what: "PAYMENT", key: "cash/*", accountCode: "500-0000", was: "320-0000" });
     expect(res.status).toBe(422);
     const body = await json(res);
     expect(body.code).toBe("account_not_money");
-    expect(body.message).toBe("Account 500-0000 is not a bank, cash or card account in use. Choose one from Money accounts.");
+    expect(body.message).toBe("Account 500-0000 is not a bank, cash or card account in use. Choose one in use.");
   });
 
   it("refuses operation and a body it cannot read before the database", async () => {

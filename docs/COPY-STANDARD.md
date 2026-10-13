@@ -4341,23 +4341,23 @@ they open (`money-owed.ts`). The words may appear only on these pages until the 
 
 **APPROVED — YH merged #1360 (Finance Settings) and #1364 (0514) on 15 Sep 2026, and picked the
 0515 refusal wording the same day.** Page: `Finance Settings` at `/finance/settings`, opened from
-the header gear (`GlobalTopBar.tsx`, `moduleSettingsFor`). It is the one list of money accounts:
-cash, each bank, and the holding account of each card or online payment company. A word already in
-this file keeps its meaning; a word with a second meaning says so here.
+the header gear (`GlobalTopBar.tsx`, `moduleSettingsFor`). The money accounts (cash, each bank, and
+the holding account of each card or online payment company) are kept on its Chart of accounts tab
+since 0692 (Chew 2026-10-13); there is no Money accounts tab. A word already in this file keeps its
+meaning; a word with a second meaning says so here.
 
 | Group | Word | Meaning |
 |---|---|---|
 | Page | **`Finance Settings`** | The page word, and the header gear's label on every Finance page. |
-| Button | **`Add a money account`** | The page's one create action, and the heading of its form. Same pattern as `Add a payment method`. |
+| Button | **`Add a money account`** | On Chart of accounts' toolbar, after `Add account`; also the heading of its form. Same pattern as `Add a payment method`. |
 | Form | `Money account` | The form's heading when one account is opened. Same word as the Invoice doors block. |
 | | `Name` · `Kind` · `Active` · `Save` · `Cancel` | The form. `Kind` shows only when adding; `Active` only when an account is opened. |
-| Columns | `Account` · `Name` · `Kind` · `Status` | The account's code, its name, its kind, and whether it is in use. |
 | Kind | **`Cash`** | The cash account, which is already on the list; adding never offers it. |
 | Kind | **`Bank account`** | A real bank account. Paid from and Received into both take it. |
 | Kind | **`Card and online holding`** | Where card and online money waits until the card payout moves it to a bank. Received into takes it; a voucher's Paid from never does, and a card payout pays out of it. Also the holding field's label on Card payout banks. |
 | | | These are the `Kind` of a money account, words of their own. They are not the pay method words `Bank transfer` and `Online payment`, and not the Trial Balance kind (`Asset` and the rest). Adding offers only `Bank account` and `Card and online holding`. |
-| Status | `Active` · `Not active` | **Second meaning.** In the Other debtors block they say whether a party can be chosen. Here they say whether the account is in use. A `Not active` account is not offered in any Paid from or Received into picker. |
-| Failed read | `The accounts could not be loaded. Try again.` · `Try again` | Reused from the Supplier advances block. |
+| Status | `Active` · `Not active` | **Second meaning.** In the Other debtors block they say whether a party can be chosen. Here they say whether the account is in use: `Active` is the money account form's checkbox, and `Not active` the grey mark after its name on Chart of accounts. A `Not active` account is not offered in any Paid from or Received into picker. |
+| Failed read | `The money accounts could not be loaded. Try again.` · `Try again` | On Chart of accounts, when the money accounts cannot be read. |
 | Refusals (database, 0512) | `The money accounts are for Finance.` · `Only Finance changes the money accounts.` | Who may read the list, and who may change it. |
 | | `Type the account name.` · `Keep the name to 60 characters.` · `Choose the kind: a bank, or an online payment company.` | The form's checks. The API and the database say the same sentence. |
 | | `A money account named {name} is already on the list.` | Two accounts cannot share a name. |
@@ -4509,7 +4509,7 @@ this file keep their meaning: `Account` · `Name` · `Kind` and the kind words �
 
 | Group | Word | Meaning |
 |---|---|---|
-| Tabs | **`Chart of accounts`** · **`Money accounts`** · `Posting accounts` · `Item groups` · `Card payout banks` · `Closed months` · `Payment requests` | The tabs of Finance Settings, in this order since Chew's 2026-10-12 ruling (「B 可以」): the chart first, at the plain address; Money accounts is `?tab=money`. |
+| Tabs | **`Chart of accounts`** · `Posting accounts` · `Item groups` · `Card payout banks` · `Closed months` · `Payment requests` | The tabs of Finance Settings: the chart first, at the plain address (Chew 2026-10-12, 「B 可以」). The Money accounts tab went in 0692 (Chew 2026-10-13); the chart keeps the money accounts. |
 | Chart | `{code} {name}` | One account, indented under its parent. A heading account (one that other accounts sit under) is bold; nothing is ever posted to it. |
 | Form | `Account` · `{code} · {kind}` | The account form's heading, and the line under it. The name and the number change here, for an account and a heading alike (0570); a heading's accounts stay under it when its number changes. |
 | Refusals (database, 0539) | `Only Finance changes the chart of accounts.` · `That account is not in the chart.` · `An account named {name} is already in the chart.` | Who may rename, a code that is not in the chart (the API says it too for a code that is not four digits), and two accounts with one name. |
@@ -4955,8 +4955,8 @@ the proposal; `Reject` never is.
 
 ## PROPOSAL — PENDING APPROVAL · Money accounts: the number changes on an opened account (24 Sep)
 
-The rule is YH's (24 Sep 2026): an opened money account on Finance Settings → Money accounts shows
-its number, and the number can be changed there, not only on Chart of accounts. The placement below
+The rule is YH's (24 Sep 2026): an opened money account (opened from Chart of accounts since 0692)
+shows its number, and the number can be changed there. The placement below
 is the proposal. No new sentence is added.
 
 - Field `Number` on the `Money account` form, below `Active`, holding the account's number. A blank
@@ -4997,7 +4997,7 @@ Database sentences (shown as written):
 - `<code> <name> is inside <code> <name>. A heading cannot go under a heading inside it.`
 - `Every number under <code> <name> is used. Type a number for the new account.`
 - `Type a number for the new account. <code> <name> does not end in 00 or -0000, so no number is picked for you.`
-- `<code> <name> holds the bank and cash accounts. Add a bank or cash account in Money accounts.`
+- `<code> <name> holds the bank and cash accounts. Add a bank account with Add a money account.`
 - `<code> <name> decides how money may be recorded. A heading cannot go under it.`
 
 
@@ -5445,7 +5445,7 @@ The chart's own account names follow Chew's AutoCount chart, in capitals as Auto
 | Chart of accounts | Button `Import from AutoCount`, beside `Add account` |
 | Modal | Title `Import from AutoCount`. One line under it: `AutoCount's printed chart of accounts, as a PDF.` Button `Choose the PDF`, then `Reading…`, then `Choose another PDF`. Footer `Cancel` and the primary button, which names its state: `Import: choose the PDF` · `Nothing new to import` · `Import {n} account(s)` · `Fill in {n} section(s)` (0656: nothing new, but sections to fill) |
 | Answer | Summary `{n} new · {n} already in the chart · {n} not imported`, and since 0656 ` · {n} section(s) filled in` when there are any. Table `Accounts in the PDF`: `Account` (`{code} {name}`) · `Under` (the number it goes under) · `What happens`: `New` · `Already in the chart` · `Already in the chart · section filled in` (0656) · the reason it is not imported. Rows not imported come first |
-| Reasons (the database's) | `{code} is not an account number.` · `{code} is listed twice.` · `{code} has no name.` · `{code} {name} is longer than 60 characters.` · `{code} {name} is under {section}, a section the chart does not know.` · `{code} {name} is a bank or cash account. Add it in Money accounts.` · `{code} {name} is a debtor or creditor control account, which the system sets up.` · `{code} {name} is a stock or retained earnings account, which the system sets up.` · `{code} {name} is under {parent}, which is not imported.` · `{code} {name} is under {parent}, which is another kind of account.` · `{code} {name} is under {parent}, an account the ledger posts to. Accounts can only go under a heading.` · `{code} {name} is under {parent}, which is not in the chart.` · `{code} {name} is under {parent}, which is retired.` · `{code}: an account named {name} is already in the chart ({code}).` |
+| Reasons (the database's) | `{code} is not an account number.` · `{code} is listed twice.` · `{code} has no name.` · `{code} {name} is longer than 60 characters.` · `{code} {name} is under {section}, a section the chart does not know.` · `{code} {name} is a bank or cash account. Add it with Add a money account.` · `{code} {name} is a debtor or creditor control account, which the system sets up.` · `{code} {name} is a stock or retained earnings account, which the system sets up.` · `{code} {name} is under {parent}, which is not imported.` · `{code} {name} is under {parent}, which is another kind of account.` · `{code} {name} is under {parent}, an account the ledger posts to. Accounts can only go under a heading.` · `{code} {name} is under {parent}, which is not in the chart.` · `{code} {name} is under {parent}, which is retired.` · `{code}: an account named {name} is already in the chart ({code}).` |
 | Reading the PDF | `{code} is printed before any section line.` · `{code} is printed twice.` · `No account was found in this PDF. Choose AutoCount's chart of accounts.` · `This PDF could not be read. Choose AutoCount's chart of accounts.` |
 | Done | Toast `{n} account(s) added to the chart.` · `{n} section(s) filled in.` · `{n} account(s) added to the chart, {n} section(s) filled in.` |
 | Refusals | `Only Finance changes the chart of accounts.` · `There is no account to import. Pick AutoCount's chart of accounts.` · `A chart of more than 2,000 accounts is not imported in one go.` |
@@ -5456,12 +5456,12 @@ Chew approved the layout (「可以」, 2026-10-07) and the row icons (「直接
 
 | Where | Words |
 |---|---|
-| The chart | Groups `{SECTION} · {Kind}` with the count beside, in AutoCount's order (`CAPITAL · Equity`, `FIXED ASSETS · Asset` …); a top account with no section yet groups under `No section yet`. Columns `Code` · `Name` · `Type`. After a name, its special type, `Heading` on a heading, `Retired` on a retired account. An account under a heading starts `└ `. A heading's fold control is named `Fold {code} {name}`, then `Open {code} {name}`. Each row ends with two icons named `Edit {code} {name}` and `Retire {code} {name}`; only the first on a row the retire door always refuses (a retired account, an account the system posts to, a bank, cash or card account, a control account, a heading with accounts in use) |
-| Toolbar | Checkbox `Show retired accounts` · `Add account` · `Import from AutoCount` |
+| The chart | Groups `{SECTION} · {Kind}` with the count beside, in AutoCount's order (`CAPITAL · Equity`, `FIXED ASSETS · Asset` …); a top account with no section yet groups under `No section yet`. Columns `Code` · `Name` · `Type`. After a name, its special type (none on a money account), `Heading` on a heading, `Retired` on a retired account, `Not active` on a money account out of use. Under `Type`, a money account's kind word (`Bank account` · `Cash` · `Card and online holding`) in place of `Asset`. An account under a heading starts `└ `. A heading's fold control is named `Fold {code} {name}`, then `Open {code} {name}`. Each row ends with two icons named `Edit {code} {name}` and `Retire {code} {name}`; only the first on a row the retire door always refuses (a retired account, an account the system posts to, a bank, cash or card account, a control account, a heading with accounts in use) |
+| Toolbar | Checkbox `Show not active` (retired accounts and money accounts out of use) · `Add account` · `Add a money account` · `Import from AutoCount`. A money account's row and edit icon open the `Money account` form, not the account window |
 | The account window | Title `Account` (or `Heading`), the number and kind under it. Fields `Name` · `Number` · `Section` (only the sections of the account's kind) · `Under` (`Top of the section`, then the section's headings). Footer `Retire account` (or `Bring back` on a retired account) · `Cancel` · `Save`, which names its gap: `Save: pick the section` · `Save: type the number` · `Save: type the name` (`Save: type the heading number` · `Save: type the heading name` for a heading) |
 | Retiring | Title `Retire account`, the number and name under it. `A retired account leaves the chart and can no longer be picked. An account the ledger has posted to stays.` Footer `Cancel` · `Retire` |
 | Add account | Title `Add account`. Fields `It is a heading` · `Section` · `Under` (`Top of the section`, then the section's headings; never the bank and cash heading) · `Number` (`Heading number`) · `Name` (`Heading name`). Save names its gap as above |
-| Refusals (the database's) | `Choose the section.` · `That heading is in another section.` · `{SECTION} is not a section for an account of this kind.` · `A top heading is not changed here.` · `A top heading is not retired.` · `{code} {name} has accounts under it. Retire them first.` · `{code} {name} has postings, so it stays. A used account is never retired.` · `{code} {name} is a bank, cash or card account. Stop using it in Money accounts.` · `{code} {name} is an account the system posts to, so it stays.` · `{code} {name} is under {code} {name}, which is retired. Bring that heading back first.` · reused: `That account is not in the chart.` · `Only Finance changes the chart of accounts.` and the 0570, 0577 and 0580 sentences a move or an add can still raise |
+| Refusals (the database's) | `Choose the section.` · `That heading is in another section.` · `{SECTION} is not a section for an account of this kind.` · `A top heading is not changed here.` · `A top heading is not retired.` · `{code} {name} has accounts under it. Retire them first.` · `{code} {name} has postings, so it stays. A used account is never retired.` · `{code} {name} is a bank, cash or card account. Open it and untick Active instead.` · `{code} {name} is an account the system posts to, so it stays.` · `{code} {name} is under {code} {name}, which is retired. Bring that heading back first.` · reused: `That account is not in the chart.` · `Only Finance changes the chart of accounts.` and the 0570, 0577 and 0580 sentences a move or an add can still raise |
 
 Retired by 0656 (no longer on any screen): the line above the chart `Drag an account onto a heading to move it, or onto another account to reorder. Keyboard: Alt+Up/Down reorders, Shift+F10 moves.`; the row menu's `Move under {code} {name}`; Add account's `Top of the chart`, `Kind`, `Save: pick Under` and `Save: pick the kind`; and the two 0608 sentences about a heading at the top of the chart. The chart reads by number, a move is the `Under` field, and a new top account goes at the top of its section.
 
@@ -5476,7 +5476,7 @@ Chew approved the page's purpose (MASTER §0 "Automatic posting accounts", 「�
 | Postings | `Goods sold, when the item group has no sales account` (0659) · `Goods sold ({source})` · `Subscription fees` · `Storage charges` · an add-on's own name · `Goods bought that are not in the catalog` (0659) · `Bank and card charges` · `Money the bank pays in` · `Transport to customers, by delivery order` (0689) · `Dealer commission` · `Dealer commission owed` · `Renovation rebate` · `Renovation rebate owed` · `KPI allowance` · `KPI allowance owed` (0675) · `Owed by showroom customers` · `Owed by dealers' customers · one account per dealer under it` · `Owed by subscription customers` (0685) · `Suppliers owed for goods` · `Suppliers owed for other bills` · `Customer deposits` · `Stock` · `Retained earnings` · `Opening balance` · a payment method's name, with ` · Not active` when it is off · `POS card` · `Online payment` · `Online payment · Stripe checkout` |
 | The window | Title `Posting account`, the posting under it. Field `Account ({Kind})`; for a way of being paid `Money account`, offering the money accounts Payment settings offers. `The new account takes the postings made from now on. Earlier postings keep their account.` Footer `Cancel` · `Save`, which names its gap: `Save: pick the account` · `Save: pick another account` |
 | Changes | Heading `Changes`. Columns `When` · `Posting` · `From` (`No account yet` when there was none) · `To`. Empty `No posting account has been changed yet.` |
-| Refusals (the database's) | `Only Finance changes the posting accounts.` · `This posting account is kept by the system and is changed in Chart of accounts.` · `This posting has no account yet.` · `This is not a posting the system makes.` · `Choose the account for each add-on.` · `Account {code} is not in the chart.` · `Account {code} {name} is retired.` · `Account {code} {name} is a group heading. Pick an account under it.` · `Account {code} {name} is kept by its own documents and cannot be picked here.` · `Account {code} {name} is not an income account.` · `Account {code} {name} is not an expense account.` · `Account {code} {name} is not a liability account.` (0675) · `Someone else changed this posting after you opened it. Open it again to see their change.` · `A recorded change to a posting account cannot be altered.` · a way of being paid (0658): `This is not a way of being paid that Payment settings knows.` · `Account {code} is not a bank, cash or card account in use. Choose one from Money accounts.` |
+| Refusals (the database's) | `Only Finance changes the posting accounts.` · `This posting account is kept by the system and is changed in Chart of accounts.` · `This posting has no account yet.` · `This is not a posting the system makes.` · `Choose the account for each add-on.` · `Account {code} is not in the chart.` · `Account {code} {name} is retired.` · `Account {code} {name} is a group heading. Pick an account under it.` · `Account {code} {name} is kept by its own documents and cannot be picked here.` · `Account {code} {name} is not an income account.` · `Account {code} {name} is not an expense account.` · `Account {code} {name} is not a liability account.` (0675) · `Someone else changed this posting after you opened it. Open it again to see their change.` · `A recorded change to a posting account cannot be altered.` · a way of being paid (0658): `This is not a way of being paid that Payment settings knows.` · `Account {code} is not a bank, cash or card account in use. Choose one in use.` |
 
 ### PROPOSAL — PENDING CHEW · Item groups (0659)
 
