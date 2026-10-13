@@ -15,6 +15,10 @@
  * Every figure is the shared daily-bank arithmetic's (Law D); this page only
  * prints it. The ledger holds no opening balances until Finance enters them,
  * so the toolbar says the figures count from the ledger's start.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the code and the name are two columns, only
+ * the code is the account's link, and a zero is a blank cell, so the accounts
+ * holding money stand out.
  */
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -34,19 +38,19 @@ import DataTable, { type Column } from "@/components/kit/DataTable";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { DateField } from "@/components/register/DateField";
-import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import { addDaysIso } from "@/lib/excel-date-filter";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { useDailyBank } from "../ledger/ledger-queries";
+import { FINANCE_WIDTH } from "../finance-widths";
 import { VOUCHER_PURPOSE_WORD } from "../payables/payables-words";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
-const AMOUNT = REGISTER_FIELD_WIDTH.amount;
+const AMOUNT = FINANCE_WIDTH.amount;
 const link = "text-kit-blue-11 underline underline-offset-2";
 
-/** A day's flow prints nothing when nothing moved; a balance always prints. */
+/** A zero prints nothing, a flow or a balance alike (Finance look, 2026-10-13). */
 const flow = (n: number) => (sen(n) === 0 ? "" : rm(n));
 const total = (rows: DailyBankRow[], pick: (r: DailyBankRow) => number | null) =>
   rm(rows.reduce((s, r) => s + sen(pick(r) ?? 0), 0) / 100);
@@ -160,21 +164,24 @@ export default function DailyBankPage() {
   const beforeStart = goLive !== null && day < goLive;
 
   const columns = useMemo<DataGridColumn<DailyBankRow>[]>(() => [
-    { key: "account", label: "Account", width: 220,
+    { key: "code", label: "Code", width: FINANCE_WIDTH.code,
       accessor: (r) => (
-        <Link className={link} to={ledgerAccountHref(r.account.account_code, day, day)}>
-          {r.account.account_code} {r.account.name}
+        <Link className="underline decoration-dotted underline-offset-[3px]" to={ledgerAccountHref(r.account.account_code, day, day)}>
+          {r.account.account_code}
         </Link>
       ),
-      searchValue: (r) => `${r.account.account_code} ${r.account.name}`,
-      exportValue: (r) => `${r.account.account_code} ${r.account.name}` },
+      searchValue: (r) => r.account.account_code,
+      exportValue: (r) => r.account.account_code },
+    // Bank and cash names are short; every money column fits 1440 wide with the menu open.
+    { key: "account", label: "Account", width: 150, wrap: true, accessor: (r) => r.account.name,
+      searchValue: (r) => r.account.name, exportValue: (r) => r.account.name },
     // Hidden until asked for in Columns: the account's name and the column its
     // money sits in already say which kind it is, and without it every money
     // column fits a 1440px screen with the menu open.
     { key: "kind", label: "Kind", width: 170, accessor: (r) => MONEY_ACCOUNT_KIND_WORD[r.account.money_kind],
       filterValue: (r) => MONEY_ACCOUNT_KIND_WORD[r.account.money_kind], filterType: "enum", defaultHidden: true },
     { key: "broughtForward", label: "Brought forward", headerLines: ["Brought", "forward"], width: AMOUNT, align: "right",
-      accessor: (r) => rm(r.broughtForward), numberValue: (r) => r.broughtForward, exportValue: (r) => r.broughtForward,
+      accessor: (r) => flow(r.broughtForward), numberValue: (r) => r.broughtForward, exportValue: (r) => r.broughtForward,
       footerTotal: (visible) => total(visible, (r) => r.broughtForward) },
     { key: "inflow", label: "Inflow", width: AMOUNT, align: "right",
       accessor: (r) => flow(r.received), numberValue: (r) => r.received, exportValue: (r) => r.received,
@@ -183,7 +190,7 @@ export default function DailyBankPage() {
       accessor: (r) => flow(r.paid), numberValue: (r) => r.paid, exportValue: (r) => r.paid,
       footerTotal: (visible) => total(visible, (r) => r.paid) },
     { key: "balance", label: "Balance", width: AMOUNT, align: "right",
-      accessor: (r) => rm(r.closing), numberValue: (r) => r.closing, exportValue: (r) => r.closing,
+      accessor: (r) => flow(r.closing), numberValue: (r) => r.closing, exportValue: (r) => r.closing,
       footerTotal: (visible) => total(visible, (r) => r.closing) },
     { key: "waiting", label: "Waiting for approval", headerLines: ["Waiting for", "approval"], width: AMOUNT, align: "right",
       accessor: (r) => (r.available === null ? "" : flow(r.pending)),
@@ -191,11 +198,11 @@ export default function DailyBankPage() {
       exportValue: (r) => (r.available === null ? "" : r.pending),
       footerTotal: (visible) => rm(dailyBankTotals(visible).awaitingApproval) },
     { key: "available", label: "Available to pay", headerLines: ["Available", "to pay"], width: AMOUNT, align: "right",
-      accessor: (r) => (r.available === null ? "" : rm(r.available)),
+      accessor: (r) => (r.available === null ? "" : flow(r.available)),
       numberValue: (r) => r.available, exportValue: (r) => r.available ?? "",
       footerTotal: (visible) => rm(dailyBankTotals(visible).canMove) },
     { key: "cardPayout", label: "Waiting for card payout", headerLines: ["Waiting for", "card payout"], width: AMOUNT, align: "right",
-      accessor: (r) => (r.inTransit === null ? "" : rm(r.inTransit)),
+      accessor: (r) => (r.inTransit === null ? "" : flow(r.inTransit)),
       numberValue: (r) => r.inTransit, exportValue: (r) => r.inTransit ?? "",
       footerTotal: (visible) => rm(dailyBankTotals(visible).inTransit) },
   ], [day]);
@@ -220,8 +227,9 @@ export default function DailyBankPage() {
             columns={columns}
             rowKey={(r) => r.account.account_code}
             rowTestId={(r) => `daily-bank-row-${r.account.account_code}`}
-            storageKey="carres.finance.daily-bank.v1"
+            storageKey="carres.finance.daily-bank.v2"
             appearance="reference"
+            look="finance"
             exportName={`Daily Bank ${day}`}
             groupBanner={false}
             stickyIdentity

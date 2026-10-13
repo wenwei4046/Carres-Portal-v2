@@ -14,6 +14,9 @@
  * footer; a ② band appears only while debits and credits differ. The ledger
  * holds no opening balances, so Row 2 says the figures are movement since the
  * ledger started — never a full position.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the code and the name are two columns, only
+ * the code is the account's link, and every heading line reads as a subtotal.
  */
 import { useCallback, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -28,6 +31,7 @@ import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { useTrialBalance } from "./ledger-queries";
 import { DepartmentFilter, useDepartmentParam } from "../department";
 import { headingWalk, indent } from "../reports/StatementTable";
+import { FINANCE_WIDTH } from "../finance-widths";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -119,23 +123,25 @@ export default function LedgerTrialBalance() {
   const goLive = report?.go_live_on ?? null;
 
   const columns = useMemo<DataGridColumn<TrialBalanceLine>[]>(() => [
-    { key: "account", label: "Account", width: 300,
-      accessor: (r) => r.heading
-        ? <span className={`font-semibold ${indent(r.depth)}`}>{r.name}</span>
-        : <span className={indent(r.depth)}><Link className="underline underline-offset-2"
-          to={ledgerAccountHref(r.code, goLive, asOf)}>{r.code} {r.name}</Link></span>,
+    { key: "code", label: "Code", width: FINANCE_WIDTH.code,
+      accessor: (r) => (r.heading ? "" : <Link className="underline decoration-dotted underline-offset-[3px]"
+        to={ledgerAccountHref(r.code, goLive, asOf)}>{r.code}</Link>),
       // Search looks through accounts only; a heading never matches.
-      searchValue: (r) => (r.heading ? "" : `${r.code} ${r.name}`),
-      exportValue: trialBalanceLabel },
+      searchValue: (r) => (r.heading ? "" : r.code),
+      exportValue: (r) => (r.heading ? "" : r.code) },
+    { key: "account", label: "Account", width: 380, wrap: true,
+      accessor: (r) => <span className={indent(r.depth)}>{r.name}</span>,
+      searchValue: (r) => (r.heading ? "" : r.name),
+      exportValue: (r) => "  ".repeat(r.depth - 1) + r.name },
     { key: "kind", label: "Kind", width: 130, accessor: (r) => ledgerKindWord(r.kind),
       groupValue: (r) => ledgerKindWord(r.kind), filterType: "enum" },
-    { key: "debit", label: "Debit", width: 150, align: "right",
-      accessor: (r) => (r.heading ? <span className="font-semibold">{money(r.debit)}</span> : money(r.debit)),
+    { key: "debit", label: "Debit", width: FINANCE_WIDTH.amount, align: "right",
+      accessor: (r) => money(r.debit),
       // A heading's subtotal stays out of the export, so a column sum adds each account once.
       numberValue: (r) => r.debit, exportValue: (r) => (r.heading ? "" : r.debit),
       footerTotal: (visible) => rm(sum(visible, "debit")) },
-    { key: "credit", label: "Credit", width: 150, align: "right",
-      accessor: (r) => (r.heading ? <span className="font-semibold">{money(r.credit)}</span> : money(r.credit)),
+    { key: "credit", label: "Credit", width: FINANCE_WIDTH.amount, align: "right",
+      accessor: (r) => money(r.credit),
       numberValue: (r) => r.credit, exportValue: (r) => (r.heading ? "" : r.credit),
       footerTotal: (visible) => rm(sum(visible, "credit")) },
   ], [goLive, asOf]);
@@ -159,7 +165,8 @@ export default function LedgerTrialBalance() {
       </div>}
       <ListPageShell register>
         <DataGrid rows={rows} columns={columns} rowKey={(r) => `${r.heading ? "heading" : "account"}:${r.code}`}
-          storageKey="carres.finance.trial-balance.v1" appearance="reference" exportName="Trial Balance"
+          storageKey="carres.finance.trial-balance.v2" appearance="reference" exportName="Trial Balance"
+          look="finance" rowTone={(r) => (r.heading ? "subtotal" : null)}
           initialGroupBy={["kind"]} groupBanner={false} stickyIdentity isLoading={!query.isSuccess}
           onSortChange={onSortChange} onSearchChange={onSearchChange} countsInGroup={isAccount}
           searchPlaceholder="Search accounts…"

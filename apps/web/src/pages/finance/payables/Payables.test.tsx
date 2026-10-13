@@ -1167,6 +1167,40 @@ describe("Supplier advance (0484–0485)", () => {
 });
 
 describe("Unpaid by Supplier", () => {
+  /** Five columns show at first (Finance look, 2026-10-13); the rest are shown through Columns. */
+  const heads = () => [...document.querySelectorAll<HTMLElement>("thead th")].map((th) => th.title).filter(Boolean);
+  const showColumn = (label: string) => {
+    if (!screen.queryByRole("checkbox", { name: label })) fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: label }));
+  };
+
+  it("shows five columns at first; the rest wait in Columns", async () => {
+    show("/finance/ap-outstanding");
+    await screen.findByText("Lumen Sofa Works");
+    expect(heads()).toEqual(["Supplier", "Unpaid Bills", "Unpaid", "Advance Left", "Unpaid After Advance and Credit"]);
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    for (const held of ["Creditor Type", "Billed", "Paid", "Debit Notes Unpaid", "Credit Left",
+      "On a Voucher, Not Approved", "Not on a Voucher", "Oldest Unpaid Bill"]) {
+      expect(screen.getByRole("checkbox", { name: held })).not.toBeChecked();
+    }
+  });
+
+  it("a supplier with nothing open shows only with Show all suppliers", async () => {
+    const owed = (api.routes[`${B}/outstanding`] as { rows: Array<Record<string, unknown>> }).rows[0]!;
+    api.routes[`${B}/outstanding`] = { rows: [owed, { ...owed, supplier_id: "33333333-3333-4333-8333-333333333333",
+      supplier_name: "Quiet Timber", billed_total: "500.00", paid_total: "500.00", allocated_total: "0.00",
+      balance_owing: "0.00", uncommitted: "0.00", open_bills: 0, oldest_unpaid_bill_date: null,
+      advance_open: "0.00", credit_open: "0.00", debit_open: "0.00", net_owing: "0.00" }] };
+    show("/finance/ap-outstanding");
+    await screen.findByText("Lumen Sofa Works");
+    expect(screen.queryByText("Quiet Timber")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Show all suppliers" }));
+    const quiet = (await screen.findByText("Quiet Timber")).closest("tr")!;
+    // Nothing open: every zero, and the zero Unpaid Bills count, is a blank cell.
+    expect(quiet).not.toHaveTextContent("RM");
+    expect(within(quiet).queryByText("0")).not.toBeInTheDocument();
+  });
+
   it("0642: a credit note not knocked off yet is Credit Left, and comes off what is owed", async () => {
     const NOTE = "22222222-2222-4222-8222-222222222222";
     const owed = (api.routes[`${B}/outstanding`] as { rows: Array<Record<string, unknown>> }).rows[0]!;
@@ -1178,9 +1212,13 @@ describe("Unpaid by Supplier", () => {
     ] };
     show("/finance/ap-outstanding");
     await screen.findByText("Lumen Sofa Works");
-    expect(screen.getByText("Credit Left")).toBeInTheDocument();
-    expect(screen.getByText("RM 150.00")).toBeInTheDocument();
     expect(screen.getByText("RM 775.00")).toBeInTheDocument();
+    // Credit Left waits in Columns until it is asked for.
+    expect(heads()).not.toContain("Credit Left");
+    expect(screen.queryByText("RM 150.00")).not.toBeInTheDocument();
+    showColumn("Credit Left");
+    expect(heads()).toContain("Credit Left");
+    expect(screen.getByText("RM 150.00")).toBeInTheDocument();
     fireEvent.click(screen.getAllByTitle("Show unpaid bills")[0]!);
     expect(await screen.findByTestId(`ap-outstanding-credits-${SUP}`))
       .toHaveTextContent("SCN-20260920-4821 · Sun, 20 Sep · RM 150.00 left of RM 350.00");
@@ -1192,7 +1230,11 @@ describe("Unpaid by Supplier", () => {
     api.routes[`${B}/debit-notes`] = { rows: [debitNoteRow] };
     show("/finance/ap-outstanding");
     await screen.findByText("Lumen Sofa Works");
-    expect(screen.getAllByText(/Debit Notes/).length).toBeGreaterThan(0);
+    // Debit Notes Unpaid waits in Columns until it is asked for.
+    expect(heads()).not.toContain("Debit Notes Unpaid");
+    expect(screen.queryByText("RM 180.00")).not.toBeInTheDocument();
+    showColumn("Debit Notes Unpaid");
+    expect(heads()).toContain("Debit Notes Unpaid");
     expect(screen.getByText("RM 180.00")).toBeInTheDocument();
     // Unpaid is the bills' RM 1,225.00 and the debit note's RM 180.00.
     expect(screen.getByTestId("ap-outstanding-summary")).toHaveTextContent("1 supplier · RM 1,405.00 unpaid");
@@ -1205,7 +1247,10 @@ describe("Unpaid by Supplier", () => {
   it("shows what is owed per supplier, and what already sits on a voucher", async () => {
     show("/finance/ap-outstanding");
     await screen.findByText("Lumen Sofa Works");
-    expect(screen.getByText("RM 1,025.00")).toBeInTheDocument(); // on a voucher, not approved
+    // On a voucher, not approved: shown through Columns.
+    expect(screen.queryByText("RM 1,025.00")).not.toBeInTheDocument();
+    showColumn("On a Voucher, Not Approved");
+    expect(screen.getByText("RM 1,025.00")).toBeInTheDocument();
     expect(screen.getByTestId("ap-outstanding-summary")).toHaveTextContent("1 supplier · RM 1,225.00 unpaid");
     // 0484: the advance left and what is owed after it, both from the database.
     expect(screen.getByText("RM 300.00")).toBeInTheDocument();

@@ -367,6 +367,19 @@ export type DataGridProps<T> = {
    * every Register draws the slate-3 band it draws today.
    */
   headerTone?: "paleBlue";
+  /**
+   * FINANCE LOOK — opt-in, Finance pages only (Chew 2026-10-13, 「c」 then
+   * 「1，做吧」; docs/finance/MASTER.md §4.2). A Finance exception to the one
+   * kit, recorded there; omitted, every grid draws exactly what it draws today.
+   * A light blue header band, a hairline between columns, columns as wide as
+   * their content (the table no longer stretches to the card), and a selected
+   * row in light grey with a dark edge on its left, so it never reads as the
+   * blue header. Rows the page marks with `rowTone` read as a subtotal (light
+   * grey, 600) or the total (light grey, 600, a heavy rule above).
+   */
+  look?: "finance";
+  /** With `look="finance"`: which rows are subtotals or the total. */
+  rowTone?: (row: T) => "subtotal" | "total" | null;
   /** Opt-in responsive Register Search (owner ruling R4 2026-09-16): a
       readable box when the toolbar has room, an icon that opens when narrow,
       and an active query plus its clear control always visible. */
@@ -784,6 +797,8 @@ function DataGridInner<T>({
   onSelectionChange,
   rowTestId,
   rowHighlight,
+  look,
+  rowTone,
   onFilteredRowsChange,
   onSearchChange,
   serverColumns,
@@ -2484,6 +2499,8 @@ function DataGridInner<T>({
           title={highlight?.label}
           aria-description={highlight?.label}
           className={`${highlight ? ROW_HIGHLIGHT_CLASS[highlight.tone] : ""} ${styles.tr} ${
+            rowTone?.(row) === "total" ? styles.trTotal : rowTone?.(row) === "subtotal" ? styles.trSubtotal : ""
+          } ${
             palette === "slate"
               ? selectable && (selectable.selectedKeys.has(key) || (selectable.isIndeterminate?.(row as never) ?? false)) ? styles.trTicked : ""
               : selectedKey === key ? styles.trSelected : ""
@@ -2849,6 +2866,7 @@ function DataGridInner<T>({
         isReference ? styles.rootReference : null,
         palette === "slate" ? styles.rootPaletteSlate : null,
         headerTone === "paleBlue" ? styles.rootHeaderPaleBlue : null,
+        look === "finance" ? styles.rootLookFinance : null,
         searchPresentation === "responsive" ? styles.rootSearchResponsive : null,
         labelledToolbar || wrapToolbar ? styles.rootLabelledToolbar : null,
       ]
