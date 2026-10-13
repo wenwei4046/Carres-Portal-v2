@@ -8099,7 +8099,8 @@ stock` on the page stays what is here or on a PO; a size shows each request unde
 (`{MPR No} · {pcs} · {state}`, opening the request) and what a PO holds (`On PO · {pcs}`). A size
 fully asked for cannot be ticked and its tick says where the request stands. `Ordered` lists the
 models with stock on its way. A refused or withdrawn request asks for nothing, so its size is
-suggested again.
+suggested again. `Send for approval` reads the forecast again first: if a ticked size's
+suggestion is no longer what the review shows, nothing is sent and the person checks again.
 
 **Measured 13 Oct 2026 on the TEST shell preview** (`e2e-kit/kit-forecast.spec.ts`): 1025, 1164 and
 1440 wide, then 1164 with the Summary open and with the Tasks panel open; rows closed, one model

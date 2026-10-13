@@ -273,6 +273,27 @@ describe("Forecast Purchase · Outright", () => {
     expect(await screen.findByTestId("forecast-review-who")).toHaveTextContent("Nobody holds Purchasing Approver. PO Duty then issues the PO and sends it to the supplier.");
   });
 
+  it("sends nothing when the suggestion changed while the review was open", async () => {
+    const created: unknown[] = [];
+    let reads = 0;
+    mount(undefined, {
+      // The second read: someone already asked for the King, so nothing is suggested for it now.
+      forecast: async () => { reads += 1; return reads === 1 ? PAYLOAD : { ...PAYLOAD, sizes: PAYLOAD.sizes.map((s) => (s.sku === "A-K" ? { ...s, requested: 3, requests: [{ id: "r9", no: "MPR-TEST-9", qty: 3, state: "waiting" as const }] } : s)) }; },
+      create: (body) => { created.push(body); return { id: "r1", approval_required: true }; },
+    });
+    fireEvent.click(await screen.findByTestId("forecast-select-a"));
+    fireEvent.click(screen.getByTestId("forecast-review-open"));
+    const send = await screen.findByTestId("forecast-review-send");
+    await waitFor(() => expect(send).toBeEnabled());
+    fireEvent.click(send);
+    expect(await screen.findByTestId("forecast-review-error")).toHaveTextContent("The suggestion changed while this was open. Nothing was sent. Check the list and review again.");
+    expect(reads).toBeGreaterThan(1);
+    expect(created).toEqual([]);
+    expect(notify).not.toHaveBeenCalled();
+    // Level 6, 2 in stock, 3 now asked for: the review shows what is left, 1 pc, for the person to check.
+    expect(screen.getByTestId("forecast-review-line-A-K")).toHaveTextContent("1 pc");
+  });
+
   it("a refusal stops the rest, keeps the review open and says how many were sent", async () => {
     let calls = 0;
     mount(undefined, { create: () => { calls += 1; if (calls === 2) throw new Error("TEST refusal from the door."); return { id: "r1", approval_required: true }; } });

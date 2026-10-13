@@ -303,6 +303,16 @@ export default function ForecastPurchasePage() {
     setSendError(null);
     let sent = 0;
     try {
+      /* Read the forecast again first. If a size's suggestion is no longer
+         what this review shows (someone already asked for it, or stock came
+         in), nothing is sent: the list has the new numbers and the person
+         checks again. */
+      const fresh = await refetch();
+      const now = new Map((fresh.data ? forecastPurchaseModels(fresh.data) : []).flatMap((m) => m.sizes.map((size) => [size.sku, size] as const)));
+      if (fresh.isError || chosen.some((size) => { const current = now.get(size.sku); return !current || current.block !== null || current.suggested !== size.suggested; })) {
+        setSendError(fresh.isError ? W.sendFailed : W.changed);
+        return;
+      }
       /* One request per supplier and category, one after another: each is its
          own approval and becomes its own PO. A refusal stops the rest, and
          the page says how many went. */

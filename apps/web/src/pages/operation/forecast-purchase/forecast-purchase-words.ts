@@ -98,4 +98,5 @@ export const FORECAST_PURCHASE = {
   sent: (requests: number) => `${count(requests, "request", "requests")} sent for approval`,
   sentSome: (sent: number, all: number) => `${sent} of ${count(all, "request", "requests")} sent for approval. The rest were not sent.`,
   sendFailed: "The request was not sent. Try again.",
+  changed: "The suggestion changed while this was open. Nothing was sent. Check the list and review again.",
 } as const;
