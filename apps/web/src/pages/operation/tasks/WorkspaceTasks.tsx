@@ -49,6 +49,9 @@ const TASK_MIN = 200;
 /** Under this much room Team Work leaves `Contact` to the task view, where it
  *  is the task's own fact row, so `Owner` and `Status` stay in view. */
 const TEAM_NARROW = 700;
+/** Under this much room (a 1025 window) `Last contact` is left to the task
+ *  view's History, so the task's own words keep a readable column. */
+const NO_LAST_CONTACT = 600;
 const TONE: Record<WorkspaceTone, string> = {
   warn: "bg-c-warn-bg text-c-warn-fg",
   neutral: "bg-c-info-bg text-c-info-fg",
@@ -124,7 +127,8 @@ export default function WorkspaceTasks() {
     return () => observer.disconnect();
   });
   const showContact = !(team && room > 0 && room < TEAM_NARROW);
-  const keys = (["due", ...(showContact ? ["contact"] : []), "lastContact", ...(team ? ["owner"] : []), "status"]) as Array<keyof typeof BASE>;
+  const showLast = !(room > 0 && room < NO_LAST_CONTACT);
+  const keys = (["due", ...(showContact ? ["contact"] : []), ...(showLast ? ["lastContact"] : []), ...(team ? ["owner"] : []), "status"]) as Array<keyof typeof BASE>;
   /* 16: the list engine keeps a little of its width for itself (measured 12). */
   const fit = fitColumns(room, 16, TASK_MIN, keys.map((key) => BASE[key]), keys.map((key) => FLOOR[key]));
   const widthOf = (key: keyof typeof BASE) => fit.fixed[keys.indexOf(key)] ?? BASE[key];
@@ -159,11 +163,11 @@ export default function WorkspaceTasks() {
       filterValue: (row: WorkspaceRow) => row.contact ?? W.notRecorded,
       exportValue: (row: WorkspaceRow) => row.contact ?? "",
     } satisfies DataGridColumn<WorkspaceRow>] : []),
-    {
+    ...(showLast ? [{
       key: "lastContact", label: W.col.lastContact, width: widthOf("lastContact"), minWidth: widthOf("lastContact"), wrap: true,
-      accessor: (row) => <span className={`text-body ${row.lastContact ? "text-c-ink" : "text-c-secondary"}`} data-testid={`workspace-last-${row.id}`}>{row.lastContact ?? W.notRecorded}</span>,
-      exportValue: (row) => row.lastContact ?? "",
-    },
+      accessor: (row: WorkspaceRow) => <span className={`text-body ${row.lastContact ? "text-c-ink" : "text-c-secondary"}`} data-testid={`workspace-last-${row.id}`}>{row.lastContact ?? W.notRecorded}</span>,
+      exportValue: (row: WorkspaceRow) => row.lastContact ?? "",
+    } satisfies DataGridColumn<WorkspaceRow>] : []),
     ...(team ? [{
       key: "owner", label: W.col.owner, width: widthOf("owner"), minWidth: widthOf("owner"), sortable: true, wrap: true, filterable: roomy,
       accessor: (row: WorkspaceRow) => <span className={`text-body ${row.owner ? "text-c-ink" : "text-c-secondary"}`} data-testid={`workspace-owner-${row.id}`}>{row.owner ?? W.notAssigned}</span>,
@@ -180,7 +184,7 @@ export default function WorkspaceTasks() {
     },
     // The measured widths are numbers: the columns follow them.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [team, showContact, roomy, taskWidth, fit.fixed.join()]);
+  ], [team, showContact, showLast, roomy, taskWidth, fit.fixed.join()]);
 
   const failedBanner = (error || refreshFailed || unhealthySources.length > 0) ? (
     <div role="alert" className="flex items-start gap-2 rounded-lg bg-c-err-bg px-3 py-2 text-meta text-c-err-fg" data-testid="workspace-failed">
