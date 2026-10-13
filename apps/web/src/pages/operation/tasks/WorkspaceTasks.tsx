@@ -124,20 +124,22 @@ export default function WorkspaceTasks() {
   const { task, openTask } = desk;
 
   /* The chosen task is in the address (Workspace MASTER §5.4): a link opens
-     it, Back leaves it. The desk stays the one owner of what is open. */
+     it once the Work read has answered; from then on the address follows the
+     desk, which stays the one owner of what is open. */
   const taskParam = params.get("task");
+  const fromAddress = useRef<"waiting" | "opening" | "done">("waiting");
   useEffect(() => {
-    if (!hasData) return;
-    if (taskParam && !task) {
-      const row = items.find((candidate) => candidate.id === taskParam);
-      if (row) openTask(row); else set({ task: null });
-    }
-    // Opening from the address happens once per address.
+    if (!hasData || fromAddress.current !== "waiting") return;
+    const row = taskParam ? items.find((candidate) => candidate.id === taskParam) : null;
+    fromAddress.current = row ? "opening" : "done";
+    if (row) openTask(row); else if (taskParam) set({ task: null });
+    // Once per page: the address is read when the first answer arrives.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taskParam, hasData]);
+  }, [hasData]);
   useEffect(() => {
-    if (!hasData) return;
-    if ((task?.id ?? null) !== taskParam && (task || !items.some((candidate) => candidate.id === taskParam))) set({ task: task?.id ?? null });
+    if (fromAddress.current === "waiting") return;
+    if (fromAddress.current === "opening") { if (!task) return; fromAddress.current = "done"; }
+    if ((task?.id ?? null) !== taskParam) set({ task: task?.id ?? null });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id]);
 
