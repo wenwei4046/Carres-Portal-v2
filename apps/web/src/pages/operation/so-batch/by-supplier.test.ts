@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PurchaseDemandRow, SoBatchOrderRow } from "@carres/shared";
-import { BY_SUPPLIER, daysBetween, deadlineKey, orderedSupplierGroups, supplierGroups, todayNumbers } from "./by-supplier";
+import { BY_SUPPLIER, COLUMN_FLOOR, daysBetween, deadlineKey, fitColumns, orderedSupplierGroups, supplierGroups, todayNumbers } from "./by-supplier";
 
 /**
  * SO Batch Purchase · By supplier (owner 12 Oct 2026). One row per supplier
@@ -274,5 +274,56 @@ describe("the Today card reads the same lines as the list", () => {
     expect(BY_SUPPLIER.toOrder(null, 1)).toBe("1 pc to order");
     expect(BY_SUPPLIER.windowToday("11:00 AM")).toBe("11:00 AM today");
     expect(BY_SUPPLIER.allOrdered).toBe("All ordered");
+  });
+});
+
+/**
+ * THE LIST FITS THE ROOM IT IS GIVEN (Layout Standard, 13 Oct 2026). The five
+ * By supplier columns and their floors, as the view passes them.
+ */
+describe("fitColumns", () => {
+  const BASE = [80, 96, 120, 120, 120];
+  const FLOORS = [COLUMN_FLOOR.fixed, COLUMN_FLOOR.fixed, COLUMN_FLOOR.fixed, COLUMN_FLOOR.fixed, COLUMN_FLOOR.status];
+  const sum = (widths: number[]) => widths.reduce((n, w) => n + w, 0);
+
+  it("with room, the fixed columns keep their widths and the first takes the rest", () => {
+    const fit = fitColumns(904, 80, 150, BASE, FLOORS);
+    expect(fit).toEqual({ first: 904 - 80 - 2 - 536, fixed: BASE, tight: false });
+  });
+
+  it("the first column is never under 150 while the fixed columns keep their widths", () => {
+    /* 80 + 2 + 536 + 150 = 768 is the least room the full widths take. */
+    expect(fitColumns(768, 80, 150, BASE, FLOORS)).toMatchObject({ first: 150, tight: false });
+    expect(fitColumns(767, 80, 150, BASE, FLOORS).tight).toBe(true);
+  });
+
+  it("short of room, the fixed columns give way together and everything still fits", () => {
+    /* 1164 wide with the Tasks panel open leaves the list 570. */
+    const fit = fitColumns(570, 80, 150, BASE, FLOORS);
+    expect(fit.tight).toBe(true);
+    expect(80 + 2 + fit.first + sum(fit.fixed)).toBeLessThanOrEqual(570);
+    expect(fit.first).toBeGreaterThanOrEqual(COLUMN_FLOOR.first);
+    fit.fixed.forEach((width, index) => {
+      expect(width).toBeGreaterThanOrEqual(FLOORS[index]!);
+      expect(width).toBeLessThanOrEqual(BASE[index]!);
+    });
+    /* Status never goes under its own floor. */
+    expect(fit.fixed[4]).toBe(COLUMN_FLOOR.status);
+  });
+
+  it("gives way only as far as is needed", () => {
+    const roomy = fitColumns(700, 80, 150, BASE, FLOORS);
+    const tight = fitColumns(570, 80, 150, BASE, FLOORS);
+    expect(sum(roomy.fixed)).toBeGreaterThan(sum(tight.fixed));
+  });
+
+  it("below every floor the columns stop at their floors: the list scrolls, nothing is squeezed further", () => {
+    const fit = fitColumns(300, 80, 150, BASE, FLOORS);
+    expect(fit.fixed).toEqual([60, 60, 60, 60, 112]);
+    expect(fit.first).toBe(COLUMN_FLOOR.first);
+  });
+
+  it("before the room is measured it draws the full widths", () => {
+    expect(fitColumns(0, 80, 150, BASE, FLOORS)).toMatchObject({ fixed: BASE, tight: false });
   });
 });

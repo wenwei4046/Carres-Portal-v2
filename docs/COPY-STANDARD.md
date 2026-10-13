@@ -1443,7 +1443,7 @@ and Selangor public holidays are excluded.
 
 **SO Batch Register presentation — owner-approved 2026-10-04.** Reuse `Table`, `Cards`, `Page tools`, `Group by: None`, `Group by: Supplier` and the accessible `SO Batch Purchase view`. Standalone card summary uses `PO Pending`, `PO Partial`, `PO Done`. The CompactModuleCard header and its Open/Close words remain shared.
 
-**SO Batch optional whole-round stock — capability of 2026-10-04; its `Match Ready Stock` button REMOVED by the owner 13 Oct 2026 (never agreed), so the words below are on no screen today.** `Match Ready Stock` computed read-only suggestions in the current Listing scope. Reuse `Stock Location`, `Ready Stock`, `{n} available`, `Proceed`, `Cancel` and `Not confirmed · Try again`. Purchasing Settings uses `Ready Stock` and `Priority`, with `Customer Requested Delivery Date` / `Proceed Date`; `Not available` means the source setting could not be read. Only Proceed saves exact Unit reservations. An unknown write outcome blocks Proceed until the actual source has been checked; the interface never calls it a failed reservation merely because the response was lost.
+**SO Batch `Use stock` — owner's round 3 brief, 13 Oct 2026 · BUILT 13 Oct 2026.** `Use stock · {n}` on the selection bar, only while a ticked item line has a free Unit; never on the toolbar. Its hover says `Reserves the suggested free New Unit for each ticked item that has stock. The rest stay to buy.` After the press: `{n} Units reserved from stock` · `1 Unit reserved from stock`. A refusal, or an answer that could not be confirmed: `Not confirmed · Try again`. Purchasing Settings uses `Ready Stock` and `Priority`, with `Customer Requested Delivery Date` / `Proceed Date`; `Not available` means the source setting could not be read. The whole-round stock mode of 2026-10-04 and its words `Match Ready Stock`, `Stock Location` and `Proceed` are deleted.
 
 **The SO Batch Purchase rail — owner-approved 2026-10-04.** Local navigation is Listing / deferred
 Report; factual groups are Order time and PO Safety Days. The existing Purchasing-owned Setup to
@@ -1527,8 +1527,8 @@ These stock-picker words do not rename every Warehouse screen.
 
 | Where | The words |
 |---|---|
-| Actionable goods heads | `Status` · `Category` · `Qty` · `Item` · `Ready Stock` · `Supplier` · `Supplier Deliver To`; selection checkbox leads. Retire SKU, Ordered Qty, To buy and Order By from this table only. |
-| SO Batch parent/item PO Status | `Pending` · `Partial` · `Done`, from actual remaining quantity and non-cancelled PO commitment. Sending and receiving are separate facts. Manual Purchase retains its own Need PO / No PO needed Status. |
+| Actionable goods heads (the SO Batch quick card and Manual Purchase) | `Status` · `Category` · `Qty` · `Item` · `Ready Stock` · `Supplier` · `Supplier Deliver To`; selection checkbox leads. Retire SKU, Ordered Qty, To buy and Order By from this table only. The opened row of SO Batch `By sales order` has its own heads ("SO Batch Purchase · By sales order") |
+| SO Batch item PO Status (quick card goods lines) | `Pending` · `Partial` · `Done`, from actual remaining quantity and non-cancelled PO commitment. Sending and receiving are separate facts. Manual Purchase retains its own Need PO / No PO needed Status. A Sales Order ROW reads the `By sales order` status words, which are read from the same arithmetic |
 | Ready Stock cell | `{n} available` / `{n} reserved` on separate lines; reserved means this SO item line. `0` only for a successful empty read with no saved choice. |
 | Stock picker heads (BUILT — `components/StockPickerTable.tsx`, both purchasing surfaces) | `Goods Received Date` · `Stock Location` · `Supplier` · `PO No / Ref No` with `Unit ID` on line two · `Condition`; checkbox leads. Date only, physical receipt; current stock location. No Date In or Where on this picker. A two-line heading is ONE accessible name (`title`/`aria-label`), because two block spans concatenate in the DOM with no space. Consignment goods print the supplier's name with `Supplier owned` beneath it; a counted row prints `{n} counted` beside its grade, since `Qty` is not one of the six columns. |
 | Stock picker actions | `Choose Ready Unit` · `Change selection` · `Save changes` · `Cancel`. No per-Unit Undo; save writes, checkbox alone does not. |
@@ -2311,8 +2311,20 @@ Purchasing dictionary's words on the other pages. An item line is the model code
 `{weekday} · if sent today`. Quantities `{n} pcs` · `1 pc`, a sofa `{n} sets` · `1 set`. Status `Cut-off passed` with
 `{qty} to buy`, or `To buy` with the quantity. No supplier: `Supplier not set` · `Set the supplier in Catalog`.
 Footer `{n} groups · {n} suppliers`. `Order PO deadline` is the Order By date and `Supplier ready by` is a projection
-for demand with no PO yet; neither renames `PO Safety Days` or `PO Delivery Date`, which keep their meaning on the
-By sales order view.
+for demand with no PO yet; neither renames `PO Safety Days` or `PO Delivery Date`, which keep their meaning wherever
+they are printed (the rail, the quick card, the PO).
+
+**SO Batch Purchase · By sales order — owner's round 3 brief, 13 Oct 2026 · BUILT 13 Oct 2026 (Purchasing MASTER §9.1).**
+Columns, sentence case: `SO no.` · `Items` · `Proceed date` · `Customer’s original requested delivery` · `Status`.
+Second lines: the customer · `{n} to buy · {n} ordered · {n} stock` (item lines, each part only when above zero) ·
+the weekday. Status pill: `To buy` · `Cut-off passed` · `Late to order` · `Partly ordered` · `Ordered` ·
+`From ready stock` (with `No PO needed` under it). Under a to-buy pill: `{n} days left` · `Today` · `{n} days late`,
+or the governed reason when nothing can be ticked (`Production days not set`, `Already on a PO`, ...). Then every PO
+number, comma-separated, each a link. Item line heads: `Item` · `Qty` · `Stock you can use` · `Supplier` ·
+`Supplier delivers to`; `Stock you can use` holds the Ready Stock cell (`{n} available` · `{n} reserved`). A line of a
+matched set that carries no tick: `Part of the set above`. No items: `No items on this order`. Footer: `{n} sales
+orders` · `1 sales order` · `{shown} of {n} sales orders`. `PO Status`, `Pending`, `Partial` and `Done` are not row
+words on this view; `Customer Delivery Location`, `PO Safety Days` and `PO Delivery Date` are not columns on it.
 
 **PO panel tabs — owner ruling 2026-10-02, APPROVED TARGET / NOT BUILT:** `PO info` ·
 `Communication`. Clicking the PO number opens this shared quick panel. `Open full page` opens
@@ -2347,7 +2359,7 @@ No new document or duplicated dictionary is required. Code may lag; approval is 
 | `Damaged Qty` · `Wrong Item Qty` · `Extra Qty` | Separate existing receipt-result quantities; this naming does not change receipt arithmetic. |
 | SO Batch `PO Status` | `Pending` · `Partial` · `Done`. Actual remaining quantity and exact non-cancelled PO lineage decide purchase completion. Free stock suggestions never complete a purchase; sending and receiving remain separate. Plain text, one line. |
 | `{PO No} has {n} {Item} available.` · `Use this PO` · `{n} {Item} on {PO No} is reserved for this order.` | SO Batch Purchase second Status line for goods on an open PO that no order holds (owner ruling 2026-09-28). `reserved` is the same word Ready Stock uses — never `allocated`, never `Already on a PO`, never `On a PO` alone, because those do not say how the PO relates to the customer. A refused `Use this PO` prints `That PO has no goods left that no order holds.` or `That PO is no longer open.`; its other refusals are the Ready Stock door's own sentences. |
-| Status (SO Batch + Manual Purchase registers) | ONE word, one line: SO Batch `PO Status` is `Pending` / `Partial` / `Done`; Manual Purchase `Status` is `Need PO` / `No PO needed`. The reason never sits in the cell. SO Batch marks a row with a left-edge stripe (red = cannot buy until fixed, blue = an offer or a reservation to read); the stripe's words are the row's hover title, and the item line in the expansion prints the reason with its door: `SKU not found` + `Fix in Catalog` (also `Supplier not assigned` · `Stock identity not set`) · `Production days not set` + `Open Settings` · the PO sentence above + `Use this PO`. Manual Purchase's waiting request reads `Need approval` in `Approval Status` only. `Need approval first` is retired. Plain text, never a coloured pill. |
+| Status (Manual Purchase register; SO Batch item lines) | Manual Purchase `Status` is ONE word, one line: `Need PO` / `No PO needed`; the reason never sits in the cell. On SO Batch `By sales order` (kit list since 13 Oct 2026) the row has no stripe: its Status pill is followed by the reason in view, and the item line prints the same reason with its door: `SKU not found` + `Fix in Catalog` (also `Supplier not assigned` · `Stock identity not set`) · `Production days not set` + `Open Settings` · the PO sentence above + `Use this PO`. Manual Purchase's waiting request reads `Need approval` in `Approval Status` only. `Need approval first` is retired. Plain text, never a coloured pill. |
 | `{n} available` · `{n} reserved` | The Ready Stock cell on an item row: free exact Units for those goods, then Units saved against THIS item line. `0` prints only for a SUCCESSFUL read that found neither; a read that is loading, failed or unverified says so in its own words and NEVER as a zero. |
 | `Choose Ready Unit` · `Change selection` · `Save changes` · `Cancel` | The one stock-selection journey. Ticking is a draft and writes nothing; the first save is `Choose Ready Unit`; afterwards the saved set is reopened by `Change selection` and committed or abandoned by the other two. There is no per-Unit Undo or release: a removal is part of the replacement and is validated with it. |
 | `Stock Location` | Where a Unit actually stands today. Never the destination a purchase order instructs, and never the Sales Order's delivery address. |

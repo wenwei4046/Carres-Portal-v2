@@ -79,6 +79,11 @@ describe("no banned word reaches the screen (C12 · portal-wide)", () => {
          coverage absence is the string the file is now known to contain. */
       { minStrings: 40, expectString: "Not ordered yet" },
     );
+    /* The By sales order view's words live in its model file (13 Oct 2026). */
+    itSaysNoBannedWord(
+      join(PAGES, "operation", "so-batch", "by-sales-order.ts"),
+      { minStrings: 20, expectString: "Stock you can use" },
+    );
     itSaysNoBannedWord(
       join(PAGES, "operation", "so-batch", "SoBatchIssueWorkspace.tsx"),
       { minStrings: 20, expectString: "Goods must arrive" },

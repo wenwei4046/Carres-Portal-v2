@@ -11,12 +11,17 @@
  * `?state=empty` · `?state=nothing` (everything needs no purchase) ·
  * default: 27 orders with long names, blocked, pool-covered, partly bought,
  * Ready-Stock-only and fully ordered records.
+ *
+ * Ready Stock is answered too: SO-1301 and SO-1302 each have TEST Units free
+ * at Carres Klang, so `Use stock` shows on the selection bar when their lines
+ * are ticked, and pressing it takes the Units here in the page (nothing is
+ * written anywhere).
  */
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { PurchaseDemandRow, SoBatchOrderRow, SoBatchPurchaseResponse } from "@carres/shared";
+import type { PurchaseDemandRow, ReadyStockResponse, SoBatchOrderRow, SoBatchPurchaseResponse } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
 import OperationApp from "@/pages/operation/OperationApp";
 import "@/index.css";
@@ -70,6 +75,7 @@ if (state !== "empty") {
       status: kind === "ordered" ? "ordered" : kind === "partial" ? "partial" : "blank",
       proceededAt: `2026-09-${String(1 + (i % 15)).padStart(2, "0")}T09:00:00+08:00`,
       requestedDeliveryDate: i % 5 ? `2026-${i % 4 ? "10" : "12"}-${String(1 + (i % 27)).padStart(2, "0")}` : null,
+      originalRequestedDeliveryDate: i % 5 ? `2026-${i % 4 ? "10" : "12"}-${String(1 + (i % 27)).padStart(2, "0")}` : null,
       deliveryCity: city, deliveryState: st,
       pos: linked ? [po] : [],
       lines: [{ orderLineId: `l${i}`, sku: "B1201S-K", qty, stockTaken: kind === "stock" ? 2 : 0,
@@ -97,11 +103,54 @@ const payload: SoBatchPurchaseResponse = {
   procurementPartners: [], safetyDays: 14,
 };
 
+/* TEST Units on the shelf: two for SO-1301's line, one for SO-1302's. */
+const shelf: Array<{ itemId: string; unitCode: string; lineId: string; heldFor: string | null }> = [
+  { itemId: "aaaaaaaa-0000-4000-8000-000000000001", unitCode: "TEST-B1201S-K-001", lineId: "l1", heldFor: null },
+  { itemId: "aaaaaaaa-0000-4000-8000-000000000002", unitCode: "TEST-B1201S-K-002", lineId: "l1", heldFor: null },
+  { itemId: "aaaaaaaa-0000-4000-8000-000000000003", unitCode: "TEST-B1201S-K-003", lineId: "l2", heldFor: null },
+];
+function readyStockOf(orderId: string): ReadyStockResponse {
+  const order = registerRows.find((row) => row.orderId === orderId);
+  const lines = (order?.lines ?? []).map((line) => {
+    const held = shelf.filter((unit) => unit.heldFor === line.orderLineId);
+    const onPo = line.pos.reduce((sum, po) => sum + po.qty, 0);
+    return { orderLineId: line.orderLineId, sku: line.sku, item: line.item, qty: line.qty, reservedQty: held.length,
+      reservedUnitCodes: held.map((unit) => unit.unitCode), onPoQty: onPo, remainingQty: Math.max(0, line.qty - line.stockTaken - onPo) };
+  });
+  const lineIds = new Set(lines.map((line) => line.orderLineId));
+  return {
+    orderId, so: order?.so ?? null, reference: order?.so == null ? null : `SO-${order.so}`, lines,
+    units: shelf.filter((unit) => lineIds.has(unit.lineId)).map((unit) => ({
+      itemId: unit.itemId, unitCode: unit.unitCode, identityScope: "unit", sku: "B1201S-K", condition: "new",
+      siteName: "Carres Klang", warehouseId: KLANG, holderName: null, ownership: "carres_owned", supplier: null,
+      qty: 1, dateIn: "2026-09-01", matchingLineIds: unit.heldFor ? [] : [unit.lineId], lineIds: [unit.lineId],
+      blocked: null, reservedForLineId: unit.heldFor,
+    })),
+  } as ReadyStockResponse;
+}
+/* `Use stock`: the picked Units are held for their line, and the line has
+   that much less to buy, as the real door would answer on the next read. */
+function reserve(body: { orderId: string; picks: Array<{ itemId: string; orderLineId: string }> }) {
+  for (const pick of body.picks) {
+    const unit = shelf.find((candidate) => candidate.itemId === pick.itemId);
+    if (unit) unit.heldFor = pick.orderLineId;
+    const line = registerRows.find((row) => row.orderId === body.orderId)?.lines.find((candidate) => candidate.orderLineId === pick.orderLineId);
+    if (line) line.stockTaken += 1;
+    const demand = rows.find((row) => row.orderId === body.orderId && row.lineIds.includes(pick.orderLineId));
+    if (demand) { demand.toBuy = Math.max(0, (demand.toBuy ?? 0) - 1); demand.takenFromStock = (demand.takenFromStock ?? 0) + 1; }
+  }
+  const order = registerRows.find((row) => row.orderId === body.orderId);
+  return { reserved: body.picks.length, reference: `SO-${order?.so}`, units: body.picks };
+}
+
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input, init) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
   if (!url.includes("127.0.0.1:88")) return realFetch(input, init);
-  const body = url.includes("/api/operation/purchase/demands") ? payload : url.includes("/rest/") ? [] : {};
+  const stock = /\/purchase\/demands\/([^/]+)\/ready-stock$/.exec(url.split("?")[0]!);
+  const body = url.includes("/ready-stock/reserve") ? reserve(JSON.parse(String(init?.body ?? "{}")))
+    : stock ? readyStockOf(decodeURIComponent(stock[1]!))
+    : url.includes("/api/operation/purchase/demands") ? { ...payload, rows: rows.filter((row) => row.toBuy == null || row.toBuy > 0) } : url.includes("/rest/") ? [] : {};
   return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
 };
 

@@ -9,6 +9,8 @@ import type { PoNumberLink } from "./po-number-links";
 
 /** The shared document-link recipe. */
 const DOCUMENT_LINK_CLASS = "font-medium text-kit-blue-11 underline-offset-2 hover:underline";
+/** A record number in a kit cell (01 §3 links): ink, dotted underline, solid on hover. */
+const KIT_LINK_CLASS = "font-medium text-c-ink underline decoration-c-secondary decoration-dotted underline-offset-[3px] hover:decoration-solid";
 
 export default function PoNumberLinks({
   numbers,
@@ -16,6 +18,7 @@ export default function PoNumberLinks({
   empty = null,
   testId,
   linkTestId,
+  wrap = false,
 }: {
   numbers: readonly PoNumberLink[];
   /** Opens the exact PO — each page keeps its own navigation (return state). */
@@ -24,11 +27,13 @@ export default function PoNumberLinks({
   empty?: ReactNode;
   testId?: string;
   linkTestId?: string;
+  /** A two-line cell (01 §5): the list wraps inside its column, never cut. */
+  wrap?: boolean;
 }) {
-  /* One line, never wrapped: a list longer than the cell is clipped inside it
-     and the column is dragged wider. The row keeps the standard 32px recipe. */
+  /* On a 32px row: one line, a list longer than the cell is clipped inside it
+     and the column is dragged wider. In a two-line cell (`wrap`) it wraps. */
   return (
-    <span className="block truncate" data-testid={testId}>
+    <span className={wrap ? "block break-words" : "block truncate"} data-testid={testId}>
       {numbers.length === 0
         ? empty
         : numbers.map((po, index) => (
@@ -36,7 +41,7 @@ export default function PoNumberLinks({
               {index > 0 ? ", " : null}
               <button
                 type="button"
-                className={DOCUMENT_LINK_CLASS}
+                className={wrap ? KIT_LINK_CLASS : DOCUMENT_LINK_CLASS}
                 data-testid={linkTestId}
                 data-po-id={po.poId}
                 onClick={(event) => {
