@@ -117,6 +117,31 @@ describe("Purchase Order Register authority", () => {
     });
   });
 
+  /* Round 3 brief of 13 Oct 2026, point 4: "Goods arrived" closes the
+     supplier follow-ups on that PO. No act closes them: they exist only while
+     goods are still pending, so a full receipt removes them by itself. */
+  it("goods arrived in full: the passed date and the day-before check ask nothing more of the supplier", () => {
+    const sent = { kind: "confirmed_sent" as const, channel: "whatsapp", sentAt: "2026-08-20T09:00:00Z", poVersion: 1 };
+    const chasing: PurchaseOrderRegisterInput = { ...base, supplierDate: "2026-08-27", arrivalCheckOpen: true, sends: [sent] };
+    const before = purchaseOrderRegisterFacts(chasing, "2026-08-28");
+    expect(before.filters).toEqual(expect.arrayContaining(["supplier_date_passed", "confirm_tomorrows_delivery"]));
+    expect(purchaseOrderReplyWorkItems(chasing, null, "2026-08-28")).toHaveLength(1);
+
+    const arrived: PurchaseOrderRegisterInput = { ...chasing, status: "received", lines: [{ qty: 3, receivedQty: 3 }] };
+    const after = purchaseOrderRegisterFacts(arrived, "2026-08-28");
+    expect(after.filters).not.toContain("supplier_date_passed");
+    expect(after.filters).not.toContain("confirm_tomorrows_delivery");
+    expect(after.filters).not.toContain("supplier_date_missing");
+    expect(purchaseOrderReplyWorkItems(arrived, null, "2026-08-28")).toEqual([]);
+  });
+
+  it("a part receipt keeps the follow-up for the balance still owed", () => {
+    const sent = { kind: "confirmed_sent" as const, channel: "whatsapp", sentAt: "2026-08-20T09:00:00Z", poVersion: 1 };
+    const part: PurchaseOrderRegisterInput = { ...base, supplierDate: "2026-08-27", sends: [sent], lines: [{ qty: 3, receivedQty: 1 }] };
+    expect(purchaseOrderRegisterFacts(part, "2026-08-28").filters).toEqual(expect.arrayContaining(["supplier_date_passed", "partly_received"]));
+    expect(purchaseOrderReplyWorkItems(part, null, "2026-08-28")).toHaveLength(1);
+  });
+
   it("completed goods retain sending work while cancelled documents retain their separate guard", () => {
     const completed = purchaseOrderRegisterFacts({
       ...base,
