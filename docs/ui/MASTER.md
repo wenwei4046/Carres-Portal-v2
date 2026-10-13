@@ -652,6 +652,18 @@ PAYMENT     the customer-facing 50/50 composition is used only while editing a c
 
 # §5 · The Tasks panel (right) — owner rulings 2026-10-08 · BUILT ON BRANCH, NOT DEPLOYED
 
+**The list — owner 12 Oct 2026 (03 §8), round 3 brief of 13 Oct 2026 (point 2) · BUILT ON BRANCH `build/tasks-panel-kit`, NOT
+DEPLOYED.** Title row 36 with no line under it. The day strip of the working week; a day's number is its `To do`,
+amber when that day holds late work; the chosen day is filled in the selection colour. `To do` · `Waiting` · `Done` as
+the segmented control, each with its number. Then one white group per party (name, count, a fold), and in it one card
+per task on the ground colour: module icon, title, ›, then one row per fact, label left and value right. The whole
+card opens the task; amber is only on the row that has passed. `To do` on today is what is due today or earlier and
+what has no working date; another day shows only its own work. `Waiting` is every task a request was recorded for
+whose answer is not due yet; `Done` is what the person finished on the chosen day. All three read the ONE Work read
+(`lifecycle` and `completed`); nothing is counted twice and no second engine exists. The module filter icons, the
+`Late` and `No date` sections and the day badge of the earlier panel are removed. **Not built yet:** the one task
+view (`Steps` · `Route` · `History` · `Files` · notes), `@` notes and `Mention`, `+ Task`, the dark toast.
+
 **Current supplied shell target — owner 9 Oct 2026, kept in v12 of 11 Oct.** Task card and open-card composition: 03 §8. A collapsible Tasks region (01 §4)
 is opened by the labelled Tasks/count control; Summary collapses independently. Do not add the old
 permanent right icon column to the supplied SO composition. Tasks uses the signed-in person's

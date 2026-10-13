@@ -5076,6 +5076,22 @@ Workspace message availability: `Message not available` replaces a placeholder d
 
 | Sales Orders pilot compact search (owner approved 2026-10-01; scope words follow what the server matches — linked document numbers since PR #1850, phone digits since 2026-10-06) | `Search orders…`; accessible scope `Search sales orders by SO number, customer, phone, imported reference or linked document number` | Unverified whole-database item search claim · naming a field the server search does not match |
 
+## The Tasks panel words — owner 12 Oct 2026 (03 §8) · round 3 brief, 13 Oct 2026 (point 2) · LIST BUILT ON BRANCH, NOT DEPLOYED
+
+The shell's right panel. Work words stay the Work engine's own sentences (the card title is the act, naming the
+party); this section holds the panel's frame and the card rows.
+
+| Where | Use exactly | Do not use |
+|---|---|---|
+| Title row | `Tasks` · `{weekday} · {n} left`, where `{n}` is today's `To do` | a second number that differs from the `To do` tab |
+| Day strip | `Mon` · `Tue` · `Wed` · `Thu` · `Fri` (`Sat` only while work is dated on it) over the day number, with that day's `To do` under it · `Previous week` · `Next week` | a count of Waiting or Done under a day |
+| Tabs | `To do {n}` · `Waiting {n}` · `Done {n}` | `Waiting for answer` · `Done today` in this panel (they are the Workspace page's rail words) |
+| Party head | the party's name and its count; a purchase batch sits under `SO Batch Purchase`; work with no party sits under its page's name | a module group in place of the party |
+| Card rows, label left and value right | `PO No` · `SO No` · `MPR No` · `Supplier DO` (a record of another kind: its page's name) · `Deadline` `{weekday, date}` · late: `{weekday, date} · {n} days late` / `1 day late`, or `· passed` when the working days cannot be counted · `Deadline` `No date · set by {page}` · a purchase batch: `Cut-off` `{time}`, late `{time} · passed` · waiting: `Asked` `{date}` · `Next contact` `{date}` · back from waiting: `No answer by` `{date}` · covering: `For` `{name}` · finished: `Record` `{record}` · `Done` `{time}` | `Overdue` · `Missed` · a tag or a button on a card · amber on any row but the one that has passed |
+| Empty | `Nothing to do today` · `Nothing planned for this day` · `Nothing is waiting for an answer` · `Nothing done on this day` | `0` while loading or failed |
+| Opened task | `All tasks` · `{n} of {m}` · `Previous task` · `Next task` | `Tasks` as the way back |
+| Failure | `Tasks could not be refreshed` · `Last updated {time}` · `Could not refresh {source}` · `Try again` | a silent empty list |
+
 ### Accepted Sales Orders shared template — 2026-10-01
 
 Owner-accepted screen vocabulary: `Order summary` · `Stock Status` · `Not applicable` · `Clear all` · `Open full page` · `Related documents`. These describe the accepted read-only template. `Receipt unconfirmed` is retired (owner ruling 2026-10-05): a failed stock read shows its error with `Try again`.
