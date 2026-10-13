@@ -857,7 +857,9 @@ const SETTINGS_CHART = [
   ["0000", "ASSETS", null, true, null, null],
   ["300-0000", "TRADE DEBTORS", "0000", false, "CURRENT ASSETS", "SDC"],
   ["310-0000", "CASH AT BANK", "0000", true, "CURRENT ASSETS", null],
-  ...MONEY_ACCOUNT_ROWS.map((m) => [m.code, m.name, "310-0000", false, null, m.money_kind === "BANK" ? "SBK" : m.money_kind === "CASH" ? "SCH" : "HLD"]),
+  ["315-0000", "CARD & ONLINE CLEARING", "0000", true, "CURRENT ASSETS", null],
+  ...MONEY_ACCOUNT_ROWS.map((m) => [m.code, m.name, m.money_kind === "HOLDING" ? "315-0000" : "310-0000", false, null,
+    m.money_kind === "BANK" ? "SBK" : m.money_kind === "CASH" ? "SCH" : "HLD"]),
   ["330-0000", "STOCK", "0000", false, "CURRENT ASSETS", "SBS"],
 ].map(([code, name, parent_code, is_header, section, special]) => ({
   code, name, kind: "ASSET", parent_code, is_control: false, control_for: null, is_active: true, is_header,
@@ -937,7 +939,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/finance/dealer-commission/rules")) return json({ today: TODAY, rules: [], dealers: [], models: [], categories: [] });
   if (url.includes("/api/finance/dealer-commission")) return json(dcSource(q.get("month") ?? TODAY.slice(0, 7)));
   if (url.includes("/api/finance/ledger/accounts") && PAGE === "money-accounts")
-    return json({ go_live_on: GO_LIVE, accounts: SETTINGS_CHART, roles: { MONEY_ACCOUNTS_HEADING: "310-0000" },
+    return json({ go_live_on: GO_LIVE, accounts: SETTINGS_CHART, roles: { MONEY_ACCOUNTS_HEADING: "310-0000", CLEARING_ACCOUNTS_HEADING: "315-0000" },
       money_accounts: MONEY_ACCOUNT_ROWS.map((m) => m.code), system_accounts: [], rule_headings: [],
       sections: [{ section: "CURRENT ASSETS", kind: "ASSET", sort_order: 50 }] });
   if (url.includes("/api/finance/ledger/accounts"))

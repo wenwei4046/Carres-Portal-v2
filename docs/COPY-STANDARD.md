@@ -4997,7 +4997,7 @@ Database sentences (shown as written):
 - `<code> <name> is inside <code> <name>. A heading cannot go under a heading inside it.`
 - `Every number under <code> <name> is used. Type a number for the new account.`
 - `Type a number for the new account. <code> <name> does not end in 00 or -0000, so no number is picked for you.`
-- `<code> <name> holds the bank and cash accounts. Add a bank account with Add a money account.`
+- `<code> <name> holds money accounts. Add one with Add a money account.` (0693: either money heading, bank and cash or card and online holding)
 - `<code> <name> decides how money may be recorded. A heading cannot go under it.`
 
 
@@ -5018,8 +5018,8 @@ New database sentences (the screen prints them as written):
 
 | Word | Meaning |
 |---|---|
-| `{code} {name} is not a bank or cash account. Only bank and cash accounts go under {code} {name}.` | An account with no bank or cash row, moved under the money accounts heading or a heading inside it. The second `{code} {name}` is the money accounts heading. Tag `move_into_money_heading`. |
-| `{code} {name} holds {code} {name}, which is not a bank or cash account. Only bank and cash accounts go under {code} {name}.` | The same for a heading: it names the first account under it (by number) that is not a bank or cash account. A heading holding only bank and cash accounts, or nothing, may go in. |
+| `{code} {name} is not a money account. Only money accounts go under {code} {name}.` | An account that is not a money account, moved under a money heading (bank and cash, or card and online holding, 0693) or a heading inside one. The second `{code} {name}` is that money heading. Tag `move_into_money_heading`. |
+| `{code} {name} holds {code} {name}, which is not a money account. Only money accounts go under {code} {name}.` | The same for a heading: it names the first account under it (by number) that is not a money account. A heading holding only money accounts, or nothing, may go in. |
 
 Retired by 0580 (never raised again, so never on screen):
 
