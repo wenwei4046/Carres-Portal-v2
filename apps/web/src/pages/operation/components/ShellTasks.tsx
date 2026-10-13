@@ -106,7 +106,6 @@ export default function ShellTasks() {
   const left = useTasksLeft();
   if (!open) return null;
   const now = new Date();
-  const mon = now.toLocaleDateString("en-GB", { month: "short" }).toUpperCase();
   const weekday = now.toLocaleDateString("en-GB", { weekday: "long" });
   return (
     <aside
@@ -116,12 +115,7 @@ export default function ShellTasks() {
         taskOpen ? "w-[clamp(366px,32vw,560px)]" : "w-[320px]"
       }`}
     >
-      <div className="flex h-9 shrink-0 items-center gap-1.5 border-b border-c-line px-3.5">
-        {/* The day badge: month on charcoal over the day number. */}
-        <span className="flex h-7 w-7 shrink-0 flex-col overflow-hidden rounded-[7px] border border-c-input-border bg-white" aria-hidden>
-          <span className="bg-c-ink text-center text-[7px] font-semibold leading-[10px] tracking-[0.04em] text-white">{mon}</span>
-          <span className="grid flex-1 place-items-center text-body font-semibold text-c-ink">{now.getDate()}</span>
-        </span>
+      <div className="flex h-9 shrink-0 items-center gap-1.5 px-3.5">
         <span className="flex min-w-0 flex-1 items-baseline gap-1.5 whitespace-nowrap">
           <span className="text-strong text-c-ink">Tasks</span>
           <span className="truncate text-meta text-c-muted">
