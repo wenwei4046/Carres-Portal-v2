@@ -439,6 +439,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         section: "Purchasing",
         pageGroup: "purchasing-buy",
       },
+      /* Forecast Purchase · Outright (owner 13 Oct 2026; Purchasing MASTER
+         §9.14): the weekly stock suggestion, directly under SO Batch Purchase. */
+      { key: "forecast-purchase", label: "Forecast Purchase", icon: TrendingUp, section: "Purchasing", pageGroup: "purchasing-buy" },
       { key: "manual-purchase", label: "Manual Purchase Request", icon: ClipboardList, section: "Purchasing", pageGroup: "purchasing-buy" },
       {
         // `operation:procurement` counts POs in the Pickup-action bucket —

@@ -1199,7 +1199,7 @@ do not create a second business status, work queue or source of truth.
 | Level | Exact visible words |
 |---|---|
 | Group headings | `BUY` · `RECEIVE` · `PROBLEMS` · `SHOWROOM` |
-| BUY pages | `SO Batch Purchase` · `Manual Purchase Request` (owner rename 2026-09-23; was `Manual Purchase`) · `Purchase Orders`. **BUILT 2026-09-23** — the rail row, the page title, the create button, the register's empty/search/footer words, the object's back destination, its loading and failure sentences, the browser title and the shared review's way out all read `Manual Purchase Request`. The screen noun is the REQUEST; the purchase itself is the PO that answers it, and `MPR` was always Manual Purchase **Request**. |
+| BUY pages | `SO Batch Purchase` · `Forecast Purchase` (owner 13 Oct 2026, under SO Batch Purchase) · `Manual Purchase Request` (owner rename 2026-09-23; was `Manual Purchase`) · `Purchase Orders`. **BUILT 2026-09-23** — the rail row, the page title, the create button, the register's empty/search/footer words, the object's back destination, its loading and failure sentences, the browser title and the shared review's way out all read `Manual Purchase Request`. The screen noun is the REQUEST; the purchase itself is the PO that answers it, and `MPR` was always Manual Purchase **Request**. |
 | RECEIVE pages | `Receiving` |
 | PROBLEMS pages | `Supplier Claims` · `Purchase Returns` · `Repair Orders` |
 | SHOWROOM pages | `Display Requests` · `Consignment Orders` · `Consignment Returns` |
@@ -2281,6 +2281,37 @@ the same name (Purchase Orders rail uses `Confirm tomorrow's supplier delivery`)
 Use `Listing` consistently for module list-view navigation. The page title identifies the module;
 do not repeat SO/PO in the tab. This is the shared navigation label.
 Other views retain their purpose-specific names, such as `Monthly demand`.
+
+### Forecast Purchase · Outright — owner-approved 13 Oct 2026 · BUILT ON BRANCH 13 Oct 2026 (Purchasing MASTER §9.14)
+
+The page suggests and never tells the person to buy. It says `Suggested` and `Forecast`; it never
+says `Buy` or `To buy`. Quantities are pieces: `1 pc` · `{n} pcs`.
+
+| Where | Exact visible words |
+|---|---|
+| Menu, page title | `Forecast Purchase` |
+| Tabs | `Suggested` · `Ordered` · `All` (opens on `All`) |
+| View button and menu | `By model · Outright`; menu heads `Group by` (`By model`) and `For` (`Outright`) |
+| Column headers | `Model` · the month alone (`Aug` · `Sep` · `Oct`) · `Free` over `stock` · the Monday as `12 Oct` over `Mon` |
+| Model row, grey line | `{supplier} · {n} sizes` · `1 size`; no supplier: `Supplier not set · {n} sizes` |
+| Opened row header | `Size`, then the three months |
+| A tick that cannot be taken | `Enough stock · nothing to buy` · `Supplier not set` · `Already ordered` · `Skipped this week` (the last two are not shown until `Place PO` and `Skip this week` are built) |
+| Selection bar | `{n} items selected · {pcs} · {n} PO` (`1 item`, `2 POs`); button `Create 1 PO` · `Create {n} POs` |
+| Summary | Title `Summary`. Card `Weekly forecast` with the Monday as `Mon, 12 Oct`; headline `{n} pcs` over `Suggested`; rows `Mon, 19 Oct` → `{n} pcs`. Group `By supplier`, one row per supplier → `{n} pcs` |
+| Footer | `{n} models · in pcs · suggestion only, you decide` · `1 model`; filtered: `{shown} of {n} models · in pcs · suggestion only, you decide` |
+| Review | Title `Review 1 PO` · `Review {n} POs`; line `{pcs} · Outright · back to stock level`; heads `Item` · `Qty` · `Supplier`; note `Outright stock: buys each size back to its stock level. One PO per supplier and category. Sales orders take this stock first; SO Batch only buys what stock cannot cover.`; buttons `Back` · `Skip this week` · `Place 1 PO` · `Place {n} POs` |
+
+Dates follow the one date rule: `Mon, 12 Oct` in text; a column header splits it into `12 Oct` over `Mon`.
+
+**PROPOSAL — awaiting the owner.** (1) `Place {n} PO` and `Create {n} PO` are the handoff's words;
+the rule above ("mix send / raise / place" becomes `Issue PO` everywhere) says `Issue PO`. They stay
+as handed over until the owner chooses. (2) The handoff gives no words for these states; these are
+proposed: empty list `No Outright mattress or Jager bedframe was sold in the last 3 months, so there is
+nothing to suggest.` · `Suggested` with nothing `Nothing is suggested this week. Free stock covers the
+last 14 days of sales.` · `Ordered` with nothing `No forecast PO this week.` · a search with no match
+`No model matches. Clear the search to see every model.` · a failed read `The forecast could not be
+read. Try again.` · in the review, while placing is not built: `Placing a PO and skipping a week from
+this page are not switched on yet. Raise the purchase in Manual Purchase Request for now.`
 
 ### Purchasing UI dictionary — APPROVED (Jess, 2026-09-18) · BUILT on SO Batch Purchase 2026-09-18
 

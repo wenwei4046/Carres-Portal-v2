@@ -918,6 +918,7 @@ Primary references: [Dynamics purchase requisitions](https://learn.microsoft.com
 Purchasing ▾
 ├─ BUY ▾
 │  ├─ SO Batch Purchase
+│  ├─ Forecast Purchase        (§9.14, owner 13 Oct 2026)
 │  ├─ Manual Purchase
 │  └─ Purchase Orders
 ├─ RECEIVE ▾
@@ -8001,6 +8002,91 @@ credit and payment remain distinct owning facts. No sale-notice matching interfa
 - A complete owner review of the remaining proposal, authoritative persistence and the outstanding
   cross-module contract are required before `PLAN MISSION COMPLETE`. No application implementation,
   Card, production migration or rendered UI acceptance is claimed by this synthesis.
+
+### 9.14 Forecast Purchase · Outright — owner-approved 13 Oct 2026 · read side BUILT ON BRANCH (not deployed) · `Place PO` NOT BUILT
+
+**RULING (owner, design handoff of 13 Oct 2026; `docs/ui-reference/sales-order-design/docs/FORECAST-PURCHASE-HANDOFF-13-Oct.md`).**
+A weekly page in Purchasing → BUY, directly under `SO Batch Purchase`. Per model and size it shows
+what sold recently, the free stock, a **suggested** quantity for this Monday and a **forecast** for
+the next two Mondays. The person decides what to order; the page never pushes: `Suggested` and
+`Forecast`, never `Buy` or `To buy`. One review day a week: Monday. Outright only. Subscription is
+parked (the business has not started) and has no page.
+
+**What is on the page.** Every Outright mattress, and one bedframe model, Jager. Not on the page:
+sofas and every other bedframe (bought per Sales Order in SO Batch Purchase), and accessories
+(§ MP / PILLOW STOCK PATH). Outright Sales Orders take this stock first; SO Batch Purchase buys only
+the shortfall (the existing Ready Stock and `Use this PO` rules, unchanged).
+
+**The arithmetic — ONE home, `packages/shared/src/forecast-purchase.ts` (Law D).**
+
+| Fact | Rule |
+|---|---|
+| Daily rate | pieces sold in the last 14 days ÷ 14 |
+| Stock level | daily rate × 14 days |
+| Suggested this Monday | stock level − free stock, never under 0, capped at one week of sales (daily rate × 7); the rest follows next Monday |
+| Forecast, next two Mondays | the same rule, as if sales stay at the daily rate and each Monday's suggestion arrives |
+| Free stock | New Units no order holds, in the warehouse, plus Units on an open PO, not arrived, that no order holds. Reserved, Display and other conditions are not counted |
+
+**Where each fact comes from (BUILT, `GET /api/operation/purchase/forecast`, read-only).** The page
+records nothing and re-derives nothing its owner already holds.
+
+| Fact | Owner and source |
+|---|---|
+| Which sizes | Catalog: active size SKUs of every mattress model and of the Jager bedframe (`forecastPurchaseInScope`) |
+| Sold | Sales Orders: `order_lines.qty` of the Register's own population (proceeded, not cancelled, not a subscription), by the Malaysia month of `orders.placed_at`, the SO Doc Date |
+| Free, in the warehouse | Stock: `stock_unit_register_v`, `availability = available` and `condition = new` |
+| Free, on a PO | Purchasing: `purchasing_po_free_units`, the arithmetic behind `Use this PO` |
+| Supplier | Catalog: `product_skus.supplier_id`. None, or an other creditor: `Supplier not set` |
+
+A source that cannot be read fails the whole read: the list shows its error state, never a number
+nobody read. A model that sold nothing in the three months shown is not listed.
+
+**The page (BUILT on the one listing engine; 01 §5; words in COPY-STANDARD "Forecast Purchase · Outright").**
+One view, `By model · Outright`. Tabs `Suggested` · `Ordered` · `All`, opening on `All`. Columns, in
+order: `Model` (takes the room left, never under 120; the grey line is `{supplier} · {n} sizes`) ·
+two months ago 32 · last month 32 · this month 36 with the neutral column band · `Free stock` 48 ·
+this Monday 56 · next Monday 56 · the Monday after 56. A model opens to one line per size in the
+fixed order Super King, King, Queen, Super Single, Single. A model tick takes every size of it
+that has a suggestion; a size that cannot be ordered keeps a greyed tick that says why
+(`Enough stock · nothing to buy` · `Supplier not set`). The Summary holds two cards: `Weekly forecast`
+(this Monday's suggested pieces that can be ordered, then the next two Mondays) and `By supplier`.
+The selection bar reads `{n} items selected · {pcs} · {n} PO` with `Create {n} PO`, which opens the
+review: the ticked sizes, one PO per supplier and category.
+
+**Measured 13 Oct 2026 on the TEST shell preview** (`e2e-kit/kit-forecast.spec.ts`): 1025, 1164 and
+1440 wide, then 1164 with the Summary open and with the Tasks panel open; rows closed, one model
+open, one size ticked. No sideways scroll, nothing cut, a size line's numbers under its model's, and
+`carres-check.js` answers PASS in every state. Fixture evidence is not production evidence.
+
+**NOT BUILT, and why.**
+
+| Item | State |
+|---|---|
+| `Place PO` | **OPEN OWNER DECISION: who may press it.** The review shows what would be ordered and writes nothing. Today's law is §5.2 and §9.2: stock is bought through a Manual Purchase request and every request needs the Purchasing Approver. A direct PO from this page would be a second door for the same act (ERP-ARCHITECTURE Law C), so it is not built until the owner rules |
+| `Skip this week` | Needs a shared record (a skip by one person must hold for everyone until next Monday). Built with `Place PO` |
+| `Ordered` tab, `Already ordered`, `Skipped this week` | Follow `Place PO` and `Skip this week`. The tab is on the page and is empty |
+| Weekly task per supplier and category, owner PO Duty | Not built. It needs one Work rule and one line in the Work feed, which the Tasks work in progress owns; the owner's 6 Oct 2026 direction was "no new Work rule" |
+| `Send PO` after Place | The existing PO sending Work, once a PO exists |
+
+**CONFLICTS between the handoff and current law — PROPOSAL / NOT LAW until the owner rules.**
+
+- **Undo within 15 minutes of Place.** §5 and §9 say no timed Undo is offered after a PO is issued;
+  the correction is `Cancel goods not received` (§5.8.1). The handoff's Undo is not built.
+- **`Place {n} PO` and `Create {n} PO`.** COPY-STANDARD's verb for making a PO is `Issue PO`
+  everywhere. The handoff's words are on the page as handed over and are marked there as awaiting
+  the owner's choice.
+- **Supplier by product.** The handoff names the supplier by category (mattress Nice Future,
+  bedframe Ohana). The Portal reads Catalog's supplier per SKU, which is the one owner of that fact;
+  no category rule is written into code.
+
+**DATA GAP — FACT, measured 13 Oct 2026.** The owner's rule keeps one Jager colour as stock
+(PC151-01). Catalog records a bedframe by model and size only (`JAGER-K`, `JAGER-Q`, ...) and a Sales
+Order line carries no colour, so the Portal cannot tell that colour apart: Jager counts every colour,
+and the page prints Catalog's name, `Jager`. The page states nothing about a colour it cannot read.
+
+**Open, not in this build (handoff).** A Settings screen for the stock level per size (today the
+system works it out). The AutoCount import of monthly sales (the page reads Portal Sales Orders
+only). Supplier contacts for suppliers not yet in the Portal.
 
 ---
 
