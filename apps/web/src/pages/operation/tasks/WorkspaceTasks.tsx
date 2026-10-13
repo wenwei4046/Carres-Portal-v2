@@ -17,7 +17,7 @@
  * here are the panel's three numbers, and the Module rail counts the chosen
  * tab. It writes nothing itself: every act is the owning module's own form.
  */
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { OperationWorkModule } from "@carres/shared";
 import MIcon from "@/components/carres/MIcon";
@@ -27,6 +27,7 @@ import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import TwoLineCell from "@/components/register/TwoLineCell";
 import { fmtDate } from "@/lib/fmt-date";
 import { useShellTasks } from "../components/ShellTasks";
+import { fitColumns } from "../so-batch/by-supplier";
 import { useOpenWorkSet, type WorkRow } from "../use-open-work";
 import { sameWeekday } from "./TasksArea";
 import { TaskOpenContext } from "./TaskFrame";
@@ -39,6 +40,15 @@ import { panelFor } from "./work-panels";
 import { WORKSPACE_WORDS as W, workspaceTable, type WorkspaceRow, type WorkspaceTone } from "./workspace-table";
 
 const MODULES = Object.keys(TASK_MODULE_WORD) as OperationWorkModule[];
+/* The kit's Workspace widths (Layout Standard): `Task` takes what the fixed
+   columns leave; short of room they give way together, never under their
+   floors, so the table fits 1025 to 1440 with the Module rail open. */
+const BASE = { due: 96, contact: 130, lastContact: 150, owner: 120, status: 124 } as const;
+const FLOOR = { due: 88, contact: 100, lastContact: 112, owner: 96, status: 112 } as const;
+const TASK_MIN = 200;
+/** Under this much room Team Work leaves `Contact` to the task view, where it
+ *  is the task's own fact row, so `Owner` and `Status` stay in view. */
+const TEAM_NARROW = 700;
 const TONE: Record<WorkspaceTone, string> = {
   warn: "bg-c-warn-bg text-c-warn-fg",
   neutral: "bg-c-info-bg text-c-info-fg",
@@ -101,15 +111,35 @@ export default function WorkspaceTasks() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id]);
 
+  /* The room the table is given, measured: the columns are sized to it. */
+  const box = useRef<HTMLDivElement>(null);
+  const [room, setRoom] = useState(0);
+  useEffect(() => {
+    const el = box.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => setRoom(el.clientWidth);
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    measure();
+    return () => observer.disconnect();
+  });
+  const showContact = !(team && room > 0 && room < TEAM_NARROW);
+  const keys = (["due", ...(showContact ? ["contact"] : []), "lastContact", ...(team ? ["owner"] : []), "status"]) as Array<keyof typeof BASE>;
+  /* 16: the list engine keeps a little of its width for itself (measured 12). */
+  const fit = fitColumns(room, 16, TASK_MIN, keys.map((key) => BASE[key]), keys.map((key) => FLOOR[key]));
+  const widthOf = (key: keyof typeof BASE) => fit.fixed[keys.indexOf(key)] ?? BASE[key];
+  const taskWidth = fit.first;
+  const roomy = !fit.tight;
+
   const columns = useMemo<DataGridColumn<WorkspaceRow>[]>(() => [
     {
-      key: "due", label: W.col.due, width: 104, minWidth: 92, sortable: true, wrap: true,
+      key: "due", label: W.col.due, width: widthOf("due"), minWidth: widthOf("due"), sortable: true, wrap: true,
       accessor: (row) => <TwoLineCell top={<span className={row.late ? "font-medium text-c-warn-fg" : undefined}>{row.due}</span>} sub={row.dueSub ?? undefined} testId={`workspace-due-${row.id}`} />,
       sortFn: (a, b) => a.sortKey.localeCompare(b.sortKey),
       exportValue: (row) => [row.due, row.dueSub].filter(Boolean).join(" "),
     },
     {
-      key: "task", label: W.col.task, width: 320, minWidth: 180, sortable: true, wrap: true,
+      key: "task", label: W.col.task, width: taskWidth, minWidth: Math.min(taskWidth, TASK_MIN), sortable: true, wrap: true,
       accessor: (row) => (
         <span className="flex min-w-0 items-start gap-2" data-testid={`workspace-task-${row.id}`}>
           <MIcon name={TASK_MODULE_SYMBOL[row.module]} size={18} className="mt-px shrink-0 text-c-secondary" />
@@ -120,35 +150,37 @@ export default function WorkspaceTasks() {
       searchValue: (row) => `${row.title} ${row.record} ${row.contact ?? ""}`,
       exportValue: (row) => `${row.title} · ${row.record}`,
     },
-    {
-      key: "contact", label: W.col.contact, width: 140, minWidth: 110, sortable: true, wrap: true,
-      accessor: (row) => row.contact
+    ...(showContact ? [{
+      key: "contact", label: W.col.contact, width: widthOf("contact"), minWidth: widthOf("contact"), sortable: true, wrap: true, filterable: roomy,
+      accessor: (row: WorkspaceRow) => row.contact
         ? <TwoLineCell top={row.contact} sub={row.contactSub ?? undefined} testId={`workspace-contact-${row.id}`} />
         : <span className="text-body text-c-secondary" data-testid={`workspace-contact-${row.id}`}>{W.notRecorded}</span>,
-      sortFn: (a, b) => (a.contact ?? "").localeCompare(b.contact ?? ""),
-      filterValue: (row) => row.contact ?? W.notRecorded,
-      exportValue: (row) => row.contact ?? "",
-    },
+      sortFn: (a: WorkspaceRow, b: WorkspaceRow) => (a.contact ?? "").localeCompare(b.contact ?? ""),
+      filterValue: (row: WorkspaceRow) => row.contact ?? W.notRecorded,
+      exportValue: (row: WorkspaceRow) => row.contact ?? "",
+    } satisfies DataGridColumn<WorkspaceRow>] : []),
     {
-      key: "lastContact", label: W.col.lastContact, width: 150, minWidth: 124, wrap: true,
+      key: "lastContact", label: W.col.lastContact, width: widthOf("lastContact"), minWidth: widthOf("lastContact"), wrap: true,
       accessor: (row) => <span className={`text-body ${row.lastContact ? "text-c-ink" : "text-c-secondary"}`} data-testid={`workspace-last-${row.id}`}>{row.lastContact ?? W.notRecorded}</span>,
       exportValue: (row) => row.lastContact ?? "",
     },
     ...(team ? [{
-      key: "owner", label: W.col.owner, width: 130, minWidth: 104, sortable: true, wrap: true,
+      key: "owner", label: W.col.owner, width: widthOf("owner"), minWidth: widthOf("owner"), sortable: true, wrap: true, filterable: roomy,
       accessor: (row: WorkspaceRow) => <span className={`text-body ${row.owner ? "text-c-ink" : "text-c-secondary"}`} data-testid={`workspace-owner-${row.id}`}>{row.owner ?? W.notAssigned}</span>,
       sortFn: (a: WorkspaceRow, b: WorkspaceRow) => (a.owner ?? "").localeCompare(b.owner ?? ""),
       filterValue: (row: WorkspaceRow) => row.owner ?? W.notAssigned,
       exportValue: (row: WorkspaceRow) => row.owner ?? "",
     } satisfies DataGridColumn<WorkspaceRow>] : []),
     {
-      key: "status", label: W.col.status, width: 132, minWidth: 118, sortable: true, wrap: true,
+      key: "status", label: W.col.status, width: widthOf("status"), minWidth: widthOf("status"), sortable: true, wrap: true,
       accessor: (row) => <span data-testid={`workspace-status-${row.id}`}><StatusPill row={row} /></span>,
       sortFn: (a, b) => a.status.localeCompare(b.status),
       filterValue: (row) => row.status,
       exportValue: (row) => row.status,
     },
-  ], [team]);
+    // The measured widths are numbers: the columns follow them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [team, showContact, roomy, taskWidth, fit.fixed.join()]);
 
   const failedBanner = (error || refreshFailed || unhealthySources.length > 0) ? (
     <div role="alert" className="flex items-start gap-2 rounded-lg bg-c-err-bg px-3 py-2 text-meta text-c-err-fg" data-testid="workspace-failed">
@@ -164,7 +196,9 @@ export default function WorkspaceTasks() {
     </div>
   ) : null;
 
-  const toolbar = (
+  /* Whose work, then which of it: the first controls of the ONE toolbar line
+     (the table's own while it shows, this row beside an opened task). */
+  const controls = (
     <div className="flex h-9 shrink-0 items-center gap-3" data-testid="workspace-toolbar">
       <Tabs variant="segmented" label="Whose work" value={team ? "team" : "mine"} onValueChange={(value) => desk.guard(() => set({ scope: value === "team" ? "team" : null, task: null }))}
         tabs={[{ value: "mine", label: W.scope.mine }, { value: "team", label: W.scope.team }]} />
@@ -213,7 +247,10 @@ export default function WorkspaceTasks() {
       rowHeight={54}
       appearance="reference"
       palette="slate"
+      presentationTools
+      wrapToolbar
       searchPresentation="icon"
+      toolbarStart={controls}
       allowColumnGrouping={false}
       groupBanner={false}
       isLoading={!hasData && !error}
@@ -228,8 +265,10 @@ export default function WorkspaceTasks() {
 
   /* One task chosen: the rows as a narrow pick list, the task view beside it. */
   const picked = task && table ? (
-    <div className="grid min-h-0 flex-1 grid-cols-[minmax(260px,340px)_minmax(0,1fr)] gap-3" data-testid="workspace-picked">
-      <ul className="m-0 flex min-h-0 list-none flex-col gap-1 overflow-y-auto rounded-lg border border-c-card-border bg-white p-1.5" aria-label={TASK_CARD_WORDS.allTasks} data-testid="workspace-pick-list">
+    /* Under 1180 wide the task view takes the whole room; the pick list
+       returns with its ✕ (Outlook and Linear do the same on a narrow window). */
+    <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 min-[1180px]:grid-cols-[minmax(260px,340px)_minmax(0,1fr)]" data-testid="workspace-picked">
+      <ul className="m-0 hidden min-h-0 list-none flex-col gap-1 overflow-y-auto rounded-lg border border-c-card-border bg-white p-1.5 min-[1180px]:flex" aria-label={TASK_CARD_WORDS.allTasks} data-testid="workspace-pick-list">
         {table.rows.map((row) => {
           const on = row.id === task.id;
           return (
@@ -246,7 +285,7 @@ export default function WorkspaceTasks() {
           );
         })}
       </ul>
-      <div className="flex min-h-0 min-w-0 flex-col overflow-y-auto" data-testid="workspace-task" data-task={task.id} onInput={desk.markDirty}>
+      <div className="flex min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto" data-testid="workspace-task" data-task={task.id} onInput={desk.markDirty}>
         <div className="flex h-9 shrink-0 items-center justify-end px-3">
           <button type="button" onClick={desk.back} aria-label={W.closeTask} title={W.closeTask} data-testid="workspace-task-close"
             className="grid h-7 w-7 place-items-center rounded-full text-c-secondary outline-none hover:bg-c-hover focus-visible:[outline:var(--c-focus)]">
@@ -264,9 +303,9 @@ export default function WorkspaceTasks() {
     <div className="flex min-h-0 flex-1 gap-3 p-3" data-testid="workspace-tasks">
       {rail}
       <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-2" aria-label="Workspace">
-        {toolbar}
+        {picked || !table ? controls : null}
         {failedBanner}
-        {picked ?? <div className="flex min-h-0 flex-1 flex-col" data-testid="workspace-table">{list}</div>}
+        {picked ?? <div ref={box} className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="workspace-table">{list}</div>}
       </section>
       {desk.overlays}
     </div>

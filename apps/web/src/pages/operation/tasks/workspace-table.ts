@@ -10,7 +10,8 @@
  *   Due            `Today` · the date · `No date`; a purchase batch adds its
  *                  cut-off time
  *   Task           the task, in its list card's own words, over page · record
- *   Contact        who is asked, and how once a request is recorded
+ *   Contact        who is asked (a purchase batch: its suppliers), and how
+ *                  once a request is recorded
  *   Last contact   the request or its answer day, from the Work record
  *   Status         `{n} days late` · `passed` (amber) · `To do` · `Waiting` ·
  *                  `Done`
@@ -95,8 +96,9 @@ function openRow(row: WorkRow, today: string, facts: PoWindowFacts | null): Work
     dueSub: window ? poWindowTimeWord(window.time) : null,
     title: card.title,
     record: isBatch ? "SO Batch Purchase" : `${TASK_MODULE_WORD[row.module]} · ${row.source.object.label}`,
-    contact: isBatch ? null : row.recipient,
-    contactSub: !isBatch && row.recipient && lifecycle.channel ? CHANNEL_WORD[lifecycle.channel] : null,
+    /* The Work item's own party; for a purchase batch that is its suppliers. */
+    contact: row.recipient,
+    contactSub: row.recipient && lifecycle.channel ? CHANNEL_WORD[lifecycle.channel] : null,
     lastContact,
     owner: row.source.owner.acting?.name ?? null,
     status: late ? lateWord : lifecycle.state === "waiting" ? TASK_CARD_WORDS.tab.waiting : TASK_CARD_WORDS.tab.todo,
