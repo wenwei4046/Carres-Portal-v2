@@ -263,18 +263,33 @@ const ACCOUNTS = [
   ["3000", "Share Capital", "EQUITY"], ["4000", "Sales — Furniture", "INCOME"], ["4100", "Other Income", "INCOME"],
   ["5000", "Cost of Goods Sold", "EXPENSE"], ["6100", "Utilities", "EXPENSE"],
 ] as const;
+// The Trial Balance as production's chart prints it, headings with their
+// subtotals (0579), so the Finance look's subtotal rows show. Invented amounts.
+const TB_ACCOUNTS: Array<[string, string, string, string, number, number, number]> = [
+  ["300-0000", "TRADE DEBTORS", "ASSET", "0000", 2, 0, 13928],
+  ["1120", "BANK - CURRENT ACCOUNT (TEST ONLY)", "ASSET", "310-0000", 4, 3399, 0],
+  ["310-2000", "HONG LEONG BANK", "ASSET", "310-0000", 5, 3726.57, 0],
+  ["310-3000", "RHB BANK", "ASSET", "310-0000", 6, 0, 1],
+  ["315-9000", "CARD - MACHINE NOT KNOWN", "ASSET", "0000", 7, 5716, 0],
+  ["320-0000", "CASH IN HAND", "ASSET", "0000", 8, 2400, 0],
+  ["400-0000", "TRADE CREDITORS", "LIABILITY", "2000", 11, 40, 0],
+  ["410-0063", "ACCRUALS - EXPENSE FOR A VERY LONG NAMED SUPPLIER OF SHOWROOM UTILITIES", "LIABILITY", "2000", 12, 0, 1686],
+  ["150-0000", "RETAINED EARNING", "EQUITY", "3000", 21, 333.43, 0],
+];
 const TB = {
   status: "ok", go_live_on: GO_LIVE, as_of: TODAY,
-  accounts: [
-    ["1000", 85, 0], ["1010", 3850, 5000], ["1200", 4100, 2000], ["1300", 12480, 0],
-    ["2100", 5000, 12480], ["2150", 0, 1288.4], ["4000", 0, 4100], ["4100", 0, 85], ["6100", 1288.4, 0], ["3000", 0, 1850],
-  ].map(([code, dr, cr]) => {
-    const a = ACCOUNTS.find((x) => x[0] === code)!;
-    const debitNatural = a[2] === "ASSET" || a[2] === "EXPENSE";
-    return { account_code: a[0], account_name: a[1], kind: a[2], is_control: code === "1200" || code === "2100", is_active: true,
-      total_debit: dr, total_credit: cr, natural_balance: debitNatural ? Number(dr) - Number(cr) : Number(cr) - Number(dr) };
-  }),
-  total_debit: 26803.4, total_credit: 26803.4, difference: 0, balances: true,
+  accounts: TB_ACCOUNTS.map(([code, name, kind, header, pos, dr, cr]) => ({
+    account_code: code, account_name: name, kind, is_control: code === "300-0000" || code === "400-0000", is_active: true,
+    total_debit: dr, total_credit: cr, natural_balance: kind === "ASSET" ? dr - cr : cr - dr,
+    header_code: header, chart_position: pos,
+  })),
+  headings: [
+    { code: "0000", name: "ASSETS", kind: "ASSET", depth: 1, parent_code: null, chart_position: 1, debit: 15241.57, credit: 13929 },
+    { code: "310-0000", name: "CASH AT BANK", kind: "ASSET", depth: 2, parent_code: "0000", chart_position: 3, debit: 7125.57, credit: 1 },
+    { code: "2000", name: "LIABILITIES", kind: "LIABILITY", depth: 1, parent_code: null, chart_position: 10, debit: 40, credit: 1686 },
+    { code: "3000", name: "EQUITY", kind: "EQUITY", depth: 1, parent_code: null, chart_position: 20, debit: 333.43, credit: 0 },
+  ],
+  total_debit: 15615, total_credit: 15615, difference: 0, balances: true,
 };
 
 function plRows(from: string, to: string) {

@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { ApOutstandingRow } from "@carres/shared/schemas/finance-ap";
+import Checkbox from "@/components/kit/Checkbox";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
@@ -12,6 +13,7 @@ import { supplierUnpaid, unpaidTotal } from "../money-owed";
 import SupplierAdvancesOf from "./SupplierAdvancesOf";
 import SupplierCreditsOf from "./SupplierCreditsOf";
 import { SupplierDebitsOf } from "./SupplierDebitNotes";
+import { FINANCE_WIDTH } from "../finance-widths";
 
 /**
  * Finance → Unpaid by Supplier (migration 0477, `ap_outstanding`). What
@@ -25,45 +27,58 @@ import { SupplierDebitsOf } from "./SupplierDebitNotes";
  * self-check reads. Unpaid is the bills' unpaid plus Debit Notes Unpaid. A
  * supplier with only an advance or a credit note shows here with a negative
  * Unpaid After Advance and Credit.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): five columns show at first — Supplier,
+ * Unpaid Bills, Unpaid, Advance Left, Unpaid After Advance and Credit — and the
+ * rest wait in the column chooser; a zero is a blank cell; a supplier with
+ * nothing open at all shows only with `Show all suppliers`.
  */
+
+/** A zero amount is a blank cell, so what is owed stands out. */
+const amount = (v: number | string | null | undefined) => (num(v ?? null) === 0 ? "" : money(v ?? null));
+
+/** Nothing open with this supplier: no unpaid bill, debit note, advance or credit. */
+const nothingOpen = (r: ApOutstandingRow) =>
+  r.open_bills === 0 && !num(supplierUnpaid(r)) && !num(r.advance_open) && !num(r.credit_open ?? 0) && !num(r.net_owing);
 export default function ApOutstanding() {
   const navigate = useNavigate();
   const query = useApOutstanding();
-  const rows = query.data ?? [];
+  const [showAll, setShowAll] = useState(false);
+  const rows = useMemo(() => (query.data ?? []).filter((r) => showAll || !nothingOpen(r)), [query.data, showAll]);
   const columns = useMemo<DataGridColumn<ApOutstandingRow>[]>(() => [
-    { key: "supplier", label: "Supplier", width: 240, accessor: (r) => r.supplier_name, overflowText: (r) => r.supplier_name,
+    { key: "supplier", label: "Supplier", width: FINANCE_WIDTH.party, wrap: true, accessor: (r) => r.supplier_name,
       searchValue: (r) => r.supplier_name },
-    { key: "kind", label: "Creditor Type", width: 140, accessor: (r) => creditorKindWord(r.supplier_kind),
+    { key: "kind", label: "Creditor Type", width: 140, defaultHidden: true, accessor: (r) => creditorKindWord(r.supplier_kind),
       filterValue: (r) => creditorKindWord(r.supplier_kind), filterType: "enum" },
-    { key: "open", label: "Unpaid Bills", width: 120, align: "right", accessor: (r) => String(r.open_bills),
+    { key: "open", label: "Unpaid Bills", width: 120, align: "right", accessor: (r) => (r.open_bills ? String(r.open_bills) : ""),
       numberValue: (r) => r.open_bills, filterType: "number" },
-    { key: "billed", label: "Billed", width: 140, align: "right", accessor: (r) => money(r.billed_total),
+    { key: "billed", label: "Billed", width: FINANCE_WIDTH.amount, align: "right", defaultHidden: true, accessor: (r) => amount(r.billed_total),
       numberValue: (r) => num(r.billed_total), filterType: "number", exportValue: (r) => num(r.billed_total) ?? "" },
-    { key: "paid", label: "Paid", width: 140, align: "right", accessor: (r) => money(r.paid_total),
+    { key: "paid", label: "Paid", width: FINANCE_WIDTH.amount, align: "right", defaultHidden: true, accessor: (r) => amount(r.paid_total),
       numberValue: (r) => num(r.paid_total), filterType: "number", exportValue: (r) => num(r.paid_total) ?? "" },
     // 0681: a confirmed supplier debit note not yet paid is owed like a bill;
     // Unpaid adds it (supplierUnpaid), and so does net_owing.
-    { key: "debit", label: "Debit Notes Unpaid", headerLines: ["Debit Notes", "Unpaid"], width: 140, align: "right",
-      accessor: (r) => money(r.debit_open ?? 0),
+    { key: "debit", label: "Debit Notes Unpaid", headerLines: ["Debit Notes", "Unpaid"], width: FINANCE_WIDTH.amount, align: "right", defaultHidden: true,
+      accessor: (r) => amount(r.debit_open ?? 0),
       numberValue: (r) => num(r.debit_open ?? 0), filterType: "number", exportValue: (r) => num(r.debit_open ?? 0) ?? "" },
-    { key: "unpaid", label: "Unpaid", width: 140, align: "right", accessor: (r) => money(supplierUnpaid(r)),
+    { key: "unpaid", label: "Unpaid", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amount(supplierUnpaid(r)),
       numberValue: (r) => supplierUnpaid(r), filterType: "number", exportValue: (r) => supplierUnpaid(r) ?? "" },
     // 0484: an advance paid before the bill is owed back to Carres until it is
     // applied or sent back, so it comes off what Carres owes the supplier.
-    { key: "advance", label: "Advance Left", width: 140, align: "right", accessor: (r) => money(r.advance_open),
+    { key: "advance", label: "Advance Left", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amount(r.advance_open),
       numberValue: (r) => num(r.advance_open), filterType: "number", exportValue: (r) => num(r.advance_open) ?? "" },
     // 0642: a confirmed supplier credit note not yet knocked off a bill also
     // comes off what Carres owes; net_owing subtracts it (the ledger's figure).
-    { key: "credit", label: "Credit Left", width: 140, align: "right", accessor: (r) => money(r.credit_open ?? 0),
+    { key: "credit", label: "Credit Left", width: FINANCE_WIDTH.amount, align: "right", defaultHidden: true, accessor: (r) => amount(r.credit_open ?? 0),
       numberValue: (r) => num(r.credit_open ?? 0), filterType: "number", exportValue: (r) => num(r.credit_open ?? 0) ?? "" },
     { key: "net", label: "Unpaid After Advance and Credit", headerLines: ["Unpaid After", "Advance and Credit"], width: 170,
-      align: "right", accessor: (r) => money(r.net_owing),
+      align: "right", accessor: (r) => amount(r.net_owing),
       numberValue: (r) => num(r.net_owing), filterType: "number", exportValue: (r) => num(r.net_owing) ?? "" },
-    { key: "waiting", label: "On a Voucher, Not Approved", width: 200, align: "right",
-      accessor: (r) => money(onVoucher(r)), numberValue: (r) => onVoucher(r), filterType: "number" },
-    { key: "free", label: "Not on a Voucher", width: 160, align: "right", accessor: (r) => money(r.uncommitted),
+    { key: "waiting", label: "On a Voucher, Not Approved", width: 200, align: "right", defaultHidden: true,
+      accessor: (r) => amount(onVoucher(r)), numberValue: (r) => onVoucher(r), filterType: "number" },
+    { key: "free", label: "Not on a Voucher", width: 160, align: "right", defaultHidden: true, accessor: (r) => amount(r.uncommitted),
       numberValue: (r) => num(r.uncommitted), filterType: "number" },
-    { key: "oldest", label: "Oldest Unpaid Bill", width: 160,
+    { key: "oldest", label: "Oldest Unpaid Bill", width: 160, defaultHidden: true,
       accessor: (r) => r.oldest_unpaid_bill_date ? fmtDate(r.oldest_unpaid_bill_date) : "No unpaid bill",
       dateValue: (r) => r.oldest_unpaid_bill_date, filterType: "date" },
   ], []);
@@ -78,8 +93,14 @@ export default function ApOutstanding() {
             rows={rows}
             columns={columns}
             rowKey={(r) => r.supplier_id}
-            storageKey="carres.finance.ap-outstanding.v1"
+            storageKey="carres.finance.ap-outstanding.v2"
             appearance="reference"
+            look="finance"
+            toolbarEnd={
+              // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 2026-10-13).
+              <Checkbox id="ap-outstanding-show-all" label="Show all suppliers" checked={showAll}
+                onCheckedChange={(on) => setShowAll(on === true)} />
+            }
             exportName="Unpaid by Supplier"
             groupBanner={false}
             stickyIdentity

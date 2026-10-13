@@ -815,6 +815,20 @@ FINANCE          its title folds the area (§4.1)
 - The fold stays while you move between pages of that area. Going to another area and back, or reloading, opens it again.
 - A folded area's title turns blue. It has hidden the page you are on, so it is the rail's one mark of where you are (the rail rule: a shut parent is lit).
 
+### 4.2 · The Finance look
+
+- **Ruling.** Chew 2026-10-13: the shared table read as one white sheet (「整体都算白灰色，我根本分不出」), with the code and the name run together, subtotals not set apart and no line between columns. He chose a look for Finance's tables only (header 「c」, selected row 「1」, 「可以，上线，然后套到整个finance」).
+- **This is a Finance exception to the one kit** (CLAUDE.md, THE ONE KIT LAW, Jess 2026-09-27). Chew chose it knowing the rule and tells Jess, as with the Chart of accounts row icons. It is an opt-in on the shared table (`look="finance"`); every other module's page draws exactly what it drew before. If Jess adopts it, turning it on for every grid is the whole change.
+- What it is:
+  - the header band light blue (`#E8EEFC`, text `#1E3A8A`, 600);
+  - a hairline between columns;
+  - the table as wide as its columns, never stretched to the card; widths per field in `finance-widths.ts` (an amount 128, a code 96), cells 10 a side, so an amount up to RM 1,234,567.89 fits;
+  - a selected row light grey (`#E9EBEF`) with a dark edge on its left, so it never reads as the blue header;
+  - a subtotal row light grey and 600; the total row the same with a heavy rule above;
+  - an account's code and its name in two columns, the code alone being the link;
+  - a zero amount a blank cell.
+- Built 2026-10-13 on Trial Balance, Unpaid by Supplier (five columns at first: Supplier, Unpaid Bills, Unpaid, Advance Left, Unpaid After Advance and Credit; the rest in Columns; a supplier with nothing open only with `Show all suppliers`) and Daily Bank. Every other Finance page follows.
+
 ## 5 · Open items
 
 1. **YH.** YH changes Finance code almost every day: over 100 commits from 2026-09-19 to 2026-10-01. Agree with YH before any Finance code changes.
