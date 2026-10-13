@@ -4268,6 +4268,7 @@ with where it appears.
 | `An advance applied to a bill or sent back must be taken off or cancelled first.` | Added to the cancel-voucher sentence when the voucher carries an advance. |
 | `A bill already on a payment voucher, or with an advance applied, cannot be cancelled.` | Cancel bill sentence (extends 0477's). |
 | `Advance Left` · `Unpaid After Advance` | Columns on Unpaid by Supplier (`advance_open`, `net_owing`). |
+| `Show all suppliers` | PROPOSAL (Chew 2026-10-13, the Finance look): the checkbox on Unpaid by Supplier that adds the suppliers with nothing open. |
 | `Supplier money back` · `Supplier money back reversal` | The Journal's Source for `SUPPLIER_MONEY_BACK` and its reversal (finance-ledger.ts). |
 | `{Bill No} · {Supplier invoice} · {RM} left to pay` | An option in the Bill picker of Apply advance (from the voucher). |
 | `{PV No} · {date} · {RM} left` | An option in the Advance picker of Apply advance (from the bill). |
