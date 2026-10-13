@@ -20,7 +20,7 @@ import { useAuth } from "@/lib/auth";
 import { appTodayIso } from "@/lib/fmt-date";
 import OperationSupplierClaims from "@/pages/operation/OperationSupplierClaims";
 import OperationPurchaseReturns from "@/pages/operation/OperationPurchaseReturns";
-import OperationWork from "@/pages/operation/OperationWork";
+import WorkspaceTasks from "@/pages/operation/tasks/WorkspaceTasks";
 import { IssueForm } from "@/pages/operation/components/PurchaseReturnIssue";
 import PreviewFrame from "./preview-frame";
 import "@/index.css";
@@ -103,7 +103,7 @@ const start = view === "register" ? "/operation?tab=purchase-returns"
 const body = view === "issue"
   ? <div className="h-full overflow-auto p-4"><IssueForm source={SOURCE} onClose={() => undefined} onIssued={() => undefined} /></div>
   : view === "register" || view === "record" || view === "receipt" ? <OperationPurchaseReturns />
-  : view === "work" ? <div className="flex h-full flex-col"><OperationWork /></div>
+  : view === "work" ? <div className="flex h-full flex-col"><WorkspaceTasks /></div>
   : <OperationSupplierClaims />;
 
 createRoot(document.getElementById("root")!).render(

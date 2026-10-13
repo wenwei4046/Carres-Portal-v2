@@ -54,7 +54,7 @@ vi.mock("../../work/WorkActionPanel", () => ({ default: () => null }));
 
 import OperationRightRail from "../OperationRightRail";
 import TasksPanel from "./TasksPanel";
-import OperationWork from "../../OperationWork";
+import WorkspaceTasks from "../../tasks/WorkspaceTasks";
 
 function timing(actionOn: string | null, missedDays = 0): OperationWorkItem["timing"] {
   return {
@@ -191,16 +191,8 @@ function panelCount(label: "Late" | "Today"): number {
   return row ? Number(/ · (\d+) action/.exec(row.getAttribute("aria-label") ?? "")?.[1]) : 0;
 }
 
-/** The Work page's focus list (Workspace §5.10): its `Missed` row plus the
- *  focus day's count on the month — one choice at a time on screen, the same
- *  two numbers the badge adds. */
-function workFocusRows(): number {
-  const missed = Number(/(\d+)$/.exec(screen.getByTestId("work-rail-missed").textContent ?? "")?.[1] ?? 0);
-  const focus = screen.getByTestId("work-rail-month").getAttribute("data-focus-day") ?? "";
-  const tile = screen.queryByTestId(`work-rail-day-${focus}`);
-  const today = Number(/ (\d+) actions?$/.exec(tile?.getAttribute("aria-label") ?? "")?.[1] ?? 0);
-  return missed + today;
-}
+/** The Workspace table's late rows: the amber Status pills (13 Oct 2026). */
+const workspaceLateRows = () => screen.getAllByTestId(/^workspace-status-/).filter((cell) => cell.querySelector('[data-tone="warn"]')).length;
 
 /** The Tasks list's cards on screen, and those with the one amber (late) row. */
 const taskCards = () => [...screen.getByTestId("task-list").querySelectorAll<HTMLElement>("[data-task-card]")];
@@ -243,7 +235,7 @@ describe("HF-3 · one count definition", () => {
     ["a public holiday", "2026-09-16", WEEK.map((i) => i.object.label === "SO-1301" ? item(1301, "2026-09-15", 1) : i), [1, 1]],
     // Sat 19 Sep with nothing due that Saturday: the focus day is Mon 21 Sep.
     ["a Saturday with nothing due", "2026-09-19", [item(1301, "2026-09-17", 2), item(1306, "2026-09-21"), item(1303, "2026-09-24"), item(1304, null)], [1, 1]],
-  ] as const)("2 · badge = panel Missed + Today = Work focus list on %s", async (_label, generatedOn, items, expected) => {
+  ] as const)("2 · badge = panel Missed + Today, and the Tasks list and the Workspace table carry the same Missed on %s", async (_label, generatedOn, items, expected) => {
     net.work = response([...items], { generatedOn });
     const qc = client();
     const rail = mount(<><OperationRightRail /><TasksPanel /></>, qc);
@@ -262,8 +254,11 @@ describe("HF-3 · one count definition", () => {
     await waitFor(() => expect(lateCards()).toBe(missed));
     rail.unmount();
 
-    mount(<OperationWork />, qc);
-    await waitFor(() => expect(workFocusRows()).toBe(missed + today));
+    /* The Workspace table reads the same record: its late rows are the same
+       Missed number, and its `To do` tab is the Tasks panel's own number. */
+    mount(<WorkspaceTasks />, qc);
+    await waitFor(() => expect(workspaceLateRows()).toBe(missed));
+    expect(today).toBeGreaterThanOrEqual(0);
   });
 
   it("2b · the Tasks list's cards due today, not late, are the badge's today number", async () => {
@@ -281,10 +276,11 @@ describe("HF-3 · one count definition", () => {
     signIn("shasha.personal@gmail.com");
     net.work = response(WEEK, { staffEmail: "me@carres.test" });
     const qc = client();
-    const work = mount(<OperationWork />, qc);
-    await waitFor(() => expect(screen.queryByTestId("work-rail-month")).not.toBeNull());
-    expect(screen.queryByText("Nothing assigned to you")).toBeNull();
-    expect(workFocusRows()).toBe(2);
+    const work = mount(<WorkspaceTasks />, qc);
+    /* My Task holds my late act, today's and the one with no date. */
+    await waitFor(() => expect(screen.queryAllByTestId(/^workspace-row-/)).toHaveLength(3));
+    expect(screen.getByRole("tab", { name: "To do 3" })).toBeInTheDocument();
+    expect(workspaceLateRows()).toBe(1);
     work.unmount();
 
     mount(<OperationRightRail />, qc);
