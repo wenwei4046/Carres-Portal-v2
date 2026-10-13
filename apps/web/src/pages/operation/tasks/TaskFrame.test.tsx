@@ -130,6 +130,31 @@ describe("TaskFrame, inside the Tasks area", () => {
   });
 });
 
+describe("TaskFrame and `Record as sent`", () => {
+  const withResult = (frame: ReactNode, row: WorkRow = TASK) => render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter>
+      <TaskOpenContext.Provider value={{ row, card: taskCard(row), result: vi.fn() }}>{frame}</TaskOpenContext.Provider>
+    </MemoryRouter></QueryClientProvider>,
+  );
+  it("open work that names a party offers it between the facts and the tabs", () => {
+    withResult(<TaskFrame head={HEAD} steps={<p>the work</p>} />);
+    const request = screen.getByTestId("task-request");
+    expect(request).toHaveTextContent("After you asked TEST Supplier A");
+    expect(screen.getByRole("button", { name: "Record as sent" })).toBeInTheDocument();
+    /* After the facts, before the tabs. */
+    expect(screen.getByTestId("task-view-facts").compareDocumentPosition(request) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(request.compareDocumentPosition(screen.getByTestId("task-view-tabs")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+  it("work already waiting, and a surface that cannot return to a list, offer none", () => {
+    const waitingTask = { ...TASK, source: { ...TASK.source, lifecycle: { state: "waiting", waitingSince: "2026-10-02T03:00:00.000Z", replyDueOn: "2026-10-06", replyMissed: false, channel: "whatsapp", contactKind: null, contactId: null, lastReplyAt: null } } } as unknown as WorkRow;
+    const first = withResult(<TaskFrame head={HEAD} steps={null} />, waitingTask);
+    expect(screen.queryByTestId("task-request")).toBeNull();
+    first.unmount();
+    mount(<TaskFrame head={HEAD} steps={null} />);
+    expect(screen.queryByTestId("task-request")).toBeNull();
+  });
+});
+
 describe("TaskFrame, outside the Tasks area", () => {
   it("uses the module's own head and facts, and names no owner", () => {
     mount(<TaskFrame head={{ ...HEAD, facts: [{ key: "cut-off", icon: "schedule", label: "Cut-off", value: "11:00 AM · passed", warn: true }] }} steps={<p>the work</p>} />, false);

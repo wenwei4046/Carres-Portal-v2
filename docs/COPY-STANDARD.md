@@ -3889,8 +3889,10 @@ an action line: it prints only on or after the check's own date, beside that dat
 The three-column Work page and its right panel are removed (Workspace MASTER §5.10). This table
 keeps the words of the models the task view still reads: the Order Route (`mission-route.ts`, drawn
 in the task view's `Route` tab) and the Customer and Supplier models (`customer-card.ts`,
-`supplier-card.ts`; their cards are drawn on no screen, Workspace MASTER §5.9). `Record as sent` and
-the words beside it are APPROVED / NOT BUILT. The Logistics vocabulary is the section above.
+`supplier-card.ts`; their cards are drawn on no screen, Workspace MASTER §5.9). `Record as sent` is
+drawn by the one task view (the Tasks panel words, below); `Not sent` · `Waiting for customer` ·
+`Waiting for supplier` · `No answer · Follow up today` stay APPROVED / NOT BUILT, and the built
+page says `Waiting` and `No answer by {date}`. The Logistics vocabulary is the section above.
 
 | Meaning | Use exactly | Do not use |
 |---|---|---|
@@ -5042,7 +5044,7 @@ Not screen words (a direct database change only, never raised by a screen): the 
 
 Workspace message availability: `Message not available` replaces a placeholder draft when no governed message is available. Disable `Copy message` in that state; never report success when clipboard copying fails.
 
-## The Communication card and in-place act words · Workspace MASTER §5.10 · their place in the task view is BUILT ON BRANCH `build/workspace-v3`, NOT DEPLOYED
+## The Communication card and in-place act words · Workspace MASTER §5.10 · their place in the task view was merged 13 Oct 2026 (#2049); signed-in production check owed
 
 Drawn with the one task view on the Workspace page; the words are the earlier page's, unchanged.
 The page's own words are in "The Workspace page words"; the task view's are in "The Tasks panel
@@ -5057,7 +5059,7 @@ words".
 
 | Sales Orders pilot compact search (owner approved 2026-10-01; scope words follow what the server matches — linked document numbers since PR #1850, phone digits since 2026-10-06) | `Search orders…`; accessible scope `Search sales orders by SO number, customer, phone, imported reference or linked document number` | Unverified whole-database item search claim · naming a field the server search does not match |
 
-## The Tasks panel words — owner 12 Oct 2026 (03 §8) · round 3 brief, 13 Oct 2026 (point 2) · BUILT 13 Oct 2026
+## The Tasks panel words — owner 12 Oct 2026 (03 §8) · round 3 brief, 13 Oct 2026 (point 2) · DEPLOYED 13 Oct 2026 (#2047); signed-in production check owed
 
 The shell's right panel. Work words stay the Work engine's own sentences (the card title is the act, naming the
 party); this section holds the panel's frame and the card rows.
@@ -5080,10 +5082,11 @@ party); this section holds the panel's frame and the card rows.
 | History | `Asked {party}` with `{channel} · Next contact {date}` · `No answer` with `No answer by {date}` · `Answer recorded` · a PO: `PO sent to supplier` with `{PO No}-V{n} · {channel}` · `{channel} opened` · `Supplier answer recorded` with `Supplier date {date}, {date}` and `Delayed` · `Supplier DO {number} recorded` · `Email · Sending not confirmed` · each with `{weekday, date} {HH:MM}` and who recorded it · `No history yet` | `sent` for opening a channel · an invented time |
 | Files | stages `Sales Order` · `Purchase Order` with `{n} Sales Orders` · `{n} Purchase Orders` when more than one · a file `{SO No}.pdf` · `{PO No}-V{n}.pdf` with its kind under it · `View {file}` · `Download {file}` · `No file yet` · `No file is recorded for this task` · `Loading PDF` · `This file could not be opened. Try again.` | `Sent and received` · `Customer not recorded` under a file |
 | A form wider than the panel, on the full surface | the act as its title and `{party} · {record}` beside it (`Record supplier answer` · `Nice Future · PO-2609-0042-V2`), then the owning module's own form with its own `Cancel` and saving button | a second `Close` or `Back` beside the form's `Cancel` · the form inside the 320 panel |
+| `Record as sent`, between the facts and the tabs | `After you asked {party}` · `Communication channel` with `WhatsApp` · `Email` · `Phone` · `In person` · the button `Record as sent` · the toast `Asked {party} · {channel} · Next contact {date}` · a refusal in the door's own sentence (`This work changed. Refresh and try again.` · `This work is no longer open.`) · a lost answer `Not recorded · Try again` | `Mark sent` · `Sent` for opening WhatsApp or copying a message · `Not now` · a free-text contact |
 | Toast after a task is saved | the owning module's own success words · `Next: {party}` when another task of the same kind waits · `Close message` | `Undo` · `Saved` with nothing after it · a green line in the panel |
 | Failure | `Tasks could not be refreshed` · `Last updated {time}` · `Could not refresh {source}` · `Try again` | a silent empty list |
 
-## The Workspace page words · owner's round 3 brief, 13 Oct 2026 (points 3 and 4) · BUILT ON BRANCH `build/workspace-v3`, NOT DEPLOYED
+## The Workspace page words · owner's round 3 brief, 13 Oct 2026 (points 3 and 4) · MERGED 13 Oct 2026 (#2049); signed-in production check owed
 
 The page at `/operation?tab=work` (Workspace MASTER §5.10). It lists the same tasks as the Tasks
 panel, so a task's own words are the Tasks panel's; this section holds the page's frame and the

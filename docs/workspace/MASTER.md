@@ -5,7 +5,7 @@
 > action/approval ownership, Work and their relationship to the one global Dashboard.
 > Modules own business facts and completion; Workspace coordinates them. There is no second
 > Workspace Blueprint. The Workspace page is §5.10 (owner's round 3 brief, 13 Oct 2026; BUILT ON
-> BRANCH `build/workspace-v3`, NOT DEPLOYED); existing HTML prototypes and prototype companion
+> 2026, #2049; the signed-in production check is owed); existing HTML prototypes and prototype companion
 > specifications remain exploration only.
 
 ## 1 · Mission and boundary
@@ -1204,7 +1204,7 @@ identity; it never changes the owner, due date or completion fact.
 | Cells wrap and nothing is cut at 1025, 1164 and 1440 | Prove the same under 1025 before any narrow or phone claim |
 | The feed gaps at the end of §5.2.1 are open | Close them before production acceptance; never disguise one with a client default |
 | `Done` lists the read's `completed` occurrences with who recorded them | Never synthesize a Done row; keep the actual actor |
-| No screen records a request or an answer, so `Waiting` stays empty | Build that act through the existing API doors (§5.10 "Not built, and why") |
+| `Record as sent` records a request (built on branch, §5.10); no screen records an answer that does not finish the task | Approve a word for the answer act, then build it through `/reply-received` |
 | Warehouse external queue and acceptance: not re-measured on this branch | Complete identity/offboarding/transfer guards and production proof before admission claim |
 | Service Case is absent; Bell remains a duplicate legacy queue | Keep Service Case excluded until owner/date laws close; replace Bell only with durable transition receipts |
 
@@ -1409,7 +1409,7 @@ reads `Scheduled delivery · 29 Oct`. Had the 2-day check been missed on Sat 24,
    §2.1's stored assignment lead before the Scheduled delivery, else the Requested one; the PO day
    only opens it.
 
-### 5.10 · The Workspace page: owner's round 3 brief, 13 Oct 2026 (points 3 and 4) · BUILT ON BRANCH `build/workspace-v3` · NOT DEPLOYED · production not verified
+### 5.10 · The Workspace page: owner's round 3 brief, 13 Oct 2026 (points 3 and 4) · MERGED 13 Oct 2026 (#2049, `64994fb31`) · signed-in production check owed
 
 Source: `docs/ui-reference/sales-order-design/docs/CODE-BRIEF-13-Oct-round3.md` and the package's
 `Workspace v3.dc.html`. Where the package's words or rules differ from COPY-STANDARD or a module
@@ -1503,7 +1503,7 @@ still `open_module` in the feed and are chosen by the task panel from the rule k
 | A person as a scope, `Take over`, a reassign | §§3 and 5 allow no manual take or reassign and no per-person tab. An approval request is a Work occurrence owned by the person holding the approver Duty (§§3–4), so it arrives in that holder's `My Task` |
 | `+ New task` and `@` notes | Waiting for the owner: a task a person adds by hand conflicts with ACTION-FLOW-STANDARD ("Staff never create an action") |
 | `Board` and `Calendar` views | Not in the brief's point 3 |
-| The screen act that records a request, so a task moves to `Waiting`, and the act that records its answer | Brief point 4. The API doors `POST /api/operation/work/:occurrenceId/request-sent` and `/reply-received` exist and have no web caller, so `Waiting` stays empty until that act is built |
+| The act that records an answer which does not finish the task | No word is approved for it. `POST /api/operation/work/:occurrenceId/reply-received` exists and has no screen. Today a waiting task returns to `To do` when the owning module's fact changes it or when its answer day passes |
 | A way to narrow to blocked work or a failed source, an owner choice in the address | §5.3 |
 | Layouts under 1025 wide | Not measured |
 
@@ -1659,9 +1659,20 @@ A send never completes work, and opening or copying a WhatsApp or email text is 
 the owning module's completion fact completes an occurrence; a recurring problem is a new
 occurrence. The answer day is one Office working day after the request unless the rule sets its
 own (`workReplyDueOn`). A recorded request stores the occurrence, channel, contact, actor, time and
-answer day. **APPROVED / NOT BUILT on screen:** `Record as sent`, the act that records a request,
-and the act that records its answer have no control on any screen. Their API doors exist
-(`POST /api/operation/work/:occurrenceId/request-sent` · `/reply-received`).
+answer day.
+
+**`Record as sent`: BUILT 13 Oct 2026 (round 3 brief point 4); deployment and the signed-in production check are owed, re-measure before quoting.**
+The one task view (`tasks/TaskRequest.tsx`) offers it between the facts and the tabs for open work
+that names a party and is not waiting already: `After you asked {party}`, `Communication channel`
+(`WhatsApp` · `Email` · `Phone` · `In person`), then `Record as sent`. It posts to
+`POST /api/operation/work/:occurrenceId/request-sent` with the channel and the task's version as it
+was read; the door refuses a task that changed or is no longer open and says so in its own
+sentence. On success the dark toast says `Asked {party} · {channel} · Next contact {date}`, the
+task returns to its list and is in `Waiting` on the Tasks panel and on the Workspace page at once,
+because both read the same record. A purchase batch is not asked this way: its record is
+`PO sent to supplier`. Not sent with it: which contact (the feed carries no contact id), a template
+or evidence. **NOT BUILT:** the act that records an answer which does not finish the task
+(`/reply-received` has no screen and no approved word).
 
 #### Payment, Warehouse, loan and after-sales boundaries
 
@@ -1862,7 +1873,7 @@ Purchasing §5.6.1 owns the window law and the one arithmetic (`poWindowFor`); t
 stamps every eligible demand line and every lineage PO with its window, and both this card and SO
 Batch's `?window=` scope read that stamp. Workspace decides the composition (handoff 2026-09-25):
 
-- **The task (13 Oct 2026, BUILT ON BRANCH `build/workspace-v3`, NOT DEPLOYED).** One Work
+- **The task (13 Oct 2026, merged with #2047 and #2049; signed-in production check owed).** One Work
   occurrence per window. It opens as Purchasing's purchase batch task (`so-batch/BatchPanel.tsx`)
   in the one task view (03 §8; UI MASTER §5), from the Tasks panel and from the Workspace page
   (§5.10). Its list card and table row say the act in the Tasks panel's words (`Issue PO to
@@ -2112,7 +2123,7 @@ honest Work for admitted modules.
 
 ## 10 · Measured implementation truth — 2026-09-16
 
-- **The Workspace page: BUILT ON BRANCH `build/workspace-v3`, 13 Oct 2026; NOT DEPLOYED; production
+- **The Workspace page: MERGED 13 Oct 2026 (#2049, `64994fb31`); signed-in production check owed; production
   not verified.** §5.10 is the page. FACT on the branch: `tab=work` renders
   `tasks/WorkspaceTasks.tsx`; the earlier page (`OperationWork.tsx`, its Mission, PO view, month
   rail and their model files) is removed, and with it every measurement this section held about
@@ -2391,7 +2402,7 @@ module admission and production-proof work in §§6, 10 and 11; `Blueprint ready
 sources, migrations or pages are deployed.
 
 **The Workspace page is §5.10** (owner's round 3 brief, 13 Oct 2026; BUILT ON BRANCH
-`build/workspace-v3`, NOT DEPLOYED). The owner's review of the built page is owed. The earlier Work
+#2049, merged 13 Oct 2026; signed-in production check owed). The owner's review of the built page is owed. The earlier Work
 designs (the three-panel review surface of 2026-09-16 and the stop-card page of 2026-09-28) are
 replaced by it; Git holds them, and their fixtures were never authority.
 

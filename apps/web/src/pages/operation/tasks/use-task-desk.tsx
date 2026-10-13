@@ -141,7 +141,7 @@ export function useTaskDesk({ order, factsOf, onLeave }: {
   }), [guard, onLeave, closeTask, taskId, setDirty, simulated, queryClient, cardOrder]);
 
   /* The opened task as its list card words it: one title, one set of facts. */
-  const opened = useMemo(() => (task ? { row: task, card: taskCard(task, factsOf(task)) } : null), [task, factsOf]);
+  const opened = useMemo(() => (task ? { row: task, card: taskCard(task, factsOf(task)), result: (words: string) => host.result(words) } : null), [task, factsOf, host]);
 
   const pending = useTasksHost((s) => s.pending);
   const subject = useTasksHost((s) => s.subject);

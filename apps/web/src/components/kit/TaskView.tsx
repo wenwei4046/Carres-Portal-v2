@@ -50,7 +50,7 @@ export function ownerInitials(name: string): string {
   return words.slice(0, 2).map((word) => word.charAt(0).toUpperCase()).join("");
 }
 
-export default function TaskView({ title, moduleIcon, page, record, openRecordLabel, onOpenRecord, owner, facts, tabs, initialTab, tabsLabel, "data-testid": testId }: {
+export default function TaskView({ title, moduleIcon, page, record, openRecordLabel, onOpenRecord, owner, facts, afterFacts, tabs, initialTab, tabsLabel, "data-testid": testId }: {
   /** The task, in the words its list card uses. */
   title: string;
   /** The module's icon, a Material Symbols name. */
@@ -65,6 +65,9 @@ export default function TaskView({ title, moduleIcon, page, record, openRecordLa
   /** Who does this task now; `null` when nobody is assigned. */
   owner: string | null;
   facts: readonly TaskViewFact[];
+  /** One act about the task itself, between the facts and the tabs (the
+   *  Tasks area's `Record as sent`). The owner of the act draws it. */
+  afterFacts?: ReactNode;
   /** The first tab is the module's own work. */
   tabs: readonly TaskViewTab[];
   initialTab?: string;
@@ -125,6 +128,7 @@ export default function TaskView({ title, moduleIcon, page, record, openRecordLa
           </dl>
         ) : null}
       </div>
+      {afterFacts}
       {tabs.length > 1 ? (
         <div className="px-2.5 pb-1 pt-1.5" data-testid="task-view-tabs">
           <Tabs variant="segmented" fill label={tabsLabel} value={tab} onValueChange={choose}
