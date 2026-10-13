@@ -97,6 +97,21 @@ export type DataGridColumn<T> = {
   /** Deliberate two-line presentation; label remains the accessible/export/filter name. */
   headerLines?: readonly [string, string];
   /**
+   * A grey second line under the header label (01 §5; the design file's `l2`):
+   * `12 Oct` over `Mon`, `Free` over `stock`. The label stays the column's
+   * name for sort, filter, the Columns list and export; this line only adds
+   * to what the header shows. Omitted = the one-line header.
+   */
+  headerSub?: string;
+  /**
+   * The neutral column band (01 §5; the design file's `hl`): one soft grey
+   * fill down the whole column, header and rows, to mark the column the eye
+   * should find first (this month). It is one fixed grey, never the theme
+   * colour and never a page's own colour. An opened row's item rows carry the
+   * same fill with `bg-c-column-band`. Omitted = no band.
+   */
+  band?: boolean;
+  /**
    * ⭐ A CUT VALUE OPENS WHOLE (Listing Standard, owner approved 2026-09-16).
    * Opt-in per column: the engine prints this string on one line and, ONLY
    * when the cell actually cuts it, turns it into a kit `Popover` trigger that
@@ -261,6 +276,11 @@ export type DataGridProps<T> = {
       the operator's own grouping is never overridden. Omitted = no grouping,
       exactly as before. */
   initialGroupBy?: string[];
+  /** The sort a register opens with when this browser has no saved layout
+      for `storageKey` yet (the design file's `sortDefault`). A saved layout
+      always wins, so a person's own sort, or their choice of none, is never
+      overridden. Omitted = unsorted, exactly as before. */
+  sortDefault?: { key: string; dir: "asc" | "desc" };
   /** Governed page grouping replaces free column grouping, including older saved layouts. */
   allowColumnGrouping?: boolean;
   /** Told the column sort whenever it changes, and once on load with the
@@ -781,6 +801,7 @@ function DataGridInner<T>({
   columns,
   storageKey,
   initialGroupBy,
+  sortDefault,
   allowColumnGrouping = true,
   onSortChange,
   onGroupByChange,
@@ -874,8 +895,9 @@ function DataGridInner<T>({
     const stored = readLayout(storageKey);
     const saved = allowColumnGrouping ? stored : { ...stored, groupBy: [] };
     // `readLayout` hands back DEFAULT_LAYOUT itself only when nothing is saved.
-    return saved === DEFAULT_LAYOUT && initialGroupBy?.length
-      ? { ...DEFAULT_LAYOUT, groupBy: [...initialGroupBy] }
+    if (saved !== DEFAULT_LAYOUT) return saved;
+    return initialGroupBy?.length || sortDefault
+      ? { ...DEFAULT_LAYOUT, groupBy: [...(initialGroupBy ?? [])], sort: sortDefault ? { ...sortDefault } : null }
       : saved;
   });
   /* The keys a pristine layout hides. Keyed by value so a page that rebuilds
@@ -1193,9 +1215,10 @@ function DataGridInner<T>({
     /* With personal layouts, `Reset columns` returns to the COMPANY layout,
        which includes its default order of rows (no header sort). Back to
        pristine: the column spec's defaults show again. */
-    commitLayout((l) => ({ ...l, hidden: [], order: [], widths: {}, arranged: false, ...(personalLayouts ? { sort: null } : {}) }));
+    commitLayout((l) => ({ ...l, hidden: [], order: [], widths: {}, arranged: false, ...(personalLayouts ? { sort: sortDefault ? { ...sortDefault } : null } : {}) }));
     setColumnsMenuOpen(false);
-  }, [commitLayout, personalLayouts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the default sort is read by value
+  }, [commitLayout, personalLayouts, sortDefault?.key, sortDefault?.dir]);
   /**
    * The columns a `leadingColumns` listing may never lose or reorder: the
    * owner's own leading columns, then the record date, then the identity. A key
@@ -2078,7 +2101,7 @@ function DataGridInner<T>({
       data.forEach((col, i) => {
         const header = col.headerLines
           ? Math.max(col.headerLines[0].length, col.headerLines[1].length)
-          : col.label.length;
+          : Math.max(col.label.length, col.headerSub?.length ?? 0);
         let longest = 0;
         for (const row of cells) longest = Math.max(longest, (row[i] ?? "").length);
         const fit = Math.round(Math.max(header * 6.5 + 46, longest * 7 + 17, col.minWidth ?? 40));
@@ -2314,7 +2337,7 @@ function DataGridInner<T>({
           <th
             key={col.key}
             scope="col"
-            className={`${styles.th} ${inGroup ? styles.thInGroup : ""} ${col.headerLines ? styles.thTwoLine : ""} ${col.align === "right" ? styles.thAlignRight : ""} ${
+            className={`${styles.th} ${inGroup ? styles.thInGroup : ""} ${col.headerLines || col.headerSub ? styles.thTwoLine : ""} ${col.align === "right" ? styles.thAlignRight : ""} ${col.band ? styles.thBand : ""} ${
               dropTarget === col.key ? styles.thDragOver : ""
             }${pinClass(col.key)}`}
             style={style}
@@ -2340,7 +2363,9 @@ function DataGridInner<T>({
                     toggleSort(col.key);
                   }}
                 >
-                  {col.headerLines ? <span className={styles.headerLines}>{col.headerLines[0]}{" "}<br />{col.headerLines[1]}</span> : col.label}
+                  {col.headerLines ? <span className={styles.headerLines}>{col.headerLines[0]}{" "}<br />{col.headerLines[1]}</span>
+                    : col.headerSub ? <span className={styles.headerLines}>{col.label}{" "}<br /><span className={styles.headerSub}>{col.headerSub}</span></span>
+                    : col.label}
                   {/* ⭐ THE SORT IS AN ICON, NOT A LETTER (Card 12 review, 2026-09-21): a
                       12px Lucide arrow in the header ink, beside the same 11px
                       Filter icon. The direction is also spoken, never only drawn. */}
@@ -2355,6 +2380,8 @@ function DataGridInner<T>({
                     </span>
                   )}
                 </button>
+              ) : col.headerSub ? (
+                <span className={styles.headerLines}>{col.label}{" "}<br /><span className={styles.headerSub}>{col.headerSub}</span></span>
               ) : (
                 col.label
               )}
@@ -2730,7 +2757,7 @@ function DataGridInner<T>({
               ? <OverflowText text={col.overflowText(row)} label={col.label} />
               : col.accessor(row);
             const isEmpty = content == null || content === "";
-            const wrapClass = col.wrap ? ` ${styles.tdWrap}` : "";
+            const wrapClass = `${col.wrap ? ` ${styles.tdWrap}` : ""}${col.band ? ` ${styles.tdBand}` : ""}`;
             /* ⭐ TRIGGER COLUMN — the arrow and the content are ONE expansion
                entry (Warehouse unified card §7): one button, chevron first,
                content beside it, `aria-expanded` announced. No second expand

@@ -12,7 +12,7 @@
   /* selection: the only values a theme changes (default theme: blue) */
   --c-select-bg:#FFFFFF; --c-select-fg:#2F55E0; --c-select-soft:#EEF4FF; --c-hover:#E2E4E8; --c-row-hover:#F2F3F5;
   /* fixed in every theme */
-  --c-track:#E2E4E8; --c-track-hover:#EEF0F3; --c-select-bar:#FFFFFF; --c-link:#3965FA; --c-focus:2px solid #3965FA;
+  --c-track:#E2E4E8; --c-track-hover:#EEF0F3; --c-column-band:#EEF0F3; --c-select-bar:#FFFFFF; --c-link:#3965FA; --c-focus:2px solid #3965FA;
   /* buttons */
   --c-main:#1B1B39; --c-main-hover:#2B2B55; --c-main-fg:#FFFFFF; --c-btn-hover:#EDEFF2; --c-icon-hover:rgba(31,41,55,.10); --c-icon-press:rgba(31,41,55,.16); --disabled-opacity:.45;
   /* status: never changes with the theme */

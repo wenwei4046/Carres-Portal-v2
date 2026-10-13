@@ -55,6 +55,7 @@ Use tokens, not page-local numbers. Change the shared components once; never clo
 | Segmented track | `#E2E4E8`, hover `#EEF0F3` |
 | Hover on the grey ground | `#E2E4E8` |
 | Table row hover | `#F2F3F5` |
+| Column band in a list | `#EEF0F3`, one neutral grey in every theme (§5) |
 | Link and keyboard focus | `#3965FA` |
 
 The selection colour only marks something picked: tab, chip, menu item, ticked row, focus. A button whose menu, form or panel is open is never blue. No saturated colour fills. Other themes are in §9.
@@ -164,6 +165,8 @@ The page never scrolls; panels and table bodies scroll inside with thin scrollba
 **SO Batch Purchase · By supplier (owner 12 Oct 2026).** Columns: Supplier `minmax(150px,1fr)` · Items 80 · Sales orders 96 · Order PO deadline 120 · Supplier ready by 120 · Status 120. Status stays in view at 1131 wide with Tasks closed, with no side scroll. Built in the app on the one listing engine on 12 Oct 2026; the engine pads every cell, so that view sets 5 a side to keep the kit's 10 between columns.
 
 **Five cell formats.** Identifier (13 / 600 ink plus one 12 grey line) · Text (13 / 400 ink plus optional 12 grey line) · Number (right, tabular) · Date (`7 Oct` plus grey weekday) · Status (pill for amber and green; a status that needs no action is plain text `#4B5563`). At most two lines per cell, except the item name. When one cell in a row has a second line, every cell keeps two line slots so first lines align.
+
+**Four list options (owner 13 Oct 2026, Forecast Purchase handoff; built in the listing engine 13 Oct 2026).** Default sort: the order a list opens with, used only when the person has no saved layout; their own sort, or none, always wins (`sortDefault`). Second header line: one grey line 12 / 400 `#6B7280` under the label, for a date's weekday or a two-word header (`12 Oct` over `Mon`; column `headerSub`). Column band: one neutral fill `#EEF0F3` down a whole column (header, rows and opened items) to mark the column to read first, such as this month; it is never the theme colour and a page never passes its own colour (column `band`; item rows use `bg-c-column-band`). A tick that cannot be taken: the box stays, greyed to 45% with the not-allowed cursor, and its reason shows on hover and is read out (`selectable.unselectableReason`; `RowTick` `why` for an item).
 
 **Item text, one rule everywhere:** line 1 model 13 / 400 ink, line 2 spec 12 / 400 `#6B7280`. Never model and spec joined on one line.
 

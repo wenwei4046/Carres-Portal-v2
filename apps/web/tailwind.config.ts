@@ -148,6 +148,7 @@ export default {
           "tree-line": "var(--c-tree-line)",
           track: "var(--c-track)",
           "track-hover": "var(--c-track-hover)",
+          "column-band": "var(--c-column-band)",
           "card-border": "var(--c-card-border)",
           "btn-border": "var(--c-btn-border)",
           "head-line": "var(--c-head-line)",

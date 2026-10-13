@@ -64,6 +64,7 @@ import Tooltip from "@/components/kit/Tooltip";
 import TotalsSummary from "@/components/kit/TotalsSummary";
 import { Z_LADDER } from "@/components/kit/overlay-layer";
 import ServerRegisterExample from "@/pages/dev/ServerRegisterExample";
+import ListOptionsExample from "@/pages/dev/ListOptionsExample";
 import CompactCardExample from "@/pages/dev/CompactCardExample";
 import { fmtDate } from "@/lib/fmt-date";
 import {
@@ -887,6 +888,10 @@ export default function UiShowcase() {
               </div>
             </Card>
           </Grid>
+        </Section>
+
+        <Section id="list-options" title="List options — default sort, second header line, column band, a tick that cannot be taken" note="Preview only (01 §5, 13 Oct 2026). The list opens sorted by 12 Oct, high to low, until you sort it yourself. Oct carries the neutral column band. 12 Oct has a grey second line. Preview model A cannot be ticked: its box is greyed and says why on hover.">
+          <ListOptionsExample />
         </Section>
 
         <Section id="server-register" title="Paged register filters" note="Preview only: five rows are loaded. Supplier B exists only at record 61; choose it in the Supplier column filter, then clear the filter to restore all 61 records.">
