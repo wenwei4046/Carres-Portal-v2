@@ -13,7 +13,7 @@
  * `Supplier Deliver To` editor and every stated reason are the page's own.
  * Nothing is recomputed here; this file only draws.
  */
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import type { SoBatchOrderRow } from "@carres/shared";
 import StatusPill from "@/components/kit/StatusPill";
 import { DataGrid, type DataGridColumn, type DataGridContextMenuItem } from "@/components/register/DataGrid";
@@ -60,6 +60,9 @@ export interface OrderItemLine {
   deliverTo: ReactNode;
   /** Every PO this line is on, each its own link. */
   po: ReactNode;
+  /** A sentence about this line with its door, on its own line under the
+   *  item (`{PO No} has {n} {Item} available.` · `Use this PO`). */
+  note: ReactNode;
   /** `null`: the line belongs to a set whose first line carries the tick. */
   tick: { label: string; checked: boolean; disabled: boolean; why: string | null; onChange: () => void; testId: string } | null;
   testId?: string;
@@ -90,7 +93,8 @@ export function OrderItemRows({ label, lines, columns, stepBack, testId, before 
       </div>
       {lines.length === 0 ? <div role="row" className="px-[77px] py-3 text-body text-c-secondary">{O.noItems}</div> : null}
       {lines.map((line) => (
-        <div key={line.key} role="row" className="grid min-h-[44px] items-center border-t border-c-row-line py-1"
+        <Fragment key={line.key}>
+        <div role="row" className="grid min-h-[44px] items-center border-t border-c-row-line py-1"
           style={{ gridTemplateColumns: columns }} data-testid={line.testId ?? `by-order-line-${line.key}`}>
           <span role="cell" className="grid place-items-center">
             {line.tick ? (
@@ -116,6 +120,14 @@ export function OrderItemRows({ label, lines, columns, stepBack, testId, before 
             </div>
           ) : null}
         </div>
+        {line.note ? (
+          <div role="row" className="grid min-h-[44px] items-center py-1" style={{ gridTemplateColumns: columns }} data-testid={`by-order-note-${line.key}`}>
+            <span role="cell" />
+            <span role="cell" />
+            <span role="cell" className="min-w-0 px-[5px]" style={{ gridColumn: "3 / -1" }}>{line.note}</span>
+          </div>
+        ) : null}
+        </Fragment>
       ))}
     </ItemRows>
   );
@@ -125,7 +137,7 @@ export default function SoBatchBySalesOrder({
   orders, total, factsOf, blockedReason, today, isLoading, storageKey, sessionKey,
   eligibleOf, isTicked, onToggleOrder, selectionSummary, selectionPrimary, toolbarEnd, toolbarAfterTools, toolbarStart,
   onOpenOrder, onRowDoubleClick, contextMenu, renderItems, emptyMessage, noMatchMessage, initialSearch, searchPlaceholder, warning, searchOf, poLinksOf, onOpenPo,
-  onVisibleChange, onClearConditions,
+  onVisibleChange, onClearConditions, pageToolsItems,
 }: {
   /** The Sales Orders this tab and the rail are showing. */
   orders: SoBatchOrderRow[];
@@ -165,6 +177,8 @@ export default function SoBatchBySalesOrder({
   onVisibleChange?: (orders: SoBatchOrderRow[]) => void;
   /** `Clear filters` also clears what the page itself narrowed by. */
   onClearConditions?: () => void;
+  /** The page's own items in the ⋮ menu, between Export and Columns. */
+  pageToolsItems?: ComponentProps<typeof DataGrid>["pageToolsItems"];
   /** Everything a search may find the order by. */
   searchOf: (order: SoBatchOrderRow) => string;
   /** Every PO the order is on (owner ruling 2026-10-05: every number, each a link). */
@@ -311,6 +325,7 @@ export default function SoBatchBySalesOrder({
         appearance="reference"
         palette="slate"
         presentationTools
+        pageToolsItems={pageToolsItems}
         toolbarAfterTools={toolbarAfterTools ?? (fit.tight ? undefined : <span aria-hidden className="block" style={{ width: FIXED.status + 8 }} />)}
         wrapToolbar
         searchPresentation="icon"

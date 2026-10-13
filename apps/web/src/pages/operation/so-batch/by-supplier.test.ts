@@ -292,9 +292,12 @@ describe("fitColumns", () => {
   });
 
   it("the first column is never under 150 while the fixed columns keep their widths", () => {
-    /* 80 + 2 + 536 + 150 = 768 is the least room the full widths take. */
-    expect(fitColumns(768, 80, 150, BASE, FLOORS)).toMatchObject({ first: 150, tight: false });
-    expect(fitColumns(767, 80, 150, BASE, FLOORS).tight).toBe(true);
+    expect(fitColumns(768, 80, 150, BASE, FLOORS)).toMatchObject({ first: 150, fixed: BASE, tight: false });
+    /* The list at 1025 wide is 765: the full widths are kept there (the
+       lead's slack beside the tick and the arrow holds the last 3). */
+    expect(fitColumns(765, 80, 150, BASE, FLOORS)).toMatchObject({ first: 150, fixed: BASE, tight: false });
+    /* Below that the columns give way. */
+    expect(fitColumns(757, 80, 150, BASE, FLOORS).tight).toBe(true);
   });
 
   it("short of room, the fixed columns give way together and everything still fits", () => {

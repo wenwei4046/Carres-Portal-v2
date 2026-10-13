@@ -280,7 +280,8 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     toastError.mockClear();
     renderPage();
     await screen.findByTestId("so-batch-row-o1");
-    fireEvent.click(screen.getByRole("button", { name: /^Purchase Orders$/ }));
+    fireEvent.keyDown(screen.getByRole("button", { name: "Page tools" }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Purchase Orders" }));
     await waitFor(() => expect(toastError).toHaveBeenCalledWith("Supplier details could not be loaded.", expect.any(Object)));
     expect(screen.queryByTestId("po-supplier-result-panel")).toBeNull();
     readable = true;
@@ -301,7 +302,8 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
       : path.endsWith("email-capability") ? { configured: false } : read);
     renderPage();
     await screen.findByTestId("so-batch-row-o1");
-    fireEvent.click(screen.getByRole("button", { name: /^Purchase Orders$/ }));
+    fireEvent.keyDown(screen.getByRole("button", { name: "Page tools" }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Purchase Orders" }));
     await screen.findByTestId("po-supplier-result-panel");
     expect(apiFetch).toHaveBeenCalledWith("/api/operation/pos/PO-2041/issue-context");
     await screen.findByRole("button", { name: "Open full page" });

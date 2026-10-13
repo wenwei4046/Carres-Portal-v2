@@ -217,27 +217,36 @@ function StatusWhy({
   orderId: string;
   onDoor: (door: Exclude<SoBatchStatusDoor, "use_po">) => void;
 }) {
-  const door = why.door;
   return (
     <span className="block text-meta text-kit-slate-11" data-testid={testId}>
       <span className="block">{why.text}</span>
-      {door === "use_po" && why.usePo ? (
-        <UseThisPoButton orderId={orderId} usePo={why.usePo} />
-      ) : door && door !== "use_po" ? (
-        <button
-          type="button"
-          className={STATUS_DOOR_CLASS}
-          onClick={(e) => {
-            e.stopPropagation();
-            onDoor(door);
-          }}
-          onDoubleClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-        >
-          {door === "catalog" ? W.statusFixInCatalog : W.statusOpenSettings}
-        </button>
-      ) : null}
+      <StatusDoor why={why} orderId={orderId} onDoor={onDoor} />
     </span>
+  );
+}
+
+/** The door of a stated reason, alone: `Use this PO` · `Fix in Catalog` · `Open Settings`. */
+function StatusDoor({ why, orderId, onDoor }: {
+  why: SoBatchStatusWhy;
+  orderId: string;
+  onDoor: (door: Exclude<SoBatchStatusDoor, "use_po">) => void;
+}) {
+  const door = why.door;
+  if (door === "use_po" && why.usePo) return <UseThisPoButton orderId={orderId} usePo={why.usePo} />;
+  if (!door || door === "use_po") return null;
+  return (
+    <button
+      type="button"
+      className={STATUS_DOOR_CLASS}
+      onClick={(e) => {
+        e.stopPropagation();
+        onDoor(door);
+      }}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      {door === "catalog" ? W.statusFixInCatalog : W.statusOpenSettings}
+    </button>
   );
 }
 
@@ -1232,16 +1241,21 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 selectionPrimary={<>{issueActions}{viewSwitchCompact}</>}
                 toolbarEnd={<div className={`${styles.toolbarTools} flex min-w-0 flex-wrap items-center gap-2`}>
                   {viewSwitch}
-                  {onOpenPurchaseOrders ? <Button loading={purchaseOrdersLoading} disabled={isLoading} data-testid="so-batch-open-pos" onClick={() => {
-                    /* The Sales Orders in view: this tab, the rail AND the list's own search. */
-                    const inTab = new Set(byOrder.map(order => order.orderId));
-                    onOpenPurchaseOrders([...new Set(visibleOrders.current.filter(order => inTab.has(order.orderId)).flatMap(order => order.pos.map(po => po.poId)))]);
-                  }}>Purchase Orders</Button> : null}
                 </div>}
                 toolbarStart={<>
                   {!filterRailOpen ? <ShowFiltersButton onShow={() => setFilterRailVisible(true)} testId="so-batch-show-filters" /> : null}
                   {showTabs}
                 </>}
+                /* `Purchase Orders` (supplier preparation for the Sales Orders in
+                   view: this tab, the rail AND the list's own search) is in the ⋮
+                   menu, so the toolbar keeps one line at 1025 (01 §4). */
+                pageToolsItems={onOpenPurchaseOrders ? [{
+                  key: "purchase-orders", label: "Purchase Orders", separatorBefore: true, disabled: isLoading || purchaseOrdersLoading,
+                  onSelect: () => {
+                    const inTab = new Set(byOrder.map(order => order.orderId));
+                    onOpenPurchaseOrders([...new Set(visibleOrders.current.filter(order => inTab.has(order.orderId)).flatMap(order => order.pos.map(po => po.poId)))]);
+                  },
+                }] : undefined}
                 onOpenOrder={openOrder}
                 onRowDoubleClick={openOrder}
                 contextMenu={rowMenu}
@@ -1429,6 +1443,7 @@ function SoBatchOrderExpansion({
       const toBuy = soBatchOrderLineOutstandingQty(l) > 0;
       const why = toBuy ? (leaf ? soBatchLeafStatusWhy(leaf, order.status, stateWords, l) : null) : soBatchLineReservedWhy(l);
       const issued = issuedDest.kind === "none" ? null : issuedDest.kind === "one" ? issuedDest.value : W.multiple;
+      const offer = why?.door === "use_po";
       itemLines.push({
         key: l.orderLineId,
         testId: `so-batch-part-${l.sku}`,
@@ -1439,22 +1454,28 @@ function SoBatchOrderExpansion({
         stockDetail: readyStock.detail(l.orderLineId),
         supplier: summaryText(supplier, (n) => `${n} suppliers`) ?? null,
         deliverTo: drawEditor ? (
-          <>
-            <DestinationAllocationEditor row={leaf} destinations={destinations} allocations={arranged}
-              onWholeRow={(destinationId) => onWholeLeaf(leaf, destinationId)}
-              onSplit={(allocations) => onSplitLeaf(leaf.id, allocations)} />
-            {/* An offer never blocks buying: `Use this PO` stays beside the editor (owner ruling 2026-09-28). */}
-            {why ? <StatusWhy why={why} testId={`so-batch-line-status-why-${l.orderLineId}`} orderId={order.orderId}
-              onDoor={(door) => navigate(STATUS_DOOR_PATH[door])} /> : null}
-          </>
+          <DestinationAllocationEditor row={leaf} destinations={destinations} allocations={arranged}
+            onWholeRow={(destinationId) => onWholeLeaf(leaf, destinationId)}
+            onSplit={(allocations) => onSplitLeaf(leaf.id, allocations)} />
         ) : (
           <>
             {issued ? <span className="break-words">{issued}</span> : null}
-            {why ? <StatusWhy why={why} testId={`so-batch-line-status-why-${l.orderLineId}`} orderId={order.orderId}
+            {why && !offer ? <StatusWhy why={why} testId={`so-batch-line-status-why-${l.orderLineId}`} orderId={order.orderId}
               onDoor={(door) => navigate(STATUS_DOOR_PATH[door])} /> : null}
             {!issued && !why && leaf != null && !firstOfLeaf ? <span className="text-meta text-c-secondary">{BY_SALES_ORDER.partOfSet}</span> : null}
           </>
         ),
+        /* ⭐ AN OFFER HAS ITS OWN LINE UNDER THE ITEM (owner ruling 2026-09-28:
+           the offer shows, and never blocks buying). `{PO No} has {n} {Item}
+           available.` with `Use this PO` is longer than a cell, so it sits
+           under the item across the row's width: the item row keeps its two
+           lines at every width, and the sentence is never cut. */
+        note: why && offer ? (
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-meta text-kit-slate-11" data-testid={`so-batch-line-status-why-${l.orderLineId}`}>
+            <span className="break-words">{why.text}</span>
+            <StatusDoor why={why} orderId={order.orderId} onDoor={(door) => navigate(STATUS_DOOR_PATH[door])} />
+          </span>
+        ) : null,
         po: linePos.length > 0 ? (
           <PoNumberLinks wrap numbers={poNumberLinks(linePos.map((p) => p!))} onOpen={(poId) => navigate(poObjectPath(poId))}
             testId={`so-batch-line-po-${l.orderLineId}`} linkTestId={`so-batch-line-po-link-${l.orderLineId}`} />
@@ -1648,7 +1669,7 @@ function SoBatchOrderExpansion({
         itemLines.push({
           key: `${leaf.id}::${part.sku}`, testId: `so-batch-part-${part.sku}`, code: part.sku, detail: null,
           qty: BY_SUPPLIER.qty(leaf.category, part.qty), stock: null, stockDetail: null, supplier: leaf.supplier ?? null,
-          deliverTo: null, po: null, tick: null,
+          deliverTo: null, note: null, po: null, tick: null,
         });
       }
     }

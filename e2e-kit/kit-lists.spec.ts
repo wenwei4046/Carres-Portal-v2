@@ -82,7 +82,13 @@ async function measure(page: Page, box: string, last: string) {
     const cut = [...root.querySelectorAll("*")].filter((el) =>
       el.children.length === 0 && (el as HTMLElement).scrollWidth > (el as HTMLElement).clientWidth + 1 &&
       getComputedStyle(el).textOverflow === "ellipsis").length;
+    /* The list's toolbar is one line (01 §4): every control on it starts at
+       the same height. */
+    const toolbar = root.querySelector('[class*="toolbar"]');
+    const tops = toolbar ? [...toolbar.querySelectorAll("button")].filter((b) => (b as HTMLElement).offsetParent)
+      .map((b) => Math.round(b.getBoundingClientRect().top + b.getBoundingClientRect().height / 2)) : [];
     return {
+      toolbarLines: tops.length ? (Math.max(...tops) - Math.min(...tops) > 12 ? 2 : 1) : 0,
       pageScroll: document.documentElement.scrollWidth - window.innerWidth,
       listSpare: scroller.scrollWidth - scroller.clientWidth,
       lastCells: cells.length,
@@ -114,6 +120,7 @@ for (const list of LISTS) {
         expect(m!.lastPastEdge, `${state}: the last column passes the list's edge`).toBeLessThanOrEqual(0);
         expect(m!.cut, `${state}: values cut with "..."`).toBe(0);
         if (list.kitCheck) {
+          expect(m!.toolbarLines, `${state}: the toolbar is one line`).toBe(1);
           await page.mouse.move(4, 4);
           expect(await carresCheck(page), `${state}: carres-check.js`).toEqual(PASS);
         }
