@@ -891,9 +891,9 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
        already holds need nothing done, so that is said in grey. */
     const why = soBatchOrderStatusWhy(order, leaves, stateWords);
     const text = why?.text ?? tick;
-    const absence = soBatchOrderPlanning(order, leaves).absence;
-    const fix = tick != null && (leaves.some((leaf) => !isPurchaseDemandTimingState(leaf.state)) || absence === "not_planned" || absence === "coverage_not_checked");
-    return text ? { text, tick, fix } : null;
+    const held = soBatchOrderPlanning(order, leaves).absence === "already_on_po"
+      && !order.lines.some((line) => line.poOfferUnread && soBatchOrderLineOutstandingQty(line) > 0);
+    return text ? { text, tick, fix: tick != null && !held } : null;
   }, [leafsByOrder, stateWords]);
   const visibleOrders = useRef<SoBatchOrderRow[]>([]);
   const rememberVisibleOrders = useCallback((rows: SoBatchOrderRow[]) => { visibleOrders.current = rows; }, []);

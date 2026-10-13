@@ -72,13 +72,15 @@ import SoBatchRegister from "./SoBatchRegister";
  * SO BATCH PURCHASE — THE PERMANENT ORDER REGISTER
  * (CARD 02-B, owner ruling 2026-08-27; `docs/purchasing/MASTER.md` §9.1).
  *
- * One row per proceeded Sales Order, and the row never leaves when a purchase
- * order is issued. These tests hold the approved shape: the exact ten business
- * columns in the exact order, blank · `Partial` · `Ordered` and nothing else,
- * PO attribution drawn only from what the server's lineage sent, the parent
- * checkbox standing for ALL eligible child demand, and the expansion drawn by
- * the ONE shared child table — with no second `Purchase order details` table
- * (owner ruling 2026-10-06).
+ * One row per proceeded Sales Order, and the record never leaves the Register
+ * when a purchase order is issued (`All` holds every one). These tests hold
+ * the approved shape of `By sales order` since 13 Oct 2026, round 3: the five
+ * columns in their order on 54 rows, the governed Status words with every PO
+ * number as a link under the pill, `To buy` · `Ordered` · `All`, PO
+ * attribution drawn only from what the server's lineage sent, the parent
+ * checkbox standing for ALL eligible child demand, and an opened row drawn as
+ * the list's own item rows — with no second `Purchase order details` table
+ * (owner ruling 2026-10-06). The shared goods table lives in the quick view.
  */
 
 const KLANG = "11111111-1111-4111-8111-111111111111";
