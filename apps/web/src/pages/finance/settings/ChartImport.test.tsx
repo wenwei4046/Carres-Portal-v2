@@ -29,7 +29,7 @@ vi.mock("@/lib/api", () => ({
       { code: "300-0000", name: "TRADE DEBTORS", parentCode: "0000", status: "exists", reason: null, chartName: "TRADE DEBTORS" },
       { code: "900-A001", name: "ADVERTISING", parentCode: "6000", status: "create", reason: null, chartName: null },
       { code: "900-A002", name: "ADVERTISING - ONLINE", parentCode: "900-A001", status: "create", reason: null, chartName: null },
-      { code: "310-9000", name: "NEW BANK", parentCode: "310-0000", status: "problem", reason: "310-9000 NEW BANK is a bank or cash account. Add it in Money accounts.", chartName: null },
+      { code: "310-9000", name: "NEW BANK", parentCode: "310-0000", status: "problem", reason: "310-9000 NEW BANK is a bank or cash account. Add it with Add a money account.", chartName: null },
     ];
     return { applied: body.apply, created: 2, existing: 1, problems: 1, rows };
   }),
@@ -89,7 +89,7 @@ describe("ChartImport (0655)", () => {
     ]);
     const table = screen.getByTestId("chart-import-rows");
     const text = within(table).getAllByRole("row").map((r) => r.textContent);
-    expect(text[1]).toContain("Add it in Money accounts.");
+    expect(text[1]).toContain("Add it with Add a money account.");
     expect(text[2]).toContain("900-A001 ADVERTISING");
     expect(text[2]).toContain("New");
     expect(text[4]).toContain("Already in the chart");

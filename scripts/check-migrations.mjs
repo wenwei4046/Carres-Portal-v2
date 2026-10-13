@@ -151,10 +151,31 @@ if (altered.length) throw new Error(`Committed migrations are immutable; only ne
 /* What counts as destructive, and what is set aside as code a migration
    defines (function bodies, function rewrites, comments), has one definition in
    scripts/migration-destructive.mjs, which the gate's regression test reads too. */
+/**
+ * DESTRUCTIVE, REVIEWED AND APPLIED BY THE GOVERNED PATH.
+ *
+ * 0692 drops the table gl_money_accounts (0512) after moving every row onto the
+ * chart (gl_accounts.special, money_in_use) and replaces it with a view of the
+ * same name and columns. It was probed on production in a rolled-back
+ * transaction, applied as the exact file (tracker md5
+ * a764b03cabe59f2910a55ed730e7f5b6), and the owner of Finance confirmed the
+ * DROP in the conversation (Chew 2026-10-13, 「确认，继续」;
+ * docs/finance/MASTER.md §0 "One place for the money accounts").
+ *
+ * Pinned to the reviewed content (the git blob id), not the file name, so any
+ * edit to the file is refused again.
+ */
+const REVIEWED_DESTRUCTIVE = new Map([
+  ["0692_the_chart_marks_the_money_accounts.sql", "9bf5c9424e5ee11a0c46244d69fee1bd771ccbbe"],
+]);
+const isReviewedDestructive = (file) => {
+  const pinned = REVIEWED_DESTRUCTIVE.get(file.split("/").pop());
+  return !!pinned && execFileSync("git", ["rev-parse", `HEAD:${file}`], { encoding: "utf8" }).trim() === pinned;
+};
 for (const line of changed.filter((entry) => entry.startsWith("A\t"))) {
   const file = line.slice(2);
   const sql = await readFile(file, "utf8");
-  if (isDestructiveSql(sql)) {
+  if (isDestructiveSql(sql) && !isReviewedDestructive(file)) {
     throw new Error(`${file} contains destructive SQL and requires the governed manual review/apply path.`);
   }
 }

@@ -29,9 +29,17 @@
  *
  * Accounts read by number (0656), so there is no drag and no column sort: a
  * sort would lift accounts away from the heading they are indented under.
+ *
+ * THE MONEY ACCOUNTS (0692, Chew 2026-10-13, 「对，做」). The chart is the one
+ * place that marks an account as holding money: a bank (SBK), cash (SCH) or a
+ * card or online payment company's holding account (HLD, Carres's own). Such a
+ * row reads its kind in words under Type in place of its special type, opens
+ * the money account's own window (name, Active, number), and has no retire icon. `Add a money account` adds one. A money account out of use
+ * reads `Not active` and, like a retired account, shows only when asked for.
  */
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ledgerKindWord, LEDGER_ACCOUNT_CODE_MESSAGE, type LedgerAccount, type LedgerSection } from "@carres/shared/finance-ledger";
+import { MONEY_ACCOUNT_KIND_WORD, type MoneyAccountRow } from "@carres/shared/money-accounts";
 import { ledgerAccountCodeInput } from "@carres/shared/schemas/finance";
 import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
@@ -43,9 +51,10 @@ import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { useLedgerChart } from "../ledger/ledger-queries";
 import { LoadFailed } from "../other-money-in/parts";
-import { useAddAccountInSection, useEditAccount, useSetAccountActive } from "./api";
+import { useAddAccountInSection, useEditAccount, useMoneyAccounts, useSetAccountActive } from "./api";
 import { useSaveKey } from "../save-key";
 import ChartImport from "./ChartImport";
+import MoneyAccountModal from "./MoneyAccountModal";
 
 /** The group of a top account that has no section yet. */
 export const NO_SECTION = "__no_section__";
@@ -64,14 +73,14 @@ const byCode = (x: LedgerAccount, y: LedgerAccount) => x.code.localeCompare(y.co
 
 /**
  * The chart as AutoCount prints it: section by section, each top account
- * followed by the accounts under it, every heading by number. Retired accounts
- * are left out unless asked for; a folded heading keeps its row and hides
- * what is under it.
+ * followed by the accounts under it, every heading by number. Retired accounts,
+ * and money accounts out of use (`notActive`, 0692), are left out unless asked
+ * for; a folded heading keeps its row and hides what is under it.
  */
 export function chartBySection(
   accounts: readonly LedgerAccount[],
   sections: readonly LedgerSection[],
-  opts: { showRetired: boolean; folded: ReadonlySet<string> },
+  opts: { showRetired: boolean; folded: ReadonlySet<string>; notActive?: ReadonlySet<string> },
 ): ChartRow[] {
   const known = new Set(sections.map((s) => s.section));
   const codes = new Map(accounts.map((a) => [a.code, a]));
@@ -83,7 +92,7 @@ export function chartBySection(
     under.set(a.parent_code, list);
   }
   for (const list of under.values()) list.sort(byCode);
-  const shown = (a: LedgerAccount) => opts.showRetired || a.is_active;
+  const shown = (a: LedgerAccount) => opts.showRetired || (a.is_active && !opts.notActive?.has(a.code));
 
   const walk = (a: LedgerAccount, depth: number, group: string): ChartRow[] => {
     if (!shown(a)) return [];
@@ -139,15 +148,37 @@ export default function ChartOfAccounts() {
   const [folded, setFolded] = useState<Set<string>>(() => new Set());
   const [editing, setEditing] = useState<{ account: LedgerAccount; retire: boolean } | null>(null);
   const [adding, setAdding] = useState(false);
+  /* 0692: a money account's own window. `undefined` = closed; `null` = adding one. */
+  const [moneyEditing, setMoneyEditing] = useState<MoneyAccountRow | null | undefined>(undefined);
+  const moneyQuery = useMoneyAccounts();
+  const moneyRows = useMemo(() => new Map((moneyQuery.data ?? []).map((m) => [m.code, m])), [moneyQuery.data]);
+  const notActive = useMemo(
+    () => new Set((moneyQuery.data ?? []).filter((m) => !m.is_active).map((m) => m.code)),
+    [moneyQuery.data],
+  );
+  /** A row opens its money account's window when it is one, else the chart's. */
+  const open = useCallback(
+    (account: LedgerAccount, retire: boolean) => {
+      const money = moneyRows.get(account.code);
+      if (money) setMoneyEditing(money);
+      else setEditing({ account, retire });
+    },
+    [moneyRows],
+  );
   const [importing, setImporting] = useState(false);
 
   const accounts = useMemo(() => query.data?.accounts ?? [], [query.data]);
   const sections = useMemo(() => query.data?.sections ?? [], [query.data]);
-  const moneyHeading = query.data?.roles?.MONEY_ACCOUNTS_HEADING;
+  /* The headings that hold money accounts only: banks and cash (310-0000) and,
+     since 0693, card and online holding (315-0000). Read by role. */
+  const moneyHeadings = useMemo(
+    () => [query.data?.roles?.MONEY_ACCOUNTS_HEADING, query.data?.roles?.CLEARING_ACCOUNTS_HEADING].filter((c): c is string => !!c),
+    [query.data],
+  );
   const moneyAccounts = useMemo(() => new Set(query.data?.money_accounts ?? []), [query.data]);
   const rows = useMemo(
-    () => chartBySection(accounts, sections, { showRetired, folded }),
-    [accounts, sections, showRetired, folded],
+    () => chartBySection(accounts, sections, { showRetired, folded, notActive }),
+    [accounts, sections, showRetired, folded, notActive],
   );
 
   const fold = (code: string) =>
@@ -160,7 +191,7 @@ export default function ChartOfAccounts() {
 
   /** Accounts the retire door always refuses, so their row has no retire icon:
    *  an account the system posts to (a role, an income or payment map row), a
-   *  bank, cash or card account (stopped in Money accounts), a control
+   *  bank, cash or card account (taken out of use in its own window), a control
    *  account, and a heading with accounts in use under it. An account the
    *  ledger has posted to keeps the icon; the database's sentence says why it
    *  stays. */
@@ -176,6 +207,18 @@ export default function ChartOfAccounts() {
     }
     return set;
   }, [accounts, query.data]);
+
+  /** 0692: a money account reads its kind in words under Type, which filters
+   *  by it, and no special type beside its name; every other account its
+   *  special type and its kind. */
+  const specialWord = useCallback((a: LedgerAccount) => (moneyRows.has(a.code) ? null : a.special ?? null), [moneyRows]);
+  const typeWord = useCallback(
+    (a: LedgerAccount) => {
+      const money = moneyRows.get(a.code);
+      return money ? MONEY_ACCOUNT_KIND_WORD[money.money_kind] : ledgerKindWord(a.kind);
+    },
+    [moneyRows],
+  );
 
   const groups = useMemo(() => {
     const used = new Set(rows.map((r) => r.group));
@@ -227,13 +270,14 @@ export default function ChartOfAccounts() {
               {r.depth > 0 ? "└ " : ""}
               {r.account.name}
             </span>
-            {r.account.special ? <span className="text-label text-kit-slate-11">{r.account.special}</span> : null}
+            {specialWord(r.account) ? <span className="text-label text-kit-slate-11">{specialWord(r.account)}</span> : null}
             {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0656). */}
             {r.account.is_header ? <span className="text-label text-kit-slate-11">Heading</span> : null}
-            {!r.account.is_active ? <span className="text-label text-kit-slate-11">Retired</span> : null}
+            {!r.account.is_active ? <span className="text-label text-kit-slate-11">Retired</span>
+              : notActive.has(r.account.code) ? <span className="text-label text-kit-slate-11">Not active</span> : null}
           </span>
         ),
-        searchValue: (r) => `${r.account.name} ${r.account.special ?? ""}`,
+        searchValue: (r) => `${r.account.name} ${specialWord(r.account) ?? ""}`,
         exportValue: (r) => r.account.name,
       },
       {
@@ -241,7 +285,7 @@ export default function ChartOfAccounts() {
         label: "Type",
         width: 140,
         sortable: false,
-        accessor: (r) => ledgerKindWord(r.account.kind),
+        accessor: (r) => typeWord(r.account),
         filterType: "enum",
       },
       {
@@ -259,7 +303,7 @@ export default function ChartOfAccounts() {
               // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0656).
               aria-label={`Edit ${r.account.code} ${r.account.name}`}
               data-testid={`chart-edit-${r.account.code}`}
-              onClick={() => setEditing({ account: r.account, retire: false })}
+              onClick={() => open(r.account, false)}
             />
             {r.account.is_active && !kept.has(r.account.code) ? (
               <Button
@@ -268,7 +312,7 @@ export default function ChartOfAccounts() {
                 icon="delete"
                 aria-label={`Retire ${r.account.code} ${r.account.name}`}
                 data-testid={`chart-retire-${r.account.code}`}
-                onClick={() => setEditing({ account: r.account, retire: true })}
+                onClick={() => open(r.account, true)}
               />
             ) : null}
           </span>
@@ -276,10 +320,11 @@ export default function ChartOfAccounts() {
         exportValue: () => "",
       },
     ],
-    [folded, kept],
+    [folded, kept, notActive, specialWord, typeWord, open],
   );
 
   if (query.isError) return <LoadFailed what="The chart of accounts" onRetry={() => void query.refetch()} />;
+  if (moneyQuery.isError) return <LoadFailed what="The money accounts" onRetry={() => void moneyQuery.refetch()} />;
   return (
     <ListPageShell register>
       <DataGrid
@@ -292,19 +337,22 @@ export default function ChartOfAccounts() {
         allowColumnGrouping={false}
         fixedGroups={{ groups, groupOf: (r) => r.group, revealMatches: true }}
         stickyIdentity
-        isLoading={!query.isSuccess}
-        onRowClick={(r) => setEditing({ account: r.account, retire: false })}
+        isLoading={!query.isSuccess || !moneyQuery.isSuccess}
+        onRowClick={(r) => open(r.account, false)}
         toolbarEnd={
           <div className="flex flex-wrap items-center gap-2">
             {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0656). */}
             <Checkbox
               id="chart-show-retired"
-              label="Show retired accounts"
+              label="Show not active"
               checked={showRetired}
               onCheckedChange={(on) => setShowRetired(on === true)}
             />
             <Button variant="neutral" onClick={() => setAdding(true)} disabled={!query.isSuccess}>
               Add account
+            </Button>
+            <Button variant="neutral" onClick={() => setMoneyEditing(null)} disabled={!query.isSuccess}>
+              Add a money account
             </Button>
             {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0655). */}
             <Button variant="neutral" data-testid="chart-import-open" onClick={() => setImporting(true)} disabled={!query.isSuccess}>
@@ -320,14 +368,17 @@ export default function ChartOfAccounts() {
           startWithRetire={editing.retire}
           accounts={accounts}
           sections={sections}
-          moneyHeading={moneyHeading}
+          moneyHeadings={moneyHeadings}
           moneyAccounts={moneyAccounts}
           onClose={() => setEditing(null)}
         />
       )}
       {importing && <ChartImport onClose={() => setImporting(false)} />}
+      {moneyEditing !== undefined && (
+        <MoneyAccountModal key={moneyEditing?.code ?? "new"} account={moneyEditing} onClose={() => setMoneyEditing(undefined)} />
+      )}
       {adding && (
-        <AddAccountModal accounts={accounts} sections={sections} moneyHeading={moneyHeading} onClose={() => setAdding(false)} />
+        <AddAccountModal accounts={accounts} sections={sections} moneyHeadings={moneyHeadings} onClose={() => setAdding(false)} />
       )}
     </ListPageShell>
   );
@@ -344,18 +395,19 @@ function upFrom(code: string | null, accounts: readonly LedgerAccount[]): string
 /**
  * The headings an account may sit under in `section`: headings in use of that
  * section, never the account itself or a heading inside it (gl_account_move),
- * and inside the bank and cash heading only when the account and everything
- * under it are bank and cash accounts (0580). `account` null = a new account,
- * which never goes there: bank and cash accounts are added in Money accounts.
+ * and inside a money heading (bank and cash, or card and online holding, 0693)
+ * only when the account and everything under it are money accounts (0580).
+ * `account` null = a new account, which never goes there: money accounts are
+ * added with Add a money account.
  */
 export function headingsIn(
   section: string,
   account: LedgerAccount | null,
   accounts: readonly LedgerAccount[],
-  money: { heading: string | undefined; accounts: ReadonlySet<string> },
+  money: { headings: readonly string[]; accounts: ReadonlySet<string> },
 ): LedgerAccount[] {
   const inside = (h: LedgerAccount) => !!account && upFrom(h.code, accounts).includes(account.code);
-  const inMoney = (code: string) => !!money.heading && upFrom(code, accounts).includes(money.heading);
+  const inMoney = (code: string) => upFrom(code, accounts).some((c) => money.headings.includes(c));
   const subtree = account ? accounts.filter((x) => upFrom(x.code, accounts).includes(account.code)) : [];
   const allMoney = subtree.length > 0 && subtree.every((x) => x.is_header || money.accounts.has(x.code));
   return accounts
@@ -399,7 +451,7 @@ function AccountModal({
   startWithRetire,
   accounts,
   sections,
-  moneyHeading,
+  moneyHeadings,
   moneyAccounts,
   onClose,
 }: {
@@ -407,7 +459,7 @@ function AccountModal({
   startWithRetire: boolean;
   accounts: readonly LedgerAccount[];
   sections: readonly LedgerSection[];
-  moneyHeading: string | undefined;
+  moneyHeadings: readonly string[];
   moneyAccounts: ReadonlySet<string>;
   onClose: () => void;
 }) {
@@ -425,7 +477,7 @@ function AccountModal({
   const sectionOptions = sections
     .filter((s) => s.kind === account.kind)
     .map((s) => ({ value: s.section, label: s.section }));
-  const headings = section ? headingsIn(section, account, accounts, { heading: moneyHeading, accounts: moneyAccounts }) : [];
+  const headings = section ? headingsIn(section, account, accounts, { headings: moneyHeadings, accounts: moneyAccounts }) : [];
   const underOptions = [
     // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0656).
     { value: TOP_OF_SECTION, label: "Top of the section" },
@@ -548,18 +600,18 @@ function AccountModal({
 /**
  * Add an account, or a heading, in one of AutoCount's sections (0656): at the
  * top of the section or under one of its headings. The kind follows the
- * section. Bank and cash accounts are added in Money accounts, so the bank
- * and cash heading is never offered.
+ * section. Money accounts are added with Add a money account, so neither money
+ * heading (bank and cash, card and online holding) is offered.
  */
 function AddAccountModal({
   accounts,
   sections,
-  moneyHeading,
+  moneyHeadings,
   onClose,
 }: {
   accounts: readonly LedgerAccount[];
   sections: readonly LedgerSection[];
-  moneyHeading: string | undefined;
+  moneyHeadings: readonly string[];
   onClose: () => void;
 }) {
   const add = useAddAccountInSection();
@@ -569,7 +621,7 @@ function AddAccountModal({
   const [name, setName] = useState("");
   const [isHeading, setIsHeading] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
-  const headings = section ? headingsIn(section, null, accounts, { heading: moneyHeading, accounts: new Set() }) : [];
+  const headings = section ? headingsIn(section, null, accounts, { headings: moneyHeadings, accounts: new Set() }) : [];
   const gap = accountSaveGap({ section, code, name, isHeading });
 
   const submit = () => {

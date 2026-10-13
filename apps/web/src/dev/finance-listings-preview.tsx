@@ -14,7 +14,7 @@
  * credit-note-new · debit-notes · debit-note · debit-note-new ·
  * voucher-pays-debit-note (0681) · forecast (last month, so the actual is a whole month) ·
  * posting-accounts · item-groups (long lists under their tables, 0657–0659) ·
- * money-accounts (0691: accounts out of use hidden until asked for) ·
+ * money-accounts (0692: Chart of accounts with its money accounts; those out of use hidden until asked for) ·
  * dealer-commission · dealer-statement (one made-up dealer, 0664; pick it on
  * the Statement view) · notes-to-follow-up · note-to-follow-up (0676).
  * `?role=principal` draws the area titles, to see an area fold.
@@ -839,7 +839,7 @@ const CODE_OF: Record<string, string> = {
   "s-1": "400-O001", "s-2": "400-L001", "s-3": "405-B001", "s-4": "405-T001", "s-5": "400-D001", "s-6": "405-P001",
 };
 const PARTY_CODES = ["305-P001", "305-I001", "305-A001", "305-A002"];
-// Finance Settings → Money accounts: two old test accounts out of use, hidden until asked for.
+// Finance Settings → Chart of accounts, its money accounts: two old test accounts out of use, hidden until asked for.
 const MONEY_ACCOUNT_ROWS = [
   { code: "1120", name: "BANK - CURRENT ACCOUNT (TEST ONLY)", money_kind: "BANK", is_active: false },
   { code: "1121", name: "Public Bank", money_kind: "BANK", is_active: false },
@@ -851,6 +851,20 @@ const MONEY_ACCOUNT_ROWS = [
   { code: "315-9000", name: "CARD - MACHINE NOT KNOWN", money_kind: "HOLDING", is_active: true },
   { code: "320-0000", name: "CASH IN HAND", money_kind: "CASH", is_active: true },
 ];
+
+// 0692: Chart of accounts in its CURRENT ASSETS section, the money accounts marked on it. Invented.
+const SETTINGS_CHART = [
+  ["0000", "ASSETS", null, true, null, null],
+  ["300-0000", "TRADE DEBTORS", "0000", false, "CURRENT ASSETS", "SDC"],
+  ["310-0000", "CASH AT BANK", "0000", true, "CURRENT ASSETS", null],
+  ["315-0000", "CARD & ONLINE CLEARING", "0000", true, "CURRENT ASSETS", null],
+  ...MONEY_ACCOUNT_ROWS.map((m) => [m.code, m.name, m.money_kind === "HOLDING" ? "315-0000" : "310-0000", false, null,
+    m.money_kind === "BANK" ? "SBK" : m.money_kind === "CASH" ? "SCH" : "HLD"]),
+  ["330-0000", "STOCK", "0000", false, "CURRENT ASSETS", "SBS"],
+].map(([code, name, parent_code, is_header, section, special]) => ({
+  code, name, kind: "ASSET", parent_code, is_control: false, control_for: null, is_active: true, is_header,
+  sort_order: 0, section, special,
+}));
 
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -924,6 +938,10 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/finance/dealer-commission/payment-choices")) return json(DC_CHOICES);
   if (url.includes("/api/finance/dealer-commission/rules")) return json({ today: TODAY, rules: [], dealers: [], models: [], categories: [] });
   if (url.includes("/api/finance/dealer-commission")) return json(dcSource(q.get("month") ?? TODAY.slice(0, 7)));
+  if (url.includes("/api/finance/ledger/accounts") && PAGE === "money-accounts")
+    return json({ go_live_on: GO_LIVE, accounts: SETTINGS_CHART, roles: { MONEY_ACCOUNTS_HEADING: "310-0000", CLEARING_ACCOUNTS_HEADING: "315-0000" },
+      money_accounts: MONEY_ACCOUNT_ROWS.map((m) => m.code), system_accounts: [], rule_headings: [],
+      sections: [{ section: "CURRENT ASSETS", kind: "ASSET", sort_order: 50 }] });
   if (url.includes("/api/finance/ledger/accounts"))
     return json({ go_live_on: GO_LIVE, accounts: ACCOUNTS.map(([code, name, kind]) => ({ code, name, kind, parent_code: null,
       is_control: code === "1200" || code === "2100", control_for: null, is_active: true, is_header: false })) });
@@ -978,7 +996,7 @@ const ROUTES: Record<string, string> = {
   "payment-request-new": "/finance/payment-requests/new",
   "request-access": "/finance/settings?tab=requests",
   "posting-accounts": "/finance/settings?tab=posting",
-  "money-accounts": "/finance/settings?tab=money",
+  "money-accounts": "/finance/settings",
   "item-groups": "/finance/settings?tab=groups",
   "dealer-commission": "/finance/reports/dealer-commission",
   "dealer-statement": "/finance/reports/dealer-commission?view=statement",
