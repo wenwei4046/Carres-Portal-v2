@@ -116,9 +116,9 @@ export default function ShellTasks() {
         taskOpen ? "w-[clamp(366px,32vw,560px)]" : "w-[320px]"
       }`}
     >
-      <div className="flex shrink-0 items-center gap-1.5 border-b border-c-line px-3.5 pb-2.5 pt-3">
+      <div className="flex h-9 shrink-0 items-center gap-1.5 border-b border-c-line px-3.5">
         {/* The day badge: month on charcoal over the day number. */}
-        <span className="flex h-[30px] w-7 shrink-0 flex-col overflow-hidden rounded-[7px] border border-c-input-border bg-white" aria-hidden>
+        <span className="flex h-7 w-7 shrink-0 flex-col overflow-hidden rounded-[7px] border border-c-input-border bg-white" aria-hidden>
           <span className="bg-c-ink text-center text-[7px] font-semibold leading-[10px] tracking-[0.04em] text-white">{mon}</span>
           <span className="grid flex-1 place-items-center text-body font-semibold text-c-ink">{now.getDate()}</span>
         </span>

@@ -207,12 +207,11 @@ message sent; do not promote that report to a full live issue-to-send journey.
 columns `PO Status · Proceed Date · SO No · PO Safety Days · Customer’s original requested delivery ·
 Customer Delivery Location · Customer · Items · Supplier · Supplier Deliver To · PO No · PO Delivery
 Date`, rail `Listing` / `Report` with `Order time` (11:00 AM · 4:00 PM) and `PO Safety Days`.
-SO Batch adopts the confirmed SO-derived shared listing recipe: 32px desktop baseline rows,
-12px body/18px line height, natural growth for complete wrapped facts; 40px desktop toolbar with
-responsive wrapping. Table/Cards belongs after Search in the existing right tools cluster; all
-labels and supported controls remain reachable. This adoption is scoped to SO Batch; no shared
-component behaviour or other module changes are commissioned. Listing/disabled Report stays;
-`Match Ready Stock` is not on the toolbar: the owner removed it on 13 Oct 2026 (never agreed).
+That measurement is the record of 6 Oct. **Since 13 Oct 2026 every view of this page is the kit list**
+(§9.1): rows 54, item rows 44, one 40px toolbar line, no side scroll at 1025, 1164 and 1440. The
+twelve-column list above is gone; §9.1 `By sales order` says where each of its facts is read now.
+Listing/disabled Report stays; `Match Ready Stock` is not on the toolbar: the owner removed it on
+13 Oct 2026 (never agreed).
 
 The listing heading is `Customer’s original requested delivery`, in two lines `Customer’s original`
 / `requested delivery`, using the preserved revision-1 SO request for display, date filtering,
@@ -267,7 +266,9 @@ confusion without an action. Exact availability, Units, selection and save remai
 This removes parent presentation only, not stock eligibility, reservation or matching capability.
 
 **Ready Stock placement — CLOSED by the owner, 13 Oct 2026.** `Match Ready Stock` has no button on this page, in the
-toolbar or the rail. Stock for an order is reserved in the opened row (`Reserve stock`).
+toolbar or the rail. Stock for an order is reserved in two places only: in the opened row of `By sales order`, per item
+line (`Stock you can use`: the counts, then `Choose Ready Unit` / `Save changes`), and with `Use stock · {n}` on the
+selection bar (owner's round 3 brief, 13 Oct 2026; §9.1). The whole-round matching mode is deleted.
 
 Current-source finding: the allocation helper sorts by the current-request field
 (`orders.delivery_date`) then Proceed, not yet the preserved original request, and
@@ -2651,13 +2652,70 @@ this release.
 
 **BY SUPPLIER VIEW — owner 12 Oct 2026 (design handoff) · BUILT 12 Oct 2026 · the page's first view.**
 The page has four groupings of the same demand, chosen from ONE view button (owner 13 Oct 2026, the design file's
-`By supplier ▾`): `By supplier` (the first view), `By sales order` (one row per Sales Order, the list this page always
-had; `view=table` in the address), `By category` (`view=category`) and `By order deadline` (`view=deadline`). The
+`By supplier ▾`): `By supplier` (the first view), `By sales order` (one row per Sales Order; `view=table` in the
+address), `By category` (`view=category`) and `By order deadline` (`view=deadline`). All four are the same kit list. The
 button's menu has two parts: `GROUP BY` with those four, and `SHOW COLUMNS FOR` with the modules. Only `Purchasing`
 columns exist on this page; `Overview` · `Sales Order` · `Warehouse` · `Payment` · `Delivery` · `Service` are named,
 marked `Coming soon`, and cannot be chosen until this page reads their facts from their owning modules.
 **Removed by the owner, 13 Oct 2026:** the `Cards` view (an old `view=cards` link opens `By supplier`) and the
-`Match Ready Stock` toolbar button (never agreed). The whole-round matching code has no door and awaits its own ruling.
+`Match Ready Stock` toolbar button (never agreed). The whole-round matching mode behind it is deleted (round 3).
+
+**By sales order — owner's round 3 brief, 13 Oct 2026 (point 1) · BUILT 13 Oct 2026.** The twelve-column wide list is
+replaced by one row per Sales Order on the same kit list as `By supplier`, so nothing scrolls sideways.
+
+| Column | Width | What it shows |
+|---|---|---|
+| `SO no.` | takes the room left, never under 150 | The Sales Order number (opens the quick card; a double click and the row menu `View` · `Print` · `Open {PO}` are kept); under it the customer |
+| `Items` | 150 | The customer's quantity over every item line, in pieces (a sofa-only order in sets); under it the item lines by what is left: `{n} to buy · {n} ordered · {n} stock` |
+| `Proceed date` | 104 | `orders.proceeded_at`; under it the weekday |
+| `Customer’s original requested delivery` | 150 | The date; under it the weekday. `Not recorded` when the order has none |
+| `Status` | 132 | A pill, then one line, then every PO the order is on |
+
+- **Status.** `Ordered` (green) when nothing is left to buy and the order is on a PO; `From ready stock` (green) with
+  `No PO needed` when nothing is left and no PO exists (`Ordered` never describes an order with no PO); `Late to order`
+  (amber) when the earliest Order By date of its buyable lines has passed; `Cut-off passed` (amber) when a buyable line's
+  PO window has gone by; `Partly ordered` (amber) when part is on a PO; otherwise `To buy`. Under a to-buy pill the line
+  is the Order By countdown (`{n} days left` · `Today` · `{n} days late`). An order nothing can be ticked on reads
+  `To buy` with the governed reason under it (`Production days not set`, `Already on a PO`, ...): amber when a fact is
+  missing and must be set, grey when another PO already covers the goods. The left-edge stripe of the old list is gone;
+  the reason is in view on the row and on the item line.
+- **Every PO number stays on the row (owner ruling 2026-10-05).** Under Status, every linked PO, comma-separated, each
+  its own link to that PO; a list wraps inside the column and is never cut or counted. Search finds the order by the
+  stored or the printed number, and Export writes them after the status word.
+- **Tabs.** `To buy` (first) · `Ordered` · `All`, as on the other three views. `To buy` lists the Sales Orders with an
+  item line still to buy; `Ordered` those on a PO; `All` every proceeded Sales Order the rail is showing. The Register
+  stays permanent: nothing leaves `All` when a PO is issued. The footer is `{n} sales orders`, or `{shown} of {n} sales
+  orders`.
+- **An opened row** lists the order's item lines under `Item` · `Qty` · `Stock you can use` · `Supplier` · `Supplier
+  delivers to`: the line's tick (one per demand; a matched set says `With {n} more lines in this set`), the model code
+  over the size, the customer's quantity, the Ready Stock cell and its picker under the same line, the supplier, then
+  the `Supplier Deliver To` editor (Split included) while the line is to buy. A line already on a PO reads where that
+  PO sends it and its PO numbers as links. A line that may not be bought has a disabled tick that says why, and the
+  same reason with its door (`Use this PO` · `Fix in Catalog` · `Open Settings`) in the last cell. A missing-setup
+  blocker is stated above the lines in amber.
+- **`Use stock · {n}` on the selection bar, never on the toolbar.** While item lines are ticked, the page reads Ready
+  Stock for their Sales Orders (at most five orders at a time) and counts the ticked lines that have a free Unit. The
+  button shows only when that count is above zero, in all four views. One press reserves the suggested Unit for each
+  of those lines through the existing reservation door (`so_batch_reserve_ready_units`); the lines with no stock stay
+  ticked to buy. The suggestion is the shared matcher's: Carres-owned exact Units at Carres Klang, oldest first, the
+  order chosen by the `Ready Stock priority` setting first. A tick on a line the press answers is dropped before the
+  write, so a stale quantity can never be issued; a lost response is read back, never sent twice. A refusal says
+  `Not confirmed · Try again` above the list.
+- **Kept from the old list:** eligibility and the duplicate-PO protection, the one tick set and the one `Issue PO` door,
+  the PO Duty chip, `Export Excel (n)` for the ticked rows, Export in ⋮, the rail and its counts, the quick card,
+  `Purchase Orders` on the toolbar (supplier preparation for the Sales Orders in view), the pending-stock warning.
+- **Facts that left the row, and where each is read:** `PO Safety Days` in the rail's own group and the quick card;
+  `Customer Delivery Location` in the quick card and the Sales Order; `Supplier` and `Supplier Deliver To` on each item
+  line; `PO Delivery Date` on the PO (each number is its door) and under `Supplier ready by` in `By supplier`. The
+  column chooser has nothing left to choose on five fixed columns and is not offered; `SHOW COLUMNS FOR` is where a
+  module's columns will come.
+- **Not drawn from the package:** its `Order type` column. The SO Batch read carries no order type, and a column that
+  says the same word on every row adds nothing; it joins when a second order type is recorded. Its `Outstation` mark
+  needs the same.
+- **Measured 13 Oct 2026 on the fixture preview:** the package's `carres-check.js` and the page's own measures (no page
+  or list side scroll, nothing cut) PASS at 1025, 1164 and 1440 with rows closed, one row open, a row ticked with
+  `Use stock` showing, and after the press. `pnpm kit:check` runs all of it for the four views on every pull request.
+  The Tasks title row is 36 high (01 §4), which the check measures at 1440.
 
 **By category and By order deadline — owner 13 Oct 2026 · BUILT 13 Oct 2026.** The same lines and the same arithmetic
 as `By supplier`; only the key changes. Columns: `Category` or `Order PO deadline` (takes the room left) · `Items` 80 ·
@@ -2680,11 +2738,11 @@ because one PO goes to one supplier for one category. Rows whose PO window has g
 | `Items` | 80 | What is still to buy, in pieces, a sofa in sets; under it the number of models |
 | `Sales orders` | 96 | How many Sales Orders; under it the first number and how many more |
 | `Order PO deadline` | 120 | The earliest Order By date among the lines still to buy; under it the weekday and `{n} days left` · `Today` · `{n} days late` (amber once the date has passed) |
-| `Supplier ready by` | 120 | The PO Delivery Date a PO issued today would carry (the same projection the Issue PO review shows), marked `if sent today`. It is never the `PO Delivery Date` of an issued PO; that column of the Table view still shows a date only once the PO exists |
+| `Supplier ready by` | 120 | The PO Delivery Date a PO issued today would carry (the same projection the Issue PO review shows), marked `if sent today`. It is never the `PO Delivery Date` of an issued PO, which is read on the PO itself |
 | `Status` | 120 | `Cut-off passed` (amber) with what is still to buy, when a line's PO window has gone by; otherwise `To buy` |
 
 - A row opens to its item lines under the heads `Item` · `To buy` · `SO No` · `Order By` · `Supplier Deliver To`: tick · item and variant · quantity · Sales Order number (opens the order card) · that line's Order By date · the SAME `Supplier Deliver To` editor the By sales order list uses, Split included. A line that may not be bought has no tick and no editor and states its reason with the same words and the same door (`Use this PO` · `Fix in Catalog`) as the By sales order list.
-- A tick on a row ticks every line of it that may be bought; a line has its own tick. The ticks are the same ticks the Table view holds, and the same `Issue PO` door takes them. Who may tick and issue is unchanged.
+- A tick on a row ticks every line of it that may be bought; a line has its own tick. The ticks are the same ticks every view holds, and the same `Issue PO` door takes them. Who may tick and issue is unchanged.
 - Every date and number is the server's (`orderBy`, `poDeliveryDate`, `poDeliveryWorkingDays`, `poWindow`, `toBuy`); the PO window times are the Purchasing Settings values, never the specimen's.
 - Status stays in view at 1131 wide with Tasks closed, with no side scroll (measured 12 Oct 2026). Tasks now opens by itself only from 1280 wide (03 §1).
 - The earlier `Group by: Supplier` page tool, which only regrouped the Sales Order rows, is removed: one way to see demand by supplier.
@@ -2727,11 +2785,9 @@ because one PO goes to one supplier for one category. Rows whose PO window has g
   unchanged. Days are counted from the server's date, the same one the rows use.
   The toolbar is one line at 1025, 1164, 1440 and 1700: search is one icon here (the top bar
   searches everything) and `Export` and `Columns` are in the ⋮ menu.
-  Not built from the package: `THIS MONTH`, `PIECES ORDERED`, the `{n} outstation` chip, `Group by`
-  category and order deadline, and `Use stock` on the selection bar (Ready Stock results still show
-  in `By sales order`, which is why that view stays).
-- **Kept functions (owner instruction 12 Oct 2026: the kit is the visual source, never permission to drop a working function).** Eligibility, the duplicate-PO protection and the destination rules are the By sales order list's own, read through the same functions: one tick set, one `Issue PO` door, the server's re-check unchanged. `Match Ready Stock` sits in this view's toolbar and opens the By sales order list, where stock is matched per Sales Order; the per-line Ready Stock picker lives there.
-- **Not built yet:** the specimen's other groupings (`By category` · `By order deadline`), its Summary panel and its `To buy · Ordered · All` tabs. The specimen's `Place` and `Send PO` are not Portal words: the act is `Issue PO` (COPY-STANDARD), and sending evidence stays inside the approved issuance lifecycle.
+  Not built from the package: `THIS MONTH`, `PIECES ORDERED` and the `{n} outstation` chip.
+- **Kept functions (owner instruction 12 Oct 2026: the kit is the visual source, never permission to drop a working function).** Eligibility, the duplicate-PO protection and the destination rules are the page's own, read through the same functions in every view: one tick set, one `Issue PO` door, the server's re-check unchanged. The per-line Ready Stock picker is in `By sales order`; `Use stock` is on the selection bar of every view.
+- **Not built yet:** the specimen's Summary panel beyond the Today card, and the module column sets under `SHOW COLUMNS FOR`. The specimen's `Place` and `Send PO` are not Portal words: the act is `Issue PO` (COPY-STANDARD), and sending evidence stays inside the approved issuance lifecycle.
 
 **PO PLACEMENT UNBLOCK — CORE PRODUCTION-VERIFIED, 2026-10-01.** PRs #1827 / #1832
 merged at `45f43e96b92305583fa176a17d5222152dc5eb9a`. CI `36816676966` passed 13,745
@@ -3137,20 +3193,11 @@ creating and reserving nothing. Every rail count — timing, Product, Supplier �
 proceeded-SO population. Rail filters combine with AND: a timing facet plus a product facet shows
 only rows satisfying both, never a widening OR.
 
-**Columns — OWNER RULING (Jess, 2026-09-18) · BUILT 2026-09-18, exactly in this order:**
-
-```text
-PO Status · Proceed Date · SO No · PO Safety Days · Customer’s original requested delivery ·
-Customer Delivery Location · Customer · Items · Supplier · Supplier Deliver To · PO No ·
-PO Delivery Date
-```
-
-`Items` shows `{first item} + {n} more`, with all items available in expansion.
-The default order is unfinished purchase work first, then Done, with Proceed Date ascending within each. All retained records remain visible; the former automatic purchase/no-purchase groups are retired. `PO Safety Days` reads the remaining working-day margin defined in the shared COPY dictionary; the Order By date is not a goods-table column; underlying timing calculations remain unchanged. `Proceed Date` and `SO No` pin at canvas ≥768px; below 768px only `SO No`
-pins. `Proceed Date` reads `orders.proceeded_at` (the actual hand-off), never
-`orders.proceed_date`. The build bumps the saved layout key so no stored arrangement keeps the old
-order; `leadingColumns` still refuses to hide or move the pair. Widths are measured at 1440 in the
-shell with the rail open during the build.
+**Columns.** The 2026-09-18 twelve-column order (`PO Status · Proceed Date · SO No · PO Safety Days · ...`) was replaced on
+13 Oct 2026 by the kit list: §9.1 `By sales order` holds the five columns, their widths and where every other fact is
+read. The order of rows is unchanged in meaning: Sales Orders with work left first, by Proceed Date; the `To buy` ·
+`Ordered` · `All` tabs choose which are listed, and every retained record is under `All`.
+`Proceed date` reads `orders.proceeded_at` (the actual hand-off), never `orders.proceed_date`.
 
 - **PO Status** follows the owner-approved Pending / Partial / Done quantity contract above. The word does not authorize selection or assert supplier communication or Receiving. Unknown coverage cannot prove Done.
 - **Visible PO attribution comes ONLY from `po_line_sources`** — never `purchase_orders.so`,

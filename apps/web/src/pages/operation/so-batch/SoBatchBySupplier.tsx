@@ -51,7 +51,7 @@ const modelCode = (line: PurchaseDemandRow) => (line.skus?.length ? line.skus.jo
 
 export default function SoBatchBySupplier({
   groups, by = "supplier", today, isLoading, storageKey, sessionKey, canBuy, isTicked, onToggleLine, onToggleLines,
-  selectionSummary, selectionPrimary, toolbarEnd, toolbarAfterTools, toolbarStart, onOpenOrder, emptyMessage, initialSearch, searchPlaceholder, lineExtras,
+  selectionSummary, selectionPrimary, toolbarEnd, toolbarAfterTools, toolbarStart, onOpenOrder, emptyMessage, initialSearch, searchPlaceholder, lineExtras, warning,
 }: {
   groups: SupplierGroup[];
   /** How the rows are grouped. The columns follow it. */
@@ -79,6 +79,8 @@ export default function SoBatchBySupplier({
   /** The By sales order list's own controls for one demand line: where the
    *  supplier delivers it, and why it may not be bought. */
   lineExtras?: (line: PurchaseDemandRow) => { deliverTo?: ReactNode; whyText?: string | null; door?: ReactNode };
+  /** A business blocker shown between the toolbar and the list. */
+  warning?: string;
 }) {
   const buyable = useMemo(
     () => new Map(groups.map((g) => [g.key, g.lines.filter(canBuy).map((l) => l.id)])),
@@ -277,11 +279,12 @@ export default function SoBatchBySupplier({
       toolbarAfterTools={toolbarAfterTools ?? <span aria-hidden className="block" style={{ width: (by === "supplier" ? FIXED.status : GROUPED.status) + 8 }} />}
       wrapToolbar
       /* The top bar already searches everything; here search is one icon, so
-         the tabs, the views and Match Ready Stock stay on one line (01 §4). */
+         the tabs and the view button stay on one line (01 §4). */
       searchPresentation="icon"
       allowColumnGrouping={false}
       groupBanner={false}
       isLoading={isLoading}
+      warning={warning}
       emptyMessage={emptyMessage}
       noMatchMessage={emptyMessage}
       initialSearch={initialSearch}

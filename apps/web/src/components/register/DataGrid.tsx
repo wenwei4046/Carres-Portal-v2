@@ -2612,7 +2612,7 @@ function DataGridInner<T>({
                     }}
                     onChange={() => selectable.onToggle(key)}
                   />
-                  {refusal ? <span id={refusalId} className="sr-only">{refusal}</span> : null}
+                  {refusal ? <span id={refusalId} hidden>{refusal}</span> : null}
                   </label>
               );
               return (
