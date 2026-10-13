@@ -255,7 +255,7 @@ describe("one account's running balance", () => {
   });
 
   it("hides the balance while the rows are grouped", async () => {
-    window.localStorage.setItem("carres.finance.journal.v1", JSON.stringify({ groupBy: ["source"] }));
+    window.localStorage.setItem("carres.finance.journal.v2", JSON.stringify({ groupBy: ["source"] }));
     try {
       api.fetch.mockImplementation((u: string) => withLedger(u));
       show("/finance/ledger?account=1210");
@@ -266,7 +266,7 @@ describe("one account's running balance", () => {
       expect(screen.queryByRole("columnheader", { name: "Running balance" })).not.toBeInTheDocument();
       expect(document.body.textContent).not.toMatch(/RM [\d,.]+ (Debit|Credit)/);
     } finally {
-      window.localStorage.removeItem("carres.finance.journal.v1");
+      window.localStorage.removeItem("carres.finance.journal.v2");
     }
   });
 

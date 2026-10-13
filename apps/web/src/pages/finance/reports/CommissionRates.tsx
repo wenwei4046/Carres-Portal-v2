@@ -14,6 +14,9 @@
  * A row is never changed: `Add a rate` adds the new one from its day, and a
  * row added by mistake is removed from its window. The first rows are from
  * the start and stay.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): Applies to and the memo wrap rather than
+ * being cut. No amount is listed here; a rate is a rate, never blanked.
  */
 import { useMemo, useState } from "react";
 import { categoryLabel } from "@carres/shared";
@@ -87,11 +90,11 @@ export default function CommissionRates({ toolbarStart }: { toolbarStart: React.
 
   const columns = useMemo<DataGridColumn<DcRule>[]>(
     () => [
-      { key: "applies", label: "Applies to", width: 260, sortable: false, accessor: appliesTo, searchValue: appliesTo },
+      { key: "applies", label: "Applies to", width: 260, wrap: true, sortable: false, accessor: appliesTo, searchValue: appliesTo },
       { key: "rate", label: "Rate", width: 170, sortable: false, accessor: ruleWord, searchValue: ruleWord },
       { key: "from", label: "From", width: 140, sortable: false, accessor: fromWord, exportValue: (r) => r.startsOn ?? "" },
       { key: "state", label: "Status", width: 130, sortable: false, filterType: "enum", accessor: (r) => STATE_WORD[r.state] },
-      { key: "memo", label: "Memo", width: 320, sortable: false, accessor: (r) => r.memo ?? "No memo", searchValue: (r) => r.memo ?? "" },
+      { key: "memo", label: "Memo", width: 320, wrap: true, sortable: false, accessor: (r) => r.memo ?? "No memo", searchValue: (r) => r.memo ?? "" },
       { key: "added", label: "Added", width: 200, sortable: false, filterable: false, accessor: addedWord },
     ],
     [],
@@ -105,8 +108,9 @@ export default function CommissionRates({ toolbarStart }: { toolbarStart: React.
           rows={rules}
           columns={columns}
           rowKey={(r) => r.id}
-          storageKey="carres.finance.commission-rates.v1"
+          storageKey="carres.finance.commission-rates.v2"
           appearance="reference"
+          look="finance"
           groupBanner={false}
           allowColumnGrouping={false}
           exportName="Commission rates"

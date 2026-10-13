@@ -286,6 +286,21 @@ describe("Payment vouchers register", () => {
     expect(await screen.findByRole("link", { name: "PV-9M3Q" })).toHaveClass("text-kit-blue-11");
   });
 
+  it("the account paid from shows its code and its name in two cells (Finance look, 2026-10-13)", async () => {
+    api.routes[`${B}/vouchers`] = { rows: [{ id: PV, voucher_no: "PV-9M3Q", status: "approved", purpose: "SUPPLIER_BILLS",
+      supplier_id: SUP, supplier_name: "Lumen Sofa Works", payee_name: "Lumen Sofa Works", voucher_date: "2026-09-11",
+      amount: "1225.00", pay_method: "BANK_TRANSFER", pay_reference: null, pay_from_account_code: "1120",
+      pay_from_name: "Bank", bill_nos: "BILL-4XK2", line_count: 0, prepared_by_name: "Aina", checked_by_name: "Boon",
+      approved_by_name: "Dina", file_count: 0, created_at: "2026-09-11T01:00:00Z", advance_amount: "0.00",
+      advance_open: null }] };
+    show("/finance/payment-vouchers");
+    const link = await screen.findByRole("link", { name: "PV-9M3Q" });
+    const voucher = link.closest("tr")!;
+    expect(within(voucher).getByRole("cell", { name: "1120" })).toBeInTheDocument();
+    expect(within(voucher).getByRole("cell", { name: "Bank" })).toBeInTheDocument();
+    expect(within(voucher).queryByText("1120 Bank")).not.toBeInTheDocument();
+  });
+
   it("sorts Advance by the amount, with No advance last either way", async () => {
     const pv = (id: string, voucher_no: string, advance_amount: string, advance_open: string | null) => ({
       id, voucher_no, status: "approved", purpose: "SUPPLIER_BILLS", supplier_id: SUP, supplier_name: "Lumen Sofa Works",

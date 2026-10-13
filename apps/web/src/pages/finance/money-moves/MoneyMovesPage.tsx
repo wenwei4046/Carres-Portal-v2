@@ -10,6 +10,11 @@
  *
  * Built from the kit pieces Other receipts uses; the form sits in a Modal
  * because it has six fields and no lines.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): a zero amount or fee is a blank cell. Paid
+ * from and Paid into keep each account's code with its name in one cell, and
+ * wrap: a row holds two accounts, and two columns both headed Code would not
+ * say which account each belongs to.
  */
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -47,6 +52,7 @@ import { useLedgerChart } from "../ledger/ledger-queries";
 import { accountLabel, CancelWithReason, LoadFailed } from "../other-money-in/parts";
 import { useApproveMoneyMove, useCancelMoneyMove, useMoneyMoves, useMoneyMovesMe, usePrepareMoneyMove } from "./api";
 import { useSaveKey } from "../save-key";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 
 const TONE = { prepared: "warning", approved: "success", reversed: "neutral", cancelled: "neutral" } as const;
 const from = (r: MoneyMoveRow) => accountLabel({ code: r.from_account_code, name: r.from_account_name });
@@ -75,14 +81,14 @@ export default function MoneyMovesPage() {
         exportValue: (r) => fmtDate(r.move_date),
       },
       { key: "kind", label: "Kind", width: 140, accessor: (r) => MONEY_MOVE_KIND_WORD[r.kind], filterType: "enum" },
-      { key: "from", label: "Paid from", width: 200, accessor: from, filterType: "enum" },
-      { key: "to", label: "Paid into", width: 200, accessor: to, filterType: "enum" },
+      { key: "from", label: "Paid from", width: FINANCE_WIDTH.account, wrap: true, accessor: from, filterType: "enum" },
+      { key: "to", label: "Paid into", width: FINANCE_WIDTH.account, wrap: true, accessor: to, filterType: "enum" },
       {
         key: "amount",
         label: "Amount",
-        width: 130,
+        width: FINANCE_WIDTH.amount,
         align: "right",
-        accessor: (r) => rm(Number(r.amount)),
+        accessor: (r) => amountCell(r.amount),
         numberValue: (r) => Number(r.amount),
         filterType: "number",
         exportValue: (r) => Number(r.amount),
@@ -90,9 +96,9 @@ export default function MoneyMovesPage() {
       {
         key: "fee",
         label: "Fee",
-        width: 110,
+        width: FINANCE_WIDTH.amount,
         align: "right",
-        accessor: (r) => rm(Number(r.fee)),
+        accessor: (r) => amountCell(r.fee),
         numberValue: (r) => Number(r.fee),
         exportValue: (r) => Number(r.fee),
       },
@@ -135,8 +141,9 @@ export default function MoneyMovesPage() {
             rows={query.data ?? []}
             columns={columns}
             rowKey={(r) => r.move_id}
-            storageKey="carres.finance.money-moves.v1"
+            storageKey="carres.finance.money-moves.v2"
             appearance="reference"
+            look="finance"
             exportName="Money moves"
             groupBanner={false}
             stickyIdentity

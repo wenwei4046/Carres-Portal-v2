@@ -82,7 +82,9 @@ describe("Other receipts — the Register", () => {
     expect(screen.getByTestId("other-receipts-destination-header")).toHaveTextContent("Other receipts");
     expect(screen.getAllByText("Recorded").length).toBe(2);
     expect(screen.getByText("Cancelled")).toBeInTheDocument();
-    expect(screen.getAllByText("1120 · Bank — current account").length).toBe(3);
+    // The money account's code and its name each sit in their own cell (Finance look, 2026-10-13).
+    expect(screen.getAllByRole("cell", { name: "1120" }).length).toBe(3);
+    expect(screen.getAllByRole("cell", { name: "Bank — current account" }).length).toBe(3);
     expect(screen.getByTestId("other-receipts-summary")).toHaveTextContent("3 receipts · RM 10,600.00 received");
     expect(document.body.textContent).not.toMatch(/Balance|Posted|Voided/);
     for (const raw of ["posted", "voided"]) expect(screen.queryByText(raw)).not.toBeInTheDocument();

@@ -96,11 +96,14 @@ function CardRoutes() {
   };
 
   /* Chew 2026-10-13 (「这个card payouts banks 要做成表」): the routes are the
-     shared listing, one column per fact, so a long account name is never cut. */
+     shared listing, one column per fact, so a long account name is never cut.
+     FINANCE LOOK (Chew 2026-10-13): the look is on and both accounts wrap. Each
+     keeps its code with its name in one cell: a row holds two accounts, and two
+     columns both headed Code would not say which account each belongs to. */
   const columns: DataGridColumn<CardRouteRow>[] = [
-    { key: "holding", label: MONEY_ACCOUNT_KIND_WORD.HOLDING, width: 320, accessor: (r) => name(r.holding_code), searchValue: (r) => name(r.holding_code) },
+    { key: "holding", label: MONEY_ACCOUNT_KIND_WORD.HOLDING, width: 320, wrap: true, accessor: (r) => name(r.holding_code), searchValue: (r) => name(r.holding_code) },
     { key: "channel", label: "Machine at", width: 130, accessor: (r) => CARD_CHANNEL_WORD[r.channel], filterType: "enum" },
-    { key: "bank", label: "Pays out to", width: 320, accessor: (r) => name(r.bank_code), searchValue: (r) => name(r.bank_code) },
+    { key: "bank", label: "Pays out to", width: 320, wrap: true, accessor: (r) => name(r.bank_code), searchValue: (r) => name(r.bank_code) },
   ];
 
   if (accountQuery.isError) return <LoadFailed what="The accounts" onRetry={() => void accountQuery.refetch()} />;
@@ -119,6 +122,7 @@ function CardRoutes() {
           rowTestId={(r) => `card-route-${r.holding_code}-${r.channel}`}
           storageKey="carres.finance.card-payout-banks.v1"
           appearance="reference"
+          look="finance"
           groupBanner={false}
           allowColumnGrouping={false}
           stickyIdentity

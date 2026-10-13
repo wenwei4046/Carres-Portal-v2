@@ -11,6 +11,7 @@ import { rm } from "@/lib/format-currency";
 import { statementExport } from "./month-end-pack";
 import { parseBalanceSheet, parseProfitAndLoss } from "./reports/report-queries";
 import { paidBeforeInvoiceNote } from "./reports/StatementTable";
+import look from "./finance-look.module.css";
 import { lastMonths } from "./reports/by-month";
 
 const api = vi.hoisted(() => ({ fetch: vi.fn() }));
@@ -197,6 +198,14 @@ describe("Reports — the statements read the ledger", () => {
       "6200 Rent and utilities | RM 1,800.00",
       "Net result | RM 4,050.00",
     ]);
+    // FINANCE LOOK (Chew 2026-10-13): the table sits in the Finance look, and a
+    // heading line is marked as a subtotal row; an account line is not.
+    expect(look.statement).toBeTruthy();
+    expect(table.parentElement).toHaveClass(look.statement);
+    const heading = within(table).getByText("Cost of sales");
+    expect(heading).toHaveAttribute("data-fin-tone", "subtotal");
+    const account = within(table).getByRole("link", { name: "5100 Cost of goods sold" }).closest("tr")!;
+    expect(account.querySelector("[data-fin-tone]")).toBeNull();
   });
 
   it("prints the total the ledger served, never a sum of its own", async () => {

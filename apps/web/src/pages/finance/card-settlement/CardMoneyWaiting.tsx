@@ -12,6 +12,10 @@
  *
  * Every figure is the shared card-money-waiting arithmetic's (Law D); this
  * page only prints it.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the card account's code and its name are
+ * two columns, the customer wraps rather than being cut, and a zero is a
+ * blank cell.
  */
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
@@ -32,6 +36,7 @@ import { fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { ReadFailed } from "../payables/PayablesParts";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 
 const link = "text-kit-blue-11 underline underline-offset-2";
 
@@ -74,10 +79,11 @@ export default function CardMoneyWaiting() {
       filterValue: (r) => ledgerSourceWord(r.wire.source_type), filterType: "enum", defaultHidden: true },
     { key: "so", label: "SO No", width: 110, accessor: (r) => (r.wire.so != null ? `SO-${r.wire.so}` : ""),
       searchValue: (r) => (r.wire.so != null ? `SO-${r.wire.so}` : "") },
-    { key: "customer", label: "Customer", width: 180, accessor: (r) => r.wire.customer_name ?? "" },
-    { key: "account", label: "Card account", width: 140, accessor: (r) => `${r.wire.account_code} ${r.holdingName}`,
+    { key: "customer", label: "Customer", width: FINANCE_WIDTH.party, wrap: true, accessor: (r) => r.wire.customer_name ?? "" },
+    { key: "code", label: "Code", width: FINANCE_WIDTH.code, accessor: (r) => r.wire.account_code },
+    { key: "account", label: "Card account", width: 140, wrap: true, accessor: (r) => r.holdingName,
       filterValue: (r) => r.holdingName, filterType: "enum" },
-    { key: "amount", label: "Amount", width: REGISTER_FIELD_WIDTH.amount, align: "right", accessor: (r) => rm(r.amount),
+    { key: "amount", label: "Amount", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.amount),
       numberValue: (r) => r.amount, exportValue: (r) => r.amount,
       footerTotal: (v) => rm(v.reduce((t, r) => t + Math.round(r.amount * 100), 0) / 100) },
     { key: "days", label: "Days", width: 80, align: "right", accessor: (r) => String(r.days),
@@ -86,7 +92,7 @@ export default function CardMoneyWaiting() {
     { key: "age", label: "Waiting", width: 130, accessor: (r) => r.age, defaultHidden: true,
       filterValue: (r) => r.age, filterType: "enum",
       sortFn: (a, b) => CARD_WAITING_AGES.indexOf(a.age) - CARD_WAITING_AGES.indexOf(b.age) },
-    { key: "where", label: "Where it is", width: 260,
+    { key: "where", label: "Where it is", width: 220, wrap: true,
       accessor: (r) => <Link className={link} to="/finance/card-settlement">{whereItIs(r)}</Link>,
       filterValue: whereItIs, filterType: "enum", exportValue: whereItIs },
   ], []);
@@ -104,7 +110,7 @@ export default function CardMoneyWaiting() {
       <ListPageShell register>
         <DataGrid rows={ready?.rows ?? []} columns={columns} rowKey={(r) => r.key}
           rowTestId={(r) => `card-money-waiting-row-${r.wire.entry_no}`}
-          storageKey="carres.finance.card-money-waiting.v1" appearance="reference" exportName="Card money waiting"
+          storageKey="carres.finance.card-money-waiting.v2" appearance="reference" look="finance" exportName="Card money waiting"
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess} wrapToolbar
           searchPlaceholder="Search payments…"
           emptyMessage="No card or online money is waiting. Every payment has reached the bank."

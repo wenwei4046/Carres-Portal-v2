@@ -9,6 +9,9 @@
  * each year. Finance keeps the amounts here; they are never in the code. A rule
  * is never changed: `Add a KPI allowance` adds a new one from its day, and one
  * added by mistake is removed from its window.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the tier bonus, the guarantee and the memo
+ * wrap rather than being cut, and a zero amount is a blank cell.
  */
 import { useMemo, useState } from "react";
 import type { DcKpiRuleAddInput, DcKpiRuleRow, DcKpiRulesRead } from "@carres/shared/dealer-commission";
@@ -26,6 +29,7 @@ import { fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import { LoadFailed } from "../other-money-in/parts";
 import { kpiPeriodWord, kpiTiersWord } from "./commission-words";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 
 const BASE = "/api/finance/dealer-commission";
 
@@ -51,13 +55,13 @@ export default function CommissionKpi({ toolbarStart }: { toolbarStart: React.Re
   const columns = useMemo<DataGridColumn<DcKpiRuleRow>[]>(
     () => [
       { key: "from", label: "From", width: 140, sortable: false, accessor: (r) => fmtDate(r.startsOn), exportValue: (r) => r.startsOn },
-      { key: "per", label: "Per guarantee", width: 150, align: "right", sortable: false, filterable: false,
-        accessor: (r) => rm(Number(r.perUnit)), exportValue: (r) => Number(r.perUnit) },
-      { key: "tiers", label: "Tier bonus", width: 340, sortable: false, filterable: false, accessor: kpiTiersWord, exportValue: kpiTiersWord },
+      { key: "per", label: "Per guarantee", width: FINANCE_WIDTH.amount, align: "right", sortable: false, filterable: false,
+        accessor: (r) => amountCell(r.perUnit), exportValue: (r) => Number(r.perUnit) },
+      { key: "tiers", label: "Tier bonus", width: 340, wrap: true, sortable: false, filterable: false, accessor: kpiTiersWord, exportValue: kpiTiersWord },
       { key: "period", label: "Count starts again", width: 170, sortable: false, filterType: "enum", accessor: (r) => kpiPeriodWord(r.period) },
-      { key: "guarantee", label: "Guarantee", width: 200, sortable: false, accessor: guaranteeWord, searchValue: guaranteeWord },
+      { key: "guarantee", label: "Guarantee", width: 200, wrap: true, sortable: false, accessor: guaranteeWord, searchValue: guaranteeWord },
       { key: "state", label: "Status", width: 130, sortable: false, filterType: "enum", accessor: (r) => STATE_WORD[r.state] },
-      { key: "memo", label: "Memo", width: 260, sortable: false, accessor: (r) => r.memo ?? "No memo", searchValue: (r) => r.memo ?? "" },
+      { key: "memo", label: "Memo", width: 260, wrap: true, sortable: false, accessor: (r) => r.memo ?? "No memo", searchValue: (r) => r.memo ?? "" },
       { key: "added", label: "Added", width: 200, sortable: false, filterable: false, accessor: addedWord },
     ],
     [],
@@ -71,8 +75,9 @@ export default function CommissionKpi({ toolbarStart }: { toolbarStart: React.Re
           rows={rules}
           columns={columns}
           rowKey={(r) => r.id}
-          storageKey="carres.finance.commission-kpi.v1"
+          storageKey="carres.finance.commission-kpi.v2"
           appearance="reference"
+          look="finance"
           groupBanner={false}
           allowColumnGrouping={false}
           exportName="KPI allowance"

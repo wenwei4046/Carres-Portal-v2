@@ -12,6 +12,10 @@
  * Every total is the shared stock-value arithmetic's (Law D); this page only
  * prints it. Nothing is saved: Stock MASTER §9 keeps the month-end total
  * Stock's.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the look is on, with Finance's amount width.
+ * A zero Cost or Value still prints RM 0.00 here: an empty cell already means
+ * no cost recorded, so a recorded zero must read differently.
  */
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -37,6 +41,7 @@ import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { ReadFailed } from "../payables/PayablesParts";
 import { recentMonths } from "./period";
+import { FINANCE_WIDTH } from "../finance-widths";
 
 /** The month before today's, as YYYY-MM: the last month that has ended. */
 export function lastEndedMonth(today: string): string {
@@ -93,10 +98,10 @@ export default function StockValue() {
       filterValue: (u) => u.site_name ?? "", filterType: "enum", searchValue: (u) => u.site_name ?? "" },
     { key: "holder", label: "Held by", width: 150, accessor: (u) => u.holder_name ?? "", defaultHidden: true },
     { key: "qty", label: "Qty", width: W.qty, align: "right", accessor: (u) => String(u.qty), numberValue: (u) => u.qty },
-    { key: "cost", label: "Cost", width: W.amount, align: "right",
+    { key: "cost", label: "Cost", width: FINANCE_WIDTH.amount, align: "right",
       accessor: (u) => { const c = costOf(u); return c === null ? "" : rm(c); },
       numberValue: costOf, exportValue: (u) => costOf(u) ?? "" },
-    { key: "value", label: "Value", width: W.amount, align: "right",
+    { key: "value", label: "Value", width: FINANCE_WIDTH.amount, align: "right",
       accessor: (u) => { const v = valueOf(u); return v === null ? "" : rm(v); },
       numberValue: valueOf, exportValue: (u) => valueOf(u) ?? "",
       footerTotal: (rows) => amount(rows.reduce((s, u) => s + Math.round((valueOf(u) ?? 0) * 100), 0)) },
@@ -134,7 +139,7 @@ export default function StockValue() {
       <ListPageShell register>
         <DataGrid rows={query.data?.units ?? []} columns={columns} rowKey={(u) => u.id}
           rowTestId={(u) => `stock-value-row-${u.unit_code}`}
-          storageKey="carres.finance.stock-value.v1" appearance="reference" exportName={`Stock value ${monthEnd}`}
+          storageKey="carres.finance.stock-value.v2" appearance="reference" look="finance" exportName={`Stock value ${monthEnd}`}
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess} wrapToolbar
           searchPlaceholder="Search Units…"
           emptyMessage={`Carres held no Unit at the end of ${fmtDate(monthEnd, { year: "always" })}.`}

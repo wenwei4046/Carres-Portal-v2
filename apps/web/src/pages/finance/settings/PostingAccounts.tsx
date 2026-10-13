@@ -32,10 +32,13 @@
  *
  * WHEN EACH GROUP POSTS (Chew 2026-10-13, 「这个posting是怎样触发？」): every
  * group's title says the moment its postings are made, and a row is matched by
- * its fixed code (an add-on's key, a role), never by the words shown. Two
- * columns: the posting and its account; a posting that was changed says when
- * and by whom on a grey line under its account. Every change is listed under
- * the table.
+ * its fixed code (an add-on's key, a role), never by the words shown. Three
+ * columns: the posting, its account's code and its account's name; a posting
+ * that was changed says when and by whom on a grey line under the name. Every
+ * change is listed under the table.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the account's code and name are two columns,
+ * and the posting and the name wrap rather than being cut.
  */
 import { useMemo, useState } from "react";
 import type { LedgerIncomePosting, LedgerPostingChange, LedgerRolePosting } from "@carres/shared";
@@ -53,6 +56,7 @@ import { fmtDate } from "@/lib/fmt-date";
 import { useLedgerChart } from "../ledger/ledger-queries";
 import { LoadFailed } from "../other-money-in/parts";
 import { usePostingAccounts, useSetPostingAccount } from "./api";
+import { FINANCE_WIDTH } from "../finance-widths";
 
 // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0657).
 // Chew 2026-10-13: each title says when its postings are made.
@@ -223,22 +227,31 @@ export default function PostingAccounts() {
 
   const columns = useMemo<DataGridColumn<PostingRow>[]>(
     () => [
-      { key: "posting", label: "Posting", width: 380, sortable: false, accessor: (r) => r.word, searchValue: (r) => r.word },
+      { key: "posting", label: "Posting", width: 380, wrap: true, sortable: false, accessor: (r) => r.word, searchValue: (r) => r.word },
+      {
+        key: "code",
+        label: "Code",
+        width: FINANCE_WIDTH.code,
+        sortable: false,
+        accessor: (r) => r.accountCode ?? "",
+        exportValue: (r) => r.accountCode ?? "",
+      },
       {
         key: "account",
         label: "Account",
-        width: 340,
+        width: 300,
+        wrap: true,
         sortable: false,
         accessor: (r) =>
           r.accountCode ? (
             /* A changed posting says when and by whom under its account. */
-            <TwoLineCell top={`${r.accountCode} ${r.accountName ?? ""}`} sub={r.changedAt ? `Changed ${changedWord(r)}` : undefined} />
+            <TwoLineCell top={r.accountName ?? ""} sub={r.changedAt ? `Changed ${changedWord(r)}` : undefined} />
           ) : (
             // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0657).
             <span className="text-kit-red-11">No account yet</span>
           ),
         searchValue: (r) => `${r.accountCode ?? ""} ${r.accountName ?? ""}`,
-        exportValue: (r) => (r.accountCode ? `${r.accountCode} ${r.accountName ?? ""}` : ""),
+        exportValue: (r) => (r.accountCode ? r.accountName ?? "" : ""),
       },
     ],
     [],
@@ -254,8 +267,9 @@ export default function PostingAccounts() {
           rows={rows}
           columns={columns}
           rowKey={(r) => r.id}
-          storageKey="carres.finance.posting-accounts.v2"
+          storageKey="carres.finance.posting-accounts.v3"
           appearance="reference"
+          look="finance"
           groupBanner={false}
           allowColumnGrouping={false}
           fixedGroups={{ groups: POSTING_GROUPS.map((g) => ({ key: g.key, label: g.label })), groupOf: (r) => r.group, revealMatches: true }}

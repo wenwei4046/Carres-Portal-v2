@@ -7,6 +7,13 @@
  *
  * Every figure printed here is one the ledger summed and the API served.
  * This file adds nothing up.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the table reads like Finance's grids, from
+ * finance-look.module.css: a light blue header, a hairline between columns,
+ * each section band and heading line a subtotal row (light grey, 600) and the
+ * bottom line the total (the same, with a heavy rule above). An account at
+ * RM 0.00 already prints no line. A heading's subtotal, a section's total and
+ * the bottom line still print RM 0.00: on a statement that zero is the answer.
  */
 import { Link } from "react-router-dom";
 import { isZeroMoney, ledgerKindWord } from "@carres/shared/finance-ledger";
@@ -15,6 +22,7 @@ import DataTable, { type Column, type GroupRowCell } from "@/components/kit/Data
 import Tooltip from "@/components/kit/Tooltip";
 import { rm } from "@/lib/format-currency";
 import type { StatementLine, StatementSection } from "./report-queries";
+import look from "../finance-look.module.css";
 
 // The line under a section where every account is at RM 0.00 (YH, 14 Sep
 // 2026). Reports and the month-end pack print the same words.
@@ -219,7 +227,7 @@ export default function StatementTable({
       cell: (r) => {
         switch (r.kind) {
           case "group":
-            return <span className={`font-semibold ${indent(r.depth)}`}>{r.name}</span>;
+            return <span data-fin-tone="subtotal" className={`font-semibold ${indent(r.depth)}`}>{r.name}</span>;
           case "line": {
             // The account link, then (only when there is a note) a mark that
             // shows the note on hover or keyboard focus. A long name cuts off
@@ -262,7 +270,7 @@ export default function StatementTable({
     ];
   };
 
-  return <DataTable
+  return <div className={look.statement}><DataTable
     label={label}
     testId={testId}
     rowTestId={`${testId}-row`}
@@ -279,5 +287,5 @@ export default function StatementTable({
         { align: "right", content: <span className="font-semibold tabular-nums">{rm(bottomLine.amount)}</span> },
       ],
     } : undefined}
-  />;
+  /></div>;
 }

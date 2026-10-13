@@ -11,6 +11,10 @@
  * The principal alone also sees `New journal entry` (ruling M), which opens
  * the manual journal form at `?entry=new`; for anyone else `new` is just a
  * number nobody has.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the narration wraps rather than being cut,
+ * and a zero amount is a blank cell. A running balance of nothing still reads
+ * RM 0.00: after an entry, a cleared account is the answer, not an empty cell.
  */
 import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -44,6 +48,7 @@ import {
   type JournalScope,
 } from "./ledger-queries";
 import ManualJournalForm from "./ManualJournalForm";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 
 const ALL_ACCOUNTS = "all";
 const NEW_ENTRY = "new";
@@ -144,9 +149,9 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
     { key: "document", label: "Document", width: 170, accessor: (r) => ledgerDocWord(r.source_doc_no),
       searchValue: (r) => ledgerDocWord(r.source_doc_no), filterValue: (r) => ledgerDocWord(r.source_doc_no),
       filterType: "numbering" },
-    { key: "narration", label: "Narration", width: 280, accessor: (r) => r.narration ?? "No narration",
+    { key: "narration", label: "Narration", width: 280, wrap: true, accessor: (r) => r.narration ?? "No narration",
       searchValue: (r) => r.narration ?? "" },
-    { key: "amount", label: "Amount", width: 140, align: "right", accessor: (r) => rm(r.total_debit),
+    { key: "amount", label: "Amount", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.total_debit),
       numberValue: (r) => r.total_debit, filterType: "number", exportValue: (r) => r.total_debit },
     { key: "reversal", label: "Reversal", width: 230,
       accessor: (r) => <ReversalLink row={r} search={search} />,
@@ -183,7 +188,7 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
       </div>}
       <ListPageShell register>
         <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id} onSortChange={setSort} onGroupByChange={onGroupByChange}
-          storageKey="carres.finance.journal.v1" appearance="reference" exportName="Journal"
+          storageKey="carres.finance.journal.v2" appearance="reference" look="finance" exportName="Journal"
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess}
           searchPlaceholder="Search entries…"
           toolbarStart={<span className="flex items-center gap-3 text-body">

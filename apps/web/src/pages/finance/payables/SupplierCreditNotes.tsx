@@ -40,6 +40,7 @@ import { asCredit, attachPages, formLines, ReadPaperButton, readPaperNotes } fro
 import { CreditNoteSettlesCard } from "./NoteFollowUpParts";
 import type { BillReadAnswer } from "@carres/shared/bill-reading";
 import { ADVANCE_APPLICATION_STATUS_WORD, BILL_STATUS_WORD, cents, creditorKindWord, money, num, refusal, word } from "./payables-words";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 
 /**
  * Finance → Payables → Credit notes (migration 0642; Chew 2026-10-03,
@@ -54,6 +55,9 @@ import { ADVANCE_APPLICATION_STATUS_WORD, BILL_STATUS_WORD, cents, creditorKindW
  * credit is then knocked off the supplier's bills, which posts nothing. The
  * database decides every rule; this page offers only what it says the person
  * may do (`can`).
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the supplier wraps rather than being cut,
+ * and a zero amount is a blank cell.
  */
 export default function SupplierCreditNotes() {
   return (
@@ -81,19 +85,19 @@ function CreditNoteRegister() {
       searchValue: (r) => r.note_no ?? "", exportValue: noteNo },
     { key: "date", label: "Date", width: W.date, accessor: (r) => fmtDate(r.note_date),
       dateValue: (r) => r.note_date, filterType: "date", exportValue: (r) => r.note_date },
-    { key: "supplier", label: "Supplier", width: 220, accessor: (r) => r.supplier_name, overflowText: (r) => r.supplier_name,
+    { key: "supplier", label: "Supplier", width: FINANCE_WIDTH.party, wrap: true, accessor: (r) => r.supplier_name,
       searchValue: (r) => r.supplier_name, filterType: "enum" },
     { key: "paper", label: "Supplier's credit note", headerLines: ["Supplier's", "credit note"], width: 130, accessor: (r) => r.supplier_note_no,
       searchValue: (r) => r.supplier_note_no },
     { key: "status", label: "Status", width: 110, accessor: (r) => word(BILL_STATUS_WORD, r.status),
       filterValue: (r) => word(BILL_STATUS_WORD, r.status), filterType: "enum" },
-    { key: "total", label: "Total", width: W.amount, align: "right", accessor: (r) => money(r.total_amount),
+    { key: "total", label: "Total", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.total_amount),
       numberValue: (r) => num(r.total_amount), exportValue: (r) => num(r.total_amount) ?? "" },
-    { key: "applied", label: "Knocked off", width: W.amount, align: "right",
-      accessor: (r) => (r.status === "confirmed" ? money(r.applied_total) : ""),
+    { key: "applied", label: "Knocked off", width: FINANCE_WIDTH.amount, align: "right",
+      accessor: (r) => (r.status === "confirmed" ? amountCell(r.applied_total) : ""),
       numberValue: (r) => num(r.applied_total), exportValue: (r) => num(r.applied_total) ?? "" },
-    { key: "open", label: "Left to knock off", headerLines: ["Left to", "knock off"], width: W.amount, align: "right",
-      accessor: (r) => (r.status === "confirmed" ? money(r.credit_open) : ""),
+    { key: "open", label: "Left to knock off", headerLines: ["Left to", "knock off"], width: FINANCE_WIDTH.amount, align: "right",
+      accessor: (r) => (r.status === "confirmed" ? amountCell(r.credit_open) : ""),
       numberValue: (r) => num(r.credit_open), exportValue: (r) => num(r.credit_open) ?? "" },
     { key: "files", label: "Files", width: W.qty, align: "right", accessor: (r) => String(r.file_count),
       numberValue: (r) => r.file_count },
@@ -109,8 +113,9 @@ function CreditNoteRegister() {
             columns={columns}
             rowKey={(r) => r.id}
             rowTestId={(r) => `credit-note-row-${r.id}`}
-            storageKey="carres.finance.credit-notes.v1"
+            storageKey="carres.finance.credit-notes.v2"
             appearance="reference"
+            look="finance"
             exportName="Credit Notes"
             groupBanner={false}
             stickyIdentity

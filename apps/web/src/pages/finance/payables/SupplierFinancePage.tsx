@@ -9,6 +9,7 @@ import { useSupplierFinance } from "@/lib/payables-queries";
 import { creditorKindWord } from "./payables-words";
 import { ReadFailed } from "./PayablesParts";
 import SupplierFinanceModal from "./SupplierFinanceModal";
+import { FINANCE_WIDTH } from "../finance-widths";
 
 /**
  * Finance → Payables → Suppliers, at `/finance/suppliers` (migration 0636;
@@ -19,6 +20,9 @@ import SupplierFinanceModal from "./SupplierFinanceModal";
  * The supplier itself stays Purchasing's record: its name and kind are read
  * here, never changed. Who last changed the bank details, and when, is on the
  * row, because a changed account number is where a payment can go wrong.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the supplier and the account holder wrap
+ * rather than being cut. No amount is listed here.
  */
 export default function SupplierFinancePage() {
   const query = useSupplierFinance();
@@ -29,14 +33,14 @@ export default function SupplierFinancePage() {
   // (UI MASTER §6.0: no glyph, no absence word for an optional fact).
   const columns = useMemo<DataGridColumn<SupplierFinanceRow>[]>(() => [
     // 0691 (Chew 2026-10-12): Finance's AutoCount-style code, first, as AutoCount lists creditors.
-    { key: "code", label: "Code", width: 110, accessor: (r) => r.code ?? "", searchValue: (r) => r.code ?? "" },
-    { key: "supplier", label: "Supplier", width: 240, accessor: (r) => r.name, overflowText: (r) => r.name,
+    { key: "code", label: "Code", width: FINANCE_WIDTH.code, accessor: (r) => r.code ?? "", searchValue: (r) => r.code ?? "" },
+    { key: "supplier", label: "Supplier", width: FINANCE_WIDTH.party, wrap: true, accessor: (r) => r.name,
       searchValue: (r) =>
         [r.name, r.tax_no, r.registration_no, r.bank_name, r.bank_account_no, r.bank_account_holder].filter(Boolean).join(" ") },
     { key: "bank", label: "Bank", width: 130, accessor: (r) => r.bank_name ?? "",
       filterValue: (r) => r.bank_name ?? "", filterType: "enum" },
     { key: "account", label: "Account No", width: 140, accessor: (r) => r.bank_account_no ?? "" },
-    { key: "holder", label: "Account holder", width: 200, accessor: (r) => r.bank_account_holder ?? "" },
+    { key: "holder", label: "Account holder", width: 200, wrap: true, accessor: (r) => r.bank_account_holder ?? "" },
     { key: "changed", label: "Last changed", width: 200,
       accessor: (r) => (r.updated_at
         ? [fmtDate(r.updated_at, { time: true }), r.updated_by_name].filter(Boolean).join(" · ")
@@ -59,8 +63,9 @@ export default function SupplierFinancePage() {
             columns={columns}
             rowKey={(r) => r.supplier_id}
             rowTestId={(r) => `supplier-finance-row-${r.supplier_id}`}
-            storageKey="carres.finance.supplier-finance.v1"
+            storageKey="carres.finance.supplier-finance.v2"
             appearance="reference"
+            look="finance"
             exportName="Suppliers"
             groupBanner={false}
             stickyIdentity

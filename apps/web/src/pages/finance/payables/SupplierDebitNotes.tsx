@@ -35,6 +35,7 @@ import { DepartmentName, DepartmentPicker } from "../department";
 import { FactRow, Facts, FilesCard, HistoryCard, ReadFailed, ReasonModal } from "./PayablesParts";
 import { DebitNoteSettlesCard } from "./NoteFollowUpParts";
 import { BILL_STATUS_WORD, VOUCHER_STATUS_WORD, cents, creditorKindWord, money, num, refusal, word } from "./payables-words";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 
 /**
  * Finance → Payables → Debit Notes (migration 0681; Chew 2026-10-03,
@@ -50,6 +51,9 @@ import { BILL_STATUS_WORD, VOUCHER_STATUS_WORD, cents, creditorKindWord, money, 
  * dated the note's date. A payment voucher pays it, as it pays a bill. The
  * database decides every rule; this page offers only what it says the person
  * may do (`can`).
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the supplier wraps rather than being cut,
+ * and a zero amount is a blank cell.
  */
 export default function SupplierDebitNotes() {
   return (
@@ -97,7 +101,7 @@ function DebitNoteRegister() {
       searchValue: (r) => r.note_no ?? "", exportValue: noteNo },
     { key: "date", label: "Date", width: W.date, accessor: (r) => fmtDate(r.note_date),
       dateValue: (r) => r.note_date, filterType: "date", exportValue: (r) => r.note_date },
-    { key: "supplier", label: "Supplier", width: 220, accessor: (r) => r.supplier_name, overflowText: (r) => r.supplier_name,
+    { key: "supplier", label: "Supplier", width: FINANCE_WIDTH.party, wrap: true, accessor: (r) => r.supplier_name,
       searchValue: (r) => r.supplier_name, filterType: "enum" },
     { key: "paper", label: "Supplier's debit note", headerLines: ["Supplier's", "debit note"], width: 130, accessor: (r) => r.supplier_note_no,
       searchValue: (r) => r.supplier_note_no },
@@ -105,13 +109,13 @@ function DebitNoteRegister() {
       filterValue: (r) => word(BILL_STATUS_WORD, r.status), filterType: "enum" },
     { key: "due", label: "Due Date", width: W.date, accessor: (r) => (r.due_date ? fmtDate(r.due_date) : ""),
       dateValue: (r) => r.due_date, filterType: "date", exportValue: (r) => r.due_date ?? "" },
-    { key: "total", label: "Total", width: W.amount, align: "right", accessor: (r) => money(r.total_amount),
+    { key: "total", label: "Total", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.total_amount),
       numberValue: (r) => num(r.total_amount), exportValue: (r) => num(r.total_amount) ?? "" },
-    { key: "paid", label: "Paid", width: W.amount, align: "right",
-      accessor: (r) => (r.status === "confirmed" ? money(r.paid_total) : ""),
+    { key: "paid", label: "Paid", width: FINANCE_WIDTH.amount, align: "right",
+      accessor: (r) => (r.status === "confirmed" ? amountCell(r.paid_total) : ""),
       numberValue: (r) => num(r.paid_total), exportValue: (r) => num(r.paid_total) ?? "" },
-    { key: "open", label: "Left to pay", headerLines: ["Left to", "pay"], width: W.amount, align: "right",
-      accessor: (r) => (r.status === "confirmed" ? money(r.debit_open) : ""),
+    { key: "open", label: "Left to pay", headerLines: ["Left to", "pay"], width: FINANCE_WIDTH.amount, align: "right",
+      accessor: (r) => (r.status === "confirmed" ? amountCell(r.debit_open) : ""),
       numberValue: (r) => num(r.debit_open), exportValue: (r) => num(r.debit_open) ?? "" },
     { key: "files", label: "Files", width: W.qty, align: "right", accessor: (r) => String(r.file_count),
       numberValue: (r) => r.file_count },
@@ -127,8 +131,9 @@ function DebitNoteRegister() {
             columns={columns}
             rowKey={(r) => r.id}
             rowTestId={(r) => `debit-note-row-${r.id}`}
-            storageKey="carres.finance.debit-notes.v1"
+            storageKey="carres.finance.debit-notes.v2"
             appearance="reference"
+            look="finance"
             exportName="Debit Notes"
             groupBanner={false}
             stickyIdentity

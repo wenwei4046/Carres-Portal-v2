@@ -36,6 +36,11 @@
  * row reads its kind in words under Type in place of its special type, opens
  * the money account's own window (name, Active, number), and has no retire icon. `Add a money account` adds one. A money account out of use
  * reads `Not active` and, like a retired account, shows only when asked for.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the code and the name were already two
+ * columns; every heading row reads as a subtotal row (light grey, 600), as on
+ * the Trial Balance, and a long name wraps rather than being cut. The Code
+ * column keeps its width for the indent and the fold button.
  */
 import { useCallback, useMemo, useState } from "react";
 import { ledgerKindWord, LEDGER_ACCOUNT_CODE_MESSAGE, type LedgerAccount, type LedgerSection } from "@carres/shared/finance-ledger";
@@ -262,6 +267,7 @@ export default function ChartOfAccounts() {
         key: "name",
         label: "Name",
         width: 440,
+        wrap: true,
         sortable: false,
         filterable: false,
         accessor: (r) => (
@@ -331,8 +337,10 @@ export default function ChartOfAccounts() {
         rows={rows}
         columns={columns}
         rowKey={(r) => r.account.code}
-        storageKey="carres.finance.chart-of-accounts.v2"
+        storageKey="carres.finance.chart-of-accounts.v3"
         appearance="reference"
+        look="finance"
+        rowTone={(r) => (r.account.is_header ? "subtotal" : null)}
         groupBanner={false}
         allowColumnGrouping={false}
         fixedGroups={{ groups, groupOf: (r) => r.group, revealMatches: true }}

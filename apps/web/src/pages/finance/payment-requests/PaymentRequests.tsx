@@ -34,6 +34,7 @@ import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import SalesOrderTabs from "@/pages/operation/SalesOrderTabs";
 import { FactRow, Facts, ReadFailed, ReasonModal } from "../payables/PayablesParts";
 import { money, num, refusal } from "../payables/payables-words";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 
 /**
  * Finance → Payment Requests (migration 0645; Chew 2026-10-03,
@@ -48,6 +49,9 @@ import { money, num, refusal } from "../payables/payables-words";
  *
  * Operation staff reach these pages (FinanceApp lets them in here only); the
  * database decides what each person may see and do (`can`).
+ *
+ * FINANCE LOOK (Chew 2026-10-13): Pay to and What it is for wrap rather than
+ * being cut, and a zero amount is a blank cell.
  */
 export default function PaymentRequests() {
   return (
@@ -88,14 +92,14 @@ function RequestRegister() {
       filterType: "date", exportValue: (r) => r.created_at.slice(0, 10) },
     ...(finance ? [{ key: "who", label: "Requested by", width: 160, accessor: (r: PaymentRequestRow) => r.requested_by_name ?? "",
       filterValue: (r: PaymentRequestRow) => r.requested_by_name ?? "", filterType: "enum" as const }] : []),
-    { key: "payee", label: "Pay to", width: 200, accessor: (r) => r.payee_name, searchValue: (r) => r.payee_name },
-    { key: "amount", label: "Amount", width: W.amount, align: "right", accessor: (r) => money(r.amount),
+    { key: "payee", label: "Pay to", width: FINANCE_WIDTH.party, wrap: true, accessor: (r) => r.payee_name, searchValue: (r) => r.payee_name },
+    { key: "amount", label: "Amount", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.amount),
       numberValue: (r) => num(r.amount), exportValue: (r) => num(r.amount) ?? "" },
     // The stage is what both sides open the page for: right after the money.
     { key: "stage", label: "Stage", width: 240, accessor: stageOf, filterValue: stageOf, filterType: "enum" },
     { key: "payBy", label: "Pay by", width: W.date, accessor: (r) => (r.pay_by ? fmtDate(r.pay_by) : ""),
       dateValue: (r) => r.pay_by, filterType: "date" },
-    { key: "purpose", label: "What it is for", width: 260, accessor: (r) => r.purpose, searchValue: (r) => r.purpose },
+    { key: "purpose", label: "What it is for", width: 260, wrap: true, accessor: (r) => r.purpose, searchValue: (r) => r.purpose },
     { key: "answer", label: "Paid by", width: W.documentNo, accessor: answerOf, searchValue: answerOf },
     { key: "files", label: "Files", width: W.qty, align: "right", accessor: (r) => String(r.file_count), numberValue: (r) => r.file_count },
   ], [finance]);
@@ -121,8 +125,9 @@ function RequestRegister() {
             columns={columns}
             rowKey={(r) => r.id}
             rowTestId={(r) => `payment-request-row-${r.request_no}`}
-            storageKey={`carres.finance.payment-requests.${finance ? view : "mine"}.v1`}
+            storageKey={`carres.finance.payment-requests.${finance ? view : "mine"}.v2`}
             appearance="reference"
+            look="finance"
             exportName="Payment requests"
             groupBanner={false}
             stickyIdentity

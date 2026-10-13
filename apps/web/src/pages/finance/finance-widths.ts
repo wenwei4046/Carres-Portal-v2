@@ -6,6 +6,8 @@
  * belongs to the field, so every Finance page prints the same fact the same
  * width; a value that clips is fixed here, once.
  */
+import { rm } from "@/lib/format-currency";
+
 export const FINANCE_WIDTH = {
   /** An amount, right aligned: `RM 1,234,567.89` in 13px tabular figures. */
   amount: 128,
@@ -16,3 +18,15 @@ export const FINANCE_WIDTH = {
   /** A supplier, customer or other party; it wraps. */
   party: 260,
 } as const;
+
+/**
+ * The Finance look's amount cell (Chew 2026-10-13): a zero, to the cent, is a
+ * blank cell, so the figures that hold money stand out; any other figure
+ * prints in RM. An absent figure is blank too. Only the screen: a sort, a
+ * filter, a footer total or an export keeps the number.
+ */
+export function amountCell(v: number | string | null | undefined): string {
+  if (v === null || v === undefined || v === "") return "";
+  const n = Number(v);
+  return !Number.isFinite(n) || Math.round(n * 100) === 0 ? "" : rm(n);
+}
