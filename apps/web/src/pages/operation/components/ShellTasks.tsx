@@ -19,7 +19,8 @@ import MIcon from "@/components/carres/MIcon";
 import TasksArea from "../tasks/TasksArea";
 import { useTasksHost } from "../tasks/tasks-host";
 import { useOpenWorkSet } from "../use-open-work";
-import { myMissedAndToday } from "../work/work-model";
+import { todoOn } from "../tasks/task-cards";
+import { myTasks } from "../tasks/tasks-model";
 
 const KEY = "shell-tasks-open";
 
@@ -59,13 +60,13 @@ export const useShellTasks = create<{
   },
 }));
 
-/** Missed + today for the signed-in person — the same count the old rail
- *  badge carried. Null while loading or failed: never a guessed number. */
+/** The signed-in person's `To do` for today: the very list the panel opens
+ *  on (`todoOn`), so the title, the button and the `To do` tab say one
+ *  number. Null while loading or failed: never a guessed number. */
 export function useTasksLeft(): number | null {
-  const { items, myUserId, myFocus, hasData, error } = useOpenWorkSet();
-  if (!hasData || error) return null;
-  const { missed, today } = myMissedAndToday(items, myUserId, myFocus);
-  return missed + today;
+  const { items, myUserId, generatedOn, hasData, error } = useOpenWorkSet();
+  if (!hasData || error || !generatedOn) return null;
+  return todoOn(myTasks(items, myUserId), generatedOn, generatedOn).length;
 }
 
 /** The `Tasks 5` pill that re-opens a hidden panel (Layout Standard §1: "a
