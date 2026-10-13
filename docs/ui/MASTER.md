@@ -672,8 +672,9 @@ act panel all render through `TaskFrame`, and `CompactModuleCard` stays for modu
 What each tab reads: `Route` the one Order Route model (`useMissionRoute`, the Work page's own); `History` the Work
 record's request and answer day plus the owning module's records (a PO's `sends` and supplier answers); `Files` the
 owning module's existing print doors, rendered on demand. A tab that cannot be read says so in one line and never
-takes the task's steps down with it. Goods of a PO are drawn as wrapping lines (`PoTaskGoods`), so nothing is cut at
-320. A form wider than the panel is never squeezed into it to scroll sideways: `Record supplier answer` (a line table
+takes the task's steps down with it. Goods of a PO are drawn as wrapping lines (`PoTaskGoods`), and a purchase batch's
+PO row puts its items and destination under the PO number with the PDF door at the right, so nothing is cut or
+passes the panel's edge at 320 (measured 13 Oct 2026: the one-line PO row passed the edge by 31). A form wider than the panel is never squeezed into it to scroll sideways: `Record supplier answer` (a line table
 900 wide) opens on the host's full surface (`WorkPanelHost.openReview` with `TaskWideSurface`, the door Issue PO's
 review already uses), titled with the act, the supplier and the PO; the form's own `Cancel` and saving button are the
 only ways out, and the task stays mounted underneath. After a task is saved the app's dark toast says the module's own words for 12 seconds with ✕, and

@@ -84,6 +84,17 @@ for (const width of WIDTHS) {
     await expect(page.locator("[data-task-card][aria-pressed=true]")).toHaveCount(1);
   });
 
+  test(`Tasks panel: a purchase batch task and its send steps at ${width}`, async ({ page }) => {
+    await openTasks(page, width, "/work-preview.html?shell=1&pw=1");
+    await page.locator("[data-task-card]", { hasText: "Send 2 POs" }).click();
+    const view = page.locator(`${TASKS} [data-kit="task-view"]`);
+    await expect(view.getByTestId("task-view-head")).toContainText("SO Batch Purchase");
+    /* The PO to send, its PDF door and the three numbered steps all stay
+       inside the panel (13 Oct 2026: at 320 the PO row passed the edge by 31). */
+    await expect(view.getByTestId("batch-whatsapp-steps")).toBeVisible();
+    await expectKit(page, width, "task · Steps");
+  });
+
   test(`Tasks panel: a Sales Order task and its Order Route at ${width}`, async ({ page }) => {
     await openTasks(page, width, "/work-preview.html?shell=1");
     await page.locator("[data-task-card]", { hasText: "SO-1362" }).filter({ hasText: "Ask customer to pay" }).click();

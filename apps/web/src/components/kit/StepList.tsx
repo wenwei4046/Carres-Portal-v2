@@ -55,8 +55,10 @@ export function Step({ n, state, title, sub, action, children, "data-testid": te
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-[6px]">
         {(title || sub || action) && (
-          <div className="flex items-center gap-2">
-            <span className="flex min-w-0 flex-1 flex-col">
+          /* The step's button drops under its words when the room is narrow
+             (the Tasks panel at 320), so neither is squeezed or cut. */
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+            <span className="flex min-w-[112px] flex-1 flex-col">
               {title ? <span className="text-body font-medium text-c-ink">{title}</span> : null}
               {sub ? <span className="text-meta text-c-secondary">{sub}</span> : null}
             </span>

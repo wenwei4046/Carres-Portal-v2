@@ -453,23 +453,31 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
   const destinationName = (id: string | null | undefined) => data?.destinations.find((d) => d.id === id)?.name ?? "Not recorded";
   const lastSendOf = (fact: PoFacts) => [...fact.sends].reverse().find((send) => send.kind === "confirmed_sent" && send.po_version === fact.document?.version);
 
-  const poRow = (fact: PoFacts, tickable: boolean) => (
-    <div key={fact.po.id} className="flex min-w-0 items-center gap-2 border-t border-kit-slate-5 py-1.5" data-testid={`batch-po-${fact.po.id}`}>
-      {tickable
-        ? <Checkbox id={`batch-tick-${fact.po.id}`} label={fact.document ? documentDisplayNumber(`${fact.document.po_number}-V${fact.document.version}`) : documentDisplayNumber(fact.po.id)}
-            checked={!unticked.has(fact.po.id)} disabled={busy}
-            onCheckedChange={(on) => setUnticked((previous) => { const next = new Set(previous); if (on) next.delete(fact.po.id); else next.add(fact.po.id); return next; })} />
-        : <span className="flex min-w-0 items-center gap-2 text-strong text-kit-green-11"><Icon name="ready" />
-            <span className="whitespace-nowrap text-kit-slate-12">{fact.document ? documentDisplayNumber(`${fact.document.po_number}-V${fact.document.version}`) : documentDisplayNumber(fact.po.id)}</span></span>}
-      <span className="ml-auto shrink-0 text-meta text-kit-slate-11">{itemsOf(fact.document)}</span>
-      <span className={`text-meta ${tickable ? "shrink-0 text-kit-slate-11" : "min-w-0 truncate font-medium text-kit-green-11"}`}>
-        {tickable ? (fact.document?.destination.name ?? fact.po.destination ?? "") : (() => {
-          const send = lastSendOf(fact); return send ? T.sent(CHANNEL_WORD[send.channel] ?? send.channel, timeOf(send.sent_at)) : "";
-        })()}
-      </span>
-      <Button iconOnly variant="ghost" icon="print" aria-label={`Open PDF ${documentDisplayNumber(fact.po.id)}`} disabled={!fact.document} onClick={() => setPreview(fact)} />
-    </div>
-  );
+  /* One PO: its number (a tick while it is still to send), then its items and
+     where it goes on a second line, so the row fits the panel at 320 and
+     nothing passes the edge. */
+  const poRow = (fact: PoFacts, tickable: boolean) => {
+    const number = fact.document ? documentDisplayNumber(`${fact.document.po_number}-V${fact.document.version}`) : documentDisplayNumber(fact.po.id);
+    const send = tickable ? null : lastSendOf(fact);
+    const where = tickable ? (fact.document?.destination.name ?? fact.po.destination ?? "") : send ? T.sent(CHANNEL_WORD[send.channel] ?? send.channel, timeOf(send.sent_at)) : "";
+    return (
+      <div key={fact.po.id} className="flex min-w-0 items-start gap-2 border-t border-kit-slate-5 py-1.5" data-testid={`batch-po-${fact.po.id}`}>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          {tickable
+            ? <Checkbox id={`batch-tick-${fact.po.id}`} label={number}
+                checked={!unticked.has(fact.po.id)} disabled={busy}
+                onCheckedChange={(on) => setUnticked((previous) => { const next = new Set(previous); if (on) next.delete(fact.po.id); else next.add(fact.po.id); return next; })} />
+            : <span className="flex min-w-0 items-center gap-2 text-strong text-kit-green-11"><Icon name="ready" />
+                <span className="min-w-0 break-words text-kit-slate-12">{number}</span></span>}
+          <span className="flex min-w-0 flex-wrap gap-x-2 pl-6 text-meta">
+            <span className="text-kit-slate-11">{itemsOf(fact.document)}</span>
+            {where ? <span className={`min-w-0 break-words ${tickable ? "text-kit-slate-11" : "font-medium text-kit-green-11"}`}>{where}</span> : null}
+          </span>
+        </div>
+        <Button iconOnly variant="ghost" icon="print" aria-label={`Open PDF ${documentDisplayNumber(fact.po.id)}`} disabled={!fact.document} onClick={() => setPreview(fact)} />
+      </div>
+    );
+  };
 
   const failures = rows.filter((fact) => fact.failure);
   const sendSection = rows.length > 0 && (

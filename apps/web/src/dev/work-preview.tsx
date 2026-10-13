@@ -421,6 +421,30 @@ globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   }
   const poConfirm = /\/api\/operation\/pos\/([^/]+)\/confirm-sent/.exec(url);
   if (poConfirm) { sentPos.add(decodeURIComponent(poConfirm[1]!)); return json({ ok: true }); }
+  /* The purchase batch task's own PO reads (`BatchPanel`): the issued PO, its
+     document and its send record. Seeded so the task's send steps can be walked. */
+  const batchPo = /\/api\/operation\/pos\/([^/?]+)\/(issue-context|print-data|sends)/.exec(url);
+  if (batchPo) {
+    const id = decodeURIComponent(batchPo[1]!);
+    const po = SO_BATCH.registerRows[0]!.pos.find((p) => p.poId === id);
+    if (!po) return json({ message: "not seeded" }, 404);
+    const supplier = WINDOW_SUPPLIERS.find((s) => s.id === po.supplierId);
+    if (batchPo[2] === "issue-context") return json({
+      id, supplierId: po.supplierId, supplierName: po.supplierName, destinationId: "dest-klang", destination: "Carres Klang Warehouse",
+      poSendChannel: "whatsapp", contact: null, contactEmail: supplier?.contact_email ?? null, whatsappGroupUrl: supplier?.whatsapp_group_url ?? null, version: 1,
+    });
+    if (batchPo[2] === "print-data") return json({
+      po_id: id, po_number: id, version: 1, issue_date: TODAY,
+      supplier: { name: po.supplierName, address: "TEST supplier address", contact: "TEST contact" },
+      destination: { name: "Carres Klang Warehouse", address: "TEST warehouse address" },
+      delivery_instructions: "TEST data only. Do not send this document.", eta_date: "2026-10-20",
+      so_refs: [1390], issued_by: "TEST · Staff A",
+      lines: [{ sku: "TEST-MAT-K", description: "TEST Mattress · King", qty: 6, unit: "pcs", identity_mode: "quantity" }],
+      terms: "LOCAL TEST. No purchase was placed.",
+    });
+    return json({ sends: sentPos.has(id) ? [{ channel: "whatsapp", note: null, sent_at: `${TODAY}T03:10:00Z`, kind: "confirmed_sent", recipient: "group", po_version: 1, sent_by_name: "TEST · Staff A" }] : [] });
+  }
+  if (/\/api\/operation\/pos\/email-capability/.test(url)) return json({ configured: false });
   const onePo = /\/api\/operation\/pos\?[^#]*poId=([^&]+)/.exec(url);
   if (onePo) return json(poRow(decodeURIComponent(onePo[1]!)));
   if (/\/api\/operation\/delivery-arrangements(\?|$)/.test(url)) return json(ARRANGEMENTS);
