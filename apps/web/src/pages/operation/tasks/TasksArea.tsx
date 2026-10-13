@@ -166,9 +166,10 @@ export default function TasksArea({ onClose, fill = false, bare = false }: {
       setResult(null);
     });
   };
-  /* The toast's `Next` outlives the render that made it. */
+  /* The toast's `Next` outlives the render that made it: it opens the task
+     only while that task is still open work, never a stale one. */
   const openTaskRef = useRef(openTask);
-  openTaskRef.current = openTask;
+  openTaskRef.current = (row: WorkRow) => { if (items.some((r) => r.id === row.id)) openTask(row); };
 
   /* The open work of the tab the task was opened from, in the list's order. */
   const cardOrder = useMemo(() => (tabs ? tabs[tab].groups.flatMap((group) => group.cards.filter((card) => card.work)) : []), [tabs, tab]);
