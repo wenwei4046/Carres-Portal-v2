@@ -406,17 +406,20 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
             ),
     );
     await recordSent();
-    // Confirmation retains the result; closing returns to the same register. The
-    // ordered Sales Order REMAINS — one permanent row, now carrying its
-    // document. (`Status` was retired as a presentation on 2026-09-11: the
-    // document and the refused tick say what the word used to.)
+    // Confirmation retains the result; closing returns to the same register.
+    // The page is on `To buy`, and this order has nothing left to buy, so it
+    // leaves that tab (owner 13 Oct 2026, round 3) …
     await waitFor(() => expect(screen.getByTestId("so-batch-page")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    expect(screen.getByTestId("so-batch-status-o1")).toHaveTextContent("Done");
-    await waitFor(() =>
-      expect(screen.getByTestId("so-batch-po-link-o1")).toHaveTextContent("PO-2041"),
-    );
+    await waitFor(() => expect(screen.queryByTestId("so-batch-row-o1")).not.toBeInTheDocument());
+    expect(screen.getByText("Nothing to buy. Every Sales Order already has its PO.")).toBeInTheDocument();
+    // … and the ordered Sales Order REMAINS on the permanent Register: `All`
+    // shows its one row, now `Ordered`, carrying its document, tick refused.
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "All" }));
+    expect(screen.getByTestId("so-batch-status-o1")).toHaveTextContent("Ordered");
+    expect(screen.getByTestId("so-batch-po-link-o1")).toHaveTextContent("PO-2041");
     expect(screen.getByTestId("so-batch-select-o1")).toBeDisabled();
+    expect(screen.getByTestId("so-batch-footer")).toHaveTextContent("1 sales order");
   });
 
   it("the confirmation declares the version the RENDERED document reported", async () => {
@@ -478,6 +481,8 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     apiFetch.mockResolvedValue(payload());
     renderPage();
     await screen.findByTestId("so-batch-row-o1");
+    /* Search is an icon on the toolbar: press it, then type. */
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
     const search = screen.getByRole("searchbox", { name: "Search" }) as HTMLInputElement;
     fireEvent.change(search, { target: { value: "SO-" } });
     fireEvent.click(screen.getByTestId("so-batch-select-o1"));
@@ -492,7 +497,8 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     expect(screen.getByTestId("selection-bar")).toBeInTheDocument();
     /* … and clearing it hands back the toolbar with the query still typed. */
     fireEvent.click(screen.getByRole("button", { name: "Clear" }));
-    expect((screen.getByTestId("search-box").querySelector("input") as HTMLInputElement).value).toBe("SO-");
+    expect((screen.getByRole("searchbox", { name: "Search" }) as HTMLInputElement).value).toBe("SO-");
+    expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument();
   });
 });
 

@@ -122,7 +122,8 @@ export function OrderItemRows({ label, lines, columns, stepBack, testId, before 
 export default function SoBatchBySalesOrder({
   orders, total, factsOf, blockedReason, today, isLoading, storageKey, sessionKey,
   eligibleOf, isTicked, onToggleOrder, selectionSummary, selectionPrimary, toolbarEnd, toolbarAfterTools, toolbarStart,
-  onOpenOrder, onRowDoubleClick, contextMenu, renderItems, emptyMessage, initialSearch, searchPlaceholder, warning, searchOf, poLinksOf, onOpenPo,
+  onOpenOrder, onRowDoubleClick, contextMenu, renderItems, emptyMessage, noMatchMessage, initialSearch, searchPlaceholder, warning, searchOf, poLinksOf, onOpenPo,
+  onVisibleChange, onClearConditions,
 }: {
   /** The Sales Orders this tab and the rail are showing. */
   orders: SoBatchOrderRow[];
@@ -131,7 +132,7 @@ export default function SoBatchBySalesOrder({
   factsOf: (order: SoBatchOrderRow) => OrderRowFacts;
   /** Why nothing on this order can be bought, in the page's governed words.
    *  `fix` = something is missing and must be set before it can be bought. */
-  blockedReason: (order: SoBatchOrderRow) => { text: string; fix: boolean } | null;
+  blockedReason: (order: SoBatchOrderRow) => { text: string; fix: boolean; tick: string | null } | null;
   /** The server's Malaysia date, `YYYY-MM-DD`. */
   today: string;
   isLoading: boolean;
@@ -152,10 +153,16 @@ export default function SoBatchBySalesOrder({
   /** The item rows of one order, drawn on the template this list measured. */
   renderItems: (order: SoBatchOrderRow, layout: { columns: string; stepBack: number }) => ReactNode;
   emptyMessage: string;
+  /** What a search or a filter that finds nothing says: never the empty sentence. */
+  noMatchMessage: string;
   initialSearch?: string;
   searchPlaceholder?: string;
   /** A business blocker shown between the toolbar and the list. */
   warning?: string;
+  /** The rows left after the list's own search and filters. */
+  onVisibleChange?: (orders: SoBatchOrderRow[]) => void;
+  /** `Clear filters` also clears what the page itself narrowed by. */
+  onClearConditions?: () => void;
   /** Everything a search may find the order by. */
   searchOf: (order: SoBatchOrderRow) => string;
   /** Every PO the order is on (owner ruling 2026-10-05: every number, each a link). */
@@ -298,7 +305,10 @@ export default function SoBatchBySalesOrder({
         isLoading={isLoading}
         warning={warning}
         emptyMessage={emptyMessage}
-        noMatchMessage={emptyMessage}
+        noMatchMessage={noMatchMessage}
+        facetRows={orders}
+        onFacetRowsChange={onVisibleChange}
+        onClearConditions={onClearConditions}
         initialSearch={initialSearch}
         searchPlaceholder={searchPlaceholder}
         toolbarStart={toolbarStart}
@@ -322,7 +332,7 @@ export default function SoBatchBySalesOrder({
           onToggleAll: (keys, allSelected) => { for (const key of keys) onToggleOrder(key, !allSelected); },
           isSelectable: (order: SoBatchOrderRow) => eligibleOf(order.orderId).length > 0,
           /* Printed under Status too; here it is what a screen reader hears on the tick. */
-          unselectableReason: (order: SoBatchOrderRow) => blockedReason(order)?.text ?? null,
+          unselectableReason: (order: SoBatchOrderRow) => blockedReason(order)?.tick ?? null,
           isIndeterminate: (order: SoBatchOrderRow) => { const n = ticked(order); return n > 0 && n < eligibleOf(order.orderId).length; },
           testId: (order: SoBatchOrderRow) => `so-batch-select-${order.orderId}`,
         }}

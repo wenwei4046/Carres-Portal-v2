@@ -27,6 +27,8 @@ import {
   soBatchOrderSelection,
   soBatchOrderLineOutstandingQty,
   soBatchOrderUnselectableReason,
+  soBatchOrderStatusWhy,
+  soBatchOrderPlanning,
   soBatchLeafStatusWhy,
   soBatchLineReservedWhy,
   readyStockRefusalWord,
@@ -881,11 +883,20 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
     [presentation, shown, show, orderFacts]);
   const blockedReason = useCallback((order: SoBatchOrderRow) => {
     const leaves = leafsByOrder.get(order.orderId) ?? [];
-    const text = soBatchOrderUnselectableReason(order, leaves, stateWords);
-    /* A missing fact (supplier, cost, production days, customer date) is the
-       operator's to fix; goods another PO already covers are not. */
-    return text ? { text, fix: leaves.some((leaf) => !isSelectableForBuying(leaf) && !isPurchaseDemandTimingState(leaf.state)) } : null;
+    const tick = soBatchOrderUnselectableReason(order, leaves, stateWords);
+    /* The row says what its item line says (`soBatchOrderStatusWhy`, the one
+       projection): the missing fact, or the PO that already holds the goods.
+       Amber is for what someone must do before the order can be bought: a
+       missing fact, or a PO balance that could not be read. Goods another PO
+       already holds need nothing done, so that is said in grey. */
+    const why = soBatchOrderStatusWhy(order, leaves, stateWords);
+    const text = why?.text ?? tick;
+    const absence = soBatchOrderPlanning(order, leaves).absence;
+    const fix = tick != null && (leaves.some((leaf) => !isPurchaseDemandTimingState(leaf.state)) || absence === "not_planned" || absence === "coverage_not_checked");
+    return text ? { text, tick, fix } : null;
   }, [leafsByOrder, stateWords]);
+  const visibleOrders = useRef<SoBatchOrderRow[]>([]);
+  const rememberVisibleOrders = useCallback((rows: SoBatchOrderRow[]) => { visibleOrders.current = rows; }, []);
   const orderSearch = useCallback((o: SoBatchOrderRow) => [
     o.so == null ? "" : `SO-${o.so} ${o.so}`, o.customer ?? "", ...o.lines.map((l) => `${l.sku} ${l.item} ${l.variant ?? ""}`), ...o.outstandingSuppliers,
     ...o.pos.map((p) => `${p.poId} ${documentDisplayNumber(p.poId)} ${p.supplierName ?? ""}`), poNumberLinksSearch(poNumberLinks(o.pos)),
@@ -1209,7 +1220,9 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 toolbarEnd={<div className={`${styles.toolbarTools} flex min-w-0 flex-wrap items-center gap-2`}>
                   {viewSwitch}
                   {onOpenPurchaseOrders ? <Button loading={purchaseOrdersLoading} disabled={isLoading} data-testid="so-batch-open-pos" onClick={() => {
-                    onOpenPurchaseOrders([...new Set(byOrder.flatMap(order => order.pos.map(po => po.poId)))]);
+                    /* The Sales Orders in view: this tab, the rail AND the list's own search. */
+                    const inTab = new Set(byOrder.map(order => order.orderId));
+                    onOpenPurchaseOrders([...new Set(visibleOrders.current.filter(order => inTab.has(order.orderId)).flatMap(order => order.pos.map(po => po.poId)))]);
                   }}>Purchase Orders</Button> : null}
                 </div>}
                 toolbarStart={<>
@@ -1225,6 +1238,9 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 poLinksOf={poLinksOf}
                 onOpenPo={openPo}
                 emptyMessage={orders.length === 0 ? W.empty : shown.length < orders.length ? W.noMatch : show === "ordered" ? BY_SALES_ORDER.nothingOrdered : BY_SALES_ORDER.nothingToBuy}
+                noMatchMessage={W.noMatch}
+                onVisibleChange={rememberVisibleOrders}
+                onClearConditions={() => { setFilter(SO_BATCH_RAIL_CLEAR); if (roundNavigation?.selected) roundNavigation.onSelect(roundNavigation.selected); }}
                 initialSearch={initialSearch}
                 searchPlaceholder={W.search}
               />
@@ -1410,9 +1426,14 @@ function SoBatchOrderExpansion({
         stockDetail: readyStock.detail(l.orderLineId),
         supplier: summaryText(supplier, (n) => `${n} suppliers`) ?? null,
         deliverTo: drawEditor ? (
-          <DestinationAllocationEditor row={leaf} destinations={destinations} allocations={arranged}
-            onWholeRow={(destinationId) => onWholeLeaf(leaf, destinationId)}
-            onSplit={(allocations) => onSplitLeaf(leaf.id, allocations)} />
+          <>
+            <DestinationAllocationEditor row={leaf} destinations={destinations} allocations={arranged}
+              onWholeRow={(destinationId) => onWholeLeaf(leaf, destinationId)}
+              onSplit={(allocations) => onSplitLeaf(leaf.id, allocations)} />
+            {/* An offer never blocks buying: `Use this PO` stays beside the editor (owner ruling 2026-09-28). */}
+            {why ? <StatusWhy why={why} testId={`so-batch-line-status-why-${l.orderLineId}`} orderId={order.orderId}
+              onDoor={(door) => navigate(STATUS_DOOR_PATH[door])} /> : null}
+          </>
         ) : (
           <>
             {issued ? <span className="break-words">{issued}</span> : null}
@@ -1425,7 +1446,9 @@ function SoBatchOrderExpansion({
           <PoNumberLinks wrap numbers={poNumberLinks(linePos.map((p) => p!))} onOpen={(poId) => navigate(poObjectPath(poId))}
             testId={`so-batch-line-po-${l.orderLineId}`} linkTestId={`so-batch-line-po-link-${l.orderLineId}`} />
         ) : null,
-        tick: firstOfLeaf && toBuy ? {
+        /* The page's own tick rule decides (`isSelectableForOrder`): a line
+           whose documents are all unsent may still be bought. */
+        tick: firstOfLeaf && (eligible || toBuy) ? {
           testId: `so-batch-line-tick-${leaf.id}`,
           label: `Select ${l.sku} for ${order.so == null ? "this Sales Order" : `SO-${order.so}`}`,
           checked: selectedIds.has(leaf.id), disabled: !eligible, why: why?.text ?? null,
