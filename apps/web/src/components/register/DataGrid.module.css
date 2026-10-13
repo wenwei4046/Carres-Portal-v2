@@ -1555,3 +1555,71 @@ div:first-child > .columnsMenuGroup {
     opacity: 1;
   }
 }
+
+
+/* ⭐ FINANCE LOOK — opt-in with `look="finance"`, Finance pages only (Chew
+   2026-10-13; docs/finance/MASTER.md §4.2, a Finance exception to the one kit).
+   Every other grid is untouched. */
+.rootLookFinance {
+  --fin-head-bg: #E8EEFC;
+  --fin-head-ink: #1E3A8A;
+  --fin-col-line: #E5E7EB;
+  --fin-sub-bg: #F6F7F9;
+  --fin-select-bg: #E9EBEF;
+  --fin-select-edge: #374151;
+  --fin-total-rule: #6B7280;
+}
+.rootLookFinance .table {
+  min-width: 0;
+}
+.rootLookFinance .thead,
+.rootLookFinance .th,
+.rootLookFinance .thead .stickyCell {
+  background: var(--fin-head-bg);
+  color: var(--fin-head-ink);
+  font-weight: 600;
+}
+.rootLookFinance .th,
+.rootLookFinance .td {
+  border-right: 1px solid var(--fin-col-line);
+}
+.rootLookFinance .th:last-child,
+.rootLookFinance .td:last-child {
+  border-right: 0;
+}
+.rootLookFinance .trSubtotal > .td,
+.rootLookFinance .trSubtotal > .stickyCell {
+  background: var(--fin-sub-bg);
+  font-weight: 600;
+}
+.rootLookFinance .trTotal > .td,
+.rootLookFinance .trTotal > .stickyCell {
+  background: var(--fin-sub-bg);
+  font-weight: 600;
+  border-top: 2px solid var(--fin-total-rule);
+}
+.rootLookFinance .trSelected > .td,
+.rootLookFinance .trSelected > .stickyCell,
+.rootLookFinance .trSelected:hover > .stickyCell {
+  background: var(--fin-select-bg);
+}
+.rootLookFinance .trSelected > .td:first-child {
+  box-shadow: inset 3px 0 0 var(--fin-select-edge);
+}
+.rootLookFinance .tfootTd {
+  background: var(--fin-sub-bg);
+  font-weight: 600;
+  border-top: 2px solid var(--fin-total-rule);
+  border-right: 1px solid var(--fin-col-line);
+}
+.rootLookFinance .tfootTd:last-child {
+  border-right: 0;
+}
+/* Finance tables hold many amount columns side by side: 10 a side, so every
+   money column of Daily Bank fits 1440 wide with the menu open. */
+.rootLookFinance .th,
+.rootLookFinance .td,
+.rootLookFinance .tfootTd {
+  padding-left: 10px;
+  padding-right: 10px;
+}

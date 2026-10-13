@@ -93,16 +93,23 @@ describe("Daily Bank (0637)", () => {
   });
 
   it("prints each account's day: brought forward, money in and out, balance, waiting and what is left to pay", async () => {
+    // An active account where nothing sits and nothing moved: every zero is a blank cell (Finance look, 2026-10-13).
+    api.days["2026-10-03"] = { ...DAY, accounts: [...DAY.accounts, account({ account_code: "1123", name: "CIMB" })] };
     show();
     await screen.findByTestId("daily-bank-row-1122");
     const bank = row("1122");
-    expect(bank).toHaveTextContent("1122 Maybank");
+    // The code and the name each sit in their own cell.
+    expect(within(bank).getByRole("cell", { name: "1122" })).toBeInTheDocument();
+    expect(within(bank).getByRole("cell", { name: "Maybank" })).toBeInTheDocument();
     expect(bank).toHaveTextContent("RM 10,000.00"); // brought forward
     expect(bank).toHaveTextContent("RM 1,200.00"); // out
     expect(bank).toHaveTextContent("RM 8,800.00"); // balance
     expect(bank).toHaveTextContent("RM 800.00"); // waiting
     expect(bank).toHaveTextContent("RM 8,000.00"); // available to pay
     expect(row("1110")).toHaveTextContent("RM 620.00");
+    // Brought forward, balance and available to pay are all zero: blank, never RM 0.00.
+    expect(row("1123")).toHaveTextContent("CIMB");
+    expect(row("1123")).not.toHaveTextContent("RM");
   });
 
   it("card and online money waits for its payout: never available to pay, never waiting for approval", async () => {
@@ -192,12 +199,13 @@ describe("Daily Bank (0637)", () => {
     expect(within(open).getByRole("link", { name: "JE-202610-0005" })).toHaveAttribute("href", "/finance/ledger?entry=JE-202610-0005");
   });
 
-  it("an account name opens the Journal on that account and that day", async () => {
+  it("an account code opens the Journal on that account and that day; the name is plain text", async () => {
     show();
     await screen.findByTestId("daily-bank-row-1122");
-    expect(within(row("1122")).getByRole("link", { name: "1122 Maybank" })).toHaveAttribute(
+    expect(within(row("1122")).getByRole("link", { name: "1122" })).toHaveAttribute(
       "href", "/finance/ledger?account=1122&from=2026-10-03&to=2026-10-03",
     );
+    expect(within(row("1122")).queryByRole("link", { name: /Maybank/ })).not.toBeInTheDocument();
   });
 });
 
