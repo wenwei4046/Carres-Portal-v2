@@ -43,9 +43,18 @@ export const useShellTasks = create<{
    *  pill only while none does. */
   pillHosts: number;
   hostPill: () => () => void;
+  /** Pages that ARE the tasks (Workspace): the panel and its pill step aside
+   *  there, so one task is never open in two places at once. */
+  pageHosts: number;
+  hostPage: () => () => void;
 }>((set) => ({
   open: readOpen(),
   pillHosts: 0,
+  pageHosts: 0,
+  hostPage: () => {
+    set((s) => ({ pageHosts: s.pageHosts + 1 }));
+    return () => set((s) => ({ pageHosts: s.pageHosts - 1 }));
+  },
   hostPill: () => {
     set((s) => ({ pillHosts: s.pillHosts + 1 }));
     return () => set((s) => ({ pillHosts: s.pillHosts - 1 }));
@@ -80,7 +89,8 @@ export function TasksPill({ fallback = false }: { fallback?: boolean } = {}) {
   const hostPill = useShellTasks((s) => s.hostPill);
   useEffect(() => (fallback ? undefined : hostPill()), [fallback, hostPill]);
   const left = useTasksLeft();
-  if (open || (fallback && hosts > 0)) return null;
+  const pageHosts = useShellTasks((s) => s.pageHosts);
+  if (open || pageHosts > 0 || (fallback && hosts > 0)) return null;
   return (
     <button
       type="button"
@@ -105,7 +115,8 @@ export default function ShellTasks() {
   const taskOpen = useTasksHost((s) => s.taskOpen);
   const guard = useTasksHost((s) => s.guard);
   const left = useTasksLeft();
-  if (!open) return null;
+  const pageHosts = useShellTasks((s) => s.pageHosts);
+  if (!open || pageHosts > 0) return null;
   const now = new Date();
   const weekday = now.toLocaleDateString("en-GB", { weekday: "long" });
   return (

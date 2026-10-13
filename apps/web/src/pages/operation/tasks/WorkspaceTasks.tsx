@@ -26,6 +26,7 @@ import Tabs from "@/components/kit/Tabs";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import TwoLineCell from "@/components/register/TwoLineCell";
 import { fmtDate } from "@/lib/fmt-date";
+import { useShellTasks } from "../components/ShellTasks";
 import { useOpenWorkSet, type WorkRow } from "../use-open-work";
 import { sameWeekday } from "./TasksArea";
 import { TaskOpenContext } from "./TaskFrame";
@@ -51,6 +52,9 @@ function StatusPill({ row }: { row: WorkspaceRow }) {
 export default function WorkspaceTasks() {
   const work = useOpenWorkSet();
   const { items, completed, myUserId, hasData, error, refreshFailed, lastUpdatedAt, unhealthySources, generatedOn: today, retry } = work;
+  /* This page IS the tasks: the shell's Tasks panel steps aside while it is shown. */
+  const hostPage = useShellTasks((s) => s.hostPage);
+  useEffect(() => hostPage(), [hostPage]);
   const [params, setParams] = useSearchParams();
   const set = useCallback((changes: Record<string, string | null>) => {
     setParams((previous) => {
