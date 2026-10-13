@@ -652,8 +652,8 @@ PAYMENT     the customer-facing 50/50 composition is used only while editing a c
 
 # §5 · The Tasks panel (right) — owner rulings 2026-10-08
 
-**The list and the one task view — owner 12 Oct 2026 (03 §8), round 3 brief of 13 Oct 2026 (point 2) · BUILT 13 Oct 2026;
-deployment and the production check are recorded in this PR's closing note, not assumed here.** Title row 36 with no
+**The list and the one task view — owner 12 Oct 2026 (03 §8), round 3 brief of 13 Oct 2026 (point 2) · DEPLOYED 13 Oct 2026
+(#2047, `3a9188f95`: the ERP reported that commit and its bundle held this code); the signed-in look at 1025, 1164 and 1440 is owed.** Title row 36 with no
 line under it. The day strip of the working week; a day's number is its `To do`, amber when that day holds late work;
 the chosen day is filled in the selection colour. `To do` · `Waiting` · `Done` as the segmented control, each with its
 number. Then one white group per party (name, count, a fold), and in it one card per task on the ground colour: module
@@ -664,7 +664,7 @@ person finished on the chosen day. All three read the ONE Work read (`lifecycle`
 twice and no second engine exists. The module filter icons, the `Late` and `No date` sections and the day badge of the
 earlier panel are removed.
 
-**The Workspace page** (Workspace MASTER §5.10; BUILT ON BRANCH `build/workspace-v3`, NOT DEPLOYED) lists the same tasks
+**The Workspace page** (Workspace MASTER §5.10; merged 13 Oct 2026, #2049; signed-in production check owed) lists the same tasks
 as one table. It opens a task through the same task desk (`useTaskDesk`) and counts with the same list arithmetic
 (`task-cards.ts`), so its `To do` · `Waiting` · `Done` are this panel's numbers. While that page is shown, this panel
 and its pill step aside.

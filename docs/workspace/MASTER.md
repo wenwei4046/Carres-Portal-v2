@@ -5,7 +5,7 @@
 > action/approval ownership, Work and their relationship to the one global Dashboard.
 > Modules own business facts and completion; Workspace coordinates them. There is no second
 > Workspace Blueprint. The Workspace page is §5.10 (owner's round 3 brief, 13 Oct 2026; BUILT ON
-> BRANCH `build/workspace-v3`, NOT DEPLOYED); existing HTML prototypes and prototype companion
+> 2026, #2049; the signed-in production check is owed); existing HTML prototypes and prototype companion
 > specifications remain exploration only.
 
 ## 1 · Mission and boundary
@@ -1409,7 +1409,7 @@ reads `Scheduled delivery · 29 Oct`. Had the 2-day check been missed on Sat 24,
    §2.1's stored assignment lead before the Scheduled delivery, else the Requested one; the PO day
    only opens it.
 
-### 5.10 · The Workspace page: owner's round 3 brief, 13 Oct 2026 (points 3 and 4) · BUILT ON BRANCH `build/workspace-v3` · NOT DEPLOYED · production not verified
+### 5.10 · The Workspace page: owner's round 3 brief, 13 Oct 2026 (points 3 and 4) · MERGED 13 Oct 2026 (#2049, `64994fb31`) · signed-in production check owed
 
 Source: `docs/ui-reference/sales-order-design/docs/CODE-BRIEF-13-Oct-round3.md` and the package's
 `Workspace v3.dc.html`. Where the package's words or rules differ from COPY-STANDARD or a module
@@ -1661,7 +1661,7 @@ occurrence. The answer day is one Office working day after the request unless th
 own (`workReplyDueOn`). A recorded request stores the occurrence, channel, contact, actor, time and
 answer day.
 
-**`Record as sent`: BUILT ON BRANCH `build/one-task-record` (round 3 brief point 4), NOT DEPLOYED.**
+**`Record as sent`: BUILT 13 Oct 2026 (round 3 brief point 4); deployment and the signed-in production check are owed, re-measure before quoting.**
 The one task view (`tasks/TaskRequest.tsx`) offers it between the facts and the tabs for open work
 that names a party and is not waiting already: `After you asked {party}`, `Communication channel`
 (`WhatsApp` · `Email` · `Phone` · `In person`), then `Record as sent`. It posts to
@@ -1873,7 +1873,7 @@ Purchasing §5.6.1 owns the window law and the one arithmetic (`poWindowFor`); t
 stamps every eligible demand line and every lineage PO with its window, and both this card and SO
 Batch's `?window=` scope read that stamp. Workspace decides the composition (handoff 2026-09-25):
 
-- **The task (13 Oct 2026, BUILT ON BRANCH `build/workspace-v3`, NOT DEPLOYED).** One Work
+- **The task (13 Oct 2026, merged with #2047 and #2049; signed-in production check owed).** One Work
   occurrence per window. It opens as Purchasing's purchase batch task (`so-batch/BatchPanel.tsx`)
   in the one task view (03 §8; UI MASTER §5), from the Tasks panel and from the Workspace page
   (§5.10). Its list card and table row say the act in the Tasks panel's words (`Issue PO to
@@ -2123,7 +2123,7 @@ honest Work for admitted modules.
 
 ## 10 · Measured implementation truth — 2026-09-16
 
-- **The Workspace page: BUILT ON BRANCH `build/workspace-v3`, 13 Oct 2026; NOT DEPLOYED; production
+- **The Workspace page: MERGED 13 Oct 2026 (#2049, `64994fb31`); signed-in production check owed; production
   not verified.** §5.10 is the page. FACT on the branch: `tab=work` renders
   `tasks/WorkspaceTasks.tsx`; the earlier page (`OperationWork.tsx`, its Mission, PO view, month
   rail and their model files) is removed, and with it every measurement this section held about
@@ -2402,7 +2402,7 @@ module admission and production-proof work in §§6, 10 and 11; `Blueprint ready
 sources, migrations or pages are deployed.
 
 **The Workspace page is §5.10** (owner's round 3 brief, 13 Oct 2026; BUILT ON BRANCH
-`build/workspace-v3`, NOT DEPLOYED). The owner's review of the built page is owed. The earlier Work
+#2049, merged 13 Oct 2026; signed-in production check owed). The owner's review of the built page is owed. The earlier Work
 designs (the three-panel review surface of 2026-09-16 and the stop-card page of 2026-09-28) are
 replaced by it; Git holds them, and their fixtures were never authority.
 
