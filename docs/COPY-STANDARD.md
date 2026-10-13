@@ -5082,7 +5082,7 @@ Not screen words (a direct database change only, never raised by a screen): the 
 
 Workspace message availability: `Message not available` replaces a placeholder draft when no governed message is available. Disable `Copy message` in that state; never report success when clipboard copying fails.
 
-## The Communication card and in-place act words · Workspace MASTER §5.10 · their place in the task view was merged 13 Oct 2026 (#2049); signed-in production check owed
+## The Communication card and in-place act words · Workspace MASTER §5.10 · their place in the task view was deployed 13 Oct 2026 (#2049); seen signed in on production 13 Oct 2026 at 1025, 1164 and 1440, view only
 
 Drawn with the one task view on the Workspace page; the words are the earlier page's, unchanged.
 The page's own words are in "The Workspace page words"; the task view's are in "The Tasks panel
@@ -5097,7 +5097,7 @@ words".
 
 | Sales Orders pilot compact search (owner approved 2026-10-01; scope words follow what the server matches — linked document numbers since PR #1850, phone digits since 2026-10-06) | `Search orders…`; accessible scope `Search sales orders by SO number, customer, phone, imported reference or linked document number` | Unverified whole-database item search claim · naming a field the server search does not match |
 
-## The Tasks panel words — owner 12 Oct 2026 (03 §8) · round 3 brief, 13 Oct 2026 (point 2) · DEPLOYED 13 Oct 2026 (#2047); signed-in production check owed
+## The Tasks panel words — owner 12 Oct 2026 (03 §8) · round 3 brief, 13 Oct 2026 (point 2) · DEPLOYED 13 Oct 2026 (#2047); the list seen signed in on production 13 Oct 2026 at 1025, 1164 and 1440, view only; a task open inside the 320 panel measured on the fixture preview only
 
 The shell's right panel. Work words stay the Work engine's own sentences (the card title is the act, naming the
 party); this section holds the panel's frame and the card rows.
@@ -5124,7 +5124,7 @@ party); this section holds the panel's frame and the card rows.
 | Toast after a task is saved | the owning module's own success words · `Next: {party}` when another task of the same kind waits · `Close message` | `Undo` · `Saved` with nothing after it · a green line in the panel |
 | Failure | `Tasks could not be refreshed` · `Last updated {time}` · `Could not refresh {source}` · `Try again` | a silent empty list |
 
-## The Workspace page words · owner's round 3 brief, 13 Oct 2026 (points 3 and 4) · MERGED 13 Oct 2026 (#2049); signed-in production check owed
+## The Workspace page words · owner's round 3 brief, 13 Oct 2026 (points 3 and 4) · DEPLOYED 13 Oct 2026 (#2049, #2050); seen signed in on production 13 Oct 2026 at 1025, 1164 and 1440, view only
 
 The page at `/operation?tab=work` (Workspace MASTER §5.10). It lists the same tasks as the Tasks
 panel, so a task's own words are the Tasks panel's; this section holds the page's frame and the

@@ -162,6 +162,23 @@ for (const list of LISTS.filter((candidate) => candidate.kitCheck)) {
    Unit, and never on the toolbar (owner's round 3 brief, point 1). The preview
    holds TEST Units for SO-1301. The same measures and the kit's check run
    with the bar showing and after the Units are taken. */
+/* The filter rail is closed by default, so the closed-rail measurements above
+   never see its `Listing` · `Report` switch. Found on production, 13 Oct 2026:
+   a page rule drew the chosen one at 600. The kit tab is 500 chosen, 400 not. */
+for (const page of ["/so-batch-shell-preview.html", "/purchase-orders-shell-preview.html"] as const) {
+  test(`${page}: the filter rail's view switch is the kit tab`, async ({ page: browser }) => {
+    await browser.setViewportSize({ width: 1440, height: 900 });
+    await browser.goto(page);
+    const rail = browser.locator(".so-rail-navigation [role=tab]");
+    if (!(await rail.first().isVisible().catch(() => false))) await browser.getByRole("button", { name: "Show filters" }).first().click();
+    await expect(rail.first()).toBeVisible();
+    const weights = await rail.evaluateAll((tabs) => tabs.map((tab) => [tab.getAttribute("aria-selected"), getComputedStyle(tab).fontWeight]));
+    expect(weights.length).toBeGreaterThan(0);
+    for (const [chosen, weight] of weights) expect(weight).toBe(chosen === "true" ? "500" : "400");
+    expect((await carresCheck(browser)).filter((finding) => /^tab /.test(finding))).toEqual([]);
+  });
+}
+
 for (const width of WIDTHS) {
   test(`SO Batch Purchase · By sales order: Use stock on the selection bar at ${width}`, async ({ page }) => {
     const list = LISTS[1]!;

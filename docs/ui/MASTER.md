@@ -664,7 +664,7 @@ person finished on the chosen day. All three read the ONE Work read (`lifecycle`
 twice and no second engine exists. The module filter icons, the `Late` and `No date` sections and the day badge of the
 earlier panel are removed.
 
-**The Workspace page** (Workspace MASTER §5.10; merged 13 Oct 2026, #2049; signed-in production check owed) lists the same tasks
+**The Workspace page** (Workspace MASTER §5.10; deployed 13 Oct 2026, #2049; seen signed in on production 13 Oct 2026 at 1025, 1164 and 1440, view only) lists the same tasks
 as one table. It opens a task through the same task desk (`useTaskDesk`) and counts with the same list arithmetic
 (`task-cards.ts`), so its `To do` · `Waiting` · `Done` are this panel's numbers. While that page is shown, this panel
 and its pill step aside.

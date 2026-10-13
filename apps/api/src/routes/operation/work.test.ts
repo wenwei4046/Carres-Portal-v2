@@ -403,6 +403,35 @@ describe("operation Work response composition", () => {
     expect(run?.action).not.toContain("Operation PIC");
   });
 
+  it("names the Logistics Partner, never the customer, as the party of a `Call {logistics}` task", () => {
+    const context = {
+      orderId: "order-2041",
+      so: 2041,
+      picName: "Operation PIC",
+      picUserId: "pic-1",
+      promisedDateIso: "2026-09-08",
+      confirmedDateIso: null,
+      deliveredAtIso: null,
+      delayDetectedAtIso: null,
+      delayDecisionAtIso: null,
+    };
+    const partyOf = (key: "confirm_delivery_date" | "arrange_new_delivery_date", logistics: string | null) => {
+      const [item] = projectSalesOrderWork({
+        open: [{ key, track: "delivery", tone: "warning" }],
+        context,
+        customer: "TEST Customer A",
+        logistics,
+        today: "2026-09-07",
+      });
+      return [item?.action, item?.recipient];
+    };
+
+    expect(partyOf("confirm_delivery_date", "TEST Logistics A")).toEqual(["Call TEST Logistics A", "TEST Logistics A"]);
+    expect(partyOf("arrange_new_delivery_date", "TEST Logistics A")).toEqual(["Call TEST Logistics A", "TEST Logistics A"]);
+    /* No partner recorded: the task names nobody, so nothing is asked of the customer by mistake. */
+    expect(partyOf("confirm_delivery_date", null)[1]).toBeNull();
+  });
+
   it("admits only Delivery proof review as an embedded Work action", () => {
     const context = {
       orderId: "order-2041",

@@ -1409,7 +1409,7 @@ reads `Scheduled delivery · 29 Oct`. Had the 2-day check been missed on Sat 24,
    §2.1's stored assignment lead before the Scheduled delivery, else the Requested one; the PO day
    only opens it.
 
-### 5.10 · The Workspace page: owner's round 3 brief, 13 Oct 2026 (points 3 and 4) · MERGED 13 Oct 2026 (#2049, `64994fb31`) · signed-in production check owed
+### 5.10 · The Workspace page: owner's round 3 brief, 13 Oct 2026 (points 3 and 4) · DEPLOYED 13 Oct 2026 (#2049, #2050) · seen signed in on production 13 Oct 2026 at 1025, 1164 and 1440, view only
 
 Source: `docs/ui-reference/sales-order-design/docs/CODE-BRIEF-13-Oct-round3.md` and the package's
 `Workspace v3.dc.html`. Where the package's words or rules differ from COPY-STANDARD or a module
@@ -1873,7 +1873,7 @@ Purchasing §5.6.1 owns the window law and the one arithmetic (`poWindowFor`); t
 stamps every eligible demand line and every lineage PO with its window, and both this card and SO
 Batch's `?window=` scope read that stamp. Workspace decides the composition (handoff 2026-09-25):
 
-- **The task (13 Oct 2026, merged with #2047 and #2049; signed-in production check owed).** One Work
+- **The task (13 Oct 2026, deployed with #2047 and #2049; seen signed in on production 13 Oct 2026 at 1025, 1164 and 1440, view only).** One Work
   occurrence per window. It opens as Purchasing's purchase batch task (`so-batch/BatchPanel.tsx`)
   in the one task view (03 §8; UI MASTER §5), from the Tasks panel and from the Workspace page
   (§5.10). Its list card and table row say the act in the Tasks panel's words (`Issue PO to
@@ -2123,8 +2123,13 @@ honest Work for admitted modules.
 
 ## 10 · Measured implementation truth — 2026-09-16
 
-- **The Workspace page: MERGED 13 Oct 2026 (#2049, `64994fb31`); signed-in production check owed; production
-  not verified.** §5.10 is the page. FACT on the branch: `tab=work` renders
+- **The Workspace page: DEPLOYED 13 Oct 2026 (#2049, #2050); seen signed in on production 13 Oct 2026 at 1025, 1164 and 1440, view only.**
+  Seen there: the table in both scopes, one task open with its four tabs, `Record as sent` shown and
+  not pressed, the Communication card. Not seen there: a `Waiting` or `Done` row (none existed) and
+  a task open inside the 320 Tasks panel (that account had no task of its own).
+  Found there and fixed in the next change: a Delivery task spoken as `Call {logistics}` named the
+  customer as its party, so `Contact` and `After you asked` said the customer. The party of such a
+  task is the Logistics Partner (ACTION-FLOW Law 4 rung 2); with no partner recorded it names nobody. §5.10 is the page. FACT on the branch: `tab=work` renders
   `tasks/WorkspaceTasks.tsx`; the earlier page (`OperationWork.tsx`, its Mission, PO view, month
   rail and their model files) is removed, and with it every measurement this section held about
   that page. Measured on fixture previews with TEST data: §5.10 "Measured". The browser still
@@ -2402,7 +2407,7 @@ module admission and production-proof work in §§6, 10 and 11; `Blueprint ready
 sources, migrations or pages are deployed.
 
 **The Workspace page is §5.10** (owner's round 3 brief, 13 Oct 2026; BUILT ON BRANCH
-#2049, merged 13 Oct 2026; signed-in production check owed). The owner's review of the built page is owed. The earlier Work
+#2049, deployed 13 Oct 2026; seen signed in on production 13 Oct 2026 at 1025, 1164 and 1440, view only). The owner's review of the built page is owed. The earlier Work
 designs (the three-panel review surface of 2026-09-16 and the stop-card page of 2026-09-28) are
 replaced by it; Git holds them, and their fixtures were never authority.
 
