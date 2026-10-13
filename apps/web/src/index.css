@@ -522,8 +522,9 @@
 .so-template-rail { background: theme('colors.kit.slate.2'); }
 .so-template-rail [data-testid='sales-orders-rail-fixed'] { padding: 8px 12px; }
 .so-rail-navigation [data-kit='tabs'] { flex-direction: column; align-items: stretch; gap: 4px; border: 0; padding-right: 28px; }
-.so-rail-navigation [data-kit='tab'] { height: 36px; justify-content: flex-start; padding: 0 8px; border-radius: 6px; font-weight: 500; }
-.so-rail-navigation [data-kit='tab'][data-state='active'] { background: theme('colors.kit.blue.3'); color: theme('colors.kit.blue.11'); font-weight: 600; }
+/* Weight is the kit tab's own (500 chosen, 400 not): 01 §3. */
+.so-rail-navigation [data-kit='tab'] { height: 36px; justify-content: flex-start; padding: 0 8px; border-radius: 6px; }
+.so-rail-navigation [data-kit='tab'][data-state='active'] { background: theme('colors.kit.blue.3'); color: theme('colors.kit.blue.11'); }
 .so-rail-navigation [data-kit='tab-indicator'] { display: none; }
 .so-template-rail [data-rail-group] { border-top: 0; padding: 4px 0; }
 .so-template-rail [data-rail-group] > button { min-height: 36px; padding-top: 6px; padding-bottom: 6px; }

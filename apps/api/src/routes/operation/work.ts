@@ -1200,6 +1200,9 @@ const ORDER_RESULT: Record<string, string> = {
   ask_delivery_date: "Customer Delivery exists or Not yet is recorded",
 };
 
+/** The Delivery acts spoken as `Call {logistics}` (`order-action-words.ts`). */
+const CALLS_LOGISTICS: ReadonlySet<string> = new Set(["confirm_delivery_date", "arrange_new_delivery_date"]);
+
 export function projectSalesOrderWork(input: {
   open: readonly OrderOpenAction[];
   context: OrderWorkContext;
@@ -1257,10 +1260,14 @@ export function projectSalesOrderWork(input: {
             label: `SO-${input.context.so}`,
           },
       problem: ORDER_PROBLEM[item.ruleKey] ?? "Action required",
-      recipient:
-        item.ruleKey === "ask_delivery_date" ||
-        item.ruleKey === "confirm_delivery_date" ||
-        item.ruleKey === "collect"
+      /* The party is the one the act names. A Delivery act that reads
+         `Call {logistics}` asks the Logistics Partner, never the customer
+         (ACTION-FLOW Law 4 rung 2); with no partner recorded it names nobody. */
+      recipient: deliveryOwned && CALLS_LOGISTICS.has(item.ruleKey)
+        ? input.logistics ?? null
+        : item.ruleKey === "ask_delivery_date" ||
+            item.ruleKey === "confirm_delivery_date" ||
+            item.ruleKey === "collect"
           ? input.customer
           : null,
       requiredResult:
