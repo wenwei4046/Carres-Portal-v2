@@ -4591,6 +4591,7 @@ Card payout banks moves from a block under Money accounts to its own Finance Set
 
 - `Card payout banks` (the tab name, the same word as the section heading above)
 - `A card account and machine that is not listed here fills in no bank. Whoever records the card payout chooses it.` (the line at the top of the tab: there is no catch-all route, so an unlisted card account and machine leaves Paid into empty on the card payout form)
+- The routes are a table (Chew 2026-10-13, 「这个card payouts banks 要做成表」): columns `Card and online holding` · `Machine at` · `Pays out to`, the field labels of the form; `Add a card payout bank` on the toolbar; a row opens `Card payout bank`.
 
 ## Finance Settings — Closed months (migration 0622)
 
@@ -5484,7 +5485,7 @@ Chew approved the page's purpose (MASTER §0 "Automatic posting accounts", 「�
 | Where | Words |
 |---|---|
 | Finance Settings | Tab `Posting accounts` |
-| The list | Groups `Sales` · `Purchases and charges` · `Dealers` (0675) · `Customer money` · `Kept by the system · renamed in Chart of accounts`. Columns `Posting` · `Account` · `Changed` (`{date} · {who}`). An add-on with no account reads `No account yet`, in red: its invoices cannot be issued until it has one |
+| The list | Groups, each saying when it posts (Chew 2026-10-13): `Sales · when Operation issues a sales invoice, each line by its kind` · `Purchases and charges · when a bill, a card payout or a bank line is recorded` · `Dealers · when a month's dealer commission is closed` (0675) · `Customer money · when a customer payment is recorded, by how it was paid` · `Kept by the system · renamed in Chart of accounts`. Columns `Posting` · `Account`; a changed posting reads `Changed {date} · {who}` on a grey line under its account. An add-on with no account reads `No account yet`, in red: its invoices cannot be issued until it has one |
 | Postings | `Goods sold, when the item group has no sales account` (0659) · `Goods sold ({source})` · `Subscription fees` · `Storage charges` · an add-on's own name · `Goods bought that are not in the catalog` (0659) · `Bank and card charges` · `Money the bank pays in` · `Transport to customers, by delivery order` (0689) · `Dealer commission` · `Dealer commission owed` · `Renovation rebate` · `Renovation rebate owed` · `KPI allowance` · `KPI allowance owed` (0675) · `Owed by showroom customers` · `Owed by dealers' customers · one account per dealer under it` · `Owed by subscription customers` (0685) · `Suppliers owed for goods` · `Suppliers owed for other bills` · `Customer deposits` · `Stock` · `Retained earnings` · `Opening balance` · a payment method's name, with ` · Not active` when it is off · `POS card` · `Online payment` · `Online payment · Stripe checkout` |
 | The window | Title `Posting account`, the posting under it. Field `Account ({Kind})`; for a way of being paid `Money account`, offering the money accounts Payment settings offers. `The new account takes the postings made from now on. Earlier postings keep their account.` Footer `Cancel` · `Save`, which names its gap: `Save: pick the account` · `Save: pick another account` |
 | Changes | Heading `Changes`. Columns `When` · `Posting` · `From` (`No account yet` when there was none) · `To`. Empty `No posting account has been changed yet.` |

@@ -14,7 +14,7 @@
  * credit-note-new · debit-notes · debit-note · debit-note-new ·
  * voucher-pays-debit-note (0681) · forecast (last month, so the actual is a whole month) ·
  * posting-accounts · item-groups (long lists under their tables, 0657–0659) ·
- * money-accounts (0692: Chart of accounts with its money accounts; those out of use hidden until asked for) ·
+ * card-payout-banks (a table since 2026-10-13) · money-accounts (0692: Chart of accounts with its money accounts; those out of use hidden until asked for) ·
  * dealer-commission · dealer-statement (one made-up dealer, 0664; pick it on
  * the Statement view) · notes-to-follow-up · note-to-follow-up (0676).
  * `?role=principal` draws the area titles, to see an area fold.
@@ -875,6 +875,14 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (init?.method && init.method !== "GET") return json({ message: "Local preview does not save records." }, 405);
   const q = new URL(url, window.location.origin).searchParams;
   if (new URL(url, window.location.origin).pathname === "/api/finance/ledger/money-accounts") return json(MONEY_ACCOUNT_ROWS);
+  // 0541: the card payout banks, as production has them. Invented.
+  if (new URL(url, window.location.origin).pathname === "/api/finance/ledger/money-accounts/card-routes")
+    return json([
+      { holding_code: "315-9000", channel: "dealer", bank_code: "310-1000" },
+      { holding_code: "315-9000", channel: "showroom", bank_code: "310-2000" },
+      { holding_code: "315-5000", channel: "dealer", bank_code: "310-4000" },
+      { holding_code: "315-5000", channel: "showroom", bank_code: "310-2000" },
+    ]);
   if (url.includes("/api/finance/invoices/register")) return json({ rows: INVOICES, total: INVOICES.length });
   if (url.includes("/api/finance/payments/register")) return json({ rows: [], total: 0 });
   // 0687: `?role=hr` or `?role=bd` previews an allowed HR or BD person, who sees only their own requests.
@@ -996,6 +1004,7 @@ const ROUTES: Record<string, string> = {
   "payment-request-new": "/finance/payment-requests/new",
   "request-access": "/finance/settings?tab=requests",
   "posting-accounts": "/finance/settings?tab=posting",
+  "card-payout-banks": "/finance/settings?tab=card",
   "money-accounts": "/finance/settings",
   "item-groups": "/finance/settings?tab=groups",
   "dealer-commission": "/finance/reports/dealer-commission",

@@ -221,7 +221,7 @@ describe("Finance Settings — a money account's number, changed on its own form
     // The payout banks live on their own tab.
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Card payout banks" }), { button: 0, ctrlKey: false });
     await waitFor(() =>
-      expect(screen.getByTestId("card-route-1131-dealer")).toHaveTextContent("1131 · GHL · Dealer → 310-A000 · Public Bank"),
+      expect(screen.getByTestId("card-route-1131-dealer")).toHaveTextContent(/1131 · GHL.*Dealer.*310-A000 · Public Bank/),
     );
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Chart of accounts" }), { button: 0, ctrlKey: false });
     await waitFor(() => expect(chartRow("310-A000")).toHaveTextContent("Public Bank"));
@@ -370,7 +370,7 @@ describe("Finance Settings — card payout banks (0541)", () => {
   it("shows each route and saves a new bank for it", async () => {
     show("/finance/settings?tab=card");
     const row = await screen.findByTestId("card-route-1131-dealer");
-    expect(row).toHaveTextContent("1131 · GHL · Dealer → 1121 · Public Bank");
+    expect(row).toHaveTextContent(/1131 · GHL.*Dealer.*1121 · Public Bank/);
     fireEvent.click(row);
     const dialog = await screen.findByRole("dialog");
     /* The holding side wears the kind's word, not "Card account". */
