@@ -162,18 +162,21 @@ describe("BatchPanel — a PO belongs to its earliest window only (§5.6.1)", ()
 });
 
 describe("BatchPanel — opened by window key from any page", () => {
-  it("header is the supplier over the time and date; tabs open on SO Batch Purchase; every PO is ticked", async () => {
+  it("the one task view: the supplier, the cut-off and its date; it opens on Steps; every PO is ticked", async () => {
     mount();
     await loaded();
     const card = panel();
-    expect(within(card).getByText("Nice Future")).toBeInTheDocument();
-    /* The date through the one date home: the year only when it is not this year. */
-    expect(within(card).getByText(`11:00 AM · ${fmtDate("2026-09-01")}`)).toBeInTheDocument();
-    expect(within(card).getByText("Passed")).toBeInTheDocument();
+    expect(within(card).getByTestId("task-view-title")).toHaveTextContent(/^Nice Future$/);
+    expect(within(card).getByTestId("task-view-head")).toHaveTextContent("SO Batch Purchase");
+    /* The date through the one date home: the year only when it is not this
+       year. A cut-off that has gone by says so on its own amber row. */
+    const cutOff = within(card).getByTestId("task-view-fact-cut-off");
+    expect(cutOff).toHaveTextContent(`Cut-off11:00 AM · ${fmtDate("2026-09-01")} · passed`);
+    expect(cutOff).toHaveAttribute("data-warn", "true");
     expect(card.textContent).not.toMatch(/round|PO window/i);
-    expect(within(card).getByRole("button", { name: "SO Batch Purchase" })).toHaveAttribute("aria-current", "page");
-    expect(within(card).getByRole("button", { name: "Info" })).toBeInTheDocument();
-    expect(within(card).getByRole("button", { name: "Sales Order" })).toBeInTheDocument();
+    expect(within(card).getAllByRole("tab").slice(0, 4).map((tab) => tab.textContent)).toEqual(["Steps", "Route", "History", "Files 4"]);
+    expect(within(card).getByRole("tab", { name: "Steps" })).toHaveAttribute("aria-selected", "true");
+    expect(within(card).getByTestId("task-sales-orders-toggle")).toHaveTextContent("2 Sales Orders");
     expect(within(card).getByText("Select all · 2 of 2 ticked")).toBeInTheDocument();
     expect(within(card).getByRole("button", { name: "Download PDFs (2)" })).toBeEnabled();
     expect(within(card).getByRole("button", { name: "Open WhatsApp group" })).toBeEnabled();
@@ -261,19 +264,19 @@ describe("BatchPanel — opened by window key from any page", () => {
     expect(fake.emailPosts).toBe(1);
   });
 
-  it("Email: an unknown or failed outcome keeps who sent it and when on the Timeline", async () => {
+  it("Email: an unknown or failed outcome keeps who sent it and when in History", async () => {
     for (const outcome of ["unknown", "failed"] as const) {
       cleanup(); sessionStorage.clear(); fake.attempts = []; fake.email = outcome;
       mount();
       await loaded();
       fireEvent.mouseDown(within(panel()).getByRole("tab", { name: "Email" }));
       fireEvent.click(await within(panel()).findByTestId("batch-send-email"));
-      fireEvent.click(await within(panel()).findByRole("button", { name: "Show timeline" }));
+      fireEvent.mouseDown(within(panel()).getByRole("tab", { name: "History" }));
       const event = await within(panel()).findByText("Email · Sending not confirmed");
       const item = event.closest("li")!;
-      expect(within(item).getByLabelText("Recorded by Shasha")).toBeInTheDocument();
+      expect(item).toHaveTextContent("PO-260903-4585-V1 · PO-260903-7907-V1");
+      expect(item).toHaveTextContent("Shasha");
       expect(item.querySelector("time")?.getAttribute("datetime")).toBe("2026-10-05T06:12:00Z");
-      expect(item).toHaveTextContent("5 Oct · 2:12 PMPO-260903-4585-V1 · PO-260903-7907-V1");
     }
   });
 
@@ -298,19 +301,32 @@ describe("BatchPanel — opened by window key from any page", () => {
     expect(host.back).not.toHaveBeenCalled();
   });
 
-  it("Info states the task and the whole batch; Sales Order lists first", async () => {
+  it("the facts state the task and the whole batch; what finishes them is under the steps; Sales Order lists first", async () => {
     mount();
     await loaded();
-    fireEvent.click(within(panel()).getByRole("button", { name: "Info" }));
+    expect(within(panel()).getByTestId("batch-this-task")).toHaveTextContent("2 POs to Nice Future · 2 Sales Orders");
+    expect(within(panel()).getByTestId("batch-whole")).toHaveTextContent("2 POs · 1 supplier (Nice Future) · 0 SO still to buy");
     const info = within(panel()).getByTestId("batch-info");
-    expect(info).toHaveTextContent("2 POs to Nice Future · 2 Sales Orders");
-    expect(info).toHaveTextContent("2 POs · 1 supplier (Nice Future) · 0 SO still to buy");
     expect(info).toHaveTextContent("Both Nice Future POs are recorded as sent");
     expect(info).toHaveTextContent("Nothing is left to buy and every PO of every supplier is sent");
-    fireEvent.click(within(panel()).getByRole("button", { name: "Sales Order" }));
+    /* The Sales Orders stay closed until asked for. */
+    expect(within(panel()).queryByTestId("batch-so-list")).toBeNull();
+    fireEvent.click(within(panel()).getByTestId("task-sales-orders-toggle"));
     expect(within(panel()).getByTestId("batch-so-list")).toHaveTextContent("2 Sales Orders on these POs");
     fireEvent.click(within(panel()).getAllByRole("button", { name: /^Open SO-/ })[0]!);
     expect(within(panel()).getByTestId("embedded")).toHaveTextContent("o1");
+  });
+
+  it("Files: the batch's Sales Orders and this supplier's POs, staged; nothing is read until asked", async () => {
+    mount();
+    await loaded();
+    const reads = api.mock.calls.length;
+    fireEvent.mouseDown(within(panel()).getByRole("tab", { name: "Files 4" }));
+    const files = within(panel()).getByTestId("task-files");
+    expect(within(files).getByTestId("task-files-stage-sales-order")).toHaveTextContent("Sales Order2 Sales Orders");
+    expect(within(within(files).getByTestId("task-files-stage-purchase-order")).getAllByRole("button", { name: /^View / }).map((b) => b.getAttribute("aria-label")))
+      .toEqual(["View PO-260903-4585-V1.pdf", "View PO-260903-7907-V1.pdf"]);
+    expect(api.mock.calls.length).toBe(reads);
   });
 
   it("a batch with two suppliers names both and sends one supplier at a time", async () => {

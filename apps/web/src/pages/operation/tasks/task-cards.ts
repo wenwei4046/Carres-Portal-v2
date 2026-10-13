@@ -62,6 +62,9 @@ export const TASK_CARD_WORDS = {
   position: (at: number, of: number) => `${at} of ${of}`,
   previousTask: "Previous task",
   nextTask: "Next task",
+  /* The toast after a task closes (01 §3). */
+  next: (party: string) => `Next: ${party}`,
+  closeMessage: "Close message",
 } as const;
 
 const W = TASK_CARD_WORDS;

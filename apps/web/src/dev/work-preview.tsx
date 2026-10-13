@@ -14,7 +14,8 @@
  */
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import OperationApp from "@/pages/operation/OperationApp";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { OperationWorkItem, OperationWorkModule, OperationWorkResponse } from "@carres/shared";
 import { addWorkingDays, myHolidaySet } from "@carres/shared";
@@ -431,21 +432,38 @@ globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   return realFetch(input, init);
 };
 
-useAuth.setState({ role: "operation", user: { id: ME, email: "sha@carres.co" } as never });
+/* `?shell=1` mounts the REAL shell over the same seeded reads, so the Tasks
+   panel's one task view (its Route tab reads the Order Route's own sources)
+   can be walked and measured with shaped answers. */
+const shell = new URLSearchParams(window.location.search).get("shell") === "1";
+useAuth.setState({
+  role: "operation", hydrated: true, loading: false,
+  user: { id: ME, email: "sha@carres.co" } as never,
+  ...(shell ? { session: { access_token: "preview", user: { id: ME, email: "sha@carres.co" } } as never } : {}),
+});
+if (shell) {
+  try { window.localStorage.setItem(`carres.pendingWork.shownOn.${ME}`, REAL_TODAY); } catch { /* a private window: the reminder shows */ }
+}
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 const start = new URLSearchParams(window.location.search).get("at")
-  ?? "/operation?tab=work&day=missed&selected=delivery%3ASO-1362%3Aconfirm_delivery_date";
+  ?? (shell ? "/operation?tab=purchase" : "/operation?tab=work&day=missed&selected=delivery%3ASO-1362%3Aconfirm_delivery_date");
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[start]}>
-        <PreviewFrame label="Work shell and middle cards (illustrative data)">
-          <div className="flex h-full flex-col">
-            <OperationWork />
-          </div>
-        </PreviewFrame>
+        {shell ? (
+          <Routes>
+            <Route path="/operation/*" element={<OperationApp />} />
+          </Routes>
+        ) : (
+          <PreviewFrame label="Work shell and middle cards (illustrative data)">
+            <div className="flex h-full flex-col">
+              <OperationWork />
+            </div>
+          </PreviewFrame>
+        )}
       </MemoryRouter>
     </QueryClientProvider>
   </StrictMode>,

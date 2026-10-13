@@ -11,20 +11,10 @@
  * This file only draws. What is listed, counted and worded is `task-cards.ts`.
  */
 import { useState } from "react";
-import type { OperationWorkModule } from "@carres/shared";
 import MIcon from "@/components/carres/MIcon";
 import Tabs from "@/components/kit/Tabs";
 import { TASK_CARD_WORDS as W, TASK_TABS, emptyWord, type TaskCard, type TaskGroup, type TaskStrip, type TaskTab } from "./task-cards";
-
-/** The module's icon, as the side menu draws it. */
-export const TASK_MODULE_SYMBOL: Record<OperationWorkModule, string> = {
-  orders: "receipt_long",
-  purchasing: "shopping_cart",
-  receiving: "warehouse",
-  payment: "payments",
-  delivery: "local_shipping",
-  issue_tracker: "assignment_late",
-};
+import { TASK_MODULE_SYMBOL } from "./tasks-model";
 
 function Card({ card, selected, onOpen }: { card: TaskCard; selected: boolean; onOpen: (card: TaskCard) => void }) {
   const body = (

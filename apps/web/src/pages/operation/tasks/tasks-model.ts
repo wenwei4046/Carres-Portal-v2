@@ -20,6 +20,16 @@ export const TASK_MODULE_WORD: Record<OperationWorkModule, string> = {
   issue_tracker: "Issue Tracker",
 };
 
+/** The module's icon, as the side menu draws it (Material Symbols). */
+export const TASK_MODULE_SYMBOL: Record<OperationWorkModule, string> = {
+  orders: "receipt_long",
+  purchasing: "shopping_cart",
+  receiving: "warehouse",
+  payment: "payments",
+  delivery: "local_shipping",
+  issue_tracker: "assignment_late",
+};
+
 /** Words of the panel's frame and its rows. */
 export const TASKS_WORDS = {
   title: "Tasks",

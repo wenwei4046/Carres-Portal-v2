@@ -650,19 +650,49 @@ PAYMENT     the customer-facing 50/50 composition is used only while editing a c
 
 ---
 
-# §5 · The Tasks panel (right) — owner rulings 2026-10-08 · BUILT ON BRANCH, NOT DEPLOYED
+# §5 · The Tasks panel (right) — owner rulings 2026-10-08
 
-**The list — owner 12 Oct 2026 (03 §8), round 3 brief of 13 Oct 2026 (point 2) · BUILT ON BRANCH `build/tasks-panel-kit`, NOT
-DEPLOYED.** Title row 36 with no line under it. The day strip of the working week; a day's number is its `To do`,
-amber when that day holds late work; the chosen day is filled in the selection colour. `To do` · `Waiting` · `Done` as
-the segmented control, each with its number. Then one white group per party (name, count, a fold), and in it one card
-per task on the ground colour: module icon, title, ›, then one row per fact, label left and value right. The whole
-card opens the task; amber is only on the row that has passed. `To do` on today is what is due today or earlier and
-what has no working date; another day shows only its own work. `Waiting` is every task a request was recorded for
-whose answer is not due yet; `Done` is what the person finished on the chosen day. All three read the ONE Work read
-(`lifecycle` and `completed`); nothing is counted twice and no second engine exists. The module filter icons, the
-`Late` and `No date` sections and the day badge of the earlier panel are removed. **Not built yet:** the one task
-view (`Steps` · `Route` · `History` · `Files` · notes), `@` notes and `Mention`, `+ Task`, the dark toast.
+**The list and the one task view — owner 12 Oct 2026 (03 §8), round 3 brief of 13 Oct 2026 (point 2) · BUILT 13 Oct 2026;
+deployment and the production check are recorded in this PR's closing note, not assumed here.** Title row 36 with no
+line under it. The day strip of the working week; a day's number is its `To do`, amber when that day holds late work;
+the chosen day is filled in the selection colour. `To do` · `Waiting` · `Done` as the segmented control, each with its
+number. Then one white group per party (name, count, a fold), and in it one card per task on the ground colour: module
+icon, title, ›, then one row per fact, label left and value right. The whole card opens the task; amber is only on the
+row that has passed. `To do` on today is what is due today or earlier and what has no working date; another day shows
+only its own work. `Waiting` is every task a request was recorded for whose answer is not due yet; `Done` is what the
+person finished on the chosen day. All three read the ONE Work read (`lifecycle` and `completed`); nothing is counted
+twice and no second engine exists. The module filter icons, the `Late` and `No date` sections and the day badge of the
+earlier panel are removed.
+
+A card opens **the one task view** (kit `TaskView`, 02; composition in 03 §8). The Tasks area supplies the task (the
+list card's own title and facts, `TaskOpenContext`); the owning module's panel supplies its steps and what only it
+knows through `TaskFrame`: extra facts, the Sales Orders the task serves, what was recorded and its documents. No
+module draws its own card inside Tasks any more: `BatchPanel`, `SupplierAnswerTaskPanel`, the PO Duty panel and the
+act panel all render through `TaskFrame`, and `CompactModuleCard` stays for module pages and embedded Sales Orders.
+What each tab reads: `Route` the one Order Route model (`useMissionRoute`, the Work page's own); `History` the Work
+record's request and answer day plus the owning module's records (a PO's `sends` and supplier answers); `Files` the
+owning module's existing print doors, rendered on demand. A tab that cannot be read says so in one line and never
+takes the task's steps down with it. Goods of a PO are drawn as wrapping lines (`PoTaskGoods`), so nothing is cut at
+320. A form wider than the panel is never squeezed into it to scroll sideways: `Record supplier answer` (a line table
+900 wide) opens on the host's full surface (`WorkPanelHost.openReview` with `TaskWideSurface`, the door Issue PO's
+review already uses), titled with the act, the supplier and the PO; the form's own `Cancel` and saving button are the
+only ways out, and the task stays mounted underneath. After a task is saved the app's dark toast says the module's own words for 12 seconds with ✕, and
+`Next: {party} ›` when another task of the same kind waits in the list's order; nothing opens by itself, and no
+`Undo` is offered (owner 12 Oct 2026 evening). The green result line of the earlier panel is removed.
+
+**Measured (13 Oct 2026, fixture previews, `pnpm kit:check` · `e2e-kit/kit-tasks.spec.ts`):** `carres-check.js`
+answers PASS at 1025, 1164 and 1440 with the list, with a task open and on each of its four tabs; the panel is 320
+below 1280 and the title row 36; nothing passes the panel's edge and no value is cut. The supplier answer form on
+the full surface has no side scroll at the three widths (its table is 951 to 1066 wide there; inside the panel it
+scrolled 576 to 628 sideways). At 1025 with the panel open the
+list behind it is narrower than its columns' minimums, so the table scrolls sideways inside its own scroller with the
+first column fixed (01 §5), as the package's own page does; the kit lists' scroller carries `data-list-scroll`, the
+mark the package's check reads, and `e2e-kit/kit-lists.spec.ts` still measures that each list FITS wherever it must.
+
+**Not built, waiting for the owner:** `+ Task` (a task a person adds by hand and may give to another person conflicts
+with ACTION-FLOW-STANDARD "Staff never create an action"; asked 13 Oct 2026) and with it `@` notes and `Mention`, which
+need the same new records. `Undo` for 15 minutes with `Correct` after it (the package's Ops Rules §8) reverses stock
+moves, tasks and approvals across modules and is a plan of its own, not a toast change.
 
 **Current supplied shell target — owner 9 Oct 2026, kept in v12 of 11 Oct.** Task card and open-card composition: 03 §8. A collapsible Tasks region (01 §4)
 is opened by the labelled Tasks/count control; Summary collapses independently. Do not add the old

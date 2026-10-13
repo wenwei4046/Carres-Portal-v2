@@ -10,9 +10,15 @@
  * (`issue-batch` via the approved 50/50 review, `confirm-sent`, `supplier-email`)
  * by the shared send operations — nothing new is computed in the browser.
  *
- *   Header      the supplier (one, two by name, or `{first} and {k} more`) ·
- *               `{time} · {date}` · `Missed`. Never `round` or `PO window`.
- *   Tabs        Info · SO Batch Purchase (opens first) · Sales Order.
+ *   Frame       the ONE task view (`TaskFrame`, owner's round 3 brief of
+ *               13 Oct 2026). Outside the Tasks area the head names the
+ *               supplier (one, two by name, or `{first} and {k} more`) and
+ *               `{time} · {date}`. Never `round` or `PO window`.
+ *   Facts       `This task` · `Whole batch` · `Sales Order` (opens the list,
+ *               then one Sales Order).
+ *   Steps       the supplier's lines to buy and POs to send, then what
+ *               finishes the task and the batch.
+ *   History     this batch's send record. Files: its Sales Orders and POs.
  *   Done        every PO of the batch has `PO sent to supplier` for its
  *               current version and nothing is left to buy (§5.6.1): the
  *               host's `result` takes the success words and returns to the
@@ -35,7 +41,6 @@ import {
   type SoBatchOrderRow,
   type SoBatchPurchaseResponse,
 } from "@carres/shared";
-import CompactModuleCard, { type CardModule, type CardTimelineEvent } from "@/components/kit/CompactModuleCard";
 import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
 import Icon from "@/components/kit/Icon";
@@ -55,6 +60,10 @@ import { preparePoBundle, zipPoBundle } from "@/lib/purchasing/po-bundle";
 import { CHANNEL_WORD, confirmedSendFor, doorsForIssuedPo, refreshPurchasingReads, type IssuedPo, type PoSendEvidence } from "../components/PoIssueEvidence";
 import EmbeddedSalesOrders from "../components/EmbeddedSalesOrders";
 import SoBatchIssueWorkspace from "./SoBatchIssueWorkspace";
+import TaskFrame from "../tasks/TaskFrame";
+import { TASK_CARD_WORDS } from "../tasks/task-cards";
+import { purchasingFileStages } from "../tasks/task-files";
+import type { TaskHistoryEvent } from "../tasks/task-view";
 import type { WorkPanelHost } from "../tasks/tasks-host";
 import { partiesWord } from "../tasks/tasks-model";
 import {
@@ -318,9 +327,9 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
   const pickedEmailAttempts = attempts.filter((attempt) => attempt.documents.some((document) => rows.some((fact) => fact.po.id === document.id && fact.document?.version === document.version)));
   const unknown = pickedEmailAttempts.some((attempt) => attempt.status === "unknown");
   const missing = pickedEmailAttempts.filter((attempt) => attempt.status === "dispatched" && attempt.documents.some((document) => !document.recorded));
-  /* An unknown or failed Email names who sent it and when (Timeline). Only a
+  /* An unknown or failed Email names who sent it and when (History). Only a
      recorded actor and time are shown; without them the attempt stays off. */
-  const emailEvents: CardTimelineEvent[] = (() => {
+  const emailEvents: TaskHistoryEvent[] = (() => {
     const byId = new Map<string, { id: string; actorName?: string; at?: string; documents: EmailAttempt["documents"] }>();
     for (const attempt of pickedEmailAttempts) if (attempt.status === "unknown") byId.set(attempt.id, attempt);
     for (const attempt of rows.flatMap((fact) => fact.failedRecords ?? [])) {
@@ -328,11 +337,17 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
       byId.set(attempt.id, { ...attempt, documents: [...(known?.documents ?? []), ...attempt.documents].filter((d, i, all) => all.findIndex((x) => x.id === d.id) === i) });
     }
     return [...byId.values()].filter((attempt) => attempt.actorName && attempt.at).map((attempt) => ({
-      id: `email-${attempt.id}`, actorName: attempt.actorName!, actorInitial: attempt.actorName!.slice(0, 1).toUpperCase(),
-      summary: "Email · Sending not confirmed", at: attempt.at,
-      result: attempt.documents.map((d) => documentDisplayNumber(`${d.id}-V${d.version}`)).join(" · "),
+      key: `email-${attempt.id}`, at: attempt.at!, text: "Email · Sending not confirmed", by: attempt.actorName!,
+      detail: attempt.documents.map((d) => documentDisplayNumber(`${d.id}-V${d.version}`)).join(" · "),
     }));
   })();
+  /* What left Carres for this supplier's POs of the batch, as History prints it. */
+  const sendEvents: TaskHistoryEvent[] = rows.flatMap((fact) => fact.sends.map((send, index) => ({
+    key: `send-${fact.po.id}-${index}`, at: send.sent_at,
+    text: send.kind === "confirmed_sent" ? "PO sent to supplier" : `${CHANNEL_WORD[send.channel] ?? send.channel} opened`,
+    detail: [documentDisplayNumber(`${fact.po.id}${send.po_version ? `-V${send.po_version}` : ""}`), send.kind === "confirmed_sent" ? CHANNEL_WORD[send.channel] ?? send.channel : null].filter(Boolean).join(" · "),
+    by: send.sent_by_name ?? null,
+  })));
 
   async function download() {
     if (!tickedReady.length || !contact) return;
@@ -428,7 +443,7 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
   const parsed = parsePoWindowKey(windowKey);
   /* The date through the one date home (COPY-STANDARD): the year only when it is not this year. */
   const reference = parsed ? `${poWindowTimeWord(parsed.time)} · ${fmtDate(parsed.date)}` : windowKey;
-  const status = item.timingBucket === "overdue" ? R.missed : undefined;
+  const late = item.timingBucket === "overdue";
 
   /* ── SO Batch Purchase ── */
   const statusLine = lines.length > 0 && rows.length === 0 ? T.nothingIssued
@@ -548,11 +563,11 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
   );
 
   const purchaseContent = batch.isPending || full.isPending || (pos.length > 0 && (facts.isPending || (facts.isPlaceholderData && rows.length !== pos.length)))
-    ? <p role="status" className="px-3 py-3 text-body text-kit-slate-11">Loading…</p>
+    ? <p role="status" className="text-body text-kit-slate-11">Loading…</p>
     : batch.isError || facts.isError
-      ? <div role="alert" className="flex items-center gap-2 px-3 py-3 text-body text-kit-slate-11"><span>Could not be loaded</span>
+      ? <div role="alert" className="flex items-center gap-2 text-body text-kit-slate-11"><span>Could not be loaded</span>
           <Button size="sm" onClick={() => { void batch.refetch(); void facts.refetch(); }}>Try again</Button></div>
-      : <div className="flex flex-col gap-3 px-3 py-3" data-testid={`batch-panel-purchase-${item.id}`}>
+      : <div className="flex flex-col gap-3" data-testid={`batch-panel-purchase-${item.id}`}>
           {/* One supplier's send at a time: a message and an email go to one party. */}
           {suppliers.length > 1 && <Select id={`batch-supplier-${item.id}`} label="Supplier" value={supplierId ?? ""}
             onValueChange={(value) => { setSupplierPick(value); setUnticked(new Set()); setBuyUnticked(new Set()); setError(null); setNotice(null); }}
@@ -580,26 +595,24 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
   /* "This task" is what the row says: the POs still to send (the row's
      `Send {n} POs`), never every PO the window ever issued. */
   const toSendInWindow = windowPos.filter((po) => !po.sentCurrentVersion).length;
-  const infoRows: Array<[string, string]> = [
-    [T.thisTask, `${toSendInWindow ? T.posToSupplier(toSendInWindow, parties) : T.itemsToBuy(windowLines.reduce((sum, row) => sum + (row.toBuy ?? 0), 0))} · ${T.salesOrders(orderIds.length)}`],
-    [T.wholeBatch, T.wholeBatchLine(batchPoCount, batchSuppliers, batchToBuy)],
-    [T.thisTaskDoneWhen, toSendInWindow ? T.taskDoneRule(toSendInWindow, parties) : T.taskDoneIssueRule(parties)],
-    [T.batchDoneWhen, T.batchDoneRule],
-  ];
-  const infoContent = <dl className="flex flex-col px-3 py-2" data-testid="batch-info">
-    {infoRows.map(([label, value]) => <div key={label} className="flex flex-col gap-0.5 border-t border-kit-slate-5 py-2 first:border-t-0">
-      <dt className="text-meta text-kit-slate-11">{label}</dt><dd className="text-strong text-kit-slate-12">{value}</dd>
-    </div>)}
+  const thisTask = `${toSendInWindow ? T.posToSupplier(toSendInWindow, parties) : T.itemsToBuy(windowLines.reduce((sum, row) => sum + (row.toBuy ?? 0), 0))} · ${T.salesOrders(orderIds.length)}`;
+  /* What finishes the task and the batch, under the work it describes. */
+  const doneWhen = <dl className="m-0 flex flex-col gap-1.5 border-t border-c-row-line pt-2.5" data-testid="batch-info">
+    {([[T.thisTaskDoneWhen, toSendInWindow ? T.taskDoneRule(toSendInWindow, parties) : T.taskDoneIssueRule(parties)], [T.batchDoneWhen, T.batchDoneRule]] as const).map(([label, value]) => (
+      <div key={label} className="flex flex-col">
+        <dt className="text-meta text-c-secondary">{label}</dt><dd className="m-0 text-meta text-c-ink">{value}</dd>
+      </div>
+    ))}
   </dl>;
 
   /* ── Sales Order: a list first, then one (shared EmbeddedSalesOrders) ── */
   const [soPick, setSoPick] = useState<string | null>(null);
   const salesContent = orderIds.length === 1 || soPick
-    ? <div className="flex flex-col gap-2 px-3 py-3">
+    ? <div className="flex flex-col gap-2">
         {orderIds.length > 1 && <span><Button variant="ghost" size="sm" icon="back" onClick={() => setSoPick(null)}>{R.allSalesOrders}</Button></span>}
         <EmbeddedSalesOrders orderIds={[soPick ?? orderIds[0]!.orderId]} />
       </div>
-    : <div className="flex flex-col gap-1 px-3 py-3" data-testid="batch-so-list">
+    : <div className="flex flex-col gap-1" data-testid="batch-so-list">
         <span className="text-strong">{T.sosOnPos(orderIds.length)}</span>
         <span className="text-meta text-kit-slate-11">{T.pickOne}</span>
         <DocumentTable label="Sales Orders" columns={[{ key: "so", label: "SO No" }, { key: "customer", label: "Customer" }]}
@@ -607,18 +620,29 @@ export function BatchPanel({ item, windowKey, host }: { item: BatchPanelItem; wi
             cells: { so: order.so == null ? "Not recorded" : `SO-${order.so}`, customer: order.customer ?? "Not recorded" } }))} />
       </div>;
 
-  const modules: CardModule[] = [
-    { key: "info", label: R.info, communication: null, content: infoContent },
-    { key: "purchasing", label: R.purchasing, communication: null, content: purchaseContent },
-    /* The contract shows `Sales Order` only when one is linked; loading never reads as none. */
-    ...(batch.isPending ? [{ key: "sales", label: R.salesOrder, communication: null, content: <p role="status" className="px-3 py-3 text-body text-kit-slate-11">Loading…</p> }]
-      : orderIds.length ? [{ key: "sales", label: R.salesOrder, communication: null, content: salesContent }] : []),
-  ];
+  /* The Sales Orders with a number are the ones a Route and a file can name. */
+  const taskOrders = orderIds.flatMap((order) => (order.so == null ? [] : [{ orderId: order.orderId, label: `SO-${order.so}` }]));
+  const taskPos = rows.map((fact) => ({
+    id: fact.po.id, document: fact.document,
+    label: fact.document ? documentDisplayNumber(`${fact.document.po_number}-V${fact.document.version}`) : documentDisplayNumber(fact.po.id),
+  }));
 
-  return <div data-testid={`batch-panel-${item.id}`}>
-    <CompactModuleCard name={parties} reference={reference} referenceStatus={status}
-      closeLabel="Close task" onClose={host.close} modulesLabel="SO Batch Purchase" initialModule="purchasing" modules={modules}
-      timeline={emailEvents.length ? emailEvents : undefined} />
+  return <div className="p-3" data-testid={`batch-panel-${item.id}`}>
+    <TaskFrame
+      head={{ title: parties, page: R.purchasing, record: null, moduleIcon: "shopping_cart",
+        facts: [{ key: "cut-off", icon: "schedule", label: TASK_CARD_WORDS.cutOff, warn: late,
+          value: late ? `${reference} · ${TASK_CARD_WORDS.passed}` : reference }] }}
+      facts={[
+        { key: "this-task", icon: "task_alt", label: T.thisTask, value: <span data-testid="batch-this-task">{thisTask}</span> },
+        { key: "whole-batch", icon: "inventory_2", label: T.wholeBatch, value: <span data-testid="batch-whole">{T.wholeBatchLine(batchPoCount, batchSuppliers, batchToBuy)}</span> },
+      ]}
+      orders={taskOrders}
+      /* The contract opens `Sales Order` only when one is linked; loading never reads as none. */
+      salesOrders={batch.isPending ? <p role="status" className="text-body text-kit-slate-11">Loading…</p> : orderIds.length ? salesContent : undefined}
+      history={[...sendEvents, ...emailEvents]}
+      files={purchasingFileStages(taskOrders, taskPos)}
+      steps={<div className="flex flex-col gap-3">{purchaseContent}{doneWhen}</div>}
+    />
     <Modal open={confirming} onOpenChange={setConfirming} title={T.confirmTitle}
       footer={<><Button onClick={() => setConfirming(false)}>Cancel</Button>
         <Button variant="primary" loading={busy} disabled={!tickedReady.length} data-testid="batch-record-confirm" onClick={() => void recordWhatsApp()}>{T.recordN(tickedReady.length)}</Button></>}>

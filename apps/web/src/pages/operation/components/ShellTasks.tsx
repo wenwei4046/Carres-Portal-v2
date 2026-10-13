@@ -10,8 +10,8 @@
  *
  * A 320px white card on the canvas. `›` hides it; the shell header then shows
  * a `Tasks 5` pill that opens it again. The choice is remembered per browser.
- * While a task's own work panel is open the card widens, because a module's
- * form does not fit 320px.
+ * With a task open the card stays 320 below 1280 wide, so a task takes no
+ * room from the list (03 §8); from 1280 it may use the spare width.
  */
 import { useEffect } from "react";
 import { create } from "zustand";
@@ -113,7 +113,9 @@ export default function ShellTasks() {
       aria-label="Tasks"
       data-testid="shell-tasks"
       className={`flex min-h-0 shrink-0 flex-col overflow-hidden rounded-lg border border-c-border bg-white ${
-        taskOpen ? "w-[clamp(366px,32vw,560px)]" : "w-[320px]"
+        /* 320 always (01 §2), so opening a task never takes room from the
+           list. On a wide screen the opened task may use the spare width. */
+        taskOpen ? "w-[320px] min-[1280px]:w-[clamp(366px,32vw,560px)]" : "w-[320px]"
       }`}
     >
       <div className="flex h-9 shrink-0 items-center gap-1.5 px-3.5">

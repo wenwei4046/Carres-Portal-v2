@@ -3479,6 +3479,11 @@ function DataGridInner<T>({
         }}
         className={`${styles.scroll} ${embedded ? styles.scrollEmbedded : ""}`}
         data-testid={isReference ? "grid-scroll" : undefined}
+        /* The kit list's own scroller (01 §5): when the middle is narrower than
+           the columns' minimums, the whole table scrolls sideways here with its
+           first column fixed, and nothing is cut. `carres-check.js` reads this
+           mark; `e2e-kit` still measures that the list FITS wherever it must. */
+        data-list-scroll={isReference ? "" : undefined}
       >
         {renderResults && !isLoading && errorState == null && sortedRows.length > 0
           ? groupLocalHeaders

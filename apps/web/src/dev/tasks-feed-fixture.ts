@@ -52,11 +52,12 @@ const SEEDS: Seed[] = [
 
 function item(seed: Seed, index: number, me: { id: string; name: string }, today: string): OperationWorkItem {
   const actionOn = seed.day === null ? null : workingDay(today, seed.day);
-  const id = `test-${index + 1}`;
+  /* A Purchase Order is its own number; a Sales Order is an order id. */
+  const id = seed.kind === "purchase_order" ? seed.label : `test-${index + 1}`;
   const destination = seed.module === "purchasing" ? `/operation/procurement?po=${seed.label}` : `/operation/orders/so/${id}`;
   return {
     contractVersion: 2,
-    id: `${seed.module}:${id}:${seed.ruleKey}`,
+    id: `${seed.module}:test-${index + 1}:${seed.ruleKey}`,
     module: seed.module,
     ruleKey: seed.ruleKey,
     ruleVersion: 1,
@@ -131,4 +132,48 @@ export function testTasksFeed(me: { id: string; name: string; email: string }): 
       done(2, "delivery", "issue_delivery_order", "SO-9099", 1),
     ],
   } as OperationWorkResponse;
+}
+
+/* ── The Purchase Order behind a TEST task, as `/api/operation/pos` answers
+   it for one PO: enough for the task's steps, History and Files. ─────────── */
+
+const TEST_SUPPLIERS = [
+  { id: "00000000-0000-4000-8000-00000000a001", name: "TEST Supplier A", whatsapp_group_url: "https://chat.whatsapp.com/TEST-GROUP-A" },
+  { id: "00000000-0000-4000-8000-00000000a002", name: "TEST Supplier B", whatsapp_group_url: null },
+];
+
+/** `/api/operation/suppliers` for the previews. */
+export function testTaskSuppliers() {
+  return { suppliers: TEST_SUPPLIERS.map((supplier) => ({ ...supplier, kind: "own_logistics", cat_covered: [], lead_time: null })) };
+}
+
+/** `/api/operation/pos?poId=…` for one TEST Purchase Order. */
+export function testTaskPo(poId: string) {
+  const today = appTodayIso();
+  const seed = SEEDS.find((candidate) => candidate.label === poId);
+  const supplier = seed?.recipient === "TEST Supplier B" ? TEST_SUPPLIERS[1]! : TEST_SUPPLIERS[0]!;
+  const sentOn = workingDay(today, -6);
+  return {
+    pos: [{
+      id: poId, supplier_id: supplier.id, version: 2, status: "sent",
+      official_delivery_date: workingDay(today, seed?.day ?? 0), eta_date: workingDay(today, seed?.day ?? 0),
+      destination_id: "w1", warehouse_id: "w1",
+      purchase_order_lines: [
+        { id: `${poId}-1`, sku: "TEST-MAT-Q", model_name: "TEST Mattress", size: "Queen", qty: 6, received_qty: 2 },
+        { id: `${poId}-2`, sku: "TEST-BF-K", model_name: "TEST Bedframe", size: "King", qty: 3, received_qty: 0 },
+      ],
+      sources: [
+        { kind: "sales_order", reference: "SO-9101", order_id: "00000000-0000-4000-8000-000000009101" },
+        { kind: "sales_order", reference: "SO-9102", order_id: "00000000-0000-4000-8000-000000009102" },
+      ],
+      sends: [
+        { channel: "whatsapp", note: null, sent_at: `${sentOn}T02:10:00.000Z`, kind: "external_open", recipient: null, po_version: 2, sent_by_name: "TEST · Staff A", po_revisions: null },
+        { channel: "whatsapp", note: null, sent_at: `${sentOn}T02:14:00.000Z`, kind: "confirmed_sent", recipient: "TEST group", po_version: 2, sent_by_name: "TEST · Staff A", po_revisions: null },
+      ],
+      promises: [],
+      do_number: null, do_file_path: null, do_uploaded_at: null,
+    }],
+    destinations: [{ id: "w1", name: "Carres Klang" }],
+    referencedDestinations: [],
+  };
 }

@@ -31,6 +31,7 @@ import Badge from "@/components/kit/Badge";
 import Block from "@/components/kit/Block";
 import ChecklistRow from "@/components/kit/ChecklistRow";
 import StepList, { Step } from "@/components/kit/StepList";
+import TaskView from "@/components/kit/TaskView";
 import QuietRouteRow from "@/components/kit/QuietRouteRow";
 import RouteStop from "@/components/kit/RouteStop";
 import Button from "@/components/kit/Button";
@@ -1015,6 +1016,42 @@ export default function UiShowcase() {
                 </Step>
               </StepList>
             </Block>
+          </div>
+        </Section>
+
+        <Section
+          id="task-view"
+          title="TaskView — the one task view"
+          note="What every opened task looks like: the task, its page and record with the owner's initials, one row per fact (amber only on the one that has gone by), then the tabs. The first tab is the module's own work and stays mounted; the others are drawn when opened. The view reads nothing and writes nothing."
+        >
+          <div className="max-w-[320px]">
+            <TaskView
+              title="{The task, as its list card says it}"
+              moduleIcon="shopping_cart"
+              page="{Page}"
+              record="{Record}"
+              openRecordLabel="Open {Record}"
+              onOpenRecord={() => {}}
+              owner="{Owner Name}"
+              tabsLabel="Task sections"
+              facts={[
+                { key: "deadline", icon: "event", label: "Deadline", value: "{date · n days late}", warn: true },
+                { key: "contact", icon: "forum", label: "Contact", value: "{party · channel}" },
+                { key: "record-fact", icon: "local_shipping", label: "{Fact}", value: "{value}" },
+              ]}
+              tabs={[
+                { key: "steps", label: "Steps", content: (
+                  <StepList aria-label="{Job}">
+                    <Step n={1} state="current" title="{What to record}" sub="{Finish when: …}">
+                      <div><Button variant="primary" size="sm">{"{The one act}"}</Button></div>
+                    </Step>
+                  </StepList>
+                ) },
+                { key: "route", label: "Route", content: <p className="text-body text-c-secondary">{"{The Order Route of the Sales Order behind the task}"}</p> },
+                { key: "history", label: "History", content: <p className="text-body text-c-secondary">{"{What was recorded, newest first}"}</p> },
+                { key: "files", label: "Files 2", content: <p className="text-body text-c-secondary">{"{The task's documents, staged along the route}"}</p> },
+              ]}
+            />
           </div>
         </Section>
 

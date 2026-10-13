@@ -24,7 +24,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PurchaseDemandRow, ReadyStockResponse, SoBatchOrderRow, SoBatchPurchaseResponse } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
 import OperationApp from "@/pages/operation/OperationApp";
-import { testTasksFeed } from "./tasks-feed-fixture";
+import { testTaskPo, testTaskSuppliers, testTasksFeed } from "./tasks-feed-fixture";
 import { appTodayIso } from "@/lib/fmt-date";
 import "@/index.css";
 
@@ -152,6 +152,8 @@ function reserve(body: { orderId: string; picks: Array<{ itemId: string; orderLi
   return { reserved: body.picks.length, reference: `SO-${order?.so}`, units: body.picks };
 }
 
+const poOf = (url: string) => (url.includes("/api/operation/pos?") ? new URL(url).searchParams.get("poId") : null);
+
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input, init) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -161,7 +163,11 @@ window.fetch = async (input, init) => {
     : stock ? readyStockOf(decodeURIComponent(stock[1]!))
     : url.includes("/api/operation/purchase/demands") ? { ...payload, rows: rows.filter((row) => row.toBuy == null || row.toBuy > 0) }
     /* The shell's Tasks panel reads the one Work feed: TEST work for the preview person. */
-    : /\/api\/operation\/work(\?|$)/.test(url) ? testTasksFeed({ id: ME, name: "Yu Jun", email: "preview@carres.local" })
+    : /\/api\/operation\/work(\?|$)/.test(url) ? testTasksFeed({ id: ME, name: "TEST · Staff A", email: "preview@carres.local" })
+    /* An opened TEST task reads its Purchase Order and its supplier. */
+    : poOf(url) ? testTaskPo(poOf(url)!)
+    : url.includes("/api/operation/suppliers") ? testTaskSuppliers()
+    : url.includes("/api/operation/orders?") ? { orders: [] }
     : url.includes("/rest/") ? [] : {};
   return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
 };

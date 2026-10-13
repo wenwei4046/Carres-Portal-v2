@@ -11,16 +11,19 @@
  *        PO No                              PO-260926-4016
  *        Deadline                       Fri, 9 Oct · 4 days late   (amber)
  *
- * A card opens THAT module's own panel in the same area with `‹ All tasks`;
- * the left page never changes. The list stays mounted underneath, so its day,
- * tab and scroll are exactly where they were on return, and the module's own
- * success words show as one result line. Leaving a task with unsaved input
- * (‹ All tasks, ×, another rail door) asks `Leave without saving?`.
+ * A card opens the ONE task view in the same area with `‹ All tasks`: the
+ * task's own title and facts, then `Steps` (that module's own panel) ·
+ * `Route` · `History` · `Files` (`TaskFrame`). The left page never changes.
+ * The list stays mounted underneath, so its day, tab and scroll are exactly
+ * where they were on return. The module's own success words show in the dark
+ * toast, with `Next: {party}` when another task of the same kind waits.
+ * Leaving a task with unsaved input (‹ All tasks, ×, another rail door) asks
+ * `Leave without saving?`.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Check, ListTodo, X } from "lucide-react";
+import { ArrowLeft, ListTodo, X } from "lucide-react";
 import {
   poWindowWorkFromSoBatch,
   soBatchPurchaseResponseSchema,
@@ -31,14 +34,16 @@ import Icon from "@/components/kit/Icon";
 import MIcon from "@/components/carres/MIcon";
 import Modal from "@/components/kit/Modal";
 import Button from "@/components/kit/Button";
+import { notifyTaskSaved } from "@/components/kit/Toast";
 import { Z_DIALOG } from "@/components/kit/overlay-layer";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { qk, useOperationSuppliers } from "@/lib/queries";
 import { useOpenWorkSet, type WorkRow } from "../use-open-work";
 import { TASK_MODULE_WORD, TASKS_WORDS as T, myTasks, type PoWindowFacts } from "./tasks-model";
+import { TaskOpenContext } from "./TaskFrame";
 import TaskList from "./TaskList";
-import { TASK_CARD_WORDS, taskStrip, taskTabs, type TaskCard, type TaskTab } from "./task-cards";
+import { TASK_CARD_WORDS, taskCard, taskStrip, taskTabs, type TaskCard, type TaskTab } from "./task-cards";
 import { isSimulatedWalk, useTasksHost, type WorkPanelHost } from "./tasks-host";
 import { panelFor } from "./work-panels";
 
@@ -161,6 +166,13 @@ export default function TasksArea({ onClose, fill = false, bare = false }: {
       setResult(null);
     });
   };
+  /* The toast's `Next` outlives the render that made it. */
+  const openTaskRef = useRef(openTask);
+  openTaskRef.current = openTask;
+
+  /* The open work of the tab the task was opened from, in the list's order. */
+  const cardOrder = useMemo(() => (tabs ? tabs[tab].groups.flatMap((group) => group.cards.filter((card) => card.work)) : []), [tabs, tab]);
+  const taskOrder = useMemo(() => cardOrder.map((card) => card.work!), [cardOrder]);
 
   const host: WorkPanelHost = useMemo(() => ({
     close: () => guard(() => { closeTask(); onClose(); }),
@@ -168,18 +180,30 @@ export default function TasksArea({ onClose, fill = false, bare = false }: {
     result: (text, opts) => {
       if (!taskId) return;
       setDirty(false);
-      setResult({ text, taskId, stay: Boolean(opts?.stay) });
+      const stay = Boolean(opts?.stay);
+      setResult({ text, taskId, stay });
+      /* The app's dark toast says what was saved. When the task closes it
+         offers the next task of the same kind, in the list's own order: one
+         click, never an automatic jump (01 §3). */
+      const at = cardOrder.findIndex((card) => card.id === taskId);
+      const rule = cardOrder[at]?.work?.ruleKey;
+      const after = at < 0 ? [] : [...cardOrder.slice(at + 1), ...cardOrder.slice(0, at)];
+      const next = stay ? null : after.find((card) => card.work!.ruleKey === rule) ?? null;
+      notifyTaskSaved(text, {
+        closeLabel: TASK_CARD_WORDS.closeMessage,
+        next: next ? { label: TASK_CARD_WORDS.next(next.party), onOpen: () => openTaskRef.current(next.work!) } : null,
+      });
       /* Ask the ONE Work feed again now, so a closed act leaves the list
          without waiting for the next poll. */
       void queryClient.invalidateQueries({ queryKey: qk.operation.work() });
       /* A batch row is worded from the SO Batch read (to buy / to send), so
          an issued or sent PO changes that row's words too. */
       void queryClient.invalidateQueries({ queryKey: ["so-batch-purchase"] });
-      if (!opts?.stay) closeTask();
+      if (!stay) closeTask();
     },
     openReview: (render) => setReview(() => render),
     simulated,
-  }), [guard, onClose, closeTask, taskId, setDirty, simulated, queryClient]);
+  }), [guard, onClose, closeTask, taskId, setDirty, simulated, queryClient, cardOrder]);
 
   /* ── states ───────────────────────────────────────────────────────────── */
   const failedBanner = (error || refreshFailed || unhealthySources.length > 0) ? (
@@ -209,16 +233,6 @@ export default function TasksArea({ onClose, fill = false, bare = false }: {
     </div>
   );
 
-  const resultLine = result ? (
-    <div className="mx-3 mt-3 flex items-center gap-2 rounded-control bg-kit-green-3 px-3 py-2 text-meta text-kit-green-11" role="status" data-testid="tasks-result">
-      <Check size={14} aria-hidden className="shrink-0" />
-      <span className="min-w-0 flex-1">
-        <span className="font-semibold">{result.text.split(" · ")[0]}</span>
-        {result.text.includes(" · ") ? ` · ${result.text.split(" · ").slice(1).join(" · ")}` : ""}
-      </span>
-    </div>
-  ) : null;
-
   const listView = (
     <div className={`${task ? "hidden" : "flex"} min-h-0 flex-1 flex-col`} hidden={Boolean(task)} data-testid="tasks-list">
       <div className={`${bare ? "hidden" : "flex"} h-12 shrink-0 items-center gap-2 border-b border-kit-slate-4 px-3`}>
@@ -228,9 +242,6 @@ export default function TasksArea({ onClose, fill = false, bare = false }: {
           <X size={16} />
         </button>
       </div>
-      {/* ONE result line: inside the task while it stays open, here only
-          once the list is showing — never both. */}
-      {task ? null : resultLine}
       {failedBanner}
       {!hasData ? (error ? null : loadingList) : strip && tabs ? (
         <TaskList
@@ -245,9 +256,12 @@ export default function TasksArea({ onClose, fill = false, bare = false }: {
     </div>
   );
 
-  /* The open work of the tab the task was opened from, in the list's order. */
-  const taskOrder = useMemo(() => (tabs ? tabs[tab].groups.flatMap((group) => group.cards.flatMap((card) => (card.work ? [card.work] : []))) : []), [tabs, tab]);
   const taskAt = task ? taskOrder.findIndex((row) => row.id === task.id) + 1 : 0;
+  /* The opened task as its list card words it: one title, one set of facts. */
+  const opened = useMemo(() => (task ? {
+    row: task,
+    card: taskCard(task, task.source.object.kind === "po_window" ? windows.get(task.source.object.id) ?? null : null),
+  } : null), [task, windows]);
 
   const taskView = task ? (
     <div
@@ -280,8 +294,9 @@ export default function TasksArea({ onClose, fill = false, bare = false }: {
           </>
         ) : null}
       </div>
-      {result && result.taskId === task.id ? resultLine : null}
-      <div className="min-h-0 flex-1 overflow-y-auto">{panelFor(task, host)}</div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <TaskOpenContext.Provider value={opened}>{panelFor(task, host)}</TaskOpenContext.Provider>
+      </div>
     </div>
   ) : null;
 
