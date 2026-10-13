@@ -29,6 +29,13 @@
  * A row Finance may change opens its window on a click; the window sends the
  * account the screen showed (`was`), and a change someone made meanwhile is
  * refused rather than overwritten.
+ *
+ * WHEN EACH GROUP POSTS (Chew 2026-10-13, 「这个posting是怎样触发？」): every
+ * group's title says the moment its postings are made, and a row is matched by
+ * its fixed code (an add-on's key, a role), never by the words shown. Two
+ * columns: the posting and its account; a posting that was changed says when
+ * and by whom on a grey line under its account. Every change is listed under
+ * the table.
  */
 import { useMemo, useState } from "react";
 import type { LedgerIncomePosting, LedgerPostingChange, LedgerRolePosting } from "@carres/shared";
@@ -40,6 +47,7 @@ import Select from "@/components/kit/Select";
 import { FieldError } from "@/components/kit/FieldFrame";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
+import TwoLineCell from "@/components/register/TwoLineCell";
 import { methodLabel, usePaymentMethodRegistry } from "@/lib/payment-methods";
 import { fmtDate } from "@/lib/fmt-date";
 import { useLedgerChart } from "../ledger/ledger-queries";
@@ -47,12 +55,13 @@ import { LoadFailed } from "../other-money-in/parts";
 import { usePostingAccounts, useSetPostingAccount } from "./api";
 
 // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0657).
+// Chew 2026-10-13: each title says when its postings are made.
 export const POSTING_GROUPS = [
-  { key: "sales", label: "Sales" },
-  { key: "costs", label: "Purchases and charges" },
+  { key: "sales", label: "Sales · when Operation issues a sales invoice, each line by its kind" },
+  { key: "costs", label: "Purchases and charges · when a bill, a card payout or a bank line is recorded" },
   // 0675: PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew)).
-  { key: "dealer", label: "Dealers" },
-  { key: "money", label: "Customer money" },
+  { key: "dealer", label: "Dealers · when a month's dealer commission is closed" },
+  { key: "money", label: "Customer money · when a customer payment is recorded, by how it was paid" },
   { key: "system", label: "Kept by the system · renamed in Chart of accounts" },
 ] as const;
 type GroupKey = (typeof POSTING_GROUPS)[number]["key"];
@@ -214,15 +223,16 @@ export default function PostingAccounts() {
 
   const columns = useMemo<DataGridColumn<PostingRow>[]>(
     () => [
-      { key: "posting", label: "Posting", width: 320, sortable: false, accessor: (r) => r.word, searchValue: (r) => r.word },
+      { key: "posting", label: "Posting", width: 380, sortable: false, accessor: (r) => r.word, searchValue: (r) => r.word },
       {
         key: "account",
         label: "Account",
-        width: 320,
+        width: 340,
         sortable: false,
         accessor: (r) =>
           r.accountCode ? (
-            `${r.accountCode} ${r.accountName ?? ""}`
+            /* A changed posting says when and by whom under its account. */
+            <TwoLineCell top={`${r.accountCode} ${r.accountName ?? ""}`} sub={r.changedAt ? `Changed ${changedWord(r)}` : undefined} />
           ) : (
             // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0657).
             <span className="text-kit-red-11">No account yet</span>
@@ -230,7 +240,6 @@ export default function PostingAccounts() {
         searchValue: (r) => `${r.accountCode ?? ""} ${r.accountName ?? ""}`,
         exportValue: (r) => (r.accountCode ? `${r.accountCode} ${r.accountName ?? ""}` : ""),
       },
-      { key: "changed", label: "Changed", width: 200, sortable: false, filterable: false, accessor: changedWord },
     ],
     [],
   );
@@ -245,7 +254,7 @@ export default function PostingAccounts() {
           rows={rows}
           columns={columns}
           rowKey={(r) => r.id}
-          storageKey="carres.finance.posting-accounts.v1"
+          storageKey="carres.finance.posting-accounts.v2"
           appearance="reference"
           groupBanner={false}
           allowColumnGrouping={false}

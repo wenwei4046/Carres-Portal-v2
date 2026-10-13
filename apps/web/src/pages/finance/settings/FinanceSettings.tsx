@@ -22,10 +22,11 @@ import {
 } from "@carres/shared/money-accounts";
 import Button from "@/components/kit/Button";
 import DatePicker from "@/components/kit/DatePicker";
-import Icon from "@/components/kit/Icon";
 import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
 import Tabs from "@/components/kit/Tabs";
+import ListPageShell from "@/components/ListPageShell";
+import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { accountLabel, LoadFailed } from "../other-money-in/parts";
 import { useBooksClosed, useCardRoutes, useMoneyAccounts, useSaveBooksClosed, useSaveCardRoute } from "./api";
@@ -94,44 +95,46 @@ function CardRoutes() {
     return a ? accountLabel(a) : code;
   };
 
+  /* Chew 2026-10-13 (「这个card payouts banks 要做成表」): the routes are the
+     shared listing, one column per fact, so a long account name is never cut. */
+  const columns: DataGridColumn<CardRouteRow>[] = [
+    { key: "holding", label: MONEY_ACCOUNT_KIND_WORD.HOLDING, width: 320, accessor: (r) => name(r.holding_code), searchValue: (r) => name(r.holding_code) },
+    { key: "channel", label: "Machine at", width: 130, accessor: (r) => CARD_CHANNEL_WORD[r.channel], filterType: "enum" },
+    { key: "bank", label: "Pays out to", width: 320, accessor: (r) => name(r.bank_code), searchValue: (r) => name(r.bank_code) },
+  ];
+
   if (accountQuery.isError) return <LoadFailed what="The accounts" onRetry={() => void accountQuery.refetch()} />;
+  if (routes.isError) return <LoadFailed what="Card payout banks" onRetry={() => void routes.refetch()} />;
   return (
-    <section className="h-full overflow-auto p-6" data-testid="card-routes">
-      <div className="flex items-start justify-between gap-4">
-        <p className="max-w-[560px] text-meta text-kit-slate-11">
+    <ListPageShell register>
+      <div className="flex min-h-0 flex-1 flex-col" data-testid="card-routes">
+        <p className="px-1 pb-2 pt-3 text-meta text-kit-slate-11">
           A card account and machine that is not listed here fills in no bank. Whoever records the
           card payout chooses it.
         </p>
-        <Button variant="neutral" size="sm" onClick={() => setEditing(null)}>
-          Add a card payout bank
-        </Button>
-      </div>
-      {routes.isError && <LoadFailed what="Card payout banks" onRetry={() => void routes.refetch()} />}
-      <div className="mt-4 max-w-[560px] border-t border-kit-slate-5">
-        {(routes.data ?? []).map((r) => (
-          /* A clickable row wears the portal's row chrome at rest — a ruled row
-             with a forward chevron (GlobalActivity, HrPeopleTab) — because a
-             hover wash alone never says "open me" until the mouse arrives. */
-          <button
-            key={`${r.holding_code}:${r.channel}`}
-            type="button"
-            className="flex w-full items-center gap-2 border-b border-kit-slate-5 px-2 py-2 text-left text-body hover:bg-kit-slate-3"
-            data-testid={`card-route-${r.holding_code}-${r.channel}`}
-            onClick={() => setEditing(r)}
-          >
-            <span className="min-w-0 flex-1 truncate">
-              {name(r.holding_code)} · {CARD_CHANNEL_WORD[r.channel]} → {name(r.bank_code)}
-            </span>
-            <span className="shrink-0 text-kit-slate-11">
-              <Icon name="forward" size={14} />
-            </span>
-          </button>
-        ))}
+        <DataGrid
+          rows={routes.data ?? []}
+          columns={columns}
+          rowKey={(r) => `${r.holding_code}:${r.channel}`}
+          rowTestId={(r) => `card-route-${r.holding_code}-${r.channel}`}
+          storageKey="carres.finance.card-payout-banks.v1"
+          appearance="reference"
+          groupBanner={false}
+          allowColumnGrouping={false}
+          stickyIdentity
+          isLoading={!routes.isSuccess || !accountQuery.isSuccess}
+          onRowClick={(r) => setEditing(r)}
+          toolbarEnd={
+            <Button variant="neutral" onClick={() => setEditing(null)} disabled={!accountQuery.isSuccess}>
+              Add a card payout bank
+            </Button>
+          }
+        />
       </div>
       {editing !== undefined && (
         <CardRouteModal route={editing} accounts={accounts} onClose={() => setEditing(undefined)} />
       )}
-    </section>
+    </ListPageShell>
   );
 }
 
