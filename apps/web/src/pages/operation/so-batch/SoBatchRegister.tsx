@@ -78,6 +78,8 @@ import { fmtDate } from "@/lib/fmt-date";
 import SoBatchBySupplier from "./SoBatchBySupplier";
 import { BY_SUPPLIER, orderedSupplierGroups, supplierGroups, todayNumbers, type SupplierShow } from "./by-supplier";
 import SoBatchTodayCard from "./SoBatchTodayCard";
+import CPopover, { CMenuGroup, CMenuItem } from "@/components/carres/CPopover";
+import MIcon from "@/components/carres/MIcon";
 import { conciseLocality, NOT_RECORDED } from "@/lib/locality";
 import { avatarColor, personInitials } from "@/lib/staff-avatar";
 import {
@@ -333,19 +335,43 @@ export interface SoBatchRegisterProps {
   scope?: { label: string; onClear: () => void; preselectKey?: string };
 }
 
+/** The page's four groupings (the design file's `GROUP BY`), in its order. */
+type SoBatchView = "supplier" | "table" | "category" | "deadline";
+const SO_BATCH_VIEWS: Record<SoBatchView, { label: string; icon: string }> = {
+  supplier: { label: BY_SUPPLIER.view, icon: "factory" },
+  table: { label: BY_SUPPLIER.bySalesOrder, icon: "receipt_long" },
+  category: { label: BY_SUPPLIER.byCategory, icon: "category" },
+  deadline: { label: BY_SUPPLIER.byDeadline, icon: "event" },
+};
+/** `SHOW COLUMNS FOR`: the modules, as the Sales Orders list names them. Only
+ *  this page's own columns exist here today. */
+const SO_BATCH_COLUMN_SETS: ReadonlyArray<{ label: string; icon: string; built: boolean }> = [
+  { label: "Purchasing", icon: "shopping_cart", built: true },
+  { label: "Overview", icon: "dashboard", built: false },
+  { label: "Sales Order", icon: "receipt_long", built: false },
+  { label: "Warehouse", icon: "warehouse", built: false },
+  { label: "Payment", icon: "payments", built: false },
+  { label: "Delivery", icon: "local_shipping", built: false },
+  { label: "Service", icon: "support_agent", built: false },
+];
+
 export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurchaseOrders, purchaseOrdersLoading = false, initialSearch, hidden = false, scope, roundNavigation, sessionKey = "carres.soBatchPurchase.register" }: SoBatchRegisterProps) {
   const navigate = useNavigate();
   const [presentationParams, setPresentationParams] = useSearchParams();
   const viewParam = presentationParams.get("view");
   /* BY SUPPLIER IS THE PAGE'S FIRST VIEW (owner 12 Oct 2026, the kit's default).
-     `view=table` is By sales order, `view=cards` the cards. */
-  const presentation = viewParam === "cards" ? "cards" : viewParam === "table" ? "table" : "supplier";
+     `view=table` is By sales order, `view=category` and `view=deadline` the
+     two other groupings (owner 13 Oct 2026). An old `view=cards` link opens
+     By supplier: the Cards view is gone. */
+  const presentation: SoBatchView = viewParam === "table" ? "table" : viewParam === "category" ? "category" : viewParam === "deadline" ? "deadline" : "supplier";
+  const grouped = presentation !== "table";
   const changePresentationParam = (key: string, value: string | null) => setPresentationParams(current => {
     const next = new URLSearchParams(current);
     if (value) next.set(key, value); else next.delete(key);
     return next;
   }, { replace: true });
-  const setPresentation = (value: string) => changePresentationParam("view", value === "cards" || value === "table" ? value : null);
+  const setPresentation = (value: string) => changePresentationParam("view", value === "table" || value === "category" || value === "deadline" ? value : null);
+  const [viewOpen, setViewOpen] = useState(false);
   const [quickOrderId, setQuickOrderId] = useState<string | null>(null);
   /* R8 — a `display:none` box forgets its scroll offset, and by the time a
      render hides it the offset already reads 0. So the offset is remembered
@@ -490,7 +516,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
      opened it before (`useFilterRailOpen`). */
   const canvasRef = useRef<HTMLDivElement>(null);
   const [filterRailOpen, setFilterRailVisible] = useFilterRailOpen(FILTER_RAIL_STORAGE_KEY, canvasRef,
-    presentation === "supplier" ? FILTER_RAIL_KIT_LIST_BELOW_PX : undefined);
+    grouped ? FILTER_RAIL_KIT_LIST_BELOW_PX : undefined);
   const railFacts = useMemo(() => soBatchRailFacts(orders, leafs), [orders, leafs]);
   const rail = useMemo(() => soBatchRailModel(railFacts, filter), [railFacts, filter]);
   const orderMatchesTime = useCallback((order: SoBatchOrderRow, time: string) =>
@@ -1291,8 +1317,32 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
       onOpen={() => navigate(`/operation/orders/so/${o.orderId}`)} onClose={close ?? (() => setPresentation("table"))} />;
   };
   const quickOrder = quickOrderId ? orders.find(order => order.orderId === quickOrderId) : null;
-  const viewSwitch = <Tabs variant="segmented" label="SO Batch Purchase view" value={presentation} onValueChange={setPresentation}
-    tabs={[{ value: "supplier", label: BY_SUPPLIER.view }, { value: "table", label: BY_SUPPLIER.bySalesOrder }, { value: "cards", label: BY_SUPPLIER.cards }]} />;
+  /* ⭐ ONE VIEW BUTTON (owner 13 Oct 2026, the design file's `By supplier ▾`).
+     `GROUP BY` chooses how the lines are grouped. `SHOW COLUMNS FOR` names the
+     modules; this page holds its own facts only, so the others say
+     `Coming soon` and cannot be chosen until their facts are read here. */
+  const viewSwitch = (
+    <CPopover label="SO Batch Purchase view" role="menu" width={236} open={viewOpen} onOpenChange={setViewOpen}
+      trigger={
+        <Button data-testid="so-batch-view" aria-label={`View: ${SO_BATCH_VIEWS[presentation].label}`}>
+          <MIcon name={SO_BATCH_VIEWS[presentation].icon} size={18} className="text-c-secondary" />
+          {SO_BATCH_VIEWS[presentation].label}
+          <MIcon name="expand_more" size={18} className="text-c-secondary" />
+        </Button>
+      }>
+      <CMenuGroup first>{BY_SUPPLIER.groupBy}</CMenuGroup>
+      {(Object.keys(SO_BATCH_VIEWS) as SoBatchView[]).map((key) => (
+        <CMenuItem key={key} icon={SO_BATCH_VIEWS[key].icon} checked={presentation === key} strong={presentation === key}
+          testId={`so-batch-view-${key}`} onSelect={() => { setPresentation(key); setViewOpen(false); }}>
+          {SO_BATCH_VIEWS[key].label}
+        </CMenuItem>
+      ))}
+      <CMenuGroup>{BY_SUPPLIER.showColumnsFor}</CMenuGroup>
+      {SO_BATCH_COLUMN_SETS.map((set) => set.built
+        ? <CMenuItem key={set.label} icon={set.icon} checked strong onSelect={() => setViewOpen(false)}>{set.label}</CMenuItem>
+        : <CMenuItem key={set.label} icon={set.icon} disabled note={BY_SUPPLIER.comingSoon} onSelect={() => {}}>{set.label}</CMenuItem>)}
+    </CPopover>
+  );
   /* BY SUPPLIER (owner 12 Oct 2026): the demand of the orders this list is
      showing, one row per supplier and category. It reads the same ticks, so
      `Issue PO` takes them from either view. */
@@ -1302,11 +1352,11 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
      buy, what is already on a PO, or both, for the same shown Sales Orders. */
   const show: SupplierShow = presentationParams.get("show") === "ordered" ? "ordered" : presentationParams.get("show") === "all" ? "all" : "buy";
   const bySupplier = useMemo(() => {
-    if (presentation !== "supplier") return [];
-    const buy = show === "ordered" ? [] : supplierGroups(leafs.filter((leaf) => shownOrderIds.has(leaf.orderId)), nowKey);
-    const ordered = show === "buy" ? [] : orderedSupplierGroups(shown);
+    if (presentation === "table") return [];
+    const buy = show === "ordered" ? [] : supplierGroups(leafs.filter((leaf) => shownOrderIds.has(leaf.orderId)), nowKey, presentation, data.today);
+    const ordered = show === "buy" ? [] : orderedSupplierGroups(shown, presentation);
     return [...buy, ...ordered];
-  }, [presentation, show, leafs, shown, shownOrderIds, nowKey]);
+  }, [presentation, show, leafs, shown, shownOrderIds, nowKey, data.today]);
   const showTabs = <Tabs variant="segmented" label="SO Batch Purchase shown" value={show}
     onValueChange={(value) => changePresentationParam("show", value === "ordered" || value === "all" ? value : null)}
     tabs={[{ value: "buy", label: BY_SUPPLIER.showBuy }, { value: "ordered", label: BY_SUPPLIER.showOrdered }, { value: "all", label: BY_SUPPLIER.showAll }]} />;
@@ -1548,13 +1598,15 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
             className="flex min-h-0 flex-1 flex-col"
             data-testid="so-batch-grid"
           >
-            {presentation === "supplier" ? (
+            {presentation !== "table" ? (
               <SoBatchBySupplier
+                key={presentation}
+                by={presentation}
                 groups={bySupplier}
                 today={data.today}
                 isLoading={isLoading}
-                storageKey={`${STORAGE_KEY}.bySupplier`}
-                sessionKey={`${sessionKey}.bySupplier`}
+                storageKey={`${STORAGE_KEY}.${presentation === "supplier" ? "bySupplier" : presentation}`}
+                sessionKey={`${sessionKey}.${presentation === "supplier" ? "bySupplier" : presentation}`}
                 canBuy={selectable}
                 isTicked={(id) => live.has(id)}
                 onToggleLine={toggleLeaf}
@@ -1564,14 +1616,6 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 toolbarEnd={<div className={`${styles.toolbarTools} flex min-w-0 flex-wrap items-center gap-2`}>
                   {viewSwitch}
                 </div>}
-                /* Ready Stock is matched per Sales Order, so the same act opens the
-                   By sales order list. It sits after the ⋮ button (owner 13 Oct 2026). */
-                toolbarAfterTools={<Button loading={stock.busy} disabled={isLoading || data.readyStockPriority == null}
-                  title={data.readyStockPriority == null ? "Not available" : undefined}
-                  data-testid="by-supplier-match-stock"
-                  onClick={() => { setPresentation("table"); void stock.match(shown.filter(order => purchaseStatus(order) !== "Done")); }}>
-                  {BY_SUPPLIER.matchReadyStock}
-                </Button>}
                 lineExtras={(leaf) => {
                   const order = orderById.get(leaf.orderId);
                   if (!order) return {};
@@ -1611,18 +1655,15 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
               presentationTools
               allowColumnGrouping={false}
               sessionKey={sessionKey}
-              presentationKey={presentation}
-              renderResults={presentation === "cards" ? visible => <div className="grid grid-cols-1 gap-3 p-3 xl:grid-cols-2" data-testid="so-batch-cards">
-                {visible.map(o => <div key={o.orderId} data-row-key={o.orderId}>{compactView(o)}</div>)}
-              </div> : undefined}
               toolbarEnd={<div className={`${styles.toolbarTools} flex min-w-0 flex-wrap items-center gap-2`}>
                 {viewSwitch}
+                {/* `Match Ready Stock` is gone from the toolbar (owner 13 Oct 2026:
+                    never agreed). The whole-round matching it started is left
+                    in place, unreachable, until the owner rules on it; stock
+                    is still reserved per Sales Order in the opened row. */}
                 {stock.active ? <><Select id="round-stock-location" toolbar label="Stock Location" value={stock.location}
                   onValueChange={stock.setLocation} disabled={stock.busy} options={stock.locations} />
-                  <Button disabled={stock.busy} onClick={stock.clear}>Cancel</Button></>
-                  : <Button loading={stock.busy} disabled={isLoading || data.readyStockPriority == null} title={data.readyStockPriority == null ? "Not available" : undefined} onClick={() => {
-                    void stock.match(visibleOrders.current.filter(order => shown.some(row => row.orderId === order.orderId) && purchaseStatus(order) !== "Done"));
-                  }}>Match Ready Stock</Button>}
+                  <Button disabled={stock.busy} onClick={stock.clear}>Cancel</Button></> : null}
                 {onOpenPurchaseOrders ? <Button loading={purchaseOrdersLoading} disabled={isLoading} onClick={() => {
                 const visibleIds = new Set(shown.map(order => order.orderId));
                 onOpenPurchaseOrders([...new Set(visibleOrders.current.filter(order => visibleIds.has(order.orderId))

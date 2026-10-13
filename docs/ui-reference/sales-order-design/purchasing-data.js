@@ -22,11 +22,11 @@ var sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === 
 var ago = d => { const n = dd(new Date(d.getFullYear(), d.getMonth(), d.getDate()), T0); return n === 0 ? 'Today' : n === 1 ? 'Yesterday' : n + ' days ago'; };
 var GREY = ['#E5E7EB', '#374151'], AMB = ['#FBF0D6', '#7A5A00'], GRN = ['#E7F6EC', '#1E7A40'];
 var SUP = {
-  'Nice Future Sdn Bhd': { method: 'We collect', days: { Mattress: 7 }, email: 'TEST-nicefuture@example.com', wa: 'https://chat.whatsapp.com/TEST-GROUP-1', pref: 'WhatsApp' },
-  'Ohana Furniture Sdn Bhd': { method: 'Supplier delivers', aka: 'Hookka', labels: false, days: { Bedframe: 7, Sofa: 14 }, email: 'TEST-ohana@example.com', wa: 'https://chat.whatsapp.com/TEST-GROUP-2', pref: 'Email' },
-  'Armani': { method: 'Supplier delivers', days: { Sofa: 14 }, wa: 'https://chat.whatsapp.com/TEST-GROUP-3', pref: 'WhatsApp' },
-  'Dorsettloft Sofa': { method: 'Supplier delivers', days: { Sofa: 14 }, wa: 'https://chat.whatsapp.com/TEST-GROUP-4', pref: 'WhatsApp' },
-  'Todern': { method: 'Supplier delivers', days: { Sofa: 14 }, wa: 'https://chat.whatsapp.com/TEST-GROUP-5', pref: 'WhatsApp' },
+  'Nice Future Sdn Bhd': { method: 'We collect', days: { Mattress: 7 }, email: 'TEST-nicefuture@example.com', wa: 'https://chat.whatsapp.com/TEST-group-1', pref: 'WhatsApp' },
+  'Ohana Furniture Sdn Bhd': { method: 'Supplier delivers', aka: 'Hookka', labels: false, days: { Bedframe: 7, Sofa: 14 }, email: 'TEST-ohana@example.com', wa: 'https://chat.whatsapp.com/TEST-group-2', pref: 'Email' },
+  'Armani': { method: 'Supplier delivers', days: { Sofa: 14 }, wa: 'https://chat.whatsapp.com/TEST-group-3', pref: 'WhatsApp' },
+  'Dorsettloft Sofa': { method: 'Supplier delivers', days: { Sofa: 14 }, wa: 'https://chat.whatsapp.com/TEST-group-4', pref: 'WhatsApp' },
+  'Todern': { method: 'Supplier delivers', days: { Sofa: 14 }, wa: 'https://chat.whatsapp.com/TEST-group-5', pref: 'WhatsApp' },
   'Renness': { method: 'Supplier delivers', days: { Bedframe: 7 }, pref: 'WhatsApp' },
   'NB': { method: 'Supplier delivers', days: { Bedframe: 7 }, inactive: true, pref: 'WhatsApp' },
   'Laveo': { method: 'Supplier delivers', days: { Bedframe: 7 }, inactive: true, pref: 'WhatsApp' }
@@ -205,6 +205,9 @@ function soStat(s) {
   return { k: am ? 'am' : 'pm', due, pill: (am ? 'Morning' : 'Afternoon') + ' batch', c: GREY, sub: 'Cut-off ' + when, subFg: '#6B7280' };
 }
 var WHS = ['Carres Klang Warehouse', 'Houzs', 'AL'], WH_DEF = 'Carres Klang Warehouse';
+// Deliver to (Ops Rules §4): per SO if set (whBy), else the PO's warehouse if it is one of ours, else the default Carres Klang Warehouse. A supplier name is never a delivery place.
+var whOf = (p, so) => { const w = (so && p && p.whBy && p.whBy[so]) || (p && p.wh) || ''; return WHS.some(x => String(w).startsWith(x)) || /^AL |Houzs/.test(w) ? w : WH_DEF; };
+var whShort = w => String(w || '').replace(/ Warehouse$/, '');
 var SOX = { 'SO-1368': { dealer: 'Carres Kota Damansara', loc: 'Carres Kota Damansara', sp: 'Alvin', total: 2759, paid: 1380, conf: null, logi: '', doNo: '', delivered: false, cases: 0 } };
 var RM = n => 'RM ' + n.toLocaleString('en-MY');
 var MODS_V = [['Overview', 'dashboard'], ['Sales Order', 'receipt_long'], ['Purchasing', 'shopping_cart'], ['Warehouse', 'warehouse'], ['Payment', 'payments'], ['Delivery', 'local_shipping'], ['Service', 'support_agent']];

@@ -14,7 +14,7 @@ window.CarresTasks = {
   take(r) { const m = { ...this.owners(), [r.mod + '|' + r.key]: this.ME }; try { localStorage.setItem('carres.owner', JSON.stringify(m)); } catch (e) {} },
   publish(mod, href, rows) {
     const k = 'carres.tasks.' + mod;
-    const v = JSON.stringify((rows || []).map(r => ({ key: r.key, mod: r.mod || mod, t: r.t, sub: r.sub || '', next: r.next || '', owner: r.owner || '', ref: r.ref || '', late: !!r.late, due: r.due || '', dueDay: r.dueDay || '', isNew: !!r.isNew, later: !!r.later, fol: !!r.fol, prog: !!r.prog, who: r.who || '' })));
+    const v = JSON.stringify((rows || []).map(r => ({ key: r.key, mod: r.mod || mod, t: r.t, sub: r.sub || '', next: r.next || '', owner: r.owner || '', ref: r.ref || '', late: !!r.late, due: r.due || '', dueDay: r.dueDay || '', isNew: !!r.isNew, later: !!r.later, fol: !!r.fol, prog: !!r.prog, plan: !!r.plan, who: r.who || '' })));
     try { if (localStorage.getItem(k) !== v) localStorage.setItem(k, v); if (href) localStorage.setItem(k + '.href', href); } catch (e) {}
   },
   publishDone(mod, href, rows) {

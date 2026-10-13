@@ -1443,7 +1443,7 @@ and Selangor public holidays are excluded.
 
 **SO Batch Register presentation — owner-approved 2026-10-04.** Reuse `Table`, `Cards`, `Page tools`, `Group by: None`, `Group by: Supplier` and the accessible `SO Batch Purchase view`. Standalone card summary uses `PO Pending`, `PO Partial`, `PO Done`. The CompactModuleCard header and its Open/Close words remain shared.
 
-**SO Batch optional whole-round stock — owner-approved capability, 2026-10-04.** `Match Ready Stock` computes read-only suggestions in the current Listing scope. Reuse `Stock Location`, `Ready Stock`, `{n} available`, `Proceed`, `Cancel` and `Not confirmed · Try again`. Purchasing Settings uses `Ready Stock` and `Priority`, with `Customer Requested Delivery Date` / `Proceed Date`; `Not available` means the source setting could not be read. Only Proceed saves exact Unit reservations. An unknown write outcome blocks Proceed until the actual source has been checked; the interface never calls it a failed reservation merely because the response was lost.
+**SO Batch optional whole-round stock — capability of 2026-10-04; its `Match Ready Stock` button REMOVED by the owner 13 Oct 2026 (never agreed), so the words below are on no screen today.** `Match Ready Stock` computed read-only suggestions in the current Listing scope. Reuse `Stock Location`, `Ready Stock`, `{n} available`, `Proceed`, `Cancel` and `Not confirmed · Try again`. Purchasing Settings uses `Ready Stock` and `Priority`, with `Customer Requested Delivery Date` / `Proceed Date`; `Not available` means the source setting could not be read. Only Proceed saves exact Unit reservations. An unknown write outcome blocks Proceed until the actual source has been checked; the interface never calls it a failed reservation merely because the response was lost.
 
 **The SO Batch Purchase rail — owner-approved 2026-10-04.** Local navigation is Listing / deferred
 Report; factual groups are Order time and PO Safety Days. The existing Purchasing-owned Setup to
@@ -2296,7 +2296,11 @@ Other views retain their purpose-specific names, such as `Monthly demand`.
 ### Purchasing UI dictionary — APPROVED (Jess, 2026-09-18) · BUILT on SO Batch Purchase 2026-09-18
 
 **SO Batch Purchase · By supplier — owner 12 Oct 2026 · BUILT 12 Oct 2026 (Purchasing MASTER §9.1).** View names
-`By supplier` (first) · `By sales order` (was `Table`) · `Cards`. Item line heads, sentence case (owner 13 Oct 2026):
+`By supplier` (first) · `By sales order` (was `Table`) · `By category` · `By order deadline`, chosen from one view
+button whose menu reads `GROUP BY` and `SHOW COLUMNS FOR` (`Purchasing`; the other modules `Coming soon`). `Cards` and
+`Match Ready Stock` were removed from this page by the owner on 13 Oct 2026. Grouping words (owner 13 Oct 2026):
+columns `Category` · `Suppliers`; item line head `Supplier`; rows `Deadline passed` · `Next week +` · `From {date}`;
+status `Late to order`. Never `Overdue` or `Missed`. Item line heads, sentence case (owner 13 Oct 2026):
 `Item` · `To buy` · `Sales order` · `Order deadline` · `Supplier delivers to`; an ordered line reads `Item` · `Qty` ·
 `Sales order` · `PO No`. These heads are this view's own; `SO No`, `Order By` and `Supplier Deliver To` stay the
 Purchasing dictionary's words on the other pages. An item line is the model code as the data spells it, then the size

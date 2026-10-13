@@ -27,6 +27,20 @@ const LISTS = [
     expand: '[data-testid^="by-supplier-expand-"]',
   },
   {
+    name: "SO Batch Purchase · By category",
+    page: "/so-batch-shell-preview.html?view=category",
+    box: '[data-testid="by-supplier"]',
+    last: '[data-testid^="by-supplier-status-"]',
+    expand: '[data-testid^="by-supplier-expand-"]',
+  },
+  {
+    name: "SO Batch Purchase · By order deadline",
+    page: "/so-batch-shell-preview.html?view=deadline",
+    box: '[data-testid="by-supplier"]',
+    last: '[data-testid^="by-supplier-status-"]',
+    expand: '[data-testid^="by-supplier-expand-"]',
+  },
+  {
     name: "Purchase Orders · Overview",
     page: "/purchase-orders-shell-preview.html",
     box: '[data-testid="po-register-content"]',

@@ -1,4 +1,4 @@
-# Sales Order UI kit specimen · supplied 12 Oct 2026, 5:35 PM
+# Sales Order UI kit specimen · supplied 13 Oct 2026 (SO Batch round 2)
 
 > **Repository note. Read before the supplied README below.**
 >
@@ -12,10 +12,11 @@
 > the value here is **PROPOSAL / NOT LAW**. `docs/01-design-tokens.md` §10 lists the
 > differences and the values the package itself leaves unsettled.
 >
-> Source: the folder `design_handoff_sales_order_ui_kit`, handed over by the owner on 12 Oct 2026 at
-> 5:35 PM. It replaces the package of the same morning completely: every kit the owner hands over
-> replaces the kit, and one version is kept (owner 12 Oct 2026). The owner keeps the original; Git
-> keeps the history.
+> Source: the folder `design_handoff_sales_order_ui_kit` in `Sales Order (6).zip`, handed over by the owner on 13 Oct 2026
+> with `docs/CODE-FIX-13-Oct-round2.md`. It replaces the 12 Oct, 5:35 PM package completely: every kit the owner hands
+> over replaces the kit, and one version is kept (owner 12 Oct 2026). No colour, type or size token changed in this
+> package (`Carres UI Kit.dc.html` and `carres-theme.js` are the same files); the table and shell pages, the Purchasing
+> page and its data changed. The owner keeps the original; Git keeps the history.
 >
 > **What differs from the supplied archive (this repository is public).**
 >
@@ -26,7 +27,7 @@
 > | `Sales Order Outright v12.dc.html` | One line: it loads `sales-test.js`. Every other page is as supplied; `Purchasing v3.dc.html` is the only Purchasing page in the package |
 > | `screens/SO-*`, `PO-*`, `SH-01` | Retaken on 12 Oct from these pages with the TEST details, 924 × 540; `PO-*` from `Purchasing v3.dc.html`; `PO-04` is the pop-up alone. `KIT-*` are the supplied pictures |
 > | `UX-FLOWS.md` | The example customer and phone are the TEST values |
-> | `docs/Carres Ops Rules.md`, `docs/Carres Handoff.md`, `CHANGES-after-*.md` | Not stored. The Ops Rules are the designer's business-rule notes (the module MASTERs hold the rules). The Handoff and the change notes are the design chat's own working log |
+> | `docs/Carres Ops Rules.md`, `docs/Carres Handoff.md`, `CHANGES-after-*.md` | Not stored (`docs/CODE-FIX-13-Oct.md` and `docs/CODE-FIX-13-Oct-round2.md`, the owner's two fix lists for Code, are stored). The Ops Rules are the designer's business-rule notes (the module MASTERs hold the rules). The Handoff and the change notes are the design chat's own working log |
 >
 > The signed-in Portal is unaffected: it reads real records by permission and never reads
 > these files.
