@@ -2714,8 +2714,8 @@ replaced by one row per Sales Order on the same kit list as `By supplier`, so no
   `Purchase Orders` on the toolbar (supplier preparation for the Sales Orders in view), the pending-stock warning.
 - **Facts that left the row, and where each is read:** `PO Safety Days` in the rail's own group and the quick card;
   `Customer Delivery Location` in the quick card and the Sales Order; `Supplier` and `Supplier Deliver To` on each item
-  line; `PO Delivery Date` on the PO (each number is its door) and under `Supplier ready by` in `By supplier`. The
-  column chooser has nothing left to choose on five fixed columns and is not offered; `SHOW COLUMNS FOR` is where a
+  line; `PO Delivery Date` on the PO (each number is its door) and under `Supplier ready by` in `By supplier`. `Columns`
+  in ⋮ lists the five columns of this view (the old Order / Documents / Buying groups are gone); `SHOW COLUMNS FOR` is where a
   module's columns will come.
 - **Not drawn from the package:** its `Order type` column. The SO Batch read carries no order type, and a column that
   says the same word on every row adds nothing; it joins when a second order type is recorded. Its `Outstation` mark
