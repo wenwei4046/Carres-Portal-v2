@@ -118,7 +118,7 @@ export const BY_SALES_ORDER = {
   nothingOrdered: BY_SUPPLIER.nothingOrdered,
   /* `Use stock` on the selection bar (owner 13 Oct 2026, round 3). */
   useStock: (lines: number) => `Use stock · ${lines}`,
-  useStockWhy: "Reserves the suggested free Unit for each ticked item that has stock. The rest stay to buy.",
+  useStockWhy: "Reserves the suggested free New Unit for each ticked item that has stock. The rest stay to buy.",
   useStockDone: (units: number) => `${units} ${units === 1 ? "Unit" : "Units"} reserved from stock`,
   useStockFailed: "Not confirmed · Try again",
 } as const;

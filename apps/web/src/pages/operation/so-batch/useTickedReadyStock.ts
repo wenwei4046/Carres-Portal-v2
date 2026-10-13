@@ -15,6 +15,12 @@ import { ApiError, apiFetch } from "@/lib/api";
  * (`matchSoBatchReadyStock`): Carres-owned exact Units at Carres Klang, the
  * oldest first, the order that needs its goods soonest first. The door
  * recomputes every requirement on the locked row and refuses by name.
+ *
+ * ⭐ NEW UNITS ONLY. One press chooses for the operator, so it may only take
+ * what nobody would question: a Unit recorded `New`. A Display, used,
+ * refurbished or damaged Unit, or one with no condition recorded, is a
+ * decision about what the customer receives; it stays in the row's own
+ * picker (`Stock you can use`), where the operator sees it and chooses it.
  */
 export interface TickedLine {
   /** The demand line the tick is on. */
@@ -30,6 +36,8 @@ const readStock = async (orderId: string): Promise<ReadyStockResponse> => {
   if (stock.orderId !== orderId) throw new Error("invalid_stock_source");
   return stock;
 };
+/** The one condition a press may take by itself. */
+export const AUTO_CONDITION = "new";
 /** How many Sales Orders are read at once. */
 const READ_AT_ONCE = 5;
 
@@ -132,11 +140,13 @@ export function useTickedReadyStock({ ticked, orderOf, priority = "customer_deli
       orderId, orderLineId: line.orderLineId, remainingQty: line.remainingQty,
       requestedDeliveryDate: orderOf(orderId)?.requestedDeliveryDate ?? null, proceededAt: orderOf(orderId)?.proceededAt ?? null,
     })));
+    const scope = klang?.warehouseId ? { warehouseId: klang.warehouseId, priority } : { siteName: klang?.siteName ?? "Carres Klang", priority };
     try {
-      return matchSoBatchReadyStock(demands, units, klang?.warehouseId
-        ? { warehouseId: klang.warehouseId, priority } : { siteName: klang?.siteName ?? "Carres Klang", priority });
+      /* Every Unit is checked first: two reads that disagree about one Unit
+         (its condition included) are stale evidence, and nothing is offered. */
+      matchSoBatchReadyStock(demands, units, scope);
+      return matchSoBatchReadyStock(demands, units.filter((unit) => unit.condition === AUTO_CONDITION), scope);
     } catch {
-      /* Two reads disagree about one Unit: stale evidence is never stock. */
       return [];
     }
   }, [stamp, ticked, orderIds, priority, orderOf, unconfirmed]);

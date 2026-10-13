@@ -2699,7 +2699,9 @@ replaced by one row per Sales Order on the same kit list as `By supplier`, so no
   button shows only when that count is above zero, in all four views. One press reserves the suggested Unit for each
   of those lines through the existing reservation door (`so_batch_reserve_ready_units`); the lines with no stock stay
   ticked to buy. The suggestion is the shared matcher's: Carres-owned exact Units at Carres Klang, oldest first, the
-  order chosen by the `Ready Stock priority` setting first. A tick on a line the press answers is dropped before the
+  order chosen by the `Ready Stock priority` setting first. **It takes `New` Units only.** A `Display`, `Fair (used)`,
+  `Refurbished` or `Damaged` Unit, or one with no condition recorded, is a decision about what the customer receives:
+  it is never taken by the press and stays in the row's own picker, where the operator sees its condition and chooses it. A tick on a line the press answers is dropped before the
   write, so a stale quantity can never be issued; a lost response is read back, never sent twice. The press stops at
   the first Sales Order that is refused or cannot be confirmed: what was reserved before it is said
   (`{n} Units reserved from stock`), `Not confirmed · Try again` stands above the list until the next tick, and an

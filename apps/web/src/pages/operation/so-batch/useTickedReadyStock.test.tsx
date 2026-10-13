@@ -227,6 +227,30 @@ describe("`lines` counts the ticked demand lines that have a free Unit", () => {
     expect(state()).toMatchObject({ lines: 1, units: 1, error: false });
   });
 
+  /* One press chooses for the operator, so it takes only what nobody would
+     question. A Display, used or damaged Unit, or one with no condition
+     recorded, is chosen by hand in the row's own picker. */
+  it.each(["exhibition", "old", "refurbished", "damaged", null])("a free Unit recorded `%s` is never offered by the press", async (condition) => {
+    answer({ o1: stock("o1", [LINE], [unit(UNIT, [LINE], { condition })]) });
+    draw(O1_TICK);
+    await waitFor(() => expect(reads()).toHaveLength(1));
+    await settle();
+    expect(state()).toMatchObject({ lines: 0, units: 0 });
+    fireEvent.click(screen.getByText("Use"));
+    await settle();
+    expect(posts()).toEqual([]);
+  });
+
+  it("a New Unit is taken while a Display Unit beside it is left for the picker", async () => {
+    answer({ o1: { ...stock("o1", [LINE], [unit(UNIT_2, [LINE], { condition: "exhibition", dateIn: "2026-01-01" }), unit(UNIT, [LINE])]), lines: [stockLine(LINE, 2)] } });
+    draw(O1_TICK);
+    await waitFor(() => expect(state().lines).toBe(1));
+    expect(state().units).toBe(1);
+    fireEvent.click(screen.getByText("Use"));
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    expect(posts()[0]![1]).toEqual({ orderId: "o1", picks: [{ itemId: UNIT, orderLineId: LINE }] });
+  });
+
   it("two reads that disagree about one Unit offer nothing: stale evidence is never stock", async () => {
     answer({
       o1: stock("o1", [LINE], [unit(UNIT, [LINE])]),
