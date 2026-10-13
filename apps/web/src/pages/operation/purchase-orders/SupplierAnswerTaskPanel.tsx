@@ -5,25 +5,27 @@
  *
  * A PURCHASING act on the exact PO (Purchasing §2.4, #1907) — never Receiving
  * work. The feed emits no balance / short-receipt rule (Purchasing correction
- * 2026-10-06), so this panel answers exactly the rule above. The panel is the PO host: the supplier over the PO and its
- * PO Delivery Date, tabs `Info · Purchase Order · Sales Order`, the goods lines
- * read-only (`Order Qty · Received Qty · Pending Delivery Qty`) and ONE
- * `Record supplier answer` button that opens the EXISTING form (its own door),
- * so the goods lines are shown once, never as a second table beside it.
+ * 2026-10-06), so this panel answers exactly the rule above. It is drawn in
+ * the ONE task view (`TaskFrame`, owner's round 3 brief of 13 Oct 2026): the
+ * facts `Supplier Deliver To` and `PO Delivery Date`, then under `Steps` the
+ * goods lines read-only (`Order Qty · Received Qty · Pending Delivery Qty`)
+ * and ONE `Record supplier answer` button that opens the EXISTING form (its
+ * own door) on the host's full surface, because its line table is wider than
+ * the panel. `Route`, `History` and `Files` read the same PO.
  */
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { documentDisplayNumber } from "@carres/shared";
 import Button from "@/components/kit/Button";
-import CompactModuleCard, { type CardFact } from "@/components/kit/CompactModuleCard";
-import DocumentTable from "@/components/kit/DocumentTable";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { useOperationSuppliers, type operationPosListResponse, type SupplierRow } from "@/lib/queries";
-import EmbeddedSalesOrders, { linkedSalesOrderIds } from "../components/EmbeddedSalesOrders";
+import EmbeddedSalesOrders from "../components/EmbeddedSalesOrders";
 import SupplierReplySection, { stillToDeliver } from "./SupplierReplySection";
+import TaskFrame, { TaskWideSurface } from "../tasks/TaskFrame";
+import { purchasingFileStages } from "../tasks/task-files";
 import type { WorkPanelHost } from "../tasks/tasks-host";
+import { poTaskHistory, poTaskOrders } from "./po-task-parts";
+import PoTaskGoods from "./PoTaskGoods";
 
 /** The Work rules this panel answers (the feed's real PO rules, `apps/api/src/lib/purchasing-work-completion.ts`). */
 export const SUPPLIER_ANSWER_RULES = new Set(["purchasing.supplier_date_passed"]);
@@ -40,7 +42,6 @@ function State({ text, alert = false }: { text: string; alert?: boolean }) {
 }
 
 export default function SupplierAnswerTaskPanel({ item, host }: { item: SupplierAnswerItem; host: WorkPanelHost }) {
-  const navigate = useNavigate();
   const poId = item.source.object.id;
   const poQ = useQuery({
     queryKey: ["operation", "pos", "one", poId],
@@ -48,7 +49,6 @@ export default function SupplierAnswerTaskPanel({ item, host }: { item: Supplier
     staleTime: 10_000,
   });
   const suppliersQ = useOperationSuppliers();
-  const [recording, setRecording] = useState(false);
   const po = poQ.data?.pos.find((p) => p.id === poId) ?? null;
   if (poQ.isPending) return <State text="Loading…" />;
   if (poQ.isError || !po) return <State text="This purchase order could not be opened" alert />;
@@ -68,64 +68,54 @@ export default function SupplierAnswerTaskPanel({ item, host }: { item: Supplier
   }));
   const pending = lines.reduce((sum, line) => sum + stillToDeliver(line), 0);
   const canRecord = !!currentSend && pending > 0;
-  const orderIds = linkedSalesOrderIds((po.sources ?? []).map((s) => ({ kind: s.kind, orderId: s.order_id ?? null })));
-  const info: CardFact[] = [
-    { key: "deliver", label: "Supplier Deliver To", value: deliverTo },
-    { key: "date", label: "PO Delivery Date", value: poDate ? fmtDate(poDate) : "Not recorded" },
-  ];
-  const reference = [documentDisplayNumber(`${po.id}-V${version}`), poDate ? `PO Delivery Date ${fmtDate(poDate)}` : null].filter(Boolean).join(" · ");
+  const orders = poTaskOrders(po);
+  const poLabel = documentDisplayNumber(`${po.id}-V${version}`);
+  /* The answer form is a line table wider than the panel: it opens on the
+     host's full surface (the door Issue PO's review uses), never squeezed. */
+  const openAnswer = () => host.openReview((close) => (
+    <TaskWideSurface title="Record supplier answer" about={`${supplierName} · ${poLabel}`}>
+      <SupplierReplySection
+        startEditing
+        onCancel={close}
+        poId={po.id}
+        version={version}
+        officialDeliveryDate={po.official_delivery_date ?? null}
+        supplierName={supplierName}
+        lines={lines}
+        promises={po.promises ?? []}
+        canRecord={canRecord}
+        defaultChannel={currentSend?.channel === "email" ? "email" : "whatsapp"}
+        defaultRecipient={currentSend?.recipient ?? ""}
+        supplierDo={po.do_number || po.do_uploaded_at ? { number: po.do_number ?? null, uploadedAt: po.do_uploaded_at ?? null, file: po.do_file_path ?? null } : null}
+        onSaved={() => { close(); host.result(`Supplier answer recorded · ${supplierName} · ${poLabel}`); }}
+      />
+    </TaskWideSurface>
+  ));
 
   return (
     <div className="p-3" data-testid={`supplier-answer-panel-${po.id}`}>
-      <CompactModuleCard
-        name={supplierName}
-        reference={reference}
-        referenceStatus={item.timingBucket === "overdue" ? "Late" : undefined}
-        openLabel={`Open ${documentDisplayNumber(po.id)}`}
-        onOpen={() => navigate(`/operation/procurement?po=${encodeURIComponent(po.id)}`)}
-        closeLabel="Close panel"
-        onClose={host.close}
-        modulesLabel="Purchase Order"
-        initialModule="purchase-order"
-        modules={[
-          { key: "info", label: "Info", summary: info, communication: null },
-          {
-            key: "purchase-order", label: "Purchase Order", communication: null,
-            content: (
-              <div className="flex flex-col gap-3 p-3" data-testid="supplier-answer-po">
-                <DocumentTable label="Goods lines" columns={[
-                  { key: "item", label: "Item" }, { key: "qty", label: "Order Qty", numeric: true },
-                  { key: "received", label: "Received Qty", numeric: true }, { key: "pending", label: "Pending Delivery Qty", numeric: true },
-                ]} rows={lines.map((line) => ({ key: line.id, cells: {
-                  item: <span className="flex flex-col"><span>{line.model}</span>{line.size ? <span className="text-meta text-kit-slate-11">{line.size}</span> : null}</span>,
-                  qty: line.qty, received: line.receivedQty, pending: stillToDeliver(line),
-                } }))} />
-                {recording ? (
-                  <SupplierReplySection
-                    startEditing
-                    onCancel={() => setRecording(false)}
-                    poId={po.id}
-                    version={version}
-                    officialDeliveryDate={po.official_delivery_date ?? null}
-                    supplierName={supplierName}
-                    lines={lines}
-                    promises={po.promises ?? []}
-                    canRecord={canRecord}
-                    defaultChannel={currentSend?.channel === "email" ? "email" : "whatsapp"}
-                    defaultRecipient={currentSend?.recipient ?? ""}
-                    supplierDo={po.do_number || po.do_uploaded_at ? { number: po.do_number ?? null, uploadedAt: po.do_uploaded_at ?? null, file: po.do_file_path ?? null } : null}
-                    onSaved={() => { setRecording(false); host.result(`Supplier answer recorded · ${supplierName} · ${documentDisplayNumber(`${po.id}-V${version}`)}`); }}
-                  />
-                ) : (
-                  <div className="flex justify-end">
-                    <Button variant="primary" icon="confirm" disabled={!canRecord} data-testid="supplier-answer-record" onClick={() => setRecording(true)}>Record supplier answer</Button>
-                  </div>
-                )}
-              </div>
-            ),
-          },
-          ...(orderIds.length ? [{ key: "sales", label: "Sales Order", communication: null, content: <EmbeddedSalesOrders orderIds={orderIds} /> }] : []),
+      <TaskFrame
+        head={{ title: `Ask ${supplierName} when the goods will arrive`, page: "Purchasing", record: documentDisplayNumber(po.id), moduleIcon: "shopping_cart",
+          destination: `/operation/procurement?po=${encodeURIComponent(po.id)}` }}
+        facts={[
+          { key: "deliver-to", icon: "warehouse", label: "Supplier Deliver To", value: deliverTo },
+          { key: "po-date", icon: "local_shipping", label: "PO Delivery Date", value: poDate ? fmtDate(poDate) : "Not recorded" },
         ]}
+        orders={orders}
+        salesOrders={orders.length ? <EmbeddedSalesOrders orderIds={orders.map((order) => order.orderId)} /> : undefined}
+        history={poTaskHistory(po)}
+        files={purchasingFileStages(orders, [{ id: po.id, label: poLabel }])}
+        steps={
+          <div className="flex flex-col gap-3" data-testid="supplier-answer-po">
+            <PoTaskGoods label="Goods lines" lines={lines.map((line) => ({
+              key: line.id, name: line.model, detail: line.size || null,
+              orderQty: line.qty, receivedQty: line.receivedQty, pendingQty: stillToDeliver(line),
+            }))} />
+            <div className="flex justify-end">
+              <Button variant="primary" icon="confirm" disabled={!canRecord} data-testid="supplier-answer-record" onClick={openAnswer}>Record supplier answer</Button>
+            </div>
+          </div>
+        }
       />
     </div>
   );

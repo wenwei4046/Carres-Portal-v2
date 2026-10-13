@@ -24,8 +24,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PurchaseDemandRow, ReadyStockResponse, SoBatchOrderRow, SoBatchPurchaseResponse } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
 import OperationApp from "@/pages/operation/OperationApp";
+import { testTaskPo, testTaskSuppliers, testTasksFeed } from "./tasks-feed-fixture";
+import { appTodayIso } from "@/lib/fmt-date";
 import "@/index.css";
 
+/* The preview person. A UUID, as every account id is: the Tasks panel
+   matches work to the signed-in person by it. */
+const ME = "00000000-0000-4000-8000-0000000000aa";
 const KLANG = "11111111-1111-4111-8111-111111111111";
 const BULOH = "22222222-2222-4222-8222-222222222222";
 const params = new URLSearchParams(window.location.search);
@@ -102,7 +107,7 @@ const payload: SoBatchPurchaseResponse = {
     { id: BULOH, name: "AL Sungai Buloh", address: "20 Example Warehouse Road, Sungai Buloh", isDefault: false, active: true },
   ],
   defaultDestinationId: KLANG,
-  currentPoDuty: { userId: "u-duty", name: "Yu Jun" }, actingPoDuty: null,
+  currentPoDuty: { userId: ME, name: "Yu Jun" }, actingPoDuty: null,
   poDutyNameUnavailable: false, poDutyUnavailable: false, mayIssue: true,
   procurementPartners: [], safetyDays: 14,
 };
@@ -147,6 +152,8 @@ function reserve(body: { orderId: string; picks: Array<{ itemId: string; orderLi
   return { reserved: body.picks.length, reference: `SO-${order?.so}`, units: body.picks };
 }
 
+const poOf = (url: string) => (url.includes("/api/operation/pos?") ? new URL(url).searchParams.get("poId") : null);
+
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input, init) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -154,15 +161,28 @@ window.fetch = async (input, init) => {
   const stock = /\/purchase\/demands\/([^/]+)\/ready-stock$/.exec(url.split("?")[0]!);
   const body = url.includes("/ready-stock/reserve") ? reserve(JSON.parse(String(init?.body ?? "{}")))
     : stock ? readyStockOf(decodeURIComponent(stock[1]!))
-    : url.includes("/api/operation/purchase/demands") ? { ...payload, rows: rows.filter((row) => row.toBuy == null || row.toBuy > 0) } : url.includes("/rest/") ? [] : {};
+    : url.includes("/api/operation/purchase/demands") ? { ...payload, rows: rows.filter((row) => row.toBuy == null || row.toBuy > 0) }
+    /* The shell's Tasks panel reads the one Work feed: TEST work for the preview person. */
+    : /\/api\/operation\/work(\?|$)/.test(url) ? testTasksFeed({ id: ME, name: "TEST · Staff A", email: "preview@carres.local" })
+    /* An opened TEST task reads its Purchase Order and its supplier. */
+    : poOf(url) ? testTaskPo(poOf(url)!)
+    : url.includes("/api/operation/suppliers") ? testTaskSuppliers()
+    : url.includes("/api/operation/orders?") ? { orders: [] }
+    : url.includes("/rest/") ? [] : {};
   return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
 };
 
 useAuth.setState({
   role: "operation", hydrated: true, loading: false,
-  user: { id: "u-duty", email: "preview@carres.local" } as never,
-  session: { access_token: "preview", user: { id: "u-duty", email: "preview@carres.local" } } as never,
+  user: { id: ME, email: "preview@carres.local" } as never,
+  session: { access_token: "preview", user: { id: ME, email: "preview@carres.local" } } as never,
 });
+
+/* The first-entry `Pending work` reminder is its own surface: it shows here
+   only when asked for (`?reminder=1`), so the page under it can be walked. */
+if (params.get("reminder") !== "1") {
+  try { window.localStorage.setItem(`carres.pendingWork.shownOn.${ME}`, appTodayIso()); } catch { /* a private window: the reminder shows */ }
+}
 
 const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 createRoot(document.getElementById("root")!).render(

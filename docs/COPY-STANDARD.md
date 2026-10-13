@@ -5078,6 +5078,32 @@ Workspace message availability: `Message not available` replaces a placeholder d
 
 | Sales Orders pilot compact search (owner approved 2026-10-01; scope words follow what the server matches — linked document numbers since PR #1850, phone digits since 2026-10-06) | `Search orders…`; accessible scope `Search sales orders by SO number, customer, phone, imported reference or linked document number` | Unverified whole-database item search claim · naming a field the server search does not match |
 
+## The Tasks panel words — owner 12 Oct 2026 (03 §8) · round 3 brief, 13 Oct 2026 (point 2) · BUILT 13 Oct 2026
+
+The shell's right panel. Work words stay the Work engine's own sentences (the card title is the act, naming the
+party); this section holds the panel's frame and the card rows.
+
+| Where | Use exactly | Do not use |
+|---|---|---|
+| Title row | `Tasks` · `{weekday} · {n} left`, where `{n}` is today's `To do` | a second number that differs from the `To do` tab |
+| Day strip | `Mon` · `Tue` · `Wed` · `Thu` · `Fri` (`Sat` only while work is dated on it) over the day number, with that day's `To do` under it · `Previous week` · `Next week` | a count of Waiting or Done under a day |
+| Tabs | `To do {n}` · `Waiting {n}` · `Done {n}` | `Waiting for answer` · `Done today` in this panel (they are the Workspace page's rail words) |
+| Party head | the party's name and its count; a purchase batch sits under `SO Batch Purchase`; work with no party sits under its page's name | a module group in place of the party |
+| Card rows, label left and value right | `PO No` · `SO No` · `MPR No` · `Supplier DO` (a record of another kind: its page's name) · `Deadline` `{weekday, date}` · late: `{weekday, date} · {n} days late` / `1 day late`, or `· passed` when the working days cannot be counted · `Deadline` `No date · set by {page}` · a purchase batch: `Cut-off` `{time}`, late `{time} · passed` · waiting: `Asked` `{date}` · `Next contact` `{date}` · back from waiting: `No answer by` `{date}` · covering: `For` `{name}` · finished: `Record` `{record}` · `Done` `{time}` | `Overdue` · `Missed` · a tag or a button on a card · amber on any row but the one that has passed |
+| Empty | `Nothing to do today` · `Nothing planned for this day` · `Nothing is waiting for an answer` · `Nothing done on this day` | `0` while loading or failed |
+| Opened task, above the view | `All tasks` · `{n} of {m}` · `Previous task` · `Next task` | `Tasks` as the way back |
+| The one task view: head | the task in its list card's own words · `{page} / {record}` (`Purchasing / PO-2609-0042`; a purchase batch: `SO Batch Purchase` alone) · the record's door `Open {record}` · the initials of who does it now, with the full name on hover | `Open` as a second button in the head · a status tag · the owner's name inside the task sentence |
+| The one task view: fact rows | the list card's own rows without the record, then `Contact` `{party}` or `{party} · {channel}` (`WhatsApp` · `Email` · `Phone` · `In person`) once a request is recorded, then the owning module's facts in its own dictionary words (`Supplier Deliver To` · `PO Delivery Date` · `This task` · `Whole batch`), then `Sales Order` `{SO No}` or `{n} Sales Orders` | `Customer date` (the fact is `Customer’s original requested delivery`, shown on the Route) · `Sales order` in lower case · `Show each` |
+| The one task view: tabs | `Steps` · `Route` · `History` · `Files {n}` (`Files` alone when there is none); spoken as `Task sections` | `Info` · `Timeline` · `Notes` (not built) · a count on any other tab |
+| Steps of an act with no form of its own | the Work item's own problem, then the step named by its required result with `Finish when: {completion}` only when that adds to the name, the one button `Open {record}`, and `Then: {next consequence}` when the rule has one | `Record the answer` · `Save` · `Not now` · `Mark done` |
+| Goods of a PO inside its task | the item, its size or SKU, then `Order Qty {n}` · `Received Qty {n}` · `Pending Delivery Qty {n}` | a table that scrolls sideways inside the panel |
+| Route | the Order Route's own points and words (`Proceed` · `PO` · `GRN` · `Contact` · `Delivery`, its header and its Payment line) · several Sales Orders: `Order Route of` `{SO No}` · `Open {SO No}` · `No Sales Order is linked to this task` · `Loading the Order Route` · `The Order Route could not be read` | `PO placed` · `Supplier delivers` · `Goods in warehouse` · `Paid` (the package's words) |
+| History | `Asked {party}` with `{channel} · Next contact {date}` · `No answer` with `No answer by {date}` · `Answer recorded` · a PO: `PO sent to supplier` with `{PO No}-V{n} · {channel}` · `{channel} opened` · `Supplier answer recorded` with `Supplier date {date}, {date}` and `Delayed` · `Supplier DO {number} recorded` · `Email · Sending not confirmed` · each with `{weekday, date} {HH:MM}` and who recorded it · `No history yet` | `sent` for opening a channel · an invented time |
+| Files | stages `Sales Order` · `Purchase Order` with `{n} Sales Orders` · `{n} Purchase Orders` when more than one · a file `{SO No}.pdf` · `{PO No}-V{n}.pdf` with its kind under it · `View {file}` · `Download {file}` · `No file yet` · `No file is recorded for this task` · `Loading PDF` · `This file could not be opened. Try again.` | `Sent and received` · `Customer not recorded` under a file |
+| A form wider than the panel, on the full surface | the act as its title and `{party} · {record}` beside it (`Record supplier answer` · `Nice Future · PO-2609-0042-V2`), then the owning module's own form with its own `Cancel` and saving button | a second `Close` or `Back` beside the form's `Cancel` · the form inside the 320 panel |
+| Toast after a task is saved | the owning module's own success words · `Next: {party}` when another task of the same kind waits · `Close message` | `Undo` · `Saved` with nothing after it · a green line in the panel |
+| Failure | `Tasks could not be refreshed` · `Last updated {time}` · `Could not refresh {source}` · `Try again` | a silent empty list |
+
 ### Accepted Sales Orders shared template — 2026-10-01
 
 Owner-accepted screen vocabulary: `Order summary` · `Stock Status` · `Not applicable` · `Clear all` · `Open full page` · `Related documents`. These describe the accepted read-only template. `Receipt unconfirmed` is retired (owner ruling 2026-10-05): a failed stock read shows its error with `Try again`.

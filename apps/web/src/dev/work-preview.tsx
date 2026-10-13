@@ -14,7 +14,8 @@
  */
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import OperationApp from "@/pages/operation/OperationApp";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { OperationWorkItem, OperationWorkModule, OperationWorkResponse } from "@carres/shared";
 import { addWorkingDays, myHolidaySet } from "@carres/shared";
@@ -420,6 +421,30 @@ globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   }
   const poConfirm = /\/api\/operation\/pos\/([^/]+)\/confirm-sent/.exec(url);
   if (poConfirm) { sentPos.add(decodeURIComponent(poConfirm[1]!)); return json({ ok: true }); }
+  /* The purchase batch task's own PO reads (`BatchPanel`): the issued PO, its
+     document and its send record. Seeded so the task's send steps can be walked. */
+  const batchPo = /\/api\/operation\/pos\/([^/?]+)\/(issue-context|print-data|sends)/.exec(url);
+  if (batchPo) {
+    const id = decodeURIComponent(batchPo[1]!);
+    const po = SO_BATCH.registerRows[0]!.pos.find((p) => p.poId === id);
+    if (!po) return json({ message: "not seeded" }, 404);
+    const supplier = WINDOW_SUPPLIERS.find((s) => s.id === po.supplierId);
+    if (batchPo[2] === "issue-context") return json({
+      id, supplierId: po.supplierId, supplierName: po.supplierName, destinationId: "dest-klang", destination: "Carres Klang Warehouse",
+      poSendChannel: "whatsapp", contact: null, contactEmail: supplier?.contact_email ?? null, whatsappGroupUrl: supplier?.whatsapp_group_url ?? null, version: 1,
+    });
+    if (batchPo[2] === "print-data") return json({
+      po_id: id, po_number: id, version: 1, issue_date: TODAY,
+      supplier: { name: po.supplierName, address: "TEST supplier address", contact: "TEST contact" },
+      destination: { name: "Carres Klang Warehouse", address: "TEST warehouse address" },
+      delivery_instructions: "TEST data only. Do not send this document.", eta_date: "2026-10-20",
+      so_refs: [1390], issued_by: "TEST · Staff A",
+      lines: [{ sku: "TEST-MAT-K", description: "TEST Mattress · King", qty: 6, unit: "pcs", identity_mode: "quantity" }],
+      terms: "LOCAL TEST. No purchase was placed.",
+    });
+    return json({ sends: sentPos.has(id) ? [{ channel: "whatsapp", note: null, sent_at: `${TODAY}T03:10:00Z`, kind: "confirmed_sent", recipient: "group", po_version: 1, sent_by_name: "TEST · Staff A" }] : [] });
+  }
+  if (/\/api\/operation\/pos\/email-capability/.test(url)) return json({ configured: false });
   const onePo = /\/api\/operation\/pos\?[^#]*poId=([^&]+)/.exec(url);
   if (onePo) return json(poRow(decodeURIComponent(onePo[1]!)));
   if (/\/api\/operation\/delivery-arrangements(\?|$)/.test(url)) return json(ARRANGEMENTS);
@@ -431,21 +456,38 @@ globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   return realFetch(input, init);
 };
 
-useAuth.setState({ role: "operation", user: { id: ME, email: "sha@carres.co" } as never });
+/* `?shell=1` mounts the REAL shell over the same seeded reads, so the Tasks
+   panel's one task view (its Route tab reads the Order Route's own sources)
+   can be walked and measured with shaped answers. */
+const shell = new URLSearchParams(window.location.search).get("shell") === "1";
+useAuth.setState({
+  role: "operation", hydrated: true, loading: false,
+  user: { id: ME, email: "sha@carres.co" } as never,
+  ...(shell ? { session: { access_token: "preview", user: { id: ME, email: "sha@carres.co" } } as never } : {}),
+});
+if (shell) {
+  try { window.localStorage.setItem(`carres.pendingWork.shownOn.${ME}`, REAL_TODAY); } catch { /* a private window: the reminder shows */ }
+}
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 const start = new URLSearchParams(window.location.search).get("at")
-  ?? "/operation?tab=work&day=missed&selected=delivery%3ASO-1362%3Aconfirm_delivery_date";
+  ?? (shell ? "/operation?tab=purchase" : "/operation?tab=work&day=missed&selected=delivery%3ASO-1362%3Aconfirm_delivery_date");
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[start]}>
-        <PreviewFrame label="Work shell and middle cards (illustrative data)">
-          <div className="flex h-full flex-col">
-            <OperationWork />
-          </div>
-        </PreviewFrame>
+        {shell ? (
+          <Routes>
+            <Route path="/operation/*" element={<OperationApp />} />
+          </Routes>
+        ) : (
+          <PreviewFrame label="Work shell and middle cards (illustrative data)">
+            <div className="flex h-full flex-col">
+              <OperationWork />
+            </div>
+          </PreviewFrame>
+        )}
       </MemoryRouter>
     </QueryClientProvider>
   </StrictMode>,

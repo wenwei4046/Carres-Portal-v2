@@ -10,8 +10,8 @@
  *
  * A 320px white card on the canvas. `›` hides it; the shell header then shows
  * a `Tasks 5` pill that opens it again. The choice is remembered per browser.
- * While a task's own work panel is open the card widens, because a module's
- * form does not fit 320px.
+ * With a task open the card stays 320 below 1280 wide, so a task takes no
+ * room from the list (03 §8); from 1280 it may use the spare width.
  */
 import { useEffect } from "react";
 import { create } from "zustand";
@@ -19,7 +19,8 @@ import MIcon from "@/components/carres/MIcon";
 import TasksArea from "../tasks/TasksArea";
 import { useTasksHost } from "../tasks/tasks-host";
 import { useOpenWorkSet } from "../use-open-work";
-import { myMissedAndToday } from "../work/work-model";
+import { todoOn } from "../tasks/task-cards";
+import { myTasks } from "../tasks/tasks-model";
 
 const KEY = "shell-tasks-open";
 
@@ -59,13 +60,13 @@ export const useShellTasks = create<{
   },
 }));
 
-/** Missed + today for the signed-in person — the same count the old rail
- *  badge carried. Null while loading or failed: never a guessed number. */
+/** The signed-in person's `To do` for today: the very list the panel opens
+ *  on (`todoOn`), so the title, the button and the `To do` tab say one
+ *  number. Null while loading or failed: never a guessed number. */
 export function useTasksLeft(): number | null {
-  const { items, myUserId, myFocus, hasData, error } = useOpenWorkSet();
-  if (!hasData || error) return null;
-  const { missed, today } = myMissedAndToday(items, myUserId, myFocus);
-  return missed + today;
+  const { items, myUserId, generatedOn, hasData, error } = useOpenWorkSet();
+  if (!hasData || error || !generatedOn) return null;
+  return todoOn(myTasks(items, myUserId), generatedOn, generatedOn).length;
 }
 
 /** The `Tasks 5` pill that re-opens a hidden panel (Layout Standard §1: "a
@@ -106,22 +107,18 @@ export default function ShellTasks() {
   const left = useTasksLeft();
   if (!open) return null;
   const now = new Date();
-  const mon = now.toLocaleDateString("en-GB", { month: "short" }).toUpperCase();
   const weekday = now.toLocaleDateString("en-GB", { weekday: "long" });
   return (
     <aside
       aria-label="Tasks"
       data-testid="shell-tasks"
       className={`flex min-h-0 shrink-0 flex-col overflow-hidden rounded-lg border border-c-border bg-white ${
-        taskOpen ? "w-[clamp(366px,32vw,560px)]" : "w-[320px]"
+        /* 320 always (01 §2), so opening a task never takes room from the
+           list. On a wide screen the opened task may use the spare width. */
+        taskOpen ? "w-[320px] min-[1280px]:w-[clamp(366px,32vw,560px)]" : "w-[320px]"
       }`}
     >
-      <div className="flex h-9 shrink-0 items-center gap-1.5 border-b border-c-line px-3.5">
-        {/* The day badge: month on charcoal over the day number. */}
-        <span className="flex h-7 w-7 shrink-0 flex-col overflow-hidden rounded-[7px] border border-c-input-border bg-white" aria-hidden>
-          <span className="bg-c-ink text-center text-[7px] font-semibold leading-[10px] tracking-[0.04em] text-white">{mon}</span>
-          <span className="grid flex-1 place-items-center text-body font-semibold text-c-ink">{now.getDate()}</span>
-        </span>
+      <div className="flex h-9 shrink-0 items-center gap-1.5 px-3.5">
         <span className="flex min-w-0 flex-1 items-baseline gap-1.5 whitespace-nowrap">
           <span className="text-strong text-c-ink">Tasks</span>
           <span className="truncate text-meta text-c-muted">

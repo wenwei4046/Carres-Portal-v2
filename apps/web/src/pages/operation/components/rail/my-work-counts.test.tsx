@@ -16,6 +16,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OperationWorkItem, OperationWorkResponse } from "@carres/shared";
+import { fmtDate } from "@/lib/fmt-date";
 import { qk } from "@/lib/queries";
 
 const ME = "11111111-1111-4111-8111-111111111111";
@@ -201,6 +202,10 @@ function workFocusRows(): number {
   return missed + today;
 }
 
+/** The Tasks list's cards on screen, and those with the one amber (late) row. */
+const taskCards = () => [...screen.getByTestId("task-list").querySelectorAll<HTMLElement>("[data-task-card]")];
+const lateCards = () => taskCards().filter((card) => card.querySelector('[data-warn="true"]')).length;
+
 beforeEach(() => {
   net.mode = "ok";
   net.work = response(WEEK);
@@ -249,23 +254,27 @@ describe("HF-3 · one count definition", () => {
 
     await screen.findByTestId("my-work-panel");
     expect([panelCount("Late"), panelCount("Today")]).toEqual([missed, today]);
-    /* The rail's Tasks door opens the ONE Tasks list; its Missed section
-       carries the badge's own Missed number. */
+    /* The rail's Tasks door opens the ONE Tasks list. It has no Missed
+       section since 13 Oct 2026: late work sits in today's `To do`, each card
+       with its one amber row. Those cards are the badge's own Missed number. */
     fireEvent.click(railButton());
     await screen.findByTestId("tasks-list");
-    expect(within(await screen.findByTestId("task-section-missed")).getByTestId("section-count")).toHaveTextContent(String(missed));
+    await waitFor(() => expect(lateCards()).toBe(missed));
     rail.unmount();
 
     mount(<OperationWork />, qc);
     await waitFor(() => expect(workFocusRows()).toBe(missed + today));
   });
 
-  it("2b · the Tasks list's today section carries the badge's today number", async () => {
+  it("2b · the Tasks list's cards due today, not late, are the badge's today number", async () => {
     mount(<OperationRightRail />);
     await waitFor(() => expect(badgeCounts()).toEqual([1, 1]));
     fireEvent.click(railButton());
     await screen.findByTestId("tasks-list");
-    expect(within(await screen.findByTestId("task-section-2026-09-17")).getByTestId("section-count")).toHaveTextContent("1");
+    /* Today's `To do` also holds late work and work with no date; the cards
+       whose deadline IS today, with no amber row, are the badge's Today. */
+    await waitFor(() => expect(taskCards().filter((card) => !card.querySelector("[data-warn]") && card.textContent?.includes(fmtDate("2026-09-17")))).toHaveLength(1));
+    expect(lateCards()).toBe(1);
   });
 
   it("3 · a staff email different from the login email is still the same person in the rail and in My Work", async () => {
