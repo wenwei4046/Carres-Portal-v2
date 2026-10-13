@@ -21,57 +21,22 @@
  * `Leave without saving?`.
  */
 import { useCallback, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ListTodo, X } from "lucide-react";
-import {
-  poWindowWorkFromSoBatch,
-  soBatchPurchaseResponseSchema,
-  type OperationWorkModule,
-  type SoBatchPurchaseResponse,
-} from "@carres/shared";
+import type { OperationWorkModule } from "@carres/shared";
 import Icon from "@/components/kit/Icon";
 import MIcon from "@/components/carres/MIcon";
-import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
-import { useOperationSuppliers } from "@/lib/queries";
 import { useOpenWorkSet, type WorkRow } from "../use-open-work";
-import { TASK_MODULE_WORD, TASKS_WORDS as T, myTasks, type PoWindowFacts } from "./tasks-model";
+import { usePoWindowFacts } from "./use-po-window-facts";
+import { TASK_MODULE_WORD, TASKS_WORDS as T, myTasks } from "./tasks-model";
 import { TaskOpenContext } from "./TaskFrame";
 import TaskList from "./TaskList";
 import { TASK_CARD_WORDS, taskStrip, taskTabs, type TaskCard, type TaskTab } from "./task-cards";
 import { useTaskDesk } from "./use-task-desk";
 import { panelFor } from "./work-panels";
 
-/** The purchase batches' facts for their row words, from the same SO Batch
- *  read the Work items were projected from. Read only while a batch is listed. */
-function usePoWindowFacts(enabled: boolean): Map<string, PoWindowFacts> {
-  const demands = useQuery<SoBatchPurchaseResponse>({
-    queryKey: ["so-batch-purchase", null],
-    queryFn: async () =>
-      soBatchPurchaseResponseSchema.parse(await apiFetch<unknown>("/api/operation/purchase/demands")) as SoBatchPurchaseResponse,
-    staleTime: 15_000,
-    enabled,
-  });
-  const suppliers = useOperationSuppliers({ enabled });
-  return useMemo(() => {
-    const map = new Map<string, PoWindowFacts>();
-    if (!demands.data || !suppliers.data) return map;
-    try {
-      for (const window of poWindowWorkFromSoBatch(demands.data, suppliers.data.suppliers as never, { keepClosed: true })) {
-        const demandSos = [...new Set(demands.data.rows
-          .filter((r) => r.poWindow === window.key && window.demand.rowIds.includes(r.id) && r.so != null)
-          .map((r) => r.so as number))];
-        map.set(window.key, { window, demandSos });
-      }
-    } catch {
-      /* Settings unavailable: rows keep the Work item's own sentence. */
-    }
-    return map;
-  }, [demands.data, suppliers.data]);
-}
-
 /** The same weekday in the week that starts on `monday` (both `YYYY-MM-DD`). */
-function sameWeekday(monday: string, chosen: string): string {
+export function sameWeekday(monday: string, chosen: string): string {
   const at = (iso: string) => new Date(`${iso}T00:00:00Z`);
   const offset = (at(chosen).getUTCDay() + 6) % 7;
   const day = at(monday); day.setUTCDate(day.getUTCDate() + offset);
