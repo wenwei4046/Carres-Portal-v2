@@ -115,7 +115,7 @@ const client = new QueryClient({ defaultOptions: { queries: { retry: false } } }
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[`/operation?tab=purchase${params.get("so") ? `&so=${params.get("so")}` : ""}`]}>
+      <MemoryRouter initialEntries={[`/operation?tab=purchase${params.get("so") ? `&so=${params.get("so")}` : ""}${params.get("view") ? `&view=${params.get("view")}` : ""}`]}>
         <Routes>
           <Route path="/operation/*" element={<OperationApp />} />
         </Routes>

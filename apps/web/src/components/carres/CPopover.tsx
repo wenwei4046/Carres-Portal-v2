@@ -56,6 +56,7 @@ export function CMenuItem({
   checked,
   onSelect,
   strong = false,
+  disabled = false,
   testId,
 }: {
   icon?: string;
@@ -64,6 +65,8 @@ export function CMenuItem({
   checked?: boolean;
   onSelect: () => void;
   strong?: boolean;
+  /** Not available yet: 45% and no hover or click (01 §3 "Disabled"). */
+  disabled?: boolean;
   testId?: string;
 }) {
   return (
@@ -71,11 +74,13 @@ export function CMenuItem({
       type="button"
       role={checked === undefined ? "menuitem" : "menuitemradio"}
       aria-checked={checked}
-      onClick={onSelect}
+      aria-disabled={disabled || undefined}
+      disabled={disabled}
+      onClick={disabled ? undefined : onSelect}
       data-testid={testId}
-      className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-left text-[13px] text-c-ink hover:bg-c-search-bg ${
-        strong ? "font-semibold" : "font-medium"
-      }`}
+      className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-left text-[13px] text-c-ink ${
+        disabled ? "cursor-default opacity-45" : "hover:bg-c-search-bg"
+      } ${strong ? "font-semibold" : "font-medium"}`}
     >
       {icon && <MIcon name={icon} size={18} className="text-c-secondary" />}
       <span className="min-w-0 flex-1">{children}</span>

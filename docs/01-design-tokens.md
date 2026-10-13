@@ -14,7 +14,7 @@ Business facts, permissions, completion gates, document formats and exact words 
 | `docs/03-page-patterns.md` | Shared page compositions | Current target |
 | `docs/ui/MASTER.md` | Interaction, ownership and acceptance | Current authority |
 | `apps/web/src/styles/carres-tokens.css`, `components/kit/`, `components/register/` | Running implementation | Still draws the previous kit; migration required; preserve APIs and behaviour |
-| `docs/ui-reference/sales-order-design/` | Supplied 12 Oct specimen | Reference only; not production code or business law |
+| `docs/ui-reference/sales-order-design/` | Supplied specimen (files refreshed from the 13 Oct 2026 package; no token value changed) | Reference only; not production code or business law |
 
 Use tokens, not page-local numbers. Change the shared components once; never clone the specimen into a module. The frame, sizes, widths and cell formats never change per module; a module only chooses its content. Git keeps the old values; no archive or second kit is created.
 
@@ -325,3 +325,5 @@ Everything in this table is **PROPOSAL / NOT LAW**. Pages are built on the curre
 | Purchasing and delivery timing | Batch cut-off times, outstation logistics order, PO sending steps | Purchasing and Delivery MASTERs |
 | Task completion | `Mark done`, an undo window, follow-up attempt counts, tasks that close by themselves when the work is done on their page | Workspace MASTER and the owning module |
 | Appearance storage | Browser only | The person's profile in the application |
+| SO Batch Purchase views (13 Oct package, Layout Standard) | One view button: `By supplier` · `By sales order` · `By category` · `By order deadline`; no `Cards`, no `Match Ready Stock` | Purchasing MASTER §9.1. **Adopted and built 13 Oct 2026** (owner's fix list round 2). The package's row word `Overdue` is not used: the row reads `Deadline passed` (owner's word rule). Its `Show columns for` module sets are named and marked `Coming soon` until the page reads those facts |
+| Workspace page and `My Task ▾` scope button (13 Oct package, Layout Standard) | Page title `Workspace`, `Summary` panel, short task table, scope menu | Workspace MASTER. **PROPOSAL / NOT BUILT**: the owner's 13 Oct instruction keeps Workspace and the Tasks panel out of this round |

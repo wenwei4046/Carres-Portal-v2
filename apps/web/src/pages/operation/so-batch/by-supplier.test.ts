@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PurchaseDemandRow, SoBatchOrderRow } from "@carres/shared";
-import { BY_SUPPLIER, daysBetween, orderedSupplierGroups, supplierGroups, todayNumbers } from "./by-supplier";
+import { BY_SUPPLIER, daysBetween, deadlineKey, orderedSupplierGroups, supplierGroups, todayNumbers } from "./by-supplier";
 
 /**
  * SO Batch Purchase · By supplier (owner 12 Oct 2026). One row per supplier
@@ -73,6 +73,66 @@ describe("By supplier: one row per supplier and category", () => {
     const [mixed] = supplierGroups([row({ id: "a" }), row({ id: "b", poDeliveryWorkingDays: 14 })], "2026-10-12T09:00");
     expect(BY_SUPPLIER.supplierLine(same!)).toBe("We collect · 7d");
     expect(BY_SUPPLIER.supplierLine(mixed!)).toBe("We collect");
+  });
+});
+
+/* THE TWO OTHER GROUPINGS (owner 13 Oct 2026). Same lines, same arithmetic;
+   only the key they are gathered under changes. */
+describe("By category and By order deadline: the same lines, grouped another way", () => {
+  const rows = [
+    row({ id: "a", category: "sofa", supplierId: "s-2", supplier: "TEST Supplier Two", toBuy: 1, orderBy: "2026-10-09" }),
+    row({ id: "b", category: "mattress", supplierId: "s-1", supplier: "TEST Supplier One", toBuy: 2, orderBy: "2026-10-12" }),
+    row({ id: "c", category: "mattress", supplierId: "s-3", supplier: "TEST Supplier Three", toBuy: 3, orderBy: "2026-10-14" }),
+    row({ id: "d", category: "bedframe", supplierId: "s-2", supplier: "TEST Supplier Two", toBuy: 4, orderBy: "2026-10-30" }),
+    row({ id: "e", category: "bedframe", supplierId: "s-2", supplier: "TEST Supplier Two", toBuy: 5, orderBy: null }),
+  ];
+
+  it("By category: one row per category in the buying order, naming every supplier in it", () => {
+    const groups = supplierGroups(rows, "2026-10-12T09:00", "category");
+    expect(groups.map((g) => `${g.category} · ${g.qty} · ${g.suppliers.join(", ")}`)).toEqual([
+      "mattress · 5 · TEST Supplier One, TEST Supplier Three",
+      "bedframe · 9 · TEST Supplier Two",
+      "sofa · 1 · TEST Supplier Two",
+    ]);
+    expect(groups.map((g) => g.key)).toEqual(["category|mattress", "category|bedframe", "category|sofa"]);
+    expect(groups.every((g) => g.deadline === undefined)).toBe(true);
+  });
+
+  it("the deadline key: passed, each of the next seven days, then later, then none", () => {
+    expect(deadlineKey("2026-10-11", "2026-10-12")).toBe("passed");
+    expect(deadlineKey("2026-10-12", "2026-10-12")).toBe("2026-10-12");
+    expect(deadlineKey("2026-10-18", "2026-10-12")).toBe("2026-10-18");
+    expect(deadlineKey("2026-10-19", "2026-10-12")).toBe("later");
+    expect(deadlineKey(null, "2026-10-12")).toBe("none");
+  });
+
+  it("By order deadline: passed first, then day by day, then later, then lines with no deadline", () => {
+    const groups = supplierGroups(rows, "2026-10-12T09:00", "deadline", "2026-10-12");
+    expect(groups.map((g) => `${g.key} · ${g.deadline} · ${g.qty}`)).toEqual([
+      "deadline|passed · passed · 1",
+      "deadline|2026-10-12 · day · 2",
+      "deadline|2026-10-14 · day · 3",
+      "deadline|later · later · 4",
+      "deadline|none · none · 5",
+    ]);
+    expect(groups[0]!.suppliers).toEqual(["TEST Supplier Two"]);
+  });
+
+  it("no grouping loses or doubles a line", () => {
+    const total = (by: "supplier" | "category" | "deadline") =>
+      supplierGroups(rows, "2026-10-12T09:00", by, "2026-10-12").reduce((n, g) => n + g.qty, 0);
+    expect(total("supplier")).toBe(15);
+    expect(total("category")).toBe(15);
+    expect(total("deadline")).toBe(15);
+  });
+
+  it("the words: the passed row never says Overdue or Missed", () => {
+    expect(BY_SUPPLIER.deadlinePassed).toBe("Deadline passed");
+    expect(BY_SUPPLIER.lateToOrder).toBe("Late to order");
+    expect(BY_SUPPLIER.nextWeekAndLater).toBe("Next week +");
+    expect(Object.values(BY_SUPPLIER).filter((v) => typeof v === "string").join(" ")).not.toMatch(/Overdue|Missed/);
+    expect("cards" in BY_SUPPLIER).toBe(false);
+    expect("matchReadyStock" in BY_SUPPLIER).toBe(false);
   });
 });
 
@@ -167,6 +227,15 @@ describe("Ordered: what is already on a PO, by supplier and category", () => {
     expect(g!.key.startsWith("ordered|")).toBe(true);
     expect(g!.cutOffPassed).toBe(false);
     expect(g!.qty).toBeGreaterThan(0);
+  });
+
+  it("By category gathers what is ordered by category, each line naming its supplier; By order deadline shows none", () => {
+    const groups = orderedSupplierGroups(orders, "category");
+    expect(groups.map((g) => `${g.key} · ${g.qty} · ${g.suppliers.join(", ")}`)).toEqual([
+      "ordered|category|mattress · 3 · TEST Supplier One", "ordered|category|sofa · 1 · TEST Supplier Two",
+    ]);
+    expect(groups[0]!.ordered!.lines.every((l) => l.supplier === "TEST Supplier One")).toBe(true);
+    expect(orderedSupplierGroups(orders, "deadline")).toEqual([]);
   });
 
   it("an ordered line carries the model code the data spells", () => {

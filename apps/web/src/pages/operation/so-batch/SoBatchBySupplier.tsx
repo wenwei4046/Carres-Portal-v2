@@ -25,7 +25,7 @@ import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import TwoLineCell from "@/components/register/TwoLineCell";
 import RowTick from "@/components/register/RowTick";
 import ItemRows from "@/components/register/ItemRows";
-import { BY_SUPPLIER as B, daysBetween, type SupplierGroup } from "./by-supplier";
+import { BY_SUPPLIER as B, daysBetween, type GroupBy, type SupplierGroup } from "./by-supplier";
 
 /** The five fixed columns (01 §5) and the grid's own tick and arrow columns. */
 const FIXED = { items: 80, orders: 96, deadline: 120, readyBy: 120, status: 120 } as const;
@@ -34,6 +34,13 @@ const FIXED_TOTAL = FIXED.items + FIXED.orders + FIXED.deadline + FIXED.readyBy 
    header a few pixels more than its column asks for. */
 const GRID_LEAD = 80;
 const SUPPLIER_MIN = 150;
+/* `By category` and `By order deadline` (the design file's third layout):
+   the first column, Items, Sales orders, Suppliers and Status. Suppliers also
+   holds the room the design leaves empty before Status, so an item line's
+   Supplier delivers to has space for its select. */
+const GROUPED = { items: 80, orders: 96, suppliers: 230, status: 124 } as const;
+const GROUPED_TOTAL = GROUPED.items + GROUPED.orders + GROUPED.suppliers + GROUPED.status;
+const LINE_SUPPLIER = 110;
 
 const soRef = (so: number | null) => (so == null ? B.notRecorded : `SO-${so}`);
 const weekday = (iso: string) => fmtDate(iso).split(",")[0] ?? "";
@@ -43,10 +50,12 @@ const poNo = (id: string) => documentDisplayNumber(id);
 const modelCode = (line: PurchaseDemandRow) => (line.skus?.length ? line.skus.join(" + ") : line.item);
 
 export default function SoBatchBySupplier({
-  groups, today, isLoading, storageKey, sessionKey, canBuy, isTicked, onToggleLine, onToggleLines,
+  groups, by = "supplier", today, isLoading, storageKey, sessionKey, canBuy, isTicked, onToggleLine, onToggleLines,
   selectionSummary, selectionPrimary, toolbarEnd, toolbarAfterTools, toolbarStart, onOpenOrder, emptyMessage, initialSearch, searchPlaceholder, lineExtras,
 }: {
   groups: SupplierGroup[];
+  /** How the rows are grouped. The columns follow it. */
+  by?: GroupBy;
   /** The server's Malaysia date, `YYYY-MM-DD`. */
   today: string;
   isLoading: boolean;
@@ -102,7 +111,8 @@ export default function SoBatchBySupplier({
     measure();
     return () => observer.disconnect();
   });
-  const supplierWidth = room > 0 ? Math.max(SUPPLIER_MIN, Math.floor(room - GRID_LEAD - FIXED_TOTAL - 2)) : 260;
+  const fixedTotal = by === "supplier" ? FIXED_TOTAL : GROUPED_TOTAL;
+  const supplierWidth = room > 0 ? Math.max(SUPPLIER_MIN, Math.floor(room - GRID_LEAD - fixedTotal - 2)) : 260;
 
   /* A supplier with rows in two categories (one PO per supplier and category)
      names the category on each of them: `Ohana · Bedframe`, `Ohana · Sofa`. */
@@ -111,9 +121,33 @@ export default function SoBatchBySupplier({
     for (const g of groups) { const id = g.supplierId ?? "none"; (seen.get(id) ?? seen.set(id, new Set()).get(id)!).add(g.category ?? "other"); }
     return new Set([...seen].filter(([, categories]) => categories.size > 1).map(([id]) => id));
   }, [groups]);
-  const nameOf = (g: SupplierGroup) => B.groupName(g, twoCategories.has(g.supplierId ?? "none"));
+  const nameOf = (g: SupplierGroup) => (by === "category" ? B.category(g.category) : by === "deadline" ? (g.orderBy ?? B.notRecorded) : B.groupName(g, twoCategories.has(g.supplierId ?? "none")));
 
-  const columns = useMemo<DataGridColumn<SupplierGroup>[]>(() => [
+  /* A group of one category counts in that category's unit; a mixed group in pieces. */
+  const unitOf = (g: SupplierGroup) => {
+    const all = [...g.lines.map((l) => l.category), ...(g.ordered?.lines ?? []).map((l) => l.category)];
+    return new Set(all).size <= 1 ? g.category : null;
+  };
+  const statusWord = (g: SupplierGroup) => (g.ordered ? B.ordered : g.deadline === "passed" ? B.lateToOrder : g.cutOffPassed ? B.cutOffPassed : B.toBuy);
+  const statusCell = (g: SupplierGroup) => {
+    if (g.ordered) return (
+      <span className="flex min-w-0 flex-col items-start gap-0.5" data-testid={`by-supplier-status-${g.key}`}>
+        <StatusPill tone="success">{B.ordered}</StatusPill>
+        <span className="break-words text-meta text-c-secondary" title={g.ordered.poIds.map(poNo).join(", ")}>{B.poRefs(g.ordered.poIds, poNo)}</span>
+      </span>
+    );
+    const warn = g.deadline === "passed" || g.cutOffPassed;
+    return (
+      <span className="flex min-w-0 flex-col items-start gap-0.5" data-testid={`by-supplier-status-${g.key}`}>
+        <StatusPill tone={warn ? "warning" : "neutral"}>{statusWord(g)}</StatusPill>
+        <span className={`text-meta ${warn ? "text-c-warn-fg" : "text-c-secondary"}`}>
+          {warn ? B.toBuyLine(unitOf(g), g.qty) : B.qty(unitOf(g), g.qty)}
+        </span>
+      </span>
+    );
+  };
+
+  const supplierColumns = useMemo<DataGridColumn<SupplierGroup>[]>(() => [
     {
       key: "supplier", label: B.colSupplier, width: supplierWidth, minWidth: SUPPLIER_MIN, sortable: true, wrap: true,
       accessor: (g) => <TwoLineCell strong top={nameOf(g)} sub={g.ordered ? B.category(g.category) : B.supplierLine(g)} testId={`by-supplier-name-${g.key}`} />,
@@ -156,32 +190,67 @@ export default function SoBatchBySupplier({
     },
     {
       key: "status", label: B.colStatus, width: FIXED.status, minWidth: FIXED.status, sortable: true, wrap: true,
-      accessor: (g) => g.ordered ? (
-        <span className="flex min-w-0 flex-col items-start gap-0.5" data-testid={`by-supplier-status-${g.key}`}>
-          <StatusPill tone="success">{B.ordered}</StatusPill>
-          <span className="break-words text-meta text-c-secondary" title={g.ordered.poIds.map(poNo).join(", ")}>{B.poRefs(g.ordered.poIds, poNo)}</span>
-        </span>
-      ) : (
-        <span className="flex min-w-0 flex-col items-start gap-0.5" data-testid={`by-supplier-status-${g.key}`}>
-          <StatusPill tone={g.cutOffPassed ? "warning" : "neutral"}>{g.cutOffPassed ? B.cutOffPassed : B.toBuy}</StatusPill>
-          <span className={`text-meta ${g.cutOffPassed ? "text-c-warn-fg" : "text-c-secondary"}`}>
-            {g.cutOffPassed ? B.toBuyLine(g.category, g.qty) : B.qty(g.category, g.qty)}
-          </span>
-        </span>
-      ),
+      accessor: statusCell,
       sortFn: (a, b) => Number(!!a.ordered) - Number(!!b.ordered) || Number(b.cutOffPassed) - Number(a.cutOffPassed),
-      filterValue: (g) => (g.ordered ? B.ordered : g.cutOffPassed ? B.cutOffPassed : B.toBuy),
-      exportValue: (g) => (g.ordered ? B.ordered : g.cutOffPassed ? B.cutOffPassed : B.toBuy),
+      filterValue: statusWord,
+      exportValue: statusWord,
     },
-  ], [today, supplierWidth, twoCategories]);
+  ], [today, supplierWidth, twoCategories, by]);
+
+  /* `By category` and `By order deadline`: the same rows of lines, grouped
+     another way. The first column names the group; Suppliers lists who makes
+     the goods; Items, Sales orders and Status read as they do by supplier. */
+  const columns = useMemo<DataGridColumn<SupplierGroup>[]>(() => {
+    if (by === "supplier") return supplierColumns;
+    const pick = (key: string) => supplierColumns.find((column) => column.key === key)!;
+    const search = pick("supplier").searchValue;
+    const deadlineLabel = (g: SupplierGroup) => {
+      if (g.deadline === "passed") return { top: B.deadlinePassed, sub: g.orderBy ? B.deadline(daysBetween(today, g.orderBy)) : "", warn: true };
+      if (g.deadline === "later") return { top: B.nextWeekAndLater, sub: g.orderBy ? B.from(fmtDateShort(g.orderBy)) : "", warn: false };
+      if (g.deadline === "none" || !g.orderBy) return { top: B.notRecorded, sub: "", warn: false };
+      return { top: fmtDateShort(g.orderBy), sub: `${weekday(g.orderBy)} · ${B.deadline(daysBetween(today, g.orderBy))}`, warn: false };
+    };
+    const first: DataGridColumn<SupplierGroup> = by === "category" ? {
+      key: "category", label: B.colCategory, width: supplierWidth, minWidth: SUPPLIER_MIN, sortable: true, wrap: true,
+      accessor: (g) => <TwoLineCell strong top={B.category(g.category)} testId={`by-supplier-name-${g.key}`} />,
+      searchValue: (g) => `${B.category(g.category)} ${g.suppliers.join(" ")} ${search ? search(g) : ""}`,
+      filterValue: (g) => B.category(g.category),
+      exportValue: (g) => B.category(g.category),
+    } : {
+      key: "deadlineGroup", label: B.colDeadline, width: supplierWidth, minWidth: SUPPLIER_MIN, sortable: true, wrap: true,
+      accessor: (g) => { const label = deadlineLabel(g); return <TwoLineCell strong warn={label.warn} top={label.top} sub={label.sub} testId={`by-supplier-name-${g.key}`} />; },
+      sortFn: (a, b) => (a.orderBy ?? "9999").localeCompare(b.orderBy ?? "9999"),
+      searchValue: (g) => `${deadlineLabel(g).top} ${g.suppliers.join(" ")} ${search ? search(g) : ""}`,
+      filterValue: (g) => deadlineLabel(g).top,
+      exportValue: (g) => g.orderBy ?? deadlineLabel(g).top,
+    };
+    return [
+      first,
+      { ...pick("items"), accessor: (g) => <TwoLineCell top={B.qty(unitOf(g), g.qty)} sub={B.models(g.models)} />, exportValue: (g) => B.qty(unitOf(g), g.qty) },
+      pick("orders"),
+      {
+        key: "suppliers", label: B.colSuppliers, width: GROUPED.suppliers, minWidth: GROUPED.suppliers, sortable: true, wrap: true,
+        accessor: (g) => <TwoLineCell top={g.suppliers[0] ?? B.supplierNotSet} sub={B.moreSuppliers(g.suppliers)} />,
+        sortFn: (a, b) => (a.suppliers[0] ?? "").localeCompare(b.suppliers[0] ?? ""),
+        filterValue: (g) => g.suppliers[0] ?? B.supplierNotSet,
+        exportValue: (g) => g.suppliers.join(", ") || B.supplierNotSet,
+      },
+      { ...pick("status"), width: GROUPED.status, minWidth: GROUPED.status },
+    ];
+  }, [by, supplierColumns, supplierWidth, today]);
 
   /* An item line repeats the row's columns: its tick under the row's tick,
      its name under Supplier, then quantity, sales order and deadline under
      their own headers. The engine starts an opened row at the first data
      column, so the lines step back over the tick and arrow columns (72). */
-  const lineColumns = drawn.length >= 6
-    ? `${drawn.slice(0, 6).map((width) => `${width}px`).join(" ")} 1fr`
-    : `40px 32px ${Math.max(SUPPLIER_MIN, supplierWidth)}px ${FIXED.items + 2}px ${FIXED.orders + 2}px ${FIXED.deadline + 3}px 1fr`;
+  const grouped = by !== "supplier";
+  const lineColumns = grouped
+    ? (drawn.length >= 5
+      ? `${drawn.slice(0, 5).map((width) => `${width}px`).join(" ")} ${LINE_SUPPLIER}px 1fr`
+      : `40px 32px ${Math.max(SUPPLIER_MIN, supplierWidth)}px ${GROUPED.items + 2}px ${GROUPED.orders + 2}px ${LINE_SUPPLIER}px 1fr`)
+    : drawn.length >= 6
+      ? `${drawn.slice(0, 6).map((width) => `${width}px`).join(" ")} 1fr`
+      : `40px 32px ${Math.max(SUPPLIER_MIN, supplierWidth)}px ${FIXED.items + 2}px ${FIXED.orders + 2}px ${FIXED.deadline + 3}px 1fr`;
   const stepBack = drawn.length >= 2 ? drawn[0]! + drawn[1]! : 72;
 
   return (
@@ -201,10 +270,11 @@ export default function SoBatchBySupplier({
       appearance="reference"
       palette="slate"
       presentationTools
-      /* The ⋮ menu opens below its button and to the left. With Match Ready
-         Stock after it, the button is no longer over the Status column, so
-         its menu never covers that column (owner 13 Oct 2026). */
-      toolbarAfterTools={toolbarAfterTools}
+      /* The ⋮ menu opens below its button and to the left. The toolbar ends
+         one Status column short (where the design file has its Tasks button),
+         so the button is not over Status and its menu never covers that
+         column (owner 13 Oct 2026). */
+      toolbarAfterTools={toolbarAfterTools ?? <span aria-hidden className="block" style={{ width: (by === "supplier" ? FIXED.status : GROUPED.status) + 8 }} />}
       wrapToolbar
       /* The top bar already searches everything; here search is one icon, so
          the tabs, the views and Match Ready Stock stay on one line (01 §4). */
@@ -230,8 +300,9 @@ export default function SoBatchBySupplier({
               <span role="columnheader" className="px-[5px]">{B.lineItem}</span>
               <span role="columnheader" className="px-[5px]">{B.lineQty}</span>
               <span role="columnheader" className="px-[5px]">{B.lineSoNo}</span>
+              {grouped ? <span role="columnheader" className="px-[5px]">{B.lineSupplier}</span> : null}
               <span role="columnheader" className="px-[5px]">{B.linePoNo}</span>
-              <span role="columnheader" />
+              {grouped ? null : <span role="columnheader" />}
             </div>
             {g.ordered.lines.map((line) => (
               <div key={line.id} role="row" className="grid min-h-[44px] items-center border-t border-c-row-line py-1"
@@ -249,7 +320,8 @@ export default function SoBatchBySupplier({
                     {soRef(line.so)}
                   </button>
                 </span>
-                <span role="cell" className="break-words px-[5px] text-body text-c-ink" style={{ gridColumn: "6 / -1" }}>{poNo(line.poId)}</span>
+                {grouped ? <span role="cell" className="break-words px-[5px] text-body text-c-ink">{line.supplier ?? B.supplierNotSet}</span> : null}
+                <span role="cell" className="break-words px-[5px] text-body text-c-ink" style={grouped ? undefined : { gridColumn: "6 / -1" }}>{poNo(line.poId)}</span>
               </div>
             ))}
           </ItemRows>
@@ -261,7 +333,7 @@ export default function SoBatchBySupplier({
               <span role="columnheader" className="px-[5px]">{B.lineItem}</span>
               <span role="columnheader" className="px-[5px]">{B.lineToBuy}</span>
               <span role="columnheader" className="px-[5px]">{B.lineSoNo}</span>
-              <span role="columnheader" className="px-[5px]">{B.lineOrderBy}</span>
+              <span role="columnheader" className="px-[5px]">{grouped ? B.lineSupplier : B.lineOrderBy}</span>
               <span role="columnheader" className="px-[5px]">{B.lineDeliverTo}</span>
             </div>
             {g.lines.map((line) => {
@@ -283,17 +355,24 @@ export default function SoBatchBySupplier({
                     {line.variant ? <span className="break-words text-meta text-c-secondary">{line.variant}</span> : null}
                   </span>
                   <span role="cell" className="px-[5px] text-body text-c-ink">{B.qty(line.category, line.toBuy ?? 0)}</span>
-                  <span role="cell" className="px-[5px]">
+                  <span role="cell" className="flex min-w-0 flex-col items-start px-[5px]">
                     <button type="button" onClick={() => onOpenOrder(line.orderId)}
                       className="text-body font-semibold text-c-ink underline decoration-c-secondary decoration-dotted underline-offset-[3px] hover:decoration-solid">
                       {soRef(line.so)}
                     </button>
+                    {/* Grouped another way, the line's own deadline sits under its Sales Order (the design file). */}
+                    {grouped && line.orderBy && days != null
+                      ? <span className={`text-meta ${days < 0 ? "text-c-warn-fg" : "text-c-secondary"}`}>{B.deadline(days)}</span> : null}
                   </span>
-                  <span role="cell" className={`flex min-w-0 flex-col px-[5px] ${days != null && days < 0 ? "text-c-warn-fg" : "text-c-secondary"}`}>
-                    {line.orderBy && days != null
-                      ? <><span className="text-body text-c-ink">{fmtDateShort(line.orderBy)}</span><span className="text-meta">{B.deadline(days)}</span></>
-                      : <span className="text-meta">{B.notRecorded}</span>}
-                  </span>
+                  {grouped ? (
+                    <span role="cell" className="break-words px-[5px] text-body text-c-ink">{line.supplier ?? B.supplierNotSet}</span>
+                  ) : (
+                    <span role="cell" className={`flex min-w-0 flex-col px-[5px] ${days != null && days < 0 ? "text-c-warn-fg" : "text-c-secondary"}`}>
+                      {line.orderBy && days != null
+                        ? <><span className="text-body text-c-ink">{fmtDateShort(line.orderBy)}</span><span className="text-meta">{B.deadline(days)}</span></>
+                        : <span className="text-meta">{B.notRecorded}</span>}
+                    </span>
+                  )}
                   <span role="cell" className="min-w-0 px-[5px] text-body text-c-ink" data-testid={`by-supplier-deliver-${line.id}`}>
                     {extras.deliverTo ?? extras.door ?? null}
                   </span>

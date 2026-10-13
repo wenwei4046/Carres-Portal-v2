@@ -212,7 +212,7 @@ SO Batch adopts the confirmed SO-derived shared listing recipe: 32px desktop bas
 responsive wrapping. Table/Cards belongs after Search in the existing right tools cluster; all
 labels and supported controls remain reachable. This adoption is scoped to SO Batch; no shared
 component behaviour or other module changes are commissioned. Listing/disabled Report stays;
-Match Ready Stock remains in its existing toolbar cluster pending the separate owner discussion.
+`Match Ready Stock` is not on the toolbar: the owner removed it on 13 Oct 2026 (never agreed).
 
 The listing heading is `Customer’s original requested delivery`, in two lines `Customer’s original`
 / `requested delivery`, using the preserved revision-1 SO request for display, date filtering,
@@ -262,21 +262,12 @@ execution. Missing implementation does not reopen these decisions.
 **OWNER RULING — 2026-10-05, APPROVED / LOCKED: no parent Ready Stock column.**
 Remove the `Ready Stock` column from the SO Batch parent Register, including the dynamically
 added matching-mode column. Repeated `0 available` on completed or non-matching SOs creates
-confusion without an action. Preserve optional Match Ready Stock, its applied-mode summary and
-matching-only results; exact availability, Units, selection and save remain at expanded item level.
+confusion without an action. Exact availability, Units, selection and save remain at expanded item level
+(the whole-round `Match Ready Stock` button itself was removed by the owner on 13 Oct 2026).
 This removes parent presentation only, not stock eligibility, reservation or matching capability.
 
-**Ready Stock placement — RECOMMENDED DESIGN / PROPOSAL, NOT LAW (2026-10-05).**
-Use the existing actionable `FilterRailRow` at the top of the rail for `Match Ready Stock`,
-with its governed active styling and `aria-pressed`, rather than a newly styled toggle/pill.
-The control is an action rendered with the rail grammar, not a passive status badge. Show the
-existing Stock Location Select below it only while matching; use one existing Cancel action
-for exit. Do not duplicate exit in an invented close-icon composite. A compact applied-mode
-summary above the grid names the source buying scope, location, matching SO count and original
-requested-delivery sort. Current round filters are preserved: matching does not silently widen
-into other dated rounds. Exiting restores prior listing state. Suggestions are manually selected;
-only confirmed saved reservations change purchase remainder. Mission counts remain sourced from
-procurement/send facts and are never recalculated from matching-only results.
+**Ready Stock placement — CLOSED by the owner, 13 Oct 2026.** `Match Ready Stock` has no button on this page, in the
+toolbar or the rail. Stock for an order is reserved in the opened row (`Reserve stock`).
 
 Current-source finding: the allocation helper sorts by the current-request field
 (`orders.delivery_date`) then Proceed, not yet the preserved original request, and
@@ -2355,8 +2346,8 @@ again. Only the accepted, usable received quantity is reserved. When several SOs
 allocation follows the existing source rows (lineage), never a guess. Damaged, wrong-item and
 over-received quantities are never auto-reserved. If the original SO is cancelled, its requirement has
 fallen, or the source is unclear, nothing is forced: the exception is kept and shown for handling.
-Ordinary warehouse stock is still reserved only when staff choose `Reserve stock`; Match Ready Stock
-stays an optional, user-started mode. Receiving posts the receipt; the reservation is written through
+Ordinary warehouse stock is still reserved only when staff choose `Reserve stock`; the whole-round
+`Match Ready Stock` button was removed by the owner on 13 Oct 2026. Receiving posts the receipt; the reservation is written through
 Stock's existing reservation door (Stock MASTER §4). Manual `Reserve stock` reserves only a line's
 uncovered quantity and never releases or replaces a PO; using stock instead of a PO means changing or
 cancelling the PO through Purchasing's existing route first (owner ruling 2026-10-05). SO Batch demand
@@ -2659,8 +2650,28 @@ MASTER and ACTION-FLOW already approve; a new alarm or a third-no-reply escalati
 this release.
 
 **BY SUPPLIER VIEW — owner 12 Oct 2026 (design handoff) · BUILT 12 Oct 2026 · the page's first view.**
-The page has three views of the same demand: `By supplier` (the first view), `By sales order` (one row per Sales
-Order, the list this page always had; `view=table` in the address) and `Cards`. `By supplier` reads the demand the way a buyer orders it: one row per supplier and category,
+The page has four groupings of the same demand, chosen from ONE view button (owner 13 Oct 2026, the design file's
+`By supplier ▾`): `By supplier` (the first view), `By sales order` (one row per Sales Order, the list this page always
+had; `view=table` in the address), `By category` (`view=category`) and `By order deadline` (`view=deadline`). The
+button's menu has two parts: `GROUP BY` with those four, and `SHOW COLUMNS FOR` with the modules. Only `Purchasing`
+columns exist on this page; `Overview` · `Sales Order` · `Warehouse` · `Payment` · `Delivery` · `Service` are named,
+marked `Coming soon`, and cannot be chosen until this page reads their facts from their owning modules.
+**Removed by the owner, 13 Oct 2026:** the `Cards` view (an old `view=cards` link opens `By supplier`) and the
+`Match Ready Stock` toolbar button (never agreed). The whole-round matching code has no door and awaits its own ruling.
+
+**By category and By order deadline — owner 13 Oct 2026 · BUILT 13 Oct 2026.** The same lines and the same arithmetic
+as `By supplier`; only the key changes. Columns: `Category` or `Order PO deadline` (takes the room left) · `Items` 80 ·
+`Sales orders` 96 · `Suppliers` (first name, under it `+ the others`) · `Status` 124. `By category` is one row per
+category in the buying order Mattress, Bedframe, Sofa, then the rest. `By order deadline` is one row for every line
+whose Order By date has passed (`Deadline passed`, status `Late to order`; the design file's word `Overdue` is not
+used, by the owner's word rule), one row for each of the next seven days (`{date}` over `{weekday} · {n} days left`),
+then `Next week +` (`From {date}`), then `Not recorded` for lines with no Order By date. Status reads `Ordered`,
+`Late to order`, `Cut-off passed` or `To buy`. An opened row lists its lines with `Item` · `To buy` · `Sales order`
+(the line's own days left under it) · `Supplier` · `Supplier delivers to`; ticks, `Split` and `Issue PO` are the same
+controls as `By supplier`, and a tick made in one grouping is the same tick in every other. `Ordered` shows what is on
+a PO by category; `By order deadline` shows nothing under `Ordered`, because an ordered line has no deadline left.
+
+`By supplier` reads the demand the way a buyer orders it: one row per supplier and category,
 because one PO goes to one supplier for one category. Rows whose PO window has gone by come first.
 
 | Column | Width | What it shows |
@@ -2692,7 +2703,7 @@ because one PO goes to one supplier for one category. Rows whose PO window has g
   (4) Item line heads are `Item` · `To buy` · `Sales order` · `Order deadline` · `Supplier delivers to`.
   (5) The footer is the rows' count only.
   (8) The ⋮ menu opens below its button and to the left, above the table, and closes on a click
-  outside; `Match Ready Stock` sits after the button, so the menu never covers `Status`.
+  outside; the toolbar ends one `Status` column short, so the menu never covers `Status`.
   (9) Item lines use the list's own tick (16, the selection colour), drawn by the shared `RowTick`;
   a tick is disabled only when the line cannot be bought, and then says why on hover. A reason that
   has a door (`Open Settings`, `Fix in Catalog`, `Use this PO`) keeps its door in the line's last cell.

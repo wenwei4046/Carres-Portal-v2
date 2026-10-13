@@ -320,11 +320,17 @@ function data(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRespo
 const onIssue = vi.fn();
 const onOpenPurchaseOrders = vi.fn();
 
-function renderRegister(over: Partial<SoBatchPurchaseResponse> = {}, expandHistory = true, isLoading = false, view: "table" | "supplier" = "table") {
+/** Opens the one view button and chooses a grouping (owner 13 Oct 2026). */
+function pickView(name: string) {
+  fireEvent.click(screen.getByTestId("so-batch-view"));
+  fireEvent.click(within(screen.getByRole("menu", { name: "SO Batch Purchase view" })).getByRole("menuitemradio", { name }));
+}
+
+function renderRegister(over: Partial<SoBatchPurchaseResponse> = {}, expandHistory = true, isLoading = false, view: "table" | "supplier" | "category" | "deadline" | "cards" = "table") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const rendered = render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[view === "table" ? "/operation?tab=purchase&view=table" : "/operation?tab=purchase"]}>
+      <MemoryRouter initialEntries={[view === "supplier" ? "/operation?tab=purchase" : `/operation?tab=purchase&view=${view}`]}>
         <SoBatchRegister sessionKey={expect.getState().currentTestName} data={data(over)} isLoading={isLoading} onIssue={onIssue} onOpenPurchaseOrders={onOpenPurchaseOrders} />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -345,25 +351,37 @@ it("never substitutes the current request when original-date evidence is missing
   expect(screen.getByTestId("so-batch-requested-o1")).not.toHaveTextContent("Dec");
 });
 
-it("refuses manual whole-round matching when the persisted priority source is unavailable", () => {
-  renderRegister({ readyStockPriority: null });
-  expect(screen.getByRole("button", { name: "Match Ready Stock" })).toBeDisabled();
+/* Owner 13 Oct 2026: `Match Ready Stock` was never agreed and the Cards view
+   is gone. Neither may come back on any grouping. */
+it("has no Match Ready Stock button and no Cards view, in any grouping", () => {
+  renderRegister({ readyStockPriority: "customer_delivery", registerRows: [ORDER_O1], rows: [LEAF_O1] });
+  for (const name of ["By sales order", "By supplier", "By category", "By order deadline"]) {
+    pickView(name);
+    expect(screen.queryByRole("button", { name: "Match Ready Stock" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Cards" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("so-batch-cards")).not.toBeInTheDocument();
+  }
   expect(apiFetch).not.toHaveBeenCalled();
 });
 
-it("Cards shares the filtered Register and retains buying ticks when returning to Table", async () => {
+it("an old Cards link opens By supplier", () => {
+  renderRegister({ registerRows: [ORDER_O1], rows: [LEAF_O1] }, true, false, "cards");
+  expect(screen.getByTestId("so-batch-view")).toHaveTextContent("By supplier");
+  expect(screen.queryByTestId("so-batch-cards")).not.toBeInTheDocument();
+  expect(screen.getAllByTestId(/^by-supplier-row-/).length).toBeGreaterThan(0);
+});
+
+it("the search and the buying ticks stay when the grouping changes", async () => {
   renderRegister({ registerRows: [ORDER_O1, ORDER_O3], rows: [LEAF_O1, LEAF_O3] });
   fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Kimmy" } });
   await waitFor(() => expect(screen.queryByTestId("so-batch-row-o3")).not.toBeInTheDocument());
   fireEvent.click(screen.getByTestId("so-batch-select-o1"));
-  fireEvent.mouseDown(screen.getByRole("tab", { name: "Cards" }));
-  const card = screen.getByTestId("so-batch-card-o1");
-  expect(screen.queryByTestId("so-batch-card-o3")).not.toBeInTheDocument();
-  expect(within(card).getByRole("checkbox", { name: "Select SO-1318" })).toHaveAttribute("data-state", "checked");
-  fireEvent.mouseDown(screen.getByRole("tab", { name: "By sales order" }));
+  pickView("By category");
+  pickView("By sales order");
   expect(screen.getByTestId("so-batch-select-o1")).toBeChecked();
-  fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+  fireEvent.click(screen.getByTestId("so-batch-select-o1")); // the selection bar gives the toolbar back
   expect(screen.getByRole("searchbox")).toHaveValue("Kimmy");
+  expect(screen.queryByTestId("so-batch-row-o3")).not.toBeInTheDocument();
 });
 
 it("Quick View issues only its own prepared scope while another SO stays selected", () => {
@@ -381,17 +399,67 @@ it("Quick View issues only its own prepared scope while another SO stays selecte
    one row per supplier and category. It replaces the earlier `Group by:
    Supplier` page tool, which only regrouped the Sales Order rows. */
 describe("By supplier view", () => {
-  const viewBar = () => screen.getAllByRole("tablist").find((list) => within(list).queryByRole("tab", { name: "By sales order" }))!;
-
-  it("is the page's first view; By sales order and Cards sit beside it", () => {
+  /* ONE VIEW BUTTON (owner 13 Oct 2026, the design file's `By supplier ▾`). */
+  it("is the page's first view; one button holds the four groupings and the column sets", () => {
     renderRegister({ registerRows: [ORDER_O1, ORDER_O8], rows: [LEAF_O1, LEAF_O8A, LEAF_O8B] }, true, false, "supplier");
-    const views = within(viewBar()).getAllByRole("tab");
-    expect(views.map((tab) => tab.textContent)).toEqual(["By supplier", "By sales order", "Cards"]);
-    expect(views[0]).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("so-batch-view")).toHaveTextContent("By supplier");
     expect(screen.queryByTestId("so-batch-row-o8")).not.toBeInTheDocument();
     expect(screen.getByTestId("by-supplier-footer")).toBeInTheDocument();
-    fireEvent.mouseDown(within(viewBar()).getByRole("tab", { name: "By sales order" }));
+    fireEvent.click(screen.getByTestId("so-batch-view"));
+    const menu = screen.getByRole("menu", { name: "SO Batch Purchase view" });
+    expect(within(menu).getByText("GROUP BY")).toBeInTheDocument();
+    expect(within(menu).getByText("SHOW COLUMNS FOR")).toBeInTheDocument();
+    const items = within(menu).getAllByRole("menuitemradio");
+    expect(items.map((item) => item.textContent?.replace("check", "").trim())).toEqual(
+      ["By supplier", "By sales order", "By category", "By order deadline", "Purchasing"]);
+    expect(items[0]).toHaveAttribute("aria-checked", "true");
+    expect(items[1]).toHaveAttribute("aria-checked", "false");
+    /* The other modules' columns are not read by this page yet: named, and off. */
+    const later = within(menu).getAllByRole("menuitem");
+    expect(later.map((item) => item.textContent)).toEqual(
+      ["Overview", "Sales Order", "Warehouse", "Payment", "Delivery", "Service"].map((name) => `${name}Coming soon`));
+    for (const item of later) expect(item).toBeDisabled();
+    fireEvent.click(within(menu).getByRole("menuitemradio", { name: /By sales order/ }));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-view")).toHaveTextContent("By sales order");
     expect(screen.getByTestId("so-batch-row-o8")).toBeInTheDocument();
+  });
+
+  it("By category is one row per category, and each line names its supplier", () => {
+    const sofaLeaf = { ...LEAF_O8B, id: "leaf-sofa", category: "sofa" } as typeof LEAF_O8B;
+    renderRegister({ registerRows: [ORDER_O1, ORDER_O8], rows: [LEAF_O1, LEAF_O8A, sofaLeaf] }, true, false, "category");
+    expect(screen.getByTestId("so-batch-view")).toHaveTextContent("By category");
+    const heads = screen.getAllByRole("columnheader").map((h) => h.textContent?.replace(/\s+/g, " ").trim()).filter(Boolean);
+    expect(heads.slice(-5)).toEqual(["Category", "Items", "Sales orders", "Suppliers", "Status"]);
+    const rows = screen.getAllByTestId(/^by-supplier-row-/);
+    expect(new Set(rows.map((row) => row.getAttribute("data-testid"))).size).toBe(rows.length);
+    expect(rows.some((row) => /Sofa/.test(row.textContent ?? ""))).toBe(true);
+    fireEvent.click(within(rows[0]!).getAllByRole("button")[0]!);
+    const key = rows[0]!.getAttribute("data-testid")!.replace("by-supplier-row-", "");
+    const lines = screen.getByTestId(`by-supplier-lines-${key}`);
+    expect(within(lines).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(
+      expect.arrayContaining(["Item", "Sales order", "Supplier", "Supplier delivers to"]));
+  });
+
+  it("By order deadline groups by the day to order by, and never says Overdue", () => {
+    renderRegister({ registerRows: [ORDER_O1, ORDER_O8], rows: [LEAF_O1, LEAF_O8A, LEAF_O8B] }, true, false, "deadline");
+    expect(screen.getByTestId("so-batch-view")).toHaveTextContent("By order deadline");
+    const heads = screen.getAllByRole("columnheader").map((h) => h.textContent?.replace(/\s+/g, " ").trim()).filter(Boolean);
+    expect(heads.slice(-5)).toEqual(["Order PO deadline", "Items", "Sales orders", "Suppliers", "Status"]);
+    expect(screen.getAllByTestId(/^by-supplier-row-/).length).toBeGreaterThan(0);
+    expect(document.body.textContent).not.toMatch(/Overdue|Missed/);
+  });
+
+  it("a tick made in By category is the same tick By supplier and By sales order show", () => {
+    renderRegister({ registerRows: [ORDER_O1], rows: [LEAF_O1] }, true, false, "category");
+    const box = screen.getAllByRole("checkbox").find((b) => /^by-supplier-select-/.test(b.getAttribute("data-testid") ?? ""))!;
+    fireEvent.click(box);
+    pickView("By sales order");
+    expect(screen.getByTestId("so-batch-select-o1")).toBeChecked();
+    pickView("By order deadline");
+    fireEvent.click(screen.getByTestId("so-batch-issue"));
+    expect(onIssue).toHaveBeenCalledTimes(1);
+    expect(onIssue.mock.calls[0]![0].map((selection: { demandId: string }) => selection.demandId)).toEqual([LEAF_O1.id]);
   });
 
   /* To buy · Ordered · All, the footer totals and the Today card (owner's
@@ -492,7 +560,7 @@ describe("By supplier view", () => {
     renderRegister({ registerRows: [ORDER_O1], rows: [LEAF_O1] }, true, false, "supplier");
     const box = screen.getAllByRole("checkbox").find((b) => /^by-supplier-select-/.test(b.getAttribute("data-testid") ?? ""))!;
     fireEvent.click(box);
-    fireEvent.mouseDown(within(viewBar()).getByRole("tab", { name: "By sales order" }));
+    pickView("By sales order");
     expect(screen.getByTestId("so-batch-select-o1")).toBeChecked();
   });
 
@@ -507,56 +575,15 @@ describe("By supplier view", () => {
     expect(within(line).getByTestId(`by-supplier-deliver-${LEAF_O1.id}`).querySelector("select, button, [role=combobox]")).not.toBeNull();
     expect(within(line).getByRole("checkbox")).not.toBeDisabled();
   });
-
-  it("Match Ready Stock stays reachable: it opens the By sales order list, where stock is matched per order", () => {
-    renderRegister({ registerRows: [ORDER_O1], rows: [LEAF_O1], readyStockPriority: "customer_delivery" }, true, false, "supplier");
-    expect(screen.getByTestId("by-supplier-match-stock")).toHaveTextContent("Match Ready Stock");
-    expect(screen.getByTestId("by-supplier-match-stock")).not.toBeDisabled();
-    fireEvent.click(screen.getByTestId("by-supplier-match-stock"));
-    expect(within(viewBar()).getByRole("tab", { name: "By sales order" })).toHaveAttribute("aria-selected", "true");
-  });
 });
 
-it("does not match or recover POs from an unfinished Register load", () => {
+it("does not recover POs from an unfinished Register load", () => {
   renderRegister({ readyStockPriority: "customer_delivery" }, false, true);
-  const match = screen.getByRole("button", { name: "Match Ready Stock" });
   const pos = screen.getByRole("button", { name: "Purchase Orders" });
-  expect(match).toBeDisabled();
   expect(pos).toBeDisabled();
-  fireEvent.click(match);
   fireEvent.click(pos);
   expect(apiFetch).not.toHaveBeenCalled();
   expect(onOpenPurchaseOrders).not.toHaveBeenCalled();
-});
-
-it("keeps an empty-stock match at the readable default location and Cancel restores Listing", async () => {
-  apiFetch.mockResolvedValueOnce({ orderId: "o1", so: ORDER_O1.so, reference: "SO-1318",
-    lines: [{ orderLineId: "l1", sku: "A", item: "A", qty: 2, reservedQty: 0,
-      reservedUnitCodes: [], onPoQty: 0, remainingQty: 2 }], units: [] } as unknown as SalesOrderExpansionResponse);
-  renderRegister({ readyStockPriority: "customer_delivery", registerRows: [ORDER_O1], rows: [LEAF_O1] });
-  fireEvent.click(screen.getByRole("button", { name: "Match Ready Stock" }));
-  await waitFor(() => expect(screen.getByRole("combobox", { name: "Stock Location" })).toHaveTextContent("Carres Klang"));
-  expect(screen.getByText("0 available")).toBeInTheDocument();
-  expect(screen.queryByText("site:Carres Klang")).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-  expect(screen.queryByRole("combobox", { name: "Stock Location" })).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Match Ready Stock" })).toBeEnabled();
-  expect(apiFetch.mock.calls.every(([, options]) => (options as { method?: string } | undefined)?.method !== "POST")).toBe(true);
-});
-
-it("matches through actual Listing controls and ticking exposes Proceed without a reservation write", async () => {
-  apiFetch.mockResolvedValueOnce({ orderId: "o1", so: ORDER_O1.so, reference: "SO-1318",
-    lines: [{ orderLineId: "l1", sku: "A", item: "A", qty: 2, reservedQty: 0, reservedUnitCodes: [], onPoQty: 0, remainingQty: 2 }],
-    units: [{ itemId: KLANG, unitCode: "SAMPLE-UNIT-1", identityScope: "unit", sku: "A", condition: "new",
-      siteName: "Carres Klang", warehouseId: KLANG, holderName: null, ownership: "carres_owned", supplier: null,
-      qty: 1, dateIn: "2026-08-01", matchingLineIds: ["l1"], blocked: null, reservedForLineId: null }] } as unknown as SalesOrderExpansionResponse);
-  renderRegister({ readyStockPriority: "customer_delivery", registerRows: [ORDER_O1], rows: [LEAF_O1] });
-  fireEvent.click(screen.getByRole("button", { name: "Match Ready Stock" }));
-  await waitFor(() => expect(screen.getByRole("combobox", { name: "Stock Location" })).toHaveTextContent("Carres Klang"));
-  expect(screen.getByText("1 available")).toBeInTheDocument();
-  fireEvent.click(screen.getByTestId("so-batch-stock-select-o1"));
-  expect(screen.getByRole("button", { name: "Proceed" })).toBeEnabled();
-  expect(apiFetch.mock.calls.every(([, options]) => (options as { method?: string } | undefined)?.method !== "POST")).toBe(true);
 });
 
 beforeEach(() => {
@@ -1059,8 +1086,10 @@ describe("selection — the parent checkbox is ALL eligible child demand", () =>
     );
     expect(within(bar).getByTestId("so-batch-issue")).toBeEnabled();
     expect(bar).not.toHaveTextContent("Yu Jun holds PO duty");
-    expect(within(bar).getAllByRole("button").map((button) => button.textContent)).toEqual([
+    /* The one view button stays in the bar, where the view tabs were. */
+    expect(within(bar).getAllByRole("button").map((button) => button.textContent?.replace("expand_more", "").replace("receipt_long", ""))).toEqual([
       "Clear",
+      "By sales order",
       "Issue PO",
       "Export Excel (1)",
     ]);

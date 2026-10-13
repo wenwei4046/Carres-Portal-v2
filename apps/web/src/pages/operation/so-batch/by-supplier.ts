@@ -28,6 +28,11 @@ export interface SupplierGroup {
   readyBy: string | null;
   /** A line's PO window has gone by and it is still to buy. */
   cutOffPassed: boolean;
+  /** Every supplier in the group, by name. One for `By supplier`; several
+   *  when the rows are grouped by category or by order deadline. */
+  suppliers: string[];
+  /** `By order deadline` only: which part of the calendar this row is. */
+  deadline?: "passed" | "day" | "later" | "none";
   lines: PurchaseDemandRow[];
   /** Set on a group whose goods are already on a PO (`Ordered`): its PO
    *  numbers and its lines. Such a group has nothing to buy and no `lines`. */
@@ -46,9 +51,33 @@ export interface OrderedLine {
   category: PurchaseDemandRow["category"];
   qty: number;
   poId: string;
+  supplier: string | null;
 }
 
 export type SupplierShow = "buy" | "ordered" | "all";
+
+/**
+ * HOW THE SAME LINES ARE GROUPED (owner 13 Oct 2026, the design file's
+ * `GROUP BY`): by supplier and category, by category, or by order deadline.
+ * `By sales order` is the page's own Sales Order list, not a grouping here.
+ */
+export type GroupBy = "supplier" | "category" | "deadline";
+const CATEGORY_ORDER = ["mattress", "bedframe", "sofa"];
+const categoryRank = (category: string | null) => { const at = CATEGORY_ORDER.indexOf(category ?? ""); return at < 0 ? CATEGORY_ORDER.length : at; };
+
+/**
+ * Which deadline row a line belongs to, as the design file groups them: every
+ * passed date together, then one row per day for the next seven days, then
+ * everything later together. A line with no Order By date says so.
+ */
+export function deadlineKey(orderBy: string | null | undefined, today: string): string {
+  if (!orderBy) return "none";
+  const days = daysBetween(today, orderBy);
+  if (days < 0) return "passed";
+  if (days < 7) return orderBy;
+  return "later";
+}
+const deadlineRank = (key: string) => (key === "passed" ? "0" : key === "later" ? "8" : key === "none" ? "9" : `1${key}`);
 
 const toBuyOf = (row: PurchaseDemandRow) => row.toBuy ?? 0;
 
@@ -62,11 +91,13 @@ export function isOpenDemand(row: PurchaseDemandRow): boolean {
  * clock as `YYYY-MM-DDTHH:MM`, the same spelling as a row's `poWindow`, so
  * "has this window gone by" is one string comparison.
  */
-export function supplierGroups(rows: readonly PurchaseDemandRow[], nowKey: string): SupplierGroup[] {
+export function supplierGroups(rows: readonly PurchaseDemandRow[], nowKey: string, by: GroupBy = "supplier", today: string = nowKey.slice(0, 10)): SupplierGroup[] {
   const byKey = new Map<string, PurchaseDemandRow[]>();
   for (const row of rows) {
     if (!isOpenDemand(row)) continue;
-    const key = `${row.supplierId ?? "none"}|${row.category ?? "other"}`;
+    const key = by === "category" ? `category|${row.category ?? "other"}`
+      : by === "deadline" ? `deadline|${deadlineKey(row.orderBy, today)}`
+      : `${row.supplierId ?? "none"}|${row.category ?? "other"}`;
     const bucket = byKey.get(key);
     if (bucket) bucket.push(row);
     else byKey.set(key, [row]);
@@ -100,9 +131,13 @@ export function supplierGroups(rows: readonly PurchaseDemandRow[], nowKey: strin
       orderBy: orderBys[0] ?? null,
       readyBy: readyBys[readyBys.length - 1] ?? null,
       cutOffPassed: lines.some((l) => !!l.poWindow && l.poWindow < nowKey),
+      suppliers: [...new Set(lines.map((l) => l.supplier).filter((name): name is string => !!name))].sort(),
+      ...(by === "deadline" ? { deadline: ((part) => (part === "passed" || part === "later" || part === "none" ? part : "day"))(key.slice("deadline|".length)) as SupplierGroup["deadline"] } : {}),
       lines,
     });
   }
+  if (by === "category") return groups.sort((a, b) => categoryRank(a.category) - categoryRank(b.category) || (a.category ?? "").localeCompare(b.category ?? ""));
+  if (by === "deadline") return groups.sort((a, b) => deadlineRank(a.key.slice("deadline|".length)).localeCompare(deadlineRank(b.key.slice("deadline|".length))));
   /* What needs ordering first comes first: a window that has gone by, then
      the supplier's name, then the category. */
   return groups.sort(
@@ -119,19 +154,22 @@ export function supplierGroups(rows: readonly PurchaseDemandRow[], nowKey: strin
  * supplier and PO Delivery Date. Nothing is computed about buying here; the
  * to-buy arithmetic stays with `supplierGroups`.
  */
-export function orderedSupplierGroups(orders: readonly SoBatchOrderRow[]): SupplierGroup[] {
-  const byKey = new Map<string, { supplierId: string | null; supplier: string | null; category: PurchaseDemandRow["category"]; lines: OrderedLine[]; dates: string[] }>();
+export function orderedSupplierGroups(orders: readonly SoBatchOrderRow[], by: GroupBy = "supplier"): SupplierGroup[] {
+  /* An ordered line has no deadline left to meet, so that grouping shows none. */
+  if (by === "deadline") return [];
+  const byKey = new Map<string, { supplierId: string | null; supplier: string | null; category: PurchaseDemandRow["category"]; lines: OrderedLine[]; dates: string[]; suppliers: Set<string> }>();
   for (const order of orders) {
     for (const line of order.lines) {
       for (const onPo of line.pos) {
         if (!(onPo.qty > 0)) continue;
         const po = order.pos.find((candidate) => candidate.poId === onPo.poId);
         const category = (line.category ?? null) as PurchaseDemandRow["category"];
-        const key = `ordered|${po?.supplierId ?? "none"}|${category ?? "other"}`;
-        const bucket = byKey.get(key) ?? { supplierId: po?.supplierId ?? null, supplier: po?.supplierName ?? null, category, lines: [], dates: [] };
+        const key = by === "category" ? `ordered|category|${category ?? "other"}` : `ordered|${po?.supplierId ?? "none"}|${category ?? "other"}`;
+        const bucket = byKey.get(key) ?? { supplierId: po?.supplierId ?? null, supplier: po?.supplierName ?? null, category, lines: [], dates: [], suppliers: new Set<string>() };
+        if (po?.supplierName) bucket.suppliers.add(po.supplierName);
         bucket.lines.push({
           id: `${line.orderLineId}|${onPo.poId}`, orderId: order.orderId, so: order.so,
-          sku: line.sku, item: line.item ?? line.sku, variant: line.variant ?? null, category, qty: onPo.qty, poId: onPo.poId,
+          sku: line.sku, item: line.item ?? line.sku, variant: line.variant ?? null, category, qty: onPo.qty, poId: onPo.poId, supplier: po?.supplierName ?? null,
         });
         if (po?.officialDeliveryDate) bucket.dates.push(po.officialDeliveryDate);
         byKey.set(key, bucket);
@@ -155,10 +193,12 @@ export function orderedSupplierGroups(orders: readonly SoBatchOrderRow[]): Suppl
       orderBy: null,
       readyBy: [...bucket.dates].sort().at(-1) ?? null,
       cutOffPassed: false,
+      suppliers: [...bucket.suppliers].sort(),
       lines: [],
       ordered: { poIds: [...new Set(lines.map((l) => l.poId))].sort(), lines },
     });
   }
+  if (by === "category") return groups.sort((a, b) => categoryRank(a.category) - categoryRank(b.category));
   return groups.sort((a, b) =>
     (a.supplier ?? "\uffff").localeCompare(b.supplier ?? "\uffff") || (a.category ?? "").localeCompare(b.category ?? ""));
 }
@@ -224,8 +264,20 @@ export const BY_SUPPLIER = {
   lineSoNo: "Sales order",
   lineOrderBy: "Order deadline",
   lineDeliverTo: "Supplier delivers to",
-  cards: "Cards",
-  matchReadyStock: "Match Ready Stock",
+  /* The one view button (owner 13 Oct 2026, the design file's menu). */
+  groupBy: "GROUP BY",
+  showColumnsFor: "SHOW COLUMNS FOR",
+  byCategory: "By category",
+  byDeadline: "By order deadline",
+  comingSoon: "Coming soon",
+  colCategory: "Category",
+  colSuppliers: "Suppliers",
+  lineSupplier: "Supplier",
+  moreSuppliers: (names: readonly string[]) => (names.length > 1 ? `+ ${names.slice(1).join(", ")}` : ""),
+  deadlinePassed: "Deadline passed",
+  nextWeekAndLater: "Next week +",
+  from: (date: string) => `From ${date}`,
+  lateToOrder: "Late to order",
   /* The three tabs and the `Ordered` rows (owner's 12 Oct 2026 package). */
   showBuy: "To buy",
   showOrdered: "Ordered",
