@@ -30,7 +30,8 @@ import { moneyOfOrder } from "../sales-order-facts";
 import { useGoodsName } from "./goods-name";
 import { useLogisticsMessage, useLogisticsModel } from "./LogisticsCard";
 import { useSupplierCard } from "./SupplierCard";
-import type { CommParty } from "./work-stops";
+/** The outside parties a message can go to. */
+export type CommParty = "supplier" | "warehouse" | "logistics" | "customer";
 
 export const COMM_COPY = {
   title: "Communication",

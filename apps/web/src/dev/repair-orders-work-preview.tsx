@@ -21,7 +21,7 @@ import {
 } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
 import { appTodayIso } from "@/lib/fmt-date";
-import OperationWork from "@/pages/operation/OperationWork";
+import WorkspaceTasks from "@/pages/operation/tasks/WorkspaceTasks";
 import PreviewFrame from "./preview-frame";
 import "@/index.css";
 
@@ -108,7 +108,7 @@ createRoot(document.getElementById("root")!).render(
       <MemoryRouter initialEntries={[start]}>
         <PreviewFrame label="Work · Repair Order items (fixture Repair Orders, real projector)">
           <div className="flex h-full flex-col">
-            <OperationWork />
+            <WorkspaceTasks />
           </div>
         </PreviewFrame>
       </MemoryRouter>

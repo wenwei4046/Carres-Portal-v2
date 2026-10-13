@@ -43,7 +43,7 @@ import SettingsWorkspace, { settingsSectionLabel } from "./SettingsWorkspace";
 // procurement are path-driven), so `?tab=delivery` deep-links it.
 import OperationDelivery from "./OperationDelivery";
 import EditDeliveryRedirect from "./EditDeliveryRedirect";
-import OperationWork from "./OperationWork";
+import WorkspaceTasks from "./tasks/WorkspaceTasks";
 import OperationLeave from "./OperationLeave";
 import OperationRental from "./OperationRental";
 // Purchase / Procurement MRP cockpit — the "what to buy today" guided worklist.
@@ -553,7 +553,7 @@ export default function OperationApp() {
             {/* SO V2 CARD 10 — My Work / Team Work: two filters over the ONE
                 open work set (Card 9's engine). The page writes nothing; a
                 row opens the Sales Order Workspace. */}
-            {tab === "work" && <OperationWork />}
+            {tab === "work" && <WorkspaceTasks />}
             {/* Workspace → Leave (0670): a person records their own MC,
                 Emergency leave or Planned leave. */}
             {tab === "leave" && <OperationLeave />}

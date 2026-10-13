@@ -62,6 +62,48 @@ function Group({ group, lastTaskId, onOpen }: { group: TaskGroup; lastTaskId: st
   );
 }
 
+/** The working week: a day's number is its `To do`, amber when that day
+ *  holds late work; the chosen day is filled in the selection colour. */
+export function TaskDayStrip({ strip, chosen, onChoose, onWeek }: {
+  strip: TaskStrip;
+  chosen: string;
+  onChoose: (iso: string) => void;
+  onWeek: (iso: string) => void;
+}) {
+  return (
+    <div className="flex shrink-0 items-stretch gap-0.5 px-1.5 pb-1 pt-1.5" data-testid="task-strip">
+      <button type="button" aria-label={W.previousWeek} title={W.previousWeek} onClick={() => onWeek(strip.previousWeek)}
+        className="grid w-7 shrink-0 place-items-center rounded-lg text-c-muted hover:bg-c-hover">
+        <MIcon name="chevron_left" size={18} />
+      </button>
+      <div role="tablist" aria-label={W.days} className="flex min-w-0 flex-1 items-stretch">
+        {strip.days.map((d) => {
+          const on = d.iso === chosen;
+          return (
+            <button key={d.iso} type="button" role="tab" aria-selected={on} title={d.holiday ?? undefined}
+              aria-label={`${d.weekday} ${d.dayNumber}${d.count ? ` · ${d.count}` : ""}${d.holiday ? ` · ${d.holiday}` : ""}`}
+              onClick={() => onChoose(d.iso)} data-testid={`task-day-${d.iso}`}
+              className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-lg py-1 outline-none focus-visible:[outline:var(--c-focus)] ${on ? "font-medium" : "font-normal hover:bg-c-hover"}`}>
+              <span className={`text-label ${on ? "text-c-select-fg" : "text-c-secondary"}`}>{d.weekday}</span>
+              <span className={`grid h-7 w-7 place-items-center rounded-full text-body tabular-nums ${
+                on ? "bg-c-select-fg text-white" : d.today ? "bg-c-select-bg text-c-select-fg" : "text-c-ink"}`} data-testid={d.today ? "today-circle" : undefined}>
+                {d.dayNumber}
+              </span>
+              <span className={`h-4 text-label tabular-nums ${d.late ? "text-c-warn-fg" : on ? "text-c-select-fg" : "text-c-secondary"}`} data-testid="task-day-count">
+                {d.count > 0 ? d.count : ""}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <button type="button" aria-label={W.nextWeek} title={W.nextWeek} onClick={() => onWeek(strip.nextWeek)}
+        className="grid w-7 shrink-0 place-items-center rounded-lg text-c-muted hover:bg-c-hover">
+        <MIcon name="chevron_right" size={18} />
+      </button>
+    </div>
+  );
+}
+
 export default function TaskList({ strip, chosen, today, onChoose, onWeek, tab, onTab, tabs, lastTaskId, onOpen }: {
   strip: TaskStrip;
   /** The chosen day, `YYYY-MM-DD`. */
@@ -79,36 +121,7 @@ export default function TaskList({ strip, chosen, today, onChoose, onWeek, tab, 
   const shown = tabs[tab];
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="task-list">
-      <div className="flex shrink-0 items-stretch gap-0.5 px-1.5 pb-1 pt-1.5" data-testid="task-strip">
-        <button type="button" aria-label={W.previousWeek} title={W.previousWeek} onClick={() => onWeek(strip.previousWeek)}
-          className="grid w-7 shrink-0 place-items-center rounded-lg text-c-muted hover:bg-c-hover">
-          <MIcon name="chevron_left" size={18} />
-        </button>
-        <div role="tablist" aria-label={W.days} className="flex min-w-0 flex-1 items-stretch">
-          {strip.days.map((d) => {
-            const on = d.iso === chosen;
-            return (
-              <button key={d.iso} type="button" role="tab" aria-selected={on} title={d.holiday ?? undefined}
-                aria-label={`${d.weekday} ${d.dayNumber}${d.count ? ` · ${d.count}` : ""}${d.holiday ? ` · ${d.holiday}` : ""}`}
-                onClick={() => onChoose(d.iso)} data-testid={`task-day-${d.iso}`}
-                className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-lg py-1 outline-none focus-visible:[outline:var(--c-focus)] ${on ? "font-medium" : "font-normal hover:bg-c-hover"}`}>
-                <span className={`text-label ${on ? "text-c-select-fg" : "text-c-secondary"}`}>{d.weekday}</span>
-                <span className={`grid h-7 w-7 place-items-center rounded-full text-body tabular-nums ${
-                  on ? "bg-c-select-fg text-white" : d.today ? "bg-c-select-bg text-c-select-fg" : "text-c-ink"}`} data-testid={d.today ? "today-circle" : undefined}>
-                  {d.dayNumber}
-                </span>
-                <span className={`h-4 text-label tabular-nums ${d.late ? "text-c-warn-fg" : on ? "text-c-select-fg" : "text-c-secondary"}`} data-testid="task-day-count">
-                  {d.count > 0 ? d.count : ""}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <button type="button" aria-label={W.nextWeek} title={W.nextWeek} onClick={() => onWeek(strip.nextWeek)}
-          className="grid w-7 shrink-0 place-items-center rounded-lg text-c-muted hover:bg-c-hover">
-          <MIcon name="chevron_right" size={18} />
-        </button>
-      </div>
+      <TaskDayStrip strip={strip} chosen={chosen} onChoose={onChoose} onWeek={onWeek} />
       <div className="shrink-0 px-1.5 pb-2" data-testid="task-tabs">
         <Tabs variant="segmented" fill label={W.show} value={tab} onValueChange={(value) => onTab(value as TaskTab)}
           tabs={TASK_TABS.map((key) => ({ value: key, label: `${W.tab[key]} ${tabs[key].count}` }))} />

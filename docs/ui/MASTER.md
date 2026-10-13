@@ -79,9 +79,9 @@ not a current pattern: do not copy it from a neighbouring page. Live examples ar
 | Forms | `Input` · `Textarea` · `Select` · `SearchInput` · `Checkbox` · `DatePicker` · `FieldFrame` | `components/kit/*`, `field-recipe.ts` | Existing component built; current visual migration owed |
 | Buttons and menus | `Button` · `DropdownMenu` · `Popover` · `Tooltip` · `Tabs` (segmented Table/Cards) | `components/kit/*` | Existing component built; current visual migration owed |
 | Dialogs, documents and evidence | `Modal` · `Drawer` · `Toast` · `PdfPreview` + `PdfPreviewHeader` · `SavedEvidenceViewer` | `components/kit/*` | §4.4 · built |
-| Work route pieces | `RouteStop` · `ChecklistRow` · `QuietRouteRow` | `components/kit/*` | §3 · built 2026-09-28 |
+| Work route pieces | `RouteStop` · `ChecklistRow` · `QuietRouteRow` | `components/kit/*` | §3 · built 2026-09-28 · the Workspace page no longer draws them (branch `build/workspace-v3`, 13 Oct 2026): `RouteStop` is drawn by the Repair Order record, the other two by `/ui` only |
 | Orders list / drawer band | `SectionPanel` (cream band) — that surface only, not a general card | `components/SectionPanel.tsx` | Not a `Block` duplicate |
-| Work right-panel Communication | `WorkCommunication` — recorded channels only | `pages/operation/work/WorkCommunication.tsx` | Built; differs from the card's editable `To` (§7.2) |
+| Communication card under a task (Workspace page) | `WorkCommunication` — recorded channels only | `pages/operation/work/WorkCommunication.tsx` | Built; on branch `build/workspace-v3` it is drawn under the one task view (Workspace MASTER §5.10); differs from the card's editable `To` (§7.2) |
 | Record history | §5.2 three-rank grammar | this MASTER | LOCKED · no shared component; each page draws it |
 | Tasks and quick reference | Existing Work/Tasks host; `OperationRightRail` for existing quick capabilities | `pages/operation/work/` · `pages/operation/components/OperationRightRail.tsx` | §5 · supplied target has a collapsible Tasks region; Calendar/Activity capability retained, unresolved placement stays explicit; runtime adoption not verified |
 
@@ -584,7 +584,7 @@ hidden parts, states and entry points: the contract's "Embedded presentation"; n
 | SO Batch Purchase purchasing round | round time/date + `Passed` / `Done`; Info · `SO Batch Purchase` (default) · `Sales Order` (embedded) | APPROVED TARGET / NOT BUILT — tabs owner-approved 2026-10-05; the layout of the work content is PROPOSAL, localhost only | Purchasing MASTER §5.6.1 |
 | Manual Purchase Request | Info · `Manual Purchase Request` (default) · related `Sales Order` (embedded) per its approved capability | APPROVED TARGET / NOT BUILT — tabs owner-approved 2026-10-05; the layout of the work content is PROPOSAL | Purchasing MASTER §9.2 |
 | Warehouse | a `Warehouse` tab in the shared panel | APPROVED TARGET / NOT BUILT (§0.2) | Stock MASTER |
-| Workspace Work right panel | Workspace §5.10 composition | Governed by `docs/workspace/MASTER.md` §5.10 (deployed §5.9 Logistics; rest NOT BUILT); not yet aligned to this card | Workspace MASTER |
+| Workspace page | the one task view (§5; `TaskView` through `TaskFrame`) beside its list, with the `Communication` card under it; a PO task's `Sales Order` fact opens the embedded Sales Order (§4.3.3) | BUILT ON BRANCH `build/workspace-v3`, NOT DEPLOYED (`docs/workspace/MASTER.md` §5.10). The earlier three-column page and its right panel are removed; the Logistics, Customer and Supplier cards are drawn on no screen (§5.9 there) | Workspace MASTER |
 
 ### §4.3.5 · Default page work and `Tasks` — owner direction 2026-10-05
 
@@ -664,12 +664,17 @@ person finished on the chosen day. All three read the ONE Work read (`lifecycle`
 twice and no second engine exists. The module filter icons, the `Late` and `No date` sections and the day badge of the
 earlier panel are removed.
 
+**The Workspace page** (Workspace MASTER §5.10; BUILT ON BRANCH `build/workspace-v3`, NOT DEPLOYED) lists the same tasks
+as one table. It opens a task through the same task desk (`useTaskDesk`) and counts with the same list arithmetic
+(`task-cards.ts`), so its `To do` · `Waiting` · `Done` are this panel's numbers. While that page is shown, this panel
+and its pill step aside.
+
 A card opens **the one task view** (kit `TaskView`, 02; composition in 03 §8). The Tasks area supplies the task (the
 list card's own title and facts, `TaskOpenContext`); the owning module's panel supplies its steps and what only it
 knows through `TaskFrame`: extra facts, the Sales Orders the task serves, what was recorded and its documents. No
 module draws its own card inside Tasks any more: `BatchPanel`, `SupplierAnswerTaskPanel`, the PO Duty panel and the
 act panel all render through `TaskFrame`, and `CompactModuleCard` stays for module pages and embedded Sales Orders.
-What each tab reads: `Route` the one Order Route model (`useMissionRoute`, the Work page's own); `History` the Work
+What each tab reads: `Route` the one Order Route model (`useMissionRoute`); `History` the Work
 record's request and answer day plus the owning module's records (a PO's `sends` and supplier answers); `Files` the
 owning module's existing print doors, rendered on demand. A tab that cannot be read says so in one line and never
 takes the task's steps down with it. Goods of a PO are drawn as wrapping lines (`PoTaskGoods`), and a purchase batch's

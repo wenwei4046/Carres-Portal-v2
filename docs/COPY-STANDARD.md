@@ -197,25 +197,18 @@ Workspace-owned Staff & Duties page under global Settings (placement production 
 | Work scopes | `My Task` · `Team Work` (Workspace MASTER §5.10) | My Work on this page · My Tasks · Team Tasks · Work queue |
 | Work header search (Jess reverted the `Search` rename, 2026-09-26) | `Jump to…` beside its keyboard hint | Search · Find · Go to |
 | Work timing | `Broken commitment` · `Late` (owner time-word ruling 12 Oct 2026; was `Missed`) · governed working weekdays · Saturday when an authoritative action remains there · `Today` (accessible name only) · `Holiday operation` · `No date` | Due as the primary structure · Upcoming · Later · Overdue · Missed · Backlog |
-| Work search | `Search work…` | Search tasks… |
-| My Work true empty | `Nothing assigned to you` | All done! · No tasks · `0` while loading/failed |
-| Team Work true empty | `No open work. Every track is clear.` | All done! · No tasks · `0` while loading/failed |
 | Work no match | `No work matches these filters` · `Clear filters` | No work · No results |
 | Work applied filters | `Clear all` | Reset · Clear everything |
-| Work selected-action sections | `CURRENT FACT` · `ACTION` · `REQUIRED RESULT` · `COMMUNICATION` · `FINISH WHEN` · `WHAT HAPPENS NEXT` | Problem details · Task · Done when |
-| Work selected-action navigation | `Back to work` · `Open {object}` | Close · Go back · View details |
+| Work navigation | `Back to all tasks` (the Workspace page's way back from an opened task to the table) · `All tasks` (the Tasks panel's) · `Open {object}` · `Back to work` (Staff & Duties' way back to the Workspace page) | Close · Go back · View details |
 | Work embedded result | icon plus `Nice Future confirmed Fri, 18 Sep` · `Delivery proof accepted` (the exact source result; icon/colour never stands alone) | Done · Completed · Success · icon alone |
 | Work closure by another actor | icon plus `Done by {person}` only when the source supplies durable actor evidence | inferring the actor from assignment or cover |
 | Work order cancelled | icon plus `Order cancelled` | No longer needed without the known reason |
 | Work closure without an authorised receipt | icon plus `No longer needed` | This work is no longer open. · invented person/result |
 | Work mutation not confirmed | warning icon plus `Not confirmed · Try again` | Not saved when the response is uncertain · Something went wrong · optimistic completion |
 | Work stale action | warning icon plus `Action changed · Review again` | Conflict · stale record · silently submitting an old source version |
-| Work Inbox date navigation (owner-approved UI, Jess 2026-09-27 — replaces the separate rail) | header `Previous month` · **`{Mon YYYY}`** (`Sep 2026`, one line) · `Next month`; Monday–Saturday month grid (column heads `MON`–`SAT`; Sunday never drawn): day number beside its count (empty when none); a closed day is grey with its name in the accessible name/tooltip only; today is ringed; the chosen day is pale blue; fixed rows `Late` · `No date` (`0` printed). Pressing `{Mon YYYY}` contracts/expands the month. Page, Owner and cover choices live behind `Filters`, not as a second rail. Accessible names: `{fmtDate} · Today · {holiday} · {n} action(s)` (each part only when true) | `Today` on screen · `No work` · `Public holiday ·` · `Hol` · a two-date week label · a dash anywhere in the date navigation · `No working date` · permanent filter groups · list tabs · a hidden `0` on a fixed row |
-| Work Inbox list heading (owner ruling 2026-09-27) | none — the month, `Late` or `No date` selection already names the list | repeating `Late` or the selected date above the first action · a count heading |
-| Work centre groups, in order (owner ruling 2026-09-17) | `BROKEN COMMITMENT` → `LATE` → `{WEEKDAY, DATE}` · a broken commitment is a red group heading plus a thin red row edge, no row badge, and still counts under its own working day | a Broken badge on the row · a `BLOCKED` group · counting a broken commitment twice |
 | Work blocked job (owner ruling 2026-09-17) | `Blocked by {dependency}` on the row, inside its own working-day group · filter option `Blocked` | `Blocked` as a group · `Waiting` alone · hiding a blocked late job |
 | Work filters door (owner ruling 2026-09-17) | `Filters` — the toolbar door only | `Filters` as a left-panel or rail heading |
-| Work communication controls (owner ruling 2026-09-17) | the owning module's own `Open WhatsApp group` · `Open WhatsApp` · `Copy message` in the right panel's `COMMUNICATION` section, labelled by the door the click opens | `Send` · `Sent` · `Message sent` · treating an opened WhatsApp or a copied message as sent evidence |
+| Work communication controls (owner ruling 2026-09-17) | the owning module's own `Open WhatsApp group` · `Open WhatsApp` · `Copy message` in the task's `Communication` card, labelled by the door the click opens | `Send` · `Sent` · `Message sent` · treating an opened WhatsApp or a copied message as sent evidence |
 | Work action sentences (owner ruling 2026-09-17; supplier correction 2026-09-24) | fact `Delivery date passed` (owner time-word ruling 12 Oct 2026; was `Overdue delivery`) · `Call {logistics}` over `Arrange a new delivery date` · `Ask {logistics}` over `Record the delivery result` · `Confirm tomorrow's supplier delivery` only one Office working day before the effective arrival · button `Record supplier answer` only on an admitted date-specific or exception action | a bare `Date passed` · `Overdue delivery` · `Reschedule` · generic `Follow up supplier` · an immediate `Supplier has not confirmed the PO date` action after sending |
 | Purchasing arrival and delay words (owner ruling 2026-09-24) | `PO Delivery Date` for the immutable planned/default date · `Waiting for goods from supplier` after confirmed send · `Supplier DO` for the supplier's dispatch document · `Confirm tomorrow's supplier delivery` · `Confirmed for {date}` only with evidence · `Delayed · New expected date {date}` | `Supplier confirmed` for the calculated default date · `Delivery Order` when Supplier DO is meant · treating a WhatsApp screenshot or Supplier DO as Goods Received |
 | Purchasing supplier answer words (owner ruling 2026-09-25; Purchasing MASTER §5.7) | button `Record supplier answer` · top option `Supplier DO received` · per item `What changed?` with `No change` · `Confirmed` · `New date` (auto `Earlier` / `Delayed`) · `Split delivery` · `+ Add another date` · `Total {n} of {m}` · batch `{n} pcs · {date}` · `Evidence` · `Add a WhatsApp screenshot` · `Affects {SO No} · customer date {date}` · reasons `Production delay` · `Material unavailable` · `Capacity / scheduling delay` · `Quality issue / remake` · `Transport delay` · `Supplier closed / holiday` · `Partial quantity ready` · `Other` · day-before action `Click WhatsApp, ask {Supplier} for the Supplier DO for {PO No}` | `Part now, rest later` · `Waiting Customer Confirmation` · `Material Shortage` · `Factory Closed` · editing `PO {n}-Day Delivery Date` |
@@ -231,7 +224,6 @@ Workspace-owned Staff & Duties page under global Settings (placement production 
 | Purchasing PO window words (owner rulings 2026-09-25; Purchasing MASTER §5.6.1) | Work card, **owner choice 2026-09-25**: before issue `Buy {n} items for {m} Sales Orders` / `Issue the POs by {time}`; after issue `{k} POs issued · {x} not sent yet` / the earliest unsent PO's send line; reference `{time} PO window` · send lines `Click WhatsApp, send {PO No} to {Supplier}` · `Click Email, send {PO No} to {Supplier}` · `Send {PO No} to {Supplier}` (no channel recorded) · permission `Only Operation staff can issue POs` · Settings (BUILT 2026-09-28) card `PO windows` with subtitle `When POs are bought each day. Lines added before a window are bought in it.`, rows `PO Days` (`The days a PO window opens.`) · `First PO window` (`Lines added before this time are bought in this window.`) · `Second PO window` (`Lines added after the first window are bought here.`) with the switch `Use a second PO window`; refusals `The first PO window needs a time.` · `The second PO window needs a time.` · `The second PO window must be later than the first.`; history `was 11:30 AM and 4:00 PM` · `was 11:30 AM, second window off`; under it (owner 2026-09-29) `Last PO time for one supplier` with `Only for a supplier that needs POs earlier. The rest use the PO windows.`, each supplier reading its time (`10:00 AM`) or `Uses the PO windows`, doors `Set a time` (no time yet; never an empty `--:-- --` box) and `Use the PO windows` (clears it), refusal `Must be earlier than the last PO window.`; a viewer who cannot change Settings reads `Only a manager signed in with their own account can change these.` |
 | Purchasing Settings · Supplier Claims (0606; Purchasing §9.5, owner-approved / LOCKED 2026-09-06) | block `Supplier Claims`; rows `Reply waiting days` (help `From the day we ask the supplier to the day a reply is expected.`) and `Extra days before escalation` (help `After the reply date has passed, before the Purchasing Approver is asked to decide.`), value `{n} Office working days`, approved start 2 and 2. | Reply SLA · Grace days · Chase days |
 | Purchasing Settings · Repair return target (0602 · 0603; Purchasing §9.7) | row `Repair return target`, value `{n} working days`, help `Counted from when the Supplier receives the Repair Order.` Each Repair Order keeps the value that applied when Supplier receipt was recorded. | Repair SLA · Turnaround · Due days | `{time} PO window · {n} suppliers · {n} Sales Orders` · `Issue POs to {suppliers}` · `{n} of {m} POs · Sending not confirmed` as card lines · `Not marked as sent` · `then press PO sent to supplier` on the card · one card per Sales Order · `Supplier date missing` · treating an opened WhatsApp as sent |
-| Work embedded location | neutral `Do it here` on an admitted embedded row only | green badge · repeating `Open module` on ordinary rows |
 | Work embedded validation | `Choose a review result.` · `Write the reason.` | generic Required · invalid input |
 | Delivery proof choices | `Accept proof` · `Request more proof` · `Reject proof` | colour-only consequences · claiming a driver was contacted |
 | Delivery proof supporting result | `More proof is required` | The driver is asked for more proof |
@@ -240,12 +232,9 @@ Workspace-owned Staff & Duties page under global Settings (placement production 
 | Delivery proof viewed aid | `Viewed` | storing view state · treating view state as completion evidence |
 | Delivery proof load failure | `Photo could not be loaded · Try again` · `Photo {n} of {total} could not be loaded` | allowing `Accept proof` while any file in the latest proof package is unreadable |
 | Work read-only action | `Only {acting person} can record this.` · `You can see this work here. Recording it is not part of your access.` | disabled mutation controls · implying Team Work visibility grants permission |
-| Work detail evidence | `Working day and source` · `Owner, working day and source` only when exceptional owner evidence is present · `Required` · `Working day` · `Source` | ordinary owner metadata in My Work |
 | Work source remainder | `Other work is current.` | implying one failed source made the whole list current or empty |
-| Work loading announcement | `Loading work` | No work · zero counts while loading |
-| Work object shortcut | `Open {object} (O)` | an undiscoverable keyboard shortcut |
+| Work loading announcement | `Loading tasks` (the Workspace page and the Tasks panel) | No work · zero counts while loading · `Loading work` |
 | Work source health | `Could not refresh {source}` · `Last updated {time}` | `0` · No open work |
-| Work read failure | `Work could not be loaded. Try again.` · `Try again` | No open work · Something went wrong |
 | Work calendar not configured | `Working hours not configured · {Site or owner}` · `Open {owning settings}` | assuming Sunday or Saturday is closed · showing `0` |
 | Work calendar read failure | `Working days could not be loaded. Dates may be missing.` · `Try again` | using a default calendar silently · showing an invented count of days late |
 | Work day has no eligible actor | `Nobody works {weekday, date} for {Duty}.` · `Set cover in Settings → Staff & Duties` | Nobody holds {Duty}. · Saturday Duty · moving a physical Saturday action to Friday |
@@ -295,7 +284,7 @@ Workspace-owned Staff & Duties page under global Settings (placement production 
 | Issue detail sections | `What is true` · `Linked records` · `Accountability` · `Money` · `Evidence & timeline` · `Review & learning` · `Related Issues & history` | Details · Activity · Notes as catch-all sections |
 | Issue report door | `Monthly report` | Report dashboard · Export issues |
 
-An empty or failure sentence uses the exact object it describes. `No open work` cannot describe an
+An empty or failure sentence uses the exact object it describes. `Nothing to do today` cannot describe an
 empty Issue Register; `No issues recorded` cannot describe a filtered no-match; neither may appear
 until the complete authorised source is healthy.
 
@@ -3829,28 +3818,18 @@ the row still carries its order, its person and its time.
 
 ## The Work module words (SO V2 Card 10, owner ruling 2026-08-11)
 
-The Work page adds **no new action vocabulary** — every row line is the same
-`orderActionLine` the Orders list prints, and every due date is the ruled
-weekday+date spelling (`Thu 6 Aug`). Only these strings are the page's own:
+Work adds **no new action vocabulary**: every task line is the same `orderActionLine` the Orders
+list prints. The Workspace page's own strings are in "The Workspace page words" and the Tasks
+panel's in "The Tasks panel words". These stay for every Work surface:
 
 | Concept | Canonical word | Do NOT use |
 |---|---|---|
-| The sidebar door / page | **Work** | Tasks · To-do · Queue · Dashboard |
-| The two filters over the one set | **My Work · Team Work** | My tasks · Everyone · All work |
 | Work with no anchor date yet | **No date** | Unscheduled · Someday · TBD |
-| The tally — page, staff group and rail row | **{n} actions to do · {n} late** | **{n} open · {n} overdue** (superseded) · Total · Outstanding |
-| An Inbox row's due date, on line 1 at right | **`{fmtDate}`** (`Wed, 20 Aug`) · **`No date`** | Today · Tomorrow · `due` before the date · an invented date |
-| A Late Inbox row's date | **`{fmtDate}` in red** (owner ruling 2026-09-27: never `Late —`, never a dash on any screen) | `Late — was due` · Overdue · Missed · a dash · a red row |
-| The clear state | **No open work. Every track is clear.** | All done · Empty |
-| Empty My Work while the team has work (owner review 2026-09-25) | header **`0 for you · {n} for the team`** · list door **`See Team Work`** | a bare `0 actions to do` |
 | Work assignment filter (owner ruling 2026-09-29; NOT BUILT) | `Assigned to` · `All staff`; assignment changes belong in history | Covering · Covered for · Covered by · Covering for others |
-| The page filter (owner review 2026-09-25 item 17) | rail section **Page** · **All pages** | Module · All modules |
-| The Work Inbox controls (owner ruling 2026-09-27) | `My Work` · `Team Work`; `Search work…` · `Filters`; header `Previous month` · **`{Mon YYYY}`** · `Next month`; Monday–Saturday month grid with the count under the day; fixed `Late {n}` · `No date {n}` (`0` printed); pressing the month contracts/expands it; Filters contains `Page` · `All pages` · `Assigned to` · `All staff` | a hidden `0` · `No work` · Today on screen · `Public holiday ·` · a two-date header · permanent filter groups · list tabs · `Covering` |
 
-> **⭐ EVERY COUNT SAYS WHAT IT COUNTS — owner ruling 2026-08-16 (blueprint card §7), and it
-> OVERWRITES the 2026-08-14/15 `open · overdue` tally.** A bare `open` beside a number told a
-> low-English operator nothing; `{n} actions to do · {n} late` says the thing itself. The rail's
-> Team peek and the Work page speak the same pair.
+> **⭐ EVERY COUNT SAYS WHAT IT COUNTS — owner ruling 2026-08-16 (blueprint card §7).** A bare
+> `open` beside a number told a low-English operator nothing. A Work number stands beside the word
+> it counts: `To do {n}` · `Waiting {n}` · `Done {n}` · `{n} tasks`.
 
 **THE TWO-LINE WORK ROW HAS ONE MAPPING (card §7).** Line 1 is the action's registered SHORT
 display — **the dictionary's own QUEUE word**, no second definition of any act. Line 2 carries
@@ -3871,11 +3850,15 @@ roster holder yet shows its DUTY WORD where a name cannot stand — never a hand
 records the completion fact. A human follow-up stays `ops_tasks`, labelled
 human, and is the only explicitly completable thing.
 
-## The Work Logistics card and external link words — owner rulings 2026-09-24 · BUILT
+## The Work Logistics card and external link words — owner rulings 2026-09-24 · model and link page BUILT · the card is NOT MOUNTED on any screen
 
-The Work right panel's party cards (`workspace/MASTER.md` §5.9) and the external logistics link
+The Logistics model (`workspace/MASTER.md` §5.9) and the external logistics link
 (`delivery/MASTER.md` §5.5). The owner's own words are marked ⭐ and are not open to re-wording.
 One arithmetic prints them: `logisticsCardModel` (`packages/shared/src/logistics-card.ts`).
+FACT (13 Oct 2026, Workspace MASTER §5.9): the Logistics card is drawn on no screen, so the rows
+`Card heading`, `Progress`, `Expanded section headings`, `External link — Carres side` and
+`Communication` have no screen today. The words stay: they live in the model, and Delivery's pages
+and the external link page print some of them.
 
 | Where | The words |
 |---|---|
@@ -3901,16 +3884,16 @@ One arithmetic prints them: `logisticsCardModel` (`packages/shared/src/logistics
 **`Contact logistics today` is the owner's exact phrase** and is the one admitted use of `today` in
 an action line: it prints only on or after the check's own date, beside that date.
 
-## The complete Work right panel words — owner ruling 2026-09-25 · APPROVED TARGET / NOT BUILT
+## The complete Work right panel words — owner ruling 2026-09-25 · the right panel is REMOVED (13 Oct 2026); the Route, Customer and Supplier model words remain
 
-Workspace MASTER §5.10 owns composition, source boundaries, interaction and responsive law. This
-table freezes the new visible words; §5.9's Logistics vocabulary remains built and unchanged.
+The three-column Work page and its right panel are removed (Workspace MASTER §5.10). This table
+keeps the words of the models the task view still reads: the Order Route (`mission-route.ts`, drawn
+in the task view's `Route` tab) and the Customer and Supplier models (`customer-card.ts`,
+`supplier-card.ts`; their cards are drawn on no screen, Workspace MASTER §5.9). `Record as sent` and
+the words beside it are APPROVED / NOT BUILT. The Logistics vocabulary is the section above.
 
 | Meaning | Use exactly | Do not use |
 |---|---|---|
-| Layer order (Jess, 2026-09-26 — BUILT) | the Route titled `{object} · {module}` · `Sales Order` card (`Customer` · `Deliver to` · `Goods` · `Customer date` · `Balance`; `Open {SO}`) · `Logistics` · `Customer` · `Supplier` · `Owner, timing and source` | the words `Order Route` on screen · a summary block above the Route for an order mission · duplicate task messages above every card · Journey · Steps |
-| Balance line | **`RM 0.00 · paid`** · **`RM {n} · not paid`** — followed by **`· by {date}`**, the governed collection deadline (the Route's payment line), while money is owed · `Value not recorded`. It is the panel's ONE money line: the collapsed Logistics card does not repeat it (Jess, 2026-09-26) | Outstanding · Due · Owing · `to collect` · `still to collect` |
-| The Work Inbox action row (Jess, 2026-09-27 — replaces the four-line card) | 76px continuous row; line 1 `{document}` + `{fmtDate}` (red when Late) / `No date`; line 2 the action; line 3 `{page} · {short fact or party}`; current responsibility uses **`Assigned to {name}`**, with changes retained in history; every line truncates with `…` and shows whole on hover/focus; selected row = 3px blue left edge + pale-blue wash | a fourth chip line · page/party chips · a card gap/radius/shadow · `Was due` · `Late —` · a dash anywhere · a repeated date heading · a list tab bar |
 | Route points | `Proceed` · optional `Loan` · `PO` · `GRN` · `Contact` · `Delivery` | Stock received as a second GRN point · permanent Payment/Logistics circles |
 | Route progress | `{n} of {total}` · `{n} of {total} confirmed` · `Scheduled delivery · {date}` · `Delivered · {date}` | repeating `1 pending` beside equivalent progress |
 | Customer collapsed states | `{company} contacts the customer · by {date}` · `Scheduled {date}` · `Customer requested another date · {date}` · `Customer refused delivery` · `Phone number is wrong` · `Delivery delayed · customer notice required` | routine Carres `Contact due today` · routine `Waiting for customer` · Customer confirmed |
@@ -3921,14 +3904,13 @@ table freezes the new visible words; §5.9's Logistics vocabulary remains built 
 | Supplier follow-up | `Confirmation needed today` · `Waiting for supplier` · `Arrival date passed · Follow up supplier` · card summary `{n} arrival dates passed` (`1 arrival date passed`) · `Record supplier delay` | default-date confirmation immediately after PO issue |
 | Communication receipt | `Record as sent` · `Not sent` · `Waiting for customer` · `Waiting for supplier` · `No answer · Follow up today` | treating Copy/Open WhatsApp as sent or complete |
 | Missing contact | `WhatsApp unavailable · No phone number` · `Open customer record` (equivalent exact party door) | unexplained disabled control |
-| Refresh failure | `Some information could not be refreshed.` · `Try again` while the last good mission stays visible | replacing the mission with a generic error |
-| No selection / missing order | `Select a work item` · `Choose an item from the Work list to see its mission.` · `Order details unavailable` · `The work item still exists, but its Sales Order could not be loaded.` | empty fake Route · guessed `Logistics not assigned` |
+| Refresh failure | `Some information could not be refreshed.` · `Try again` while the last good reading stays visible | replacing it with a generic error |
+| Missing order | `Order details unavailable` | empty fake Route · guessed `Logistics not assigned` |
 | Customer stored-result and partner lines | `Customer refused delivery` · `Phone number is wrong` · `Customer requested another date` · `{company} contacts the customer · by {date}` · `{company} contacts the customer.` · `Logistics not assigned` · `Delivered · {date}` · `No email recorded` · `No phone recorded` · `No contact recorded yet` | a guessed reply · a Carres calling line |
 | Customer current act | normally none: `{company} contacts the customer.`; exceptions only: `Tell the customer the new date` · `Decide the next step for this delivery` · `Correct the phone number` · `The customer asked for {date}` | `Contact customer today` as routine Carres work · `Agree the delivery date, then record the reply` |
 | Customer card sections | `Current action` · `Delivery` · `Partner contact` · `Contact by` · `Latest result` · `Open in Delivery` · `Exception` · `Evidence and communication history` · `Name not recorded` · `WhatsApp reply · 1 photo` · `In person` | Record reply · Accepted date |
 | Customer communication preview | always available on the card (owner ruling 2026-09-26; a governed exception or ERP-ARCHITECTURE §6.5 outstation release supplies its own template): `To {name} · {phone}` · source-owned template · `Copy message` · `Open WhatsApp` · `Open email` · `Was this message sent?` · `Recorded as sent` · `Message copied` · `Email unavailable · No email recorded` | routine `Confirm delivery date` template · Send |
 | Route statuses and payment line | `Unavailable` · `Due` · `Done` · `Not proceeded` · `Offered` · `Accepted` · `Declined` · `Lent out` · `Returned` · `PO not issued` · `Issued` · `From stock` · `In stock` · `Received` · `Due today` · `Due {date}` · `Passed` under the Contact point's own date (owner time-word ruling 12 Oct 2026; was `Missed`) · `Scheduled` · `Requested` · `No date` · `{n} days left` · `{n} days late` · `Payment due {day}` (owner reconciliation 2026-09-25; the amount is said once, in the summary) · `Payment · Hold delivery · Finance hold · {reason}` | Blocked · a Payment circle · to collect · `Payment · Hold delivery · RM {amount} unpaid · by {date}` (retired 2026-09-25) |
-| Route detail row | `{supplier}  {state} · Expected {date}` · `Received {date}` · `Not received yet` · `Customer` · `Logistics` · `Open Supplier card` · `Open Customer card` · `Open Logistics card` · `Open Purchasing` · `Open Sales Order` · `Open in Delivery` · `Logistics not assigned` · `Logistics · Cannot deliver · {reason}` | a second timeline |
 | Customer exception doors | `Open Sales Order` (a known delay · a wrong phone number) · `Open in Delivery` (another date · a refusal) | a Work form |
 | Customer card read failure | `Customer contact unavailable` + `Open Sales Order` | a guessed partner state |
 | Supplier row labels | `PO Delivery Date` (the original, never changes) · ⭐ `Expected arrival` (the supplier's newest promised date) · `From stock · {ready} of {total} ready` · `No purchase order for this Sales Order · {n} items need one` · `{n} items need a PO` · `Open Sales Order` · `Delay reason` · `Evidence` · `WhatsApp · {date}` · `Supplier DO` · `Needed by {date}` · `Not needed yet` · `Deliver to` · `GRN` · `Received {date}` · `{r} of {n} received` · `Not received yet` · `Not recorded` · `{n} of 4 complete` · `Open {PO No}` · `Open Purchasing` · `Copy message` · `Open WhatsApp group` · `WhatsApp group not set` · `Message copied` · `The message could not be copied. Try again.` · `Supplier details could not be loaded.` · `Try again` | Stock received · `Latest date` |
@@ -5060,19 +5042,16 @@ Not screen words (a direct database change only, never raised by a screen): the 
 
 Workspace message availability: `Message not available` replaces a placeholder draft when no governed message is available. Disable `Copy message` in that state; never report success when clipboard copying fails.
 
-## The Work page words — Workspace MASTER §5.10 · APPROVED / LOCKED 2026-09-28 · BUILT 2026-09-28
+## The Communication card and in-place act words · Workspace MASTER §5.10 · their place in the task view is BUILT ON BRANCH `build/workspace-v3`, NOT DEPLOYED
+
+Drawn with the one task view on the Workspace page; the words are the earlier page's, unchanged.
+The page's own words are in "The Workspace page words"; the task view's are in "The Tasks panel
+words".
 
 | Where | Use exactly | Do not use |
 |---|---|---|
-| Page and scope | main-menu destination and page title `Workspace` (owner ruling 2026-09-29) · `My Task` · `Team Work` | `Work` for the main-menu destination · `My Work` on this page |
-| Rail | `Search work…` · `Attention`: `Broken commitment` · `Late` · `Waiting for answer` · `No date` · `Module`: `All modules`, then the module names · one row per order: `{SO No}` and its task count (a PO view row: `{PO No}`; a PO window row: `{time} PO window` over its date) | a customer name, `actions`, `Late` or `No date` on an order row · `Missed` · `Overdue` |
-| Order header | `{SO No}` over the customer · `Planned production start` · `Customer Requested Delivery Date` · a missing value `Not recorded` | `Order Route · To do {n}` · band words `GOODS` / `DELIVERY` |
-| Stops | the Order Route node labels (`PURCHASING` · `SUPPLIER` · `RECEIVING` · `STOCK` · `LOAN` · `LOGISTICS` · `DELIVERY DATE` · `PAYMENT` · `DELIVERY ORDER` · `DELIVER` · `DELIVERY PHOTO`) with `Late` / `Due` only · `{n} of {m} done` (only steps with completion evidence count) | a second count on the stop · `T1` / `T2` / `T3` |
-| Checklist steps | `PO issued` · `PO sent to supplier` / `Sending not confirmed` · `Supplier Confirmed Delivery Date` · `GRN posted` · `Units ready` · `Logistics assigned` · the Logistics check labels · `Scheduled delivery` · `Customer paid in full` · `Delivered` · `Delivery photo` · the DELIVERY ORDER card lists the gate's own requirement sentences | a fact (a date that is not a step) as a checklist row |
-| Act buttons | the owning form's own word: `PO sent to supplier` · `Record supplier answer` · `Record balance date` · `Update date and time` · `Assign logistics` · an act with no in-place form yet: `Open {object}` | a Workspace-invented button |
-| PO view (a PO serving two or more orders) | `{PO No} · {Supplier}` over `PO Delivery Date {date} · Expected arrival {date} · Related orders · {n}` · a related order line `{SO No} · {customer} · Requested {date}` · on the order it opens: `Back to {PO No}` | copying the PO's act onto each order |
-| Communication | `Communication` · tabs `Supplier` · `Warehouse` · `Logistics` · `Customer` · `To` (recorded channels only: `{party} · WhatsApp group` · `{party} · Email`) · `Template` · `Message` · `Message not available` · `Copy message` · `History {n}` | a typed recipient · a message with a missing field · a dash |
-| Empty and failure | `Nothing assigned to you` + `See Team Work` · `Nothing due on {date}` + `Open {date}` / `Open Late` · `No late work` · `No open work. Every track is clear.` · `Could not refresh {source}` · `Last updated {time}` · `Work could not be loaded. Try again.` | `0` for a failed source |
+| Act buttons | the owning form's own word: `PO sent to supplier` · `Record supplier answer` · `Update date and time` · `Assign logistics` · an act with no in-place form yet: `Open {record}` | a Workspace-invented button |
+| Communication | `Communication` · tabs `Supplier` · `Warehouse` · `Logistics` · `Customer` · `To` (recorded channels only: `{party} · WhatsApp group` · `{party} · WhatsApp` · `{party} · Email`) · `Template` · `Message` · `Message not available` · doors `Open WhatsApp` · `Open email` · `Copy message` · `Message copied` · `The message could not be copied.` · `History {n}` | a typed recipient · a message with a missing field · a dash |
 
 | Sales Orders pilot page-tools overflow (owner approved 2026-10-01) | `Page tools` (accessible trigger/menu name); `Export` · `Columns` with existing submenu words | Order business actions in page-tools menu |
 
@@ -5087,7 +5066,7 @@ party); this section holds the panel's frame and the card rows.
 |---|---|---|
 | Title row | `Tasks` · `{weekday} · {n} left`, where `{n}` is today's `To do` | a second number that differs from the `To do` tab |
 | Day strip | `Mon` · `Tue` · `Wed` · `Thu` · `Fri` (`Sat` only while work is dated on it) over the day number, with that day's `To do` under it · `Previous week` · `Next week` | a count of Waiting or Done under a day |
-| Tabs | `To do {n}` · `Waiting {n}` · `Done {n}` | `Waiting for answer` · `Done today` in this panel (they are the Workspace page's rail words) |
+| Tabs | `To do {n}` · `Waiting {n}` · `Done {n}` | `Waiting for answer` · `Done today` (retired with the earlier Workspace page) |
 | Party head | the party's name and its count; a purchase batch sits under `SO Batch Purchase`; work with no party sits under its page's name | a module group in place of the party |
 | Card rows, label left and value right | `PO No` · `SO No` · `MPR No` · `Supplier DO` (a record of another kind: its page's name) · `Deadline` `{weekday, date}` · late: `{weekday, date} · {n} days late` / `1 day late`, or `· passed` when the working days cannot be counted · `Deadline` `No date · set by {page}` · a purchase batch: `Cut-off` `{time}`, late `{time} · passed` · waiting: `Asked` `{date}` · `Next contact` `{date}` · back from waiting: `No answer by` `{date}` · covering: `For` `{name}` · finished: `Record` `{record}` · `Done` `{time}` | `Overdue` · `Missed` · a tag or a button on a card · amber on any row but the one that has passed |
 | Empty | `Nothing to do today` · `Nothing planned for this day` · `Nothing is waiting for an answer` · `Nothing done on this day` | `0` while loading or failed |
@@ -5103,6 +5082,31 @@ party); this section holds the panel's frame and the card rows.
 | A form wider than the panel, on the full surface | the act as its title and `{party} · {record}` beside it (`Record supplier answer` · `Nice Future · PO-2609-0042-V2`), then the owning module's own form with its own `Cancel` and saving button | a second `Close` or `Back` beside the form's `Cancel` · the form inside the 320 panel |
 | Toast after a task is saved | the owning module's own success words · `Next: {party}` when another task of the same kind waits · `Close message` | `Undo` · `Saved` with nothing after it · a green line in the panel |
 | Failure | `Tasks could not be refreshed` · `Last updated {time}` · `Could not refresh {source}` · `Try again` | a silent empty list |
+
+## The Workspace page words · owner's round 3 brief, 13 Oct 2026 (points 3 and 4) · BUILT ON BRANCH `build/workspace-v3`, NOT DEPLOYED
+
+The page at `/operation?tab=work` (Workspace MASTER §5.10). It lists the same tasks as the Tasks
+panel, so a task's own words are the Tasks panel's; this section holds the page's frame and the
+table. The package prints `Today` in `Due` and `Owner` as a column head; the page prints the date
+("NO RELATIVE DATE WORDS", owner ruling 2026-08-15) and `Assigned to` (Workspace MASTER §3).
+
+| Where | Use exactly | Do not use |
+|---|---|---|
+| Page | `Workspace` | `Work` as the page or menu word |
+| Left panel | `Module` · `All modules` · `Sales Orders` · `Purchasing` · `Warehouse` · `Delivery` · `Payment` · `Issue Tracker`, each with ONE plain number; above them the Tasks panel's day strip | `Page` · `All pages` · `Attention` · a second number or a late word on a row · `0` while loading or failed |
+| Scope | `My Task` · `Team Work` (spoken as `Whose work`) | `My Tasks` · `My Work` · a person's name as a scope · `Take over` |
+| Tabs | `To do {n}` · `Waiting {n}` · `Done {n}` (spoken as `Show`, as in the Tasks panel) | `Waiting for answer` · `Done today` |
+| Columns | `Due` · `Task` · `Contact` · `Last contact` · `Assigned to` (Team Work only) · `Status`; on the `Done` tab the first column is `Done` and the person column is `Completed by` | `Owner` as a column head · a column the table does not need to decide the next step (03 §2) |
+| `Due` | `{weekday, date}` · `No date`; a purchase batch's cut-off time under it; a late date in amber. `Done`: the time it was finished | `Today` · `Tomorrow` · `Overdue` · an invented date |
+| `Task` | the task in its list card's own words, over `{page} · {record}`; a purchase batch: `SO Batch Purchase` | the owner's name inside the task sentence |
+| `Contact` | the party, with `WhatsApp` · `Email` · `Phone` · `In person` under it once a request is recorded · `Not recorded` | a guessed party |
+| `Last contact` | `Asked {date}` · `No answer by {date}` · `Answer recorded {date}` · `Not recorded` | `sent` for opening a channel |
+| `Assigned to` · `Completed by` | the person's name · `Not assigned` | `Take over` · a hand-picked person where nobody is assigned |
+| `Status` | amber: `Broken commitment` · `{n} days late` / `1 day late` · `passed` (the working days cannot be counted) · `Cut-off passed` (a purchase batch); grey: `To do` · `Waiting`; green: `Done` | `Overdue` · `Missed` · colour without the word |
+| Footer | `{n} tasks` / `1 task`; narrowed: `{k} of {n} tasks` | `{n} actions to do` |
+| A search or a column filter that matches nothing | `No work matches these filters` | the tab's empty words (`Nothing to do today`) when work exists |
+| Opened task | `Back to all tasks` | `Close` · `Go back` |
+| Empty, loading and failure | the Tasks panel's words | `Nothing assigned to you` · `No open work. Every track is clear.` · `Work could not be loaded. Try again.` |
 
 ### Accepted Sales Orders shared template — 2026-10-01
 

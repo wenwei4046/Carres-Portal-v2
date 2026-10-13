@@ -194,12 +194,17 @@ export function waitingRows(mine: readonly WorkRow[]): WorkRow[] {
   return mine.filter(isWaiting);
 }
 
-/** What I finished on the chosen day (Malaysia's date). */
+/** Everything finished on the chosen day (Malaysia's date), newest first. */
+export function doneOnDay(completed: readonly OperationWorkCompleted[], chosen: string): OperationWorkCompleted[] {
+  return completed
+    .filter((done) => malaysiaClockOf(done.completedAt).date === chosen)
+    .sort((a, b) => b.completedAt.localeCompare(a.completedAt));
+}
+
+/** What I finished on the chosen day. */
 export function doneOn(completed: readonly OperationWorkCompleted[], myUserId: string | null, chosen: string): OperationWorkCompleted[] {
   if (!myUserId) return [];
-  return completed
-    .filter((done) => done.completedBy?.userId === myUserId && malaysiaClockOf(done.completedAt).date === chosen)
-    .sort((a, b) => b.completedAt.localeCompare(a.completedAt));
+  return doneOnDay(completed, chosen).filter((done) => done.completedBy?.userId === myUserId);
 }
 
 export interface TaskStripDay {

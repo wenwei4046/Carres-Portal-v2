@@ -2,11 +2,21 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import type { ReactNode } from "react";
 import type { WorkRow } from "../use-open-work";
 import type { WorkPanelHost } from "./tasks-host";
+const refreshWork = vi.hoisted(() => vi.fn());
 import { panelFor } from "./work-panels";
 
 vi.mock("../work/WorkOrderRoute", () => ({ useMissionRoute: () => ({ route: null, loading: true, failed: false }) }));
+/* Delivery's own forms are their own doors; here they only prove which one a
+   task opens, for which order, and that closing them returns to the task. */
+vi.mock("../work/WorkActForms", () => ({
+  useRefreshWork: () => refreshWork,
+  SupplierAnswerForm: () => null,
+  AssignLogisticsForm: ({ orderId, onDone }: { orderId: string; onDone: () => void }) => <button type="button" onClick={onDone}>assign form {orderId}</button>,
+  DeliveryDateForm: ({ orderId, onDone }: { orderId: string; onDone: () => void }) => <button type="button" onClick={onDone}>date form {orderId}</button>,
+}));
 
 /**
  * What a task opens when its module has no panel of its own: the act, in the
@@ -67,5 +77,32 @@ describe("the act panel, in the one task view", () => {
     expect(screen.getByRole("tab", { name: "Files" })).toBeInTheDocument();
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Route" }));
     expect(screen.getByTestId("task-route-none")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["assign_logistics", "Assign logistics", "assign form o-9105"],
+    ["confirm_delivery_date", "Update date and time", "date form o-9105"],
+  ])("Delivery's %s is done in place: the one button opens Delivery's own form on the full surface", (ruleKey, button, form) => {
+    (host.openReview as ReturnType<typeof vi.fn>).mockClear(); refreshWork.mockClear();
+    mount(task({ module: "delivery", ruleKey }, { object: { kind: "delivery_scope", id: "o-9105", label: "SO-9105" }, requiredResult: "Scheduled delivery recorded" }));
+    expect(screen.queryByTestId("task-generic-open")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: button }));
+    expect(host.openReview).toHaveBeenCalledTimes(1);
+    const close = vi.fn();
+    render((host.openReview as ReturnType<typeof vi.fn>).mock.calls[0]![0](close) as ReactNode);
+    expect(screen.getByRole("heading", { name: button })).toBeInTheDocument();
+    expect(screen.getByTestId("task-wide-surface")).toHaveTextContent("SO-9105");
+    /* Saved or cancelled, the form closes back to the task and the Work reads
+       are asked again; the form says its own result, the host adds none. */
+    fireEvent.click(screen.getByRole("button", { name: form }));
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(refreshWork).toHaveBeenCalledTimes(1);
+    expect(host.result).not.toHaveBeenCalled();
+  });
+
+  it("the same rule about a Delivery Order, which names no order id, keeps the record's own page", () => {
+    mount(task({ module: "delivery", ruleKey: "confirm_delivery_date" }, { object: { kind: "delivery_order", id: "DO-2041", label: "DO-2041" } }));
+    expect(screen.getByTestId("task-generic-open")).toHaveTextContent("Open DO-2041");
+    expect(screen.queryByTestId("task-generic-act")).toBeNull();
   });
 });
