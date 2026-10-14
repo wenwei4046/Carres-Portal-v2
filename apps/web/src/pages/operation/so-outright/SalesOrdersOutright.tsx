@@ -25,6 +25,7 @@ import { useSalesOrderRegisterFacts, useSalesOrderRegisterOrders } from "@/lib/q
 import { buildRegisterRow, type RegisterRow } from "../sales-order-columns";
 import { isRental, lineName } from "../sales-order-facts";
 import { paymentStatusOf, skuKey, useCatalogNames } from "../SalesOrdersRegister";
+import { inRequestedNarrowing, requestedNarrowingOf, requestedNarrowingWord } from "../requested-narrowing";
 import SalesOrderReadFailure from "../SalesOrderReadFailure";
 import { printSalesOrdersOrSay } from "../record-print";
 import ModuleHeader from "../components/ModuleHeader";
@@ -192,16 +193,27 @@ export default function SalesOrdersOutright() {
     (r: RegisterRow) => (tab === "all" ? true : tab === "delivered" ? isDelivered(r) : !isDelivered(r)),
     [tab],
   );
+  /* A door by the customer's original requested delivery (Purchasing's Monthly
+     demand opens `?tab=all&requested=…`): the same narrowing the earlier
+     register read, on version 1's preserved request. */
+  const requestedParam = params.get("requested");
+  const requested = useMemo(() => requestedNarrowingOf(requestedParam), [requestedParam]);
   const list = useMemo(
-    () => all.filter((r) => inTab(r) && Object.entries(filters).every(([k, v]) => COLUMNS[k]!.cell(r, ctx).t === v)),
-    [all, inTab, filters, ctx],
+    () =>
+      all.filter(
+        (r) =>
+          inTab(r) &&
+          (!requested || inRequestedNarrowing(r.customerDelivery, requested, isDelivered(r))) &&
+          Object.entries(filters).every(([k, v]) => COLUMNS[k]!.cell(r, ctx).t === v),
+      ),
+    [all, inTab, requested, filters, ctx],
   );
 
   /* ── paging · selection ── */
   const [pageSize, setPageSize] = useState<number>(20);
   const [page, setPage] = useState(1);
   const pages = Math.max(1, Math.ceil(list.length / pageSize));
-  useEffect(() => setPage(1), [tab, layoutKey, filters, pageSize, seededSearch]);
+  useEffect(() => setPage(1), [tab, layoutKey, filters, pageSize, seededSearch, requestedParam]);
   const shown = list.slice((Math.min(page, pages) - 1) * pageSize, Math.min(page, pages) * pageSize);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [opened, setOpened] = useState<Set<string>>(new Set());
@@ -311,13 +323,14 @@ export default function SalesOrdersOutright() {
 
   const chips = [
     ...(seededSearch ? [{ key: "search", label: `Search: ${seededSearch}`, clear: () => setParam("search", null) }] : []),
+    ...(requested ? [{ key: "requested", label: `Customer’s original requested delivery: ${requestedNarrowingWord(requested)}`, clear: () => setParam("requested", null) }] : []),
     ...Object.entries(filters).map(([k, v]) => ({ key: k, label: `${COLUMNS[k]!.label}: ${v}`, clear: () => setParam(`f.${k}`, null) })),
   ];
   const columns = layout.columns.map((k) => COLUMNS[k]!);
   const clearFilters = () =>
     setParams((p) => {
       const n = new URLSearchParams(p);
-      [...n.keys()].filter((k) => k === "search" || k.startsWith("f.")).forEach((k) => n.delete(k));
+      [...n.keys()].filter((k) => k === "search" || k === "requested" || k.startsWith("f.")).forEach((k) => n.delete(k));
       return n;
     }, { replace: true });
 
