@@ -276,7 +276,7 @@ export default function PostingAccounts() {
           // The Customer money rows come from the payment methods; wait for them
           // too, so the group never appears a moment after the others.
           isLoading={!query.isSuccess || registry.isLoading}
-          onRowClick={(r) => {
+          onRowDoubleClick={(r) => {
             if (r.change) setOpen(r);
           }}
         />

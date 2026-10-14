@@ -123,7 +123,7 @@ function CardRoutes() {
           allowColumnGrouping={false}
           stickyIdentity
           isLoading={!routes.isSuccess || !accountQuery.isSuccess}
-          onRowClick={(r) => setEditing(r)}
+          onRowDoubleClick={(r) => setEditing(r)}
           /* The note says what the table is for, on the toolbar's left beside it. */
           toolbarStart={
             <p className="max-w-[560px] text-meta text-kit-slate-11">

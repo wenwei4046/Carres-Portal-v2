@@ -186,7 +186,7 @@ describe("Finance Settings — the money accounts, on Chart of accounts (0692)",
   it("takes an account out of use, and shows the database's refusal when it still holds money", async () => {
     net.refuse = "1121 Public Bank is not at RM 0.00 in the ledger. It stays in use until it is.";
     show();
-    fireEvent.click(await screen.findByText("Public Bank"));
+    fireEvent.doubleClick(await screen.findByText("Public Bank"));
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(within(dialog).getByRole("checkbox", { name: "Active" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
@@ -205,7 +205,7 @@ describe("Finance Settings — the money accounts, on Chart of accounts (0692)",
 describe("Finance Settings — a money account's number, changed on its own form (24 Sep)", () => {
   const CHART_DOOR = "PATCH /api/finance/ledger/accounts/1121";
   const openPublicBank = async () => {
-    fireEvent.click(await screen.findByText("Public Bank"));
+    fireEvent.doubleClick(await screen.findByText("Public Bank"));
     return screen.findByRole("dialog");
   };
   const numberField = (dialog: HTMLElement) => within(dialog).getByRole("textbox", { name: /Number/ });
@@ -380,7 +380,7 @@ describe("Finance Settings — card payout banks (0541)", () => {
     show("/finance/settings?tab=card");
     const row = await screen.findByTestId("card-route-1131-dealer");
     expect(row).toHaveTextContent(/1131 · GHL.*Dealer.*1121 · Public Bank/);
-    fireEvent.click(row);
+    fireEvent.doubleClick(row);
     const dialog = await screen.findByRole("dialog");
     /* An opened route's card account and machine are fixed facts, read as
        text under the kind's word, never a disabled field (Chew 2026-10-14). */
@@ -397,8 +397,8 @@ describe("Finance Settings — card payout banks (0541)", () => {
 
 describe("Finance Settings — the chart of accounts", () => {
   /* The chart screen itself is ChartOfAccounts.test.tsx. Here: the tab opens
-     it, grouped by AutoCount's section (0656), and a row opens the account. */
-  it("opens the chart grouped by section, and a row click opens the account", async () => {
+     it, grouped by AutoCount's section (0656), and a double click on a row opens the account. */
+  it("opens the chart grouped by section, and a double click opens the account", async () => {
     net.chart = [
       acc("2000", "Liabilities", null, true),
       { ...acc("2100", "Payables", "2000", true), section: "CURRENT LIABILITIES" },
@@ -408,7 +408,7 @@ describe("Finance Settings — the chart of accounts", () => {
     const accrued = await screen.findByText(/Accrued expenses/);
     expect(screen.getByTestId("grid-group-toggle-CURRENT LIABILITIES")).toHaveTextContent("CURRENT LIABILITIES · Liability");
     expect(screen.queryByText("Liabilities")).toBeNull();
-    fireEvent.click(accrued);
+    fireEvent.doubleClick(accrued);
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByLabelText(/^Name/)).toHaveValue("Accrued expenses");
   });

@@ -105,7 +105,7 @@ export default function CommissionStatement({
             Add a payment
           </Button>
         }
-        onRowClick={(l) => (l.kind === "payment" ? setPayment(l) : l.month && onOpenMonth(l.month))}
+        onRowDoubleClick={(l) => (l.kind === "payment" ? setPayment(l) : l.month && onOpenMonth(l.month))}
         statusSummary={() => (
           <span data-testid="commission-statement-summary">
             {statement

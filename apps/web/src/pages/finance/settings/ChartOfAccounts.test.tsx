@@ -7,7 +7,7 @@
  *     headings (0000 ...) are not shown;
  *   · a top account with no section yet reads under `No section yet`;
  *   · a heading folds; retired accounts show only when asked for;
- *   · the edit icon and a row click open the same window, and Save is ONE call
+ *   · the edit icon and a double click on the row open the same window, and Save is ONE call
  *     carrying the name, number, section and heading;
  *   · the retire icon asks first, and a refusal is the database's sentence;
  *   · Add account asks for the section first, offers only that section's
@@ -244,10 +244,21 @@ describe("Chart of accounts — edit and retire from the row (0656)", () => {
     expect(within(dialog).getByRole("combobox", { name: /Kind/ })).toBeInTheDocument();
   });
 
-  it("a row click opens the same window; Top of the section sends no heading", async () => {
+  it("a single click only selects the row; a double click opens the account window (Chew 2026-10-14)", async () => {
     show();
     await ready();
-    fireEvent.click(within(row("900-C004")).getByText(/COMMISSION - AGENT/));
+    fireEvent.click(within(row("900-E001")).getByText(/ENTERTAINMENT/));
+    expect(row("900-E001").className).toMatch(/trSelected/);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.doubleClick(within(row("900-E001")).getByText(/ENTERTAINMENT/));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText(/^Name/)).toHaveValue("ENTERTAINMENT");
+  });
+
+  it("a double click opens the same window; Top of the section sends no heading", async () => {
+    show();
+    await ready();
+    fireEvent.doubleClick(within(row("900-C004")).getByText(/COMMISSION - AGENT/));
     const dialog = await screen.findByRole("dialog");
     pick(dialog, /Under/, "Top of the section");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));

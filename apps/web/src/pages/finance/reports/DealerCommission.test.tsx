@@ -153,10 +153,10 @@ describe("Dealer commission", () => {
     expect(screen.queryByRole("heading", { name: "Renovation quotas" })).toBeNull();
   });
 
-  it("a dealer's row opens its orders for the same month, in their groups", async () => {
+  it("a double click on a dealer's row opens its orders for the same month, in their groups", async () => {
     renderAt();
     await screen.findByText("Ace Furniture");
-    fireEvent.click(screen.getByText("Ace Furniture"));
+    fireEvent.doubleClick(screen.getByText("Ace Furniture"));
     expect(await screen.findByText("SO-2054")).toBeTruthy();
     expect(screen.getByText("New orders this month")).toBeTruthy();
     expect(screen.getByText("Cancelled this month")).toBeTruthy();
@@ -174,7 +174,7 @@ describe("Dealer commission", () => {
 
   it("an order's window says how its commission is made up", async () => {
     renderAt("/?view=orders");
-    fireEvent.click(await screen.findByText("SO-2054"));
+    fireEvent.doubleClick(await screen.findByText("SO-2054"));
     const dialog = await screen.findByRole("dialog");
     expect(dialog).toHaveTextContent("Probe Customer One · Ace Furniture");
     expect(dialog).toHaveTextContent("Order total: RM 1,000.00");
@@ -188,7 +188,7 @@ describe("Dealer commission", () => {
 
   it("a cancelled order's commission is taken back from its window", async () => {
     renderAt("/?view=orders");
-    fireEvent.click(await screen.findByText("SO-2050"));
+    fireEvent.doubleClick(await screen.findByText("SO-2050"));
     const dialog = await screen.findByRole("dialog");
     expect(dialog).toHaveTextContent("What it earned on money Carres kept stays. Taking it back counts in the month you do it.");
     fireEvent.click(within(dialog).getByRole("button", { name: "Take commission back" }));
@@ -291,14 +291,14 @@ describe("Commission rates (0661)", () => {
   it("removes a rate added from a day; a rate from the start stays", async () => {
     renderAt("/?view=rates");
     await screen.findByText("Sofa One");
-    fireEvent.click(screen.getByText("Sofa One"));
+    fireEvent.doubleClick(screen.getByText("Sofa One"));
     const dialog = await screen.findByRole("dialog");
     expect(dialog).toHaveTextContent("Removing it gives the orders from");
     fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(net.calls).toContain(`DELETE ${RULES_URL}/r-prod`));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
-    fireEvent.click(screen.getByText("Accessory"));
+    fireEvent.doubleClick(screen.getByText("Accessory"));
     const start = await screen.findByRole("dialog");
     expect(start).toHaveTextContent("A rate from the start stays. Add a new one from a day instead.");
     expect(within(start).queryByRole("button", { name: "Remove" })).toBeNull();
@@ -343,17 +343,17 @@ describe("Statement (0664)", () => {
     expect(net.bodies[`POST ${DC}/payments`]).toEqual({ voucherId: CHOICES[0].id, dealerId: "d1" });
   });
 
-  it("a payment's row takes it off the statement; a month's row opens its orders", async () => {
+  it("a double click on a payment's row takes it off the statement; on a month's row it opens its orders", async () => {
     renderAt("/?view=statement");
     await pickWhenReady("Dealer", "Ace Furniture");
-    fireEvent.click(await screen.findByText("Payment PV-0001"));
+    fireEvent.doubleClick(await screen.findByText("Payment PV-0001"));
     const dialog = await screen.findByRole("dialog");
     expect(dialog).toHaveTextContent("Taking it off leaves the payment voucher as it is");
     fireEvent.click(within(dialog).getByRole("button", { name: "Take off this statement" }));
     await waitFor(() => expect(net.calls).toContain(`DELETE ${DC}/payments/pay1`));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
-    fireEvent.click(screen.getByText(`Commission ${fmtMonth(PREV)}`));
+    fireEvent.doubleClick(screen.getByText(`Commission ${fmtMonth(PREV)}`));
     expect(await screen.findByText("SO-2050")).toBeTruthy();
     expect(screen.getByTestId("commission-orders-summary")).toBeTruthy();
     await waitFor(() => expect(net.calls).toContain(`GET ${DC}?month=${PREV}`));
@@ -417,7 +417,7 @@ describe("KPI allowance and the rebate's total (0665)", () => {
 
   it("removes one from its window", async () => {
     renderAt("/?view=kpi");
-    fireEvent.click(await screen.findByText("Mattress Guarantee"));
+    fireEvent.doubleClick(await screen.findByText("Mattress Guarantee"));
     const dialog = await screen.findByRole("dialog");
     expect(dialog).toHaveTextContent("Tier bonus: 5 guarantees RM 50.00");
     fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
