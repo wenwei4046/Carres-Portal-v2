@@ -60,7 +60,7 @@ const money = amountCell;
 const strong = (text: string) => <span className="font-semibold">{text}</span>;
 
 /** Each column's pixels; Description's is its least, as it takes the rest. */
-const WIDTH = { date: 110, entry: 130, source: 140, document: 170, description: 180,
+const WIDTH = { date: 110, entry: 150, source: 140, document: 170, description: 180,
   debit: FINANCE_WIDTH.amount, credit: FINANCE_WIDTH.amount, balance: 150 } as const;
 /** Where a person's dragged widths for this table are kept. */
 export const GENERAL_LEDGER_WIDTHS_KEY = "carres.finance.widths.general-ledger.v1";

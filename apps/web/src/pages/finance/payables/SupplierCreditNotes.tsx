@@ -80,7 +80,7 @@ function CreditNoteRegister() {
   const query = useSupplierCreditNotes();
   const rows = query.data ?? [];
   const columns = useMemo<DataGridColumn<SupplierCreditNoteRegisterRow>[]>(() => [
-    { key: "note", label: "Credit Note No", width: W.documentNo,
+    { key: "note", label: "Credit Note No", width: FINANCE_WIDTH.documentNo,
       accessor: (r) => <Link className={link} to={`/finance/credit-notes/${r.id}`}>{noteNo(r)}</Link>,
       searchValue: (r) => r.note_no ?? "", exportValue: noteNo },
     { key: "date", label: "Date", width: W.date, accessor: (r) => fmtDate(r.note_date),

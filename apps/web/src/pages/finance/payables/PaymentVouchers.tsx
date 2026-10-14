@@ -131,7 +131,7 @@ function VoucherRegister() {
   const query = usePaymentVouchers(dept);
   const rows = query.data ?? [];
   const columns = useMemo<DataGridColumn<PaymentVoucherRegisterRow>[]>(() => [
-    { key: "voucher", label: "Voucher No", width: 150,
+    { key: "voucher", label: "Voucher No", width: FINANCE_WIDTH.documentNo,
       accessor: (r) => <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/payment-vouchers/${r.id}`}>{r.voucher_no ?? "Draft, no number yet"}</Link>,
       searchValue: (r) => r.voucher_no ?? "", exportValue: (r) => r.voucher_no ?? "Draft, no number yet" },
     { key: "date", label: "Voucher Date", width: 120, accessor: (r) => fmtDate(r.voucher_date),

@@ -140,7 +140,7 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
   const balanceData = scope.account ? balances.data : undefined;
 
   const columns = useMemo<DataGridColumn<LedgerEntryRow>[]>(() => [
-    { key: "entry", label: "Entry No", width: 150, accessor: (r) => r.entry_no,
+    { key: "entry", label: "Entry No", width: FINANCE_WIDTH.entryNo, accessor: (r) => r.entry_no,
       searchValue: (r) => r.entry_no, filterValue: (r) => r.entry_no, filterType: "numbering" },
     { key: "date", label: "Date", width: 120, accessor: (r) => fmtDate(r.entry_date),
       dateValue: (r) => r.entry_date, filterType: "date", exportValue: (r) => fmtDate(r.entry_date) },

@@ -96,7 +96,7 @@ function DebitNoteRegister() {
   const query = useSupplierDebitNotes();
   const rows = query.data ?? [];
   const columns = useMemo<DataGridColumn<SupplierDebitNoteRegisterRow>[]>(() => [
-    { key: "note", label: "Debit Note No", width: W.documentNo,
+    { key: "note", label: "Debit Note No", width: FINANCE_WIDTH.documentNo,
       accessor: (r) => <Link className={link} to={`/finance/debit-notes/${r.id}`}>{noteNo(r)}</Link>,
       searchValue: (r) => r.note_no ?? "", exportValue: noteNo },
     { key: "date", label: "Date", width: W.date, accessor: (r) => fmtDate(r.note_date),
