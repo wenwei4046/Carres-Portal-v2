@@ -38,7 +38,7 @@ const paths = () => api.mock.calls.map(([path, init]) => `${(init as { method?: 
 
 beforeEach(() => {
   api.mockReset();
-  api.mockImplementation(async (path: string, init?: { method?: string }) => (init?.method === "POST" ? { id: TASK, completionRecorded: true } : record));
+  api.mockImplementation(async (_path: string, init?: { method?: string }) => (init?.method === "POST" ? { id: TASK, completionRecorded: true } : record));
 });
 
 describe("an internal task, opened", () => {
