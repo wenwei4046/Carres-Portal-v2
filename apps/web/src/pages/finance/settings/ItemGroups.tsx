@@ -131,7 +131,7 @@ export default function ItemGroups() {
           allowColumnGrouping={false}
           stickyIdentity
           isLoading={!query.isSuccess}
-          onRowClick={(g) => setOpen(g)}
+          onRowDoubleClick={(g) => setOpen(g)}
           toolbarEnd={
             // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0659).
             <Button variant="neutral" onClick={() => setOpen("new")} disabled={!query.isSuccess}>
@@ -342,6 +342,7 @@ function ProductList({
         columns={columns}
         rowId={(p) => p.modelId}
         onRowOpen={(p) => onOpen(p)}
+        openOnDoubleClick
         empty="No product is in the catalog yet."
         loading={loading}
       />

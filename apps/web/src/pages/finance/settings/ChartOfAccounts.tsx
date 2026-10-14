@@ -361,7 +361,7 @@ export default function ChartOfAccounts() {
         fixedGroups={{ groups, groupOf: (r) => r.group, revealMatches: true }}
         stickyIdentity
         isLoading={!query.isSuccess || !moneyQuery.isSuccess}
-        onRowClick={(r) => open(r.account, false)}
+        onRowDoubleClick={(r) => open(r.account, false)}
         /* Chew 2026-10-14: one main button for the area; the other two acts
            sit in the ⋮ menu (01 §3, one main button per area), and the filter
            sits on the left, apart from the actions. */

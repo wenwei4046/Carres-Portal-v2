@@ -144,7 +144,7 @@ function NotesRegister() {
               </Button>
             }
             emptyMessage="No supplier owes a note. Mark a bill's line from the bill, or add one here."
-            onRowClick={(r) => navigate(`/finance/notes-to-follow-up/${r.id}`)}
+            onRowDoubleClick={(r) => navigate(`/finance/notes-to-follow-up/${r.id}`)}
             statusSummary={(visible) => {
               const credit = visible.filter((r) => r.kind === "CREDIT" && isOpen(r)).reduce((s, r) => s + (num(r.left) ?? 0), 0);
               return (

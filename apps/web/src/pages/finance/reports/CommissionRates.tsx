@@ -120,7 +120,7 @@ export default function CommissionRates({ toolbarStart }: { toolbarStart: React.
             revealMatches: true,
           }}
           isLoading={!query.isSuccess}
-          onRowClick={(r) => setOpen(r)}
+          onRowDoubleClick={(r) => setOpen(r)}
           wrapToolbar
           toolbarStart={toolbarStart}
           toolbarEnd={

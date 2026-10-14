@@ -167,7 +167,7 @@ export default function DealerCommission() {
         appearance="reference" look="finance" fillColumn="dealer" exportName={`Dealer commission ${month}`} groupBanner={false} stickyIdentity
         isLoading={!q.isSuccess} wrapToolbar
         // A dealer's row opens its orders for the same month.
-        onRowClick={(r) => { setDealerId(r.dealerId); setOutletId(ALL); setParams({ view: "orders" }); }}
+        onRowDoubleClick={(r) => { setDealerId(r.dealerId); setOutletId(ALL); setParams({ view: "orders" }); }}
         toolbarStart={scope("report")}
         statusSummary={(visible) => <span data-testid="dealer-commission-summary">
           {visible.length} of {rows.length} rows · {closedOn
