@@ -1,8 +1,8 @@
 -- =============================================================================
 -- 0695_a_forecast_purchase_is_asked_once_through_the_request_door.sql
 -- =============================================================================
--- THE RULING (Jess 2026-10-14, A; docs/purchasing/MASTER.md §5 "Forecast
---   Purchase approval and issuance" and §9.14):
+-- THE RULING (Jess 2026-10-14, A; docs/purchasing/MASTER.md section 5 "Forecast
+--   Purchase approval and issuance" and section 9.14):
 --   Jess approves Forecast Purchase. After her approval PO Duty issues the PO
 --   and sends it. Approval and issuance are separate acts with their own
 --   actor and time. The existing governed doors are reused; there is no new
@@ -69,15 +69,15 @@ create index if not exists forecast_purchase_requests_submission_key_idx
   on public.forecast_purchase_requests (submission_key);
 
 comment on table public.forecast_purchase_requests is
-  '0695 — the structured mark that a Manual Purchase Request was asked for by Forecast Purchase: its week, its lines as asked and the submission key. Written only by purchasing_submit_forecast_requests, read only through purchasing_forecast_request_marks and purchasing_forecast_requests_in_progress.';
+  '0695 : the structured mark that a Manual Purchase Request was asked for by Forecast Purchase: its week, its lines as asked and the submission key. Written only by purchasing_submit_forecast_requests, read only through purchasing_forecast_request_marks and purchasing_forecast_requests_in_progress.';
 
 alter table public.forecast_purchase_requests enable row level security;
 revoke all on table public.forecast_purchase_requests from public, anon, authenticated;
 
--- ───────────────────────────────────────────────────────────────────────────
--- ① WHAT IS IN PROGRESS — the one arithmetic, shared by the page's read and
+-- ----------------------------------------------------------------
+-- 1. WHAT IS IN PROGRESS : the one arithmetic, shared by the page's read and
 --    the submit door's own check.
--- ───────────────────────────────────────────────────────────────────────────
+-- ----------------------------------------------------------------
 create or replace function public._purchasing_forecast_in_progress_rows()
 returns table (request_id uuid, req_no text, state text, sku text, qty integer, from_forecast boolean, created_at timestamptz)
 language sql
@@ -130,11 +130,11 @@ revoke all on function public.purchasing_forecast_requests_in_progress() from pu
 grant execute on function public.purchasing_forecast_requests_in_progress() to authenticated;
 
 comment on function public.purchasing_forecast_requests_in_progress() is
-  '0695 — what open Ready Stock requests that buy extra have still to put on a PO, per request and SKU: approved quantity (else the asked quantity) less what is issued, for requests neither refused nor withdrawn and lines not cancelled. The ONE arithmetic of a request in progress (Law D). It is not stock and not ordered supply.';
+  '0695 : what open Ready Stock requests that buy extra have still to put on a PO, per request and SKU: approved quantity (else the asked quantity) less what is issued, for requests neither refused nor withdrawn and lines not cancelled. The ONE arithmetic of a request in progress (Law D). It is not stock and not ordered supply.';
 
--- ───────────────────────────────────────────────────────────────────────────
--- ② THE MARKS — which of the named requests the forecast asked for.
--- ───────────────────────────────────────────────────────────────────────────
+-- ----------------------------------------------------------------
+-- 2. THE MARKS : which of the named requests the forecast asked for.
+-- ----------------------------------------------------------------
 create or replace function public.purchasing_forecast_request_marks(p_request_ids uuid[])
 returns table (request_id uuid, forecast_week date, lines jsonb)
 language plpgsql
@@ -159,11 +159,11 @@ revoke all on function public.purchasing_forecast_request_marks(uuid[]) from pub
 grant execute on function public.purchasing_forecast_request_marks(uuid[]) to authenticated;
 
 comment on function public.purchasing_forecast_request_marks(uuid[]) is
-  '0695 — the forecast mark of each named Manual Purchase Request that Forecast Purchase asked for (week and lines as asked); a request it did not ask for returns no row. Read by the issue door to recheck a forecast request before a PO is issued.';
+  '0695 : the forecast mark of each named Manual Purchase Request that Forecast Purchase asked for (week and lines as asked); a request it did not ask for returns no row. Read by the issue door to recheck a forecast request before a PO is issued.';
 
--- ───────────────────────────────────────────────────────────────────────────
--- ②b A SUBMISSION ALREADY MADE — the caller's own retry reads what its key did.
--- ───────────────────────────────────────────────────────────────────────────
+-- ----------------------------------------------------------------
+-- 2b. A SUBMISSION ALREADY MADE : the caller's own retry reads what its key did.
+-- ----------------------------------------------------------------
 create or replace function public.purchasing_forecast_submission(p_submission_key uuid)
 returns jsonb
 language plpgsql
@@ -190,13 +190,13 @@ revoke all on function public.purchasing_forecast_submission(uuid) from public, 
 grant execute on function public.purchasing_forecast_submission(uuid) to authenticated;
 
 comment on function public.purchasing_forecast_submission(uuid) is
-  '0695 — the requests the caller''s own submission key already made (id and MPR No), or NULL when that key made none. Lets a retry be answered with the first result.';
+  '0695 : the requests the caller''s own submission key already made (id and MPR No), or NULL when that key made none. Lets a retry be answered with the first result.';
 
--- ───────────────────────────────────────────────────────────────────────────
--- ③ THE SUBMIT DOOR
+-- ----------------------------------------------------------------
+-- 3. THE SUBMIT DOOR
 --    p_groups: [{ required_by, requirement, lines: [{ sku, qty, in_progress, basis }] }]
 --    One group becomes one Manual Purchase Request (one supplier and category).
--- ───────────────────────────────────────────────────────────────────────────
+-- ----------------------------------------------------------------
 create or replace function public.purchasing_submit_forecast_requests(
   p_submission_key uuid,
   p_forecast_week  date,
@@ -316,4 +316,4 @@ revoke all on function public.purchasing_submit_forecast_requests(uuid, date, uu
 grant execute on function public.purchasing_submit_forecast_requests(uuid, date, uuid, jsonb) to authenticated;
 
 comment on function public.purchasing_submit_forecast_requests(uuid, date, uuid, jsonb) is
-  '0695 — Forecast Purchase''s submit door. One submission at a time; a retry with the same key answers with the requests it already made; refuses forecast_in_progress_changed when another request for a SKU appeared since the caller read; raises each request through purchasing_create_request_with_lines (Ready Stock, additional_stock), so approval stays required and this function writes no request row itself; records the forecast mark. All or none.';
+  '0695 : Forecast Purchase''s submit door. One submission at a time; a retry with the same key answers with the requests it already made; refuses forecast_in_progress_changed when another request for a SKU appeared since the caller read; raises each request through purchasing_create_request_with_lines (Ready Stock, additional_stock), so approval stays required and this function writes no request row itself; records the forecast mark. All or none.';
