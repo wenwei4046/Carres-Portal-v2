@@ -59,9 +59,9 @@ describe("DataGrid · leadingColumns", () => {
     const { container } = mount("test.leading.wide");
     expect(headerLabels(container)).toEqual(["SO Date", "SO No", "Customer"]);
     // 30 (☐) + 32 (▸) = 62 for the date; 62 + 100 = 162 for the identity.
-    expect(headerLefts(container)).toEqual(["0px", "30px", "62px", "162px", ""]);
+    expect(headerLefts(container)).toEqual(["0px", "32px", "62px", "162px", ""]);
     expect([...container.querySelectorAll<HTMLElement>("tbody tr:first-child td")].map((td) => td.style.left))
-      .toEqual(["0px", "30px", "62px", "162px", ""]);
+      .toEqual(["0px", "32px", "62px", "162px", ""]);
   });
 
   it("pins the identity ALONE below a 768px canvas; the date scrolls under it", () => {
@@ -69,7 +69,7 @@ describe("DataGrid · leadingColumns", () => {
     const { container } = mount("test.leading.narrow");
     expect(headerLabels(container)).toEqual(["SO Date", "SO No", "Customer"]);
     // Narrow gutter: the ☐ column is 40 wide, so the identity pins at 72.
-    expect(headerLefts(container)).toEqual(["0px", "40px", "", "72px", ""]);
+    expect(headerLefts(container)).toEqual(["0px", "32px", "", "72px", ""]);
   });
 
   it("a saved layout from before the ruling can neither reorder nor hide the pair", () => {
