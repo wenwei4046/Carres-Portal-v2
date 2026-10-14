@@ -84,7 +84,7 @@ export function CTableHead({ column }: { column: CTableColumn }) {
   return column.head ? (
     <span className="text-left leading-[1.25]" title={column.label}>
       <span className="block whitespace-nowrap">{column.head[0]}</span>
-      <span className="block whitespace-nowrap font-normal">{column.head[1]}</span>
+      <span className="block whitespace-nowrap">{column.head[1]}</span>
     </span>
   ) : (
     <span className="whitespace-nowrap text-left leading-[1.25]">{column.label}</span>
