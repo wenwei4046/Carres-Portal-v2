@@ -19,6 +19,7 @@
  * The Module rail counts the rows of the chosen tab: its rows sum to the tab.
  */
 import {
+  INTERNAL_TASK_KIND,
   parsePoWindowKey,
   poWindowTimeWord,
   workLifecycleOrToDo,
@@ -100,7 +101,10 @@ function openRow(row: WorkRow, facts: PoWindowFacts | null): WorkspaceRow {
     due: row.dueIso === null ? W.noDate : fmtDate(row.dueIso),
     dueSub: window ? poWindowTimeWord(window.time) : null,
     title: card.title,
-    record: isBatch ? "SO Batch Purchase" : `${TASK_MODULE_WORD[row.module]} · ${row.source.object.label}`,
+    /* An internal task: its page, then who added it (its name is the title). */
+    record: isBatch ? "SO Batch Purchase"
+      : row.source.object.kind === INTERNAL_TASK_KIND ? `${TASK_MODULE_WORD[row.module]} · ${row.problem}`
+      : `${TASK_MODULE_WORD[row.module]} · ${row.source.object.label}`,
     /* The Work item's own party; for a purchase batch that is its suppliers. */
     contact: row.recipient,
     contactSub: row.recipient && lifecycle.channel ? CHANNEL_WORD[lifecycle.channel] : null,
@@ -123,7 +127,7 @@ function doneRow(done: OperationWorkCompleted): WorkspaceRow {
     due: fmtDate(done.completedAt, { timeOnly: true }),
     dueSub: null,
     title: card.title,
-    record: `${TASK_MODULE_WORD[done.module]} · ${done.objectLabel}`,
+    record: done.module === "workspace" ? TASK_MODULE_WORD[done.module] : `${TASK_MODULE_WORD[done.module]} · ${done.objectLabel}`,
     contact: null, contactSub: null, lastContact: null,
     owner: done.completedBy?.name ?? null,
     status: TASK_CARD_WORDS.tab.done,

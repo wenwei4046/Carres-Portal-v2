@@ -64,6 +64,13 @@ export type InternalTaskOpen = z.infer<typeof internalTaskOpenSchema>;
 export type InternalTask = z.infer<typeof internalTaskSchema>;
 export type InternalTaskAdd = z.infer<typeof internalTaskAddSchema>;
 
+/* The task's first line in Work says who added it. Both directions live here,
+   so no screen takes a name out of a sentence by its own rule. */
+const ADDED_BY = "Added by ";
+export const internalTaskProblem = (creator: string): string => `${ADDED_BY}${creator}`;
+export const internalTaskCreatorOf = (problem: string): string | null =>
+  problem.startsWith(ADDED_BY) && problem.length > ADDED_BY.length ? problem.slice(ADDED_BY.length) : null;
+
 /** `workspace:{task}:internal_task`, the one identity of this task in Work. */
 export function internalTaskOccurrenceId(taskId: string): string {
   return operationWorkStableId("workspace", taskId, INTERNAL_TASK_RULE);
@@ -106,7 +113,7 @@ export function projectInternalTaskWork(input: {
       ruleKey: INTERNAL_TASK_RULE,
       ruleVersion: 1,
       object: { kind: INTERNAL_TASK_KIND, id: task.id, label: task.title },
-      problem: `Added by ${task.createdBy.name}`,
+      problem: internalTaskProblem(task.createdBy.name),
       action: "Do this task",
       recipient: null,
       requiredResult: "Task marked done",

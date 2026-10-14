@@ -22,7 +22,7 @@
  * `generatedOn`; nothing here counts days.
  */
 import type { HTMLAttributes, KeyboardEvent, ReactNode } from "react";
-import { CircleAlert, ClipboardList, Lock, PackageCheck, Route, ShoppingBag, Wallet, type LucideIcon } from "lucide-react";
+import { CircleAlert, ClipboardList, ListChecks, Lock, PackageCheck, Route, ShoppingBag, Wallet, type LucideIcon } from "lucide-react";
 import type { OperationWorkModule } from "@carres/shared";
 import Icon from "@/components/kit/Icon";
 import type { WorkRow } from "../use-open-work";
@@ -35,6 +35,7 @@ const MODULE_ICON: Record<OperationWorkModule, LucideIcon> = {
   delivery: Route,
   payment: Wallet,
   issue_tracker: CircleAlert,
+  workspace: ListChecks,
 };
 
 export type WorkDateStatus = "missed" | "today" | "upcoming" | "no_date";

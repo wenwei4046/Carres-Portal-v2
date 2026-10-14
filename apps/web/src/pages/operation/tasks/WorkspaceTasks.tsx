@@ -31,6 +31,7 @@ import WorkCommunication, { type CommParty } from "../work/WorkCommunication";
 import { useOpenWorkSet, type WorkRow } from "../use-open-work";
 import { sameWeekday } from "./TasksArea";
 import { TaskOpenContext } from "./TaskFrame";
+import NewTask from "./NewTask";
 import { TaskDayStrip } from "./TaskList";
 import { TASK_CARD_WORDS, TASK_TABS, emptyWord, taskCard, taskStrip, type TaskTab } from "./task-cards";
 import { TASK_MODULE_SYMBOL, TASK_MODULE_WORD, TASKS_WORDS as T, myTasks } from "./tasks-model";
@@ -61,7 +62,7 @@ const TONE: Record<WorkspaceTone, string> = {
 
 /** Who a task's message usually goes to: the tab the Communication card opens on. */
 const PARTY_OF: Record<OperationWorkModule, CommParty> = {
-  purchasing: "supplier", receiving: "warehouse", delivery: "logistics", orders: "customer", payment: "customer", issue_tracker: "customer",
+  purchasing: "supplier", receiving: "warehouse", delivery: "logistics", orders: "customer", payment: "customer", issue_tracker: "customer", workspace: "customer",
 };
 /** A task about one order by its id (`operation/work.ts`). */
 const ORDER_KINDS = new Set(["sales_order", "delivery_scope"]);
@@ -237,6 +238,8 @@ export default function WorkspaceTasks() {
         tabs={[{ value: "mine", label: W.scope.mine }, { value: "team", label: W.scope.team }]} />
       <Tabs variant="segmented" label={TASK_CARD_WORDS.show} value={tab} onValueChange={(value) => desk.guard(() => set({ status: value === "todo" ? null : value, task: null }))}
         tabs={TASK_TABS.map((key) => ({ value: key, label: table ? `${TASK_CARD_WORDS.tab[key]} ${table.counts[key]}` : TASK_CARD_WORDS.tab[key] }))} />
+      {/* The shell's Tasks panel steps aside on this page, so its `+ Task` is here. */}
+      <NewTask wide />
     </div>
   );
 

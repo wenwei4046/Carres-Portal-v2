@@ -17,8 +17,8 @@ import { createRoot } from "react-dom/client";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import OperationApp from "@/pages/operation/OperationApp";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { OperationWorkItem, OperationWorkModule, OperationWorkResponse } from "@carres/shared";
-import { addWorkingDays, myHolidaySet } from "@carres/shared";
+import type { InternalTaskOpen, OperationWorkItem, OperationWorkModule, OperationWorkResponse } from "@carres/shared";
+import { addWorkingDays, myHolidaySet, projectInternalTaskWork } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
 import { appTodayIso } from "@/lib/fmt-date";
 import WorkspaceTasks from "@/pages/operation/tasks/WorkspaceTasks";
@@ -64,6 +64,8 @@ const WORDS: Record<OperationWorkModule, Words[]> = {
   ],
   payment: [{ problem: "Payment due today", action: "Ask customer to pay", recipient: "Wong Kah Wai" }],
   issue_tracker: [{ problem: "Issue waiting for a reply", action: "Record result", recipient: null }],
+  /* Internal tasks come from the production projection below, never from this table. */
+  workspace: [],
 };
 const used: Partial<Record<OperationWorkModule, number>> = {};
 
@@ -125,13 +127,21 @@ function item(module: OperationWorkModule, actionOn: string | null, missedDays =
   };
 }
 
+const COLLEAGUE = { userId: "00000000-0000-4000-8000-0000000000b2", name: "TEST · Staff B" };
+const INTERNAL_TASKS: InternalTaskOpen[] = [
+  { id: "00000000-0000-4000-8000-0000000000c1", title: "TEST · Get the new product photographs", dueOn: TODAY, createdAt: `${TODAY}T01:20:00.000Z`,
+    createdBy: COLLEAGUE, assignedTo: { userId: ME, name: "Shasha" } },
+  { id: "00000000-0000-4000-8000-0000000000c2", title: "TEST · Count the showroom price tags", dueOn: wd(1), createdAt: `${TODAY}T02:05:00.000Z`,
+    createdBy: { userId: ME, name: "Shasha" }, assignedTo: COLLEAGUE },
+];
+
 const FEED: OperationWorkResponse = {
   contractVersion: 2,
   complete: true,
   generatedOn: TODAY,
   closureReceipt: null,
-  staff: [{ userId: ME, name: "Shasha", email: "sha@carres.co" }],
-  sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((key) => ({
+  staff: [{ userId: ME, name: "Shasha", email: "sha@carres.co" }, { userId: COLLEAGUE.userId, name: COLLEAGUE.name, email: "staff-b@carres.local" }],
+  sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker", "workspace"] as const).map((key) => ({
     key,
     state: "healthy" as const,
     observedAt: `${TODAY}T01:00:00.000Z`,
@@ -153,6 +163,8 @@ const FEED: OperationWorkResponse = {
     item("purchasing", wd(2)),
     item("orders", null),
     item("payment", null),
+    /* `+ Task`: one a colleague added for the preview person, one the other way round. */
+    ...projectInternalTaskWork({ tasks: INTERNAL_TASKS, today: TODAY, observedAt: `${TODAY}T01:00:00.000Z` }),
   ],
 };
 
@@ -452,6 +464,15 @@ globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (/\/logistics-card/.test(url)) return json(facts());
   if (/\/link\/revoke/.test(url)) { linkActive = false; return json({ revoked: true }); }
   if (/\/link(\?|$)/.test(url)) { linkActive = true; return json({ link: { id: "link-1" } }, 201); }
+  const internalTask = /\/api\/operation\/internal-tasks\/([0-9a-f-]{36})(\/done)?$/.exec(url.split("?")[0]!);
+  if (internalTask) {
+    const task = INTERNAL_TASKS.find((row) => row.id === internalTask[1]);
+    if (!task) return json({ code: "task_not_found", message: "task not found" }, 404);
+    if (internalTask[2]) return json({ id: task.id, occurrenceId: `workspace:${task.id}:internal_task`, doneAt: `${TODAY}T04:00:00.000Z`, completionRecorded: true });
+    return json({ ...task, detail: task.id.endsWith("c1") ? "TEST data. Ask TEST Supplier A for the photographs of the two new models." : null,
+      doneAt: null, doneBy: null, events: [{ event: "added", at: task.createdAt, actor: task.createdBy }] });
+  }
+  if (/\/api\/operation\/internal-tasks$/.test(url.split("?")[0]!)) return json({ id: "00000000-0000-4000-8000-0000000000c9", occurrenceId: "workspace:00000000-0000-4000-8000-0000000000c9:internal_task" }, 201);
   if (url.includes("/api/")) return new Response(JSON.stringify({ message: "not seeded" }), { status: 404 });
   return realFetch(input, init);
 };

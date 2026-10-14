@@ -331,7 +331,7 @@ import {
   type RepairOrderEligibleUnit,
   type RepairOrderListRow,
 } from "@carres/shared";
-import { operationWorkResponseSchema, type LogisticsCardFacts, type RouteGoodsFacts, type SupplierClaimInspection } from "@carres/shared";
+import { OPERATION_WORK_INCLUDE_WORKSPACE, operationWorkResponseSchema, type LogisticsCardFacts, type RouteGoodsFacts, type SupplierClaimInspection } from "@carres/shared";
 import {
   soBatchOrderLineOutstandingQty,
   soBatchPurchaseResponseSchema,
@@ -4470,7 +4470,8 @@ export function useOperationWork(
   return useQuery({
     queryKey: qk.operation.work(),
     queryFn: async () => operationWorkResponseSchema.parse(
-      await apiFetch<unknown>("/api/operation/work"),
+      /* `include`: this build knows the `workspace` module (internal tasks). */
+      await apiFetch<unknown>(`/api/operation/work?include=${OPERATION_WORK_INCLUDE_WORKSPACE}`),
     ),
     staleTime: 30_000,
     refetchInterval: 30_000,
