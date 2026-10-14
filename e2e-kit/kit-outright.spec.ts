@@ -165,9 +165,9 @@ test("Sales Order Outright toolbar never cuts or hides a control with filters on
   expect(await carresCheck(page)).toEqual(PASS);
 });
 
-for (const toolbar of ["one-line", "two-rows"] as const) test(`Sales Order Outright toolbar (${toolbar}) holds one search chip in the Sales Order view, at 1025 with Tasks open (real-data case, owner 14 Oct)`, async ({ page }) => {
+test("Sales Order Outright toolbar holds one search chip in the Sales Order view on one line, at 1025 with Tasks open (real-data case, owner 14 Oct)", async ({ page }) => {
   await page.setViewportSize({ width: 1025, height: 900 });
-  await page.goto(`${PAGE}?search=1314${toolbar === "two-rows" ? "&toolbar=two-rows" : ""}`, { waitUntil: "networkidle" });
+  await page.goto(`${PAGE}?search=1314`, { waitUntil: "networkidle" });
   await page.waitForTimeout(500);
   await setPanels(page, false, true);
   await page.waitForTimeout(500);
@@ -182,7 +182,7 @@ for (const toolbar of ["one-line", "two-rows"] as const) test(`Sales Order Outri
       overflow: bar.scrollWidth - bar.clientWidth,
       past: buttons.filter((b) => b.getBoundingClientRect().right > edge + 0.5).length,
       view: buttons.find((b) => (b.getAttribute("aria-label") ?? "").startsWith("View:"))?.textContent?.trim(),
-      /* The Tasks body starts level with the table on one line and on two rows. */
+      /* The Tasks body starts level with the table. */
       level: Math.round((tasks.children[1] as HTMLElement).getBoundingClientRect().top) - Math.round(table.getBoundingClientRect().top),
       rows: Math.round(bar.getBoundingClientRect().height) > 40 ? 2 : 1,
     };
@@ -192,9 +192,8 @@ for (const toolbar of ["one-line", "two-rows"] as const) test(`Sales Order Outri
   expect(m!.past).toBe(0);
   expect(m!.view).toContain("Sales Order");
   expect(m!.level, "the Tasks body starts level with the table").toBe(0);
-  expect(m!.rows, "two rows only in the two-row candidate").toBe(toolbar === "two-rows" ? 2 : 1);
-  /* carres-check's rule 2 wants a 36 toolbar row; two rows are checked for cut controls and level panels. */
-  if (toolbar === "one-line") expect(await carresCheck(page)).toEqual(PASS);
+  expect(m!.rows, "the toolbar stays one line").toBe(1);
+  expect(await carresCheck(page)).toEqual(PASS);
 });
 
 test("Sales Order Outright opened row: Qty and Supplier are reachable by keyboard inside the list's own scroll box (1025, Tasks open)", async ({ page }) => {
