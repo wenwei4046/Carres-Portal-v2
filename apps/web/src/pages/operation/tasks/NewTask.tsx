@@ -69,7 +69,12 @@ export default function NewTask({ wide = false }: { wide?: boolean }) {
     if (!title) local.name = W.nameRequired;
     if (!dueOn) local.due = W.dueRequired;
     setErrors(local); setFailed(null);
-    if (local.name || local.due || !chosen) return;
+    if (local.name || local.due || !chosen) {
+      /* The first field that needs an answer takes the focus, so the person
+         is not left looking for what stopped the save. */
+      if (local.name) document.getElementById("new-task-name")?.focus();
+      return;
+    }
     setBusy(true);
     attempt.current ??= crypto.randomUUID();
     try {
@@ -112,7 +117,7 @@ export default function NewTask({ wide = false }: { wide?: boolean }) {
         }
       >
         <form className="flex flex-col gap-3" onSubmit={(event) => { event.preventDefault(); void add(); }} data-testid="new-task-form">
-          <Input id="new-task-name" label={W.name} required value={name} maxLength={INTERNAL_TASK_TITLE_MAX} placeholder={W.namePlaceholder} error={errors.name}
+          <Input id="new-task-name" label={W.name} required autoFocus value={name} maxLength={INTERNAL_TASK_TITLE_MAX} placeholder={W.namePlaceholder} error={errors.name}
             onChange={(event) => { setName(event.target.value); setErrors((e) => ({ ...e, name: undefined })); }} />
           <Textarea id="new-task-detail" label={W.detail} value={detail} maxLength={INTERNAL_TASK_DETAIL_MAX} placeholder={W.detailPlaceholder} error={errors.detail}
             onChange={(event) => { setDetail(event.target.value); setErrors((e) => ({ ...e, detail: undefined })); }} />
