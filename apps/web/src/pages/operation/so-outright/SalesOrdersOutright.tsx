@@ -242,7 +242,7 @@ export default function SalesOrdersOutright() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [viewsOpen, setViewsOpen] = useState(false);
   const exportTable = (rows: RegisterRow[]) => ({
-    headers: ["SO No.", ...layout.columns.filter((k) => k !== "order").map((k) => COLUMNS[k]!.label)],
+    headers: [COLUMNS.order!.label, ...layout.columns.filter((k) => k !== "order").map((k) => COLUMNS[k]!.label)],
     rows: rows.map((r) => [
       `SO-${r.so}`,
       ...layout.columns.filter((k) => k !== "order").map((k) => {
@@ -534,12 +534,17 @@ function HeaderCell({
   const c = COLUMNS[col]!;
   const [open, setOpen] = useState(false);
   const alignEnd = c.align === "end";
-  const words = (
+  const words = c.head ? (
+    <span className="text-left leading-[1.25]" title={c.label}>
+      <span className="block whitespace-nowrap">{c.head[0]}</span>
+      <span className="block whitespace-nowrap">{c.head[1]}</span>
+    </span>
+  ) : (
     <span className="text-left leading-[1.25]">{c.label}</span>
   );
   if (!c.filterable) {
     return (
-      <div role="columnheader" className={`flex ${alignEnd ? "justify-end" : ""}`}>
+      <div role="columnheader" aria-label={c.head ? c.label : undefined} className={`flex ${alignEnd ? "justify-end" : ""}`}>
         {words}
       </div>
     );
@@ -550,7 +555,7 @@ function HeaderCell({
     counts.set(t, (counts.get(t) ?? 0) + 1);
   }
   return (
-    <div role="columnheader" className="flex">
+    <div role="columnheader" aria-label={c.head ? c.label : undefined} className="flex">
       <CPopover
         label={c.label}
         role="menu"

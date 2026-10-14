@@ -4928,6 +4928,7 @@ was read and holds nothing, a read that failed, and a record this person may not
 
 | Meaning | Approved wording | Do not use for this entry |
 |---|---|---|
+| The `Sales Order` view's column headings, in order (owner fix list 14 Oct 2026 · BUILT 14 Oct 2026) | **`Proceed Date`** · **`SO No`** · **`Items`** · **`Sales Location`** · **`Delivery Location`** · **`Customer’s original`** over **`requested delivery`** (two lines; its full name `Customer’s original requested delivery` is the screen-reader and export heading) | `SO No.` · `Sales location` · `Delivery location` · `Customer original delivery date` |
 | The owner's record was read and holds nothing | **`Not recorded`** (grey) | `Not set` (retired here 2026-10-09: it meant a read the list did not do yet) · None · a blank · a dash |
 | The owner's read failed | **`Could not read`** (amber); on hover the governed sentence **`Could not read {owner} for this order.`** + **`This does not mean {the empty fact}.`** (`Purchasing` · `Receiving` · `Delivery` · `Stock` · `Payments` · `Finance` · `Service Cases` · `the SO PIC`) | `Not recorded` · `Not yet` · `No Finance hold` · `0` from a failed read |
 | The record exists but this person may not see it | **`No access`** (grey); hover **`You may not see this record.`** / for the PIC **`A PIC is recorded, but you may not see this person's name.`** | `Not recorded` · `Unknown` |
