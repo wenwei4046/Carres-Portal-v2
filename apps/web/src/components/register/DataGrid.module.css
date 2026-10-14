@@ -1620,6 +1620,19 @@ div:first-child > .columnsMenuGroup {
   font-weight: 600;
   border-top: 2px solid var(--fin-total-rule);
 }
+/* The row under the pointer: the whole row, pinned cells included, in a very
+   light blue, never the half outline a pinned cell covered (Chew 2026-10-14,
+   「code 那边不会右选到的痕迹」). The keyboard keeps its outline. */
+.rootLookFinance {
+  --fin-hover-bg: #F4F7FD;
+}
+.rootLookFinance .tr:not(.trExpansion):hover {
+  outline: none;
+}
+.rootLookFinance .tr:not(.trExpansion):hover > .td,
+.rootLookFinance .tr:not(.trExpansion):hover > .stickyCell {
+  background: var(--fin-hover-bg);
+}
 .rootLookFinance .trSelected > .td,
 .rootLookFinance .trSelected > .stickyCell,
 .rootLookFinance .trSelected:hover > .stickyCell {
@@ -1687,4 +1700,9 @@ div:first-child > .columnsMenuGroup {
   padding-top: 3px;
   padding-bottom: 3px;
   height: calc(var(--grid-cell-h) - 1px);
+}
+/* A selected row stays grey under the pointer. */
+.rootLookFinance .tr.trSelected:not(.trExpansion):hover > .td,
+.rootLookFinance .tr.trSelected:not(.trExpansion):hover > .stickyCell {
+  background: var(--fin-select-bg);
 }
