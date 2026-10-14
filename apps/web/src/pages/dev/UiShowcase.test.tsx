@@ -41,12 +41,13 @@ describe("/ui — the one Carres UI kit", () => {
     expect(table.getByRole("checkbox", { name: "Select SO-TEST-02" })).toBeChecked();
   });
 
-  it("the footer's quantity line wraps inside the card; the pager stays", () => {
+  it("the footer's quantity line wraps inside the card, never cut; the pager stays", () => {
     render(<UiShowcase />);
     const section = document.querySelector('[data-carres-table="list"]') as HTMLElement;
     expect(section.className).toContain("grid-cols-[minmax(0,1fr)]");
     const qty = within(section).getByText(/^· Qty: Mattress 23/);
-    expect(qty.className).toContain("line-clamp-2");
+    expect(qty.className).toContain("break-words");
+    expect(qty.className).not.toContain("line-clamp");
     expect(qty.className).toContain("min-w-0");
     expect(within(section).getByRole("button", { name: "Next page" })).toBeInTheDocument();
   });

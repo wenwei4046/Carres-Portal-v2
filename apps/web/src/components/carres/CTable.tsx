@@ -12,8 +12,8 @@
  *   └───────────────────────────────────────────────────────────────────────┘
  *
  * The card has ONE column, `minmax(0,1fr)`, so nothing in the footer can widen
- * the list: a long quantity line wraps inside the footer, and a list wider
- * than its box scrolls sideways in its own box (Layout Standard: "the table
+ * the list: a long quantity line wraps inside the footer (which grows, never
+ * cuts), and a list wider than its box scrolls sideways in its own box (Layout Standard: "the table
  * scrolls sideways with the identifier column frozen; nothing is cut").
  */
 import { Fragment, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
@@ -37,8 +37,8 @@ export type CCell = {
   align?: "start" | "end";
   /** The full sentence behind a short state word (hover). */
   title?: string;
-  /** The sub-line is an essential fact: it wraps instead of being cut. */
-  subWrap?: boolean;
+  /** The full words behind a short second line, e.g. `MS, BF` (hover). */
+  subTitle?: string;
 };
 
 export type CTableColumn = {
@@ -79,8 +79,9 @@ export function CTableHead({ column }: { column: CTableColumn }) {
   );
 }
 
-/** One body cell: plain words or a pill, then the grey second line; a value
- *  longer than its column ends in "…" with the whole value on hover (v12 Table). */
+/** One body cell: plain words or a pill, then the grey second line. No value is
+ *  ever cut with "…": a long one wraps and the row grows (Layout Standard "Never
+ *  cut information", owner 11 Oct; design reply 14 Oct). */
 export function CTableCell({ cell }: { cell: CCell }) {
   const fg =
     cell.fg === "ink" ? "text-c-ink" : cell.fg === "muted" ? "text-c-muted" : cell.fg === "warn" ? "text-c-warn-fg" : cell.fw === 600 ? "text-c-ink" : "text-c-tab";
@@ -95,12 +96,12 @@ export function CTableCell({ cell }: { cell: CCell }) {
           <CPill tone={cell.tone ?? "info"}>{cell.t}</CPill>
         )
       ) : (
-        <span className={`max-w-full truncate tabular-nums ${fw} ${fg}`} title={cell.title ?? cell.t}>
+        <span className={`max-w-full break-words tabular-nums ${fw} ${fg}`} title={cell.title}>
           {cell.t}
         </span>
       )}
       {cell.sub && (
-        <span className={`max-w-full text-[12px] ${cell.subWrap ? "break-words" : "truncate"} ${subFg}`} title={cell.sub}>
+        <span className={`max-w-full break-words text-[12px] ${subFg}`} title={cell.subTitle}>
           {cell.sub}
         </span>
       )}
@@ -200,7 +201,7 @@ export default function CTable<R>({
       aria-label={label}
       data-carres-table="list"
       data-testid={testId}
-      className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)_44px] overflow-hidden rounded-lg border border-c-card-border bg-c-card"
+      className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto] overflow-hidden rounded-lg border border-c-card-border bg-c-card"
     >
       <div className="min-h-0 min-w-0 overflow-auto [scrollbar-width:thin]" data-list-scroll>
         {failure ?? (
@@ -394,9 +395,9 @@ function RowsMenu({ size, onSize }: { size: number; onSize: (n: number) => void 
 }
 
 /**
- * The footer: the count, then the quantity line, then rows per page and the
- * pager. The quantity line takes the room that is left and wraps to a second
- * line, its full text on hover; it never pushes the pager out of the card.
+ * The footer (44 high): the count, then the quantity line, then rows per page
+ * and the pager. The quantity line takes the room that is left and wraps; the
+ * footer grows rather than cut it, and it never pushes the pager out of the card.
  */
 export function CTableFooter({
   count,
@@ -418,9 +419,9 @@ export function CTableFooter({
   testId?: string;
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-3 border-t border-c-footer-line px-3.5 text-[13px] text-c-secondary" data-testid={testId}>
+    <div className="flex min-h-[44px] min-w-0 items-center gap-3 border-t border-c-footer-line px-3.5 py-1 text-[13px] text-c-secondary" data-testid={testId}>
       <span className="shrink-0 whitespace-nowrap">{count}</span>
-      <span className="line-clamp-2 min-w-0 flex-1 leading-4" title={qty || undefined} data-testid={testId ? `${testId}-qty` : undefined}>
+      <span className="min-w-0 flex-1 break-words leading-4" data-testid={testId ? `${testId}-qty` : undefined}>
         {qty}
       </span>
       <RowsMenu size={pageSize} onSize={onPageSize} />

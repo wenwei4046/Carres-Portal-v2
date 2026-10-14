@@ -48,7 +48,7 @@ const ROWS: Row[] = [
     cells: {
       proceed: { t: "11 Oct 26", sub: "Sun", subTone: "muted", fw: 500 },
       order: { t: "SO-TEST-01", sub: "TEST · Customer A", fw: 600, fg: "ink" },
-      items: { t: "3 pcs", sub: "Mattress, Pillow" },
+      items: { t: "3 pcs", sub: "MS, Pillow", subTitle: "Mattress, Pillow" },
       channel: { t: "TEST Showroom A", sub: "TEST · Staff A" },
       dloc: { t: "Setapak", sub: "Kuala Lumpur" },
       reqDate: { t: "19 Nov 26", sub: "Thu", subTone: "muted", fw: 500 },
@@ -59,7 +59,7 @@ const ROWS: Row[] = [
     cells: {
       proceed: { t: "28 Aug 26", sub: "Fri", subTone: "muted", fw: 500 },
       order: { t: "SO-TEST-02", sub: "TEST · Customer B", fw: 600, fg: "ink" },
-      items: { t: "2 pcs + 1 set", sub: "Mattress, Sofa" },
+      items: { t: "2 pcs + 1 set", sub: "MS, SOF", subTitle: "Mattress, Sofa" },
       channel: { t: "TEST Showroom B", sub: "TEST · Staff B" },
       dloc: { t: "Kuala Lumpur", sub: "Kuala Lumpur" },
       reqDate: { t: "Not recorded", fg: "muted" },
@@ -170,7 +170,7 @@ export default function UiShowcase() {
         <TableExample narrow />
       </Section>
 
-      <Section id="cells" title="Table cells" note="Main words, then the grey second line. Three states are never merged: read and empty, read failed, no access.">
+      <Section id="cells" title="Table cells" note="Main words, then the grey second line. Nothing is cut: a long value wraps and the row grows. Three states are never merged: read and empty, read failed, no access.">
         <div className="grid grid-cols-4 gap-3">
           {CELLS.map(([name, cell]) => (
             <div key={name} className="flex flex-col gap-1.5 rounded-lg bg-c-card p-3 ring-1 ring-inset ring-c-card-border">

@@ -67,12 +67,13 @@ export function pcsOf(r: RegisterRow): number {
   return (r.o.order_lines ?? []).reduce((sum, l) => sum + (Number(l.qty) || 0), 0);
 }
 
+/** v12's Items line 2 codes (owner 11 Oct; design reply 14 Oct); a category
+ *  without a code prints its own word. The full words show on hover. */
+const CATEGORY_CODE: Partial<Record<string, string>> = { Mattress: "MS", Bedframe: "BF", Sofa: "SOF", "Mattress protector": "M.P" };
+
 /**
  * Items, as v12 prints them: pieces, a sofa in sets (`3 pcs + 1 set`), and
- * under it the goods' category words. The words are COPY-STANDARD's governed
- * category words (`Mattress · Bedframe · Sofa …`), not v12's codes
- * (`MS · BF · SOF · M.P`): the Blueprint wins for words, and `M.P` is a
- * banned abbreviation.
+ * under it the goods' categories in v12's codes (`MS, BF`).
  */
 export function itemsCell(r: RegisterRow): Cell {
   let pcs = 0;
@@ -89,7 +90,9 @@ export function itemsCell(r: RegisterRow): Cell {
   const t = [pcs || !sets ? `${pcs} ${pcs === 1 ? "pc" : "pcs"}` : "", sets ? `${sets} ${sets === 1 ? "set" : "sets"}` : ""]
     .filter(Boolean)
     .join(" + ");
-  return { t, sub: words.length ? words.join(", ") : undefined };
+  return words.length
+    ? { t, sub: words.map((w) => CATEGORY_CODE[w] ?? w).join(", "), subTitle: words.join(", ") }
+    : { t };
 }
 
 export function isDelivered(r: RegisterRow): boolean {
@@ -321,7 +324,7 @@ export const COLUMNS: Record<string, Column> = {
     /* An OPEN `order_finance_exceptions` row (0355). Unknown is never no hold. */
     cell: (r, ctx) => fromOwner(r, ctx, "finance", "Finance", "there is no Finance hold", (f) =>
       f.financeHold
-        ? { t: "Hold delivery", pill: true, tone: "warn", sub: f.financeHold.reason ? `Finance hold · ${f.financeHold.reason}` : "Finance hold", subTone: "warn", subWrap: true }
+        ? { t: "Hold delivery", pill: true, tone: "warn", sub: f.financeHold.reason ? `Finance hold · ${f.financeHold.reason}` : "Finance hold", subTone: "warn" }
         : { t: "No Finance hold", fg: "muted" }),
   },
   po: {
