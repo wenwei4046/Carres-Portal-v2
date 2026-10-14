@@ -29,7 +29,7 @@
 import { type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { documentDisplayNumber, parsePoWindowKey, poLineReportable } from "@carres/shared";
+import { INTERNAL_TASK_KIND, documentDisplayNumber, parsePoWindowKey, poLineReportable } from "@carres/shared";
 import Button from "@/components/kit/Button";
 import Icon from "@/components/kit/Icon";
 import StepList, { Step } from "@/components/kit/StepList";
@@ -44,6 +44,7 @@ import { BatchPanel } from "../so-batch/BatchPanel";
 import { poTaskHistory, poTaskOrders } from "../purchase-orders/po-task-parts";
 import PoTaskGoods from "../purchase-orders/PoTaskGoods";
 import SupplierAnswerTaskPanel, { SUPPLIER_ANSWER_RULES } from "../purchase-orders/SupplierAnswerTaskPanel";
+import InternalTaskPanel from "./InternalTaskPanel";
 import TaskFrame, { TaskWideSurface } from "./TaskFrame";
 import { purchasingFileStages } from "./task-files";
 import { TASK_VIEW_WORDS as V } from "./task-view";
@@ -58,6 +59,8 @@ export const WORK_PANELS: Partial<Record<string, WorkPanelRenderer>> = {
   po_window: (item, host) => parsePoWindowKey(item.source.object.id)
     ? <BatchPanel key={item.id} item={item} windowKey={item.source.object.id} host={host} />
     : <GenericTaskPanel key={item.id} item={item} host={host} />,
+  /* A task one employee added for another: its own `Mark done`, no module door. */
+  [INTERNAL_TASK_KIND]: (item, host) => <InternalTaskPanel key={item.id} item={item} host={host} />,
 };
 
 /** The panel a task opens: the registry by object kind, then the module's

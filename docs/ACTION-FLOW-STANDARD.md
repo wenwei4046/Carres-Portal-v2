@@ -14,6 +14,12 @@ becomes true, and disappears BY ITSELF when its completion becomes true. Staff n
 create an action, never tick one off, never decide what is next, and never read an SOP
 to find out — every action explains itself on screen at the moment it is needed.
 
+**One bounded exception, owner 2026-10-14.** An employee may add an INTERNAL TASK for a colleague
+with `+ Task` (Workspace MASTER "Employee-created internal tasks"). It is not an action of this
+standard: no rule raises it, it stands for no module's obligation, and its `Mark done` closes only
+itself. It approves nothing, sends nothing and posts nothing. Every action a module owns still
+appears and disappears by itself.
+
 **No paper.** There is no printed SOP, no wall chart, no training deck. If a staff member
 needs a document to use the portal, the portal is wrong. (Jess, 2026-07-27.)
 

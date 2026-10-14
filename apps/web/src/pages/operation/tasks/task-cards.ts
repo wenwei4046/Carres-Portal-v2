@@ -19,6 +19,8 @@
  * The day strip counts `To do` only.
  */
 import {
+  INTERNAL_TASK_KIND,
+  internalTaskCreatorOf,
   malaysiaClockOf,
   parsePoWindowKey,
   poWindowTimeWord,
@@ -65,6 +67,8 @@ export const TASK_CARD_WORDS = {
   /* The toast after a task closes (01 §3). */
   next: (party: string) => `Next: ${party}`,
   closeMessage: "Close message",
+  /* An internal task: who added it (COPY "The internal task words"). */
+  addedBy: "Added by",
 } as const;
 
 const W = TASK_CARD_WORDS;
@@ -135,9 +139,12 @@ export function taskCard(row: WorkRow, facts: PoWindowFacts | null = null): Task
   const words = taskRowWords(row, facts);
   const lifecycle = workLifecycleOrToDo(row.source);
   const isBatch = row.source.object.kind === "po_window";
+  /* An internal task has no record: its name is what the creator typed. */
+  const isInternal = row.source.object.kind === INTERNAL_TASK_KIND;
+  const creator = isInternal ? internalTaskCreatorOf(row.problem) : null;
   const rows: TaskCardRow[] = [];
   /* A purchase batch is named by its time, never by a key. */
-  if (!isBatch) rows.push({ icon: "description", label: recordWord(row.source.object.kind, row.module), value: row.source.object.label, warn: false });
+  if (!isBatch && !isInternal) rows.push({ icon: "description", label: recordWord(row.source.object.kind, row.module), value: row.source.object.label, warn: false });
   rows.push(deadlineRow(row, facts));
   if (lifecycle.state === "waiting") {
     if (lifecycle.waitingSince) rows.push({ icon: "send", label: W.asked, value: day(lifecycle.waitingSince.slice(0, 10)), warn: false });
@@ -146,6 +153,7 @@ export function taskCard(row: WorkRow, facts: PoWindowFacts | null = null): Task
     rows.push({ icon: "alarm", label: W.noAnswerBy, value: day(lifecycle.replyDueOn), warn: true });
   }
   if (row.ownerState === "covered" && row.normalOwner?.name) rows.push({ icon: "person", label: W.forOwner, value: row.normalOwner.name, warn: false });
+  if (creator) rows.push({ icon: "person_add", label: W.addedBy, value: creator, warn: false });
   return {
     id: row.id,
     module: row.module,
@@ -161,6 +169,8 @@ export function taskCard(row: WorkRow, facts: PoWindowFacts | null = null): Task
 /** What was recorded, in the rule's own completion words; a rule this build
  *  does not know keeps the module's result reference. */
 function doneTitle(done: OperationWorkCompleted): string {
+  /* A finished internal task keeps the name its creator typed. */
+  if (done.module === "workspace") return done.objectLabel;
   try { return workCompletionStatement(done.ruleKey); } catch { return done.resultReference; }
 }
 
@@ -168,7 +178,8 @@ function doneTitle(done: OperationWorkCompleted): string {
 export function doneCard(done: OperationWorkCompleted): TaskCard {
   const at = malaysiaClockOf(done.completedAt);
   const rows: TaskCardRow[] = [
-    { icon: "description", label: W.record, value: done.objectLabel, warn: false },
+    /* An internal task has no record beside its own name, the card's title. */
+    ...(done.module === "workspace" ? [] : [{ icon: "description", label: W.record, value: done.objectLabel, warn: false }]),
     { icon: "check_circle", label: W.doneAt, value: fmtDate(done.completedAt, { timeOnly: true }), warn: false },
   ];
   return {

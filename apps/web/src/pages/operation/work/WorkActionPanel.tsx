@@ -60,7 +60,7 @@ export interface WorkCommunication {
 }
 
 const MODULE_ICON: Record<OperationWorkItem["module"], IconName> = {
-  orders: "order", purchasing: "supplier", receiving: "warehouse", delivery: "delivery", payment: "money", issue_tracker: "flag",
+  orders: "order", purchasing: "supplier", receiving: "warehouse", delivery: "delivery", payment: "money", issue_tracker: "flag", workspace: "confirm",
 };
 
 export default function WorkActionPanel({

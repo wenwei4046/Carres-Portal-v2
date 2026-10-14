@@ -11,7 +11,7 @@
  * the task serves, what was recorded (History) and its documents (Files).
  * This file only places them.
  */
-import { workLifecycleOrToDo, type WorkChannel } from "@carres/shared";
+import { INTERNAL_TASK_KIND, workLifecycleOrToDo, type WorkChannel } from "@carres/shared";
 import type { TaskViewFact } from "@/components/kit/TaskView";
 import { fmtDate } from "@/lib/fmt-date";
 import type { WorkRow } from "../use-open-work";
@@ -76,7 +76,8 @@ export function taskHead(row: WorkRow, card: TaskCard): TaskHead {
     title: card.title,
     moduleIcon: TASK_MODULE_SYMBOL[row.module],
     page: isBatch ? "SO Batch Purchase" : TASK_MODULE_WORD[row.module],
-    record: isBatch ? null : row.source.object.label,
+    /* An internal task's name is its title: there is no record to repeat. */
+    record: isBatch || row.source.object.kind === INTERNAL_TASK_KIND ? null : row.source.object.label,
     owner: row.source.owner.acting?.name ?? null,
     destination: row.destination,
   };

@@ -107,4 +107,41 @@ for (const width of WIDTHS) {
     await expect(view.getByTestId("task-route-point-delivery")).toBeVisible();
     await expectKit(page, width, "task · Route");
   });
+
+  /* `+ Task` (Workspace MASTER "Employee-created internal tasks", Jess
+     2026-10-14): the button is in the 36 title row, the dialog is whole on the
+     page, and an internal task opens as the one task view with `Steps` and
+     `History` only, because it serves no order and holds no document. */
+  test(`Tasks panel: + Task, its dialog and an internal task at ${width}`, async ({ page }) => {
+    await openTasks(page, width, "/so-batch-shell-preview.html");
+    const open = page.locator(`${TASKS} [data-testid="new-task-open"]`);
+    await expect(open).toHaveText("Task");
+    expect(await open.evaluate((button) => button.closest("aside")!.children[0]!.contains(button)), "the button is in the title row").toBe(true);
+    await expectKit(page, width, "the list with + Task");
+
+    await open.click();
+    const dialog = page.getByRole("dialog", { name: "New task" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator("#new-task-name")).toBeFocused();
+    const box = (await dialog.boundingBox())!;
+    expect(box.x >= 0 && box.y >= 0 && box.x + box.width <= width && box.y + box.height <= 900, "the dialog is whole on the page").toBe(true);
+    /* An empty name saves nothing and says so under the field. */
+    await dialog.getByTestId("new-task-add").click();
+    await expect(dialog.getByText("Task name is required.")).toBeVisible();
+    await dialog.locator("#new-task-name").fill("TEST · Call TEST Supplier A about the price list");
+    await dialog.locator("#new-task-assignee").click();
+    await page.getByRole("option", { name: "TEST · Staff B" }).click();
+    await dialog.getByTestId("new-task-add").click();
+    await expect(dialog).toBeHidden();
+
+    await page.locator("[data-task-card]", { hasText: "TEST · Get the new product photographs" }).click();
+    const view = page.locator(`${TASKS} [data-kit="task-view"]`);
+    await expect(view.getByRole("tab")).toHaveText(["Steps", "History"]);
+    await expect(view.getByTestId("task-internal-detail")).toBeVisible();
+    await expect(view.getByRole("button", { name: "Mark done" })).toBeVisible();
+    await expectKit(page, width, "internal task · Steps");
+    await view.getByRole("tab", { name: "History" }).click();
+    await expect(view.getByText("Added by TEST · Staff B · for TEST · Staff A")).toBeVisible();
+    await expectKit(page, width, "internal task · History");
+  });
 }

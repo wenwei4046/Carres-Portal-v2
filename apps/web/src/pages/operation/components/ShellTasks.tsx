@@ -16,6 +16,7 @@
 import { useEffect } from "react";
 import { create } from "zustand";
 import MIcon from "@/components/carres/MIcon";
+import NewTask from "../tasks/NewTask";
 import TasksArea from "../tasks/TasksArea";
 import { useTasksHost } from "../tasks/tasks-host";
 import { useOpenWorkSet } from "../use-open-work";
@@ -137,6 +138,8 @@ export default function ShellTasks() {
             {left != null ? ` · ${left} left` : ""}
           </span>
         </span>
+        {/* `+ Task`: a task for yourself or a colleague (Workspace MASTER, Jess 2026-10-14). */}
+        <NewTask />
         <button
           type="button"
           onClick={() => guard(() => setOpen(false))}

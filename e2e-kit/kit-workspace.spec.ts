@@ -79,4 +79,28 @@ for (const width of WIDTHS) {
       await expect(page.getByTestId("workspace-table")).toBeVisible();
     });
   }
+
+  /* `+ Task` on this page (the shell's Tasks panel steps aside here): the
+     button is on the one toolbar line, `Staff tasks` is a Module row, and an
+     internal task opens beside the list with no Communication card, because
+     nobody outside is asked. */
+  test(`Workspace: New task and an internal task at ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(address("&scope=team"), { waitUntil: "networkidle" });
+    await page.locator('[data-testid^="workspace-row-"]').first().waitFor();
+    const open = page.getByTestId("new-task-open");
+    await expect(open).toHaveText("New task");
+    const [toolbar, button] = [(await page.getByTestId("workspace-toolbar").boundingBox())!, (await open.boundingBox())!];
+    expect(Math.abs((button.y + button.height / 2) - (toolbar.y + toolbar.height / 2)), "the button is on the toolbar line").toBeLessThan(3);
+    expect(button.x + button.width, "the button is inside the page").toBeLessThanOrEqual(width);
+    await expect(page.getByTestId("workspace-module-workspace")).toContainText("Staff tasks");
+    await expectKit(page, "the table with New task");
+
+    await page.locator('[data-testid^="workspace-row-"]', { hasText: "TEST · Get the new product photographs" }).first().click();
+    const view = page.locator('[data-testid="workspace-task"] [data-kit="task-view"]');
+    await expect(view.getByRole("tab")).toHaveText(["Steps", "History"]);
+    await expect(view.getByRole("button", { name: "Mark done" })).toBeVisible();
+    await expect(page.getByTestId("workspace-communication")).toHaveCount(0);
+    await expectKit(page, "one internal task");
+  });
 }

@@ -180,7 +180,7 @@ describe("workRailDates — the Date section in a Kuala Lumpur browser", () => {
 
   it("module counts cover every admitted module and add up to the rows", () => {
     const counts = workModuleCounts([row({ module: "delivery" }), row({ module: "delivery" }), row({ module: "payment" })]);
-    expect(counts).toEqual({ orders: 0, purchasing: 0, receiving: 0, delivery: 2, payment: 1, issue_tracker: 0 });
+    expect(counts).toEqual({ orders: 0, purchasing: 0, receiving: 0, delivery: 2, payment: 1, issue_tracker: 0, workspace: 0 });
   });
 });
 

@@ -5,7 +5,7 @@
  * file only words what the engine already decided; the list itself (day
  * strip, `To do` · `Waiting` · `Done`, the cards) is `task-cards.ts`.
  */
-import { parsePoWindowKey, poWindowTimeWord, type OperationWorkModule, type PoWindowWork } from "@carres/shared";
+import { INTERNAL_TASK_KIND, parsePoWindowKey, poWindowTimeWord, type OperationWorkModule, type PoWindowWork } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
 import type { WorkRow } from "../use-open-work";
 
@@ -18,6 +18,8 @@ export const TASK_MODULE_WORD: Record<OperationWorkModule, string> = {
   delivery: "Delivery",
   payment: "Payment",
   issue_tracker: "Issue Tracker",
+  /* Tasks one employee adds for another (COPY "The internal task words"). */
+  workspace: "Staff tasks",
 };
 
 /** The module's icon, as the side menu draws it (Material Symbols). */
@@ -28,6 +30,7 @@ export const TASK_MODULE_SYMBOL: Record<OperationWorkModule, string> = {
   payment: "payments",
   delivery: "local_shipping",
   issue_tracker: "assignment_late",
+  workspace: "task_alt",
 };
 
 /** Words of the panel's frame and its rows. */
@@ -104,6 +107,10 @@ const DETAIL_CARRIES_PROBLEM = new Set(["confirm_delivery_date", "assign_logisti
 export function taskRowWords(row: WorkRow, facts: PoWindowFacts | null = null): TaskRowWords {
   const base = row.source.object.kind === "po_window"
     ? poWindowWords(row, facts)
+    /* An internal task is named by what its creator typed; its line under
+       the name says who added it. */
+    : row.source.object.kind === INTERNAL_TASK_KIND
+    ? { act: row.source.object.label, detail: row.problem }
     : {
         act: row.line,
         detail: DETAIL_CARRIES_PROBLEM.has(row.ruleKey) ? `${row.source.object.label} · ${row.problem}` : row.source.object.label,

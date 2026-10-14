@@ -9,6 +9,8 @@ export const operationWorkModuleSchema = z.enum([
   "delivery",
   "payment",
   "issue_tracker",
+  /* Tasks one employee adds for another (Workspace MASTER, Jess 2026-10-14). */
+  "workspace",
 ]);
 
 export const operationWorkPersonSchema = z.object({
@@ -37,7 +39,15 @@ export const operationWorkSourceKeySchema = z.enum([
   "delivery",
   "payment",
   "issue_tracker",
+  "workspace",
 ]);
+
+/**
+ * A reader that was loaded before `workspace` joined the feed parses the
+ * response strictly and knows six sources. It gets the six it knows; a reader
+ * that asks with `?include=workspace` gets all of them.
+ */
+export const OPERATION_WORK_INCLUDE_WORKSPACE = "workspace";
 
 export const operationWorkCalendarStateSchema = z.enum([
   "ready",
