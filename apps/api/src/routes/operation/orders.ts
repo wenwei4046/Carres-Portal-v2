@@ -196,7 +196,7 @@ async function resolveSkuLabels(
    so what every other caller receives is unchanged. */
 const SALES_ORDER_REGISTER_EXCLUDED_STATUSES = "(place,cancelled)";
 const SALES_ORDER_REGISTER_NOT_RENTAL = "source_system.is.null,source_system.neq.rental";
-function salesOrderRegisterPopulation<
+export function salesOrderRegisterPopulation<
   Q extends { not(column: string, operator: string, value: string): Q; or(filters: string): Q },
 >(q: Q): Q {
   return q

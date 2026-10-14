@@ -55,6 +55,7 @@ type PurchasingPage =
   | "purchase-demands"
   | "to-order"
   | "manual-purchase"
+  | "forecast-purchase"
   | "purchase-orders"
   | "receiving"
   | "claims"
@@ -82,6 +83,8 @@ const PAGE_WORD: Record<PurchasingPage, string> = {
   "purchase-demands": "SO Batch Purchase",
   "to-order": "SO Batch Purchase",
   "manual-purchase": "Manual Purchase Request",
+  /* The weekly stock suggestion (owner 13 Oct 2026). The SIDEBAR's own word. */
+  "forecast-purchase": "Forecast Purchase",
   "purchase-orders": "Purchase Orders",
   receiving: "Receiving",
   claims: "Supplier Claims",
@@ -106,6 +109,8 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
       ? "purchase-demands"
       : tabParam === "manual-purchase"
       ? "manual-purchase"
+      : tabParam === "forecast-purchase"
+      ? "forecast-purchase"
       : tabParam === "receiving"
       ? "receiving"
       : tabParam === "claims"

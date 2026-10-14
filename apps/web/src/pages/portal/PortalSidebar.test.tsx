@@ -941,6 +941,7 @@ describe("PortalSidebar — the Purchasing map", () => {
     );
     expect(rows).toEqual([
       "SO Batch Purchase",
+      "Forecast Purchase",
       "Manual Purchase Request",
       "Purchase Orders",
       "Receiving",
@@ -1011,7 +1012,7 @@ describe("PortalSidebar — the Purchasing map", () => {
         .getByTestId("nav-group-children-purchasing-buy")
         .querySelectorAll("[data-testid^='nav-child-']"),
     ).map((el) => el.textContent?.replace("Coming soon", "").trim());
-    expect(rows).toEqual(["SO Batch Purchase", "Manual Purchase Request", "Purchase Orders"]);
+    expect(rows).toEqual(["SO Batch Purchase", "Forecast Purchase", "Manual Purchase Request", "Purchase Orders"]);
   });
 
   it("the rail word is `Manual Purchase Request`, in BUY (owner 2026-09-23)", () => {

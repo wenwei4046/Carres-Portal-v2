@@ -166,6 +166,7 @@ describe("what typing searches", () => {
          a real page, so a real destination, named as a report. */
       "Purchasing report",
       "SO Batch Purchase",
+      "Forecast Purchase",
       "Manual Purchase Request",
     ]);
   });

@@ -59,6 +59,7 @@ import purchaseRouter from "./routes/operation/purchase";
 import toOrderRouter from "./routes/operation/to-order";
 import soBatchReadyStockRouter from "./routes/operation/so-batch-ready-stock";
 import purchaseDemandsRouter from "./routes/operation/purchase-demands";
+import forecastPurchaseRouter from "./routes/operation/forecast-purchase";
 import manualPurchaseRouter from "./routes/operation/manual-purchase";
 import purchasingSettingsRouter from "./routes/operation/purchasing-settings";
 // Settings → Warehouse — the ONE Warehouse Settings surface (0456 · 0457).
@@ -250,6 +251,7 @@ api.route("/operation/purchase/to-order", toOrderRouter);
 // CARD-2026-08-20 — the read-only customer-demand Register. Mounted beside To
 // Order, on the same recomputation; it issues nothing.
 api.route("/operation/purchase/demands", purchaseDemandsRouter);
+api.route("/operation/purchase/forecast", forecastPurchaseRouter);
 // 0471 — SO Batch Purchase's Ready Stock: the offer for one Sales Order, and
 // the one act that commits an exact Unit to an exact item line. Mounted on the
 // same path so the page reads one base, not two.

@@ -29,7 +29,11 @@ var SUP = {
   'Todern': { method: 'Supplier delivers', days: { Sofa: 14 }, wa: 'https://chat.whatsapp.com/TEST-group-5', pref: 'WhatsApp' },
   'Renness': { method: 'Supplier delivers', days: { Bedframe: 7 }, pref: 'WhatsApp' },
   'NB': { method: 'Supplier delivers', days: { Bedframe: 7 }, inactive: true, pref: 'WhatsApp' },
-  'Laveo': { method: 'Supplier delivers', days: { Bedframe: 7 }, inactive: true, pref: 'WhatsApp' }
+  'Laveo': { method: 'Supplier delivers', days: { Bedframe: 7 }, inactive: true, pref: 'WhatsApp' },
+  // Diglant (placeholder name, owner): keeps finished stock at its site; logistics collects there (Ops Rules §8). 45-day production (Rental MASTER). Contacts not saved yet.
+  'Diglant': { method: 'We collect', days: { Mattress: 45 }, pref: 'WhatsApp' },
+  // John Curtis (owner 13 Oct): China supplier of pillows and mattress protectors; ordered 2 months ahead. Contacts not saved yet.
+  'John Curtis': { method: 'Supplier delivers', days: {}, pref: 'Email' }
 };
 var CATDAYS = { Bedframe: 7, Sofa: 14, Mattress: 14 };
 var CD = (c, s) => (SUP[s] && SUP[s].days && SUP[s].days[c]) || 0;
@@ -162,13 +166,29 @@ var REAL20 = [{"so":"DL0829","cust":"TEST customer U","type":"Outright","procYMD
 var SOS0 = (() => { const m = {}; let id = 1;
   POS0.forEach(p => p.lines.forEach(l => { const s = m[l.so] = m[l.so] || { so: l.so, cust: l.cust, type: 'Outright', proc: null, cdate: null, items: [] }; const [c, model, spec] = l.item.split(' · '); s.items.push({ id: id++, cat: c, model, spec: spec || '', qty: l.qty, sup: p.sup, po: p.no, pod: p.d, wh: (p.whBy && p.whBy[l.so]) || p.wh }); }));
   // TEST (owner 11 Oct): one Subscription order that uses Diglant forecast stock, to show how SO Batch treats it (All tab only, no tick, no PO).
-  m['TEST-SS-0012'] = { so: 'TEST-SS-0012', cust: 'TEST · Lim Ah Kow', type: 'Subscription', loc: 'Cheras, Kuala Lumpur', proc: D(9, 8), cdate: D(10, 5), items: [{ id: id++, cat: 'Mattress', model: 'FORTE L1202F', spec: 'Queen', qty: 1, sup: 'Diglant', forecast: true, fromLoc: 'Held at Diglant' }] };
+  m['TEST-SS-0012'] = { so: 'TEST-SS-0012', cust: 'TEST · Lim Ah Kow', type: 'Subscription', loc: 'Cheras, Kuala Lumpur', proc: D(9, 8), cdate: D(10, 5), items: [{ id: id++, cat: 'Mattress', model: 'FORTE L1202F', spec: 'Queen', qty: 1, sup: 'Diglant' }] };
+  m['TEST-SS-0013'] = { so: 'TEST-SS-0013', cust: 'TEST · Tan Mei Ling', type: 'Subscription', loc: 'Petaling Jaya, Selangor', proc: D(9, 12), cdate: D(10, 20), items: [{ id: id++, cat: 'Mattress', model: 'FORTE L1202F', spec: 'King', qty: 12, sup: 'Diglant' }] };
   m['SO-1368'] = { so: 'SO-1368', cust: 'Jimmy', type: 'Outright', loc: 'Ampang, Selangor', proc: D(8, 30), cdate: D(9, 31), items: [{ id: id++, cat: 'Mattress', model: 'B1201S-K B1201S', spec: 'King', qty: 1, sup: 'Nice Future Sdn Bhd' }] };
   // Source: uploads/Carres_Master_Sample.xlsx · Delivery_Sum · 20 newest orders (Import Date 4–5 Oct). Real items, customers, ETA. Their PO numbers are kept in realPO; shown here as not yet ordered so they can be worked through SO Batch Purchase.
   REAL20.forEach(r => r.items.forEach(i => { if (/^\d{4}(\([A-Z]\))?[A-Za-z]+\//.test(i.model)) { const p = i.model.split('/'); i.cat = 'Bedframe'; i.sup = 'Ohana Furniture Sdn Bhd'; i.model = p[0].replace(/^(\d{4}(?:\([A-Z]\))?)/, '$1 '); i.spec = p.slice(1).join(' · ').replace(/^Fab3 /i, 'Fab3 · ').replace(/COL(OUR)?:/i, ''); const sz = /Super ?Single/i.test(i.spec) ? 'Super Single' : /King/i.test(i.spec) ? 'King' : /Queen/i.test(i.spec) ? 'Queen' : ''; if (sz && !i.spec.includes(' · ' + sz)) i.spec = i.spec.replace(/\s(King|Queen|SuperSingle)\b/i, ' · ' + sz); } }));
   REAL20.forEach(r => { const ar = areaOf(r.loc); r.items.forEach(i => { i.whDefault = 'Carres Klang Warehouse'; }); });
   REAL20.forEach(r => { m[r.so] = { so: r.so, cust: r.cust, type: r.type, proc: new Date(r.procYMD[0], r.procYMD[1], r.procYMD[2]), cdate: r.cdateYMD ? new Date(r.cdateYMD[0], r.cdateYMD[1], r.cdateYMD[2]) : null, loc: r.loc, realPO: r.realPO, items: r.items }; });
   return Object.values(m); })();
+// Forecast stock (TEST · Forecast Purchase): stock held at Diglant + forecast POs not picked up, per business type. Shared by SO Batch and Forecast Purchase.
+var FSTOCK = [
+  { biz: 'Subscription', model: 'FORTE L1202F', spec: 'Queen', held: 6, pos: [['TEST-FP-2610-001', 20, '20 Nov']] },
+  { biz: 'Subscription', model: 'FORTE L1202F', spec: 'King', held: 0, pos: [['TEST-FP-2610-001', 10, '20 Nov']] },
+  { biz: 'Subscription', model: 'FORTE L1202F', spec: 'Single', held: 0, pos: [] }
+];
+// Forecast first (SAP MRP, Ops Rules §8): an SO line for a forecast product takes free Diglant stock first, then forecast PO supply (expected, never Ready Stock); only the rest goes to SO Batch to buy. Oldest SO first.
+(() => { let nid = 90000; const left = new Map(); FSTOCK.forEach(f => left.set(f, { held: f.held, pos: f.pos.map(p => p[1]) }));
+  SOS0.slice().sort((a, b) => (a.proc || 0) - (b.proc || 0)).forEach(s => { const out = [];
+    s.items.forEach(i => { const f = !i.po && !i.stock && !i.res && FSTOCK.find(x => x.biz === s.type && x.model === i.model && x.spec === i.spec); if (!f) return out.push(i);
+      const L = left.get(f); let q = i.qty; const take = n => { const k = Math.min(n, q); q -= k; return k; };
+      const h = take(L.held); L.held -= h; if (h) out.push({ ...i, id: nid++, qty: h, forecast: true, fcSrc: 'held', fromLoc: 'Held at Diglant' });
+      f.pos.forEach((p, k) => { const t = take(L.pos[k]); L.pos[k] -= t; if (t) out.push({ ...i, id: nid++, qty: t, forecast: true, fcSrc: 'po', fcPo: p[0], fromLoc: p[0] + ' · ready by ' + p[2] }); });
+      if (q) out.push({ ...i, qty: q, fcShort: i.qty - q }); });
+    s.items = out; }); })();
 var cat = it => it.split(' · ')[0];
 var dlOf = p => p.dlx || (isD(p.d) ? addWd(p.d, daysOf(p.lines, p.sup)) : NA);
 function stat(p) {
@@ -193,7 +213,7 @@ function stat(p) {
 }
 var isOpen = p => !p.got || !!p.claim;
 function soStat(s) {
-  if (s.items.length && s.items.every(i => i.forecast)) return { k: 'done', due: null, pill: 'From stock', c: GRN, sub: [...new Set(s.items.map(i => i.fromLoc || 'Forecast stock'))].join(', '), subFg: '#6B7280' };
+  if (s.items.length && s.items.every(i => i.forecast)) return { k: 'done', due: null, pill: s.items.some(i => i.fcSrc === 'po') ? 'Expected supply' : 'From stock', c: GRN, sub: [...new Set(s.items.map(i => i.fromLoc || 'Forecast stock'))].join(', '), subFg: '#6B7280' };
   const buy = s.items.filter(i => !i.stock && !i.res && !i.forecast), done = buy.filter(i => i.po), due = s.proc ? cutoffAfter(s.proc) : null;
   if (!buy.length && s.items.some(i => i.res)) { const locs = [...new Set(s.items.filter(i => i.res).map(i => i.res.loc))]; return { k: 'res', due, pill: 'Reserved from stock', c: GRN, sub: locs.join(', ') + ' · no PO needed', subFg: '#6B7280' }; }
   if (done.length === buy.length) { const pos = [...new Set(done.map(i => i.po))]; return { k: 'done', due, pill: 'Ordered', c: GRN, sub: pos.length === 1 ? pos[0] : pos.length + ' POs', subFg: '#6B7280' }; }
