@@ -548,7 +548,7 @@ export default function SalesOrdersOutright() {
           footer={
             <CTableFooter
               testId="outright-footer"
-              count={isLoading ? "Loading orders" : `${list.length} orders`}
+              count={isLoading ? "Loading orders" : `${list.length} ${list.length === 1 ? "order" : "orders"}`}
               {...(isLoading || totals.parts.length === 0 ? {} : { totals })}
               pageSize={pageSize}
               onPageSize={setPageSize}
