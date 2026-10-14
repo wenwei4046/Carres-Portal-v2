@@ -38,20 +38,25 @@ export default function PoNumberLinks({
         ? empty
         : numbers.map((po, index) => (
             <Fragment key={po.poId}>
-              {index > 0 ? ", " : null}
-              <button
-                type="button"
-                className={wrap ? KIT_LINK_CLASS : DOCUMENT_LINK_CLASS}
-                data-testid={linkTestId}
-                data-po-id={po.poId}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onOpen(po.poId);
-                }}
-                onDoubleClick={(event) => event.stopPropagation()}
-              >
-                {po.display}
-              </button>
+              {index > 0 ? " " : null}
+              {/* The comma stays with its number, so a wrapped list never
+                  starts a line with `,` (seen on SO Batch, 15 Oct 2026). */}
+              <span className="whitespace-nowrap">
+                <button
+                  type="button"
+                  className={wrap ? KIT_LINK_CLASS : DOCUMENT_LINK_CLASS}
+                  data-testid={linkTestId}
+                  data-po-id={po.poId}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onOpen(po.poId);
+                  }}
+                  onDoubleClick={(event) => event.stopPropagation()}
+                >
+                  {po.display}
+                </button>
+                {index < numbers.length - 1 ? "," : null}
+              </span>
             </Fragment>
           ))}
     </span>
