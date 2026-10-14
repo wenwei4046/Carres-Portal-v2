@@ -1262,6 +1262,13 @@ column that widens to its longest value instead of ending in `…` (01 §5); the
 own toolbar row in the engine's toolbar slots, keeping the one-line give-way steps. Acceptance: the 12
 Sales Order baseline pictures unchanged and `kit-outright.spec.ts` green; then `CTable` is deleted.
 
+**Type outside 01 §2 (measured 15 Oct 2026).** `text-label` (11 / 14 / 500) is used 1,294 times and
+`text-[11px]` 71 times; 01 §2 allows 11 only for caps labels, tags and badges (labels and second
+lines are 12 / 400). `carres-check.js` reports 11/400, 11/600 and 12/600 text on Delivery Orders,
+Delivery Monitor, Warehouse Outbound and Stock. Retuning the token in one go would move every
+page at once; it goes page by page with each page's kit check, or as one measured change with the
+whole kit suite and baselines retaken.
+
 **Unreachable page (measured 15 Oct 2026).** `pages/operation/SalesOrdersRegister.tsx` is no longer
 routed (`/operation/orders` and `/operation/orders/:stage` render Sales Order Outright); Outright still
 imports `skuKey`, `useCatalogNames` and `paymentStatusOf` from it. Outright does not have: grouping

@@ -86,7 +86,11 @@ data locally, so opening another page cannot overwrite tasks. Round 3 (#2044–#
    Design's fix list or dropped by the owner; only then move `skuKey`, `useCatalogNames`,
    `paymentStatusOf` out and delete the old page and its two test files.
 5. **Page adoption down the side menu** after Design's fix list per page (UI MASTER "How design and
-   Code work"): Receiving, Delivery, Warehouse, Payments still use the older rail and toolbar.
+   Code work"). Production sweep 15 Oct at 1164 (`carres-check.js` at `a6c6eabc9`): PASS on Sales
+   Order Outright, SO Batch, Forecast, Purchase Orders, Receiving, Workspace; FAIL on Delivery
+   Orders (11/400 text), Delivery Monitor (11/600 month heads; its own tabs, not the shared segmented
+   control), Warehouse Inbound (`Awaiting receipt` cut), Warehouse Outbound (11/400 text, a status
+   cut), Stock (11/600 and 12/600 text). The type debt is portal-wide (UI MASTER §7.7).
 6. **Settings per module** at completion (owner 2026-10-05).
 
 ## 5 · Pending owner/design decisions (bring only these, one at a time)
