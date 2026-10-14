@@ -127,6 +127,46 @@ test("Forecast Purchase fits 1164 with the Tasks panel open", async ({ page }) =
   await walk(page, "1164 Tasks open");
 });
 
+/* AN OPEN MODEL FOLLOWS THE LIST WHEN IT GETS NARROWER (found on production,
+   14 Oct 2026). A size line copies its model's column widths. If it copies
+   them as fixed pixels, the open lines hold the whole list at the width it
+   had, and a narrower window or a panel opened afterwards makes the list
+   scroll sideways until the model is closed. Measured after each narrowing,
+   with the model still open. */
+test("Forecast Purchase: an open model follows the list when it gets narrower", async ({ page }) => {
+  await open(page, 1440);
+  /* The Tasks panel starts closed, as it does at 1164 and 1025, so each width
+     is measured with its own panels; it is opened again at the end. */
+  if (await page.locator('aside[aria-label="Tasks"]').count() > 0) await page.getByRole("button", { name: "Hide tasks" }).click();
+  await expect(page.locator('aside[aria-label="Tasks"]')).toHaveCount(0);
+  await page.locator('[data-testid^="forecast-expand-"]').first().click();
+  await page.waitForTimeout(600);
+  const steps: Array<[string, () => Promise<unknown>]> = [
+    ["1164 after 1440", () => page.setViewportSize({ width: 1164, height: 900 })],
+    ["1025 after 1164", () => page.setViewportSize({ width: 1025, height: 900 })],
+    ["1164 again with the Tasks panel", async () => {
+      await page.setViewportSize({ width: 1164, height: 900 });
+      await page.waitForTimeout(400);
+      if (await page.locator('aside[aria-label="Tasks"]').count() === 0) await page.getByRole("button", { name: /^Tasks/ }).first().click();
+      await expect(page.locator('aside[aria-label="Tasks"]')).toBeVisible();
+    }],
+  ];
+  for (const [state, step] of steps) {
+    await step();
+    await page.waitForTimeout(700);
+    await page.mouse.move(4, 4);
+    const m = await measure(page);
+    expect(m, `${state}: the list is on the page`).not.toBeNull();
+    expect(await page.locator('[data-testid^="forecast-size-week-2-"]').count(), `${state}: the model is still open`).toBeGreaterThan(0);
+    expect(m!.pageScroll, `${state}: the page scrolls sideways`).toBeLessThanOrEqual(0);
+    expect(m!.listSpare, `${state}: the list scrolls sideways`).toBeLessThanOrEqual(1);
+    expect(m!.lastPastEdge, `${state}: the last column passes the list's edge`).toBeLessThanOrEqual(0);
+    expect(m!.lineDrift, `${state}: a size line's numbers sit under the model's`).toBeLessThanOrEqual(1);
+    expect(await carresCheck(page), `${state}: carres-check.js`).toEqual(PASS);
+    await shot(page, `narrowing · ${state}`);
+  }
+});
+
 /* THE ONE WRITE (owner ruling 2026-10-14, A): `Send for approval` asks the
    forecast's submit door for Manual Purchase Requests. The page never issues a
    PO. A request in progress is shown as a request: the suggestion and Free

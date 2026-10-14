@@ -228,10 +228,18 @@ export default function ForecastPurchasePage() {
   /* A size line repeats its model's columns: its tick under the model's tick,
      its size under Model, then each number under its own header. The engine
      starts an opened row at the first data column, so the lines step back
-     over the tick and arrow columns. */
-  const lineColumns = drawn.length >= 10
-    ? drawn.slice(0, 10).map((width) => `${width}px`).join(" ")
-    : `40px 32px ${modelWidth}px ${FIXED.m0}px ${FIXED.m1}px ${FIXED.m2}px ${FIXED.free}px ${FIXED.week}px ${FIXED.week}px ${FIXED.week}px`;
+     over the tick and arrow columns.
+     The widths are copied as SHARES that may shrink (`minmax(0, Nfr)`), never
+     as fixed pixels: fixed pixels held the whole list at the width it had, so
+     a narrower window or a panel opened with a model open made the list scroll
+     sideways (production, 14 Oct 2026). At the drawn width the shares are the
+     drawn pixels exactly; while the list narrows they shrink with it, and the
+     next measure makes them exact again. */
+  const track = (width: number) => `minmax(0, ${width}fr)`;
+  const lineColumns = (drawn.length >= 10
+    ? drawn.slice(0, 10)
+    : [40, 32, modelWidth, FIXED.m0, FIXED.m1, FIXED.m2, FIXED.free, FIXED.week, FIXED.week, FIXED.week]
+  ).map(track).join(" ");
   const stepBack = drawn.length >= 2 ? drawn[0]! + drawn[1]! : 72;
   const cell = "flex items-center justify-end px-[5px] text-body tabular-nums";
   const sizeLine = (m: Row, s: ForecastPurchaseSizeRow) => (
