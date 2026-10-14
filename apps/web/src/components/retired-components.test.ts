@@ -76,6 +76,8 @@ const RETIRED: Record<string, { file: string; replacement: string; allow: string
   "kit/GridToolbar": { file: "components/kit/GridToolbar.tsx", replacement: "components/register/DataGrid selectable (its own selection bar)", allow: [] },
   "kit/ChecklistRow": { file: "components/kit/ChecklistRow.tsx", replacement: "components/kit/StepList", allow: [] },
   "kit/QuietRouteRow": { file: "components/kit/QuietRouteRow.tsx", replacement: "components/kit/RouteStop", allow: [] },
+  /* One pop-up (15 Oct 2026). */
+  "kit/Popover": { file: "components/kit/Popover.tsx", replacement: "components/carres/CPopover", allow: [] },
 };
 
 function sourceFiles(dir: string, out: string[] = []): string[] {

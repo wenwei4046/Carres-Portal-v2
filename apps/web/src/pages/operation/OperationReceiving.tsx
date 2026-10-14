@@ -40,7 +40,7 @@ import GoodsMiniTable, {
 import PoReceivingView from "./components/PoReceivingView";
 import ReceivingRecord from "./components/ReceivingRecord";
 import ReceivingCompactView from "./components/ReceivingCompactView";
-import Popover from "@/components/kit/Popover";
+import CPopover from "@/components/carres/CPopover";
 import Button from "@/components/kit/Button";
 import Tabs from "@/components/kit/Tabs";
 import Drawer from "@/components/kit/Drawer";
@@ -984,7 +984,7 @@ export default function OperationReceiving() {
                 >
                   Start Receiving
                 </button>
-                <Popover label="Filters" trigger={<Button>Filters</Button>}>
+                <CPopover label="Filters" trigger={<Button>Filters</Button>}>
                   <div data-testid="receiving-list-filters">
                     <FilterRailGroup title="Received with" icon="goods">
                       {RECEIVED_WITH_ROWS.map(row => <FilterRailRow key={row.key} label={row.label}
@@ -1001,7 +1001,7 @@ export default function OperationReceiving() {
                         onClick={() => setFacet("cancelled", cancelledSel ? null : "1")} testId="rail-cancelled" />
                     </div>}
                   </div>
-                </Popover>
+                </CPopover>
               </>}
               emptyMessage={
                 !narrowed && search.trim() === ""

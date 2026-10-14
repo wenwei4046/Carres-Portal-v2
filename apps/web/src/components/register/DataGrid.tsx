@@ -64,8 +64,7 @@ import Button from "@/components/kit/Button";
 import Modal from "@/components/kit/Modal";
 const RegisterPdfPreview = lazy(() => import("@/components/kit/PdfPreview"));
 import Icon from "@/components/kit/Icon";
-import { CMenu, type CMenuEntry } from "@/components/carres/CPopover";
-import Popover from "@/components/kit/Popover";
+import CPopover, { CMenu, type CMenuEntry } from "@/components/carres/CPopover";
 import Tooltip from "@/components/kit/Tooltip";
 import { EXPANSION_JOIN_Y, ExpansionJoinContext } from "./expansion-connector";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
@@ -4165,7 +4164,7 @@ export function OverflowText({ text, label }: { text: string; label: string }) {
   );
   if (!cut) return line;
   return (
-    <Popover
+    <CPopover
       label={label}
       trigger={
         <Tooltip content={text}>
@@ -4183,7 +4182,7 @@ export function OverflowText({ text, label }: { text: string; label: string }) {
       }
     >
       <p className="max-w-[320px] whitespace-normal break-words text-body text-c-ink">{text}</p>
-    </Popover>
+    </CPopover>
   );
 }
 
