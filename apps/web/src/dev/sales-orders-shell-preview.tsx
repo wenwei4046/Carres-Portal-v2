@@ -19,12 +19,16 @@ import type { SoBatchPurchaseResponse } from "@carres/shared";
 import { appTodayIso } from "@/lib/fmt-date";
 import "@/index.css";
 import { supabase } from "@/lib/supabase";
+import { testTasksFeed } from "./tasks-feed-fixture";
+
+/* The signed-in TEST person: a UUID, as the Tasks feed needs. */
+const ME = "00000000-0000-4000-8000-0000000000aa";
 
 /* DEV ONLY: Appearance saves to the person's profile; the preview has no real
    session, so the save is answered here and only the page changes. */
 /* Like Supabase: the signed-in user comes back with the merged metadata. */
 supabase.auth.updateUser = (async (attrs: { data?: Record<string, unknown> }) => ({
-  data: { user: { id: "u-op", email: "preview@carres.local", user_metadata: { ...(attrs.data ?? {}) } } },
+  data: { user: { id: ME, email: "preview@carres.local", user_metadata: { ...(attrs.data ?? {}) } } },
   error: null,
 })) as never;
 
@@ -277,6 +281,8 @@ window.fetch = async (input, init) => {
       nextCursor: page.length === 500 ? keyOf(page[page.length - 1]!) : null,
     });
   }
+  /* The Tasks panel reads the same TEST feed as the other shell previews. */
+  if (/\/api\/operation\/work(\?|$)/.test(url)) return json(testTasksFeed({ id: ME, name: "TEST · Staff A", email: "preview@carres.local" }));
   /* The header's Team list (0663). TEST people, never real staff. */
   if (path === "/api/operation/work-activity/team-today") {
     const now = Date.now();
@@ -312,10 +318,16 @@ window.fetch = async (input, init) => {
   return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
 };
 
+/* The first-entry `Pending work` reminder is its own surface: it shows here
+   only when asked for (`?reminder=1`), so the page under it can be walked. */
+if (new URLSearchParams(window.location.search).get("reminder") !== "1") {
+  try { window.localStorage.setItem(`carres.pendingWork.shownOn.${ME}`, appTodayIso()); } catch { /* a private window: the reminder shows */ }
+}
+
 useAuth.setState({
   role: "operation", hydrated: true, loading: false,
-  user: { id: "u-op", email: "preview@carres.local" } as never,
-  session: { access_token: "preview", user: { id: "u-op", email: "preview@carres.local" } } as never,
+  user: { id: ME, email: "preview@carres.local" } as never,
+  session: { access_token: "preview", user: { id: ME, email: "preview@carres.local" } } as never,
 });
 
 const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
