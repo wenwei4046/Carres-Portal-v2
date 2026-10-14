@@ -227,7 +227,7 @@ describe("Bills register", () => {
     const heads = () => [...document.querySelectorAll<HTMLElement>("thead th")].map((th) => th.title).filter(Boolean);
     expect(heads()).toEqual(["Bill No", "Bill Date", "Supplier", "Due Date", "Status", "Total", "Unpaid"]);
     expect(screen.queryByText("1 line differs from PO")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
     for (const held of ["Creditor Type", "Supplier Invoice", "GRN", "Files"]) {
       expect(screen.getByRole("checkbox", { name: held })).not.toBeChecked();
     }
@@ -301,7 +301,7 @@ describe("Payment vouchers register", () => {
     await screen.findByTestId("new-voucher");
     const heads = () => [...document.querySelectorAll<HTMLElement>("thead th")].map((th) => th.title).filter(Boolean);
     await waitFor(() => expect(heads()).toEqual(["Voucher No", "Voucher Date", "Payee", "Purpose", "Code", "Paid From", "Status", "Amount"]));
-    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
     for (const held of ["Supplier", "Bills and Debit Notes Paid", "Method", "Advance", "Prepared By", "Checked By", "Approved By", "Files"]) {
       expect(screen.getByRole("checkbox", { name: held })).not.toBeChecked();
     }
@@ -340,7 +340,7 @@ describe("Payment vouchers register", () => {
     const order = () => screen.getAllByRole("link").map((l) => l.textContent).filter((t) => t?.startsWith("PV-"));
     // Advance waits in Columns at first (Chew 2026-10-14).
     expect(screen.queryByRole("button", { name: /^Advance/ })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
     fireEvent.click(screen.getByRole("checkbox", { name: "Advance" }));
     const sortAdvance = () => fireEvent.click(screen.getAllByRole("button", { name: /^Advance/ })[0]!);
 
@@ -1210,7 +1210,7 @@ describe("Unpaid by Supplier", () => {
   /** Five columns show at first (Finance look, 2026-10-13); the rest are shown through Columns. */
   const heads = () => [...document.querySelectorAll<HTMLElement>("thead th")].map((th) => th.title).filter(Boolean);
   const showColumn = (label: string) => {
-    if (!screen.queryByRole("checkbox", { name: label })) fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    if (!screen.queryByRole("checkbox", { name: label })) (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
     fireEvent.click(screen.getByRole("checkbox", { name: label }));
   };
 
@@ -1218,7 +1218,7 @@ describe("Unpaid by Supplier", () => {
     show("/finance/ap-outstanding");
     await screen.findByText("Lumen Sofa Works");
     expect(heads()).toEqual(["Supplier", "Unpaid Bills", "Unpaid", "Advance Left", "Unpaid After Advance and Credit"]);
-    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
     for (const held of ["Creditor Type", "Billed", "Paid", "Debit Notes Unpaid", "Credit Left",
       "On a Voucher, Not Approved", "Not on a Voucher", "Oldest Unpaid Bill"]) {
       expect(screen.getByRole("checkbox", { name: held })).not.toBeChecked();
