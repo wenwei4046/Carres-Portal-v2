@@ -182,6 +182,8 @@ describe("GET /api/operation/orders/register-facts", () => {
       { id: "l-unit", sku: "JAGER-SS", qty: 1, unit_price: 100 },
       { id: "l-none", sku: "MEMORY-FOAM-PILLOW", qty: 2, unit_price: 10 },
       { id: "l-hidden", sku: "TRION-Q", qty: 1, unit_price: 100 },
+      { id: "l-two", sku: "CODY-SK", qty: 2, unit_price: 100 },
+      { id: "l-dup", sku: "H1401F-K", qty: 1, unit_price: 100 },
     ];
     mockSb({
       orders: [order(1, { order_lines: lines })],
@@ -189,12 +191,23 @@ describe("GET /api/operation/orders/register-facts", () => {
         { id: "s1", order_id: id(1), po_id: "po-nf", po_line_id: "pl1", order_line_id: "l-po" },
         { id: "s2", order_id: id(1), po_id: "po-x", po_line_id: "pl2", order_line_id: "l-cancelled" },
         { id: "s3", order_id: id(1), po_id: "po-h", po_line_id: "pl3", order_line_id: "l-hidden" },
+        // One line on two suppliers' POs.
+        { id: "s4", order_id: id(1), po_id: "po-nf", po_line_id: "pl4", order_line_id: "l-two" },
+        { id: "s5", order_id: id(1), po_id: "po-oh", po_line_id: "pl5", order_line_id: "l-two" },
+        // SO-1340's shape: one qty-1 line on three open POs of one supplier — one name.
+        { id: "s6", order_id: id(1), po_id: "po-d1", po_line_id: "pl6", order_line_id: "l-dup" },
+        { id: "s7", order_id: id(1), po_id: "po-d2", po_line_id: "pl7", order_line_id: "l-dup" },
+        { id: "s8", order_id: id(1), po_id: "po-d3", po_line_id: "pl8", order_line_id: "l-dup" },
       ],
       purchase_orders: [
         { id: "po-nf", do_number: null, supplier_id: "sup-nf", status: "open" },
         { id: "po-x", do_number: null, supplier_id: "sup-oh", status: "cancelled" },
         { id: "po-h", do_number: null, supplier_id: "sup-hidden", status: "open" },
         { id: "po-unit", supplier_id: "sup-oh" },
+        { id: "po-oh", do_number: null, supplier_id: "sup-oh", status: "open" },
+        { id: "po-d1", do_number: null, supplier_id: "sup-nf", status: "open" },
+        { id: "po-d2", do_number: null, supplier_id: "sup-nf", status: "open" },
+        { id: "po-d3", do_number: null, supplier_id: "sup-nf", status: "received" },
       ],
       // A sold Unit still names its line; its supplier is its own PO's.
       ops_stock_items: [{ ...unit(7, "sold", 1), reserved_order_line_id: "l-unit", po_line_id: "pl-unit" }],
@@ -211,6 +224,8 @@ describe("GET /api/operation/orders/register-facts", () => {
       "l-unit": { from: "unit", names: ["Ohana"] },
       "l-none": { from: "none", names: [] },
       "l-hidden": { from: "po", names: [null] }, // a supplier this caller may not read
+      "l-two": { from: "po", names: ["Nice Future", "Ohana"] },
+      "l-dup": { from: "po", names: ["Nice Future"] }, // three POs, one supplier, a received one included
     });
     expect(body.failed.suppliers).toBe(false);
   });

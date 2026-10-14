@@ -353,9 +353,12 @@ existing Subscription records and links, without folding its quantities or rules
   14 Oct 2026; BUILT ON BRANCH in PR #2066, not deployed): the non-cancelled POs that source the
   line (`po_line_sources.order_line_id` → `purchase_orders.supplier_id`), else the Units bound to
   the line (`ops_stock_items.reserved_order_line_id`, reserved or sold) named by each Unit's own PO
-  line; neither reads `No PO yet`. The Catalog's default supplier is NOT a fallback (not approved),
-  and a fact that was not read never prints `Not recorded`. Counted goods taken from the warehouse
-  have no bound Unit, so no record names their source; that stays a REAL GAP until Stock records it.
+  line; neither reads `Not recorded` (the lineage was read and holds no supplier). The cell is
+  supplier provenance only: PO existence, supplier provenance and stock coverage stay three facts
+  with three owners, so it never says a line must still be bought. The Catalog's default supplier is
+  NOT a fallback (not approved), and a fact that was not read never prints `Not recorded`. Counted
+  goods taken from the warehouse have no bound Unit, so no record names their source; missing
+  provenance is not missing supply, and that stays a REAL GAP until Stock records it.
 - SO shows source-owned Purchasing, Stock, Delivery and Payment facts, their original record
   links and remaining obligations. Read each owner’s effective calculation and Settings version;
   do not duplicate calculations, clocks, configuration editors or completion writers in Orders.

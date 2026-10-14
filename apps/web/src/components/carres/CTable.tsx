@@ -84,7 +84,7 @@ export function CTableHead({ column }: { column: CTableColumn }) {
   return column.head ? (
     <span className="text-left leading-[1.25]" title={column.label}>
       <span className="block whitespace-nowrap">{column.head[0]}</span>
-      <span className="block whitespace-nowrap">{column.head[1]}</span>
+      <span className="block whitespace-nowrap font-normal">{column.head[1]}</span>
     </span>
   ) : (
     <span className="whitespace-nowrap text-left leading-[1.25]">{column.label}</span>
@@ -238,7 +238,9 @@ export default function CTable<R>({
       data-testid={testId}
       className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto] overflow-hidden rounded-lg border border-c-card-border bg-c-card"
     >
-      <div className="min-h-0 min-w-0 overflow-auto [scrollbar-width:thin]" data-list-scroll>
+      {/* The list's own scroll box takes keyboard focus, so arrow keys reach every
+          column, including Qty and Supplier in an opened row (WCAG 2.1.1). */}
+      <div className="min-h-0 min-w-0 overflow-auto [scrollbar-width:thin] focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px]" data-list-scroll tabIndex={0}>
         {failure ?? (
           <div ref={tableRef} role="table" aria-label={label} style={{ minWidth: tableMinWidth(widened, ticks, arrows) }}>
             <div

@@ -174,8 +174,13 @@ describe("The item row's Supplier (owner 14 Oct 2026: source-owned records only,
     expect(cell(withLines({ l1: { from: "unit", names: ["Ohana"] } }))).toMatchObject({ t: "Ohana" });
   });
 
-  it("says No PO yet when neither a PO nor a Unit covers the line", () => {
-    expect(cell(withLines({ l1: { from: "none", names: [] } }))).toMatchObject({ t: "No PO yet", fg: "muted" });
+  it("says Not recorded when the line's lineage was read and holds no supplier — never a purchase or stock word", () => {
+    expect(cell(withLines({ l1: { from: "none", names: [] } }))).toMatchObject({ t: "Not recorded", fg: "muted" });
+    expect(cell(withLines({ l1: { from: "none", names: [] } })).t).not.toMatch(/PO|stock/i);
+  });
+
+  it("names every supplier when POs from two suppliers source one line", () => {
+    expect(cell(withLines({ l1: { from: "po", names: ["Nice Future", "Ohana"] } }))).toMatchObject({ t: "Nice Future, Ohana" });
   });
 
   it("never prints Not recorded for a read that did not happen", () => {

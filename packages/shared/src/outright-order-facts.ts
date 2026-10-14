@@ -33,9 +33,10 @@ export type OutrightOrderFacts = {
    * never the Catalog): `po` = the non-cancelled POs that source the line
    * (`po_line_sources.order_line_id`); `unit` = else the Units bound to the line
    * (`ops_stock_items.reserved_order_line_id`), named by each Unit's own PO;
-   * `none` = neither, so no PO yet. A `null` name is a supplier this caller may
-   * not read; an empty list is a PO or Unit that records no supplier. Absent from
-   * a server that does not read it yet.
+   * `none` = neither holds a supplier record (supplier provenance only: not a
+   * statement about PO existence or stock coverage — counted warehouse goods have
+   * none). A `null` name is a supplier this caller may not read; an empty list is a
+   * PO or Unit that records no supplier. Absent from a server that does not read it yet.
    */
   lineSuppliers?: Record<string, { from: "po" | "unit" | "none"; names: (string | null)[] }>;
 };

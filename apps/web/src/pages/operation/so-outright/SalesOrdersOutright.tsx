@@ -321,21 +321,28 @@ export default function SalesOrdersOutright() {
       return n;
     }, { replace: true });
 
-  /* Every control on one toolbar line, none cut or overlapping (owner 14 Oct
-     2026): when the line is too short (Tasks open at 1025), Summary keeps its
-     icon first, then each filter chip, then the chips become one `Clear filters`
-     (each filter on hover) and the gaps close from 8 to 4; the view button
-     always keeps its name. Measured on real data: 1025, Tasks and menu open, a
-     search chip and the `Sales Order` view were 3px too long at step 2.
-     `need[n]` is the width the line needed at step n, to step back when it fits. */
+  /* No toolbar control is cut or overlaps (owner 14 Oct 2026); Summary may keep
+     its icon only and the view button always keeps its name. What gives way next
+     on a short line is a PENDING presentation decision with two candidates, shown
+     on this one page for review, neither a portal rule yet:
+       one line (default, Code)  each filter chip keeps its icon, then the chips
+                                 become one `Clear filters` and the gaps close 8 → 4
+       ?toolbar=two-rows (Design Round 4, "implementation preview")  the chips keep
+                                 their words and the view button and ⋮ move to a
+                                 second line
+     Measured on real data: 1025, Tasks and menu open, a search chip and the
+     `Sales Order` view. `need[n]` is the width the line needed at step n. */
+  const twoRows = params.get("toolbar") === "two-rows";
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(0);
   const need = useRef<number[]>([]);
+  const wrapped = twoRows && compact >= 2;
   useLayoutEffect(() => {
     const bar = toolbarRef.current;
     if (!bar) return;
+    const most = twoRows ? 2 : chips.length > 0 ? 3 : 1;
     const fit = () => {
-      if (bar.scrollWidth > bar.clientWidth + 1 && compact < (chips.length > 0 ? 3 : 1)) {
+      if (bar.scrollWidth > bar.clientWidth + 1 && compact < most) {
         need.current[compact] = bar.scrollWidth;
         setCompact(compact + 1);
       } else if (compact > 0 && bar.clientWidth >= (need.current[compact - 1] ?? Infinity)) setCompact(compact - 1);
@@ -344,11 +351,11 @@ export default function SalesOrdersOutright() {
     const watch = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(fit);
     watch?.observe(bar);
     return () => watch?.disconnect();
-  }, [compact, chips.length, layoutKey, tasksOpen, summaryOpen, selected.size]);
+  }, [compact, chips.length, layoutKey, tasksOpen, summaryOpen, selected.size, twoRows]);
   useEffect(() => {
     need.current = [];
     setCompact(0);
-  }, [chips.length, layoutKey]);
+  }, [chips.length, layoutKey, twoRows]);
   /* SO No stays fixed on the left while the list scrolls (with ▸ and ☐). */
   const identifier = Math.max(0, layout.columns.indexOf("order"));
 
@@ -414,7 +421,12 @@ export default function SalesOrdersOutright() {
             </span>
           </div>
         ) : (
-          <div ref={toolbarRef} className={`flex h-9 min-w-0 flex-nowrap items-center ${compact >= 3 ? "gap-1" : "gap-2"}`} data-testid="outright-toolbar">
+          <div
+            ref={toolbarRef}
+            className={`flex min-w-0 items-center ${wrapped ? "min-h-9 flex-wrap gap-x-2 gap-y-1" : `h-9 flex-nowrap ${compact >= 3 ? "gap-1" : "gap-2"}`}`}
+            data-testid="outright-toolbar"
+            data-toolbar={twoRows ? "two-rows" : "one-line"}
+          >
             {!summaryOpen && <CShowPanelButton label="Summary" compact={compact >= 1} onShow={() => setSummaryOpen(true)} />}
             <div role="tablist" aria-label="Views" className={SEGMENTED_TRACK}>
               {TABS.map((t) => (
@@ -432,15 +444,16 @@ export default function SalesOrdersOutright() {
             </div>
             {chips.length > 0 && (
               <span className="flex shrink-0 items-center gap-1.5">
-                {compact >= 3 && chips.length > 1 ? (
+                {!twoRows && compact >= 3 && chips.length > 1 ? (
                   <CChip compact title={chips.map((c) => c.label).join(" · ")} onClear={clearFilters}>Clear filters</CChip>
                 ) : (
                   chips.map((c) => (
-                    <CChip key={c.key} onClear={c.clear} compact={compact >= 2}>{c.label}</CChip>
+                    <CChip key={c.key} onClear={c.clear} compact={!twoRows && compact >= 2}>{c.label}</CChip>
                   ))
                 )}
               </span>
             )}
+            {wrapped && <span aria-hidden="true" className="h-0 basis-full" />}
             <span className="ml-auto flex shrink-0 items-center gap-1.5">
               <CPopover
                 label="Views"

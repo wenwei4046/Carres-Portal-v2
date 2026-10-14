@@ -156,19 +156,18 @@ test("Sales Order Outright toolbar never cuts or hides a control with filters on
       overflow: bar.scrollWidth - bar.clientWidth,
       past: buttons.filter((b) => b.getBoundingClientRect().right > edge + 0.5).length,
       view: buttons.find((b) => (b.getAttribute("aria-label") ?? "").startsWith("View:"))?.textContent?.trim(),
-      clear: buttons.find((b) => b.getAttribute("aria-label") === "Clear filters")?.title,
     };
   });
+  /* Approach-neutral (owner 14 Oct): the short-line behaviour is pending review. */
   expect(m.overflow, "the toolbar line holds every control").toBeLessThanOrEqual(0);
   expect(m.past, "no control runs under the Tasks panel").toBe(0);
   expect(m.view, "the view button keeps its name").toContain("Overview");
-  expect(m.clear, "Clear filters names each filter on hover").toBe("Payment: Owes · Problems: None");
   expect(await carresCheck(page)).toEqual(PASS);
 });
 
-test("Sales Order Outright toolbar holds one search chip in the Sales Order view, at 1025 with Tasks and the menu open (real-data case, owner 14 Oct)", async ({ page }) => {
+for (const toolbar of ["one-line", "two-rows"] as const) test(`Sales Order Outright toolbar (${toolbar}) holds one search chip in the Sales Order view, at 1025 with Tasks open (real-data case, owner 14 Oct)`, async ({ page }) => {
   await page.setViewportSize({ width: 1025, height: 900 });
-  await page.goto(`${PAGE}?search=1314`, { waitUntil: "networkidle" });
+  await page.goto(`${PAGE}?search=1314${toolbar === "two-rows" ? "&toolbar=two-rows" : ""}`, { waitUntil: "networkidle" });
   await page.waitForTimeout(500);
   await setPanels(page, false, true);
   await page.waitForTimeout(500);
@@ -184,5 +183,32 @@ test("Sales Order Outright toolbar holds one search chip in the Sales Order view
   expect(m!.overflow).toBeLessThanOrEqual(0);
   expect(m!.past).toBe(0);
   expect(m!.view).toContain("Sales Order");
-  expect(await carresCheck(page)).toEqual(PASS);
+  /* carres-check measures the panels level with a 36 toolbar; two rows are checked for cut controls only. */
+  if (toolbar === "one-line") expect(await carresCheck(page)).toEqual(PASS);
+});
+
+test("Sales Order Outright opened row: Qty and Supplier are reachable by keyboard inside the list's own scroll box (1025, Tasks open)", async ({ page }) => {
+  await page.setViewportSize({ width: 1025, height: 900 });
+  await page.goto(PAGE, { waitUntil: "networkidle" });
+  await page.locator('[data-testid^="outright-row-"]').first().waitFor();
+  await setPanels(page, false, true);
+  await page.getByRole("button", { name: "Show items" }).first().click();
+  const items = page.locator('[data-carres-table="item-rows"]').first();
+  await items.waitFor();
+  const inBox = (name: string) =>
+    page.evaluate((n) => {
+      const box = document.querySelector('[data-list-scroll]') as HTMLElement;
+      const head = [...document.querySelectorAll('[data-carres-table="item-rows"] [role="columnheader"]')].find((h) => h.textContent?.trim() === n) as HTMLElement | undefined;
+      if (!head) return "missing";
+      const b = box.getBoundingClientRect(), r = head.getBoundingClientRect();
+      return r.left >= b.left - 1 && r.right <= b.right + 1 ? "in view" : "out of view";
+    }, name);
+  /* Start scrolled left, so the keyboard has to bring them in. */
+  await page.evaluate(() => { (document.querySelector('[data-list-scroll]') as HTMLElement).scrollLeft = 0; });
+  await page.locator("[data-list-scroll]").focus();
+  expect(await page.evaluate(() => document.activeElement?.hasAttribute("data-list-scroll"))).toBe(true);
+  for (let i = 0; i < 60 && ((await inBox("Supplier")) !== "in view"); i++) await page.keyboard.press("ArrowRight");
+  expect(await inBox("Qty")).not.toBe("missing");
+  expect(await inBox("Supplier"), "Supplier comes into view with the arrow keys").toBe("in view");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), "the page itself never scrolls sideways").toBeLessThanOrEqual(0);
 });

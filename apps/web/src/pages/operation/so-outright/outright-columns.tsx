@@ -168,10 +168,13 @@ export function timeWords(t: string | null | undefined): string | undefined {
 }
 
 /**
- * The item row's `Supplier`: the server's per-line lineage (Orders MASTER Order
- * Route — the line's PO, else its Unit's PO; never the Catalog). A line with
- * neither is `No PO yet` (COPY, the SO goods expansion before any PO line); a
- * read that did not happen is `Could not read`, never `Not recorded`.
+ * The item row's `Supplier`: supplier provenance only, from the server's per-line
+ * lineage (Orders MASTER Order Route — the line's PO, else its Unit's PO; never the
+ * Catalog). A line whose lineage was read and holds no supplier record is
+ * `Not recorded` (COPY: read and empty) — it says nothing about whether goods must
+ * be bought (PO existence is the `PO No.` cell's fact) or are in stock (the `Stock`
+ * cell's): counted warehouse goods carry no provenance record. A read that did not
+ * happen is `Could not read`, never `Not recorded`.
  */
 export function supplierCell(r: RegisterRow, ctx: CellContext, lineId: string | null | undefined): Cell {
   const read = ctx.owned(r);
@@ -179,7 +182,7 @@ export function supplierCell(r: RegisterRow, ctx: CellContext, lineId: string | 
   if (read.state === "denied") return NO_ACCESS;
   const line = lineId && read.state === "ok" ? read.facts?.lineSuppliers?.[lineId] : undefined;
   if (read.state === "failed" || read.failed.suppliers || !line) return couldNotRead("Purchasing", "there is no supplier");
-  if (line.from === "none") return { t: "No PO yet", fg: "muted" };
+  if (line.from === "none") return NOT_RECORDED;
   const known = line.names.filter((n): n is string => Boolean(n));
   if (known.length === 0) return line.names.length > 0 ? NO_ACCESS : NOT_RECORDED;
   return { t: known.join(", "), fg: "ink" };
