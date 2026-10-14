@@ -8016,7 +8016,7 @@ credit and payment remain distinct owning facts. No sale-notice matching interfa
   cross-module contract are required before `PLAN MISSION COMPLETE`. No application implementation,
   Card, production migration or rendered UI acceptance is claimed by this synthesis.
 
-### 9.14 Forecast Purchase · Outright — design handoff 13 Oct 2026 · approval ruling 14 Oct 2026 (A) · BUILT ON BRANCH (not deployed)
+### 9.14 Forecast Purchase · Outright — design handoff 13 Oct 2026 · approval ruling 14 Oct 2026 (A) · BUILT · 0695 APPLIED 14 Oct 2026 · deployment and signed-in production walk recorded below
 
 **What has authority here, line by line.** Three different things are in this section and they are
 kept apart (FACT · RULING · PROPOSAL):
@@ -8125,6 +8125,13 @@ same size, each having read the same state: exactly ONE went through. The contro
 door alone six times at once: all six went through. A second group with an unknown SKU took the
 whole submission with it. No sign-in: `not permitted` on every door. The table is not readable by
 `authenticated` or `anon`.
+
+**Migration 0695 — APPLIED to production 14 Oct 2026** through the governed path (the record is
+`docs/ENGINEERING.md`, migration tail). Rolled-back production probe first, as a real Operation
+person: one request through the existing door with approval required and not approved, the retry
+answered with the same request, the stale ask refused, no sign-in refused; nothing persisted. Then
+the exact committed file: tracker checksum equals the file's, the five function bodies equal the
+replay's, the table is unreadable directly and holds no row.
 
 **FACT found while proving it.** The existing line door `purchasing_create_demand` admits the
 `operation` role only. A Principal therefore cannot raise a request with lines, from this page or
