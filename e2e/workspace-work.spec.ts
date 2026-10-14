@@ -36,7 +36,7 @@ const FIXTURE = {
     workItem("delivery:do-2041:review_proof", "DO-2041", "delivery", "2026-09-17", "on_day"),
     workItem("payment:invoice-2041:collect_balance", "INV-2041", "payment", "2026-09-17", "on_day"),
   ],
-  sources: ["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"].map((key) => ({ key, state: "healthy", observedAt: "2026-09-17T01:42:00.000Z", lastSuccessfulAt: "2026-09-17T01:42:00.000Z", errorLabel: null })),
+  sources: ["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker", "workspace"].map((key) => ({ key, state: "healthy", observedAt: "2026-09-17T01:42:00.000Z", lastSuccessfulAt: "2026-09-17T01:42:00.000Z", errorLabel: null })),
 };
 
 async function useGovernedFixture(page: Page) {

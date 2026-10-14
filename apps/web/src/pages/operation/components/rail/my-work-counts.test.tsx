@@ -113,7 +113,7 @@ function item(so: number, actionOn: string | null, missedDays = 0, ownerId = ME)
   };
 }
 
-const SOURCE_KEYS = ["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const;
+const SOURCE_KEYS = ["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker", "workspace"] as const;
 
 function response(
   items: OperationWorkItem[],

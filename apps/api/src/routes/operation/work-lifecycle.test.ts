@@ -49,7 +49,7 @@ const item: OperationWorkItem = {
   tone: "warning", locked: false, broken: false,
 };
 
-const SOURCES = ["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const;
+const SOURCES = ["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker", "workspace"] as const;
 function feed(items: OperationWorkItem[]): OperationWorkResponse {
   return composeOperationWorkResponse(
     SOURCES.map((key) => ({

@@ -218,9 +218,10 @@ describe("Operation Work wire contract", () => {
         { key: "delivery", state: "healthy", observedAt: item.observedAt, lastSuccessfulAt: item.observedAt, errorLabel: null },
         { key: "payment", state: "healthy", observedAt: item.observedAt, lastSuccessfulAt: item.observedAt, errorLabel: null },
         { key: "issue_tracker", state: "healthy", observedAt: item.observedAt, lastSuccessfulAt: item.observedAt, errorLabel: null },
+        { key: "workspace", state: "healthy", observedAt: item.observedAt, lastSuccessfulAt: item.observedAt, errorLabel: null },
       ],
     });
-    expect(response.sources).toHaveLength(6);
+    expect(response.sources).toHaveLength(7);
     expect(response.complete).toBe(false);
   });
 
