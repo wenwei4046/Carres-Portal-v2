@@ -131,7 +131,7 @@ describe("Notes to follow up", () => {
     await screen.findByTestId(`note-row-${NOTE1}`);
     // From and Last follow-up wait in Columns at first (Chew 2026-10-14).
     expect(screen.getByTestId(`note-row-${NOTE1}`)).not.toHaveTextContent("Not followed up yet");
-    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
     fireEvent.click(screen.getByRole("checkbox", { name: "From" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Last follow-up" }));
     const first = screen.getByTestId(`note-row-${NOTE1}`);

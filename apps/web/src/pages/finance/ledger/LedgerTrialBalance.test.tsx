@@ -226,7 +226,7 @@ describe("Trial Balance headings", () => {
     api.fetch.mockResolvedValue(NESTED);
     show();
     await screen.findByText("Bank");
-    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Export" })));
     fireEvent.click(screen.getByRole("menuitem", { name: "Excel" }));
     await waitFor(() => expect(api.sheet).toHaveBeenCalled());
     const sheet = (api.sheet.mock.calls[0] as unknown[])[0] as Record<string, string>[];

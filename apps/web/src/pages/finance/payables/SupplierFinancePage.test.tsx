@@ -90,7 +90,7 @@ describe("Finance → Suppliers (0636)", () => {
     const heads = screen.getAllByRole("columnheader").map((h) => h.textContent?.trim()).filter(Boolean);
     // Chew 2026-10-14: Last changed, Tax No and Registration No wait in Columns.
     expect(heads).toEqual(["Code", "Supplier", "Bank", "Account No", "Account holder", "Creditor Type"]);
-    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
     for (const held of ["Last changed", "Tax No", "Registration No"]) {
       expect(screen.getByRole("checkbox", { name: held })).not.toBeChecked();
     }

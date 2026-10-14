@@ -124,7 +124,7 @@ describe("DataGrid · group-local headers", () => {
     const { container } = mount("k.shared");
     fireEvent.click(screen.getByTestId("grid-group-toggle-completed"));
     // Hide a column from ONE header; every group loses it.
-    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
     fireEvent.click(screen.getByRole("checkbox", { name: "Supplier" }));
     for (const row of headerRows(container)) expect(labelsOf(row)).toEqual(["PO Date", "PO No"]);
     fireEvent.click(screen.getByRole("checkbox", { name: "Supplier" }));

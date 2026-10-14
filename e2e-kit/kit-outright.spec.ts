@@ -221,3 +221,27 @@ test("Sales Order Outright opened row: Qty and Supplier are reachable by keyboar
   expect(await inBox("Supplier"), "Supplier comes into view with the arrow keys").toBe("in view");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), "the page itself never scrolls sideways").toBeLessThanOrEqual(0);
 });
+
+/* THE MONTHLY DEMAND DOOR (15 Oct 2026). Purchasing's Monthly demand opens the
+   list at `?tab=all&requested=…`; the list narrows on the preserved request and
+   says so in a chip that clears it. Fixture-independent: before Jan 1900 holds
+   nothing, after Jan 1900 holds every order with a recorded request. */
+test("Sales Order Outright opens from Monthly demand narrowed by the customer's original requested delivery, with a chip that clears it", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const rows = () => page.locator('[data-testid^="outright-row-"]');
+  await page.goto(`${PAGE}?tab=all`, { waitUntil: "networkidle" });
+  await rows().first().waitFor();
+  const footer = page.getByTestId("outright-footer-qty");
+  const everyOrder = (await footer.textContent()) ?? "";
+
+  await page.goto(`${PAGE}?tab=all&requested=before%3A1900-01`, { waitUntil: "networkidle" });
+  await expect(page.getByRole("button", { name: /Customer’s original requested delivery: Before Jan 1900/ })).toBeVisible();
+  await expect(rows()).toHaveCount(0);
+
+  await page.goto(`${PAGE}?tab=all&requested=after%3A1900-01`, { waitUntil: "networkidle" });
+  await rows().first().waitFor();
+  expect(await carresCheck(page)).toEqual(PASS);
+  await page.getByRole("button", { name: /Customer’s original requested delivery: After Jan 1900/ }).click();
+  await expect(page.getByRole("button", { name: /Customer’s original requested delivery/ })).toHaveCount(0);
+  await expect(footer).toHaveText(everyOrder);
+});
