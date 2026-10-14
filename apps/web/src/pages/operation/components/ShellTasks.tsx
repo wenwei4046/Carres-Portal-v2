@@ -99,7 +99,7 @@ export function TasksPill({ fallback = false }: { fallback?: boolean } = {}) {
       data-testid="tasks-pill"
       /* Below 768px the phone top bar carries its own Tasks door, so the
          pill hides there: one Tasks control per screen. */
-      className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-c-input-border bg-white px-3 text-[14px] font-medium text-c-ink hover:bg-c-info-bg max-[767px]:hidden"
+      className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-c-input-border bg-white px-3 text-[13px] font-medium text-c-ink hover:bg-c-info-bg max-[767px]:hidden"
     >
       <MIcon name="right_panel_open" size={18} />
       Tasks
@@ -124,12 +124,14 @@ export default function ShellTasks() {
     <aside
       aria-label="Tasks"
       data-testid="shell-tasks"
-      className={`flex min-h-0 shrink-0 flex-col overflow-hidden rounded-lg border border-c-border bg-white ${
+      className={`flex min-h-0 shrink-0 flex-col overflow-hidden rounded-lg bg-white ring-1 ring-inset ring-c-border ${
         /* 320 always (01 §2), so opening a task never takes room from the
            list. On a wide screen the opened task may use the spare width. */
         taskOpen ? "w-[320px] min-[1280px]:w-[clamp(366px,32vw,560px)]" : "w-[320px]"
       }`}
     >
+      {/* The line is drawn inside the card (an inset ring), so this 36px title row
+          starts level with the page toolbar, as the Summary title does (CSidePanel). */}
       <div className="flex h-9 shrink-0 items-center gap-1.5 px-3.5">
         <span className="flex min-w-0 flex-1 items-baseline gap-1.5 whitespace-nowrap">
           <span className="text-strong text-c-ink">Tasks</span>
@@ -150,7 +152,8 @@ export default function ShellTasks() {
           <MIcon name="chevron_right" size={20} />
         </button>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col">
+      {/* 10px under the title, so the body starts level with the table (v12 Shell). */}
+      <div className="mt-2.5 flex min-h-0 flex-1 flex-col">
         <TasksArea onClose={() => setOpen(false)} fill bare />
       </div>
     </aside>

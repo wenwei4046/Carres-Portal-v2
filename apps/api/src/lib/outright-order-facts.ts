@@ -27,6 +27,12 @@
  *                 its lines (`reserved_order_line_id`, 0471) or by its SO ref.
  *   Finance hold  an OPEN order_finance_exceptions row (0355). Unknown is never
  *                 "no hold".
+ *   Supplier      per order line, by the line's own lineage (Orders MASTER, Order
+ *                 Route PURCHASING and STOCK): the non-cancelled POs that source
+ *                 the line (po_line_sources.order_line_id → purchase_orders.
+ *                 supplier_id), else the Units bound to the line (reserved_order_
+ *                 line_id, reserved or sold) named by each Unit's own PO line.
+ *                 Never SKU matching and never the Catalog (owner, 14 Oct 2026).
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -97,8 +103,9 @@ export async function outrightOrderFacts(
   const staffIds = orders.map((o) => ctrlOf(o)?.assigned_staff ?? "").filter(Boolean);
 
   const lineIds = orders.flatMap((o) => (o.order_lines ?? []).map((l) => l.id ?? "")).filter(Boolean);
-  const [sources, staff, arrangements, documents, holds, lineUnits] = await Promise.all([
-    readIn<{ order_id: string; po_id: string; po_line_id: string | null }>(sb, "po_line_sources", "id, order_id, po_id, po_line_id", "order_id", ids),
+  const [sources, staff, arrangements, documents, holds, lineUnits, boundUnits] = await Promise.all([
+    readIn<{ order_id: string; po_id: string; po_line_id: string | null; order_line_id: string | null }>(
+      sb, "po_line_sources", "id, order_id, po_id, po_line_id, order_line_id", "order_id", ids),
     readIn<{ id: string; name: string | null }>(sb, "app_users", "id, name", "id", staffIds),
     readIn<{ order_id: string; leg: number | null; partner_id: string | null; confirmed_date: string | null; confirmed_time: string | null }>(
       sb, "ops_delivery_arrangements", "id, order_id, leg, partner_id, confirmed_date, confirmed_time", "order_id", ids),
@@ -108,6 +115,9 @@ export async function outrightOrderFacts(
       sb, "order_finance_exceptions", "id, order_id, status, reason, opened_at", "order_id", ids, (q) => q.eq("status", "open")),
     readIn<{ warehouse_id: string | null; reserved_order_line_id: string | null }>(
       sb, "ops_stock_items", "id, warehouse_id, reserved_order_line_id", "reserved_order_line_id", lineIds, (q) => q.eq("status", "reserved")),
+    /* The Units bound to a line, reserved or already sold, with the PO line each was born on (0426). */
+    readIn<{ reserved_order_line_id: string | null; po_line_id: string | null }>(
+      sb, "ops_stock_items", "id, reserved_order_line_id, po_line_id", "reserved_order_line_id", lineIds, (q) => q.in("status", ["reserved", "sold"])),
   ]);
 
   const poIds = [...new Set((sources ?? []).map((s) => s.po_id).filter(Boolean))];
@@ -118,8 +128,12 @@ export async function outrightOrderFacts(
   ].filter(Boolean);
   const warehouseIds = [...(reservedUnits ?? []), ...(lineUnits ?? [])].map((u) => u.warehouse_id ?? "").filter(Boolean);
 
-  const [pos, receipts, handovers, partners, warehouses] = await Promise.all([
-    sources ? readIn<{ id: string; do_number: string | null }>(sb, "purchase_orders", "id, do_number", "id", poIds) : Promise.resolve(null),
+  const unitPoLineIds = [...new Set((boundUnits ?? []).map((u) => u.po_line_id ?? "").filter(Boolean))];
+  const [pos, receipts, handovers, partners, warehouses, unitPoLines] = await Promise.all([
+    sources
+      ? readIn<{ id: string; do_number: string | null; supplier_id: string | null; status: string | null }>(
+          sb, "purchase_orders", "id, do_number, supplier_id, status", "id", poIds)
+      : Promise.resolve(null),
     sources
       ? readIn<{ id: string; po_id: string; grn_no: string | null; lines: unknown }>(
           sb, "warehouse_receipts", "id, po_id, grn_no, lines, status", "po_id", poIds, (q) => q.eq("status", "posted"))
@@ -128,7 +142,16 @@ export async function outrightOrderFacts(
       sb, "delivery_handover_events", "id, delivery_order_id, kind, recorded_at", "delivery_order_id", liveDoIds) : Promise.resolve(null),
     readIn<{ id: string; name: string | null }>(sb, "delivery_partners", "id, name", "id", partnerIds),
     readIn<{ id: string; name: string | null }>(sb, "warehouses", "id, name", "id", warehouseIds),
+    boundUnits ? readIn<{ id: string; po_id: string }>(sb, "purchase_order_lines", "id, po_id", "id", unitPoLineIds) : Promise.resolve(null),
   ]);
+
+  /* The Units' own POs, then every supplier's name. */
+  const unitPoIds = [...new Set((unitPoLines ?? []).map((l) => l.po_id).filter(Boolean))];
+  const unitPos = unitPoLines
+    ? await readIn<{ id: string; supplier_id: string | null }>(sb, "purchase_orders", "id, supplier_id", "id", unitPoIds)
+    : null;
+  const supplierIds = [...(pos ?? []), ...(unitPos ?? [])].map((p) => p.supplier_id ?? "").filter(Boolean);
+  const suppliers = await readIn<{ id: string; name: string | null }>(sb, "suppliers", "id, name", "id", supplierIds);
 
   const failed: OutrightFactsFailed = {
     pic: staff === null,
@@ -137,6 +160,25 @@ export async function outrightOrderFacts(
     loading: documents === null || handovers === null,
     location: reservedUnits === null || lineUnits === null || warehouses === null,
     finance: holds === null,
+    suppliers: sources === null || pos === null || boundUnits === null || unitPoLines === null || unitPos === null || suppliers === null,
+  };
+  const nameOfSupplier = new Map((suppliers ?? []).map((s) => [s.id, (s.name ?? "").trim() || null]));
+  const poById = new Map((pos ?? []).map((p) => [p.id, p]));
+  const supplierOfPoLine = new Map(
+    (unitPoLines ?? []).map((l) => [l.id, (unitPos ?? []).find((p) => p.id === l.po_id)?.supplier_id ?? null]),
+  );
+  /* Distinct suppliers; a recorded supplier this caller may not read is null. */
+  const named = (supplierIdsOfLine: (string | null)[]) =>
+    [...new Set(supplierIdsOfLine.filter((s): s is string => Boolean(s)))].map((s) => nameOfSupplier.get(s) ?? null);
+  const lineSupplierOf = (lineId: string): { from: "po" | "unit" | "none"; names: (string | null)[] } => {
+    const live = (sources ?? [])
+      .filter((s) => s.order_line_id === lineId)
+      .map((s) => poById.get(s.po_id))
+      .filter((p): p is NonNullable<typeof p> => Boolean(p) && p!.status !== "cancelled");
+    if (live.length > 0) return { from: "po", names: named(live.map((p) => p.supplier_id)) };
+    const units = (boundUnits ?? []).filter((u) => u.reserved_order_line_id === lineId);
+    if (units.length > 0) return { from: "unit", names: named(units.map((u) => (u.po_line_id ? supplierOfPoLine.get(u.po_line_id) ?? null : null))) };
+    return { from: "none", names: [] };
   };
 
   const nameOfStaff = new Map((staff ?? []).map((u) => [u.id, u.name]));
@@ -210,6 +252,7 @@ export async function outrightOrderFacts(
       loading: { hasDo: legDocs.length > 0, kind: newest?.kind ?? null, at: newest?.recorded_at ?? null },
       locations,
       financeHold: holdOf.has(o.id) ? { reason: holdOf.get(o.id)!.reason } : null,
+      lineSuppliers: Object.fromEntries([...myLines].map((lineId) => [lineId, lineSupplierOf(lineId)])),
     };
   }
   return { facts, failed };

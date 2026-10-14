@@ -104,9 +104,9 @@ Nothing else uses 600 at 15 or above. Never below 11; 11 only for caps labels, t
 |---|---|
 | Corner radius | 8 for cards, rows, inputs, buttons, menu items; 10 for the segmented track; pills and avatars fully round |
 | Word button | Box, radius 8, height 34 (toolbar 32, panel 30, small 28), 13 / 500, main 13 / 600, 1 to 2 words, icon only when the icon alone is the button |
-| Icon-only button | Round, 34 (toolbar 36, small 28 to 32), no border, no fill, icon 20 |
+| Icon-only button | Round, 34 (toolbar 32, small 28 to 32), no border, no fill, icon 20 |
 | Top-bar utility (team, bell) and search | 34 high, white, 1px `#E1E4E8`, round; bell badge charcoal, team badge white with green dot |
-| Segmented control (list tabs, view switches, Settings tabs) | Track `#E2E4E8`, radius 10, padding 3; segment padding 5 × 12, 13; selected white, theme text, 500, soft lift; others 400 `#4B5563` |
+| Segmented control (list tabs, view switches, Settings tabs) | Track `#E2E4E8`, radius 10, padding 3; segment padding 5 × 12, 13 on a 16 line, so the track is 32; selected white, theme text, 500, soft lift; others 400 `#4B5563` |
 | Status pill | 12 / 500, padding 3 × 10, fully round, colour plus one word |
 | Choice chip | 28 high, 12 / 500, radius 8; unselected `#F2F3F5` fill (PROPOSAL, §10.1), `#4B5563` text; selected soft selection fill, theme text and 1px theme border; icon 16 |
 | Theme chip (Appearance) | 32 high, radius 8, 12 dot and name 13 / 500 |
@@ -138,7 +138,7 @@ Icons: Material Symbols Rounded, outline, weight 300; 18 in buttons and menus, 2
 | Menu words | A long name wraps to a second line (13 on 17) and is never cut. A page that is not built shows `Coming soon` 11 grey under its name and is not a link. The whole menu has one scrollbar |
 | Logo | Wordmark 20 high open; mark 34 closed; never recolour or distort |
 | Top bar | 56 high, bottom hairline; `[Module] / [Page]` with the path 14 / 400 and the title 20 / 600; search, team, bell at the right |
-| Toolbar row | 36 high, one line, never wraps; Summary title, toolbar and Tasks title share this line |
+| Toolbar row | 36 high, one line, never wraps; Summary title, toolbar and Tasks title share this line. Every button on it is 32 high, centred: Summary · tabs · view button · ⋮ · Tasks (fix list 14 Oct 2026). The view button keeps its name in every state, the show-panel button may keep its icon only (name on hover), and no control is cut or runs under a panel (owner 14 Oct 2026). What gives way next on a short line is PENDING owner review and not yet a rule. Built today: one line (filter chips keep their icon, then one `Clear filters`, gaps 8 → 4). The two-row alternative (Design Round 4: chips keep their words, the view button and ⋮ move to a second line) is kept on branch `preview/two-row-toolbar`, outside the release |
 | Summary | 264, left; a section has ONE headline tile with its breakdown rows under it, never two tiles that mean the same thing (owner 12 Oct 2026); title row on the ground, then one white card per section, 8 apart; row exactly 32 high; label 13 / 400 `#4B5563`, value 13 / 500 ink, amber 500 when it needs action; 1px line on its right |
 | Tasks | 320, right; title row on the ground: `Tasks` · `Log call` · ⤢ (all tasks in Workspace) · › hide, and no footer link; 1px `#E5E7EB` line separates it from the middle with 12 on both sides. Under the title: the day strip, then `To do` · `Waiting` · `Done` as the same grey segmented control as the page tabs, equal widths, then one white card per contact or action group, 8 apart With a task open the panel stays 320 below 1280 wide and may use the spare width from 1280 (13 Oct 2026), so opening a task never takes room from the list |
 | Day strip (owner 12 Oct 2026) | On the panel ground with one hairline under it, no box. Office working days only (Monday to Friday by default), 5 days per page, ‹ › move a working week; a task dated on a weekend shows on the next Monday. Each day: weekday 11 / 500 · date 12 · task count 11 / 500 in the theme colour, amber when something is late, blank when none. The picked day wears the selection pair. Today's list shows only today's tasks; another day's tasks are seen by picking that day |
@@ -155,9 +155,9 @@ The page never scrolls; panels and table bodies scroll inside with thin scrollba
 |---|---|
 | Table card | White, 1px `#E5E7EB`, radius 8 |
 | Header | 40, ground `#F8F9FA`, 12 / 500 `#6B7280`, bottom line `#E5E7EB`, stays on top |
-| List row and group row | 54, cell padding 6 × 14, line `#F1F2F4` |
+| List row and group row | 54, cell padding 6 × 14, line `#F1F2F4`. Every cell is one line (fix list 14 Oct 2026): a column is as wide as its longest value, never narrower than its track, and a list wider than its box scrolls sideways in its own box with ▸, ☐ and the identifier fixed. Nothing is cut, except a customer's name under the identifier: it ends with … when its column is short, the full name on hover and in the record (owner 14 Oct 2026). A two-line header (a long business name such as `Customer’s original` / `requested delivery`) stays inside the 40 header |
 | Item row in an expanded list row, and total row | 44 minimum; a long item name wraps and the row grows |
-| Footer | 44, white, top line `#E5E7EB`: count, totals, rows per page, pager; on a narrow list the totals wrap to a second line inside the footer, never cut |
+| Footer | 44, white, top line `#E5E7EB`: the count and totals as one line of words (`72 orders · Qty: Mattress 72 · Pillow 91`), then rows per page and the pager. Two lines at most: when the full words need a third, the short forms show with the full words on hover (fix list 14 Oct 2026) |
 | Expanded row | One box: 1px `#CBD0D6` frame, corners 8, 8 above and below; parent stays white; item sub-header `#F8F9FA`; parent and sub-header stick together under the table header |
 | Ticked row or item | Soft selection fill; text stays ink |
 | Selection bar | Replaces the toolbar; white, 1px `#E5E7EB`; count 13 / 600 ink, totals grey; only the tick and Clear use the theme colour; the text is counts only; bar buttons 32 high, 13 / 500 |

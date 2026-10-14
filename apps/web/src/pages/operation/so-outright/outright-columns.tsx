@@ -13,33 +13,18 @@
  * A document that does not exist yet prints `Not yet`, as v8 does. Finance
  * hold unknown is `Could not read`, never `No Finance hold`.
  */
-import { registerDeliveryConditionOf, type OutrightFactsFailed, type OutrightOrderFacts } from "@carres/shared";
+import { goodsCategoryWordOf, registerDeliveryConditionOf, type OutrightFactsFailed, type OutrightOrderFacts } from "@carres/shared";
 import type { PaymentMonitorRow } from "@carres/shared/payment-monitor";
 import type { RegisterRow } from "../sales-order-columns";
 import { salesLocationOf } from "../sales-order-columns";
 import type { CPillTone } from "@/components/carres/CPill";
+import type { CCell, CTableColumn } from "@/components/carres/CTable";
+import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 
 export type CellTone = CPillTone | "none";
 
-export type Cell = {
-  t: string;
-  sub?: string;
-  /** Sub-line colour: muted grey (default secondary), ok green, warn amber. */
-  subTone?: "muted" | "ok" | "warn";
-  /** 400 · 500 · 600. */
-  fw?: 400 | 500 | 600;
-  /** Text colour: ink (default: the unselected-tab grey, c-tab), muted, warn. */
-  fg?: "ink" | "muted" | "warn";
-  pill?: boolean;
-  tone?: CellTone;
-  align?: "start" | "end";
-  /** The Items cell: `› n pcs` opens the items pop-up. */
-  pop?: boolean;
-  /** The full sentence behind a short state word (hover). */
-  title?: string;
-  /** The sub-line is an essential fact: it wraps instead of being cut. */
-  subWrap?: boolean;
-};
+/** A Carres Table cell. */
+export type Cell = CCell;
 
 export type LayoutKey = "so" | "general" | "payment" | "stock" | "warehouse" | "delivery";
 
@@ -61,18 +46,14 @@ export function couldNotRead(owner: string, notMean: string): Cell {
   return { t: "Could not read", fg: "warn", title: `Could not read ${owner} for this order. This does not mean ${notMean}.` };
 }
 
-/** `6 Oct 26` over `Tue` — v8 `dF`. */
+/** `17 Sep` over `Thu`, the year only when it is not this year (`3 Jan 27`) —
+ *  COPY's year rule, through the one formatter (fix list 14 Oct, point 2). */
 export function dayCell(iso: string | null | undefined, fw: 400 | 500 = 500): Cell | null {
-  if (!iso) return null;
-  const d = new Date(iso.length === 10 ? `${iso}T00:00:00+08:00` : iso);
-  if (Number.isNaN(d.getTime())) return null;
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Kuala_Lumpur", day: "numeric", month: "numeric", year: "2-digit", weekday: "short",
-  }).formatToParts(d);
-  const v = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  const mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][Number(v("month")) - 1];
-  return { t: `${Number(v("day"))} ${mon} ${v("year")}`, sub: v("weekday"), subTone: "muted", fw };
+  const t = fmtDateShort(iso);
+  if (!t) return null;
+  return { t, sub: fmtDate(iso).split(",")[0], subTone: "muted", fw };
 }
+
 
 /** `RM 14,170` — v8 `rmF`, Inter tabular (never a mono face). */
 export function rm(n: number): string {
@@ -81,6 +62,34 @@ export function rm(n: number): string {
 
 export function pcsOf(r: RegisterRow): number {
   return (r.o.order_lines ?? []).reduce((sum, l) => sum + (Number(l.qty) || 0), 0);
+}
+
+/** v12's Items line 2 codes (owner 11 Oct; design reply 14 Oct); a category
+ *  without a code prints its own word. The full words show on hover. */
+export const CATEGORY_CODE: Partial<Record<string, string>> = { Mattress: "MS", Bedframe: "BF", Sofa: "SOF", "Mattress protector": "M.P" };
+
+/**
+ * Items, as v12 prints them: pieces, a sofa in sets (`3 pcs + 1 set`), and
+ * under it the goods' categories in v12's codes (`MS, BF`).
+ */
+export function itemsCell(r: RegisterRow): Cell {
+  let pcs = 0;
+  let sets = 0;
+  const words: string[] = [];
+  for (const line of r.o.order_lines ?? []) {
+    const qty = Number(line.qty) || 0;
+    if (qty <= 0) continue;
+    const word = goodsCategoryWordOf(line);
+    if (word === "Sofa") sets += qty;
+    else pcs += qty;
+    if (word !== "Accessory" && !words.includes(word)) words.push(word);
+  }
+  const t = [pcs || !sets ? `${pcs} ${pcs === 1 ? "pc" : "pcs"}` : "", sets ? `${sets} ${sets === 1 ? "set" : "sets"}` : ""]
+    .filter(Boolean)
+    .join(" + ");
+  return words.length
+    ? { t, sub: words.map((w) => CATEGORY_CODE[w] ?? w).join(", "), subTitle: words.join(", ") }
+    : { t };
 }
 
 export function isDelivered(r: RegisterRow): boolean {
@@ -103,8 +112,7 @@ function supplierEta(r: RegisterRow): string | null {
 }
 
 function shortDay(iso: string): string {
-  const c = dayCell(iso, 400);
-  return c ? c.t.replace(/ \d\d$/, "") : iso;
+  return fmtDateShort(iso) || iso;
 }
 
 /** One server read as a cell sees it: still loading, refused, failed, or answered. */
@@ -159,24 +167,38 @@ export function timeWords(t: string | null | undefined): string | undefined {
   return v.replace(/\s*[\u2013\u2014]\s*/g, " to ").replace(/(\d(?:\s?[ap]m)?)\s*-\s*(\d)/gi, "$1 to $2");
 }
 
+/**
+ * The item row's `Supplier`: supplier provenance only, from the server's per-line
+ * lineage (Orders MASTER Order Route — the line's PO, else its Unit's PO; never the
+ * Catalog). A line whose lineage was read and holds no supplier record is
+ * `Not recorded` (COPY: read and empty) — it says nothing about whether goods must
+ * be bought (PO existence is the `PO No.` cell's fact) or are in stock (the `Stock`
+ * cell's): counted warehouse goods carry no provenance record. A read that did not
+ * happen is `Could not read`, never `Not recorded`.
+ */
+export function supplierCell(r: RegisterRow, ctx: CellContext, lineId: string | null | undefined): Cell {
+  const read = ctx.owned(r);
+  if (read.state === "loading") return LOADING;
+  if (read.state === "denied") return NO_ACCESS;
+  const line = lineId && read.state === "ok" ? read.facts?.lineSuppliers?.[lineId] : undefined;
+  if (read.state === "failed" || read.failed.suppliers || !line) return couldNotRead("Purchasing", "there is no supplier");
+  if (line.from === "none") return NOT_RECORDED;
+  const known = line.names.filter((n): n is string => Boolean(n));
+  if (known.length === 0) return line.names.length > 0 ? NO_ACCESS : NOT_RECORDED;
+  return { t: known.join(", "), fg: "ink" };
+}
+
 const HANDOVER_WORD: Record<NonNullable<OutrightOrderFacts["loading"]["kind"]>, string> = {
   ready_for_handover: "Ready for handover",
   handed_over: "Handed over",
   received_by_logistics: "Received by logistics",
 };
 
-export type Column = {
-  key: string;
-  label: string;
-  /** A long header printed on two lines; `label` stays its accessible and export name. */
-  head?: readonly [string, string];
-  /** v8's grid track. */
-  width: string;
+/** A Carres Table column, with how it reads its cell. Width = the v12 track. */
+export type Column = CTableColumn & {
   cell: (r: RegisterRow, ctx: CellContext) => Cell;
   /** v8 marks these filterable: the header opens a value menu. */
   filterable?: boolean;
-  /** Money columns sit right. */
-  align?: "end";
 };
 
 const docs = (list: (string | null | undefined)[]): Cell => {
@@ -187,23 +209,25 @@ const docs = (list: (string | null | undefined)[]): Cell => {
 
 export const COLUMNS: Record<string, Column> = {
   proceed: {
-    key: "proceed", label: "Proceed Date", width: "100px",
+    key: "proceed", label: "Proceed date", width: "120px",
     cell: (r) => dayCell(r.proceeded) ?? NOT_RECORDED,
   },
   order: {
-    key: "order", label: "SO No", width: "minmax(118px,1fr)",
-    cell: (r) => ({ t: `SO-${r.so}`, fw: 600, fg: "ink", sub: r.customer || "Not recorded" }),
+    key: "order", label: "SO no.", width: "minmax(150px,1fr)",
+    /* The customer's name stays on one line and ends with … when the column is
+       short; the full name is on hover and in the order (owner 14 Oct 2026). */
+    cell: (r) => (r.customer ? { t: `SO-${r.so}`, fw: 600, fg: "ink", sub: r.customer, subClip: true, subTitle: r.customer } : { t: `SO-${r.so}`, fw: 600, fg: "ink", sub: "Not recorded" }),
   },
   items: {
-    key: "items", label: "Items", width: "84px",
-    cell: (r) => { const n = pcsOf(r); return { t: `${n} ${n === 1 ? "pc" : "pcs"}`, pop: true }; },
+    key: "items", label: "Items", width: "120px",
+    cell: (r) => itemsCell(r),
   },
   channel: {
-    key: "channel", label: "Sales Location", width: "minmax(100px,.9fr)",
+    key: "channel", label: "Sales location", width: "minmax(120px,1fr)",
     cell: (r) => ({ t: salesLocationOf(r.o) || "Not recorded", sub: r.o.salespersons?.name?.trim() || "Not recorded" }),
   },
   dloc: {
-    key: "dloc", label: "Delivery Location", width: "minmax(100px,.9fr)",
+    key: "dloc", label: "Delivery location", width: "minmax(170px,1fr)",
     cell: (r) => {
       const city = r.o.customer_address_city?.trim();
       const state = r.o.customer_address_state?.trim();
@@ -211,7 +235,10 @@ export const COLUMNS: Record<string, Column> = {
     },
   },
   reqDate: {
-    key: "reqDate", label: "Customer’s original requested delivery", width: "112px",
+    /* Version 1's preserved request (COPY "SO table and filters" / "SO requested-date
+       header"): two header lines, never `ETA` (Logistics ETA is a separate fact;
+       owner 14 Oct 2026). The day and its weekday; `Delivered` once delivered. */
+    key: "reqDate", label: "Customer’s original requested delivery", width: "140px",
     head: ["Customer’s original", "requested delivery"],
     cell: (r) => {
       const c = dayCell(r.customerDelivery);
@@ -319,7 +346,7 @@ export const COLUMNS: Record<string, Column> = {
     /* An OPEN `order_finance_exceptions` row (0355). Unknown is never no hold. */
     cell: (r, ctx) => fromOwner(r, ctx, "finance", "Finance", "there is no Finance hold", (f) =>
       f.financeHold
-        ? { t: "Hold delivery", pill: true, tone: "warn", sub: f.financeHold.reason ? `Finance hold · ${f.financeHold.reason}` : "Finance hold", subTone: "warn", subWrap: true }
+        ? { t: "Hold delivery", pill: true, tone: "warn", sub: f.financeHold.reason ? `Finance hold · ${f.financeHold.reason}` : "Finance hold", subTone: "warn" }
         : { t: "No Finance hold", fg: "muted" }),
   },
   po: {

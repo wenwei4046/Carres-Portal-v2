@@ -10,13 +10,15 @@
  * catalogue names, the server's stock / payment / case facts). Nothing here
  * writes. A row click opens the order; Ctrl/⌘-click opens it in a new tab.
  */
-import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { goodsCategoryWordOf } from "@carres/shared";
 import MIcon from "@/components/carres/MIcon";
-import CPill from "@/components/carres/CPill";
 import CPopover, { CMenuGroup, CMenuItem } from "@/components/carres/CPopover";
+import CTable, { CTableCell, CTableFooter, CTableHead, CTableItems, type CTableGrid } from "@/components/carres/CTable";
+import CSidePanel from "@/components/carres/CSidePanel";
+import { CChip, CIconButton, CShowPanelButton, CViewButton } from "@/components/carres/CToolbar";
 import { useAuth } from "@/lib/auth";
 import { appTodayIso } from "@/lib/fmt-date";
 import { useSalesOrderRegisterFacts, useSalesOrderRegisterOrders } from "@/lib/queries";
@@ -27,14 +29,15 @@ import SalesOrderReadFailure from "../SalesOrderReadFailure";
 import { printSalesOrdersOrSay } from "../record-print";
 import ModuleHeader from "../components/ModuleHeader";
 import { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
-import { TasksPill } from "../components/ShellTasks";
+import { TasksPill, useShellTasks } from "../components/ShellTasks";
 import {
+  CATEGORY_CODE,
   COLUMNS,
   LAYOUTS,
   isDelivered,
   pcsOf,
   rm,
-  type Cell,
+  supplierCell,
   type CellContext,
   type LayoutKey,
 } from "./outright-columns";
@@ -46,18 +49,24 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "delivered", label: "Delivered" },
   { key: "all", label: "All" },
 ];
-const PAGE_SIZES = [20, 50, 100] as const;
 const SUMMARY_KEY = "carres.outright.summary";
+/** Below this width only one side panel is open at a time (v12 Shell). */
+const ONE_PANEL_BELOW = 1280;
 const VIEW_KEY = (user: string) => `carres.outright.view.${user}`;
 
-/* The summary's goods words — v8 ITEMS. `Bed frame` is the design's word. */
-const SUMMARY_CATS = ["Mattress", "Bed frame", "Sofa", "Pillow", "Mattress protector", "Others"] as const;
+/* The summary's goods words — v12 CATS, the catalog's own `Bedframe` (one word). */
+const SUMMARY_CATS = ["Mattress", "Bedframe", "Sofa", "Pillow", "Mattress protector", "Others"] as const;
 function summaryCat(line: Parameters<typeof goodsCategoryWordOf>[0]): (typeof SUMMARY_CATS)[number] | null {
   const word = goodsCategoryWordOf(line);
   if (word === "Service") return null;
-  if (word === "Bedframe") return "Bed frame";
-  if (word === "Mattress" || word === "Sofa" || word === "Pillow" || word === "Mattress protector") return word;
+  if (word === "Mattress" || word === "Bedframe" || word === "Sofa" || word === "Pillow" || word === "Mattress protector") return word;
   return "Others";
+}
+/* The footer's goods words, in this fixed order (fix list 14 Oct, point 7). */
+const FOOTER_CATS = ["Mattress", "Pillow", "Bedframe", "Mattress protector", "Sofa", "Service", "Others"] as const;
+function footerCat(line: Parameters<typeof goodsCategoryWordOf>[0]): (typeof FOOTER_CATS)[number] {
+  const word = goodsCategoryWordOf(line);
+  return (FOOTER_CATS as readonly string[]).includes(word) ? (word as (typeof FOOTER_CATS)[number]) : "Others";
 }
 
 const monthKey = (iso: string) => {
@@ -195,6 +204,7 @@ export default function SalesOrdersOutright() {
   useEffect(() => setPage(1), [tab, layoutKey, filters, pageSize, seededSearch]);
   const shown = list.slice((Math.min(page, pages) - 1) * pageSize, Math.min(page, pages) * pageSize);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [opened, setOpened] = useState<Set<string>>(new Set());
   const selectedRows = list.filter((r) => selected.has(r.id));
   const allShownSelected = shown.length > 0 && shown.every((r) => selected.has(r.id));
   const toggle = (id: string) =>
@@ -221,7 +231,19 @@ export default function SalesOrdersOutright() {
   const setSummaryOpen = (open: boolean) => {
     writeStore(SUMMARY_KEY, open ? "1" : "0");
     setSummaryOpenState(open);
+    /* Under 1280 wide the list keeps the room: opening one side panel closes
+       the other (v12 Shell). */
+    if (open && window.innerWidth < ONE_PANEL_BELOW) useShellTasks.getState().setOpen(false);
   };
+  const tasksOpen = useShellTasks((s) => s.open);
+  useEffect(() => {
+    const narrow = () => {
+      if (tasksOpen && window.innerWidth < ONE_PANEL_BELOW) setSummaryOpenState(false);
+    };
+    narrow();
+    window.addEventListener("resize", narrow);
+    return () => window.removeEventListener("resize", narrow);
+  }, [tasksOpen]);
   const thisMonth = appTodayIso().slice(0, 7);
   const [month, setMonth] = useState(thisMonth);
 
@@ -291,30 +313,62 @@ export default function SalesOrdersOutright() {
     ...(seededSearch ? [{ key: "search", label: `Search: ${seededSearch}`, clear: () => setParam("search", null) }] : []),
     ...Object.entries(filters).map(([k, v]) => ({ key: k, label: `${COLUMNS[k]!.label}: ${v}`, clear: () => setParam(`f.${k}`, null) })),
   ];
-  const gcols = `24px ${layout.columns.map((k) => COLUMNS[k]!.width).join(" ")}`;
-  /* The table is as wide as its columns' own minimums — checkbox 24, each
-     track's px floor, a 10px gap between tracks, 14px padding each side and
-     the 6px row margins — so a row's line spans every column when the table
-     scrolls sideways. */
-  const minWidth =
-    24 +
-    layout.columns.reduce((sum, k) => sum + (Number(/(\d+)px/.exec(COLUMNS[k]!.width)?.[1]) || 0), 0) +
-    10 * layout.columns.length +
-    28 +
-    12;
+  const columns = layout.columns.map((k) => COLUMNS[k]!);
+  const clearFilters = () =>
+    setParams((p) => {
+      const n = new URLSearchParams(p);
+      [...n.keys()].filter((k) => k === "search" || k.startsWith("f.")).forEach((k) => n.delete(k));
+      return n;
+    }, { replace: true });
 
-  /* Footer: `n orders` · `Qty: Mattress 7 · Bed frame 4 …` (most first). */
-  const qty = useMemo(() => {
+  /* No toolbar control is cut or overlaps (owner 14 Oct 2026); Summary may keep
+     its icon only and the view button always keeps its name. On a short line the
+     filter chips keep their icon, then become one `Clear filters` and the gaps
+     close 8 → 4. (The two-row candidate is kept on branch preview/two-row-toolbar,
+     pending review; it is not part of the release.) `need[n]` is the width the
+     line needed at step n. */
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const [compact, setCompact] = useState(0);
+  const need = useRef<number[]>([]);
+  useLayoutEffect(() => {
+    const bar = toolbarRef.current;
+    if (!bar) return;
+    const most = chips.length > 0 ? 3 : 1;
+    const fit = () => {
+      if (bar.scrollWidth > bar.clientWidth + 1 && compact < most) {
+        need.current[compact] = bar.scrollWidth;
+        setCompact(compact + 1);
+      } else if (compact > 0 && bar.clientWidth >= (need.current[compact - 1] ?? Infinity)) setCompact(compact - 1);
+    };
+    fit();
+    const watch = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(fit);
+    watch?.observe(bar);
+    return () => watch?.disconnect();
+  }, [compact, chips.length, layoutKey, tasksOpen, summaryOpen, selected.size]);
+  useEffect(() => {
+    need.current = [];
+    setCompact(0);
+  }, [chips.length, layoutKey]);
+  /* SO No stays fixed on the left while the list scrolls (with ▸ and ☐). */
+  const identifier = Math.max(0, layout.columns.indexOf("order"));
+
+  /* Footer: `72 orders · Qty: Mattress 72 · Pillow 91 …` in the fixed order; the
+     short forms (`MS 72 · BF 14 · M.P 4 · SOF 22 sets`) when two lines are not enough. */
+  const totals = useMemo(() => {
     const c = new Map<string, number>();
     for (const r of list) {
       for (const line of r.o.order_lines ?? []) {
-        const word = summaryCat(line);
-        if (word) c.set(word, (c.get(word) ?? 0) + (Number(line.qty) || 0));
+        const word = footerCat(line);
+        c.set(word, (c.get(word) ?? 0) + (Number(line.qty) || 0));
       }
     }
-    return [...c.entries()].filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+    const shown = FOOTER_CATS.filter((k) => (c.get(k) ?? 0) > 0);
+    const part = (k: string, name: string) => {
+      const n = c.get(k)!;
+      return k === "Sofa" ? `${name} ${n} ${n === 1 ? "set" : "sets"}` : `${name} ${n}`;
+    };
+    return { lead: "Qty:", parts: shown.map((k) => part(k, k)), short: shown.map((k) => part(k, CATEGORY_CODE[k] ?? k)) };
   }, [list]);
-  const qtyLine = qty.length ? `· Qty: ${qty.map(([k, n]) => `${k} ${n}`).join(" · ")}` : "";
   const selPcs = selectedRows.reduce((s, r) => s + pcsOf(r), 0);
   const selTotal = selectedRows.reduce((s, r) => s + (r.total.kind === "amount" ? r.total.value : 0), 0);
 
@@ -348,24 +402,24 @@ export default function SalesOrdersOutright() {
               · {selPcs} {selPcs === 1 ? "pc" : "pcs"} · Total {rm(selTotal)}
             </span>
             <span className="ml-auto flex items-center gap-1.5">
-              <button type="button" onClick={() => void downloadExcel(selectedRows)} className="flex h-7 items-center gap-1 rounded-lg border border-c-btn-border bg-white px-3 text-[12px] font-semibold text-c-ink hover:bg-c-hover">
+              <button type="button" onClick={() => void downloadExcel(selectedRows)} className="flex h-8 items-center gap-1 rounded-lg border border-c-btn-border bg-white px-3 text-[13px] font-medium text-c-ink hover:bg-c-hover">
                 <MIcon name="download" size={16} />Export
               </button>
-              <button type="button" onClick={() => void printSalesOrdersOrSay(selectedRows)} className="flex h-7 items-center gap-1 rounded-lg border border-c-btn-border bg-white px-3 text-[12px] font-semibold text-c-ink hover:bg-c-hover">
+              <button type="button" onClick={() => void printSalesOrdersOrSay(selectedRows)} className="flex h-8 items-center gap-1 rounded-lg border border-c-btn-border bg-white px-3 text-[13px] font-medium text-c-ink hover:bg-c-hover">
                 <MIcon name="print" size={16} />Print SO
               </button>
-              <button type="button" onClick={() => setSelected(new Set())} className="flex h-7 items-center gap-1 rounded-lg px-2.5 text-[12px] font-semibold text-c-select-fg hover:bg-white/60">
+              <button type="button" onClick={() => setSelected(new Set())} className="flex h-8 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium text-c-select-fg hover:bg-white/60">
                 Clear<MIcon name="close" size={16} />
               </button>
             </span>
           </div>
         ) : (
-          <div className="flex flex-wrap items-center gap-2" data-testid="outright-toolbar">
-            {!summaryOpen && (
-              <button type="button" onClick={() => setSummaryOpen(true)} className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-c-btn-border bg-white px-3 text-[13px] font-medium text-c-ink hover:bg-c-hover">
-                <MIcon name="left_panel_open" size={18} />Summary
-              </button>
-            )}
+          <div
+            ref={toolbarRef}
+            className={`flex h-9 min-w-0 flex-nowrap items-center ${compact >= 3 ? "gap-1" : "gap-2"}`}
+            data-testid="outright-toolbar"
+          >
+            {!summaryOpen && <CShowPanelButton label="Summary" compact={compact >= 1} onShow={() => setSummaryOpen(true)} />}
             <div role="tablist" aria-label="Views" className={SEGMENTED_TRACK}>
               {TABS.map((t) => (
                 <button
@@ -380,24 +434,25 @@ export default function SalesOrdersOutright() {
                 </button>
               ))}
             </div>
-            <span className="whitespace-nowrap text-[12px] text-c-muted">· {layout.label} view</span>
-            {chips.map((c) => (
-              <button key={c.key} type="button" onClick={c.clear} className="whitespace-nowrap rounded-lg border border-c-head-line bg-c-search-bg px-2.5 py-1 text-[12px] font-semibold text-c-body">
-                {c.label} ×
-              </button>
-            ))}
-            <span className="ml-auto flex items-center gap-1.5">
+            {chips.length > 0 && (
+              <span className="flex shrink-0 items-center gap-1.5">
+                {compact >= 3 && chips.length > 1 ? (
+                  <CChip compact title={chips.map((c) => c.label).join(" · ")} onClear={clearFilters}>Clear filters</CChip>
+                ) : (
+                  chips.map((c) => (
+                    <CChip key={c.key} onClear={c.clear} compact={compact >= 2}>{c.label}</CChip>
+                  ))
+                )}
+              </span>
+            )}
+            <span className="ml-auto flex shrink-0 items-center gap-1.5">
               <CPopover
                 label="Views"
                 role="menu"
                 width={220}
                 open={viewsOpen}
                 onOpenChange={setViewsOpen}
-                trigger={
-                  <button type="button" aria-label={`View: ${layout.label}`} title={`View: ${layout.label}`} className={`grid h-9 w-9 place-items-center rounded-full text-c-body hover:bg-c-hover ${viewsOpen ? "bg-c-hover" : ""}`}>
-                    <MIcon name="view_column" size={20} />
-                  </button>
-                }
+                trigger={<CViewButton icon={layout.icon} name={layout.label} open={viewsOpen} />}
               >
                 <div className="px-2.5 py-1.5 text-[12px] text-c-secondary">Show columns for</div>
                 {LAYOUTS.map((l) => (
@@ -412,11 +467,7 @@ export default function SalesOrdersOutright() {
                 width={250}
                 open={moreOpen}
                 onOpenChange={setMoreOpen}
-                trigger={
-                  <button type="button" aria-label="More actions" title="More actions" className={`grid h-9 w-9 place-items-center rounded-full text-c-body hover:bg-c-hover ${moreOpen ? "bg-c-hover" : ""}`}>
-                    <MIcon name="more_vert" size={20} />
-                  </button>
-                }
+                trigger={<CIconButton icon="more_vert" label="More actions" pressed={moreOpen} />}
               >
                 <CMenuGroup first>EXPORT · orders shown now</CMenuGroup>
                 <CMenuItem icon="table_view" note=".xlsx" onSelect={() => { setMoreOpen(false); void downloadExcel(list); }}>Download Excel</CMenuItem>
@@ -431,93 +482,68 @@ export default function SalesOrdersOutright() {
           </div>
         )}
 
-        <section aria-label="Sales orders" className="grid min-h-0 grid-rows-[minmax(0,1fr)_44px] overflow-hidden rounded-lg border border-c-card-border bg-c-card">
-          <div className="min-h-0 overflow-auto [scrollbar-width:thin]" data-list-scroll>
-            {isError ? (
-              <SalesOrderReadFailure error={error} surface="sales-orders-register" onRetry={() => void refetch()} />
-            ) : (
-              <div role="table" aria-label="Sales orders" style={{ minWidth }}>
-                <div
-                  role="row"
-                  className="sticky top-0 z-10 mx-1.5 grid min-h-10 items-center gap-2.5 border-b border-c-head-line bg-c-card px-3.5 py-1.5 text-[12px] font-medium text-c-muted"
-                  style={{ gridTemplateColumns: gcols }}
-                >
-                  <span className="flex items-center" role="columnheader">
-                    <input
-                      type="checkbox"
-                      checked={allShownSelected}
-                      onChange={toggleAll}
-                      aria-label="Select all"
-                      className="h-4 w-4 cursor-pointer accent-[var(--c-select-fg)]"
-                    />
-                  </span>
-                  {layout.columns.map((k) => (
-                    <HeaderCell key={k} col={k} rows={all.filter(inTab)} ctx={ctx} value={filters[k]} onPick={(v) => setParam(`f.${k}`, v)} />
-                  ))}
-                </div>
-                {isLoading ? (
-                  <div className="px-6 py-6 text-center text-[13px] text-c-secondary" role="status">Loading orders</div>
-                ) : shown.length === 0 ? (
-                  <div className="px-6 py-6 text-center text-[13px] text-c-secondary">
-                    No orders match.{" "}
-                    <button type="button" className="font-semibold text-c-body" onClick={() => setParams(new URLSearchParams({ tab: "all" }), { replace: true })}>
-                      Clear filters
-                    </button>
-                  </div>
-                ) : (
-                  shown.map((r) => (
-                    <div
-                      key={r.id}
-                      role="row"
-                      onClick={(e) => open(r, e)}
-                      title="Open order · Ctrl/⌘-click opens a new tab"
-                      data-testid={`outright-row-${r.so}`}
-                      className={`mx-1.5 grid min-h-[54px] cursor-pointer items-center gap-2.5 rounded-[10px] border-b border-c-row-line px-3.5 py-1.5 text-[13px] -outline-offset-2 hover:[outline:var(--c-focus)] ${
-                        selected.has(r.id) ? "bg-c-select-bg" : "bg-c-card hover:bg-c-search-bg"
-                      }`}
-                      style={{ gridTemplateColumns: gcols }}
-                    >
-                      <span className="flex items-center" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selected.has(r.id)}
-                          onChange={() => toggle(r.id)}
-                          aria-label={`Select SO-${r.so}`}
-                          className="h-4 w-4 cursor-pointer accent-[var(--c-select-fg)]"
-                        />
-                      </span>
-                      {layout.columns.map((k) => (
-                        <BodyCell key={k} cell={COLUMNS[k]!.cell(r, ctx)} row={r} catalogNames={catalogNames} />
-                      ))}
-                    </div>
-                  ))
-                )}
+        <CTable
+          label="Sales orders"
+          columns={columns}
+          rows={shown}
+          rowKey={(r) => r.id}
+          rowTestId={(r) => `outright-row-${r.so}`}
+          rowTitle="Open order · Ctrl/⌘-click opens a new tab"
+          onRowClick={open}
+          identifier={identifier}
+          selection={{
+            isSelected: (r) => selected.has(r.id),
+            toggle: (r) => toggle(r.id),
+            allSelected: allShownSelected,
+            toggleAll,
+            rowLabel: (r) => `Select SO-${r.so}`,
+          }}
+          renderHeader={(c) => <HeaderCell col={c.key} rows={all.filter(inTab)} ctx={ctx} value={filters[c.key]} onPick={(v) => setParam(`f.${c.key}`, v)} />}
+          expand={{
+            isOpen: (r) => opened.has(r.id),
+            toggle: (r) =>
+              setOpened((s) => {
+                const n = new Set(s);
+                if (n.has(r.id)) n.delete(r.id);
+                else n.add(r.id);
+                return n;
+              }),
+            label: (r) => (opened.has(r.id) ? "Hide items" : "Show items"),
+            render: (r, grid) => <OrderItems row={r} catalogNames={catalogNames} grid={grid} ctx={ctx} />,
+          }}
+          renderCell={(r, c) => <CTableCell cell={COLUMNS[c.key]!.cell(r, ctx)} />}
+          failure={isError ? <SalesOrderReadFailure error={error} surface="sales-orders-register" onRetry={() => void refetch()} /> : undefined}
+          placeholder={
+            isLoading ? (
+              <div className="px-6 py-6 text-center text-[13px] text-c-secondary" role="status">Loading orders</div>
+            ) : shown.length === 0 ? (
+              <div className="px-6 py-6 text-center text-[13px] text-c-secondary">
+                No orders match.{" "}
+                <button type="button" className="font-semibold text-c-body" onClick={() => setParams(new URLSearchParams({ tab: "all" }), { replace: true })}>
+                  Clear filters
+                </button>
               </div>
-            )}
-          </div>
-          <div className="flex items-center gap-3 border-t border-c-footer-line px-3.5 text-[13px] text-c-secondary" data-testid="outright-footer">
-            <span className="whitespace-nowrap">{isLoading ? "Loading orders" : `${list.length} orders`}</span>
-            {!isLoading && qtyLine && (
-              <span className="min-w-0 truncate" title={qtyLine}>{qtyLine}</span>
-            )}
-            <RowsMenu size={pageSize} onSize={setPageSize} />
-            <span className="flex items-center gap-1 whitespace-nowrap text-c-ink">
-              <button type="button" aria-label="Previous page" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="grid place-items-center text-c-ink disabled:text-c-head-line">
-                <MIcon name="chevron_left" size={18} />
-              </button>
-              {Math.min(page, pages)} / {pages}
-              <button type="button" aria-label="Next page" disabled={page >= pages} onClick={() => setPage((p) => Math.min(pages, p + 1))} className="grid place-items-center text-c-ink disabled:text-c-head-line">
-                <MIcon name="chevron_right" size={18} />
-              </button>
-            </span>
-          </div>
-        </section>
+            ) : undefined
+          }
+          footer={
+            <CTableFooter
+              testId="outright-footer"
+              count={isLoading ? "Loading orders" : `${list.length} ${list.length === 1 ? "order" : "orders"}`}
+              {...(isLoading || totals.parts.length === 0 ? {} : { totals })}
+              pageSize={pageSize}
+              onPageSize={setPageSize}
+              page={Math.min(page, pages)}
+              pages={pages}
+              onPage={setPage}
+            />
+          }
+        />
       </main>
     </div>
   );
 }
 
-/* ── the header cell: plain grey words; a filterable column opens its values ── */
+/* ── the header words; a filterable column opens its values (CTable draws the box) ── */
 function HeaderCell({
   col,
   rows,
@@ -533,175 +559,68 @@ function HeaderCell({
 }) {
   const c = COLUMNS[col]!;
   const [open, setOpen] = useState(false);
-  const alignEnd = c.align === "end";
-  const words = c.head ? (
-    <span className="text-left leading-[1.25]" title={c.label}>
-      <span className="block whitespace-nowrap">{c.head[0]}</span>
-      <span className="block whitespace-nowrap">{c.head[1]}</span>
-    </span>
-  ) : (
-    <span className="text-left leading-[1.25]">{c.label}</span>
-  );
-  if (!c.filterable) {
-    return (
-      <div role="columnheader" aria-label={c.head ? c.label : undefined} className={`flex ${alignEnd ? "justify-end" : ""}`}>
-        {words}
-      </div>
-    );
-  }
+  if (!c.filterable) return <CTableHead column={c} />;
   const counts = new Map<string, number>();
   for (const r of rows) {
     const t = c.cell(r, ctx).t;
     counts.set(t, (counts.get(t) ?? 0) + 1);
   }
   return (
-    <div role="columnheader" aria-label={c.head ? c.label : undefined} className="flex">
-      <CPopover
-        label={c.label}
-        role="menu"
-        align="start"
-        open={open}
-        onOpenChange={setOpen}
-        trigger={
-          <button type="button" className={`flex items-center gap-1 text-left font-medium ${value ? "text-c-body" : "text-c-secondary"}`}>
-            {words}
-            <MIcon name={value ? "filter_alt" : "arrow_drop_down"} size={16} className={value ? "text-c-body" : "text-c-muted"} />
-          </button>
-        }
-      >
-        <div className="min-w-[170px]">
-          {[...counts.entries()].map(([v, n]) => (
-            <CMenuItem key={v} note={n} checked={value === v ? true : undefined} onSelect={() => { onPick(value === v ? null : v); setOpen(false); }}>
-              {v}
-            </CMenuItem>
-          ))}
-        </div>
-      </CPopover>
-    </div>
-  );
-}
-
-/* ── one body cell: plain words, a pill, or the Items pop-up; then a sub-line ── */
-function BodyCell({
-  cell,
-  row,
-  catalogNames,
-}: {
-  cell: Cell;
-  row: RegisterRow;
-  catalogNames: Map<string, { name: string; variant: string }>;
-}) {
-  const fg =
-    cell.fg === "ink" ? "text-c-ink" : cell.fg === "muted" ? "text-c-muted" : cell.fg === "warn" ? "text-c-warn-fg" : cell.fw === 600 ? "text-c-ink" : "text-c-tab";
-  const fw = cell.fw === 600 ? "font-semibold" : cell.fw === 500 ? "font-medium" : "font-normal";
-  const subFg = cell.subTone === "muted" ? "text-c-muted" : cell.subTone === "ok" ? "text-c-ok-fg" : cell.subTone === "warn" ? "text-c-warn-fg" : "text-c-secondary";
-  return (
-    <span role="cell" className={`flex min-w-0 flex-col leading-[1.3] ${cell.align === "end" ? "items-end" : "items-start"}`}>
-      {cell.pop ? (
-        <ItemsButton row={row} label={cell.t} catalogNames={catalogNames} />
-      ) : cell.pill ? (
-        cell.tone === "none" ? (
-          <span className="text-[13px] text-c-muted">{cell.t}</span>
-        ) : (
-          <CPill tone={cell.tone ?? "info"}>{cell.t}</CPill>
-        )
-      ) : (
-        <span className={`max-w-full truncate tabular-nums ${fw} ${fg}`} title={cell.title ?? cell.t}>
-          {cell.t}
-        </span>
-      )}
-      {cell.sub && (
-        <span className={`max-w-full text-[12px] ${cell.subWrap ? "break-words" : "truncate"} ${subFg}`} title={cell.sub}>
-          {cell.sub}
-        </span>
-      )}
-    </span>
-  );
-}
-
-/* ── Items: `› 2 pcs` opens what the order holds (v8 "Items in order") ── */
-function ItemsButton({
-  row,
-  label,
-  catalogNames,
-}: {
-  row: RegisterRow;
-  label: string;
-  catalogNames: Map<string, { name: string; variant: string }>;
-}) {
-  const [open, setOpen] = useState(false);
-  const lines = (row.o.order_lines ?? []).filter((l) => Number(l.qty) > 0);
-  return (
-    <span onClick={(e) => e.stopPropagation()}>
-      <CPopover
-        label="Items in order"
-        align="start"
-        width={320}
-        open={open}
-        onOpenChange={setOpen}
-        trigger={
-          <button type="button" aria-expanded={open} className="-ml-1.5 inline-flex items-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-0.5 text-[13px] font-medium text-c-body hover:bg-c-search-bg">
-            <MIcon name={open ? "expand_more" : "chevron_right"} size={18} className="text-c-muted" />
-            {label}
-          </button>
-        }
-      >
-        <div className="-m-1.5 flex max-h-[360px] flex-col">
-          <div className="flex items-center justify-between border-b border-c-row-line px-3 pb-2 pt-2.5">
-            <span className="text-[13px] font-semibold">SO-{row.so}</span>
-            <span className="text-[12px] text-c-secondary">{label}</span>
-          </div>
-          <div className="overflow-auto px-3 py-1">
-            {lines.map((l, i) => {
-              const named = catalogNames.get(skuKey(l.sku));
-              return (
-                <div key={l.id ?? `${l.sku}-${i}`} className="grid grid-cols-[minmax(0,1fr)_28px] gap-2.5 border-b border-c-row-line py-2 last:border-b-0">
-                  <span className="flex min-w-0 flex-col gap-0.5">
-                    <span className="break-words text-[13px] font-semibold text-c-ink">{named?.name ?? lineName(l)}</span>
-                    <span className="break-words text-[12px] leading-[1.35] text-c-secondary">
-                      {[named?.variant, l.sku].filter(Boolean).join(" · ")}
-                    </span>
-                  </span>
-                  <span className="text-right text-[13px] font-semibold tabular-nums">{Number(l.qty)}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </CPopover>
-    </span>
-  );
-}
-
-/* ── `Rows 20 ▾` ── */
-function RowsMenu({ size, onSize }: { size: number; onSize: (n: number) => void }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <span className="ml-auto">
-      <CPopover
-        label="Rows per page"
-        role="menu"
-        width={120}
-        open={open}
-        onOpenChange={setOpen}
-        trigger={
-          <button type="button" className="flex items-center gap-0.5 whitespace-nowrap text-c-secondary">
-            Rows {size}
-            <MIcon name="arrow_drop_down" size={18} />
-          </button>
-        }
-      >
-        {PAGE_SIZES.map((n) => (
-          <CMenuItem key={n} checked={n === size} onSelect={() => { onSize(n); setOpen(false); }}>
-            {n}
+    <CPopover
+      label={c.label}
+      role="menu"
+      align="start"
+      open={open}
+      onOpenChange={setOpen}
+      trigger={
+        <button type="button" className={`flex items-center gap-1 text-left font-medium ${value ? "text-c-body" : "text-c-secondary"}`}>
+          <CTableHead column={c} />
+          <MIcon name={value ? "filter_alt" : "arrow_drop_down"} size={16} className={value ? "text-c-body" : "text-c-muted"} />
+        </button>
+      }
+    >
+      <div className="min-w-[170px]">
+        {[...counts.entries()].map(([v, n]) => (
+          <CMenuItem key={v} note={n} checked={value === v ? true : undefined} onSelect={() => { onPick(value === v ? null : v); setOpen(false); }}>
+            {v}
           </CMenuItem>
         ))}
-      </CPopover>
-    </span>
+      </div>
+    </CPopover>
   );
 }
 
-/* ── the Summary panel — v8 `sum`: one card, thin spacing, no box inside ── */
+/** `1 pc` · `2 pcs`; a sofa in sets, `1 set` · `2 sets` (COPY quantities). */
+const qtyWords = (n: number, sofa: boolean) => (sofa ? `${n} ${n === 1 ? "set" : "sets"}` : `${n} ${n === 1 ? "pc" : "pcs"}`);
+
+/* ── what ▸ opens: the order's items, as the kit's item rows ── */
+function OrderItems({
+  row,
+  catalogNames,
+  grid,
+  ctx,
+}: {
+  row: RegisterRow;
+  catalogNames: Map<string, { name: string; variant: string }>;
+  grid: CTableGrid;
+  ctx: CellContext;
+}) {
+  const items = (row.o.order_lines ?? [])
+    .filter((l) => Number(l.qty) > 0)
+    .map((l, i) => {
+      const named = catalogNames.get(skuKey(l.sku));
+      return {
+        key: l.id ?? `${l.sku}-${i}`,
+        name: named?.name ?? lineName(l),
+        detail: [named?.variant, l.sku].filter(Boolean).join(" · "),
+        qty: qtyWords(Number(l.qty), goodsCategoryWordOf(l) === "Sofa"),
+        supplier: supplierCell(row, ctx, l.id),
+      };
+    });
+  return <CTableItems label={`SO-${row.so}`} grid={grid} items={items} empty="No items on this order" testId={`outright-items-${row.so}`} />;
+}
+
+/* ── the Summary panel — v8 `sum` in the kit side panel frame ── */
 function SummaryPanel({
   rows,
   facts,
@@ -749,14 +668,8 @@ function SummaryPanel({
     </div>
   );
   return (
-    <aside aria-label="Summary" className="flex w-[240px] shrink-0 flex-col gap-3.5 overflow-auto rounded-lg border border-c-card-border bg-c-card px-3.5 py-3 [scrollbar-width:thin]" data-testid="outright-summary">
-      <div className="flex items-center gap-1.5">
-        <span className="flex-1 text-strong">Summary</span>
-        <button type="button" onClick={onHide} aria-label="Hide summary" className="flex text-c-muted">
-          <MIcon name="chevron_left" size={20} />
-        </button>
-      </div>
-      <div className="flex h-9 items-center justify-between rounded-[10px] border border-c-card-border px-1">
+    <CSidePanel label="Summary" title="Summary" onHide={onHide} testId="outright-summary">
+      <div className="flex h-9 shrink-0 items-center justify-between rounded-[10px] border border-c-card-border px-1">
         <button type="button" onClick={onPrev} aria-label="Previous month" className="flex text-c-body">
           <MIcon name="chevron_left" size={20} />
         </button>
@@ -788,6 +701,6 @@ function SummaryPanel({
           </div>
         </>
       )}
-    </aside>
+    </CSidePanel>
   );
 }

@@ -10,7 +10,7 @@ Screenshots of each state: `screens/` (file name given after each flow).
 
 **A1 Open the list** · `SO-01`
 1. Open `/sales-orders/outright`.
-→ Tab **Open** is selected (white on grey track, theme text, 500). Default view "Sales Order" columns: Proceed date · SO no. · Items · Sales location · Delivery location · ETA. 17 rows. Footer: "17 orders · Qty: Mattress 30 · Pillow 20 · Bedframe 20 · Mattress protector 7 · Sofa 3 sets · Service 3" (full names, never cut).
+→ Tab **Open** is selected (white on grey track, theme text, 500). Default view "Sales Order" columns: Proceed date · SO no. · Items · Sales location · Delivery location · Customer’s original / requested delivery (two header lines, Jess 14 Oct; never ETA). 17 rows. Footer: "17 orders · Qty: Mattress 30 · Pillow 20 · Bedframe 20 · Mattress protector 7 · Sofa 3 sets · Service 3" (full names, never cut).
 
 **A2 Switch tabs**
 1. Click **Delivered**. → 3 rows (Logistic remark "Completed"). Filters cleared.

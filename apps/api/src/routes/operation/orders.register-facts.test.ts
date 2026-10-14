@@ -39,21 +39,22 @@ const unit = (n: number, status: "sold" | "reserved", orderN: number) => ({
   sold_order_id: status === "sold" ? id(orderN) : null,
 });
 
-/** Each table answers its rows; `ops_stock_items` answers by its `status` filter. */
+/** Each table answers its rows; `ops_stock_items` answers by its `status` filter (one value or a list). */
 function mockSb(rows: Record<string, unknown[]>, fail: string[] = []) {
   const from = vi.fn((table: string) => {
     const chain: Record<string, unknown> = {};
-    let status: unknown = null;
+    let status: unknown[] = [];
     for (const method of ["select", "eq", "in", "or", "not", "order", "range"]) {
       chain[method] = vi.fn((...args: unknown[]) => {
-        if (method === "eq" && args[0] === "status") status = args[1];
+        if (method === "eq" && args[0] === "status") status = [args[1]];
+        if (method === "in" && args[0] === "status") status = args[1] as unknown[];
         return chain;
       });
     }
     chain.then = (resolve: (v: unknown) => unknown) => {
       if (fail.includes(table)) return resolve({ data: null, error: { code: "XX000", message: "boom" } });
       const all = rows[table] ?? [];
-      const data = table === "ops_stock_items" ? all.filter((u) => (u as { status: unknown }).status === status) : all;
+      const data = table === "ops_stock_items" ? all.filter((u) => status.includes((u as { status: unknown }).status)) : all;
       return resolve({ data, error: null });
     };
     return chain;
@@ -156,6 +157,7 @@ describe("GET /api/operation/orders/register-facts", () => {
       loading: { hasDo: true, kind: "handed_over", at: "2026-10-02T03:00:00Z" },
       locations: ["Klang"],
       financeHold: { reason: "Refund under review" }, // the newest open one
+      lineSuppliers: {}, // its line carries no id
     });
     expect(body.facts[id(2)].owned).toMatchObject({
       pic: { userId: "33333333-3333-3333-3333-000000000002", name: null },
@@ -169,8 +171,77 @@ describe("GET /api/operation/orders/register-facts", () => {
     });
     expect(body.failed).toEqual({
       obligations: false, cases: false,
-      pic: false, purchasing: false, delivery: false, loading: false, location: false, finance: false,
+      pic: false, purchasing: false, delivery: false, loading: false, location: false, finance: false, suppliers: false,
     });
+  });
+
+  it("names each line's supplier by the line's own lineage: its PO, else its Unit's PO, else no PO yet — never the Catalog", async () => {
+    const lines = [
+      { id: "l-po", sku: "B1201S-K", qty: 1, unit_price: 100 },
+      { id: "l-cancelled", sku: "CODY-SK", qty: 1, unit_price: 100 },
+      { id: "l-unit", sku: "JAGER-SS", qty: 1, unit_price: 100 },
+      { id: "l-none", sku: "MEMORY-FOAM-PILLOW", qty: 2, unit_price: 10 },
+      { id: "l-hidden", sku: "TRION-Q", qty: 1, unit_price: 100 },
+      { id: "l-two", sku: "CODY-SK", qty: 2, unit_price: 100 },
+      { id: "l-dup", sku: "H1401F-K", qty: 1, unit_price: 100 },
+    ];
+    mockSb({
+      orders: [order(1, { order_lines: lines })],
+      po_line_sources: [
+        { id: "s1", order_id: id(1), po_id: "po-nf", po_line_id: "pl1", order_line_id: "l-po" },
+        { id: "s2", order_id: id(1), po_id: "po-x", po_line_id: "pl2", order_line_id: "l-cancelled" },
+        { id: "s3", order_id: id(1), po_id: "po-h", po_line_id: "pl3", order_line_id: "l-hidden" },
+        // One line on two suppliers' POs.
+        { id: "s4", order_id: id(1), po_id: "po-nf", po_line_id: "pl4", order_line_id: "l-two" },
+        { id: "s5", order_id: id(1), po_id: "po-oh", po_line_id: "pl5", order_line_id: "l-two" },
+        // SO-1340's shape: one qty-1 line on three open POs of one supplier — one name.
+        { id: "s6", order_id: id(1), po_id: "po-d1", po_line_id: "pl6", order_line_id: "l-dup" },
+        { id: "s7", order_id: id(1), po_id: "po-d2", po_line_id: "pl7", order_line_id: "l-dup" },
+        { id: "s8", order_id: id(1), po_id: "po-d3", po_line_id: "pl8", order_line_id: "l-dup" },
+      ],
+      purchase_orders: [
+        { id: "po-nf", do_number: null, supplier_id: "sup-nf", status: "open" },
+        { id: "po-x", do_number: null, supplier_id: "sup-oh", status: "cancelled" },
+        { id: "po-h", do_number: null, supplier_id: "sup-hidden", status: "open" },
+        { id: "po-unit", supplier_id: "sup-oh" },
+        { id: "po-oh", do_number: null, supplier_id: "sup-oh", status: "open" },
+        { id: "po-d1", do_number: null, supplier_id: "sup-nf", status: "open" },
+        { id: "po-d2", do_number: null, supplier_id: "sup-nf", status: "open" },
+        { id: "po-d3", do_number: null, supplier_id: "sup-nf", status: "received" },
+      ],
+      // A sold Unit still names its line; its supplier is its own PO's.
+      ops_stock_items: [{ ...unit(7, "sold", 1), reserved_order_line_id: "l-unit", po_line_id: "pl-unit" }],
+      purchase_order_lines: [{ id: "pl-unit", po_id: "po-unit" }],
+      // The Catalog knows the pillow's supplier; the list must not borrow it.
+      product_skus: [{ id: "c1", sku: "MEMORY-FOAM-PILLOW", supplier_id: "sup-catalog" }],
+      suppliers: [{ id: "sup-nf", name: "Nice Future" }, { id: "sup-oh", name: "Ohana" }, { id: "sup-catalog", name: "Catalog Supplier" }],
+    });
+    const res = await read();
+    const body = (await res.json()) as { facts: Record<string, { owned: { lineSuppliers: unknown } }>; failed: Record<string, boolean> };
+    expect(body.facts[id(1)].owned.lineSuppliers).toEqual({
+      "l-po": { from: "po", names: ["Nice Future"] },
+      "l-cancelled": { from: "none", names: [] }, // its only PO is cancelled
+      "l-unit": { from: "unit", names: ["Ohana"] },
+      "l-none": { from: "none", names: [] },
+      "l-hidden": { from: "po", names: [null] }, // a supplier this caller may not read
+      "l-two": { from: "po", names: ["Nice Future", "Ohana"] },
+      "l-dup": { from: "po", names: ["Nice Future"] }, // three POs, one supplier, a received one included
+    });
+    expect(body.failed.suppliers).toBe(false);
+  });
+
+  it("a failed supplier read is flagged, never printed as no PO", async () => {
+    mockSb(
+      {
+        orders: [order(1, { order_lines: [{ id: "l1", sku: "MS12", qty: 1, unit_price: 100 }] })],
+        po_line_sources: [{ id: "s1", order_id: id(1), po_id: "po1", po_line_id: "pl1", order_line_id: "l1" }],
+        purchase_orders: [{ id: "po1", do_number: null, supplier_id: "sup1", status: "open" }],
+      },
+      ["suppliers"],
+    );
+    const res = await read();
+    const body = (await res.json()) as { failed: Record<string, boolean> };
+    expect(body.failed.suppliers).toBe(true);
   });
 
   it("a failed owner read is flagged, so the screen says it could not read — never 'not recorded' or 'no hold'", async () => {

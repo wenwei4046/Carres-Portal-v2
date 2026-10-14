@@ -1,146 +1,83 @@
 /**
- * `/ui` — the showcase's ONE job is that it cannot go stale (card D0.5a).
- *
- * So these tests do not check that it looks right; they check that it still
- * shows everything the law says it must:
- *   · the FROZEN answers, because D0.5a's three questions are settled and a
- *     page still ASKING one is how a settled question gets re-opened;
- *   · every icon meaning, every tone, every spacing step and every z-layer, read
- *     from the same records the components read — adding one without showing it
- *     fails here;
- *   · the two forced hover/focus states, pinned to the components' own
- *     declarations, so a screenshot of a state is a screenshot of the REAL
- *     state and not a hand-painted lookalike;
- *   · every D0.5b box, since a Radix component that renders nowhere is a
- *     component the screenshot gate cannot see.
- *
- * NEGATIVE CONTROL: change `hover:brightness-125` in Button.tsx to
- * `hover:brightness-110` — only the mirror test goes red.
+ * `/ui` is the one Carres UI kit (UI MASTER, owner ruling 14 Oct 2026): every
+ * part on it is the component the pages import, with TEST data, and the earlier
+ * kit is gone from it. These tests pin what design checks against v12.
  */
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { ICON_NAMES } from "@/components/kit/Icon";
-import { Z_LADDER } from "@/components/kit/overlay-layer";
-import { SPACING_SCALE, TONES } from "@/components/kit/tokens";
+import { fireEvent, render as rtlRender, screen, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
 import UiShowcase from "./UiShowcase";
 
-const src = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
-const SHOWCASE = src("./UiShowcase.tsx");
-const BUTTON = src("../../components/kit/Button.tsx");
-const FIELD = src("../../components/kit/field-recipe.ts");
+/* As in the app: the Tasks button reads the tasks count through the query client. */
+const render = (ui: ReactElement) =>
+  rtlRender(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })}>{ui}</QueryClientProvider>);
 
-describe("/ui showcase", () => {
-  it("records all four frozen answers and asks nothing", () => {
+describe("/ui — the one Carres UI kit", () => {
+  it("shows the v12 kit parts and nothing of the earlier kit", () => {
     render(<UiShowcase />);
-    expect(screen.getByRole("heading", { name: "Frozen decisions" })).toBeInTheDocument();
-    expect(screen.getByText(/Candidate A — 8 steps/)).toBeInTheDocument();
-    expect(screen.getByText("Radix slate-3")).toBeInTheDocument();
-    expect(screen.getByText("Deleted into 600")).toBeInTheDocument();
-    expect(screen.getByText(/Lucide default — 2/)).toBeInTheDocument();
-    // The register is empty, so the page no longer poses a choice.
-    expect(screen.queryByRole("heading", { name: "Pending decisions" })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Candidate B/)).not.toBeInTheDocument();
-    expect(screen.queryByText("stroke 1.5")).not.toBeInTheDocument();
+    for (const id of ["table", "cells", "pills", "toolbar", "side-panel", "icons", "not-yet"]) {
+      expect(document.getElementById(id), id).toBeInTheDocument();
+    }
+    expect(screen.queryByRole("heading", { name: "Frozen decisions" })).not.toBeInTheDocument();
+    expect(document.querySelector('[data-kit="status-pill"]')).not.toBeInTheDocument();
   });
 
-  it("shows every step of the frozen spacing scale", () => {
+  it("the Carres Table is the marked table, with the preserved date's two-line header and the identifier fixed", () => {
     render(<UiShowcase />);
-    for (const s of SPACING_SCALE) expect(screen.getByText(`${s.px}px`), `${s.px}`).toBeInTheDocument();
+    const tables = document.querySelectorAll('[data-carres-table="list"]');
+    expect(tables).toHaveLength(2);
+    const table = within(tables[0] as HTMLElement);
+    /* the preserved request keeps its two lines, never ETA (owner 14 Oct 2026) */
+    expect(table.getByRole("columnheader", { name: "Customer’s original requested delivery" })).toHaveTextContent("Customer’s originalrequested delivery");
+    /* ▸ · ☐ · Proceed date · SO no. · … */
+    const firstHeader = table.getAllByRole("columnheader")[2]!;
+    expect(firstHeader).toHaveTextContent("Proceed date");
+    expect(firstHeader.className).not.toContain("sticky");
+    /* the identifier, SO No, stays (Layout Standard: ▸, tick and identifier stay fixed) */
+    expect(table.getAllByRole("columnheader")[3]!.className).toContain("sticky");
+    expect(table.getAllByRole("columnheader")[4]!.className).not.toContain("sticky");
+    expect(table.getByRole("button", { name: "Hide items" })).toHaveAttribute("aria-expanded", "true");
+    expect(within(document.querySelector('[data-carres-table="item-rows"]') as HTMLElement).getByText("TEST · Mattress model A")).toBeInTheDocument();
+    expect(table.getByRole("checkbox", { name: "Select SO-TEST-02" })).toBeChecked();
   });
 
-  it("shows the whole z-index ladder — five layers, and the page names no sixth", () => {
+  it("the footer reads one line of words, two lines at most, inside the card; the pager stays", () => {
     render(<UiShowcase />);
-    for (const l of Z_LADDER) expect(screen.getByText(`z-${l.z}`), `${l.z}`).toBeInTheDocument();
+    const section = document.querySelector('[data-carres-table="list"]') as HTMLElement;
+    expect(section.className).toContain("grid-cols-[minmax(0,1fr)]");
+    const words = section.querySelector(".line-clamp-2") as HTMLElement;
+    /* fix list 14 Oct, point 7: one space each side of every ·, the fixed order */
+    expect(words.textContent).toBe("3 orders · Qty: Mattress 23 · Pillow 10 · Bedframe 14 · Mattress protector 4 · Sofa 22 sets · Others 1");
+    expect(words.className).toContain("line-clamp-2");
+    expect(within(section).getByRole("button", { name: "Next page" })).toBeInTheDocument();
   });
 
-  it("renders every D0.5b box, including the ones that only exist when opened", () => {
+  it("keeps the three empty states apart in the cells", () => {
     render(<UiShowcase />);
-    // Closed by default — a modal that renders itself open would be a bug.
-    expect(document.querySelector('[data-kit="modal"]')).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open a modal" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open a drawer" })).toBeInTheDocument();
-    // On the page without a click.
-    expect(document.querySelectorAll('[data-kit="select"]').length).toBeGreaterThanOrEqual(3);
-    expect(document.querySelectorAll('[data-kit="checkbox"]').length).toBeGreaterThanOrEqual(4);
-    expect(document.querySelectorAll('[data-kit="date-picker"]').length).toBeGreaterThanOrEqual(3);
-    expect(document.querySelectorAll('[data-kit="tab"]').length).toBeGreaterThanOrEqual(5);
-    expect(document.querySelectorAll('[data-kit="toast"]').length).toBe(3);
+    const cells = document.getElementById("cells")!;
+    expect(within(cells).getByText("Not recorded")).toBeInTheDocument();
+    expect(within(cells).getByText("Could not read")).toBeInTheDocument();
+    /* the sample's name and the cell itself */
+    expect(within(cells).getAllByText("No access")).toHaveLength(2);
   });
 
-  it("renders the three shells, and the calm record shows NO issues block", () => {
+  it("the side panel hides and comes back from the toolbar", () => {
     render(<UiShowcase />);
-    expect(document.querySelector('[data-kit="page-shell"]')).toBeInTheDocument();
-    expect(document.querySelector('[data-kit="data-table"]')).toBeInTheDocument();
-    // Two DetailShells side by side: one calm, one blocked.
-    expect(document.querySelectorAll('[data-kit="detail-shell"]')).toHaveLength(2);
-    expect(document.querySelectorAll('[data-kit="detail-current-action"]')).toHaveLength(2);
-    // …and exactly ONE issues container between them — the calm one draws none.
-    expect(document.querySelectorAll('[data-kit="detail-current-issues"]')).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Hide summary" }));
+    expect(screen.queryByRole("complementary", { name: "Summary" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "Summary" })[0]!);
+    expect(screen.getByRole("complementary", { name: "Summary" })).toBeInTheDocument();
   });
 
-  it("opens the modal it offers, and closes it again", () => {
+  it("the toolbar's chips clear and its ⋮ opens the menu", () => {
     render(<UiShowcase />);
-    fireEvent.click(screen.getByRole("button", { name: "Open a modal" }));
-    expect(screen.getByRole("dialog")).toHaveAccessibleName("Record the delay decision");
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  });
-
-  it("shows every icon meaning the kit has", () => {
-    render(<UiShowcase />);
-    const shown = new Set(
-      Array.from(document.querySelectorAll("[data-icon]")).map((n) => n.getAttribute("data-icon")),
-    );
-    for (const name of ICON_NAMES) expect(shown.has(name), name).toBe(true);
-  });
-
-  it("shows every tone", () => {
-    render(<UiShowcase />);
-    const shown = new Set(
-      Array.from(document.querySelectorAll('[data-kit="status-pill"]')).map((n) =>
-        n.getAttribute("data-tone"),
-      ),
-    );
-    for (const tone of TONES) expect(shown.has(tone), tone).toBe(true);
-  });
-
-  it("renders each component in its ugly states, not only its happy one", () => {
-    render(<UiShowcase />);
-    expect(screen.getAllByRole("alert").length).toBeGreaterThanOrEqual(2); // input + textarea errors
-    expect(document.querySelectorAll("button[disabled]").length).toBeGreaterThanOrEqual(2);
-    expect(document.querySelectorAll('[data-testid="kit-loading-skeleton"]').length).toBe(1);
-    expect(document.querySelectorAll('[data-testid="kit-loading-spinner"]').length).toBeGreaterThanOrEqual(4);
-  });
-
-  it("forces the SAME hover and focus the components declare", () => {
-    // Button's own declarations…
-    // The primary is CHARCOAL since 2026-10-08 (Layout Standard §4.1) and
-    // lightens on hover; the neutral one takes the info tint.
-    expect(BUTTON).toContain("hover:brightness-125");
-    expect(BUTTON).toContain("hover:bg-c-info-bg");
-    // GREY, not blue (Loo, 2026-08-03): hover says "the mouse is here" and is
-    // true for one second, so it may not spend the accent. This mirror is what
-    // stops the component and the showcase drifting apart again.
-    expect(BUTTON).toContain("hover:bg-kit-slate-3");
-    expect(BUTTON).not.toContain("hover:bg-kit-blue-3");
-    expect(BUTTON).toContain("focus-visible:ring-2");
-    expect(BUTTON).toContain("focus-visible:ring-kit-blue-9");
-    expect(BUTTON).toContain("focus-visible:ring-offset-1");
-    // The field focus is the v4 Appearance outline (01 §3 · §9), not a ring.
-    expect(FIELD).toContain("focus:[outline:var(--c-focus)]");
-    expect(FIELD).not.toContain("focus:ring-kit-blue-9");
-    // …and the showcase's forced mirrors of them.
-    expect(SHOWCASE).toContain("[&>button]:brightness-125");
-    expect(SHOWCASE).toContain("[&>button]:bg-c-info-bg");
-    expect(SHOWCASE).toContain("[&>button]:ring-2");
-    expect(SHOWCASE).toContain("[&>button]:ring-kit-blue-9");
-    expect(SHOWCASE).toContain("[&>button]:ring-offset-1");
-    // OWED: `UiShowcase.tsx` still forces the retired field ring below; its v4
-    // mirror (`[&_input]:[outline:var(--c-focus)]`) moves with that file.
-    expect(SHOWCASE).toContain("[&_input]:ring-2");
-    expect(SHOWCASE).toContain("[&_input]:ring-kit-blue-9");
-    expect(SHOWCASE).toContain("[&_input]:border-kit-blue-9");
+    const toolbar = document.getElementById("toolbar")!;
+    fireEvent.click(within(toolbar).getByRole("button", { name: "Payment: Owes ×" }));
+    expect(within(toolbar).queryByRole("button", { name: "Payment: Owes ×" })).not.toBeInTheDocument();
+    expect(within(toolbar).getByRole("tablist", { name: "Views" })).toBeInTheDocument();
+    expect(within(toolbar).getByRole("button", { name: "More actions" })).toBeInTheDocument();
+    /* the view button names the view (v12 Shell) */
+    expect(within(toolbar).getByRole("button", { name: "View: Sales Order" })).toHaveTextContent("Sales Order");
   });
 });

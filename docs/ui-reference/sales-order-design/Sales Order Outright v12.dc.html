@@ -264,7 +264,7 @@ const C = {
   problems: ['Problems', '120px', () => ({ t: NR, fg: '#6B7280' })],
   channel: ['Sales location', '160px', o => o.salesLoc ? { t: o.salesLoc, sub: o.salesperson || '' } : { t: NR, fg: '#6B7280' }],
   dloc: ['Delivery location', 'minmax(170px,1fr)', o => { const p = String(o.loc).split(',').map(x => x.trim()).filter(Boolean); const ar0 = areaOf(o.loc); const a = p.length > 1 ? p.slice(0, -1).join(', ') : p[0]; let b = p.length > 1 ? p[p.length - 1] : (ar0.out ? ar0.state : ''); if (b && b.toLowerCase() === String(a).toLowerCase()) b = ''; return { t: a, sub: b, tagEnd: true, tag: ar0.out ? 'Outstation' : '', tagTip: ar0.out ? 'Outside the Klang Valley · ' + ar0.state : '' }; }, true],
-  reqDate: ['ETA', '140px', o => { const d = YMD(o.eta); if (!d) return DC(null); const n = dLeft(d); return { t: f1(d), sub: WD[d.getDay()] + (n < 0 ? ' · passed' : ''), subFg: n < 0 ? '#7A5A00' : '#6B7280' }; }],
+  reqDate: ['Customer’s original|requested delivery', '140px', o => { const d = YMD(o.eta); if (!d) return DC(null); return { t: f1(d), sub: WD[d.getDay()], subFg: '#6B7280' }; }], /* Jess 14 Oct: the preserved request keeps its two-line header, never ETA; no today-based word on it (COPY "SO requested-date header"). The sample field o.eta stands in for the date. */
   po: ['PO no.', '150px', o => o.po.length ? { t: o.po[0], fw: '500', sub: o.po.length > 1 ? '+ ' + (o.po.length - 1) + ' more' : '' } : { t: NR, fg: '#6B7280' }],
   eta: ['Supplier ETA', '120px', () => ({ t: NR, fg: '#6B7280' })],
   sdo: ['Supplier DO', '130px', () => ({ t: NR, fg: '#6B7280' })],
@@ -303,7 +303,7 @@ class Component extends DCLogic {
     const base = R.filter(vf);
     const list = base.filter(o => Object.entries(S.f).every(([k, v]) => val(o, k) === v)).sort((a, b) => (YMD(a.eta) || 0) - (YMD(b.eta) || 0));
     const cols = keys.map(k => { const can = !!C[k][3]; const opts = can ? [...new Set(base.map(o => val(o, k)))].map(v => ({ l: v, n: String(base.filter(o => val(o, k) === v).length), on: S.f[k] === v, pick: () => { const f = { ...S.f }; if (f[k] === v) delete f[k]; else f[k] = v; set({ f }); } })) : [];
-      const px = parseInt(C[k][1], 10); return { l: C[k][0], w: px >= 150 ? 'minmax(' + Math.round(px * 0.75) + 'px,1fr)' : C[k][1], al: R[0] && C[k][2](R[0]).al === 'right' ? 'right' : undefined, opts, on: S.f[k] != null }; });
+      const px = parseInt(C[k][1], 10); return { l: String(C[k][0]).split('|')[0], l2: String(C[k][0]).split('|')[1] || undefined, w: px >= 150 ? 'minmax(' + Math.round(px * 0.75) + 'px,1fr)' : C[k][1], al: R[0] && C[k][2](R[0]).al === 'right' ? 'right' : undefined, opts, on: S.f[k] != null }; });
     const open = so => () => { set({ det: so, dTab: 'so' }); try { history.replaceState(null, '', '#so=' + encodeURIComponent(so)); } catch (e) {} };
     const rows = list.map(o => ({ id: o.so, open: open(o.so), cells: keys.map(k => C[k][2](o)),
       items: o.items.map(i => [{ t: i.model, sub: i.spec, span: 3 }, { t: i.cat === 'Sofa' ? i.qty + (i.qty === 1 ? ' set' : ' sets') : pcsTxt(i.qty) }, i.stock ? { t: 'Warehouse stock', fg: '#6B7280' } : i.sup ? { t: SHORT(i.sup) } : { t: NR, fg: '#6B7280' }]) }));
@@ -445,13 +445,13 @@ class Component extends DCLogic {
       hasFilter: Object.keys(S.f || {}).length > 0, isDet: !!o, isList: !o, back: () => { set({ det: null }); try { history.replaceState(null, '', location.pathname); } catch (e) {} }, dv, amOn: !!A, am,
       summary, showing: ({ open: 'open orders', done: 'delivered orders', all: 'all orders' })[S.view] + ' · ' + ordN(list.length),
       tabs: VIEWS.map(([k, l]) => ({ l, on: S.view === k, click: () => set({ view: k, f: {} }) })),
-      chips: Object.entries(S.f).map(([k, v]) => ({ l: C[k][0] + ': ' + v, x: () => { const f = { ...S.f }; delete f[k]; set({ f }); } })),
+      chips: Object.entries(S.f).map(([k, v]) => ({ l: String(C[k][0]).replace('|', ' ') + ': ' + v, x: () => { const f = { ...S.f }; delete f[k]; set({ f }); } })),
       views: LAYOUTS.map(([k, l, ic]) => ({ l, ic, on: S.layout === k, pick: () => set({ layout: k, f: {} }) })), viewName: LY[1],
       more: [{ h: 'EXPORT', items: [{ l: 'Download Excel', ic: 'table_view', k: '.xlsx' }, { l: 'Download PDF', ic: 'picture_as_pdf' }] }, { h: 'VIEW', items: [{ l: 'Save as my view', ic: 'bookmark_add' }] }, { h: 'DATA', items: [{ l: 'Sync from Sales Portal now', ic: 'sync', k: 'Last sync not recorded' }] }],
       selBar: selL.length ? { n: selL.length + ' selected', sum: '· ' + pcsTxt(selL.reduce((a, x) => a + pcsOf(x), 0)), acts: [{ l: 'Export', ic: 'download' }, { l: 'Print SO', ic: 'print' }], clear: () => set({ sel: {} }) } : null,
       tasks, cols, rows, sel: S.sel, onSel: s => set({ sel: s }), onClear: () => set({ f: {} }),
       subHeads: ['Item', '', '', 'Qty', 'Supplier'], subCols: 'minmax(150px,1fr) 76px 48px 104px',
-      footer: ordN(list.length), footerSum: '· Qty: ' + (Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([k, q]) => k + ' ' + (k === 'Sofa' ? q + (q === 1 ? ' set' : ' sets') : q)).join(' · ') || 'none'),
+      footer: ordN(list.length), footerSum: '· Qty: ' + (['Mattress', 'Pillow', 'Bedframe', 'Mattress protector', 'Sofa', 'Service', 'Others'].filter(k => cnt[k]).map(k => [k, cnt[k]]).concat(Object.entries(cnt).filter(([k]) => !['Mattress', 'Pillow', 'Bedframe', 'Mattress protector', 'Sofa', 'Service', 'Others'].includes(k))).map(([k, q]) => k + ' ' + (k === 'Sofa' ? q + (q === 1 ? ' set' : ' sets') : q)).join(' · ') || 'none'),
       emptyT: S.view === 'done' ? 'No delivered orders recorded.' : 'No orders match.',
     };
   }

@@ -1,10 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { OutrightOrderFacts } from "@carres/shared";
 import type { PaymentMonitorRow } from "@carres/shared/payment-monitor";
 import { ApiError } from "@/lib/api";
 import type { RegisterRow } from "../sales-order-columns";
-import { COLUMNS, LAYOUTS, timeWords, type CellContext, type OwnedRead, type PayByRead } from "./outright-columns";
+import { COLUMNS, LAYOUTS, supplierCell, timeWords, type CellContext, type OwnedRead, type PayByRead } from "./outright-columns";
 import { readStateOf } from "./pay-by";
+
+/* The year rule and `passed` read today: pin it (COPY "THE YEAR RULE"). */
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-14T04:00:00Z"));
+});
+afterAll(() => vi.useRealTimers());
 
 const row = (over: Partial<RegisterRow["o"]> = {}) =>
   ({
@@ -43,7 +50,7 @@ describe("Outright list cells read each owner and keep three states apart", () =
     expect(t("grnNo", ctx).t).toBe("GRN-11");
     expect(t("logi", ctx).t).toBe("NETS");
     expect(t("appt", ctx)).toMatchObject({ t: "Scheduled", sub: "2 PM to 5 PM" });
-    expect(t("delivery", ctx)).toMatchObject({ t: "20 Oct 26", sub: "Tue" });
+    expect(t("delivery", ctx)).toMatchObject({ t: "20 Oct", sub: "Tue" });
     expect(t("load", ctx).t).toBe("Handed over");
     expect(t("loc", ctx).t).toBe("Carres Klang");
     expect(t("hold", ctx).t).toBe("No Finance hold");
@@ -95,7 +102,7 @@ describe("Outright list cells read each owner and keep three states apart", () =
 
   it("Pay by is Payments' own deadline, and an unread clock is never 'no deadline'", () => {
     const monitorRow = { timing: { dueIso: "2026-10-16", late: false, fact: "Payment due Fri, 16 Oct" } } as unknown as PaymentMonitorRow;
-    expect(t("payDue", ctxOf(ok(facts()), { state: "ok", row: monitorRow })).t).toBe("16 Oct 26");
+    expect(t("payDue", ctxOf(ok(facts()), { state: "ok", row: monitorRow })).t).toBe("16 Oct");
     expect(t("payDue", ctxOf(ok(facts()), { state: "ok", row: null })).t).toBe("Not recorded");
     expect(t("payDue", ctxOf(ok(facts()), { state: "failed" })).t).toBe("Could not read");
     expect(t("payDue", ctxOf(ok(facts()), { state: "denied" })).t).toBe("No access");
@@ -127,18 +134,64 @@ describe("readStateOf", () => {
 });
 
 describe("Sales Order view headers (fix list 14 Oct 2026)", () => {
-  it("prints the dictionary words, in v12 order", () => {
+  it("prints the v12 words, sentence case, and the preserved date's own two-line header (owner 14 Oct)", () => {
     const so = LAYOUTS.find((l) => l.key === "so")!;
     expect(so.columns.map((k) => COLUMNS[k]!.label)).toEqual([
-      "Proceed Date", "SO No", "Items", "Sales Location", "Delivery Location", "Customer’s original requested delivery",
+      "Proceed date", "SO no.", "Items", "Sales location", "Delivery location", "Customer’s original requested delivery",
     ]);
   });
 
-  it("splits the long header on two lines and keeps the widths", () => {
+  it("splits the preserved date's header on two lines, never ETA, and uses the v12 widths", () => {
     expect(COLUMNS.reqDate!.head).toEqual(["Customer’s original", "requested delivery"]);
     const so = LAYOUTS.find((l) => l.key === "so")!;
     expect(so.columns.map((k) => COLUMNS[k]!.width)).toEqual([
-      "100px", "minmax(118px,1fr)", "84px", "minmax(100px,.9fr)", "minmax(100px,.9fr)", "112px",
+      "120px", "minmax(150px,1fr)", "120px", "minmax(120px,1fr)", "minmax(170px,1fr)", "140px",
     ]);
+  });
+});
+
+describe("The preserved requested date and the year rule (fix list 14 Oct 2026, point 2; owner 14 Oct)", () => {
+  const eta = (customerDelivery: string | null, over: Partial<RegisterRow["o"]> = {}) =>
+    COLUMNS.reqDate!.cell({ ...row(over), customerDelivery } as RegisterRow, ctxOf({ state: "loading" }));
+
+  it("prints no year in this year, and the year in another", () => {
+    expect(eta("2026-10-19")).toMatchObject({ t: "19 Oct", sub: "Mon" });
+    expect(eta("2027-01-03")).toMatchObject({ t: "3 Jan 27", sub: "Sun" });
+  });
+
+  it("prints no today-based word on the preserved request (COPY: never a today-based countdown)", () => {
+    expect(eta("2026-10-10")).toMatchObject({ t: "10 Oct", sub: "Sat" });
+    expect(eta("2026-10-10").subTone).toBe("muted");
+  });
+});
+
+describe("The item row's Supplier (owner 14 Oct 2026: source-owned records only, never the Catalog)", () => {
+  const withLines = (lineSuppliers: OutrightOrderFacts["lineSuppliers"]): OwnedRead => ({ state: "ok", facts: facts({ lineSuppliers }), cases: "none", failed: {} });
+  const cell = (read: OwnedRead, lineId = "l1") => supplierCell(row(), ctxOf(read), lineId);
+
+  it("names the PO's supplier, or the Unit's PO's supplier", () => {
+    expect(cell(withLines({ l1: { from: "po", names: ["Nice Future"] } }))).toMatchObject({ t: "Nice Future" });
+    expect(cell(withLines({ l1: { from: "unit", names: ["Ohana"] } }))).toMatchObject({ t: "Ohana" });
+  });
+
+  it("says Not recorded when the line's lineage was read and holds no supplier — never a purchase or stock word", () => {
+    expect(cell(withLines({ l1: { from: "none", names: [] } }))).toMatchObject({ t: "Not recorded", fg: "muted" });
+    expect(cell(withLines({ l1: { from: "none", names: [] } })).t).not.toMatch(/PO|stock/i);
+  });
+
+  it("names every supplier when POs from two suppliers source one line", () => {
+    expect(cell(withLines({ l1: { from: "po", names: ["Nice Future", "Ohana"] } }))).toMatchObject({ t: "Nice Future, Ohana" });
+  });
+
+  it("never prints Not recorded for a read that did not happen", () => {
+    expect(cell(withLines(undefined)).t).toBe("Could not read"); // a server that does not read it yet
+    expect(cell({ state: "ok", facts: facts(), cases: "none", failed: { suppliers: true } }).t).toBe("Could not read");
+    expect(cell({ state: "failed" }).t).toBe("Could not read");
+    expect(cell({ state: "loading" }).t).toBe("Loading");
+    expect(cell({ state: "denied" }).t).toBe("No access");
+  });
+
+  it("a supplier this person may not read is No access", () => {
+    expect(cell(withLines({ l1: { from: "po", names: [null] } })).t).toBe("No access");
   });
 });
