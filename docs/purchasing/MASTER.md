@@ -998,7 +998,7 @@ KEEP §5.1's one source-line demand calculation. ADAPT a transparent readout wit
 Recommended acceptance / PROPOSAL where extending the reader: open a shortage to its exact SO/MPR source and coverage contributors; show why a line cannot be bought; recheck demand, approved supplier/configuration and existing coverage at governed issue. Refreshing or regenerating a view completes no purchase, changes no allocation/custody and creates no duplicate PO. A changed source invalidates the old preview rather than issuing yesterday's shortage. Reference calculation, allocation and persistence remain unverified; do not introduce a new editable MRP ledger, independent demand page or warehouse-rebinding shortcut.
 
 **Forecast Purchase approval and issuance — OWNER-APPROVED, Jess 2026-10-14 (A) · BUILT · DEPLOYED
-14 Oct 2026 (`7e9d3d147`, §9.14; signed-in production walk owed).** Jess approves Forecast Purchase; after her persisted approval, PO Duty
+14 Oct 2026 (`7e9d3d147`, §9.14; signed-in production walk 14 Oct 2026).** Jess approves Forecast Purchase; after her persisted approval, PO Duty
 issues the PO and sends it to the supplier. Approval and issuance/sending are separate actions
 and retain their own actual actor/time/version evidence. Do not implement a combined approver
 “approve + issue PO” click or permit PO Duty to bypass approval within Suggested quantity.
@@ -8016,7 +8016,7 @@ credit and payment remain distinct owning facts. No sale-notice matching interfa
   cross-module contract are required before `PLAN MISSION COMPLETE`. No application implementation,
   Card, production migration or rendered UI acceptance is claimed by this synthesis.
 
-### 9.14 Forecast Purchase · Outright — design handoff 13 Oct 2026 · approval ruling 14 Oct 2026 (A) · BUILT · 0695 APPLIED · DEPLOYED 14 Oct 2026 (`7e9d3d147`) · signed-in production walk owed
+### 9.14 Forecast Purchase · Outright — design handoff 13 Oct 2026 · approval ruling 14 Oct 2026 (A) · BUILT · 0695 APPLIED · DEPLOYED 14 Oct 2026 (`7e9d3d147`) · signed-in production walk 14 Oct 2026
 
 **What has authority here, line by line.** Three different things are in this section and they are
 kept apart (FACT · RULING · PROPOSAL):
@@ -8167,8 +8167,11 @@ evidence is not production evidence.
 | Deployed | Deploy run `38503892663` succeeded; `scripts/verify-production.mjs` with `EXPECTED_SHA=7e9d3d147…` converged on all five surfaces (both Pages projects, both canonical hosts, the API health) |
 | The served portal is this build | The served bundle `index-DO1TvWpZ.js` holds the menu entry, the submit path `/api/operation/purchase/forecast/requests` and `Send for approval` |
 | The doors are closed without sign-in | `GET /api/operation/purchase/forecast` and `POST …/requests` answer 401 |
-| The database side answers a real person | On production, as a real Operation person, the three readers answer: nothing in progress, no mark, an unused key answers nothing. The table holds no row |
-| **Signed-in page walk** | **OWED.** Nobody has opened the page on production while signed in. It needs a person's own sign-in; the chat may not type a password |
+| The database side answers a real person | On production, as a real Operation person, the three readers answer: nothing in progress, no mark, an unused key answers nothing. The table holds no row. Every read the page makes answers that person under production's own row rules: 18 models and 53 sizes in scope, every size with a supplier, 11 suppliers, 113 orders with 227 lines, 179 free new Units, 42 PO stock rows, one default `Supplier Deliver To` among 5 active, `Purchasing Approver` and `PO Duty` each resolving to a person |
+| Still the page after the next deploy | Production moved to `d4e3bd107` (another lane's Finance merge): five surfaces converged again, the served bundle still holds the menu entry, the submit path and `Send for approval`, both doors still 401 without sign-in |
+| **Signed-in page walk, 14 Oct 2026** | Signed in on `erp.carresofficial.com` (Operation), opened from the menu. The page reads the real TEST rows: 7 models; the Summary shows this Monday 0 pcs, next Monday 1 pc (B1201S King), the Monday after 0. `All` 7 models, `Suggested` empty with its sentence, `Ordered` 4 of 7 (B1201S Queen reads `On PO · 2 pcs`). A model opens to its sizes; every size tick is greyed with `Enough stock · nothing to buy`; the header tick selects nothing. `carres-check.js` (from the public repo at `c602fbd6c`, SHA-256 checked) answers PASS at 1440, 1164 and 1025 loaded at that width, and on every tab; no sideways scroll |
+| **Defect found on the walk, fixed** | With a model open, a narrower window (1440 to 1164) or a panel opened afterwards made the list scroll sideways inside its card (table 948 in a 662 card) until the model was closed: a size line copied its model's column widths as fixed pixels. Fixed in #2058 (the line copies them as shares that may shrink); kit case `an open model follows the list when it gets narrower` fails without the fix (276 px) and passes with it. The SO Batch list was checked the same way on production and is not affected |
+| Submit door under load | On a fresh replay of every migration: 12 people pressing at once, 25 rounds: exactly one request each round, every other press refused `forecast_in_progress_changed`, no other error |
 | **`Send for approval` → approve → issue on production** | **NOT PROVEN LIVE and not possible today.** With the TEST rows in the database, 8 sizes sold inside the three months, 1 in the last 14 days and **no size has a suggestion**, so nothing can be ticked. The chain is proven on the replay only. Manufacturing sales to make a suggestion, or issuing a PO to a supplier to prove the door, is not authorised |
 
 **REMAINING GAPS.**
