@@ -695,9 +695,15 @@ list behind it is narrower than its columns' minimums, so the table scrolls side
 first column fixed (01 §5), as the package's own page does; the kit lists' scroller carries `data-list-scroll`, the
 mark the package's check reads, and `e2e-kit/kit-lists.spec.ts` still measures that each list FITS wherever it must.
 
-**Not built, waiting for the owner:** `+ Task` (a task a person adds by hand and may give to another person conflicts
-with ACTION-FLOW-STANDARD "Staff never create an action"; asked 13 Oct 2026) and with it `@` notes and `Mention`, which
-need the same new records. `Undo` for 15 minutes with `Correct` after it (the package's Ops Rules §8) reverses stock
+**`+ Task` (owner 2026-10-14): BUILT 14 Oct 2026; deployment and the signed-in production check owed.** `Task` with the
+plus icon in the Tasks panel's 36 title row and `New task` on the Workspace toolbar open ONE dialog built from the kit
+(`Modal`, `Input`, `Textarea`, `Select`, `DatePicker`): `Task name` · `Description (optional)` · `For` · `Due date`, then
+`Cancel` · `Add task`. The first field takes the focus, a refusal is said under the field it is about, and the dark toast
+says `Task added · for {name}`. An internal task opens as the one task view with `Steps` and `History` only and one act,
+`Mark done` (Workspace MASTER "Employee-created internal tasks"; COPY "The internal task words"). Measured in
+`e2e-kit/kit-tasks.spec.ts` and `kit-workspace.spec.ts` at 1025, 1164 and 1440. **Not built:** `@` notes and `Mention`
+(the Portal has no per-person notification record), the package's `Time` and `Linked to` fields (an internal task links
+to no other module's record) and `Add another task` on the toast. `Undo` for 15 minutes with `Correct` after it (the package's Ops Rules §8) reverses stock
 moves, tasks and approvals across modules and is a plan of its own, not a toast change.
 
 **Current supplied shell target — owner 9 Oct 2026, kept in v12 of 11 Oct.** Task card and open-card composition: 03 §8. A collapsible Tasks region (01 §4)

@@ -70,6 +70,74 @@ and results remain Service-owned. Conversation discovery inside Workspace is a s
 recommendation awaiting owner/shared-UI consolidation, not approval of another page or task engine.
 No enquiry projection, connected message history or rollout is claimed by this pointer.
 
+### Employee-created internal tasks · OWNER-APPROVED, Jess 2026-10-14 · BUILT 14 Oct 2026, 0694 APPLIED 14 Oct 2026 · deployment and the signed-in production check owed
+
+**RULING (Jess, 2026-10-14).** Employees may add an internal temporary task and assign it to
+another employee through `+ Task`; example: Shasha asks Sara to obtain Ohana product photographs
+tomorrow, which appears in Sara's Tasks. This is internal work, not a replacement for
+system-generated purchasing, receipt or delivery actions. Completing a manual task does not approve
+an MPR, issue/send a PO, post receipt or complete a customer delivery; those close only through
+their owning module facts. Assignment grants no approval or operational permission. Preserve
+creator, assignee, due date, actual completion actor/time and history. Use the existing shared
+Tasks surface; no second task inbox, roster or module writer is authorised.
+
+**How this stands beside §2 and ACTION-FLOW-STANDARD.** The law that the Portal raises every
+business action and that Work has no manual `Done` is unchanged for every module's work. An
+internal task is the one thing a person adds by hand. Its owning module is Workspace and its
+completion fact is its own record: someone pressed `Mark done`. No rule raises it, it stands for no
+other module's obligation, and it closes none.
+
+**BUILT (FACT, 14 Oct 2026).**
+
+- **Record.** `internal_tasks` and `internal_task_events` (0694): title, optional description,
+  created_by, assigned_to, due_on, done_at with done_by; history `added` and `done`, each with its
+  actor and time. Read for Operation and Principal only, no client write, four definer doors
+  (`internal_task_add` · `internal_task_mark_done` · `internal_tasks_open` · `internal_task_read`).
+- **Rules in the door.** The creator is the signed-in Operation or Principal account, never a
+  value sent by the screen. The assignee is an active Operation or Principal account. The due date
+  is today or later and an Office working day by the stored Office calendar. One request makes one
+  task, so a retry after a lost answer is the same task.
+- **Who finishes it.** Any Operation or Principal account may press `Mark done` (§3: being
+  assigned is accountability, never an execution restriction). The person who pressed is the
+  recorded actor. A second press changes nothing.
+- **One Work read.** An open task is a Work occurrence of the module `workspace`
+  (`workspace:{task}:internal_task`), owned by its assignee and due on its date. `Done` is written
+  once through the 0584 ledger's existing completion door, so the Tasks panel and the Workspace
+  page read the same `Done`. It names no party, so `Record as sent` and `Waiting` do not apply.
+- **Screens.** `+ Task` in the Tasks panel's title row and `New task` on the Workspace toolbar open
+  one dialog: `Task name` · `Description (optional)` · `For` · `Due date`. The task is a card in its
+  assignee's Tasks and a row of the `Staff tasks` module on the Workspace page (`Team Work` shows
+  everyone's). Opened, it is the one task view with `Steps` and `History` only, because it serves
+  no order and holds no document, and with one act, `Mark done`.
+- **An open tab does not break.** A page loaded before this build is given the six sources it
+  knows; this build asks the feed with `?include=workspace`.
+
+**Boundaries held in code, each pinned by a test.** The dialog sends five facts and the API refuses
+any other field. The routes call the task's own doors and the Work ledger's completion door and
+nothing else; no route takes an order, PO, receipt or delivery id. Roles outside Operation and
+Principal are refused by the API and again by the doors.
+
+**0694 APPLIED 2026-10-14 through the governed path.** Numbered from the MAX across the tracker
+(0693), main (0693) and every branch (none higher at the time; Purchasing then took 0695). A
+rolled-back production probe first (`probe_0694_rolled_back_do_not_track`: add, a repeated request
+returns the same task, four refusals, `Mark done` records its actor, a second press keeps the first
+actor, a client write is refused, an outside account reads 0 rows, an outside and a signed-out
+caller are refused at every door; re-read afterwards: nothing persisted), then the exact file.
+Tracker name = the file's basename, `md5(statements[1])` = the file's md5
+`87602bb5feda62d9c6222686d8baeaf7`, all five function bodies reconciled against `git show HEAD`.
+
+**NOT BUILT.** A time of day · a link to a Sales Order or PO · reassign · cancel or edit after
+adding · a bell note to the assignee (the Portal has no per-person notification record) · `@` notes
+· `Undo` · a view of the tasks I added for others (`Team Work` shows them) · the count of working
+days late (no Work projection passes a calendar yet, so a late task says `passed`).
+
+**Named gap: the older `ops_tasks` (0162).** The order follow-up board (`FollowUpForm`,
+`/api/ops/tasks`, the bell's escalated group) is a second, older hand-made task record. Measured
+14 Oct 2026: 13 open rows, 12 with no assignee and tied to an order, no completion actor, no
+history. It is not part of the Work read and this build left it untouched. RECOMMENDATION
+(PROPOSAL / NOT LAW): retire its doors into Work rules or internal tasks so one hand-made task
+record remains. Falsifier: a screen in daily use that only `ops_tasks` can serve.
+
 ## 2 · Action admission contract
 
 An action enters Work only when its owning module supplies:
@@ -90,7 +158,10 @@ An action enters Work only when its owning module supplies:
 | Next, when one exists | Governed consequence, not a Workspace promise; absence does not block admission |
 
 Workspace reads projections and opens the owning write door. It never copies the business record,
-assigns routine work independently, changes its due date or closes it.
+assigns routine work independently, changes its due date or closes it. The one task a person adds
+by hand is the internal task (§1 "Employee-created internal tasks"): Workspace owns that record, so
+its `Mark done` is the owning module's own completion fact, never a manual `Done` over another
+module's work.
 
 ## 3 · Assignment and actual work
 
@@ -1109,7 +1180,8 @@ never broadens permission scope and never searches a separately cached copy. Col
 filter as on every shared list (UI MASTER §6.2). Zero matches is not the same as zero work.
 
 The module list holds only currently admitted projections: `Sales Orders` · `Purchasing` ·
-`Warehouse` (Receiving's work) · `Delivery` · `Payment` · `Issue Tracker`. `Service Case`,
+`Warehouse` (Receiving's work) · `Delivery` · `Payment` · `Issue Tracker` · `Staff tasks` (internal
+tasks, §1). `Service Case`,
 `Warehouse Outbound` and `Claims` do not appear until their admission gates and live projection
 close.
 
@@ -1501,7 +1573,7 @@ still `open_module` in the feed and are chosen by the task panel from the rule k
 | Not built | Why |
 |---|---|
 | A person as a scope, `Take over`, a reassign | §§3 and 5 allow no manual take or reassign and no per-person tab. An approval request is a Work occurrence owned by the person holding the approver Duty (§§3–4), so it arrives in that holder's `My Task` |
-| `+ New task` and `@` notes | Waiting for the owner: a task a person adds by hand conflicts with ACTION-FLOW-STANDARD ("Staff never create an action") |
+| `@` notes and a bell note for a new internal task | The Portal has no per-person notification record. `+ Task` itself is built: §1 "Employee-created internal tasks" |
 | `Board` and `Calendar` views | Not in the brief's point 3 |
 | The act that records an answer which does not finish the task | No word is approved for it. `POST /api/operation/work/:occurrenceId/reply-received` exists and has no screen. Today a waiting task returns to `To do` when the owning module's fact changes it or when its answer day passes |
 | A way to narrow to blocked work or a failed source, an owner choice in the address | §5.3 |

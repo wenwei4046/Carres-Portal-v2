@@ -5086,6 +5086,24 @@ party); this section holds the panel's frame and the card rows.
 | Toast after a task is saved | the owning module's own success words · `Next: {party}` when another task of the same kind waits · `Close message` | `Undo` · `Saved` with nothing after it · a green line in the panel |
 | Failure | `Tasks could not be refreshed` · `Last updated {time}` · `Could not refresh {source}` · `Try again` | a silent empty list |
 
+## The internal task words · owner 2026-10-14 (Workspace MASTER "Employee-created internal tasks") · BUILT 14 Oct 2026; deployment and the signed-in production check owed
+
+A task one employee adds for another with `+ Task`. It is internal work: it replaces no task the Portal raises by
+itself, `Mark done` closes this task only, and being given one grants no permission. The words below are the only ones
+it prints; the dialog's field words come from the owner's kit (`Carres Shell.dc.html`, "New task").
+
+| Where | Use exactly | Do not use |
+|---|---|---|
+| The button | `Task` with the plus icon in the Tasks panel's title row · `New task` on the Workspace toolbar · both named `New task` for a screen reader · hint `Add a task for you or a colleague` | `Add` or `New` alone · `Create task` · `Assign task` |
+| The dialog | title `New task` · fields `Task name` · `Description (optional)` · `For` (the signed-in person reads `Me`) · `Due date` · buttons `Cancel` · `Add task` · placeholders `What must be done` · `What they need to know: who to call, what to check, what to send back` | `Assignee` · `Assign to` · `Owner` · `Deadline` as the field word (`Deadline` is the card's row) · `Submit` · `Save` · `Time` · `Linked to` |
+| A refusal, under its field | `Task name is required.` · `Task name is too long. Use 160 characters or fewer.` · `Description is too long. Use 2,000 characters or fewer.` · `Choose a due date.` · `This date has passed. Choose today or a later day.` · `This is not an Office working day. Choose a working day.` · `This person cannot be given a task. Choose another person.` · a save that did not reach the Portal: `Not added · Try again` | `Invalid` · `Error` · `Saturday and Sunday are not working days` (the Office calendar decides, not the weekday) |
+| After adding | the dark toast `Task added · for {name}` · your own: `Task added · for you` | `Sent to {name}` · `Assigned` · `Add another task` (not built) |
+| Its module | `Staff tasks`: the Workspace `Module` row, the page word in the task's head, the group in the Tasks list | `Workspace` as a module row on the Workspace page · `Internal tasks` · `Manual tasks` · `Added by you` |
+| The card and the row | the title is the task's own name · rows `Deadline` `{date}` or `{date} · passed` · `Added by` `{name}` · the Workspace row's second line `Staff tasks · Added by {name}` | a record row (`PO No`, `SO No`) · `Contact` · `From {name}` |
+| Opened | tabs `Steps` · `History` only · the description as its creator wrote it · step `Do this task` · `Finish when: the task is done` · button `Mark done` · failure `Not saved · Try again` | `Route` · `Files` · `Open {record}` · `Complete` · `Tick` · `Close task` · `Approve` |
+| After `Mark done` | the dark toast `Done · {task name}` | `Completed` · `Task closed` |
+| History | `Added by {name} · for {name}` · `Done by {name}`, each with its date and time | `Created` · `Assigned to` · `Marked` |
+
 ## The Workspace page words · owner's round 3 brief, 13 Oct 2026 (points 3 and 4) · DEPLOYED 13 Oct 2026 (#2049, #2050); seen signed in on production 13 Oct 2026 at 1025, 1164 and 1440, view only
 
 The page at `/operation?tab=work` (Workspace MASTER §5.10). It lists the same tasks as the Tasks
@@ -5096,7 +5114,7 @@ table. The package prints `Today` in `Due` and `Owner` as a column head; the pag
 | Where | Use exactly | Do not use |
 |---|---|---|
 | Page | `Workspace` | `Work` as the page or menu word |
-| Left panel | `Module` · `All modules` · `Sales Orders` · `Purchasing` · `Warehouse` · `Delivery` · `Payment` · `Issue Tracker`, each with ONE plain number; above them the Tasks panel's day strip | `Page` · `All pages` · `Attention` · a second number or a late word on a row · `0` while loading or failed |
+| Left panel | `Module` · `All modules` · `Sales Orders` · `Purchasing` · `Warehouse` · `Delivery` · `Payment` · `Issue Tracker` · `Staff tasks` (internal tasks), each with ONE plain number; above them the Tasks panel's day strip | `Page` · `All pages` · `Attention` · a second number or a late word on a row · `0` while loading or failed |
 | Scope | `My Task` · `Team Work` (spoken as `Whose work`) | `My Tasks` · `My Work` · a person's name as a scope · `Take over` |
 | Tabs | `To do {n}` · `Waiting {n}` · `Done {n}` (spoken as `Show`, as in the Tasks panel) | `Waiting for answer` · `Done today` |
 | Columns | `Due` · `Task` · `Contact` · `Last contact` · `Assigned to` (Team Work only) · `Status`; on the `Done` tab the first column is `Done` and the person column is `Completed by` | `Owner` as a column head · a column the table does not need to decide the next step (03 §2) |
