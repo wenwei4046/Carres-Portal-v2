@@ -13,33 +13,17 @@
  * A document that does not exist yet prints `Not yet`, as v8 does. Finance
  * hold unknown is `Could not read`, never `No Finance hold`.
  */
-import { registerDeliveryConditionOf, type OutrightFactsFailed, type OutrightOrderFacts } from "@carres/shared";
+import { goodsCategoryWordOf, registerDeliveryConditionOf, type OutrightFactsFailed, type OutrightOrderFacts } from "@carres/shared";
 import type { PaymentMonitorRow } from "@carres/shared/payment-monitor";
 import type { RegisterRow } from "../sales-order-columns";
 import { salesLocationOf } from "../sales-order-columns";
 import type { CPillTone } from "@/components/carres/CPill";
+import type { CCell, CTableColumn } from "@/components/carres/CTable";
 
 export type CellTone = CPillTone | "none";
 
-export type Cell = {
-  t: string;
-  sub?: string;
-  /** Sub-line colour: muted grey (default secondary), ok green, warn amber. */
-  subTone?: "muted" | "ok" | "warn";
-  /** 400 · 500 · 600. */
-  fw?: 400 | 500 | 600;
-  /** Text colour: ink (default: the unselected-tab grey, c-tab), muted, warn. */
-  fg?: "ink" | "muted" | "warn";
-  pill?: boolean;
-  tone?: CellTone;
-  align?: "start" | "end";
-  /** The Items cell: `› n pcs` opens the items pop-up. */
-  pop?: boolean;
-  /** The full sentence behind a short state word (hover). */
-  title?: string;
-  /** The sub-line is an essential fact: it wraps instead of being cut. */
-  subWrap?: boolean;
-};
+/** A Carres Table cell. */
+export type Cell = CCell;
 
 export type LayoutKey = "so" | "general" | "payment" | "stock" | "warehouse" | "delivery";
 
@@ -81,6 +65,31 @@ export function rm(n: number): string {
 
 export function pcsOf(r: RegisterRow): number {
   return (r.o.order_lines ?? []).reduce((sum, l) => sum + (Number(l.qty) || 0), 0);
+}
+
+/**
+ * Items, as v12 prints them: pieces, a sofa in sets (`3 pcs + 1 set`), and
+ * under it the goods' category words. The words are COPY-STANDARD's governed
+ * category words (`Mattress · Bedframe · Sofa …`), not v12's codes
+ * (`MS · BF · SOF · M.P`): the Blueprint wins for words, and `M.P` is a
+ * banned abbreviation.
+ */
+export function itemsCell(r: RegisterRow): Cell {
+  let pcs = 0;
+  let sets = 0;
+  const words: string[] = [];
+  for (const line of r.o.order_lines ?? []) {
+    const qty = Number(line.qty) || 0;
+    if (qty <= 0) continue;
+    const word = goodsCategoryWordOf(line);
+    if (word === "Sofa") sets += qty;
+    else pcs += qty;
+    if (word !== "Accessory" && !words.includes(word)) words.push(word);
+  }
+  const t = [pcs || !sets ? `${pcs} ${pcs === 1 ? "pc" : "pcs"}` : "", sets ? `${sets} ${sets === 1 ? "set" : "sets"}` : ""]
+    .filter(Boolean)
+    .join(" + ");
+  return { t, sub: words.length ? words.join(", ") : undefined };
 }
 
 export function isDelivered(r: RegisterRow): boolean {
@@ -165,18 +174,11 @@ const HANDOVER_WORD: Record<NonNullable<OutrightOrderFacts["loading"]["kind"]>, 
   received_by_logistics: "Received by logistics",
 };
 
-export type Column = {
-  key: string;
-  label: string;
-  /** A long header printed on two lines; `label` stays its accessible and export name. */
-  head?: readonly [string, string];
-  /** v8's grid track. */
-  width: string;
+/** A Carres Table column, with how it reads its cell. Width = the v12 track. */
+export type Column = CTableColumn & {
   cell: (r: RegisterRow, ctx: CellContext) => Cell;
   /** v8 marks these filterable: the header opens a value menu. */
   filterable?: boolean;
-  /** Money columns sit right. */
-  align?: "end";
 };
 
 const docs = (list: (string | null | undefined)[]): Cell => {
@@ -187,23 +189,23 @@ const docs = (list: (string | null | undefined)[]): Cell => {
 
 export const COLUMNS: Record<string, Column> = {
   proceed: {
-    key: "proceed", label: "Proceed Date", width: "100px",
+    key: "proceed", label: "Proceed Date", width: "120px",
     cell: (r) => dayCell(r.proceeded) ?? NOT_RECORDED,
   },
   order: {
-    key: "order", label: "SO No", width: "minmax(118px,1fr)",
+    key: "order", label: "SO No", width: "minmax(150px,1fr)",
     cell: (r) => ({ t: `SO-${r.so}`, fw: 600, fg: "ink", sub: r.customer || "Not recorded" }),
   },
   items: {
-    key: "items", label: "Items", width: "84px",
-    cell: (r) => { const n = pcsOf(r); return { t: `${n} ${n === 1 ? "pc" : "pcs"}`, pop: true }; },
+    key: "items", label: "Items", width: "120px",
+    cell: (r) => itemsCell(r),
   },
   channel: {
-    key: "channel", label: "Sales Location", width: "minmax(100px,.9fr)",
+    key: "channel", label: "Sales Location", width: "minmax(120px,1fr)",
     cell: (r) => ({ t: salesLocationOf(r.o) || "Not recorded", sub: r.o.salespersons?.name?.trim() || "Not recorded" }),
   },
   dloc: {
-    key: "dloc", label: "Delivery Location", width: "minmax(100px,.9fr)",
+    key: "dloc", label: "Delivery Location", width: "minmax(170px,1fr)",
     cell: (r) => {
       const city = r.o.customer_address_city?.trim();
       const state = r.o.customer_address_state?.trim();
@@ -211,7 +213,7 @@ export const COLUMNS: Record<string, Column> = {
     },
   },
   reqDate: {
-    key: "reqDate", label: "Customer’s original requested delivery", width: "112px",
+    key: "reqDate", label: "Customer’s original requested delivery", width: "140px",
     head: ["Customer’s original", "requested delivery"],
     cell: (r) => {
       const c = dayCell(r.customerDelivery);

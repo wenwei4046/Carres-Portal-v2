@@ -134,11 +134,11 @@ describe("Sales Order view headers (fix list 14 Oct 2026)", () => {
     ]);
   });
 
-  it("splits the long header on two lines and keeps the widths", () => {
+  it("splits the long header on two lines and uses the v12 widths", () => {
     expect(COLUMNS.reqDate!.head).toEqual(["Customer’s original", "requested delivery"]);
     const so = LAYOUTS.find((l) => l.key === "so")!;
     expect(so.columns.map((k) => COLUMNS[k]!.width)).toEqual([
-      "100px", "minmax(118px,1fr)", "84px", "minmax(100px,.9fr)", "minmax(100px,.9fr)", "112px",
+      "120px", "minmax(150px,1fr)", "120px", "minmax(120px,1fr)", "minmax(170px,1fr)", "140px",
     ]);
   });
 });

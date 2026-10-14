@@ -1,1308 +1,266 @@
 /**
- * `/ui` — THE live showcase (UI-KIT's third body, card D0.5a).
+ * `/ui` — THE Carres UI kit, live (UI MASTER, owner ruling 14 Oct 2026: one kit,
+ * in code; the look is Sales Order Outright v12, "this is the last").
  *
- * `docs/01-design-tokens.md` · `docs/02-components.md` explain what the kit
- * means (they replaced the retired `docs/UI-KIT.md`, 2026-07-31); `lib/design-standard.ts`
- * records it; **this page IS it.** It imports the real components and renders
- * the real tokens, so it structurally cannot describe something the code does
- * not do — which is the one failure the first two bodies cannot rule out.
+ * Every part below is the real component the pages import, rendered with TEST
+ * data. Design checks this page against v12 once; after that every page is built
+ * from these parts only. The earlier kit that stood here (the July decisions, the
+ * slate tokens and their components) is replaced, not kept beside it: one kit.
  *
- * It carries THREE jobs:
- *   1. The FROZEN REGISTER. Q1 spacing · Q2 canvas · Q3 weight · Q4 icon stroke
- *      are recorded here with what each one costs. **D0.5a rendered them as a
- *      choice and Jess answered on 2026-07-28**; D0.5b replaced the comparison
- *      with the answer, because a page still asking a settled question is how a
- *      settled question gets re-opened.
- *   2. §9 UI STATES. Every component in every state, including the ugly ones —
- *      default · hover · focus · disabled · loading · error · long text ·
- *      empty value. §13.4 screenshots this page in CI, and a screenshot that
- *      only covers the happy path proves nothing.
- *   3. The token reference — type, colour, radius, spacing, icons, layers —
- *      rendered FROM the same records the components read.
- *
- * Two kinds of thing here cannot be photographed as they really are: a hover
- * needs a pointer, and a toast is gone in four seconds. Both are rendered in a
- * FORCED / static form beside the live one, and `UiShowcase.test.tsx` pins them
- * to the components' own declarations so they can never drift into a
- * hand-painted lookalike.
+ * A part a page still draws for itself is not on this page; it is listed at the
+ * end as not in the kit yet, and joins the kit when that page's turn comes.
  */
 import { useEffect, useState, type ReactNode } from "react";
-import Badge from "@/components/kit/Badge";
-import Block from "@/components/kit/Block";
-import ChecklistRow from "@/components/kit/ChecklistRow";
-import StepList, { Step } from "@/components/kit/StepList";
-import TaskView from "@/components/kit/TaskView";
-import QuietRouteRow from "@/components/kit/QuietRouteRow";
-import RouteStop from "@/components/kit/RouteStop";
-import Button from "@/components/kit/Button";
-import Card from "@/components/kit/Card";
-import Checkbox from "@/components/kit/Checkbox";
-import DataTable, { type Column } from "@/components/kit/DataTable";
-import DatePicker from "@/components/kit/DatePicker";
-import DetailShell, { type IdentitySlot } from "@/components/kit/DetailShell";
-import DocumentTable from "@/components/kit/DocumentTable";
-import Drawer from "@/components/kit/Drawer";
-import DropdownMenu from "@/components/kit/DropdownMenu";
-import EmptyState from "@/components/kit/EmptyState";
-import Icon, { ICON_NAMES } from "@/components/kit/Icon";
-import Input from "@/components/kit/Input";
-import Loading from "@/components/kit/Loading";
-import Modal from "@/components/kit/Modal";
-import PageShell from "@/components/kit/PageShell";
-import Panel from "@/components/kit/Panel";
-import PdfPreview from "@/components/kit/PdfPreview";
-import SavedEvidenceViewer from "@/components/kit/SavedEvidenceViewer";
-import SectionHeader from "@/components/kit/SectionHeader";
-import Popover from "@/components/kit/Popover";
-import SearchInput from "@/components/kit/SearchInput";
-import Select from "@/components/kit/Select";
-import StatusPill from "@/components/kit/StatusPill";
-import Tabs from "@/components/kit/Tabs";
-import Textarea from "@/components/kit/Textarea";
-import Toast from "@/components/kit/Toast";
-import Tooltip from "@/components/kit/Tooltip";
-import TotalsSummary from "@/components/kit/TotalsSummary";
-import { Z_LADDER } from "@/components/kit/overlay-layer";
-import ServerRegisterExample from "@/pages/dev/ServerRegisterExample";
-import ListOptionsExample from "@/pages/dev/ListOptionsExample";
-import CompactCardExample from "@/pages/dev/CompactCardExample";
-import { fmtDate } from "@/lib/fmt-date";
-import {
-  ICON_STROKE,
-  RADII,
-  SPACING_SCALE,
-  TONES,
-  TYPE_TOKENS,
-  TYPE_WEIGHTS,
-} from "@/components/kit/tokens";
-
-/* Forced states — the same declarations the components carry, applied without
- * a pointer so CI can photograph them. Pinned by the test file. */
-const FORCED_HOVER_PRIMARY = "[&>button]:brightness-125";
-const FORCED_HOVER_NEUTRAL = "[&>button]:bg-c-info-bg";
-const FORCED_FOCUS_BUTTON = "[&>button]:ring-2 [&>button]:ring-kit-blue-9 [&>button]:ring-offset-1";
-const FORCED_FOCUS_INPUT = "[&_input]:ring-2 [&_input]:ring-kit-blue-9 [&_input]:border-kit-blue-9";
-
-const LONG =
-  "Kuala Lumpur Sri Damansara warehouse transfer — customer requested the whole set delivered together";
-
-function SavedEvidenceSample() {
-  const [active, setActive] = useState<string | null>(null);
-  return <>
-    <Button onClick={() => setActive("example")}>View</Button>
-    <SavedEvidenceViewer activeId={active} onClose={() => setActive(null)}
-      files={[
-        { id: "example", kind: "photo", url: "/carres-logo.png", context: "Example · Arrival evidence", unitCodes: ["U1-000-001"] },
-        { id: "unreadable", kind: "photo", url: null, context: "Example · Arrival evidence" },
-        { id: "video", kind: "video", url: "/ui-evidence-example.mp4", context: "Example · Arrival evidence" },
-      ]}
-      onRetry={async (id) => id === "example" ? "/carres-logo.png" : id === "video" ? "/ui-evidence-example.mp4" : null} />
-  </>;
-}
-
-function PdfPreviewSample() {
-  const [src, setSrc] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  useEffect(() => () => { if (src) URL.revokeObjectURL(src); }, [src]);
-  async function openSample(broken: boolean) {
-    setLoading(true);
-    try {
-      const { renderPoPdf } = await import("@/lib/pdf/render");
-      const blob = broken ? new Blob(["Unavailable document"], { type: "application/pdf" }) : await renderPoPdf({
-        draft: true, po_number: "DRAFT", po_id: "", version: 0, issue_date: "2026-09-24",
-        supplier: { name: "Example supplier", address: "Example address", contact: null },
-        destination: { name: "Example destination", address: "Example warehouse address" },
-        delivery_instructions: null, eta_date: "2026-10-02", terms: null,
-        lines: [{ sku: "EXAMPLE", description: "Example item", qty: 2, unit: "unit" }],
-      });
-      setSrc(URL.createObjectURL(blob));
-    } finally { setLoading(false); }
-  }
-  return <div className="flex flex-col gap-3">
-    <div className="flex flex-wrap gap-2">
-      <Button loading={loading} onClick={() => void openSample(false)}>Show preview</Button>
-      <Button disabled={loading} onClick={() => void openSample(true)}>Show failed preview</Button>
-    </div>
-    {src && <div className="flex h-[70vh] min-w-0 bg-kit-canvas p-4"><PdfPreview src={src} title="Example document" /></div>}
-  </div>;
-}
+import MIcon from "@/components/carres/MIcon";
+import CPill, { type CPillTone } from "@/components/carres/CPill";
+import CPopover, { CMenuGroup, CMenuItem } from "@/components/carres/CPopover";
+import CTable, { CTableCell, CTableFooter, CTableItems, type CCell, type CTableColumn } from "@/components/carres/CTable";
+import CSidePanel from "@/components/carres/CSidePanel";
+import { CChip, CIconButton, CShowPanelButton, CViewButton } from "@/components/carres/CToolbar";
+import { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
+import { TasksPill, useShellTasks } from "@/pages/operation/components/ShellTasks";
 
 function Section({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
   return (
-    <section id={id} className="flex flex-col gap-4">
+    <section id={id} className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
-        <h2 className="text-title text-kit-slate-12">{title}</h2>
-        {note && <p className="text-meta text-kit-slate-11">{note}</p>}
+        <h2 className="text-strong text-c-ink">{title}</h2>
+        {note && <p className="text-[12px] text-c-secondary">{note}</p>}
       </div>
       {children}
     </section>
   );
 }
 
-/** One labelled sample. The label is the STATE, so a screenshot is readable. */
-function Sample({ label, children }: { label: string; children: ReactNode }) {
+/* ── the Carres Table, with the Sales Order view's columns and TEST rows ── */
+const COLUMNS: CTableColumn[] = [
+  { key: "proceed", label: "Proceed Date", width: "120px" },
+  { key: "order", label: "SO No", width: "minmax(150px,1fr)" },
+  { key: "items", label: "Items", width: "120px" },
+  { key: "channel", label: "Sales Location", width: "minmax(120px,1fr)" },
+  { key: "dloc", label: "Delivery Location", width: "minmax(170px,1fr)" },
+  { key: "reqDate", label: "Customer’s original requested delivery", head: ["Customer’s original", "requested delivery"], width: "140px" },
+];
+type Row = { id: string; cells: Record<string, CCell> };
+const ROWS: Row[] = [
+  {
+    id: "t1",
+    cells: {
+      proceed: { t: "11 Oct 26", sub: "Sun", subTone: "muted", fw: 500 },
+      order: { t: "SO-TEST-01", sub: "TEST · Customer A", fw: 600, fg: "ink" },
+      items: { t: "3 pcs", sub: "Mattress, Pillow" },
+      channel: { t: "TEST Showroom A", sub: "TEST · Staff A" },
+      dloc: { t: "Setapak", sub: "Kuala Lumpur" },
+      reqDate: { t: "19 Nov 26", sub: "Thu", subTone: "muted", fw: 500 },
+    },
+  },
+  {
+    id: "t2",
+    cells: {
+      proceed: { t: "28 Aug 26", sub: "Fri", subTone: "muted", fw: 500 },
+      order: { t: "SO-TEST-02", sub: "TEST · Customer B", fw: 600, fg: "ink" },
+      items: { t: "2 pcs + 1 set", sub: "Mattress, Sofa" },
+      channel: { t: "TEST Showroom B", sub: "TEST · Staff B" },
+      dloc: { t: "Kuala Lumpur", sub: "Kuala Lumpur" },
+      reqDate: { t: "Not recorded", fg: "muted" },
+    },
+  },
+  {
+    id: "t3",
+    cells: {
+      proceed: { t: "2 Oct 26", sub: "Fri", subTone: "muted", fw: 500 },
+      order: { t: "SO-TEST-03", sub: "TEST · a customer name long enough to need its own line", fw: 600, fg: "ink" },
+      items: { t: "2 pcs" },
+      channel: { t: "Could not read", fg: "warn", title: "Could not read Sales for this order. This does not mean nothing is recorded." },
+      dloc: { t: "Johor Bahru", sub: "Johor" },
+      reqDate: { t: "6 Oct 26", sub: "Tue · Delivered", subTone: "ok", fw: 500 },
+    },
+  },
+];
+const LONG_QTY = "· Qty: Mattress 23 · Sofa 22 · Bed frame 14 · Pillow 10 · Mattress protector 4 · Others 1";
+
+function TableExample({ narrow }: { narrow: boolean }) {
+  const [picked, setPicked] = useState<Set<string>>(new Set(["t2"]));
+  const [opened, setOpened] = useState<Set<string>>(new Set(narrow ? [] : ["t1"]));
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(20);
+  const toggle = (r: Row) =>
+    setPicked((s) => {
+      const n = new Set(s);
+      if (n.has(r.id)) n.delete(r.id);
+      else n.add(r.id);
+      return n;
+    });
   return (
-    <div className="flex flex-col gap-2">
-      <span className="text-label text-kit-slate-11">{label}</span>
-      <div className="flex flex-wrap items-center gap-4">{children}</div>
+    <div className="flex min-w-0" style={{ width: narrow ? 560 : "100%", height: 300 }}>
+      <CTable
+        label={narrow ? "TEST list, narrow" : "TEST list"}
+        columns={COLUMNS}
+        rows={ROWS}
+        rowKey={(r) => r.id}
+        identifier={1}
+        selection={{
+          isSelected: (r) => picked.has(r.id),
+          toggle,
+          allSelected: ROWS.every((r) => picked.has(r.id)),
+          toggleAll: () => setPicked((s) => (ROWS.every((r) => s.has(r.id)) ? new Set() : new Set(ROWS.map((r) => r.id)))),
+          rowLabel: (r) => `Select ${r.cells.order!.t}`,
+        }}
+        expand={{
+          isOpen: (r) => opened.has(r.id),
+          toggle: (r) =>
+            setOpened((s) => {
+              const n = new Set(s);
+              if (n.has(r.id)) n.delete(r.id);
+              else n.add(r.id);
+              return n;
+            }),
+          label: (r) => (opened.has(r.id) ? "Hide items" : "Show items"),
+          render: (r, grid) => (
+            <CTableItems
+              label={r.cells.order!.t}
+              grid={grid}
+              items={[
+                { key: "a", name: "TEST · Mattress model A", detail: "Queen · TEST-MS-A", qty: "1 pc" },
+                { key: "b", name: "TEST · Pillow model B", detail: "Standard · TEST-PL-B", qty: "2 pcs" },
+              ]}
+              empty="No items on this order"
+            />
+          ),
+        }}
+        renderCell={(r, c) => <CTableCell cell={r.cells[c.key]!} />}
+        footer={<CTableFooter count="3 orders" qty={LONG_QTY} pageSize={size} onPageSize={setSize} page={page} pages={2} onPage={setPage} />}
+      />
     </div>
   );
 }
 
-function Grid({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-1 gap-8 md:grid-cols-2">{children}</div>;
-}
-
-const CARRIERS = [
-  { value: "nets", label: "NETS" },
-  { value: "houzs", label: "HOUZS" },
-  { value: "gai", label: "GAI (retired)", disabled: true },
+/* ── cells and pills: every state a cell can be in ── */
+const CELLS: Array<[string, CCell]> = [
+  ["Identifier", { t: "SO-TEST-01", sub: "TEST · Customer A", fw: 600, fg: "ink" }],
+  ["Date", { t: "11 Oct 26", sub: "Sun", subTone: "muted", fw: 500 }],
+  ["Read, nothing there", { t: "Not recorded", fg: "muted" }],
+  ["Read failed", { t: "Could not read", fg: "warn", title: "Could not read Payments for this order. This does not mean there is no receipt." }],
+  ["No access", { t: "No access", fg: "muted", title: "You may not see this record." }],
+  ["Done", { t: "6 Oct 26", sub: "Tue · Delivered", subTone: "ok", fw: 500 }],
+  ["Money", { t: "RM 14,170", align: "end" }],
+  ["Pill", { t: "Owes", pill: true, tone: "warn" }],
 ];
-
-/* D0.5c — the shells' demo data. Rows and words are made up on purpose: `/ui`
- * reads no session and fetches no row (that is why it can be public). */
-interface DemoRow {
-  id: string;
-  ref: string;
-  customer: string;
-  owing: string;
-}
-
-const DEMO_ROWS: DemoRow[] = [
-  { id: "1", ref: "SO-1256", customer: "Tan Wei Ming", owing: "2,000" },
-  { id: "2", ref: "SO-1257", customer: "Lim Ah Kaw", owing: "480" },
-  { id: "3", ref: "SO-1258", customer: "Nurul Aisyah", owing: "" },
-];
-
-const DEMO_COLUMNS: Column<DemoRow>[] = [
-  { key: "ref", label: "Order", width: 25, cell: (r) => <span className="font-mono">{r.ref}</span> },
-  { key: "customer", label: "Customer", width: 40, cell: (r) => r.customer },
-  {
-    key: "status",
-    label: "Status",
-    width: 20,
-    cell: () => (
-      <StatusPill tone="warning">
-        Waiting
-      </StatusPill>
-    ),
-  },
-  { key: "owing", label: "Outstanding", width: 15, align: "right", numeric: true, cell: (r) => r.owing },
-];
-
-const ORDER_TABS = [
-  { value: "open", label: "Open", count: 55 },
-  { value: "delivered", label: "Delivered" },
-];
-
-const DEMO_IDENTITY: IdentitySlot = {
-  primary: "Tan Wei Ming",
-  /* §7② of the information model names the four, and the type caps the set:
-   * 客户名 · Ref · the promised date · outstanding. */
-  persistentFacts: [
-    { label: "Customer", value: "Tan Wei Ming" },
-    { label: "Ref", value: <span className="font-mono">SO-1256</span> },
-    /* Through the formatter, never a literal — the showcase is the law's own
-       mirror, and a hard-coded date here quietly outlived the 2026-08-15
-       year ruling AND named 27 Jul 2026 a Sunday when it is a Monday. */
-    { label: "Promised", value: fmtDate("2026-07-27") },
-    { label: "Outstanding", value: "RM 2,000" },
-  ],
-};
-
-const DEMO_PROGRESS = {
-  steps: [
-    { id: "placed", label: "Placed", state: "done" as const },
-    { id: "proceed", label: "Proceed", state: "done" as const },
-    { id: "book", label: "To book", state: "current" as const },
-    { id: "deliver", label: "Deliver", state: "todo" as const },
-  ],
-};
-
-const DEMO_SECTIONS = [
-  {
-    id: "items",
-    label: "Items",
-    track: "goods" as const,
-    children: <p className="text-body text-kit-slate-11">3 lines · 1 sofa · 2 mattresses</p>,
-  },
-  {
-    id: "payment",
-    label: "Payment",
-    track: "money" as const,
-    children: <p className="text-body text-kit-slate-11">RM 7,248 total · RM 5,248 collected</p>,
-  },
-];
-
-const MODULE_TABS = [
-  { value: "to-order", label: "To Order", count: 4 },
-  { value: "purchase-orders", label: "Purchase Orders" },
-  { value: "receiving", label: "Receiving", count: 12 },
-  { value: "claims", label: "Claims" },
-  { value: "settings", label: "Settings" },
-];
+const TONES: CPillTone[] = ["ok", "warn", "info", "blocked", "select"];
 
 export default function UiShowcase() {
-  const [text, setText] = useState("SO-1256");
-  const [modalOpen, setModalOpen] = useState(false);
-  const [shOpen, setShOpen] = useState(true);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [carrier, setCarrier] = useState<string | undefined>(undefined);
-  const [tab, setTab] = useState("to-order");
-  const [registerView, setRegisterView] = useState("table");
-  const [ordersTab, setOrdersTab] = useState("open");
-  const [picked, setPicked] = useState(true);
-  const [some, setSome] = useState<boolean | "indeterminate">("indeterminate");
-  const [date, setDate] = useState<string | null>("2026-07-19");
-  /* D0.5d — expansion is CONTROLLED, so the page owns which record is open. */
-  const [openRows, setOpenRows] = useState<ReadonlySet<string>>(new Set(["1"]));
+  const [tab, setTab] = useState("open");
+  const [menu, setMenu] = useState(false);
+  const [summary, setSummary] = useState(true);
+  const [chips, setChips] = useState(["Payment: Owes", "Problems: Open case"]);
+  /* The Tasks button shows while the Tasks panel is closed; this page has no panel. */
+  useEffect(() => useShellTasks.setState({ open: false }), []);
 
   return (
-    <main className="min-h-screen bg-kit-slate-3 p-8">
-      <div className="mx-auto flex max-w-5xl flex-col gap-12">
-        <header className="flex flex-col gap-2">
-          <h1 className="text-page text-kit-slate-12">Carres UI-KIT</h1>
-          <p className="text-body text-kit-slate-11">
-            The live showcase. Every box below is the real component — if it renders here, it exists in
-            the code. Read the law in <span className="font-mono">docs/01-design-tokens.md</span> ·{" "}
-            <span className="font-mono">docs/02-components.md</span> · <span className="font-mono">docs/ui/MASTER.md</span>.
-          </p>
-        </header>
+    <main className="mx-auto flex max-w-[1180px] flex-col gap-10 bg-c-ground px-6 py-8 text-c-ink" data-testid="ui-kit">
+      <header className="flex flex-col gap-1">
+        <h1 className="text-page">Carres UI kit</h1>
+        <p className="text-[13px] text-c-secondary">
+          The one kit (UI MASTER, 14 Oct 2026). The look is Sales Order Outright v12. Every part is the component the pages use; all data is TEST.
+        </p>
+      </header>
 
-        {/* ─── 1 · FROZEN — what D0.5a asked, and what Jess answered ──────── */}
-        <Section
-          id="frozen"
-          title="Frozen decisions"
-          note="The PENDING REGISTER is empty. Jess answered Q1 · Q3 · Q4 on 2026-07-28; Q2 was frozen with the law. Nothing here is a question any more — it is the record."
-        >
-          <Panel title="The four answers">
-            <div className="flex flex-col gap-4">
+      <Section id="table" title="Carres Table" note="Sticky 40 header · 54 rows · ▸ and tick 24 · gap 10 · ▸, tick and the identifier stay while the list scrolls in its own box · ▸ opens the items on the row's own columns · the footer never widens the list.">
+        <TableExample narrow={false} />
+        <TableExample narrow />
+      </Section>
+
+      <Section id="cells" title="Table cells" note="Main words, then the grey second line. Three states are never merged: read and empty, read failed, no access.">
+        <div className="grid grid-cols-4 gap-3">
+          {CELLS.map(([name, cell]) => (
+            <div key={name} className="flex flex-col gap-1.5 rounded-lg bg-c-card p-3 ring-1 ring-inset ring-c-card-border">
+              <span className="text-[12px] text-c-secondary">{name}</span>
+              <span className={`flex min-w-0 flex-col leading-[1.3] text-[13px] ${cell.align === "end" ? "items-end" : "items-start"}`}>
+                <CTableCell cell={cell} />
+              </span>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section id="pills" title="Pills" note="12/500, the full word, never cut.">
+        <div className="flex flex-wrap items-center gap-2">
+          {TONES.map((t) => (
+            <CPill key={t} tone={t}>{t === "ok" ? "Paid" : t === "warn" ? "Owes" : t === "info" ? "Open" : t === "blocked" ? "Hold delivery" : "Selected"}</CPill>
+          ))}
+        </div>
+      </Section>
+
+      <Section id="toolbar" title="List toolbar" note="One 36px line: show a hidden panel · the views · filter chips · view and ⋮ · Tasks.">
+        <div className="flex h-9 min-w-0 flex-nowrap items-center gap-2 rounded-lg bg-c-ground">
+          {!summary && <CShowPanelButton label="Summary" onShow={() => setSummary(true)} />}
+          <div role="tablist" aria-label="Views" className={SEGMENTED_TRACK}>
+            {["open", "delivered", "all"].map((t) => (
+              <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`${SEGMENT} ${tab === t ? SEGMENT_ON : SEGMENT_OFF}`}>
+                {t === "open" ? "Open" : t === "delivered" ? "Delivered" : "All"}
+              </button>
+            ))}
+          </div>
+          <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+            {chips.map((c) => (
+              <CChip key={c} onClear={() => setChips((x) => x.filter((y) => y !== c))}>{c}</CChip>
+            ))}
+          </span>
+          <span className="ml-auto flex shrink-0 items-center gap-1.5">
+            <CViewButton icon="receipt_long" name="Sales Order" showName />
+            <CPopover label="More actions" role="menu" width={250} open={menu} onOpenChange={setMenu} trigger={<CIconButton icon="more_vert" label="More actions" pressed={menu} />}>
+              <CMenuGroup first>EXPORT · orders shown now</CMenuGroup>
+              <CMenuItem icon="table_view" note=".xlsx" onSelect={() => setMenu(false)}>Download Excel</CMenuItem>
+              <CMenuItem icon="picture_as_pdf" onSelect={() => setMenu(false)}>Download PDF</CMenuItem>
+              <CMenuGroup>VIEW</CMenuGroup>
+              <CMenuItem icon="bookmark_add" onSelect={() => setMenu(false)}>Save as my view…</CMenuItem>
+            </CPopover>
+          </span>
+          <TasksPill />
+        </div>
+      </Section>
+
+      <Section id="side-panel" title="Side panel" note="The Summary frame: the 36px title row sits level with the toolbar; the body starts level with the table (36 + 10).">
+        <div className="flex gap-3" style={{ height: 360 }}>
+          {summary ? (
+            <CSidePanel label="Summary" title="Summary" onHide={() => setSummary(false)}>
               {[
-                ["Q1 · Spacing scale", "Candidate A — 8 steps (2 4 6 8 12 16 24 32)", "Keeps 2 and 6, so dense rows stay dense. ~779 sites to migrate — a third of the strict-4pt alternative."],
-                ["Q2 · Page canvas", "Radix slate-3", "Frozen with the law on 2026-07-27."],
-                ["Q3 · font-semibold (700)", "Deleted into 600", "The two were doing one job. 600 is the heavy weight; 158 uses fold in at D2."],
-                ["Q4 · Icon stroke", `Lucide default — ${ICON_STROKE}`, "Icon has no strokeWidth prop, so a second stroke no longer compiles."],
-              ].map(([q, answer, cost]) => (
-                <div key={q} className="flex flex-col gap-1 border-b border-kit-slate-5 pb-4 last:border-0 last:pb-0">
-                  <span className="text-label text-kit-slate-11">{q}</span>
-                  <span className="text-strong text-kit-slate-12">{answer}</span>
-                  <span className="text-meta text-kit-slate-11">{cost}</span>
+                ["Proceeded orders", "31"],
+                ["Proceeded value", "RM 2,629"],
+                ["Delivered", "12 of 31"],
+                ["Problems open", "Could not read"],
+              ].map(([k, v]) => (
+                <div key={k} className="flex h-8 items-center justify-between text-[13px]">
+                  <span className="text-c-secondary">{k}</span>
+                  <span className="font-semibold tabular-nums text-c-ink">{v}</span>
                 </div>
               ))}
-            </div>
-          </Panel>
+            </CSidePanel>
+          ) : (
+            <CShowPanelButton label="Summary" onShow={() => setSummary(true)} />
+          )}
+        </div>
+      </Section>
 
-          <Panel title="§4.1 · the eight steps">
-            <div className="flex flex-col gap-2">
-              {SPACING_SCALE.map((s) => (
-                <div key={s.px} className="flex items-center gap-4">
-                  <span className="w-12 shrink-0 text-meta text-kit-slate-12 tabular-nums">{s.px}px</span>
-                  <span className="w-12 shrink-0 font-mono text-meta text-kit-slate-11">{s.tailwind}</span>
-                  {/* The bar's width IS the token, read from the record. This is
-                   *  the one place an inline value is right — a page drawing a
-                   *  width like this is inventing spacing, which §0.1 bans. */}
-                  <span className="h-4 bg-kit-blue-9" style={{ width: s.px }} />
-                  <span className="text-meta text-kit-slate-11">{s.use}</span>
-                </div>
-              ))}
-              <p className="text-meta text-kit-slate-11">
-                Dead under the frozen scale: 10 · 14 · 18 · 20 · 22 · 33 and every arbitrary value.
-              </p>
-            </div>
-          </Panel>
+      <Section id="icons" title="Icons" note="Material Symbols Rounded.">
+        <div className="flex flex-wrap items-center gap-4 text-c-body">
+          {["left_panel_open", "right_panel_open", "view_column", "more_vert", "chevron_left", "chevron_right", "arrow_drop_down", "filter_alt", "check_box", "download", "print"].map((n) => (
+            <span key={n} className="flex items-center gap-1.5 text-[12px] text-c-secondary">
+              <MIcon name={n} size={18} />
+              {n}
+            </span>
+          ))}
+        </div>
+      </Section>
 
-          <Panel title="§2.2 · the three weights">
-            <div className="flex flex-col gap-4">
-              {TYPE_WEIGHTS.map((w) => (
-                <Sample key={w} label={`${w}`}>
-                  <span className="text-title text-kit-slate-12" style={{ fontWeight: w }}>
-                    RM 56,859
-                  </span>
-                  <span className="text-strong text-kit-slate-12" style={{ fontWeight: w }}>
-                    Delivery this week
-                  </span>
-                </Sample>
-              ))}
-              <p className="text-meta text-kit-slate-11">
-                700 is not on this page because it is not in the kit. Q3 deleted it.
-              </p>
-            </div>
-          </Panel>
-        </Section>
-
-        {/* ─── 2 · Tokens ─────────────────────────────────────────────────── */}
-        <Section id="saved-evidence" title="Saved evidence" note="Read-only photos and video. Source, Unit and failure states remain visible.">
-          <SavedEvidenceSample />
-        </Section>
-
-        <Section id="pdf-preview" title="PDF preview" note="Actual pages, fit width, enlargement, loading and retry. Issuance remains with the owning page.">
-          <PdfPreviewSample />
-        </Section>
-
-        <Section id="type" title="Typography — §2.1" note="Six tokens. Nothing above 24, nothing below 11.">
-          <Card>
-            <div className="flex flex-col gap-4">
-              {TYPE_TOKENS.map((t) => (
-                <div key={t.token} className="flex flex-wrap items-baseline gap-4">
-                  <span className="w-40 shrink-0 font-mono text-meta text-kit-slate-11">{t.className}</span>
-                  <span className={`${t.className} text-kit-slate-12`}>{t.use}</span>
-                  <span className="text-meta text-kit-slate-11 tabular-nums">
-                    {t.px} / {t.weight} / {t.lineHeight}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </Section>
-
-        <Section
-          id="colour"
-          title="Colour — §3"
-          note="The law names the STEP; the hex comes from @radix-ui/colors. Four jobs, and everything else is neutral."
-        >
-          <Grid>
-            <Card>
-              <div className="flex flex-col gap-4">
-                <p className="text-strong text-kit-slate-12">Neutral — 95% of the screen</p>
-                {[
-                  ["slate-3", "bg-kit-slate-3", "page canvas"],
-                  ["slate-5", "bg-kit-slate-5", "hairline"],
-                  ["slate-6", "bg-kit-slate-6", "stronger divider"],
-                  ["slate-9", "bg-kit-slate-9", "icon at rest"],
-                  ["slate-11", "bg-kit-slate-11", "secondary text"],
-                  ["slate-12", "bg-kit-slate-12", "primary text"],
-                ].map(([step, cls, use]) => (
-                  <div key={step} className="flex items-center gap-4">
-                    <span className={`h-8 w-8 rounded-control border border-kit-slate-5 ${cls}`} />
-                    <span className="font-mono text-meta text-kit-slate-12">{step}</span>
-                    <span className="text-meta text-kit-slate-11">{use}</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-            <Card>
-              <div className="flex flex-col gap-4">
-                <p className="text-strong text-kit-slate-12">The four jobs</p>
-                {TONES.map((tone) => (
-                  <div key={tone} className="flex items-center gap-4">
-                    <StatusPill tone={tone}>{tone}</StatusPill>
-                  </div>
-                ))}
-                <p className="text-meta text-kit-slate-11">
-                  Red must stay rare or it stops meaning anything — a 15-row screen carries 0–2.
-                </p>
-              </div>
-            </Card>
-          </Grid>
-        </Section>
-
-        <Section id="radius" title="Radius — §4.2" note="Four, frozen. Named by use, so nobody picks a number.">
-          <Card>
-            <div className="flex flex-wrap gap-8">
-              {RADII.map((r) => (
-                <div key={r.className} className="flex flex-col items-center gap-2">
-                  <span className={`h-16 w-16 border border-kit-slate-5 bg-kit-slate-3 ${r.className}`} />
-                  <span className="font-mono text-meta text-kit-slate-12">{r.className}</span>
-                  <span className="text-meta text-kit-slate-11">{r.use}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </Section>
-
-        <Section
-          id="icons"
-          title="Icons — §5.3"
-          note="One meaning, one glyph. The name is the MEANING, never a Lucide import — a fifth name for `edit` does not compile."
-        >
-          <Card>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 md:grid-cols-6">
-              {ICON_NAMES.map((name) => (
-                <div key={name} className="flex items-center gap-2 text-kit-slate-11">
-                  <Icon name={name} />
-                  <span className="truncate text-meta">{name}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </Section>
-
-        {/* ─── 3 · Components in every state — §9 ─────────────────────────── */}
-        <Section
-          id="button"
-          title="Button — §6"
-          note="One blue action per block. No danger variant: red is a state, not a control."
-        >
-          <Card>
-            <div className="flex flex-col gap-8">
-              <Sample label="default">
-                <Button variant="primary">Issue PO</Button>
-                <Button>Open order</Button>
-                <Button variant="ghost">Cancel</Button>
-              </Sample>
-              <Sample label="with icon · md 32px">
-                <Button variant="primary" icon="call">
-                  Call NETS
-                </Button>
-                <Button icon="print">Print</Button>
-              </Sample>
-              <Sample label="sm 24px — dense bands">
-                <Button variant="primary" size="sm" icon="add">
-                  Add
-                </Button>
-                <Button size="sm">Edit</Button>
-              </Sample>
-              <Sample label="hover (forced)">
-                <span className={FORCED_HOVER_PRIMARY}>
-                  <Button variant="primary">Issue PO</Button>
-                </span>
-                <span className={FORCED_HOVER_NEUTRAL}>
-                  <Button>Open order</Button>
-                </span>
-              </Sample>
-              <Sample label="focus (forced)">
-                <span className={FORCED_FOCUS_BUTTON}>
-                  <Button variant="primary">Issue PO</Button>
-                </span>
-              </Sample>
-              <Sample label="disabled">
-                <Button variant="primary" disabled>
-                  Issue PO
-                </Button>
-                <Button disabled>Open order</Button>
-              </Sample>
-              <Sample label="loading">
-                <Button variant="primary" loading>
-                  Sending
-                </Button>
-                <Button loading>Loading</Button>
-              </Sample>
-              <Sample label="long text — the button never wraps, the caller constrains it">
-                <div className="w-64 overflow-hidden">
-                  <Button variant="primary">{LONG}</Button>
-                </div>
-              </Sample>
-            </div>
-          </Card>
-        </Section>
-
-        <Section
-          id="section-header"
-          title="SectionHeader — 02"
-          note="A region's name and what it holds. Collapsing is a TYPE: a permanent region has no chevron to press."
-        >
-          <Grid>
-            <Card>
-              <div className="flex flex-col gap-4">
-                <SectionHeader title="Items" meta="13 lines · 14 units" />
-                <SectionHeader
-                  title="Supplier information"
-                  collapsible
-                  open={shOpen}
-                  onToggle={() => setShOpen((v) => !v)}
-                  meta={shOpen ? "expanded" : "collapsed"}
-                />
-                <SectionHeader title="Notes" />
-              </div>
-            </Card>
-          </Grid>
-        </Section>
-
-        <Section id="fields" title="Input · Textarea · SearchInput — §6" note="One skin, three shapes.">
-          <Grid>
-            <Card>
-              <div className="flex flex-col gap-8">
-                <Sample label="empty value — the placeholder is the only content">
-                  <div className="w-full">
-                    <Input id="ui-empty" label="Customer" placeholder="Search a customer" />
-                  </div>
-                </Sample>
-                <Sample label="filled + hint (live — type in it)">
-                  <div className="w-full">
-                    <Input
-                      id="ui-filled"
-                      label="Sales order"
-                      hint="The reference printed on the customer's copy"
-                      value={text}
-                      onChange={(e) => setText(e.target.value)}
-                    />
-                  </div>
-                </Sample>
-                <Sample label="focus (forced)">
-                  <div className={`w-full ${FORCED_FOCUS_INPUT}`}>
-                    <Input id="ui-focus" label="Sales order" defaultValue="SO-1256" />
-                  </div>
-                </Sample>
-                <Sample label="error — the message replaces the hint">
-                  <div className="w-full">
-                    <Input
-                      id="ui-error"
-                      label="Phone"
-                      required
-                      defaultValue="01"
-                      hint="Never shown while an error is"
-                      error="Enter a Malaysian mobile number"
-                    />
-                  </div>
-                </Sample>
-                <Sample label="disabled">
-                  <div className="w-full">
-                    <Input id="ui-disabled" label="Sales order" defaultValue="SO-1256" disabled />
-                  </div>
-                </Sample>
-              </div>
-            </Card>
-            <Card>
-              <div className="flex flex-col gap-8">
-                <Sample label="search — no label, no error, never required">
-                  <div className="w-full">
-                    <SearchInput id="ui-search" />
-                  </div>
-                </Sample>
-                <Sample label="textarea — default">
-                  <div className="w-full">
-                    <Textarea id="ui-note" label="Note (optional)" placeholder="What happened" />
-                  </div>
-                </Sample>
-                <Sample label="textarea — long value">
-                  <div className="w-full">
-                    <Textarea id="ui-note-long" label="Note (optional)" defaultValue={LONG} />
-                  </div>
-                </Sample>
-                <Sample label="textarea — error">
-                  <div className="w-full">
-                    <Textarea id="ui-note-error" label="Reason" required error="A reason is required" />
-                  </div>
-                </Sample>
-                <Sample label="textarea — disabled">
-                  <div className="w-full">
-                    <Textarea id="ui-note-disabled" label="Note (optional)" defaultValue="Locked" disabled />
-                  </div>
-                </Sample>
-              </div>
-            </Card>
-          </Grid>
-        </Section>
-
-        <Section
-          id="status"
-          title="StatusPill · Badge — §3.4"
-          note="A status is a pill or it is not a status. A badge counts things and has no tone at all."
-        >
-          <Grid>
-            <Card>
-              <div className="flex flex-col gap-8">
-                <Sample label="every tone — the tone is COMPUTED by the engine, never chosen by a page">
-                  {TONES.map((tone) => (
-                    <StatusPill key={tone} tone={tone}>
-                      {tone}
-                    </StatusPill>
-                  ))}
-                </Sample>
-                <Sample label="solid status text without decorative icons">
-                  <StatusPill tone="success">
-                    Ready
-                  </StatusPill>
-                  <StatusPill tone="warning">
-                    Waiting
-                  </StatusPill>
-                  <StatusPill tone="danger">
-                    Late
-                  </StatusPill>
-                  <StatusPill tone="neutral">
-                    On hold
-                  </StatusPill>
-                </Sample>
-                <Sample label="long text — truncates inside its cell, never wraps the row">
-                  <div className="w-48">
-                    <StatusPill tone="warning">
-                      {LONG}
-                    </StatusPill>
-                  </div>
-                </Sample>
-              </div>
-            </Card>
-            <Card>
-              <div className="flex flex-col gap-8">
-                <Sample label="badge — a count">
-                  <Badge>18</Badge>
-                  <Badge>0</Badge>
-                  <Badge>129</Badge>
-                </Sample>
-                <Sample label="badge — a plain tag">
-                  <Badge>Sofa</Badge>
-                  <Badge>Klang</Badge>
-                </Sample>
-                <Sample label="badge — long text">
-                  <div className="w-48 truncate">
-                    <Badge>{LONG}</Badge>
-                  </div>
-                </Sample>
-              </div>
-            </Card>
-          </Grid>
-        </Section>
-
-        <Section id="compact-card" title="Compact module card — §4.3" note="Owner-confirmed 3 Oct 2026. One component for every module card: header, module tabs, four facts with inline editors, items, Communication and Timeline. Filled here with the confirmed Delivery sample; each module passes its own facts. Dark identity Header approved 4 Oct 2026; remaining body palette, font and radius await the owner's token decision. Embedded presentation (owner 5 Oct 2026): the Purchase Order · Sales Order tab state shows a host card whose Sales Order tab holds the same SO card with a light identity area, no Close and no module tabs.">
-          <CompactCardExample />
-        </Section>
-
-        <Section id="surfaces" title="Card · Panel — §6" note="A Card holds. A Panel holds and says what it is.">
-          <Grid>
-            <Card>
-              <div className="flex flex-col gap-2">
-                <p className="text-strong text-kit-slate-12">Card — default</p>
-                <p className="text-body text-kit-slate-11">{LONG}</p>
-              </div>
-            </Card>
-            <Panel
-              title="Panel — with a right slot"
-              right={
-                <Button iconOnly icon="open">
-                  Open order
-                </Button>
-              }
-            >
-              <p className="text-body text-kit-slate-11">
-                The header divider is the stronger `slate-6` step — a split inside one surface, not the
-                surface's own edge.
-              </p>
-            </Panel>
-            <Panel title="Panel — a title long enough to need truncating on a narrow column">
-              <p className="text-body text-kit-slate-11">The title truncates; the panel never grows a row.</p>
-            </Panel>
-            <Panel title="Panel — empty body" padding="none">
-              <EmptyState
-                icon="goods"
-                title="Nothing waiting on stock"
-                detail="Every line on this order has arrived."
-              />
-            </Panel>
-          </Grid>
-        </Section>
-
-        <Section
-          id="states"
-          title="UI states — §9"
-          note="Empty · Loading · Error · No permission · Offline all render through the same two boxes. A state that needs a new component is a state nobody defined."
-        >
-          <Grid>
-            <Card>
-              <EmptyState
-                icon="search"
-                title="No orders match this filter"
-                detail="Clear a filter to see the rest."
-                action={<Button icon="close">Clear filters</Button>}
-              />
-            </Card>
-            <Card>
-              <EmptyState
-                icon="late"
-                title="This did not load"
-                detail="The connection dropped before the list arrived."
-                action={
-                  <Button variant="primary" icon="refresh">
-                    Try again
-                  </Button>
-                }
-              />
-            </Card>
-            <Card>
-              <EmptyState icon="lock" title="You cannot open this" detail="Ask a manager for access." />
-            </Card>
-            <Card>
-              <div className="flex flex-col gap-8">
-                <Sample label="loading — skeleton (a region arriving)">
-                  <div className="w-full">
-                    <Loading variant="skeleton" />
-                  </div>
-                </Sample>
-                <Sample label="loading — spinner (a control is busy)">
-                  <span className="text-kit-slate-11">
-                    <Loading size={14} />
-                  </span>
-                  <span className="text-kit-slate-11">
-                    <Loading size={16} />
-                  </span>
-                  <span className="text-kit-slate-11">
-                    <Loading size={18} />
-                  </span>
-                </Sample>
-              </div>
-            </Card>
-          </Grid>
-        </Section>
-
-        {/* ─── 4 · The Radix half — behaviour, card D0.5b ──────────────────── */}
-        <Section
-          id="overlays"
-          title="Modal · Drawer — §6"
-          note="Radix supplies the focus trap, escape, scroll lock and returning focus to the trigger. Every visible value is the kit's. Both are CONTROLLED — a page that cannot close its own modal submits twice."
-        >
-          <Card>
-            <div className="flex flex-col gap-8">
-              <Sample label="open them — escape closes, so does the ✕, and focus comes back here">
-                <Button variant="primary" onClick={() => setModalOpen(true)}>
-                  Open a modal
-                </Button>
-                <Button onClick={() => setDrawerOpen(true)}>Open a drawer</Button>
-              </Sample>
-              <p className="text-meta text-kit-slate-11">
-                A Modal interrupts to ask something. A Drawer opens a RECORD beside the list it came
-                from — §8.2 says closing it gives the list back its filter and its scroll. What goes
-                INSIDE a record is `DetailShell`, card D0.5c.
-              </p>
-            </div>
-          </Card>
-
-          <Modal
-            open={modalOpen}
-            onOpenChange={setModalOpen}
-            title="Record the delay decision"
-            description="One question, and only Operations answers it."
-            footer={
-              <>
-                <Button variant="ghost" onClick={() => setModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button variant="primary" onClick={() => setModalOpen(false)}>
-                  Save
-                </Button>
-              </>
-            }
-          >
-            <div className="flex flex-col gap-4">
-              <Select
-                id="ui-modal-select"
-                label="Logistics"
-                placeholder="Pick a carrier"
-                options={CARRIERS}
-                value={carrier}
-                onValueChange={setCarrier}
-              />
-              <Textarea id="ui-modal-note" label="Note (optional)" placeholder="What happened" />
-            </div>
-          </Modal>
-
-          <Drawer
-            variant="quick-view"
-            open={drawerOpen}
-            onOpenChange={setDrawerOpen}
-            title="SO-1256 · Tan Wei Ming"
-            headerActions={<><Button variant="ghost" iconOnly icon="print" aria-label="Print sales order" /><Button variant="ghost" iconOnly icon="open" aria-label="Open full page" /></>}
-          >
-            <div className="flex flex-col gap-4" data-testid="sales-order-quick-view">
-              <Block title="SO info" tone="muted">
-                <p className="text-body">Customer Phone · Not recorded</p>
-                <p className="text-body">Email · Not recorded</p>
-              </Block>
-              <Block title="Delivery"><p className="text-body">Not recorded</p></Block>
-              <Block title="Items"><p className="text-body">No items on this order</p></Block>
-              <Block title="Payment"><p className="text-body">Not recorded</p></Block>
-              <Block title="Related documents"><p className="text-body">No PO yet</p></Block>
-            </div>
-          </Drawer>
-        </Section>
-
-        <Section
-          id="pickers"
-          title="Select · DropdownMenu · Popover · Tooltip — §6"
-          note="Four floating surfaces, one recipe. A Select and a DropdownMenu take their rows as DATA, so no page can put a second line or a pill inside one."
-        >
-          <Grid>
-            <Card>
-              <div className="flex flex-col gap-8">
-                <Sample label="select — empty, so the placeholder is the only content">
-                  <div className="w-full">
-                    <Select
-                      id="ui-select"
-                      label="Logistics"
-                      placeholder="Pick a carrier"
-                      hint="The company that moves the goods"
-                      options={CARRIERS}
-                      value={carrier}
-                      onValueChange={setCarrier}
-                    />
-                  </div>
-                </Sample>
-                <Sample label="select — error, and the message replaces the hint">
-                  <div className="w-full">
-                    <Select
-                      id="ui-select-error"
-                      label="Logistics"
-                      required
-                      hint="Never shown while an error is"
-                      error="Pick a carrier"
-                      options={CARRIERS}
-                      onValueChange={() => {}}
-                    />
-                  </div>
-                </Sample>
-                <Sample label="select — disabled">
-                  <div className="w-full">
-                    <Select
-                      id="ui-select-disabled"
-                      label="Logistics"
-                      value="nets"
-                      disabled
-                      options={CARRIERS}
-                      onValueChange={() => {}}
-                    />
-                  </div>
-                </Sample>
-              </div>
-            </Card>
-            <Card>
-              <div className="flex flex-col gap-8">
-                <Sample label="⋮ menu — no colour, no red row; a destructive command is an ordinary word">
-                  <DropdownMenu
-                    label="Row actions"
-                    trigger={<Button icon="overflow" aria-label="More" />}
-                    items={[
-                      { key: "print", label: "Print", icon: "print", onSelect: () => {} },
-                      { key: "copy", label: "Copy reference", icon: "copy", onSelect: () => {} },
-                      {
-                        key: "cancel",
-                        label: "Cancel order",
-                        icon: "close",
-                        separatorBefore: true,
-                        onSelect: () => {},
-                      },
-                    ]}
-                  />
-                </Sample>
-                <Sample label="popover — a Contextual Surface: it holds no permanent height">
-                  <Popover label="Filters" trigger={<Button icon="filter">Filter</Button>}>
-                    <div className="flex w-56 flex-col gap-2">
-                      <Checkbox id="ui-f1" label="Owing" checked={picked} onCheckedChange={setPicked} />
-                      <Checkbox id="ui-f2" label="Late" checked={false} onCheckedChange={() => {}} />
-                    </div>
-                  </Popover>
-                </Sample>
-                <Sample label="tooltip — opens on hover AND on focus, which title= never does">
-                  <Tooltip content="already past that deadline">
-                    <Button icon="late" aria-label="Late" />
-                  </Tooltip>
-                  <span className="text-meta text-kit-slate-11">hover or tab to it</span>
-                </Sample>
-              </div>
-            </Card>
-          </Grid>
-        </Section>
-
-        <Section id="list-options" title="List options — default sort, second header line, column band, a tick that cannot be taken" note="Preview only (01 §5, 13 Oct 2026). The list opens sorted by 12 Oct, high to low, until you sort it yourself. Oct carries the neutral column band. 12 Oct has a grey second line. Preview model A cannot be ticked: its box is greyed and says why on hover.">
-          <ListOptionsExample />
-        </Section>
-
-        <Section id="server-register" title="Paged register filters" note="Preview only: five rows are loaded. Supplier B exists only at record 61; choose it in the Supplier column filter, then clear the filter to restore all 61 records.">
-          <ServerRegisterExample />
-        </Section>
-
-        <Section
-          id="tabs"
-          title="Tabs — §8.2's stage picker"
-          note="Exactly one is on, always. Clicking the one that is on does NOTHING, because there is no unfiltered view to clear back to — that is the rule, and Radix gives it for free."
-        >
-          <Card>
-            <div className="flex flex-col gap-4">
-              <Tabs label="Purchasing" tabs={MODULE_TABS} value={tab} onValueChange={setTab} />
-              <Tabs variant="segmented" label="Register presentation" value={registerView} onValueChange={setRegisterView} tabs={[{ value: "table", label: "Table", icon: "table" }, { value: "cards", label: "Cards", icon: "cards" }]} />
-              <p className="text-meta text-kit-slate-11">
-                A count is a `Badge`, never a coloured pill — a badge that could be red would be a
-                status wearing a different name. Tabs with nothing to count show no number at all.
-              </p>
-            </div>
-          </Card>
-        </Section>
-
-        <Section
-          id="checkbox-date"
-          title="Checkbox · DatePicker — §6 · §2.4"
-          note="A checkbox's third state is a different SHAPE, not a different colour. A date field speaks ISO and prints fmtDate() — it can never hand a date to the locale."
-        >
-          <Grid>
-            <Card>
-              <div className="flex flex-col gap-8">
-                <Sample label="checked · unchecked · some (a select-all over a partial pick)">
-                  <Checkbox id="ui-cb1" label="Owing" checked={picked} onCheckedChange={setPicked} />
-                  <Checkbox id="ui-cb2" label="Late" checked={false} onCheckedChange={() => {}} />
-                  <Checkbox
-                    id="ui-cb3"
-                    label="Select all"
-                    checked={some}
-                    onCheckedChange={(next) => setSome(next)}
-                  />
-                </Sample>
-                <Sample label="disabled">
-                  <Checkbox id="ui-cb4" label="Cancelled" checked={false} disabled onCheckedChange={() => {}} />
-                </Sample>
-              </div>
-            </Card>
-            <Card>
-              <div className="flex flex-col gap-8">
-                <Sample label={`a date — the canonical ${fmtDate("2026-07-19")}, from fmtDate(); the year shows only off-year`}>
-                  <div className="w-full">
-                    <DatePicker id="ui-date" label="Delivery date" value={date} onChange={setDate} />
-                  </div>
-                </Sample>
-                <Sample label="empty — the placeholder, and nothing else">
-                  <div className="w-full">
-                    <DatePicker id="ui-date-empty" label="Ready date" value={null} onChange={() => {}} />
-                  </div>
-                </Sample>
-                <Sample label="error — the message replaces the hint">
-                  <div className="w-full">
-                    <DatePicker
-                      id="ui-date-error"
-                      label="Delivery date"
-                      required
-                      hint="Never shown while an error is"
-                      error="Pick a date"
-                      value={null}
-                      onChange={() => {}}
-                    />
-                  </div>
-                </Sample>
-              </div>
-            </Card>
-          </Grid>
-        </Section>
-
-        <Section
-          id="route"
-          title="Route stop · Checklist row · Quiet route row · Block"
-          note="The Work route (Workspace MASTER §5.10, admitted 2026-09-28). Placeholders in braces; a page fills them from records."
-        >
-          <div className="max-w-[640px] rounded-card border border-kit-slate-5 bg-white p-6">
-            <RouteStop label="{Stop}" tone="missed" data-testid="ui-route-stop-missed">
-              <Block
-                title="{What to do}"
-               
-                why={{ text: "{Why it is owed now}", tone: "missed" }}
-                headerSlot={<Button size="touch">{"{Owning form}"}</Button>}
-              >
-                <div className="flex flex-col">
-                  <ChecklistRow mark="done" step="{Step done}" value="{date}" doc={<span className="text-meta underline">{"{Document No}"}</span>} />
-                  <ChecklistRow mark="missed" step="{Step that is the act}" value="{state}" />
-                </div>
-                <p className="self-end text-meta text-kit-slate-11">1 of 2 done</p>
-              </Block>
-            </RouteStop>
-            <RouteStop label="{Stop}" tone="due">
-              <Block title="{What to do}" why={{ text: "{Why}", tone: "due" }}>
-                <ChecklistRow mark="due" step="{Step that is the act}" value="{state}" />
-                <ChecklistRow mark="none" step="{A fact}" value="{Opens date}" />
-              </Block>
-            </RouteStop>
-            <RouteStop label="{Stop}" tone="none" hideLabel>
-              <QuietRouteRow label="{STOP}" status="{Who has not done what}" progress="0 of 2 done" open={false} onToggle={() => {}} />
-            </RouteStop>
-            <RouteStop label="{Stop}" tone="done" last hideLabel>
-              <QuietRouteRow label="{STOP}" status="{Done sentence}" progress="2 of 2 done" open={false} onToggle={() => {}} />
-            </RouteStop>
-          </div>
-          <div className="max-w-[640px]">
-            <ChecklistRow mark="open" step="{Step not yet}" value="{state}" stacked />
-          </div>
-        </Section>
-
-        <Section
-          id="step-list"
-          title="StepList — the numbered steps of one job"
-          note="A 20px round mark, a 13 / 500 title, one 12 grey line and the step's own controls. Done is green with a tick, the step to do now is dark, a later step is white. The marks say where the person is; they never record anything."
-        >
-          <div className="max-w-[420px]">
-            <Block title="{Job}">
-              <StepList aria-label="{Job}">
-                <Step n={1} state="done" title="{Step done}" sub="{What was done}" />
-                <Step n={2} state="current" title="{Step to do now}" sub="{What to do}" action={<Button variant="neutral" size="sm">{"{Do it}"}</Button>} />
-                <Step n={3} state="pending">
-                  <div className="flex"><Button variant="primary" size="sm" disabled>{"{The one act}"}</Button></div>
-                </Step>
-              </StepList>
-            </Block>
-          </div>
-        </Section>
-
-        <Section
-          id="task-view"
-          title="TaskView — the one task view"
-          note="What every opened task looks like: the task, its page and record with the owner's initials, one row per fact (amber only on the one that has gone by), then the tabs. The first tab is the module's own work and stays mounted; the others are drawn when opened. The view reads nothing and writes nothing."
-        >
-          <div className="max-w-[320px]">
-            <TaskView
-              title="{The task, as its list card says it}"
-              moduleIcon="shopping_cart"
-              page="{Page}"
-              record="{Record}"
-              openRecordLabel="Open {Record}"
-              onOpenRecord={() => {}}
-              owner="{Owner Name}"
-              tabsLabel="Task sections"
-              facts={[
-                { key: "deadline", icon: "event", label: "Deadline", value: "{date · n days late}", warn: true },
-                { key: "contact", icon: "forum", label: "Contact", value: "{party · channel}" },
-                { key: "record-fact", icon: "local_shipping", label: "{Fact}", value: "{value}" },
-              ]}
-              tabs={[
-                { key: "steps", label: "Steps", content: (
-                  <StepList aria-label="{Job}">
-                    <Step n={1} state="current" title="{What to record}" sub="{Finish when: …}">
-                      <div><Button variant="primary" size="sm">{"{The one act}"}</Button></div>
-                    </Step>
-                  </StepList>
-                ) },
-                { key: "route", label: "Route", content: <p className="text-body text-c-secondary">{"{The Order Route of the Sales Order behind the task}"}</p> },
-                { key: "history", label: "History", content: <p className="text-body text-c-secondary">{"{What was recorded, newest first}"}</p> },
-                { key: "files", label: "Files 2", content: <p className="text-body text-c-secondary">{"{The task's documents, staged along the route}"}</p> },
-              ]}
-            />
-          </div>
-        </Section>
-
-        <Section
-          id="toast"
-          title="Toast — §9's Success state"
-          note="Rendered STATICALLY here: a real toast is on screen for four seconds, which no screenshot gate can photograph. It reuses the one sonner host App.tsx already mounts — a second host would stack two toasts in two corners."
-        >
-          <Card>
-            <div className="flex flex-col gap-4">
-              <Toast kind="success" message="Delivery order issued" />
-              <Toast kind="warning" message="Two lines still have no PO" />
-              <Toast kind="danger" message="That did not save — nothing changed" />
-              <p className="text-meta text-kit-slate-11">
-                Three kinds and no fourth. There is deliberately no "info" toast: a message with no
-                consequence has not earned an interruption. The tone sits on the GLYPH, never on the
-                whole surface.
-              </p>
-            </div>
-          </Card>
-        </Section>
-
-        {/* ─── 5 · The shells — structure, card D0.5c ──────────────────────── */}
-        <Section
-          id="shells"
-          title="PageShell · DataTable — §8.1 · §7"
-          note="Extracted from the Orders page, not designed fresh. The list variant has NO kpi slot and there is no extra band — an eighth band is not forbidden by a sentence, it has nowhere to go."
-        >
-          <Card padding="none">
-            <div className="h-96">
-              <PageShell
-                variant="list"
-                title="Orders"
-                toolbar={<Tabs label="Orders" tabs={ORDER_TABS} value={ordersTab} onValueChange={setOrdersTab} />}
-                toolbarRight={<SearchInput id="ui-shell-search" />}
-                chips={[{ label: "Region: KV", onClear: () => {} }]}
-                footer={<span>2 of 55 orders</span>}
-              >
-                <DataTable
-                  label="Orders"
-                  rows={DEMO_ROWS}
-                  columns={DEMO_COLUMNS}
-                  rowId={(r) => r.id}
-                  onRowOpen={() => setDrawerOpen(true)}
-                  selection={{
-                    selected: picked ? new Set(["1"]) : new Set(),
-                    onToggleRow: () => setPicked((p) => !p),
-                    onToggleAll: () => setPicked((p) => !p),
-                    label: "Select all orders",
-                  }}
-                  empty="No orders match this filter"
-                />
-              </PageShell>
-            </div>
-          </Card>
-          <p className="text-meta text-kit-slate-11">
-            The table is `table-fixed` on percentage widths, so it is always exactly the container
-            width and never scrolls sideways; rows are 40px fixed and each cell clips its own
-            overflow. Clicking a row opens its record — the drawer above.
-          </p>
-        </Section>
-
-        {/* ─── 5b · The grid powers — card D0.5d ───────────────────────────── */}
-        <Section
-          id="grid-powers"
-          title="DataTable — the grid powers, §7 · card D0.5d"
-          note="Row expand · column resize · column reorder · footer totals. Every one is an OPTIONAL prop: pass none and this is the D0.5c table, which is what lets a kit card ship while two of the three pages rendering through it are frozen. The record bar below the table is PageShell's own footer band, not a second one — it already existed."
-        >
-          <Card padding="none">
-            <div className="h-96">
-              <PageShell
-                variant="list"
-                title="To Order"
-                chips={[{ label: "Supplier: Ohana", onClear: () => {} }]}
-                /* Power 5 — the record bar — is PageShell's own band, not a
-                 * second one under the table. It is rendered here so `/ui`
-                 * shows the whole grid an operator meets. */
-                footer={<span>Record 3 of 55</span>}
-              >
-                <DataTable
-                  label="Purchase demands"
-                  rows={DEMO_ROWS}
-                  columns={DEMO_COLUMNS}
-                  rowId={(r) => r.id}
-                  expansion={{
-                    expanded: openRows,
-                    onToggle: (id) =>
-                      setOpenRows((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(id)) next.delete(id);
-                        else next.add(id);
-                        return next;
-                      }),
-                    label: (r) => `Show the lines of ${r.ref}`,
-                    render: (r) => (
-                      <div className="flex flex-col gap-1">
-                        <span className="text-label text-kit-slate-11">Lines</span>
-                        <span className="text-body text-kit-slate-12">
-                          {r.customer} — the caller renders every word in here, and the kit renders
-                          none of them. {LONG}
-                        </span>
-                      </div>
-                    ),
-                  }}
-                  layout={{ resizeLabel: "Drag to resize", reorderLabel: "Drag to reorder" }}
-                  totals={{
-                    label: "Totals",
-                    cell: (c, rows) => (c.key === "owing" ? `${rows.length} rows` : null),
-                  }}
-                  empty="No demands match this filter"
-                />
-              </PageShell>
-            </div>
-          </Card>
-          <Card padding="none">
-            <div className="h-64">
-              <Sample label="empty — the totals strip is withheld, because a total of nothing is not a total">
-                <div className="w-full">
-                  <DataTable
-                    label="Purchase demands"
-                    rows={[]}
-                    columns={DEMO_COLUMNS}
-                    rowId={(r) => r.id}
-                    totals={{ label: "Totals", cell: () => "" }}
-                    empty="No demands match this filter"
-                  />
-                </div>
-              </Sample>
-            </div>
-          </Card>
-          {/* The LOADING state is deliberately not drawn a second time here.
-           *  It is `Loading`'s own skeleton and already has a section on this
-           *  page, and the only thing D0.5d adds to it is an ABSENCE — the
-           *  totals strip withheld — which no screenshot can photograph. That
-           *  is asserted in `grid-powers.test.tsx` instead, which is where a
-           *  claim about something not being rendered actually holds. */}
-          <p className="text-meta text-kit-slate-11">
-            A resize takes width from the RIGHT NEIGHBOUR and never from the table, so the sum stays
-            the container and §7's first rule — a list table never scrolls sideways — survives the
-            first drag. The layout is NOT remembered between sessions: §0.4 rules that the tool's
-            shape is the company's, not the operator's, so a reload puts the columns back.
-          </p>
-        </Section>
-
-        {/* ─── Table recipes 3 and 4 — owner ruling 2026-09-27 ─────────────── */}
-        <Section
-          id="document-table"
-          title="DocumentTable · TotalsSummary — table recipes 3 and 4"
-          note="The table a document draws inside a card, and its totals tail. Row lines only, no column lines; numbers right and tabular; only the closing total is 600. A row may be a door, opened from its first cell."
-        >
-          <Grid>
-            <Sample label="DocumentTable — two door rows, one plain row, the closing total">
-              <Card>
-                <DocumentTable
-                  label="Example document table"
-                  columns={[
-                    { key: "month", label: "Month" },
-                    { key: "mattress", label: "Mattress", numeric: true },
-                    { key: "sofa", label: "Sofa", numeric: true },
-                    { key: "total", label: "Total Qty", numeric: true },
-                  ]}
-                  rows={[
-                    { key: "a", cells: { month: "{Mon YYYY}", mattress: 4, sofa: 1, total: 5 }, onOpen: () => {}, openLabel: "Open Sales Orders for {Mon YYYY}" },
-                    { key: "b", cells: { month: "{Mon YYYY}", mattress: 0, sofa: 2, total: 2 }, onOpen: () => {}, openLabel: "Open Sales Orders for {Mon YYYY}" },
-                    { key: "c", cells: { month: "No delivery date", mattress: 1, sofa: 0, total: 1 } },
-                    { key: "t", cells: { month: "Total", mattress: 5, sofa: 3, total: 8 }, total: true },
-                  ]}
-                />
-              </Card>
-            </Sample>
-            <Sample label="TotalsSummary — no frame, one line between rows, one strong row">
-              <Card>
-                <TotalsSummary
-                  label="Example totals"
-                  rows={[
-                    { key: "total", label: "Total Qty", value: 8 },
-                    { key: "delivered", label: "Delivered", value: 3 },
-                    { key: "owed", label: "Not delivered", value: 5, strong: true },
-                  ]}
-                />
-              </Card>
-            </Sample>
-          </Grid>
-        </Section>
-
-        <Section
-          id="detail-shell"
-          title="DetailShell — §1.4 · the information model's L4"
-          note="Six ordered slots and no state prop. Working · Blocked · Waiting · Completed are produced by what the slots are given — a component that cannot be told a state cannot print one."
-        >
-          <Grid>
-            <Card padding="none">
-              <div className="h-96 overflow-hidden">
-                <DetailShell
-                  identity={DEMO_IDENTITY}
-                  currentAction={{ answer: "Call NETS — confirm delivery date", context: "Due today · Jess" }}
-                  currentIssues={[]}
-                  progress={DEMO_PROGRESS}
-                  sections={DEMO_SECTIONS}
-                />
-              </div>
-            </Card>
-            <Card padding="none">
-              <div className="h-96 overflow-hidden">
-                <DetailShell
-                  identity={DEMO_IDENTITY}
-                  currentAction={{ answer: "Collect RM 2,000 from Tan Wei Ming" }}
-                  currentIssues={[
-                    { id: "a", track: "goods", text: "2 lines have no PO" },
-                    { id: "b", track: "money", text: "RM 2,000 is holding the delivery", holding: true },
-                  ]}
-                  progress={DEMO_PROGRESS}
-                  sections={DEMO_SECTIONS}
-                />
-              </div>
-            </Card>
-          </Grid>
-          <p className="text-meta text-kit-slate-11">
-            LEFT is a calm order: Current Issues renders NOTHING — no "✓ None", no empty card, no
-            reassuring tick. RIGHT is the same order blocked. Nothing else moved, and neither card
-            was told which one it is.
-          </p>
-        </Section>
-
-        <Section
-          id="layers"
-          title="Z-index — §4.4"
-          note="Fifteen levels are in use across the portal today. Five survive, and they are reachable only through components — one file in the kit may name one."
-        >
-          <Card>
-            <div className="flex flex-col gap-2">
-              {Z_LADDER.map((l) => (
-                <div key={l.z} className="flex items-center gap-4">
-                  <span className="w-12 shrink-0 font-mono text-meta text-kit-slate-12 tabular-nums">
-                    z-{l.z}
-                  </span>
-                  <span className="text-body text-kit-slate-12">{l.layer}</span>
-                  <span className="text-meta text-kit-slate-11">
-                    {l.owner} · {l.card}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </Section>
-      </div>
+      <Section id="not-yet" title="Not in the kit yet" note="Pages still draw these themselves. Each joins the kit, once, when its page's turn comes.">
+        <ul className="list-disc pl-5 text-[13px] text-c-body">
+          <li>Shell: side menu and top bar (they are the live app shell; check them on any page)</li>
+          <li>Buttons: main, normal and quiet; inputs; dialogs</li>
+          <li>The Tasks panel and its task card (round 3, approved and live)</li>
+          <li>Order and purchase order pages, documents, Settings</li>
+        </ul>
+      </Section>
     </main>
   );
 }

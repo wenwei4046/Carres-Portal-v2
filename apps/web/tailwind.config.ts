@@ -151,6 +151,11 @@ export default {
           "column-band": "var(--c-column-band)",
           "card-border": "var(--c-card-border)",
           "btn-border": "var(--c-btn-border)",
+          /* A white or grey button: hover and open (01 · docs/ui/carres-tokens.css). */
+          "btn-hover": "var(--c-btn-hover)",
+          /* The item sub-header band and an opened row's frame (01 §7: Expanded row). */
+          band: "var(--c-band)",
+          "open-frame": "var(--c-open-frame)",
           "head-line": "var(--c-head-line)",
           "row-line": "var(--c-row-line)",
           "footer-line": "var(--c-footer-line)",
