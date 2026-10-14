@@ -90,7 +90,7 @@ function RequestRegister() {
       searchValue: (r) => r.request_no, exportValue: (r) => r.request_no },
     { key: "date", label: "Date", width: W.date, defaultHidden: true, accessor: (r) => fmtDate(r.created_at), dateValue: (r) => r.created_at.slice(0, 10),
       filterType: "date", exportValue: (r) => r.created_at.slice(0, 10) },
-    ...(finance ? [{ key: "who", label: "Requested by", width: 160, accessor: (r: PaymentRequestRow) => r.requested_by_name ?? "",
+    ...(finance ? [{ key: "who", label: "Requested by", width: 160, wrap: true, accessor: (r: PaymentRequestRow) => r.requested_by_name ?? "",
       filterValue: (r: PaymentRequestRow) => r.requested_by_name ?? "", filterType: "enum" as const }] : []),
     { key: "payee", label: "Pay to", width: FINANCE_WIDTH.party, wrap: true, accessor: (r) => r.payee_name, searchValue: (r) => r.payee_name },
     { key: "amount", label: "Amount", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.amount),

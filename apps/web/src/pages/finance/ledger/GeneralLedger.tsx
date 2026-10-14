@@ -57,7 +57,7 @@ const money = amountCell;
 const strong = (text: string) => <span className="font-semibold">{text}</span>;
 
 /** Each column's pixels, so the table is as wide as its columns. */
-const WIDTH = { date: 110, entry: 140, source: 150, document: 150, description: 260, balance: 170 } as const;
+const WIDTH = { date: 110, entry: 130, source: 140, document: 170, description: 180, balance: 150 } as const;
 const TABLE_WIDTH = tableWidth([WIDTH.date, WIDTH.entry, WIDTH.source, WIDTH.document, WIDTH.description,
   FINANCE_WIDTH.amount, FINANCE_WIDTH.amount, WIDTH.balance]);
 

@@ -103,7 +103,7 @@ describe("General Ledger (0639)", () => {
     const table = await screen.findByTestId("general-ledger");
     expect(table.parentElement).toHaveClass(look.statement);
     // As wide as its columns: 110 + 140 + 150 + 150 + 260 + 128 + 128 + 170.
-    expect(table.parentElement!.style.getPropertyValue("--fin-table-width")).toBe("1236px");
+    expect(table.parentElement!.style.getPropertyValue("--fin-table-width")).toBe("1136px");
     const rows = within(table).getAllByTestId("general-ledger-row");
     const cells = (tr: HTMLElement) => Array.from(tr.children).map((td) => td.textContent?.trim() ?? "");
     const brought = rows.filter((tr) => tr.querySelector('[data-fin-tone="brought"]'));
