@@ -542,7 +542,8 @@ export default function PurchaseOrdersPage() {
   const openDemandMonth = (row: MonthlyDemandRow) => {
     if (!row.month) return;
     const requested = row.kind === "month" ? row.month : `${row.kind}:${row.month}`;
-    navigate(`/operation/orders?requested=${encodeURIComponent(requested)}`);
+    /* Every order of that month, open or delivered, as Monthly demand counts it. */
+    navigate(`/operation/orders?tab=all&requested=${encodeURIComponent(requested)}`);
   };
 
 
