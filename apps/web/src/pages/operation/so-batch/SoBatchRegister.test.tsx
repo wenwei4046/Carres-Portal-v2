@@ -1817,7 +1817,7 @@ describe("the opened row — the list's own item rows", () => {
     const parentRow = expansionCell.parentElement!.previousElementSibling!;
     expect(expansionCell.colSpan).toBe(parentRow.children.length - 2);
     expect(expansionCell.parentElement!.children).toHaveLength(3);
-    expect(expansionCell.previousElementSibling).toHaveAttribute("data-testid", "grid-expansion-gutter-__expand__");
+    expect(expansionCell.previousElementSibling).toHaveAttribute("data-testid", "grid-expansion-gutter-__select__");
     expect(expansionCell).toHaveStyle({ padding: "0px" });
     /* One row per item line, and nothing else under the row. */
     expect(within(box).getAllByTestId(/^so-batch-part-/).map((row) => row.getAttribute("data-testid")))

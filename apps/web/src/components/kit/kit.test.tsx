@@ -21,7 +21,6 @@ import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import Badge from "./Badge";
 import Button from "./Button";
-import Card from "./Card";
 import EmptyState from "./EmptyState";
 import Icon, { ICON_NAMES } from "./Icon";
 import Input from "./Input";
@@ -52,8 +51,6 @@ describe("no kit component accepts a style override", () => {
     void <StatusPill tone="neutral" className="bg-black">x</StatusPill>;
     // @ts-expect-error — className is not a prop of a kit component
     void <Badge className="bg-black">1</Badge>;
-    // @ts-expect-error — className is not a prop of a kit component
-    void <Card className="p-10">x</Card>;
     // @ts-expect-error — className is not a prop of a kit component
     void <Panel title="t" className="p-10">x</Panel>;
     // @ts-expect-error — className is not a prop of a kit component
@@ -265,12 +262,7 @@ describe("EmptyState and Loading", () => {
   });
 });
 
-describe("Card and Panel", () => {
-  it("lets a table-bodied card drop its padding, and nothing else", () => {
-    const { container } = render(<Card padding="none">x</Card>);
-    expect(container.querySelector('[data-kit="card"]')).not.toHaveClass("p-4");
-  });
-
+describe("Panel", () => {
   it("gives a Panel a real heading, so a screen reader finds the section", () => {
     render(<Panel title="Items ordered">x</Panel>);
     expect(screen.getByRole("heading", { name: "Items ordered" })).toBeInTheDocument();

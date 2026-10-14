@@ -97,7 +97,7 @@ import { TwoLines, joinLines, confirmedDeliveryLines } from "./components/Monito
    (`components/kit/Icon`). The contact deadline draws `call` and `late`. */
 import Icon, { type IconName } from "@/components/kit/Icon";
 import ScheduleCard from "@/components/kit/ScheduleCard";
-import Popover from "@/components/kit/Popover";
+import CPopover from "@/components/carres/CPopover";
 import Button from "@/components/kit/Button";
 import { FilterRail, FilterRailGroup, FilterRailRow } from "./components/workspace-rail";
 import AssignLogisticsDialog from "./components/AssignLogisticsDialog";
@@ -483,7 +483,7 @@ function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
       </div> : card.locality ? <div className="break-words text-label text-kit-slate-11">{card.locality}</div> : null}
       <div className="flex flex-col gap-1">
         {physical.map(line => <div key={line.key} data-testid="schedule-product-line" className="flex items-center justify-between gap-1">
-          <Popover label={line.name} trigger={
+          <CPopover label={line.name} trigger={
             <Button variant="ghost" size="sm" icon={iconOf(line.category)} aria-label={`${line.name}, ${MONITOR_COPY.qty} ${line.qty}`} title={line.name}>
               ×{line.qty}
             </Button>
@@ -495,7 +495,7 @@ function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
               <div>{line.receivedQty == null ? MONITOR_COPY.receiptUnknown : `${MONITOR_COPY.receivedQty} ${line.receivedQty}/${line.qty}`}</div>
               <div className="text-label text-kit-slate-11">{MONITOR_COPY.receiptMeaning}</div>
             </div>
-          </Popover>
+          </CPopover>
           <span title={line.receivedQty == null ? MONITOR_COPY.receiptUnknown : `${MONITOR_COPY.receivedQty} ${line.receivedQty}/${line.qty}`}>
             {line.receivedQty == null ? <StatusPill tone="neutral">{MONITOR_COPY.receiptUnknown}</StatusPill>
               : line.receivedQty === 0 ? <StatusPill tone="neutral">{MONITOR_COPY.receivedQty} 0/{line.qty}</StatusPill>

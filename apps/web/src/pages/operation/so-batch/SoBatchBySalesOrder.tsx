@@ -96,13 +96,13 @@ export function OrderItemRows({ label, lines, columns, stepBack, testId, before 
         <Fragment key={line.key}>
         <div role="row" className="grid min-h-[44px] items-center border-t border-c-row-line py-1"
           style={{ gridTemplateColumns: columns }} data-testid={line.testId ?? `by-order-line-${line.key}`}>
+          <span role="cell" />
           <span role="cell" className="grid place-items-center">
             {line.tick ? (
               <RowTick testId={line.tick.testId} label={line.tick.label} checked={line.tick.checked}
                 disabled={line.tick.disabled} why={line.tick.why} onChange={line.tick.onChange} />
             ) : null}
           </span>
-          <span role="cell" />
           <span role="cell" className="flex min-w-0 flex-col px-[5px]">
             <span className="break-words text-body text-c-ink">{line.code}</span>
             {line.detail ? <span className="break-words text-meta text-c-secondary">{line.detail}</span> : null}
@@ -220,7 +220,7 @@ export default function SoBatchBySalesOrder({
   const soWidth = fit.first;
   const [itemsWidth, proceedWidth, requestedWidth, statusWidth] = fit.fixed as [number, number, number, number];
   const soFloor = fit.tight ? COLUMN_FLOOR.first : SO_MIN;
-  const lead = drawn.length >= 3 ? drawn.slice(0, 3).map((width) => `${width}px`).join(" ") : `40px 32px ${Math.max(soFloor, soWidth)}px`;
+  const lead = drawn.length >= 3 ? drawn.slice(0, 3).map((width) => `${width}px`).join(" ") : `32px 40px ${Math.max(soFloor, soWidth)}px`;
   /* The item line gives way with them, so Supplier delivers to keeps room. */
   const line = fit.tight ? LINE_TIGHT : LINE;
   const lineColumns = `${lead} ${line.qty}px ${line.stock}px ${line.supplier}px 1fr`;
@@ -313,7 +313,7 @@ export default function SoBatchBySalesOrder({
     /* The kit's table puts 10 between columns and no padding inside a cell
        (01 §5). The listing engine pads every cell instead, so its padding is
        5 a side here, as on By supplier. */
-    <div ref={box} className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="by-sales-order" style={{ ["--table-row-pad" as string]: "6px 5px" }}>
+    <div ref={box} className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="by-sales-order">
       <DataGrid<SoBatchOrderRow>
         rows={orders}
         columns={columns}
