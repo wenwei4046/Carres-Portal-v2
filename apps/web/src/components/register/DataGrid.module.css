@@ -1676,3 +1676,15 @@ div:first-child > .columnsMenuGroup {
 .rootLookFinance .tr:last-child {
   border-bottom: 1px solid var(--fin-col-line);
 }
+
+/* Finance rows are 40 high, not the kit's 54 (Chew 2026-10-14, 「每个row 太厚了」,
+   every Finance table): a row with a second line still grows. */
+.rootLookFinance {
+  --grid-cell-h: max(var(--grid-row-h, 0px), 40px);
+}
+/* 3 above and below, so a row's 34-high icon buttons fit inside the 40. */
+.rootLookFinance .td {
+  padding-top: 3px;
+  padding-bottom: 3px;
+  height: calc(var(--grid-cell-h) - 1px);
+}

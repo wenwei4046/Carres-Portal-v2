@@ -227,7 +227,8 @@ describe("Chart of accounts — edit and retire from the row (0656)", () => {
     show();
     await ready();
     expect(await within(row("310-1000")).findAllByText("Bank account")).toHaveLength(1);
-    expect(within(row("310-1000")).queryByText("SBK")).toBeNull();
+    // Its special type has its own column, a money account's too (Chew 2026-10-14).
+    expect(within(row("310-1000")).getByText("SBK")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("chart-edit-310-1000"));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("Money account")).toBeInTheDocument();
