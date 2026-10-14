@@ -81,18 +81,26 @@ for (const width of WIDTHS) {
   }
 
   /* `+ Task` on this page (the shell's Tasks panel steps aside here): the
-     button is on the one toolbar line, `Staff tasks` is a Module row, and an
-     internal task opens beside the list with no Communication card, because
-     nobody outside is asked. */
+     button is in the `Module` panel's title row, never on the toolbar (which
+     had no room for it at 1025 on production, 14 Oct 2026); the toolbar keeps
+     its search and page tools inside the page; `Staff tasks` is a Module row;
+     an internal task opens beside the list with no Communication card,
+     because nobody outside is asked. */
   test(`Workspace: New task and an internal task at ${width}`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(address("&scope=team"), { waitUntil: "networkidle" });
     await page.locator('[data-testid^="workspace-row-"]').first().waitFor();
     const open = page.getByTestId("new-task-open");
-    await expect(open).toHaveText("New task");
-    const [toolbar, button] = [(await page.getByTestId("workspace-toolbar").boundingBox())!, (await open.boundingBox())!];
-    expect(Math.abs((button.y + button.height / 2) - (toolbar.y + toolbar.height / 2)), "the button is on the toolbar line").toBeLessThan(3);
-    expect(button.x + button.width, "the button is inside the page").toBeLessThanOrEqual(width);
+    await expect(open).toHaveText("Task");
+    expect(await open.evaluate((button) => button.closest('[data-testid="workspace-rail"]') !== null), "the button is in the Module panel").toBe(true);
+    /* Every toolbar control, the page tools last, is whole inside the table's width. */
+    const fits = await page.evaluate(() => {
+      const table = document.querySelector('[data-testid="workspace-table"]')!.getBoundingClientRect();
+      return [...document.querySelectorAll('[data-testid="workspace-table"] [data-testid="work-toolbar"] button')]
+        .filter((el) => el.getClientRects().length)
+        .every((el) => el.getBoundingClientRect().right <= table.right + 1);
+    });
+    expect(fits, "a toolbar control passes the table's right edge").toBe(true);
     await expect(page.getByTestId("workspace-module-workspace")).toContainText("Staff tasks");
     await expectKit(page, "the table with New task");
 

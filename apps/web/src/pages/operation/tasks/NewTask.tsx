@@ -35,8 +35,8 @@ import { isSimulatedWalk } from "./tasks-host";
 
 type Field = "name" | "detail" | "due" | "assignee";
 
-/** `wide`: the Workspace toolbar's full word; else the 320 panel's short one. */
-export default function NewTask({ wide = false }: { wide?: boolean }) {
+/** One button in a title row: the Tasks panel's and the Workspace `Module` panel's. */
+export default function NewTask() {
   const queryClient = useQueryClient();
   const { staff, myUserId, generatedOn } = useOpenWorkSet();
   const people = useMemo(() => internalTaskPeople(staff, myUserId), [staff, myUserId]);
@@ -101,8 +101,8 @@ export default function NewTask({ wide = false }: { wide?: boolean }) {
 
   return (
     <>
-      <Button ref={trigger} size="sm" variant={wide ? "primary" : "neutral"} icon="add" title={W.hint} aria-label={W.title} onClick={start} data-testid="new-task-open">
-        {wide ? W.buttonWide : W.button}
+      <Button ref={trigger} size="sm" variant="neutral" icon="add" title={W.hint} aria-label={W.title} onClick={start} data-testid="new-task-open">
+        {W.button}
       </Button>
       <Modal
         open={open}

@@ -22,10 +22,10 @@ import NewTask from "./NewTask";
  * `+ Task` and the `New task` dialog (Workspace MASTER "Employee-created
  * internal tasks", Jess 2026-10-14). Every person below is TEST data.
  */
-function mount(wide = false) {
+function mount() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const invalidate = vi.spyOn(client, "invalidateQueries");
-  render(<QueryClientProvider client={client}><NewTask wide={wide} /></QueryClientProvider>);
+  render(<QueryClientProvider client={client}><NewTask /></QueryClientProvider>);
   return { invalidate };
 }
 const sent = (): Array<Record<string, unknown>> => api.mock.calls.map(([path, init]) => ({ path: path as string, ...(JSON.parse((init as { body: string }).body) as Record<string, unknown>) }));
@@ -35,15 +35,11 @@ const name = () => screen.getByLabelText(/Task name/) as HTMLInputElement;
 beforeEach(() => { api.mockReset(); toast.mockReset(); });
 
 describe("the button", () => {
-  it("is `Task` in the Tasks panel and `New task` on the Workspace toolbar, and both are named New task", () => {
+  it("is `Task`, named New task, with its hint", () => {
     mount();
     expect(screen.getByTestId("new-task-open")).toHaveTextContent(/^Task$/);
     expect(screen.getByRole("button", { name: "New task" })).toBe(screen.getByTestId("new-task-open"));
     expect(screen.getByTestId("new-task-open")).toHaveAttribute("title", "Add a task for you or a colleague");
-  });
-  it("wide", () => {
-    mount(true);
-    expect(screen.getByTestId("new-task-open")).toHaveTextContent("New task");
   });
 });
 

@@ -13,9 +13,8 @@ import type { WorkRow } from "../use-open-work";
 import type { TaskHistoryEvent } from "./task-view";
 
 export const INTERNAL_TASK_WORDS = {
-  /* The two buttons: short in the 320 panel, full on the Workspace toolbar. */
+  /* The button, in the Tasks panel's and the Workspace `Module` panel's title row. */
   button: "Task",
-  buttonWide: "New task",
   hint: "Add a task for you or a colleague",
   title: "New task",
   name: "Task name",

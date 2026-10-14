@@ -104,8 +104,8 @@ other module's obligation, and it closes none.
   (`workspace:{task}:internal_task`), owned by its assignee and due on its date. `Done` is written
   once through the 0584 ledger's existing completion door, so the Tasks panel and the Workspace
   page read the same `Done`. It names no party, so `Record as sent` and `Waiting` do not apply.
-- **Screens.** `+ Task` in the Tasks panel's title row and `New task` on the Workspace toolbar open
-  one dialog: `Task name` · `Description (optional)` · `For` · `Due date`. The task is a card in its
+- **Screens.** `+ Task` in the Tasks panel's title row and in the Workspace page's `Module` title
+  row (the toolbar has no room for it at 1025: measured on production 14 Oct 2026) opens one dialog: `Task name` · `Description (optional)` · `For` · `Due date`. The task is a card in its
   assignee's Tasks and a row of the `Staff tasks` module on the Workspace page (`Team Work` shows
   everyone's). Opened, it is the one task view with `Steps` and `History` only, because it serves
   no order and holds no document, and with one act, `Mark done`.
