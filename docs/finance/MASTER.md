@@ -827,7 +827,9 @@ FINANCE          its title folds the area (§4.1)
   - a selected row light grey (`#E9EBEF`) with a dark edge on its left, so it never reads as the blue header;
   - a subtotal row light grey and 600; the total row the same with a heavy rule above;
   - an account's code and its name in two columns, the code alone being the link;
-  - a zero amount a blank cell.
+  - a zero amount a blank cell;
+  - rows 40 high, not the kit's 54 (Chew 2026-10-14, 「每个row 太厚了」, every Finance table); a row with a second line grows;
+  - on Chart of accounts, the special type is its own column, `Special`, between Name and Type, the money accounts' SBK, SCH and HLD included (Chew 2026-10-14).
 - Built 2026-10-13 on Trial Balance, Unpaid by Supplier (five columns at first: Supplier, Unpaid Bills, Unpaid, Advance Left, Unpaid After Advance and Credit; the rest in Columns; a supplier with nothing open only with `Show all suppliers`) and Daily Bank. Every other Finance page follows.
 
 ## 5 · Open items
