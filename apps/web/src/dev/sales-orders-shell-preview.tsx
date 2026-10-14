@@ -318,6 +318,12 @@ window.fetch = async (input, init) => {
   return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
 };
 
+/* The first-entry `Pending work` reminder is its own surface: it shows here
+   only when asked for (`?reminder=1`), so the page under it can be walked. */
+if (new URLSearchParams(window.location.search).get("reminder") !== "1") {
+  try { window.localStorage.setItem(`carres.pendingWork.shownOn.${ME}`, appTodayIso()); } catch { /* a private window: the reminder shows */ }
+}
+
 useAuth.setState({
   role: "operation", hydrated: true, loading: false,
   user: { id: ME, email: "preview@carres.local" } as never,
