@@ -7,8 +7,10 @@
  * from these parts only. The earlier kit that stood here (the July decisions, the
  * slate tokens and their components) is replaced, not kept beside it: one kit.
  *
- * A part a page still draws for itself is not on this page; it is listed at the
- * end as not in the kit yet, and joins the kit when that page's turn comes.
+ * The second half, "Shared parts the pages use", is every other shared component
+ * the Portal's pages import today (counted 15 Oct 2026), led by the one listing
+ * engine, DataGrid. Where two components still do one job, both are shown and the
+ * last section names the merge that is owed: one kit means nothing hides here.
  */
 import { useEffect, useState, type ReactNode } from "react";
 import MIcon from "@/components/carres/MIcon";
@@ -19,6 +21,32 @@ import CSidePanel from "@/components/carres/CSidePanel";
 import { CChip, CIconButton, CShowPanelButton, CViewButton } from "@/components/carres/CToolbar";
 import { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
 import { TasksPill, useShellTasks } from "@/pages/operation/components/ShellTasks";
+import Block from "@/components/kit/Block";
+import Button from "@/components/kit/Button";
+import Checkbox from "@/components/kit/Checkbox";
+import DatePicker from "@/components/kit/DatePicker";
+import Drawer from "@/components/kit/Drawer";
+import EmptyState from "@/components/kit/EmptyState";
+import Input from "@/components/kit/Input";
+import Loading from "@/components/kit/Loading";
+import Modal from "@/components/kit/Modal";
+import PdfPreview from "@/components/kit/PdfPreview";
+import Popover from "@/components/kit/Popover";
+import RouteStop from "@/components/kit/RouteStop";
+import SavedEvidenceViewer from "@/components/kit/SavedEvidenceViewer";
+import SearchInput from "@/components/kit/SearchInput";
+import Select from "@/components/kit/Select";
+import StatusPill from "@/components/kit/StatusPill";
+import StepList, { Step } from "@/components/kit/StepList";
+import Tabs from "@/components/kit/Tabs";
+import TaskView from "@/components/kit/TaskView";
+import Textarea from "@/components/kit/Textarea";
+import Tooltip from "@/components/kit/Tooltip";
+import { TONES as STATUS_TONES } from "@/components/kit/tokens";
+import { CMenu } from "@/components/carres/CPopover";
+import ListOptionsExample from "@/pages/dev/ListOptionsExample";
+import ServerRegisterExample from "@/pages/dev/ServerRegisterExample";
+import CompactCardExample from "@/pages/dev/CompactCardExample";
 
 function Section({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
   return (
@@ -152,6 +180,242 @@ const CELLS: Array<[string, CCell]> = [
 ];
 const TONES: CPillTone[] = ["ok", "warn", "info", "blocked", "select"];
 
+/* ── shared parts the pages use: every one is the component the pages import ── */
+const CARRIERS = [
+  { value: "nets", label: "NETS" },
+  { value: "houzs", label: "HOUZS" },
+  { value: "retired", label: "TEST · retired carrier", disabled: true },
+];
+
+function Sample({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-[12px] text-c-secondary">{label}</span>
+      <div className="flex flex-wrap items-center gap-3">{children}</div>
+    </div>
+  );
+}
+
+function Panel2({ children }: { children: ReactNode }) {
+  return <div className="flex flex-col gap-6 rounded-lg border border-c-card-border bg-c-card p-5">{children}</div>;
+}
+
+function PdfPreviewSample() {
+  const [src, setSrc] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => () => { if (src) URL.revokeObjectURL(src); }, [src]);
+  async function openSample(broken: boolean) {
+    setLoading(true);
+    try {
+      const { renderPoPdf } = await import("@/lib/pdf/render");
+      const blob = broken ? new Blob(["Unavailable document"], { type: "application/pdf" }) : await renderPoPdf({
+        draft: true, po_number: "DRAFT", po_id: "", version: 0, issue_date: "2026-09-24",
+        supplier: { name: "TEST supplier", address: "TEST address", contact: null },
+        destination: { name: "TEST destination", address: "TEST warehouse address" },
+        delivery_instructions: null, eta_date: "2026-10-02", terms: null,
+        lines: [{ sku: "TEST", description: "TEST item", qty: 2, unit: "unit" }],
+      });
+      setSrc(URL.createObjectURL(blob));
+    } finally { setLoading(false); }
+  }
+  return <div className="flex flex-col gap-3">
+    <div className="flex flex-wrap gap-2">
+      <Button loading={loading} onClick={() => void openSample(false)}>Show preview</Button>
+      <Button disabled={loading} onClick={() => void openSample(true)}>Show failed preview</Button>
+    </div>
+    {src && <div className="flex h-[70vh] min-w-0 bg-c-ground p-4"><PdfPreview src={src} title="TEST document" /></div>}
+  </div>;
+}
+
+function SavedEvidenceSample() {
+  const [active, setActive] = useState<string | null>(null);
+  return <>
+    <Button onClick={() => setActive("example")}>View</Button>
+    <SavedEvidenceViewer activeId={active} onClose={() => setActive(null)}
+      files={[
+        { id: "example", kind: "photo", url: "/carres-logo.png", context: "TEST · Arrival evidence", unitCodes: ["U1-000-001"] },
+        { id: "unreadable", kind: "photo", url: null, context: "TEST · Arrival evidence" },
+      ]}
+      onRetry={async (id) => (id === "example" ? "/carres-logo.png" : null)} />
+  </>;
+}
+
+function SharedParts() {
+  const [carrier, setCarrier] = useState<string | undefined>(undefined);
+  const [picked, setPicked] = useState(true);
+  const [date, setDate] = useState<string | null>("2026-10-19");
+  const [view, setView] = useState("table");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  return (
+    <>
+      <header className="flex flex-col gap-1 border-t border-c-section-line pt-8">
+        <h2 className="text-page">Shared parts the pages use</h2>
+        <p className="text-[13px] text-c-secondary">
+          Every component below is imported by Portal pages today; the count is how many pages import it (15 Oct 2026). All data is TEST.
+        </p>
+      </header>
+
+      <Section id="list-engine" title="List engine: DataGrid (56 pages)" note="The one listing engine (UI MASTER §6.0, §6.2): Sales Orders register, SO Batch Purchase, Forecast Purchase, Purchase Orders, Receiving, Warehouse, Delivery, Payments, Finance and Workspace Tasks. Sort, per-column filters, Columns, grouping, resize, ticks and the selection bar, row expansion, export, list PDF, saved layouts, return context and the keyboard all live here once; a module passes its columns, rows, filters and actions.">
+        <ListOptionsExample />
+        <ServerRegisterExample />
+      </Section>
+
+      <Section id="buttons" title="Button (131 pages)" note="Main, normal and quiet; 32 high on a desktop, 40 where a finger presses. One main button per area. No danger button: a destructive command is a normal button whose word says what it does.">
+        <Panel2>
+          <Sample label="main · normal · quiet">
+            <Button variant="primary">Issue PO</Button>
+            <Button>Open order</Button>
+            <Button variant="ghost">Cancel</Button>
+          </Sample>
+          <Sample label="with an icon · small · icon only (named)">
+            <Button icon="print">Print</Button>
+            <Button size="sm" icon="add">Add</Button>
+            <Button iconOnly icon="overflow" aria-label="More actions" />
+          </Sample>
+          <Sample label="disabled · busy">
+            <Button variant="primary" disabled>Issue PO</Button>
+            <Button loading>Saving</Button>
+          </Sample>
+        </Panel2>
+      </Section>
+
+      <Section id="fields" title="Fields: Input (49) · Select (72) · Textarea (29) · DatePicker (35) · Checkbox (23) · SearchInput (5)" note="One field skin: label above, hint under, an error replaces the hint and keeps what was typed.">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Panel2>
+            <Input id="ui-k-in" label="Sales order" hint="The number on the customer's copy" defaultValue="SO-TEST-01" />
+            <Input id="ui-k-err" label="Phone" required defaultValue="01" error="Enter a Malaysian mobile number" />
+            <Select id="ui-k-sel" label="Logistics" placeholder="Pick a carrier" options={CARRIERS} value={carrier} onValueChange={setCarrier} />
+            <SearchInput id="ui-k-search" />
+          </Panel2>
+          <Panel2>
+            <Textarea id="ui-k-ta" label="Note (optional)" placeholder="What happened" />
+            <DatePicker id="ui-k-date" label="Delivery date" value={date} onChange={setDate} />
+            <Checkbox id="ui-k-cb" label="Owing" checked={picked} onCheckedChange={(v) => setPicked(v === true)} />
+          </Panel2>
+        </div>
+      </Section>
+
+      <Section id="menus" title="Menu and pop-ups: CMenu · Popover (8) · Tooltip (5)" note="Every ⋮ menu is the one CPopover menu (CMenu, items as data): ↓, Enter or Space opens it on its first command, ↑ ↓ Home End move, Escape or Tab closes it and focus goes back to its button. A menu carries no colour.">
+        <Panel2>
+          <Sample label="⋮ menu">
+            <CMenu
+              label="Row actions"
+              trigger={<Button iconOnly icon="overflow" aria-label="Row actions" />}
+              items={[
+                { key: "print", label: "Print", icon: "print", onSelect: () => {} },
+                { key: "copy", label: "Copy reference", icon: "copy", onSelect: () => {} },
+                { key: "cancel", label: "Cancel order", separatorBefore: true, onSelect: () => {} },
+              ]}
+            />
+            <Popover label="Filters" trigger={<Button icon="filter">Filter</Button>}>
+              <div className="flex w-56 flex-col gap-2">
+                <Checkbox id="ui-k-f1" label="Owing" checked={picked} onCheckedChange={(v) => setPicked(v === true)} />
+              </div>
+            </Popover>
+            <Tooltip content="Already past that deadline">
+              <Button iconOnly icon="late" aria-label="Late" />
+            </Tooltip>
+          </Sample>
+        </Panel2>
+      </Section>
+
+      <Section id="tabs-kit" title="Tabs (16 pages)" note="The grey segmented control: exactly one is on.">
+        <Panel2>
+          <Tabs label="Register presentation" value={view} onValueChange={setView} tabs={[{ value: "table", label: "Table" }, { value: "cards", label: "Cards" }]} />
+        </Panel2>
+      </Section>
+
+      <Section id="dialogs" title="Modal (49) · Drawer (12)" note="A Modal asks one thing; a Drawer opens a record beside its list. Escape closes both and focus returns to the button that opened them.">
+        <Panel2>
+          <Sample label="open them">
+            <Button variant="primary" onClick={() => setModalOpen(true)}>Open a modal</Button>
+            <Button onClick={() => setDrawerOpen(true)}>Open a drawer</Button>
+          </Sample>
+        </Panel2>
+        <Modal
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+          title="Record the delay decision"
+          footer={<><Button variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button><Button variant="primary" onClick={() => setModalOpen(false)}>Save</Button></>}
+        >
+          <Select id="ui-k-modal-sel" label="Logistics" placeholder="Pick a carrier" options={CARRIERS} value={carrier} onValueChange={setCarrier} />
+        </Modal>
+        <Drawer variant="quick-view" open={drawerOpen} onOpenChange={setDrawerOpen} title="SO-TEST-01 · TEST Customer A">
+          <div className="flex flex-col gap-4">
+            <Block title="Delivery"><p className="text-body">Not recorded</p></Block>
+            <Block title="Items"><p className="text-body">No items on this order</p></Block>
+          </div>
+        </Drawer>
+      </Section>
+
+      <Section id="states" title="States: EmptyState (16) · Loading (18)" note="Empty, failed and no access are three different sentences, never one.">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <Panel2><EmptyState icon="search" title="No orders match this filter" detail="Clear a filter to see the rest." /></Panel2>
+          <Panel2><EmptyState icon="late" title="This did not load" detail="The connection dropped before the list arrived." action={<Button variant="primary" icon="refresh">Try again</Button>} /></Panel2>
+          <Panel2><EmptyState icon="lock" title="You cannot open this" detail="Ask a manager for access." /><Loading variant="skeleton" /></Panel2>
+        </div>
+      </Section>
+
+      <Section id="status-pill" title="StatusPill (19 pages)" note="The status pill the object pages and older lists use. It and the list's CPill (above) are two components for one job: the merge is owed (last section).">
+        <Panel2>
+          <Sample label="every tone">
+            {STATUS_TONES.map((tone) => <StatusPill key={tone} tone={tone}>{tone}</StatusPill>)}
+          </Sample>
+        </Panel2>
+      </Section>
+
+      <Section id="compact-card" title="Working Panel: CompactModuleCard (6 pages)" note="One card for every module's record beside its list: identity, the module's tabs, facts with their editors, items, Communication and Timeline (UI MASTER §4.3). TEST sample.">
+        <CompactCardExample />
+      </Section>
+
+      <Section id="documents" title="Documents: PdfPreview (11) · SavedEvidenceViewer (6)" note="The real rendered document, fit to width, with loading and retry. Saved photos and video stay read only.">
+        <Panel2>
+          <PdfPreviewSample />
+          <Sample label="saved evidence"><SavedEvidenceSample /></Sample>
+        </Panel2>
+      </Section>
+
+      <Section id="task-parts" title="Tasks: TaskView · StepList · RouteStop · Block" note="The one opened task (the Tasks panel and Workspace): the task, its record, one row per fact, then Steps · Route · History · Files. Placeholders in braces; a page fills them from records.">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="max-w-[320px]">
+            <TaskView
+              title="{The task, as its list card says it}"
+              moduleIcon="shopping_cart"
+              page="{Page}"
+              record="{Record}"
+              openRecordLabel="Open {Record}"
+              onOpenRecord={() => {}}
+              owner="{Owner Name}"
+              tabsLabel="Task sections"
+              facts={[
+                { key: "deadline", icon: "event", label: "Deadline", value: "{date · n days late}", warn: true },
+                { key: "contact", icon: "forum", label: "Contact", value: "{party · channel}" },
+              ]}
+              tabs={[
+                { key: "steps", label: "Steps", content: (
+                  <StepList aria-label="{Job}">
+                    <Step n={1} state="done" title="{Step done}" sub="{What was done}" />
+                    <Step n={2} state="current" title="{Step to do now}" sub="{Finish when: …}" />
+                  </StepList>
+                ) },
+                { key: "history", label: "History", content: <p className="text-body text-c-secondary">{"{What was recorded, newest first}"}</p> },
+              ]}
+            />
+          </div>
+          <div className="rounded-lg border border-c-card-border bg-c-card p-5">
+            <RouteStop label="{Stop}" tone="due" last>
+              <Block title="{What to do}" why={{ text: "{Why}", tone: "due" }}>
+                <p className="text-body">{"{A fact}"}</p>
+              </Block>
+            </RouteStop>
+          </div>
+        </div>
+      </Section>
+    </>
+  );
+}
+
 export default function UiShowcase() {
   const [tab, setTab] = useState("open");
   const [menu, setMenu] = useState(false);
@@ -257,12 +521,14 @@ export default function UiShowcase() {
         </div>
       </Section>
 
-      <Section id="not-yet" title="Not in the kit yet" note="Pages still draw these themselves. Each joins the kit, once, when its page's turn comes.">
+      <SharedParts />
+
+      <Section id="not-yet" title="Owed: one component per job" note="Where the Portal still has two parts for one job, or a part only one page draws. Each merges once, in the kit, and every page gets it.">
         <ul className="list-disc pl-5 text-[13px] text-c-body">
-          <li>Shell: side menu and top bar (they are the live app shell; check them on any page)</li>
-          <li>Buttons: main, normal and quiet; inputs; dialogs</li>
-          <li>The Tasks panel and its task card (round 3, approved and live)</li>
-          <li>Order and purchase order pages, documents, Settings</li>
+          <li>Carres Table (Sales Order Outright) and the list engine DataGrid draw one table twice: Sales Order Outright moves onto DataGrid, then Carres Table is deleted.</li>
+          <li>CPill (lists) and StatusPill (object pages): one pill.</li>
+          <li>CPopover (as a dialog) and Popover: one pop-up.</li>
+          <li>The Summary side panel is drawn by Sales Order Outright only; SO Batch Purchase and the other lists still use the older filter rail.</li>
         </ul>
       </Section>
     </main>

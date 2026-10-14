@@ -64,7 +64,7 @@ import Button from "@/components/kit/Button";
 import Modal from "@/components/kit/Modal";
 const RegisterPdfPreview = lazy(() => import("@/components/kit/PdfPreview"));
 import Icon from "@/components/kit/Icon";
-import DropdownMenu from "@/components/kit/DropdownMenu";
+import { CMenu, type CMenuEntry } from "@/components/carres/CPopover";
 import Popover from "@/components/kit/Popover";
 import Tooltip from "@/components/kit/Tooltip";
 import { EXPANSION_JOIN_Y, ExpansionJoinContext } from "./expansion-connector";
@@ -256,7 +256,7 @@ export type DataGridProps<T> = {
    *  over the last column and its menu never covers that column. */
   toolbarAfterTools?: ReactNode;
   /** Module-owned presentation commands in the existing shared tools menu. */
-  pageToolsItems?: React.ComponentProps<typeof DropdownMenu>["items"];
+  pageToolsItems?: readonly CMenuEntry[];
   toolbarSummary?: (rows: T[]) => ReactNode;
   searchScope?: string;
   /** Alternate presentation consumes this engine's exact sorted/filter result. */
@@ -3441,7 +3441,7 @@ function DataGridInner<T>({
         {!isLoading && errorState == null && toolbarSummary?.(sortedRows)}
         {isReference && toolbarEnd}
         {presentationTools && <div className={styles.pageTools}>
-          <DropdownMenu label="Page tools" trigger={<Button ref={pageToolsRef} iconOnly icon="overflow" aria-label="Page tools" />}
+          <CMenu label="Page tools" trigger={<Button ref={pageToolsRef} iconOnly icon="overflow" aria-label="Page tools" />}
             items={[
               { key: "export", label: "Export", icon: "download", disabled: exportLoading || sortedRows.length === 0, onSelect: () => {
                 const r = pageToolsRef.current?.getBoundingClientRect();

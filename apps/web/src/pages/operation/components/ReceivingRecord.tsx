@@ -31,7 +31,7 @@ import {
 } from "@/lib/queries";
 import { renderGrnPdf } from "@/lib/pdf/render";
 import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
-import DropdownMenu from "@/components/kit/DropdownMenu";
+import { CMenu } from "@/components/carres/CPopover";
 import SavedEvidenceViewer from "@/components/kit/SavedEvidenceViewer";
 import DOFileUploadField from "@/components/DOFileUploadField";
 import ArrivalEvidenceUploadField from "@/components/ArrivalEvidenceUploadField";
@@ -504,7 +504,7 @@ export default function ReceivingRecord({
               >
                 Amend Receiving
               </button>
-              <DropdownMenu
+              <CMenu
                 label="More actions"
                 trigger={
                   <button

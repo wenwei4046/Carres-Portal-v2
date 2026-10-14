@@ -14,13 +14,22 @@ const render = (ui: ReactElement) =>
   rtlRender(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })}>{ui}</QueryClientProvider>);
 
 describe("/ui — the one Carres UI kit", () => {
-  it("shows the v12 kit parts and nothing of the earlier kit", () => {
+  it("shows the v12 kit parts, then every shared part the pages import, and none of the retired kit's notes", () => {
     render(<UiShowcase />);
-    for (const id of ["table", "cells", "pills", "toolbar", "side-panel", "icons", "not-yet"]) {
+    for (const id of ["table", "cells", "pills", "toolbar", "side-panel", "icons", "list-engine", "buttons", "fields", "menus", "tabs-kit", "dialogs", "states", "status-pill", "compact-card", "documents", "task-parts", "not-yet"]) {
       expect(document.getElementById(id), id).toBeInTheDocument();
     }
     expect(screen.queryByRole("heading", { name: "Frozen decisions" })).not.toBeInTheDocument();
-    expect(document.querySelector('[data-kit="status-pill"]')).not.toBeInTheDocument();
+    /* the one listing engine is on the page, not only the Sales Order Outright frame */
+    expect(document.getElementById("list-engine")!.querySelector('[data-testid="sales-orders-grid"]')).toBeInTheDocument();
+  });
+
+  it("the ⋮ menu is the one CPopover menu: it opens, runs a command and closes", () => {
+    render(<UiShowcase />);
+    const menus = document.getElementById("menus")!;
+    fireEvent.click(within(menus).getByRole("button", { name: "Row actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Print" }));
+    expect(screen.queryByRole("menuitem", { name: "Print" })).not.toBeInTheDocument();
   });
 
   it("the Carres Table is the marked table, with the preserved date's two-line header and the identifier fixed", () => {

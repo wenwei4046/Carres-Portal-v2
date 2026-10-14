@@ -8,7 +8,7 @@
  * field that speaks ISO and prints `fmtDate()`.
  *
  * NEGATIVE CONTROLS (run by hand when touching this file):
- *   · delete `onSelect` from `DropdownMenu`'s item → the "runs the command"
+ *   · delete `onSelect` from `CMenu`'s item → the "runs the command"
  *     test goes red and nothing else moves.
  *   · make `Tabs` call `onValueChange` on every click → exactly the stage-picker
  *     test goes red.
@@ -24,7 +24,7 @@ import DataTable from "./DataTable";
 import DatePicker from "./DatePicker";
 import GridToolbar from "./GridToolbar";
 import Drawer from "./Drawer";
-import DropdownMenu from "./DropdownMenu";
+import { CMenu } from "@/components/carres/CPopover";
 import Modal from "./Modal";
 import Popover from "./Popover";
 import Select from "./Select";
@@ -268,10 +268,10 @@ describe("Select", () => {
 });
 
 /* ───────────────────────────────────────────────────────────────────────────
- * DropdownMenu — the ⋮ menu
+ * CMenu — the ⋮ menu (the one menu: CPopover as a menu, items as data)
  * ────────────────────────────────────────────────────────────────────────── */
 
-describe("DropdownMenu", () => {
+describe("CMenu", () => {
   const items = (onSelect: () => void) => [
     { key: "print", label: "Print", icon: "print" as const, onSelect },
     { key: "copy", label: "Copy reference", icon: "copy" as const, onSelect: () => {}, separatorBefore: true },
@@ -280,7 +280,7 @@ describe("DropdownMenu", () => {
 
   it("shows nothing until it is opened", () => {
     render(
-      <DropdownMenu label="Row actions" trigger={<Button icon="overflow" aria-label="More" />} items={items(() => {})} />,
+      <CMenu label="Row actions" trigger={<Button icon="overflow" aria-label="More" />} items={items(() => {})} />,
     );
     expect(screen.queryByText("Print")).not.toBeInTheDocument();
   });
@@ -288,23 +288,32 @@ describe("DropdownMenu", () => {
   it("opens, runs the command, and closes itself", () => {
     const onSelect = vi.fn();
     render(
-      <DropdownMenu label="Row actions" trigger={<Button icon="overflow" aria-label="More" />} items={items(onSelect)} />,
+      <CMenu label="Row actions" trigger={<Button icon="overflow" aria-label="More" />} items={items(onSelect)} />,
     );
     openMenu(screen.getByRole("button", { name: "More" }));
     expect(screen.getByText("Print")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Print"));
     expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Print")).not.toBeInTheDocument();
+  });
+
+  it("opens from the keyboard with ↓, on the first command", async () => {
+    render(
+      <CMenu label="Row actions" trigger={<Button icon="overflow" aria-label="More" />} items={items(() => {})} />,
+    );
+    const button = screen.getByRole("button", { name: "More" });
+    expect(button).toHaveAttribute("aria-haspopup", "menu");
+    fireEvent.keyDown(button, { key: "ArrowDown" });
+    await waitFor(() => expect(screen.getByRole("menuitem", { name: "Print" })).toHaveFocus());
   });
 
   it("refuses a disabled command", () => {
     render(
-      <DropdownMenu label="Row actions" trigger={<Button icon="overflow" aria-label="More" />} items={items(() => {})} />,
+      <CMenu label="Row actions" trigger={<Button icon="overflow" aria-label="More" />} items={items(() => {})} />,
     );
     openMenu(screen.getByRole("button", { name: "More" }));
-    expect(screen.getByText("Cancel order").closest('[data-kit="dropdown-item"]')).toHaveAttribute(
-      "data-disabled",
-    );
+    expect(screen.getByRole("menuitem", { name: "Cancel order" })).toBeDisabled();
   });
 });
 

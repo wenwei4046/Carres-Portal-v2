@@ -10,7 +10,7 @@ import type { PaymentTemplateRow } from "@carres/shared/payment-templates";
 import { MoreHorizontal } from "lucide-react";
 import ListPageShell from "@/components/ListPageShell";
 import Button from "@/components/kit/Button";
-import DropdownMenu from "@/components/kit/DropdownMenu";
+import { CMenu } from "@/components/carres/CPopover";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import {
   qk,
@@ -334,7 +334,7 @@ function PaymentRecordObject({ payment, onClose, onPrint, printing }: {
       navigation={<span className="text-body">{payment.orders ? `SO-${payment.orders.so}` : "SO not available"}</span>}
       right={!composing ? <span className="flex items-center gap-2">
         {payment.receipt_no && <Button variant="neutral" disabled={printing} onClick={onPrint}>Print</Button>}
-        {overflow.length > 0 && <DropdownMenu label="More actions" items={overflow}
+        {overflow.length > 0 && <CMenu label="More actions" items={overflow}
           trigger={<Button variant="ghost" aria-label="More actions" data-testid="payment-record-overflow">
             <MoreHorizontal size={16} aria-hidden /></Button>} />}
       </span> : undefined}

@@ -1,5 +1,5 @@
 /**
- * The ONE floating surface, shared by `Select` · `DropdownMenu` · `Popover` ·
+ * The ONE floating surface, shared by `Select` · `Popover` ·
  * `DatePicker` · `Tooltip` (UI-KIT §6.6, card D0.5b).
  *
  * §6.6: *"If a UI element appears a second time, it stops being inline and

@@ -11,7 +11,7 @@
 | Thing | Its one home |
 |---|---|
 | Numbers: type, colour, spacing, radius, icons, component and template measurements | [`../01-design-tokens.md`](../01-design-tokens.md) (§7 is the measurement lookup) |
-| Component API, use and states | **the one kit:** `apps/web/src/components/carres/` and live `/ui` (owner 14 Oct 2026); [`../02-components.md`](../02-components.md) and `components/kit/` describe parts not yet moved into it |
+| Component API, use and states | **the one kit, in code** (owner 14 Oct 2026): `apps/web/src/components/carres/` (the v12 parts: table cells, pills, toolbar, side panel, the one menu `CPopover`/`CMenu`, `MIcon`), `components/kit/` (Button, fields, Modal, Drawer, Tabs, states, documents, Working Panel, task parts) and `components/register/DataGrid` (the one listing engine), all shown on live `/ui` with how many pages import each; [`../02-components.md`](../02-components.md) describes them |
 | Page-pattern examples (Register, Object, Task, Form, Card, Batch, Settings) | [`../03-page-patterns.md`](../03-page-patterns.md) |
 | Every visible word | [`../COPY-STANDARD.md`](../COPY-STANDARD.md) |
 | The compact module card's rules (the Working Panel's card contract) | [`../ui-reference/MODULE-CARD-TEMPLATE.md`](../ui-reference/MODULE-CARD-TEMPLATE.md) |
@@ -105,14 +105,14 @@ not a current pattern: do not copy it from a neighbouring page. Live examples ar
 | Page header + global utilities | `ShellHeader` (shell-drawn; `ModuleHeader` names the page into it) · search pill · `TeamButton` · bell | `pages/operation/components/` | §4 · template 2026-10-08 · built on branch |
 | Portal navigation | `PortalSidebar` + `portal-nav` (six groups, one shared menu) | `pages/portal/` | §4.2 · template 2026-10-08 · built on branch |
 | Left mission rail | `FilterRail` family + `useFilterRailOpen` + the Sales Orders `.so-template-rail` composition | `pages/operation/components/workspace-rail.tsx` · `SalesOrdersRegister.tsx` | §6.1 · rail recipe built; mission rule APPROVED TARGET 2026-10-05; complete composition not yet extracted to the kit (KIT GAP) |
-| Register / listing | `register/DataGrid` | `components/register/DataGrid.tsx` | §6.0 · §6.2 · SO-derived template owner accepted 2026-10-01 · built; adoption per page |
+| Register / listing | `register/DataGrid` — the one listing engine; every list in the Portal passes `appearance="reference"` (56 pages, measured 15 Oct 2026) | `components/register/DataGrid.tsx` | §6.0 · §6.2 · built. **One exception owed:** Sales Order Outright draws its list with `carres/CTable` (PR #2066), a second table for one page. Its v12 look is the target for the engine's stylesheet (header band `--c-band`, 10 between columns, inset 54 rows, one frame round an opened row); the engine takes those values, Sales Order Outright moves onto it with its 12 baseline pictures unchanged, then `CTable` is deleted (§7.7) |
 | Goods expansion | `GoodsMiniTable` + connector | `pages/operation/components/GoodsMiniTable.tsx` · `ConnectedSections.tsx` | §6.9 · built |
 | Simple and document tables | `DataTable` · `DocumentTable` · `TotalsSummary` · `TableScroller` | `components/kit/*` · `components/TableScroller.tsx` | §3 · built |
 | **Compact module card** (the right Working Panel: identity header, Info and module tabs, module summary, editors, Items, Communication, Timeline) | **`CompactModuleCard`** in kit `Drawer variant="compact-card"` — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` (its `/ui` example left with the earlier kit on 14 Oct 2026; it returns when its page's turn comes) | §4.3 · shared component built · Sales Orders adoption PRODUCTION VERIFIED 2026-10-05 (PR #1893/#1896/#1897, `2ce91e2d`) · embedded presentation DEPLOYED (PR #1926, `dc631e1a`, production SHA verified 2026-10-05; owner review owed) · other modules per §4.3.4 table |
 | Object header + tabs | `SalesOrderTabs` recipe | `pages/operation/SalesOrderTabs.tsx` | §4.1 · accepted; page-owned — no generic ObjectHeader/ObjectPage kit API (KIT GAP) |
 | Object facts | `Block` — the one card · `Panel` · `StatusPill` · `EmptyState` · `Loading` | `components/kit/*` | Existing component built; current visual migration owed |
 | Forms | `Input` · `Textarea` · `Select` · `SearchInput` · `Checkbox` · `DatePicker` · `FieldFrame` | `components/kit/*`, `field-recipe.ts` | Existing component built; current visual migration owed |
-| Buttons and menus | `Button` · `DropdownMenu` · `Popover` · `Tooltip` · `Tabs` (segmented Table/Cards) | `components/kit/*` | Existing component built; current visual migration owed |
+| Buttons and menus | `Button` · the one menu `CMenu` (items as data) / `CPopover` + `CMenuItem` · `Popover` · `Tooltip` · `Tabs` (segmented) | `components/kit/*` · `components/carres/CPopover.tsx` | Built. `DropdownMenu` retired 15 Oct 2026 (a test blocks its return); `Popover` and `CPopover` as a dialog still do one job twice (§7.7) |
 | Dialogs, documents and evidence | `Modal` · `Drawer` · `Toast` · `PdfPreview` + `PdfPreviewHeader` · `SavedEvidenceViewer` | `components/kit/*` | §4.4 · built |
 | Work route pieces | `RouteStop` · `ChecklistRow` · `QuietRouteRow` | `components/kit/*` | §3 · built 2026-09-28 · the Workspace page no longer draws them (branch `build/workspace-v3`, 13 Oct 2026): `RouteStop` is drawn by the Repair Order record, the other two by `/ui` only |
 | Orders list / drawer band | `SectionPanel` (cream band) — that surface only, not a general card | `components/SectionPanel.tsx` | Not a `Block` duplicate |
@@ -121,7 +121,8 @@ not a current pattern: do not copy it from a neighbouring page. Live examples ar
 | Tasks and quick reference | Existing Work/Tasks host; `OperationRightRail` for existing quick capabilities | `pages/operation/work/` · `pages/operation/components/OperationRightRail.tsx` | §5 · supplied target has a collapsible Tasks region; Calendar/Activity capability retained, unresolved placement stays explicit; runtime adoption not verified |
 
 **Retired — do not import; a test blocks new use** (`components/retired-components.test.ts`): `Btn`
-(→ `Button`), `Field` (→ kit inputs / `field-recipe`), `PageHeader` (→ `PageShell`). Their remaining
+(→ `Button`), `Field` (→ kit inputs / `field-recipe`), `PageHeader` (→ `PageShell`), `kit/DropdownMenu`
+(→ `CMenu`, deleted 15 Oct 2026). Their remaining
 pages move only after the owner approves a before/after preview, because each swap changes what the
 operator sees. The `carres-design` skill, the old `ui-reference/` mocks and the Delivery-only card
 reference are deleted; `docs/ui-reference/` holds behaviour evidence for the compact card and the current imported Sales Order specimen. Neither is a second standard.

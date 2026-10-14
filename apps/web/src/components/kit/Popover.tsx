@@ -11,7 +11,7 @@
  * before anything else can happen, that is a `Modal` — and the difference is
  * which component a page reaches for, not a prop.
  *
- * **Content is the caller's**, unlike `Select` and `DropdownMenu`: a popover has
+ * **Content is the caller's**, unlike `Select` and `CMenu`: a popover has
  * no row shape to keep closed, and what goes in it is a form, a list, a
  * calendar. The SURFACE is the kit's; the inside is the page's.
  */

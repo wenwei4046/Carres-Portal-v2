@@ -65,6 +65,12 @@ const RETIRED: Record<string, { file: string; replacement: string; allow: string
       "pages/warehouse/WarehouseOutboundDoor.tsx",
     ],
   },
+  /* The ⋮ menu is the one CPopover menu (one kit, 15 Oct 2026). */
+  "kit/DropdownMenu": {
+    file: "components/kit/DropdownMenu.tsx",
+    replacement: "components/carres/CPopover · CMenu",
+    allow: [],
+  },
 };
 
 function sourceFiles(dir: string, out: string[] = []): string[] {

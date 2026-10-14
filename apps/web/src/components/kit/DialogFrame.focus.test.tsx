@@ -2,14 +2,14 @@ import { useRef, useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import Button from "./Button";
-import DropdownMenu from "./DropdownMenu";
+import { CMenu } from "@/components/carres/CPopover";
 import Modal from "./Modal";
 import Drawer from "./Drawer";
 
 function MenuDialog() {
  const [open, setOpen] = useState(false);
  const trigger = useRef<HTMLButtonElement>(null);
- return <><DropdownMenu label="More actions" trigger={<Button ref={trigger}>More actions</Button>}
+ return <><CMenu label="More actions" trigger={<Button ref={trigger}>More actions</Button>}
   items={[{key:"assign", label:"Assign", onSelect:()=>{trigger.current?.focus(); setOpen(true);}}]} />
   <Modal returnFocusRef={trigger} open={open} onOpenChange={setOpen} title="Assign" footer={<Button onClick={()=>setOpen(false)}>Cancel</Button>}><input aria-label="Reason" /></Modal></>;
 }
