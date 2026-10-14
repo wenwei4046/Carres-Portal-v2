@@ -69,7 +69,9 @@ accepts → next page.
   Workspace, Tasks and Forecast Purchase are approved and live; each is checked when its turn comes,
   not rebuilt. The new Manual Purchase Request design is not approved: Code does not build it.
 
-Status 14 Oct 2026: the rules are APPROVED. BUILT: the per-PR preview (`.github/workflows/preview.yml`,
+Status 15 Oct 2026: Sales Order Outright page 1 is DEPLOYED (#2066, `41bc9a6d3`); production read on
+15 Oct: `carres-check.js` PASS at 1025 / 1164 / 1440 with Summary and Tasks in each state, no
+sideways page scroll, the footer words and four Supplier examples as built. The rules are APPROVED. BUILT: the per-PR preview (`.github/workflows/preview.yml`,
 PR #2063) and the screenshot baselines (`e2e-kit/kit-baselines.spec.ts`, 45 pictures, PR #2064; the label
 `update-baselines` retakes them). `carres-align.js` (design's fingerprint of the shared parts, 14 Oct) lives
 beside `carres-check.js`; the Sales Order kit check compares it with v12 in every state. `/ui` shows only the v12 kit parts the pages use (Carres Table and its
@@ -105,14 +107,14 @@ not a current pattern: do not copy it from a neighbouring page. Live examples ar
 | Page header + global utilities | `ShellHeader` (shell-drawn; `ModuleHeader` names the page into it) · search pill · `TeamButton` · bell | `pages/operation/components/` | §4 · template 2026-10-08 · built on branch |
 | Portal navigation | `PortalSidebar` + `portal-nav` (six groups, one shared menu) | `pages/portal/` | §4.2 · template 2026-10-08 · built on branch |
 | Left mission rail | `FilterRail` family + `useFilterRailOpen` + the Sales Orders `.so-template-rail` composition | `pages/operation/components/workspace-rail.tsx` · `SalesOrdersRegister.tsx` | §6.1 · rail recipe built; mission rule APPROVED TARGET 2026-10-05; complete composition not yet extracted to the kit (KIT GAP) |
-| Register / listing | `register/DataGrid` — the one listing engine; every list in the Portal passes `appearance="reference"` (56 pages, measured 15 Oct 2026) | `components/register/DataGrid.tsx` | §6.0 · §6.2 · built. **One exception owed:** Sales Order Outright draws its list with `carres/CTable` (PR #2066), a second table for one page. Its v12 look is the engine's target: on 15 Oct 2026 the engine took the header band `--c-band`, 10 between columns with 14 at the edges, ▸ before ☐ and the 24 round chevron (01 §5) for every list; still owed are the opened row's one frame and the move of Sales Order Outright onto the engine with its 12 baseline pictures unchanged, after which `CTable` is deleted (§7.7) |
+| Register / listing | `register/DataGrid` — the one listing engine; every list in the Portal passes `appearance="reference"` (56 pages, measured 15 Oct 2026) | `components/register/DataGrid.tsx` | §6.0 · §6.2 · built. **One exception owed:** Sales Order Outright draws its list with `carres/CTable` (PR #2066), a second table for one page. Its v12 look is the engine's target: on 15 Oct 2026 the engine took the header band `--c-band`, 10 between columns with 14 at the edges, ▸ before ☐ and the 24 round chevron (01 §5) for every list (DEPLOYED, #2071 `a6c6eabc9`, production read PASS), and every list keeps Export and Columns in its one ⋮ Page tools menu (DEPLOYED, #2074); still owed are the opened row's one frame and the move of Sales Order Outright onto the engine with its 12 baseline pictures unchanged, after which `CTable` is deleted (§7.7) |
 | Goods expansion | `GoodsMiniTable` + connector | `pages/operation/components/GoodsMiniTable.tsx` · `ConnectedSections.tsx` | §6.9 · built |
 | Simple and document tables | `DataTable` · `DocumentTable` · `TotalsSummary` · `TableScroller` | `components/kit/*` · `components/TableScroller.tsx` | §3 · built |
 | **Compact module card** (the right Working Panel: identity header, Info and module tabs, module summary, editors, Items, Communication, Timeline) | **`CompactModuleCard`** in kit `Drawer variant="compact-card"` — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` (its `/ui` example left with the earlier kit on 14 Oct 2026; it returns when its page's turn comes) | §4.3 · shared component built · Sales Orders adoption PRODUCTION VERIFIED 2026-10-05 (PR #1893/#1896/#1897, `2ce91e2d`) · embedded presentation DEPLOYED (PR #1926, `dc631e1a`, production SHA verified 2026-10-05; owner review owed) · other modules per §4.3.4 table |
 | Object header + tabs | `SalesOrderTabs` recipe | `pages/operation/SalesOrderTabs.tsx` | §4.1 · accepted; page-owned — no generic ObjectHeader/ObjectPage kit API (KIT GAP) |
 | Object facts | `Block` — the one card · `Panel` · `StatusPill` · `EmptyState` · `Loading` | `components/kit/*` | Existing component built; current visual migration owed |
 | Forms | `Input` · `Textarea` · `Select` · `SearchInput` · `Checkbox` · `DatePicker` · `FieldFrame` | `components/kit/*`, `field-recipe.ts` | Existing component built; current visual migration owed |
-| Buttons and menus | `Button` · the one pop-up `CPopover` (a menu: `CMenu` with items as data, or `CMenuItem` rows; a small panel: filter, calendar, links) · `Tooltip` · `Tabs` (segmented) | `components/kit/*` · `components/carres/CPopover.tsx` | Built. `DropdownMenu` and kit `Popover` retired 15 Oct 2026 (a test blocks their return); inside a dialog `CPopover` opens within it |
+| Buttons and menus | `Button` · the one pop-up `CPopover` (a menu: `CMenu` with items as data, or `CMenuItem` rows; a small panel: filter, calendar, links) · `Tooltip` · `Tabs` (segmented) | `components/kit/*` · `components/carres/CPopover.tsx` | DEPLOYED. `DropdownMenu` (#2070) and kit `Popover` (#2072) retired 15 Oct 2026 (a test blocks their return); inside a dialog `CPopover` opens within it |
 | Dialogs, documents and evidence | `Modal` · `Drawer` · `Toast` · `PdfPreview` + `PdfPreviewHeader` · `SavedEvidenceViewer` | `components/kit/*` | §4.4 · built |
 | Work route pieces | `RouteStop` | `components/kit/RouteStop.tsx` | §3 · built 2026-09-28 · drawn by the Repair Order record. `ChecklistRow` and `QuietRouteRow` were drawn by no page after the Workspace rebuild (13 Oct 2026) and were deleted 15 Oct 2026, with the unused `Card` (Block is the one card) and `GridToolbar` (the list engine draws its own selection bar) |
 | Orders list / drawer band | `SectionPanel` (cream band) — that surface only, not a general card | `components/SectionPanel.tsx` | Not a `Block` duplicate |
@@ -1186,6 +1188,8 @@ into the section it belongs to, and this list loses it.
 | Shared Select long option at 390px | measured right edge 420.72px beyond the viewport (research file §9) | Kit fix |
 | WarehouseIncoming modal close | focus lands on the page, not the Count trigger (research file §9) | Adopt `DialogFrame` focus return |
 | Picker inside a dialog renders UNDER it | a real P1 defect, approved, not built | Kit fix |
+| **Opened row: v12 frame vs §6.9 connector** | 01 §5 (v12, owner 14 Oct 2026) draws an opened row and its items as one box (1px `#CBD0D6` frame, corners 8, 8 above and below); §6.8–§6.9 (owner 2026-09-18/21, Purchasing reference) hang the expansion flush under its row with a 1px connector from the caret. Sales Order Outright draws the frame (CTable); every DataGrid list draws the connector or flush item rows | Owner/Design: confirm the v12 frame replaces the §6.9 connector on every list; then the engine draws it once. Recommendation: the v12 frame (the latest explicit look; one frame is simpler to read than a connector), keeping §6.9's flush item columns |
+| **List header case** | COPY approves sentence-case headings for the Sales Order view (`Proceed date` · `SO no.`, 14 Oct 2026) and SO Batch/Forecast already read sentence case; other lists still read Title Case (`Proceed Date`, `PO Delivery Date`). Design's Round 4 log (K1, 15 Oct 2026) asks for one rule for every list | Owner decision, once, for all modules. Recommendation: sentence case everywhere (the v12 look, already live on the three newest pages); COPY changes each heading in one pass |
 | **Customer lookup placement** | The caller-lookup capability (name/phone/order number across all a customer's orders and recorded history) is approved 2026-09-24/26; its rail door was removed 2026-10-05. Tasks → `Sales Order` tab shows only the linked SO's customer | Owner decision on where the cross-order lookup lives (PROPOSAL in §5) |
 
 ## §7.3 · KIT GAPs — admit once, never draw locally
@@ -1248,6 +1252,33 @@ the always-visible icon-only Export/Columns toolbar (replaced by `⋯`) · the f
 composition (replaced by `CompactModuleCard`).
 
 ## §7.7 · Measured debt
+
+**One table twice (measured 15 Oct 2026).** Every Portal list is `register/DataGrid` except Sales
+Order Outright, which draws `carres/CTable` (PR #2066). Moving it onto the engine needs these
+capabilities in DataGrid first; CTable already has each one, so this is 🟡 COPY REQUIRED, not an
+engine gap: a pager footer (`Rows 20 ▾ · 1 / 2`) whose count and totals take two lines at most; a
+column that widens to its longest value instead of ending in `…` (01 §5); the opened row's one frame
+(§7.2, pending); header value filters with counts driven by the page's URL (`f.{column}`); the page's
+own toolbar row in the engine's toolbar slots, keeping the one-line give-way steps. Acceptance: the 12
+Sales Order baseline pictures unchanged and `kit-outright.spec.ts` green; then `CTable` is deleted.
+
+**Type outside 01 §2 (measured 15 Oct 2026).** `text-label` (11 / 14 / 500) is used 1,294 times and
+`text-[11px]` 71 times; 01 §2 allows 11 only for caps labels, tags and badges (labels and second
+lines are 12 / 400). `carres-check.js` reports 11/400, 11/600 and 12/600 text on Delivery Orders,
+Delivery Monitor, Warehouse Outbound and Stock. Retuning the token in one go would move every
+page at once; it goes page by page with each page's kit check, or as one measured change with the
+whole kit suite and baselines retaken.
+
+**Unreachable page (measured 15 Oct 2026).** `pages/operation/SalesOrdersRegister.tsx` is no longer
+routed (`/operation/orders` and `/operation/orders/:stage` render Sales Order Outright); Outright still
+imports `skuKey`, `useCatalogNames` and `paymentStatusOf` from it. Outright does not have: grouping
+(`?group=`), per-column sort, the grouped Columns chooser, the role money default, the Monthly demand
+view (`?view=monthly`, still on Purchase Orders), the URL filters `dealer` · `state` · `city` ·
+`delivery` · `category` · `stock` · `payment`, Cards, the row quick card, the row menu `View · Print ·
+Cancel SO`, clickable PO / DO / Receipt / Invoice numbers, money totals in the footer. The one inbound
+door that broke (`?requested=` from Monthly demand) is restored in Outright (PR #2075). Each other
+capability is moved into Outright through Design's fix list or recorded as dropped by the owner before
+the old page is deleted.
 
 **Colour** (measured 2026-07-29): 6,385 colour sites; after the ruler shipped 5,545 of 6,129 measured
 (90.5%), rules O 4,661 · P 594 · Q 111. **Typography:** the `t-*` ramp is retired; sizes carry weight
