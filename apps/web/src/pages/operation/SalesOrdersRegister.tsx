@@ -81,7 +81,7 @@ import Tabs from "@/components/kit/Tabs";
 import SalesOrderReadFailure from "./SalesOrderReadFailure";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import { printSalesOrdersOrSay } from "./record-print";
-import Popover from "@/components/kit/Popover";
+import CPopover from "@/components/carres/CPopover";
 import { useAuth } from "@/lib/auth";
 import { appTodayIso, fmtMonth } from "@/lib/fmt-date";
 import {
@@ -270,7 +270,7 @@ function toGridColumn(
       if (!docs.length) return absenceAware(legacyInvoice || f.text(r));
       const links = docs.map(d => d.number ? <button key={d.id} type="button" className="font-medium text-kit-blue-11 underline-offset-2 hover:underline" onClick={event => { event.stopPropagation(); navigate(d.url); }}>{d.number}</button> : <span key={d.id}>{NOT_RECORDED}</span>);
       if (docs.length === 1 && !legacyInvoice) return links[0];
-      return <Popover label={f.label} trigger={<Button variant="ghost" size="sm" onClick={event => event.stopPropagation()}>{docs[0]?.number || NOT_RECORDED} +{docs.length - 1 + (legacyInvoice ? 1 : 0)}</Button>}><div className="flex flex-col gap-2">{links}{legacyInvoice && <span>{legacyInvoice}</span>}</div></Popover>;
+      return <CPopover label={f.label} trigger={<Button variant="ghost" size="sm" onClick={event => event.stopPropagation()}>{docs[0]?.number || NOT_RECORDED} +{docs.length - 1 + (legacyInvoice ? 1 : 0)}</Button>}><div className="flex flex-col gap-2">{links}{legacyInvoice && <span>{legacyInvoice}</span>}</div></CPopover>;
     } };
   }
   if (f.key === "do_number") {
@@ -300,7 +300,7 @@ function toGridColumn(
             </button>
           );
         }
-        return <Popover label="Delivery Orders" trigger={<Button variant="ghost" size="sm" onClick={event => event.stopPropagation()}>{r.deliveryOrders.length} Delivery Orders</Button>}><div className="flex flex-col gap-2">{r.deliveryOrders.map(d => <button key={d.do_number} type="button" className="font-medium text-kit-blue-11 underline-offset-2 hover:underline" onClick={event => { event.stopPropagation(); navigate(`/operation/delivery-orders/${encodeURIComponent(d.do_number)}`); }}>{d.do_number}</button>)}</div></Popover>;
+        return <CPopover label="Delivery Orders" trigger={<Button variant="ghost" size="sm" onClick={event => event.stopPropagation()}>{r.deliveryOrders.length} Delivery Orders</Button>}><div className="flex flex-col gap-2">{r.deliveryOrders.map(d => <button key={d.do_number} type="button" className="font-medium text-kit-blue-11 underline-offset-2 hover:underline" onClick={event => { event.stopPropagation(); navigate(`/operation/delivery-orders/${encodeURIComponent(d.do_number)}`); }}>{d.do_number}</button>)}</div></CPopover>;
       },
     };
   }
@@ -1546,7 +1546,7 @@ function RegisterResultSummary({
   return (
     <span className="flex min-w-0 items-center" title={line}>
       <span className="min-w-0 truncate">{head} ·&nbsp;</span>
-      <Popover
+      <CPopover
         label={NOT_IN_CATALOG}
         trigger={
           <button
@@ -1586,7 +1586,7 @@ function RegisterResultSummary({
             ))}
           </tbody>
         </table>
-      </Popover>
+      </CPopover>
     </span>
   );
 }

@@ -15,7 +15,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import MIcon from "@/components/carres/MIcon";
 import CPill, { type CPillTone } from "@/components/carres/CPill";
-import CPopover, { CMenuGroup, CMenuItem } from "@/components/carres/CPopover";
+import CPopover, { CMenu, CMenuGroup, CMenuItem } from "@/components/carres/CPopover";
 import CTable, { CTableCell, CTableFooter, CTableItems, type CCell, type CTableColumn, type CTableTotals } from "@/components/carres/CTable";
 import CSidePanel from "@/components/carres/CSidePanel";
 import { CChip, CIconButton, CShowPanelButton, CViewButton } from "@/components/carres/CToolbar";
@@ -31,7 +31,6 @@ import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
 import Modal from "@/components/kit/Modal";
 import PdfPreview from "@/components/kit/PdfPreview";
-import Popover from "@/components/kit/Popover";
 import RouteStop from "@/components/kit/RouteStop";
 import SavedEvidenceViewer from "@/components/kit/SavedEvidenceViewer";
 import SearchInput from "@/components/kit/SearchInput";
@@ -43,7 +42,6 @@ import TaskView from "@/components/kit/TaskView";
 import Textarea from "@/components/kit/Textarea";
 import Tooltip from "@/components/kit/Tooltip";
 import { TONES as STATUS_TONES } from "@/components/kit/tokens";
-import { CMenu } from "@/components/carres/CPopover";
 import ListOptionsExample from "@/pages/dev/ListOptionsExample";
 import ServerRegisterExample from "@/pages/dev/ServerRegisterExample";
 import CompactCardExample from "@/pages/dev/CompactCardExample";
@@ -296,7 +294,7 @@ function SharedParts() {
         </div>
       </Section>
 
-      <Section id="menus" title="Menu and pop-ups: CMenu · Popover (8) · Tooltip (5)" note="Every ⋮ menu is the one CPopover menu (CMenu, items as data): ↓, Enter or Space opens it on its first command, ↑ ↓ Home End move, Escape or Tab closes it and focus goes back to its button. A menu carries no colour.">
+      <Section id="menus" title="Menu and pop-ups: CPopover · CMenu · Tooltip (5)" note="One pop-up, CPopover: as a menu (CMenu, items as data: ↓, Enter or Space opens it on its first command, ↑ ↓ Home End move, Escape or Tab closes it and focus goes back to its button; a menu carries no colour) and as a small panel (a filter, a calendar, a list of links). Inside a dialog it opens within the dialog.">
         <Panel2>
           <Sample label="⋮ menu">
             <CMenu
@@ -308,11 +306,11 @@ function SharedParts() {
                 { key: "cancel", label: "Cancel order", separatorBefore: true, onSelect: () => {} },
               ]}
             />
-            <Popover label="Filters" trigger={<Button icon="filter">Filter</Button>}>
+            <CPopover label="Filters" trigger={<Button icon="filter">Filter</Button>}>
               <div className="flex w-56 flex-col gap-2">
                 <Checkbox id="ui-k-f1" label="Owing" checked={picked} onCheckedChange={(v) => setPicked(v === true)} />
               </div>
-            </Popover>
+            </CPopover>
             <Tooltip content="Already past that deadline">
               <Button iconOnly icon="late" aria-label="Late" />
             </Tooltip>
@@ -526,7 +524,6 @@ export default function UiShowcase() {
       <Section id="not-yet" title="Owed: one component per job" note="Where the Portal still has two parts for one job, or a part only one page draws. Each merges once, in the kit, and every page gets it.">
         <ul className="list-disc pl-5 text-[13px] text-c-body">
           <li>Carres Table (Sales Order Outright) and the list engine DataGrid draw one table twice: Sales Order Outright moves onto DataGrid, then Carres Table is deleted.</li>
-                    <li>CPopover (as a dialog) and Popover: one pop-up.</li>
           <li>The Summary side panel is drawn by Sales Order Outright only; SO Batch Purchase and the other lists still use the older filter rail.</li>
         </ul>
       </Section>

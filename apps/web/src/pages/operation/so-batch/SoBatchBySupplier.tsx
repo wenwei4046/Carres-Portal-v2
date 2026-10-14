@@ -265,14 +265,14 @@ export default function SoBatchBySupplier({
      the Sales Order, the supplier and the Deliver To editor each stay on
      their lines (item rows 44). */
   const lineColumns = grouped && fit.tight
-    ? `${drawn[0] ?? 40}px ${drawn[1] ?? 32}px minmax(90px,1fr) 52px 80px ${LINE_SUPPLIER}px 150px`
+    ? `${drawn[0] ?? 32}px ${drawn[1] ?? 40}px minmax(90px,1fr) 52px 80px ${LINE_SUPPLIER}px 150px`
     : grouped
     ? (drawn.length >= 5
       ? `${drawn.slice(0, 5).map((width) => `${width}px`).join(" ")} ${LINE_SUPPLIER}px 1fr`
-      : `40px 32px ${Math.max(supplierFloor, supplierWidth)}px ${W5.items + 2}px ${W5.orders + 2}px ${LINE_SUPPLIER}px 1fr`)
+      : `32px 40px ${Math.max(supplierFloor, supplierWidth)}px ${W5.items + 2}px ${W5.orders + 2}px ${LINE_SUPPLIER}px 1fr`)
     : drawn.length >= 6
       ? `${drawn.slice(0, 6).map((width) => `${width}px`).join(" ")} 1fr`
-      : `40px 32px ${Math.max(supplierFloor, supplierWidth)}px ${W5.items + 2}px ${W5.orders + 2}px ${W5.deadline + 3}px 1fr`;
+      : `32px 40px ${Math.max(supplierFloor, supplierWidth)}px ${W5.items + 2}px ${W5.orders + 2}px ${W5.deadline + 3}px 1fr`;
   const stepBack = drawn.length >= 2 ? drawn[0]! + drawn[1]! : 72;
 
   return (
@@ -280,7 +280,7 @@ export default function SoBatchBySupplier({
        (01 §5). The listing engine pads every cell instead, so its padding is
        5 a side here: the same 10 between column texts, and the widths above
        then hold the same words the kit's do. */
-    <div ref={box} className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="by-supplier" style={{ ["--table-row-pad" as string]: "6px 5px" }}>
+    <div ref={box} className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="by-supplier">
     <DataGrid<SupplierGroup>
       rows={groups}
       columns={columns}
@@ -369,11 +369,11 @@ export default function SoBatchBySupplier({
                   className="grid min-h-[44px] items-center border-t border-c-row-line py-1"
                   style={{ gridTemplateColumns: lineColumns }}
                   data-testid={`by-supplier-line-${line.id}`}>
+                  <span role="cell" />
                   <span role="cell" className="grid place-items-center">
                     <RowTick testId={`by-supplier-tick-${line.id}`} label={`Select ${modelCode(line)} for ${soRef(line.so)}`}
                       checked={isTicked(line.id)} disabled={!buy} why={extras.whyText} onChange={() => onToggleLine(line.id)} />
                   </span>
-                  <span role="cell" />
                   <span role="cell" className="flex min-w-0 flex-col px-[5px]">
                     <span className="break-words text-body text-c-ink">{modelCode(line)}</span>
                     {line.variant ? <span className="break-words text-meta text-c-secondary">{line.variant}</span> : null}

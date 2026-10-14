@@ -22,11 +22,9 @@ import Button from "./Button";
 import Checkbox from "./Checkbox";
 import DataTable from "./DataTable";
 import DatePicker from "./DatePicker";
-import GridToolbar from "./GridToolbar";
 import Drawer from "./Drawer";
-import { CMenu } from "@/components/carres/CPopover";
+import CPopover, { CMenu } from "@/components/carres/CPopover";
 import Modal from "./Modal";
-import Popover from "./Popover";
 import Select from "./Select";
 import Tabs from "./Tabs";
 import Toast from "./Toast";
@@ -324,9 +322,9 @@ describe("CMenu", () => {
 describe("Popover", () => {
   it("opens beside the control and does not trap the page", () => {
     render(
-      <Popover label="Filters" trigger={<Button icon="filter">Filter</Button>}>
+      <CPopover label="Filters" trigger={<Button icon="filter">Filter</Button>}>
         <p>panel</p>
-      </Popover>,
+      </CPopover>,
     );
     expect(screen.queryByText("panel")).not.toBeInTheDocument();
     openPopover(screen.getByRole("button", { name: /Filter/ }));
@@ -342,9 +340,9 @@ describe("Popover", () => {
 
   it("sits on §4.4's floating layer, below a dialog", () => {
     render(
-      <Popover label="Filters" trigger={<Button>Filter</Button>}>
+      <CPopover label="Filters" trigger={<Button>Filter</Button>}>
         <p>panel</p>
-      </Popover>,
+      </CPopover>,
     );
     openPopover(screen.getByRole("button", { name: "Filter" }));
     expect(document.querySelector('[data-kit="popover"]')).toHaveClass("z-30");
@@ -768,21 +766,6 @@ describe("Button pill shape", () => {
     rerender(<Button>Issue Purchase Orders</Button>);
     expect(screen.getByRole("button").className).toContain("rounded-lg");
     expect(screen.getByRole("button").className).not.toContain("rounded-full");
-  });
-});
-
-describe("GridToolbar", () => {
-  it("holds its three slots and spells no word of its own", () => {
-    render(
-      <GridToolbar
-        search={<input aria-label="s" />}
-        right={<span>28 selected</span>}
-        meta={<span>Updated 10:32 AM</span>}
-      />,
-    );
-    const bar = document.querySelector('[data-kit="grid-toolbar"]')!;
-    expect(bar.textContent).toContain("28 selected");
-    expect(bar.textContent).toContain("Updated 10:32 AM");
   });
 });
 

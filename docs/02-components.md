@@ -14,13 +14,13 @@
 | Card / sections | Block, SectionHeader, CompactModuleCard | Light bordered surface, plain facts, headings; no alternate module palette |
 | Working Panel | Drawer and CompactModuleCard | Host-owned identity; Info plus module-owned work; retained draft; current visual tokens |
 | Tasks | Existing work components and right-rail adapter | Task, reason, owner, deadline, proof, recorded outcome and next action |
-| Buttons / menus | Button, CMenu (`carres/CPopover`), Popover | One `#1B1B39` main button per area; white word buttons; round icon-only buttons with no border; one 250 menu design for every ⋮, columns and filter menu |
+| Buttons / menus | Button, CMenu and CPopover (`carres/CPopover`) | One `#1B1B39` main button per area; white word buttons; round icon-only buttons with no border; one 250 menu design for every ⋮, columns and filter menu |
 | Inputs | Input, Textarea, Select, Checkbox, DatePicker, FieldFrame | Shared dimensions and validation; preserve valid input on failure |
 | Status / count | StatusPill and Badge | Soft status pairs; Hold dark; in table rows a pill only for amber and green, plain text otherwise; words never cut; counts separate |
 | Evidence / PDF | SavedEvidenceViewer, PdfPreview | Saved source versus draft evidence; failure and retry; no invented document |
 | Dialog / drawer | Modal, DialogFrame, Drawer | Focus trap, Escape where safe, focus return; no hidden unsaved loss |
 | Feedback | Toast, EmptyState, Loading | Outcome-specific words; errors beside affected action; no false success |
-| Route / history | RouteStop, QuietRouteRow, ChecklistRow, module history adapters | Actual source-owned facts; parallel paths; immutable recorded events |
+| Route / history | RouteStop, module history adapters | Actual source-owned facts; parallel paths; immutable recorded events |
 | Task steps | StepList, Step | The numbered steps of one job (owner's 12 Oct 2026 package): a 20px round mark, a 13 / 500 title, one 12 grey line and the step's own controls, a hairline between steps. Done is green with a tick, the step to do now is dark, a later step is white with the chip border. The marks show where the person is and never record anything; the act stays one named button. A step's button drops under its words when the room is narrow (the Tasks panel at 320), so neither is squeezed or cut |
 | Task view | TaskView, TaskToast | The ONE shape of an opened task (owner's round 3 brief, 13 Oct 2026; 03 §8): the task at 13 / 500; its module icon, page and record with the owner's initials at the right, the record being the door to its page; one row per fact in one grid (icon 16, label as wide as the longest and at most 104, then the value), amber only on the fact that has gone by, and a fact may open its own detail under its row; then the segmented tabs. The first tab is the owning module's work and stays mounted; another tab is drawn when it is first opened. The view reads nothing, writes nothing and closes nothing. `TaskToast` is the dark toast after a task closes (01 §3): bottom centre, 12 seconds, `Next: {party} ›` when another task waits, ✕, never `Undo` |
 | Settings | Shared page/row/form components | Plain row groups; edit mode, access, current value, treatment and history |
@@ -79,11 +79,11 @@ The 11 Oct specimen names three shared pieces and a component list. Each has one
 | Detail page: header, tabs, cards | DetailShell, Tabs, Block | Generic object header remains a KIT GAP (UI MASTER §7.3) |
 | Button · IconButton | Button | Word button is a box; icon-only is round with no border (01 §3) |
 | Pill | StatusPill | One status component |
-| Menu | `CMenu` (items as data) or `CPopover role="menu"` + `CMenuItem`; Popover for a small panel | One menu design (01 §3); `DropdownMenu` retired 15 Oct 2026 |
-| Card · FieldRow | Card, Block, field-recipe | Field rows 36, label 150 (01 §5.1) |
+| Menu | `CMenu` (items as data) or `CPopover role="menu"` + `CMenuItem`; `CPopover` (dialog) for a small panel | One menu design (01 §3); `DropdownMenu` and kit `Popover` retired 15 Oct 2026 |
+| Card · FieldRow | Block (the one card), field-recipe | Field rows 36, label 150 (01 §5.1) |
 | Tabs · SegmentedControl | Tabs | Segmented look (01 §3) |
 | Toast | Toast | Bottom centre (01 §3) |
-| Selection bar | GridToolbar | Replaces the toolbar in place |
+| Selection bar | DataGrid `selectable` (the engine draws it) | Replaces the toolbar in place |
 | Chip: choice chip and theme chip | none | KIT GAP |
 | Link: record number | PoNumberLinks and module link cells | KIT GAP: one shared record link |
 | Avatar | none | KIT GAP (UI MASTER §7.3) |
@@ -112,7 +112,7 @@ The imported HTML/support.js demonstrates interactions only and is never the run
 - **Select:** chooses a value; a menu (`CMenu`) performs an action. Input/Select share field skin,
   labels and validation. Use existing options-data API and keyboard behaviour; long choice sets
   need the existing searchable control. Do not remove a permission or validation to match a mock.
-- **CMenu/Popover:** trigger, floating content and labelled items; keep keyboard navigation (↓, Enter or Space open a menu on its first command; ↑ ↓ Home End move; Escape or Tab close it and return focus to its button),
+- **CMenu/CPopover:** trigger, floating content and labelled items; keep keyboard navigation (↓, Enter or Space open a menu on its first command; ↑ ↓ Home End move; Escape or Tab close it and return focus to its button),
   safe dismissal and focus return. A row menu acts on its row, a selection bar on its selection.
 - **PdfPreview/PdfPreviewHeader:** caller supplies the actual rendered/saved PDF URL and owns its
   lifetime. Preview never issues a document or fetches business facts. Fit/zoom and contained

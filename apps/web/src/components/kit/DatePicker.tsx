@@ -25,7 +25,7 @@ import { useState } from "react";
 import { DayPicker } from "react-day-picker";
 import FieldFrame from "./FieldFrame";
 import Icon from "./Icon";
-import Popover from "./Popover";
+import CPopover from "@/components/carres/CPopover";
 import { controlClass } from "./field-recipe";
 import { fmtDate } from "@/lib/fmt-date";
 
@@ -104,7 +104,7 @@ export default function DatePicker({
 
   return (
     <FieldFrame id={id} label={label} hint={hint} error={error} required={required}>
-      <Popover
+      <CPopover
         label={label ?? placeholder}
         open={open}
         onOpenChange={setOpen}
@@ -141,7 +141,7 @@ export default function DatePicker({
           weekStartsOn={1}
           classNames={CALENDAR_CLASSNAMES}
         />
-      </Popover>
+      </CPopover>
     </FieldFrame>
   );
 }
