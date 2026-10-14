@@ -86,7 +86,7 @@ describe("Journal", () => {
     }
     // Reversal waits in Columns at first (Chew 2026-10-14).
     expect(within(table).queryByText("Reversal")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
     expect(screen.getByRole("checkbox", { name: "Reversal" })).not.toBeChecked();
     expect(screen.getByText("Sales invoice")).toBeInTheDocument();
     expect(screen.getByText("Supplier bill reversal")).toBeInTheDocument();
@@ -101,7 +101,7 @@ describe("Journal", () => {
   it("links each half of a reversed pair to the other", async () => {
     show();
     await screen.findByText("JE-202609-0003");
-    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
     fireEvent.click(screen.getByRole("checkbox", { name: "Reversal" }));
     expect(screen.getByText("Reversed by")).toBeInTheDocument();
     expect(screen.getByText("Reverses")).toBeInTheDocument();

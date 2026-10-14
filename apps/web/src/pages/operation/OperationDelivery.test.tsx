@@ -1884,7 +1884,7 @@ describe("Get delivery date — the contact week", () => {
 
 /** Reveal an off-by-default column through the sheet's own Columns chooser. */
 function showColumn(label: string) {
-  fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+  (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
   fireEvent.click(screen.getByLabelText(label));
   fireEvent.keyDown(document.body, { key: "Escape" });
 }

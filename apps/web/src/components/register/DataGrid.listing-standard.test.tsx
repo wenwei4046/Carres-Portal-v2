@@ -77,7 +77,7 @@ afterEach(() => {
 describe("Columns · Reset columns", () => {
   it("names the reset act `Reset columns`, not a bare `Reset`", () => {
     mount({ appearance: "reference", labelledToolbar: true });
-    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    (fireEvent.click(screen.getByRole("button", { name: "Page tools" })), fireEvent.click(screen.getByRole("menuitem", { name: "Columns" })));
     expect(screen.getByRole("button", { name: "Reset columns" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reset" })).toBeNull();
   });

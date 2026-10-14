@@ -859,7 +859,8 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
       orders: [order({ po_numbers: ["PO-20260911-5002", "PO-20260910-4001"], do_number: null })],
     };
     mount();
-    const cell = screen.getByRole("button", { name: "PO-260910-4001" }).parentElement!;
+    /* Each number sits in a no-wrap span with its comma; the cell holds them all. */
+    const cell = screen.getByRole("button", { name: "PO-260910-4001" }).parentElement!.parentElement!;
     expect(cell.textContent).toBe("PO-260910-4001, PO-260911-5002");
     expect(cell).toHaveClass("block", "truncate");
     expect(within(cell).getAllByRole("button")).toHaveLength(2);

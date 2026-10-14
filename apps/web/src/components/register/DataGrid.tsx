@@ -885,6 +885,12 @@ function DataGridInner<T>({
   onClearConditions,
   embedded = false,
 }: DataGridProps<T>) {
+  /* ⭐ ONE PAGE-TOOLS MENU (01 §4 toolbar: Summary · tabs · view · ⋮ · Tasks;
+     UI MASTER §6.2 "Page tools ⋮"; the separate Export ▾ and Columns buttons
+     are rejected, §7.6). Every Register list keeps Export and Columns inside
+     the one ⋮; `presentationTools` still adds Table/Cards, the responsive
+     search and the per-column sort/filter launchers. */
+  const toolsMenu = presentationTools || appearance === "reference";
   const selectionReasonId = useId();
   const remembered = useRef(sessionKey ? registerSessions.get(sessionKey) : undefined).current;
   const rememberedScroll = useRef(remembered?.scroll ?? {});
@@ -1062,7 +1068,7 @@ function DataGridInner<T>({
      don't dismiss it. Escape also closes for keyboard parity. */
   useEffect(() => {
     if (!columnsMenuOpen) return;
-    const close = () => { setColumnsMenuOpen(false); if (presentationTools) pageToolsRef.current?.focus(); };
+    const close = () => { setColumnsMenuOpen(false); if (toolsMenu) pageToolsRef.current?.focus(); };
     /* Scrolling the menu's OWN list must not close the menu. We listen on the
        capture phase so we still catch scrolls of any outer page container, but
        skip the event when it originates inside the menu itself. */
@@ -3171,8 +3177,8 @@ function DataGridInner<T>({
             filter + sort) across the visible data columns. System-wide: every
             list rendered through DataGrid gets it for free (Wei Siang
             2026-06-19). Wording says the scope out loud (REGISTER LAW 3). */}
-        <div className={presentationTools ? styles.toolsAnchor : styles.columnsAnchor}>
-          {!presentationTools && <button
+        <div className={toolsMenu ? styles.toolsAnchor : styles.columnsAnchor}>
+          {!toolsMenu && <button
             ref={outputBtnRef}
             type="button"
             aria-label="Export"
@@ -3245,8 +3251,8 @@ function DataGridInner<T>({
             </div>
           )}
         </div>
-        <div className={presentationTools ? styles.toolsAnchor : styles.columnsAnchor}>
-          {!presentationTools && <button
+        <div className={toolsMenu ? styles.toolsAnchor : styles.columnsAnchor}>
+          {!toolsMenu && <button
             ref={columnsBtnRef}
             type="button"
             aria-label="Columns"
@@ -3415,20 +3421,24 @@ function DataGridInner<T>({
         </div>
         {!isLoading && errorState == null && toolbarSummary?.(sortedRows)}
         {isReference && toolbarEnd}
-        {presentationTools && <div className={styles.pageTools}>
+        {toolsMenu && <div className={styles.pageTools}>
           <CMenu label="Page tools" trigger={<Button ref={pageToolsRef} iconOnly icon="overflow" aria-label="Page tools" />}
             items={[
+              /* The chosen menu opens at once; its first control takes focus a
+                 frame later, after the ⋮ menu has handed focus back. */
               { key: "export", label: "Export", icon: "download", disabled: exportLoading || sortedRows.length === 0, onSelect: () => {
                 const r = pageToolsRef.current?.getBoundingClientRect();
                 if (r) setOutputMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
-                requestAnimationFrame(() => { setOutputMenuOpen(true); requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-testid="register-output-menu"] button')?.focus()); });
+                setOutputMenuOpen(true);
+                requestAnimationFrame(() => requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-testid="register-output-menu"] button')?.focus()));
               } },
               ...(outputActions ?? []).map((action, index) => ({ key: `output-${index}`, label: action.label, onSelect: action.onClick })),
               ...(pageToolsItems ?? []),
               { key: "columns", label: "Columns", icon: "settings", onSelect: () => {
                 const r = pageToolsRef.current?.getBoundingClientRect();
                 if (r) setColumnsMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
-                requestAnimationFrame(() => { setColumnsMenuOpen(true); requestAnimationFrame(() => columnsMenuRef.current?.querySelector<HTMLElement>("button, input")?.focus()); });
+                setColumnsMenuOpen(true);
+                requestAnimationFrame(() => requestAnimationFrame(() => columnsMenuRef.current?.querySelector<HTMLElement>("button, input")?.focus()));
               } },
             ]} />
         </div>}
