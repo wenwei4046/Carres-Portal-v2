@@ -28,6 +28,7 @@ import { appTodayIso, fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { useCashFlow } from "../ledger/ledger-queries";
+import { useSavedWidths } from "../finance-widths";
 import { DepartmentFilter, departmentWord, useDepartmentParam, useDepartments } from "../department";
 import type { PackSheet } from "../month-end-pack";
 import { noOpening } from "../month-end-pack";
@@ -88,16 +89,24 @@ export function cashFlowSheet(r: CashFlowReport, from: string, to: string, goLiv
   return { sheet: { name: "Cash Flow", rows }, stem: channel ? `Cash Flow ${channel} ${when}` : `Cash Flow ${when}` };
 }
 
+/** The Cash Flow tables' widths in pixels; the line or account column takes
+ *  the rest of the width unless a person dragged it (Chew 2026-10-14). */
+const CASH_FLOW_WIDTHS = { amount: 140 } as const;
+const BY_ACCOUNT_WIDTHS = { bf: 150, in: 150, out: 150, cf: 150 } as const;
+
 function Statement({ report, from, to }: { report: CashFlowReport; from: string; to: string }) {
+  const saved = useSavedWidths("carres.finance.widths.cash-flow.v1");
+  const width = (key: keyof typeof CASH_FLOW_WIDTHS | "account") =>
+    saved.widths[key] != null ? `${saved.widths[key]}px` : key === "account" ? "auto" : `${CASH_FLOW_WIDTHS[key]}px`;
   const columns: Column<Row>[] = [
-    { key: "account", label: "Account", width: "auto",
+    { key: "account", label: "Account", width: width("account"),
       cell: (row) => row.kind === "nothing"
         ? <span className="text-kit-slate-11">{NOTHING[row.section]}</span>
         : <Link className={STATEMENT_LINK} to={ledgerAccountHref(row.line.code, from, to)}
             title={cashFlowLineWord(row.line)}>
             {cashFlowLineWord(row.line)}
           </Link> },
-    { key: "amount", label: "Amount", width: "140px", align: "right", numeric: true,
+    { key: "amount", label: "Amount", width: width("amount"), align: "right", numeric: true,
       cell: (row) => (row.kind === "nothing" ? null : rm(row.line.amount)) },
   ];
   const band = (row: Row): readonly GroupRowCell[] => [
@@ -108,6 +117,7 @@ function Statement({ report, from, to }: { report: CashFlowReport; from: string;
   return <div className="flex flex-col gap-4">
     <DataTable label="Cash Flow" testId="cash-flow" rowTestId="cash-flow-row" rows={statementRows(report)} columns={columns}
       rowId={(row) => row.id} empty={NOTHING.IN} group={{ keyOf: (row) => row.section, cells: band }}
+      resizable={saved} sizing={saved.widths.account != null ? "content" : undefined}
       totals={{
         label: "Net cash flow",
         cells: () => [
@@ -130,17 +140,21 @@ function Statement({ report, from, to }: { report: CashFlowReport; from: string;
 type AccountRow = CashFlowReport["accounts"][number];
 
 function ByAccount({ report }: { report: CashFlowReport }) {
+  const saved = useSavedWidths("carres.finance.widths.cash-flow-accounts.v1");
+  const width = (key: keyof typeof BY_ACCOUNT_WIDTHS | "account") =>
+    saved.widths[key] != null ? `${saved.widths[key]}px` : key === "account" ? "auto" : `${BY_ACCOUNT_WIDTHS[key]}px`;
   const all: Column<AccountRow>[] = [
-    { key: "account", label: "Account", width: "auto", cell: (a) => `${a.account.account_code} ${a.account.name}` },
-    { key: "bf", label: "Brought forward", width: "150px", align: "right", numeric: true, cell: (a) => rm(a.broughtForward) },
-    { key: "in", label: "Inflow", width: "150px", align: "right", numeric: true, cell: (a) => rm(a.inflow) },
-    { key: "out", label: "Outflow", width: "150px", align: "right", numeric: true, cell: (a) => rm(a.outflow) },
-    { key: "cf", label: "Carried forward", width: "150px", align: "right", numeric: true, cell: (a) => rm(a.carriedForward) },
+    { key: "account", label: "Account", width: width("account"), cell: (a) => `${a.account.account_code} ${a.account.name}` },
+    { key: "bf", label: "Brought forward", width: width("bf"), align: "right", numeric: true, cell: (a) => rm(a.broughtForward) },
+    { key: "in", label: "Inflow", width: width("in"), align: "right", numeric: true, cell: (a) => rm(a.inflow) },
+    { key: "out", label: "Outflow", width: width("out"), align: "right", numeric: true, cell: (a) => rm(a.outflow) },
+    { key: "cf", label: "Carried forward", width: width("cf"), align: "right", numeric: true, cell: (a) => rm(a.carriedForward) },
   ];
   // 0684: one channel's view has no balances to bring or carry forward.
   const columns = report.byChannel ? all.filter((c) => c.key !== "bf" && c.key !== "cf") : all;
   return <DataTable label="Cash Flow by account" testId="cash-flow-accounts" rowTestId="cash-flow-account" rows={report.accounts}
     columns={columns} rowId={(a) => a.account.account_code} empty="No bank or cash account yet. Finance adds them in Settings."
+    resizable={saved} sizing={saved.widths.account != null ? "content" : undefined}
     totals={{
       label: "Total",
       cell: (c) => c.key === "account" ? "Total"

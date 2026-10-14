@@ -208,7 +208,7 @@ export default function CardSettlementPage() {
             rowKey={dayKey}
             storageKey="carres.finance.card-settlement.v3"
             appearance="reference"
-            look="finance"
+            look="finance" fillColumn="machine"
             exportName="Card settlement"
             groupBanner={false}
             stickyIdentity

@@ -110,7 +110,7 @@ export default function CommissionRates({ toolbarStart }: { toolbarStart: React.
           rowKey={(r) => r.id}
           storageKey="carres.finance.commission-rates.v3"
           appearance="reference"
-          look="finance"
+          look="finance" fillColumn="applies"
           groupBanner={false}
           allowColumnGrouping={false}
           exportName="Commission rates"

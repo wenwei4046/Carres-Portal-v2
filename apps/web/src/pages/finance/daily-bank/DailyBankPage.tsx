@@ -229,7 +229,7 @@ export default function DailyBankPage() {
             rowTestId={(r) => `daily-bank-row-${r.account.account_code}`}
             storageKey="carres.finance.daily-bank.v2"
             appearance="reference"
-            look="finance"
+            look="finance" fillColumn="account"
             exportName={`Daily Bank ${day}`}
             groupBanner={false}
             stickyIdentity

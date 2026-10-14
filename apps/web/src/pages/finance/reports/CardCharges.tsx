@@ -117,7 +117,7 @@ export default function CardCharges() {
     <ModuleHeader destinationHeader testId="card-charges-header" word="Card charges" docTitle="Card charges · Carres" />
     <ListPageShell register>
       <DataGrid rows={rows} columns={columns} rowKey={(r) => `${r.month}|${r.acquirer}`} storageKey="carres.finance.card-charges.v2"
-        appearance="reference" look="finance" exportName={`Card charges ${from} to ${to}`} groupBanner={false} stickyIdentity
+        appearance="reference" look="finance" fillColumn="acquirer" exportName={`Card charges ${from} to ${to}`} groupBanner={false} stickyIdentity
         isLoading={q.isPending} wrapToolbar
         errorState={q.isError ? <LoadFailed what="Card charges" onRetry={() => void q.refetch()} /> : undefined}
         emptyMessage="No approved card payout in these months. Only card settlement days whose payout is approved are counted."

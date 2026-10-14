@@ -77,7 +77,7 @@ export default function CommissionKpi({ toolbarStart }: { toolbarStart: React.Re
           rowKey={(r) => r.id}
           storageKey="carres.finance.commission-kpi.v3"
           appearance="reference"
-          look="finance"
+          look="finance" fillColumn="tiers"
           groupBanner={false}
           allowColumnGrouping={false}
           exportName="KPI allowance"

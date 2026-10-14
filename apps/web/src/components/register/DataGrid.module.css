@@ -1645,3 +1645,29 @@ div:first-child > .columnsMenuGroup {
   padding-left: 10px;
   padding-right: 10px;
 }
+/* Drag a header edge to resize (Chew 2026-10-14): under the Finance look the
+   edge shows itself. Hovering a header draws a faint line on its edge;
+   hovering the edge draws it in the selected row's dark edge colour. */
+.rootLookFinance .resizeHandle {
+  cursor: col-resize;
+}
+.rootLookFinance .resizeHandle:hover {
+  background: transparent;
+  opacity: 1;
+}
+.rootLookFinance .resizeHandle::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  right: 2px;
+  width: 2px;
+  background: var(--fin-select-edge);
+  opacity: 0;
+}
+.rootLookFinance .th:hover > .resizeHandle::after {
+  opacity: 0.25;
+}
+.rootLookFinance .th > .resizeHandle:hover::after {
+  opacity: 1;
+}

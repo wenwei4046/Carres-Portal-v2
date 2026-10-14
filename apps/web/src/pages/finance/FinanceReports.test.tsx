@@ -213,7 +213,7 @@ describe("Reports — the statements read the ledger", () => {
     const account = within(table).getByRole("link", { name: "5100" }).closest("tr")!;
     expect(account.querySelector("[data-fin-tone]")).toBeNull();
     // The code and the name are two columns; the code alone is the link, and
-    // the table is as wide as its three columns (Chew 2026-10-14).
+    // the table is at least as wide as its three columns (Chew 2026-10-14).
     expect(within(table).getAllByRole("columnheader").map((h) => h.textContent?.trim())).toEqual(["Code", "Account", "Amount"]);
     const [code, name] = Array.from(account.children) as HTMLElement[];
     expect(code).toHaveTextContent(/^5100$/);
@@ -221,6 +221,10 @@ describe("Reports — the statements read the ledger", () => {
     expect(name).toHaveTextContent(/^Cost of goods sold$/);
     expect(within(name!).queryByRole("link")).not.toBeInTheDocument();
     expect(table.parentElement!.style.getPropertyValue("--fin-table-width")).toBe("544px");
+    // The Account column takes the rest of the width (Chew 2026-10-14).
+    expect(table.parentElement).toHaveAttribute("data-fin-fill");
+    expect(Array.from(table.querySelectorAll("col")).map((c) => c.style.width)).toEqual(["96px", "auto", "128px"]);
+    expect(within(table).getByRole("separator", { name: "Resize Account" })).toBeInTheDocument();
   });
 
   it("prints the total the ledger served, never a sum of its own", async () => {

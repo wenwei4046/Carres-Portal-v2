@@ -139,7 +139,7 @@ export default function ApAging() {
       <ListPageShell register>
         <DataGrid rows={ready?.rows ?? []} columns={gridColumns} rowKey={(r) => r.supplierId}
           rowTestId={(r) => `ap-aging-row-${r.supplierId}`}
-          storageKey="carres.finance.ap-aging.v2" appearance="reference" look="finance" exportName={`AP Aging ${asAt}`}
+          storageKey="carres.finance.ap-aging.v2" appearance="reference" look="finance" fillColumn="supplier" exportName={`AP Aging ${asAt}`}
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess} wrapToolbar
           searchPlaceholder="Search suppliers…" expandTitle="Show bills"
           expandable={{ renderExpansion: (r) => <Bills row={r} columns={columns} /> }}

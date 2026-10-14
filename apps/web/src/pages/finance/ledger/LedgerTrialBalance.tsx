@@ -166,7 +166,7 @@ export default function LedgerTrialBalance() {
       <ListPageShell register>
         <DataGrid rows={rows} columns={columns} rowKey={(r) => `${r.heading ? "heading" : "account"}:${r.code}`}
           storageKey="carres.finance.trial-balance.v2" appearance="reference" exportName="Trial Balance"
-          look="finance" rowTone={(r) => (r.heading ? "subtotal" : null)}
+          look="finance" fillColumn="account" rowTone={(r) => (r.heading ? "subtotal" : null)}
           initialGroupBy={["kind"]} groupBanner={false} stickyIdentity isLoading={!query.isSuccess}
           onSortChange={onSortChange} onSearchChange={onSearchChange} countsInGroup={isAccount}
           searchPlaceholder="Search accounts…"

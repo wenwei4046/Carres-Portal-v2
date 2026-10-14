@@ -126,7 +126,7 @@ export default function ItemGroups() {
           rowKey={(g) => g.id}
           storageKey="carres.finance.item-groups.v3"
           appearance="reference"
-          look="finance"
+          look="finance" fillColumn="name"
           groupBanner={false}
           allowColumnGrouping={false}
           stickyIdentity

@@ -392,7 +392,8 @@ export type DataGridProps<T> = {
    * 「1，做吧」; docs/finance/MASTER.md §4.2). A Finance exception to the one
    * kit, recorded there; omitted, every grid draws exactly what it draws today.
    * A light blue header band, a hairline between columns, columns as wide as
-   * their content (the table no longer stretches to the card), and a selected
+   * their content (the table stretches to the card only through its one
+   * `fillColumn`, Chew 2026-10-14), and a selected
    * row in light grey with a dark edge on its left, so it never reads as the
    * blue header. Rows the page marks with `rowTone` read as a subtotal (light
    * grey, 600) or the total (light grey, 600, a heavy rule above).
@@ -400,6 +401,16 @@ export type DataGridProps<T> = {
   look?: "finance";
   /** With `look="finance"`: which rows are subtotals or the total. */
   rowTone?: (row: T) => "subtotal" | "total" | null;
+  /**
+   * With `look="finance"` only (Chew 2026-10-14): the ONE column that takes
+   * the width the others leave, so the table fills its box again while the
+   * amounts, dates and codes keep their own widths and stay together. Its
+   * declared `width` is its minimum. A width the person saved for it by
+   * dragging (`layout.widths`) wins: the column then keeps that width and
+   * stops filling. Ignored without the Finance look, when the column is
+   * hidden, or when a pinned column sits after it.
+   */
+  fillColumn?: string;
   /** Opt-in responsive Register Search (owner ruling R4 2026-09-16): a
       readable box when the toolbar has room, an icon that opens when narrow,
       and an active query plus its clear control always visible. */
@@ -767,6 +778,16 @@ function writeLayout(key: string, layout: Layout) {
   }
 }
 
+/** A header cell's content width as drawn (its box less its padding), so a
+ *  drag on the Finance fill column starts from where its edge really is.
+ *  Falls back to the declared width where nothing is laid out (tests). */
+function renderedWidth(th: HTMLElement | null, fallback: number): number {
+  if (!th) return fallback;
+  const cs = window.getComputedStyle(th);
+  const w = th.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+  return w > 0 ? Math.round(w) : fallback;
+}
+
 const coerceSearchString = (v: ReactNode): string => {
   if (v == null || v === false) return "";
   if (typeof v === "string" || typeof v === "number") return String(v);
@@ -820,6 +841,7 @@ function DataGridInner<T>({
   rowHighlight,
   look,
   rowTone,
+  fillColumn,
   onFilteredRowsChange,
   onSearchChange,
   serverColumns,
@@ -1395,6 +1417,24 @@ function DataGridInner<T>({
     const keys = [...pinnedLefts.keys()];
     return keys.length ? keys[keys.length - 1] : null;
   }, [pinnedLefts]);
+  /** The Finance look's fill column, when it is on (see `fillColumn`). A
+   *  pinned column after it would sit at an offset the fill moves, so the
+   *  fill is only ever the last pinned column or an unpinned one. */
+  const fillKey =
+    look === "finance" &&
+    fillColumn != null &&
+    layout.widths[fillColumn] == null &&
+    visibleColumns.some((c) => c.key === fillColumn) &&
+    (!pinnedLefts.has(fillColumn) || fillColumn === pinnedEdgeKey)
+      ? fillColumn
+      : null;
+  /** A body or footer cell's width: its pixels, or, for the fill column, no
+   *  width at all, so the table gives it what the others leave (`max-width: 0`
+   *  keeps a long value from widening it; its header holds its minimum).
+   *  Measured in Chromium 2026-10-14: a percentage width here would squeeze
+   *  the pixel columns to their content when the box is narrow. */
+  const cellWidth = (key: string, w: number | string): CSSProperties =>
+    key === fillKey ? { maxWidth: 0 } : { width: w, maxWidth: w };
   /** Both a `<th>` and a `<td>` need the same two decisions — one helper. */
   const pinStyle = (key: string): CSSProperties =>
     pinnedLefts.has(key) ? { left: pinnedLefts.get(key) } : {};
@@ -2099,6 +2139,8 @@ function DataGridInner<T>({
     setLayout((l) => {
       const widths = { ...l.widths };
       data.forEach((col, i) => {
+        // The Finance fill column keeps filling: a fitted width would fix it.
+        if (col.key === fillKey) return;
         const header = col.headerLines
           ? Math.max(col.headerLines[0].length, col.headerLines[1].length)
           : Math.max(col.label.length, col.headerSub?.length ?? 0);
@@ -2301,9 +2343,10 @@ function DataGridInner<T>({
   const headerCells = (inGroup: boolean, selectionRows: readonly T[] = sortedRows) =>
       visibleColumns.map((col) => {
         const w = layout.widths[col.key] ?? col.width ?? 140;
+        const fills = col.key === fillKey;
         const style: CSSProperties = {
-          width: w,
-          minWidth: col.minWidth ?? 40,
+          width: fills ? undefined : w,
+          minWidth: fills ? w : col.minWidth ?? 40,
           ...pinStyle(col.key),
         };
         const isSorted = layout.sort?.key === col.key;
@@ -2426,7 +2469,11 @@ function DataGridInner<T>({
                 </button>
               )}
             </span>
-            <div className={styles.resizeHandle} onMouseDown={(e) => onResizeStart(e, col.key, w)} />
+            <div
+              className={styles.resizeHandle}
+              data-testid={look === "finance" ? `grid-resize-${col.key}` : undefined}
+              onMouseDown={(e) => onResizeStart(e, col.key, fills ? renderedWidth(e.currentTarget.parentElement, Number(w)) : w)}
+            />
           </th>
         );
       });
@@ -2770,7 +2817,7 @@ function DataGridInner<T>({
                 <td
                   key={col.key}
                   className={`${styles.td}${wrapClass}${pinClass(col.key)}`}
-                  style={{ width: w, maxWidth: w, ...pinStyle(col.key) }}
+                  style={{ ...cellWidth(col.key, w), ...pinStyle(col.key) }}
                 >
                   <button
                     type="button"
@@ -2822,7 +2869,7 @@ function DataGridInner<T>({
               <td
                 key={col.key}
                 className={`${styles.td} ${col.align === "right" ? styles.tdAlignRight : ""}${wrapClass}${pinClass(col.key)}`}
-                style={{ width: w, maxWidth: w, ...pinStyle(col.key) }}
+                style={{ ...cellWidth(col.key, w), ...pinStyle(col.key) }}
               >
                 {isEmpty ? null : content}
               </td>
@@ -3568,12 +3615,12 @@ function DataGridInner<T>({
               <table
                 key={`gs-${section.group.path}`}
                 className={`${styles.table} ${styles.tablePinnedBlock} ${styles.tableGrouped}`}
-                style={{ width: groupedTableWidth }}
+                style={fillKey ? { width: "100%", minWidth: groupedTableWidth } : { width: groupedTableWidth }}
                 data-testid={`grid-section-${section.group.path}`}
               >
                 <colgroup>
                   {visibleColumns.map((col) => (
-                    <col key={col.key} style={{ width: layout.widths[col.key] ?? col.width ?? 140 }} />
+                    <col key={col.key} style={col.key === fillKey ? undefined : { width: layout.widths[col.key] ?? col.width ?? 140 }} />
                   ))}
                 </colgroup>
                 <thead className={styles.thead}>
@@ -3598,6 +3645,7 @@ function DataGridInner<T>({
         <table
           className={`${styles.table}${pinnedPrefix || leadingColumns || (typeof stickyIdentity === "object" && Array.isArray(stickyIdentity.columnKey)) ? ` ${styles.tablePinnedBlock}` : ""}`}
           hidden={groupLocalHeaders && !isLoading && errorState == null && renderList.length > 0}
+          style={fillKey ? { minWidth: "100%" } : undefined}
         >
           {/* A flat register keeps the one sticky header it has always had. */}
           {!groupLocalHeaders && (
@@ -3663,7 +3711,7 @@ function DataGridInner<T>({
                       <td
                         key={col.key}
                         className={`${styles.tfootTd} ${col.align === "right" ? styles.tdAlignRight : ""}`}
-                        style={{ width: w, maxWidth: w }}
+                        style={cellWidth(col.key, w)}
                       >
                         {col.footerTotal ? col.footerTotal(sortedRows) : null}
                       </td>

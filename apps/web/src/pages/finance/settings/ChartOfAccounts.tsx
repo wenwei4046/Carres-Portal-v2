@@ -341,7 +341,7 @@ export default function ChartOfAccounts() {
         rowKey={(r) => r.account.code}
         storageKey="carres.finance.chart-of-accounts.v3"
         appearance="reference"
-        look="finance"
+        look="finance" fillColumn="name"
         rowTone={(r) => (r.account.is_header ? "subtotal" : null)}
         groupBanner={false}
         allowColumnGrouping={false}

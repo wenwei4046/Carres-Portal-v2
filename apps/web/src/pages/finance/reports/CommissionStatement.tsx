@@ -92,7 +92,7 @@ export default function CommissionStatement({
         rowKey={statementLineKey}
         storageKey="carres.finance.dealer-commission-statement.v2"
         appearance="reference"
-        look="finance"
+        look="finance" fillColumn="what"
         exportName={`Commission statement ${statement?.dealer.name ?? ""}`.trim()}
         groupBanner={false}
         allowColumnGrouping={false}

@@ -221,7 +221,7 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         rowKey={(r) => r.invoice_id}
         storageKey="carres.finance.other-debtor-invoices.v3"
         appearance="reference"
-        look="finance"
+        look="finance" fillColumn="party"
         exportName="Other debtor invoices"
         groupBanner={false}
         stickyIdentity
@@ -365,7 +365,7 @@ function PartyRegister({ onNewInvoice }: { onNewInvoice: (partyId: string | null
         rowKey={(r) => r.party_id}
         storageKey="carres.finance.other-debtor-parties.v3"
         appearance="reference"
-        look="finance"
+        look="finance" fillColumn="name"
         exportName="Other debtor parties"
         groupBanner={false}
         stickyIdentity

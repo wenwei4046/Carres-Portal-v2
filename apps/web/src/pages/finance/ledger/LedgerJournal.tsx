@@ -188,7 +188,7 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
       </div>}
       <ListPageShell register>
         <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id} onSortChange={setSort} onGroupByChange={onGroupByChange}
-          storageKey="carres.finance.journal.v3" appearance="reference" look="finance" exportName="Journal"
+          storageKey="carres.finance.journal.v3" appearance="reference" look="finance" fillColumn="narration" exportName="Journal"
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess}
           searchPlaceholder="Search entries…"
           toolbarStart={<span className="flex items-center gap-3 text-body">

@@ -118,7 +118,7 @@ function CardRoutes() {
           rowTestId={(r) => `card-route-${r.holding_code}-${r.channel}`}
           storageKey="carres.finance.card-payout-banks.v1"
           appearance="reference"
-          look="finance"
+          look="finance" fillColumn="bank"
           groupBanner={false}
           allowColumnGrouping={false}
           stickyIdentity

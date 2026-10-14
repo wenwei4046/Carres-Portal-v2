@@ -177,7 +177,7 @@ function VoucherRegister() {
             rowKey={(r) => r.id}
             storageKey="carres.finance.payment-vouchers.v3"
             appearance="reference"
-            look="finance"
+            look="finance" fillColumn="payee"
             exportName="Payment Vouchers"
             groupBanner={false}
             stickyIdentity

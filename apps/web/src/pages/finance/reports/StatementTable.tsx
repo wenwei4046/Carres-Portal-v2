@@ -15,8 +15,10 @@
  * RM 0.00 already prints no line. A heading's subtotal, a section's total and
  * the bottom line still print RM 0.00: on a statement that zero is the answer.
  * An account's code and its name are two columns, the code alone the link, and
- * the name wraps rather than being cut; the table is as wide as its columns
- * (Chew 2026-10-14, 「A」).
+ * the name wraps rather than being cut (Chew 2026-10-14, 「A」). The Account
+ * column takes the width the code and the amount leave, so the table fills its
+ * box, and a header edge drags to resize, remembered per person per statement
+ * (Chew 2026-10-14).
  */
 import { Link } from "react-router-dom";
 import { isZeroMoney, ledgerKindWord } from "@carres/shared/finance-ledger";
@@ -26,7 +28,7 @@ import Tooltip from "@/components/kit/Tooltip";
 import { rm } from "@/lib/format-currency";
 import type { StatementLine, StatementSection } from "./report-queries";
 import look from "../finance-look.module.css";
-import { FINANCE_WIDTH } from "../finance-widths";
+import { FINANCE_WIDTH, fillSizing, useSavedWidths } from "../finance-widths";
 
 // The line under a section where every account is at RM 0.00 (YH, 14 Sep
 // 2026). Reports and the month-end pack print the same words.
@@ -45,13 +47,9 @@ export const STATEMENT_LINK = "min-w-0 truncate underline underline-offset-2";
 /** The Finance look's code link (Chew 2026-10-13): the code alone, dotted. */
 export const CODE_LINK = "underline decoration-dotted underline-offset-[3px]";
 
-/** The width a Finance-look kit table is drawn at: its columns' pixels, so it
- *  is as wide as its columns and never stretched to the page. */
-export const tableWidth = (widths: readonly number[]): React.CSSProperties =>
-  ({ "--fin-table-width": `${widths.reduce((s, w) => s + w, 0)}px` }) as React.CSSProperties;
-
-/** The statement's columns, in pixels: Code, the name, Amount. */
+/** The statement's columns, in pixels: Code, the name (its least), Amount. */
 const NAME_WIDTH = 320;
+const STATEMENT_WIDTHS = { code: FINANCE_WIDTH.code, account: NAME_WIDTH, amount: FINANCE_WIDTH.amount } as const;
 
 export const nothingInPeriod = (section: string): string => NOTHING_IN_PERIOD[section] ?? NOTHING_IN_PERIOD.INCOME!;
 /** Balance Sheet: `No assets on this day.` · `No liabilities …` · `No equity …` */
@@ -229,15 +227,17 @@ export default function StatementTable({
 }) {
   const bySection = new Map(sections.map((s) => [s.kind, s]));
   const rows = statementRows(sections);
+  const saved = useSavedWidths(`carres.finance.widths.${testId}.v1`);
+  const size = fillSizing(STATEMENT_WIDTHS, saved.widths, "account");
 
   // Every column is the width of what it holds (the Finance look): the code,
-  // the name, which wraps rather than being cut, and the amount, which fits
-  // RM 1,234,567.89. The table is as wide as the three.
+  // and the amount, which fits RM 1,234,567.89. The name wraps rather than
+  // being cut and takes the rest of the width.
   const columns: Column<StatementRow>[] = [
     {
       key: "code",
       label: "Code",
-      width: `${FINANCE_WIDTH.code}px`,
+      width: size.width("code"),
       cell: (r) => (r.kind === "line"
         ? <Link className={CODE_LINK} to={accountHref(r.code)}>{r.code}</Link>
         : null),
@@ -245,7 +245,7 @@ export default function StatementTable({
     {
       key: "account",
       label: "Account",
-      width: `${NAME_WIDTH}px`,
+      width: size.width("account"),
       cell: (r) => {
         switch (r.kind) {
           case "group":
@@ -271,7 +271,7 @@ export default function StatementTable({
     {
       key: "amount",
       label: "Amount",
-      width: `${FINANCE_WIDTH.amount}px`,
+      width: size.width("amount"),
       align: "right",
       numeric: true,
       cell: (r) => {
@@ -290,7 +290,7 @@ export default function StatementTable({
     ];
   };
 
-  return <div className={look.statement} style={tableWidth([FINANCE_WIDTH.code, NAME_WIDTH, FINANCE_WIDTH.amount])}><DataTable
+  return <div className={look.statement} style={size.style} {...size.data}><DataTable
     label={label}
     testId={testId}
     rowTestId={`${testId}-row`}
@@ -300,6 +300,7 @@ export default function StatementTable({
     loading={loading}
     empty={empty}
     group={{ keyOf: (r) => r.section, cells: band }}
+    resizable={saved}
     totals={bottomLine ? {
       label: bottomLine.label,
       cells: () => [

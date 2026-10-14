@@ -130,7 +130,7 @@ function NotesRegister() {
             rowTestId={(r) => `note-row-${r.id}`}
             storageKey="carres.finance.notes-to-follow-up.v3"
             appearance="reference"
-            look="finance"
+            look="finance" fillColumn="supplier"
             exportName="Notes to follow up"
             groupBanner={false}
             allowColumnGrouping={false}

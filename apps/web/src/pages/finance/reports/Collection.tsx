@@ -159,7 +159,7 @@ export default function Collection() {
       <ListPageShell register>
         <DataGrid key={view} rows={ready?.rows ?? []} columns={columns} rowKey={(r) => r.key}
           rowTestId={(r) => `collection-row-${r.key}`}
-          storageKey={`carres.finance.collection.${view}.v2`} appearance="reference" look="finance" exportName={`Collection ${view} ${from} to ${to}`}
+          storageKey={`carres.finance.collection.${view}.v2`} appearance="reference" look="finance" fillColumn="who" exportName={`Collection ${view} ${from} to ${to}`}
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess} wrapToolbar
           searchPlaceholder="Search salespeople…" expandTitle="Show orders"
           expandable={{ renderExpansion: (r) => <Orders row={r} view={view} /> }}

@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { generalLedgerBlocks, type GeneralLedgerAnswer, type GeneralLedgerWireRow } from "@carres/shared/general-ledger";
 import { itSaysNoBannedWord } from "@/test/banned-words";
-import GeneralLedger, { generalLedgerSheet } from "./GeneralLedger";
+import GeneralLedger, { GENERAL_LEDGER_WIDTHS_KEY, generalLedgerSheet } from "./GeneralLedger";
 import look from "../finance-look.module.css";
 
 /* Finance → Ledger → General Ledger (0639; Chew 2026-10-03). The reads are
@@ -59,6 +59,7 @@ const ANSWER: GeneralLedgerAnswer = {
 };
 
 beforeEach(() => {
+  window.localStorage.clear();
   api.answer = ANSWER;
   api.calls = [];
   api.fail = null;
@@ -102,7 +103,7 @@ describe("General Ledger (0639)", () => {
     show();
     const table = await screen.findByTestId("general-ledger");
     expect(table.parentElement).toHaveClass(look.statement);
-    // As wide as its columns: 110 + 140 + 150 + 150 + 260 + 128 + 128 + 170.
+    // At least as wide as its columns: 110 + 130 + 140 + 170 + 180 + 128 + 128 + 150.
     expect(table.parentElement!.style.getPropertyValue("--fin-table-width")).toBe("1136px");
     const rows = within(table).getAllByTestId("general-ledger-row");
     const cells = (tr: HTMLElement) => Array.from(tr.children).map((td) => td.textContent?.trim() ?? "");
@@ -114,6 +115,44 @@ describe("General Ledger (0639)", () => {
     expect(cells(totals[0]!)).toEqual(["", "", "", "", "Total", "RM 250.50", "RM 1,500.00", "RM 249.50 Credit"]);
     // Trade payables credited nothing: its Total's Credit is blank, its balance at zero prints.
     expect(cells(totals[1]!)).toEqual(["", "", "", "", "Total", "RM 1,500.00", "", "RM 0.00"]);
+  });
+
+  /* Fill and resize (Chew 2026-10-14): Description takes the rest of the
+     width; a dragged width is remembered per person and read back. */
+  it("fills its box with Description, the other columns at their pixels", async () => {
+    show();
+    const table = await screen.findByTestId("general-ledger");
+    expect(table.parentElement).toHaveAttribute("data-fin-fill");
+    const widths = Array.from(table.querySelectorAll("col")).map((c) => c.style.width);
+    expect(widths).toEqual(["110px", "130px", "140px", "170px", "auto", "128px", "128px", "150px"]);
+    expect(within(table).getByRole("separator", { name: "Resize Description" })).toBeInTheDocument();
+  });
+
+  it("reads a saved width back from storage, and a drag saves a new one", async () => {
+    window.localStorage.setItem(GENERAL_LEDGER_WIDTHS_KEY, JSON.stringify({ description: 300, debit: 140 }));
+    show();
+    const table = await screen.findByTestId("general-ledger");
+    const widths = () => Array.from(table.querySelectorAll("col")).map((c) => c.style.width);
+    expect(widths()).toEqual(["110px", "130px", "140px", "170px", "300px", "140px", "128px", "150px"]);
+    // A dragged Description keeps its width: no fill, the table as wide as its columns.
+    expect(table.parentElement).not.toHaveAttribute("data-fin-fill");
+    expect(table.parentElement!.style.getPropertyValue("--fin-table-width")).toBe("1268px");
+    fireEvent.mouseDown(within(table).getByTestId("table-resize-balance"), { clientX: 900, button: 0 });
+    fireEvent.mouseMove(window, { clientX: 930 });
+    fireEvent.mouseUp(window);
+    expect(widths()[7]).toBe("180px");
+    expect(JSON.parse(window.localStorage.getItem(GENERAL_LEDGER_WIDTHS_KEY)!)).toEqual({ description: 300, debit: 140, balance: 180 });
+  });
+
+  it("draws its own widths when storage refuses", async () => {
+    const get = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("blocked"); });
+    try {
+      show();
+      const table = await screen.findByTestId("general-ledger");
+      expect(table.parentElement).toHaveAttribute("data-fin-fill");
+    } finally {
+      get.mockRestore();
+    }
   });
 
   it("an entry number opens the entry on the Journal", async () => {

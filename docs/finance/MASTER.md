@@ -822,7 +822,8 @@ FINANCE          its title folds the area (§4.1)
 - What it is:
   - the header band light blue (`#E8EEFC`, text `#1E3A8A`, 600);
   - a hairline between columns;
-  - the table as wide as its columns, never stretched to the card; widths per field in `finance-widths.ts` (an amount 128, a code 96), cells 10 a side, so an amount up to RM 1,234,567.89 fits;
+  - the table fills its box with ONE column (Chew 2026-10-14): each table names its main name, party or description column (`fillColumn` on the grid; Account on the statements, Description on the General Ledger, the line and the account on Cash Flow), which takes the width the others leave and never drops below its own; amounts, dates and codes keep their widths per field in `finance-widths.ts` (an amount 128, a code 96), cells 10 a side, so an amount up to RM 1,234,567.89 fits;
+  - a header edge drags to resize a column (Chew 2026-10-14), the edge showing a line on hover; the width is remembered per person in this browser (the grid's saved layout; one Finance key per kit table, `carres.finance.widths.<table>.v1`). A dragged fill column keeps its width and stops filling. BUILT 2026-10-14 on branch, not yet deployed;
   - a selected row light grey (`#E9EBEF`) with a dark edge on its left, so it never reads as the blue header;
   - a subtotal row light grey and 600; the total row the same with a heavy rule above;
   - an account's code and its name in two columns, the code alone being the link;

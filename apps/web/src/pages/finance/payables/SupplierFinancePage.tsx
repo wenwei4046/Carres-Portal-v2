@@ -65,7 +65,7 @@ export default function SupplierFinancePage() {
             rowTestId={(r) => `supplier-finance-row-${r.supplier_id}`}
             storageKey="carres.finance.supplier-finance.v3"
             appearance="reference"
-            look="finance"
+            look="finance" fillColumn="supplier"
             exportName="Suppliers"
             groupBanner={false}
             stickyIdentity
