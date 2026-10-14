@@ -9,6 +9,9 @@
  *
  * Every figure is the shared collection arithmetic's (Law D); this page only
  * prints it. It reads Orders' and Payment's records and changes none.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the salesperson wraps rather than being cut,
+ * and a zero amount is a blank cell. The footer totals always print.
  */
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -36,6 +39,7 @@ import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { ReadFailed } from "../payables/PayablesParts";
 import { monthEnd, readPeriod, recentMonths, wholeMonth } from "./period";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 
 type View = "deposit" | "balance";
 const amount = (sen: number) => rm(sen / 100);
@@ -96,11 +100,11 @@ export default function Collection() {
 
   const columns = useMemo<DataGridColumn<CollectionRow>[]>(() => {
     const money = (key: string, label: string, pick: (r: CollectionRow) => number, lines?: readonly [string, string]): DataGridColumn<CollectionRow> => ({
-      key, label, headerLines: lines, width: W.amount + 14, align: "right", accessor: (r) => amount(pick(r)),
+      key, label, headerLines: lines, width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(pick(r) / 100),
       numberValue: (r) => pick(r) / 100, exportValue: (r) => pick(r) / 100,
-      footerTotal: (rows) => amount(rows.reduce((s, r) => s + pick(r), 0)),
+      footerTotal: (rows) => amountCell(rows.reduce((s, r) => s + pick(r), 0) / 100),
     });
-    const name: DataGridColumn<CollectionRow> = { key: "who", label: "Salesperson", width: 220, accessor: who,
+    const name: DataGridColumn<CollectionRow> = { key: "who", label: "Salesperson", width: 220, wrap: true, accessor: who,
       searchValue: who, exportValue: who };
     if (view === "deposit") {
       return [
@@ -155,7 +159,7 @@ export default function Collection() {
       <ListPageShell register>
         <DataGrid key={view} rows={ready?.rows ?? []} columns={columns} rowKey={(r) => r.key}
           rowTestId={(r) => `collection-row-${r.key}`}
-          storageKey={`carres.finance.collection.${view}.v1`} appearance="reference" exportName={`Collection ${view} ${from} to ${to}`}
+          storageKey={`carres.finance.collection.${view}.v2`} appearance="reference" look="finance" exportName={`Collection ${view} ${from} to ${to}`}
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess} wrapToolbar
           searchPlaceholder="Search salespeople…" expandTitle="Show orders"
           expandable={{ renderExpansion: (r) => <Orders row={r} view={view} /> }}

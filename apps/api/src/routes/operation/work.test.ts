@@ -6,6 +6,7 @@ import {
   projectOverpaymentReviewWork,
   projectStorageCheckWork,
   composeOperationWorkResponse,
+  workResponseFor,
   createOperationWorkRouter,
   loadWorkSource,
   manualPurchaseWorkInputsFromRegister,
@@ -77,7 +78,7 @@ const base: OperationWorkItem = {
   broken: false,
 };
 
-const sourceKeys = ["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const;
+const sourceKeys = ["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker", "workspace"] as const;
 const healthySources = (ordersItems: OperationWorkItem[] = []): OperationWorkSourceResult[] => sourceKeys.map((key) => ({
   health: {
     key,
@@ -120,6 +121,39 @@ describe("operation Work response composition", () => {
     expect(body.items).toHaveLength(1);
     expect(body.complete).toBe(true);
     expect(body.closureReceipt).toBeNull();
+  });
+
+  it("gives a reader that does not ask for it the six sources it knows, and none of the workspace module's work", () => {
+    const task: OperationWorkItem = {
+      ...base,
+      id: "workspace:00000000-0000-4000-8000-0000000000c1:internal_task",
+      module: "workspace",
+      ruleKey: "internal_task",
+      object: { kind: "internal_task", id: "00000000-0000-4000-8000-0000000000c1", label: "TEST · Get the new product photographs" },
+    };
+    const sources = healthySources([base]).map((source) => source.health.key === "workspace"
+      ? { health: { ...source.health, state: "failed" as const, observedAt: null, lastSuccessfulAt: null, errorLabel: "Could not refresh Staff tasks" }, items: [] }
+      : source);
+    const composed = composeOperationWorkResponse(sources, [], "2026-09-06");
+    const full: OperationWorkResponse = {
+      ...composed,
+      items: [...composed.items, task],
+      completed: [
+        { occurrenceId: "workspace:00000000-0000-4000-8000-0000000000c3:internal_task", module: "workspace", ruleKey: "internal_task", actionOn: "2026-09-06", objectLabel: "TEST · Print the price list", completedAt: "2026-09-06T03:00:00.000Z", completedBy: null, resultReference: "internal_task_done=x" },
+        { occurrenceId: "purchasing:PO-1:purchasing.po_window", module: "purchasing", ruleKey: "purchasing.po_window", actionOn: "2026-09-06", objectLabel: "PO-1", completedAt: "2026-09-06T02:00:00.000Z", completedBy: null, resultReference: "po_sends=1" },
+      ],
+    };
+    expect(full.complete).toBe(false);
+
+    const old = workResponseFor(full, undefined) as OperationWorkResponse;
+    expect(old.sources.map((source) => source.key)).toEqual(["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"]);
+    expect(old.items.map((item) => item.module)).toEqual(["orders"]);
+    expect(old.completed?.map((done) => done.module)).toEqual(["purchasing"]);
+    /* Its six sources are healthy: a failed source it never hears about must not make its read look incomplete. */
+    expect(old.complete).toBe(true);
+
+    expect(workResponseFor(full, "workspace")).toBe(full);
+    expect(workResponseFor(full, "everything")).toEqual(old);
   });
 
   it("returns one validated set and removes only duplicate stable identities", () => {

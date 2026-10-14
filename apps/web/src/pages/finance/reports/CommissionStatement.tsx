@@ -12,6 +12,10 @@
  * A payment is a paid direct payment voucher that Finance counts as a payment
  * to this dealer (`Add a payment`); its row takes it off again. A month's row
  * opens that month's orders (By order).
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the description wraps rather than being cut,
+ * and a zero Commission or Paid is a blank cell. The running Balance keeps its
+ * RM 0.00: on a statement, owing nothing after a line is the answer.
  */
 import { useMemo, useState } from "react";
 import {
@@ -33,6 +37,7 @@ import { fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import { LoadFailed } from "../other-money-in/parts";
 import { statementLineKey, statementLineWord } from "./commission-words";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 
 const BASE = "/api/finance/dealer-commission";
 
@@ -58,15 +63,15 @@ export default function CommissionStatement({
 
   const columns = useMemo<DataGridColumn<DcStatementLine>[]>(() => [
     { key: "day", label: "Date", width: 130, sortable: false, accessor: (l) => fmtDate(l.day), exportValue: (l) => l.day },
-    { key: "what", label: "Description", width: 300, sortable: false, accessor: statementLineWord, searchValue: statementLineWord },
+    { key: "what", label: "Description", width: 300, wrap: true, sortable: false, accessor: statementLineWord, searchValue: statementLineWord },
     { key: "due", label: "Due", width: 130, sortable: false, filterable: false, accessor: (l) => (l.due ? fmtDate(l.due) : ""), exportValue: (l) => l.due ?? "" },
-    { key: "owed", label: "Commission", width: 150, align: "right", sortable: false, filterable: false,
-      accessor: (l) => (l.kind === "payment" ? "" : rm(l.owed)), exportValue: (l) => (l.kind === "payment" ? "" : l.owed),
-      footerTotal: (ls) => rm(ls.reduce((s, l) => s + l.owed, 0)) },
-    { key: "paid", label: "Paid", width: 150, align: "right", sortable: false, filterable: false,
-      accessor: (l) => (l.kind === "payment" ? rm(l.paid) : ""), exportValue: (l) => (l.kind === "payment" ? l.paid : ""),
-      footerTotal: (ls) => rm(ls.reduce((s, l) => s + l.paid, 0)) },
-    { key: "balance", label: "Balance", width: 150, align: "right", sortable: false, filterable: false,
+    { key: "owed", label: "Commission", width: FINANCE_WIDTH.amount, align: "right", sortable: false, filterable: false,
+      accessor: (l) => (l.kind === "payment" ? "" : amountCell(l.owed)), exportValue: (l) => (l.kind === "payment" ? "" : l.owed),
+      footerTotal: (ls) => amountCell(ls.reduce((s, l) => s + l.owed, 0)) },
+    { key: "paid", label: "Paid", width: FINANCE_WIDTH.amount, align: "right", sortable: false, filterable: false,
+      accessor: (l) => (l.kind === "payment" ? amountCell(l.paid) : ""), exportValue: (l) => (l.kind === "payment" ? l.paid : ""),
+      footerTotal: (ls) => amountCell(ls.reduce((s, l) => s + l.paid, 0)) },
+    { key: "balance", label: "Balance", width: FINANCE_WIDTH.amount, align: "right", sortable: false, filterable: false,
       accessor: (l) => rm(l.balance), exportValue: (l) => l.balance },
   ], []);
 
@@ -85,8 +90,9 @@ export default function CommissionStatement({
         rows={lines}
         columns={columns}
         rowKey={statementLineKey}
-        storageKey="carres.finance.dealer-commission-statement.v1"
+        storageKey="carres.finance.dealer-commission-statement.v2"
         appearance="reference"
+        look="finance"
         exportName={`Commission statement ${statement?.dealer.name ?? ""}`.trim()}
         groupBanner={false}
         allowColumnGrouping={false}

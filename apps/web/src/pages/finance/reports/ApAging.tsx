@@ -12,6 +12,10 @@
  *
  * Every figure is the shared AP-aging arithmetic's (Law D); this page only
  * prints it. Opening a row lists the supplier's open bills.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the supplier wraps rather than being cut,
+ * and a zero is a blank cell, the Balance as well as the ages. The footer
+ * totals are the answer and always print.
  */
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -30,7 +34,6 @@ import Select from "@/components/kit/Select";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { DateField } from "@/components/register/DateField";
-import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import { apiFetch } from "@/lib/api";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
@@ -38,15 +41,16 @@ import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { creditorKindWord } from "../payables/payables-words";
 import { ReadFailed } from "../payables/PayablesParts";
 import { readDay } from "./period";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 
 export const AGING_COLUMN_WORDS: Record<AgingColumns, readonly string[]> = {
   month: ["This month", "1 month", "2 months", "3 months", "4 months and over"],
   day: ["0 to 30 days", "31 to 60 days", "61 to 90 days", "91 to 120 days", "Over 120 days"],
 };
-const AMOUNT = REGISTER_FIELD_WIDTH.amount;
+const AMOUNT = FINANCE_WIDTH.amount;
 const link = "text-kit-blue-11 underline underline-offset-2";
-const money = (n: number) => (Math.round(n * 100) === 0 ? "" : rm(n));
-const sum = (rows: ApAgingRow[], pick: (r: ApAgingRow) => number) => rm(rows.reduce((t, r) => t + Math.round(pick(r) * 100), 0) / 100);
+const money = amountCell;
+const sum = (rows: ApAgingRow[], pick: (r: ApAgingRow) => number) => amountCell(rows.reduce((t, r) => t + Math.round(pick(r) * 100), 0) / 100);
 
 function Bills({ row, columns }: { row: ApAgingRow; columns: AgingColumns }) {
   const cols: readonly Column<ApAgingRow["bills"][number]>[] = [
@@ -95,13 +99,14 @@ export default function ApAging() {
 
   const gridColumns = useMemo<DataGridColumn<ApAgingRow>[]>(() => [
     // 0691 (Chew 2026-10-12): Finance's AutoCount-style code, as AutoCount's aging lists it.
-    { key: "code", label: "Code", width: 110, accessor: (r) => r.code ?? "",
+    { key: "code", label: "Code", width: FINANCE_WIDTH.code, accessor: (r) => r.code ?? "",
       searchValue: (r) => r.code ?? "", exportValue: (r) => r.code ?? "" },
-    { key: "supplier", label: "Supplier", width: 220, accessor: (r) => r.name, overflowText: (r) => r.name,
+    // Narrower than a party's usual width, and wrapping, so the seven money columns fit beside it.
+    { key: "supplier", label: "Supplier", width: 140, wrap: true, accessor: (r) => r.name,
       searchValue: (r) => r.name, exportValue: (r) => r.name },
     { key: "kind", label: "Creditor Type", width: 140, accessor: (r) => creditorKindWord(r.kind),
       filterValue: (r) => creditorKindWord(r.kind), filterType: "enum", defaultHidden: true },
-    { key: "balance", label: "Balance", width: AMOUNT, align: "right", accessor: (r) => rm(r.balance),
+    { key: "balance", label: "Balance", width: AMOUNT, align: "right", accessor: (r) => money(r.balance),
       numberValue: (r) => r.balance, exportValue: (r) => r.balance, footerTotal: (v) => sum(v, (r) => r.balance) },
     ...Array.from({ length: AGING_COLUMN_COUNT }, (_, i): DataGridColumn<ApAgingRow> => {
       const word = AGING_COLUMN_WORDS[columns][i]!;
@@ -134,7 +139,7 @@ export default function ApAging() {
       <ListPageShell register>
         <DataGrid rows={ready?.rows ?? []} columns={gridColumns} rowKey={(r) => r.supplierId}
           rowTestId={(r) => `ap-aging-row-${r.supplierId}`}
-          storageKey="carres.finance.ap-aging.v1" appearance="reference" exportName={`AP Aging ${asAt}`}
+          storageKey="carres.finance.ap-aging.v2" appearance="reference" look="finance" exportName={`AP Aging ${asAt}`}
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess} wrapToolbar
           searchPlaceholder="Search suppliers…" expandTitle="Show bills"
           expandable={{ renderExpansion: (r) => <Bills row={r} columns={columns} /> }}

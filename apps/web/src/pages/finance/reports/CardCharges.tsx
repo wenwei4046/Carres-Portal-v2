@@ -10,6 +10,9 @@
  *
  * Frame: the Dealer commission report's (ModuleHeader + ListPageShell register
  * + DataGrid); the export is the engine's, the money leaves as numbers.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): a zero amount is a blank cell; Fee % keeps
+ * its 0.00%, a rate rather than money.
  */
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -20,10 +23,10 @@ import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { apiFetch } from "@/lib/api";
 import { fmtMonth } from "@/lib/fmt-date";
-import { rm } from "@/lib/format-currency";
 import { cents } from "../payables/payables-words";
 import { decodeDepartment, DepartmentFilter, useDepartmentParam } from "../department";
 import { LoadFailed } from "../other-money-in/parts";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 
 /** One approved payout's share for one department, as the database sends it. */
 export interface CardChargeSlice {
@@ -103,9 +106,9 @@ export default function CardCharges() {
   const columns = useMemo<DataGridColumn<CardChargeRow>[]>(() => [
     { key: "month", label: "Month", width: 120, accessor: (r) => fmtMonth(r.month), sortFn: (a, b) => a.month.localeCompare(b.month), exportValue: (r) => r.month },
     { key: "acquirer", label: "Card company", width: 160, accessor: (r) => CARD_ACQUIRER_WORD[r.acquirer] },
-    { key: "gross", label: "Sales total", width: 150, align: "right", accessor: (r) => rm(r.gross), numberValue: (r) => r.gross, exportValue: (r) => r.gross, footerTotal: (v) => rm(sum(v, "gross")) },
-    { key: "fee", label: "Fee", width: 140, align: "right", accessor: (r) => rm(r.fee), numberValue: (r) => r.fee, exportValue: (r) => r.fee, footerTotal: (v) => rm(sum(v, "fee")) },
-    { key: "net", label: "Paid into bank", width: 150, align: "right", accessor: (r) => rm(r.net), numberValue: (r) => r.net, exportValue: (r) => r.net, footerTotal: (v) => rm(sum(v, "net")) },
+    { key: "gross", label: "Sales total", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.gross), numberValue: (r) => r.gross, exportValue: (r) => r.gross, footerTotal: (v) => amountCell(sum(v, "gross")) },
+    { key: "fee", label: "Fee", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.fee), numberValue: (r) => r.fee, exportValue: (r) => r.fee, footerTotal: (v) => amountCell(sum(v, "fee")) },
+    { key: "net", label: "Paid into bank", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.net), numberValue: (r) => r.net, exportValue: (r) => r.net, footerTotal: (v) => amountCell(sum(v, "net")) },
     { key: "pct", label: "Fee %", width: 100, align: "right", accessor: (r) => `${r.feePct.toFixed(2)}%`, numberValue: (r) => r.feePct, exportValue: (r) => r.feePct, footerTotal: (v) => `${feePercent(sum(v, "fee"), sum(v, "gross")).toFixed(2)}%` },
   ], []);
 
@@ -113,8 +116,8 @@ export default function CardCharges() {
   return <div className="flex h-full min-h-0 flex-col" data-testid="card-charges">
     <ModuleHeader destinationHeader testId="card-charges-header" word="Card charges" docTitle="Card charges · Carres" />
     <ListPageShell register>
-      <DataGrid rows={rows} columns={columns} rowKey={(r) => `${r.month}|${r.acquirer}`} storageKey="carres.finance.card-charges.v1"
-        appearance="reference" exportName={`Card charges ${from} to ${to}`} groupBanner={false} stickyIdentity
+      <DataGrid rows={rows} columns={columns} rowKey={(r) => `${r.month}|${r.acquirer}`} storageKey="carres.finance.card-charges.v2"
+        appearance="reference" look="finance" exportName={`Card charges ${from} to ${to}`} groupBanner={false} stickyIdentity
         isLoading={q.isPending} wrapToolbar
         errorState={q.isError ? <LoadFailed what="Card charges" onRetry={() => void q.refetch()} /> : undefined}
         emptyMessage="No approved card payout in these months. Only card settlement days whose payout is approved are counted."

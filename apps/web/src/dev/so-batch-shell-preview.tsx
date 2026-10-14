@@ -24,7 +24,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PurchaseDemandRow, ReadyStockResponse, SoBatchOrderRow, SoBatchPurchaseResponse } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
 import OperationApp from "@/pages/operation/OperationApp";
-import { testTaskPo, testTaskSuppliers, testTasksFeed } from "./tasks-feed-fixture";
+import { testTaskPo, testTaskSuppliers, testInternalTask, testTasksFeed } from "./tasks-feed-fixture";
 import { appTodayIso } from "@/lib/fmt-date";
 import "@/index.css";
 
@@ -153,6 +153,8 @@ function reserve(body: { orderId: string; picks: Array<{ itemId: string; orderLi
 }
 
 const poOf = (url: string) => (url.includes("/api/operation/pos?") ? new URL(url).searchParams.get("poId") : null);
+const PREVIEW_PERSON = { id: ME, name: "TEST · Staff A", email: "preview@carres.local" };
+const internalTaskOf = (url: string) => /\/api\/operation\/internal-tasks\/([0-9a-f-]{36})$/.exec(url.split("?")[0]!)?.[1] ?? null;
 
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input, init) => {
@@ -163,7 +165,10 @@ window.fetch = async (input, init) => {
     : stock ? readyStockOf(decodeURIComponent(stock[1]!))
     : url.includes("/api/operation/purchase/demands") ? { ...payload, rows: rows.filter((row) => row.toBuy == null || row.toBuy > 0) }
     /* The shell's Tasks panel reads the one Work feed: TEST work for the preview person. */
-    : /\/api\/operation\/work(\?|$)/.test(url) ? testTasksFeed({ id: ME, name: "TEST · Staff A", email: "preview@carres.local" })
+    : /\/api\/operation\/work(\?|$)/.test(url) ? testTasksFeed(PREVIEW_PERSON)
+    /* An opened TEST internal task reads its own record; adding or finishing one answers like the door. */
+    : internalTaskOf(url) ? testInternalTask(internalTaskOf(url)!, PREVIEW_PERSON) ?? {}
+    : url.includes("/api/operation/internal-tasks") ? { id: "00000000-0000-4000-8000-0000000000c9" }
     /* An opened TEST task reads its Purchase Order and its supplier. */
     : poOf(url) ? testTaskPo(poOf(url)!)
     : url.includes("/api/operation/suppliers") ? testTaskSuppliers()

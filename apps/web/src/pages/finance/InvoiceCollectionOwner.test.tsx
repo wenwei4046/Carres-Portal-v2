@@ -23,7 +23,7 @@ vi.mock("@/lib/api", () => ({
       { userId: "u-shasha", name: "Shasha", email: "shasha@carres.com" },
       { userId: "u-yujun", name: "Yu Jun", email: "yujun@carres.com" },
     ], generatedOn: "2026-09-13", closureReceipt: null,
-      sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((key) => ({
+      sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker", "workspace"] as const).map((key) => ({
         key, state: "healthy", observedAt: "2026-09-13T01:00:00.000Z", lastSuccessfulAt: "2026-09-13T01:00:00.000Z", errorLabel: null,
       })),
     };

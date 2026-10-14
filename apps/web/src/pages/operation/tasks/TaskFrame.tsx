@@ -55,7 +55,7 @@ function History({ events }: { events: readonly TaskHistoryEvent[] }) {
   );
 }
 
-export default function TaskFrame({ head, steps, facts = [], orders = [], salesOrders, history = [], files = [], "data-testid": testId }: {
+export default function TaskFrame({ head, steps, facts = [], orders = [], salesOrders, history = [], files = [], plain = false, "data-testid": testId }: {
   /** The task in the module's own words, used only outside the Tasks area:
    *  its head, and `facts` standing for the list card's own rows. */
   head: Pick<TaskHead, "title" | "page" | "record" | "moduleIcon"> & { destination?: string; facts?: readonly TaskViewFact[] };
@@ -68,6 +68,9 @@ export default function TaskFrame({ head, steps, facts = [], orders = [], salesO
   salesOrders?: ReactNode;
   history?: readonly TaskHistoryEvent[];
   files?: readonly TaskFileStage[];
+  /** A task about no order and no document (an internal task): `Steps` and
+   *  `History` only, never an empty `Route` or `Files`. */
+  plain?: boolean;
   "data-testid"?: string;
 }) {
   const navigate = useNavigate();
@@ -123,9 +126,9 @@ export default function TaskFrame({ head, steps, facts = [], orders = [], salesO
       tabsLabel={W.sections}
       tabs={[
         { key: "steps", label: W.tab.steps, content: steps },
-        { key: "route", label: W.tab.route, content: <TaskRoute orders={orders} onOpen={openOrder} /> },
+        ...(plain ? [] : [{ key: "route", label: W.tab.route, content: <TaskRoute orders={orders} onOpen={openOrder} /> }]),
         { key: "history", label: W.tab.history, content: <History events={events} /> },
-        { key: "files", label: W.filesTab(fileTotal), content: <TaskFiles stages={files} /> },
+        ...(plain ? [] : [{ key: "files", label: W.filesTab(fileTotal), content: <TaskFiles stages={files} /> }]),
       ]}
     />
   );

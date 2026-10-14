@@ -17,7 +17,7 @@ const feed = vi.hoisted(() => ({ items: [] as unknown[], completed: [] as unknow
 vi.mock("../use-open-work", () => ({
   useOpenWorkSet: () => ({
     items: feed.items, completed: feed.completed, myUserId: "00000000-0000-4000-8000-0000000000aa", hasData: feed.hasData, error: null, refreshFailed: false,
-    lastUpdatedAt: null, unhealthySources: [], generatedOn: "2026-10-05", retry: () => {},
+    lastUpdatedAt: null, unhealthySources: [], generatedOn: "2026-10-05", retry: () => {}, staff: [],
   }),
 }));
 vi.mock("./use-po-window-facts", () => ({ usePoWindowFacts: () => new Map() }));

@@ -29,6 +29,10 @@
  * own toolbar and the note in its 32px status footer, so nothing page-owned is
  * drawn above the table (UI MASTER §6.7). Export is the engine's — the columns
  * carry `exportValue` so the money leaves as numbers.
+ *
+ * FINANCE LOOK (Chew 2026-10-13), By dealer: the dealer wraps rather than
+ * being cut, the long headers sit on two lines, and a zero amount is a blank
+ * cell. Quota left keeps its RM 0.00: a quota used up is the answer.
  */
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -52,6 +56,7 @@ import CommissionOrders from "./CommissionOrders";
 import CommissionRates from "./CommissionRates";
 import CommissionKpi from "./CommissionKpi";
 import CommissionStatement from "./CommissionStatement";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 
 const BASE = "/api/finance/dealer-commission";
 const ALL = "all";
@@ -101,13 +106,13 @@ export default function DealerCommission() {
   const monthChoices = months.includes(month) ? months : [...months, month];
 
   const columns = useMemo<DataGridColumn<DcReportRow>[]>(() => [
-    { key: "dealer", label: "Dealer", width: 240, accessor: (r) => r.dealer, searchValue: (r) => r.dealer },
-    { key: "earned", label: "Commission this month", width: 200, align: "right", accessor: (r) => rm(r.earned), numberValue: (r) => r.earned, exportValue: (r) => r.earned,
-      footerTotal: (rs) => rm(rs.reduce((s, r) => s + r.earned, 0)) },
-    { key: "still", label: "Commission still to collect", width: 220, align: "right", accessor: (r) => rm(r.stillToCollect), numberValue: (r) => r.stillToCollect, exportValue: (r) => r.stillToCollect,
-      footerTotal: (rs) => rm(rs.reduce((s, r) => s + r.stillToCollect, 0)) },
-    { key: "rebate", label: "Rebate this month", width: 170, align: "right", accessor: (r) => (r.rebate === null ? "No quota" : rm(r.rebate)), numberValue: (r) => r.rebate ?? 0, exportValue: (r) => r.rebate ?? "" },
-    { key: "left", label: "Quota left", width: 160, align: "right", numberValue: (r) => r.quotaLeft ?? 0, exportValue: (r) => r.quotaLeft ?? "",
+    { key: "dealer", label: "Dealer", width: FINANCE_WIDTH.party, wrap: true, accessor: (r) => r.dealer, searchValue: (r) => r.dealer },
+    { key: "earned", label: "Commission this month", headerLines: ["Commission", "this month"], width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.earned), numberValue: (r) => r.earned, exportValue: (r) => r.earned,
+      footerTotal: (rs) => amountCell(rs.reduce((s, r) => s + r.earned, 0)) },
+    { key: "still", label: "Commission still to collect", headerLines: ["Commission still", "to collect"], width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.stillToCollect), numberValue: (r) => r.stillToCollect, exportValue: (r) => r.stillToCollect,
+      footerTotal: (rs) => amountCell(rs.reduce((s, r) => s + r.stillToCollect, 0)) },
+    { key: "rebate", label: "Rebate this month", headerLines: ["Rebate", "this month"], width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => (r.rebate === null ? "No quota" : amountCell(r.rebate)), numberValue: (r) => r.rebate ?? 0, exportValue: (r) => r.rebate ?? "" },
+    { key: "left", label: "Quota left", width: FINANCE_WIDTH.amount, align: "right", numberValue: (r) => r.quotaLeft ?? 0, exportValue: (r) => r.quotaLeft ?? "",
       searchValue: quotaLeftWord,
       // No quota yet: the words open the quota form with this dealer chosen
       // (and not the row's own door to its orders).
@@ -116,11 +121,11 @@ export default function DealerCommission() {
             onClick={(e) => { e.stopPropagation(); setQuota({ dealerId: r.dealerId, quota: "", rebateRate: "5", startsOn: months[0] }); setParams({ view: "quotas" }); }}>No quota</button>
         : quotaLeftWord(r)) },
     // 0665: the 15-year guarantee KPI allowance (rules 8.1–8.4).
-    { key: "guarantees", label: "Guarantees this month", width: 190, align: "right", accessor: (r) => String(r.kpiUnits),
+    { key: "guarantees", label: "Guarantees this month", headerLines: ["Guarantees", "this month"], width: 110, align: "right", accessor: (r) => String(r.kpiUnits),
       numberValue: (r) => r.kpiUnits, exportValue: (r) => r.kpiUnits },
-    { key: "kpi", label: "KPI allowance this month", width: 210, align: "right", accessor: (r) => (r.kpi === null ? "Not set up" : rm(r.kpi)),
+    { key: "kpi", label: "KPI allowance this month", headerLines: ["KPI allowance", "this month"], width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => (r.kpi === null ? "Not set up" : amountCell(r.kpi)),
       numberValue: (r) => r.kpi ?? 0, exportValue: (r) => r.kpi ?? "",
-      footerTotal: (rs) => rm(rs.reduce((s, r) => s + (r.kpi ?? 0), 0)) },
+      footerTotal: (rs) => amountCell(rs.reduce((s, r) => s + (r.kpi ?? 0), 0)) },
   ], [months, setParams]);
 
   /** The month, dealer and showroom, the same on both report views. */
@@ -158,8 +163,8 @@ export default function DealerCommission() {
       // A month's row opens that month's orders for this dealer.
       onOpenMonth={(m) => { setMonth(m); setOutletId(ALL); setParams({ view: "orders" }); }} /> :
     <ListPageShell register>
-      <DataGrid rows={rows} columns={columns} rowKey={(r) => r.dealerId} storageKey="carres.finance.dealer-commission.v1"
-        appearance="reference" exportName={`Dealer commission ${month}`} groupBanner={false} stickyIdentity
+      <DataGrid rows={rows} columns={columns} rowKey={(r) => r.dealerId} storageKey="carres.finance.dealer-commission.v2"
+        appearance="reference" look="finance" exportName={`Dealer commission ${month}`} groupBanner={false} stickyIdentity
         isLoading={!q.isSuccess} wrapToolbar
         // A dealer's row opens its orders for the same month.
         onRowClick={(r) => { setDealerId(r.dealerId); setOutletId(ALL); setParams({ view: "orders" }); }}

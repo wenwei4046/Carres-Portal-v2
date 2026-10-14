@@ -11,6 +11,7 @@ import { rm } from "@/lib/format-currency";
 import { statementExport } from "./month-end-pack";
 import { parseBalanceSheet, parseProfitAndLoss } from "./reports/report-queries";
 import { paidBeforeInvoiceNote } from "./reports/StatementTable";
+import look from "./finance-look.module.css";
 import { lastMonths } from "./reports/by-month";
 
 const api = vi.hoisted(() => ({ fetch: vi.fn() }));
@@ -148,10 +149,16 @@ function Address() {
   return <output data-testid="address">{useLocation().search}</output>;
 }
 
-/** Each band, line and bottom strip of one statement, cells joined by ` | `. */
+/** Each band, line and bottom strip of one statement, cells joined by ` | `.
+ *  A line's Code and Account cells (Chew 2026-10-14) read as one, `4100 Furniture sales`,
+ *  as the export writes them; a band and the bottom strip already span the two. */
 function lines(table: HTMLElement): string[] {
   return Array.from(table.querySelectorAll('tr[data-kit="data-group"], tr[data-kit="data-row"], tr[data-kit="data-totals"]'))
-    .map((tr) => Array.from(tr.children).map((td) => (td.textContent ?? "").trim()).join(" | ").trim());
+    .map((tr) => {
+      const cells = Array.from(tr.children).map((td) => (td.textContent ?? "").trim());
+      const read = tr.getAttribute("data-kit") === "data-row" ? [cells.slice(0, 2).filter(Boolean).join(" "), ...cells.slice(2)] : cells;
+      return read.join(" | ").trim();
+    });
 }
 
 const failure = (status: number, message = "boom") => Object.assign(new Error(message), { status });
@@ -185,7 +192,7 @@ describe("Reports — the statements read the ledger", () => {
   it("prints the Profit and Loss as served: section totals, header subtotals, the accounts that moved and the net result", async () => {
     show();
     const table = screen.getByTestId("profit-and-loss");
-    await within(table).findByRole("link", { name: "4100 Furniture sales" });
+    await within(table).findByRole("link", { name: "4100" });
     expect(lines(table)).toEqual([
       "Income | RM 12,850.00",
       "4100 Furniture sales | RM 12,500.00",
@@ -197,6 +204,23 @@ describe("Reports — the statements read the ledger", () => {
       "6200 Rent and utilities | RM 1,800.00",
       "Net result | RM 4,050.00",
     ]);
+    // FINANCE LOOK (Chew 2026-10-13): the table sits in the Finance look, and a
+    // heading line is marked as a subtotal row; an account line is not.
+    expect(look.statement).toBeTruthy();
+    expect(table.parentElement).toHaveClass(look.statement);
+    const heading = within(table).getByText("Cost of sales");
+    expect(heading).toHaveAttribute("data-fin-tone", "subtotal");
+    const account = within(table).getByRole("link", { name: "5100" }).closest("tr")!;
+    expect(account.querySelector("[data-fin-tone]")).toBeNull();
+    // The code and the name are two columns; the code alone is the link, and
+    // the table is as wide as its three columns (Chew 2026-10-14).
+    expect(within(table).getAllByRole("columnheader").map((h) => h.textContent?.trim())).toEqual(["Code", "Account", "Amount"]);
+    const [code, name] = Array.from(account.children) as HTMLElement[];
+    expect(code).toHaveTextContent(/^5100$/);
+    expect(within(code!).getByRole("link")).toHaveClass("decoration-dotted");
+    expect(name).toHaveTextContent(/^Cost of goods sold$/);
+    expect(within(name!).queryByRole("link")).not.toBeInTheDocument();
+    expect(table.parentElement!.style.getPropertyValue("--fin-table-width")).toBe("544px");
   });
 
   it("prints the total the ledger served, never a sum of its own", async () => {
@@ -204,7 +228,7 @@ describe("Reports — the statements read the ledger", () => {
       r.row_kind === "SECTION_TOTAL" && r.section === "INCOME" ? { ...r, amount: 99.99 } : r)) });
     show();
     const table = screen.getByTestId("profit-and-loss");
-    await within(table).findByRole("link", { name: "4100 Furniture sales" });
+    await within(table).findByRole("link", { name: "4100" });
     expect(lines(table)[0]).toBe("Income | RM 99.99");
     expect(within(table).queryByText("RM 12,850.00")).not.toBeInTheDocument();
   });
@@ -212,7 +236,7 @@ describe("Reports — the statements read the ledger", () => {
   it("prints the Balance Sheet as served, with the result not yet closed inside equity", async () => {
     show(BS_AT);
     const table = screen.getByTestId("balance-sheet");
-    await within(table).findByRole("link", { name: "1120 Bank — current account" });
+    await within(table).findByRole("link", { name: "1120" });
     expect(lines(table)).toEqual([
       "Asset | RM 6,850.00",
       "Cash and bank | RM 5,200.00",
@@ -260,7 +284,7 @@ describe("Reports — the statements read the ledger", () => {
     serve({ bs: (a) => bs(a, reclassedBody()) });
     show(BS_AT);
     const table = screen.getByTestId("balance-sheet");
-    await within(table).findByRole("link", { name: "2210 Customer deposits held" });
+    await within(table).findByRole("link", { name: "2210" });
     // Each account stays one line: the note is not printed in the row.
     expect(lines(table)).toEqual([
       "Asset | RM 8,000.00",
@@ -275,12 +299,12 @@ describe("Reports — the statements read the ledger", () => {
     ]);
     // The note is on a mark in the same row as its account, named by the sentence.
     const rowOf = (account: string) => within(table).getByRole("link", { name: account }).closest("tr")!;
-    expect(within(rowOf("2210 Customer deposits held")).getByRole("button", { name: INCLUDES }))
+    expect(within(rowOf("2210")).getByRole("button", { name: INCLUDES }))
       .toHaveAttribute("type", "button");
-    expect(within(rowOf("1210 Trade receivables — customers")).getByRole("button", { name: LEAVES_OUT }))
+    expect(within(rowOf("1210")).getByRole("button", { name: LEAVES_OUT }))
       .toHaveAttribute("type", "button");
     expect(within(table).getAllByRole("button", { name: /paid before their invoice/ })).toHaveLength(2);
-    expect(within(rowOf("1120 Bank — current account")).queryByRole("button")).not.toBeInTheDocument();
+    expect(within(rowOf("1120")).queryByRole("button")).not.toBeInTheDocument();
     expect(screen.queryByTestId("balance-sheet-differs")).not.toBeInTheDocument();
   });
 
@@ -335,7 +359,7 @@ describe("Reports — the statements read the ledger", () => {
     serve({ bs: (a) => bs(a, advancedBody()) });
     show(BS_AT);
     const table = screen.getByTestId("balance-sheet");
-    await within(table).findByRole("link", { name: "1230 Advances to suppliers" });
+    await within(table).findByRole("link", { name: "1230" });
     expect(lines(table)).toEqual([
       "Asset | RM 8,000.00",
       "Cash and bank | RM 5,900.00",
@@ -352,10 +376,10 @@ describe("Reports — the statements read the ledger", () => {
       "Net result not yet closed | RM 4,685.00",
     ]);
     const rowOf = (account: string) => within(table).getByRole("link", { name: account }).closest("tr")!;
-    expect(within(rowOf("1230 Advances to suppliers")).getByRole("button", { name: ADVANCES })).toHaveAttribute("type", "button");
-    expect(within(rowOf("2110 Trade payables — suppliers")).getByRole("button", { name: PAYABLES })).toHaveAttribute("type", "button");
-    expect(within(rowOf("2210 Customer deposits held")).getByRole("button", { name: INCLUDES })).toBeInTheDocument();
-    expect(within(rowOf("1210 Trade receivables — customers")).getByRole("button", { name: LEAVES_OUT })).toBeInTheDocument();
+    expect(within(rowOf("1230")).getByRole("button", { name: ADVANCES })).toHaveAttribute("type", "button");
+    expect(within(rowOf("2110")).getByRole("button", { name: PAYABLES })).toHaveAttribute("type", "button");
+    expect(within(rowOf("2210")).getByRole("button", { name: INCLUDES })).toBeInTheDocument();
+    expect(within(rowOf("1210")).getByRole("button", { name: LEAVES_OUT })).toBeInTheDocument();
     expect(table.querySelectorAll('tr[data-kit="data-row"] button')).toHaveLength(4);
     fireEvent.focus(within(table).getByRole("button", { name: ADVANCES }));
     expect(await screen.findByRole("tooltip")).toHaveTextContent(ADVANCES);
@@ -377,12 +401,12 @@ describe("Reports — the statements read the ledger", () => {
 
   it("opens each account in the Journal, narrowed to that account and the statement's dates", async () => {
     const view = show();
-    const plLink = await within(screen.getByTestId("profit-and-loss")).findByRole("link", { name: "4100 Furniture sales" });
+    const plLink = await within(screen.getByTestId("profit-and-loss")).findByRole("link", { name: "4100" });
     expect(plLink).toHaveAttribute("href", `/finance/ledger?account=4100&from=${FROM}&to=${TO}`);
     view.unmount();
     show(BS_AT);
     const bsTable = screen.getByTestId("balance-sheet");
-    const bsLink = await within(bsTable).findByRole("link", { name: "1120 Bank — current account" });
+    const bsLink = await within(bsTable).findByRole("link", { name: "1120" });
     expect(bsLink).toHaveAttribute("href", `/finance/ledger?account=1120&from=${GO_LIVE}&to=${TODAY}`);
     // A header line is a subtotal, not an account: it opens nothing.
     expect(within(bsTable).queryByRole("link", { name: /Cash and bank/ })).not.toBeInTheDocument();
@@ -395,7 +419,7 @@ describe("Reports — the statements read the ledger", () => {
     fireEvent.click(await screen.findByRole("option", { name: fmtMonth(PREV) }));
     await waitFor(() => expect(api.fetch)
       .toHaveBeenCalledWith(`/api/finance/ledger/profit-and-loss?from=${PREV}-01&to=${lastDay(PREV)}`));
-    const link = await within(screen.getByTestId("profit-and-loss")).findByRole("link", { name: "4100 Furniture sales" });
+    const link = await within(screen.getByTestId("profit-and-loss")).findByRole("link", { name: "4100" });
     expect(link).toHaveAttribute("href", `/finance/ledger?account=4100&from=${PREV}-01&to=${lastDay(PREV)}`);
   });
 
@@ -440,7 +464,7 @@ describe("Reports — the statements read the ledger", () => {
 
   it("prints none of the old invented figures and asks for none of the old reads", async () => {
     show();
-    await within(screen.getByTestId("profit-and-loss")).findByRole("link", { name: "4100 Furniture sales" });
+    await within(screen.getByTestId("profit-and-loss")).findByRole("link", { name: "4100" });
     const text = document.body.textContent ?? "";
     expect(text).not.toMatch(/55\s?%/);
     expect(text).not.toMatch(/42,?000/);
@@ -505,7 +529,7 @@ describe("Reports — when there is nothing, or no answer", () => {
       : r.row_kind === "NET" ? { ...r, amount: 12850 } : r)) });
     show();
     const table = screen.getByTestId("profit-and-loss");
-    await within(table).findByRole("link", { name: "4100 Furniture sales" });
+    await within(table).findByRole("link", { name: "4100" });
     expect(lines(table).slice(3)).toEqual([
       "Expense | RM 0.00",
       "No expenses in this period. |",
@@ -547,7 +571,7 @@ describe("Reports — when there is nothing, or no answer", () => {
     down = false;
     fireEvent.click(within(alert).getByRole("button", { name: "Try again" }));
     const table = await screen.findByTestId("profit-and-loss");
-    expect(await within(table).findByRole("link", { name: "4100 Furniture sales" })).toBeInTheDocument();
+    expect(await within(table).findByRole("link", { name: "4100" })).toBeInTheDocument();
   });
 
   it.each<[string, (rows: Row[]) => Row[]]>([
@@ -582,7 +606,7 @@ describe("Reports — Export writes the statement on screen", () => {
   it("Profit and Loss for a department: the same headings, accounts, subtotals and net result as the table", async () => {
     show(`${PL_AT}?dept=SHOWROOM&from=${FROM}&to=${TO}`);
     const table = screen.getByTestId("profit-and-loss");
-    await within(table).findByRole("link", { name: "4100 Furniture sales" });
+    await within(table).findByRole("link", { name: "4100" });
     const { sheet, stem } = statementExport(parseProfitAndLoss(pl(FROM, TO, PL_BODY), FROM, TO), "Showroom");
     expect(asPrinted(sheet.rows)).toEqual(lines(table));
     expect(sheet.rows[1]).toEqual(["Department", "Showroom"]);
@@ -593,7 +617,7 @@ describe("Reports — Export writes the statement on screen", () => {
   it("Balance Sheet: the same bands, headings, accounts and unclosed result as the table", async () => {
     show(`${BS_AT}?asOf=${TODAY}`);
     const table = screen.getByTestId("balance-sheet");
-    await within(table).findByRole("link", { name: "1120 Bank — current account" });
+    await within(table).findByRole("link", { name: "1120" });
     const { sheet, stem } = statementExport(parseBalanceSheet(bs(TODAY, bsBody(0)), TODAY), null);
     expect(asPrinted(sheet.rows)).toEqual(lines(table));
     expect(stem).toBe(`Balance Sheet as of ${fmtDate(TODAY, { year: "always" })}`);
@@ -650,7 +674,7 @@ describe("Reports — By month", () => {
     for (const [i, ym] of [YM, PREV, PREV2].entries()) {
       const one = show(`${PL_AT}?from=${ym}-01&to=${lastDay(ym)}`);
       const table = screen.getByTestId("profit-and-loss");
-      await within(table).findByRole("link", { name: "4100 Furniture sales" });
+      await within(table).findByRole("link", { name: "4100" });
       const single = lines(table).map((l) => l.split(" | "));
       const column = byMonth.map((r) => [r[0], r[i + 1]]);
       // Every band, heading, account and the net result the statement prints, with its amount.
@@ -761,7 +785,7 @@ describe("Reports — stock on hand", () => {
     serve({ bs: (a) => bs(a, stockedBody()) });
     show(BS_AT);
     const table = screen.getByTestId("balance-sheet");
-    const row = (await within(table).findByRole("link", { name: "330-0000 STOCK" })).closest("tr")!;
+    const row = (await within(table).findByRole("link", { name: "330-0000" })).closest("tr")!;
     expect(row).toHaveTextContent("RM 1,500.00");
     expect(within(row).getByRole("button", { name: STOCK_LINE })).toBeInTheDocument();
     expect(paidBeforeInvoiceNote({ reclassified: -200, reclassifiedFor: "STOCK" }))

@@ -17,6 +17,7 @@ import {
   type AgeScope,
   type CustomerOwingRow,
 } from "./money-owed";
+import { FINANCE_WIDTH } from "./finance-widths";
 
 const soWord = (r: CustomerOwingRow) => (r.so !== null ? `SO-${r.so}` : "SO not available");
 const ageWord = (days: number | null) =>
@@ -41,6 +42,10 @@ export function ageScopeWord(scope: AgeScope): string {
  * age scope — the door from the Dashboard's A/R Aging rows and Overdue tile,
  * so the footer then prints the same figure the Dashboard printed. The scope
  * shows as a removable condition beside the column filters.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the customer wraps rather than being cut.
+ * Outstanding keeps its wider cell for the storage line under the amount, and
+ * is never zero here (only orders owing money are listed).
  */
 export default function FinanceAR() {
   const [dept, setDept] = useDepartmentParam();
@@ -85,7 +90,7 @@ export default function FinanceAR() {
 
   const columns = useMemo<DataGridColumn<CustomerOwingRow>[]>(() => [
     { key: "so", label: "SO No", width: 120, accessor: soWord, searchValue: soWord },
-    { key: "customer", label: "Customer", width: 240, accessor: (r) => r.customer,
+    { key: "customer", label: "Customer", width: FINANCE_WIDTH.party, wrap: true, accessor: (r) => r.customer,
       searchValue: (r) => r.customer },
     // Days since the invoice was issued, Malaysia time — the age the Dashboard's A/R Aging buckets by.
     { key: "age", label: "Age", width: 110, align: "right",
@@ -128,8 +133,9 @@ export default function FinanceAR() {
             rows={rows}
             columns={columns}
             rowKey={(r) => r.orderId}
-            storageKey="carres.finance.ar.v2"
+            storageKey="carres.finance.ar.v3"
             appearance="reference"
+            look="finance"
             exportName="AR · Receivables"
             groupBanner={false}
             stickyIdentity

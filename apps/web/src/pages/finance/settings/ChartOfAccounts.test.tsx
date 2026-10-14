@@ -121,6 +121,14 @@ const CHART = [
   acc("1230", "Advances to suppliers", "0000", "ASSET", { is_active: false }),
 ];
 
+/** The chart's ⋮ menu (Chew 2026-10-14): Add a money account and Import from AutoCount sit in it. */
+async function pickFromMore(name: string) {
+  const trigger = await screen.findByTestId("chart-more");
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: "ArrowDown" });
+  fireEvent.click(await screen.findByRole("menuitem", { name }));
+}
+
 beforeEach(() => {
   net.chart = CHART.map((a) => ({ ...a }));
   net.calls = [];
@@ -230,7 +238,7 @@ describe("Chart of accounts — edit and retire from the row (0656)", () => {
   it("Add a money account opens the money account's own window (0692)", async () => {
     show();
     await ready();
-    fireEvent.click(await screen.findByRole("button", { name: "Add a money account" }));
+    await pickFromMore("Add a money account");
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("combobox", { name: /Kind/ })).toBeInTheDocument();
   });

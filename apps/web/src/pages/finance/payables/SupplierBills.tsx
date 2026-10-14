@@ -63,6 +63,7 @@ import type { BillReadAnswer } from "@carres/shared/bill-reading";
 import { AdvanceModal, AmountField } from "./VoucherAdvance";
 import { LineFollowUp } from "./NoteFollowUpParts";
 import { useSaveKey } from "../save-key";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 
 /**
  * Finance → Bills (migration 0477). A supplier's invoice, entered once:
@@ -75,6 +76,9 @@ import { useSaveKey } from "../save-key";
  * periodic, nothing moves 1310) · Cr the payables account with the supplier as
  * the party, dated the bill date. The database decides every rule; this page
  * only offers what the database says the person may do (`can`).
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the supplier and the GRNs wrap rather than
+ * being cut, and a zero amount (a paid bill's Unpaid) is a blank cell.
  */
 export default function SupplierBills() {
   return (
@@ -100,27 +104,27 @@ function BillRegister() {
       searchValue: (r) => r.bill_no ?? "", exportValue: (r) => r.bill_no ?? "Draft, no number yet" },
     { key: "date", label: "Bill Date", width: 130, accessor: (r) => fmtDate(r.bill_date),
       dateValue: (r) => r.bill_date, filterType: "date", exportValue: (r) => fmtDate(r.bill_date) },
-    { key: "supplier", label: "Supplier", width: 220, accessor: (r) => r.supplier_name, overflowText: (r) => r.supplier_name,
+    { key: "supplier", label: "Supplier", width: FINANCE_WIDTH.party, wrap: true, accessor: (r) => r.supplier_name,
       searchValue: (r) => r.supplier_name, filterType: "enum" },
-    { key: "kind", label: "Creditor Type", width: 140, accessor: (r) => creditorKindWord(r.supplier_kind),
+    { key: "kind", label: "Creditor Type", width: 140, defaultHidden: true, accessor: (r) => creditorKindWord(r.supplier_kind),
       filterValue: (r) => creditorKindWord(r.supplier_kind), filterType: "enum" },
-    { key: "invoice", label: "Supplier Invoice", width: 160, accessor: (r) => r.supplier_invoice_no,
+    { key: "invoice", label: "Supplier Invoice", width: 160, defaultHidden: true, accessor: (r) => r.supplier_invoice_no,
       searchValue: (r) => r.supplier_invoice_no },
-    { key: "grn", label: "GRN", width: 160, accessor: (r) => r.grn_nos ?? "Not from a GRN",
+    { key: "grn", label: "GRN", width: 160, defaultHidden: true, wrap: true, accessor: (r) => r.grn_nos ?? "Not from a GRN",
       searchValue: (r) => r.grn_nos ?? "" },
     { key: "due", label: "Due Date", width: 130, accessor: (r) => r.due_date ? fmtDate(r.due_date) : "No due date",
       dateValue: (r) => r.due_date, filterType: "date" },
     { key: "status", label: "Status", width: 120, accessor: (r) => word(BILL_STATUS_WORD, r.status),
       filterValue: (r) => word(BILL_STATUS_WORD, r.status), filterType: "enum" },
-    { key: "total", label: "Total", width: 140, align: "right", accessor: (r) => money(r.total_amount),
+    { key: "total", label: "Total", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.total_amount),
       numberValue: (r) => num(r.total_amount), filterType: "number", exportValue: (r) => num(r.total_amount) ?? "" },
-    { key: "unpaid", label: "Unpaid", width: 140, align: "right",
-      accessor: (r) => r.status === "confirmed" ? money(r.unpaid) : r.status === "cancelled" ? "Cancelled" : "Not confirmed",
+    { key: "unpaid", label: "Unpaid", width: FINANCE_WIDTH.amount, align: "right",
+      accessor: (r) => r.status === "confirmed" ? amountCell(r.unpaid) : r.status === "cancelled" ? "Cancelled" : "Not confirmed",
       numberValue: (r) => num(r.unpaid), filterType: "number" },
-    { key: "price", label: "Price Check", width: 180,
+    { key: "price", label: "Price Check", width: 180, defaultHidden: true,
       accessor: (r) => priceCheckWord(r),
       filterValue: (r) => r.price_flags > 0 ? "Differs from PO" : "Matches PO", filterType: "enum" },
-    { key: "files", label: "Files", width: 90, align: "right", accessor: (r) => String(r.file_count),
+    { key: "files", label: "Files", width: 90, align: "right", defaultHidden: true, accessor: (r) => String(r.file_count),
       numberValue: (r) => r.file_count },
   ], []);
 
@@ -133,8 +137,9 @@ function BillRegister() {
             rows={rows}
             columns={columns}
             rowKey={(r) => r.id}
-            storageKey="carres.finance.bills.v1"
+            storageKey="carres.finance.bills.v3"
             appearance="reference"
+            look="finance"
             exportName="Bills"
             groupBanner={false}
             stickyIdentity

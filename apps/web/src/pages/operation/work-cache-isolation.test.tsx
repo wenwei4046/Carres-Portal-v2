@@ -133,7 +133,7 @@ function workResponse(items: OperationWorkItem[]): OperationWorkResponse {
     // Mon 14 Sep — a working day, so the focus day is generatedOn itself.
     generatedOn: "2026-09-14",
     closureReceipt: null,
-    sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((key) => ({
+    sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker", "workspace"] as const).map((key) => ({
       key,
       state: "healthy",
       observedAt: "2026-09-13T01:00:00.000Z",

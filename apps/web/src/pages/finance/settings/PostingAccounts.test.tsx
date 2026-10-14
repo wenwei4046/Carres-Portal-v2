@@ -124,6 +124,11 @@ function show() {
 }
 
 const row = (id: string) => document.querySelector<HTMLTableRowElement>(`tr[data-row-key="${id}"]`)!;
+/** The posting's account: its code in the Code cell, its name in the Account cell (Finance look, 2026-10-13). */
+const expectAccount = (id: string, code: string, name: string) => {
+  expect(within(row(id)).getByRole("cell", { name: code })).toBeInTheDocument();
+  expect(within(row(id)).getByText(name)).toBeInTheDocument();
+};
 
 async function ready() {
   await waitFor(() => expect(row("ROLE/COST_OF_GOODS_SOLD")).toBeTruthy());
@@ -135,7 +140,7 @@ describe("Posting accounts (0657)", () => {
     await ready();
     expect(screen.getByTestId("grid-group-toggle-sales")).toHaveTextContent("Sales");
     expect(within(row("INCOME/GOODS/*")).getByText("Goods sold, when the item group has no sales account")).toBeInTheDocument();
-    expect(row("INCOME/GOODS/*")).toHaveTextContent("500-0000 SALES");
+    expectAccount("INCOME/GOODS/*", "500-0000", "SALES");
     expect(within(row("INCOME/GOODS/rental")).getByText("Subscription fees")).toBeInTheDocument();
     expect(within(row("INCOME/ADDON/DELIVERY")).getByText("Delivery fee")).toBeInTheDocument();
     expect(row("ROLE/COST_OF_GOODS_SOLD")).toHaveTextContent("Goods bought that are not in the catalog");
@@ -238,7 +243,8 @@ describe("Posting accounts (0657)", () => {
     show();
     await ready();
     expect(screen.getByTestId("grid-group-toggle-dealer")).toHaveTextContent("Dealers");
-    expect(row("ROLE/DEALER_COMMISSION")).toHaveTextContent("Dealer commission900-C007 COMMISSION - DEALER");
+    expect(within(row("ROLE/DEALER_COMMISSION")).getByText("Dealer commission")).toBeInTheDocument();
+    expectAccount("ROLE/DEALER_COMMISSION", "900-C007", "COMMISSION - DEALER");
     fireEvent.click(within(row("ROLE/DEALER_COMMISSION_ACCRUED")).getByText("Dealer commission owed"));
     const dialog = await screen.findByRole("dialog");
     fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Account \(Liability\)/ }), { key: "Enter" });
@@ -255,9 +261,9 @@ describe("Posting accounts (0657)", () => {
     show();
     await ready();
     expect(row("ROLE/SHOWROOM_DEBTORS")).toHaveTextContent("Owed by showroom customers");
-    expect(row("ROLE/SHOWROOM_DEBTORS")).toHaveTextContent("300-1000 SHOWROOM DEBTORS");
+    expectAccount("ROLE/SHOWROOM_DEBTORS", "300-1000", "SHOWROOM DEBTORS");
     expect(row("ROLE/DEALER_DEBTORS_HEADING")).toHaveTextContent("Owed by dealers' customers · one account per dealer under it");
-    expect(row("ROLE/SUBSCRIPTION_DEBTORS")).toHaveTextContent("300-3000 SUBSCRIPTION DEBTORS");
+    expectAccount("ROLE/SUBSCRIPTION_DEBTORS", "300-3000", "SUBSCRIPTION DEBTORS");
     const order = ["ROLE/SHOWROOM_DEBTORS", "ROLE/DEALER_DEBTORS_HEADING", "ROLE/SUBSCRIPTION_DEBTORS", "ROLE/TRADE_PAYABLE"]
       .map((id) => Array.from(document.querySelectorAll("tr[data-row-key]")).indexOf(row(id)));
     expect(order).toEqual([...order].sort((a, b) => a - b));
@@ -270,7 +276,8 @@ describe("Posting accounts (0657)", () => {
     show();
     await ready();
     expect(screen.getByTestId("grid-group-toggle-costs")).toHaveTextContent("Purchases and charges");
-    expect(row("ROLE/DELIVERY_TRANSPORT")).toHaveTextContent("Transport to customers, by delivery order900-T002 LORRY HIRE");
+    expect(within(row("ROLE/DELIVERY_TRANSPORT")).getByText("Transport to customers, by delivery order")).toBeInTheDocument();
+    expectAccount("ROLE/DELIVERY_TRANSPORT", "900-T002", "LORRY HIRE");
     fireEvent.click(within(row("ROLE/DELIVERY_TRANSPORT")).getByText("Transport to customers, by delivery order"));
     const dialog = await screen.findByRole("dialog");
     fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Account/ }), { key: "Enter" });

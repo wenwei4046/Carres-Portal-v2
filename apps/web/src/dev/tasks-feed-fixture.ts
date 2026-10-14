@@ -8,7 +8,7 @@
  * sentences are the production rules' own. Dates count from the machine's
  * Malaysia today in Office working days.
  */
-import { addWorkingDays, myHolidaySet, type OperationWorkCompleted, type OperationWorkItem, type OperationWorkModule, type OperationWorkResponse } from "@carres/shared";
+import { addWorkingDays, internalTaskOccurrenceId, internalTaskResultReference, myHolidaySet, projectInternalTaskWork, type InternalTask, type OperationWorkCompleted, type OperationWorkItem, type OperationWorkModule, type OperationWorkResponse } from "@carres/shared";
 import { appTodayIso } from "@/lib/fmt-date";
 
 const holidays = myHolidaySet();
@@ -110,6 +110,33 @@ function item(seed: Seed, index: number, me: { id: string; name: string }, today
   } as OperationWorkItem;
 }
 
+/* ── TEST internal tasks (`+ Task`): one a colleague added for the preview
+   person, one the preview person added for the colleague, one finished. ── */
+export const TEST_COLLEAGUE = { id: "00000000-0000-4000-8000-0000000000b2", name: "TEST · Staff B", email: "staff-b@carres.local" } as const;
+const TASK_FOR_ME = "00000000-0000-4000-8000-0000000000c1";
+const TASK_FOR_COLLEAGUE = "00000000-0000-4000-8000-0000000000c2";
+const TASK_DONE = "00000000-0000-4000-8000-0000000000c3";
+
+type Person = { id: string; name: string; email: string };
+const personOf = (who: { id: string; name: string }) => ({ userId: who.id, name: who.name });
+
+function testInternalTasks(me: Person, today: string): InternalTask[] {
+  const base = { detail: null, doneAt: null, doneBy: null } as const;
+  const added = (by: { id: string; name: string }, at: string) => [{ event: "added" as const, at, actor: personOf(by) }];
+  return [
+    { ...base, id: TASK_FOR_ME, title: "TEST · Get the new product photographs", dueOn: today, createdAt: `${today}T01:20:00.000Z`,
+      detail: "TEST data. Ask TEST Supplier A for the photographs of the two new models and put them in the shared folder.",
+      createdBy: personOf(TEST_COLLEAGUE), assignedTo: personOf(me), events: added(TEST_COLLEAGUE, `${today}T01:20:00.000Z`) },
+    { ...base, id: TASK_FOR_COLLEAGUE, title: "TEST · Count the showroom price tags", dueOn: workingDay(today, 1), createdAt: `${today}T02:05:00.000Z`,
+      createdBy: personOf(me), assignedTo: personOf(TEST_COLLEAGUE), events: added(me, `${today}T02:05:00.000Z`) },
+  ];
+}
+
+/** `/api/operation/internal-tasks/:id` for one TEST task. */
+export function testInternalTask(id: string, me: Person): InternalTask | null {
+  return testInternalTasks(me, appTodayIso()).find((task) => task.id === id) ?? null;
+}
+
 /** The feed for one signed-in person. `me.id` must be a UUID. */
 export function testTasksFeed(me: { id: string; name: string; email: string }): OperationWorkResponse {
   const today = appTodayIso();
@@ -122,14 +149,23 @@ export function testTasksFeed(me: { id: string; name: string; email: string }): 
     complete: true,
     generatedOn: today,
     closureReceipt: null,
-    staff: [{ userId: me.id, name: me.name, email: me.email }],
-    sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((key) => ({
+    staff: [{ userId: me.id, name: me.name, email: me.email }, { userId: TEST_COLLEAGUE.id, name: TEST_COLLEAGUE.name, email: TEST_COLLEAGUE.email }],
+    sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker", "workspace"] as const).map((key) => ({
       key, state: "healthy" as const, observedAt: `${today}T01:00:00.000Z`, lastSuccessfulAt: `${today}T01:00:00.000Z`, errorLabel: null,
     })),
-    items: SEEDS.map((seed, index) => item(seed, index, me, today)),
+    items: [
+      ...SEEDS.map((seed, index) => item(seed, index, me, today)),
+      /* Internal tasks, in the production projection's own shape. */
+      ...projectInternalTaskWork({
+        tasks: testInternalTasks(me, today).map(({ id, title, dueOn, createdAt, createdBy, assignedTo }) => ({ id, title, dueOn, createdAt, createdBy, assignedTo })),
+        today, observedAt: `${today}T01:00:00.000Z`,
+      }),
+    ],
     completed: [
       done(1, "purchasing", "purchasing.po_window", "PO-261013-9010", 2),
       done(2, "delivery", "issue_delivery_order", "SO-9099", 1),
+      { occurrenceId: internalTaskOccurrenceId(TASK_DONE), module: "workspace", ruleKey: "internal_task", actionOn: today, objectLabel: "TEST · Print the new price list",
+        completedAt: `${today}T03:15:00.000Z`, completedBy: { userId: me.id, name: me.name }, resultReference: internalTaskResultReference(TASK_DONE) },
     ],
   } as OperationWorkResponse;
 }

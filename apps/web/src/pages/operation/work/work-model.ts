@@ -301,6 +301,7 @@ export const WORK_MODULES: readonly OperationWorkModule[] = [
   "delivery",
   "payment",
   "issue_tracker",
+  "workspace",
 ];
 
 /** Panels follow the Work area's own width, never the window's. */
@@ -319,6 +320,7 @@ export const WORK_SOURCE_LABEL: Record<OperationWorkModule, string> = {
   delivery: "Delivery",
   payment: "Payment",
   issue_tracker: "Issue Tracker",
+  workspace: "Staff tasks",
 };
 
 /** The focus window: from `generatedOn` through the focus day (`workFocusDay`). */

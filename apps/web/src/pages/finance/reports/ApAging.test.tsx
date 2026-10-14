@@ -102,6 +102,15 @@ describe("AP Aging (0640)", () => {
     expect(row(BAYVIEW)).toHaveTextContent("405-B001");
   });
 
+  /* Chew 2026-10-14 (「A」): a column that adds up to zero has a blank total, as its cells do. */
+  it("totals each column in the footer, a zero total blank", async () => {
+    show();
+    await screen.findByTestId(`ap-aging-row-${LUMEN}`);
+    const totals = Array.from(screen.getByTestId("footer-totals").querySelectorAll("td")).map((td) => td.textContent?.trim() ?? "");
+    expect(totals.filter(Boolean)).toEqual(["RM 5,000.00", "RM 4,000.00", "RM 2,000.00", "RM -1,000.00"]);
+    expect(screen.getByTestId("footer-totals")).not.toHaveTextContent("RM 0.00");
+  });
+
   it("ties the suppliers to the books in the footer", async () => {
     show();
     await screen.findByTestId(`ap-aging-row-${LUMEN}`);

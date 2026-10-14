@@ -91,6 +91,14 @@ const CHART = [
   acc("1131", "GHL", "1100", false, "ASSET"),
 ];
 
+/** The chart's ⋮ menu (Chew 2026-10-14): Add a money account and Import from AutoCount sit in it. */
+async function pickFromMore(name: string) {
+  const trigger = await screen.findByTestId("chart-more");
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: "ArrowDown" });
+  fireEvent.click(await screen.findByRole("menuitem", { name }));
+}
+
 beforeEach(() => {
   net.rows = ROWS;
   net.routes = [{ holding_code: "1131", channel: "dealer", bank_code: "1121" }];
@@ -144,13 +152,14 @@ describe("Finance Settings — the money accounts, on Chart of accounts (0692)",
     expect(tabs).not.toContain("Money accounts");
     expect(tabs[0]).toBe("Chart of accounts");
     expect(screen.getByRole("tab", { name: "Chart of accounts" })).toHaveAttribute("aria-selected", "true");
-    expect(await screen.findByRole("button", { name: "Add a money account" })).toBeInTheDocument();
+    await pickFromMore("Add a money account");
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
   it("adds a bank: the name and the kind, never a code", async () => {
     show();
     await screen.findByText("Public Bank");
-    fireEvent.click(screen.getByRole("button", { name: "Add a money account" }));
+    await pickFromMore("Add a money account");
     const dialog = await screen.findByRole("dialog");
     const save = within(dialog).getByRole("button", { name: "Save" });
     expect(save).toBeDisabled();
@@ -163,7 +172,7 @@ describe("Finance Settings — the money accounts, on Chart of accounts (0692)",
   it("adds a holding account when the kind is Card and online holding", async () => {
     show();
     await screen.findByText("Public Bank");
-    fireEvent.click(screen.getByRole("button", { name: "Add a money account" }));
+    await pickFromMore("Add a money account");
     const dialog = await screen.findByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText(/Name/), { target: { value: "Stripe" } });
     fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Kind/ }), { key: "Enter" });
@@ -373,8 +382,12 @@ describe("Finance Settings — card payout banks (0541)", () => {
     expect(row).toHaveTextContent(/1131 · GHL.*Dealer.*1121 · Public Bank/);
     fireEvent.click(row);
     const dialog = await screen.findByRole("dialog");
-    /* The holding side wears the kind's word, not "Card account". */
-    expect(within(dialog).getByRole("combobox", { name: /Card and online holding/ })).toBeInTheDocument();
+    /* An opened route's card account and machine are fixed facts, read as
+       text under the kind's word, never a disabled field (Chew 2026-10-14). */
+    const facts = within(dialog).getByTestId("card-route-facts");
+    expect(facts).toHaveTextContent(/Card and online holdings*1131 · GHL/);
+    expect(facts).toHaveTextContent(/Machine ats*Dealer/);
+    expect(within(dialog).queryByRole("combobox", { name: /Card and online holding/ })).toBeNull();
     expect(within(dialog).queryByText("Card account")).not.toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(writes()).toHaveLength(1));

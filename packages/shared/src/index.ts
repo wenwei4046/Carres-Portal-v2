@@ -1,6 +1,7 @@
 export const SHARED_VERSION = "0.0.0" as const;
 
 export * from "./issue-tracker";
+export * from "./internal-task";
 export * from "./unit-problem";
 export * from "./supplier-return-pickup";
 export * from "./repair-order";

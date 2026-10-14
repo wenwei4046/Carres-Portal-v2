@@ -82,7 +82,7 @@ const FEED: OperationWorkResponse = {
   generatedOn: TODAY,
   closureReceipt: null,
   staff: [{ userId: ME, name: "Shasha", email: "sha@carres.co" }],
-  sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"] as const).map((key) => ({
+  sources: (["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker", "workspace"] as const).map((key) => ({
     key, state: "healthy" as const, observedAt: `${TODAY}T01:00:00.000Z`, lastSuccessfulAt: `${TODAY}T01:00:00.000Z`, errorLabel: null,
   })),
   items,

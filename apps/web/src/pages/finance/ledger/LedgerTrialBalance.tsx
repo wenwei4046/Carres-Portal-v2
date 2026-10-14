@@ -31,7 +31,7 @@ import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { useTrialBalance } from "./ledger-queries";
 import { DepartmentFilter, useDepartmentParam } from "../department";
 import { headingWalk, indent } from "../reports/StatementTable";
-import { FINANCE_WIDTH } from "../finance-widths";
+import { FINANCE_WIDTH, amountCell } from "../finance-widths";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -139,11 +139,11 @@ export default function LedgerTrialBalance() {
       accessor: (r) => money(r.debit),
       // A heading's subtotal stays out of the export, so a column sum adds each account once.
       numberValue: (r) => r.debit, exportValue: (r) => (r.heading ? "" : r.debit),
-      footerTotal: (visible) => rm(sum(visible, "debit")) },
+      footerTotal: (visible) => amountCell(sum(visible, "debit")) },
     { key: "credit", label: "Credit", width: FINANCE_WIDTH.amount, align: "right",
       accessor: (r) => money(r.credit),
       numberValue: (r) => r.credit, exportValue: (r) => (r.heading ? "" : r.credit),
-      footerTotal: (visible) => rm(sum(visible, "credit")) },
+      footerTotal: (visible) => amountCell(sum(visible, "credit")) },
   ], [goLive, asOf]);
 
   const difference = report?.status === "ok" ? report.difference : null;

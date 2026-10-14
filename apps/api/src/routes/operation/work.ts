@@ -5,6 +5,7 @@ import {
   countWorkingDays,
   myHolidaySet,
   operationWorkItemFromProjection,
+  OPERATION_WORK_INCLUDE_WORKSPACE,
   projectIssueActionWork,
   operationWorkResponseSchema,
   poSupplierDeliveryDateOf,
@@ -82,6 +83,7 @@ import {
 } from "@carres/shared";
 import { z } from "zod";
 import { requireOperation } from "../../lib/auth-guards";
+import { loadInternalTaskWork } from "../../lib/internal-task-work";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
 import { readOfficeCalendar } from "../../lib/office-calendar";
 import { DEFAULT_DELIVERY_RULES, readDeliveryRules } from "../../lib/delivery-rules";
@@ -1445,6 +1447,7 @@ const WORK_SOURCE_LABEL: Record<OperationWorkSourceKey, string> = {
   delivery: "Delivery",
   payment: "Payment",
   issue_tracker: "Issue Tracker",
+  workspace: "Staff tasks",
 };
 
 export async function loadWorkSource(
@@ -2077,6 +2080,8 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       ...overpaymentItems,
     ]),
     loadWorkSource("issue_tracker", observedAt, async () => issueItems),
+    /* Tasks one employee adds for another (Workspace MASTER, Jess 2026-10-14). */
+    loadWorkSource("workspace", observedAt, () => loadInternalTaskWork(c, { today, observedAt })),
   ]);
   return composeOperationWorkResponse(
     sourceResults,
@@ -2527,6 +2532,24 @@ ledger: WorkLedger = supabaseWorkLedger,
   };
 };
 
+/**
+ * The response a reader can parse. A page loaded before `workspace` joined the
+ * feed checks the response strictly and knows six sources, so it is given the
+ * six it knows and none of the new module's work; a reader that asks with
+ * `?include=workspace` is given everything.
+ */
+export function workResponseFor(response: OperationWorkResponse, include: string | undefined): unknown {
+  if (include === OPERATION_WORK_INCLUDE_WORKSPACE) return response;
+  const sources = response.sources.filter((source) => source.key !== "workspace");
+  return {
+    ...response,
+    complete: sources.every((source) => source.state === "healthy"),
+    items: response.items.filter((item) => item.module !== "workspace"),
+    sources,
+    ...(response.completed ? { completed: response.completed.filter((done) => done.module !== "workspace") } : {}),
+  };
+}
+
 export function createOperationWorkRouter(
   loader: (c: Context<AppEnv>) => Promise<OperationWorkResponse> = loadOperationWork,
   ledger: WorkLedger = supabaseWorkLedger,
@@ -2535,7 +2558,8 @@ export function createOperationWorkRouter(
 
   const readWithLifecycle = (c: Context<AppEnv>) => readOperationWorkWithLedger(c, loader, ledger);
 
-  router.get("/", requireOperation, async (c) => c.json((await readWithLifecycle(c)).response));
+  router.get("/", requireOperation, async (c) =>
+    c.json(workResponseFor((await readWithLifecycle(c)).response, c.req.query("include"))));
 
   const door = (kind: "request_sent" | "reply_received") => async (c: Context<AppEnv>) => {
     const occurrenceId = c.req.param("occurrenceId") ?? "";
