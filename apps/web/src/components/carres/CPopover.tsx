@@ -1,5 +1,7 @@
 /**
- * CPopover — the Carres pop-up surface (UI Kit "Pop-up menu", v8 L207/L172):
+ * CPopover — THE Carres pop-up surface (UI Kit "Pop-up menu", v8 L207/L172),
+ * for a menu and for a small panel (a filter, a calendar, a list of links);
+ * the kit's earlier `Popover` merged into it 15 Oct 2026:
  * white · radius 8 · shadow 0 8 28 rgba(22,24,29,.1) · pad 6. Behaviour is the
  * Radix popover the kit already uses (outside click, Escape). `CMenuItem` is one
  * row: pad 7 10 · 13/500.
@@ -13,6 +15,7 @@ import { Fragment, useRef, useState, type KeyboardEvent, type ReactNode } from "
 import * as RadixPopover from "@radix-ui/react-popover";
 import { Z_FLOATING } from "@/components/kit/overlay-layer";
 import { iconGlyph, type IconName } from "@/components/kit/Icon";
+import { useDialogContainer } from "@/components/kit/dialog-container";
 import MIcon from "./MIcon";
 
 export default function CPopover({
@@ -35,6 +38,9 @@ export default function CPopover({
   role?: "dialog" | "menu";
 }) {
   const menu = role === "menu";
+  /* Inside a dialog the pop-up portals into it, so the dialog's focus trap
+     and scroll lock never swallow it (null outside a dialog: <body>). */
+  const dialogContainer = useDialogContainer();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   /* A click elsewhere closes it without pulling focus back from what was clicked. */
@@ -78,9 +84,10 @@ export default function CPopover({
       >
         {trigger}
       </RadixPopover.Trigger>
-      <RadixPopover.Portal>
+      <RadixPopover.Portal container={dialogContainer}>
         <RadixPopover.Content
           ref={contentRef}
+          data-kit={menu ? "menu" : "popover"}
           align={align}
           sideOffset={6}
           collisionPadding={8}

@@ -10,7 +10,7 @@
  * reachable by click and keyboard, never by hover alone. The two lines become
  * one plain focusable control that opens the kit Popover with every word.
  */
-import Popover from "@/components/kit/Popover";
+import CPopover from "@/components/carres/CPopover";
 import type { DeliveryWorkStatusTone } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
 import { STATUS_TONE_TEXT } from "./DeliveryBrief";
@@ -66,7 +66,7 @@ export function TwoLines({
   if (!reveal) return lines;
   const full = joinLines(line1, line2);
   return (
-    <Popover
+    <CPopover
       label={full}
       trigger={
         <button
@@ -83,7 +83,7 @@ export function TwoLines({
         <span className={`block ${STATUS_TONE_TEXT[tone]}`}>{line1}</span>
         {line2 ? <span className="block text-kit-slate-11">{line2}</span> : null}
       </span>
-    </Popover>
+    </CPopover>
   );
 }
 

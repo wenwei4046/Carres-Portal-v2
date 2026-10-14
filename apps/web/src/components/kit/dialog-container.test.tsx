@@ -19,7 +19,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import Button from "./Button";
 import DatePicker from "./DatePicker";
 import Modal from "./Modal";
-import Popover from "./Popover";
+import CPopover from "@/components/carres/CPopover";
 import Select from "./Select";
 import { Z_LADDER } from "./overlay-layer";
 
@@ -61,9 +61,9 @@ describe("a picker opened INSIDE a dialog", () => {
   it("puts the Popover's panel inside the dialog", async () => {
     render(
       <Modal open onOpenChange={() => {}} title="Record the delay decision">
-        <Popover label="Filters" trigger={<Button>Filters</Button>}>
+        <CPopover label="Filters" trigger={<Button>Filters</Button>}>
           <p>panel</p>
-        </Popover>
+        </CPopover>
       </Modal>,
     );
     openWithClick(screen.getByRole("button", { name: "Filters" }));

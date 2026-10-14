@@ -59,8 +59,7 @@ import StatusPill from "@/components/kit/StatusPill";
 import Checkbox from "@/components/kit/Checkbox";
 import Button from "@/components/kit/Button";
 import SalesOrderMonthlyDemand from "../SalesOrderMonthlyDemand";
-import { CMenu } from "@/components/carres/CPopover";
-import Popover from "@/components/kit/Popover";
+import CPopover, { CMenu } from "@/components/carres/CPopover";
 import { Fact } from "../SalesOrderWorkspace";
 import { SO_HEAD_ROW, SO_ROW, SO_TABLE, SO_TD, SO_TH } from "../components/so-document-table";
 import TableScroller from "@/components/TableScroller";
@@ -844,7 +843,7 @@ export default function PurchaseOrdersPage() {
            portal, so the list stops them before they reach the row. */
         return (
           <span onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}>
-            <Popover
+            <CPopover
               label={`Sources of ${row.id}`}
               trigger={
                 <button type="button" className={link} data-testid={`po-source-${row.id}`}>
@@ -873,7 +872,7 @@ export default function PurchaseOrdersPage() {
                   );
                 })}
               </ul>
-            </Popover>
+            </CPopover>
           </span>
         );
       },

@@ -14,7 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { teamTodayResponseSchema, type TeamMemberState, type TeamTodayResponse } from "@carres/shared";
 import Icon from "@/components/kit/Icon";
 import MIcon from "@/components/carres/MIcon";
-import Popover from "@/components/kit/Popover";
+import CPopover from "@/components/carres/CPopover";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { useAuth } from "@/lib/auth";
@@ -64,7 +64,7 @@ export default function TeamButton() {
   const name = `Team · ${online} online`;
 
   return (
-    <Popover
+    <CPopover
       label="Team today"
       align="end"
       open={open}
@@ -133,6 +133,6 @@ export default function TeamButton() {
           {filtered.length === 0 && <div className="px-1 py-2 text-body text-c-muted">No staff match.</div>}
         </div>
       </div>
-    </Popover>
+    </CPopover>
   );
 }
