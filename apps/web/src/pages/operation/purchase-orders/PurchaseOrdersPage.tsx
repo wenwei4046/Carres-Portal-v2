@@ -1280,8 +1280,7 @@ export default function PurchaseOrdersPage() {
           <SalesOrderMonthlyDemand view={demandView} focusMonth={focusMonth}
           onOpenMonth={openDemandMonth} loading={demandQ.isLoading}
           error={demandQ.isError ? demandQ.error : undefined} onRetry={() => void demandQ.refetch()} /></div> :
-        <div ref={overviewBox} className="flex min-h-0 min-w-0 flex-1 flex-col p-2" data-testid="po-register-content"
-          style={overview ? { ["--table-row-pad" as string]: "6px 5px" } : undefined}>
+        <div ref={overviewBox} className="flex min-h-0 min-w-0 flex-1 flex-col p-2" data-testid="po-register-content">
           {pdfProblem ? (
             <ReadProblem
               problem={pdfProblem}

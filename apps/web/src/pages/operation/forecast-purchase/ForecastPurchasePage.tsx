@@ -238,17 +238,17 @@ export default function ForecastPurchasePage() {
   const track = (width: number) => `minmax(0, ${width}fr)`;
   const lineColumns = (drawn.length >= 10
     ? drawn.slice(0, 10)
-    : [40, 32, modelWidth, FIXED.m0, FIXED.m1, FIXED.m2, FIXED.free, FIXED.week, FIXED.week, FIXED.week]
+    : [32, 40, modelWidth, FIXED.m0, FIXED.m1, FIXED.m2, FIXED.free, FIXED.week, FIXED.week, FIXED.week]
   ).map(track).join(" ");
   const stepBack = drawn.length >= 2 ? drawn[0]! + drawn[1]! : 72;
   const cell = "flex items-center justify-end px-[5px] text-body tabular-nums";
   const sizeLine = (m: Row, s: ForecastPurchaseSizeRow) => (
     <div key={s.sku} role="row" className="grid min-h-[44px] items-stretch border-t border-c-row-line" style={{ gridTemplateColumns: lineColumns }} data-testid={`forecast-size-${s.sku}`}>
+      <span role="cell" />
       <span role="cell" className="grid place-items-center">
         <RowTick testId={`forecast-size-tick-${s.sku}`} label={W.selectSize(m.model, s.size)} checked={live.has(s.sku)}
           disabled={s.block !== null} why={W.block(s.block, s.requests[0]?.state)} onChange={() => setSizes([s.sku], !live.has(s.sku))} />
       </span>
-      <span role="cell" />
       <span role="cell" className="flex min-w-0 flex-col justify-center px-[5px] py-1">
         <span className="break-words text-body text-c-ink">{s.size || W.notRecorded}</span>
         {/* Stock on its way: each request still asking, then what a PO holds. */}
@@ -393,7 +393,7 @@ export default function ForecastPurchasePage() {
           {/* The kit's table puts 10 between columns and no padding inside a
               cell (01 §5). The listing engine pads every cell instead, so its
               padding is 5 a side here: the same 10 between column texts. */}
-          <div ref={box} className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="forecast-purchase-list" style={{ ["--table-row-pad" as string]: "6px 5px" }}>
+          <div ref={box} className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="forecast-purchase-list">
             <DataGrid<Row>
               rows={shown}
               columns={columns}

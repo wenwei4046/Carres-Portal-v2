@@ -1007,14 +1007,14 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
     const gutters = screen.getAllByTestId(/^grid-expansion-gutter-/);
     expect(gutters.map((cell) => cell.dataset.testid)).toEqual([
-      "grid-expansion-gutter-__select__",
       "grid-expansion-gutter-__expand__",
+      "grid-expansion-gutter-__select__",
     ]);
     /* §6.9 (UI #1492): the line starts under the caret — the drop in the caret
-       cell, the curve in the caret column's gutter — and the checkbox gutter
-       stays empty. */
-    expect(gutters[0]).toBeEmptyDOMElement();
-    expect(within(gutters[1]!).getByTestId("expansion-connector-elbow")).toBeInTheDocument();
+       cell, the curve in the caret column's gutter — and runs on under the
+       checkbox, which comes after the caret (01 §5: expand · tick · identifier). */
+    expect(within(gutters[0]!).getByTestId("expansion-connector-elbow")).toBeInTheDocument();
+    expect(within(gutters[1]!).getByTestId("expansion-connector-run")).toBeInTheDocument();
     expect(screen.getByTestId("expansion-connector-drop")).toBeInTheDocument();
     const cell = screen.getByTestId("grid-expansion-cell");
     expect(cell).toHaveAttribute("colspan", "13");
@@ -1222,7 +1222,7 @@ describe("Sales Orders table correction", () => {
     expect(screen.getByRole("button", { name: "Filter Phone" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
     expect(screen.getAllByTestId(/^grid-expansion-gutter-/).map((e) => e.dataset.testid)).toEqual([
-      "grid-expansion-gutter-__select__", "grid-expansion-gutter-__expand__",
+      "grid-expansion-gutter-__expand__", "grid-expansion-gutter-__select__",
     ]);
     expect(JSON.parse(localStorage.getItem("carres.salesOrders.register.v6.anon")!).widths).toEqual(saved.widths);
   });
