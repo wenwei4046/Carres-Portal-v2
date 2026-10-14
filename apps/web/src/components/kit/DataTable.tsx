@@ -71,7 +71,7 @@ import Checkbox from "./Checkbox";
 import EmptyState from "./EmptyState";
 import Icon from "./Icon";
 import Loading from "./Loading";
-import Popover from "./Popover";
+import CPopover from "@/components/carres/CPopover";
 import SearchInput from "./SearchInput";
 import { controlClass } from "./field-recipe";
 import { applyColumnOrder, moveColumnOrder, resizeColumnPair } from "./grid-layout";
@@ -548,7 +548,7 @@ function HeaderFilter({ colKey, filter }: { colKey: string; filter: ColumnFilter
     : filter.options;
   const active = filter.selected.size > 0;
   return (
-    <Popover
+    <CPopover
       label={filter.label}
       trigger={
         /* A COMPACT 24px trigger, not a padded Button — on a narrow column
@@ -643,7 +643,7 @@ function HeaderFilter({ colKey, filter }: { colKey: string; filter: ColumnFilter
           </Button>
         ) : null}
       </div>
-    </Popover>
+    </CPopover>
   );
 }
 
