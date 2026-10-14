@@ -168,6 +168,8 @@ const HANDOVER_WORD: Record<NonNullable<OutrightOrderFacts["loading"]["kind"]>, 
 export type Column = {
   key: string;
   label: string;
+  /** A long header printed on two lines; `label` stays its accessible and export name. */
+  head?: readonly [string, string];
   /** v8's grid track. */
   width: string;
   cell: (r: RegisterRow, ctx: CellContext) => Cell;
@@ -189,7 +191,7 @@ export const COLUMNS: Record<string, Column> = {
     cell: (r) => dayCell(r.proceeded) ?? NOT_RECORDED,
   },
   order: {
-    key: "order", label: "SO No.", width: "minmax(118px,1fr)",
+    key: "order", label: "SO No", width: "minmax(118px,1fr)",
     cell: (r) => ({ t: `SO-${r.so}`, fw: 600, fg: "ink", sub: r.customer || "Not recorded" }),
   },
   items: {
@@ -197,11 +199,11 @@ export const COLUMNS: Record<string, Column> = {
     cell: (r) => { const n = pcsOf(r); return { t: `${n} ${n === 1 ? "pc" : "pcs"}`, pop: true }; },
   },
   channel: {
-    key: "channel", label: "Sales location", width: "minmax(100px,.9fr)",
+    key: "channel", label: "Sales Location", width: "minmax(100px,.9fr)",
     cell: (r) => ({ t: salesLocationOf(r.o) || "Not recorded", sub: r.o.salespersons?.name?.trim() || "Not recorded" }),
   },
   dloc: {
-    key: "dloc", label: "Delivery location", width: "minmax(100px,.9fr)",
+    key: "dloc", label: "Delivery Location", width: "minmax(100px,.9fr)",
     cell: (r) => {
       const city = r.o.customer_address_city?.trim();
       const state = r.o.customer_address_state?.trim();
@@ -209,7 +211,8 @@ export const COLUMNS: Record<string, Column> = {
     },
   },
   reqDate: {
-    key: "reqDate", label: "Customer original delivery date", width: "112px",
+    key: "reqDate", label: "Customer’s original requested delivery", width: "112px",
+    head: ["Customer’s original", "requested delivery"],
     cell: (r) => {
       const c = dayCell(r.customerDelivery);
       if (!c) return NOT_RECORDED;

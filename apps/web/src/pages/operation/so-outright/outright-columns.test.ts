@@ -3,7 +3,7 @@ import type { OutrightOrderFacts } from "@carres/shared";
 import type { PaymentMonitorRow } from "@carres/shared/payment-monitor";
 import { ApiError } from "@/lib/api";
 import type { RegisterRow } from "../sales-order-columns";
-import { COLUMNS, timeWords, type CellContext, type OwnedRead, type PayByRead } from "./outright-columns";
+import { COLUMNS, LAYOUTS, timeWords, type CellContext, type OwnedRead, type PayByRead } from "./outright-columns";
 import { readStateOf } from "./pay-by";
 
 const row = (over: Partial<RegisterRow["o"]> = {}) =>
@@ -123,5 +123,22 @@ describe("readStateOf", () => {
     expect(readStateOf([q({ isError: true, error: new ApiError(500, "boom", null) })])).toBe("failed");
     expect(readStateOf([q({ isPending: true })])).toBe("loading");
     expect(readStateOf([q({})])).toBe("ok");
+  });
+});
+
+describe("Sales Order view headers (fix list 14 Oct 2026)", () => {
+  it("prints the dictionary words, in v12 order", () => {
+    const so = LAYOUTS.find((l) => l.key === "so")!;
+    expect(so.columns.map((k) => COLUMNS[k]!.label)).toEqual([
+      "Proceed Date", "SO No", "Items", "Sales Location", "Delivery Location", "Customer’s original requested delivery",
+    ]);
+  });
+
+  it("splits the long header on two lines and keeps the widths", () => {
+    expect(COLUMNS.reqDate!.head).toEqual(["Customer’s original", "requested delivery"]);
+    const so = LAYOUTS.find((l) => l.key === "so")!;
+    expect(so.columns.map((k) => COLUMNS[k]!.width)).toEqual([
+      "100px", "minmax(118px,1fr)", "84px", "minmax(100px,.9fr)", "minmax(100px,.9fr)", "112px",
+    ]);
   });
 });
