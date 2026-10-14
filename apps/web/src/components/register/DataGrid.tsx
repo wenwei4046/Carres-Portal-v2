@@ -64,6 +64,7 @@ import Button from "@/components/kit/Button";
 import Modal from "@/components/kit/Modal";
 const RegisterPdfPreview = lazy(() => import("@/components/kit/PdfPreview"));
 import Icon from "@/components/kit/Icon";
+import MIcon from "@/components/carres/MIcon";
 import { CMenu, type CMenuEntry } from "@/components/carres/CPopover";
 import Popover from "@/components/kit/Popover";
 import Tooltip from "@/components/kit/Tooltip";
@@ -1313,20 +1314,8 @@ function DataGridInner<T>({
       .map((k) => byKey.get(k)!)
       .filter(Boolean);
     const synthetic: DataGridColumn<T>[] = [];
-    /* Synthetic select column — checkbox rendered in a dedicated <td>/<th>. */
-    if (selectable) {
-      synthetic.push({
-        key: "__select__",
-        label: "",
-        width: narrowCanvas ? 40 : 30,
-        minWidth: narrowCanvas ? 40 : 30,
-        sortable: false,
-        groupable: false,
-        accessor: () => null,
-        searchValue: () => "",
-      });
-    }
-    /* Synthetic chevron column — accessor is a placeholder; the actual chevron
+    /* ▸ first, then ☐ (01 §5 column order: expand · tick · identifier).
+       Synthetic chevron column — accessor is a placeholder; the actual chevron
        is rendered in a dedicated <td> in the tbody so it can wire click handlers
        without leaking `toggleExpand` into the column spec. With a `trigger`
        column declared, that data column IS the one expansion entry and no
@@ -1337,6 +1326,19 @@ function DataGridInner<T>({
         label: "",
         width: 32,
         minWidth: 32,
+        sortable: false,
+        groupable: false,
+        accessor: () => null,
+        searchValue: () => "",
+      });
+    }
+    /* Synthetic select column — checkbox rendered in a dedicated <td>/<th>. */
+    if (selectable) {
+      synthetic.push({
+        key: "__select__",
+        label: "",
+        width: narrowCanvas ? 40 : 30,
+        minWidth: narrowCanvas ? 40 : 30,
         sortable: false,
         groupable: false,
         accessor: () => null,
@@ -2729,7 +2731,7 @@ function DataGridInner<T>({
                 <td
                   key={col.key}
                   className={`${styles.td}${pinClass(col.key)}${isExpanded && expansionJoinable ? ` ${styles.expansionCaretCell}` : ""}`}
-                  style={{ width: w, maxWidth: w, padding: "4px 6px", textAlign: "center", ...pinStyle(col.key) }}
+                  style={{ width: w, maxWidth: w, padding: "4px", ...pinStyle(col.key) }}
                 >
                   {/* §6.9 — the drop from beneath the caret, shown only when
                       this row's expansion holds a connected section stack. */}
@@ -2756,39 +2758,13 @@ function DataGridInner<T>({
                       e.stopPropagation();
                       toggleExpand(expandKey);
                     }}
-                    style={{
-                      background: "transparent",
-                      border: 0,
-                      padding: 0,
-                      cursor: "pointer",
-                      /* ⭐ A DISCLOSURE IS CHROME, NOT AN ALARM — owner
-                         correction 2026-08-24 on a production screenshot.
-                         This was `var(--c-burnt)`: a 12px RED triangle in the
-                         leftmost gutter of every row, which is the portal's
-                         danger ink spent on a control that means "there is
-                         more here". Red down a whole column reads as ninety
-                         problems. Neutral grey is what a chevron is for, and
-                         fixing it in the ENGINE fixes every register at once
-                         rather than teaching one page a private colour.
-                         `--fg-muted` is the module's own base-500 alias — a
-                         token the sheet already speaks, not a new literal. */
-                      color: "var(--fg-muted)",
-                      fontSize: 14,
-                      /* A square box, so the arrow is whole when it turns
-                         (measured 13 Oct 2026: the 6 × 14 box turned to
-                         14 × 6 and clipped the glyph by 2). The negative
-                         margins keep it exactly where it was. */
-                      width: 18,
-                      height: 18,
-                      lineHeight: "18px",
-                      textAlign: "center",
-                      margin: "-2px -6px",
-                      display: "inline-block",
-                      transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
-                      transition: "transform 120ms ease",
-                    }}
+                    /* ⭐ A DISCLOSURE IS CHROME, NOT AN ALARM (owner correction
+                       2026-08-24): grey, never the danger ink. The v12 Carres
+                       Table's control (01 §5): a 24 round button, `chevron_right`
+                       closed and `expand_more` open, the darker grey once open. */
+                    className={`grid h-6 w-6 place-items-center rounded-full hover:bg-c-hover ${isExpanded ? "text-c-tab" : "text-c-muted"}`}
                   >
-                    &#9656;
+                    <MIcon name={isExpanded ? "expand_more" : "chevron_right"} size={20} />
                   </button>
                 </td>
               );

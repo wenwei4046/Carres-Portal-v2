@@ -1,8 +1,9 @@
 /* DataGrid — THE REGISTER ENGINE's stylesheet (2990 RG-2 origin).
 
    ⭐ THE ONE KIT TABLE (built from the owner handoff of 9 Oct 2026). The current
-   kit is docs/01-design-tokens.md §3 Controls · §5 Register (v12, 11 Oct 2026);
-   this stylesheet is not migrated to it yet. Every DataGrid listing on
+   kit is docs/01-design-tokens.md §3 Controls · §5 Register (v12, 11 Oct 2026):
+   header band `--c-band`, ten between columns, fourteen at the edges (15 Oct
+   2026). The opened row's one frame (01 §5 "Expanded row") is not drawn yet. Every DataGrid listing on
    every page draws the template table: the toolbar row sits on the page, and the
    table plus its status footer sit in ONE white card. The finished reference is
    pages/operation/so-outright/SalesOrdersOutright.tsx.
@@ -49,6 +50,11 @@
      `rowHeight` inline style on the same element still wins). */
   --grid-row-h: 0px;
   --grid-cell-h: max(var(--grid-row-h, 0px), var(--table-row-h));
+  /* Ten between columns, fourteen at the row's two edges (01 §5, the v12
+     Carres Table): every cell pads 5 a side and the first and last cell 14 on
+     their outer side. One rule for every list; no page sets its own. */
+  --grid-cell-pad: 6px 5px;
+  --grid-edge-pad: 14px;
 
   /* Toolbar, condition strip and the table card are separate pieces on the
      page, ten pixels apart (01 §5 row gap). */
@@ -613,7 +619,7 @@ div:first-child > .columnsMenuGroup {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: var(--c-card);
+  background: var(--c-band);
 }
 /* Embedded (drill-down) mode — the grid flows with the page, so there is no
    inner scroll container for a sticky header to anchor to. */
@@ -622,7 +628,7 @@ div:first-child > .columnsMenuGroup {
 }
 .th {
   height: calc(var(--table-head-h) - 13px);
-  padding: var(--table-row-pad);
+  padding: var(--grid-cell-pad);
   font-family: var(--font-sans);
   font-size: var(--fs-label);
   line-height: 16px;
@@ -634,7 +640,7 @@ div:first-child > .columnsMenuGroup {
   vertical-align: middle;
   border-bottom: 1px solid var(--c-head-line);
   border-right: 0;
-  background: var(--c-card);
+  background: var(--c-band);
   position: relative;
   user-select: none;
   white-space: nowrap;
@@ -703,7 +709,7 @@ div:first-child > .columnsMenuGroup {
 }
 .td {
   height: calc(var(--grid-cell-h) - 13px);
-  padding: var(--table-row-pad);
+  padding: var(--grid-cell-pad);
   border-right: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -712,6 +718,16 @@ div:first-child > .columnsMenuGroup {
   line-height: 18px;
   color: var(--c-ink);
   vertical-align: middle;
+}
+.th:first-child,
+.td:first-child,
+.tfootTd:first-child {
+  padding-left: var(--grid-edge-pad);
+}
+.th:last-child,
+.td:last-child,
+.tfootTd:last-child {
+  padding-right: var(--grid-edge-pad);
 }
 /* ⭐ THE ELLIPSIS BELONGS TO WHATEVER HOLDS THE TEXT (2026-09-14). A cell's
    text sits in the button or span its accessor returns; text-overflow applies
@@ -828,7 +844,7 @@ div:first-child > .columnsMenuGroup {
 }
 .thead .stickyCell {
   z-index: 3;
-  background: var(--c-card);
+  background: var(--c-band);
 }
 /* The block's right edge, drawn as a shadow so it changes no column's box. */
 .stickyEdge {
@@ -1024,7 +1040,7 @@ div:first-child > .columnsMenuGroup {
   background: var(--c-card);
 }
 .tfootTd {
-  padding: var(--table-row-pad);
+  padding: var(--grid-cell-pad);
   border-top: 1px solid var(--c-footer-line);
   border-right: 0;
   font-family: var(--font-sans);
@@ -1379,12 +1395,12 @@ div:first-child > .columnsMenuGroup {
 }
 
 /* ⭐ A PALE-BLUE MAIN HEADER, OPT-IN (owner ruling 2026-09-18, UI §6.8) —
-   SUPERSEDED by the v4 template (owner, 9 Oct 2026): every header is white.
+   SUPERSEDED: every header draws the one v12 band `--c-band` (01 §5).
    The class is kept so `headerTone="paleBlue"` callers still mark the root. */
 .rootHeaderPaleBlue .thead,
 .rootHeaderPaleBlue .th,
 .rootHeaderPaleBlue .thead .stickyCell {
-  background: var(--c-card);
+  background: var(--c-band);
 }
 
 /* ⭐ §6.9 — THE EXPANSION CONNECTOR, ANCHORED TO THE CARET CELL (Card 12
@@ -1432,6 +1448,9 @@ div:first-child > .columnsMenuGroup {
 }
 .expansionGutter {
   position: relative;
+  /* The connector is drawing only: a click falls through to the item row an
+     expansion steps back under it (its tick sits in the tick column). */
+  pointer-events: none;
 }
 .tr:has(+ .trExpansion [data-connected-sections]) .expansionDrop,
 .trExpansion:has([data-connected-sections]) .expansionElbow,
@@ -1583,6 +1602,9 @@ div:first-child > .columnsMenuGroup {
    2026-10-13; docs/finance/MASTER.md §4.2, a Finance exception to the one kit).
    Every other grid is untouched. */
 .rootLookFinance {
+  /* The Finance look keeps its own cell padding beside its column lines
+     (finance MASTER §4.2): 14 a side, not the list's 5. */
+  --grid-cell-pad: var(--table-row-pad);
   --fin-head-bg: #E8EEFC;
   --fin-head-ink: #1E3A8A;
   --fin-col-line: #E5E7EB;
