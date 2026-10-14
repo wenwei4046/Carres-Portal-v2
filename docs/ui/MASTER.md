@@ -696,7 +696,9 @@ first column fixed (01 §5), as the package's own page does; the kit lists' scro
 mark the package's check reads, and `e2e-kit/kit-lists.spec.ts` still measures that each list FITS wherever it must.
 
 **`+ Task` (owner 2026-10-14): BUILT 14 Oct 2026; deployment and the signed-in production check owed.** `Task` with the
-plus icon in the Tasks panel's 36 title row and `New task` on the Workspace toolbar open ONE dialog built from the kit
+plus icon in the Tasks panel's 36 title row and in the Workspace `Module` title row opens ONE dialog (the Workspace
+toolbar had no room for a third control at 1025: measured on production 14 Oct 2026, its controls already fill 512 of
+513) built from the kit
 (`Modal`, `Input`, `Textarea`, `Select`, `DatePicker`): `Task name` · `Description (optional)` · `For` · `Due date`, then
 `Cancel` · `Add task`. The first field takes the focus, a refusal is said under the field it is about, and the dark toast
 says `Task added · for {name}`. An internal task opens as the one task view with `Steps` and `History` only and one act,

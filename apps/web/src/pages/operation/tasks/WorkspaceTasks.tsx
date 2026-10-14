@@ -238,14 +238,17 @@ export default function WorkspaceTasks() {
         tabs={[{ value: "mine", label: W.scope.mine }, { value: "team", label: W.scope.team }]} />
       <Tabs variant="segmented" label={TASK_CARD_WORDS.show} value={tab} onValueChange={(value) => desk.guard(() => set({ status: value === "todo" ? null : value, task: null }))}
         tabs={TASK_TABS.map((key) => ({ value: key, label: table ? `${TASK_CARD_WORDS.tab[key]} ${table.counts[key]}` : TASK_CARD_WORDS.tab[key] }))} />
-      {/* The shell's Tasks panel steps aside on this page, so its `+ Task` is here. */}
-      <NewTask wide />
     </div>
   );
 
   const rail = (
     <aside aria-label={W.moduleRail} className="flex w-[232px] shrink-0 flex-col gap-2" data-testid="workspace-rail">
-      <h2 className="flex h-9 items-center px-1 text-strong text-c-ink">{W.moduleRail}</h2>
+      {/* `+ Task` sits in a title row, as in the Tasks panel (which steps aside on
+          this page). The toolbar has no room for it at 1025 (measured 14 Oct 2026). */}
+      <div className="flex h-9 items-center justify-between gap-2 px-1">
+        <h2 className="text-strong text-c-ink">{W.moduleRail}</h2>
+        <NewTask />
+      </div>
       <div className="flex flex-col rounded-lg border border-c-card-border bg-white pb-1.5">
         {strip ? (
           <TaskDayStrip strip={strip} chosen={chosen} onChoose={(iso) => desk.guard(() => set({ day: iso === today ? null : iso, task: null }))}
