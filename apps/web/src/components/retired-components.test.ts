@@ -71,6 +71,11 @@ const RETIRED: Record<string, { file: string; replacement: string; allow: string
     replacement: "components/carres/CPopover · CMenu",
     allow: [],
   },
+  /* Drawn by no page; deleted 15 Oct 2026 (UI MASTER §0). */
+  "kit/Card": { file: "components/kit/Card.tsx", replacement: "components/kit/Block (the one card)", allow: [] },
+  "kit/GridToolbar": { file: "components/kit/GridToolbar.tsx", replacement: "components/register/DataGrid selectable (its own selection bar)", allow: [] },
+  "kit/ChecklistRow": { file: "components/kit/ChecklistRow.tsx", replacement: "components/kit/StepList", allow: [] },
+  "kit/QuietRouteRow": { file: "components/kit/QuietRouteRow.tsx", replacement: "components/kit/RouteStop", allow: [] },
 };
 
 function sourceFiles(dir: string, out: string[] = []): string[] {

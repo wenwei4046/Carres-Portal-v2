@@ -20,7 +20,7 @@
 | Evidence / PDF | SavedEvidenceViewer, PdfPreview | Saved source versus draft evidence; failure and retry; no invented document |
 | Dialog / drawer | Modal, DialogFrame, Drawer | Focus trap, Escape where safe, focus return; no hidden unsaved loss |
 | Feedback | Toast, EmptyState, Loading | Outcome-specific words; errors beside affected action; no false success |
-| Route / history | RouteStop, QuietRouteRow, ChecklistRow, module history adapters | Actual source-owned facts; parallel paths; immutable recorded events |
+| Route / history | RouteStop, module history adapters | Actual source-owned facts; parallel paths; immutable recorded events |
 | Task steps | StepList, Step | The numbered steps of one job (owner's 12 Oct 2026 package): a 20px round mark, a 13 / 500 title, one 12 grey line and the step's own controls, a hairline between steps. Done is green with a tick, the step to do now is dark, a later step is white with the chip border. The marks show where the person is and never record anything; the act stays one named button. A step's button drops under its words when the room is narrow (the Tasks panel at 320), so neither is squeezed or cut |
 | Task view | TaskView, TaskToast | The ONE shape of an opened task (owner's round 3 brief, 13 Oct 2026; 03 §8): the task at 13 / 500; its module icon, page and record with the owner's initials at the right, the record being the door to its page; one row per fact in one grid (icon 16, label as wide as the longest and at most 104, then the value), amber only on the fact that has gone by, and a fact may open its own detail under its row; then the segmented tabs. The first tab is the owning module's work and stays mounted; another tab is drawn when it is first opened. The view reads nothing, writes nothing and closes nothing. `TaskToast` is the dark toast after a task closes (01 §3): bottom centre, 12 seconds, `Next: {party} ›` when another task waits, ✕, never `Undo` |
 | Settings | Shared page/row/form components | Plain row groups; edit mode, access, current value, treatment and history |
@@ -80,10 +80,10 @@ The 11 Oct specimen names three shared pieces and a component list. Each has one
 | Button · IconButton | Button | Word button is a box; icon-only is round with no border (01 §3) |
 | Pill | StatusPill | One status component |
 | Menu | `CMenu` (items as data) or `CPopover role="menu"` + `CMenuItem`; Popover for a small panel | One menu design (01 §3); `DropdownMenu` retired 15 Oct 2026 |
-| Card · FieldRow | Card, Block, field-recipe | Field rows 36, label 150 (01 §5.1) |
+| Card · FieldRow | Block (the one card), field-recipe | Field rows 36, label 150 (01 §5.1) |
 | Tabs · SegmentedControl | Tabs | Segmented look (01 §3) |
 | Toast | Toast | Bottom centre (01 §3) |
-| Selection bar | GridToolbar | Replaces the toolbar in place |
+| Selection bar | DataGrid `selectable` (the engine draws it) | Replaces the toolbar in place |
 | Chip: choice chip and theme chip | none | KIT GAP |
 | Link: record number | PoNumberLinks and module link cells | KIT GAP: one shared record link |
 | Avatar | none | KIT GAP (UI MASTER §7.3) |

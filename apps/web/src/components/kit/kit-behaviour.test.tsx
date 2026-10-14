@@ -22,7 +22,6 @@ import Button from "./Button";
 import Checkbox from "./Checkbox";
 import DataTable from "./DataTable";
 import DatePicker from "./DatePicker";
-import GridToolbar from "./GridToolbar";
 import Drawer from "./Drawer";
 import { CMenu } from "@/components/carres/CPopover";
 import Modal from "./Modal";
@@ -768,21 +767,6 @@ describe("Button pill shape", () => {
     rerender(<Button>Issue Purchase Orders</Button>);
     expect(screen.getByRole("button").className).toContain("rounded-lg");
     expect(screen.getByRole("button").className).not.toContain("rounded-full");
-  });
-});
-
-describe("GridToolbar", () => {
-  it("holds its three slots and spells no word of its own", () => {
-    render(
-      <GridToolbar
-        search={<input aria-label="s" />}
-        right={<span>28 selected</span>}
-        meta={<span>Updated 10:32 AM</span>}
-      />,
-    );
-    const bar = document.querySelector('[data-kit="grid-toolbar"]')!;
-    expect(bar.textContent).toContain("28 selected");
-    expect(bar.textContent).toContain("Updated 10:32 AM");
   });
 });
 
