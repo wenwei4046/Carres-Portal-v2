@@ -234,6 +234,11 @@ export type PoTemplateData = {
   lines: Array<{
     sku: string;
     description: string;
+    /** Catalog product (model) name, added by the print-data route beside the
+     *  document (owner 2026-09-30: DESCRIPTION prints the product name, the SKU
+     *  only when Catalog has none). A kept version's payload never carries it
+     *  and reprints exactly as sent. */
+    model_name?: string | null;
     qty: number;
     unit: string;
     /** Effective governed destination for this goods line. Older document

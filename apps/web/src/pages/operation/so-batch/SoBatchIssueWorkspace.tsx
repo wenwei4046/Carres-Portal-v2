@@ -7,6 +7,7 @@ import PoSupplierBundle from "./PoSupplierBundle";
 // around a surface whose whole point is document + work, side by side.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  DELIVERY_METHOD_WORDS,
   purchasingRefusal,
   SO_BATCH_PURCHASE_WORDS as W,
   type PurchasingDestination,
@@ -165,7 +166,9 @@ export default function SoBatchIssueWorkspace({
       so_refs: [...new Set(current.lines.flatMap((line) => line.so == null ? [] : [line.so]))],
       lines: current.lines.flatMap((line) => line.parts.map((part) => ({
         sku: part.sku,
-        description: [line.item, line.variant].filter(Boolean).join(" · "),
+        /* The product speaks (owner 2026-09-30): model name, then variant. */
+        model_name: line.item || null,
+        description: line.variant ?? "",
         qty: part.qty,
         unit: "unit",
         sources: [{ so: line.so, qty: part.qty }],
@@ -490,7 +493,7 @@ export default function SoBatchIssueWorkspace({
                     </span>
                   } />
                   <Fact idPrefix="po-review-fact" own={false} framed label="Delivery Method" value={
-                    draftData?.delivery_method === "we_collect" ? "We collect" : draftData?.delivery_method === "supplier_delivers" ? "Supplier delivers" : <a className="text-kit-blue-11 underline" href="/operation?tab=suppliers">Not recorded. Check Suppliers.</a>
+                    draftData?.delivery_method ? DELIVERY_METHOD_WORDS[draftData.delivery_method] : <a className="text-kit-blue-11 underline" href="/operation?tab=suppliers">Not recorded. Check Suppliers.</a>
                   } />
                   <Fact idPrefix="po-review-fact" own={false} framed label="PO Doc Date" hint="Provisional. The date is recorded when issued." value={
                     current.poDate ? fmtDate(current.poDate) : "Not available. Go back and reload."

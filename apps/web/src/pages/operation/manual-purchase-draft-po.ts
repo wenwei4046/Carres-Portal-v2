@@ -89,7 +89,9 @@ export function manualPurchaseDraftPos(input: {
       so_refs: [],
       lines: lines.map((line) => ({
         sku: line.sku,
-        description: [line.item, input.purposeLabel].filter(Boolean).join(" · "),
+        /* The product speaks (owner 2026-09-30): model name, then purpose. */
+        model_name: line.item || null,
+        description: input.purposeLabel ?? "",
         qty: line.qty,
         unit: "unit",
         attrs: line.attrs,
