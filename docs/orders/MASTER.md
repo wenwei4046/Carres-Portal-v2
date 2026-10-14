@@ -350,7 +350,10 @@ Sales is the current delivery priority. Subscription expansion is deferred; pres
 existing Subscription records and links, without folding its quantities or rules into Outright.
 
 - The Outright list's item rows name each line's supplier from Purchasing's own record (owner
-  14 Oct 2026; BUILT ON BRANCH in PR #2066, not deployed): the non-cancelled POs that source the
+  14 Oct 2026; DEPLOYED 15 Oct 2026 in #2066 `41bc9a6d3`; production read on 15 Oct: SO-1371
+  B1201S-K → Nice Future, SO-1363 TRION-Q and CODY-SK → Ohana with its pillow `Not recorded`,
+  SO-1362 JAGER-SS → Ohana by its Unit, SO-1340 H1401F-K → Nice Future; these are TEST/trial
+  orders, not proven business records): the non-cancelled POs that source the
   line (`po_line_sources.order_line_id` → `purchase_orders.supplier_id`), else the Units bound to
   the line (`ops_stock_items.reserved_order_line_id`, reserved or sold) named by each Unit's own PO
   line; neither reads `Not recorded` (the lineage was read and holds no supplier). The cell is
