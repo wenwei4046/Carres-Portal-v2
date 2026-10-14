@@ -165,3 +165,24 @@ test("Sales Order Outright toolbar never cuts or hides a control with filters on
   expect(m.clear, "Clear filters names each filter on hover").toBe("Payment: Owes · Problems: None");
   expect(await carresCheck(page)).toEqual(PASS);
 });
+
+test("Sales Order Outright toolbar holds one search chip in the Sales Order view, at 1025 with Tasks and the menu open (real-data case, owner 14 Oct)", async ({ page }) => {
+  await page.setViewportSize({ width: 1025, height: 900 });
+  await page.goto(`${PAGE}?search=1314`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(500);
+  await setPanels(page, false, true);
+  await page.waitForTimeout(500);
+  const m = await page.evaluate(() => {
+    const bar = document.querySelector('[data-testid="outright-toolbar"]') as HTMLElement | null;
+    const tasks = document.querySelector('aside[aria-label="Tasks"]') as HTMLElement;
+    if (!bar) return null;
+    const edge = Math.min(bar.getBoundingClientRect().right, tasks.getBoundingClientRect().left);
+    const buttons = [...bar.querySelectorAll("button")].filter((b) => (b as HTMLElement).offsetParent);
+    return { overflow: bar.scrollWidth - bar.clientWidth, past: buttons.filter((b) => b.getBoundingClientRect().right > edge + 0.5).length, view: buttons.find((b) => (b.getAttribute("aria-label") ?? "").startsWith("View:"))?.textContent?.trim() };
+  });
+  expect(m, "the toolbar is drawn").not.toBeNull();
+  expect(m!.overflow).toBeLessThanOrEqual(0);
+  expect(m!.past).toBe(0);
+  expect(m!.view).toContain("Sales Order");
+  expect(await carresCheck(page)).toEqual(PASS);
+});

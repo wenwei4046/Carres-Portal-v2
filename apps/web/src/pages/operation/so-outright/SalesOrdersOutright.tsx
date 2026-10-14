@@ -324,7 +324,9 @@ export default function SalesOrdersOutright() {
   /* Every control on one toolbar line, none cut or overlapping (owner 14 Oct
      2026): when the line is too short (Tasks open at 1025), Summary keeps its
      icon first, then each filter chip, then the chips become one `Clear filters`
-     (each filter on hover); the view button always keeps its name.
+     (each filter on hover) and the gaps close from 8 to 4; the view button
+     always keeps its name. Measured on real data: 1025, Tasks and menu open, a
+     search chip and the `Sales Order` view were 3px too long at step 2.
      `need[n]` is the width the line needed at step n, to step back when it fits. */
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(0);
@@ -333,7 +335,7 @@ export default function SalesOrdersOutright() {
     const bar = toolbarRef.current;
     if (!bar) return;
     const fit = () => {
-      if (bar.scrollWidth > bar.clientWidth + 1 && compact < (chips.length > 1 ? 3 : 2)) {
+      if (bar.scrollWidth > bar.clientWidth + 1 && compact < (chips.length > 0 ? 3 : 1)) {
         need.current[compact] = bar.scrollWidth;
         setCompact(compact + 1);
       } else if (compact > 0 && bar.clientWidth >= (need.current[compact - 1] ?? Infinity)) setCompact(compact - 1);
@@ -412,7 +414,7 @@ export default function SalesOrdersOutright() {
             </span>
           </div>
         ) : (
-          <div ref={toolbarRef} className="flex h-9 min-w-0 flex-nowrap items-center gap-2" data-testid="outright-toolbar">
+          <div ref={toolbarRef} className={`flex h-9 min-w-0 flex-nowrap items-center ${compact >= 3 ? "gap-1" : "gap-2"}`} data-testid="outright-toolbar">
             {!summaryOpen && <CShowPanelButton label="Summary" compact={compact >= 1} onShow={() => setSummaryOpen(true)} />}
             <div role="tablist" aria-label="Views" className={SEGMENTED_TRACK}>
               {TABS.map((t) => (
@@ -430,7 +432,7 @@ export default function SalesOrdersOutright() {
             </div>
             {chips.length > 0 && (
               <span className="flex shrink-0 items-center gap-1.5">
-                {compact >= 3 ? (
+                {compact >= 3 && chips.length > 1 ? (
                   <CChip compact title={chips.map((c) => c.label).join(" · ")} onClear={clearFilters}>Clear filters</CChip>
                 ) : (
                   chips.map((c) => (
