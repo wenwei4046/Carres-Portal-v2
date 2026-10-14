@@ -1671,3 +1671,8 @@ div:first-child > .columnsMenuGroup {
 .rootLookFinance .th > .resizeHandle:hover::after {
   opacity: 1;
 }
+/* The last row keeps its line (Chew 2026-10-14, 「最下面没有线条」): with few
+   rows, the space under the table must not read as an unfinished row. */
+.rootLookFinance .tr:last-child {
+  border-bottom: 1px solid var(--fin-col-line);
+}

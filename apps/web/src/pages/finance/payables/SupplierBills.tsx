@@ -99,7 +99,7 @@ function BillRegister() {
   const query = useSupplierBills(dept);
   const rows = query.data ?? [];
   const columns = useMemo<DataGridColumn<SupplierBillRegisterRow>[]>(() => [
-    { key: "bill", label: "Bill No", width: 170,
+    { key: "bill", label: "Bill No", width: FINANCE_WIDTH.documentNo,
       accessor: (r) => <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/bills/${r.id}`}>{r.bill_no ?? "Draft, no number yet"}</Link>,
       searchValue: (r) => r.bill_no ?? "", exportValue: (r) => r.bill_no ?? "Draft, no number yet" },
     { key: "date", label: "Bill Date", width: 130, accessor: (r) => fmtDate(r.bill_date),

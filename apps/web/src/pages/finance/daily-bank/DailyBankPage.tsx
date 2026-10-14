@@ -99,7 +99,7 @@ export function dailyBankDetails(a: DailyBankAccount): DailyBankDetail[] {
 /* Fixed interior columns and one auto tail (the kit DataTable recipe). The
    amounts sit last so they line up under each other at any width. */
 const DETAIL_COLUMNS: readonly Column<DailyBankDetail>[] = [
-  { key: "entry", label: "Entry No", width: "130px",
+  { key: "entry", label: "Entry No", width: `${FINANCE_WIDTH.entryNo}px`,
     cell: (d) => (d.entryNo
       ? <Link className={link} to={`/finance/ledger?${new URLSearchParams({ entry: d.entryNo }).toString()}`}>{d.entryNo}</Link>
       : "") },

@@ -71,7 +71,7 @@ export function channelWord(r: Pick<ArAgingRow, "channel">, departments: readonl
 
 function Invoices({ row, columns }: { row: ArAgingRow; columns: AgingColumns }) {
   const cols: readonly Column<ArAgingRow["invoices"][number]>[] = [
-    { key: "invoice", label: "Invoice No", width: "160px",
+    { key: "invoice", label: "Invoice No", width: `${FINANCE_WIDTH.documentNo}px`,
       cell: (i) => (i.kind === "other"
         ? <Link className={link} to={`/finance/other-debtors?invoice=${i.invoiceId}`}>{i.invoiceNo}</Link>
         : i.invoiceNo) },

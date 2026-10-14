@@ -12,6 +12,11 @@ import { rm } from "@/lib/format-currency";
 export const FINANCE_WIDTH = {
   /** An amount, right aligned: `RM 1,234,567.89` in 13px tabular figures. */
   amount: 128,
+  /** A document number, never cut: `PV-20260930-0012` (16 characters, the
+   *  longest on production 2026-10-14) with room to spare. */
+  documentNo: 190,
+  /** A ledger entry number: `JE-202609-0001`. */
+  entryNo: 150,
   /** An account or party code: `310-2000`, `400-A001`. */
   code: 96,
   /** An account's name; it wraps. */

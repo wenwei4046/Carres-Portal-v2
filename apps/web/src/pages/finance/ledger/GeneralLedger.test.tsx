@@ -104,7 +104,7 @@ describe("General Ledger (0639)", () => {
     const table = await screen.findByTestId("general-ledger");
     expect(table.parentElement).toHaveClass(look.statement);
     // At least as wide as its columns: 110 + 130 + 140 + 170 + 180 + 128 + 128 + 150.
-    expect(table.parentElement!.style.getPropertyValue("--fin-table-width")).toBe("1136px");
+    expect(table.parentElement!.style.getPropertyValue("--fin-table-width")).toBe("1156px");
     const rows = within(table).getAllByTestId("general-ledger-row");
     const cells = (tr: HTMLElement) => Array.from(tr.children).map((td) => td.textContent?.trim() ?? "");
     const brought = rows.filter((tr) => tr.querySelector('[data-fin-tone="brought"]'));
@@ -124,7 +124,7 @@ describe("General Ledger (0639)", () => {
     const table = await screen.findByTestId("general-ledger");
     expect(table.parentElement).toHaveAttribute("data-fin-fill");
     const widths = Array.from(table.querySelectorAll("col")).map((c) => c.style.width);
-    expect(widths).toEqual(["110px", "130px", "140px", "170px", "auto", "128px", "128px", "150px"]);
+    expect(widths).toEqual(["110px", "150px", "140px", "170px", "auto", "128px", "128px", "150px"]);
     expect(within(table).getByRole("separator", { name: "Resize Description" })).toBeInTheDocument();
   });
 
@@ -133,10 +133,10 @@ describe("General Ledger (0639)", () => {
     show();
     const table = await screen.findByTestId("general-ledger");
     const widths = () => Array.from(table.querySelectorAll("col")).map((c) => c.style.width);
-    expect(widths()).toEqual(["110px", "130px", "140px", "170px", "300px", "140px", "128px", "150px"]);
+    expect(widths()).toEqual(["110px", "150px", "140px", "170px", "300px", "140px", "128px", "150px"]);
     // A dragged Description keeps its width: no fill, the table as wide as its columns.
     expect(table.parentElement).not.toHaveAttribute("data-fin-fill");
-    expect(table.parentElement!.style.getPropertyValue("--fin-table-width")).toBe("1268px");
+    expect(table.parentElement!.style.getPropertyValue("--fin-table-width")).toBe("1288px");
     fireEvent.mouseDown(within(table).getByTestId("table-resize-balance"), { clientX: 900, button: 0 });
     fireEvent.mouseMove(window, { clientX: 930 });
     fireEvent.mouseUp(window);

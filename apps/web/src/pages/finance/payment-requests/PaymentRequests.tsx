@@ -85,7 +85,7 @@ function RequestRegister() {
   }, [query.data, finance, view]);
 
   const columns = useMemo<DataGridColumn<PaymentRequestRow>[]>(() => [
-    { key: "no", label: "Request No", width: W.documentNo,
+    { key: "no", label: "Request No", width: FINANCE_WIDTH.documentNo,
       accessor: (r) => <Link className={link} to={`/finance/payment-requests/${r.id}`}>{r.request_no}</Link>,
       searchValue: (r) => r.request_no, exportValue: (r) => r.request_no },
     { key: "date", label: "Date", width: W.date, defaultHidden: true, accessor: (r) => fmtDate(r.created_at), dateValue: (r) => r.created_at.slice(0, 10),
