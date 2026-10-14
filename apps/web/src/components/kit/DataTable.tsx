@@ -232,6 +232,10 @@ export interface DataTableProps<Row> {
   rowTestId?: string;
   /** §8.2: clicking a row opens its record on the FIRST tab. */
   onRowOpen?: (row: Row) => void;
+  /** Opt-in: the row opens on a DOUBLE click and a single click does nothing
+   *  (Finance, Chew 2026-10-14: 「点的时候都算双击点开，除了是按钮」). Absent =
+   *  a single click opens, as every other table. */
+  openOnDoubleClick?: boolean;
   /** Present = the table is selectable. Absent = no checkbox column at all. */
   selection?: {
     selected: ReadonlySet<string>;
@@ -651,6 +655,7 @@ export default function DataTable<Row>({
   rootRef,
   rowTestId,
   onRowOpen,
+  openOnDoubleClick,
   selection,
   empty,
   loading = false,
@@ -1127,7 +1132,8 @@ export default function DataTable<Row>({
                   data-kit="data-row"
                   data-testid={rowTestId}
                   data-selected={isSelected || undefined}
-                  onClick={onRowOpen ? () => onRowOpen(row) : undefined}
+                  onClick={onRowOpen && !openOnDoubleClick ? () => onRowOpen(row) : undefined}
+                  onDoubleClick={onRowOpen && openOnDoubleClick ? () => onRowOpen(row) : undefined}
                   /* HOVER IS GREY, SELECTION IS BLUE (Loo, 2026-08-03).
                    * Hover says "the mouse is here" — one second long, no
                    * meaning — so it may not spend the accent. Selection is a

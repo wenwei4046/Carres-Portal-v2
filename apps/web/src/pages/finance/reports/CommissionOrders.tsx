@@ -108,7 +108,7 @@ export default function CommissionOrders({
         isLoading={loading}
         wrapToolbar
         toolbarStart={toolbarStart}
-        onRowClick={(r) => setOpen(r)}
+        onRowDoubleClick={(r) => setOpen(r)}
         statusSummary={(visible) => (
           <span data-testid="commission-orders-summary">
             {visible.length} of {rows.length} orders · What earns nothing is paid first. Nothing is earned before half the order is paid.

@@ -158,7 +158,7 @@ describe("Posting accounts (0657)", () => {
   it("opens a Sales row and sends the account it showed as was", async () => {
     show();
     await ready();
-    fireEvent.click(within(row("INCOME/ADDON/DELIVERY")).getByText("Delivery fee"));
+    fireEvent.doubleClick(within(row("INCOME/ADDON/DELIVERY")).getByText("Delivery fee"));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("button", { name: "Save: pick another account" })).toBeDisabled();
     fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Account/ }), { key: "Enter" });
@@ -177,7 +177,7 @@ describe("Posting accounts (0657)", () => {
   it("gives an add-on with no account its first one, sending no was", async () => {
     show();
     await ready();
-    fireEvent.click(within(row("INCOME/ADDON/dispose-sofa-big")).getByText("Dispose old sofa (big size)"));
+    fireEvent.doubleClick(within(row("INCOME/ADDON/dispose-sofa-big")).getByText("Dispose old sofa (big size)"));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("button", { name: "Save: pick the account" })).toBeDisabled();
     fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Account/ }), { key: "Enter" });
@@ -191,7 +191,7 @@ describe("Posting accounts (0657)", () => {
     net.refuse = "Someone else changed this posting after you opened it. Open it again to see their change.";
     show();
     await ready();
-    fireEvent.click(within(row("ROLE/COST_OF_GOODS_SOLD")).getByText("Goods bought that are not in the catalog"));
+    fireEvent.doubleClick(within(row("ROLE/COST_OF_GOODS_SOLD")).getByText("Goods bought that are not in the catalog"));
     const dialog = await screen.findByRole("dialog");
     fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Account/ }), { key: "Enter" });
     expect(screen.queryByRole("option", { name: "500-0000 SALES" })).toBeNull();
@@ -205,7 +205,7 @@ describe("Posting accounts (0657)", () => {
     show();
     await ready();
     expect(screen.getByTestId("grid-group-toggle-money")).toHaveTextContent("Customer money");
-    fireEvent.click(within(row("PAYMENT/bank/*")).getByText("Bank transfer"));
+    fireEvent.doubleClick(within(row("PAYMENT/bank/*")).getByText("Bank transfer"));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("button", { name: "Save: pick another account" })).toBeDisabled();
     fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Money account/ }), { key: "Enter" });
@@ -223,7 +223,7 @@ describe("Posting accounts (0657)", () => {
   it("sends the POS card and Online payment rows with their channel (0658)", async () => {
     show();
     await ready();
-    fireEvent.click(within(row("PAYMENT/online/stripe_checkout")).getByText("Online payment · Stripe checkout"));
+    fireEvent.doubleClick(within(row("PAYMENT/online/stripe_checkout")).getByText("Online payment · Stripe checkout"));
     const dialog = await screen.findByRole("dialog");
     fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Money account/ }), { key: "Enter" });
     fireEvent.click(screen.getByRole("option", { name: "310-2000 HONG LEONG BANK" }));
@@ -245,7 +245,7 @@ describe("Posting accounts (0657)", () => {
     expect(screen.getByTestId("grid-group-toggle-dealer")).toHaveTextContent("Dealers");
     expect(within(row("ROLE/DEALER_COMMISSION")).getByText("Dealer commission")).toBeInTheDocument();
     expectAccount("ROLE/DEALER_COMMISSION", "900-C007", "COMMISSION - DEALER");
-    fireEvent.click(within(row("ROLE/DEALER_COMMISSION_ACCRUED")).getByText("Dealer commission owed"));
+    fireEvent.doubleClick(within(row("ROLE/DEALER_COMMISSION_ACCRUED")).getByText("Dealer commission owed"));
     const dialog = await screen.findByRole("dialog");
     fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Account \(Liability\)/ }), { key: "Enter" });
     // Never a control account, nor an expense.
@@ -267,7 +267,7 @@ describe("Posting accounts (0657)", () => {
     const order = ["ROLE/SHOWROOM_DEBTORS", "ROLE/DEALER_DEBTORS_HEADING", "ROLE/SUBSCRIPTION_DEBTORS", "ROLE/TRADE_PAYABLE"]
       .map((id) => Array.from(document.querySelectorAll("tr[data-row-key]")).indexOf(row(id)));
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    fireEvent.click(within(row("ROLE/SHOWROOM_DEBTORS")).getByText("Owed by showroom customers"));
+    fireEvent.doubleClick(within(row("ROLE/SHOWROOM_DEBTORS")).getByText("Owed by showroom customers"));
     await new Promise((r) => setTimeout(r, 20));
     expect(screen.queryByRole("dialog")).toBeNull();
   });
@@ -278,7 +278,7 @@ describe("Posting accounts (0657)", () => {
     expect(screen.getByTestId("grid-group-toggle-costs")).toHaveTextContent("Purchases and charges");
     expect(within(row("ROLE/DELIVERY_TRANSPORT")).getByText("Transport to customers, by delivery order")).toBeInTheDocument();
     expectAccount("ROLE/DELIVERY_TRANSPORT", "900-T002", "LORRY HIRE");
-    fireEvent.click(within(row("ROLE/DELIVERY_TRANSPORT")).getByText("Transport to customers, by delivery order"));
+    fireEvent.doubleClick(within(row("ROLE/DELIVERY_TRANSPORT")).getByText("Transport to customers, by delivery order"));
     const dialog = await screen.findByRole("dialog");
     fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Account/ }), { key: "Enter" });
     expect(screen.queryByRole("option", { name: "500-0000 SALES" })).toBeNull();
@@ -291,7 +291,7 @@ describe("Posting accounts (0657)", () => {
   it("never opens an account the system keeps", async () => {
     show();
     await ready();
-    fireEvent.click(within(row("ROLE/TRADE_PAYABLE")).getByText("Suppliers owed for goods"));
+    fireEvent.doubleClick(within(row("ROLE/TRADE_PAYABLE")).getByText("Suppliers owed for goods"));
     await new Promise((r) => setTimeout(r, 20));
     expect(screen.queryByRole("dialog")).toBeNull();
   });

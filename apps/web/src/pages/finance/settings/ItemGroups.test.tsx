@@ -125,7 +125,7 @@ describe("Item groups (0659)", () => {
   it("changes a group, offering only expense accounts for purchase and sending the group it showed", async () => {
     show();
     await ready();
-    fireEvent.click(within(row(G.curtain)).getByText("CURTAIN"));
+    fireEvent.doubleClick(within(row(G.curtain)).getByText("CURTAIN"));
     const dialog = await screen.findByRole("dialog");
     fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Purchase account/ }), { key: "Enter" });
     expect(screen.queryByRole("option", { name: "500-0000 SALES" })).toBeNull();
@@ -169,7 +169,7 @@ describe("Item groups (0659)", () => {
     net.refuse = "Someone else changed this item group after you opened it. Open it again to see their change.";
     show();
     await ready();
-    fireEvent.click(within(row(G.pillow)).getByText("PILLOW"));
+    fireEvent.doubleClick(within(row(G.pillow)).getByText("PILLOW"));
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
     expect(await within(dialog).findByText("Someone else changed this item group after you opened it. Open it again to see their change.")).toBeInTheDocument();
@@ -184,7 +184,7 @@ describe("Item groups (0659)", () => {
     expect(rows[1]).toContain("Mattress");
     expect(rows[2]).toContain("Memory Foam Pillow");
     expect(rows.join(" ")).not.toContain("Old Mattress");
-    fireEvent.click(within(table).getByText("Ortho Mattress"));
+    fireEvent.doubleClick(within(table).getByText("Ortho Mattress"));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("button", { name: "Save: pick another item group" })).toBeDisabled();
     fireEvent.keyDown(within(dialog).getByRole("combobox", { name: /Item group/ }), { key: "Enter" });

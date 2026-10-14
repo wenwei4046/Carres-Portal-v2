@@ -98,3 +98,10 @@
 .statement tbody > tr:last-child > td {
   border-bottom: 1px solid var(--fin-col-line);
 }
+
+/* Rows 40 high, as on the Finance grids (Chew 2026-10-14). */
+.statement tbody > tr > td {
+  height: 40px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}

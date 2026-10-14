@@ -218,7 +218,10 @@ export default function ChartOfAccounts() {
   /** 0692: a money account reads its kind in words under Type, which filters
    *  by it, and no special type beside its name; every other account its
    *  special type and its kind. */
-  const specialWord = useCallback((a: LedgerAccount) => (moneyRows.has(a.code) ? null : a.special ?? null), [moneyRows]);
+  /** Chew 2026-10-14 (「special account 应该一个column」): the special type has
+   *  its own column, every account's code alike (SBK, SCH, HLD for the money
+   *  accounts too), and filters by it. */
+  const specialWord = useCallback((a: LedgerAccount) => a.special ?? null, []);
   const typeWord = useCallback(
     (a: LedgerAccount) => {
       const money = moneyRows.get(a.code);
@@ -278,20 +281,30 @@ export default function ChartOfAccounts() {
               {r.depth > 0 ? "└ " : ""}
               {r.account.name}
             </span>
-            {specialWord(r.account) ? <span className="text-label text-kit-slate-11">{specialWord(r.account)}</span> : null}
             {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0656). */}
             {r.account.is_header ? <span className="text-label text-kit-slate-11">Heading</span> : null}
             {!r.account.is_active ? <span className="text-label text-kit-slate-11">Retired</span>
               : notActive.has(r.account.code) ? <span className="text-label text-kit-slate-11">Not active</span> : null}
           </span>
         ),
-        searchValue: (r) => `${r.account.name} ${specialWord(r.account) ?? ""}`,
+        searchValue: (r) => r.account.name,
         exportValue: (r) => r.account.name,
+      },
+      {
+        key: "special",
+        // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 2026-10-14).
+        label: "Special",
+        width: 90,
+        sortable: false,
+        accessor: (r) => specialWord(r.account) ?? "",
+        searchValue: (r) => specialWord(r.account) ?? "",
+        filterType: "enum",
       },
       {
         key: "type",
         label: "Type",
-        width: 140,
+        // Fits `Card and online holding` whole (2026-10-14).
+        width: 180,
         sortable: false,
         accessor: (r) => typeWord(r.account),
         filterType: "enum",
@@ -339,7 +352,7 @@ export default function ChartOfAccounts() {
         rows={rows}
         columns={columns}
         rowKey={(r) => r.account.code}
-        storageKey="carres.finance.chart-of-accounts.v3"
+        storageKey="carres.finance.chart-of-accounts.v4"
         appearance="reference"
         look="finance" fillColumn="name"
         rowTone={(r) => (r.account.is_header ? "subtotal" : null)}
@@ -348,7 +361,7 @@ export default function ChartOfAccounts() {
         fixedGroups={{ groups, groupOf: (r) => r.group, revealMatches: true }}
         stickyIdentity
         isLoading={!query.isSuccess || !moneyQuery.isSuccess}
-        onRowClick={(r) => open(r.account, false)}
+        onRowDoubleClick={(r) => open(r.account, false)}
         /* Chew 2026-10-14: one main button for the area; the other two acts
            sit in the ⋮ menu (01 §3, one main button per area), and the filter
            sits on the left, apart from the actions. */
