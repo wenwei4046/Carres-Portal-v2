@@ -47,7 +47,9 @@ export default function CSidePanel({
           <MIcon name="chevron_left" size={20} />
         </button>
       </div>
-      <div className="mt-2.5 flex min-h-0 flex-1 flex-col gap-3.5 overflow-auto px-3.5 pb-3 [scrollbar-width:thin]">{children}</div>
+      {/* 10 under the title, plus what a toolbar on two rows adds (`--c-toolbar-extra`,
+          set by the page), so the body still starts level with the table. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-auto px-3.5 pb-3 [scrollbar-width:thin]" style={{ marginTop: "calc(10px + var(--c-toolbar-extra, 0px))" }}>{children}</div>
     </aside>
   );
 }

@@ -451,7 +451,7 @@ class Component extends DCLogic {
       selBar: selL.length ? { n: selL.length + ' selected', sum: '· ' + pcsTxt(selL.reduce((a, x) => a + pcsOf(x), 0)), acts: [{ l: 'Export', ic: 'download' }, { l: 'Print SO', ic: 'print' }], clear: () => set({ sel: {} }) } : null,
       tasks, cols, rows, sel: S.sel, onSel: s => set({ sel: s }), onClear: () => set({ f: {} }),
       subHeads: ['Item', '', '', 'Qty', 'Supplier'], subCols: 'minmax(150px,1fr) 76px 48px 104px',
-      footer: ordN(list.length), footerSum: '· Qty: ' + (Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([k, q]) => k + ' ' + (k === 'Sofa' ? q + (q === 1 ? ' set' : ' sets') : q)).join(' · ') || 'none'),
+      footer: ordN(list.length), footerSum: '· Qty: ' + (['Mattress', 'Pillow', 'Bedframe', 'Mattress protector', 'Sofa', 'Service', 'Others'].filter(k => cnt[k]).map(k => [k, cnt[k]]).concat(Object.entries(cnt).filter(([k]) => !['Mattress', 'Pillow', 'Bedframe', 'Mattress protector', 'Sofa', 'Service', 'Others'].includes(k))).map(([k, q]) => k + ' ' + (k === 'Sofa' ? q + (q === 1 ? ' set' : ' sets') : q)).join(' · ') || 'none'),
       emptyT: S.view === 'done' ? 'No delivered orders recorded.' : 'No orders match.',
     };
   }

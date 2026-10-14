@@ -177,13 +177,23 @@ for (const toolbar of ["one-line", "two-rows"] as const) test(`Sales Order Outri
     if (!bar) return null;
     const edge = Math.min(bar.getBoundingClientRect().right, tasks.getBoundingClientRect().left);
     const buttons = [...bar.querySelectorAll("button")].filter((b) => (b as HTMLElement).offsetParent);
-    return { overflow: bar.scrollWidth - bar.clientWidth, past: buttons.filter((b) => b.getBoundingClientRect().right > edge + 0.5).length, view: buttons.find((b) => (b.getAttribute("aria-label") ?? "").startsWith("View:"))?.textContent?.trim() };
+    const table = document.querySelector('[data-carres-table="list"]') as HTMLElement;
+    return {
+      overflow: bar.scrollWidth - bar.clientWidth,
+      past: buttons.filter((b) => b.getBoundingClientRect().right > edge + 0.5).length,
+      view: buttons.find((b) => (b.getAttribute("aria-label") ?? "").startsWith("View:"))?.textContent?.trim(),
+      /* The Tasks body starts level with the table on one line and on two rows. */
+      level: Math.round((tasks.children[1] as HTMLElement).getBoundingClientRect().top) - Math.round(table.getBoundingClientRect().top),
+      rows: Math.round(bar.getBoundingClientRect().height) > 40 ? 2 : 1,
+    };
   });
   expect(m, "the toolbar is drawn").not.toBeNull();
   expect(m!.overflow).toBeLessThanOrEqual(0);
   expect(m!.past).toBe(0);
   expect(m!.view).toContain("Sales Order");
-  /* carres-check measures the panels level with a 36 toolbar; two rows are checked for cut controls only. */
+  expect(m!.level, "the Tasks body starts level with the table").toBe(0);
+  expect(m!.rows, "two rows only in the two-row candidate").toBe(toolbar === "two-rows" ? 2 : 1);
+  /* carres-check's rule 2 wants a 36 toolbar row; two rows are checked for cut controls and level panels. */
   if (toolbar === "one-line") expect(await carresCheck(page)).toEqual(PASS);
 });
 

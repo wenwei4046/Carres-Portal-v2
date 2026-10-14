@@ -152,8 +152,9 @@ export default function ShellTasks() {
           <MIcon name="chevron_right" size={20} />
         </button>
       </div>
-      {/* 10px under the title, so the body starts level with the table (v12 Shell). */}
-      <div className="mt-2.5 flex min-h-0 flex-1 flex-col">
+      {/* 10px under the title, so the body starts level with the table (v12 Shell),
+          plus what a page toolbar on two rows adds (`--c-toolbar-extra`). */}
+      <div className="flex min-h-0 flex-1 flex-col" style={{ marginTop: "calc(10px + var(--c-toolbar-extra, 0px))" }}>
         <TasksArea onClose={() => setOpen(false)} fill bare />
       </div>
     </aside>

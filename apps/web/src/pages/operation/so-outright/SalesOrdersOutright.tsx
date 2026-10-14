@@ -356,6 +356,17 @@ export default function SalesOrdersOutright() {
     need.current = [];
     setCompact(0);
   }, [chips.length, layoutKey, twoRows]);
+  /* A toolbar on two rows tells the side panels how much taller it is, so their
+     bodies still start level with the table (Design Round 4 `panHdMb`). */
+  useLayoutEffect(() => {
+    const bar = toolbarRef.current;
+    const root = document.documentElement.style;
+    if (wrapped && bar) root.setProperty("--c-toolbar-extra", `${Math.max(0, Math.round(bar.getBoundingClientRect().height) - 36)}px`);
+    else root.removeProperty("--c-toolbar-extra");
+    return () => {
+      root.removeProperty("--c-toolbar-extra");
+    };
+  }, [wrapped, chips.length, selected.size]);
   /* SO No stays fixed on the left while the list scrolls (with ▸ and ☐). */
   const identifier = Math.max(0, layout.columns.indexOf("order"));
 
