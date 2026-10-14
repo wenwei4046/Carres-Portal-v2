@@ -59,7 +59,7 @@ import StatusPill from "@/components/kit/StatusPill";
 import Checkbox from "@/components/kit/Checkbox";
 import Button from "@/components/kit/Button";
 import SalesOrderMonthlyDemand from "../SalesOrderMonthlyDemand";
-import DropdownMenu from "@/components/kit/DropdownMenu";
+import { CMenu } from "@/components/carres/CPopover";
 import Popover from "@/components/kit/Popover";
 import { Fact } from "../SalesOrderWorkspace";
 import { SO_HEAD_ROW, SO_ROW, SO_TABLE, SO_TD, SO_TH } from "../components/so-document-table";
@@ -1744,7 +1744,7 @@ function PurchaseOrderObject({
                 sending moved to CURRENT ACTION: the one primary button is the
                 Work sentence, never a header button. */}
             {po.status === "open" && mode === "read" ? (
-              <DropdownMenu
+              <CMenu
                 label="Edit purchase order"
                 trigger={
                   <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-control border border-kit-slate-5 px-3 text-meta font-medium" data-testid="po-object-edit">

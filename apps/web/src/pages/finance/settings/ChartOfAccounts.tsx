@@ -48,7 +48,7 @@ import { MONEY_ACCOUNT_KIND_WORD, type MoneyAccountRow } from "@carres/shared/mo
 import { ledgerAccountCodeInput } from "@carres/shared/schemas/finance";
 import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
-import DropdownMenu from "@/components/kit/DropdownMenu";
+import { CMenu } from "@/components/carres/CPopover";
 import { MoreHorizontal } from "lucide-react";
 import Input from "@/components/kit/Input";
 import Modal from "@/components/kit/Modal";
@@ -379,7 +379,7 @@ export default function ChartOfAccounts() {
             <Button variant="primary" onClick={() => setAdding(true)} disabled={!query.isSuccess}>
               Add account
             </Button>
-            <DropdownMenu
+            <CMenu
               label="More actions"
               items={[
                 { key: "money", label: "Add a money account", onSelect: () => setMoneyEditing(null), disabled: !query.isSuccess },

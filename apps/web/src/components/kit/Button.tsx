@@ -67,7 +67,7 @@ export type ButtonProps = {
 
 /**
  * **It forwards its ref, and that is load-bearing rather than tidiness**
- * (added by D0.5b). `Modal`, `DropdownMenu`, `Popover` and `Tooltip` take a
+ * (added by D0.5b). `Modal`, `CMenu`, `Popover` and `Tooltip` take a
  * Button as their trigger and hand it Radix's behaviour through `asChild`,
  * which anchors the overlay on the trigger's own DOM node. A Button that eats
  * the ref makes every one of those open in the wrong place — silently, because

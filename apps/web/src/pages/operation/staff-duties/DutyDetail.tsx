@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from "react";
 import Button from "@/components/kit/Button";
-import DropdownMenu from "@/components/kit/DropdownMenu";
+import { CMenu } from "@/components/carres/CPopover";
 import SectionHeader from "@/components/kit/SectionHeader";
 import AssignHolderForm from "./AssignHolderForm";
 import { currentDutyPerson, shownCoverOf } from "./staff-duties-model";
@@ -114,7 +114,7 @@ export default function DutyDetail({
 
       <section data-testid={`selected-duty-${duty.key}`}>
         <div className="flex items-center justify-between gap-3"><h2 className="text-strong text-kit-slate-12">{duty.label}</h2>
-          {canAssign ? <DropdownMenu label="More actions" trigger={<Button ref={menuTrigger} variant="ghost" size="touch" icon="overflow" aria-label="More actions" />}
+          {canAssign ? <CMenu label="More actions" trigger={<Button ref={menuTrigger} variant="ghost" size="touch" icon="overflow" aria-label="More actions" />}
                 items={[{ key: "assign", label: "Assign", onSelect: () => { menuTrigger.current?.focus(); setActingSeq(n => n + 1); setActing("assign"); } }]} /> : null}
         </div>
         <div className="mt-2">

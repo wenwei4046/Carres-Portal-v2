@@ -9,9 +9,10 @@
  * opens the menu with focus on the ticked item, else the first; ↑ ↓ Home End
  * move between items; Escape or Tab closes it and focus goes back to the button.
  */
-import { useRef, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import * as RadixPopover from "@radix-ui/react-popover";
 import { Z_FLOATING } from "@/components/kit/overlay-layer";
+import { iconGlyph, type IconName } from "@/components/kit/Icon";
 import MIcon from "./MIcon";
 
 export default function CPopover({
@@ -67,7 +68,9 @@ export default function CPopover({
         ref={triggerRef}
         aria-haspopup={menu ? "menu" : "dialog"}
         onKeyDown={(e) => {
-          if (menu && e.key === "ArrowDown" && !open) {
+          /* Enter and Space open it here (not through the click they cause), so
+             a menu opens the same way from every keyboard path. */
+          if (menu && (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") && !open) {
             e.preventDefault();
             onOpenChange?.(true);
           }
@@ -162,5 +165,61 @@ export function CMenuGroup({ children, first = false }: { children: ReactNode; f
     >
       {children}
     </div>
+  );
+}
+
+/** One command of a `CMenu`. The word belongs to COPY-STANDARD. A menu carries no
+ *  colour: a destructive command is an ordinary row whose word says what it does. */
+export type CMenuEntry = {
+  key: string;
+  label: string;
+  icon?: IconName;
+  disabled?: boolean;
+  onSelect: () => void;
+  /** A line ABOVE this command: grouping, not decoration. */
+  separatorBefore?: boolean;
+};
+
+/**
+ * CMenu — the ⋮ menu as data: the same `CPopover` menu and `CMenuItem` rows, for a
+ * page that hands over a list of commands (a row's or a list's overflow). Choosing
+ * a command closes the menu, then runs it; focus goes back to the button.
+ */
+export function CMenu({
+  trigger,
+  label,
+  items,
+  align = "end",
+  width,
+}: {
+  /** The page's own button (a kit `Button`); it gets the menu-button behaviour. */
+  trigger: ReactNode;
+  /** What the menu is, for a screen reader. Never drawn. */
+  label: string;
+  items: readonly CMenuEntry[];
+  align?: "start" | "end";
+  width?: number;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <CPopover trigger={trigger} label={label} role="menu" open={open} onOpenChange={setOpen} align={align} width={width}>
+      <div className="min-w-40">
+        {items.map((item) => (
+          <Fragment key={item.key}>
+            {item.separatorBefore ? <div role="separator" className="my-1 h-px bg-c-section-line" /> : null}
+            <CMenuItem
+              icon={item.icon ? iconGlyph(item.icon) : undefined}
+              disabled={item.disabled}
+              onSelect={() => {
+                setOpen(false);
+                item.onSelect();
+              }}
+            >
+              {item.label}
+            </CMenuItem>
+          </Fragment>
+        ))}
+      </div>
+    </CPopover>
   );
 }

@@ -110,6 +110,9 @@ export type IconName = keyof typeof GLYPH;
 /** Read by `/ui` and by the guard test, so the showcase cannot go stale. */
 export const ICON_NAMES = Object.keys(GLYPH) as IconName[];
 
+/** The Material Symbols glyph a meaning draws (the one menu, `CMenu`, reads it). */
+export const iconGlyph = (name: IconName): string => GLYPH[name];
+
 export default function Icon({
   name,
   size = 16,
