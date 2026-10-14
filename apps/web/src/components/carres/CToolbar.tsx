@@ -4,7 +4,7 @@
  * (Layout Standard §0) and every button on it is 32 high, centred (fix list
  * 14 Oct, point 6); these parts never wrap it.
  */
-import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { forwardRef, type ButtonHTMLAttributes } from "react";
 import MIcon from "./MIcon";
 
 /**
@@ -72,9 +72,24 @@ export const CViewButton = forwardRef<
   );
 });
 
-/** A filter chip, `Payment: Owes ×`; a click removes the filter. */
-export function CChip({ children, onClear }: { children: ReactNode; onClear: () => void }) {
-  return (
+/**
+ * A filter chip, `Payment: Owes ×`; a click removes the filter. `compact` (a
+ * toolbar too short for every word, after Summary has gone to its icon) keeps
+ * the filter icon only, the chip's words on hover and as its name; a chip is
+ * never cut by its box (owner 14 Oct 2026: no control may overlap or be cut).
+ */
+export function CChip({ children, onClear, compact = false, title }: { children: string; onClear: () => void; compact?: boolean; title?: string }) {
+  return compact ? (
+    <button
+      type="button"
+      onClick={onClear}
+      aria-label={children}
+      title={title ?? children}
+      className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-c-input-border bg-c-search-bg text-c-body hover:bg-c-hover"
+    >
+      <MIcon name="filter_alt_off" size={18} />
+    </button>
+  ) : (
     <button
       type="button"
       onClick={onClear}

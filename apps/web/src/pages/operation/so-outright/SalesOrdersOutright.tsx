@@ -314,28 +314,39 @@ export default function SalesOrdersOutright() {
     ...Object.entries(filters).map(([k, v]) => ({ key: k, label: `${COLUMNS[k]!.label}: ${v}`, clear: () => setParam(`f.${k}`, null) })),
   ];
   const columns = layout.columns.map((k) => COLUMNS[k]!);
+  const clearFilters = () =>
+    setParams((p) => {
+      const n = new URLSearchParams(p);
+      [...n.keys()].filter((k) => k === "search" || k.startsWith("f.")).forEach((k) => n.delete(k));
+      return n;
+    }, { replace: true });
 
-  /* Every word on one toolbar line: when it is too short (Tasks open at 1025),
-     Summary keeps its icon and the view button keeps its name. */
+  /* Every control on one toolbar line, none cut or overlapping (owner 14 Oct
+     2026): when the line is too short (Tasks open at 1025), Summary keeps its
+     icon first, then each filter chip, then the chips become one `Clear filters`
+     (each filter on hover); the view button always keeps its name.
+     `need[n]` is the width the line needed at step n, to step back when it fits. */
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const [compactSummary, setCompactSummary] = useState(false);
-  const fullToolbar = useRef(0);
+  const [compact, setCompact] = useState(0);
+  const need = useRef<number[]>([]);
   useLayoutEffect(() => {
     const bar = toolbarRef.current;
     if (!bar) return;
     const fit = () => {
-      if (!compactSummary) {
-        if (bar.scrollWidth > bar.clientWidth + 1) {
-          fullToolbar.current = bar.scrollWidth;
-          setCompactSummary(true);
-        }
-      } else if (bar.clientWidth >= fullToolbar.current) setCompactSummary(false);
+      if (bar.scrollWidth > bar.clientWidth + 1 && compact < (chips.length > 1 ? 3 : 2)) {
+        need.current[compact] = bar.scrollWidth;
+        setCompact(compact + 1);
+      } else if (compact > 0 && bar.clientWidth >= (need.current[compact - 1] ?? Infinity)) setCompact(compact - 1);
     };
     fit();
     const watch = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(fit);
     watch?.observe(bar);
     return () => watch?.disconnect();
-  }, [compactSummary, chips.length, layoutKey, tasksOpen, summaryOpen, selected.size]);
+  }, [compact, chips.length, layoutKey, tasksOpen, summaryOpen, selected.size]);
+  useEffect(() => {
+    need.current = [];
+    setCompact(0);
+  }, [chips.length, layoutKey]);
   /* SO No stays fixed on the left while the list scrolls (with ▸ and ☐). */
   const identifier = Math.max(0, layout.columns.indexOf("order"));
 
@@ -402,7 +413,7 @@ export default function SalesOrdersOutright() {
           </div>
         ) : (
           <div ref={toolbarRef} className="flex h-9 min-w-0 flex-nowrap items-center gap-2" data-testid="outright-toolbar">
-            {!summaryOpen && <CShowPanelButton label="Summary" compact={compactSummary} onShow={() => setSummaryOpen(true)} />}
+            {!summaryOpen && <CShowPanelButton label="Summary" compact={compact >= 1} onShow={() => setSummaryOpen(true)} />}
             <div role="tablist" aria-label="Views" className={SEGMENTED_TRACK}>
               {TABS.map((t) => (
                 <button
@@ -418,10 +429,14 @@ export default function SalesOrdersOutright() {
               ))}
             </div>
             {chips.length > 0 && (
-              <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
-                {chips.map((c) => (
-                  <CChip key={c.key} onClear={c.clear}>{c.label}</CChip>
-                ))}
+              <span className="flex shrink-0 items-center gap-1.5">
+                {compact >= 3 ? (
+                  <CChip compact title={chips.map((c) => c.label).join(" · ")} onClear={clearFilters}>Clear filters</CChip>
+                ) : (
+                  chips.map((c) => (
+                    <CChip key={c.key} onClear={c.clear} compact={compact >= 2}>{c.label}</CChip>
+                  ))
+                )}
               </span>
             )}
             <span className="ml-auto flex shrink-0 items-center gap-1.5">

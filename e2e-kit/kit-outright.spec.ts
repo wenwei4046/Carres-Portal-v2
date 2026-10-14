@@ -134,3 +134,34 @@ test("Sales Order Outright footer reads one line of words in the fixed order (fi
   await page.locator('[data-testid^="outright-row-"]').first().waitFor();
   await expect(page.getByTestId("outright-footer-qty")).toHaveText(/^\d+ orders · Qty: Mattress \d+ · Pillow \d+$/);
 });
+
+test("Sales Order Outright toolbar never cuts or hides a control with filters on, at 1025 with Tasks open (owner 14 Oct)", async ({ page }) => {
+  await page.setViewportSize({ width: 1025, height: 900 });
+  await page.goto(PAGE, { waitUntil: "networkidle" });
+  await page.locator('[data-testid^="outright-row-"]').first().waitFor();
+  await setPanels(page, false, true);
+  await page.getByRole("button", { name: /^View:/ }).click();
+  await page.getByRole("menu").getByText("Overview", { exact: true }).click();
+  for (const col of ["Payment", "Problems"]) {
+    await page.locator('[role="columnheader"] button', { hasText: col }).click();
+    await page.getByRole("menu").locator('[role^="menuitem"], button').first().click();
+  }
+  await page.waitForTimeout(500);
+  const m = await page.evaluate(() => {
+    const bar = document.querySelector('[data-testid="outright-toolbar"]') as HTMLElement;
+    const tasks = document.querySelector('aside[aria-label="Tasks"]') as HTMLElement;
+    const edge = Math.min(bar.getBoundingClientRect().right, tasks.getBoundingClientRect().left);
+    const buttons = [...bar.querySelectorAll("button")].filter((b) => (b as HTMLElement).offsetParent);
+    return {
+      overflow: bar.scrollWidth - bar.clientWidth,
+      past: buttons.filter((b) => b.getBoundingClientRect().right > edge + 0.5).length,
+      view: buttons.find((b) => (b.getAttribute("aria-label") ?? "").startsWith("View:"))?.textContent?.trim(),
+      clear: buttons.find((b) => b.getAttribute("aria-label") === "Clear filters")?.title,
+    };
+  });
+  expect(m.overflow, "the toolbar line holds every control").toBeLessThanOrEqual(0);
+  expect(m.past, "no control runs under the Tasks panel").toBe(0);
+  expect(m.view, "the view button keeps its name").toContain("Overview");
+  expect(m.clear, "Clear filters names each filter on hover").toBe("Payment: Owes · Problems: None");
+  expect(await carresCheck(page)).toEqual(PASS);
+});
