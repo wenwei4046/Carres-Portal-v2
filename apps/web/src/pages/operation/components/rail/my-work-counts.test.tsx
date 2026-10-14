@@ -40,7 +40,8 @@ vi.mock("@/lib/api", async () => {
   return {
     ...actual,
     apiFetch: vi.fn(async (path: string) => {
-      if (path !== "/api/operation/work") throw new Error(`unexpected ${path}`);
+      /* The one Work feed, asked with the modules this build knows. */
+      if (path !== "/api/operation/work?include=workspace") throw new Error(`unexpected ${path}`);
       if (net.mode === "pending") return new Promise(() => {});
       if (net.mode === "fail") throw new TypeError("Failed to fetch");
       return structuredClone(net.work);
