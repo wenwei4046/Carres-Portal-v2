@@ -26,7 +26,8 @@ Never report progress as a percentage; list the exact remaining obligations (§4
 
 - Repo `wenwei4046/Carres-Portal-v2` is PUBLIC: never commit customer data, real-looking names or
   the design package's `sales-real.js`.
-- Worktrees: `~/carres-worktrees/{so-outright-kit, one-kit-ui, engine-v12, kit-retire, kit-docs}`.
+- Worktrees of this lane (all merged, safe to remove): `~/carres-worktrees/{so-outright-kit,
+  one-kit-ui, engine-v12, kit-retire, one-pill, page-tools, requested-door, kit-docs}`.
   The Desktop checkout is `desktop-main` with someone else's uncommitted files: do not touch them.
 - Branch `preview/two-row-toolbar` (= `b7c7c3a01`) keeps the unapproved two-row toolbar candidate.
 - Production: `erp.carresofficial.com`, `pos.carresofficial.com`, `api.carresofficial.com/health`;
@@ -40,9 +41,9 @@ Never report progress as a percentage; list the exact remaining obligations (§4
 | #2070 `ece6de740` | One menu: kit `DropdownMenu` retired into `CMenu` (CPopover menu, items as data; Enter/Space/↓ open on the first enabled command); `/ui` shows every shared part pages import, with page counts | DEPLOYED. Production read: SO Batch ⋮ Page tools opens on Enter with focus on the first enabled command, Escape closes and returns focus; `/ui` 18 sections, DataGrid present |
 | #2071 `a6c6eabc9` | The list engine draws the v12 table for every list: header band `#F8F9FA`, 10 between columns with 14 at the edges, ▸ before ☐, 24 round chevron; four page-local padding patches removed; 30 baseline pictures retaken on Linux | DEPLOYED. Production read 15 Oct: SO Batch By supplier 1025 and All 1164 (rows closed and one open, 25 item rows), By sales order All 1025 (▸ ☐ order, `expand_more` when open, 6 item rows), Forecast 1164 (item tick 0.2 px under the row tick), Purchase Orders 1440 (62 rows), Workspace Team 1440: `carres-check.js` PASS, header `rgb(248,249,250)`, no page side scroll. Finance lists not read on production (this login has no Finance access); their look and padding are unchanged by code |
 | #2072 `bd54355c1` | One pop-up (kit `Popover` merged into `CPopover`, which gained the dialog container); `Card`, `GridToolbar`, `ChecklistRow`, `QuietRouteRow` deleted (no page drew them) | DEPLOYED. Production read: Purchase Orders column filter menu and the top bar team pop-up open (`data-kit="popover"`) and close with Escape |
-| #2073 | One pill drawing: `CPill` reads `StatusPill`'s shape and colour pairs (computed identical on `/ui`) | open, see §4.1 |
-| #2074 | Every Register list keeps Export and Columns in its one ⋮ Page tools menu (46 lists drew the rejected separate buttons); `PO No` lists keep each comma with its number | open, see §4.1 |
-| #2075 | Monthly demand's month door (`/operation/orders?tab=all&requested=…`) narrows Sales Order Outright again, with a chip that clears it; one shared `requested-narrowing.ts` | open, see §4.1 — a live defect since Outright took `/operation/orders` |
+| #2073 `4da1ddb61` | One pill drawing: `CPill` reads `StatusPill`'s shape and colour pairs | DEPLOYED. Computed identical on `/ui` for every tone (3 10 padding, 12/16, 500, same colours and box sizes) |
+| #2074 `241209c68` | Every Register list keeps Export and Columns in its one ⋮ Page tools menu (46 lists drew the rejected separate buttons); `PO No` lists keep each comma with its number | DEPLOYED (in `2bf3343ed`). Production read: Delivery Orders shows one ⋮ (`Export` · `Columns`) and no separate buttons; SO Batch By sales order All, 13 two-PO cells, the first reads `PO-260903-4316-V1,` / `PO-260903-7907-V1` (no line starts with `,`) |
+| #2075 `2bf3343ed` | Monthly demand's month door (`/operation/orders?tab=all&requested=…`) narrows Sales Order Outright again, with a chip that clears it; one shared `requested-narrowing.ts` (was a live defect since Outright took `/operation/orders`) | DEPLOYED. Production read: `?tab=all&requested=2026-10` shows the chip `Customer’s original requested delivery: Oct 2026`, 6 orders, every preserved request in October |
 
 Engine decision (evidence 15 Oct 2026): `register/DataGrid` is the one listing engine — 56 page
 importers and every one passes `appearance="reference"`; its stylesheet named Sales Order Outright as
@@ -71,13 +72,16 @@ data locally, so opening another page cannot overwrite tasks. Round 3 (#2044–#
 
 ## 4 · Remaining obligations, in order (next executable step is 4.1)
 
-1. **Land #2073, #2074, #2075**: CI green on each head → squash merge → deploy → production read
-   (a Finance list and a Delivery list show one ⋮ with Export and Columns; Monthly demand → a month
-   opens Outright with the chip; a two-PO cell on SO Batch By sales order wraps without a lone `,`).
+Production runs `2bf3343ed` (ERP, POS and API, 15 Oct 2026 03:05 MYT). Nothing of this lane is
+open in a PR.
+
+1. **Bring §5's decisions to the owner, one at a time** (recommendation first), starting with the
+   opened-row frame, because §4.2 waits for it.
 2. **Outright onto the engine, then delete `CTable`** (UI MASTER §7.7): pager footer, widen-to-content
    columns, URL-driven header value filters, page toolbar in the engine's slots; opened-row frame after
    §7.2 is decided. Acceptance: 12 sales-order baselines unchanged, `kit-outright.spec.ts` green.
-3. **One pill**: `StatusPill` (19 pages) and `CPill` draw the same tokens; make one the renderer.
+3. **Type to 01 §2** (UI MASTER §7.7): `text-label` 11/500 used 1,294 times where labels are 12/400;
+   page by page with each page's kit check.
 4. **Old `SalesOrdersRegister.tsx`** is unreachable. Capability check done 15 Oct (UI MASTER §7.7):
    Outright lacks grouping, per-column sort, the Columns chooser, the role money default, the
    Monthly demand view, the URL filters (`dealer` `state` `city` `delivery` `category` `stock`
