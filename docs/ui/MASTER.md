@@ -34,12 +34,43 @@ The shared visual target covers shell/menu, one shared table, controls, object f
 Timeline, Settings → Appearance and density, checked on Sales Order and Purchasing. Modules supply
 their own identities, columns, authorised actions and source facts.
 
-**Current work split — owner 9 Oct 2026:** Claude Code owns application implementation, tests and
-deployment. This UI owner updates governance documents only. Neither this document update nor a
-component specimen proves application adoption, deployment or production acceptance. Later pages,
-including SO Batch Purchasing, are supplied and reviewed one at a time against this same kit.
-The latest approved page delta replaces only superseded rules; unresolved proposals keep their label.
-No second MASTER, page-local kit or versioned standard is created.
+**How design and Code work — owner ruling 14 Oct 2026 (option B) · APPROVED / LOCKED.** Replaces
+the 9 Oct work split. The look stays Sales Order Outright v12 (owner 14 Oct: "this is the last").
+
+```
+ONE KIT        The Portal's own components (apps/web/src/components/kit, components/carres) and
+               their live /ui page ARE the UI kit. Design files (.dc.html) show content and flow
+               only; their styles are never copied and never prove that something works.
+ONE WORD LIST  COPY-STANDARD. The designer's Layout Standard does not repeat words.
+ONE CHECK      carres-check.js lives in this repository and runs in CI on the kit pages at
+               1025 / 1164 / 1440. Design uses the same file, never a private copy.
+ONE CHANGE     A shared part changes once, in the kit, with its /ui example; every module gets
+               it. A page never draws its own copy of a shared part.
+```
+
+| Who | Does |
+|---|---|
+| Owner | answers business rules · says yes / no on the preview, then on live · passes design's files to Code |
+| Design | compares the page with v12, the Blueprint and the kit · writes one fix list per page (now → should be, a real example per cell · how numbers are counted · do not touch · acceptance examples) · checks the preview |
+| Code | changes only what the fix list says, in the kit when the part is shared · reports PR, preview URL, live commit and a table `example · expected · seen · PASS/FAIL` · stops and names both line numbers when two authorities disagree · decides every engineering mechanic itself |
+
+**Each page:** fix list → Code builds → CI (tests · carres-check · screenshot compare) → preview
+URL → design checks the preview → owner yes → merge → deploy → Code checks live, read only → owner
+accepts → next page.
+
+- **Screenshot baselines.** When the owner approves a page, its screenshots at 1025 / 1164 / 1440
+  are stored in CI, taken from fixture previews so a picture changes only when the code changes.
+  Any visual difference fails CI and blocks the merge until the new picture is approved: the PR
+  that changes a baseline shows before and after, and approving that PR approves the picture.
+- **Preview URL first.** Every PR is deployed to its own preview address before it goes live. The
+  preview reads real data, so it is checked read only (no Save, no Send). A change to the API or the
+  database previews its web part only; the server part is checked on live after merge, read only.
+- **Order.** Sales Order Outright → SO Batch Purchase → then one by one down the side menu.
+  Workspace, Tasks and Forecast Purchase are approved and live; each is checked when its turn comes,
+  not rebuilt. The new Manual Purchase Request design is not approved: Code does not build it.
+
+Status 14 Oct 2026: the rules are APPROVED; screenshot baselines and per-PR preview URLs are
+APPROVED TARGET / NOT BUILT. No second MASTER, page-local kit or versioned standard is created.
 
 **Law order:** Business Rules → Information Architecture → Design System → Implementation; on a
 conflict Business wins. Current target token values are defined in 01; existing component internals require migration to that target. Composition inside the
@@ -217,22 +248,23 @@ coverage per module (§4.3, §6.1). Tests or shared-component imports alone do n
 
 ## §1.1 · Production UI Execution Law — owner ruling 2026-08-11
 
-**Production UI is built on proactive design judgment and reviewed asynchronously.** This overwrites
-the earlier synchronous gates (the blanket "ASCII mock first, wait for yes" and the localhost "Layout
-Approved" hold) for production execution work:
+**Production UI is built on proactive design judgment and reviewed on its preview before it goes
+live** (owner 14 Oct 2026). The blanket "ASCII mock first, wait for yes" and the localhost "Layout
+Approved" hold stay retired for production execution work:
 
 ```
 BEFORE build   token values, the kit, COPY-STANDARD and the page patterns BIND exactly as
                before. The chat composes within the admitted shared template using its own
                judgment; it does not wait for a layout sign-off.
-AFTER build    the owner reviews the LIVE surface asynchronously. A review verdict is a normal
-               re-ruling: it changes the next commit, it does not invalidate the shipped one.
+AFTER build    design checks the PREVIEW against the fix list and v12, the owner says yes,
+               then it merges and Code checks live (the flow at the top of this file). A
+               later verdict is a normal re-ruling: it changes the next commit.
 STILL GATED    a NEW business rule · a change to an approved workflow or ruled word · anything
                the Constitution's interrupt list names. Judgment covers COMPOSITION, never law.
 ```
 
 When the owner is IN the conversation choosing between options, sketch before code (Constitution
-§10). The gate that is gone is the one that parked autonomous production execution on approval.
+§10). The one approval gate is the preview: building never waits for a layout sign-off, going live does.
 
 ## §1.1.1 · The pre-show gate — owner ruling 2026-09-26 · APPROVED / LOCKED
 
