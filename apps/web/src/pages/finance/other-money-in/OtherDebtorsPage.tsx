@@ -12,6 +12,11 @@
  * Register shell per UI MASTER §6.7: the word alone in Row 1, the create
  * action and the sibling list in Row 2, the summary in the 32px footer, and
  * no KPI strip. Customer money is never here — it lives in Payments.
+ *
+ * FINANCE LOOK (Chew 2026-10-13), both lists: the party and What for wrap
+ * rather than being cut, and a zero amount is a blank cell. An invoice's
+ * Outstanding keeps its words (Paid in full, Not issued yet): they are the
+ * answer, not a zero.
  */
 import { useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -36,6 +41,7 @@ import { DepartmentFilter, useDepartmentParam } from "../department";
 import InvoicePage from "./InvoicePage";
 import PartyModal from "./PartyModal";
 import { LoadFailed } from "./parts";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -141,7 +147,8 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
       {
         key: "party",
         label: "Party",
-        width: 220,
+        width: FINANCE_WIDTH.party,
+        wrap: true,
         accessor: (r) => r.party_name,
         searchValue: (r) => r.party_name,
         filterType: "enum",
@@ -150,6 +157,8 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         key: "what",
         label: "What for",
         width: 240,
+        wrap: true,
+        defaultHidden: true,
         accessor: whatFor,
         searchValue: (r) => [r.first_line, r.reference, r.narration].filter(Boolean).join(" "),
         exportValue: whatFor,
@@ -157,9 +166,9 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
       {
         key: "total",
         label: "Total",
-        width: 130,
+        width: FINANCE_WIDTH.amount,
         align: "right",
-        accessor: (r) => rm(Number(r.total_amount)),
+        accessor: (r) => amountCell(r.total_amount),
         numberValue: (r) => Number(r.total_amount),
         filterType: "number",
         exportValue: (r) => Number(r.total_amount),
@@ -167,7 +176,7 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
       {
         key: "outstanding",
         label: "Outstanding",
-        width: 140,
+        width: FINANCE_WIDTH.amount,
         align: "right",
         accessor: invoiceOutstandingCell,
         numberValue: (r) => (r.status === "issued" ? Number(r.outstanding) : null),
@@ -210,8 +219,9 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         rows={query.data ?? []}
         columns={columns}
         rowKey={(r) => r.invoice_id}
-        storageKey="carres.finance.other-debtor-invoices.v1"
+        storageKey="carres.finance.other-debtor-invoices.v3"
         appearance="reference"
+        look="finance"
         exportName="Other debtor invoices"
         groupBanner={false}
         stickyIdentity
@@ -272,7 +282,7 @@ function PartyRegister({ onNewInvoice }: { onNewInvoice: (partyId: string | null
       {
         key: "code",
         label: "Code",
-        width: 110,
+        width: FINANCE_WIDTH.code,
         accessor: (r) => r.code ?? "",
         searchValue: (r) => r.code ?? "",
         exportValue: (r) => r.code ?? "",
@@ -280,7 +290,8 @@ function PartyRegister({ onNewInvoice }: { onNewInvoice: (partyId: string | null
       {
         key: "name",
         label: "Party",
-        width: 240,
+        width: FINANCE_WIDTH.party,
+        wrap: true,
         accessor: (r) => r.name,
         searchValue: (r) => [r.name, r.registration_no, r.phone, r.email].filter(Boolean).join(" "),
         exportValue: (r) => r.name,
@@ -296,12 +307,14 @@ function PartyRegister({ onNewInvoice }: { onNewInvoice: (partyId: string | null
         key: "registration",
         label: "SSM or IC number",
         width: 170,
+        defaultHidden: true,
         accessor: (r) => r.registration_no ?? "No number on file",
       },
       {
         key: "phone",
         label: "Phone",
         width: 140,
+        defaultHidden: true,
         accessor: (r) => r.phone ?? "No phone on file",
       },
       {
@@ -316,9 +329,9 @@ function PartyRegister({ onNewInvoice }: { onNewInvoice: (partyId: string | null
       {
         key: "outstanding",
         label: "Outstanding",
-        width: 140,
+        width: FINANCE_WIDTH.amount,
         align: "right",
-        accessor: (r) => rm(Number(r.outstanding)),
+        accessor: (r) => amountCell(r.outstanding),
         numberValue: (r) => Number(r.outstanding),
         filterType: "number",
         exportValue: (r) => Number(r.outstanding),
@@ -350,8 +363,9 @@ function PartyRegister({ onNewInvoice }: { onNewInvoice: (partyId: string | null
         rows={query.data ?? []}
         columns={columns}
         rowKey={(r) => r.party_id}
-        storageKey="carres.finance.other-debtor-parties.v1"
+        storageKey="carres.finance.other-debtor-parties.v3"
         appearance="reference"
+        look="finance"
         exportName="Other debtor parties"
         groupBanner={false}
         stickyIdentity

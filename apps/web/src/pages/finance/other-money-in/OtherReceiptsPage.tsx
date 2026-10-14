@@ -13,6 +13,10 @@
  * debtors for each invoice paid), so the form asks first. The form carries ONE
  * idempotency key per opening: a double press returns the first receipt
  * instead of recording the money twice.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the money account's code and its name are
+ * two columns (Code, Received into), the party and What for wrap rather than
+ * being cut, and a zero amount is a blank cell.
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -67,6 +71,7 @@ import {
 } from "./parts";
 import { DepartmentFilter, DepartmentName, useDepartmentParam } from "../department";
 import { useSaveKey } from "../save-key";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 import { FieldError } from "@/components/kit/FieldFrame";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -154,7 +159,8 @@ function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
       {
         key: "from",
         label: "Received from",
-        width: 220,
+        width: FINANCE_WIDTH.party,
+        wrap: true,
         accessor: receivedFrom,
         searchValue: (r) => [r.party_name, r.payer_name].filter(Boolean).join(" "),
         filterType: "enum",
@@ -163,22 +169,32 @@ function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         key: "what",
         label: "What for",
         width: 260,
+        wrap: true,
+        defaultHidden: true,
         accessor: (r) => r.what ?? "Not available",
         searchValue: (r) => [r.what, r.reference, r.narration].filter(Boolean).join(" "),
       },
       {
+        key: "code",
+        label: "Code",
+        width: FINANCE_WIDTH.code,
+        accessor: (r) => r.money_account_code,
+      },
+      {
         key: "into",
         label: "Received into",
-        width: 200,
-        accessor: (r) => accountLabel({ code: r.money_account_code, name: r.money_account_name }),
+        width: 180,
+        wrap: true,
+        accessor: (r) => r.money_account_name,
+        searchValue: (r) => accountLabel({ code: r.money_account_code, name: r.money_account_name }),
         filterType: "enum",
       },
       {
         key: "amount",
         label: "Amount",
-        width: 130,
+        width: FINANCE_WIDTH.amount,
         align: "right",
-        accessor: (r) => rm(Number(r.total_amount)),
+        accessor: (r) => amountCell(r.total_amount),
         numberValue: (r) => Number(r.total_amount),
         filterType: "number",
         exportValue: (r) => Number(r.total_amount),
@@ -219,8 +235,9 @@ function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         rows={query.data ?? []}
         columns={columns}
         rowKey={(r) => r.receipt_id}
-        storageKey="carres.finance.other-receipts.v1"
+        storageKey="carres.finance.other-receipts.v3"
         appearance="reference"
+        look="finance"
         exportName="Other receipts"
         groupBanner={false}
         stickyIdentity

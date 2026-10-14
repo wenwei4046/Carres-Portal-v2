@@ -15,6 +15,10 @@
  *
  * Every figure is the shared AR-aging arithmetic's (Law D), on AP Aging's
  * columns; this page only prints it. Opening a row lists its open invoices.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the debtor and the channel wrap rather than
+ * being cut, and a zero is a blank cell, the Balance as well as the ages. The
+ * footer totals are the answer and always print.
  */
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -33,7 +37,6 @@ import Select from "@/components/kit/Select";
 import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { DateField } from "@/components/register/DateField";
-import { REGISTER_FIELD_WIDTH } from "@/components/register/register-field-widths";
 import { apiFetch } from "@/lib/api";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
@@ -42,11 +45,12 @@ import { departmentWord, encodeDepartment, useDepartments, type DepartmentRow } 
 import { ReadFailed } from "../payables/PayablesParts";
 import { AGING_COLUMN_WORDS } from "./ApAging";
 import { readDay } from "./period";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 
-const AMOUNT = REGISTER_FIELD_WIDTH.amount;
+const AMOUNT = FINANCE_WIDTH.amount;
 const link = "text-kit-blue-11 underline underline-offset-2";
-const money = (n: number) => (Math.round(n * 100) === 0 ? "" : rm(n));
-const sum = (rows: ArAgingRow[], pick: (r: ArAgingRow) => number) => rm(rows.reduce((t, r) => t + Math.round(pick(r) * 100), 0) / 100);
+const money = amountCell;
+const sum = (rows: ArAgingRow[], pick: (r: ArAgingRow) => number) => amountCell(rows.reduce((t, r) => t + Math.round(pick(r) * 100), 0) / 100);
 
 // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0686).
 const KIND_WORD: Record<ArInvoiceKind, string> = {
@@ -116,14 +120,15 @@ export default function ArAging() {
   const gridColumns = useMemo<DataGridColumn<ArAgingRow>[]>(() => [
     // Hidden at first, as AP Aging's Creditor Type is, so every age column
     // and Not tied to an invoice fit a 1440 screen beside Channel.
-    { key: "debtor", label: "Debtor", width: 204, accessor: (r) => r.name, overflowText: (r) => r.name,
+    // Narrower than a party's usual width, and wrapping, so the money columns fit beside it.
+    { key: "debtor", label: "Debtor", width: 110, wrap: true, accessor: (r) => r.name,
       searchValue: (r) => r.name, exportValue: (r) => r.name },
     { key: "type", label: "Debtor Type", width: 130, accessor: debtorTypeWord,
       filterValue: debtorTypeWord, filterType: "enum", defaultHidden: true },
-    { key: "channel", label: "Channel", width: 130, accessor: (r) => channelWord(r, departments),
-      overflowText: (r) => channelWord(r, departments), filterValue: (r) => channelWord(r, departments), filterType: "enum",
+    { key: "channel", label: "Channel", width: 120, wrap: true, accessor: (r) => channelWord(r, departments),
+      filterValue: (r) => channelWord(r, departments), filterType: "enum",
       exportValue: (r) => channelWord(r, departments) },
-    { key: "balance", label: "Balance", width: AMOUNT, align: "right", accessor: (r) => rm(r.balance),
+    { key: "balance", label: "Balance", width: AMOUNT, align: "right", accessor: (r) => money(r.balance),
       numberValue: (r) => r.balance, exportValue: (r) => r.balance, footerTotal: (v) => sum(v, (r) => r.balance) },
     ...Array.from({ length: AGING_COLUMN_COUNT }, (_, i): DataGridColumn<ArAgingRow> => {
       const word = AGING_COLUMN_WORDS[columns][i]!;
@@ -135,8 +140,7 @@ export default function ArAging() {
         footerTotal: (v) => sum(v, (r) => r.cells[i]!),
       };
     }),
-    // Money paid ahead totals below zero, one character wider than an age
-    // column's: the Debtor column gives up the 16px it needs.
+    // Money paid ahead totals below zero, one character wider than an age column's.
     { key: "notTied", label: "Not tied to an invoice", headerLines: ["Not tied to", "an invoice"], width: AMOUNT + 16, align: "right",
       accessor: (r) => money(r.notTied), numberValue: (r) => r.notTied, exportValue: (r) => r.notTied,
       footerTotal: (v) => sum(v, (r) => r.notTied) },
@@ -163,7 +167,7 @@ export default function ArAging() {
       <ListPageShell register>
         <DataGrid rows={ready?.rows ?? []} columns={gridColumns} rowKey={(r) => r.key}
           rowTestId={(r) => `ar-aging-row-${r.key}`}
-          storageKey="carres.finance.ar-aging.v1" appearance="reference" exportName={`AR Aging ${asAt}`}
+          storageKey="carres.finance.ar-aging.v2" appearance="reference" look="finance" exportName={`AR Aging ${asAt}`}
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess} wrapToolbar
           searchPlaceholder="Search debtors…" expandTitle="Show invoices"
           expandable={{ renderExpansion: (r) => <Invoices row={r} columns={columns} /> }}

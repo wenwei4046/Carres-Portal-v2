@@ -21,6 +21,11 @@
  *
  * Every window sends what the screen showed (`was`); a change someone made in
  * between is refused, never overwritten.
+ *
+ * FINANCE LOOK (Chew 2026-10-13), the groups table: the look is on and the
+ * four accounts wrap at an account's width. Each keeps its code with its name
+ * in one cell: a row holds four accounts, and four columns all headed Code
+ * would not say which account each belongs to.
  */
 import { useMemo, useState } from "react";
 import { categoryLabel } from "@carres/shared";
@@ -42,6 +47,7 @@ import ListPageShell from "@/components/ListPageShell";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { fmtDate } from "@/lib/fmt-date";
 import { useLedgerChart } from "../ledger/ledger-queries";
+import { FINANCE_WIDTH } from "../finance-widths";
 import { LoadFailed } from "../other-money-in/parts";
 import { money } from "../payables/payables-words";
 import { usePlaceProduct, useItemGroups, useSaveItemGroup } from "./api";
@@ -90,17 +96,18 @@ export default function ItemGroups() {
 
   const columns = useMemo<DataGridColumn<LedgerItemGroup>[]>(
     () => [
-      { key: "name", label: "Item group", width: 200, accessor: (g) => g.name, searchValue: (g) => g.name },
+      { key: "name", label: "Item group", width: 180, wrap: true, accessor: (g) => g.name, searchValue: (g) => g.name },
       ...ITEM_GROUP_ACCOUNTS.map((a): DataGridColumn<LedgerItemGroup> => ({
         key: a.key,
         label: a.label,
-        width: 240,
+        width: FINANCE_WIDTH.account,
+        wrap: true,
         sortable: false,
         accessor: (g) => accountCell(codeOf(g, a.key), nameOf(g, a.key)),
         searchValue: (g) => `${codeOf(g, a.key) ?? ""} ${nameOf(g, a.key) ?? ""}`,
         exportValue: (g) => (codeOf(g, a.key) ? `${codeOf(g, a.key)} ${nameOf(g, a.key) ?? ""}` : ""),
       })),
-      { key: "products", label: "Products", width: 110, align: "right", filterable: false, accessor: (g) => g.products },
+      { key: "products", label: "Products", width: 110, align: "right", defaultHidden: true, filterable: false, accessor: (g) => g.products },
       { key: "status", label: "Status", width: 120, accessor: (g) => (g.active ? "Active" : "Not active"), filterType: "enum" },
     ],
     [],
@@ -117,8 +124,9 @@ export default function ItemGroups() {
           rows={groups}
           columns={columns}
           rowKey={(g) => g.id}
-          storageKey="carres.finance.item-groups.v1"
+          storageKey="carres.finance.item-groups.v3"
           appearance="reference"
+          look="finance"
           groupBanner={false}
           allowColumnGrouping={false}
           stickyIdentity

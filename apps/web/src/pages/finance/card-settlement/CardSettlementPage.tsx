@@ -17,6 +17,9 @@
  * date in the file name, or is typed by staff.
  *
  * Built from the kit pieces Money moves uses.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the machine wraps rather than being cut, and
+ * a zero amount is a blank cell.
  */
 import { useMemo, useRef, useState } from "react";
 import {
@@ -46,6 +49,7 @@ import { toast } from "sonner";
 import { MoneyMoveForm } from "../money-moves/MoneyMovesPage";
 import { LoadFailed } from "../other-money-in/parts";
 import { useCardSettlement, useImportCardFile, useMatchCardRow, usePrepareCardPayout } from "./api";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 
 const MATCHED_WORD: Record<CardMatchHow, string> = {
   approval_code: "Matched by approval code",
@@ -134,19 +138,21 @@ export default function CardSettlementPage() {
         filterType: "date",
         exportValue: saleDate,
       },
-      { key: "machine", label: "Machine", width: 220, accessor: machine, searchValue: machine },
-      { key: "rows", label: "Sales", width: 80, align: "right", accessor: (d) => String(d.row_count), numberValue: (d) => d.row_count },
-      { key: "matched", label: "Matched", width: 90, align: "right", accessor: (d) => String(d.matched_count), numberValue: (d) => d.matched_count },
+      { key: "machine", label: "Machine", width: 220, wrap: true, accessor: machine, searchValue: machine },
+      { key: "rows", label: "Sales", width: 80, align: "right", defaultHidden: true, accessor: (d) => String(d.row_count), numberValue: (d) => d.row_count },
+      { key: "matched", label: "Matched", width: 90, align: "right", defaultHidden: true, accessor: (d) => String(d.matched_count), numberValue: (d) => d.matched_count },
       ...(["gross", "fee", "net"] as const).map<DataGridColumn<CardSettlementDay>>((k) => {
         const v = (d: CardSettlementDay) => (k === "fee" ? dayFee(d) : Number(d[k]));
-        return { key: k, label: { gross: "Sales total", fee: "Fee", net: "Paid into bank" }[k], width: 130, align: "right", accessor: (d) => rm(v(d)), numberValue: v, exportValue: v };
+        return { key: k, label: { gross: "Sales total", fee: "Fee", net: "Paid into bank" }[k], width: FINANCE_WIDTH.amount, align: "right", accessor: (d) => amountCell(v(d)), numberValue: v, exportValue: v };
       }),
       {
         key: "recorded",
         label: "Recorded in Carres",
-        width: 150,
+        headerLines: ["Recorded", "in Carres"],
+        width: FINANCE_WIDTH.amount,
+        defaultHidden: true,
         align: "right",
-        accessor: (d) => (d.recorded === null ? "Nothing matched" : rm(Number(d.recorded))),
+        accessor: (d) => (d.recorded === null ? "Nothing matched" : amountCell(d.recorded)),
         numberValue: (d) => Number(d.recorded ?? 0),
       },
       {
@@ -200,8 +206,9 @@ export default function CardSettlementPage() {
             rows={query.data?.days ?? []}
             columns={columns}
             rowKey={dayKey}
-            storageKey="carres.finance.card-settlement.v1"
+            storageKey="carres.finance.card-settlement.v3"
             appearance="reference"
+            look="finance"
             exportName="Card settlement"
             groupBanner={false}
             stickyIdentity

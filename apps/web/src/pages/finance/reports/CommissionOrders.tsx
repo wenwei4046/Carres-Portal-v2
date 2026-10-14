@@ -12,6 +12,10 @@
  * paid first; nothing is earned before half the order is paid) and, for a
  * cancelled order, the switch that takes its commission back (0662), which
  * counts in the month Finance turns it on.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the dealer, the customer and the note wrap
+ * rather than being cut, the long money headers sit on two lines, and a zero
+ * amount is a blank cell. The footer totals always print.
  */
 import { useMemo, useState } from "react";
 import {
@@ -30,6 +34,7 @@ import { apiFetch } from "@/lib/api";
 import { fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import { customerWord, noteWord, soWord } from "./commission-words";
+import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 
 const BASE = "/api/finance/dealer-commission";
 
@@ -47,7 +52,7 @@ export const ORDER_GROUPS: readonly { key: DcOrderGroup; label: string }[] = [
 const soOf = (r: OrderRow) => soWord(r.order);
 const customerOf = (r: OrderRow) => customerWord(r.order);
 
-const sum = (rows: OrderRow[], f: (r: OrderRow) => number) => rm(rows.reduce((s, r) => s + f(r), 0));
+const sum = (rows: OrderRow[], f: (r: OrderRow) => number) => amountCell(rows.reduce((s, r) => s + f(r), 0));
 
 export default function CommissionOrders({
   src,
@@ -69,21 +74,21 @@ export default function CommissionOrders({
 
   const columns = useMemo<DataGridColumn<OrderRow>[]>(() => [
     { key: "so", label: "SO", width: 110, accessor: soOf, searchValue: soOf },
-    { key: "dealer", label: "Dealer", width: 200, accessor: (r) => r.dealer, searchValue: (r) => r.dealer },
-    { key: "customer", label: "Customer", width: 200, accessor: customerOf, searchValue: customerOf },
+    { key: "dealer", label: "Dealer", width: FINANCE_WIDTH.party, wrap: true, accessor: (r) => r.dealer, searchValue: (r) => r.dealer },
+    { key: "customer", label: "Customer", width: FINANCE_WIDTH.party, wrap: true, accessor: customerOf, searchValue: customerOf },
     { key: "ordered", label: "Order day", width: 120, accessor: (r) => (r.order.orderedOn ? fmtDate(r.order.orderedOn) : "Day not recorded"),
       exportValue: (r) => r.order.orderedOn ?? "" },
-    { key: "total", label: "Order total", width: 140, align: "right", accessor: (r) => rm(r.terms.total),
+    { key: "total", label: "Order total", width: FINANCE_WIDTH.amount, defaultHidden: true, align: "right", accessor: (r) => amountCell(r.terms.total),
       numberValue: (r) => r.terms.total, exportValue: (r) => r.terms.total },
-    { key: "full", label: "Commission in full", width: 160, align: "right", accessor: (r) => rm(r.terms.full),
+    { key: "full", label: "Commission in full", headerLines: ["Commission", "in full"], width: FINANCE_WIDTH.amount, defaultHidden: true, align: "right", accessor: (r) => amountCell(r.terms.full),
       numberValue: (r) => r.terms.full, exportValue: (r) => Math.round(r.terms.full * 100) / 100 },
-    { key: "kept", label: "Paid by month end", width: 160, align: "right", accessor: (r) => rm(r.keptToMonthEnd),
+    { key: "kept", label: "Paid by month end", headerLines: ["Paid by", "month end"], width: FINANCE_WIDTH.amount, defaultHidden: true, align: "right", accessor: (r) => amountCell(r.keptToMonthEnd),
       numberValue: (r) => r.keptToMonthEnd, exportValue: (r) => r.keptToMonthEnd },
-    { key: "earned", label: "Commission this month", width: 190, align: "right", accessor: (r) => rm(r.earned),
+    { key: "earned", label: "Commission this month", headerLines: ["Commission", "this month"], width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.earned),
       numberValue: (r) => r.earned, exportValue: (r) => r.earned, footerTotal: (rs) => sum(rs, (r) => r.earned) },
-    { key: "still", label: "Still to earn", width: 140, align: "right", accessor: (r) => rm(r.stillToEarn),
+    { key: "still", label: "Still to earn", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.stillToEarn),
       numberValue: (r) => r.stillToEarn, exportValue: (r) => r.stillToEarn, footerTotal: (rs) => sum(rs, (r) => r.stillToEarn) },
-    { key: "note", label: "Note", width: 200, filterType: "enum", accessor: noteWord },
+    { key: "note", label: "Note", width: 170, wrap: true, filterType: "enum", accessor: noteWord },
   ], []);
 
   return (
@@ -92,8 +97,9 @@ export default function CommissionOrders({
         rows={rows}
         columns={columns}
         rowKey={(r) => r.order.orderId}
-        storageKey="carres.finance.dealer-commission-orders.v1"
+        storageKey="carres.finance.dealer-commission-orders.v3"
         appearance="reference"
+        look="finance"
         exportName={`Dealer commission by order ${month}`}
         groupBanner={false}
         allowColumnGrouping={false}

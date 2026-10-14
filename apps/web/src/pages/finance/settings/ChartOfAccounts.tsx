@@ -36,6 +36,11 @@
  * row reads its kind in words under Type in place of its special type, opens
  * the money account's own window (name, Active, number), and has no retire icon. `Add a money account` adds one. A money account out of use
  * reads `Not active` and, like a retired account, shows only when asked for.
+ *
+ * FINANCE LOOK (Chew 2026-10-13): the code and the name were already two
+ * columns; every heading row reads as a subtotal row (light grey, 600), as on
+ * the Trial Balance, and a long name wraps rather than being cut. The Code
+ * column keeps its width for the indent and the fold button.
  */
 import { useCallback, useMemo, useState } from "react";
 import { ledgerKindWord, LEDGER_ACCOUNT_CODE_MESSAGE, type LedgerAccount, type LedgerSection } from "@carres/shared/finance-ledger";
@@ -43,6 +48,8 @@ import { MONEY_ACCOUNT_KIND_WORD, type MoneyAccountRow } from "@carres/shared/mo
 import { ledgerAccountCodeInput } from "@carres/shared/schemas/finance";
 import Button from "@/components/kit/Button";
 import Checkbox from "@/components/kit/Checkbox";
+import DropdownMenu from "@/components/kit/DropdownMenu";
+import { MoreHorizontal } from "lucide-react";
 import Input from "@/components/kit/Input";
 import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
@@ -262,6 +269,7 @@ export default function ChartOfAccounts() {
         key: "name",
         label: "Name",
         width: 440,
+        wrap: true,
         sortable: false,
         filterable: false,
         accessor: (r) => (
@@ -331,33 +339,46 @@ export default function ChartOfAccounts() {
         rows={rows}
         columns={columns}
         rowKey={(r) => r.account.code}
-        storageKey="carres.finance.chart-of-accounts.v2"
+        storageKey="carres.finance.chart-of-accounts.v3"
         appearance="reference"
+        look="finance"
+        rowTone={(r) => (r.account.is_header ? "subtotal" : null)}
         groupBanner={false}
         allowColumnGrouping={false}
         fixedGroups={{ groups, groupOf: (r) => r.group, revealMatches: true }}
         stickyIdentity
         isLoading={!query.isSuccess || !moneyQuery.isSuccess}
         onRowClick={(r) => open(r.account, false)}
+        /* Chew 2026-10-14: one main button for the area; the other two acts
+           sit in the ⋮ menu (01 §3, one main button per area), and the filter
+           sits on the left, apart from the actions. */
+        toolbarStart={
+          // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0656).
+          <Checkbox
+            id="chart-show-retired"
+            label="Show not active"
+            checked={showRetired}
+            onCheckedChange={(on) => setShowRetired(on === true)}
+          />
+        }
         toolbarEnd={
-          <div className="flex flex-wrap items-center gap-2">
-            {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0656). */}
-            <Checkbox
-              id="chart-show-retired"
-              label="Show not active"
-              checked={showRetired}
-              onCheckedChange={(on) => setShowRetired(on === true)}
-            />
-            <Button variant="neutral" onClick={() => setAdding(true)} disabled={!query.isSuccess}>
+          <div className="flex items-center gap-2">
+            <Button variant="primary" onClick={() => setAdding(true)} disabled={!query.isSuccess}>
               Add account
             </Button>
-            <Button variant="neutral" onClick={() => setMoneyEditing(null)} disabled={!query.isSuccess}>
-              Add a money account
-            </Button>
-            {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0655). */}
-            <Button variant="neutral" data-testid="chart-import-open" onClick={() => setImporting(true)} disabled={!query.isSuccess}>
-              Import from AutoCount
-            </Button>
+            <DropdownMenu
+              label="More actions"
+              items={[
+                { key: "money", label: "Add a money account", onSelect: () => setMoneyEditing(null), disabled: !query.isSuccess },
+                // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0655).
+                { key: "import", label: "Import from AutoCount", onSelect: () => setImporting(true), disabled: !query.isSuccess },
+              ]}
+              trigger={
+                <Button variant="ghost" aria-label="More actions" data-testid="chart-more">
+                  <MoreHorizontal size={16} aria-hidden />
+                </Button>
+              }
+            />
           </div>
         }
       />

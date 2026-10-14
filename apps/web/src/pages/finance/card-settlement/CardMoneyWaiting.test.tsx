@@ -60,7 +60,9 @@ describe("Card money waiting (0641)", () => {
     expect(fresh).toHaveTextContent("OR-2610-0001");
     expect(fresh).toHaveTextContent("SO-1401");
     expect(fresh).toHaveTextContent("Tan Mei Ling");
-    expect(fresh).toHaveTextContent("1131 GHL");
+    // The card account's code and its name each sit in their own cell (Finance look, 2026-10-13).
+    expect(within(fresh).getByRole("cell", { name: "1131" })).toBeInTheDocument();
+    expect(within(fresh).getByRole("cell", { name: "GHL" })).toBeInTheDocument();
     expect(within(fresh).getByText("2")).toBeInTheDocument(); // days waiting
     expect(fresh).toHaveTextContent("No card company file shows it yet");
     expect(row("JE-202609-0040")).toHaveTextContent("Matched · card payout not prepared");
