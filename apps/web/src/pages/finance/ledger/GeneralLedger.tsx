@@ -18,6 +18,9 @@
  * table as wide as its columns, Brought forward light grey, each account's
  * Total light grey and 600 with the heavy rule above. A zero debit or credit
  * is a blank cell, the Total's too; a Balance at zero prints, being the answer.
+ * Description takes the width the other columns leave, so the table fills its
+ * box, and a header edge drags to resize, remembered per person (Chew
+ * 2026-10-14).
  */
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -36,9 +39,9 @@ import { noOpening, type PackSheet } from "../month-end-pack";
 import { ReadFailed } from "../payables/PayablesParts";
 import ExportStatement from "../reports/ExportStatement";
 import { monthChoices, monthEnd, readPeriod, wholeMonth } from "../reports/period";
-import { STATEMENT_LINK, tableWidth } from "../reports/StatementTable";
+import { STATEMENT_LINK } from "../reports/StatementTable";
 import look from "../finance-look.module.css";
-import { FINANCE_WIDTH, amountCell } from "../finance-widths";
+import { FINANCE_WIDTH, amountCell, fillSizing, useSavedWidths } from "../finance-widths";
 
 type Row =
   | { id: string; code: string; kind: "opening"; block: GeneralLedgerBlock }
@@ -56,28 +59,29 @@ function rowsOf(blocks: GeneralLedgerBlock[]): Row[] {
 const money = amountCell;
 const strong = (text: string) => <span className="font-semibold">{text}</span>;
 
-/** Each column's pixels, so the table is as wide as its columns. */
-const WIDTH = { date: 110, entry: 130, source: 140, document: 170, description: 180, balance: 150 } as const;
-const TABLE_WIDTH = tableWidth([WIDTH.date, WIDTH.entry, WIDTH.source, WIDTH.document, WIDTH.description,
-  FINANCE_WIDTH.amount, FINANCE_WIDTH.amount, WIDTH.balance]);
+/** Each column's pixels; Description's is its least, as it takes the rest. */
+const WIDTH = { date: 110, entry: 130, source: 140, document: 170, description: 180,
+  debit: FINANCE_WIDTH.amount, credit: FINANCE_WIDTH.amount, balance: 150 } as const;
+/** Where a person's dragged widths for this table are kept. */
+export const GENERAL_LEDGER_WIDTHS_KEY = "carres.finance.widths.general-ledger.v1";
 
-const COLUMNS: readonly Column<Row>[] = [
-  { key: "date", label: "Date", width: `${WIDTH.date}px`, cell: (r) => (r.kind === "line" ? fmtDate(r.line.entryDate) : "") },
-  { key: "entry", label: "Entry No", width: `${WIDTH.entry}px`,
+const columnsAt = (width: (key: string) => string): readonly Column<Row>[] => [
+  { key: "date", label: "Date", width: width("date"), cell: (r) => (r.kind === "line" ? fmtDate(r.line.entryDate) : "") },
+  { key: "entry", label: "Entry No", width: width("entry"),
     cell: (r) => (r.kind === "line"
       ? <Link className={STATEMENT_LINK} to={`/finance/ledger?${new URLSearchParams({ entry: r.line.entryNo }).toString()}`}>{r.line.entryNo}</Link>
       : "") },
-  { key: "source", label: "Source", width: `${WIDTH.source}px`, cell: (r) => (r.kind === "line" ? ledgerSourceWord(r.line.sourceType) : "") },
-  { key: "document", label: "Document", width: `${WIDTH.document}px`, cell: (r) => (r.kind === "line" ? ledgerDocWord(r.line.docNo) : "") },
-  { key: "description", label: "Description", width: `${WIDTH.description}px`,
+  { key: "source", label: "Source", width: width("source"), cell: (r) => (r.kind === "line" ? ledgerSourceWord(r.line.sourceType) : "") },
+  { key: "document", label: "Document", width: width("document"), cell: (r) => (r.kind === "line" ? ledgerDocWord(r.line.docNo) : "") },
+  { key: "description", label: "Description", width: width("description"),
     cell: (r) => (r.kind === "opening" ? <span data-fin-tone="brought">Brought forward</span>
       : r.kind === "total" ? <span data-fin-tone="total" className="font-semibold">Total</span>
       : <span className="whitespace-normal" title={r.line.description ?? "No memo"}>{r.line.description ?? "No memo"}</span>) },
-  { key: "debit", label: "Debit", width: `${FINANCE_WIDTH.amount}px`, align: "right", numeric: true,
+  { key: "debit", label: "Debit", width: width("debit"), align: "right", numeric: true,
     cell: (r) => (r.kind === "line" ? money(r.line.debit) : r.kind === "total" ? strong(money(r.block.totalDebit)) : "") },
-  { key: "credit", label: "Credit", width: `${FINANCE_WIDTH.amount}px`, align: "right", numeric: true,
+  { key: "credit", label: "Credit", width: width("credit"), align: "right", numeric: true,
     cell: (r) => (r.kind === "line" ? money(r.line.credit) : r.kind === "total" ? strong(money(r.block.totalCredit)) : "") },
-  { key: "balance", label: "Balance", width: `${WIDTH.balance}px`, align: "right", numeric: true,
+  { key: "balance", label: "Balance", width: width("balance"), align: "right", numeric: true,
     cell: (r) => r.kind === "opening" ? balanceWords(r.block.kind, r.block.opening)
       : r.kind === "line" ? balanceWords(r.block.kind, r.line.balance)
       : strong(balanceWords(r.block.kind, r.block.closing)) },
@@ -114,6 +118,9 @@ export default function GeneralLedger() {
   const deptWord = departmentWord(dept, departments);
   const query = useGeneralLedger(from, to, dept);
   const [search, setSearch] = useState("");
+  const saved = useSavedWidths(GENERAL_LEDGER_WIDTHS_KEY);
+  const size = useMemo(() => fillSizing(WIDTH, saved.widths, "description"), [saved.widths]);
+  const columns = useMemo(() => columnsAt(size.width), [size]);
 
   const blocks = useMemo((): GeneralLedgerBlock[] | "unreadable" | null => {
     if (!query.data) return null;
@@ -177,8 +184,8 @@ export default function GeneralLedger() {
           : beforeStart && goLive ? <p className="text-body" data-testid="general-ledger-before-start">
               The ledger started on {fmtDate(goLive)}. Pick a day from then on.</p>
           : !ready ? <p className="text-body" role="status">Loading the General Ledger…</p>
-          : <div className={look.statement} style={TABLE_WIDTH}><DataTable label="General Ledger" testId="general-ledger" rowTestId="general-ledger-row" rows={rowsOf(shown)}
-              columns={COLUMNS} rowId={(r) => r.id}
+          : <div className={look.statement} style={size.style} {...size.data}><DataTable label="General Ledger" testId="general-ledger" rowTestId="general-ledger-row" rows={rowsOf(shown)}
+              columns={columns} rowId={(r) => r.id} resizable={saved}
               empty={search.trim() ? "No account matches this search." : "No account moved or carried a balance in this period."}
               group={{
                 keyOf: (r) => r.code,

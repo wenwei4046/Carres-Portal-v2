@@ -167,7 +167,7 @@ export default function ArAging() {
       <ListPageShell register>
         <DataGrid rows={ready?.rows ?? []} columns={gridColumns} rowKey={(r) => r.key}
           rowTestId={(r) => `ar-aging-row-${r.key}`}
-          storageKey="carres.finance.ar-aging.v2" appearance="reference" look="finance" exportName={`AR Aging ${asAt}`}
+          storageKey="carres.finance.ar-aging.v2" appearance="reference" look="finance" fillColumn="debtor" exportName={`AR Aging ${asAt}`}
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess} wrapToolbar
           searchPlaceholder="Search debtors…" expandTitle="Show invoices"
           expandable={{ renderExpansion: (r) => <Invoices row={r} columns={columns} /> }}

@@ -144,7 +144,7 @@ export default function MoneyMovesPage() {
             rowKey={(r) => r.move_id}
             storageKey="carres.finance.money-moves.v3"
             appearance="reference"
-            look="finance"
+            look="finance" fillColumn="from"
             exportName="Money moves"
             groupBanner={false}
             stickyIdentity

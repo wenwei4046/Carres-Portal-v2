@@ -110,7 +110,7 @@ export default function CardMoneyWaiting() {
       <ListPageShell register>
         <DataGrid rows={ready?.rows ?? []} columns={columns} rowKey={(r) => r.key}
           rowTestId={(r) => `card-money-waiting-row-${r.wire.entry_no}`}
-          storageKey="carres.finance.card-money-waiting.v2" appearance="reference" look="finance" exportName="Card money waiting"
+          storageKey="carres.finance.card-money-waiting.v2" appearance="reference" look="finance" fillColumn="customer" exportName="Card money waiting"
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess} wrapToolbar
           searchPlaceholder="Search payments…"
           emptyMessage="No card or online money is waiting. Every payment has reached the bank."

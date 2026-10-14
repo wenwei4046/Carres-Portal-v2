@@ -237,7 +237,7 @@ function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         rowKey={(r) => r.receipt_id}
         storageKey="carres.finance.other-receipts.v3"
         appearance="reference"
-        look="finance"
+        look="finance" fillColumn="from"
         exportName="Other receipts"
         groupBanner={false}
         stickyIdentity

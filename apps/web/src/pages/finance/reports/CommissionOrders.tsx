@@ -99,7 +99,7 @@ export default function CommissionOrders({
         rowKey={(r) => r.order.orderId}
         storageKey="carres.finance.dealer-commission-orders.v3"
         appearance="reference"
-        look="finance"
+        look="finance" fillColumn="customer"
         exportName={`Dealer commission by order ${month}`}
         groupBanner={false}
         allowColumnGrouping={false}

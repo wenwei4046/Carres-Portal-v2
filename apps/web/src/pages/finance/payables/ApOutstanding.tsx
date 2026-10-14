@@ -95,7 +95,7 @@ export default function ApOutstanding() {
             rowKey={(r) => r.supplier_id}
             storageKey="carres.finance.ap-outstanding.v2"
             appearance="reference"
-            look="finance"
+            look="finance" fillColumn="supplier"
             toolbarEnd={
               // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 2026-10-13).
               <Checkbox id="ap-outstanding-show-all" label="Show all suppliers" checked={showAll}

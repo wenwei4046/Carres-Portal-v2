@@ -505,7 +505,31 @@ export interface DataTableProps<Row> {
    * of a table that no longer stretches is a disclosure control in 20px.
    */
   sizing?: "fill" | "content";
+  /**
+   * **Drag a header edge to resize, in PIXELS, with the caller owning the
+   * widths** (Chew 2026-10-14, Finance first). OPT-IN: absent, the table
+   * renders exactly the markup it rendered before.
+   *
+   * Unlike `layout` (which trades width with the right neighbour and forgets
+   * it on reload), a drag here sets that one column's width and nothing else;
+   * the caller stores `widths` wherever it keeps a person's choices and hands
+   * them back. A key in `widths` overrides the column's own `width`. Every
+   * column gets a handle on its right edge; with the keyboard, the focused
+   * handle moves by 10px on ArrowLeft / ArrowRight. Ignored while `layout`
+   * is passed, which has its own handle.
+   */
+  resizable?: {
+    /** The widths the person chose, in pixels, by column key. */
+    widths: Readonly<Record<string, number>>;
+    /** A column's new width in pixels, on every step of a drag. */
+    onResize: (key: string, width: number) => void;
+  };
 }
+
+/** The narrowest a dragged column may become, in pixels. */
+const MIN_RESIZE_PX = 40;
+/** One ArrowLeft / ArrowRight on a focused resize handle, in pixels. */
+const RESIZE_KEY_STEP = 10;
 
 /**
  * One column's ▼ — an Excel AutoFilter as a checkbox popover. Lit blue while
@@ -644,6 +668,7 @@ export default function DataTable<Row>({
    * defaulting a prop to a string, and it is right to: the default must be
    * the ABSENCE of the caller's choice, never a copy of it. */
   sizing,
+  resizable,
 }: DataTableProps<Row>) {
   const selectableRows = selection
     ? rows.filter((r) => selection.selectable?.(r) ?? true)
@@ -728,6 +753,42 @@ export default function DataTable<Row>({
     [ordered],
   );
 
+  /** `resizable`: is it on (the `layout` handle wins when both are passed)? */
+  const pxResize = resizable != null && layout == null;
+  /** A column's width as drawn, in pixels: the header's box when there is a
+   *  layout to measure, else the caller's saved width, else its declared px. */
+  const drawnWidth = (c: Column<Row>, th: Element | null): number => {
+    const measured = th?.getBoundingClientRect().width ?? 0;
+    if (measured > 0) return measured;
+    const saved = resizable?.widths[c.key];
+    if (saved != null) return saved;
+    const declared = typeof c.width === "string" ? parseFloat(c.width) : NaN;
+    return typeof c.width === "string" && c.width.trim().endsWith("px") && Number.isFinite(declared) ? declared : 0;
+  };
+  const startPxResize = (c: Column<Row>, e: React.MouseEvent<HTMLElement>) => {
+    if (!resizable || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const startW = drawnWidth(c, e.currentTarget.parentElement);
+    const startX = e.clientX;
+    const onResize = resizable.onResize;
+    const move = (ev: MouseEvent) =>
+      onResize(c.key, Math.max(MIN_RESIZE_PX, Math.round(startW + ev.clientX - startX)));
+    const end = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", end);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", end);
+  };
+  const keyPxResize = (c: Column<Row>, e: React.KeyboardEvent<HTMLElement>) => {
+    if (!resizable || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const step = e.key === "ArrowRight" ? RESIZE_KEY_STEP : -RESIZE_KEY_STEP;
+    resizable.onResize(c.key, Math.max(MIN_RESIZE_PX, Math.round(drawnWidth(c, e.currentTarget.parentElement) + step)));
+  };
+
   /* A column the caller stopped passing must not keep a width, or the grid
    * silently narrows for every operator who dragged it before it went. */
   useEffect(() => {
@@ -774,6 +835,8 @@ export default function DataTable<Row>({
                 width:
                   widthPct?.[c.key] != null
                     ? `${widthPct[c.key]}%`
+                    : pxResize && resizable.widths[c.key] != null
+                      ? `${resizable.widths[c.key]}px`
                     : typeof c.width === "number"
                       ? `${c.width}%`
                       : c.width,
@@ -856,7 +919,7 @@ export default function DataTable<Row>({
                  * typed once; without this pin, turning the grid draggable
                  * quietly said it twice. What the operator may DO to the
                  * header is `aria-roledescription`, never part of its name. */
-                aria-label={layout ? c.label : undefined}
+                aria-label={layout || pxResize ? c.label : undefined}
                 aria-roledescription={layout?.reorderLabel}
                 className={`relative px-2 ${HEAD_CELL} text-meta font-medium text-c-muted ${
                   layout ? "cursor-grab" : ""
@@ -929,6 +992,24 @@ export default function DataTable<Row>({
                     onPointerDown={(e) => startResize(ci, e)}
                     onClick={(e) => e.stopPropagation()}
                     className="absolute inset-y-0 right-0 w-1 cursor-col-resize hover:bg-c-select-fg"
+                  />
+                ) : null}
+                {/* RESIZE IN PIXELS (`resizable`) — a 6px strip on the right
+                 * edge of every column. It takes the press before the header
+                 * can start a sort or a drag, and only on the edge itself. */}
+                {pxResize ? (
+                  <span
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label={`Resize ${c.label}`}
+                    tabIndex={0}
+                    data-kit="table-resize"
+                    data-testid={`table-resize-${c.key}`}
+                    draggable={false}
+                    onMouseDown={(e) => startPxResize(c, e)}
+                    onKeyDown={(e) => keyPxResize(c, e)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute inset-y-0 right-0 w-1.5 cursor-col-resize hover:bg-c-select-fg focus-visible:bg-c-select-fg focus-visible:outline-none"
                   />
                 ) : null}
               </th>

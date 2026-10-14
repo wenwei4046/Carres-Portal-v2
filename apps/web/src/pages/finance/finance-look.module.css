@@ -11,21 +11,42 @@
   --fin-col-line: #E5E7EB;
   --fin-sub-bg: #F6F7F9;
   --fin-total-rule: #6B7280;
+  --fin-select-edge: #374151;
   display: flex;
   min-height: 0;
   flex: 1 1 0%;
   flex-direction: column;
 }
 
-/* The table is as wide as its columns, never stretched to the page: the page
-   sets --fin-table-width to the sum of its column widths, and the frame hugs
-   the table. A narrow screen scrolls it sideways. */
+/* The table fills its box with ONE column (Chew 2026-10-14): the page sets
+   --fin-table-width to the sum of its column widths and marks the wrapper
+   data-fin-fill; the fill column (width auto) takes what the others leave and
+   never drops below its own width. A narrow screen scrolls it sideways. When
+   the person has dragged the fill column, it keeps that width: no mark, the
+   table is as wide as its columns and the frame hugs it. */
 .statement > [data-kit="data-table"] {
   width: fit-content;
   max-width: 100%;
 }
 .statement > [data-kit="data-table"] > table {
   width: var(--fin-table-width, 100%);
+}
+.statement[data-fin-fill] > [data-kit="data-table"] {
+  width: auto;
+}
+.statement[data-fin-fill] > [data-kit="data-table"] > table {
+  width: 100%;
+  min-width: var(--fin-table-width, 0);
+}
+
+/* Drag a header edge to resize (Chew 2026-10-14): a faint line on the edge
+   while the header is hovered, the dark edge colour on the edge itself. */
+.statement thead th:hover > [data-kit="table-resize"] {
+  background: color-mix(in srgb, var(--fin-select-edge) 25%, transparent);
+}
+.statement thead th > [data-kit="table-resize"]:hover,
+.statement thead th > [data-kit="table-resize"]:focus-visible {
+  background: var(--fin-select-edge);
 }
 
 /* The header band: light blue, dark blue words, 600. */

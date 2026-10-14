@@ -139,7 +139,7 @@ function BillRegister() {
             rowKey={(r) => r.id}
             storageKey="carres.finance.bills.v3"
             appearance="reference"
-            look="finance"
+            look="finance" fillColumn="supplier"
             exportName="Bills"
             groupBanner={false}
             stickyIdentity

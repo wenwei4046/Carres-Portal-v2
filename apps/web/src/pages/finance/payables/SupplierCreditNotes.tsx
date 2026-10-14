@@ -115,7 +115,7 @@ function CreditNoteRegister() {
             rowTestId={(r) => `credit-note-row-${r.id}`}
             storageKey="carres.finance.credit-notes.v3"
             appearance="reference"
-            look="finance"
+            look="finance" fillColumn="supplier"
             exportName="Credit Notes"
             groupBanner={false}
             stickyIdentity

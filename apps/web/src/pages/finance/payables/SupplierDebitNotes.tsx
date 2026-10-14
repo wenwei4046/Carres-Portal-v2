@@ -133,7 +133,7 @@ function DebitNoteRegister() {
             rowTestId={(r) => `debit-note-row-${r.id}`}
             storageKey="carres.finance.debit-notes.v3"
             appearance="reference"
-            look="finance"
+            look="finance" fillColumn="supplier"
             exportName="Debit Notes"
             groupBanner={false}
             stickyIdentity

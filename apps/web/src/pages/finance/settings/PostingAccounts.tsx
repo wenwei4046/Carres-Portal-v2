@@ -269,7 +269,7 @@ export default function PostingAccounts() {
           rowKey={(r) => r.id}
           storageKey="carres.finance.posting-accounts.v3"
           appearance="reference"
-          look="finance"
+          look="finance" fillColumn="posting"
           groupBanner={false}
           allowColumnGrouping={false}
           fixedGroups={{ groups: POSTING_GROUPS.map((g) => ({ key: g.key, label: g.label })), groupOf: (r) => r.group, revealMatches: true }}

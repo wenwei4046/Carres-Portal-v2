@@ -135,7 +135,7 @@ export default function FinanceAR() {
             rowKey={(r) => r.orderId}
             storageKey="carres.finance.ar.v3"
             appearance="reference"
-            look="finance"
+            look="finance" fillColumn="customer"
             exportName="AR · Receivables"
             groupBanner={false}
             stickyIdentity

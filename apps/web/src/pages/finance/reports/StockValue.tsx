@@ -139,7 +139,7 @@ export default function StockValue() {
       <ListPageShell register>
         <DataGrid rows={query.data?.units ?? []} columns={columns} rowKey={(u) => u.id}
           rowTestId={(u) => `stock-value-row-${u.unit_code}`}
-          storageKey="carres.finance.stock-value.v3" appearance="reference" look="finance" exportName={`Stock value ${monthEnd}`}
+          storageKey="carres.finance.stock-value.v3" appearance="reference" look="finance" fillColumn="sku" exportName={`Stock value ${monthEnd}`}
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess} wrapToolbar
           searchPlaceholder="Search Units…"
           emptyMessage={`Carres held no Unit at the end of ${fmtDate(monthEnd, { year: "always" })}.`}

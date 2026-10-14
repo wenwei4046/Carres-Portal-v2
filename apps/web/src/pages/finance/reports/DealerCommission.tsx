@@ -164,7 +164,7 @@ export default function DealerCommission() {
       onOpenMonth={(m) => { setMonth(m); setOutletId(ALL); setParams({ view: "orders" }); }} /> :
     <ListPageShell register>
       <DataGrid rows={rows} columns={columns} rowKey={(r) => r.dealerId} storageKey="carres.finance.dealer-commission.v2"
-        appearance="reference" look="finance" exportName={`Dealer commission ${month}`} groupBanner={false} stickyIdentity
+        appearance="reference" look="finance" fillColumn="dealer" exportName={`Dealer commission ${month}`} groupBanner={false} stickyIdentity
         isLoading={!q.isSuccess} wrapToolbar
         // A dealer's row opens its orders for the same month.
         onRowClick={(r) => { setDealerId(r.dealerId); setOutletId(ALL); setParams({ view: "orders" }); }}

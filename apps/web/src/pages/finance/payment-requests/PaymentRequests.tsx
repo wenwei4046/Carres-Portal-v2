@@ -127,7 +127,7 @@ function RequestRegister() {
             rowTestId={(r) => `payment-request-row-${r.request_no}`}
             storageKey={`carres.finance.payment-requests.${finance ? view : "mine"}.v3`}
             appearance="reference"
-            look="finance"
+            look="finance" fillColumn="payee"
             exportName="Payment requests"
             groupBanner={false}
             stickyIdentity
