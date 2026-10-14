@@ -89,6 +89,9 @@ export const STATUS_PILL_CLASS: Record<OrderActionTone, string> = TONE_CLASS;
 /** Finance hold: the ONE dark pill, charcoal with white words (§1 Hold). */
 export const HOLD_PILL_CLASS = "bg-c-hold-bg text-c-hold-fg";
 
+/** The theme's selection pair, for a chosen value shown as a pill. */
+export const SELECT_PILL_CLASS = "bg-c-select-bg text-c-select-fg";
+
 /** Every tone, in the order §3.6 lists them — used by `/ui` and by tests. */
 export const TONES: readonly OrderActionTone[] = ["danger", "warning", "info", "success", "neutral"];
 

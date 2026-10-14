@@ -357,7 +357,7 @@ function SharedParts() {
         </div>
       </Section>
 
-      <Section id="status-pill" title="StatusPill (19 pages)" note="The status pill the object pages and older lists use. It and the list's CPill (above) are two components for one job: the merge is owed (last section).">
+      <Section id="status-pill" title="StatusPill (19 pages)" note="The status pill the object pages and older lists use, in the action engine's tone words. It draws from the same shape and colour pairs as the list's CPill (above): one pill, changed in one place.">
         <Panel2>
           <Sample label="every tone">
             {STATUS_TONES.map((tone) => <StatusPill key={tone} tone={tone}>{tone}</StatusPill>)}
@@ -526,8 +526,7 @@ export default function UiShowcase() {
       <Section id="not-yet" title="Owed: one component per job" note="Where the Portal still has two parts for one job, or a part only one page draws. Each merges once, in the kit, and every page gets it.">
         <ul className="list-disc pl-5 text-[13px] text-c-body">
           <li>Carres Table (Sales Order Outright) and the list engine DataGrid draw one table twice: Sales Order Outright moves onto DataGrid, then Carres Table is deleted.</li>
-          <li>CPill (lists) and StatusPill (object pages): one pill.</li>
-          <li>CPopover (as a dialog) and Popover: one pop-up.</li>
+                    <li>CPopover (as a dialog) and Popover: one pop-up.</li>
           <li>The Summary side panel is drawn by Sales Order Outright only; SO Batch Purchase and the other lists still use the older filter rail.</li>
         </ul>
       </Section>
