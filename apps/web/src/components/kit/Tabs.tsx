@@ -41,7 +41,7 @@ export interface TabDef {
  * a page takes these and adds nothing of its own.
  */
 export const SEGMENTED_TRACK = "inline-flex items-center gap-0 rounded-[10px] bg-c-track p-[3px]";
-export const SEGMENT = "whitespace-nowrap rounded-lg px-3 py-[5px] text-body";
+export const SEGMENT = "whitespace-nowrap rounded-lg px-3 py-[5px] text-body leading-4";
 export const SEGMENT_ON = "bg-c-select-pill font-medium text-c-select-fg [box-shadow:var(--shadow-lift)]";
 export const SEGMENT_OFF = "font-normal text-c-tab hover:bg-c-track-hover";
 
@@ -68,7 +68,7 @@ export default function Tabs({
   /* THE SEGMENTED CONTROL (01 §3, owner 11 Oct 2026: tabs are the shell's one
    * shared control). List tabs, view switches and Settings tabs are all this
    * one drawing: track `--c-track`, radius 10, pad 3 · segment pad 5 × 12 at
-   * 13 · selected the theme's pill with its text at 500 and the soft lift ·
+   * 13 on a 16 line, so the track is 32 like every toolbar button · selected the theme's pill with its text at 500 and the soft lift ·
    * others 400 in the quiet grey. No underline and no indicator bar.
    * `variant` is kept so callers need no edit; both values draw the same.
    * Keyboard focus is the shell's one outline (`--c-focus`, offset −2). */
@@ -91,7 +91,7 @@ export default function Tabs({
             disabled={t.disabled}
             data-kit="tab"
             className={
-              `relative flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-[5px] text-body ${fill ? "flex-auto justify-center" : ""} ` +
+              `relative flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-[5px] text-body leading-4 ${fill ? "flex-auto justify-center" : ""} ` +
               "data-[orientation=vertical]:justify-start " +
               "data-[state=inactive]:font-normal data-[state=inactive]:text-c-tab data-[state=inactive]:hover:bg-c-track-hover " +
               "data-[state=active]:bg-c-select-pill data-[state=active]:font-medium data-[state=active]:text-c-select-fg data-[state=active]:[box-shadow:var(--shadow-lift)] " +

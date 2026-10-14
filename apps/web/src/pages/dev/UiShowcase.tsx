@@ -14,7 +14,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import MIcon from "@/components/carres/MIcon";
 import CPill, { type CPillTone } from "@/components/carres/CPill";
 import CPopover, { CMenuGroup, CMenuItem } from "@/components/carres/CPopover";
-import CTable, { CTableCell, CTableFooter, CTableItems, type CCell, type CTableColumn } from "@/components/carres/CTable";
+import CTable, { CTableCell, CTableFooter, CTableItems, type CCell, type CTableColumn, type CTableTotals } from "@/components/carres/CTable";
 import CSidePanel from "@/components/carres/CSidePanel";
 import { CChip, CIconButton, CShowPanelButton, CViewButton } from "@/components/carres/CToolbar";
 import { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
@@ -34,50 +34,54 @@ function Section({ id, title, note, children }: { id: string; title: string; not
 
 /* ── the Carres Table, with the Sales Order view's columns and TEST rows ── */
 const COLUMNS: CTableColumn[] = [
-  { key: "proceed", label: "Proceed Date", width: "120px" },
-  { key: "order", label: "SO No", width: "minmax(150px,1fr)" },
+  { key: "proceed", label: "Proceed date", width: "120px" },
+  { key: "order", label: "SO no.", width: "minmax(150px,1fr)" },
   { key: "items", label: "Items", width: "120px" },
-  { key: "channel", label: "Sales Location", width: "minmax(120px,1fr)" },
-  { key: "dloc", label: "Delivery Location", width: "minmax(170px,1fr)" },
-  { key: "reqDate", label: "Customer’s original requested delivery", head: ["Customer’s original", "requested delivery"], width: "140px" },
+  { key: "channel", label: "Sales location", width: "minmax(120px,1fr)" },
+  { key: "dloc", label: "Delivery location", width: "minmax(170px,1fr)" },
+  { key: "reqDate", label: "ETA", hint: "Customer’s original requested delivery", width: "140px" },
 ];
 type Row = { id: string; cells: Record<string, CCell> };
 const ROWS: Row[] = [
   {
     id: "t1",
     cells: {
-      proceed: { t: "11 Oct 26", sub: "Sun", subTone: "muted", fw: 500 },
+      proceed: { t: "11 Oct", sub: "Sun", subTone: "muted", fw: 500 },
       order: { t: "SO-TEST-01", sub: "TEST · Customer A", fw: 600, fg: "ink" },
       items: { t: "3 pcs", sub: "MS, Pillow", subTitle: "Mattress, Pillow" },
       channel: { t: "TEST Showroom A", sub: "TEST · Staff A" },
       dloc: { t: "Setapak", sub: "Kuala Lumpur" },
-      reqDate: { t: "19 Nov 26", sub: "Thu", subTone: "muted", fw: 500 },
+      reqDate: { t: "19 Nov", sub: "Thu", subTone: "muted", fw: 500 },
     },
   },
   {
     id: "t2",
     cells: {
-      proceed: { t: "28 Aug 26", sub: "Fri", subTone: "muted", fw: 500 },
+      proceed: { t: "28 Aug", sub: "Fri", subTone: "muted", fw: 500 },
       order: { t: "SO-TEST-02", sub: "TEST · Customer B", fw: 600, fg: "ink" },
       items: { t: "2 pcs + 1 set", sub: "MS, SOF", subTitle: "Mattress, Sofa" },
       channel: { t: "TEST Showroom B", sub: "TEST · Staff B" },
       dloc: { t: "Kuala Lumpur", sub: "Kuala Lumpur" },
-      reqDate: { t: "Not recorded", fg: "muted" },
+      reqDate: { t: "10 Oct", sub: "Sat · passed", subTone: "warn", fw: 500 },
     },
   },
   {
     id: "t3",
     cells: {
-      proceed: { t: "2 Oct 26", sub: "Fri", subTone: "muted", fw: 500 },
-      order: { t: "SO-TEST-03", sub: "TEST · a customer name long enough to need its own line", fw: 600, fg: "ink" },
+      proceed: { t: "2 Oct", sub: "Fri", subTone: "muted", fw: 500 },
+      order: { t: "SO-TEST-03", sub: "TEST · a customer name long enough to widen its column", fw: 600, fg: "ink" },
       items: { t: "2 pcs" },
       channel: { t: "Could not read", fg: "warn", title: "Could not read Sales for this order. This does not mean nothing is recorded." },
       dloc: { t: "Johor Bahru", sub: "Johor" },
-      reqDate: { t: "6 Oct 26", sub: "Tue · Delivered", subTone: "ok", fw: 500 },
+      reqDate: { t: "6 Oct", sub: "Tue · Delivered", subTone: "ok", fw: 500 },
     },
   },
 ];
-const LONG_QTY = "· Qty: Mattress 23 · Sofa 22 · Bed frame 14 · Pillow 10 · Mattress protector 4 · Others 1";
+const LONG_QTY: CTableTotals = {
+  lead: "Qty:",
+  parts: ["Mattress 23", "Pillow 10", "Bedframe 14", "Mattress protector 4", "Sofa 22 sets", "Others 1"],
+  short: ["MS 23", "Pillow 10", "BF 14", "M.P 4", "SOF 22 sets", "Others 1"],
+};
 
 function TableExample({ narrow }: { narrow: boolean }) {
   const [picked, setPicked] = useState<Set<string>>(new Set(["t2"]));
@@ -129,7 +133,7 @@ function TableExample({ narrow }: { narrow: boolean }) {
           ),
         }}
         renderCell={(r, c) => <CTableCell cell={r.cells[c.key]!} />}
-        footer={<CTableFooter count="3 orders" qty={LONG_QTY} pageSize={size} onPageSize={setSize} page={page} pages={2} onPage={setPage} />}
+        footer={<CTableFooter count="3 orders" totals={LONG_QTY} pageSize={size} onPageSize={setSize} page={page} pages={2} onPage={setPage} />}
       />
     </div>
   );
@@ -138,11 +142,11 @@ function TableExample({ narrow }: { narrow: boolean }) {
 /* ── cells and pills: every state a cell can be in ── */
 const CELLS: Array<[string, CCell]> = [
   ["Identifier", { t: "SO-TEST-01", sub: "TEST · Customer A", fw: 600, fg: "ink" }],
-  ["Date", { t: "11 Oct 26", sub: "Sun", subTone: "muted", fw: 500 }],
+  ["Date", { t: "11 Oct", sub: "Sun", subTone: "muted", fw: 500 }],
   ["Read, nothing there", { t: "Not recorded", fg: "muted" }],
   ["Read failed", { t: "Could not read", fg: "warn", title: "Could not read Payments for this order. This does not mean there is no receipt." }],
   ["No access", { t: "No access", fg: "muted", title: "You may not see this record." }],
-  ["Done", { t: "6 Oct 26", sub: "Tue · Delivered", subTone: "ok", fw: 500 }],
+  ["Done", { t: "6 Oct", sub: "Tue · Delivered", subTone: "ok", fw: 500 }],
   ["Money", { t: "RM 14,170", align: "end" }],
   ["Pill", { t: "Owes", pill: true, tone: "warn" }],
 ];
@@ -165,12 +169,12 @@ export default function UiShowcase() {
         </p>
       </header>
 
-      <Section id="table" title="Carres Table" note="Sticky 40 header · 54 rows · ▸ and tick 24 · gap 10 · ▸, tick and the identifier stay while the list scrolls in its own box · ▸ opens the items on the row's own columns · the footer never widens the list.">
+      <Section id="table" title="Carres Table" note="Sticky grey 40 header · 54 rows, every cell on one line · ▸ and tick 24 · gap 10 · a column is as wide as its longest value · ▸, tick and the identifier stay while the list scrolls in its own box · ▸ opens the items on the row's own columns · the footer takes two lines at most, short forms when the full words need a third, and never widens the list.">
         <TableExample narrow={false} />
         <TableExample narrow />
       </Section>
 
-      <Section id="cells" title="Table cells" note="Main words, then the grey second line. Nothing is cut: a long value wraps and the row grows. Three states are never merged: read and empty, read failed, no access.">
+      <Section id="cells" title="Table cells" note="Main words, then the grey second line, each on one line. Nothing is cut: a long value widens its column and the list scrolls sideways in its own box. A date has no year in this year. Three states are never merged: read and empty, read failed, no access.">
         <div className="grid grid-cols-4 gap-3">
           {CELLS.map(([name, cell]) => (
             <div key={name} className="flex flex-col gap-1.5 rounded-lg bg-c-card p-3 ring-1 ring-inset ring-c-card-border">
@@ -191,7 +195,7 @@ export default function UiShowcase() {
         </div>
       </Section>
 
-      <Section id="toolbar" title="List toolbar" note="One 36px line: show a hidden panel · the views · filter chips · view and ⋮ · Tasks.">
+      <Section id="toolbar" title="List toolbar" note="One 36px line, every button 32 high: show a hidden panel · the views · filter chips · view (its name always shown) and ⋮ · Tasks. Too short a line keeps the show-panel button's icon only.">
         <div className="flex h-9 min-w-0 flex-nowrap items-center gap-2 rounded-lg bg-c-ground">
           {!summary && <CShowPanelButton label="Summary" onShow={() => setSummary(true)} />}
           <div role="tablist" aria-label="Views" className={SEGMENTED_TRACK}>
@@ -207,7 +211,7 @@ export default function UiShowcase() {
             ))}
           </span>
           <span className="ml-auto flex shrink-0 items-center gap-1.5">
-            <CViewButton icon="receipt_long" name="Sales Order" showName />
+            <CViewButton icon="receipt_long" name="Sales Order" />
             <CPopover label="More actions" role="menu" width={250} open={menu} onOpenChange={setMenu} trigger={<CIconButton icon="more_vert" label="More actions" pressed={menu} />}>
               <CMenuGroup first>EXPORT · orders shown now</CMenuGroup>
               <CMenuItem icon="table_view" note=".xlsx" onSelect={() => setMenu(false)}>Download Excel</CMenuItem>

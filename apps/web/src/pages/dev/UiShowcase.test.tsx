@@ -23,15 +23,16 @@ describe("/ui — the one Carres UI kit", () => {
     expect(document.querySelector('[data-kit="status-pill"]')).not.toBeInTheDocument();
   });
 
-  it("the Carres Table is the marked table, with the two-line header and the identifier fixed", () => {
+  it("the Carres Table is the marked table, with one-line v12 headers and the identifier fixed", () => {
     render(<UiShowcase />);
     const tables = document.querySelectorAll('[data-carres-table="list"]');
     expect(tables).toHaveLength(2);
     const table = within(tables[0] as HTMLElement);
-    expect(table.getByRole("columnheader", { name: "Customer’s original requested delivery" })).toHaveTextContent("Customer’s originalrequested delivery");
-    /* ▸ · ☐ · Proceed Date · SO No · … */
+    /* `ETA` keeps the full words on hover (fix list 14 Oct, point 1) */
+    expect(table.getByRole("columnheader", { name: "ETA" }).querySelector("span")).toHaveAttribute("title", "Customer’s original requested delivery");
+    /* ▸ · ☐ · Proceed date · SO no. · … */
     const firstHeader = table.getAllByRole("columnheader")[2]!;
-    expect(firstHeader).toHaveTextContent("Proceed Date");
+    expect(firstHeader).toHaveTextContent("Proceed date");
     expect(firstHeader.className).not.toContain("sticky");
     /* the identifier, SO No, stays (Layout Standard: ▸, tick and identifier stay fixed) */
     expect(table.getAllByRole("columnheader")[3]!.className).toContain("sticky");
@@ -41,14 +42,14 @@ describe("/ui — the one Carres UI kit", () => {
     expect(table.getByRole("checkbox", { name: "Select SO-TEST-02" })).toBeChecked();
   });
 
-  it("the footer's quantity line wraps inside the card, never cut; the pager stays", () => {
+  it("the footer reads one line of words, two lines at most, inside the card; the pager stays", () => {
     render(<UiShowcase />);
     const section = document.querySelector('[data-carres-table="list"]') as HTMLElement;
     expect(section.className).toContain("grid-cols-[minmax(0,1fr)]");
-    const qty = within(section).getByText(/^· Qty: Mattress 23/);
-    expect(qty.className).toContain("break-words");
-    expect(qty.className).not.toContain("line-clamp");
-    expect(qty.className).toContain("min-w-0");
+    const words = section.querySelector(".line-clamp-2") as HTMLElement;
+    /* fix list 14 Oct, point 7: one space each side of every ·, the fixed order */
+    expect(words.textContent).toBe("3 orders · Qty: Mattress 23 · Pillow 10 · Bedframe 14 · Mattress protector 4 · Sofa 22 sets · Others 1");
+    expect(words.className).toContain("line-clamp-2");
     expect(within(section).getByRole("button", { name: "Next page" })).toBeInTheDocument();
   });
 

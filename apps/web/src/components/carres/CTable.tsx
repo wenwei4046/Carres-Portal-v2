@@ -4,19 +4,20 @@
  * code). A page brings its columns, rows and cells; the table brings the frame:
  *
  *   ┌ card · data-carres-table ─────────────────────────────────────────────┐
- *   │ [▸][☐] [frozen 1st] [col] [col] …  sticky 40 header, 54 rows, gap 10  │
+ *   │ [▸][☐] [frozen 1st] [col] [col] …  sticky grey 40 header, 54 rows     │
  *   │  ▸ opens the row: one frame round the row and what opens under it     │
  *   │  …the list scrolls inside its own box; ▸ ☐ and the identifier stay    │
  *   ├───────────────────────────────────────────────────────────────────────┤
- *   │ n orders · Qty: … (wraps to a 2nd line)       Rows 20 ▾   ‹ 1 / 2 ›   │
+ *   │ n orders · Qty: … (2 lines at most)           Rows 20 ▾   ‹ 1 / 2 ›   │
  *   └───────────────────────────────────────────────────────────────────────┘
  *
- * The card has ONE column, `minmax(0,1fr)`, so nothing in the footer can widen
- * the list: a long quantity line wraps inside the footer (which grows, never
- * cuts), and a list wider than its box scrolls sideways in its own box (Layout Standard: "the table
- * scrolls sideways with the identifier column frozen; nothing is cut").
+ * Every cell is one line, so every row is 54 (fix list 14 Oct, point 4): a
+ * column is as wide as its longest value, never narrower than its v12 track,
+ * and a list wider than its box scrolls sideways in its own box with ▸, ☐ and
+ * the identifier fixed. Nothing is cut. The card has ONE column,
+ * `minmax(0,1fr)`, so nothing in the footer can widen the list.
  */
-import { Fragment, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import MIcon from "./MIcon";
 import CPill, { type CPillTone } from "./CPill";
 import CPopover, { CMenuItem } from "./CPopover";
@@ -44,9 +45,10 @@ export type CCell = {
 export type CTableColumn = {
   key: string;
   label: string;
-  /** A long header printed on two lines; `label` stays its accessible name. */
-  head?: readonly [string, string];
-  /** The grid track, as v12 sets it (`120px`, `minmax(150px,1fr)`). */
+  /** The header's full meaning on hover, when its word is short (`ETA`). */
+  hint?: string;
+  /** The grid track, as v12 sets it (`120px`, `minmax(150px,1fr)`): the
+   *  narrowest the column gets; a longer value widens it. */
   width: string;
   align?: "end";
 };
@@ -59,6 +61,13 @@ const INSET = 6 + 14;
 /** The px floor of a track: `120px` → 120, `minmax(150px,1fr)` → 150. */
 export const trackFloor = (width: string) => Number(/(\d+)px/.exec(width)?.[1]) || 0;
 
+/** A track widened to its longest value: `120px` + 164 → `164px`,
+ *  `minmax(150px,1fr)` + 190 → `minmax(190px,1fr)`. */
+export function widenTrack(width: string, need: number | undefined): string {
+  const floor = trackFloor(width);
+  return need && need > floor ? width.replace(/\d+px/, `${need}px`) : width;
+}
+
 /** The narrowest the table may be before it scrolls: every column's floor. */
 export function tableMinWidth(columns: readonly CTableColumn[], selectable: boolean, expandable = false) {
   const lead = (selectable ? 1 : 0) + (expandable ? 1 : 0);
@@ -67,21 +76,17 @@ export function tableMinWidth(columns: readonly CTableColumn[], selectable: bool
   return lead * TICK + tracks + gaps + 2 * INSET;
 }
 
-/** The header words: one line, or the two lines a long header is split into. */
+/** The header words, on one line; a short word carries its full meaning on hover. */
 export function CTableHead({ column }: { column: CTableColumn }) {
-  return column.head ? (
-    <span className="text-left leading-[1.25]" title={column.label}>
-      <span className="block whitespace-nowrap">{column.head[0]}</span>
-      <span className="block whitespace-nowrap">{column.head[1]}</span>
+  return (
+    <span className="whitespace-nowrap text-left leading-[1.25]" title={column.hint}>
+      {column.label}
     </span>
-  ) : (
-    <span className="text-left leading-[1.25]">{column.label}</span>
   );
 }
 
-/** One body cell: plain words or a pill, then the grey second line. No value is
- *  ever cut with "…": a long one wraps and the row grows (Layout Standard "Never
- *  cut information", owner 11 Oct; design reply 14 Oct). */
+/** One body cell: plain words or a pill, then the grey second line, each on one
+ *  line. No value is cut with "…": its column widens instead (fix list 14 Oct). */
 export function CTableCell({ cell }: { cell: CCell }) {
   const fg =
     cell.fg === "ink" ? "text-c-ink" : cell.fg === "muted" ? "text-c-muted" : cell.fg === "warn" ? "text-c-warn-fg" : cell.fw === 600 ? "text-c-ink" : "text-c-tab";
@@ -96,12 +101,12 @@ export function CTableCell({ cell }: { cell: CCell }) {
           <CPill tone={cell.tone ?? "info"}>{cell.t}</CPill>
         )
       ) : (
-        <span className={`max-w-full break-words tabular-nums ${fw} ${fg}`} title={cell.title}>
+        <span className={`whitespace-nowrap tabular-nums ${fw} ${fg}`} title={cell.title}>
           {cell.t}
         </span>
       )}
       {cell.sub && (
-        <span className={`max-w-full break-words text-[12px] ${subFg}`} title={cell.subTitle}>
+        <span className={`whitespace-nowrap text-[12px] ${subFg}`} title={cell.subTitle}>
           {cell.sub}
         </span>
       )}
@@ -190,7 +195,30 @@ export default function CTable<R>({
   const ticks = selection != null;
   const arrows = expand != null;
   const lead = (arrows ? 1 : 0) + (ticks ? 1 : 0);
-  const gcols = `${`${TICK}px `.repeat(lead)}${columns.map((c) => c.width).join(" ")}`;
+  /* Each column's longest value (header included), measured after every render:
+     the rows are separate grids, so the widths are set here, the same for all. */
+  const tableRef = useRef<HTMLDivElement>(null);
+  const [need, setNeed] = useState<readonly number[]>([]);
+  const [, setFontsTick] = useState(0);
+  useEffect(() => {
+    void document.fonts?.ready.then(() => setFontsTick((n) => n + 1));
+  }, []);
+  useLayoutEffect(() => {
+    const table = tableRef.current;
+    if (!table) return;
+    const next = columns.map((_, i) => {
+      let most = 0;
+      table.querySelectorAll<HTMLElement>(`[data-ct-col="${i}"]`).forEach((cell) => {
+        const left = cell.getBoundingClientRect().left;
+        for (const child of cell.children) most = Math.max(most, child.getBoundingClientRect().right - left);
+      });
+      return Math.ceil(most);
+    });
+    setNeed((was) => (was.length === next.length && was.every((n, i) => n === next[i]) ? was : next));
+  });
+  const widths = columns.map((c, i) => widenTrack(c.width, need[i]));
+  const widened = columns.map((c, i) => ({ ...c, width: widths[i]! }));
+  const gcols = `${`${TICK}px `.repeat(lead)}${widths.join(" ")}`;
   /* ▸, then ☐, then the first column: each frozen at its own left. */
   const tickLeft = arrows ? INSET + TICK + GAP : INSET;
   const firstLeft = INSET + lead * (TICK + GAP);
@@ -205,10 +233,10 @@ export default function CTable<R>({
     >
       <div className="min-h-0 min-w-0 overflow-auto [scrollbar-width:thin]" data-list-scroll>
         {failure ?? (
-          <div role="table" aria-label={label} style={{ minWidth: tableMinWidth(columns, ticks, arrows) }}>
+          <div ref={tableRef} role="table" aria-label={label} style={{ minWidth: tableMinWidth(widened, ticks, arrows) }}>
             <div
               role="row"
-              className="sticky top-0 z-10 mx-1.5 grid min-h-10 items-center gap-2.5 border-b border-c-head-line bg-[var(--row-bg)] px-3.5 py-1.5 text-[12px] font-medium text-c-muted [--row-bg:var(--c-card)]"
+              className="sticky top-0 z-10 grid h-10 items-center gap-2.5 border-b border-c-head-line bg-[var(--row-bg)] px-5 text-[12px] font-medium text-c-muted [--row-bg:var(--c-band)]"
               style={{ gridTemplateColumns: gcols }}
             >
               {arrows && <span className={`${FROZEN} z-[2] self-stretch`} style={frozen(INSET, true)} role="columnheader" />}
@@ -227,8 +255,8 @@ export default function CTable<R>({
                 <div
                   key={c.key}
                   role="columnheader"
-                  aria-label={c.head ? c.label : undefined}
-                  className={`flex self-stretch items-center ${c.align === "end" ? "justify-end" : ""} ${isFrozen(i) ? `${FROZEN} z-[2]` : ""}`}
+                  data-ct-col={i}
+                  className={`flex min-w-0 self-stretch items-center ${c.align === "end" ? "justify-end" : ""} ${isFrozen(i) ? `${FROZEN} z-[2]` : ""}`}
                   style={isFrozen(i) ? frozenStyle() : undefined}
                 >
                   {renderHeader ? renderHeader(c) : <CTableHead column={c} />}
@@ -279,6 +307,7 @@ export default function CTable<R>({
                     <span
                       key={c.key}
                       role="cell"
+                      data-ct-col={i}
                       className={`flex min-w-0 flex-col self-stretch justify-center leading-[1.3] ${c.align === "end" ? "items-end" : "items-start"} ${isFrozen(i) ? FROZEN : ""}`}
                       style={isFrozen(i) ? frozenStyle() : undefined}
                     >
@@ -367,6 +396,8 @@ export function CTableItems({
 }
 
 const PAGE_SIZES = [20, 50, 100] as const;
+/* The footer's line height (leading-4). */
+const LINE = 16;
 
 /** `Rows 20 ▾`. */
 function RowsMenu({ size, onSize }: { size: number; onSize: (n: number) => void }) {
@@ -394,14 +425,42 @@ function RowsMenu({ size, onSize }: { size: number; onSize: (n: number) => void 
   );
 }
 
+/** The footer's totals: `Qty:` then its parts; `short` is the same parts in short forms. */
+export type CTableTotals = { lead: string; parts: readonly string[]; short?: readonly string[] };
+
+/** `72 orders · Qty: Mattress 72 · Pillow 91`: one flow, one space each side of `·`, each part kept whole. */
+function TotalsLine({ count, totals }: { count: string; totals?: CTableTotals | undefined; }) {
+  const parts = (list: readonly string[]) =>
+    list.map((p, i) => (
+      <Fragment key={i}>
+        {" · "}
+        <span className="whitespace-nowrap">{p}</span>
+      </Fragment>
+    ));
+  return (
+    <>
+      <span className="whitespace-nowrap">{count}</span>
+      {totals && totals.parts.length > 0 ? (
+        <>
+          {" · "}
+          <span className="whitespace-nowrap">{totals.lead}</span>{" "}
+          <span className="whitespace-nowrap">{totals.parts[0]}</span>
+          {parts(totals.parts.slice(1))}
+        </>
+      ) : null}
+    </>
+  );
+}
+
 /**
- * The footer (44 high): the count, then the quantity line, then rows per page
- * and the pager. The quantity line takes the room that is left and wraps; the
- * footer grows rather than cut it, and it never pushes the pager out of the card.
+ * The footer (44 high): the count and the totals in one line of words, then rows
+ * per page and the pager. The words take two lines at most (fix list 14 Oct):
+ * when the full words need a third, the short forms show and the full words are
+ * on hover; the footer never pushes the pager out of the card.
  */
 export function CTableFooter({
   count,
-  qty,
+  totals,
   pageSize,
   onPageSize,
   page,
@@ -410,7 +469,7 @@ export function CTableFooter({
   testId,
 }: {
   count: string;
-  qty?: string;
+  totals?: CTableTotals;
   pageSize: number;
   onPageSize: (n: number) => void;
   page: number;
@@ -418,11 +477,32 @@ export function CTableFooter({
   onPage: (n: number) => void;
   testId?: string;
 }) {
+  const full = useRef<HTMLSpanElement>(null);
+  const [short, setShort] = useState(false);
+  useLayoutEffect(() => {
+    const el = full.current;
+    if (!el) return;
+    /* The hidden copy holds the full words at the footer's own width. */
+    const check = () => setShort(Boolean(totals?.short) && el.getBoundingClientRect().height > 2 * LINE + 1);
+    check();
+    const watch = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(check);
+    watch?.observe(el);
+    return () => watch?.disconnect();
+  }, [count, totals]);
+  const words = (list?: readonly string[]) => [count, ...(totals && list?.length ? [`${totals.lead} ${list.join(" · ")}`] : [])].join(" · ");
   return (
     <div className="flex min-h-[44px] min-w-0 items-center gap-3 border-t border-c-footer-line px-3.5 py-1 text-[13px] text-c-secondary" data-testid={testId}>
-      <span className="shrink-0 whitespace-nowrap">{count}</span>
-      <span className="min-w-0 flex-1 break-words leading-4" data-testid={testId ? `${testId}-qty` : undefined}>
-        {qty}
+      <span className="relative min-w-0 flex-1 leading-4">
+        <span ref={full} aria-hidden="true" className="invisible absolute inset-x-0 top-0">
+          <TotalsLine count={count} totals={totals} />
+        </span>
+        <span
+          className="line-clamp-2"
+          title={short ? words(totals?.parts) : undefined}
+          data-testid={testId ? `${testId}-qty` : undefined}
+        >
+          <TotalsLine count={count} totals={totals && short ? { ...totals, parts: totals.short ?? totals.parts } : totals} />
+        </span>
       </span>
       <RowsMenu size={pageSize} onSize={onPageSize} />
       <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-c-ink">

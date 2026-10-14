@@ -19,6 +19,7 @@ import type { RegisterRow } from "../sales-order-columns";
 import { salesLocationOf } from "../sales-order-columns";
 import type { CPillTone } from "@/components/carres/CPill";
 import type { CCell, CTableColumn } from "@/components/carres/CTable";
+import { appDateIsoOf, appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
 
 export type CellTone = CPillTone | "none";
 
@@ -45,17 +46,18 @@ export function couldNotRead(owner: string, notMean: string): Cell {
   return { t: "Could not read", fg: "warn", title: `Could not read ${owner} for this order. This does not mean ${notMean}.` };
 }
 
-/** `6 Oct 26` over `Tue` — v8 `dF`. */
+/** `17 Sep` over `Thu`, the year only when it is not this year (`3 Jan 27`) —
+ *  COPY's year rule, through the one formatter (fix list 14 Oct, point 2). */
 export function dayCell(iso: string | null | undefined, fw: 400 | 500 = 500): Cell | null {
-  if (!iso) return null;
-  const d = new Date(iso.length === 10 ? `${iso}T00:00:00+08:00` : iso);
-  if (Number.isNaN(d.getTime())) return null;
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Kuala_Lumpur", day: "numeric", month: "numeric", year: "2-digit", weekday: "short",
-  }).formatToParts(d);
-  const v = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  const mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][Number(v("month")) - 1];
-  return { t: `${Number(v("day"))} ${mon} ${v("year")}`, sub: v("weekday"), subTone: "muted", fw };
+  const t = fmtDateShort(iso);
+  if (!t) return null;
+  return { t, sub: fmtDate(iso).split(",")[0], subTone: "muted", fw };
+}
+
+/** The day has gone by (Malaysia's today). */
+export function isPast(iso: string): boolean {
+  const day = appDateIsoOf(iso);
+  return day !== "" && day < appTodayIso();
 }
 
 /** `RM 14,170` — v8 `rmF`, Inter tabular (never a mono face). */
@@ -69,7 +71,7 @@ export function pcsOf(r: RegisterRow): number {
 
 /** v12's Items line 2 codes (owner 11 Oct; design reply 14 Oct); a category
  *  without a code prints its own word. The full words show on hover. */
-const CATEGORY_CODE: Partial<Record<string, string>> = { Mattress: "MS", Bedframe: "BF", Sofa: "SOF", "Mattress protector": "M.P" };
+export const CATEGORY_CODE: Partial<Record<string, string>> = { Mattress: "MS", Bedframe: "BF", Sofa: "SOF", "Mattress protector": "M.P" };
 
 /**
  * Items, as v12 prints them: pieces, a sofa in sets (`3 pcs + 1 set`), and
@@ -115,8 +117,7 @@ function supplierEta(r: RegisterRow): string | null {
 }
 
 function shortDay(iso: string): string {
-  const c = dayCell(iso, 400);
-  return c ? c.t.replace(/ \d\d$/, "") : iso;
+  return fmtDateShort(iso) || iso;
 }
 
 /** One server read as a cell sees it: still loading, refused, failed, or answered. */
@@ -192,11 +193,11 @@ const docs = (list: (string | null | undefined)[]): Cell => {
 
 export const COLUMNS: Record<string, Column> = {
   proceed: {
-    key: "proceed", label: "Proceed Date", width: "120px",
+    key: "proceed", label: "Proceed date", width: "120px",
     cell: (r) => dayCell(r.proceeded) ?? NOT_RECORDED,
   },
   order: {
-    key: "order", label: "SO No", width: "minmax(150px,1fr)",
+    key: "order", label: "SO no.", width: "minmax(150px,1fr)",
     cell: (r) => ({ t: `SO-${r.so}`, fw: 600, fg: "ink", sub: r.customer || "Not recorded" }),
   },
   items: {
@@ -204,11 +205,11 @@ export const COLUMNS: Record<string, Column> = {
     cell: (r) => itemsCell(r),
   },
   channel: {
-    key: "channel", label: "Sales Location", width: "minmax(120px,1fr)",
+    key: "channel", label: "Sales location", width: "minmax(120px,1fr)",
     cell: (r) => ({ t: salesLocationOf(r.o) || "Not recorded", sub: r.o.salespersons?.name?.trim() || "Not recorded" }),
   },
   dloc: {
-    key: "dloc", label: "Delivery Location", width: "minmax(170px,1fr)",
+    key: "dloc", label: "Delivery location", width: "minmax(170px,1fr)",
     cell: (r) => {
       const city = r.o.customer_address_city?.trim();
       const state = r.o.customer_address_state?.trim();
@@ -216,12 +217,15 @@ export const COLUMNS: Record<string, Column> = {
     },
   },
   reqDate: {
-    key: "reqDate", label: "Customer’s original requested delivery", width: "140px",
-    head: ["Customer’s original", "requested delivery"],
+    /* The customer's original requested delivery, `ETA` on the list (fix list
+       14 Oct, point 1); the full words are the header's hover and stay in the
+       SO detail Delivery card. Line 2 says `· passed` once the day has gone by. */
+    key: "reqDate", label: "ETA", hint: "Customer’s original requested delivery", width: "140px",
     cell: (r) => {
       const c = dayCell(r.customerDelivery);
       if (!c) return NOT_RECORDED;
-      return isDelivered(r) ? { ...c, sub: `${c.sub} · Delivered`, subTone: "ok" } : c;
+      if (isDelivered(r)) return { ...c, sub: `${c.sub} · Delivered`, subTone: "ok" };
+      return r.customerDelivery && isPast(r.customerDelivery) ? { ...c, sub: `${c.sub} · passed`, subTone: "warn" } : c;
     },
   },
   stock: {

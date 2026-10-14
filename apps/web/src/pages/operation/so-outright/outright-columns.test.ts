@@ -1,10 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { OutrightOrderFacts } from "@carres/shared";
 import type { PaymentMonitorRow } from "@carres/shared/payment-monitor";
 import { ApiError } from "@/lib/api";
 import type { RegisterRow } from "../sales-order-columns";
 import { COLUMNS, LAYOUTS, timeWords, type CellContext, type OwnedRead, type PayByRead } from "./outright-columns";
 import { readStateOf } from "./pay-by";
+
+/* The year rule and `passed` read today: pin it (COPY "THE YEAR RULE"). */
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-14T04:00:00Z"));
+});
+afterAll(() => vi.useRealTimers());
 
 const row = (over: Partial<RegisterRow["o"]> = {}) =>
   ({
@@ -43,7 +50,7 @@ describe("Outright list cells read each owner and keep three states apart", () =
     expect(t("grnNo", ctx).t).toBe("GRN-11");
     expect(t("logi", ctx).t).toBe("NETS");
     expect(t("appt", ctx)).toMatchObject({ t: "Scheduled", sub: "2 PM to 5 PM" });
-    expect(t("delivery", ctx)).toMatchObject({ t: "20 Oct 26", sub: "Tue" });
+    expect(t("delivery", ctx)).toMatchObject({ t: "20 Oct", sub: "Tue" });
     expect(t("load", ctx).t).toBe("Handed over");
     expect(t("loc", ctx).t).toBe("Carres Klang");
     expect(t("hold", ctx).t).toBe("No Finance hold");
@@ -95,7 +102,7 @@ describe("Outright list cells read each owner and keep three states apart", () =
 
   it("Pay by is Payments' own deadline, and an unread clock is never 'no deadline'", () => {
     const monitorRow = { timing: { dueIso: "2026-10-16", late: false, fact: "Payment due Fri, 16 Oct" } } as unknown as PaymentMonitorRow;
-    expect(t("payDue", ctxOf(ok(facts()), { state: "ok", row: monitorRow })).t).toBe("16 Oct 26");
+    expect(t("payDue", ctxOf(ok(facts()), { state: "ok", row: monitorRow })).t).toBe("16 Oct");
     expect(t("payDue", ctxOf(ok(facts()), { state: "ok", row: null })).t).toBe("Not recorded");
     expect(t("payDue", ctxOf(ok(facts()), { state: "failed" })).t).toBe("Could not read");
     expect(t("payDue", ctxOf(ok(facts()), { state: "denied" })).t).toBe("No access");
@@ -127,18 +134,34 @@ describe("readStateOf", () => {
 });
 
 describe("Sales Order view headers (fix list 14 Oct 2026)", () => {
-  it("prints the dictionary words, in v12 order", () => {
+  it("prints the v12 words, sentence case, in v12 order", () => {
     const so = LAYOUTS.find((l) => l.key === "so")!;
     expect(so.columns.map((k) => COLUMNS[k]!.label)).toEqual([
-      "Proceed Date", "SO No", "Items", "Sales Location", "Delivery Location", "Customer’s original requested delivery",
+      "Proceed date", "SO no.", "Items", "Sales location", "Delivery location", "ETA",
     ]);
   });
 
-  it("splits the long header on two lines and uses the v12 widths", () => {
-    expect(COLUMNS.reqDate!.head).toEqual(["Customer’s original", "requested delivery"]);
+  it("keeps ETA's full meaning on hover and uses the v12 widths", () => {
+    expect(COLUMNS.reqDate!.hint).toBe("Customer’s original requested delivery");
     const so = LAYOUTS.find((l) => l.key === "so")!;
     expect(so.columns.map((k) => COLUMNS[k]!.width)).toEqual([
       "120px", "minmax(150px,1fr)", "120px", "minmax(120px,1fr)", "minmax(170px,1fr)", "140px",
     ]);
+  });
+});
+
+describe("ETA and dates (fix list 14 Oct 2026, points 2 and 3)", () => {
+  const eta = (customerDelivery: string | null, over: Partial<RegisterRow["o"]> = {}) =>
+    COLUMNS.reqDate!.cell({ ...row(over), customerDelivery } as RegisterRow, ctxOf({ state: "loading" }));
+
+  it("prints no year in this year, and the year in another", () => {
+    expect(eta("2026-10-19")).toMatchObject({ t: "19 Oct", sub: "Mon" });
+    expect(eta("2027-01-03")).toMatchObject({ t: "3 Jan 27", sub: "Sun" });
+  });
+
+  it("says passed once the day has gone by, never for today or later", () => {
+    expect(eta("2026-10-10")).toMatchObject({ t: "10 Oct", sub: "Sat · passed", subTone: "warn" });
+    expect(eta("2026-10-14")).toMatchObject({ t: "14 Oct", sub: "Wed" });
+    expect(eta("2026-10-14").subTone).not.toBe("warn");
   });
 });

@@ -37,7 +37,7 @@
   if (T) { const root = nav?.parentElement; if (root && cs(root).backgroundColor !== rgb(T.page)) say('ground', 'colour', cs(root).backgroundColor, T.page); qa('[aria-current="true"]').forEach(b => { if (cs(b).backgroundColor !== rgb(T.selBg)) say('selected ' + b.innerText.trim().slice(0, 12), 'bg', cs(b).backgroundColor, T.selBg); }); const th0 = qa('[role=row]')[0]; if (th0 && cs(th0).backgroundColor !== rgb('#F8F9FA')) say('table header', 'bg', cs(th0).backgroundColor, '#F8F9FA'); }
   // 5 table
   // List rows only: the item rows an open row shows (item-rows) have their own rule (10), and their 32-px sub-header is not a list row (14 Oct, Code).
-  // At least 44, no ceiling: a long value wraps and the row grows; information is never cut (design reply 14 Oct)
+  // At least 44. A list row's cells are one line (fix list 14 Oct): a long value widens its column and the list scrolls in its own box; nothing is cut
   qa('[role=row]').filter(r => !r.closest('[data-carres-table="item-rows"]')).slice(1, 4).forEach((r, i) => { const h = px(r.getBoundingClientRect().height); if (h < 44) say('table row ' + (i + 1), 'height', h, 'at least 44'); });
   qa('[role=row]')[0] && qa('[role=row]')[0].querySelectorAll('button').forEach(b => { const t = b.innerText.replace(/\n.*/, '').trim(); if (/^[a-z_]+$/.test(t)) return; if (t && t !== t[0].toUpperCase() + t.slice(1) && /[a-z]/.test(t[0])) say('header ' + t, 'case', t, 'Sentence case'); if (/\b[A-Z][a-z]+ [A-Z][a-z]+/.test(t) && !/^(SO|PO|RM|ETA)\b/.test(t)) say('header ' + t, 'case', t, 'Sentence case'); });
   // 6 no black rings / stray colours

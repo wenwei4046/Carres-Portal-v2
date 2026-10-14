@@ -10,9 +10,13 @@ import { expect, test, type Page } from "@playwright/test";
  *   page     the page never scrolls sideways
  *   pager    Rows and the pager stay inside the table card (the footer's
  *            quantity line never widens the list)
- *   toolbar  one 36px line
- *   frozen   scrolled to its right end, the list still shows SO No
+ *   toolbar  one 36px line, every button on it 32 high
+ *   rows     every list row 54: each cell on one line, none past its column
+ *   frozen   scrolled to its right end, the list still shows SO no.
  *   check    `carres-check.js`, as the repository ships it, answers PASS
+ *   align    `carres-align.js` gives v12's fingerprint (fix list 14 Oct): toolbar
+ *            32, tabs 32, the view button with its name, ⋮ 32, header 40 grey
+ *            12/500 in the v12 words, rows 54/54, sticky header, pager, no year
  *
  * This list may scroll sideways in its own box when its columns do not fit
  * (Layout Standard 14 Oct: "the whole table scrolls sideways and the identifier
@@ -20,6 +24,18 @@ import { expect, test, type Page } from "@playwright/test";
  */
 const WIDTHS = [1025, 1164, 1440] as const;
 const CARRES_CHECK = readFileSync(fileURLToPath(new URL("../docs/ui-reference/sales-order-design/carres-check.js", import.meta.url)), "utf8");
+const CARRES_ALIGN = readFileSync(fileURLToPath(new URL("../docs/ui-reference/sales-order-design/carres-align.js", import.meta.url)), "utf8");
+/* v12's fingerprint, the fix list's acceptance (14 Oct 2026). */
+const V12 = {
+  toolbar: { height: 32, tabs: "32 rgb(226, 228, 232)", viewBtn: "32 · Sales Order", more: 32 },
+  table: {
+    headH: 40, headBg: "rgb(248, 249, 250)", headFont: "12px/500",
+    headWords: "Proceed date · SO no. · Items · Sales location · Delivery location · ETA",
+    rowH: "54/54", sticky: "sticky", footer: "pager",
+  },
+  dates: "no year",
+};
+const carresAlign = (page: Page) => page.evaluate((source) => (0, eval)(source) as Record<string, unknown>, CARRES_ALIGN);
 const PASS = ["PASS — all measured items match the Standard"];
 const carresCheck = (page: Page) =>
   page.evaluate((source) => { try { return (0, eval)(source) as string[]; } catch (error) { return [`CHECK ERROR ${(error as Error).message}`]; } }, CARRES_CHECK);
@@ -47,9 +63,16 @@ async function measure(page: Page) {
     const toolbar = document.querySelector('[data-testid="outright-toolbar"]') as HTMLElement | null;
     const edge = card.getBoundingClientRect();
     box.scrollLeft = box.scrollWidth;
-    const soNo = [...card.querySelectorAll('[role="columnheader"]')].find((h) => h.textContent?.trim() === "SO No") as HTMLElement;
+    const soNo = [...card.querySelectorAll('[role="columnheader"]')].find((h) => h.textContent?.trim() === "SO no.") as HTMLElement;
     const soAt = soNo.getBoundingClientRect();
+    const rows = [...card.querySelectorAll('[role="row"]')].filter((r) => !r.closest('[data-carres-table="item-rows"]')).slice(1);
+    const cells = [...card.querySelectorAll('[role="row"] [role="cell"]')].filter((c) => !c.closest('[data-carres-table="item-rows"]'));
+    const past = cells.filter((c) => [...c.children].some((s) => s.getBoundingClientRect().right > c.getBoundingClientRect().right + 1)).length;
+    const buttons = toolbar ? [...toolbar.querySelectorAll("button")].filter((b) => (b as HTMLElement).offsetParent).map((b) => Math.round(b.getBoundingClientRect().height)) : [];
     const out = {
+      rowHeights: [...new Set(rows.map((r) => Math.round(r.getBoundingClientRect().height)))],
+      cellsPastColumn: past,
+      buttonHeights: [...new Set(buttons.filter((h) => h > 26))],
       pageScroll: document.documentElement.scrollWidth - window.innerWidth,
       pagerInside: next.getBoundingClientRect().right <= edge.right,
       toolbar: toolbar ? Math.round(toolbar.getBoundingClientRect().height) : null,
@@ -78,20 +101,33 @@ for (const width of WIDTHS) {
           expect(m.pageScroll, `${state}: the page scrolls sideways`).toBeLessThanOrEqual(0);
           expect(m.pagerInside, `${state}: the pager is inside the card`).toBe(true);
           expect(m.toolbar, `${state}: the toolbar is one 36px line`).toBe(36);
-          expect(m.soNoInView, `${state}: SO No stays in view at the list's right end`).toBe(true);
+          expect(m.buttonHeights, `${state}: every toolbar button is 32 high`).toEqual([32]);
+          expect(m.rowHeights, `${state}: every list row is 54`).toEqual([54]);
+          expect(m.cellsPastColumn, `${state}: no cell runs past its column`).toBe(0);
+          expect(m.soNoInView, `${state}: SO no. stays in view at the list's right end`).toBe(true);
           expect(await carresCheck(page), `${state}: carres-check.js`).toEqual(PASS);
+          /* With a row open its item sub-header (32) is the align's second row, as in v12: rows 54/54 is measured closed. */
+          const { rowH: _rowH, ...openTable } = V12.table;
+          expect(await carresAlign(page), `${state}: carres-align.js matches v12`).toMatchObject(state === "rows closed" ? V12 : { ...V12, table: openTable });
         }
       });
     }
   }
 }
 
-test("Sales Order Outright headers read the dictionary words (fix list 14 Oct)", async ({ page }) => {
+test("Sales Order Outright headers read the v12 words (fix list 14 Oct)", async ({ page }) => {
   await page.setViewportSize({ width: 1164, height: 900 });
   await page.goto(PAGE, { waitUntil: "networkidle" });
   await page.locator('[data-testid^="outright-row-"]').first().waitFor();
   const heads = await page.locator(`${TABLE} [role="row"]`).first().locator('[role="columnheader"]').allInnerTexts();
   expect(heads.map((h) => h.replace(/\n/g, " / ")).filter(Boolean)).toEqual([
-    "Proceed Date", "SO No", "Items", "Sales Location", "Delivery Location", "Customer’s original / requested delivery",
+    "Proceed date", "SO no.", "Items", "Sales location", "Delivery location", "ETA",
   ]);
+});
+
+test("Sales Order Outright footer reads one line of words in the fixed order (fix list 14 Oct)", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(PAGE, { waitUntil: "networkidle" });
+  await page.locator('[data-testid^="outright-row-"]').first().waitFor();
+  await expect(page.getByTestId("outright-footer-qty")).toHaveText(/^\d+ orders · Qty: Mattress \d+ · Pillow \d+$/);
 });

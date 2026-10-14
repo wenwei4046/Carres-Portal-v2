@@ -1,26 +1,33 @@
 /**
  * The list toolbar's small parts (v12 kit): the button that shows a hidden side
  * panel, the round icon button, and a filter chip. The toolbar is one 36px line
- * (Layout Standard §0); these parts never wrap it.
+ * (Layout Standard §0) and every button on it is 32 high, centred (fix list
+ * 14 Oct, point 6); these parts never wrap it.
  */
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import MIcon from "./MIcon";
 
-/** `▤ Summary` — brings a hidden side panel back. */
-export function CShowPanelButton({ label, onShow }: { label: string; onShow: () => void }) {
+/**
+ * `▤ Summary` — brings a hidden side panel back. `compact` (a toolbar too short
+ * for every word) keeps the icon only, its name on hover: the view button's
+ * name is the one that stays (fix list 14 Oct, point 5).
+ */
+export function CShowPanelButton({ label, onShow, compact = false }: { label: string; onShow: () => void; compact?: boolean }) {
   return (
     <button
       type="button"
       onClick={onShow}
-      className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-c-btn-border bg-white px-3 text-[13px] font-medium text-c-ink hover:bg-c-hover"
+      aria-label={compact ? label : undefined}
+      title={compact ? label : undefined}
+      className={`flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-c-btn-border bg-white text-[13px] font-medium text-c-ink hover:bg-c-hover ${compact ? "w-8 justify-center" : "px-3"}`}
     >
       <MIcon name="left_panel_open" size={18} />
-      {label}
+      {compact ? null : label}
     </button>
   );
 }
 
-/** A 36px round icon button: the view menu, ⋮. Its name is its tooltip. */
+/** A 32px round icon button on the toolbar: ⋮. Its name is its tooltip. */
 export const CIconButton = forwardRef<
   HTMLButtonElement,
   { icon: string; label: string; pressed?: boolean } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children">
@@ -32,7 +39,7 @@ export const CIconButton = forwardRef<
       aria-label={label}
       title={label}
       {...rest}
-      className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-c-body hover:bg-c-hover ${pressed ? "bg-c-hover" : ""} ${className ?? ""}`}
+      className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-c-body hover:bg-c-hover ${pressed ? "bg-c-hover" : ""} ${className ?? ""}`}
     >
       <MIcon name={icon} size={20} />
     </button>
@@ -41,13 +48,13 @@ export const CIconButton = forwardRef<
 
 /**
  * The view button (v12 Shell): a white word button, 32 high — the current view's
- * icon, its name, ▾ — grey while its menu is open. The name hides while the Tasks
- * panel is open, so the toolbar stays one line; the button keeps it as its name.
+ * icon, its name, ▾ — grey while its menu is open. It keeps its name in every
+ * state, Tasks open too (owner 14 Oct; fix list 14 Oct, point 5).
  */
 export const CViewButton = forwardRef<
   HTMLButtonElement,
-  { icon: string; name: string; showName: boolean; open?: boolean } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children">
->(function CViewButton({ icon, name, showName, open = false, className, ...rest }, ref) {
+  { icon: string; name: string; open?: boolean } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children">
+>(function CViewButton({ icon, name, open = false, className, ...rest }, ref) {
   const label = `View: ${name}`;
   return (
     <button
@@ -59,7 +66,7 @@ export const CViewButton = forwardRef<
       className={`flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-c-btn-border pl-2.5 pr-2 text-[13px] font-medium text-c-ink hover:bg-c-btn-hover ${open ? "bg-c-btn-hover" : "bg-white"} ${className ?? ""}`}
     >
       <MIcon name={icon} size={18} className="text-c-secondary" />
-      {showName && name}
+      {name}
       <MIcon name="expand_more" size={18} className="text-c-secondary" />
     </button>
   );

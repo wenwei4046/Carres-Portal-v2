@@ -71,7 +71,8 @@ accepts → next page.
 
 Status 14 Oct 2026: the rules are APPROVED. BUILT: the per-PR preview (`.github/workflows/preview.yml`,
 PR #2063) and the screenshot baselines (`e2e-kit/kit-baselines.spec.ts`, 45 pictures, PR #2064; the label
-`update-baselines` retakes them). `/ui` shows only the v12 kit parts the pages use (Carres Table and its
+`update-baselines` retakes them). `carres-align.js` (design's fingerprint of the shared parts, 14 Oct) lives
+beside `carres-check.js`; the Sales Order kit check compares it with v12 in every state. `/ui` shows only the v12 kit parts the pages use (Carres Table and its
 item rows and footer, side panel, toolbar parts, cells, pills); a part a page still draws itself joins
 the kit when that page's turn comes. No second MASTER, page-local kit or versioned standard is created.
 

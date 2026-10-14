@@ -10,7 +10,7 @@
  * catalogue names, the server's stock / payment / case facts). Nothing here
  * writes. A row click opens the order; Ctrl/⌘-click opens it in a new tab.
  */
-import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { goodsCategoryWordOf } from "@carres/shared";
@@ -31,6 +31,7 @@ import ModuleHeader from "../components/ModuleHeader";
 import { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
 import { TasksPill, useShellTasks } from "../components/ShellTasks";
 import {
+  CATEGORY_CODE,
   COLUMNS,
   LAYOUTS,
   isDelivered,
@@ -52,14 +53,19 @@ const SUMMARY_KEY = "carres.outright.summary";
 const ONE_PANEL_BELOW = 1280;
 const VIEW_KEY = (user: string) => `carres.outright.view.${user}`;
 
-/* The summary's goods words — v8 ITEMS. `Bed frame` is the design's word. */
-const SUMMARY_CATS = ["Mattress", "Bed frame", "Sofa", "Pillow", "Mattress protector", "Others"] as const;
+/* The summary's goods words — v12 CATS, the catalog's own `Bedframe` (one word). */
+const SUMMARY_CATS = ["Mattress", "Bedframe", "Sofa", "Pillow", "Mattress protector", "Others"] as const;
 function summaryCat(line: Parameters<typeof goodsCategoryWordOf>[0]): (typeof SUMMARY_CATS)[number] | null {
   const word = goodsCategoryWordOf(line);
   if (word === "Service") return null;
-  if (word === "Bedframe") return "Bed frame";
-  if (word === "Mattress" || word === "Sofa" || word === "Pillow" || word === "Mattress protector") return word;
+  if (word === "Mattress" || word === "Bedframe" || word === "Sofa" || word === "Pillow" || word === "Mattress protector") return word;
   return "Others";
+}
+/* The footer's goods words, in this fixed order (fix list 14 Oct, point 7). */
+const FOOTER_CATS = ["Mattress", "Pillow", "Bedframe", "Mattress protector", "Sofa", "Service", "Others"] as const;
+function footerCat(line: Parameters<typeof goodsCategoryWordOf>[0]): (typeof FOOTER_CATS)[number] {
+  const word = goodsCategoryWordOf(line);
+  return (FOOTER_CATS as readonly string[]).includes(word) ? (word as (typeof FOOTER_CATS)[number]) : "Others";
 }
 
 const monthKey = (iso: string) => {
@@ -307,21 +313,48 @@ export default function SalesOrdersOutright() {
     ...Object.entries(filters).map(([k, v]) => ({ key: k, label: `${COLUMNS[k]!.label}: ${v}`, clear: () => setParam(`f.${k}`, null) })),
   ];
   const columns = layout.columns.map((k) => COLUMNS[k]!);
+
+  /* Every word on one toolbar line: when it is too short (Tasks open at 1025),
+     Summary keeps its icon and the view button keeps its name. */
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const [compactSummary, setCompactSummary] = useState(false);
+  const fullToolbar = useRef(0);
+  useLayoutEffect(() => {
+    const bar = toolbarRef.current;
+    if (!bar) return;
+    const fit = () => {
+      if (!compactSummary) {
+        if (bar.scrollWidth > bar.clientWidth + 1) {
+          fullToolbar.current = bar.scrollWidth;
+          setCompactSummary(true);
+        }
+      } else if (bar.clientWidth >= fullToolbar.current) setCompactSummary(false);
+    };
+    fit();
+    const watch = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(fit);
+    watch?.observe(bar);
+    return () => watch?.disconnect();
+  }, [compactSummary, chips.length, layoutKey, tasksOpen, summaryOpen, selected.size]);
   /* SO No stays fixed on the left while the list scrolls (with ▸ and ☐). */
   const identifier = Math.max(0, layout.columns.indexOf("order"));
 
-  /* Footer: `n orders` · `Qty: Mattress 7 · Bed frame 4 …` (most first). */
-  const qty = useMemo(() => {
+  /* Footer: `72 orders · Qty: Mattress 72 · Pillow 91 …` in the fixed order; the
+     short forms (`MS 72 · BF 14 · M.P 4 · SOF 22 sets`) when two lines are not enough. */
+  const totals = useMemo(() => {
     const c = new Map<string, number>();
     for (const r of list) {
       for (const line of r.o.order_lines ?? []) {
-        const word = summaryCat(line);
-        if (word) c.set(word, (c.get(word) ?? 0) + (Number(line.qty) || 0));
+        const word = footerCat(line);
+        c.set(word, (c.get(word) ?? 0) + (Number(line.qty) || 0));
       }
     }
-    return [...c.entries()].filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+    const shown = FOOTER_CATS.filter((k) => (c.get(k) ?? 0) > 0);
+    const part = (k: string, name: string) => {
+      const n = c.get(k)!;
+      return k === "Sofa" ? `${name} ${n} ${n === 1 ? "set" : "sets"}` : `${name} ${n}`;
+    };
+    return { lead: "Qty:", parts: shown.map((k) => part(k, k)), short: shown.map((k) => part(k, CATEGORY_CODE[k] ?? k)) };
   }, [list]);
-  const qtyLine = qty.length ? `· Qty: ${qty.map(([k, n]) => (k === "Sofa" ? `${k} ${n} ${n === 1 ? "set" : "sets"}` : `${k} ${n}`)).join(" · ")}` : "";
   const selPcs = selectedRows.reduce((s, r) => s + pcsOf(r), 0);
   const selTotal = selectedRows.reduce((s, r) => s + (r.total.kind === "amount" ? r.total.value : 0), 0);
 
@@ -367,8 +400,8 @@ export default function SalesOrdersOutright() {
             </span>
           </div>
         ) : (
-          <div className="flex h-9 min-w-0 flex-nowrap items-center gap-2" data-testid="outright-toolbar">
-            {!summaryOpen && <CShowPanelButton label="Summary" onShow={() => setSummaryOpen(true)} />}
+          <div ref={toolbarRef} className="flex h-9 min-w-0 flex-nowrap items-center gap-2" data-testid="outright-toolbar">
+            {!summaryOpen && <CShowPanelButton label="Summary" compact={compactSummary} onShow={() => setSummaryOpen(true)} />}
             <div role="tablist" aria-label="Views" className={SEGMENTED_TRACK}>
               {TABS.map((t) => (
                 <button
@@ -383,11 +416,13 @@ export default function SalesOrdersOutright() {
                 </button>
               ))}
             </div>
-            <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
-              {chips.map((c) => (
-                <CChip key={c.key} onClear={c.clear}>{c.label}</CChip>
-              ))}
-            </span>
+            {chips.length > 0 && (
+              <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+                {chips.map((c) => (
+                  <CChip key={c.key} onClear={c.clear}>{c.label}</CChip>
+                ))}
+              </span>
+            )}
             <span className="ml-auto flex shrink-0 items-center gap-1.5">
               <CPopover
                 label="Views"
@@ -395,7 +430,7 @@ export default function SalesOrdersOutright() {
                 width={220}
                 open={viewsOpen}
                 onOpenChange={setViewsOpen}
-                trigger={<CViewButton icon={layout.icon} name={layout.label} showName={!tasksOpen} open={viewsOpen} />}
+                trigger={<CViewButton icon={layout.icon} name={layout.label} open={viewsOpen} />}
               >
                 <div className="px-2.5 py-1.5 text-[12px] text-c-secondary">Show columns for</div>
                 {LAYOUTS.map((l) => (
@@ -472,7 +507,7 @@ export default function SalesOrdersOutright() {
             <CTableFooter
               testId="outright-footer"
               count={isLoading ? "Loading orders" : `${list.length} orders`}
-              qty={isLoading ? undefined : qtyLine}
+              {...(isLoading || totals.parts.length === 0 ? {} : { totals })}
               pageSize={pageSize}
               onPageSize={setPageSize}
               page={Math.min(page, pages)}
