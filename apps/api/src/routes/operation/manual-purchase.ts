@@ -33,6 +33,7 @@ import {
   loadPurchasingSettings,
   type LoadedPurchasingSettings,
 } from "../../lib/purchasing-settings";
+import { forecastIssueRefusal, forecastItemWord } from "../../lib/forecast-purchase-read";
 import { fail, mapPgError } from "../../lib/route-helpers";
 import { readyStockRefusedUnitId } from "./so-batch-ready-stock";
 import { userClient } from "../../lib/supabase";
@@ -2453,6 +2454,39 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     .filter((l) => l.issueQty > 0);
   if (toIssue.length === 0) {
     return refuse(c, 409, "nothing_to_issue");
+  }
+
+  /* ⭐ FORECAST PURCHASE — THE RECHECK BEFORE A PO IS ISSUED (owner ruling
+     2026-10-14, A: "revalidate the approved quantities, existing stock/PO
+     coverage and source version before issuance; material changes cannot
+     silently reuse a decision on a different request scope").
+
+     ONLY a request Forecast Purchase asked for is rechecked, and it is known by
+     its structured mark (0695), never by a text match. Every other request,
+     Ready Stock that buys extra included, is not looked at here and keeps the
+     rules it has: this door nets no shelf stock for it, exactly as before.
+
+     For a forecast request, each line about to go on a PO must still be a line
+     the forecast asked for, still be forecast stock, and ask for no more than
+     the forecast suggests NOW, worked out again from today's sales, free stock
+     and PO stock (`forecastIssueRefusal`). Goods that arrived or a PO issued
+     since the approval make the approved quantity a decision on another scope:
+     the PO is refused by name and the request goes back for a new decision
+     through its own send back or withdraw door. A forecast that cannot be
+     read refuses the issue; a PO is never issued against a number nobody read. */
+  try {
+    const stopped = await forecastIssueRefusal(
+      sb,
+      todayIsoMYT(),
+      toIssue.map((l) => ({ requestId: l.request_id as string, sku: l.sku as string, issueQty: l.issueQty })),
+    );
+    if (stopped) {
+      const sku = await forecastItemWord(sb, stopped.sku);
+      const facts = stopped.code === "forecast_coverage_changed" ? { sku, qty: stopped.qty, toBuy: stopped.toBuy } : { sku };
+      return c.json({ ...refusalBody(stopped.code, facts), requestId: stopped.requestId }, 409);
+    }
+  } catch (e) {
+    return fail(c, ((e as { pg?: unknown }).pg ?? { message: (e as Error).message }) as Parameters<typeof fail>[1]);
   }
 
   // The catalog facts: supplier truth, cost, category (for the ETA).

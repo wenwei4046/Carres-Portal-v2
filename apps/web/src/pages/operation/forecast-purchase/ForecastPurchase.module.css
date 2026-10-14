@@ -1,0 +1,15 @@
+/* Forecast Purchase · Outright (owner 13 Oct 2026). Breakpoints measure the
+   page's own canvas, after the portal menu and the Tasks panel. Below 896 the
+   Summary floats over the list instead of taking 240 of its width, as on the
+   other Purchasing pages. */
+.canvas { container: forecast-purchase / inline-size; }
+@container forecast-purchase (width < 896px) {
+  .canvas .rail { position: absolute; inset-block: 0; left: 0; z-index: 30; }
+}
+/* The view button sits at the toolbar's right end. */
+.page .toolbarTools {
+  order: 3;
+  margin-left: auto;
+  flex: 0 1 auto;
+  max-width: 100%;
+}

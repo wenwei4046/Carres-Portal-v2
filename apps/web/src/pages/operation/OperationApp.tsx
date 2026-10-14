@@ -49,6 +49,7 @@ import OperationRental from "./OperationRental";
 // Purchase / Procurement MRP cockpit — the "what to buy today" guided worklist.
 import OperationToOrder from "./OperationToOrder";
 import OperationManualPurchase from "./OperationManualPurchase";
+import ForecastPurchasePage from "./forecast-purchase/ForecastPurchasePage";
 import OperationWarehouse from "./OperationWarehouse";
 import OperationMovements from "./OperationMovements";
 import TabbedProcurementShell from "./procurement/TabbedProcurementShell";
@@ -593,6 +594,9 @@ export default function OperationApp() {
             {/* Purchasing → Manual Purchase — the typed request lane
                 (CARD-2026-08-18-manual-purchase). */}
             {tab === "manual-purchase" && <OperationManualPurchase />}
+            {/* Forecast Purchase · Outright: the weekly stock suggestion
+                (owner 13 Oct 2026; Purchasing MASTER §9.14). */}
+            {tab === "forecast-purchase" && <ForecastPurchasePage />}
             {tab === "catalog" &&
               (role === "principal" ? (
                 <Navigate

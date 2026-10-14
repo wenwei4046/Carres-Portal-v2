@@ -1199,7 +1199,7 @@ do not create a second business status, work queue or source of truth.
 | Level | Exact visible words |
 |---|---|
 | Group headings | `BUY` · `RECEIVE` · `PROBLEMS` · `SHOWROOM` |
-| BUY pages | `SO Batch Purchase` · `Manual Purchase Request` (owner rename 2026-09-23; was `Manual Purchase`) · `Purchase Orders`. **BUILT 2026-09-23** — the rail row, the page title, the create button, the register's empty/search/footer words, the object's back destination, its loading and failure sentences, the browser title and the shared review's way out all read `Manual Purchase Request`. The screen noun is the REQUEST; the purchase itself is the PO that answers it, and `MPR` was always Manual Purchase **Request**. |
+| BUY pages | `SO Batch Purchase` · `Forecast Purchase` (owner 13 Oct 2026, under SO Batch Purchase) · `Manual Purchase Request` (owner rename 2026-09-23; was `Manual Purchase`) · `Purchase Orders`. **BUILT 2026-09-23** — the rail row, the page title, the create button, the register's empty/search/footer words, the object's back destination, its loading and failure sentences, the browser title and the shared review's way out all read `Manual Purchase Request`. The screen noun is the REQUEST; the purchase itself is the PO that answers it, and `MPR` was always Manual Purchase **Request**. |
 | RECEIVE pages | `Receiving` |
 | PROBLEMS pages | `Supplier Claims` · `Purchase Returns` · `Repair Orders` |
 | SHOWROOM pages | `Display Requests` · `Consignment Orders` · `Consignment Returns` |
@@ -2281,6 +2281,57 @@ the same name (Purchase Orders rail uses `Confirm tomorrow's supplier delivery`)
 Use `Listing` consistently for module list-view navigation. The page title identifies the module;
 do not repeat SO/PO in the tab. This is the shared navigation label.
 Other views retain their purpose-specific names, such as `Monthly demand`.
+
+### Forecast Purchase · Outright — design handoff 13 Oct 2026 · approval ruling 14 Oct 2026 (A) · BUILT ON BRANCH (Purchasing MASTER §9.14)
+
+The page suggests and never tells the person to buy. It says `Suggested` and `Forecast`; it never
+says `Buy` or `To buy`. Quantities are pieces: `1 pc` · `{n} pcs`. **Nothing on the page is called a
+PO before one exists**: what the page raises is a `Manual Purchase Request`, and the page never says
+`Create PO`, `Place PO`, `Review PO` or `Issue PO` (owner ruling 14 Oct 2026: the page asks, the
+Purchasing Approver approves, PO Duty issues).
+
+| Where | Exact visible words |
+|---|---|
+| Menu, page title | `Forecast Purchase` |
+| Tabs | `Suggested` · `Ordered` · `All` (opens on `All`). `Ordered` is what is on a PO; a request in progress stays under `Suggested` |
+| View button and menu | `By model · Outright`; menu heads `Group by` (`By model`) and `For` (`Outright`) |
+| Column headers | `Model` · the month alone (`Aug` · `Sep` · `Oct`) · `Free` over `stock` · the Monday as `12 Oct` over `Mon` |
+| Model row, grey line | `{supplier} · {n} sizes` · `1 size`; no supplier: `Supplier not set · {n} sizes` |
+| Opened row header | `Size`, then the three months |
+| A tick that cannot be taken | `Enough stock · nothing to buy` · `Supplier not set` · a size already asked for says its request's own state: `Waiting for approval` · `Ready to order` · `Sent back for changes` |
+| Under a size | A request in progress `{MPR No} · {pcs} · {state}` (opens the request; hover `Open {MPR No}`) · stock on a PO `On PO · {pcs}` |
+| Selection bar | `{n} items selected · {pcs}` (`1 item`); button `Review 1 request` · `Review {n} requests` |
+| Summary | Title `Summary`. Card `Weekly forecast` with the Monday as `Mon, 12 Oct`; headline `{n} pcs` over `Suggested`; rows `Mon, 19 Oct` → `{n} pcs`; then, when any, the request states `Waiting for approval` · `Ready to order` · `Sent back for changes` → `{n} pcs`. Group `By supplier`, one row per supplier → `{n} pcs` |
+| Footer | `{n} models · in pcs · suggestion only, you decide` · `1 model`; filtered: `{shown} of {n} models · in pcs · suggestion only, you decide` |
+| Review | Title `Review 1 Manual Purchase Request` · `Review {n} Manual Purchase Requests`; line `{pcs} · Outright · back to stock level`; heads `Item` · `Qty` · `Supplier`; one row per request `{supplier} · {Category}` → `Delivery Date {date}`; row `Supplier Deliver To` → the default destination; note `Outright stock: asks for each size back to its stock level. One Manual Purchase Request per supplier and category; each becomes one PO after approval. Sales orders take this stock first; SO Batch only buys what stock cannot cover.`; who acts next `{name} approves. {PO Duty name} then issues the PO and sends it to the supplier.` (nobody holding the duty: `Nobody holds Purchasing Approver.`); buttons `Back` · `Send for approval` (sending: `Sending`) |
+| Review, cannot be sent | `Production days are not set` over `Add production days for {supplier} · {category} in Settings`, button hover `Send: lead days are not set` (the Manual Purchase Request's words) · `No default Deliver To is set. Set one in Purchasing → Settings.` |
+| After sending | Toast `1 request sent for approval` · `{n} requests sent for approval`. A refusal keeps the review open and prints the door's two lines. An answer that never came back: `The request was not sent. Press Send for approval again.` |
+| On the request | Purchase requirement `Forecast Purchase · week of {YYYY-MM-DD}` (the Monday; written by the server) |
+
+**Refusals — the two lines each door answers with (`purchasing-refusals.ts`).**
+
+| Code | Line 1 · Line 2 |
+|---|---|
+| `forecast_changed` (sending) | `The forecast for {item} changed while this was open.` · `Nothing was sent. Check the list, then review again.` |
+| `forecast_not_stock_item` | `{item} is not on the Forecast Purchase list.` · `Raise it in Manual Purchase Request, or send this request back.` |
+| `forecast_no_deliver_to` | `No default Deliver To is set.` · `Set one in Purchasing Settings, then send again.` |
+| `forecast_coverage_changed` (issuing) | `The forecast now suggests {n} of {item}, not {approved}.` · `Nothing was issued. Send the request back for changes, or withdraw it.` |
+| `forecast_request_changed` (issuing) | `{item} was added after Forecast Purchase asked for this request.` · `Nothing was issued. Send the request back for a new approval.` |
+
+Dates follow the one date rule: `Mon, 12 Oct` in text; a column header splits it into `12 Oct` over `Mon`.
+
+**Where these words come from.** `Send for approval`, `Manual Purchase Request`, `MPR No`, the three
+request states, `Supplier Deliver To`, `Delivery Date` and the production-days lines are the Manual
+Purchase Request's own. The tab names, column headers, `Suggested`, the footer and the review's
+`{pcs} · Outright · back to stock level` are the design handoff's. The handoff's `Create {n} PO`,
+`Place {n} PO` and `Skip this week` are NOT on the page: the 14 Oct ruling makes them untrue.
+
+**PROPOSAL — awaiting the owner.** The handoff gives no words for these, so these are proposed:
+the bar button `Review {n} request` · the changed review note · `Nothing is on a PO.` (`Ordered` with
+nothing) · `No Outright mattress or Jager bedframe was sold in the last 3 months, so there is nothing
+to suggest.` · `Nothing is suggested this week. Free stock covers the last 14 days of sales.` ·
+`No model matches. Clear the search to see every model.` · `The forecast could not be read. Try
+again.` · `On PO · {pcs}` · the five refusals above.
 
 ### Purchasing UI dictionary — APPROVED (Jess, 2026-09-18) · BUILT on SO Batch Purchase 2026-09-18
 

@@ -520,6 +520,35 @@ export function purchasingRefusal(
         wrong: "No purchase order was created.",
         todo: "Nothing was sent. Tell IT, then issue again.",
       };
+    /* ── FORECAST PURCHASE (owner ruling 2026-10-14, A; MASTER §9.14) ─────────
+       The page asks through the Manual Purchase Request door and the issue door
+       rechecks a forecast request. Each refusal says what changed and the one
+       act that follows. */
+    case "forecast_changed":
+      return {
+        wrong: `The forecast for ${sku} changed while this was open.`,
+        todo: "Nothing was sent. Check the list, then review again.",
+      };
+    case "forecast_not_stock_item":
+      return {
+        wrong: `${sku} is not on the Forecast Purchase list.`,
+        todo: "Raise it in Manual Purchase Request, or send this request back.",
+      };
+    case "forecast_no_deliver_to":
+      return {
+        wrong: "No default Deliver To is set.",
+        todo: "Set one in Purchasing Settings, then send again.",
+      };
+    case "forecast_coverage_changed":
+      return {
+        wrong: `The forecast now suggests ${facts.toBuy ?? 0} of ${sku}, not ${facts.qty ?? "the approved quantity"}.`,
+        todo: "Nothing was issued. Send the request back for changes, or withdraw it.",
+      };
+    case "forecast_request_changed":
+      return {
+        wrong: `${sku} was added after Forecast Purchase asked for this request.`,
+        todo: "Nothing was issued. Send the request back for a new approval.",
+      };
     default:
       return {
         wrong: "The Portal refused this purchase order.",
@@ -591,6 +620,11 @@ export const PURCHASING_REFUSAL_CODES = [
   "request_ordered",
   "request_closed",
   "nothing_to_issue",
+  "forecast_changed",
+  "forecast_not_stock_item",
+  "forecast_no_deliver_to",
+  "forecast_coverage_changed",
+  "forecast_request_changed",
   "blocked_delivery_date",
   "production_days_required",
   "unresolved_supplier",

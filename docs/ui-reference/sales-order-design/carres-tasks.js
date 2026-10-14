@@ -10,7 +10,7 @@ window.CarresTasks = {
   PO_DUTY: 'Staff A', // TEST: today's PO Duty (Ops Rules: supplier late is chased by PO Duty). Real value comes from Settings → Team → Duty.
   PEOPLE: [['Staff A', 'on', ''], ['Staff C', 'away', 'Away · 34m idle'], ['Staff D', 'on', ''], ['Staff B', 'off', 'MC today · jobs moved to Staff D']],
   owners() { try { return JSON.parse(localStorage.getItem('carres.owner') || '{}'); } catch (e) { return {}; } },
-  ownerOf(r, map) { if (r.owner) return r.owner; const k = r.mod + '|' + r.key, m = map || this.owners(); if (m[k]) return m[k]; if (r.isNew) return this.ME; if (r.mod === 'Purchasing' && /^(chase|eta|sdo|clm|am|pm|placeToday|send):/.test(String(r.key) + ':')) return this.PO_DUTY; const W = this.PEOPLE.filter(p => p[1] !== 'off').map(p => p[0]); const h = String(k).split('').reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7); return W[h % W.length]; },
+  ownerOf(r, map) { if (r.owner) return r.owner; const k = r.mod + '|' + r.key, m = map || this.owners(); if (m[k]) return m[k]; if (r.isNew) return this.ME; if (r.mod === 'Purchasing' && /^(chase|eta|sdo|clm|am|pm|placeToday|send|keep):/.test(String(r.key) + ':')) return this.PO_DUTY; const W = this.PEOPLE.filter(p => p[1] !== 'off').map(p => p[0]); const h = String(k).split('').reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7); return W[h % W.length]; },
   take(r) { const m = { ...this.owners(), [r.mod + '|' + r.key]: this.ME }; try { localStorage.setItem('carres.owner', JSON.stringify(m)); } catch (e) {} },
   publish(mod, href, rows) {
     const k = 'carres.tasks.' + mod;

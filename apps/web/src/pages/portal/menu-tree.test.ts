@@ -81,6 +81,8 @@ describe("the approved hierarchy", () => {
 
     expect(group("purchasing-buy")).toEqual([
       "SO Batch Purchase",
+      /* Forecast Purchase · Outright (owner 13 Oct 2026), under SO Batch Purchase. */
+      "Forecast Purchase",
       "Manual Purchase Request",
       "Purchase Orders",
     ]);
@@ -97,8 +99,8 @@ describe("the approved hierarchy", () => {
     ]);
   });
 
-  it("is exactly ten pages", () => {
-    expect(purchasing).toHaveLength(10);
+  it("is exactly eleven pages", () => {
+    expect(purchasing).toHaveLength(11);
   });
 
   it("no row carries a hairline — Reports are central, not a Purchasing row", () => {
@@ -143,13 +145,15 @@ describe("the approved hierarchy", () => {
 
 /** THE ROUTE TRUTH — the Card's own minimum assertion. Words moved; no address did. */
 describe("the live destinations keep their exact current addresses", () => {
-  it("seven live pages, at their unchanged addresses", () => {
+  it("eight live pages, at their unchanged addresses", () => {
     expect(
       purchasing
         .filter((item) => !item.soon)
         .map((item) => [item.label, navItemHref(operation, item)]),
     ).toEqual([
       ["SO Batch Purchase", "/operation?tab=purchase"],
+      /* Forecast Purchase · Outright opened 13 Oct 2026; no other address moved. */
+      ["Forecast Purchase", "/operation?tab=forecast-purchase"],
       ["Manual Purchase Request", "/operation?tab=manual-purchase"],
       ["Purchase Orders", "/operation/procurement"],
       ["Receiving", "/operation?tab=receiving"],

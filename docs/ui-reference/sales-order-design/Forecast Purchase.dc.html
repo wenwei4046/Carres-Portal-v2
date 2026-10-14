@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0">
+  <script src="./carres-theme.js"></script>
+  <script src="./carres-tasks.js"></script>
+  <script src="./purchasing-data.js"></script>
+  <script src="./ops-sales.js"></script>
+  <script src="./inv-stock.js"></script>
+  <script src="./carres-log.js"></script>
+  <style>.material-symbols-rounded{font-variation-settings:'FILL' 0,'wght' 300,'GRAD' 0,'opsz' 20}body{margin:0;background:#FAFAF9;font-family:Inter,system-ui,sans-serif;color:#1F2937;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}a{color:#1F2937}a:hover{color:#3965FA}*{box-sizing:border-box}</style>
+</helmet>
+<dc-import name="Carres Shell" task-style="list" crumb="Purchasing" title="Forecast Purchase" nav="fcst" alerts="{{ 6 }}" team-on="{{ 8 }}" summary="{{ summary }}" tabs="{{ tabs }}" showing="{{ showing }}" chips="{{ chips }}" views="{{ views }}" views-head="Group by" view-name="{{ viewName }}" views2="{{ views2 }}" views2-head="For" more="{{ more }}" sel="{{ selBar }}" tasks="{{ tasks }}" search="{{ search }}" hint-size="100%,100vh">
+  <div style="display:flex;flex-direction:column;gap:12px;height:100%;min-height:0">
+    <sc-if value="{{ hasRep }}" hint-placeholder-val="{{ true }}"><section aria-label="12-month report" style="flex:none;display:flex;flex-direction:column;gap:8px;min-width:0">
+      <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding:0 2px"><span style="font-size:15px;font-weight:500;color:#1F2937">{{ rep.title }}</span><span style="font-size:12px;color:#6B7280">{{ rep.sub }}</span></div>
+      <div style="height:{{ rep.h }};min-width:0"><dc-import name="Carres Table" label="Forecast purchase · 12-month report" ticks="{{ false }}" cols="{{ rep.cols }}" rows="{{ rep.rows }}" footer="{{ rep.footer }}" empty="Pick a model in the list below." hint-size="100%,100%" style="display:block;height:100%;min-height:0"></dc-import></div>
+    </section></sc-if>
+    <div style="flex:1;min-height:240px"><dc-import name="Carres Table" label="{{ tblLabel }}" sort-default="{{ sortDef }}" cols="{{ cols }}" rows="{{ rows }}" sel="{{ sel }}" on-sel="{{ onSel }}" sub-heads="{{ subHeads }}" ticks="{{ ticks }}" footer="{{ footer }}" empty="{{ emptyT }}" hint-size="100%,100%" style="display:block;min-height:0;height:100%"></dc-import></div>
+  </div>
+</dc-import>
+<sc-if value="{{ edOpen }}"><div onClick="{{ ed.close }}" style="position:fixed;inset:0;z-index:60;background:transparent"></div>
+  <div role="dialog" aria-label="{{ ed.title }}" style="position:fixed;top:{{ ed.top }};left:{{ ed.left }};z-index:61;width:320px;max-width:calc(100vw - 16px);background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 12px 32px rgba(22,24,29,.16);padding:8px;display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 4px 10px 10px;border-bottom:1px solid #F1F2F4">
+      <span style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0;line-height:1.35"><span style="font-size:15px;font-weight:500;color:#1F2937">{{ ed.title }}</span><span style="font-size:13px;font-weight:500;color:#1F2937">{{ ed.model }}</span><span style="font-size:12px;color:#6B7280">{{ ed.spec }}</span></span>
+      <button onClick="{{ ed.close }}" aria-label="Close" style="width:28px;height:28px;border:0;border-radius:50%;background:transparent;color:#6B7280;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;flex:none" style-hover="background:rgba(31,41,55,.10)" style-active="background:rgba(31,41,55,.16)"><i class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;font-style:normal">close</i></button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;padding:0 10px">
+      
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#6B7280">{{ ed.qL }}<span style="display:flex;align-items:center;gap:8px"><input type="number" min="0" value="{{ ed.q }}" onInput="{{ ed.onQ }}" style="width:96px;height:34px;border:1px solid #E5E7EB;border-radius:8px;padding:0 10px;font:inherit;font-size:13px;color:#1F2937;text-align:right"><span style="font-size:13px;color:#1F2937">pcs</span><span style="font-size:12px;color:#6B7280">{{ ed.hint }}</span></span></label>
+      <sc-if value="{{ ed.needWhy }}"><label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#6B7280">Reason<select value="{{ ed.why }}" onChange="{{ ed.onWhy }}" style="height:34px;border:1px solid #E5E7EB;border-radius:8px;padding:0 8px;font:inherit;font-size:13px;color:#1F2937;background:#FFFFFF"><option value="">Choose the reason</option><sc-for list="{{ ed.whys }}" as="w" hint-placeholder-count="4"><option value="{{ w }}">{{ w }}</option></sc-for></select></label></sc-if>
+      <sc-if value="{{ ed.needNote }}"><label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#6B7280">Note<input value="{{ ed.note }}" onInput="{{ ed.onNote }}" placeholder="Why this number?" style="height:34px;border:1px solid #E5E7EB;border-radius:8px;padding:0 10px;font:inherit;font-size:13px;color:#1F2937"></label></sc-if>
+      <sc-if value="{{ ed.err }}"><span style="font-size:12px;color:#7A5A00">{{ ed.err }}</span></sc-if>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:6px;border-top:1px solid #F1F2F4;padding:10px 4px 4px">
+      <button onClick="{{ ed.close }}" style="height:32px;border:1px solid #E5E7EB;background:#FFFFFF;color:#1F2937;border-radius:8px;padding:0 14px;font:inherit;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#EDEFF2">Cancel</button>
+      <button onClick="{{ ed.save }}" style="height:32px;border:0;background:#1B1B39;color:#FFFFFF;border-radius:8px;padding:0 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#2B2B55">{{ ed.btn }}</button>
+    </div>
+  </div>
+</sc-if>
+<sc-if value="{{ rvOpen }}"><div style="position:fixed;inset:0;z-index:70;background:rgba(31,41,55,.28);display:flex;align-items:center;justify-content:center;padding:24px">
+  <div role="dialog" aria-label="Review PO" style="width:520px;max-width:100%;max-height:100%;overflow:auto;background:#FFFFFF;border-radius:8px;box-shadow:0 12px 40px rgba(22,24,29,.22);padding:16px;display:flex;flex-direction:column;gap:12px">
+    <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:15px;font-weight:500;color:#1F2937">{{ rv.title }}</span><span style="font-size:13px;color:#6B7280">{{ rv.sub }}</span></span>
+    <div style="border:1px solid #E5E7EB;border-radius:8px;display:flex;flex-direction:column">
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 72px 110px;gap:10px;align-items:center;height:36px;padding:0 12px;background:#F8F9FA;border-bottom:1px solid #E5E7EB;border-radius:8px 8px 0 0;font-size:12px;font-weight:500;color:#6B7280"><span>Item</span><span style="text-align:right">Qty</span><span>Supplier</span></div>
+      <sc-for list="{{ rv.lines }}" as="l" hint-placeholder-count="2"><div style="display:grid;grid-template-columns:minmax(0,1fr) 72px 110px;gap:10px;align-items:center;min-height:44px;padding:4px 12px;border-top:1px solid #F1F2F4"><span style="display:flex;flex-direction:column;gap:1px;line-height:1.3"><span style="font-size:13px;color:#1F2937">{{ l.model }}</span><span style="font-size:12px;color:#6B7280">{{ l.spec }}</span></span><span style="font-size:13px;color:#1F2937;text-align:right">{{ l.qty }}</span><span style="font-size:13px;color:#1F2937">{{ l.mon }}</span></div></sc-for>
+    </div>
+    <span style="font-size:12px;color:#6B7280;line-height:1.4">{{ rv.note }}</span>
+    <div style="display:flex;justify-content:flex-end;gap:6px;border-top:1px solid #F1F2F4;padding-top:12px">
+      <button onClick="{{ rv.close }}" style="height:32px;border:1px solid #E5E7EB;background:#FFFFFF;color:#1F2937;border-radius:8px;padding:0 14px;font:inherit;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#EDEFF2">Back</button>
+      <sc-if value="{{ rv.canSkip }}"><button onClick="{{ rv.skip }}" style="height:32px;border:1px solid #E5E7EB;background:#FFFFFF;color:#1F2937;border-radius:8px;padding:0 14px;font:inherit;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#EDEFF2">Skip this week</button></sc-if>
+      <button onClick="{{ rv.place }}" style="height:32px;border:0;background:#1B1B39;color:#FFFFFF;border-radius:8px;padding:0 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#2B2B55">Place {{ rv.btn }}</button>
+    </div>
+  </div>
+</div></sc-if>
+<sc-if value="{{ toast }}"><div role="status" style="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:80;background:#1F2937;color:#FFFFFF;border-radius:8px;padding:8px 14px;font-size:13px;box-shadow:0 8px 24px rgba(17,24,39,.2)">{{ toast }}</div></sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+// Subscription rows = TEST (uploads/ has no KPI or Diglant stock; FSTOCK in purchasing-data.js). Outright rows = owner-confirmed SO Batch data (SOS0): pieces sold last full month.
+const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const T0 = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
+const monAdd = n => new Date(T0.getFullYear(), T0.getMonth() + n, 1);
+const ML = d => MO[d.getMonth()] + ' ' + d.getFullYear();
+// Subscription: KPI month = first month whose 45-day deadline is still ahead (Rental MASTER). Outright: next month, from last full month's sales (owner 13 Oct, all Outright products).
+const SUB_M = (() => { for (let k = 1; k < 6; k++) { const m = monAdd(k), d = new Date(+m - 45 * 864e5); if (d >= T0) return m; } return monAdd(2); })();
+const OUT_M = monAdd(1), PAST_M = monAdd(-1);
+const subDl = () => new Date(+SUB_M - 45 * 864e5);
+const outDl = (cat, sup) => window.subWd && window.CD ? window.subWd(OUT_M, (sup && window.CD(cat, sup)) || 0) : OUT_M;
+const SH = s => window.SHORT ? window.SHORT(s) : s;
+// What is kept as stock (owner 13 Oct): no sofa (and no Hookka sofa pillow); bedframe = only 1013 Jager in one colour, PC151-01, so far. Everything else is bought per sales order in SO Batch.
+const KEEP_BF = [{ code: '1013', col: 'PC151-01' }];
+const keepOut = (cat, model) => { if (cat === 'Sofa' || cat === 'Pillow' || cat === 'Mattress protector') return false; if (/HOOKKA/i.test(model)) return false; if (cat === 'Bedframe') { const p = model.split('/'), code = (p[0].match(/^\d{4}/) || [])[0], col = (p[2] || '').toUpperCase(); return p.length === 3 && KEEP_BF.some(k => k.code === code && k.col === col); } return true; };
+// Supplier (owner 13 Oct): every bedframe = Ohana; sofa code TH = Todern, AM = Armani, DSL = Dorsettloft, HK / Hookka = Ohana. Mattress = Nice Future (6 Oct Inventory: all 213 mattress rows). Else the SO Batch match; else not set.
+const supOf = (cat, model, sup) => { const u = String(model || '').toUpperCase();
+  if (cat === 'Bedframe') return 'Ohana Furniture Sdn Bhd';
+  if (/(^|[^A-Z])HK\s?\d|HOOKKA/.test(u)) return 'Ohana Furniture Sdn Bhd';
+  if (cat === 'Sofa') { if (/(^|[^A-Z])TH\s?\d/.test(u)) return 'Todern'; if (/(^|[^A-Z])AM\s?\d/.test(u)) return 'Armani'; if (/DSL\s?\d/.test(u)) return 'Dorsettloft Sofa'; }
+  if (cat === 'Mattress') return 'Nice Future Sdn Bhd';
+  if (cat === 'Pillow' || cat === 'Mattress protector') return CHINA;
+  return sup || ''; };
+// Pillow + mattress protector: John Curtis (China), ordered 2 months ahead (owner 13 Oct). Sales month = first month whose 1st − 2 months is still ahead.
+const CHINA = 'John Curtis';
+const chinaMon = () => { for (let k = 1; k < 8; k++) { const m = monAdd(k), d = new Date(m.getFullYear(), m.getMonth() - 2, m.getDate()); if (d >= T0) return m; } return monAdd(3); };
+const chinaDl = m => new Date(m.getFullYear(), m.getMonth() - 2, 1);
+const ROWS0 = () => {
+  const sub = (window.FSTOCK || []).filter(f => f.biz === 'Subscription').map(f => ({ id: 'sub|' + f.model + '|' + f.spec, biz: 'sub', test: true, cat: 'Mattress', model: f.model, spec: f.spec, sup: 'Diglant', base: ({ Queen: 60, King: 30, Single: 10 })[f.spec] ?? null, safety: 0, held: f.held, pos: f.pos, mon: SUB_M, dl: subDl() }));
+  const ymOf = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  const T0S = ymOf(T0) + '-' + String(T0.getDate()).padStart(2, '0'), D30 = (() => { const d = new Date(+T0 - 30 * 864e5); return ymOf(d) + '-' + String(d.getDate()).padStart(2, '0'); })();
+  const D14 = (() => { const d = new Date(+T0 - 14 * 864e5); return ymOf(d) + '-' + String(d.getDate()).padStart(2, '0'); })();
+  const g = {}, M3 = [ymOf(monAdd(-2)), ymOf(PAST_M), ymOf(monAdd(0))], pm = M3[1];
+  (window.OPS_SALES || []).filter(o => M3.includes(o[0].slice(0, 7))).forEach(o => { const [, ref, cat, model0, spec0, q, sup0] = o, model = cat === 'Bedframe' ? model0.replace(/\/\s*COL(OUR)?\s*:?\s*/i, '/').replace(/\s*\/\s*/g, '/').replace(/\/or /i, '/').replace(/PC ?(\d{3})/i, 'PC$1').trim() : model0, sup = supOf(cat, model, sup0), spec = cat === 'Sofa' || cat === 'Pillow' ? '' : spec0; if (!keepOut(cat, model)) return; const k = cat + '|' + model + '|' + spec, mi = M3.indexOf(o[0].slice(0, 7)); (g[k] = g[k] || { cat, model, spec, sup, q: 0, m3: [0, 0, 0], d30: 0, sos: [] }); g[k].m3[mi] += q; if (o[0] > D30 && o[0] <= T0S) g[k].d30 += q; if (o[0] > D14 && o[0] <= T0S) g[k].d14 = (g[k].d14 || 0) + q; if (mi === 1) { g[k].q += q; if (!g[k].sos.includes(ref)) g[k].sos.push(ref); } if (sup && !g[k].sup) g[k].sup = sup; });
+  // Mattress: list all 4 sizes of every model sold (owner 13 Oct), 0 when not sold.
+  Object.values(g).filter(x => x.cat === 'Mattress').map(x => x.model).filter((m, i, a) => a.indexOf(m) === i).forEach(m => { const ref = Object.values(g).find(x => x.cat === 'Mattress' && x.model === m); ['King', 'Queen', 'Super Single', 'Single'].forEach(s => { const k = 'Mattress|' + m + '|' + s; if (!g[k]) g[k] = { cat: 'Mattress', model: m, spec: s, sup: ref.sup, q: 0, m3: [0, 0, 0], d30: 0, sos: [] }; }); });
+  const fo = (window.FSTOCK || []).filter(f => f.biz === 'Outright');
+  const inv = {}; (window.INV_FREE || []).forEach(f => { const k = window.invKey ? window.invKey(f[1], f[2]) : f[0]; if (k) (inv[k] = inv[k] || []).push(f); });
+  const out = Object.values(g).map(x => { const ik = window.invKey ? window.invKey(x.cat, x.model, x.spec) : '', st = ik ? (inv[ik] || []) : [], f = { held: st.reduce((a, s) => a + s[3], 0), pos: [], stock: st, matched: !!ik }; const mg = x.cat === 'Bedframe' ? x.model.split('/').slice(0, 2).join(' ').replace(/^(\d{4})(\D)/, '$1 $2') + ' · ' + x.model.split('/').slice(2).join(' · ') : x.model, vr = '';
+    return { id: 'out|' + x.cat + '|' + x.model + '|' + x.spec, biz: 'out', test: false, stock: f.stock, matched: f.matched, mg, vr, cat: x.cat, model: x.model, spec: x.spec || 'One size', sup: x.sup || '', base: x.q, m3: x.m3, d30: x.d30, d14: x.d14 || 0, sos: x.sos, safety: 0, held: f.held, pos: f.pos, mon: x.sup === CHINA ? chinaMon() : OUT_M, dl: x.sup === CHINA ? chinaDl(chinaMon()) : outDl(x.cat, x.sup), weekly: false, lead: x.sup === CHINA ? '2 months' : ((window.CD && window.CD(x.cat, x.sup)) || 0) ? (window.CD(x.cat, x.sup)) + ' working days' : 'Not recorded' }; });
+  const sv = (() => { try { return JSON.parse(localStorage.getItem('carres.fc.kpi') || '{}'); } catch (e) { return {}; } })();
+  return [...sub, ...out].map(r => { const k = sv[r.id + '|' + ML(r.mon)]; return k != null ? { ...r, base0: r.base, base: k, saved: true } : r; });
+};
+const WHY = ['Promotion this month', 'New showroom or dealer', 'Expect more orders than forecast', 'Expect fewer orders than forecast', 'Supplier minimum batch', 'Other'];
+const resvOf = r => (window.SOS0 || []).filter(s => s.type === (r.biz === 'out' ? 'Outright' : 'Subscription')).flatMap(s => s.items.filter(i => i.forecast && i.model === r.model && i.spec === r.spec).map(i => [s.so, i.qty, i.fcSrc === 'po' ? i.fcPo : 'held']));
+const pcs = n => n + (n === 1 ? ' pc' : ' pcs');
+// Copy Standard: date = weekday + day + month, e.g. "Fri, 16 Oct" (one format everywhere; year only on printed documents).
+const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const f1 = d => WD[d.getDay()] + ', ' + d.getDate() + ' ' + MO[d.getMonth()];
+const WK = (() => { const d = new Date(T0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+// One review day a week (owner 13 Oct "forecast should make one day review, not everyday"; follows SAP weekly MRP run / periodic review): Monday. Order the same day.
+const FRI = new Date(WK + 'T00:00:00');
+const tIdx = n => 'TEST-FP-2610-' + String(n).padStart(3, '0');
+const leftOf = d => Math.round((d - T0) / 864e5);
+const dlTxt = n => n > 0 ? 'Order in ' + n + (n === 1 ? ' day' : ' days') : n === 0 ? 'Order today' : (-n) + (n === -1 ? ' day late' : ' days late');
+
+class Component extends DCLogic {
+  state = { oView: 'model', /* "Set stock level" view removed (owner 13 Oct "what?"): the 2-week level is worked out by the system; code kept */ keep: (() => { try { return JSON.parse(localStorage.getItem('carres.fc.keep') || '{}'); } catch (e) { return {}; } })(), kEd: null, repM: null, skip: (() => { try { return JSON.parse(localStorage.getItem('carres.fc.skip') || '{}'); } catch (e) { return {}; } })(), grp: 'grid', cN: 12, cId: null, cM: null, cS: null, play: false, pk: {}, biz: 'out', /* Subscription not started yet (owner 13 Oct): Outright only; Subscription code kept for later. */ view: 'all', rows: ROWS0(), sel: {}, ed: null, rv: false, toast: '', ordered: {}, nextPo: 2, tasks: [], got: {}, via: {}, sent: {}, tkOpen: null };
+  componentDidMount() { const go = () => { if (window.FSTOCK && window.SOS0 && window.OPS_SALES && window.INV_FREE) { if (!this.state.rows.length) this.setState({ rows: ROWS0() }); } else this._w = setTimeout(go, 50); }; go(); }
+  componentWillUnmount() { clearTimeout(this._w); clearTimeout(this._t); }
+  // Weekly POs (owner 13 Oct, follows SAP / Odoo weekly lot size): Outright items from suppliers with ≤ 14 production days are bought one week of the sales month at a time.
+  weeksOf(r, have) {
+    const y = r.mon.getFullYear(), mo = r.mon.getMonth(), dim = new Date(y, mo + 1, 0).getDate(), rg = [[1, 7], [8, 14], [15, 21], [22, dim]], need = (r.base || 0);
+    const raw = rg.map(([a, b]) => need * (b - a + 1) / dim), fl = raw.map(Math.floor); let left = need - fl.reduce((s, v) => s + v, 0);
+    raw.map((v, i) => [v - fl[i], i]).sort((p, q) => q[0] - p[0]).forEach(([, i]) => { if (left > 0) { fl[i]++; left--; } });
+    let cum = 0, cumBuy = 0; const days = (window.CD && window.CD(r.cat, r.sup)) || 0;
+    return rg.map(([a, b], i) => { const nd = fl[i] + (i === 0 ? r.safety : 0); cum += nd; const buy = Math.max(0, cum - have - cumBuy); cumBuy += buy; const st = new Date(y, mo, a);
+      return { i, from: st, to: new Date(y, mo, b), lbl: a + '–' + b + ' ' + MO[mo], need: nd, buy, dl: window.subWd ? window.subWd(st, days) : st }; });
+  }
+  // Outright = Keep in stock (owner 13 Oct, follows Odoo min/max reordering rule): To buy = Keep − Have when Have is below Keep.
+  // Suggested Keep (owner 13 Oct "Sep 49 but Oct only 17, too risky"): from the last 30 days, so a drop in sales lowers it at once. Nice Future / Ohana = 14 days of sales; John Curtis = 75 days (takes 2 months).
+  // Daily rate (owner 13 Oct "Oct 2 weeks I only sold 17"): Nice Future / Ohana use the last 14 days, so a drop shows at once; John Curtis (2 months ahead) uses the last 30 days.
+  rate(r) { return r.sup === CHINA ? (r.d30 || 0) / 30 : (r.d14 || 0) / 14; }
+  sugKeep(r) { return Math.ceil(this.rate(r) * (r.sup === CHINA ? 75 : 14)); }
+  // Weekly cap (owner 13 Oct "1 week buy 18? so many"; follows Odoo max per order): Nice Future / Ohana buy at most 7 days of sales a week, the rest follows next week. John Curtis (monthly, 2 months) is not capped.
+  capOf(r) { if (r.sup === CHINA) return Infinity; return Math.max(1, Math.ceil(this.rate(r) * 7)); }
+  keepOf(r) { const S = this.state || {}, k = (S.keep || {})[r.id]; return k != null ? k : this.sugKeep(r); }
+  calc(r) {
+    if (r.biz === 'out') { const resv = [], free = r.held || 0, onPo = (r.pos || []).reduce((a, p) => a + p[1], 0), keep = this.keepOf(r), wkSk = ((this.state || {}).skip || {})[r.id] === WK, gap = Math.max(0, keep - free - onPo), cap = this.capOf(r), sug = wkSk ? 0 : Math.min(gap, cap); return { resv, free, onPo, need: keep, keep, gap, cap, sug, buy: r.qty != null ? r.qty : sug, skipped: wkSk }; }
+    if (this.state && this.state.play && this.state.pk[r.id] != null) r = { ...r, base: this.state.pk[r.id], qty: null };
+    const resv = resvOf(r), rq = src => resv.filter(x => x[2] === src).reduce((a, x) => a + x[1], 0), free = Math.max(0, r.held - rq('held')), onPo = r.pos.reduce((a, p) => a + Math.max(0, p[1] - rq(p[0])), 0);
+    const need = r.base == null ? null : r.base + r.safety, sug = need == null ? null : Math.max(0, need - free - onPo);
+    if (r.weekly && need != null) { const ord = (this.state && this.state.ordered) || {}, weeks = this.weeksOf(r, free + onPo), skp = (this.state && this.state.skip) || {}, wk = weeks.find(w => w.buy > 0 && !ord[r.id + '#' + w.i] && !skp[r.id + '#' + w.i]) || null, done = weeks.filter(w => w.buy > 0).every(w => ord[r.id + '#' + w.i] || skp[r.id + '#' + w.i]);
+      const s2 = wk ? wk.buy : 0; return { resv, free, onPo, need, sug: s2, buy: r.qty != null ? r.qty : s2, weeks, wk, wDone: done && weeks.some(w => w.buy > 0) }; }
+    return { resv, free, onPo, need, sug, buy: r.qty != null ? r.qty : sug };
+  }
+  flash(t) { this.setState({ toast: t }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: '' }), 5000); }
+  openEd(e, r) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const b = e.currentTarget.getBoundingClientRect(), c = this.calc(r);
+    if (this.state.play) { const v = this.state.pk[r.id] ?? r.base; return this.setState({ ed: { id: r.id, kpi: true, q: v == null ? '' : String(v), err: '', top: Math.max(8, Math.min(b.bottom + 4, window.innerHeight - 300)), left: Math.max(8, Math.min(b.left + 160, window.innerWidth - 328)) } }); }
+    this.setState({ ed: { id: r.id, q: c.buy == null ? '' : String(c.buy), why: r.why || '', note: r.note || '', err: '', top: Math.max(8, Math.min(b.bottom + 4, window.innerHeight - 400)), left: Math.max(8, Math.min(b.left + 160, window.innerWidth - 328)) } });
+  }
+  edSug(E) { const r = this.state.rows.find(x => x.id === E.id); return this.calc({ ...r, qty: null }).sug; }
+  saveEd() {
+    if (this.state.ed && this.state.ed.kpi) { const E = this.state.ed, q = E.q === '' ? null : Math.max(0, parseInt(E.q, 10) || 0); if (q == null) return this.setState({ ed: { ...E, err: 'Type a number.' } }); return this.setState({ pk: { ...this.state.pk, [E.id]: q }, ed: null }); }
+    const E = this.state.ed, r = this.state.rows.find(x => x.id === E.id), q = E.q === '' ? null : Math.max(0, parseInt(E.q, 10) || 0);
+    if (q == null) return this.setState({ ed: { ...E, err: 'Type the quantity to buy.' } });
+    const sug = this.edSug(E), changed = q !== sug;
+    if (changed && !E.why) return this.setState({ ed: { ...E, err: 'Choose the reason.' } });
+    if (changed && E.why === 'Other' && !String(E.note).trim()) return this.setState({ ed: { ...E, err: 'Write a short note for Other.' } });
+    this.setState({ rows: this.state.rows.map(x => x.id === E.id ? { ...x, qty: changed ? q : null, why: changed ? E.why : '', note: changed ? E.note : '' } : x), ed: null });
+    this.flash('Saved · ' + r.model + ' ' + r.spec + ' · to buy ' + pcs(q));
+  }
+  savePlay() {
+    const S = this.state, ks = Object.keys(S.pk); if (!ks.length) return this.setState({ play: false });
+    let sv = {}, hist = []; try { sv = JSON.parse(localStorage.getItem('carres.fc.kpi') || '{}'); hist = JSON.parse(localStorage.getItem('carres.fc.kpiHist') || '[]'); } catch (e) {}
+    const at = new Date(); ks.forEach(id => { const r = S.rows.find(x => x.id === id); sv[id + '|' + ML(r.mon)] = S.pk[id]; hist.push({ id, mon: ML(r.mon), from: r.base, to: S.pk[id], by: 'You', at: +at }); });
+    try { localStorage.setItem('carres.fc.kpi', JSON.stringify(sv)); localStorage.setItem('carres.fc.kpiHist', JSON.stringify(hist)); } catch (e) {}
+    this.setState({ rows: S.rows.map(r => S.pk[r.id] != null ? { ...r, base0: r.base0 ?? r.base, base: S.pk[r.id], saved: true, qty: null } : r), pk: {}, play: false, sel: {} });
+    this.flash(ks.length + (ks.length === 1 ? ' plan number saved' : ' plan numbers saved') + ' · To buy uses them now');
+  }
+  groups(ids) { const G = {}; ids.forEach(id => { const r = this.state.rows.find(x => x.id === id); const k = r.sup + '|' + r.cat; (G[k] = G[k] || []).push(r); }); return Object.values(G); }
+  place(ids) {
+    const S = this.state, ord = { ...S.ordered }, tasks = [...S.tasks]; let n0 = S.nextPo; const made = [];
+    this.groups(ids).forEach(rs => { const no = tIdx(n0++); let n = 0;
+      const lines = rs.map(r => { const c = this.calc(r), q = c.buy; ord[c.wk ? r.id + '#' + c.wk.i : r.id] = { no, qty: q }; n += q; return { so: (r.biz === 'out' ? 'Outright' : 'Subscription') + ' forecast · ' + (c.wk ? c.wk.lbl + ' ' + r.mon.getFullYear() : ML(r.mon)), cust: 'Forecast stock', item: r.cat + ' · ' + r.model + ' · ' + r.spec, qty: q }; });
+      tasks.push({ no, n, biz: rs[0].biz, sup: rs[0].sup, cat: rs[0].cat, mon: rs[0].mon, at: new Date(), lines }); made.push(no); });
+    this.setState({ ordered: ord, sel: {}, rv: false, nextPo: n0, tasks });
+    this.flash(made.length === 1 ? made[0] + ' created · Send PO is in Tasks' : made.length + ' POs created · ' + made.length + ' Send PO tasks are in Tasks');
+  }
+  sendTask(T) {
+    const S = this.state, set = o => this.setState(o), key = 'send:' + T.no, on = S.tkOpen === key, got = !!S.got[T.no], via = S.via[T.no] || '', sn = SH(T.sup);
+    const sp = (window.SUP || {})[T.sup] || {}, wa = sp.wa || '', em = sp.email || '';
+    const po = { no: T.no, ver: 'V1', sup: T.sup, d: T.at, isNew: true, wh: T.sup === 'Diglant' ? 'Held at Diglant' : 'Carres Klang', lines: T.lines };
+    const dl = () => { if (window.dlPdf) window.dlPdf(po); set({ got: { ...S.got, [T.no]: true } }); };
+    const lineTxt = T.lines.map((l, i) => (i + 1) + '. ' + l.item.split(' · ').slice(1).join(' ') + ' x' + l.qty).join('\n');
+    const chan = (l, to, ic) => ({ l, ic, off: !to, to, subj: 'Purchase Order · Carres Sdn Bhd', tip: to ? 'Open ' + l : l + ' not saved · Supplier Settings', f: () => { if (!to) return; set({ via: { ...S.via, [T.no]: l } }); if (l === 'Email') window.open('mailto:' + to); else window.open(/^https?:/.test(to) ? to : 'https://wa.me/' + String(to).replace(/\D/g, ''), '_blank'); } });
+    const ch = sp.pref === 'Email' && em ? 'Email' : wa ? 'WhatsApp' : em ? 'Email' : 'WhatsApp';
+    return { key, mod: 'Purchasing', t: 'Send ' + T.cat + ' PO to ' + sn + ' · 1 PO', sub: 'Not sent · ' + (T.biz === 'out' ? 'Outright' : 'Subscription') + ' forecast' + (wa || em ? '' : ' · contact not saved'), ref: T.no + ' V1', cat: T.cat, who: '', due: 'Any time', dueDay: 'today', isNew: true, kind: 'steps', on, open: () => set({ tkOpen: on ? null : key }),
+      sendFlow: true, prog: got, chans: [chan('WhatsApp', wa, 'chat'), chan('Email', em, 'mail')], viaDone: via, onVia: c => set({ via: { ...S.via, [T.no]: c } }),
+      msg: { tpl: 'Send PO', vars: { supplier: sn, date: '', po: T.no + ' V1\n' + lineTxt } },
+      next: got ? 'Send 1 PDF to ' + sn + ' by ' + ch + ', then Mark sent' : 'Download 1 PDF, then send by ' + ch,
+      quick: got ? chan(ch, ch === 'Email' ? em : wa, ch === 'Email' ? 'mail' : 'chat') : { l: 'Download PDFs', ic: 'download', tip: 'Download 1 PDF', f: dl },
+      facts: [{ l: 'Send by', v: wa || em ? ch + ' · ' + sn : ch + ' · contact not saved', muted: !(wa || em) }],
+      files: [{ name: T.no + ' V1.pdf', sub: pcs(T.n) + ' · ' + ML(T.mon), done: got, dl }], dlAll: dl,
+      mark: () => { if (!got || !via) return; if (window.CarresLog) { const at = new Date(); window.CarresLog.add(T.no, { k: 'Purchasing', d: f1(at), tm: at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }), t: T.no + ' V1 sent to ' + sn + ' by ' + via, by: 'You · Operations' }); } set({ sent: { ...S.sent, [T.no]: { ch: via, at: new Date() } }, tkOpen: null }); this.flash(T.no + ' sent to ' + sn + ' by ' + via); },
+      markOff: !got || !via, markT: 'Mark 1 PO sent', hint: got ? '' : 'Download the PDF first.' };
+  }
+  renderVals() {
+    const S = this.state, set = o => this.setState(o), OUT = S.biz === 'out';
+    const BIZ = OUT ? 'Outright' : 'Subscription', MONd = OUT ? OUT_M : SUB_M, MON = ML(MONd);
+    const baseL = OUT ? 'Sold · ' + MO[PAST_M.getMonth()] : 'KPI · ' + MO[MONd.getMonth()];
+    const all = S.rows.filter(r => r.biz === S.biz).map(r0 => { const c = this.calc(r0), r = c.wk ? { ...r0, dl: c.wk.dl } : r0, o = r0.weekly ? (c.wDone ? { no: (c.weeks.filter(w => S.ordered[r0.id + '#' + w.i]).map(w => S.ordered[r0.id + '#' + w.i].no).pop()), qty: c.weeks.reduce((a, w) => a + ((S.ordered[r0.id + '#' + w.i] || {}).qty || 0), 0) } : null) : S.ordered[r0.id]; return { r, c, o, left: leftOf(r.dl) }; });
+    const stOf = x => x.o ? 'done' : x.c.need == null ? 'nofc' : x.c.buy > 0 ? (x.r.sup ? 'buy' : 'nosup') : 'cov';
+    const SZ0 = ['Super King', 'King', 'Queen', 'Super Single', 'Single'], si0 = s => { const i = SZ0.indexOf(s); return i < 0 ? 9 : i; };
+    const list = all.filter(x => S.view === 'all' ? true : S.view === 'done' ? !!x.o : !x.o).sort((a, b) => a.r.dl - b.r.dl || a.r.model.localeCompare(b.r.model) || si0(a.r.spec) - si0(b.r.spec));
+    const cols = [{ l: 'Item', w: 'minmax(130px,1fr)' }, { l: baseL, w: '88px', al: 'right' }, { l: 'Have', w: '96px', al: 'right' }, { l: 'To buy', w: '96px', al: 'right' }, { l: 'Supplier', w: '104px' }, { l: 'Order PO deadline', w: '112px' }, { l: 'Status', w: '112px' }];
+    const rows = list.map(x => { const { r, c, o, left } = x, st = stOf(x);
+      const [pl, tone] = ({ buy: [left < 0 ? 'Deadline passed' : 'To buy', 'warn'], nofc: [OUT ? 'Not sold last month' : 'KPI not set', 'neutral'], cov: ['Covered', 'ok'], done: ['Ordered', 'ok'], nosup: ['Supplier not set', 'neutral'] })[st];
+      const tryV = S.play ? S.pk[r.id] : null;
+      const baseCell = S.play ? { t: pcs(tryV ?? r.base ?? 0), sub: tryV != null ? 'Trying · was ' + (r.base ?? 0) : 'Click to try', subFg: tryV != null ? '#7A5A00' : '#6B7280', tip: 'Not saved · no PO' } : { t: r.base == null ? 'Not recorded' : pcs(r.base), sub: r.saved ? 'Plan · was ' + (r.base0 ?? 0) : 'Safety ' + r.safety, tip: OUT ? 'Pieces sold in ' + ML(PAST_M) + (r.sos ? ' · ' + r.sos.join(', ') : '') : 'Month KPI set by management' };
+      const buyCell = o ? { t: pcs(o.qty), sub: o.no + (S.sent[o.no] ? ' · sent' : ' · not sent') } : c.need == null ? { t: 'Not recorded', sub: OUT ? 'No sales' : 'Needs KPI' } : { t: pcs(c.buy), sub: r.qty != null ? 'Changed' : c.wk ? 'Week ' + c.wk.lbl : 'Suggested', subFg: r.qty != null ? '#7A5A00' : '#6B7280', tip: r.qty != null ? 'Suggested ' + pcs(c.sug) + ' · ' + r.why + (r.note ? ' · ' + r.note : '') : 'Need − Have' };
+      const stockL = r.sup === 'Diglant' ? 'Held at Diglant' : 'Forecast stock';
+      const items = [
+        [{ t: OUT ? 'Sold · ' + ML(PAST_M) : 'KPI · ' + MON, sub: OUT ? (r.sos || []).length + ((r.sos || []).length === 1 ? ' sales order' : ' sales orders') : 'From Settings', tip: OUT ? (r.sos || []).join(', ') : 'Settings → Purchasing' }, { t: r.base == null ? 'Not recorded' : pcs(r.base) }, { t: '' }, { t: '', span: 4 }],
+        [{ t: 'Safety stock', sub: 'From Settings', tip: 'Set by the manager in Settings → Purchasing' }, { t: pcs(r.safety) }, { t: '' }, { t: '', span: 4 }],
+        ...(r.biz === 'out' ? (r.stock && r.stock.length ? r.stock.map(s => [{ t: s[4], sub: 'Free · New', tip: s[2] + ' · 6 Oct Inventory row ' + s[5] }, { t: '' }, { t: pcs(s[3]) }, { t: '', span: 4 }]) : [[{ t: 'Carres stock', sub: r.matched ? 'No free stock' : 'Not matched', tip: r.matched ? '6 Oct Inventory: no Free · New row for this item' : 'No model code to match with the inventory list' }, { t: '' }, { t: '0 pcs' }, { t: '', span: 4 }]]) : [[{ t: stockL, sub: r.sup === 'Diglant' ? 'Diglant site' : 'Not reserved', tip: 'Forecast stock of this business type only' }, { t: '' }, { t: pcs(r.held) }, { t: '', span: 4 }]]),
+        ...c.resv.filter(v => v[2] === 'held').map(v => [{ t: v[0], sub: 'Reserved', tip: 'Reserved for this sales order · not free' }, { t: '' }, { t: '− ' + pcs(v[1]) }, { t: '', span: 4 }]),
+        ...(c.weeks ? c.weeks.map(w => { const od = S.ordered[r.id + '#' + w.i], sk = S.skip[r.id + '#' + w.i]; return [{ t: 'Week ' + w.lbl, sub: od ? od.no + ' · ordered' : sk ? 'Skipped' : w.buy ? 'Order by ' + f1(w.dl) : 'Covered by stock' }, { t: pcs(w.need) }, { t: '' }, { t: w.buy ? 'To buy ' + pcs(w.buy) : '—', fg: !od && c.wk && c.wk.i === w.i ? '#7A5A00' : '#6B7280', span: 4 }]; }) : []),
+        ...r.pos.flatMap(p => [[{ t: p[0], sub: 'Ready by ' + p[2], tip: 'Not picked up yet · ready by ' + p[2] }, { t: '' }, { t: pcs(p[1]) }, { t: '', span: 4 }], ...c.resv.filter(v => v[2] === p[0]).map(v => [{ t: v[0], sub: 'Reserved', tip: 'Takes ' + pcs(v[1]) + ' of ' + p[0] + ' · not free' }, { t: '' }, { t: '− ' + pcs(v[1]) }, { t: '', span: 4 }])])
+      ];
+      return { id: r.id, canCk: !S.play && st === 'buy', items, open: o ? null : e => this.openEd(e, r), cells: [{ t: r.model, sub: r.spec, fw: '600', tag: r.test ? 'TEST' : '', tagEnd: true }, baseCell, { t: pcs(c.free + c.onPo), sub: 'Free ' + c.free + ' · PO ' + c.onPo, tip: c.resv.length ? pcs(c.resv.reduce((a, v) => a + v[1], 0)) + ' reserved for sales orders, not counted' : '' }, buyCell, { t: r.sup ? SH(r.sup) : 'Not recorded', fg: r.sup ? '#1F2937' : '#6B7280', sub: r.cat }, r.sup ? { t: f1(r.dl), sub: o ? 'Placed' : dlTxt(left), subFg: !o && left < 0 ? '#7A5A00' : '#6B7280' } : { t: 'Not recorded', fg: '#6B7280', sub: 'Needs supplier days' }, { t: pl, tone }] }; });
+    const BYC = S.grp === 'cat', BYM = S.grp === 'model' || BYC, kpiAll = all.reduce((a, x) => a + (x.r.base || 0), 0);
+    const covOf = (have, kpi) => kpi ? have / kpi : null, covT = v => v == null ? 'Not recorded' : v === 0 ? 'None' : v < 1 ? Math.max(1, Math.round(v * 30)) + ' days' : (Math.round(v * 10) / 10) + (Math.round(v * 10) === 10 ? ' month' : ' months');
+    const mCols = [{ l: 'Model', w: 'minmax(130px,1fr)' }, { l: baseL, w: '80px', al: 'right' }, { l: 'Have', w: '72px', al: 'right' }, { l: 'To buy', w: '80px', al: 'right' }, { l: 'Lasts', w: '72px', al: 'right' }, { l: 'Order by', w: '108px' }, { l: 'Status', w: '112px' }];
+    const mRow = xs => { const k = xs.reduce((a, x) => a + (x.r.base || 0), 0), hv = xs.reduce((a, x) => a + x.c.free + x.c.onPo, 0), b = xs.reduce((a, x) => a + (x.o ? 0 : (x.c.buy || 0)), 0), cv = covOf(hv, k), anyK = xs.some(x => x.r.base != null), allO = xs.every(x => x.o);
+      const st = !anyK ? ['KPI not set', 'neutral'] : allO ? ['Ordered', 'ok'] : b > 0 && !xs.some(x => x.r.sup) ? ['Supplier not set', 'neutral'] : b > 0 ? ['To buy', 'warn'] : cv != null && cv >= 2 ? ['Too much stock', 'warn'] : ['Covered', 'ok'];
+      return { b, cells: [{ t: anyK ? pcs(k) : 'Not recorded' }, { t: pcs(hv) }, { t: pcs(b), fw: b ? '600' : '400' }, { t: covT(cv), fg: cv != null && cv < 1 && b > 0 ? '#7A5A00' : '#1F2937', tip: 'Have ÷ ' + baseL + ' = how long the stock you have lasts' }, (() => { const ds = xs.filter(x => x.r.sup && !x.o && (x.c.buy || 0) > 0).map(x => x.r.dl).sort((p, q) => p - q), d0 = ds[0]; if (!d0) return { t: '—', fg: '#6B7280' }; const n = leftOf(d0); return { t: f1(d0), sub: dlTxt(n), subFg: n < 0 ? '#7A5A00' : '#6B7280' }; })(), { t: st[0], tone: st[1] }] }; };
+    const mgOf = r => r.mg || r.model;
+    const SZ = ['Super King', 'King', 'Queen', 'Super Single', 'Single', ''], SZA = { 'Super King': 'SK', King: 'K', Queen: 'Q', 'Super Single': 'SS', Single: 'S' }, szI = s => { const i = SZ.indexOf(s || ''); return i < 0 ? 9 : i; };
+    const models = [...new Set(list.map(x => mgOf(x.r)))].map(m => { const xs = list.filter(x => mgOf(x.r) === m).sort((p, q) => szI(p.r.spec) - szI(q.r.spec) || (q.c.buy || 0) - (p.c.buy || 0)), g = mRow(xs);
+      const bySz = SZ.filter(s => s && xs.some(x => x.r.spec === s)).map(s => SZA[s] + ' ' + xs.filter(x => x.r.spec === s).reduce((a, x) => a + (x.o ? 0 : (x.c.buy || 0)), 0)).join(' · ');
+      return { id: 'm|' + m, b: g.b, bySz, canCk: !S.play && xs.some(x => stOf(x) === 'buy'), open: null, cells: [{ t: m, sub: xs.length + (xs.length === 1 ? (xs[0].r.vr ? ' item' : ' size') : (xs.some(x => x.r.vr) ? ' items' : ' sizes')) + ' · ' + (xs[0].r.sup ? SH(xs[0].r.sup) : 'Supplier not recorded'), fw: '600', tag: xs.some(x => x.r.test) ? 'TEST' : '', tagEnd: true }, ...g.cells], items: xs.map(x => [{ t: x.r.spec || 'One size', sub: x.r.vr || (x.r.sup ? '' : 'Supplier not recorded') }, ...mRow([x]).cells]) }; }).sort((a, b) => b.b - a.b);
+    const CATS = ['Mattress', 'Bedframe', 'Sofa', 'Pillow', 'Mattress protector'];
+    const cats = [...new Set(list.map(x => x.r.cat))].sort((a, b) => (CATS.indexOf(a) + 99) % 99 - (CATS.indexOf(b) + 99) % 99).map(ct => { const xs = list.filter(x => x.r.cat === ct), g = mRow(xs), ms = models.filter(m => xs.some(x => 'm|' + mgOf(x.r) === m.id));
+      return { id: 'c|' + ct, b: g.b, canCk: !S.play && xs.some(x => stOf(x) === 'buy'), open: null, cells: [{ t: ct, sub: ms.length + (ms.length === 1 ? ' model' : ' models') + ' · ' + [...new Set(xs.map(x => x.r.sup ? SH(x.r.sup) : 'Not recorded'))].join(', '), fw: '600', tag: xs.some(x => x.r.test) ? 'TEST' : '', tagEnd: true }, ...g.cells], items: ms.map(m => [{ t: m.cells[0].t, sub: m.bySz ? 'To buy ' + m.bySz : m.cells[0].sub, tip: 'SK Super King · K King · Q Queen · SS Super Single · S Single' }, ...m.cells.slice(1)]) }; });
+    const GRID = S.grp === 'grid', gSz = ['Super King', 'King', 'Queen', 'Super Single', 'Single'].filter(s => list.some(x => x.r.spec === s));
+    const gRows = [...new Set(list.map(x => mgOf(x.r)))].map(m => { const xs = list.filter(x => mgOf(x.r) === m), sold = xs.reduce((a, x) => a + (x.r.base || 0), 0), hv = xs.reduce((a, x) => a + x.c.free + x.c.onPo, 0), b = xs.reduce((a, x) => a + (x.o ? 0 : (x.c.buy || 0)), 0), top = Math.max(...xs.map(x => x.r.base || 0));
+      const ds = xs.filter(x => x.r.sup && !x.o && (x.c.buy || 0) > 0).map(x => x.r.dl).sort((p, q) => p - q), d0 = ds[0], wk = (xs.find(x => x.c.wk) || {}).c;
+      return { id: 'm|' + m, sold, canCk: !S.play && xs.some(x => stOf(x) === 'buy'), open: () => set({ repM: m, cId: (xs.find(x => (x.r.base || 0) === top) || xs[0]).r.id, cM: null, cS: null }),
+        cells: [{ t: m, sub: xs[0].r.cat + ' · ' + (xs[0].r.sup ? SH(xs[0].r.sup) : 'Supplier not set'), fw: '600', tag: xs.some(x => x.r.test) ? 'TEST' : '', tagEnd: true },
+          ...gSz.map(s => { const y = xs.find(x => x.r.spec === s); if (!y) return { t: '—', fg: '#9CA3AF' }; const v = y.r.base || 0; return { t: String(v), fw: v === top && v > 0 && xs.length > 1 ? '600' : '400', sub: y.o ? 'ordered' : (y.c.buy || 0) ? 'buy ' + y.c.buy : 'covered', subFg: (y.c.buy || 0) && !y.o ? '#7A5A00' : '#6B7280', tip: s + ': sold ' + v + ' · have ' + (y.c.free + y.c.onPo) + ' · to buy now ' + (y.c.buy || 0) }; }),
+          { t: pcs(sold), fw: '600', sub: 'have ' + hv }, { t: pcs(b), fw: b ? '600' : '400', sub: wk && wk.wk ? 'week ' + wk.wk.lbl : '' }, d0 ? { t: f1(d0), sub: dlTxt(leftOf(d0)), subFg: leftOf(d0) < 0 ? '#7A5A00' : '#6B7280' } : { t: '—', fg: '#6B7280' }] }; }).sort((a, b) => b.sold - a.sold);
+    const gCols = [{ l: 'Model', w: 'minmax(150px,1fr)' }, ...gSz.map(s => ({ l: SZA[s], w: '50px', al: 'right', tip: s })), { l: OUT ? 'Sold · ' + MO[PAST_M.getMonth()] : 'KPI', w: '72px', al: 'right' }, { l: 'To buy now', w: '84px', al: 'right' }, { l: 'Order by', w: '104px' }];
+    const PLAN = S.grp === 'plan', NMp = 12;
+    // Each future month (owner 13 Oct: always 12 months): Subscription = saved KPI, else this month's KPI. Outright = saved plan, else the same month last year if recorded, else the last full month sold.
+    const hist = (() => { const m = {}; (window.OPS_SALES || []).forEach(o => { const k = o[2] + '|' + o[3] + '|' + (o[2] === 'Sofa' || o[2] === 'Pillow' ? '' : o[4]) + '|' + o[0].slice(0, 7); m[k] = (m[k] || 0) + o[5]; }); return m; })();
+    const lastYr = (r, m) => { if (r.biz !== 'out') return null; const p = new Date(m.getFullYear() - 1, m.getMonth(), 1), k = r.cat + '|' + r.model + '|' + (r.spec === 'One size' ? '' : r.spec) + '|' + p.getFullYear() + '-' + String(p.getMonth() + 1).padStart(2, '0'); return hist[k] ?? null; };
+    const svP = (() => { try { return JSON.parse(localStorage.getItem('carres.fc.kpi') || '{}'); } catch (e) { return {}; } })();
+    const planOf = x => { const r = x.r; let have = x.c.free + x.c.onPo; return [...Array(NMp).keys()].map(k => { const m = new Date(r.mon.getFullYear(), r.mon.getMonth() + k, 1), key = ML(m), ly = k === 0 ? null : lastYr(r, m), v = k === 0 ? (r.base ?? 0) : (svP[r.id + '|' + key] ?? ly ?? (r.base ?? 0)), buy = Math.max(0, v + (k === 0 ? r.safety : 0) - have); have = have + buy - v; return { m, v, buy, src: k === 0 ? 'now' : svP[r.id + '|' + key] != null ? 'plan' : ly != null ? 'ly' : 'last' }; }); };
+    const pMonths = list.length ? planOf(list[0]).map(p => p.m) : [];
+    const pCols = [{ l: OUT ? 'Model' : 'Model', w: 'minmax(150px,1fr)' }, ...pMonths.map(m => ({ l: MO[m.getMonth()] + (m.getMonth() === 0 || m === pMonths[0] ? ' ' + String(m.getFullYear()).slice(2) : ''), w: '46px', al: 'right' }))];
+    const pCell = (v, b, first) => ({ t: String(v), sub: b ? '+' + b : '—', subFg: first && b ? '#7A5A00' : '#6B7280', tip: (OUT ? 'Expected to sell ' : 'KPI ') + v + ' · to buy ' + b });
+    const planRows = [...new Set(list.map(x => mgOf(x.r)))].map(m => { const xs = list.filter(x => mgOf(x.r) === m).sort((p, q) => szI(p.r.spec) - szI(q.r.spec)), pl = xs.map(planOf), tot = pMonths.map((_, k) => ({ v: pl.reduce((a, p) => a + p[k].v, 0), b: pl.reduce((a, p) => a + p[k].buy, 0) }));
+      return { id: 'p|' + m, b: tot[0] ? tot[0].b : 0, canCk: false, open: () => set({ repM: m, cId: (xs.find(x => x.r.spec === 'Queen') || xs[0]).r.id, cM: null, cS: null }), cells: [{ t: m, sub: xs.length + (xs.length === 1 ? ' size' : ' sizes') + ' · ' + (OUT ? 'sell' : 'KPI') + ' / +buy', fw: '600', tag: xs.some(x => x.r.test) ? 'TEST' : '', tagEnd: true }, ...tot.map((t, k) => pCell(t.v, t.b, k === 0))],
+        items: xs.map((x, i) => [{ t: x.r.spec || 'One size', sub: 'Have ' + (x.c.free + x.c.onPo) }, ...pl[i].map((p, k) => pCell(p.v, p.buy, k === 0))]) }; }).sort((a, b) => b.b - a.b);
+    // 12-month report above the list (owner 13 Oct): one model, its sizes × 12 months.
+    const repKey = S.repM && list.some(x => mgOf(x.r) === S.repM) ? S.repM : (gRows[0] ? gRows[0].id.slice(2) : null);
+    const repXs = repKey ? list.filter(x => mgOf(x.r) === repKey).sort((p, q) => szI(p.r.spec) - szI(q.r.spec)) : [], repPl = repXs.map(planOf);
+    const rCell = (v, b, first) => ({ t: String(v), sub: b ? '+' + b : '—', subFg: first && b ? '#7A5A00' : '#6B7280', tip: (OUT ? 'Expected to sell ' : 'KPI ') + v + ' · to buy ' + b });
+    const repTot = pMonths.map((_, k) => ({ v: repPl.reduce((a, p) => a + p[k].v, 0), b: repPl.reduce((a, p) => a + p[k].buy, 0) }));
+    const repRows = repXs.length ? [...repXs.map((x, i) => ({ id: 'r|' + x.r.id, cells: [{ t: x.r.spec || 'One size', sub: 'have ' + (x.c.free + x.c.onPo) }, ...repPl[i].map((p, k) => rCell(p.v, p.buy, k === 0)), { t: String(repPl[i].reduce((a, p) => a + p.v, 0)), fw: '600', sub: '+' + repPl[i].reduce((a, p) => a + p.buy, 0) }] })),
+      ...(repXs.length > 1 ? [{ id: 'r|total', cells: [{ t: 'All sizes', fw: '600' }, ...repTot.map((t, k) => ({ ...rCell(t.v, t.b, k === 0), fw: '600' })), { t: String(repTot.reduce((a, t) => a + t.v, 0)), fw: '600', sub: '+' + repTot.reduce((a, t) => a + t.b, 0) }] }] : [])] : [];
+    const rep = { title: repKey || 'No model', sub: repXs.length ? (OUT ? 'sell' : 'KPI') + ' per size · grey +n = to buy · 12 months from ' + MON : '', h: (40 + Math.max(1, repRows.length) * 46 + 40) + 'px',
+      cols: [{ l: 'Size', w: 'minmax(96px,1fr)' }, ...pMonths.map(m => ({ l: MO[m.getMonth()] + (m.getMonth() === 0 || m === pMonths[0] ? ' ' + String(m.getFullYear()).slice(2) : ''), w: '44px', al: 'right' })), { l: 'Total', w: '56px', al: 'right' }],
+      rows: repRows, footer: 'Click a model in the list below to see its 12 months · change numbers in Plan calculator' };
+    const selKeys = Object.keys(S.sel).filter(k => S.sel[k]), ids = S.play ? [] : list.filter(x => stOf(x) === 'buy' && (selKeys.includes(x.r.id) || selKeys.includes('m|' + (x.r.mg || x.r.model)) || selKeys.includes('c|' + x.r.cat))).map(x => x.r.id);
+    const selPcs = ids.reduce((a, id) => a + this.calc(S.rows.find(x => x.id === id)).buy, 0), nPo = this.groups(ids).length, poW = nPo === 1 ? '1 PO' : nPo + ' POs';
+    const toBuy = all.filter(x => stOf(x) === 'buy'), noFc = all.filter(x => stOf(x) === 'nofc'), ordN = all.filter(x => x.o), lateN = toBuy.filter(x => x.left < 0);
+    const noSup = all.filter(x => stOf(x) === 'nosup');
+    const firstDl = toBuy.slice().sort((a, b) => a.r.dl - b.r.dl)[0];
+    const E = S.ed, Er = E ? S.rows.find(x => x.id === E.id) : null, EsS = E ? this.edSug(E) : 0, Eq = E && E.q !== '' ? parseInt(E.q, 10) : null;
+    const base = {
+      tblLabel: GRID ? 'Forecast purchase · Size grid' : PLAN ? 'Forecast purchase · Month plan' : BYC ? 'Forecast purchase · By category' : BYM ? 'Forecast purchase · By model' : 'Forecast purchase', sortDef: GRID ? null : PLAN ? null : BYC ? null : BYM ? { i: 3, dir: 'desc' } : null,
+      hasRep: !!repKey && (GRID || PLAN), rep,
+      cols: GRID ? gCols : PLAN ? pCols : BYC ? [{ ...mCols[0], l: 'Category' }, ...mCols.slice(1)] : BYM ? mCols : cols, rows: GRID ? gRows : PLAN ? planRows : BYC ? cats : BYM ? models : rows, ticks: !S.play && !PLAN, sel: S.sel, onSel: s => set({ sel: s }), subHeads: GRID ? [] : PLAN ? ['Size', ...pMonths.map(m => MO[m.getMonth()])] : BYC ? ['Model', baseL, 'Have', 'To buy', 'Lasts', 'Order by', 'Status'] : BYM ? ['Size', baseL, 'Have', 'To buy', 'Lasts', 'Order by', 'Status'] : ['Source', 'Need', 'Have', { l: '', span: 4 }],
+      footer: GRID ? gRows.length + (gRows.length === 1 ? ' model' : ' models') + ' · best seller first · number = ' + (OUT ? 'sold in ' + ML(PAST_M) : 'KPI') + ' per size, bold = best size · grey = to buy now' : PLAN ? planRows.length + (planRows.length === 1 ? ' model' : ' models') + ' · 12 months from ' + MON + ' · black = ' + (OUT ? 'expected to sell' : 'KPI') + ' · grey +n = to buy · click a model to change it in Plan calculator' : BYC ? cats.length + (cats.length === 1 ? ' category' : ' categories') + ' · ' + models.length + (models.length === 1 ? ' model' : ' models') + ' · for ' + MON + ' · open a category to see its models' : BYM ? models.length + (models.length === 1 ? ' model' : ' models') + ' · ' + list.length + ' sizes · for ' + MON + ' · most to buy first' : list.length + (list.length === 1 ? ' item' : ' items') + ' · for ' + MON,
+      emptyT: OUT && !all.length ? 'No Outright pieces were sold in ' + ML(PAST_M) + ', so nothing to buy ahead for ' + MON + '.' : S.view === 'done' ? 'No ' + BIZ + ' forecast POs for ' + MON + ' yet.' : 'Nothing to buy for ' + MON + '.',
+      tabs: [['buy', 'To buy'], ['done', 'Ordered'], ['all', 'All']].map(([k, l]) => ({ l, on: S.view === k, click: () => set({ view: k, sel: {} }) })),
+      showing: '', chips: [],
+      views: [['grid', 'Size grid', 'grid_on'], ['plan', 'Month plan', 'calendar_month'], ['cat', 'By category', 'category'], ['size', 'By size', 'straighten']].map(([k, l, ic]) => ({ l, ic, on: S.grp === k, pick: () => set({ grp: k, sel: {} }) })), viewName: (GRID ? 'Size grid' : PLAN ? 'Month plan' : BYC ? 'By category' : BYM ? 'By model' : 'By size') + ' · ' + BIZ,
+      views2: [['out', 'Outright', 'sell']].map(([k, l, ic]) => ({ l, ic, on: S.biz === k, pick: () => { try { localStorage.setItem('carres.fc.biz', k); } catch (e) {} set({ biz: k, sel: {}, view: 'buy', cId: null }); } })),
+      more: [{ h: 'EXPORT', items: [{ l: 'Export to Excel', ic: 'download', fn: () => this.flash('Export is not built yet') }] }],
+      selBar: S.play ? { n: 'Trying numbers', sum: '· ' + Object.keys(S.pk).length + ' changed · not saved · no PO', sumTip: 'Click a row to try another KPI. To buy updates at once. Nothing is saved until Save as plan.', acts: [{ l: 'Reset', ic: 'restart_alt', fn: () => set({ pk: {} }) }, { l: 'Save as plan', ic: 'check', pri: true, fn: () => this.savePlay() }], clear: () => set({ play: false, pk: {} }) } : ids.length ? { n: ids.length + (ids.length === 1 ? ' item' : ' items') + ' selected', sum: '· ' + pcs(selPcs) + ' · ' + poW, sumTip: 'One PO per supplier and category', acts: [{ l: 'Create ' + poW, ic: 'shopping_cart', pri: true, fn: () => set({ rv: true }) }], clear: () => set({ sel: {} }) } : null,
+      summary: [
+        { t: 'For ' + MON, meta: BIZ, kpis: [{ l: OUT ? 'To buy now' : 'To buy', v: String(toBuy.reduce((a, x) => a + x.c.buy, 0)), unit: 'pcs', warn: lateN.length > 0 || (firstDl && firstDl.left <= 3), zero: !toBuy.length, tip: 'Need − Have, for the items still to order' }],
+          rows: [...(OUT ? [{ k: 'Nice Future · Ohana', v: 'Weekly PO', tip: 'Bought one week of ' + MON + ' at a time: 1–7 · 8–14 · 15–21 · 22–end' }, { k: 'John Curtis', v: 'Monthly PO', tip: '2 months ahead' }] : []), { k: 'Models', v: String(new Set(all.map(x => x.r.model)).size), tip: 'Diglant will supply 5 models; only models with data are listed' }, { k: 'Next order PO deadline', v: firstDl ? f1(firstDl.r.dl) : 'None', warn: !!firstDl && firstDl.left < 0, tip: firstDl ? dlTxt(firstDl.left) : '' }, { k: 'Deadline passed', v: pcs(lateN.reduce((a, x) => a + x.c.buy, 0)), warn: lateN.length > 0 }, ...(noSup.length ? [{ k: 'Supplier not set', v: noSup.length + (noSup.length === 1 ? ' item' : ' items'), warn: true, tip: 'Set the supplier in Catalog to order these' }] : []), { k: 'Ordered', v: ordN.length + ' of ' + all.length + ' items', bar: all.length ? ordN.length / all.length : 0 }] },
+        (() => { const top = BYM ? (models[0] && list.find(x => 'm|' + x.r.model === models[0].id)) : list[0], cr = all.find(x => x.r.id === S.cId) || top || all[0]; if (!cr) return { t: 'Plan calculator', rows: [{ k: 'Nothing to plan', v: '' }] };
+          const r = cr.r, c0 = this.calc({ ...r, qty: null }), num = v => Math.max(0, parseInt(v, 10) || 0);
+          const sv = (() => { try { return JSON.parse(localStorage.getItem('carres.fc.kpi') || '{}'); } catch (e) { return {}; } })();
+          const ed = (S.cId === r.id && S.cM) || {}, sf = S.cId === r.id && S.cS != null ? S.cS : r.safety;
+          const NM = S.cN || 6, months = [...Array(NM).keys()].map(k => { const m = new Date(r.mon.getFullYear(), r.mon.getMonth() + k, 1), key = ML(m), saved = k === 0 ? (r.base ?? 0) : (sv[r.id + '|' + key] ?? (r.base ?? 0)); return { m, key, saved, v: ed[key] != null ? ed[key] : saved, dl: OUT ? outDl(r.cat, r.sup) && (window.subWd ? window.subWd(m, window.CD(r.cat, r.sup) || 0) : m) : new Date(+m - 45 * 864e5) }; });
+          let have = c0.free + c0.onPo, tot = 0; const plan = months.map((x, k) => { const buy = Math.max(0, x.v + (k === 0 ? sf : 0) - have); have = have + buy - x.v; tot += buy; return { ...x, buy }; });
+          const first = plan[0], chg = plan.some(x => x.v !== x.saved) || sf !== r.safety, cw = r.weekly ? this.calc({ ...r, base: first.v, safety: sf, qty: null }) : null, nowQ = cw ? cw.buy : first.buy, nowL = cw && cw.wk ? 'week ' + cw.wk.lbl : MO[first.m.getMonth()], left0 = leftOf(cw && cw.wk ? cw.wk.dl : first.dl), canOrder = !cr.o && nowQ > 0;
+          const setM = (key, v) => set({ cId: r.id, cS: sf, cM: { ...ed, [key]: num(v) } });
+          const savePlan = () => { let s2 = {}, hist = []; try { s2 = JSON.parse(localStorage.getItem('carres.fc.kpi') || '{}'); hist = JSON.parse(localStorage.getItem('carres.fc.kpiHist') || '[]'); } catch (e) {} plan.forEach(x => { if (x.v !== x.saved) { s2[r.id + '|' + x.key] = x.v; hist.push({ id: r.id, mon: x.key, from: x.saved, to: x.v, by: 'You', at: Date.now() }); } }); try { localStorage.setItem('carres.fc.kpi', JSON.stringify(s2)); localStorage.setItem('carres.fc.kpiHist', JSON.stringify(hist)); } catch (e) {} return s2; };
+          return { t: 'Plan calculator', meta: NM === 1 ? '1 month' : NM + ' months', calc: { pickL: 'Item', pickV: r.id, opts: all.map(x => ({ v: x.r.id, l: x.r.model + ' · ' + x.r.spec })), onPick: e => set({ cId: e.target.value, cM: null, cS: null }),
+            pick2L: 'Months', n2: NM, setN2: n => set({ cN: n }),
+            head: ['Month', OUT ? 'Sell' : 'KPI', 'To buy'],
+            ins: [{ l: 'Safety stock', sub: 'Saved ' + pcs(r.safety), r: '', v: String(sf), changed: sf !== r.safety, on: e => set({ cId: r.id, cS: num(e.target.value), cM: ed }) },
+              ...plan.map((x, k) => ({ l: MO[x.m.getMonth()] + ' ' + String(x.m.getFullYear()).slice(2), sub: k === 0 ? (left0 < 0 ? 'Order by ' + f1(x.dl) + ' · late' : 'Order by ' + f1(x.dl)) : 'Order by ' + f1(x.dl), subWarn: k === 0 && left0 <= 3, aria: (OUT ? 'Sell in ' : 'KPI for ') + x.key, tip: 'Saved ' + pcs(x.saved), v: String(x.v), changed: x.v !== x.saved, on: e => setM(x.key, e.target.value), r: String(x.buy), rWarn: k === 0 && x.buy > 0 }))],
+            out: [{ k: 'Have now', v: pcs(c0.free + c0.onPo), tip: 'Free stock ' + c0.free + ' + open PO ' + c0.onPo }, { k: (NM === 1 ? '1 month' : NM + ' months') + ' to buy', v: pcs(tot) }, ...(cw ? [{ k: MO[first.m.getMonth()] + ' in total', v: pcs(first.buy), tip: 'Bought in 4 weekly POs' }] : []), { k: 'Order now · ' + nowL, v: cr.o ? 'Ordered' : pcs(nowQ), big: true, warn: canOrder }],
+            note: cw ? 'Weekly PO: only ' + nowL + ' is ordered now; the next week follows after it. Stock left from one month counts for the next.' : 'Left from one month counts for the next. Only ' + MO[first.m.getMonth()] + ' can be ordered now; later months wait for their own order-by date.',
+            btns: [{ l: 'Reset', off: !chg, f: () => set({ cM: null, cS: null }) }, { l: 'Save plan', off: !chg, f: () => { savePlan(); this.setState({ rows: S.rows.map(x => x.id === r.id ? { ...x, base0: x.base0 ?? x.base, base: first.v, safety: sf, saved: first.v !== (r.base ?? 0) || x.saved, qty: null } : x), cM: null, cS: null }); this.flash(NM + '-month plan saved · ' + r.model + ' ' + r.spec); } },
+              { l: 'Order ' + nowL + ' · ' + pcs(nowQ), pri: true, off: !canOrder, f: () => { savePlan(); this.setState({ rows: S.rows.map(x => x.id === r.id ? { ...x, base0: x.base0 ?? x.base, base: first.v, safety: sf, saved: first.v !== (r.base ?? 0) || x.saved, qty: null } : x), cM: null, cS: null, sel: { [r.id]: true }, rv: true, view: 'buy' }); } }] } }; })()
+      ],
+      tasks: (() => { const open = S.tasks.filter(t => !S.sent[t.no]);
+        const G = {}; S.rows.filter(r => r.weekly).forEach(r => { const c = this.calc(r); if (!c.wk || !c.buy || leftOf(c.wk.dl) > 3) return; const k = r.sup + '|' + r.cat + '|' + c.wk.i; (G[k] = G[k] || { sup: r.sup, cat: r.cat, wk: c.wk, ids: [], n: 0 }); G[k].ids.push(r.id); G[k].n += c.buy; });
+        const rem = Object.values(G).map(g => { const n = leftOf(g.wk.dl); return { key: 'wk:' + g.sup + g.cat + g.wk.i, mod: 'Purchasing', t: 'Order week ' + g.wk.lbl + ' · ' + SH(g.sup), sub: g.cat + ' · ' + pcs(g.n) + ' · forecast, can skip', ref: 'Outright forecast', cat: g.cat, who: '', due: f1(g.wk.dl), dueDay: n <= 0 ? 'today' : 'soon', late: n < 0, next: 'Weekly review: place the PO today or Skip this week', quick: { l: 'Review PO', ic: 'shopping_cart', f: () => set({ biz: 'out', sel: Object.fromEntries(g.ids.map(i => [i, true])), rv: true }) } }; });
+        return { rows: [...rem, ...open.map(t => this.sendTask(t))], left: rem.length + open.length }; })(),
+      search: q => all.filter(x => (x.r.model + ' ' + x.r.spec).toLowerCase().includes(q.toLowerCase())).map(x => ({ h: 'Items', ic: 'bed', t: x.r.model, sub: x.r.spec, go: () => {} })),
+      edOpen: !!E, ed: E && E.kpi ? { title: 'Try ' + (OUT ? 'plan' : 'KPI') + ' · ' + ML(Er.mon), model: Er.model, spec: Er.spec, top: E.top + 'px', left: E.left + 'px', q: E.q, hint: 'Saved ' + pcs(Er.base ?? 0), needWhy: false, needNote: false, whys: WHY, why: '', note: '', err: E.err, onQ: e => set({ ed: { ...E, q: e.target.value, err: '' } }), onWhy: () => {}, onNote: () => {}, close: () => set({ ed: null }), save: () => this.saveEd(), qL: 'Pieces for ' + ML(Er.mon), btn: 'Try' } : E ? { qL: 'To buy', btn: 'Save', title: 'To buy · ' + ML(Er.mon), model: Er.model, spec: Er.spec, top: E.top + 'px', left: E.left + 'px', q: E.q, hint: EsS == null ? 'Not recorded' : 'Suggested ' + pcs(EsS),
+        needWhy: Eq != null && EsS != null && Eq !== EsS, needNote: Eq != null && Eq !== EsS && E.why === 'Other', whys: WHY, why: E.why, note: E.note, err: E.err,
+        onQ: e => set({ ed: { ...E, q: e.target.value, err: '' } }), onWhy: e => set({ ed: { ...E, why: e.target.value, err: '' } }), onNote: e => set({ ed: { ...E, note: e.target.value, err: '' } }),
+        close: () => set({ ed: null }), save: () => this.saveEd() } : {},
+      rvOpen: S.rv && ids.length > 0, rv: { title: 'Review ' + poW, btn: poW, sub: pcs(selPcs) + ' · ' + BIZ + ' only · for ' + MON, lines: ids.map(id => { const r = S.rows.find(x => x.id === id); return { model: r.model, spec: r.spec, qty: pcs(this.calc(r).buy), mon: SH(r.sup) }; }), note: 'One PO per supplier and category. ' + BIZ + ' forecast stock, kept apart from ' + (OUT ? 'Subscription' : 'Outright') + ', not for one sales order. Sales orders take it later; SO Batch will not buy it again.', close: () => set({ rv: false }), place: () => this.place(ids), canSkip: ids.some(id => { const r = S.rows.find(x => x.id === id); return r && r.weekly; }), skip: () => { const sk = { ...S.skip }; ids.forEach(id => { const r = S.rows.find(x => x.id === id), c = this.calc(r); if (c.wk) sk[id + '#' + c.wk.i] = true; }); this.setState({ skip: sk, rv: false, sel: {} }); this.flash('Skipped this week · ' + ids.length + (ids.length === 1 ? ' item' : ' items') + ' · the next week shows'); } },
+      toast: S.toast
+    };
+    return OUT ? { ...base, ...this.minMax(all, list, stOf, set, ids, selPcs, poW, base) } : base;
+  }
+  minMax(all, list, stOf, set, ids, selPcs, poW, base) {
+    // Weekly forecast (owner 13 Oct "show weekly forecast date"; "2 lines, stupid UI"): one column per Monday, this week + next 3, header one line "Mon, 12 Oct". Week 1 = buy now; later weeks = expected if sales stay at the same daily rate.
+    const MONS = [0, 1, 2].map(k => { const d = new Date(FRI); d.setDate(d.getDate() + 7 * k); return d; });
+    const w4 = x => { if (x.o) return [x.o.qty, null, null]; if (x.r.sup === CHINA) return [x.c.buy, null, null]; const rt = this.rate(x.r), kp = x.c.keep, cap = x.c.cap; let hv = x.c.free + x.c.onPo + x.c.buy; const out = [x.c.buy]; for (let k = 1; k < 3; k++) { hv = Math.max(0, hv - rt * 7); const bb = Math.min(Math.max(0, Math.ceil(kp - hv)), cap); out.push(bb); hv += bb; } return out; };
+    const wCells = arr => arr.map((v, k) => v == null ? { t: '—', fg: '#9CA3AF', tip: 'John Curtis is ordered once a month' } : { t: String(v), fw: k === 0 && v ? '600' : '400', fg: k === 0 ? '#1F2937' : (v ? '#4B5563' : '#9CA3AF'), tip: k === 0 ? 'Suggested for ' + f1(MONS[0]) + ' (this week)' : 'Forecast for ' + f1(MONS[k]) + ' if sales stay the same' });
+    const N = n => String(n), M3L = [ML(monAdd(-2)), ML(PAST_M), ML(monAdd(0)) + ' (this month, so far)'], dn = m => m.replace(/ Waterproof Mattress Protector$/, ' protector').replace(/^(\d{4} \w+) Fab3 · /, '$1 · ');
+    const S = this.state, SZ = ['Super King', 'King', 'Queen', 'Super Single', 'Single', ''], szI = s => { const i = SZ.indexOf(s === 'One size' ? '' : (s || '')); return i < 0 ? 9 : i; };
+    const mgOf = r => r.mg || r.model, mSold = {}; list.forEach(x => { mSold[mgOf(x.r)] = (mSold[mgOf(x.r)] || 0) + (x.r.base || 0); });
+    const L = list.slice().sort((p, q) => (mSold[mgOf(q.r)] - mSold[mgOf(p.r)]) || mgOf(p.r).localeCompare(mgOf(q.r)) || szI(p.r.spec) - szI(q.r.spec));
+    const first = {}; L.forEach(x => { const m = mgOf(x.r); if (!first[m]) first[m] = x.r.id; });
+    const rows = L.map(x => { const { r, c, o } = x, st = o ? 'done' : !r.sup ? 'nosup' : c.skipped ? 'skip' : c.buy > 0 ? 'buy' : 'ok', isF = first[mgOf(r)] === r.id, setK = S.keep[r.id] != null;
+      const [pl, tone] = ({ buy: ['To buy', 'warn'], ok: ['Enough', 'ok'], done: ['Ordered', 'ok'], nosup: ['Supplier not set', 'neutral'], skip: ['Skipped this week', 'neutral'] })[st];
+      return { id: r.id, canCk: st === 'buy', ckTip: ({ ok: 'Enough stock · nothing to buy', done: 'Already ordered', nosup: 'Supplier not set', skip: 'Skipped this week' })[st] || '', open: e => this.openKeep(e, r), cells: [
+        { t: dn(mgOf(r)), sub: (r.spec || 'One size') + ' · ' + (r.sup ? SH(r.sup) : 'Supplier not set'), fw: isF ? '600' : '400', tip: mgOf(r) + ' · ' + (r.spec || 'One size') },
+        ...[0, 1, 2].map(i => ({ t: String((r.m3 || [0, 0, 0])[i]), fw: i === 2 ? '600' : '400', fg: (r.m3 || [0, 0, 0])[i] ? '#1F2937' : '#9CA3AF', tip: 'Sold in ' + M3L[i] })),
+        { t: N(c.keep), fw: '500', sub: setK ? 'set by you' : 'suggested', subFg: setK ? '#1F2937' : '#6B7280', tip: 'Suggested ' + pcs(this.sugKeep(r)) + ' = sold in last ' + (r.sup === CHINA ? '30 days (' + (r.d30 || 0) + ') ÷ 30 × 75 days' : '14 days (' + (r.d14 || 0) + ') ÷ 14 × 14 days') + ' · click the row to change' },
+        { t: N(c.free + c.onPo), sub: c.onPo ? 'on PO ' + c.onPo : '' },
+        ...wCells(w4(x)),
+        { t: pl, tone }] }; });
+    const BYMO = S.oView === 'model', ms = [...new Set(L.map(x => mgOf(x.r)))];
+    const mRows = ms.map(m => { const xs = L.filter(x => mgOf(x.r) === m), sold = xs.reduce((a, x) => a + (x.r.base || 0), 0), kp = xs.reduce((a, x) => a + x.c.keep, 0), hv = xs.reduce((a, x) => a + x.c.free + x.c.onPo, 0), b = xs.reduce((a, x) => a + (x.o ? 0 : x.c.buy), 0), nB = xs.filter(x => !x.o && x.r.sup && x.c.buy > 0).length, allO = xs.every(x => x.o), sup = xs[0].r.sup;
+      const st = !sup ? ['Supplier not set', 'neutral'] : allO ? ['Ordered', 'ok'] : nB ? [nB + ' suggested', 'warn'] : ['Enough', 'ok'];
+      return { id: 'm|' + m, canCk: nB > 0, ckTip: !sup ? 'Supplier not set' : allO ? 'Already ordered' : 'Enough stock · nothing to buy', open: null, cells: [{ t: dn(m), tip: m + ' · sold per month: ' + M3L.join(' · '), sub: (xs[0].r.sup ? SH(xs[0].r.sup) : 'Supplier not set') + ' · ' + xs.length + (xs.length === 1 ? ' size' : ' sizes'), fw: '600' }, ...[0, 1, 2].map(i => ({ t: String(xs.reduce((a, x) => a + ((x.r.m3 || [])[i] || 0), 0)), fw: i === 2 ? '600' : '400', tip: 'Sold in ' + M3L[i] })), { t: N(hv) }, ...wCells([0, 1, 2].map(k => { const vs = xs.map(w4).map(q => q[k]); return vs.every(v => v == null) ? null : vs.reduce((s, v) => s + (v || 0), 0); })), ],
+        items: xs.map(x => { const can = !x.o && !!x.r.sup && x.c.buy > 0, mk = 'm|' + m, on = can && (!!S.sel[x.r.id] || !!S.sel[mk]);
+          const tick = () => { const s = { ...S.sel }; if (s[mk]) { delete s[mk]; xs.forEach(y => { if (!y.o && y.r.sup && y.c.buy > 0) s[y.r.id] = true; }); } s[x.r.id] = !on; if (!s[x.r.id]) delete s[x.r.id]; set({ sel: s }); };
+          return { ck: { on, can, tick, tip: x.o ? 'Already ordered' : !x.r.sup ? 'Supplier not set' : 'Enough stock · nothing to buy' }, cells: [{ t: x.r.spec || 'One size' }, ...[0, 1, 2].map(i => ({ t: String((x.r.m3 || [])[i] || 0), fw: i === 2 ? '600' : '400', fg: ((x.r.m3 || [])[i] || 0) ? '#1F2937' : '#9CA3AF' })), { t: N(x.c.free + x.c.onPo) }, ...wCells(w4(x))] }; }) }; });
+    const below = all.filter(x => !x.o && x.r.sup && !x.c.skipped && x.c.buy > 0), tot = below.reduce((a, x) => a + x.c.buy, 0), nM = new Set(list.map(x => mgOf(x.r))).size;
+    const E = S.kEd, Er = E ? S.rows.find(x => x.id === E.id) : null;
+    return {
+      tabs: [['buy', 'Suggested'], ['done', 'Ordered'], ['all', 'All']].map(([k, l]) => ({ l, on: S.view === k, click: () => set({ view: k, sel: {} }) })),
+      hasRep: false, tblLabel: BYMO ? 'Forecast purchase · Outright weekly' : 'Forecast purchase · Outright stock level', sortDef: null, ticks: true,
+      cols: [{ l: BYMO ? 'Model' : 'Model · size', w: 'minmax(120px,1fr)' }, { l: MO[monAdd(-2).getMonth()], w: '32px', al: 'right', tip: 'Sold in ' + M3L[0] }, { l: MO[PAST_M.getMonth()], w: '32px', al: 'right', tip: 'Sold in ' + M3L[1] }, { l: MO[monAdd(0).getMonth()], w: '36px', al: 'right', hl: '#EEF0F3', tip: 'This month, sold so far' }, ...(BYMO ? [] : [{ l: 'Want in stock', w: '52px', al: 'right', tip: 'How many you want to keep. Suggested = 14 days of sales; click the row to change' }]), { l: 'Free', l2: 'stock', w: '48px', al: 'right', tip: 'Not reserved by any order (New, in the warehouse) + on PO not yet arrived. Reserved, Displayed and Exhibition are not counted' }, ...MONS.map((d, k) => ({ l: d.getDate() + ' ' + MO[d.getMonth()], l2: WD[d.getDay()], w: '56px', al: 'right', tip: k ? 'Forecast for ' + f1(d) + ' if sales stay the same' : 'Suggested for ' + f1(d) + ' (this week)' })), ...(BYMO ? [] : [{ l: 'Status', w: '80px' }])],
+      rows: BYMO ? mRows : rows, subHeads: BYMO ? ['Size', MO[monAdd(-2).getMonth()], MO[PAST_M.getMonth()], MO[monAdd(0).getMonth()], '', '', '', ''] : [],
+      footer: BYMO ? nM + (nM === 1 ? ' model' : ' models') + ' · in pcs · suggestion only, you decide' : nM + (nM === 1 ? ' model' : ' models') + ' · ' + list.length + ' sizes · all numbers in pcs · best seller first · click a row to change Want in stock',
+      views: [['model', 'By model', 'stacks']].map(([k, l, ic]) => ({ l, ic, on: S.oView === k, pick: () => set({ oView: k, sel: {} }) })), viewName: (BYMO ? 'By model' : 'Set stock level') + ' · Outright',
+      summary: [
+        { t: 'Weekly forecast', meta: f1(MONS[0]), kpis: [{ l: 'Suggested', v: String(tot), unit: 'pcs', warn: false, zero: !tot, tip: 'A suggestion from the last 2 weeks of sales. You decide what to order.' }],
+          rows: [...MONS.slice(1).map(d => { const k = MONS.indexOf(d), n = L.reduce((s, x) => s + (w4(x)[k] || 0), 0); return { k: f1(d), v: pcs(n), tip: 'Expected if sales stay the same' }; })] },
+        { h: 'BY SUPPLIER', rows: (() => { const G = {}; below.forEach(x => { (G[x.r.sup] = G[x.r.sup] || { n: 0, m: new Set() }); G[x.r.sup].n += x.c.buy; G[x.r.sup].m.add(mgOf(x.r)); }); const ks = Object.keys(G); return ks.map(s => ({ k: SH(s), v: pcs(G[s].n), tip: [...G[s].m].join(' · ') })); })() }
+      ],
+      tasks: (() => { const open = S.tasks.filter(t => !S.sent[t.no]), G = {}; below.forEach(x => { const k = x.r.sup + '|' + x.r.cat; (G[k] = G[k] || { sup: x.r.sup, cat: x.r.cat, ids: [], n: 0 }); G[k].ids.push(x.r.id); G[k].n += x.c.buy; });
+        const CT = window.CarresTasks, fri = new Date(WK + 'T00:00:00');
+        const rem = Object.values(G).map(g => { const tk = { key: 'keep:' + g.sup + '|' + g.cat + '|' + WK, mod: 'Purchasing' }, own = CT ? CT.ownerOf(tk) : ''; return { ...tk, owner: own, t: 'Weekly forecast · ' + SH(g.sup), sub: g.cat + ' · suggested ' + pcs(g.n) + ' · you decide', ref: 'Outright stock · week of ' + f1(fri), cat: g.cat, who: own ? 'PO Duty · ' + (CT ? CT.label(own) : own) : '', due: f1(fri), dueDay: leftOf(fri) <= 0 ? 'today' : 'soon', late: leftOf(fri) < 0, next: 'Check the suggestion, then order what you decide or Skip this week', quick: { l: 'Review PO', ic: 'shopping_cart', f: () => set({ sel: Object.fromEntries(g.ids.map(i => [i, true])), rv: true }) } }; });
+        return { rows: [...rem, ...open.map(t => this.sendTask(t))], left: rem.length + open.length }; })(),
+      rv: { ...base.rv, sub: pcs(selPcs) + ' · Outright · back to stock level', note: 'Outright stock: buys each size back to its stock level. One PO per supplier and category. Sales orders take this stock first; SO Batch only buys what stock cannot cover.', lines: (base.rv.lines || []).map(l => ({ ...l })), canSkip: ids.length > 0, skip: () => { const sk = { ...S.skip }; ids.forEach(id => { sk[id] = WK; }); try { localStorage.setItem('carres.fc.skip', JSON.stringify(sk)); } catch (e) {} this.setState({ skip: sk, rv: false, sel: {} }); this.flash('Skipped this week · ' + ids.length + (ids.length === 1 ? ' size' : ' sizes') + ' · they come back next Monday'); } },
+      edOpen: !!E, ed: E ? { title: 'Want in stock', model: mgOf(Er), spec: (Er.spec || 'One size') + ' · sold ' + (Er.base || 0) + ' in ' + ML(PAST_M), top: E.top + 'px', left: E.left + 'px', q: E.q, qL: 'How many you want to keep', hint: 'Suggested ' + pcs(this.sugKeep(Er)) + ' · sold in last ' + (Er.sup === CHINA ? '30 days ' + (Er.d30 || 0) : '14 days ' + (Er.d14 || 0)), needWhy: false, needNote: false, whys: [], why: '', note: '', err: E.err, btn: 'Save',
+        onQ: e => set({ kEd: { ...E, q: e.target.value, err: '' } }), onWhy: () => {}, onNote: () => {}, close: () => set({ kEd: null }),
+        save: () => { const q = E.q === '' ? null : Math.max(0, parseInt(E.q, 10) || 0); if (q == null) return set({ kEd: { ...E, err: 'Type a number.' } }); const kp = { ...S.keep, [E.id]: q }; try { localStorage.setItem('carres.fc.keep', JSON.stringify(kp)); } catch (e) {} set({ keep: kp, kEd: null }); this.flash('Saved · ' + mgOf(Er) + ' ' + (Er.spec || '') + ' · ' + pcs(q)); } } : {}
+    };
+  }
+  openKeep(e, r) { if (e && e.stopPropagation) e.stopPropagation(); const b = e.currentTarget.getBoundingClientRect(); this.setState({ kEd: { id: r.id, q: String(this.keepOf(r)), err: '', top: Math.max(8, Math.min(b.bottom + 4, window.innerHeight - 260)), left: Math.max(8, Math.min(b.left + 160, window.innerWidth - 328)) } }); }
+}
+</script>
+</body>
+</html>
