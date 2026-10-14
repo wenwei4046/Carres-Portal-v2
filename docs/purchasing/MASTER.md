@@ -997,8 +997,8 @@ KEEP §5.1's one source-line demand calculation. ADAPT a transparent readout wit
 
 Recommended acceptance / PROPOSAL where extending the reader: open a shortage to its exact SO/MPR source and coverage contributors; show why a line cannot be bought; recheck demand, approved supplier/configuration and existing coverage at governed issue. Refreshing or regenerating a view completes no purchase, changes no allocation/custody and creates no duplicate PO. A changed source invalidates the old preview rather than issuing yesterday's shortage. Reference calculation, allocation and persistence remain unverified; do not introduce a new editable MRP ledger, independent demand page or warehouse-rebinding shortcut.
 
-**Forecast Purchase approval and issuance — OWNER-APPROVED, Jess 2026-10-14 (A) · BUILT ON BRANCH
-(§9.14; not deployed).** Jess approves Forecast Purchase; after her persisted approval, PO Duty
+**Forecast Purchase approval and issuance — OWNER-APPROVED, Jess 2026-10-14 (A) · BUILT · DEPLOYED
+14 Oct 2026 (`7e9d3d147`, §9.14; signed-in production walk owed).** Jess approves Forecast Purchase; after her persisted approval, PO Duty
 issues the PO and sends it to the supplier. Approval and issuance/sending are separate actions
 and retain their own actual actor/time/version evidence. Do not implement a combined approver
 “approve + issue PO” click or permit PO Duty to bypass approval within Suggested quantity.
@@ -8016,15 +8016,15 @@ credit and payment remain distinct owning facts. No sale-notice matching interfa
   cross-module contract are required before `PLAN MISSION COMPLETE`. No application implementation,
   Card, production migration or rendered UI acceptance is claimed by this synthesis.
 
-### 9.14 Forecast Purchase · Outright — design handoff 13 Oct 2026 · approval ruling 14 Oct 2026 (A) · BUILT · 0695 APPLIED 14 Oct 2026 · deployment and signed-in production walk recorded below
+### 9.14 Forecast Purchase · Outright — design handoff 13 Oct 2026 · approval ruling 14 Oct 2026 (A) · BUILT · 0695 APPLIED · DEPLOYED 14 Oct 2026 (`7e9d3d147`) · signed-in production walk owed
 
 **What has authority here, line by line.** Three different things are in this section and they are
 kept apart (FACT · RULING · PROPOSAL):
 
 | What | Authority | Status |
 |---|---|---|
-| Who approves and who issues; approval and issuance separate; no bypass; recheck before issuance; reuse the existing doors | **RULING**, Jess 2026-10-14 (A), §5 "Forecast Purchase approval and issuance" | BUILT ON BRANCH |
-| That the page exists, its place in the menu, its layout, columns and words | The owner-approved **design handoff** of 13 Oct 2026 (`docs/ui-reference/sales-order-design/docs/FORECAST-PURCHASE-HANDOFF-13-Oct.md`), as changed by the 14 Oct ruling | BUILT ON BRANCH |
+| Who approves and who issues; approval and issuance separate; no bypass; recheck before issuance; reuse the existing doors | **RULING**, Jess 2026-10-14 (A), §5 "Forecast Purchase approval and issuance" | BUILT · DEPLOYED 14 Oct 2026 (`7e9d3d147`) |
+| That the page exists, its place in the menu, its layout, columns and words | The owner-approved **design handoff** of 13 Oct 2026 (`docs/ui-reference/sales-order-design/docs/FORECAST-PURCHASE-HANDOFF-13-Oct.md`), as changed by the 14 Oct ruling | BUILT · DEPLOYED 14 Oct 2026 (`7e9d3d147`) |
 | **The forecast algorithm** (14 days, 14-day level, 7-day cap) | The handoff's README only ("Ops Rules · Forecast Purchase · Outright"). No MASTER ruling states it, and the 14 Oct ruling says in terms that it "does not approve an algorithm" | **PROPOSAL / NOT LAW.** Built as the handoff gives it so the page can be reviewed; one named constant each in `packages/shared/src/forecast-purchase.ts` |
 | **Which models are forecast stock** (every mattress, and the Jager bedframe) | The handoff's README only ("on the page: Outright mattresses + bedframe 1013 Jager PC151-01", "so far") | **PROPOSAL / NOT LAW.** One constant, `FORECAST_PURCHASE_OUTRIGHT_SCOPE`; no Settings record holds it |
 | Supplier by category (mattress one supplier, bedframe another) | The handoff's README | **Not followed.** Catalog owns the supplier of a SKU (Law A); the page reads `product_skus.supplier_id` |
@@ -8124,7 +8124,9 @@ was in progress was refused and wrote nothing. Six submissions pressed at the sa
 same size, each having read the same state: exactly ONE went through. The control, the existing
 door alone six times at once: all six went through. A second group with an unknown SKU took the
 whole submission with it. No sign-in: `not permitted` on every door. The table is not readable by
-`authenticated` or `anon`.
+`authenticated` or `anon`. The same cases are kept as a repeatable test,
+`apps/api/src/test/forecast-purchase-submit.integration.test.ts` (7 cases, run against a kept
+replay cluster; skipped, never passed, without one).
 
 **Migration 0695 — APPLIED to production 14 Oct 2026** through the governed path (the record is
 `docs/ENGINEERING.md`, migration tail). Rolled-back production probe first, as a real Operation
@@ -8156,6 +8158,18 @@ the ticked sizes, one request per supplier and category with its Delivery Date, 
 model open at the three widths; one walk of `Send for approval`. No sideways scroll, nothing cut, a
 size line's numbers under its model's, and `carres-check.js` answers PASS in every state. Fixture
 evidence is not production evidence.
+
+**Production record, 14 Oct 2026.** Kept apart on purpose: what is live, and what is proven live.
+
+| Fact | Evidence |
+|---|---|
+| Code on `main` | #2051 (four list options) `e6877ba20`; #2052 (page, doors, 0695) squash-merged `7e9d3d147`, CI 16/16 on its head including the kit check |
+| Deployed | Deploy run `38503892663` succeeded; `scripts/verify-production.mjs` with `EXPECTED_SHA=7e9d3d147…` converged on all five surfaces (both Pages projects, both canonical hosts, the API health) |
+| The served portal is this build | The served bundle `index-DO1TvWpZ.js` holds the menu entry, the submit path `/api/operation/purchase/forecast/requests` and `Send for approval` |
+| The doors are closed without sign-in | `GET /api/operation/purchase/forecast` and `POST …/requests` answer 401 |
+| The database side answers a real person | On production, as a real Operation person, the three readers answer: nothing in progress, no mark, an unused key answers nothing. The table holds no row |
+| **Signed-in page walk** | **OWED.** Nobody has opened the page on production while signed in. It needs a person's own sign-in; the chat may not type a password |
+| **`Send for approval` → approve → issue on production** | **NOT PROVEN LIVE and not possible today.** With the TEST rows in the database, 8 sizes sold inside the three months, 1 in the last 14 days and **no size has a suggestion**, so nothing can be ticked. The chain is proven on the replay only. Manufacturing sales to make a suggestion, or issuing a PO to a supplier to prove the door, is not authorised |
 
 **REMAINING GAPS.**
 

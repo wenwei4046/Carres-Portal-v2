@@ -2282,7 +2282,7 @@ Use `Listing` consistently for module list-view navigation. The page title ident
 do not repeat SO/PO in the tab. This is the shared navigation label.
 Other views retain their purpose-specific names, such as `Monthly demand`.
 
-### Forecast Purchase · Outright — design handoff 13 Oct 2026 · approval ruling 14 Oct 2026 (A) · BUILT ON BRANCH (Purchasing MASTER §9.14)
+### Forecast Purchase · Outright — design handoff 13 Oct 2026 · approval ruling 14 Oct 2026 (A) · BUILT · DEPLOYED 14 Oct 2026 (Purchasing MASTER §9.14)
 
 The page suggests and never tells the person to buy. It says `Suggested` and `Forecast`; it never
 says `Buy` or `To buy`. Quantities are pieces: `1 pc` · `{n} pcs`. **Nothing on the page is called a
