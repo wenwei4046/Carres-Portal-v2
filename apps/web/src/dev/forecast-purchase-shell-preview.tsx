@@ -10,11 +10,12 @@
  * `?state=empty` (nothing sold) · `?state=error` (the read fails) ·
  * `?state=nolead` (production days not set for one supplier) ·
  * `?state=nodest` (no default Deliver To) · `?show=suggested` · `?show=ordered` ·
- * default: eight TEST models, one with no supplier, one size already asked
- * for and one already approved.
+ * default: eight TEST models, one with no supplier, one size with a request
+ * waiting for approval and one with a request approved.
  *
  * `Send for approval` works here: the TEST requests are kept in the page and
- * the sizes then read `Waiting for approval`. Nothing is written anywhere.
+ * the sizes then read their request. A second press with the same key is
+ * answered with the first press's requests. Nothing is written anywhere.
  */
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -50,44 +51,49 @@ const sizes: ForecastPurchaseSize[] = state === "empty" ? [] : MODELS.flatMap(([
     modelId: `test-model-${m + 1}`, model, category, size: SIZES[s]!,
     supplierId: supplier ? `test-supplier-${supplier}` : null, supplier,
     sold: [a!, b!, c!] as [number, number, number], sold14: last14!, free: free!, onPo: onPo!,
-    requested: 0, requests: [],
+    inProgress: 0, requests: [],
+    /* The plan's answer: seven days of production for Supplier One, ten for Two. */
+    deliveryDate: !supplier ? null : state === "nolead" && supplier === "TEST Supplier Two" ? null : forecastPurchaseAddDays(appTodayIso(), supplier === "TEST Supplier Two" ? 10 : 7),
   })));
-/* Stock on its way: Charlie · King is asked for and waits for the approver;
-   Foxtrot · Queen is approved and waits for PO Duty. */
+/* Requests in progress: Delta · King is asked for and waits for the approver;
+   Hotel · Queen is approved and waits for PO Duty. Neither is stock. */
 const ask = (sku: string, id: string, no: string, qty: number, state: "waiting" | "ready") => {
   const size = sizes.find((candidate) => candidate.sku === sku);
   if (!size) return;
-  size.requested += qty;
-  size.requests.push({ id, no, qty, state });
+  size.inProgress += qty;
+  size.requests.push({ id, no, qty, state, fromForecast: true });
 };
-ask("TEST-3-K", "bbbbbbbb-0000-4000-8000-000000000001", "MPR-TEST-0001", 2, "waiting");
-ask("TEST-6-Q", "bbbbbbbb-0000-4000-8000-000000000002", "MPR-TEST-0002", 1, "ready");
+ask("TEST-4-K", "bbbbbbbb-0000-4000-8000-000000000001", "MPR-TEST-0001", 2, "waiting");
+ask("TEST-8-Q", "bbbbbbbb-0000-4000-8000-000000000002", "MPR-TEST-0002", 1, "ready");
 
 const today = appTodayIso();
 const window_ = forecastPurchaseWindow(today);
 const payload: ForecastPurchaseResponse = {
   today, months: window_.months, mondays: window_.mondays, sizes,
   deliverTo: state === "nodest" ? null : { id: "cccccccc-0000-4000-8000-000000000001", name: "TEST Warehouse" },
-  minDeliveryDays: 0,
   approver: { id: "dddddddd-0000-4000-8000-000000000001", name: "TEST · Approver" },
   poDuty: { id: ME, name: "TEST · Staff A" },
 };
-/* The plan's answer: seven days of production for Supplier One, ten for Two. */
-const planOf = (skus: string[]) => {
-  const lines = skus.map((sku) => {
-    const size = sizes.find((candidate) => candidate.sku === sku);
-    const days = !size?.supplierId ? null : state === "nolead" && size.supplier === "TEST Supplier Two" ? null : size.supplier === "TEST Supplier Two" ? 10 : 7;
-    return { sku, supplierId: size?.supplierId ?? null, supplierName: size?.supplier ?? null, category: size?.category ?? null, productionDays: days, arrival: days == null ? null : forecastPurchaseAddDays(today, days) };
+/* The submit door, as the server answers it: one request per supplier and
+   category, and the same key answered with the same requests. */
+const made = new Map<string, Array<{ id: string; reqNo: string }>>();
+const submit = (body: { submissionKey: string; lines: Array<{ sku: string; qty: number }> }) => {
+  const again = made.get(body.submissionKey);
+  if (again) return { replayed: true, requests: again };
+  const groups = new Map<string, Array<{ sku: string; qty: number }>>();
+  for (const line of body.lines) {
+    const size = sizes.find((candidate) => candidate.sku === line.sku);
+    const key = `${size?.supplierId}|${size?.category}`;
+    groups.set(key, [...(groups.get(key) ?? []), line]);
+  }
+  const requests = [...groups.values()].map((lines) => {
+    const n = made.size * 10 + 101 + [...groups.values()].indexOf(lines);
+    const id = `eeeeeeee-0000-4000-8000-${String(n).padStart(12, "0")}`;
+    for (const line of lines) ask(line.sku, id, `MPR-TEST-${n}`, line.qty, "waiting");
+    return { id, reqNo: `MPR-TEST-${n}` };
   });
-  const complete = lines.every((line) => line.arrival != null);
-  return { proceedDate: today, lines, planUnavailable: false, deliveryDateDefault: complete ? lines.map((line) => line.arrival!).sort().pop() ?? null : null };
-};
-let created = 0;
-const createRequest = (body: { lines?: Array<{ sku: string; qty: number }> }) => {
-  created += 1;
-  const id = `eeeeeeee-0000-4000-8000-${String(created).padStart(12, "0")}`;
-  for (const line of body.lines ?? []) ask(line.sku, id, `MPR-TEST-${String(100 + created)}`, line.qty, "waiting");
-  return { id, approval_required: true };
+  made.set(body.submissionKey, requests);
+  return { replayed: false, requests };
 };
 
 const realFetch = window.fetch.bind(window);
@@ -99,9 +105,8 @@ window.fetch = async (input, init) => {
   }
   const method = (init?.method ?? "GET").toUpperCase();
   const sent = method === "POST" ? JSON.parse(String(init?.body ?? "{}")) : null;
-  const body = url.includes("/api/operation/purchase/forecast") ? payload
-    : url.includes("/api/operation/purchasing/requests/plan") ? planOf((sent as { skus?: string[] })?.skus ?? [])
-    : url.includes("/api/operation/purchasing/requests") && method === "POST" ? createRequest(sent)
+  const body = url.includes("/api/operation/purchase/forecast/requests") && method === "POST" ? submit(sent)
+    : url.includes("/api/operation/purchase/forecast") ? payload
     /* The shell's Tasks panel reads the one Work feed: TEST work for the preview person. */
     : /\/api\/operation\/work(\?|$)/.test(url) ? testTasksFeed({ id: ME, name: "TEST · Staff A", email: "preview@carres.local" })
     : url.includes("/api/operation/orders?") ? { orders: [] }

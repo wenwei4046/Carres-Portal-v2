@@ -1,243 +1,157 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
+import { z } from "zod";
 import {
-  forecastPurchaseInScope,
-  forecastPurchaseWindow,
-  isOtherCreditor,
-  type ForecastPurchaseRequestState,
-  type ForecastPurchaseResponse,
-  type ForecastPurchaseSize,
+  forecastPurchaseRequestGroups,
+  forecastPurchaseSizeRow,
+  purchasingRefusal,
+  type ForecastPurchaseSubmitResult,
 } from "@carres/shared";
-import { resolveActorNames } from "../../lib/actor-names";
 import { requireOperation } from "../../lib/auth-guards";
-import { loadPurchasingNumbers } from "../../lib/purchasing-settings";
+import { isForecastMigrationMissing, readForecastPurchase, type ReadFailure } from "../../lib/forecast-purchase-read";
 import { fail } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import { todayIsoMYT } from "../../lib/today";
 import type { AppEnv } from "../../types";
-import { salesOrderRegisterPopulation } from "./orders";
 
 /**
- * FORECAST PURCHASE · OUTRIGHT — the page's one read (owner 13 Oct 2026;
- * Purchasing MASTER §9.14). READ-ONLY: it writes nothing and suggests nothing
- * itself. It hands the page four facts per size, each from its owner, and the
- * shared arithmetic (`forecastPurchaseSuggestion`) works out the rest:
+ * FORECAST PURCHASE · OUTRIGHT (Purchasing MASTER §9.14).
  *
- *   which sizes   Catalog: every active mattress size and the Jager bedframe
- *                 (`forecastPurchaseInScope`), with Catalog's supplier
- *   sold          Sales Orders: `order_lines.qty` of the Register's own
- *                 population (proceeded, not cancelled, not a subscription),
- *                 by the Malaysia month of `orders.placed_at`, the SO Doc Date
- *   free          Stock: Units that are New and available, at any Site
- *   on PO         Purchasing: `purchasing_po_free_units`, the ONE arithmetic of
- *                 what an open PO line has that no order holds
- *   requested     Purchasing: open Manual Purchase Requests for `Ready Stock`
- *                 that buy extra, by what each line has not yet put on a PO
+ * `GET /`          the page's one read (`readForecastPurchase`). It writes
+ *                  nothing and suggests nothing itself.
+ * `POST /requests` `Send for approval` (owner ruling 2026-10-14, A). The page
+ *                  asks; it never issues a PO.
  *
- * Nothing is guessed. A source that cannot be read fails the request, so the
- * list shows its error state and never a number nobody read.
+ * ── THE SUBMIT DOOR ─────────────────────────────────────────────────────────
  *
- * ── WHAT `Send for approval` NEEDS (owner ruling 2026-10-14, A) ─────────────
+ * The browser sends only WHICH sizes and HOW MANY, with one key per press.
+ * Everything else is worked out here again from this server's own read, so a
+ * stale tab or a hand-made call cannot ask for yesterday's numbers:
  *
- * The page raises Manual Purchase Requests through the existing door and
- * nothing else. This read hands it the facts that door asks for: the default
- * Deliver To and the Settings floor for a Delivery Date, and names who acts
- * next, both through the ONE duty resolver: the Purchasing Approver, then PO
- * Duty. Names are labels: an unreadable name never fails the read.
+ *   · each size must be forecast stock with a supplier;
+ *   · its quantity must be no more than what can still be asked for now
+ *     (this Monday's suggestion less what a request in progress already asks);
+ *   · the default Deliver To and each request's Delivery Date are the server's.
+ *
+ * It then calls `purchasing_submit_forecast_requests` (0695), which under one
+ * lock (a) answers a retry of the same key with the requests it already made,
+ * (b) refuses if a request for the same size appeared since this read, and
+ * (c) raises each request through the EXISTING whole-request door, so every
+ * Manual Purchase Request rule and the approval requirement still apply.
+ * All requests of one press are one transaction: all or none.
+ *
+ * Approval and issuing are not here. They stay on the request, with the
+ * Purchasing Approver and PO Duty, each with its own actor and time.
  */
 const forecastPurchaseRouter = new Hono<AppEnv>();
 
-const PAGE = 1000;
-const REQUEST_CHUNK = 100;
-const MYT_MS = 8 * 3_600_000;
-/** The Malaysia calendar date of an instant. */
-const mytDate = (instant: string) => new Date(new Date(instant).getTime() + MYT_MS).toISOString().slice(0, 10);
+function refusal(c: Context<AppEnv>, status: 409 | 422 | 503, code: string, facts: Parameters<typeof purchasingRefusal>[1] = {}) {
+  const words = purchasingRefusal(code, facts);
+  return c.json({ error: code, code, message: words.wrong, action: words.todo, ...facts }, status);
+}
 
-/** Today's holder or cover of a duty, with their name. Fails soft to nobody. */
-async function dutyActor(sb: ReturnType<typeof userClient>, dutyKey: string): Promise<{ id: string; name: string | null } | null> {
-  try {
-    const { data, error } = await sb.rpc("workspace_resolve_duty", { p_duty_key: dutyKey });
-    const id = !error && data != null && typeof data === "object" ? (data as Record<string, unknown>).actor_user_id : null;
-    if (typeof id !== "string") return null;
-    let name: string | null = null;
-    try { name = (await resolveActorNames(sb, [id])).get(id) ?? null; } catch { name = null; }
-    return { id, name };
-  } catch {
-    return null;
-  }
+/** 0695 is applied before this code is deployed. If it is not, say so. */
+function migrationMissing(c: Context<AppEnv>) {
+  return c.json({
+    error: "migration_not_applied",
+    code: "migration_not_applied",
+    message: "Forecast Purchase is not switched on in the database yet.",
+    action: "Ask IT to apply migration 0695, then open the page again.",
+  }, 503);
 }
 
 forecastPurchaseRouter.get("/", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const today = todayIsoMYT();
-  const window = forecastPurchaseWindow(today);
+  const read = await readForecastPurchase(sb, todayIsoMYT());
+  if (!read.ok) return isForecastMigrationMissing(read.error) ? migrationMissing(c) : fail(c, read.error as ReadFailure);
+  return c.json(read.data);
+});
 
-  /* 1 · Catalog: the sizes kept as stock, and who supplies them. */
-  const { data: modelRows, error: modelErr } = await sb
-    .from("product_models")
-    .select("id, name, category, model_key")
-    .in("category", ["mattress", "bedframe"]);
-  if (modelErr) return fail(c, modelErr);
-  const models = new Map(
-    ((modelRows ?? []) as Array<{ id: string; name: string | null; category: string | null; model_key: string | null }>)
-      .filter((m) => forecastPurchaseInScope(m.category, m.model_key))
-      .map((m) => [m.id, m]),
-  );
+const submitBody = z.object({
+  submissionKey: z.string().uuid(),
+  lines: z.array(z.object({ sku: z.string().min(1).max(200), qty: z.number().int().min(1).max(100_000) })).min(1).max(200),
+}).strict();
 
-  const { data: skuRows, error: skuErr } = await sb
-    .from("product_skus")
-    .select("sku, variant, variant_kind, supplier_id, model_id, discontinued_at")
-    .eq("variant_kind", "size")
-    .is("discontinued_at", null);
-  if (skuErr) return fail(c, skuErr);
-
-  const { data: supRows, error: supErr } = await sb.from("suppliers").select("id, name, kind");
-  if (supErr) return fail(c, supErr);
-  /* An other creditor is Finance's row, never a supplier Purchasing buys
-     from: a catalog slot pointing at one reads as no supplier (0477). */
-  const supplierName = new Map(
-    ((supRows ?? []) as Array<{ id: string; name: string | null; kind?: unknown }>)
-      .filter((s) => !isOtherCreditor(s))
-      .map((s) => [s.id, (s.name ?? "").trim()]),
-  );
-
-  const sizes = new Map<string, ForecastPurchaseSize>();
-  for (const row of (skuRows ?? []) as Array<{ sku: string; variant: string | null; supplier_id: string | null; model_id: string }>) {
-    const model = models.get(row.model_id);
-    if (!model || !row.sku) continue;
-    const supplier = row.supplier_id ? supplierName.get(row.supplier_id) ?? null : null;
-    sizes.set(row.sku, {
-      sku: row.sku,
-      modelId: model.id,
-      model: (model.name ?? "").trim() || row.sku,
-      category: (model.category ?? "").toLowerCase(),
-      size: (row.variant ?? "").trim(),
-      supplierId: supplier ? row.supplier_id : null,
-      supplier: supplier || null,
-      sold: [0, 0, 0],
-      sold14: 0,
-      free: 0,
-      onPo: 0,
-      requested: 0,
-      requests: [],
-    });
-  }
-
-  /* 2 · Sold: the Register's own population, by the month of the SO Doc Date. */
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await salesOrderRegisterPopulation(
-      sb.from("orders").select("id, placed_at, order_lines(sku, qty)"),
-    )
-      .gte("placed_at", `${window.from}T00:00:00+08:00`)
-      .order("id", { ascending: true })
-      .range(from, from + PAGE - 1);
-    if (error) return fail(c, error);
-    const page = (data ?? []) as unknown as Array<{ placed_at: string | null; order_lines?: Array<{ sku: string | null; qty: number | null }> | null }>;
-    for (const order of page) {
-      if (!order.placed_at) continue;
-      const date = mytDate(order.placed_at);
-      if (date > today) continue;
-      const month = window.months.indexOf(date.slice(0, 7));
-      for (const line of order.order_lines ?? []) {
-        const size = line.sku ? sizes.get(line.sku) : undefined;
-        const qty = Math.max(0, Number(line.qty ?? 0));
-        if (!size || qty <= 0) continue;
-        if (month >= 0) size.sold[month] += qty;
-        if (date > window.after14) size.sold14 += qty;
-      }
-    }
-    if (page.length < PAGE) break;
-  }
-
-  /* 3 · Free stock: New Units that are available. Display, older and damaged
-     Units, and anything reserved or gone out, are not counted. */
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await sb
-      .from("stock_unit_register_v")
-      .select("id, sku, qty")
-      .eq("availability", "available")
-      .eq("condition", "new")
-      .order("id", { ascending: true })
-      .range(from, from + PAGE - 1);
-    if (error) return fail(c, error);
-    const page = (data ?? []) as Array<{ sku: string | null; qty: number | null }>;
-    for (const unit of page) {
-      const size = unit.sku ? sizes.get(unit.sku) : undefined;
-      if (size) size.free += Math.max(1, Number(unit.qty ?? 1));
-    }
-    if (page.length < PAGE) break;
-  }
-
-  /* 4 · On a PO, not arrived, held by no order. */
-  const { data: poRows, error: poErr } = await sb.rpc("purchasing_po_free_units");
-  if (poErr) return fail(c, poErr);
-  for (const row of (poRows ?? []) as Array<{ sku: string | null; free_units: number | null }>) {
-    const size = row.sku ? sizes.get(row.sku) : undefined;
-    if (size) size.onPo += Math.max(0, Number(row.free_units ?? 0));
-  }
-
-  /* 5 · Asked for and not yet on a PO: open Ready Stock requests that buy
-     extra. A refused or withdrawn request asks for nothing; a line that is
-     cancelled, or already on its PO, is not counted here (its Units are in 4). */
-  const { data: requestRows, error: requestErr } = await sb
-    .from("purchase_requests")
-    .select("id, req_no, approved_at, sent_back_at, created_at")
-    .eq("purpose", "ready_stock")
-    .eq("fulfilment_intent", "additional_stock")
-    .is("refused_at", null)
-    .is("withdrawn_at", null)
-    .order("created_at", { ascending: true });
-  if (requestErr) return fail(c, requestErr);
-  const requests = new Map(
-    ((requestRows ?? []) as Array<{ id: string; req_no: string | null; approved_at: string | null; sent_back_at: string | null }>).map((r) => [
-      r.id,
-      { no: r.req_no, state: (r.approved_at ? "ready" : r.sent_back_at ? "sent_back" : "waiting") as ForecastPurchaseRequestState },
-    ]),
-  );
-  const requestIds = [...requests.keys()];
-  for (let from = 0; from < requestIds.length; from += REQUEST_CHUNK) {
-    const { data, error } = await sb
-      .from("purchase_demands")
-      .select("request_id, sku, qty, approved_qty, issued_qty, cancelled_at")
-      .in("request_id", requestIds.slice(from, from + REQUEST_CHUNK));
-    if (error) return fail(c, error);
-    for (const line of (data ?? []) as Array<{ request_id: string; sku: string | null; qty: number | null; approved_qty: number | null; issued_qty: number | null; cancelled_at: string | null }>) {
-      const size = line.sku ? sizes.get(line.sku) : undefined;
-      const request = requests.get(line.request_id);
-      if (!size || !request || line.cancelled_at) continue;
-      const left = Math.max(0, Number(line.approved_qty ?? line.qty ?? 0) - Math.max(0, Number(line.issued_qty ?? 0)));
-      if (left <= 0) continue;
-      size.requested += left;
-      size.requests.push({ id: line.request_id, no: request.no, qty: left, state: request.state });
-    }
-  }
-
-  /* 6 · What `Send for approval` needs: where the goods go, the Settings floor
-     for a Delivery Date, and who acts next. */
-  const { data: destinationRows, error: destinationErr } = await sb
-    .from("purchasing_destinations")
-    .select("id, name, is_default, active");
-  if (destinationErr) return fail(c, destinationErr);
-  const destination = ((destinationRows ?? []) as Array<{ id: string; name: string | null; is_default: boolean | null; active: boolean | null }>)
-    .find((d) => d.is_default === true && d.active !== false) ?? null;
-  let minDeliveryDays = 0;
+forecastPurchaseRouter.post("/requests", requireOperation, async (c) => {
+  let raw: unknown;
   try {
-    minDeliveryDays = Math.max(0, Number((await loadPurchasingNumbers(sb)).manualPurchaseMinDeliveryDays) || 0);
-  } catch (e) {
-    /* The create door reads the same setting and refuses a date before it,
-       so an unreadable floor here cannot let an early date through. */
-    console.error("forecast purchase: purchasing settings unavailable", (e as Error).message);
+    raw = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_json" }, 400);
   }
-  const [approver, poDuty] = await Promise.all([dutyActor(sb, "purchasing_approver"), dutyActor(sb, "po_duty")]);
+  const parsed = submitBody.safeParse(raw);
+  if (!parsed.success) return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  const { submissionKey, lines } = parsed.data;
+  if (new Set(lines.map((line) => line.sku)).size !== lines.length) return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
 
-  const body: ForecastPurchaseResponse = {
-    today,
-    months: window.months,
-    mondays: window.mondays,
-    sizes: [...sizes.values()].sort((a, b) => a.sku.localeCompare(b.sku)),
-    deliverTo: destination ? { id: destination.id, name: (destination.name ?? "").trim() } : null,
-    minDeliveryDays,
-    approver,
-    poDuty,
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  /* A RETRY IS ANSWERED, NOT JUDGED AGAIN. The first press went through and
+     its answer was lost on the way back. The same key returns the requests it
+     made; without this the quantity check below would refuse the retry,
+     because the first press's own request is now in progress. */
+  const { data: already, error: alreadyErr } = await sb.rpc("purchasing_forecast_submission", { p_submission_key: submissionKey });
+  if (alreadyErr) return isForecastMigrationMissing(alreadyErr) ? migrationMissing(c) : fail(c, alreadyErr);
+  if (Array.isArray(already) && already.length > 0) {
+    const replay: ForecastPurchaseSubmitResult = {
+      replayed: true,
+      requests: (already as Array<{ id: string; req_no: string | null }>).map((request) => ({ id: request.id, reqNo: request.req_no ?? null })),
+    };
+    return c.json(replay);
+  }
+
+  const read = await readForecastPurchase(sb, todayIsoMYT());
+  if (!read.ok) return isForecastMigrationMissing(read.error) ? migrationMissing(c) : fail(c, read.error as ReadFailure);
+  const forecast = read.data;
+  const rows = new Map(forecast.sizes.map((size) => [size.sku, forecastPurchaseSizeRow(size)]));
+  const itemWord = (sku: string) => { const row = rows.get(sku); return row ? `${row.model} ${row.size}`.trim() : sku; };
+
+  /* THE SERVER'S OWN NUMBERS. A size that is not forecast stock, has no
+     supplier, or is asked for in a quantity the forecast no longer has room
+     for is refused by name and nothing is written. */
+  const asked = [];
+  for (const line of lines) {
+    const row = rows.get(line.sku);
+    if (!row) return refusal(c, 422, "forecast_not_stock_item", { sku: line.sku });
+    if (!row.supplierId) return refusal(c, 422, "unresolved_supplier", { sku: itemWord(line.sku) });
+    if (line.qty > row.toAsk) return refusal(c, 409, "forecast_changed", { sku: itemWord(line.sku), qty: line.qty, toBuy: row.toAsk });
+    asked.push({ ...row, toAsk: line.qty });
+  }
+  if (!forecast.deliverTo) return refusal(c, 422, "forecast_no_deliver_to");
+  const groups = forecastPurchaseRequestGroups(asked);
+  for (const group of groups) {
+    if (!group.deliveryDate) return refusal(c, 422, "production_days_required", { supplier: group.supplier });
+  }
+
+  const { data, error } = await sb.rpc("purchasing_submit_forecast_requests", {
+    p_submission_key: submissionKey,
+    p_forecast_week: forecast.mondays[0],
+    p_destination_id: forecast.deliverTo.id,
+    p_groups: groups.map((group) => ({
+      required_by: group.deliveryDate,
+      requirement: `Forecast Purchase · week of ${forecast.mondays[0]}`,
+      lines: group.lines.map((line) => ({
+        sku: line.sku,
+        qty: line.qty,
+        /* What this read saw in progress: the door refuses if it has moved. */
+        in_progress: line.inProgress,
+        /* What the ask was worked out from, kept with the request's mark. */
+        basis: { level: line.suggestion.level, cap: line.suggestion.cap, suggested: line.suggestion.weeks[0], free: rows.get(line.sku)!.free, on_po: rows.get(line.sku)!.onPo, sold14: rows.get(line.sku)!.sold14 },
+      })),
+    })),
+  });
+  if (error) {
+    if (isForecastMigrationMissing(error)) return migrationMissing(c);
+    const detail = String((error as ReadFailure).details ?? "").trim();
+    if (detail === "forecast_in_progress_changed") {
+      const sku = String((error as { hint?: string }).hint ?? "").trim();
+      return refusal(c, 409, "forecast_changed", { sku: sku ? itemWord(sku) : null });
+    }
+    return fail(c, error);
+  }
+  const made = (data ?? {}) as { replayed?: boolean; requests?: Array<{ id: string; req_no: string | null }> };
+  const body: ForecastPurchaseSubmitResult = {
+    replayed: made.replayed === true,
+    requests: (made.requests ?? []).map((request) => ({ id: request.id, reqNo: request.req_no ?? null })),
   };
   return c.json(body);
 });

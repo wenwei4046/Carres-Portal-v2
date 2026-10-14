@@ -755,9 +755,10 @@ or predicted new dealer orders would be a separately identified input; no target
 forecast model or automatic purchasing based on speculative orders is approved here. Do not blend
 unreceived orders into confirmed demand. Delivery, Purchasing, Stock and Payments retain all write
 ownership; historical deliveries and documents remain unchanged by the reporting view.
-Purchasing MASTER §9.14 (owner 13 Oct 2026) approves one weekly stock suggestion for Outright
-mattresses and the Jager bedframe. It reads sales already proceeded, never predicted orders, and
-buys nothing by itself; this boundary is otherwise unchanged.
+Purchasing MASTER §9.14 holds a weekly stock suggestion page (design handoff 13 Oct 2026). Its
+formula and its list of stock models are PROPOSAL / NOT LAW there; it reads sales already
+proceeded, never predicted orders, and buys nothing by itself (owner ruling 2026-10-14: it only
+sends a Manual Purchase Request for approval). This boundary is unchanged by it.
 
 **Diglant Subscription advance-supply boundary — OWNER-APPROVED TARGET / NOT BUILT,
 Jess 2026-09-22.** `../rental/MASTER.md` §4/§5.6 owns the new programme's ruling: an approved

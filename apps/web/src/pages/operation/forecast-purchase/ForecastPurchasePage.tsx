@@ -19,27 +19,36 @@
  *
  * ── THE PAGE ASKS; IT NEVER ISSUES (owner ruling 2026-10-14, A) ────────────
  *
- * `Send for approval` raises one Manual Purchase Request per supplier and
- * category through the existing door (`Ready Stock`, buying extra). The
- * Purchasing Approver decides it on the request; PO Duty then issues the PO
- * and sends it, on the request too. Approval and issuing stay two acts with
- * their own actor and time, and no quantity skips approval. This page writes
- * nothing else: no PO, no skip, no undo.
+ * `Send for approval` sends WHICH sizes and HOW MANY to the forecast's submit
+ * door, with one key per review. The server works everything out again from
+ * its own read, refuses a quantity the forecast no longer has room for, and
+ * raises one Manual Purchase Request per supplier and category through the
+ * existing request door, all or none. A retry with the same key is answered
+ * with the requests the first press made. The Purchasing Approver decides the
+ * request on the request; PO Duty then issues the PO and sends it there, and
+ * that door checks a forecast request against today's forecast again.
+ *
+ * ── A REQUEST IN PROGRESS IS NOT STOCK ──────────────────────────────────────
+ *
+ * What a request still has to put on a PO never enters `Free stock`, the
+ * suggestion or the forecast: the request may be refused. It only lowers what
+ * can still be asked, so a size is not asked for twice, and it is shown under
+ * the size as the request it is. `Ordered` means on a PO.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  forecastPurchaseDeliveryDate,
   forecastPurchaseModels,
-  forecastPurchasePoGroups,
   forecastPurchaseRequestGroups,
   type ForecastPurchaseModelRow,
+  type ForecastPurchaseRequestState,
   type ForecastPurchaseResponse,
   type ForecastPurchaseSizeRow,
+  type ForecastPurchaseSubmitBody,
+  type ForecastPurchaseSubmitResult,
 } from "@carres/shared";
-import { apiFetch } from "@/lib/api";
-import { useCreatePurchaseRequest, type ManualPurchasePlanPayload } from "@/lib/queries";
+import { ApiError, apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { notify } from "@/components/kit/Toast";
 import Button from "@/components/kit/Button";
@@ -53,7 +62,7 @@ import RowTick from "@/components/register/RowTick";
 import TwoLineCell from "@/components/register/TwoLineCell";
 import { FilterRail, ShowFiltersButton, useFilterRailOpen } from "../components/workspace-rail";
 import PurchasingTabs from "../PurchasingTabs";
-import { FORECAST_PURCHASE as W, monthWord, pcs, weekdayWord } from "./forecast-purchase-words";
+import { FORECAST_PURCHASE as W, monthWord, pcs, requestStateWord, weekdayWord } from "./forecast-purchase-words";
 import styles from "./ForecastPurchase.module.css";
 
 const STORAGE_KEY = "carres.forecastPurchase.outright.v1";
@@ -106,12 +115,12 @@ export default function ForecastPurchasePage() {
   };
 
   const models = useMemo(() => (data ? forecastPurchaseModels(data) : []), [data]);
-  /* `Suggested` is the models with a suggestion this Monday, one with no
-     supplier included: the person must see it to set the supplier.
-     `Ordered` is the models with stock on its way: asked for on a request,
-     or already on a PO that has not arrived. */
+  /* `Suggested` is the models with a suggestion this Monday: one with no
+     supplier (the person must see it to set the supplier) and one whose
+     request is in progress (it is not ordered until it is on a PO) included.
+     `Ordered` is the models with stock on an open PO that has not arrived. */
   const shown = useMemo(
-    () => (show === "all" ? models : show === "suggested" ? models.filter((m) => m.weeks[0] > 0) : models.filter((m) => m.requested > 0 || m.onPo > 0)),
+    () => (show === "all" ? models : show === "suggested" ? models.filter((m) => m.weeks[0] > 0) : models.filter((m) => m.onPo > 0)),
     [models, show],
   );
 
@@ -128,23 +137,29 @@ export default function ForecastPurchasePage() {
     return next;
   });
   const chosen = useMemo(() => [...live].map((sku) => sizeBySku.get(sku)!).filter(Boolean), [live, sizeBySku]);
-  const chosenPcs = chosen.reduce((n, s) => n + s.suggested, 0);
-  const chosenPos = forecastPurchasePoGroups(chosen);
+  const chosenPcs = chosen.reduce((n, s) => n + s.toAsk, 0);
+  /* One request per supplier and category; each becomes one PO after approval. */
+  const groups = useMemo(() => forecastPurchaseRequestGroups(chosen), [chosen]);
+  const chosenRequests = groups.length;
 
   /* ── The Summary: this Monday's suggestion, the next two, and by supplier. */
   const totals = useMemo(() => {
     const weeks = [0, 1, 2].map((i) => models.reduce((n, m) => n + m.weeks[i]!, 0));
     const bySupplier = new Map<string, { name: string; pieces: number; models: Set<string> }>();
+    const inProgress: Record<ForecastPurchaseRequestState, number> = { waiting: 0, ready: 0, sent_back: 0 };
     for (const m of models) for (const s of m.sizes) {
-      if (s.block !== null) continue;
-      const entry = bySupplier.get(s.supplierId!) ?? { name: s.supplier ?? W.supplierNotSet, pieces: 0, models: new Set<string>() };
+      for (const request of s.requests) inProgress[request.state] += request.qty;
+      if (!s.supplierId || s.suggested <= 0) continue;
+      const entry = bySupplier.get(s.supplierId) ?? { name: s.supplier ?? W.supplierNotSet, pieces: 0, models: new Set<string>() };
       entry.pieces += s.suggested;
       entry.models.add(m.model);
-      bySupplier.set(s.supplierId!, entry);
+      bySupplier.set(s.supplierId, entry);
     }
-    /* The headline counts what can be ordered: a size with no supplier is not in it. */
+    /* The headline is this Monday's suggestion for sizes that have a supplier:
+       the same pieces `By supplier` splits. What is already asked for is said
+       under it, by the request's own state, and is never taken off it. */
     const now = [...bySupplier.values()].reduce((n, entry) => n + entry.pieces, 0);
-    return { now, weeks, bySupplier: [...bySupplier.values()].sort((a, b) => b.pieces - a.pieces || a.name.localeCompare(b.name)) };
+    return { now, weeks, inProgress, bySupplier: [...bySupplier.values()].sort((a, b) => b.pieces - a.pieces || a.name.localeCompare(b.name)) };
   }, [models]);
 
   /* ── Layout: Model takes the room the seven number columns leave. ──────── */
@@ -273,66 +288,40 @@ export default function ForecastPurchasePage() {
   /* ── The review, and the one write: `Send for approval`. ────────────────── */
   const [reviewOpen, setReviewOpen] = useState(false);
   useEffect(() => { if (chosen.length === 0) setReviewOpen(false); }, [chosen.length]);
-  const groups = useMemo(() => forecastPurchaseRequestGroups(chosen), [chosen]);
-  const planSkus = useMemo(() => groups.flatMap((g) => g.lines.map((l) => l.sku)).sort(), [groups]);
-  /* The Delivery Date is the server's own plan (production days from today),
-     the same read the Manual Purchase Request form makes. The browser never
-     guesses a date. */
-  const plan = useQuery({
-    queryKey: ["operation", "purchasing", "requests", "plan", planSkus.join("|")],
-    queryFn: () => apiFetch<ManualPurchasePlanPayload>("/api/operation/purchasing/requests/plan", { method: "POST", body: JSON.stringify({ skus: planSkus }) }),
-    enabled: reviewOpen && planSkus.length > 0,
-    staleTime: 30_000,
-  });
-  const arrivalBySku = useMemo(() => new Map((plan.data?.lines ?? []).map((line) => [line.sku, line.arrival])), [plan.data]);
-  const dated = groups.map((group) => {
-    const arrivals = group.lines.map((line) => arrivalBySku.get(line.sku) ?? null);
-    const latest = arrivals.some((a) => a == null) ? null : arrivals.reduce<string | null>((max, a) => (max == null || a! > max ? a : max), null);
-    return { group, deliveryDate: data ? forecastPurchaseDeliveryDate(latest, data.today, data.minDeliveryDays) : null };
-  });
-  const leadMissing = plan.isSuccess && dated.some((d) => d.deliveryDate == null);
-  const createRequest = useCreatePurchaseRequest();
+  const leadMissing = groups.some((group) => group.deliveryDate == null);
   const queryClient = useQueryClient();
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
-  useEffect(() => { if (!reviewOpen) setSendError(null); }, [reviewOpen]);
-  const canSend = !!data?.deliverTo && plan.isSuccess && !leadMissing && groups.length > 0 && !sending;
+  /* ONE KEY PER REVIEW. A press whose answer was lost is pressed again with
+     the same key, and the server answers with the requests the first press
+     made. A new review, or a changed selection, is a new key. */
+  const submissionKey = useRef<string | null>(null);
+  const askSignature = groups.map((group) => group.lines.map((line) => `${line.sku}:${line.qty}`).join(",")).join("|");
+  useEffect(() => { submissionKey.current = null; setSendError(null); }, [reviewOpen, askSignature]);
+  const canSend = !!data?.deliverTo && !leadMissing && groups.length > 0 && !sending;
   async function send() {
-    if (!data?.deliverTo || !canSend) return;
+    if (!canSend) return;
     setSending(true);
     setSendError(null);
-    let sent = 0;
+    submissionKey.current ??= crypto.randomUUID();
+    const body: ForecastPurchaseSubmitBody = {
+      submissionKey: submissionKey.current,
+      lines: groups.flatMap((group) => group.lines.map((line) => ({ sku: line.sku, qty: line.qty }))),
+    };
     try {
-      /* Read the forecast again first. If a size's suggestion is no longer
-         what this review shows (someone already asked for it, or stock came
-         in), nothing is sent: the list has the new numbers and the person
-         checks again. */
-      const fresh = await refetch();
-      const now = new Map((fresh.data ? forecastPurchaseModels(fresh.data) : []).flatMap((m) => m.sizes.map((size) => [size.sku, size] as const)));
-      if (fresh.isError || chosen.some((size) => { const current = now.get(size.sku); return !current || current.block !== null || current.suggested !== size.suggested; })) {
-        setSendError(fresh.isError ? W.sendFailed : W.changed);
-        return;
-      }
-      /* One request per supplier and category, one after another: each is its
-         own approval and becomes its own PO. A refusal stops the rest, and
-         the page says how many went. */
-      for (const { group, deliveryDate } of dated) {
-        await createRequest.mutateAsync({
-          purpose: "ready_stock",
-          destinationId: data.deliverTo.id,
-          requiredBy: deliveryDate,
-          fulfilmentIntent: "additional_stock",
-          purchaseRequirement: W.requirement(data.mondays[0]),
-          lines: group.lines.map((line) => ({ sku: line.sku, qty: line.qty, requiredBy: deliveryDate })),
-        });
-        sent += 1;
-      }
-      notify("success", W.sent(sent));
+      const result = await apiFetch<ForecastPurchaseSubmitResult>("/api/operation/purchase/forecast/requests", { method: "POST", body: JSON.stringify(body) });
+      notify("success", W.sent(result.requests.length));
+      submissionKey.current = null;
       setTicked(new Set());
       setReviewOpen(false);
+      void queryClient.invalidateQueries({ queryKey: ["operation", "purchasing", "requests"] });
     } catch (e) {
-      const word = e instanceof Error && e.message ? e.message : W.sendFailed;
-      setSendError(sent > 0 ? `${W.sentSome(sent, dated.length)} ${word}` : word);
+      /* A refusal carries its two lines: what is wrong, and the one act. A
+         refusal wrote nothing, so the next press is a new ask with a new key;
+         a lost answer (no refusal body) keeps the key for the retry. */
+      const refusal = e instanceof ApiError && e.body && typeof e.body === "object" ? (e.body as { message?: string; action?: string; code?: string }) : null;
+      if (refusal?.code) submissionKey.current = null;
+      setSendError(refusal?.message ? [refusal.message, refusal.action].filter(Boolean).join(" ") : W.sendFailed);
     } finally {
       setSending(false);
       void queryClient.invalidateQueries({ queryKey: ["forecast-purchase"] });
@@ -365,6 +354,13 @@ export default function ForecastPurchasePage() {
                   <div key={i} className="flex min-h-8 items-center justify-between gap-3" data-testid={`forecast-summary-week-${i}`}>
                     <span className="min-w-0 text-body text-c-tab">{mondays ? W.monday(mondays[i]!) : W.notRecorded}</span>
                     <span className="shrink-0 text-body font-medium text-c-ink">{pcs(totals.weeks[i]!)}</span>
+                  </div>
+                ))}
+                {/* What is already asked for, by the request's own state. Not stock, and not taken off the suggestion. */}
+                {(["waiting", "ready", "sent_back"] as const).filter((state) => totals.inProgress[state] > 0).map((state) => (
+                  <div key={state} className="flex min-h-8 items-center justify-between gap-3" data-testid={`forecast-summary-${state}`}>
+                    <span className="min-w-0 text-body text-c-tab">{requestStateWord(state)}</span>
+                    <span className="shrink-0 text-body font-medium text-c-ink">{pcs(totals.inProgress[state])}</span>
                   </div>
                 ))}
               </div>
@@ -453,12 +449,12 @@ export default function ForecastPurchasePage() {
                 isIndeterminate: (m: Row) => { const n = tickedIn(m); return n > 0 && n < tickable(m).length; },
                 testId: (m: Row) => `forecast-select-${m.modelId}`,
               }}
-              selectionSummary={() => W.selected(chosen.length, chosenPcs, chosenPos)}
+              selectionSummary={() => W.selected(chosen.length, chosenPcs)}
               selectionPrimary={chosen.length > 0 ? (
                 <span className="flex shrink-0 items-center gap-2" data-testid="forecast-selection-actions">
                   <Button variant="primary" size="md" data-testid="forecast-review-open" onClick={() => setReviewOpen(true)}>
                     <MIcon name="shopping_cart" size={18} />
-                    {W.reviewButton(chosenPos)}
+                    {W.reviewButton(chosenRequests)}
                   </Button>
                   {viewMenu(true)}
                 </span>
@@ -474,7 +470,7 @@ export default function ForecastPurchasePage() {
         </div>
       </div>
 
-      <Modal open={reviewOpen} onOpenChange={setReviewOpen} title={W.review(chosenPos)} description={W.reviewLine(chosenPcs)}
+      <Modal open={reviewOpen} onOpenChange={setReviewOpen} title={W.review(chosenRequests)} description={W.reviewLine(chosenPcs)}
         footer={<>
           <Button data-testid="forecast-review-back" disabled={sending} onClick={() => setReviewOpen(false)}>{W.back}</Button>
           <Button variant="primary" data-testid="forecast-review-send" disabled={!canSend} loading={sending}
@@ -483,7 +479,7 @@ export default function ForecastPurchasePage() {
           </Button>
         </>}>
         <div className="flex flex-col gap-3" data-testid="forecast-review">
-          <div role="table" aria-label={W.review(chosenPos)} className="rounded-lg border border-c-card-border">
+          <div role="table" aria-label={W.review(chosenRequests)} className="rounded-lg border border-c-card-border">
             <div role="row" className="grid h-9 grid-cols-[minmax(0,1fr)_72px_110px] items-center gap-2.5 rounded-t-lg border-b border-c-head-line bg-c-info-bg px-3 text-meta font-medium text-c-secondary">
               <span role="columnheader">{W.reviewItem}</span>
               <span role="columnheader" className="text-right">{W.reviewQty}</span>
@@ -495,26 +491,24 @@ export default function ForecastPurchasePage() {
                   <span className="break-words text-body text-c-ink">{s.model}</span>
                   <span className="text-meta text-c-secondary">{s.size}</span>
                 </span>
-                <span role="cell" className="text-right text-body tabular-nums text-c-ink">{pcs(s.suggested)}</span>
+                <span role="cell" className="text-right text-body tabular-nums text-c-ink">{pcs(s.toAsk)}</span>
                 <span role="cell" className="break-words text-body text-c-ink">{s.supplier ?? W.supplierNotSet}</span>
               </div>
             ))}
           </div>
           {/* One request per supplier and category: when it is asked to arrive, and where. */}
           <div className="flex flex-col" data-testid="forecast-review-requests">
-            {dated.map(({ group, deliveryDate }) => (
+            {groups.map((group) => (
               <div key={group.key} className="flex min-h-9 items-start justify-between gap-3 py-1.5" data-testid={`forecast-review-group-${group.key}`}>
                 <span className="min-w-0 break-words text-body text-c-ink">{W.group(group.supplier, group.category)}</span>
                 <span className="flex shrink-0 flex-col items-end text-right">
-                  {deliveryDate ? (
-                    <span className="text-body text-c-ink">{W.deliveryDate} {fmtDate(deliveryDate)}</span>
-                  ) : plan.isSuccess ? (
+                  {group.deliveryDate ? (
+                    <span className="text-body text-c-ink">{W.deliveryDate} {fmtDate(group.deliveryDate)}</span>
+                  ) : (
                     <>
                       <span className="text-body text-c-warn-fg">{W.leadNotSet}</span>
                       <span className="max-w-[240px] break-words text-meta text-c-warn-fg">{W.leadFix(group.supplier, group.category)}</span>
                     </>
-                  ) : (
-                    <span className="text-body text-c-secondary" role={plan.isError ? "alert" : "status"}>{plan.isError ? W.planFailed : W.planLoading}</span>
                   )}
                 </span>
               </div>

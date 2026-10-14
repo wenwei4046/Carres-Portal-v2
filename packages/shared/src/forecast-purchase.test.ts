@@ -3,18 +3,23 @@ import {
   forecastPurchaseAddDays,
   forecastPurchaseDeliveryDate,
   forecastPurchaseInScope,
+  forecastPurchaseIssueShortfall,
   forecastPurchaseModels,
-  forecastPurchasePoGroups,
+  forecastPurchaseRequestCount,
   forecastPurchaseRequestGroups,
+  forecastPurchaseSizeRow,
   forecastPurchaseSuggestion,
+  forecastPurchaseToAsk,
   forecastPurchaseWindow,
   type ForecastPurchaseSize,
 } from "./forecast-purchase";
 
 const size = (over: Partial<ForecastPurchaseSize>): ForecastPurchaseSize => ({
   sku: "TEST-A-Q", modelId: "m-a", model: "TEST model A", category: "mattress", size: "Queen",
-  supplierId: "s1", supplier: "TEST supplier", sold: [0, 0, 0], sold14: 0, free: 0, onPo: 0, requested: 0, requests: [], ...over,
+  supplierId: "s1", supplier: "TEST supplier", sold: [0, 0, 0], sold14: 0, free: 0, onPo: 0,
+  inProgress: 0, requests: [], deliveryDate: "2026-10-20", ...over,
 });
+const waiting = (qty: number) => [{ id: "r1", no: "MPR-TEST-1", qty, state: "waiting" as const, fromForecast: true }];
 
 describe("forecastPurchaseWindow", () => {
   it("reads two months ago, last month and this month, and this week's Monday with the next two", () => {
@@ -37,7 +42,7 @@ describe("forecastPurchaseWindow", () => {
   });
 });
 
-describe("forecastPurchaseSuggestion", () => {
+describe("forecastPurchaseSuggestion — from stock alone", () => {
   it("holds 14 days of sales and buys at most one week of sales a Monday", () => {
     // 7 sold in 14 days: 0.5 a day, level 7, at most 4 a Monday.
     expect(forecastPurchaseSuggestion({ sold14: 7, free: 0, onPo: 0 })).toEqual({ level: 7, cap: 4, weeks: [4, 4, 4] });
@@ -53,12 +58,6 @@ describe("forecastPurchaseSuggestion", () => {
     expect(forecastPurchaseSuggestion({ sold14: 6, free: 2, onPo: 4 }).weeks[0]).toBe(0);
   });
 
-  it("counts what is already asked for on an open request, so a size is never asked for twice", () => {
-    // Level 6, nothing here, 4 already asked for: at most 2 more.
-    expect(forecastPurchaseSuggestion({ sold14: 6, free: 0, onPo: 0, requested: 4 }).weeks[0]).toBe(2);
-    expect(forecastPurchaseSuggestion({ sold14: 6, free: 0, onPo: 0, requested: 6 }).weeks[0]).toBe(0);
-  });
-
   it("nothing sold in 14 days suggests nothing, now or later", () => {
     expect(forecastPurchaseSuggestion({ sold14: 0, free: 0, onPo: 0 })).toEqual({ level: 0, cap: 1, weeks: [0, 0, 0] });
   });
@@ -68,9 +67,41 @@ describe("forecastPurchaseSuggestion", () => {
     // Monday 1: 14 − 10 = 4. Then 14 in hand, 7 sell: buy 7 back, twice.
     expect(forecastPurchaseSuggestion({ sold14: 14, free: 10, onPo: 0 }).weeks).toEqual([4, 7, 7]);
   });
+});
 
-  it("a skipped week suggests 0 now and the shortfall follows next Monday", () => {
-    expect(forecastPurchaseSuggestion({ sold14: 14, free: 10, onPo: 0, skipped: true }).weeks).toEqual([0, 7, 7]);
+describe("a request in progress is not stock", () => {
+  it("never changes the suggestion, the forecast or Free stock; it only lowers what can still be asked", () => {
+    const plain = forecastPurchaseSizeRow(size({ sold14: 6, free: 1, onPo: 2 }));
+    const asked = forecastPurchaseSizeRow(size({ sold14: 6, free: 1, onPo: 2, inProgress: 2, requests: waiting(2) }));
+    // Level 6, 3 in stock: 3 suggested either way.
+    expect(asked.suggestion).toEqual(plain.suggestion);
+    expect(asked.suggested).toBe(3);
+    expect(asked.have).toBe(3);
+    expect(plain.toAsk).toBe(3);
+    expect(asked.toAsk).toBe(1);
+    expect(asked.block).toBeNull();
+  });
+
+  it("a size fully asked for cannot be ticked and says it is requested; with nothing suggested it says enough", () => {
+    expect(forecastPurchaseSizeRow(size({ sold14: 6, inProgress: 3, requests: waiting(3) })).block).toBe("requested");
+    expect(forecastPurchaseSizeRow(size({ sold14: 6, inProgress: 9, requests: waiting(9) })).toAsk).toBe(0);
+    expect(forecastPurchaseSizeRow(size({ sold14: 6, free: 9 })).block).toBe("enough");
+    expect(forecastPurchaseToAsk(3, 5)).toBe(0);
+  });
+
+  it("a model keeps its full suggestion and says separately what is in progress and on a PO", () => {
+    const [row] = forecastPurchaseModels({ sizes: [
+      size({ sku: "A-K", size: "King", sold: [0, 6, 6], sold14: 6, free: 1, onPo: 2, inProgress: 3, requests: waiting(3) }),
+      size({ sku: "A-Q", size: "Queen", sold: [0, 4, 4], sold14: 4 }),
+    ] });
+    expect(row!.sizes.map((s) => s.block)).toEqual(["requested", null]);
+    expect(row!.weeks[0]).toBe(5);       // 3 + 2 suggested from stock
+    expect(row!.toAsk).toBe(2);          // only the Queen can still be asked
+    expect(row!.inProgress).toBe(3);
+    expect(row!.onPo).toBe(2);
+    expect(row!.have).toBe(3);           // what is asked for is not stock
+    expect(row!.suggestedSizes).toBe(1);
+    expect(row!.block).toBeNull();
   });
 });
 
@@ -105,40 +136,36 @@ describe("forecastPurchaseModels", () => {
   });
 });
 
-describe("requests in progress", () => {
-  const waiting = [{ id: "r1", no: "MPR-TEST-1", qty: 6, state: "waiting" as const }];
-
-  it("a size fully asked for cannot be ticked, and says it is requested; what is asked for is not counted as stock", () => {
-    const [row] = forecastPurchaseModels({ sizes: [
-      size({ sku: "A-K", size: "King", sold: [0, 6, 6], sold14: 6, free: 1, onPo: 2, requested: 6, requests: waiting }),
-      size({ sku: "A-Q", size: "Queen", sold: [0, 2, 2], sold14: 2, free: 9 }),
-    ] });
-    expect(row!.sizes.map((s) => s.block)).toEqual(["requested", "enough"]);
-    expect(row!.block).toBe("requested");
-    expect(row!.sizes[0]!.have).toBe(3);
-    expect(row!.have).toBe(12);
-    expect(row!.requested).toBe(6);
-    expect(row!.onPo).toBe(2);
-  });
-
-  it("groups the ticked sizes into one request per supplier and category, with the suggested pieces", () => {
+describe("requests", () => {
+  it("groups the ticked sizes into one request per supplier and category, asking only what can still be asked", () => {
     const [a, c] = forecastPurchaseModels({ sizes: [
-      size({ sku: "A-K", size: "King", sold: [0, 6, 6], sold14: 6 }),
-      size({ sku: "A-Q", size: "Queen", sold: [0, 4, 4], sold14: 4 }),
-      size({ sku: "C-Q", modelId: "c", model: "TEST model C", category: "bedframe", supplierId: "s2", supplier: "TEST supplier two", sold: [0, 2, 2], sold14: 2 }),
+      size({ sku: "A-K", size: "King", sold: [0, 6, 6], sold14: 6, inProgress: 1, requests: waiting(1) }),
+      size({ sku: "A-Q", size: "Queen", sold: [0, 4, 4], sold14: 4, deliveryDate: "2026-10-22" }),
+      size({ sku: "C-Q", modelId: "c", model: "TEST model C", category: "bedframe", supplierId: "s2", supplier: "TEST supplier two", sold: [0, 2, 2], sold14: 2, deliveryDate: "2026-10-23" }),
     ] });
-    expect(forecastPurchaseRequestGroups([...a!.sizes, ...c!.sizes])).toEqual([
-      { key: "s1|mattress", supplierId: "s1", supplier: "TEST supplier", category: "mattress", pieces: 5,
-        lines: [{ sku: "A-K", qty: 3, model: "TEST model A", size: "King" }, { sku: "A-Q", qty: 2, model: "TEST model A", size: "Queen" }] },
-      { key: "s2|bedframe", supplierId: "s2", supplier: "TEST supplier two", category: "bedframe", pieces: 1,
-        lines: [{ sku: "C-Q", qty: 1, model: "TEST model C", size: "Queen" }] },
+    const groups = forecastPurchaseRequestGroups([...a!.sizes, ...c!.sizes]);
+    expect(groups.map((g) => [g.key, g.supplier, g.category, g.pieces, g.deliveryDate])).toEqual([
+      ["s1|mattress", "TEST supplier", "mattress", 4, "2026-10-22"],
+      ["s2|bedframe", "TEST supplier two", "bedframe", 1, "2026-10-23"],
     ]);
+    // King: 3 suggested, 1 in progress: asks 2, and carries what it read as in progress.
+    expect(groups[0]!.lines.map((l) => [l.sku, l.qty, l.inProgress])).toEqual([["A-K", 2, 1], ["A-Q", 2, 0]]);
+    expect(forecastPurchaseRequestCount([...a!.sizes, ...c!.sizes])).toBe(2);
   });
 
-  it("a size with no supplier or no suggestion is never put on a request", () => {
+  it("a group has no Delivery Date when one of its lines has none", () => {
+    const [a] = forecastPurchaseModels({ sizes: [
+      size({ sku: "A-K", size: "King", sold: [0, 6, 6], sold14: 6 }),
+      size({ sku: "A-Q", size: "Queen", sold: [0, 4, 4], sold14: 4, deliveryDate: null }),
+    ] });
+    expect(forecastPurchaseRequestGroups(a!.sizes)[0]!.deliveryDate).toBeNull();
+  });
+
+  it("a size with no supplier or nothing left to ask is never put on a request", () => {
     const [row] = forecastPurchaseModels({ sizes: [
       size({ sku: "A-K", size: "King", sold: [0, 6, 6], sold14: 6, supplierId: null, supplier: null }),
       size({ sku: "A-Q", size: "Queen", sold: [0, 4, 4], sold14: 4, free: 9 }),
+      size({ sku: "A-S", size: "Single", sold: [0, 4, 4], sold14: 4, inProgress: 2, requests: waiting(2) }),
     ] });
     expect(forecastPurchaseRequestGroups(row!.sizes)).toEqual([]);
   });
@@ -151,19 +178,28 @@ describe("requests in progress", () => {
   });
 });
 
-describe("scope and PO count", () => {
-  it("keeps every mattress and the Jager bedframe as stock, nothing else", () => {
+describe("the recheck before a PO is issued", () => {
+  it("passes while the forecast still suggests at least what is being issued", () => {
+    expect(forecastPurchaseIssueShortfall({ asking: 3, suggested: 3, known: true })).toEqual({ ok: true });
+    expect(forecastPurchaseIssueShortfall({ asking: 2, suggested: 5, known: true })).toEqual({ ok: true });
+  });
+
+  it("stops when stock or a PO arrived, or sales fell, since the approval", () => {
+    expect(forecastPurchaseIssueShortfall({ asking: 3, suggested: 1, known: true })).toEqual({ ok: false, reason: "coverage_changed" });
+    expect(forecastPurchaseIssueShortfall({ asking: 1, suggested: 0, known: true })).toEqual({ ok: false, reason: "coverage_changed" });
+  });
+
+  it("stops for a size that is no longer forecast stock", () => {
+    expect(forecastPurchaseIssueShortfall({ asking: 1, suggested: 0, known: false })).toEqual({ ok: false, reason: "not_forecast_stock" });
+  });
+});
+
+describe("scope", () => {
+  it("keeps every mattress and the Jager bedframe as stock, nothing else (handoff value)", () => {
     expect(forecastPurchaseInScope("mattress", "anything")).toBe(true);
     expect(forecastPurchaseInScope("bedframe", "jager")).toBe(true);
     expect(forecastPurchaseInScope("bedframe", "other")).toBe(false);
     expect(forecastPurchaseInScope("sofa", null)).toBe(false);
     expect(forecastPurchaseInScope("accessory", null)).toBe(false);
-  });
-
-  it("one PO per supplier and category", () => {
-    expect(forecastPurchasePoGroups([
-      { supplierId: "s1", category: "mattress" }, { supplierId: "s1", category: "mattress" },
-      { supplierId: "s2", category: "bedframe" }, { supplierId: "s2", category: "mattress" },
-    ])).toBe(3);
   });
 });

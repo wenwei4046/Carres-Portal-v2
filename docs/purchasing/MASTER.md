@@ -918,7 +918,7 @@ Primary references: [Dynamics purchase requisitions](https://learn.microsoft.com
 Purchasing ▾
 ├─ BUY ▾
 │  ├─ SO Batch Purchase
-│  ├─ Forecast Purchase        (§9.14, owner 13 Oct 2026)
+│  ├─ Forecast Purchase        (§9.14, design handoff 13 Oct 2026)
 │  ├─ Manual Purchase
 │  └─ Purchase Orders
 ├─ RECEIVE ▾
@@ -8016,122 +8016,156 @@ credit and payment remain distinct owning facts. No sale-notice matching interfa
   cross-module contract are required before `PLAN MISSION COMPLETE`. No application implementation,
   Card, production migration or rendered UI acceptance is claimed by this synthesis.
 
-### 9.14 Forecast Purchase · Outright — owner-approved 13 Oct 2026 · approval ruling 14 Oct 2026 (A) · BUILT ON BRANCH (not deployed)
+### 9.14 Forecast Purchase · Outright — design handoff 13 Oct 2026 · approval ruling 14 Oct 2026 (A) · BUILT ON BRANCH (not deployed)
 
-**RULING (owner, design handoff of 13 Oct 2026; `docs/ui-reference/sales-order-design/docs/FORECAST-PURCHASE-HANDOFF-13-Oct.md`).**
-A weekly page in Purchasing → BUY, directly under `SO Batch Purchase`. Per model and size it shows
-what sold recently, the free stock, a **suggested** quantity for this Monday and a **forecast** for
-the next two Mondays. The person decides what to order; the page never pushes: `Suggested` and
-`Forecast`, never `Buy` or `To buy`. One review day a week: Monday. Outright only. Subscription is
-parked (the business has not started) and has no page.
+**What has authority here, line by line.** Three different things are in this section and they are
+kept apart (FACT · RULING · PROPOSAL):
 
-**What is on the page.** Every Outright mattress, and one bedframe model, Jager. Not on the page:
-sofas and every other bedframe (bought per Sales Order in SO Batch Purchase), and accessories
-(§ MP / PILLOW STOCK PATH). Outright Sales Orders take this stock first; SO Batch Purchase buys only
-the shortfall (the existing Ready Stock and `Use this PO` rules, unchanged).
+| What | Authority | Status |
+|---|---|---|
+| Who approves and who issues; approval and issuance separate; no bypass; recheck before issuance; reuse the existing doors | **RULING**, Jess 2026-10-14 (A), §5 "Forecast Purchase approval and issuance" | BUILT ON BRANCH |
+| That the page exists, its place in the menu, its layout, columns and words | The owner-approved **design handoff** of 13 Oct 2026 (`docs/ui-reference/sales-order-design/docs/FORECAST-PURCHASE-HANDOFF-13-Oct.md`), as changed by the 14 Oct ruling | BUILT ON BRANCH |
+| **The forecast algorithm** (14 days, 14-day level, 7-day cap) | The handoff's README only ("Ops Rules · Forecast Purchase · Outright"). No MASTER ruling states it, and the 14 Oct ruling says in terms that it "does not approve an algorithm" | **PROPOSAL / NOT LAW.** Built as the handoff gives it so the page can be reviewed; one named constant each in `packages/shared/src/forecast-purchase.ts` |
+| **Which models are forecast stock** (every mattress, and the Jager bedframe) | The handoff's README only ("on the page: Outright mattresses + bedframe 1013 Jager PC151-01", "so far") | **PROPOSAL / NOT LAW.** One constant, `FORECAST_PURCHASE_OUTRIGHT_SCOPE`; no Settings record holds it |
+| Supplier by category (mattress one supplier, bedframe another) | The handoff's README | **Not followed.** Catalog owns the supplier of a SKU (Law A); the page reads `product_skus.supplier_id` |
+| `Skip this week`, timed `Undo`, a weekly PO Duty task | The handoff's README; the 14 Oct ruling approves none of them | NOT BUILT |
 
-**The arithmetic — ONE home, `packages/shared/src/forecast-purchase.ts` (Law D).**
+Nothing in the PROPOSAL rows may be quoted as a rule. They become law only when the owner rules on
+them and that ruling is written here.
 
-| Fact | Rule |
+**What the page is.** A weekly page in Purchasing → BUY, directly under `SO Batch Purchase`. Per
+model and size it shows what sold recently, the free stock, a **suggested** quantity for this Monday
+and a **forecast** for the next two Mondays. The person decides what to ask for; the page never
+pushes: `Suggested` and `Forecast`, never `Buy` or `To buy`. Outright only. Subscription is parked
+and has no page. Outright Sales Orders take this stock first and SO Batch Purchase buys only the
+shortfall: the existing Ready Stock and `Use this PO` rules, unchanged.
+
+**The arithmetic as built (PROPOSAL values) — ONE home, `packages/shared/src/forecast-purchase.ts` (Law D).**
+
+| Fact | As built |
 |---|---|
 | Daily rate | pieces sold in the last 14 days ÷ 14 |
 | Stock level | daily rate × 14 days |
 | Suggested this Monday | stock level − free stock, never under 0, capped at one week of sales (daily rate × 7); the rest follows next Monday |
 | Forecast, next two Mondays | the same rule, as if sales stay at the daily rate and each Monday's suggestion arrives |
 | Free stock | New Units no order holds, in the warehouse, plus Units on an open PO, not arrived, that no order holds. Reserved, Display and other conditions are not counted |
+| Can still be asked | this Monday's suggestion − what a request in progress already asks, never under 0 |
 
-**Where each fact comes from (BUILT, `GET /api/operation/purchase/forecast`, read-only).** The page
-records nothing and re-derives nothing its owner already holds.
+**A request in progress is not stock — RULING consequence, BUILT.** What an open `Ready Stock`
+request that buys extra has still to put on a PO is a *request in progress*. It is not free stock,
+not incoming stock and not ordered supply: it may still be refused. It therefore never enters
+`Free stock`, the suggestion or the forecast. It does exactly one thing: it is taken off what can
+still be ASKED, so a size is never asked for twice. On the page the suggestion and `Free stock` of a
+size do not move when a request is raised; the size shows the request under it
+(`{MPR No} · {pcs} · {state}`, opening the request) and what a PO holds (`On PO · {pcs}`); a size
+fully asked for cannot be ticked and its tick says where the request stands. `Suggested` keeps a
+model whose request is in progress; `Ordered` is only what is on a PO. A refused or withdrawn
+request asks for nothing.
+
+**Where each fact comes from (BUILT, `apps/api/src/lib/forecast-purchase-read.ts`, read-only).** The
+page, the submit door and the issue recheck read the forecast through this ONE read.
 
 | Fact | Owner and source |
 |---|---|
-| Which sizes | Catalog: active size SKUs of every mattress model and of the Jager bedframe (`forecastPurchaseInScope`) |
+| Which sizes | Catalog: active size SKUs of the stock models (`forecastPurchaseInScope`) |
 | Sold | Sales Orders: `order_lines.qty` of the Register's own population (proceeded, not cancelled, not a subscription), by the Malaysia month of `orders.placed_at`, the SO Doc Date |
 | Free, in the warehouse | Stock: `stock_unit_register_v`, `availability = available` and `condition = new` |
 | Free, on a PO | Purchasing: `purchasing_po_free_units`, the arithmetic behind `Use this PO` |
+| In progress | Purchasing: `purchasing_forecast_requests_in_progress()` (0695), the ONE arithmetic: approved quantity, else the asked quantity, less what is issued, for requests neither refused nor withdrawn and lines not cancelled |
 | Supplier | Catalog: `product_skus.supplier_id`. None, or an other creditor: `Supplier not set` |
-| Asked for, not yet on a PO | Purchasing: open `Ready Stock` requests that buy extra (`purchase_requests` not refused or withdrawn), by what each line has still to issue (`purchase_demands`) |
-| Deliver To, Delivery Date floor, who acts next | Purchasing: the default active destination and `manual_purchase_min_delivery_days`; the ONE duty resolver for `purchasing_approver` and `po_duty` |
+| Delivery Date | Purchasing: the plan's own arrival (`expectedArrivalOf`, production days from today), never before `manual_purchase_min_delivery_days` |
+| Deliver To, who acts next | Purchasing: the default active destination; the ONE duty resolver for `purchasing_approver` and `po_duty` |
 
 A source that cannot be read fails the whole read: the list shows its error state, never a number
 nobody read. A model that sold nothing in the three months shown is not listed.
+
+**Buying — RULING, Jess 2026-10-14 (A). BUILT. The page asks and never issues.**
+
+1. **`Send for approval`** (`POST /api/operation/purchase/forecast/requests`). The browser sends only
+   which sizes and how many, with one key per review. The server works everything out again from
+   its own read: each size must be forecast stock with a supplier; its quantity may not exceed what
+   can still be asked now; the default `Deliver To` and each request's Delivery Date are the
+   server's. A size with no production days cannot be sent and the review names the fix.
+2. **The submit door** `purchasing_submit_forecast_requests` (0695) then runs one submission at a
+   time under a transaction lock. It (a) answers a retry of the same key with the requests the first
+   press made and writes nothing; (b) refuses, with `forecast_in_progress_changed`, when what is in
+   progress for a size is no longer what the server read, so two people pressing together cannot
+   both ask for the same pieces; (c) raises one request per supplier and category through the
+   EXISTING whole-request door `purchasing_create_request_with_lines` (purpose `Ready Stock`, intent
+   `additional_stock`), so every Manual Purchase Request rule and the approval requirement still
+   run in their own body and this door writes no request row itself; (d) records the structured
+   forecast mark (`forecast_purchase_requests`: week, lines as asked, submission key). All requests
+   of one press are one transaction: all or none.
+3. **Approval** is the existing one, on the request: the Purchasing Approver decides it; nobody
+   decides a request they raised; the existing approval Work carries it.
+4. **Issuing and sending** are the existing ones, on the request, by PO Duty, with the existing
+   issue and sending Work. Before a PO is issued the existing issue door
+   (`POST /purchasing/requests/issue`) **rechecks a forecast request** (`forecastIssueRefusal`): each
+   line about to go on a PO must still be a line the forecast asked for
+   (`forecast_request_changed`), still be forecast stock (`forecast_not_stock_item`), and, with every
+   other forecast line for the same size in that issue, ask for no more than the forecast suggests
+   NOW, worked out again from today's sales, free stock and PO stock
+   (`forecast_coverage_changed`). Goods that arrived, a PO issued meanwhile or sales that fell make
+   the approved quantity a decision on another scope: the PO is refused by name and the request goes
+   back for a new decision through its own send back or withdraw door. A forecast that cannot be
+   read refuses the issue.
+5. **Only forecast requests are rechecked**, and they are known by their structured mark, never by
+   a text match. An ordinary Manual Purchase Request, `Ready Stock` that buys extra included, is not
+   looked at and keeps its own rules: the issue door nets no shelf stock for it, exactly as before.
+
+The two acts keep their own actor and time (`purchase_requests.approved_by` / `approved_at`; the
+PO's own issue and sending evidence). No quantity skips approval. The page adds no approval door, no
+issue door and no writer of a request, a PO or a supplier message.
+
+**Proven on a replay of every migration (14 Oct 2026), with the real doors.** A first submission
+made one request (`ready_stock`, `additional_stock`, approval required, not approved) and its mark.
+The same key again answered `replayed` with no new request. A new key that still believed nothing
+was in progress was refused and wrote nothing. Six submissions pressed at the same moment for the
+same size, each having read the same state: exactly ONE went through. The control, the existing
+door alone six times at once: all six went through. A second group with an unknown SKU took the
+whole submission with it. No sign-in: `not permitted` on every door. The table is not readable by
+`authenticated` or `anon`.
+
+**FACT found while proving it.** The existing line door `purchasing_create_demand` admits the
+`operation` role only. A Principal therefore cannot raise a request with lines, from this page or
+from the request page: the page shows the door's own refusal. This fits the ruling (the approver
+does not raise her own request) and is not changed here.
 
 **The page (BUILT on the one listing engine; 01 §5; words in COPY-STANDARD "Forecast Purchase · Outright").**
 One view, `By model · Outright`. Tabs `Suggested` · `Ordered` · `All`, opening on `All`. Columns, in
 order: `Model` (takes the room left, never under 120; the grey line is `{supplier} · {n} sizes`) ·
 two months ago 32 · last month 32 · this month 36 with the neutral column band · `Free stock` 48 ·
 this Monday 56 · next Monday 56 · the Monday after 56. A model opens to one line per size in the
-fixed order Super King, King, Queen, Super Single, Single. A model tick takes every size of it
-that has a suggestion; a size that cannot be ordered keeps a greyed tick that says why
-(`Enough stock · nothing to buy` · `Supplier not set`). The Summary holds two cards: `Weekly forecast`
-(this Monday's suggested pieces that can be ordered, then the next two Mondays) and `By supplier`.
-The selection bar reads `{n} items selected · {pcs} · {n} PO` with `Review {n} PO`, which opens the
-review: the ticked sizes, one request per supplier and category with its Delivery Date, the
-`Supplier Deliver To`, and who acts next.
+fixed order Super King, King, Queen, Super Single, Single. A model tick takes every size of it that
+can still be asked; a size that cannot keeps a greyed tick that says why. The Summary holds two
+cards: `Weekly forecast` (this Monday's suggestion for sizes that have a supplier, the next two
+Mondays, then what is already asked for by the request's own state) and `By supplier`. The
+selection bar reads `{n} items selected · {pcs}` with `Review {n} request`, which opens the review:
+the ticked sizes, one request per supplier and category with its Delivery Date, the
+`Supplier Deliver To`, and who acts next. Nothing on the page is called a PO before one exists.
 
-**Buying — RULING, Jess 2026-10-14 (A); §5 "Forecast Purchase approval and issuance". BUILT.**
-The page asks and never issues. `Send for approval` raises one Manual Purchase Request per supplier
-and category through the EXISTING door (`POST /api/operation/purchasing/requests`,
-`purchasing_create_request_with_lines`): purpose `Ready Stock`, intent `additional_stock` (buying
-extra; the suggestion has already netted free stock), the default active `Deliver To`, the ticked
-sizes at their suggested quantity, and `Forecast Purchase · week of {Monday}` as its Purchase
-requirement. Its Delivery Date is the existing plan's own proposal (production days from today, the
-read the request form makes), never earlier than the Settings floor; a supplier with no production
-days cannot be sent and the review names the fix. From there nothing is new: the Purchasing Approver
-decides the request on the request (no self-approval, as for every request), PO Duty issues the PO
-and sends it there, and the existing approval, issue and sending Work carries each step. The two
-acts keep their own actor and time; no quantity skips approval. The page adds no approval door, no
-issue door and no purchasing writer.
+**Measured 14 Oct 2026 on the TEST shell preview** (`e2e-kit/kit-forecast.spec.ts`, 10 tests): 1025,
+1164 and 1440 wide; 1164 with the Summary open and with the Tasks panel open; `Suggested` with every
+model open at the three widths; one walk of `Send for approval`. No sideways scroll, nothing cut, a
+size line's numbers under its model's, and `carres-check.js` answers PASS in every state. Fixture
+evidence is not production evidence.
 
-**Recheck before issuing — FACT, read 14 Oct 2026 (`manual-purchase.ts` `POST /issue`).** The
-existing issue door refuses a request that is unknown, refused, withdrawn, not approved or sent
-back, re-reads what each line still has to issue on the locked row (a stale tab is refused) and
-refuses when nothing is left. A request changed and sent again needs its approval again. 🟡 It does
-NOT re-net free stock for a request that buys extra (§9.2: `additional_stock` never nets shelf
-stock), so stock that arrives between the request and the PO is seen by the person issuing, on the
-request's `Free Stock · Already On PO · Still Needed`, and is not refused by the door. The 14 Oct
-ruling asks for coverage to be revalidated before issuance and also forbids a new writer; whether
-the existing door should gain that refusal is the Manual Purchase door's decision, not built here.
+**REMAINING GAPS.**
 
-**A size is never asked for twice.** What an open `Ready Stock` request that buys extra still has to
-put on a PO counts as stock on its way: the suggestion nets free stock, PO stock and that. `Free
-stock` on the page stays what is here or on a PO; a size shows each request under it
-(`{MPR No} · {pcs} · {state}`, opening the request) and what a PO holds (`On PO · {pcs}`). A size
-fully asked for cannot be ticked and its tick says where the request stands. `Ordered` lists the
-models with stock on its way. A refused or withdrawn request asks for nothing, so its size is
-suggested again. `Send for approval` reads the forecast again first: if a ticked size's
-suggestion is no longer what the review shows, nothing is sent and the person checks again.
-
-**Measured 13 Oct 2026 on the TEST shell preview** (`e2e-kit/kit-forecast.spec.ts`): 1025, 1164 and
-1440 wide, then 1164 with the Summary open and with the Tasks panel open; rows closed, one model
-open, one size ticked. No sideways scroll, nothing cut, a size line's numbers under its model's, and
-`carres-check.js` answers PASS in every state. Fixture evidence is not production evidence.
-
-**NOT BUILT, and why (the 14 Oct ruling says it approves none of these).**
-
-| Item | State |
-|---|---|
-| `Place PO` on this page | **Ruled out, 2026-10-14 (A).** The page sends for approval; the PO is issued on the request by PO Duty after approval |
-| `Skip this week` | Not approved (no Skip policy). Not built; a size nobody asks for simply stays suggested |
-| Timed `Undo` | Not approved. Before approval the requester withdraws the request; after a PO is issued the correction is `Cancel goods not received` (§5.8.1) |
-| Weekly task per supplier and category, owner PO Duty | Not approved (no weekly task cadence). Not built. The request's own approval and issue Work exists and is unchanged |
-
-**Where the handoff differs from law — the design file's version is PROPOSAL / NOT LAW.**
-
-- **`Create {n} PO` · `Place {n} PO` · `Skip this week`.** Superseded by the 14 Oct ruling. The page
-  says `Review {n} PO` and `Send for approval`, the Manual Purchase Request's own verb.
-- **Supplier by product.** The handoff names the supplier by category (mattress Nice Future,
-  bedframe Ohana). The Portal reads Catalog's supplier per SKU, which is the one owner of that fact;
-  no category rule is written into code.
-
-**DATA GAP — FACT, measured 13 Oct 2026.** The owner's rule keeps one Jager colour as stock
-(PC151-01). Catalog records a bedframe by model and size only (`JAGER-K`, `JAGER-Q`, ...) and a Sales
-Order line carries no colour, so the Portal cannot tell that colour apart: Jager counts every colour,
-and the page prints Catalog's name, `Jager`. The page states nothing about a colour it cannot read.
-
-**Open, not in this build (handoff).** A Settings screen for the stock level per size (today the
-system works it out). The AutoCount import of monthly sales (the page reads Portal Sales Orders
-only). Supplier contacts for suppliers not yet in the Portal.
+- **Algorithm and stock models are PROPOSAL** (table above). The page should not be relied on for
+  real buying until the owner rules on them.
+- **Jager colour.** The handoff keeps one Jager colour as stock (PC151-01). Catalog records a
+  bedframe by model and size only and a Sales Order line carries no colour, so the Portal cannot
+  tell that colour apart: the page lists `Jager` and counts every colour.
+- **The issue recheck lives in the API door**, where the one forecast arithmetic lives (Law D). The
+  SQL creation authority `purchasing_issue_pos_batch` does not repeat it; every Portal issue of a
+  request goes through the API door.
+- **A request raised on the request page for the same size** counts as in progress (it lowers what
+  can still be asked) but carries no forecast mark, so the issue recheck does not look at it. That is
+  the "ordinary rules preserved" half of the ruling.
+- **Not approved, not built:** `Skip this week`, timed `Undo` (before approval the requester
+  withdraws; after a PO the correction is `Cancel goods not received`, §5.8.1), a weekly PO Duty
+  task, a Settings screen for the stock level or the stock models, an AutoCount import of sales.
 
 ---
 

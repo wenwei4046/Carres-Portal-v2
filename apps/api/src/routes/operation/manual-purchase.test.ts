@@ -15,6 +15,15 @@ vi.mock("../../lib/duties", () => ({
 vi.mock("../../lib/purchase-demand-read", () => ({
   readFreeStock: vi.fn(),
 }));
+/* The forecast recheck before a PO (owner ruling 2026-10-14, A) has its own
+   tests (`forecast-purchase.test.ts`, `manual-purchase.forecast-issue.test.ts`).
+   No request in this file was asked for by Forecast Purchase, so here it lets
+   every issue through and makes no database call of its own: this file reads
+   the creation payload by its position among the calls. */
+vi.mock("../../lib/forecast-purchase-read", () => ({
+  forecastIssueRefusal: vi.fn().mockResolvedValue(null),
+  forecastItemWord: vi.fn(),
+}));
 vi.mock("../../lib/purchasing-settings", () => ({
   // The frozen ETA arithmetic is the SHARED function; the loader is mocked to
   // a minimal settings shape whose arithmetic degrades to `today` — this test

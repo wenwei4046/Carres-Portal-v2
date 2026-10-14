@@ -15,8 +15,9 @@ export const weekdayWord = (iso: string) => fmtDate(iso).split(",")[0] ?? "";
 /** `1 pc` · `{n} pcs`. */
 export const pcs = (n: number) => `${n} ${n === 1 ? "pc" : "pcs"}`;
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-/** `1 PO` · `{n} POs`. */
-export const poCount = (n: number) => count(n, "PO", "POs");
+/** `1 Manual Purchase Request` · `{n} Manual Purchase Requests`: the page's
+ *  own name for what it raises. Nothing here is a PO until PO Duty issues one. */
+export const requestCount = (n: number) => count(n, "Manual Purchase Request", "Manual Purchase Requests");
 /** `mattress` to `Mattress`: Catalog's category as a word. */
 export const categoryWord = (category: string) => (category ? category[0]!.toUpperCase() + category.slice(1) : "");
 /** A request's state, in the Manual Purchase Request's own words. */
@@ -55,8 +56,10 @@ export const FORECAST_PURCHASE = {
   openRequest: (no: string | null) => `Open ${no ?? "the request"}`,
   selectModel: (model: string) => `Select ${model}`,
   selectSize: (model: string, size: string) => `Select ${model} ${size}`,
-  selected: (sizes: number, pieces: number, pos: number) => `${count(sizes, "item", "items")} selected · ${pcs(pieces)} · ${poCount(pos)}`,
-  reviewButton: (pos: number) => `Review ${poCount(pos)}`,
+  /* The bar says what is ticked; its button says how many requests that
+     makes. Nothing on the bar is called a PO: no PO exists before approval. */
+  selected: (sizes: number, pieces: number) => `${count(sizes, "item", "items")} selected · ${pcs(pieces)}`,
+  reviewButton: (requests: number) => `Review ${count(requests, "request", "requests")}`,
   footer: (models: number) => `${count(models, "model", "models")} · in pcs · suggestion only, you decide`,
   footerOf: (shown: number, models: number) => `${shown} of ${count(models, "model", "models")} · in pcs · suggestion only, you decide`,
   weeklyForecast: "Weekly forecast",
@@ -66,16 +69,16 @@ export const FORECAST_PURCHASE = {
   /* PROPOSAL: the design gives no words for an empty list. */
   empty: "No Outright mattress or Jager bedframe was sold in the last 3 months, so there is nothing to suggest.",
   nothingSuggested: "Nothing is suggested this week. Free stock covers the last 14 days of sales.",
-  nothingOrdered: "Nothing is waiting for approval or on a PO.",
+  nothingOrdered: "Nothing is on a PO.",
   noMatch: "No model matches. Clear the search to see every model.",
   search: "Search model or supplier",
   couldNotRead: "The forecast could not be read. Try again.",
-  review: (pos: number) => `Review ${poCount(pos)}`,
+  review: (requests: number) => `Review ${requestCount(requests)}`,
   reviewLine: (pieces: number) => `${pcs(pieces)} · Outright · back to stock level`,
   reviewItem: "Item",
   reviewQty: "Qty",
   reviewSupplier: "Supplier",
-  reviewNote: "Outright stock: buys each size back to its stock level. One PO per supplier and category. Sales orders take this stock first; SO Batch only buys what stock cannot cover.",
+  reviewNote: "Outright stock: asks for each size back to its stock level. One Manual Purchase Request per supplier and category; each becomes one PO after approval. Sales orders take this stock first; SO Batch only buys what stock cannot cover.",
   back: "Back",
   /* Owner ruling 2026-10-14 (A): the page asks, the Purchasing Approver
      approves, PO Duty issues and sends. The verb is the Manual Purchase
@@ -89,14 +92,8 @@ export const FORECAST_PURCHASE = {
   leadNotSet: "Production days are not set",
   leadFix: (supplier: string, category: string) => `Add production days for ${supplier} · ${categoryWord(category)} in Settings`,
   sendLeadNotSet: "Send: lead days are not set",
-  planLoading: "Working out the Delivery Date",
-  planFailed: "The Delivery Date could not be worked out. Try again.",
   whoNext: (approver: string | null, poDuty: string | null) =>
     `${approver ? `${approver} approves.` : "Nobody holds Purchasing Approver."} ${poDuty ?? "PO Duty"} then issues the PO and sends it to the supplier.`,
-  /* What the request says it is for, on the Manual Purchase Request. */
-  requirement: (monday: string) => `Forecast Purchase · week of ${fmtDate(monday, { year: "always" })}`,
   sent: (requests: number) => `${count(requests, "request", "requests")} sent for approval`,
-  sentSome: (sent: number, all: number) => `${sent} of ${count(all, "request", "requests")} sent for approval. The rest were not sent.`,
-  sendFailed: "The request was not sent. Try again.",
-  changed: "The suggestion changed while this was open. Nothing was sent. Check the list and review again.",
+  sendFailed: "The request was not sent. Press Send for approval again.",
 } as const;
