@@ -128,7 +128,13 @@ describe("its words", () => {
 describe("Notes to follow up", () => {
   it("lists every note in its group, in words", async () => {
     show("/finance/notes-to-follow-up");
-    const first = await screen.findByTestId(`note-row-${NOTE1}`);
+    await screen.findByTestId(`note-row-${NOTE1}`);
+    // From and Last follow-up wait in Columns at first (Chew 2026-10-14).
+    expect(screen.getByTestId(`note-row-${NOTE1}`)).not.toHaveTextContent("Not followed up yet");
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "From" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Last follow-up" }));
+    const first = screen.getByTestId(`note-row-${NOTE1}`);
     expect(first).toHaveTextContent("Lumen Sofa Works");
     expect(first).toHaveTextContent("Credit note");
     expect(first).toHaveTextContent("Price differs from PO");

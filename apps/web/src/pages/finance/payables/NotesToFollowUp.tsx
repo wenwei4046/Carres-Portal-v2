@@ -102,7 +102,7 @@ function NotesRegister() {
       filterValue: (r) => word(NOTE_KIND_WORD, r.kind), filterType: "enum" },
     { key: "why", label: "Why", width: 180, accessor: (r) => word(NOTE_REASON_WORD, r.reason),
       filterValue: (r) => word(NOTE_REASON_WORD, r.reason), filterType: "enum" },
-    { key: "from", label: "From", width: 200, wrap: true, accessor: noteFromWord,
+    { key: "from", label: "From", width: 200, wrap: true, defaultHidden: true, accessor: noteFromWord,
       searchValue: (r) => [noteFromWord(r), r.remark, r.grn_no, r.po_id].filter(Boolean).join(" ") },
     { key: "amount", label: "Amount", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.amount),
       numberValue: (r) => num(r.amount), exportValue: (r) => num(r.amount) ?? "" },
@@ -111,7 +111,7 @@ function NotesRegister() {
     { key: "next", label: "Next follow-up", headerLines: ["Next", "follow-up"], width: W.date,
       accessor: (r) => (!isOpen(r) ? "" : r.next_follow_up_on ? fmtDate(r.next_follow_up_on) : "Not set"),
       dateValue: (r) => r.next_follow_up_on, filterType: "date", exportValue: (r) => r.next_follow_up_on ?? "" },
-    { key: "last", label: "Last follow-up", width: 280, wrap: true,
+    { key: "last", label: "Last follow-up", width: 280, wrap: true, defaultHidden: true,
       accessor: (r) => (r.last_contact ? `${fmtDate(r.last_contact.contacted_on)} · ${r.last_contact.said}` : "Not followed up yet"),
       searchValue: (r) => r.last_contact?.said ?? "" },
     { key: "status", label: "Status", width: 120, accessor: (r) => word(NOTE_STATUS_WORD, r.status),
@@ -128,7 +128,7 @@ function NotesRegister() {
             columns={columns}
             rowKey={(r) => r.id}
             rowTestId={(r) => `note-row-${r.id}`}
-            storageKey="carres.finance.notes-to-follow-up.v2"
+            storageKey="carres.finance.notes-to-follow-up.v3"
             appearance="reference"
             look="finance"
             exportName="Notes to follow up"

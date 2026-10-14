@@ -95,7 +95,7 @@ export default function CommissionRates({ toolbarStart }: { toolbarStart: React.
       { key: "from", label: "From", width: 140, sortable: false, accessor: fromWord, exportValue: (r) => r.startsOn ?? "" },
       { key: "state", label: "Status", width: 130, sortable: false, filterType: "enum", accessor: (r) => STATE_WORD[r.state] },
       { key: "memo", label: "Memo", width: 320, wrap: true, sortable: false, accessor: (r) => r.memo ?? "No memo", searchValue: (r) => r.memo ?? "" },
-      { key: "added", label: "Added", width: 200, sortable: false, filterable: false, accessor: addedWord },
+      { key: "added", label: "Added", width: 200, sortable: false, defaultHidden: true, filterable: false, accessor: addedWord },
     ],
     [],
   );
@@ -108,7 +108,7 @@ export default function CommissionRates({ toolbarStart }: { toolbarStart: React.
           rows={rules}
           columns={columns}
           rowKey={(r) => r.id}
-          storageKey="carres.finance.commission-rates.v2"
+          storageKey="carres.finance.commission-rates.v3"
           appearance="reference"
           look="finance"
           groupBanner={false}

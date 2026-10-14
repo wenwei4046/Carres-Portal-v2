@@ -41,7 +41,7 @@ import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { ReadFailed } from "../payables/PayablesParts";
 import { recentMonths } from "./period";
-import { FINANCE_WIDTH } from "../finance-widths";
+import { FINANCE_WIDTH, amountCell } from "../finance-widths";
 
 /** The month before today's, as YYYY-MM: the last month that has ended. */
 export function lastEndedMonth(today: string): string {
@@ -104,8 +104,8 @@ export default function StockValue() {
     { key: "value", label: "Value", width: FINANCE_WIDTH.amount, align: "right",
       accessor: (u) => { const v = valueOf(u); return v === null ? "" : rm(v); },
       numberValue: valueOf, exportValue: (u) => valueOf(u) ?? "",
-      footerTotal: (rows) => amount(rows.reduce((s, u) => s + Math.round((valueOf(u) ?? 0) * 100), 0)) },
-    { key: "po", label: "PO No", width: W.documentNo, accessor: (u) => u.po_no ?? "", searchValue: (u) => u.po_no ?? "" },
+      footerTotal: (rows) => amountCell(rows.reduce((s, u) => s + Math.round((valueOf(u) ?? 0) * 100), 0) / 100) },
+    { key: "po", label: "PO No", width: W.documentNo, defaultHidden: true, accessor: (u) => u.po_no ?? "", searchValue: (u) => u.po_no ?? "" },
   ], []);
 
   return <div className="flex h-full min-h-0 flex-col">
@@ -139,7 +139,7 @@ export default function StockValue() {
       <ListPageShell register>
         <DataGrid rows={query.data?.units ?? []} columns={columns} rowKey={(u) => u.id}
           rowTestId={(u) => `stock-value-row-${u.unit_code}`}
-          storageKey="carres.finance.stock-value.v2" appearance="reference" look="finance" exportName={`Stock value ${monthEnd}`}
+          storageKey="carres.finance.stock-value.v3" appearance="reference" look="finance" exportName={`Stock value ${monthEnd}`}
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess} wrapToolbar
           searchPlaceholder="Search Units…"
           emptyMessage={`Carres held no Unit at the end of ${fmtDate(monthEnd, { year: "always" })}.`}

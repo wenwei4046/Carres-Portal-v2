@@ -111,13 +111,13 @@ function DebitNoteRegister() {
       dateValue: (r) => r.due_date, filterType: "date", exportValue: (r) => r.due_date ?? "" },
     { key: "total", label: "Total", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.total_amount),
       numberValue: (r) => num(r.total_amount), exportValue: (r) => num(r.total_amount) ?? "" },
-    { key: "paid", label: "Paid", width: FINANCE_WIDTH.amount, align: "right",
+    { key: "paid", label: "Paid", width: FINANCE_WIDTH.amount, defaultHidden: true, align: "right",
       accessor: (r) => (r.status === "confirmed" ? amountCell(r.paid_total) : ""),
       numberValue: (r) => num(r.paid_total), exportValue: (r) => num(r.paid_total) ?? "" },
     { key: "open", label: "Left to pay", headerLines: ["Left to", "pay"], width: FINANCE_WIDTH.amount, align: "right",
       accessor: (r) => (r.status === "confirmed" ? amountCell(r.debit_open) : ""),
       numberValue: (r) => num(r.debit_open), exportValue: (r) => num(r.debit_open) ?? "" },
-    { key: "files", label: "Files", width: W.qty, align: "right", accessor: (r) => String(r.file_count),
+    { key: "files", label: "Files", width: W.qty, align: "right", defaultHidden: true, accessor: (r) => String(r.file_count),
       numberValue: (r) => r.file_count },
   ], []);
 
@@ -131,7 +131,7 @@ function DebitNoteRegister() {
             columns={columns}
             rowKey={(r) => r.id}
             rowTestId={(r) => `debit-note-row-${r.id}`}
-            storageKey="carres.finance.debit-notes.v2"
+            storageKey="carres.finance.debit-notes.v3"
             appearance="reference"
             look="finance"
             exportName="Debit Notes"

@@ -102,7 +102,7 @@ export default function Collection() {
     const money = (key: string, label: string, pick: (r: CollectionRow) => number, lines?: readonly [string, string]): DataGridColumn<CollectionRow> => ({
       key, label, headerLines: lines, width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(pick(r) / 100),
       numberValue: (r) => pick(r) / 100, exportValue: (r) => pick(r) / 100,
-      footerTotal: (rows) => amount(rows.reduce((s, r) => s + pick(r), 0)),
+      footerTotal: (rows) => amountCell(rows.reduce((s, r) => s + pick(r), 0) / 100),
     });
     const name: DataGridColumn<CollectionRow> = { key: "who", label: "Salesperson", width: 220, wrap: true, accessor: who,
       searchValue: who, exportValue: who };

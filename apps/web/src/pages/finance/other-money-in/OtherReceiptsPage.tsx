@@ -170,6 +170,7 @@ function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         label: "What for",
         width: 260,
         wrap: true,
+        defaultHidden: true,
         accessor: (r) => r.what ?? "Not available",
         searchValue: (r) => [r.what, r.reference, r.narration].filter(Boolean).join(" "),
       },
@@ -234,7 +235,7 @@ function ReceiptRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         rows={query.data ?? []}
         columns={columns}
         rowKey={(r) => r.receipt_id}
-        storageKey="carres.finance.other-receipts.v2"
+        storageKey="carres.finance.other-receipts.v3"
         appearance="reference"
         look="finance"
         exportName="Other receipts"

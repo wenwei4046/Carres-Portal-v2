@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { generalLedgerBlocks, type GeneralLedgerAnswer, type GeneralLedgerWireRow } from "@carres/shared/general-ledger";
 import { itSaysNoBannedWord } from "@/test/banned-words";
 import GeneralLedger, { generalLedgerSheet } from "./GeneralLedger";
+import look from "../finance-look.module.css";
 
 /* Finance → Ledger → General Ledger (0639; Chew 2026-10-03). The reads are
    answered by URL; names and figures are invented. */
@@ -94,6 +95,25 @@ describe("General Ledger (0639)", () => {
     expect(table).toHaveTextContent("2110 Trade payables · Liability");
     expect(table).toHaveTextContent("RM 1,500.00 Credit");
     expect(screen.getByTestId("general-ledger-summary")).toHaveTextContent("2 accounts");
+  });
+
+  /* FINANCE LOOK (Chew 2026-10-14, 「A」). */
+  it("wears the Finance look: Brought forward and each Total marked, a zero total blank, a zero balance kept", async () => {
+    show();
+    const table = await screen.findByTestId("general-ledger");
+    expect(table.parentElement).toHaveClass(look.statement);
+    // As wide as its columns: 110 + 140 + 150 + 150 + 260 + 128 + 128 + 170.
+    expect(table.parentElement!.style.getPropertyValue("--fin-table-width")).toBe("1236px");
+    const rows = within(table).getAllByTestId("general-ledger-row");
+    const cells = (tr: HTMLElement) => Array.from(tr.children).map((td) => td.textContent?.trim() ?? "");
+    const brought = rows.filter((tr) => tr.querySelector('[data-fin-tone="brought"]'));
+    const totals = rows.filter((tr) => tr.querySelector('[data-fin-tone="total"]'));
+    expect(brought).toHaveLength(2);
+    expect(totals).toHaveLength(2);
+    expect(cells(brought[0]!)).toEqual(["", "", "", "", "Brought forward", "", "", "RM 1,000.00 Debit"]);
+    expect(cells(totals[0]!)).toEqual(["", "", "", "", "Total", "RM 250.50", "RM 1,500.00", "RM 249.50 Credit"]);
+    // Trade payables credited nothing: its Total's Credit is blank, its balance at zero prints.
+    expect(cells(totals[1]!)).toEqual(["", "", "", "", "Total", "RM 1,500.00", "", "RM 0.00"]);
   });
 
   it("an entry number opens the entry on the Journal", async () => {

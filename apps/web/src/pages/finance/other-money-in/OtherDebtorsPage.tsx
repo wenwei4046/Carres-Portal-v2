@@ -158,6 +158,7 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         label: "What for",
         width: 240,
         wrap: true,
+        defaultHidden: true,
         accessor: whatFor,
         searchValue: (r) => [r.first_line, r.reference, r.narration].filter(Boolean).join(" "),
         exportValue: whatFor,
@@ -218,7 +219,7 @@ function InvoiceRegister({ onOpen, onNew }: { onOpen: (id: string) => void; onNe
         rows={query.data ?? []}
         columns={columns}
         rowKey={(r) => r.invoice_id}
-        storageKey="carres.finance.other-debtor-invoices.v2"
+        storageKey="carres.finance.other-debtor-invoices.v3"
         appearance="reference"
         look="finance"
         exportName="Other debtor invoices"
@@ -306,12 +307,14 @@ function PartyRegister({ onNewInvoice }: { onNewInvoice: (partyId: string | null
         key: "registration",
         label: "SSM or IC number",
         width: 170,
+        defaultHidden: true,
         accessor: (r) => r.registration_no ?? "No number on file",
       },
       {
         key: "phone",
         label: "Phone",
         width: 140,
+        defaultHidden: true,
         accessor: (r) => r.phone ?? "No phone on file",
       },
       {
@@ -360,7 +363,7 @@ function PartyRegister({ onNewInvoice }: { onNewInvoice: (partyId: string | null
         rows={query.data ?? []}
         columns={columns}
         rowKey={(r) => r.party_id}
-        storageKey="carres.finance.other-debtor-parties.v2"
+        storageKey="carres.finance.other-debtor-parties.v3"
         appearance="reference"
         look="finance"
         exportName="Other debtor parties"

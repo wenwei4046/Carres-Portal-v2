@@ -12,6 +12,12 @@
  * It is the statement shape of the ledger pages (kit DataTable with a band per
  * account), not a Register: a sort or a filter would pull a line away from the
  * balance before it. A search narrows the accounts shown, never the lines.
+ *
+ * FINANCE LOOK (Chew 2026-10-14, 「A」): the table wears finance-look.module.css,
+ * as the statements do: a light blue header, a hairline between columns, the
+ * table as wide as its columns, Brought forward light grey, each account's
+ * Total light grey and 600 with the heavy rule above. A zero debit or credit
+ * is a blank cell, the Total's too; a Balance at zero prints, being the answer.
  */
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -22,7 +28,6 @@ import DatePicker from "@/components/kit/DatePicker";
 import SearchInput from "@/components/kit/SearchInput";
 import Select from "@/components/kit/Select";
 import { appTodayIso, fmtDate, fmtMonth } from "@/lib/fmt-date";
-import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { useGeneralLedger } from "./ledger-queries";
 import { balanceWords } from "./LedgerJournal";
@@ -31,7 +36,9 @@ import { noOpening, type PackSheet } from "../month-end-pack";
 import { ReadFailed } from "../payables/PayablesParts";
 import ExportStatement from "../reports/ExportStatement";
 import { monthChoices, monthEnd, readPeriod, wholeMonth } from "../reports/period";
-import { STATEMENT_LINK } from "../reports/StatementTable";
+import { STATEMENT_LINK, tableWidth } from "../reports/StatementTable";
+import look from "../finance-look.module.css";
+import { FINANCE_WIDTH, amountCell } from "../finance-widths";
 
 type Row =
   | { id: string; code: string; kind: "opening"; block: GeneralLedgerBlock }
@@ -46,25 +53,31 @@ function rowsOf(blocks: GeneralLedgerBlock[]): Row[] {
   ]);
 }
 
-const money = (n: number) => (Math.round(n * 100) === 0 ? "" : rm(n));
+const money = amountCell;
 const strong = (text: string) => <span className="font-semibold">{text}</span>;
 
+/** Each column's pixels, so the table is as wide as its columns. */
+const WIDTH = { date: 110, entry: 140, source: 150, document: 150, description: 260, balance: 170 } as const;
+const TABLE_WIDTH = tableWidth([WIDTH.date, WIDTH.entry, WIDTH.source, WIDTH.document, WIDTH.description,
+  FINANCE_WIDTH.amount, FINANCE_WIDTH.amount, WIDTH.balance]);
+
 const COLUMNS: readonly Column<Row>[] = [
-  { key: "date", label: "Date", width: "110px", cell: (r) => (r.kind === "line" ? fmtDate(r.line.entryDate) : "") },
-  { key: "entry", label: "Entry No", width: "140px",
+  { key: "date", label: "Date", width: `${WIDTH.date}px`, cell: (r) => (r.kind === "line" ? fmtDate(r.line.entryDate) : "") },
+  { key: "entry", label: "Entry No", width: `${WIDTH.entry}px`,
     cell: (r) => (r.kind === "line"
       ? <Link className={STATEMENT_LINK} to={`/finance/ledger?${new URLSearchParams({ entry: r.line.entryNo }).toString()}`}>{r.line.entryNo}</Link>
       : "") },
-  { key: "source", label: "Source", width: "150px", cell: (r) => (r.kind === "line" ? ledgerSourceWord(r.line.sourceType) : "") },
-  { key: "document", label: "Document", width: "150px", cell: (r) => (r.kind === "line" ? ledgerDocWord(r.line.docNo) : "") },
-  { key: "description", label: "Description", width: "auto",
-    cell: (r) => (r.kind === "opening" ? "Brought forward" : r.kind === "total" ? strong("Total")
-      : <span title={r.line.description ?? "No memo"}>{r.line.description ?? "No memo"}</span>) },
-  { key: "debit", label: "Debit", width: "120px", align: "right", numeric: true,
-    cell: (r) => (r.kind === "line" ? money(r.line.debit) : r.kind === "total" ? strong(rm(r.block.totalDebit)) : "") },
-  { key: "credit", label: "Credit", width: "120px", align: "right", numeric: true,
-    cell: (r) => (r.kind === "line" ? money(r.line.credit) : r.kind === "total" ? strong(rm(r.block.totalCredit)) : "") },
-  { key: "balance", label: "Balance", width: "170px", align: "right", numeric: true,
+  { key: "source", label: "Source", width: `${WIDTH.source}px`, cell: (r) => (r.kind === "line" ? ledgerSourceWord(r.line.sourceType) : "") },
+  { key: "document", label: "Document", width: `${WIDTH.document}px`, cell: (r) => (r.kind === "line" ? ledgerDocWord(r.line.docNo) : "") },
+  { key: "description", label: "Description", width: `${WIDTH.description}px`,
+    cell: (r) => (r.kind === "opening" ? <span data-fin-tone="brought">Brought forward</span>
+      : r.kind === "total" ? <span data-fin-tone="total" className="font-semibold">Total</span>
+      : <span className="whitespace-normal" title={r.line.description ?? "No memo"}>{r.line.description ?? "No memo"}</span>) },
+  { key: "debit", label: "Debit", width: `${FINANCE_WIDTH.amount}px`, align: "right", numeric: true,
+    cell: (r) => (r.kind === "line" ? money(r.line.debit) : r.kind === "total" ? strong(money(r.block.totalDebit)) : "") },
+  { key: "credit", label: "Credit", width: `${FINANCE_WIDTH.amount}px`, align: "right", numeric: true,
+    cell: (r) => (r.kind === "line" ? money(r.line.credit) : r.kind === "total" ? strong(money(r.block.totalCredit)) : "") },
+  { key: "balance", label: "Balance", width: `${WIDTH.balance}px`, align: "right", numeric: true,
     cell: (r) => r.kind === "opening" ? balanceWords(r.block.kind, r.block.opening)
       : r.kind === "line" ? balanceWords(r.block.kind, r.line.balance)
       : strong(balanceWords(r.block.kind, r.block.closing)) },
@@ -164,13 +177,13 @@ export default function GeneralLedger() {
           : beforeStart && goLive ? <p className="text-body" data-testid="general-ledger-before-start">
               The ledger started on {fmtDate(goLive)}. Pick a day from then on.</p>
           : !ready ? <p className="text-body" role="status">Loading the General Ledger…</p>
-          : <DataTable label="General Ledger" testId="general-ledger" rowTestId="general-ledger-row" rows={rowsOf(shown)}
+          : <div className={look.statement} style={TABLE_WIDTH}><DataTable label="General Ledger" testId="general-ledger" rowTestId="general-ledger-row" rows={rowsOf(shown)}
               columns={COLUMNS} rowId={(r) => r.id}
               empty={search.trim() ? "No account matches this search." : "No account moved or carried a balance in this period."}
               group={{
                 keyOf: (r) => r.code,
                 header: (r) => <span className="font-semibold">{r.block.code} {r.block.name} · {ledgerKindWord(r.block.kind)}</span>,
-              }} />}
+              }} /></div>}
           {ready && <p className="text-body text-kit-slate-11" data-testid="general-ledger-summary">
             {shown.length} {shown.length === 1 ? "account" : "accounts"}
             {search.trim() && Array.isArray(blocks) ? ` of ${blocks.length}` : ""} · {fmtDate(from)} to {fmtDate(to)}

@@ -67,10 +67,10 @@ export default function CommissionStatement({
     { key: "due", label: "Due", width: 130, sortable: false, filterable: false, accessor: (l) => (l.due ? fmtDate(l.due) : ""), exportValue: (l) => l.due ?? "" },
     { key: "owed", label: "Commission", width: FINANCE_WIDTH.amount, align: "right", sortable: false, filterable: false,
       accessor: (l) => (l.kind === "payment" ? "" : amountCell(l.owed)), exportValue: (l) => (l.kind === "payment" ? "" : l.owed),
-      footerTotal: (ls) => rm(ls.reduce((s, l) => s + l.owed, 0)) },
+      footerTotal: (ls) => amountCell(ls.reduce((s, l) => s + l.owed, 0)) },
     { key: "paid", label: "Paid", width: FINANCE_WIDTH.amount, align: "right", sortable: false, filterable: false,
       accessor: (l) => (l.kind === "payment" ? amountCell(l.paid) : ""), exportValue: (l) => (l.kind === "payment" ? l.paid : ""),
-      footerTotal: (ls) => rm(ls.reduce((s, l) => s + l.paid, 0)) },
+      footerTotal: (ls) => amountCell(ls.reduce((s, l) => s + l.paid, 0)) },
     { key: "balance", label: "Balance", width: FINANCE_WIDTH.amount, align: "right", sortable: false, filterable: false,
       accessor: (l) => rm(l.balance), exportValue: (l) => l.balance },
   ], []);

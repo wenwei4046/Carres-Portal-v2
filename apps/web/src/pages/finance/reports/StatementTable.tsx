@@ -14,6 +14,9 @@
  * bottom line the total (the same, with a heavy rule above). An account at
  * RM 0.00 already prints no line. A heading's subtotal, a section's total and
  * the bottom line still print RM 0.00: on a statement that zero is the answer.
+ * An account's code and its name are two columns, the code alone the link, and
+ * the name wraps rather than being cut; the table is as wide as its columns
+ * (Chew 2026-10-14, 「A」).
  */
 import { Link } from "react-router-dom";
 import { isZeroMoney, ledgerKindWord } from "@carres/shared/finance-ledger";
@@ -23,6 +26,7 @@ import Tooltip from "@/components/kit/Tooltip";
 import { rm } from "@/lib/format-currency";
 import type { StatementLine, StatementSection } from "./report-queries";
 import look from "../finance-look.module.css";
+import { FINANCE_WIDTH } from "../finance-widths";
 
 // The line under a section where every account is at RM 0.00 (YH, 14 Sep
 // 2026). Reports and the month-end pack print the same words.
@@ -38,6 +42,16 @@ const NOTHING_ON_DAY: Record<string, string> = {
 /** Profit and Loss: `No income in this period.` · `No expenses in this period.` */
 /** A statement line's account link: one line, cut with … when it is long. */
 export const STATEMENT_LINK = "min-w-0 truncate underline underline-offset-2";
+/** The Finance look's code link (Chew 2026-10-13): the code alone, dotted. */
+export const CODE_LINK = "underline decoration-dotted underline-offset-[3px]";
+
+/** The width a Finance-look kit table is drawn at: its columns' pixels, so it
+ *  is as wide as its columns and never stretched to the page. */
+export const tableWidth = (widths: readonly number[]): React.CSSProperties =>
+  ({ "--fin-table-width": `${widths.reduce((s, w) => s + w, 0)}px` }) as React.CSSProperties;
+
+/** The statement's columns, in pixels: Code, the name, Amount. */
+const NAME_WIDTH = 320;
 
 export const nothingInPeriod = (section: string): string => NOTHING_IN_PERIOD[section] ?? NOTHING_IN_PERIOD.INCOME!;
 /** Balance Sheet: `No assets on this day.` · `No liabilities …` · `No equity …` */
@@ -208,7 +222,7 @@ export default function StatementTable({
   nothing: (section: string) => string;
   accountHref: (code: string) => string;
   /** A note about an account, or null for none. It shows in the tooltip of a
-   *  small mark after the account name, so the row stays one line. */
+   *  small mark after the account name. */
   lineNote?: (line: Pick<StatementLine, "code" | "reclassified" | "reclassifiedFor">) => string | null;
   /** The strip under the last row. Null: no strip. */
   bottomLine: { label: string; amount: number } | null;
@@ -216,27 +230,32 @@ export default function StatementTable({
   const bySection = new Map(sections.map((s) => [s.kind, s]));
   const rows = statementRows(sections);
 
-  // The amount column is fixed and the account takes what is left, so a
-  // figure is never cut. At 70% / 30% a 375px phone gave the amount 70px and
-  // cut `RM 4,185.00` (measured in the Finance preview, 2026-10-03).
+  // Every column is the width of what it holds (the Finance look): the code,
+  // the name, which wraps rather than being cut, and the amount, which fits
+  // RM 1,234,567.89. The table is as wide as the three.
   const columns: Column<StatementRow>[] = [
+    {
+      key: "code",
+      label: "Code",
+      width: `${FINANCE_WIDTH.code}px`,
+      cell: (r) => (r.kind === "line"
+        ? <Link className={CODE_LINK} to={accountHref(r.code)}>{r.code}</Link>
+        : null),
+    },
     {
       key: "account",
       label: "Account",
-      width: "auto",
+      width: `${NAME_WIDTH}px`,
       cell: (r) => {
         switch (r.kind) {
           case "group":
-            return <span data-fin-tone="subtotal" className={`font-semibold ${indent(r.depth)}`}>{r.name}</span>;
+            return <span data-fin-tone="subtotal" className={`whitespace-normal font-semibold ${indent(r.depth)}`}>{r.name}</span>;
           case "line": {
-            // The account link, then (only when there is a note) a mark that
-            // shows the note on hover or keyboard focus. A long name cuts off
-            // with "…"; the mark never does.
+            // The name, then (only when there is a note) a mark that shows the
+            // note on hover or keyboard focus. The name wraps; the mark stays.
             const note = lineNote?.(r) ?? null;
             return <span className={`flex items-center ${indent(r.depth)}`}>
-              <Link className={STATEMENT_LINK} to={accountHref(r.code)}>
-                {r.code} {r.name ?? "Account name not available"}
-              </Link>
+              <span className="min-w-0 whitespace-normal">{r.name ?? "Account name not available"}</span>
               {note && <Tooltip content={note}>
                 <Button variant="ghost" size="sm" icon="help" aria-label={note} />
               </Tooltip>}
@@ -245,14 +264,14 @@ export default function StatementTable({
           case "unclosed":
             return "Net result not yet closed";
           case "nothing":
-            return <span className="text-kit-slate-11">{nothing(r.section)}</span>;
+            return <span className="whitespace-normal text-kit-slate-11">{nothing(r.section)}</span>;
         }
       },
     },
     {
       key: "amount",
       label: "Amount",
-      width: "140px",
+      width: `${FINANCE_WIDTH.amount}px`,
       align: "right",
       numeric: true,
       cell: (r) => {
@@ -262,15 +281,16 @@ export default function StatementTable({
     },
   ];
 
+  // A band and the bottom line read across the code and the name.
   const band = (r: StatementRow): readonly GroupRowCell[] => {
     const s = bySection.get(r.section);
     return [
-      { content: <span className="font-semibold">{ledgerKindWord(r.section)}</span> },
+      { span: 2, content: <span className="font-semibold">{ledgerKindWord(r.section)}</span> },
       { align: "right", content: s ? <span className="font-semibold tabular-nums">{rm(s.total)}</span> : null },
     ];
   };
 
-  return <div className={look.statement}><DataTable
+  return <div className={look.statement} style={tableWidth([FINANCE_WIDTH.code, NAME_WIDTH, FINANCE_WIDTH.amount])}><DataTable
     label={label}
     testId={testId}
     rowTestId={`${testId}-row`}
@@ -283,7 +303,7 @@ export default function StatementTable({
     totals={bottomLine ? {
       label: bottomLine.label,
       cells: () => [
-        { content: <span className="font-semibold">{bottomLine.label}</span> },
+        { span: 2, content: <span className="font-semibold">{bottomLine.label}</span> },
         { align: "right", content: <span className="font-semibold tabular-nums">{rm(bottomLine.amount)}</span> },
       ],
     } : undefined}

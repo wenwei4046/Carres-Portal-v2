@@ -41,13 +41,13 @@ export default function SupplierFinancePage() {
       filterValue: (r) => r.bank_name ?? "", filterType: "enum" },
     { key: "account", label: "Account No", width: 140, accessor: (r) => r.bank_account_no ?? "" },
     { key: "holder", label: "Account holder", width: 200, wrap: true, accessor: (r) => r.bank_account_holder ?? "" },
-    { key: "changed", label: "Last changed", width: 200,
+    { key: "changed", label: "Last changed", width: 200, defaultHidden: true,
       accessor: (r) => (r.updated_at
         ? [fmtDate(r.updated_at, { time: true }), r.updated_by_name].filter(Boolean).join(" · ")
         : ""),
       dateValue: (r) => (r.updated_at ? appDateIsoOf(r.updated_at) : null), filterType: "date" },
-    { key: "tax", label: "Tax No", width: 130, accessor: (r) => r.tax_no ?? "" },
-    { key: "registration", label: "Registration No", width: 140, accessor: (r) => r.registration_no ?? "" },
+    { key: "tax", label: "Tax No", width: 130, defaultHidden: true, accessor: (r) => r.tax_no ?? "" },
+    { key: "registration", label: "Registration No", width: 140, defaultHidden: true, accessor: (r) => r.registration_no ?? "" },
     { key: "kind", label: "Creditor Type", width: 130, accessor: (r) => creditorKindWord(r.kind),
       filterValue: (r) => creditorKindWord(r.kind), filterType: "enum" },
   ], []);
@@ -63,7 +63,7 @@ export default function SupplierFinancePage() {
             columns={columns}
             rowKey={(r) => r.supplier_id}
             rowTestId={(r) => `supplier-finance-row-${r.supplier_id}`}
-            storageKey="carres.finance.supplier-finance.v2"
+            storageKey="carres.finance.supplier-finance.v3"
             appearance="reference"
             look="finance"
             exportName="Suppliers"

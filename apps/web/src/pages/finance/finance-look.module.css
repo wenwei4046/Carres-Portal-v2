@@ -3,7 +3,8 @@
    Cash Flow print through StatementTable, which draws the kit DataTable; this
    wrapper gives that table the look the Finance grids get from
    `look="finance"` (DataGrid.module.css `.rootLookFinance`), with the same
-   values. The colours are set here, once, for every statement. */
+   values. The colours are set here, once, for every statement. The General
+   Ledger's kit table wears the same wrapper (Chew 2026-10-14). */
 .statement {
   --fin-head-bg: #E8EEFC;
   --fin-head-ink: #1E3A8A;
@@ -14,6 +15,17 @@
   min-height: 0;
   flex: 1 1 0%;
   flex-direction: column;
+}
+
+/* The table is as wide as its columns, never stretched to the page: the page
+   sets --fin-table-width to the sum of its column widths, and the frame hugs
+   the table. A narrow screen scrolls it sideways. */
+.statement > [data-kit="data-table"] {
+  width: fit-content;
+  max-width: 100%;
+}
+.statement > [data-kit="data-table"] > table {
+  width: var(--fin-table-width, 100%);
 }
 
 /* The header band: light blue, dark blue words, 600. */
@@ -39,6 +51,19 @@
 .statement tr[data-kit="data-row"]:has([data-fin-tone="subtotal"]) > td {
   background: var(--fin-sub-bg);
   font-weight: 600;
+}
+
+/* A line carried in (the General Ledger's Brought forward): light grey. */
+.statement tr[data-kit="data-row"]:has([data-fin-tone="brought"]) > td {
+  background: var(--fin-sub-bg);
+}
+
+/* An account's Total line inside the table (the General Ledger): light grey,
+   600, with the heavy rule above, as the bottom line. */
+.statement tr[data-kit="data-row"]:has([data-fin-tone="total"]) > td {
+  background: var(--fin-sub-bg);
+  font-weight: 600;
+  border-top: 2px solid var(--fin-total-rule);
 }
 
 /* The total: the statement's bottom line, with a heavy rule above. */

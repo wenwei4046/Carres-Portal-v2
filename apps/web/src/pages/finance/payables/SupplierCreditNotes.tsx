@@ -93,13 +93,13 @@ function CreditNoteRegister() {
       filterValue: (r) => word(BILL_STATUS_WORD, r.status), filterType: "enum" },
     { key: "total", label: "Total", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.total_amount),
       numberValue: (r) => num(r.total_amount), exportValue: (r) => num(r.total_amount) ?? "" },
-    { key: "applied", label: "Knocked off", width: FINANCE_WIDTH.amount, align: "right",
+    { key: "applied", label: "Knocked off", width: FINANCE_WIDTH.amount, defaultHidden: true, align: "right",
       accessor: (r) => (r.status === "confirmed" ? amountCell(r.applied_total) : ""),
       numberValue: (r) => num(r.applied_total), exportValue: (r) => num(r.applied_total) ?? "" },
     { key: "open", label: "Left to knock off", headerLines: ["Left to", "knock off"], width: FINANCE_WIDTH.amount, align: "right",
       accessor: (r) => (r.status === "confirmed" ? amountCell(r.credit_open) : ""),
       numberValue: (r) => num(r.credit_open), exportValue: (r) => num(r.credit_open) ?? "" },
-    { key: "files", label: "Files", width: W.qty, align: "right", accessor: (r) => String(r.file_count),
+    { key: "files", label: "Files", width: W.qty, align: "right", defaultHidden: true, accessor: (r) => String(r.file_count),
       numberValue: (r) => r.file_count },
   ], []);
 
@@ -113,7 +113,7 @@ function CreditNoteRegister() {
             columns={columns}
             rowKey={(r) => r.id}
             rowTestId={(r) => `credit-note-row-${r.id}`}
-            storageKey="carres.finance.credit-notes.v2"
+            storageKey="carres.finance.credit-notes.v3"
             appearance="reference"
             look="finance"
             exportName="Credit Notes"

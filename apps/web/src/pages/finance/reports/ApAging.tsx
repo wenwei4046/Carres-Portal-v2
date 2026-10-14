@@ -50,7 +50,7 @@ export const AGING_COLUMN_WORDS: Record<AgingColumns, readonly string[]> = {
 const AMOUNT = FINANCE_WIDTH.amount;
 const link = "text-kit-blue-11 underline underline-offset-2";
 const money = amountCell;
-const sum = (rows: ApAgingRow[], pick: (r: ApAgingRow) => number) => rm(rows.reduce((t, r) => t + Math.round(pick(r) * 100), 0) / 100);
+const sum = (rows: ApAgingRow[], pick: (r: ApAgingRow) => number) => amountCell(rows.reduce((t, r) => t + Math.round(pick(r) * 100), 0) / 100);
 
 function Bills({ row, columns }: { row: ApAgingRow; columns: AgingColumns }) {
   const cols: readonly Column<ApAgingRow["bills"][number]>[] = [
@@ -102,7 +102,7 @@ export default function ApAging() {
     { key: "code", label: "Code", width: FINANCE_WIDTH.code, accessor: (r) => r.code ?? "",
       searchValue: (r) => r.code ?? "", exportValue: (r) => r.code ?? "" },
     // Narrower than a party's usual width, and wrapping, so the seven money columns fit beside it.
-    { key: "supplier", label: "Supplier", width: 200, wrap: true, accessor: (r) => r.name,
+    { key: "supplier", label: "Supplier", width: 140, wrap: true, accessor: (r) => r.name,
       searchValue: (r) => r.name, exportValue: (r) => r.name },
     { key: "kind", label: "Creditor Type", width: 140, accessor: (r) => creditorKindWord(r.kind),
       filterValue: (r) => creditorKindWord(r.kind), filterType: "enum", defaultHidden: true },

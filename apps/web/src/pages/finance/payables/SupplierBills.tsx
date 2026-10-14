@@ -106,11 +106,11 @@ function BillRegister() {
       dateValue: (r) => r.bill_date, filterType: "date", exportValue: (r) => fmtDate(r.bill_date) },
     { key: "supplier", label: "Supplier", width: FINANCE_WIDTH.party, wrap: true, accessor: (r) => r.supplier_name,
       searchValue: (r) => r.supplier_name, filterType: "enum" },
-    { key: "kind", label: "Creditor Type", width: 140, accessor: (r) => creditorKindWord(r.supplier_kind),
+    { key: "kind", label: "Creditor Type", width: 140, defaultHidden: true, accessor: (r) => creditorKindWord(r.supplier_kind),
       filterValue: (r) => creditorKindWord(r.supplier_kind), filterType: "enum" },
-    { key: "invoice", label: "Supplier Invoice", width: 160, accessor: (r) => r.supplier_invoice_no,
+    { key: "invoice", label: "Supplier Invoice", width: 160, defaultHidden: true, accessor: (r) => r.supplier_invoice_no,
       searchValue: (r) => r.supplier_invoice_no },
-    { key: "grn", label: "GRN", width: 160, wrap: true, accessor: (r) => r.grn_nos ?? "Not from a GRN",
+    { key: "grn", label: "GRN", width: 160, defaultHidden: true, wrap: true, accessor: (r) => r.grn_nos ?? "Not from a GRN",
       searchValue: (r) => r.grn_nos ?? "" },
     { key: "due", label: "Due Date", width: 130, accessor: (r) => r.due_date ? fmtDate(r.due_date) : "No due date",
       dateValue: (r) => r.due_date, filterType: "date" },
@@ -121,10 +121,10 @@ function BillRegister() {
     { key: "unpaid", label: "Unpaid", width: FINANCE_WIDTH.amount, align: "right",
       accessor: (r) => r.status === "confirmed" ? amountCell(r.unpaid) : r.status === "cancelled" ? "Cancelled" : "Not confirmed",
       numberValue: (r) => num(r.unpaid), filterType: "number" },
-    { key: "price", label: "Price Check", width: 180,
+    { key: "price", label: "Price Check", width: 180, defaultHidden: true,
       accessor: (r) => priceCheckWord(r),
       filterValue: (r) => r.price_flags > 0 ? "Differs from PO" : "Matches PO", filterType: "enum" },
-    { key: "files", label: "Files", width: 90, align: "right", accessor: (r) => String(r.file_count),
+    { key: "files", label: "Files", width: 90, align: "right", defaultHidden: true, accessor: (r) => String(r.file_count),
       numberValue: (r) => r.file_count },
   ], []);
 
@@ -137,7 +137,7 @@ function BillRegister() {
             rows={rows}
             columns={columns}
             rowKey={(r) => r.id}
-            storageKey="carres.finance.bills.v2"
+            storageKey="carres.finance.bills.v3"
             appearance="reference"
             look="finance"
             exportName="Bills"

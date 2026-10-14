@@ -81,9 +81,13 @@ describe("Journal", () => {
     expect(screen.getByTestId("journal-destination-header")).toBeInTheDocument();
     expect(await screen.findByText("JE-202609-0003")).toBeInTheDocument();
     const table = screen.getByRole("table");
-    for (const label of ["Entry No", "Date", "Source", "Document", "Narration", "Amount", "Reversal"]) {
+    for (const label of ["Entry No", "Date", "Source", "Document", "Narration", "Amount"]) {
       expect(within(table).getAllByText(label).length).toBeGreaterThan(0);
     }
+    // Reversal waits in Columns at first (Chew 2026-10-14).
+    expect(within(table).queryByText("Reversal")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    expect(screen.getByRole("checkbox", { name: "Reversal" })).not.toBeChecked();
     expect(screen.getByText("Sales invoice")).toBeInTheDocument();
     expect(screen.getByText("Supplier bill reversal")).toBeInTheDocument();
     // A key the words do not know yet, and a payment posted under its row id.
@@ -97,6 +101,8 @@ describe("Journal", () => {
   it("links each half of a reversed pair to the other", async () => {
     show();
     await screen.findByText("JE-202609-0003");
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Reversal" }));
     expect(screen.getByText("Reversed by")).toBeInTheDocument();
     expect(screen.getByText("Reverses")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "JE-202609-0005" }));
@@ -255,7 +261,7 @@ describe("one account's running balance", () => {
   });
 
   it("hides the balance while the rows are grouped", async () => {
-    window.localStorage.setItem("carres.finance.journal.v2", JSON.stringify({ groupBy: ["source"] }));
+    window.localStorage.setItem("carres.finance.journal.v3", JSON.stringify({ groupBy: ["source"] }));
     try {
       api.fetch.mockImplementation((u: string) => withLedger(u));
       show("/finance/ledger?account=1210");
@@ -266,7 +272,7 @@ describe("one account's running balance", () => {
       expect(screen.queryByRole("columnheader", { name: "Running balance" })).not.toBeInTheDocument();
       expect(document.body.textContent).not.toMatch(/RM [\d,.]+ (Debit|Credit)/);
     } finally {
-      window.localStorage.removeItem("carres.finance.journal.v2");
+      window.localStorage.removeItem("carres.finance.journal.v3");
     }
   });
 

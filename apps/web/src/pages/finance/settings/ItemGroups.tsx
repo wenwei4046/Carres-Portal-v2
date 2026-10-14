@@ -96,7 +96,7 @@ export default function ItemGroups() {
 
   const columns = useMemo<DataGridColumn<LedgerItemGroup>[]>(
     () => [
-      { key: "name", label: "Item group", width: 200, wrap: true, accessor: (g) => g.name, searchValue: (g) => g.name },
+      { key: "name", label: "Item group", width: 180, wrap: true, accessor: (g) => g.name, searchValue: (g) => g.name },
       ...ITEM_GROUP_ACCOUNTS.map((a): DataGridColumn<LedgerItemGroup> => ({
         key: a.key,
         label: a.label,
@@ -107,7 +107,7 @@ export default function ItemGroups() {
         searchValue: (g) => `${codeOf(g, a.key) ?? ""} ${nameOf(g, a.key) ?? ""}`,
         exportValue: (g) => (codeOf(g, a.key) ? `${codeOf(g, a.key)} ${nameOf(g, a.key) ?? ""}` : ""),
       })),
-      { key: "products", label: "Products", width: 110, align: "right", filterable: false, accessor: (g) => g.products },
+      { key: "products", label: "Products", width: 110, align: "right", defaultHidden: true, filterable: false, accessor: (g) => g.products },
       { key: "status", label: "Status", width: 120, accessor: (g) => (g.active ? "Active" : "Not active"), filterType: "enum" },
     ],
     [],
@@ -124,7 +124,7 @@ export default function ItemGroups() {
           rows={groups}
           columns={columns}
           rowKey={(g) => g.id}
-          storageKey="carres.finance.item-groups.v2"
+          storageKey="carres.finance.item-groups.v3"
           appearance="reference"
           look="finance"
           groupBanner={false}

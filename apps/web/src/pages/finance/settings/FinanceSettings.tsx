@@ -111,10 +111,6 @@ function CardRoutes() {
   return (
     <ListPageShell register>
       <div className="flex min-h-0 flex-1 flex-col" data-testid="card-routes">
-        <p className="px-1 pb-2 pt-3 text-meta text-kit-slate-11">
-          A card account and machine that is not listed here fills in no bank. Whoever records the
-          card payout chooses it.
-        </p>
         <DataGrid
           rows={routes.data ?? []}
           columns={columns}
@@ -128,8 +124,15 @@ function CardRoutes() {
           stickyIdentity
           isLoading={!routes.isSuccess || !accountQuery.isSuccess}
           onRowClick={(r) => setEditing(r)}
+          /* The note says what the table is for, on the toolbar's left beside it. */
+          toolbarStart={
+            <p className="max-w-[560px] text-meta text-kit-slate-11">
+              A card account and machine that is not listed here fills in no bank. Whoever records the
+              card payout chooses it.
+            </p>
+          }
           toolbarEnd={
-            <Button variant="neutral" onClick={() => setEditing(null)} disabled={!accountQuery.isSuccess}>
+            <Button variant="primary" onClick={() => setEditing(null)} disabled={!accountQuery.isSuccess}>
               Add a card payout bank
             </Button>
           }
@@ -176,10 +179,23 @@ function CardRouteModal({ route, accounts, onClose }: { route: CardRouteRow | nu
       }
     >
       <div className="flex flex-col gap-3" data-testid="card-route-form">
-        <Select id="card-route-holding" label={MONEY_ACCOUNT_KIND_WORD.HOLDING} required value={holding} onValueChange={setHolding}
-          options={opts("HOLDING")} disabled={route !== null} placeholder="Choose an account" />
-        <Select id="card-route-channel" label="Machine at" required value={channel}
-          onValueChange={(v) => setChannel(v as CardChannel)} options={CHANNEL_OPTIONS} disabled={route !== null} />
+        {route ? (
+          /* An opened route's card account and machine are fixed: read-only
+             facts are text, never a disabled field (01 §3). */
+          <dl className="grid grid-cols-[160px_1fr] gap-y-2 text-body" data-testid="card-route-facts">
+            <dt className="text-kit-slate-11">{MONEY_ACCOUNT_KIND_WORD.HOLDING}</dt>
+            <dd>{opts("HOLDING").find((o) => o.value === route.holding_code)?.label ?? route.holding_code}</dd>
+            <dt className="text-kit-slate-11">Machine at</dt>
+            <dd>{CARD_CHANNEL_WORD[route.channel]}</dd>
+          </dl>
+        ) : (
+          <>
+            <Select id="card-route-holding" label={MONEY_ACCOUNT_KIND_WORD.HOLDING} required value={holding} onValueChange={setHolding}
+              options={opts("HOLDING")} placeholder="Choose an account" />
+            <Select id="card-route-channel" label="Machine at" required value={channel}
+              onValueChange={(v) => setChannel(v as CardChannel)} options={CHANNEL_OPTIONS} />
+          </>
+        )}
         <Select id="card-route-bank" label="Pays out to" required value={bank} onValueChange={setBank}
           options={opts("BANK")} placeholder="Choose an account" />
         {refusal && <FieldError>{refusal}</FieldError>}

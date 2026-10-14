@@ -131,37 +131,37 @@ function VoucherRegister() {
   const query = usePaymentVouchers(dept);
   const rows = query.data ?? [];
   const columns = useMemo<DataGridColumn<PaymentVoucherRegisterRow>[]>(() => [
-    { key: "voucher", label: "Voucher No", width: 170,
+    { key: "voucher", label: "Voucher No", width: 150,
       accessor: (r) => <Link className="text-kit-blue-11 underline underline-offset-2" to={`/finance/payment-vouchers/${r.id}`}>{r.voucher_no ?? "Draft, no number yet"}</Link>,
       searchValue: (r) => r.voucher_no ?? "", exportValue: (r) => r.voucher_no ?? "Draft, no number yet" },
-    { key: "date", label: "Voucher Date", width: 130, accessor: (r) => fmtDate(r.voucher_date),
+    { key: "date", label: "Voucher Date", width: 120, accessor: (r) => fmtDate(r.voucher_date),
       dateValue: (r) => r.voucher_date, filterType: "date", exportValue: (r) => fmtDate(r.voucher_date) },
     { key: "payee", label: "Payee", width: FINANCE_WIDTH.party, wrap: true, accessor: (r) => r.payee_name, searchValue: (r) => r.payee_name },
-    { key: "supplier", label: "Supplier", width: FINANCE_WIDTH.party, wrap: true, accessor: (r) => r.supplier_name ?? "No supplier",
+    { key: "supplier", label: "Supplier", width: FINANCE_WIDTH.party, defaultHidden: true, wrap: true, accessor: (r) => r.supplier_name ?? "No supplier",
       searchValue: (r) => r.supplier_name ?? "", filterType: "enum" },
-    { key: "purpose", label: "Purpose", width: 160, accessor: (r) => word(VOUCHER_PURPOSE_WORD, r.purpose),
+    { key: "purpose", label: "Purpose", width: 150, accessor: (r) => word(VOUCHER_PURPOSE_WORD, r.purpose),
       filterValue: (r) => word(VOUCHER_PURPOSE_WORD, r.purpose), filterType: "enum" },
     // 0681: the debit notes it pays are listed beside the bills.
-    { key: "bills", label: "Bills and Debit Notes Paid", headerLines: ["Bills and Debit", "Notes Paid"], width: 200, wrap: true,
+    { key: "bills", label: "Bills and Debit Notes Paid", headerLines: ["Bills and Debit", "Notes Paid"], width: 200, defaultHidden: true, wrap: true,
       accessor: (r) => r.bill_nos ?? "No bill", searchValue: (r) => r.bill_nos ?? "" },
     { key: "code", label: "Code", width: FINANCE_WIDTH.code, accessor: (r) => r.pay_from_account_code ?? "" },
-    { key: "from", label: "Paid From", width: 180, wrap: true,
+    { key: "from", label: "Paid From", width: 150, wrap: true,
       accessor: paidFromName, searchValue: paidFromWord, filterType: "enum" },
-    { key: "method", label: "Method", width: 130, accessor: (r) => word(PAY_METHOD_WORD, r.pay_method),
+    { key: "method", label: "Method", width: 130, defaultHidden: true, accessor: (r) => word(PAY_METHOD_WORD, r.pay_method),
       filterValue: (r) => word(PAY_METHOD_WORD, r.pay_method), filterType: "enum" },
     { key: "status", label: "Status", width: 120, accessor: (r) => word(VOUCHER_STATUS_WORD, r.status),
       filterValue: (r) => word(VOUCHER_STATUS_WORD, r.status), filterType: "enum" },
-    { key: "advance", label: "Advance", width: 190, accessor: (r) => advanceCell(r),
+    { key: "advance", label: "Advance", width: 190, defaultHidden: true, accessor: (r) => advanceCell(r),
       numberValue: advanceAmount, exportValue: (r) => num(r.advance_amount) ?? "" },
     { key: "amount", label: "Amount", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.amount),
       numberValue: (r) => num(r.amount), filterType: "number", exportValue: (r) => num(r.amount) ?? "" },
-    { key: "prepared", label: "Prepared By", width: 150, accessor: (r) => r.prepared_by_name ?? "Not prepared yet",
+    { key: "prepared", label: "Prepared By", width: 150, defaultHidden: true, accessor: (r) => r.prepared_by_name ?? "Not prepared yet",
       filterType: "enum" },
-    { key: "checked", label: "Checked By", width: 150, accessor: (r) => r.checked_by_name ?? "Not checked yet",
+    { key: "checked", label: "Checked By", width: 150, defaultHidden: true, accessor: (r) => r.checked_by_name ?? "Not checked yet",
       filterType: "enum" },
-    { key: "approved", label: "Approved By", width: 150, accessor: (r) => r.approved_by_name ?? "Not approved yet",
+    { key: "approved", label: "Approved By", width: 150, defaultHidden: true, accessor: (r) => r.approved_by_name ?? "Not approved yet",
       filterType: "enum" },
-    { key: "files", label: "Files", width: 90, align: "right", accessor: (r) => String(r.file_count),
+    { key: "files", label: "Files", width: 90, align: "right", defaultHidden: true, accessor: (r) => String(r.file_count),
       numberValue: (r) => r.file_count },
   ], []);
 
@@ -175,7 +175,7 @@ function VoucherRegister() {
             rows={rows}
             columns={columns}
             rowKey={(r) => r.id}
-            storageKey="carres.finance.payment-vouchers.v2"
+            storageKey="carres.finance.payment-vouchers.v3"
             appearance="reference"
             look="finance"
             exportName="Payment Vouchers"

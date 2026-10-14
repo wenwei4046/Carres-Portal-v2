@@ -50,7 +50,7 @@ import { amountCell, FINANCE_WIDTH } from "../finance-widths";
 const AMOUNT = FINANCE_WIDTH.amount;
 const link = "text-kit-blue-11 underline underline-offset-2";
 const money = amountCell;
-const sum = (rows: ArAgingRow[], pick: (r: ArAgingRow) => number) => rm(rows.reduce((t, r) => t + Math.round(pick(r) * 100), 0) / 100);
+const sum = (rows: ArAgingRow[], pick: (r: ArAgingRow) => number) => amountCell(rows.reduce((t, r) => t + Math.round(pick(r) * 100), 0) / 100);
 
 // PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0686).
 const KIND_WORD: Record<ArInvoiceKind, string> = {
@@ -121,7 +121,7 @@ export default function ArAging() {
     // Hidden at first, as AP Aging's Creditor Type is, so every age column
     // and Not tied to an invoice fit a 1440 screen beside Channel.
     // Narrower than a party's usual width, and wrapping, so the money columns fit beside it.
-    { key: "debtor", label: "Debtor", width: 200, wrap: true, accessor: (r) => r.name,
+    { key: "debtor", label: "Debtor", width: 110, wrap: true, accessor: (r) => r.name,
       searchValue: (r) => r.name, exportValue: (r) => r.name },
     { key: "type", label: "Debtor Type", width: 130, accessor: debtorTypeWord,
       filterValue: debtorTypeWord, filterType: "enum", defaultHidden: true },

@@ -23,7 +23,6 @@ import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { apiFetch } from "@/lib/api";
 import { fmtMonth } from "@/lib/fmt-date";
-import { rm } from "@/lib/format-currency";
 import { cents } from "../payables/payables-words";
 import { decodeDepartment, DepartmentFilter, useDepartmentParam } from "../department";
 import { LoadFailed } from "../other-money-in/parts";
@@ -107,9 +106,9 @@ export default function CardCharges() {
   const columns = useMemo<DataGridColumn<CardChargeRow>[]>(() => [
     { key: "month", label: "Month", width: 120, accessor: (r) => fmtMonth(r.month), sortFn: (a, b) => a.month.localeCompare(b.month), exportValue: (r) => r.month },
     { key: "acquirer", label: "Card company", width: 160, accessor: (r) => CARD_ACQUIRER_WORD[r.acquirer] },
-    { key: "gross", label: "Sales total", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.gross), numberValue: (r) => r.gross, exportValue: (r) => r.gross, footerTotal: (v) => rm(sum(v, "gross")) },
-    { key: "fee", label: "Fee", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.fee), numberValue: (r) => r.fee, exportValue: (r) => r.fee, footerTotal: (v) => rm(sum(v, "fee")) },
-    { key: "net", label: "Paid into bank", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.net), numberValue: (r) => r.net, exportValue: (r) => r.net, footerTotal: (v) => rm(sum(v, "net")) },
+    { key: "gross", label: "Sales total", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.gross), numberValue: (r) => r.gross, exportValue: (r) => r.gross, footerTotal: (v) => amountCell(sum(v, "gross")) },
+    { key: "fee", label: "Fee", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.fee), numberValue: (r) => r.fee, exportValue: (r) => r.fee, footerTotal: (v) => amountCell(sum(v, "fee")) },
+    { key: "net", label: "Paid into bank", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.net), numberValue: (r) => r.net, exportValue: (r) => r.net, footerTotal: (v) => amountCell(sum(v, "net")) },
     { key: "pct", label: "Fee %", width: 100, align: "right", accessor: (r) => `${r.feePct.toFixed(2)}%`, numberValue: (r) => r.feePct, exportValue: (r) => r.feePct, footerTotal: (v) => `${feePercent(sum(v, "fee"), sum(v, "gross")).toFixed(2)}%` },
   ], []);
 

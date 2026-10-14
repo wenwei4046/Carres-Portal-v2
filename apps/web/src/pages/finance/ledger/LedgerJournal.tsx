@@ -142,18 +142,18 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
   const columns = useMemo<DataGridColumn<LedgerEntryRow>[]>(() => [
     { key: "entry", label: "Entry No", width: 150, accessor: (r) => r.entry_no,
       searchValue: (r) => r.entry_no, filterValue: (r) => r.entry_no, filterType: "numbering" },
-    { key: "date", label: "Date", width: 140, accessor: (r) => fmtDate(r.entry_date),
+    { key: "date", label: "Date", width: 120, accessor: (r) => fmtDate(r.entry_date),
       dateValue: (r) => r.entry_date, filterType: "date", exportValue: (r) => fmtDate(r.entry_date) },
     { key: "source", label: "Source", width: 190, accessor: (r) => ledgerSourceWord(r.source_type),
       searchValue: (r) => ledgerSourceWord(r.source_type), filterType: "enum" },
     { key: "document", label: "Document", width: 170, accessor: (r) => ledgerDocWord(r.source_doc_no),
       searchValue: (r) => ledgerDocWord(r.source_doc_no), filterValue: (r) => ledgerDocWord(r.source_doc_no),
       filterType: "numbering" },
-    { key: "narration", label: "Narration", width: 280, wrap: true, accessor: (r) => r.narration ?? "No narration",
+    { key: "narration", label: "Narration", width: 200, wrap: true, accessor: (r) => r.narration ?? "No narration",
       searchValue: (r) => r.narration ?? "" },
     { key: "amount", label: "Amount", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.total_debit),
       numberValue: (r) => r.total_debit, filterType: "number", exportValue: (r) => r.total_debit },
-    { key: "reversal", label: "Reversal", width: 230,
+    { key: "reversal", label: "Reversal", width: 230, defaultHidden: true,
       accessor: (r) => <ReversalLink row={r} search={search} />,
       searchValue: (r) => ledgerReversalText(r), filterValue: (r) => ledgerReversalKind(r),
       filterType: "enum", exportValue: (r) => ledgerReversalText(r) },
@@ -188,7 +188,7 @@ function JournalRegister({ scope, search, onOpen, onPickDept, onPickAccount, onS
       </div>}
       <ListPageShell register>
         <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id} onSortChange={setSort} onGroupByChange={onGroupByChange}
-          storageKey="carres.finance.journal.v2" appearance="reference" look="finance" exportName="Journal"
+          storageKey="carres.finance.journal.v3" appearance="reference" look="finance" exportName="Journal"
           groupBanner={false} stickyIdentity isLoading={!query.isSuccess}
           searchPlaceholder="Search entries…"
           toolbarStart={<span className="flex items-center gap-3 text-body">

@@ -88,7 +88,7 @@ function RequestRegister() {
     { key: "no", label: "Request No", width: W.documentNo,
       accessor: (r) => <Link className={link} to={`/finance/payment-requests/${r.id}`}>{r.request_no}</Link>,
       searchValue: (r) => r.request_no, exportValue: (r) => r.request_no },
-    { key: "date", label: "Date", width: W.date, accessor: (r) => fmtDate(r.created_at), dateValue: (r) => r.created_at.slice(0, 10),
+    { key: "date", label: "Date", width: W.date, defaultHidden: true, accessor: (r) => fmtDate(r.created_at), dateValue: (r) => r.created_at.slice(0, 10),
       filterType: "date", exportValue: (r) => r.created_at.slice(0, 10) },
     ...(finance ? [{ key: "who", label: "Requested by", width: 160, accessor: (r: PaymentRequestRow) => r.requested_by_name ?? "",
       filterValue: (r: PaymentRequestRow) => r.requested_by_name ?? "", filterType: "enum" as const }] : []),
@@ -99,9 +99,9 @@ function RequestRegister() {
     { key: "stage", label: "Stage", width: 240, accessor: stageOf, filterValue: stageOf, filterType: "enum" },
     { key: "payBy", label: "Pay by", width: W.date, accessor: (r) => (r.pay_by ? fmtDate(r.pay_by) : ""),
       dateValue: (r) => r.pay_by, filterType: "date" },
-    { key: "purpose", label: "What it is for", width: 260, wrap: true, accessor: (r) => r.purpose, searchValue: (r) => r.purpose },
-    { key: "answer", label: "Paid by", width: W.documentNo, accessor: answerOf, searchValue: answerOf },
-    { key: "files", label: "Files", width: W.qty, align: "right", accessor: (r) => String(r.file_count), numberValue: (r) => r.file_count },
+    { key: "purpose", label: "What it is for", width: 260, defaultHidden: true, wrap: true, accessor: (r) => r.purpose, searchValue: (r) => r.purpose },
+    { key: "answer", label: "Paid by", width: W.documentNo, defaultHidden: true, accessor: answerOf, searchValue: answerOf },
+    { key: "files", label: "Files", width: W.qty, align: "right", defaultHidden: true, accessor: (r) => String(r.file_count), numberValue: (r) => r.file_count },
   ], [finance]);
 
   return (
@@ -125,7 +125,7 @@ function RequestRegister() {
             columns={columns}
             rowKey={(r) => r.id}
             rowTestId={(r) => `payment-request-row-${r.request_no}`}
-            storageKey={`carres.finance.payment-requests.${finance ? view : "mine"}.v2`}
+            storageKey={`carres.finance.payment-requests.${finance ? view : "mine"}.v3`}
             appearance="reference"
             look="finance"
             exportName="Payment requests"

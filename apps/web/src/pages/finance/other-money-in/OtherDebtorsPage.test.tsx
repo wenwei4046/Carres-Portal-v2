@@ -64,9 +64,13 @@ describe("Other debtors — the invoice Register", () => {
     await screen.findByText("ARI-20260915-4821");
     expect(screen.getByTestId("other-debtors-destination-header")).toHaveTextContent("Other debtors");
     const table = screen.getByRole("table");
-    for (const label of ["Invoice No", "Invoice Date", "Party", "What for", "Total", "Outstanding", "Due Date", "Status"]) {
+    for (const label of ["Invoice No", "Invoice Date", "Party", "Total", "Outstanding", "Due Date", "Status"]) {
       expect(within(table).getAllByText(label).length).toBeGreaterThan(0);
     }
+    // What for waits in Columns at first (Chew 2026-10-14).
+    expect(screen.queryByText("Office rent September and 1 more")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "What for" }));
     expect(screen.getByText("Draft, no number yet")).toBeInTheDocument();
     expect(screen.getByText("Not issued yet")).toBeInTheDocument();
     expect(screen.getByText("RM 900.00")).toBeInTheDocument();
@@ -205,7 +209,13 @@ describe("Other debtors — the party Register", () => {
     show("/finance/other-debtors?view=parties");
     await screen.findByText("Example Director");
     expect(screen.getByText("Example Sister Sdn Bhd")).toBeInTheDocument();
+    // SSM or IC number and Phone wait in Columns at first (Chew 2026-10-14).
+    expect(screen.queryByText("No number on file")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    expect(screen.getByRole("checkbox", { name: "Phone" })).not.toBeChecked();
+    fireEvent.click(screen.getByRole("checkbox", { name: "SSM or IC number" }));
     expect(screen.getByText("No number on file")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
     expect(screen.getByTestId("other-debtor-parties-summary")).toHaveTextContent("2 parties · RM 900.00 outstanding");
     const nav = screen.getByRole("navigation", { name: "Other debtors" });
     expect(within(nav).getByText("Parties")).toHaveAttribute("aria-current", "page");

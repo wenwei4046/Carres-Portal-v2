@@ -61,8 +61,8 @@ export default function CommissionKpi({ toolbarStart }: { toolbarStart: React.Re
       { key: "period", label: "Count starts again", width: 170, sortable: false, filterType: "enum", accessor: (r) => kpiPeriodWord(r.period) },
       { key: "guarantee", label: "Guarantee", width: 200, wrap: true, sortable: false, accessor: guaranteeWord, searchValue: guaranteeWord },
       { key: "state", label: "Status", width: 130, sortable: false, filterType: "enum", accessor: (r) => STATE_WORD[r.state] },
-      { key: "memo", label: "Memo", width: 260, wrap: true, sortable: false, accessor: (r) => r.memo ?? "No memo", searchValue: (r) => r.memo ?? "" },
-      { key: "added", label: "Added", width: 200, sortable: false, filterable: false, accessor: addedWord },
+      { key: "memo", label: "Memo", width: 260, wrap: true, sortable: false, defaultHidden: true, accessor: (r) => r.memo ?? "No memo", searchValue: (r) => r.memo ?? "" },
+      { key: "added", label: "Added", width: 200, sortable: false, defaultHidden: true, filterable: false, accessor: addedWord },
     ],
     [],
   );
@@ -75,7 +75,7 @@ export default function CommissionKpi({ toolbarStart }: { toolbarStart: React.Re
           rows={rules}
           columns={columns}
           rowKey={(r) => r.id}
-          storageKey="carres.finance.commission-kpi.v2"
+          storageKey="carres.finance.commission-kpi.v3"
           appearance="reference"
           look="finance"
           groupBanner={false}

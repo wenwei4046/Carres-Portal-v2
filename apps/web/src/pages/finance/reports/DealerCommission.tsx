@@ -108,9 +108,9 @@ export default function DealerCommission() {
   const columns = useMemo<DataGridColumn<DcReportRow>[]>(() => [
     { key: "dealer", label: "Dealer", width: FINANCE_WIDTH.party, wrap: true, accessor: (r) => r.dealer, searchValue: (r) => r.dealer },
     { key: "earned", label: "Commission this month", headerLines: ["Commission", "this month"], width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.earned), numberValue: (r) => r.earned, exportValue: (r) => r.earned,
-      footerTotal: (rs) => rm(rs.reduce((s, r) => s + r.earned, 0)) },
+      footerTotal: (rs) => amountCell(rs.reduce((s, r) => s + r.earned, 0)) },
     { key: "still", label: "Commission still to collect", headerLines: ["Commission still", "to collect"], width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.stillToCollect), numberValue: (r) => r.stillToCollect, exportValue: (r) => r.stillToCollect,
-      footerTotal: (rs) => rm(rs.reduce((s, r) => s + r.stillToCollect, 0)) },
+      footerTotal: (rs) => amountCell(rs.reduce((s, r) => s + r.stillToCollect, 0)) },
     { key: "rebate", label: "Rebate this month", headerLines: ["Rebate", "this month"], width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => (r.rebate === null ? "No quota" : amountCell(r.rebate)), numberValue: (r) => r.rebate ?? 0, exportValue: (r) => r.rebate ?? "" },
     { key: "left", label: "Quota left", width: FINANCE_WIDTH.amount, align: "right", numberValue: (r) => r.quotaLeft ?? 0, exportValue: (r) => r.quotaLeft ?? "",
       searchValue: quotaLeftWord,
@@ -125,7 +125,7 @@ export default function DealerCommission() {
       numberValue: (r) => r.kpiUnits, exportValue: (r) => r.kpiUnits },
     { key: "kpi", label: "KPI allowance this month", headerLines: ["KPI allowance", "this month"], width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => (r.kpi === null ? "Not set up" : amountCell(r.kpi)),
       numberValue: (r) => r.kpi ?? 0, exportValue: (r) => r.kpi ?? "",
-      footerTotal: (rs) => rm(rs.reduce((s, r) => s + (r.kpi ?? 0), 0)) },
+      footerTotal: (rs) => amountCell(rs.reduce((s, r) => s + (r.kpi ?? 0), 0)) },
   ], [months, setParams]);
 
   /** The month, dealer and showroom, the same on both report views. */

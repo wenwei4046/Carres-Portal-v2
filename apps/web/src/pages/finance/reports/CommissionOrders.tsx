@@ -52,7 +52,7 @@ export const ORDER_GROUPS: readonly { key: DcOrderGroup; label: string }[] = [
 const soOf = (r: OrderRow) => soWord(r.order);
 const customerOf = (r: OrderRow) => customerWord(r.order);
 
-const sum = (rows: OrderRow[], f: (r: OrderRow) => number) => rm(rows.reduce((s, r) => s + f(r), 0));
+const sum = (rows: OrderRow[], f: (r: OrderRow) => number) => amountCell(rows.reduce((s, r) => s + f(r), 0));
 
 export default function CommissionOrders({
   src,
@@ -78,17 +78,17 @@ export default function CommissionOrders({
     { key: "customer", label: "Customer", width: FINANCE_WIDTH.party, wrap: true, accessor: customerOf, searchValue: customerOf },
     { key: "ordered", label: "Order day", width: 120, accessor: (r) => (r.order.orderedOn ? fmtDate(r.order.orderedOn) : "Day not recorded"),
       exportValue: (r) => r.order.orderedOn ?? "" },
-    { key: "total", label: "Order total", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.terms.total),
+    { key: "total", label: "Order total", width: FINANCE_WIDTH.amount, defaultHidden: true, align: "right", accessor: (r) => amountCell(r.terms.total),
       numberValue: (r) => r.terms.total, exportValue: (r) => r.terms.total },
-    { key: "full", label: "Commission in full", headerLines: ["Commission", "in full"], width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.terms.full),
+    { key: "full", label: "Commission in full", headerLines: ["Commission", "in full"], width: FINANCE_WIDTH.amount, defaultHidden: true, align: "right", accessor: (r) => amountCell(r.terms.full),
       numberValue: (r) => r.terms.full, exportValue: (r) => Math.round(r.terms.full * 100) / 100 },
-    { key: "kept", label: "Paid by month end", headerLines: ["Paid by", "month end"], width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.keptToMonthEnd),
+    { key: "kept", label: "Paid by month end", headerLines: ["Paid by", "month end"], width: FINANCE_WIDTH.amount, defaultHidden: true, align: "right", accessor: (r) => amountCell(r.keptToMonthEnd),
       numberValue: (r) => r.keptToMonthEnd, exportValue: (r) => r.keptToMonthEnd },
     { key: "earned", label: "Commission this month", headerLines: ["Commission", "this month"], width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.earned),
       numberValue: (r) => r.earned, exportValue: (r) => r.earned, footerTotal: (rs) => sum(rs, (r) => r.earned) },
     { key: "still", label: "Still to earn", width: FINANCE_WIDTH.amount, align: "right", accessor: (r) => amountCell(r.stillToEarn),
       numberValue: (r) => r.stillToEarn, exportValue: (r) => r.stillToEarn, footerTotal: (rs) => sum(rs, (r) => r.stillToEarn) },
-    { key: "note", label: "Note", width: 200, wrap: true, filterType: "enum", accessor: noteWord },
+    { key: "note", label: "Note", width: 170, wrap: true, filterType: "enum", accessor: noteWord },
   ], []);
 
   return (
@@ -97,7 +97,7 @@ export default function CommissionOrders({
         rows={rows}
         columns={columns}
         rowKey={(r) => r.order.orderId}
-        storageKey="carres.finance.dealer-commission-orders.v2"
+        storageKey="carres.finance.dealer-commission-orders.v3"
         appearance="reference"
         look="finance"
         exportName={`Dealer commission by order ${month}`}

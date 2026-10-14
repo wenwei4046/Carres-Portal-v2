@@ -139,8 +139,8 @@ export default function CardSettlementPage() {
         exportValue: saleDate,
       },
       { key: "machine", label: "Machine", width: 220, wrap: true, accessor: machine, searchValue: machine },
-      { key: "rows", label: "Sales", width: 80, align: "right", accessor: (d) => String(d.row_count), numberValue: (d) => d.row_count },
-      { key: "matched", label: "Matched", width: 90, align: "right", accessor: (d) => String(d.matched_count), numberValue: (d) => d.matched_count },
+      { key: "rows", label: "Sales", width: 80, align: "right", defaultHidden: true, accessor: (d) => String(d.row_count), numberValue: (d) => d.row_count },
+      { key: "matched", label: "Matched", width: 90, align: "right", defaultHidden: true, accessor: (d) => String(d.matched_count), numberValue: (d) => d.matched_count },
       ...(["gross", "fee", "net"] as const).map<DataGridColumn<CardSettlementDay>>((k) => {
         const v = (d: CardSettlementDay) => (k === "fee" ? dayFee(d) : Number(d[k]));
         return { key: k, label: { gross: "Sales total", fee: "Fee", net: "Paid into bank" }[k], width: FINANCE_WIDTH.amount, align: "right", accessor: (d) => amountCell(v(d)), numberValue: v, exportValue: v };
@@ -150,6 +150,7 @@ export default function CardSettlementPage() {
         label: "Recorded in Carres",
         headerLines: ["Recorded", "in Carres"],
         width: FINANCE_WIDTH.amount,
+        defaultHidden: true,
         align: "right",
         accessor: (d) => (d.recorded === null ? "Nothing matched" : amountCell(d.recorded)),
         numberValue: (d) => Number(d.recorded ?? 0),
@@ -205,7 +206,7 @@ export default function CardSettlementPage() {
             rows={query.data?.days ?? []}
             columns={columns}
             rowKey={dayKey}
-            storageKey="carres.finance.card-settlement.v2"
+            storageKey="carres.finance.card-settlement.v3"
             appearance="reference"
             look="finance"
             exportName="Card settlement"

@@ -74,7 +74,7 @@ export default function MoneyMovesPage() {
       {
         key: "date",
         label: "Date",
-        width: 130,
+        width: 120,
         accessor: (r) => fmtDate(r.move_date),
         dateValue: (r) => r.move_date,
         filterType: "date",
@@ -97,6 +97,7 @@ export default function MoneyMovesPage() {
         key: "fee",
         label: "Fee",
         width: FINANCE_WIDTH.amount,
+        defaultHidden: true,
         align: "right",
         accessor: (r) => amountCell(r.fee),
         numberValue: (r) => Number(r.fee),
@@ -141,7 +142,7 @@ export default function MoneyMovesPage() {
             rows={query.data ?? []}
             columns={columns}
             rowKey={(r) => r.move_id}
-            storageKey="carres.finance.money-moves.v2"
+            storageKey="carres.finance.money-moves.v3"
             appearance="reference"
             look="finance"
             exportName="Money moves"

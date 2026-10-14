@@ -43,7 +43,7 @@ import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import { useDailyBank } from "../ledger/ledger-queries";
-import { FINANCE_WIDTH } from "../finance-widths";
+import { FINANCE_WIDTH, amountCell } from "../finance-widths";
 import { VOUCHER_PURPOSE_WORD } from "../payables/payables-words";
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -53,7 +53,7 @@ const link = "text-kit-blue-11 underline underline-offset-2";
 /** A zero prints nothing, a flow or a balance alike (Finance look, 2026-10-13). */
 const flow = (n: number) => (sen(n) === 0 ? "" : rm(n));
 const total = (rows: DailyBankRow[], pick: (r: DailyBankRow) => number | null) =>
-  rm(rows.reduce((s, r) => s + sen(pick(r) ?? 0), 0) / 100);
+  amountCell(rows.reduce((s, r) => s + sen(pick(r) ?? 0), 0) / 100);
 
 /** One line under an opened account: a posted entry, or a voucher waiting. */
 export interface DailyBankDetail {
@@ -196,15 +196,15 @@ export default function DailyBankPage() {
       accessor: (r) => (r.available === null ? "" : flow(r.pending)),
       numberValue: (r) => (r.available === null ? null : r.pending),
       exportValue: (r) => (r.available === null ? "" : r.pending),
-      footerTotal: (visible) => rm(dailyBankTotals(visible).awaitingApproval) },
+      footerTotal: (visible) => amountCell(dailyBankTotals(visible).awaitingApproval) },
     { key: "available", label: "Available to pay", headerLines: ["Available", "to pay"], width: AMOUNT, align: "right",
       accessor: (r) => (r.available === null ? "" : flow(r.available)),
       numberValue: (r) => r.available, exportValue: (r) => r.available ?? "",
-      footerTotal: (visible) => rm(dailyBankTotals(visible).canMove) },
+      footerTotal: (visible) => amountCell(dailyBankTotals(visible).canMove) },
     { key: "cardPayout", label: "Waiting for card payout", headerLines: ["Waiting for", "card payout"], width: AMOUNT, align: "right",
       accessor: (r) => (r.inTransit === null ? "" : flow(r.inTransit)),
       numberValue: (r) => r.inTransit, exportValue: (r) => r.inTransit ?? "",
-      footerTotal: (visible) => rm(dailyBankTotals(visible).inTransit) },
+      footerTotal: (visible) => amountCell(dailyBankTotals(visible).inTransit) },
   ], [day]);
 
   const notStarted = (query.error as { status?: number } | null)?.status === 409;
