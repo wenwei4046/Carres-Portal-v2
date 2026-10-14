@@ -1264,9 +1264,14 @@ Sales Order baseline pictures unchanged and `kit-outright.spec.ts` green; then `
 
 **Unreachable page (measured 15 Oct 2026).** `pages/operation/SalesOrdersRegister.tsx` is no longer
 routed (`/operation/orders` and `/operation/orders/:stage` render Sales Order Outright); Outright still
-imports three helpers from it. Before the old register is deleted, each capability it had (grouping,
-Columns, Monthly demand, row menu `View · Print`, list PDF) is checked against Outright and either
-kept in Outright or recorded as dropped by the owner.
+imports `skuKey`, `useCatalogNames` and `paymentStatusOf` from it. Outright does not have: grouping
+(`?group=`), per-column sort, the grouped Columns chooser, the role money default, the Monthly demand
+view (`?view=monthly`, still on Purchase Orders), the URL filters `dealer` · `state` · `city` ·
+`delivery` · `category` · `stock` · `payment`, Cards, the row quick card, the row menu `View · Print ·
+Cancel SO`, clickable PO / DO / Receipt / Invoice numbers, money totals in the footer. The one inbound
+door that broke (`?requested=` from Monthly demand) is restored in Outright (PR #2075). Each other
+capability is moved into Outright through Design's fix list or recorded as dropped by the owner before
+the old page is deleted.
 
 **Colour** (measured 2026-07-29): 6,385 colour sites; after the ruler shipped 5,545 of 6,129 measured
 (90.5%), rules O 4,661 · P 594 · Q 111. **Typography:** the `t-*` ramp is retired; sizes carry weight
