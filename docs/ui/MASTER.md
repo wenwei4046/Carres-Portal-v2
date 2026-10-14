@@ -11,7 +11,7 @@
 | Thing | Its one home |
 |---|---|
 | Numbers: type, colour, spacing, radius, icons, component and template measurements | [`../01-design-tokens.md`](../01-design-tokens.md) (§7 is the measurement lookup) |
-| Component API, use and states | [`../02-components.md`](../02-components.md) · `apps/web/src/components/kit/` · live `/ui` |
+| Component API, use and states | **the one kit:** `apps/web/src/components/carres/` and live `/ui` (owner 14 Oct 2026); [`../02-components.md`](../02-components.md) and `components/kit/` describe parts not yet moved into it |
 | Page-pattern examples (Register, Object, Task, Form, Card, Batch, Settings) | [`../03-page-patterns.md`](../03-page-patterns.md) |
 | Every visible word | [`../COPY-STANDARD.md`](../COPY-STANDARD.md) |
 | The compact module card's rules (the Working Panel's card contract) | [`../ui-reference/MODULE-CARD-TEMPLATE.md`](../ui-reference/MODULE-CARD-TEMPLATE.md) |
@@ -69,8 +69,11 @@ accepts → next page.
   Workspace, Tasks and Forecast Purchase are approved and live; each is checked when its turn comes,
   not rebuilt. The new Manual Purchase Request design is not approved: Code does not build it.
 
-Status 14 Oct 2026: the rules are APPROVED; screenshot baselines and per-PR preview URLs are
-APPROVED TARGET / NOT BUILT. No second MASTER, page-local kit or versioned standard is created.
+Status 14 Oct 2026: the rules are APPROVED. BUILT: the per-PR preview (`.github/workflows/preview.yml`,
+PR #2063) and the screenshot baselines (`e2e-kit/kit-baselines.spec.ts`, 45 pictures, PR #2064; the label
+`update-baselines` retakes them). `/ui` shows only the v12 kit parts the pages use (Carres Table and its
+item rows and footer, side panel, toolbar parts, cells, pills); a part a page still draws itself joins
+the kit when that page's turn comes. No second MASTER, page-local kit or versioned standard is created.
 
 **Law order:** Business Rules → Information Architecture → Design System → Implementation; on a
 conflict Business wins. Current target token values are defined in 01; existing component internals require migration to that target. Composition inside the
@@ -104,7 +107,7 @@ not a current pattern: do not copy it from a neighbouring page. Live examples ar
 | Register / listing | `register/DataGrid` | `components/register/DataGrid.tsx` | §6.0 · §6.2 · SO-derived template owner accepted 2026-10-01 · built; adoption per page |
 | Goods expansion | `GoodsMiniTable` + connector | `pages/operation/components/GoodsMiniTable.tsx` · `ConnectedSections.tsx` | §6.9 · built |
 | Simple and document tables | `DataTable` · `DocumentTable` · `TotalsSummary` · `TableScroller` | `components/kit/*` · `components/TableScroller.tsx` | §3 · built |
-| **Compact module card** (the right Working Panel: identity header, Info and module tabs, module summary, editors, Items, Communication, Timeline) | **`CompactModuleCard`** in kit `Drawer variant="compact-card"` — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · `/ui#compact-card` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` | §4.3 · shared component built · Sales Orders adoption PRODUCTION VERIFIED 2026-10-05 (PR #1893/#1896/#1897, `2ce91e2d`) · embedded presentation DEPLOYED (PR #1926, `dc631e1a`, production SHA verified 2026-10-05; owner review owed) · other modules per §4.3.4 table |
+| **Compact module card** (the right Working Panel: identity header, Info and module tabs, module summary, editors, Items, Communication, Timeline) | **`CompactModuleCard`** in kit `Drawer variant="compact-card"` — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` (its `/ui` example left with the earlier kit on 14 Oct 2026; it returns when its page's turn comes) | §4.3 · shared component built · Sales Orders adoption PRODUCTION VERIFIED 2026-10-05 (PR #1893/#1896/#1897, `2ce91e2d`) · embedded presentation DEPLOYED (PR #1926, `dc631e1a`, production SHA verified 2026-10-05; owner review owed) · other modules per §4.3.4 table |
 | Object header + tabs | `SalesOrderTabs` recipe | `pages/operation/SalesOrderTabs.tsx` | §4.1 · accepted; page-owned — no generic ObjectHeader/ObjectPage kit API (KIT GAP) |
 | Object facts | `Block` — the one card · `Panel` · `StatusPill` · `EmptyState` · `Loading` | `components/kit/*` | Existing component built; current visual migration owed |
 | Forms | `Input` · `Textarea` · `Select` · `SearchInput` · `Checkbox` · `DatePicker` · `FieldFrame` | `components/kit/*`, `field-recipe.ts` | Existing component built; current visual migration owed |
@@ -551,7 +554,7 @@ Never copy reference HTML or CSS into a page; never draw a lookalike panel.
   colour, the original requested-date day count, the adapters and the reference differences) live
   **once** in [`MODULE-CARD-TEMPLATE.md`](../ui-reference/MODULE-CARD-TEMPLATE.md). Its numbers live in
   [01 §7.6](../01-design-tokens.md#76-compact-module-card--compactmodulecard); its words in
-  COPY-STANDARD "Compact module card words" (`CARD_WORDS`); `/ui#compact-card` shows it live.
+  COPY-STANDARD "Compact module card words" (`CARD_WORDS`). It is not on `/ui` until its page's turn (one kit, 14 Oct 2026).
 - **Sales fact word — UI Master approved 2026-10-06 (owner ruling: two dates, two names).** The
   card's planned-date fact (`orders.proceed_date`) and its `{n}d` tooltip say **`Planned production
   start`** (`CARD_WORDS.proceedDate`, `CARD_WORDS.dayCountTitle`); `Proceed Date` names only the actual

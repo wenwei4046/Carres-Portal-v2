@@ -11,8 +11,8 @@ the adoption status per module are in UI MASTER §4.3. **Numbers** live in
 "Compact module card words" (`CARD_WORDS`). This file holds the card's rules once.
 
 **Use the kit component, never these files:** `apps/web/src/components/kit/CompactModuleCard.tsx`
-inside the kit `Drawer variant="compact-card"` (live on `/ui#compact-card` with Info and Delivery,
-including the long-address state). The reference page `module-card-reference.html` (SHA-256
+inside the kit `Drawer variant="compact-card"` (its `/ui` example left with the earlier kit on
+14 Oct 2026, UI MASTER one kit; it returns to `/ui` when its page's turn comes). The reference page `module-card-reference.html` (SHA-256
 `98c1ae5396a53143…`, published at `/ui-kit/module-card`; the retired `/ui-kit/delivery-card` and
 `/ui-kit/delivery-card.html` answer with a 301 that keeps the query string) is historical behaviour evidence, not the current visual target.
 `node scripts/compact-card-states.mjs <dev url>` drives both through 25 states at five widths,
