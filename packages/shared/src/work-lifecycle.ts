@@ -67,7 +67,7 @@ export type OperationWorkLifecycle = z.infer<typeof operationWorkLifecycleSchema
  *  Work date, when, by whom, with what result. */
 export const operationWorkCompletedSchema = z.object({
   occurrenceId: z.string().min(5),
-  module: z.enum(["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker"]),
+  module: z.enum(["orders", "purchasing", "receiving", "delivery", "payment", "issue_tracker", "workspace"]),
   ruleKey: z.string().min(1),
   /** The original Work date — the Date filter counts it here (null = No working date). */
   actionOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
