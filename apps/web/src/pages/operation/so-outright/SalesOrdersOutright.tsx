@@ -37,6 +37,7 @@ import {
   isDelivered,
   pcsOf,
   rm,
+  supplierCell,
   type CellContext,
   type LayoutKey,
 } from "./outright-columns";
@@ -487,7 +488,7 @@ export default function SalesOrdersOutright() {
                 return n;
               }),
             label: (r) => (opened.has(r.id) ? "Hide items" : "Show items"),
-            render: (r, grid) => <OrderItems row={r} catalogNames={catalogNames} grid={grid} />,
+            render: (r, grid) => <OrderItems row={r} catalogNames={catalogNames} grid={grid} ctx={ctx} />,
           }}
           renderCell={(r, c) => <CTableCell cell={COLUMNS[c.key]!.cell(r, ctx)} />}
           failure={isError ? <SalesOrderReadFailure error={error} surface="sales-orders-register" onRetry={() => void refetch()} /> : undefined}
@@ -576,10 +577,12 @@ function OrderItems({
   row,
   catalogNames,
   grid,
+  ctx,
 }: {
   row: RegisterRow;
   catalogNames: Map<string, { name: string; variant: string }>;
   grid: CTableGrid;
+  ctx: CellContext;
 }) {
   const items = (row.o.order_lines ?? [])
     .filter((l) => Number(l.qty) > 0)
@@ -590,6 +593,7 @@ function OrderItems({
         name: named?.name ?? lineName(l),
         detail: [named?.variant, l.sku].filter(Boolean).join(" · "),
         qty: qtyWords(Number(l.qty), goodsCategoryWordOf(l) === "Sofa"),
+        supplier: supplierCell(row, ctx, l.id),
       };
     });
   return <CTableItems label={`SO-${row.so}`} grid={grid} items={items} empty="No items on this order" testId={`outright-items-${row.so}`} />;

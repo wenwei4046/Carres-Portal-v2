@@ -16,7 +16,10 @@ import { expect, test, type Page } from "@playwright/test";
  *   check    `carres-check.js`, as the repository ships it, answers PASS
  *   align    `carres-align.js` gives v12's fingerprint (fix list 14 Oct): toolbar
  *            32, tabs 32, the view button with its name, ⋮ 32, header 40 grey
- *            12/500 in the v12 words, rows 54/54, sticky header, pager, no year
+ *            12/500, rows 54/54, sticky header, pager, no year. The one permitted
+ *            difference is a business word: the preserved date keeps its two-line
+ *            header `Customer’s original` / `requested delivery` (owner 14 Oct),
+ *            where v12 says `ETA`
  *
  * This list may scroll sideways in its own box when its columns do not fit
  * (Layout Standard 14 Oct: "the whole table scrolls sideways and the identifier
@@ -25,12 +28,12 @@ import { expect, test, type Page } from "@playwright/test";
 const WIDTHS = [1025, 1164, 1440] as const;
 const CARRES_CHECK = readFileSync(fileURLToPath(new URL("../docs/ui-reference/sales-order-design/carres-check.js", import.meta.url)), "utf8");
 const CARRES_ALIGN = readFileSync(fileURLToPath(new URL("../docs/ui-reference/sales-order-design/carres-align.js", import.meta.url)), "utf8");
-/* v12's fingerprint, the fix list's acceptance (14 Oct 2026). */
+/* v12's fingerprint, the fix list's acceptance (14 Oct 2026), with the owner's header word. */
 const V12 = {
   toolbar: { height: 32, tabs: "32 rgb(226, 228, 232)", viewBtn: "32 · Sales Order", more: 32 },
   table: {
     headH: 40, headBg: "rgb(248, 249, 250)", headFont: "12px/500",
-    headWords: "Proceed date · SO no. · Items · Sales location · Delivery location · ETA",
+    headWords: "Proceed date · SO no. · Items · Sales location · Delivery location · Customer’s originalrequested delivery",
     rowH: "54/54", sticky: "sticky", footer: "pager",
   },
   dates: "no year",
@@ -115,13 +118,13 @@ for (const width of WIDTHS) {
   }
 }
 
-test("Sales Order Outright headers read the v12 words (fix list 14 Oct)", async ({ page }) => {
+test("Sales Order Outright headers read the v12 words and the preserved date's two lines (owner 14 Oct)", async ({ page }) => {
   await page.setViewportSize({ width: 1164, height: 900 });
   await page.goto(PAGE, { waitUntil: "networkidle" });
   await page.locator('[data-testid^="outright-row-"]').first().waitFor();
   const heads = await page.locator(`${TABLE} [role="row"]`).first().locator('[role="columnheader"]').allInnerTexts();
   expect(heads.map((h) => h.replace(/\n/g, " / ")).filter(Boolean)).toEqual([
-    "Proceed date", "SO no.", "Items", "Sales location", "Delivery location", "ETA",
+    "Proceed date", "SO no.", "Items", "Sales location", "Delivery location", "Customer’s original / requested delivery",
   ]);
 });
 

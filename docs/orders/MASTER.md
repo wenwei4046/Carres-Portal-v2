@@ -349,6 +349,13 @@ OWNER SCOPE  an authorised operator may find every order; owner may remain a fil
 Sales is the current delivery priority. Subscription expansion is deferred; preserve authorised
 existing Subscription records and links, without folding its quantities or rules into Outright.
 
+- The Outright list's item rows name each line's supplier from Purchasing's own record (owner
+  14 Oct 2026; BUILT ON BRANCH in PR #2066, not deployed): the non-cancelled POs that source the
+  line (`po_line_sources.order_line_id` → `purchase_orders.supplier_id`), else the Units bound to
+  the line (`ops_stock_items.reserved_order_line_id`, reserved or sold) named by each Unit's own PO
+  line; neither reads `No PO yet`. The Catalog's default supplier is NOT a fallback (not approved),
+  and a fact that was not read never prints `Not recorded`. Counted goods taken from the warehouse
+  have no bound Unit, so no record names their source; that stays a REAL GAP until Stock records it.
 - SO shows source-owned Purchasing, Stock, Delivery and Payment facts, their original record
   links and remaining obligations. Read each owner’s effective calculation and Settings version;
   do not duplicate calculations, clocks, configuration editors or completion writers in Orders.

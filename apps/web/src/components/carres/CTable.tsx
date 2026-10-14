@@ -40,13 +40,16 @@ export type CCell = {
   title?: string;
   /** The full words behind a short second line, e.g. `MS, BF` (hover). */
   subTitle?: string;
+  /** The second line ends with … when its column is short (a customer's name;
+   *  owner 14 Oct 2026); `subTitle` carries the full words on hover. */
+  subClip?: boolean;
 };
 
 export type CTableColumn = {
   key: string;
   label: string;
-  /** The header's full meaning on hover, when its word is short (`ETA`). */
-  hint?: string;
+  /** A long header printed on two lines; `label` stays its accessible name. */
+  head?: readonly [string, string];
   /** The grid track, as v12 sets it (`120px`, `minmax(150px,1fr)`): the
    *  narrowest the column gets; a longer value widens it. */
   width: string;
@@ -76,17 +79,21 @@ export function tableMinWidth(columns: readonly CTableColumn[], selectable: bool
   return lead * TICK + tracks + gaps + 2 * INSET;
 }
 
-/** The header words, on one line; a short word carries its full meaning on hover. */
+/** The header words: one line, or the two lines a long header is split into. */
 export function CTableHead({ column }: { column: CTableColumn }) {
-  return (
-    <span className="whitespace-nowrap text-left leading-[1.25]" title={column.hint}>
-      {column.label}
+  return column.head ? (
+    <span className="text-left leading-[1.25]" title={column.label}>
+      <span className="block whitespace-nowrap">{column.head[0]}</span>
+      <span className="block whitespace-nowrap">{column.head[1]}</span>
     </span>
+  ) : (
+    <span className="whitespace-nowrap text-left leading-[1.25]">{column.label}</span>
   );
 }
 
 /** One body cell: plain words or a pill, then the grey second line, each on one
- *  line. No value is cut with "…": its column widens instead (fix list 14 Oct). */
+ *  line. A value widens its column rather than be cut (fix list 14 Oct); only a
+ *  `subClip` line (the customer's name) ends with …, its full words on hover. */
 export function CTableCell({ cell }: { cell: CCell }) {
   const fg =
     cell.fg === "ink" ? "text-c-ink" : cell.fg === "muted" ? "text-c-muted" : cell.fg === "warn" ? "text-c-warn-fg" : cell.fw === 600 ? "text-c-ink" : "text-c-tab";
@@ -106,7 +113,7 @@ export function CTableCell({ cell }: { cell: CCell }) {
         </span>
       )}
       {cell.sub && (
-        <span className={`whitespace-nowrap text-[12px] ${subFg}`} title={cell.subTitle}>
+        <span className={`${cell.subClip ? "max-w-full truncate" : "whitespace-nowrap"} text-[12px] ${subFg}`} title={cell.subTitle}>
           {cell.sub}
         </span>
       )}
@@ -255,6 +262,7 @@ export default function CTable<R>({
                 <div
                   key={c.key}
                   role="columnheader"
+                  aria-label={c.head ? c.label : undefined}
                   data-ct-col={i}
                   className={`flex min-w-0 self-stretch items-center ${c.align === "end" ? "justify-end" : ""} ${isFrozen(i) ? `${FROZEN} z-[2]` : ""}`}
                   style={isFrozen(i) ? frozenStyle() : undefined}
@@ -340,7 +348,8 @@ export default function CTable<R>({
  * The item rows that ▸ opens under a row (v12 Carres Table): a 32px sub-header
  * on the grey band, then one 44px row per item on the row's own columns. `Item`
  * (the model, then its grey spec line) spans the first three columns and keeps
- * its words in view while the list scrolls sideways; `Qty` sits under the fourth.
+ * its words in view while the list scrolls sideways; `Qty` sits under the fourth
+ * and `Supplier`, when the page gives one, under the fifth and sixth (v12).
  * The ▸ and ☐ spaces stay fixed, so nothing scrolls out from under them.
  */
 export function CTableItems({
@@ -352,8 +361,8 @@ export function CTableItems({
 }: {
   label: string;
   grid: CTableGrid;
-  /** `qty` is the words, `1 pc` · `2 pcs` · `1 set`. */
-  items: readonly { key: string; name: string; detail?: string; qty: string }[];
+  /** `qty` is the words, `1 pc` · `2 pcs` · `1 set`; `supplier` is the owner's cell. */
+  items: readonly { key: string; name: string; detail?: string; qty: string; supplier?: CCell }[];
   /** The line for a row with no items, e.g. `No items on this order`. */
   empty: string;
   testId?: string;
@@ -368,6 +377,8 @@ export function CTableItems({
   ));
   const item = { gridColumn: `${grid.lead + 1} / span 3` };
   const qty = { gridColumn: `${grid.lead + 4} / span 1` };
+  const supplier = { gridColumn: `${grid.lead + 5} / span 2` };
+  const suppliers = items.some((it) => it.supplier);
   const keep = { left: grid.firstLeft };
   return (
     <ItemRows label={label} stepBack={0} testId={testId}>
@@ -377,6 +388,7 @@ export function CTableItems({
           <span className="sticky z-[1] bg-[var(--row-bg)]" style={keep}>Item</span>
         </span>
         <span role="columnheader" style={qty}>Qty</span>
+        {suppliers ? <span role="columnheader" style={supplier}>Supplier</span> : null}
       </div>
       {items.length === 0 ? <div role="row" className="border-t border-c-row-line px-3.5 py-3 text-body text-c-secondary">{empty}</div> : null}
       {items.map((it) => (
@@ -389,6 +401,11 @@ export function CTableItems({
             </span>
           </span>
           <span role="cell" className="whitespace-nowrap text-body tabular-nums text-c-ink" style={qty}>{it.qty}</span>
+          {suppliers ? (
+            <span role="cell" className="flex min-w-0 flex-col text-body" style={supplier}>
+              {it.supplier ? <CTableCell cell={it.supplier} /> : null}
+            </span>
+          ) : null}
         </div>
       ))}
     </ItemRows>

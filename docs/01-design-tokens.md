@@ -155,7 +155,7 @@ The page never scrolls; panels and table bodies scroll inside with thin scrollba
 |---|---|
 | Table card | White, 1px `#E5E7EB`, radius 8 |
 | Header | 40, ground `#F8F9FA`, 12 / 500 `#6B7280`, bottom line `#E5E7EB`, stays on top |
-| List row and group row | 54, cell padding 6 × 14, line `#F1F2F4`. Every cell is one line (fix list 14 Oct 2026): a column is as wide as its longest value, never narrower than its track, and a list wider than its box scrolls sideways in its own box with ▸, ☐ and the identifier fixed. Nothing is cut |
+| List row and group row | 54, cell padding 6 × 14, line `#F1F2F4`. Every cell is one line (fix list 14 Oct 2026): a column is as wide as its longest value, never narrower than its track, and a list wider than its box scrolls sideways in its own box with ▸, ☐ and the identifier fixed. Nothing is cut, except a customer's name under the identifier: it ends with … when its column is short, the full name on hover and in the record (owner 14 Oct 2026). A two-line header (a long business name such as `Customer’s original` / `requested delivery`) stays inside the 40 header |
 | Item row in an expanded list row, and total row | 44 minimum; a long item name wraps and the row grows |
 | Footer | 44, white, top line `#E5E7EB`: the count and totals as one line of words (`72 orders · Qty: Mattress 72 · Pillow 91`), then rows per page and the pager. Two lines at most: when the full words need a third, the short forms show with the full words on hover (fix list 14 Oct 2026) |
 | Expanded row | One box: 1px `#CBD0D6` frame, corners 8, 8 above and below; parent stays white; item sub-header `#F8F9FA`; parent and sub-header stick together under the table header |

@@ -39,7 +39,7 @@ const COLUMNS: CTableColumn[] = [
   { key: "items", label: "Items", width: "120px" },
   { key: "channel", label: "Sales location", width: "minmax(120px,1fr)" },
   { key: "dloc", label: "Delivery location", width: "minmax(170px,1fr)" },
-  { key: "reqDate", label: "ETA", hint: "Customer’s original requested delivery", width: "140px" },
+  { key: "reqDate", label: "Customer’s original requested delivery", head: ["Customer’s original", "requested delivery"], width: "140px" },
 ];
 type Row = { id: string; cells: Record<string, CCell> };
 const ROWS: Row[] = [
@@ -62,14 +62,14 @@ const ROWS: Row[] = [
       items: { t: "2 pcs + 1 set", sub: "MS, SOF", subTitle: "Mattress, Sofa" },
       channel: { t: "TEST Showroom B", sub: "TEST · Staff B" },
       dloc: { t: "Kuala Lumpur", sub: "Kuala Lumpur" },
-      reqDate: { t: "10 Oct", sub: "Sat · passed", subTone: "warn", fw: 500 },
+      reqDate: { t: "Not recorded", fg: "muted" },
     },
   },
   {
     id: "t3",
     cells: {
       proceed: { t: "2 Oct", sub: "Fri", subTone: "muted", fw: 500 },
-      order: { t: "SO-TEST-03", sub: "TEST · a customer name long enough to widen its column", fw: 600, fg: "ink" },
+      order: { t: "SO-TEST-03", sub: "TEST · a customer name long enough to end with an ellipsis", subClip: true, subTitle: "TEST · a customer name long enough to end with an ellipsis", fw: 600, fg: "ink" },
       items: { t: "2 pcs" },
       channel: { t: "Could not read", fg: "warn", title: "Could not read Sales for this order. This does not mean nothing is recorded." },
       dloc: { t: "Johor Bahru", sub: "Johor" },
@@ -174,7 +174,7 @@ export default function UiShowcase() {
         <TableExample narrow />
       </Section>
 
-      <Section id="cells" title="Table cells" note="Main words, then the grey second line, each on one line. Nothing is cut: a long value widens its column and the list scrolls sideways in its own box. A date has no year in this year. Three states are never merged: read and empty, read failed, no access.">
+      <Section id="cells" title="Table cells" note="Main words, then the grey second line, each on one line. A long value widens its column and the list scrolls sideways in its own box; only a customer's name ends with … when its column is short, the full name on hover. A date has no year in this year. Three states are never merged: read and empty, read failed, no access.">
         <div className="grid grid-cols-4 gap-3">
           {CELLS.map(([name, cell]) => (
             <div key={name} className="flex flex-col gap-1.5 rounded-lg bg-c-card p-3 ring-1 ring-inset ring-c-card-border">

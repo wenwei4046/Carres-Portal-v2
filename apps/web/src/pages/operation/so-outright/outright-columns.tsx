@@ -19,7 +19,7 @@ import type { RegisterRow } from "../sales-order-columns";
 import { salesLocationOf } from "../sales-order-columns";
 import type { CPillTone } from "@/components/carres/CPill";
 import type { CCell, CTableColumn } from "@/components/carres/CTable";
-import { appDateIsoOf, appTodayIso, fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 
 export type CellTone = CPillTone | "none";
 
@@ -54,11 +54,6 @@ export function dayCell(iso: string | null | undefined, fw: 400 | 500 = 500): Ce
   return { t, sub: fmtDate(iso).split(",")[0], subTone: "muted", fw };
 }
 
-/** The day has gone by (Malaysia's today). */
-export function isPast(iso: string): boolean {
-  const day = appDateIsoOf(iso);
-  return day !== "" && day < appTodayIso();
-}
 
 /** `RM 14,170` — v8 `rmF`, Inter tabular (never a mono face). */
 export function rm(n: number): string {
@@ -172,6 +167,24 @@ export function timeWords(t: string | null | undefined): string | undefined {
   return v.replace(/\s*[\u2013\u2014]\s*/g, " to ").replace(/(\d(?:\s?[ap]m)?)\s*-\s*(\d)/gi, "$1 to $2");
 }
 
+/**
+ * The item row's `Supplier`: the server's per-line lineage (Orders MASTER Order
+ * Route — the line's PO, else its Unit's PO; never the Catalog). A line with
+ * neither is `No PO yet` (COPY, the SO goods expansion before any PO line); a
+ * read that did not happen is `Could not read`, never `Not recorded`.
+ */
+export function supplierCell(r: RegisterRow, ctx: CellContext, lineId: string | null | undefined): Cell {
+  const read = ctx.owned(r);
+  if (read.state === "loading") return LOADING;
+  if (read.state === "denied") return NO_ACCESS;
+  const line = lineId && read.state === "ok" ? read.facts?.lineSuppliers?.[lineId] : undefined;
+  if (read.state === "failed" || read.failed.suppliers || !line) return couldNotRead("Purchasing", "there is no supplier");
+  if (line.from === "none") return { t: "No PO yet", fg: "muted" };
+  const known = line.names.filter((n): n is string => Boolean(n));
+  if (known.length === 0) return line.names.length > 0 ? NO_ACCESS : NOT_RECORDED;
+  return { t: known.join(", "), fg: "ink" };
+}
+
 const HANDOVER_WORD: Record<NonNullable<OutrightOrderFacts["loading"]["kind"]>, string> = {
   ready_for_handover: "Ready for handover",
   handed_over: "Handed over",
@@ -198,7 +211,9 @@ export const COLUMNS: Record<string, Column> = {
   },
   order: {
     key: "order", label: "SO no.", width: "minmax(150px,1fr)",
-    cell: (r) => ({ t: `SO-${r.so}`, fw: 600, fg: "ink", sub: r.customer || "Not recorded" }),
+    /* The customer's name stays on one line and ends with … when the column is
+       short; the full name is on hover and in the order (owner 14 Oct 2026). */
+    cell: (r) => (r.customer ? { t: `SO-${r.so}`, fw: 600, fg: "ink", sub: r.customer, subClip: true, subTitle: r.customer } : { t: `SO-${r.so}`, fw: 600, fg: "ink", sub: "Not recorded" }),
   },
   items: {
     key: "items", label: "Items", width: "120px",
@@ -217,15 +232,15 @@ export const COLUMNS: Record<string, Column> = {
     },
   },
   reqDate: {
-    /* The customer's original requested delivery, `ETA` on the list (fix list
-       14 Oct, point 1); the full words are the header's hover and stay in the
-       SO detail Delivery card. Line 2 says `· passed` once the day has gone by. */
-    key: "reqDate", label: "ETA", hint: "Customer’s original requested delivery", width: "140px",
+    /* Version 1's preserved request (COPY "SO table and filters" / "SO requested-date
+       header"): two header lines, never `ETA` (Logistics ETA is a separate fact;
+       owner 14 Oct 2026). The day and its weekday; `Delivered` once delivered. */
+    key: "reqDate", label: "Customer’s original requested delivery", width: "140px",
+    head: ["Customer’s original", "requested delivery"],
     cell: (r) => {
       const c = dayCell(r.customerDelivery);
       if (!c) return NOT_RECORDED;
-      if (isDelivered(r)) return { ...c, sub: `${c.sub} · Delivered`, subTone: "ok" };
-      return r.customerDelivery && isPast(r.customerDelivery) ? { ...c, sub: `${c.sub} · passed`, subTone: "warn" } : c;
+      return isDelivered(r) ? { ...c, sub: `${c.sub} · Delivered`, subTone: "ok" } : c;
     },
   },
   stock: {

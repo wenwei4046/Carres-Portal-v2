@@ -23,13 +23,13 @@ describe("/ui — the one Carres UI kit", () => {
     expect(document.querySelector('[data-kit="status-pill"]')).not.toBeInTheDocument();
   });
 
-  it("the Carres Table is the marked table, with one-line v12 headers and the identifier fixed", () => {
+  it("the Carres Table is the marked table, with the preserved date's two-line header and the identifier fixed", () => {
     render(<UiShowcase />);
     const tables = document.querySelectorAll('[data-carres-table="list"]');
     expect(tables).toHaveLength(2);
     const table = within(tables[0] as HTMLElement);
-    /* `ETA` keeps the full words on hover (fix list 14 Oct, point 1) */
-    expect(table.getByRole("columnheader", { name: "ETA" }).querySelector("span")).toHaveAttribute("title", "Customer’s original requested delivery");
+    /* the preserved request keeps its two lines, never ETA (owner 14 Oct 2026) */
+    expect(table.getByRole("columnheader", { name: "Customer’s original requested delivery" })).toHaveTextContent("Customer’s originalrequested delivery");
     /* ▸ · ☐ · Proceed date · SO no. · … */
     const firstHeader = table.getAllByRole("columnheader")[2]!;
     expect(firstHeader).toHaveTextContent("Proceed date");
