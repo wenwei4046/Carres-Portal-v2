@@ -151,12 +151,35 @@ export default function SalesOrdersOutright() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const userId = useAuth((s) => s.user?.id ?? "anon");
+  const latestParams = useRef(params);
+  latestParams.current = params;
+  /* Router setters do not queue functional updates like React state. A grid
+     filter effect in the same clear event must not reintroduce the old search. */
+  const updateParams = useCallback((update: (next: URLSearchParams) => void) => {
+    const next = new URLSearchParams(latestParams.current);
+    update(next);
+    if (next.toString() === latestParams.current.toString()) return;
+    latestParams.current = next;
+    setParams(next, { replace: true });
+  }, [setParams]);
 
   /* ── the real read: every proceeded order, as the register reads it ── */
   const seededSearch = params.get("search") ?? "";
-  const { data, isLoading, isError, error, refetch, dataUpdatedAt } = useSalesOrderRegisterOrders(
+  const { data, isLoading, isError, error, refetch, dataUpdatedAt, isPlaceholderData } = useSalesOrderRegisterOrders(
     seededSearch ? { stage: "proceeded", search: seededSearch } : { stage: "proceeded" },
   );
+  /* The counter is unsearched and permission-scoped. If it is unavailable,
+     only an empty searched answer needs the existing complete unsearched read. */
+  const needsPopulation = Boolean(seededSearch) && !isLoading && !isError && !isPlaceholderData && data?.orders.length === 0 && data.salesOrderTotal == null;
+  const population = useSalesOrderRegisterOrders({ stage: "proceeded" }, needsPopulation);
+  const checkingPopulation = needsPopulation && population.isPending;
+  const populationFailed = needsPopulation && population.isError;
+  const loadingList = isLoading || (isPlaceholderData && data?.orders.length === 0) || checkingPopulation;
+  const failedList = isError || populationFailed;
+  const listError = isError ? error : population.error;
+  const retryList = () => { void (populationFailed ? population.refetch() : refetch()); };
+  const populationEmpty = data?.salesOrderTotal === 0 || (data?.salesOrderTotal == null &&
+    (!seededSearch ? data?.orders.length === 0 : needsPopulation && population.data?.orders.length === 0));
   const catalogNames = useCatalogNames();
   const factsQ = useSalesOrderRegisterFacts(true);
   const facts = factsQ.data?.facts ?? null;
@@ -214,27 +237,21 @@ export default function SalesOrdersOutright() {
   }, [params]);
   const setParam = useCallback(
     (key: string, value: string | null) =>
-      setParams((p) => {
-        const next = new URLSearchParams(p);
+      updateParams((next) => {
         if (value == null) next.delete(key);
         else next.set(key, value);
-        return next;
-      }, { replace: true }),
-    [setParams],
+      }),
+    [updateParams],
   );
   const chooseTab = (next: Tab) =>
-    setParams((p) => {
-      const n = new URLSearchParams(p);
+    updateParams((n) => {
       n.set("tab", next);
-      return n;
-    }, { replace: true });
+    });
   const chooseLayout = (next: LayoutKey) =>
-    setParams((p) => {
-      const n = new URLSearchParams(p);
+    updateParams((n) => {
       n.set("cols", next);
       [...n.keys()].filter((k) => k.startsWith("f.")).forEach((k) => n.delete(k));
-      return n;
-    }, { replace: true });
+    });
 
   const inTab = useCallback(
     (r: RegisterRow) => (tab === "all" ? true : tab === "delivered" ? isDelivered(r) : !isDelivered(r)),
@@ -397,11 +414,11 @@ export default function SalesOrdersOutright() {
     ...Object.entries(filters).map(([k, v]) => ({ key: k, label: `${COLUMNS[k]!.label}: ${v.join(", ")}`, clear: () => setParam(`f.${k}`, null) })),
   ];
   const clearFilters = () =>
-    setParams((p) => {
-      const n = new URLSearchParams(p);
+    updateParams((n) => {
       [...n.keys()].filter((k) => k === "search" || k === "requested" || k.startsWith("f.")).forEach((k) => n.delete(k));
-      return n;
-    }, { replace: true });
+    });
+  const emptyMessage = populationEmpty ? "No sales orders yet" : "No sales orders match these filters";
+  const clearableEmpty = !populationEmpty && Boolean(seededSearch || requested || Object.keys(filters).length);
 
   /* No toolbar control is cut or overlaps (owner 14 Oct 2026); Summary may keep
      its icon only and the view button always keeps its name. On a short line the
@@ -545,15 +562,12 @@ export default function SalesOrdersOutright() {
   const onColumnQuery = useCallback(
     (q: { filters: Record<string, string[]>; sort: { key: string; dir: "asc" | "desc" } | null }) => {
       setSort(q.sort);
-      setParams((p) => {
-        const next = new URLSearchParams(p);
-        const before = next.toString();
+      updateParams((next) => {
         [...next.keys()].filter((key) => key.startsWith("f.")).forEach((key) => next.delete(key));
         for (const [key, values] of Object.entries(q.filters)) for (const v of values) next.append(`f.${key}`, v);
-        return next.toString() === before ? p : next;
-      }, { replace: true });
+      });
     },
-    [setParams, setSort],
+    [updateParams, setSort],
   );
   const fixedGroups =
     group === "delivery"
@@ -589,8 +603,8 @@ export default function SalesOrdersOutright() {
           onPrev={() => setMonth((m) => shiftMonth(m, -1))}
           onNext={() => setMonth((m) => (m < thisMonth ? shiftMonth(m, 1) : m))}
           onHide={() => setSummaryOpen(false)}
-          loading={isLoading}
-          failure={isError ? <SalesOrderReadFailure error={error} surface="sales-orders-register" onRetry={() => void refetch()} /> : undefined}
+          loading={loadingList}
+          failure={failedList ? <SalesOrderReadFailure error={listError} surface="sales-orders-register" onRetry={retryList} /> : undefined}
         />
       )}
       <main className="grid min-h-0 min-w-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-2.5">
@@ -732,15 +746,16 @@ export default function SalesOrdersOutright() {
               label: (_r, isOpen) => (isOpen ? "Hide items" : "Show items"),
               renderExpansion: (r) => <OrderItems row={r} catalogNames={catalogNames} ctx={ctx} drawn={drawn} />,
             }}
-            isLoading={isLoading}
-            errorState={isError ? <SalesOrderReadFailure error={error} surface="sales-orders-register" onRetry={() => void refetch()} /> : undefined}
-            emptyMessage="No orders match."
-            noMatchMessage="No orders match."
+            isLoading={loadingList}
+            errorState={failedList ? <SalesOrderReadFailure error={listError} surface="sales-orders-register" onRetry={retryList} /> : undefined}
+            emptyMessage={emptyMessage}
+            noMatchMessage={clearableEmpty ? emptyMessage : undefined}
+            onClearConditions={clearFilters}
             statusSummary={() => (
               <CListFooter
                 testId="outright-footer"
-                count={isLoading ? "Loading orders" : `${list.length} ${list.length === 1 ? "order" : "orders"}`}
-                {...(isLoading || totals.parts.length === 0 ? {} : { totals })}
+                count={loadingList ? "Loading orders" : `${list.length} ${list.length === 1 ? "order" : "orders"}`}
+                {...(loadingList || totals.parts.length === 0 ? {} : { totals })}
                 pageSize={pageSize}
                 onPageSize={setPageSize}
                 page={Math.min(page, pages)}

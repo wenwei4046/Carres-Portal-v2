@@ -162,6 +162,7 @@ const demandPurchase: SoBatchPurchaseResponse = {
 } as unknown as SoBatchPurchaseResponse;
 
 const realFetch = window.fetch.bind(window);
+let populationReadAttempts = 0;
 window.fetch = async (input, init) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
   const path = new URL(url, window.location.href).pathname;
@@ -265,19 +266,26 @@ window.fetch = async (input, init) => {
   /* The server's paged contract (`paged=1`): 500 per page, placed_at desc then
      id desc, `nextCursor` = the page's last row, the total on page one only. */
   if (/\/api\/operation\/orders(\?|$)/.test(url) && new URL(url, window.location.href).searchParams.get("paged") === "1") {
-    const after = new URL(url, window.location.href).searchParams.get("after");
+    const query = new URL(url, window.location.href).searchParams;
+    const after = query.get("after");
+    /* Declared TEST read states, not a second implementation of business search.
+       An empty searched response keeps the same permitted unsearched population. */
+    if (scenario === "population-retry" && !query.get("search") && populationReadAttempts++ === 0) {
+      return new Response(JSON.stringify({ error: "TEST population read failed" }), { status: 503 });
+    }
     /* Every page read is recorded, so a measurement can show the walk. */
     const reads = ((window as unknown as { __soListPageReads?: string[] }).__soListPageReads ??= []);
     reads.push(new URL(url, window.location.href).search);
     const population = scenario === "empty" ? [] : [...orders].sort((a, b) =>
       b.placed_at.localeCompare(a.placed_at) || b.id.localeCompare(a.id));
+    const answer = query.get("search") && (scenario === "search-empty" || scenario === "population-retry") ? [] : population;
     const keyOf = (o: (typeof orders)[number]) => `${o.placed_at}|${o.id}`;
-    const start = after ? population.findIndex((o) => keyOf(o) === after) + 1 : 0;
-    const page = population.slice(start, start + 500);
+    const start = after ? answer.findIndex((o) => keyOf(o) === after) + 1 : 0;
+    const page = answer.slice(start, start + 500);
     if (PAGE_LATENCY_MS) await new Promise((resolve) => setTimeout(resolve, PAGE_LATENCY_MS));
     return json({
       orders: page,
-      ...(after ? {} : { salesOrderTotal: population.length }),
+      ...(after ? {} : { salesOrderTotal: previewParams.get("total") === "unknown" ? null : population.length }),
       nextCursor: page.length === 500 ? keyOf(page[page.length - 1]!) : null,
     });
   }

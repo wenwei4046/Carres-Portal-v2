@@ -5898,7 +5898,7 @@ export async function fetchEverySalesOrderPage(
  * all read the same complete list. Keyed under `["operation","orders"]`, so
  * an order write's blunt invalidation refreshes it with every other list.
  */
-export function useSalesOrderRegisterOrders(filters: operationOrderFilters) {
+export function useSalesOrderRegisterOrders(filters: operationOrderFilters, enabled = true) {
   return useQuery({
     queryKey: [...qk.operation.orders(filters), "every-page"],
     queryFn: ({ signal }) =>
@@ -5909,6 +5909,7 @@ export function useSalesOrderRegisterOrders(filters: operationOrderFilters) {
         return apiFetch<operationOrdersListResponse>(`/api/operation/orders?${params}`, { signal });
       }),
     staleTime: 30_000,
+    enabled,
     /* Same reason as `useOperationOrders`: a new search keeps the last
        complete list on screen instead of unmounting the grid mid-keystroke. */
     placeholderData: keepPreviousData,

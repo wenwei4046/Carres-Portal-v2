@@ -310,6 +310,11 @@ function SharedParts() {
       <Section id="complete-pages" title="Complete pages" note="Development fixtures using actual page components. These examples do not prove saved records, production permissions or completed business actions.">
         <nav aria-label="Complete page previews" className="flex flex-col gap-3 text-body">
           <a className="underline underline-offset-4" href="/sales-orders-shell-preview.html">Sales Order · list and record opening</a>
+          <a className="underline underline-offset-4" href="/sales-orders-shell-preview.html?scenario=empty">Sales Order · genuinely empty list</a>
+          <a className="underline underline-offset-4" href="/sales-orders-shell-preview.html?scenario=search-empty&amp;search=TEST-NONE&amp;total=unknown">Sales Order · empty search with unknown total</a>
+          <a className="underline underline-offset-4" href="/sales-orders-shell-preview.html?scenario=population-retry&amp;search=TEST-NONE&amp;total=unknown">Sales Order · population read failure and retry</a>
+          <a className="underline underline-offset-4" href="/sales-orders-shell-preview.html?scenario=failed">Sales Order · list read failure</a>
+          <a className="underline underline-offset-4" href="/sales-orders-shell-preview.html?scenario=denied">Sales Order · list access denied</a>
           <a className="underline underline-offset-4" href="/so-workspace-shell-preview.html">Sales Order · full shell and detail</a>
           <a className="underline underline-offset-4" href="/so-workspace-shell-preview.html?state=empty">Sales Order · no payments recorded</a>
           <a className="underline underline-offset-4" href="/so-workspace-shell-preview.html?state=forbidden">Sales Order · payment access denied</a>

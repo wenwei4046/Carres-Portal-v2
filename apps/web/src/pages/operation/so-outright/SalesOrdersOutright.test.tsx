@@ -3,12 +3,18 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { MemoryRouter, Routes, Route, Link, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-const testState = vi.hoisted(() => ({ user: "TEST-return-a", orders: [] as unknown[], names: new Map(), error: null as unknown, loading: false }));
+const testState = vi.hoisted(() => ({ user: "TEST-return-a", orders: [] as unknown[], searchOrders: null as unknown[] | null, total: undefined as number | null | undefined, names: new Map(), error: null as unknown, loading: false, populationLoading:false, populationError:null as unknown }));
 const retry = vi.hoisted(() => vi.fn());
+const populationRetry = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/auth", () => ({ useAuth: Object.assign((select: (s: unknown) => unknown) => select({user:{id:testState.user},role:"operation"}), {getState:()=>({user:{id:testState.user},role:"operation"})}) }));
 vi.mock("@/lib/queries", async () => ({
   ...await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries"),
-  useSalesOrderRegisterOrders: () => ({data:testState.error || testState.loading ? undefined : {orders:testState.orders},isLoading:testState.loading,isError:!!testState.error,error:testState.error,refetch:retry}),
+  useSalesOrderRegisterOrders: (filters: {search?:string}, enabled = true) => {
+    const fallback = !filters.search && testState.searchOrders !== null;
+    const loading = testState.loading || (fallback && enabled && testState.populationLoading);
+    const error = testState.error || (fallback && enabled ? testState.populationError : null);
+    return {data:error || loading ? undefined : {orders:filters.search && testState.searchOrders !== null ? testState.searchOrders : testState.orders,salesOrderTotal:testState.total},isLoading:loading,isPending:loading,isError:!!error,error,refetch:fallback?populationRetry:retry};
+  },
   useSalesOrderRegisterFacts: () => ({data:{facts:{},failed:{}},isPending:false,isError:false}),
 }));
 vi.mock("../sales-order-register-readings", async () => ({
@@ -27,12 +33,13 @@ function Detail() {
   const location = useLocation();
   return <><p>TEST source record</p><Link to={(location.state as {salesOrderRegisterReturn:string}).salesOrderRegisterReturn}>Back to Sales Orders</Link></>;
 }
+function Where() { return <output data-testid="register-location">{useLocation().search}</output>; }
 function mount(at = "/operation/orders?cols=payment&f.payment=Owes") {
   return render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false,enabled:false}}})}>
     <MemoryRouter initialEntries={[at]}><Routes>
       <Route path="/operation/orders" element={<SalesOrdersOutright />} />
       <Route path="/operation/orders/so/:id" element={<Detail />} />
-    </Routes></MemoryRouter>
+    </Routes><Where /></MemoryRouter>
   </QueryClientProvider>);
 }
 const footer = () => screen.getByTestId("outright-footer");
@@ -40,6 +47,7 @@ beforeEach(() => {
   testState.user = `TEST-return-${expect.getState().currentTestName}`;
   localStorage.clear();
   testState.error = null; testState.loading = false; retry.mockClear();
+  testState.searchOrders = null; testState.total = undefined; testState.populationLoading = false; testState.populationError = null; populationRetry.mockClear();
   testState.orders = Array.from({length:60}, (_, n) => ({
     id:`TEST-order-${n+1}`,so:1001+n,status:"proceed_order",operation_stage:"confirmed",
     customer_name:`TEST Customer ${n+1}`,placed_at:"2026-09-01T02:00:00Z",proceeded_at:"2026-09-02T02:00:00Z",
@@ -81,6 +89,50 @@ describe("Outright Summary source states", () => {
     expect(summary).toHaveTextContent("Proceeded orders0");
     expect(summary).toHaveTextContent("Proceeded valueRM 0");
     expect(within(summary).queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("Outright empty population versus filtered empty", () => {
+  it("an authoritative zero shows the genuine empty words without a pointless Clear filters", () => {
+    testState.orders = []; testState.total = 0;
+    mount();
+    expect(screen.getByText("No sales orders yet")).toBeVisible();
+    expect(screen.queryByRole("button", {name:"Clear filters"})).toBeNull();
+  });
+  it("a positive total and empty search keep the search chip and Clear filters restores the permitted list", async () => {
+    testState.searchOrders = []; testState.total = 60;
+    mount("/operation/orders?cols=payment&search=TEST-NONE&f.payment=Owes");
+    expect(screen.getByText("No sales orders match these filters")).toBeVisible();
+    expect(screen.getByRole("button", {name:/Search: TEST-NONE/})).toBeVisible();
+    fireEvent.click(screen.getByRole("button", {name:"Clear filters"}));
+    await waitFor(()=>expect(screen.getByTestId("register-location")).toHaveTextContent(/^\?cols=payment$/));
+    await waitFor(()=>expect(screen.getAllByTestId(/^outright-row-/)).toHaveLength(20));
+    expect(screen.queryByRole("button", {name:/Search: TEST-NONE/})).toBeNull();
+    expect(screen.queryByRole("button", {name:/Payment: Owes/})).toBeNull();
+  });
+  it("an unknown count waits for the unsearched reader rather than guessing either empty face", () => {
+    testState.searchOrders = []; testState.populationLoading = true;
+    mount("/operation/orders?search=TEST-NONE");
+    expect(screen.queryByText("No sales orders yet")).toBeNull();
+    expect(screen.queryByText("No sales orders match these filters")).toBeNull();
+    expect(screen.queryByTestId("outright-footer")).toBeNull();
+    expect(document.querySelectorAll("tbody tr[aria-hidden=true]").length).toBeGreaterThan(0);
+  });
+  it.each([0, 60])("the complete unsearched answer resolves unknown total from %s permitted rows", (count) => {
+    testState.orders = testState.orders.slice(0, count); testState.searchOrders = [];
+    mount("/operation/orders?search=TEST-NONE");
+    expect(screen.getByText(count ? "No sales orders match these filters" : "No sales orders yet")).toBeVisible();
+  });
+  it.each([403, 500])("an unsearched reader returning %s never becomes empty, and only a retryable failure offers Retry", (status) => {
+    testState.searchOrders = []; testState.populationError = new ApiError(status, "TEST hidden error", null);
+    mount("/operation/orders?search=TEST-NONE");
+    expect(screen.getByText(status === 403 ? "You cannot view sales orders" : "Sales orders could not be loaded")).toBeVisible();
+    expect(screen.queryByText("No sales orders yet")).toBeNull();
+    if (status === 403) expect(screen.queryByRole("button", {name:"Try again"})).toBeNull();
+    else {
+      fireEvent.click(screen.getByRole("button", {name:"Try again"}));
+      expect(populationRetry).toHaveBeenCalledTimes(1); expect(retry).not.toHaveBeenCalled();
+    }
   });
 });
 
