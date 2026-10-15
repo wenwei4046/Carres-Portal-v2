@@ -8,6 +8,7 @@
 
 ## Start here · the one Master UI Kit
 
+- **New chat: execute, do not guess.** Read 01 §7's filled measurement checklist and this MASTER §2.2's UX contract before touching UI. For the parts being built, name the approved value, trigger, existing component and `/ui` example. Mark CONFORMS / DEVIATION / NOT APPLICABLE in the existing handoff; a missing value is UNRESOLVED, never an implementation value promoted to law. Do not create another guide or tracker.
 - **Rules:** this MASTER → 01 values → 02 component directory → 03 page composition; COPY and module MASTERs keep business ownership.
 - **Practical reference:** the approved Sales Order Outright v12 direction, improved in existing shared components; no fresh redesign or second kit.
 - **Local catalogue:** `/ui`, implemented by `apps/web/src/pages/dev/UiShowcase.tsx`. The coordinated developer serves it at `http://127.0.0.1:5415/ui`; an address is a local session entry, not permanent hosting or proof of acceptance.

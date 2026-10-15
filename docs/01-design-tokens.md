@@ -210,22 +210,95 @@ Source-specific compact facts are not 54 register rows. Two cards side by side s
 
 Plain grouped rows: name and purpose on the left, value on the right; no box around every setting. Read-only values are plain text. Edit controls appear only during editing. Authorized staff can fill a missing approved setting; `Not set` does not itself remove edit permission. Unapproved business rules remain visibly unresolved. IDs, source, permission, effective treatment and history belong in the detail or disclosure, not repeated in every row. Timing changes do not silently rewrite existing deadlines. The Settings sections are a left section list, never a row of top tabs that wraps (owner 11 Oct 2026); the segmented control is used only for the groups inside one section. Never two facts in one box: a number per category is its own row with its unit (`Production days · Mattress`, a number, `working days`; owner 12 Oct 2026). A group is its title and one line above one bordered list; each row is the setting's name with one short explanation on the left and its value on the right.
 
-## 7 · Canonical component measurements — one lookup
+## 7 · Canonical component measurements — executable checklist
 
-Sections 1 to 6 are the single current measurement lookup. The earlier warm ground, orange default selection, per-theme page ground, Focus chooser, 240 Summary and 32 key-value density are removed. Existing code may still render them while migration proceeds; do not copy them into a new page.
+This replaces the former §7 headings that only redirected the reader elsewhere. This is part of the ONE kit, not another MASTER. Values below are the approved targets already defined in §§1–6, not a claim that current consumers comply. Units are CSS px. A missing value is UNRESOLVED; do not turn an implementation measurement into approved law.
+
+For every used row, record **CONFORMS / DEVIATION / NOT APPLICABLE** in the existing delivery handoff. No second checklist file. Each component contract must account for width, height, min/max, padding, gap, radius, border, icon, type, states, narrow behaviour and keyboard; mark a property N/A only with a reason.
 
 ### 7.1 Shell and controls
-Use §§3–4.
+
+| Check | Approved value | Trigger / behaviour | Shared entry under apps/web/src |
+|---|---|---|---|
+| Navigation | 220 expanded; 64 collapsed | Remember user choice; detail below viewport1100 temporarily64; restore on list | pages/portal/PortalSidebar.tsx |
+| Top bar | Height56; bottom1px #E5E7EB | Same frame across modules | components/kit/PageShell.tsx and existing header adapters |
+| Toolbar | Height36; controls32; one line | Never clipped; narrow give-way policy UNRESOLVED, not permission to hide actions | components/carres/CToolbar.tsx and existing list host |
+| Summary | Width264; rows32; cards8 apart | One headline per section; no duplicate totals | Existing source-summary adapter |
+| Tasks | Width320 | Open task may use spare width at viewport1280+ | pages/operation/components/ShellTasks.tsx |
+| Zones | Gap12 | Panel/table scroll internally; no page sideways overflow | components/kit/PageShell.tsx |
+| Initial panels | Both at1600+; Tasks only1280–1599; both closed below1280 | Viewport rule; user may reopen | Existing shell panel state |
+| List → object | Replace middle list; hide Summary/list toolbar; keep Tasks | Back preserves scope and list context | Existing module object route; do not clone a shell |
+
 ### 7.2 Inputs and toolbar
-Use §3.
+
+| Check | Approved value | Trigger / behaviour | Shared entry under components/ |
+|---|---|---|---|
+| Word button | Height34; toolbar32; panel30; small28; radius8 | Ordinary13/500; main13/600; one main action per area | kit/Button.tsx |
+| Icon-only | Round; no resting fill/border; glyph20 | Toolbar32; ordinary34; small28–32 | kit/Button.tsx; carres/CToolbar.tsx adapter |
+| Hit area | Desktop minimum32; mobile/partner minimum44 | Glyph size is not hit area | Existing owning control |
+| Icons | Material Symbols Rounded outline weight300 | Menu/word18; icon-only20; chip16 | kit/Icon.tsx; carres/MIcon.tsx |
+| Input / search | Height32 /34; radius8 | Mobile interactive target minimum44 | kit/Input.tsx; kit/SearchInput.tsx; kit/field-recipe.ts |
+| Date | Same field role; calendar required | Preserve module disabled-day rules; keyboard pick and focus return | kit/DatePicker.tsx |
+| Field row | Minimum36; label150; label12/400; value13/500 | Long value wraps and increases row height | Existing property-row adapter; kit/field-recipe.ts |
+| Focus | 2px #3965FA; offset2; fields offset0 | Keyboard only; no alternate Focus setting | Shared focus token and owning control |
+| Disabled | Opacity.45 | No click or hover; distinguish disabled from read-only | Existing owning control |
+| Choice chip | Height28; radius8; text12/500; glyph16 | Theme pair only when selected; unselected fill remains proposal in §10 | carres/CToolbar.tsx CChip |
+| Segmented tabs | Track32; radius10; padding3; segment5×12; text13/16 | Selected500, others400; shared selection pair | kit/Tabs.tsx |
+| Status pill | Text12/500; padding3×10; fully round | Always status word; status colours fixed across themes | kit/StatusPill.tsx and existing adapters |
+
 ### 7.3 Surfaces
-Use §§1 and 3.
+
+| Check | Approved value | Trigger / behaviour | Shared entry under components/ |
+|---|---|---|---|
+| Card | White; border1 #E5E7EB; radius8; padding14×16; gap12; no shadow | No card inside a card for decoration | Existing Block; kit/CompactModuleCard.tsx |
+| Card heading | 15/500; gap6 below; internal section18 above | Same role in every panel | Existing shared heading role |
+| Menu | Width250; padding6; radius8; border1 #E5E7EB | Fit window; scroll internally; not clipped | carres/CPopover.tsx CMenu |
+| Menu item | Height32; padding7×10; gap10; icon18; text13/400 | Selected500; mobile target44; group11/500 caps with8 10 4 padding | carres/CPopover.tsx CMenuItem/CMenuGroup |
+| Menu shadow | 0 8px 24px rgba(17,24,39,.12) | Shared token, no page-local shadow | carres/CPopover.tsx |
+| Small choice | Width320 | Up to6 options; closes after pick/outside/Escape | Existing shared picker/CPopover |
+| Large choice | Width380; top64; bottom12 | More than6; search; body scroll; action pinned | kit/Drawer.tsx and owning picker adapter |
+| Dialog | Shadow0 12px 40px rgba(22,24,29,.22) | Shared focus trap/return and scroll isolation | kit/Modal.tsx; kit/DialogFrame.tsx |
+| Toast | Bottom centre; #1F2937/white; text13 | Ordinary2.2–2.6s; task close12s; no timed Undo | kit/Toast.tsx |
+| Avatar | Round; header24 | Fixed colour per person; accessible name/tooltip | Shared generic Avatar remains KIT GAP in02 |
+| Unspecified surface geometry | UNRESOLVED: ordinary dialog size variants, padding/max-height, complete z-layer ladder | Preserve existing unique capability; do not invent a global value | Owning component contract must be completed |
+
 ### 7.4 Goods tables
-Use §5 and the owning module's quantity contract.
+
+| Check | Approved value | Trigger / behaviour | Shared entry under components/ |
+|---|---|---|---|
+| Table frame | White; border1 #E5E7EB; radius8 | One list engine | register/DataGrid |
+| Header | Height40; #F8F9FA; text12/500 #6B7280 | Sticky; two-line heading stays within40 | register/DataGrid |
+| Parent/group row | Height54; padding6×14; column gap10; line#F1F2F4 | Cell content one line; content owns column width | register/DataGrid |
+| Expanded goods/total | Minimum44 | Long item name wraps and grows; preserve quantity ownership | register/ItemRows.tsx |
+| Expansion frame | Border1 #CBD0D6; radius8; above/below8 | Parent white; parent/subheader stick together | register/DataGrid + ItemRows |
+| Detail goods | Header40; row44; columns20 /flex /32 /80 /80; gap10 | Two item lines, no wrap; contained horizontal scroll | carres/COrderLines.tsx |
+| Frozen identity | Expand, tick and identifier fixed | Wider content scrolls inside table; no page overflow | register/DataGrid |
+| Text overflow | Only approved customer-name second line may ellipsize | Full value on hover and in object; other content not silently cut | DataGrid column/cell registry |
+| Number alignment | Right for numbers-only columns | Left column following right gets14 extra | Shared column configuration |
+| Footer | Height44; maximum2 lines | Full total words; approved short forms when a third line would be needed | register/DataGrid footer adapter |
+| Selection bar | Replace ordinary toolbar; buttons32; count13/600 | Same area; scope-correct count; no second toolbar | register/DataGrid selectable |
+
 ### 7.5 Accepted SO-derived template — measurement lookup
-Use §§4–5.
+
+| Check | Approved value / rule | Applies when | Shared entry |
+|---|---|---|---|
+| Detail identity | Record20/600; party13 secondary; Back34; avatars24; chips24; actions34 | One title per object; actions may wrap when narrow | DetailShell + owning module adapter; generic header gap in02 remains explicit |
+| Detail facts | Row minimum36; label150; values wrap | Not register54 density | Existing property-row adapter |
+| Summary strip | Equal columns; label12; label/value gap6; value13/500 | Long value wraps within own column | Existing module summary composition |
+| Read-only | Plain facts; Not recorded #6B7280 | No fabricated zero/false or disabled input | Existing shared fact renderer |
+| Narrow | No page side-scroll; touch44; contained table scroll; cards stack without losing facts | Trigger must name viewport OR available canvas explicitly | Shared host + owning component |
+| Unresolved typography/spacing | Complete per-role line-height set, all field horizontal padding/textarea minimum, unspecified min/max and component breakpoints | Current implementation is MEASURED, not approved law | Complete this contract in place; no new kit |
+
 ### 7.6 Compact module card — CompactModuleCard
-Use §§1 and 3 for surface and control values; preserve the card's host identity, facts, source ownership and action contracts. Its old HTML is behaviour evidence, not a competing visual palette.
+
+| Check | Contract | Owning entry |
+|---|---|---|
+| Surface | Same card/control/type/colour values above; never copy reference HTML CSS | components/kit/CompactModuleCard.tsx |
+| Identity and facts | Host identity, source-linked facts, honest missing/error/permission states | Owning module adapter |
+| Actions | Existing permission and writer; saved result comes from module | Owning module MASTER; no generic Done |
+| Content disclosure | Preserve unique facts and controls; narrow stacking does not remove them | Current module contract in02/03 |
+
+**New-chat execution checklist:** read CLAUDE → UI MASTER §0 current index → this §7 plus §§1–6 for the used roles →02 component API →03 composition → owning MASTER/COPY. Select the actual shared component before implementation. For each used property fill approved value/trigger/component/example; missing values stay UNRESOLVED. No second MASTER, no copied page skin, no invented values. UI MASTER §2.2 owns the UX state contract. Kit standards, page adoption and deployment are separate outcomes.
 
 ## 8 · Verification and migration gaps
 
