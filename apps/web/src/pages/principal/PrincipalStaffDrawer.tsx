@@ -43,7 +43,7 @@ export default function PrincipalStaffDrawer({
         <div className="px-6 pt-5 pb-4 border-b border-base-100 flex items-start justify-between gap-3">
           <div>
             <div className="kicker text-label">HQ · Staff</div>
-            <h2 className="font-display text-title mt-1 tracking-[-0.02em] font-semibold">{orgName}</h2>
+            <h2 className="font-display text-strong mt-1 tracking-[-0.02em]">{orgName}</h2>
             <div className="text-meta text-base-600 mt-1 capitalize">
               {storeKind} · manage sign-in staff &amp; PINs
             </div>
@@ -55,12 +55,12 @@ export default function PrincipalStaffDrawer({
 
         <div className="p-6 flex-1">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-label font-semibold uppercase tracking-[0.08em] text-base-700">Staff</h3>
+            <h3 className="text-label uppercase tracking-[0.06em] text-base-700">Staff</h3>
             <button
               type="button"
               onClick={() => setShowAdd(true)}
               data-testid="principal-staff-add"
-              className="px-3 py-1.5 bg-base-900 text-white text-meta font-semibold rounded hover:bg-base-800 cursor-pointer"
+              className="px-3 py-1.5 bg-base-900 text-white text-body font-semibold rounded hover:bg-base-800 cursor-pointer"
             >
               + Add staff
             </button>
@@ -112,7 +112,7 @@ function StaffRow({ staff, dealerId }: { staff: StaffDto; dealerId: string }) {
             </span>
             <TierBadge tier={staff.staffRole} />
           </div>
-          <div className="text-label text-base-500">
+          <div className="text-meta text-base-500">
             {staff.hasPin ? "PIN set" : "No PIN"}
             {!staff.active && " · inactive"}
           </div>
@@ -122,7 +122,7 @@ function StaffRow({ staff, dealerId }: { staff: StaffDto; dealerId: string }) {
         type="button"
         onClick={() => setShowPin(true)}
         data-testid={`principal-staff-setpin-${staff.id}`}
-        className="text-label font-semibold text-base-700 hover:bg-base-100 rounded px-2 py-1 flex-shrink-0"
+        className="text-body font-medium text-base-700 hover:bg-base-100 rounded px-2 py-1 flex-shrink-0"
       >
         {staff.hasPin ? "Reset PIN" : "Set PIN"}
       </button>

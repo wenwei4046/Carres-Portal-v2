@@ -124,7 +124,7 @@ export default function WarehouseHandoverBlock({
         <Link
           to={outboundHref}
           data-testid="do-object-primary-action"
-          className="btn-primary inline-flex h-7 items-center px-2.5 text-meta"
+          className="btn-primary inline-flex h-7 items-center px-2.5 text-body font-medium"
         >
           Open Outbound
         </Link>
@@ -135,7 +135,7 @@ export default function WarehouseHandoverBlock({
         <button
           type="button"
           data-testid="do-object-primary-action"
-          className="btn-primary inline-flex h-7 items-center px-2.5 text-meta"
+          className="btn-primary inline-flex h-7 items-center px-2.5 text-body font-medium"
           disabled={record.isPending}
           onClick={() => setFormOpen(true)}
         >
@@ -156,7 +156,7 @@ export default function WarehouseHandoverBlock({
 
   return (
     <div className="px-4 py-3 border-t border-base-100" data-testid="handover-block">
-      <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-1.5">
+      <div className="text-label uppercase tracking-[0.06em] text-base-500 mb-1.5">
         Warehouse handover
       </div>
 
@@ -184,7 +184,7 @@ export default function WarehouseHandoverBlock({
                     : ""}
                 </span>
                 {e && (
-                  <span className="block text-label text-base-500">
+                  <span className="block text-meta text-base-500">
                     {e.recorded_by_name || "Recorded"} · {fmtDate(e.recorded_at)}
                     {e.company ? ` · ${e.company}` : ""}
                   </span>
@@ -197,23 +197,23 @@ export default function WarehouseHandoverBlock({
 
       {closed ? null : next === "handed_over" ? (
         <div data-testid="handover-outbound-door">
-          <Link to={outboundHref} className="btn-primary inline-block text-meta py-1.5 px-3">
+          <Link to={outboundHref} className="btn-primary inline-block text-body font-medium py-1.5 px-3">
             Open Outbound
           </Link>
-          <p className="text-label text-base-500 mt-1">
+          <p className="text-meta text-base-500 mt-1">
             Scan, check, pack and hand over the exact Units in Outbound.
           </p>
         </div>
       ) : next === "received_by_logistics" ? (
         <div className="flex flex-col gap-2" data-testid="handover-receipt-form">
-          <span className="text-label text-base-600">
+          <span className="text-meta text-base-500">
             Logistics&rsquo; own count. Correct any quantity that differs; both
             counts stay on record.
           </span>
           <ul className="flex flex-col gap-1">
             {receiptBase.map((g) => (
               <li key={g.sku} className="flex items-center gap-2">
-                <span className="min-w-0 flex-1 truncate font-mono text-label text-base-700">
+                <span className="min-w-0 flex-1 truncate font-mono text-meta text-base-700">
                   {g.sku}
                 </span>
                 <input
@@ -240,7 +240,7 @@ export default function WarehouseHandoverBlock({
             <button
               type="button"
               data-testid="handover-confirm-receipt"
-              className="btn-primary text-meta py-1.5 px-3"
+              className="btn-primary text-body font-medium py-1.5 px-3"
               disabled={record.isPending}
               onClick={() =>
                 recordFact(

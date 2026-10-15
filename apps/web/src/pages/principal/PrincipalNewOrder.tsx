@@ -423,7 +423,7 @@ export default function PrincipalNewOrder() {
     return (
       <div className="min-h-full grid place-items-center p-8">
         <div className="w-full max-w-md bg-card border border-base-200 rounded-lg shadow-sm p-7 text-center">
-          <p className="text-label uppercase tracking-[0.05em] text-base-400">Maintain · New order</p>
+          <p className="text-label uppercase tracking-[0.06em] text-base-500">Maintain · New order</p>
           <h1 className="text-page mt-1">Order SO-{submitted.so} created</h1>
           <p className="text-body text-base-500 mt-2">
             {submitted.customer.name} · {submitted.lines?.length ?? 0} line
@@ -498,7 +498,7 @@ export default function PrincipalNewOrder() {
   return (
     <div className="max-w-5xl mx-auto px-6 py-8 flex flex-col gap-6">
       <header>
-        <p className="text-label uppercase tracking-[0.05em] text-base-400">Maintain · New order</p>
+        <p className="text-label uppercase tracking-[0.06em] text-base-500">Maintain · New order</p>
         <h1 className="text-page mt-1">New Sales Order</h1>
         <p className="text-body text-base-500 mt-1">
           Raw creation, no POS gates. Every line, price and date is saved exactly as you
@@ -894,11 +894,11 @@ export default function PrincipalNewOrder() {
         <div className="flex flex-col gap-2">
           <div className="hidden sm:grid grid-cols-[24px_1fr_180px_70px_110px_100px_64px] gap-2 px-1">
             <span />
-            <span className="text-label uppercase tracking-[0.05em] text-base-400">Product (pick or type)</span>
-            <span className="text-label uppercase tracking-[0.05em] text-base-400">Remarks</span>
-            <span className="text-label uppercase tracking-[0.05em] text-base-400">Qty</span>
-            <span className="text-label uppercase tracking-[0.05em] text-base-400">Unit price</span>
-            <span className="text-label uppercase tracking-[0.05em] text-base-400 text-right">Total</span>
+            <span className="text-meta font-medium text-base-500">Product (pick or type)</span>
+            <span className="text-meta font-medium text-base-500">Remarks</span>
+            <span className="text-meta font-medium text-base-500">Qty</span>
+            <span className="text-meta font-medium text-base-500">Unit price</span>
+            <span className="text-meta font-medium text-base-500 text-right">Total</span>
             <span />
           </div>
           {draft.lines.map((l, i) => {
@@ -916,7 +916,7 @@ export default function PrincipalNewOrder() {
                 className="border border-base-200 rounded-md p-2 bg-white"
               >
               <div className="grid sm:grid-cols-[24px_1fr_180px_70px_110px_100px_64px] grid-cols-2 gap-2 items-start">
-                <span className="text-meta text-base-400 pt-2.5 text-center">{i + 1}</span>
+                <span className="text-meta text-base-500 pt-2.5 text-center">{i + 1}</span>
                 <div className="min-w-0">
                   <RowSkuPicker
                     line={l}
@@ -937,7 +937,7 @@ export default function PrincipalNewOrder() {
                     <p className="text-meta text-base-500 mt-1 px-1 truncate">{l.label}</p>
                   )}
                   {!isCatalogLine && l.sku.trim().length > 0 && (
-                    <span className="text-label uppercase tracking-[0.05em] text-warning px-1">OTHERS · custom line</span>
+                    <span className="text-label uppercase tracking-[0.06em] text-warning px-1">OTHERS · custom line</span>
                   )}
                 </div>
                 <input
@@ -1039,7 +1039,7 @@ export default function PrincipalNewOrder() {
             Add line item
           </button>
           <p className="text-right text-body">
-            Subtotal <span className="font-mono font-semibold">{rm(subtotal)}</span>
+            Subtotal <span className="font-mono font-medium tabular-nums">{rm(subtotal)}</span>
           </p>
         </div>
       </Section>
@@ -1178,7 +1178,7 @@ export default function PrincipalNewOrder() {
       )}
       <div className="flex items-center justify-between pb-10">
         <span className="text-body text-base-700">
-          Total <span className="font-mono font-semibold text-base-900">{rm(subtotal)}</span>
+          Total <span className="font-mono font-medium tabular-nums text-base-900">{rm(subtotal)}</span>
           {draft.paid > 0 && (
             <span className="text-body text-base-500 ml-3">
               Paid {rm(draft.paid)}
@@ -1296,7 +1296,7 @@ function RowSkuPicker({
                     {[model?.name, s.variant].filter(Boolean).join(" · ")}
                   </span>
                   {s.posActive === false && (
-                    <span className="text-label uppercase tracking-[0.05em] text-warning shrink-0">POS off</span>
+                    <span className="text-label uppercase tracking-[0.06em] text-warning shrink-0">POS off</span>
                   )}
                   <span className="font-mono text-meta text-base-600 shrink-0">
                     {rm(s.price ?? 0)}
@@ -1348,7 +1348,7 @@ function Field({
     <label className="block">
       <span className="text-meta uppercase tracking-wide text-base-500">{label}</span>
       <div className="mt-1">{children}</div>
-      {hint && <span className="text-meta text-base-400 mt-1 block">{hint}</span>}
+      {hint && <span className="text-meta text-base-500 mt-1 block">{hint}</span>}
     </label>
   );
 }

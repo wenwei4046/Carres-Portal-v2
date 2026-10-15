@@ -152,7 +152,7 @@ function BillRegister() {
                   type="button"
                   data-testid="new-bill"
                   onClick={() => navigate("/finance/bills/new")}
-                  className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90"
+                  className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-kit-blue-9 px-3 text-body font-semibold text-white hover:opacity-90"
                 >
                   + New Bill
                 </button>

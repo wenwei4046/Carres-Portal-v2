@@ -276,20 +276,20 @@ function InvoiceObject({ invoice, facts: f, onAsk, onResult, correctionInFlight,
         {f.timing.kind === "paid" ? <p>The money is in. Nothing to do.</p>
         : f.timing.kind === "wait" ? <>
           <p>Wait</p>
-          <p className="text-label font-normal">Goods are not ready and arrival is not confirmed. Do not ask the customer to pay yet.</p>
+          <p className="text-meta">Goods are not ready and arrival is not confirmed. Do not ask the customer to pay yet.</p>
         </> : f.timing.kind === "no_date" ? <>
           <p>No delivery date</p>
-          <p className="text-label font-normal">The clock starts when the customer has a delivery date.</p>
+          <p className="text-meta">The clock starts when the customer has a delivery date.</p>
         </> : f.timing.kind === "late" ? <>
           <p>{rm(f.money.outstanding)} should have been paid</p>
-          <p className="text-label font-normal">Ask customer to pay · Record the result.</p>
+          <p className="text-meta">Ask customer to pay · Record the result.</p>
           <span className="mt-2 flex flex-wrap gap-2">
             {onAsk && <button className="btn-primary" onClick={onAsk}>Ask customer to pay</button>}
             {onResult && <button className="btn-secondary" onClick={onResult}>Record the result</button>}
           </span>
         </> : <>
           <p>{rm(f.money.outstanding)} needed by {fmtDate(f.timing.dueIso)}</p>
-          <p className="text-label font-normal">Ask customer to pay · Record the result.</p>
+          <p className="text-meta">Ask customer to pay · Record the result.</p>
           <span className="mt-2 flex flex-wrap gap-2">
             {onAsk && <button className="btn-primary" onClick={onAsk}>Ask customer to pay</button>}
             {onResult && <button className="btn-secondary" onClick={onResult}>Record the result</button>}
@@ -353,19 +353,19 @@ function Communications({ invoice }: { invoice: InvoiceRegisterRow }) {
     {rows.map((row) => row.kind === "message"
       ? <details key={row.key}>
           <summary className="cursor-pointer">
-            <span className="font-semibold">{MESSAGE_KIND_WORD[row.m.kind] ?? "Message sent"}</span>
+            <span className="font-medium">{MESSAGE_KIND_WORD[row.m.kind] ?? "Message sent"}</span>
             <span className="ml-2 text-meta font-normal">{fmtDate(row.m.recorded_at, { time: true })}</span>
           </summary>
-          <pre className="mt-1 whitespace-pre-wrap font-sans text-label font-normal">{row.m.message_text}</pre>
+          <pre className="mt-1 whitespace-pre-wrap font-sans text-meta">{row.m.message_text}</pre>
         </details>
       : <div key={row.key} data-testid="communication-outcome">
           <p>
-            <span className="font-semibold">{COLLECTION_OUTCOME_WORD[row.o.outcome] ?? "Result recorded"}</span>
+            <span className="font-medium">{COLLECTION_OUTCOME_WORD[row.o.outcome] ?? "Result recorded"}</span>
             {row.o.promised_date && <span> · promised {fmtDate(row.o.promised_date)}</span>}
             <span className="ml-2 text-meta font-normal">{fmtDate(row.o.recorded_at, { time: true })}{row.o.recorded_by_user?.name ? ` · ${row.o.recorded_by_user.name}` : ""}</span>
           </p>
-          {row.o.note && <p className="text-label font-normal">{row.o.note}</p>}
-          <p className="text-label font-normal">Next: {COLLECTION_OUTCOME_NEXT[row.o.outcome] ?? "Ask again."}</p>
+          {row.o.note && <p className="text-meta">{row.o.note}</p>}
+          <p className="text-meta">Next: {COLLECTION_OUTCOME_NEXT[row.o.outcome] ?? "Ask again."}</p>
         </div>)}
   </div>;
 }

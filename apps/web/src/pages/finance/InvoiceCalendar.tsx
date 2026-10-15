@@ -145,13 +145,13 @@ export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderI
       data-testid={highlighted ? "calendar-highlight" : undefined}
       className={`block w-full rounded-control border px-1.5 py-1 text-left ${
         highlighted ? "border-kit-blue-9 bg-kit-blue-3" : "border-base-200 bg-white hover:bg-hovertint"}`}>
-      <span className="block text-label font-normal">
+      <span className="block text-meta">
         {KIND_WORD[e.kind]}{withDate ? ` · ${fmtDate(e.dateIso)}` : ""}{highlighted ? " · selected" : ""}
       </span>
-      <span className="block text-body font-semibold">
+      <span className="block text-body font-medium">
         {e.row.orders ? `SO-${e.row.orders.so}` : "SO not available"} · {e.row.orders?.customer_name ?? "Customer not available"}
       </span>
-      <span className="block text-label font-normal">
+      <span className="block text-meta">
         {money.known ? `${rm(money.outstanding)} still needed` : "Value not recorded"}
       </span>
     </button>;
@@ -179,7 +179,7 @@ export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderI
       </div></SectionCard>
       <div className="min-h-0 overflow-auto">
         <SectionCard><div className="p-3" data-testid="calendar-filters">
-          <div className="text-label uppercase tracking-[0.08em] text-base-500 mb-1">Dates shown</div>
+          <div className="text-label uppercase tracking-[0.06em] text-base-500 mb-1">Dates shown</div>
           {([
             ["all", "All dates"],
             ["delivery", "Customer Delivery"],
@@ -188,7 +188,7 @@ export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderI
             onClick={() => onFilter(key)}
             aria-current={filter === key ? "true" : undefined}
             className={`block w-full rounded-control px-2 py-1.5 text-left text-body ${
-              filter === key ? "bg-kit-blue-3 text-kit-blue-11 font-semibold" : "hover:bg-hovertint"}`}>
+              filter === key ? "bg-kit-blue-3 text-kit-blue-11 font-medium" : "hover:bg-hovertint"}`}>
             {word}
           </button>)}
         </div></SectionCard>
@@ -198,7 +198,7 @@ export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderI
     {mode === "listing"
       ? <div className="min-w-0 flex-1" data-testid="calendar-listing">
         <div className="mb-2 flex items-center justify-between gap-2">
-          <span className="text-body font-semibold">
+          <span className="text-strong">
             {filter === "delivery" ? "Customer Delivery dates" : "Expected arrival dates"}
           </span>
           <button className="btn-secondary" onClick={onBack}>Back to Invoices</button>
@@ -215,7 +215,7 @@ export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderI
           <span className="flex items-center gap-2">
             <button className="btn-secondary" aria-label="Previous week"
               onClick={() => onPickDate(isoAddDays(monday, -7))}>‹ Previous week</button>
-            <span className="text-body font-semibold" data-testid="calendar-week-word">
+            <span className="text-body font-medium" data-testid="calendar-week-word">
               {fmtDate(monday)} to {fmtDate(isoAddDays(monday, 6))}
             </span>
             <button className="btn-secondary" aria-label="Next week"
@@ -230,8 +230,8 @@ export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderI
             const list = byDay.get(iso) ?? [];
             return <div key={iso}
               className={`rounded-card border border-base-200 p-2 ${off ? "bg-base-50" : "bg-white"}`}>
-              <div className={`text-label ${off ? "text-kit-slate-11" : "text-kit-slate-12"} ${
-                iso === safeDate ? "font-semibold text-kit-blue-11" : ""}`}>
+              <div className={`text-meta font-medium ${off ? "text-kit-slate-11" : "text-kit-slate-12"} ${
+                iso === safeDate ? "text-kit-blue-11" : ""}`}>
                 {WEEKDAY_WORD[dow === 0 ? 6 : dow - 1]}, {Number(iso.slice(8, 10))}
                 {iso === safeDate && <span className="ml-1">· selected</span>}
                 {off && <span className="ml-1">· not a working day</span>}

@@ -19,12 +19,12 @@ export default function ApprovalsTile({ pending, setTab }: Props) {
   return (
     <div className="bg-white border border-base-200 rounded-md">
       <div className="flex items-center justify-between px-[18px] py-3.5 border-b border-base-100">
-        <div className="font-display text-strong font-semibold">Awaiting your decision</div>
+        <div className="font-display text-strong">Awaiting your decision</div>
         {pending.length > 0 && (
           <button
             type="button"
             onClick={() => setTab("approvals")}
-            className="btn-primary text-label py-1 px-2.5"
+            className="btn-primary text-body font-semibold py-1 px-2.5"
           >
             Review all
           </button>
@@ -43,10 +43,10 @@ export default function ApprovalsTile({ pending, setTab }: Props) {
             >
               <ApprovalKindBadge kind={a.kind} />
               <div className="flex-1 min-w-0">
-                <div className="text-meta font-semibold leading-tight">
+                <div className="text-body font-medium leading-tight">
                   {a.title}
                 </div>
-                <div className="text-label text-base-500 mt-0.5">
+                <div className="text-meta text-base-500 mt-0.5">
                   {a.actor} &middot; {new Date(a.created_at).toLocaleDateString()}
                 </div>
               </div>

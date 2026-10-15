@@ -334,7 +334,7 @@ function ProductList({
   return (
     <section className="flex flex-col gap-2 pt-4" data-testid="item-group-products">
       {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0659). */}
-      <h2 className="text-section">Products</h2>
+      <h2 className="text-strong">Products</h2>
       <DataTable
         label="Products"
         testId="item-group-products-table"
@@ -364,7 +364,7 @@ function UnboundSales({ rows, groupName }: { rows: readonly LedgerItemGroupUnbou
   return (
     <section className="flex flex-col gap-2 pt-4" data-testid="item-group-unbound">
       {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0659). */}
-      <h2 className="text-section">Sales posted to the goods account</h2>
+      <h2 className="text-strong">Sales posted to the goods account</h2>
       <p className="text-body text-kit-slate-11">
         Their item group had no sales account, or the product is not in the catalog. Give the group an account; a journal moves what is already posted.
       </p>
@@ -422,7 +422,7 @@ const CHANGE_COLUMNS: readonly Column<LedgerItemGroupChange>[] = [
 function ItemGroupChanges({ changes, loading }: { changes: readonly LedgerItemGroupChange[]; loading: boolean }) {
   return (
     <section className="flex flex-col gap-2 pt-4" data-testid="item-group-changes">
-      <h2 className="text-section">Changes</h2>
+      <h2 className="text-strong">Changes</h2>
       <DataTable
         label="Changes"
         testId="item-group-changes-table"

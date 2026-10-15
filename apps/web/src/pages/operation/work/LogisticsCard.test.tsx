@@ -297,18 +297,17 @@ describe("the external link", () => {
 });
 
 describe("density below 768px — owner ruling 2026-09-25 (classes only; behaviour and words unchanged)", () => {
-  it("collapsed: at least 72px, 12px sides, 15/20 heading, 13/18/600 action, 12/16 status, 12px checks, 40×40 chevron", () => {
+  /* The one type scale (01 §2): card title 15/500 on a 20 line, task title 13/500, second lines 12/400. */
+  it("collapsed: at least 72px, 12px sides, 15/500 heading, 13/500 action, 12/400 status, 12px checks, 40×40 chevron", () => {
     draw();
-    expect(screen.getByTestId("logistics-card-heading").className).toContain("text-[14px]");
+    expect(screen.getByTestId("logistics-card-heading").className).toContain("text-strong");
     expect(screen.getByTestId("logistics-card-heading").className).toContain("leading-5");
     const [act, status] = Array.from(screen.getByTestId("logistics-card-action").children) as HTMLElement[];
-    expect(screen.getByTestId("logistics-card-status-lines").className).toContain("text-[12px]");
-    expect(act.className).toContain("text-[13px]");
-    expect(act.className).toContain("leading-[18px]");
-    expect(act.className).toContain("font-semibold");
-    expect(status.className).toContain("text-[12px]");
-    expect(status.className).toContain("leading-4");
-    expect(screen.getByTestId("logistics-card-progress").className).toContain("text-[12px]");
+    expect(screen.getByTestId("logistics-card-status-lines").className).toContain("text-meta");
+    expect(act.className).toContain("text-body");
+    expect(act.className).toContain("font-medium");
+    expect(status.className).toContain("text-meta");
+    expect(screen.getByTestId("logistics-card-progress").className).toContain("text-meta");
     const chevron = screen.getByTestId("logistics-card-chevron");
     expect(chevron.className).toContain("h-9");
     expect(chevron.className).toContain("w-9");

@@ -52,7 +52,7 @@ function Card({ title, findings, testId, children }: {
 function Verdict({ verdict }: { verdict: SectionVerdict }) {
   return <>
     {verdict.findings.length === 0 && <p>{verdict.clean}</p>}
-    {verdict.findings.map((f) => <p key={f} className="font-semibold">{f}</p>)}
+    {verdict.findings.map((f) => <p key={f} className="font-medium">{f}</p>)}
     {verdict.notes.map((n) => <p key={n}>{n}</p>)}
   </>;
 }
@@ -73,7 +73,7 @@ function NotChecked({ section }: { section: Checked<object> }) {
 function HealthRow({ row }: { row: LedgerHealthRow }) {
   const words = healthCheckWords(row, rm, dateWord);
   return <div className="flex items-start justify-between gap-3 py-1" data-testid={`health-${row.check_key}`}>
-    <div><p className="font-semibold">{words.title}</p><p>{words.sentence}</p></div>
+    <div><p className="font-medium">{words.title}</p><p>{words.sentence}</p></div>
     {words.verdict === "finding" ? <StatusPill tone="danger">Finding</StatusPill>
       : words.verdict === "clean" ? <StatusPill tone="success">Clean</StatusPill> : null}
   </div>;
@@ -106,7 +106,7 @@ export default function LedgerSelfCheck() {
 
         {report.controls.ok && report.controls.accounts.length === 0 && <Card
           title="Customer and supplier accounts" testId="self-check-controls" findings={1}>
-          <p className="font-semibold">The chart has no customer or supplier account to check.</p>
+          <p className="font-medium">The chart has no customer or supplier account to check.</p>
         </Card>}
         {report.controls.ok ? report.controls.accounts.map((a) => {
           const verdict = controlVerdict(a, rm);
@@ -114,7 +114,7 @@ export default function LedgerSelfCheck() {
             testId={`self-check-control-${a.account_code}`} findings={verdict.findings.length}>
             {verdict.findings.length === 0 && <p>{verdict.clean}</p>}
             {a.findings.map((f, i) => <div key={`${f.kind}-${f.party_type ?? ""}-${i}`}>
-              <p className="font-semibold">{verdict.findings[i]}</p>
+              <p className="font-medium">{verdict.findings[i]}</p>
               <EntryLinks entryNos={f.entry_nos} />
             </div>)}
           </Card>;

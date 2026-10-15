@@ -45,7 +45,7 @@ export default function DealerRow({ d, showOutlets, onOpen }: Props) {
           {d.code && <span className="font-mono text-base-500 mr-1.5">{d.code}</span>}
           {d.name}
         </div>
-        <div className="text-label text-base-500 mt-0.5">{d.contact ?? ""}</div>
+        <div className="text-meta text-base-500 mt-0.5">{d.contact ?? ""}</div>
       </td>
       <td className="px-4 py-3 text-base-700">{d.region}</td>
       {showOutlets && (
@@ -62,7 +62,7 @@ export default function DealerRow({ d, showOutlets, onOpen }: Props) {
       )}
       <td className="px-4 py-3 text-base-700">{d.joinedDate ?? ""}</td>
       <td className="px-4 py-3 text-right font-mono">{d.orderCount}</td>
-      <td className="px-4 py-3 text-right font-semibold font-mono">
+      <td className="px-4 py-3 text-right font-mono tabular-nums">
         RM {(Number(d.gmv) / 1000).toFixed(1)}k
       </td>
       <td

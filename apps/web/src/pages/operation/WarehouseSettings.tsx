@@ -381,7 +381,7 @@ export default function WarehouseSettings() {
       <div className="mx-auto grid w-full max-w-4xl gap-5 overflow-auto p-5" data-testid="warehouse-settings">
         {/* The Site identity, exactly as the card writes it. */}
         <div data-testid="warehouse-settings-identity">
-          <div className="text-section font-display text-kit-slate-12">{data.details.name}</div>
+          <div className="text-strong font-display text-kit-slate-12">{data.details.name}</div>
           <div className="text-body text-kit-slate-11">
             {data.details.operatingPartyName
               ? `Operated by ${data.details.operatingPartyName}`
@@ -566,7 +566,7 @@ function ChangeHistory({
       className="rounded-card border border-kit-slate-5 bg-white p-5"
       data-testid="warehouse-settings-history"
     >
-      <h2 className="text-section">History</h2>
+      <h2 className="text-strong">History</h2>
       {rows.length === 0 ? (
         <p className="mt-1 text-body text-kit-slate-11">
           Nothing has been changed here yet.
@@ -642,7 +642,7 @@ function DetailsSection({
 
   return (
     <section className="rounded-card border border-kit-slate-5 bg-white p-5" data-testid="warehouse-details">
-      <h2 className="text-section">Warehouse Details</h2>
+      <h2 className="text-strong">Warehouse Details</h2>
       <p className="mt-1 text-body text-kit-slate-11">
         Who runs this site, where it is, and who to call. Operated by is an organisation. Key
         contact is a person from People. This page never creates one.
@@ -792,7 +792,7 @@ function HoursSection({
 
   return (
     <section className="rounded-card border border-kit-slate-5 bg-white p-5" data-testid="warehouse-working-hours">
-      <h2 className="text-section">Working Hours</h2>
+      <h2 className="text-strong">Working Hours</h2>
       <p className="mt-1 text-body text-kit-slate-11">
         Receiving hours are when suppliers or transport can bring goods in. Collection hours are
         when an authorised Delivery partner can collect goods. A day can be closed for one and
@@ -927,7 +927,7 @@ function HolidaysSection({
 
   return (
     <section className="rounded-card border border-kit-slate-5 bg-white p-5" data-testid="warehouse-public-holidays">
-      <h2 className="text-section">Public Holidays</h2>
+      <h2 className="text-strong">Public Holidays</h2>
 
       {!data.holidayPolicy && (
         <p className="mt-1 text-body text-kit-slate-12" data-testid="holiday-policy-state">
@@ -1090,7 +1090,7 @@ function SpecialDatesSection({
 
   return (
     <section className="rounded-card border border-kit-slate-5 bg-white p-5" data-testid="warehouse-special-dates">
-      <h2 className="text-section">Special Dates</h2>
+      <h2 className="text-strong">Special Dates</h2>
       <p className="mt-1 text-body text-kit-slate-11">
         A day that is different from the normal week or the public-holiday policy. Every one needs
         a reason. A Special Date beats every other rule on that day.
@@ -1210,7 +1210,7 @@ function AccessSection({
 
   return (
     <section className="rounded-card border border-kit-slate-5 bg-white p-5" data-testid="warehouse-access">
-      <h2 className="text-section">Access</h2>
+      <h2 className="text-strong">Access</h2>
       <p className="mt-1 text-body text-kit-slate-11">
         Who may do each Warehouse job. Only people who are still with Carres can be given access.
         Nothing here reaches a Delivery date, an ETA, a route or a customer&apos;s delivery

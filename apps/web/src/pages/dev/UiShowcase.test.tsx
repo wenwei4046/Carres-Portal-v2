@@ -16,7 +16,7 @@ const render = (ui: ReactElement) =>
 describe("/ui — the one Carres UI kit", () => {
   it("shows the v12 kit parts, then every shared part the pages import, and none of the retired kit's notes", () => {
     render(<UiShowcase />);
-    for (const id of ["table", "cells", "pills", "toolbar", "side-panel", "icons", "list-engine", "buttons", "fields", "menus", "tabs-kit", "dialogs", "states", "status-pill", "compact-card", "documents", "task-parts", "not-yet"]) {
+    for (const id of ["table", "cells", "order-lines", "pills", "toolbar", "side-panel", "icons", "list-engine", "buttons", "fields", "menus", "tabs-kit", "dialogs", "states", "status-pill", "compact-card", "documents", "task-parts", "not-yet"]) {
       expect(document.getElementById(id), id).toBeInTheDocument();
     }
     expect(screen.queryByRole("heading", { name: "Frozen decisions" })).not.toBeInTheDocument();

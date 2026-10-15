@@ -103,7 +103,7 @@ export default function FinanceAR() {
       accessor: (r) => (
         <span className="flex flex-col items-end">
           <span className="tabular-nums">{rm(r.outstanding)}</span>
-          {r.storageOwing > 0 && <span className="text-label font-normal">includes storage {rm(r.storageOwing)}</span>}
+          {r.storageOwing > 0 && <span className="text-meta whitespace-normal text-right">includes storage {rm(r.storageOwing)}</span>}
         </span>
       ),
       numberValue: (r) => r.outstanding, filterType: "number", exportValue: (r) => r.outstanding },

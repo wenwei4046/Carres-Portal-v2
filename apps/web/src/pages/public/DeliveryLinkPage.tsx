@@ -158,7 +158,7 @@ export default function DeliveryLinkPage() {
       <div className="mx-auto flex w-full max-w-[560px] flex-col gap-4">
         <header className="rounded-work border border-work-line bg-white px-4 py-3">
           <p className="text-label text-kit-slate-11">{LINK_COPY.pageTitle}</p>
-          <h1 className="text-section font-semibold text-kit-slate-12">{view.company}</h1>
+          <h1 className="text-strong text-kit-slate-12">{view.company}</h1>
         </header>
 
         <section aria-label="Delivery" className="rounded-work border border-work-line bg-white px-4 py-2">

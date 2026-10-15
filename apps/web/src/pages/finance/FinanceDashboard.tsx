@@ -219,7 +219,7 @@ function CashflowChart({ cash }: { cash: CashMovement }) {
   const peak = Math.max(0, ...cash.weeks.map((w) => Math.max(w.moneyIn, w.moneyOut)));
   const height = (n: number) => `${peak > 0 ? (n / peak) * 100 : 0}%`;
   return <div className="flex flex-col gap-3.5" data-testid="dashboard-cashflow">
-    <div className="flex flex-wrap items-center justify-between gap-3 text-label text-kit-slate-11">
+    <div className="flex flex-wrap items-center justify-between gap-3 text-meta text-kit-slate-11">
       <span>Money in less money out on cash and bank accounts · No opening balances</span>
       <span className="flex gap-3.5">
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-kit-green-11" />Inflow</span>
@@ -238,8 +238,8 @@ function CashflowChart({ cash }: { cash: CashMovement }) {
               <span className="w-3 rounded-sm bg-kit-green-11" style={{ height: height(w.moneyIn) }} />
               <span className="w-3 rounded-sm bg-kit-slate-11" style={{ height: height(w.moneyOut) }} />
             </span>
-            <span className="text-label text-kit-slate-11">{fmtDateShort(w.from)}</span>
-            <span className="text-label tabular-nums">{rm(w.net)}</span>
+            <span className="text-meta text-kit-slate-11">{fmtDateShort(w.from)}</span>
+            <span className="text-meta tabular-nums">{rm(w.net)}</span>
             <span className="sr-only">In {rm(w.moneyIn)} · Out {rm(w.moneyOut)}</span>
           </li>
         ))}
@@ -264,7 +264,7 @@ function AccountMovement({ rows, goLiveOn, today }: { rows: CashAccountMovement[
     { key: "net", label: "Net", width: 20, align: "right", numeric: true, cell: (r) => rm(r.net) },
   ];
   return <div className="flex flex-col gap-3.5" data-testid="dashboard-account-movement">
-    <p className="text-label text-kit-slate-11">
+    <p className="text-meta text-kit-slate-11">
       Money in and out of each account since {fmtDate(goLiveOn)}, when the ledger started.
       Money held before then is not counted.
     </p>
@@ -277,7 +277,7 @@ function AccountMovement({ rows, goLiveOn, today }: { rows: CashAccountMovement[
 
 function Total({ label, value, testId }: { label: string; value: string; testId: string }) {
   return <div>
-    <div className="text-label uppercase tracking-[0.06em] font-semibold text-kit-slate-11">{label}</div>
+    <div className="text-label uppercase tracking-[0.06em] text-kit-slate-11">{label}</div>
     <div className="text-strong tabular-nums" data-testid={testId}>{value}</div>
   </div>;
 }
@@ -298,8 +298,8 @@ function AgingRows({ aging, total }: { aging: ArAging; total: number }) {
       return <li key={b}>
         <Link to={`/finance/ar?age=${encodeURIComponent(b)}`} className="block rounded-control hover:bg-kit-slate-3"
           data-testid={`dashboard-aging-${b}`}>
-          <span className="mb-1 flex justify-between text-label">
-            <span className="font-semibold">{b} days</span>
+          <span className="mb-1 flex justify-between text-body">
+            <span className="font-medium">{b} days</span>
             <span className="tabular-nums" data-testid={`dashboard-aging-${b}-amount`}>
               {rm(row.total)} · {ordersWord(row.orders)}
             </span>
@@ -378,9 +378,9 @@ function NoFigure({ source, query, last }: {
   const lastAvailable = query.dataUpdatedAt > 0 ? fmtDate(new Date(query.dataUpdatedAt).toISOString(), { time: true }) : null;
   return (
     <div role="alert">
-      <p className="font-semibold">Could not load {source}</p>
+      <p className="font-medium">Could not load {source}</p>
       {last !== null && lastAvailable && (
-        <p className="text-label font-normal">Last available {lastAvailable} · {rm(last)}</p>
+        <p className="text-meta">Last available {lastAvailable} · {rm(last)}</p>
       )}
       <button className="btn-secondary mt-2" onClick={() => void query.refetch()}>Try again</button>
     </div>

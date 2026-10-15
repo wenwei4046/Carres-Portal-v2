@@ -231,7 +231,7 @@ export default function RawLineOptions({
       className="mt-2 border-t border-base-100 pt-2.5"
       data-testid={`raw-options-${line.localId}`}
     >
-      <p className="text-label uppercase tracking-[0.05em] text-base-400 mb-1.5">
+      <p className="text-label uppercase tracking-[0.06em] text-base-500 mb-1.5">
         {isSofa ? "Sofa variants" : isBed ? "Bed frame variants" : "Options"}
         <span className="normal-case tracking-normal"> · optional, KIV if not confirmed</span>
       </p>
@@ -445,7 +445,7 @@ function RawSpecialsPicker({
 function MiniField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="text-label uppercase tracking-[0.05em] text-base-400">{label}</span>
+      <span className="text-label uppercase tracking-[0.06em] text-base-500">{label}</span>
       <div className="mt-0.5">{children}</div>
     </label>
   );

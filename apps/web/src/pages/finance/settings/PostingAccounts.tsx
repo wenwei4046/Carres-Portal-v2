@@ -403,7 +403,7 @@ function PostingChanges({ changes, loading }: { changes: readonly LedgerPostingC
   return (
     <section className="flex flex-col gap-2 pt-4" data-testid="posting-changes">
       {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0657). */}
-      <h2 className="text-section">Changes</h2>
+      <h2 className="text-strong">Changes</h2>
       <DataTable
         label="Changes"
         testId="posting-changes-table"

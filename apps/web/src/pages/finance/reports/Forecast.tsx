@@ -303,7 +303,7 @@ export default function Forecast() {
               <Button variant="primary" disabled={!dirty || bad} loading={save.isPending} onClick={() => save.mutate()}>Save</Button>
             </span>
           </div>
-          <p className="text-label text-kit-slate-11" data-testid="forecast-note">
+          <p className="text-meta text-kit-slate-11" data-testid="forecast-note">
             Plan income as an amount. Plan a cost as an amount or as a % of the month's planned income; the other box shows what it works out to.
             Difference is actual less plan.
             {answer?.updated_at ? ` Saved by ${answer.updated_by_name ?? "Finance"} on ${fmtDate(answer.updated_at, { time: true })}.` : ""}

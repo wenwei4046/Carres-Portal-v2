@@ -20,11 +20,11 @@ export default function DealerLeaderboard({ stats, setTab }: Props) {
   return (
     <div className="bg-white border border-base-200 rounded-md">
       <div className="flex items-center justify-between px-[18px] py-3.5 border-b border-base-100">
-        <div className="font-display text-strong font-semibold">Dealer leaderboard</div>
+        <div className="font-display text-strong">Dealer leaderboard</div>
         <button
           type="button"
           onClick={() => setTab("dealers")}
-          className="btn-secondary text-label py-1 px-2.5"
+          className="btn-secondary text-body font-medium py-1 px-2.5"
         >
           Manage all
         </button>
@@ -43,17 +43,17 @@ export default function DealerLeaderboard({ stats, setTab }: Props) {
               }`}
               style={{ gridTemplateColumns: "20px 1fr auto" }}
             >
-              <div className="font-mono text-label text-base-400">{i + 1}</div>
+              <div className="font-mono text-meta text-base-500">{i + 1}</div>
               <div className="min-w-0">
-                <div className="text-body font-semibold flex items-center gap-2">
+                <div className="text-body font-medium flex items-center gap-2">
                   <span className="truncate">{d.name}</span>
                   {d.status === "suspended" && (
-                    <span className="text-label px-1.5 py-px bg-base-200 rounded-full text-base-600">
+                    <span className="text-label uppercase tracking-[0.06em] px-1.5 py-px bg-base-200 rounded-full text-base-600">
                       SUSPENDED
                     </span>
                   )}
                   {d.status === "pending" && (
-                    <span className="text-label px-1.5 py-px bg-primary/10 rounded-full text-primary">
+                    <span className="text-label uppercase tracking-[0.06em] px-1.5 py-px bg-primary/10 rounded-full text-primary">
                       PENDING
                     </span>
                   )}
@@ -64,11 +64,11 @@ export default function DealerLeaderboard({ stats, setTab }: Props) {
                     style={{ width: `${(Number(d.gmv) / max) * 100}%` }}
                   />
                 </div>
-                <div className="text-label text-base-500 mt-1">
+                <div className="text-meta text-base-500 mt-1">
                   {d.region} · {d.order_count} orders
                 </div>
               </div>
-              <div className="font-mono text-body font-semibold text-base-900">
+              <div className="font-mono text-body tabular-nums text-base-900">
                 RM {(Number(d.gmv) / 1000).toFixed(1)}k
               </div>
             </div>

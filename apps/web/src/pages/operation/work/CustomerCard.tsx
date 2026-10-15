@@ -186,7 +186,7 @@ export default function CustomerCard({
         {action ? (
           <>
             <div>
-              <div className="text-[14px] font-semibold leading-5 text-kit-slate-12">{action.act}</div>
+              <div className="text-body font-medium text-kit-slate-12">{action.act}</div>
               <ToneLine tone={actionTone}>{action.result}</ToneLine>
             </div>
             <span className="self-start">
@@ -207,7 +207,7 @@ export default function CustomerCard({
         <SectionTitle>{C.sectionDelivery}</SectionTitle>
         <Fact label="Requested delivery">{card.scope.customerDeliveryIso ? spell(card.scope.customerDeliveryIso) : "No requested delivery date"}</Fact>
         <Fact label="Scheduled delivery">
-          <span className="font-semibold">{card.confirmedDate ? [spell(card.confirmedDate), card.confirmedTime].filter(Boolean).join(" · ") : "Not scheduled yet"}</span>
+          <span className="font-medium">{card.confirmedDate ? [spell(card.confirmedDate), card.confirmedTime].filter(Boolean).join(" · ") : "Not scheduled yet"}</span>
         </Fact>
         {o.delivered_at ? <Fact label="Delivered">{spell(mytDayOf(o.delivered_at))}</Fact> : null}
       </section>
@@ -234,7 +234,7 @@ export default function CustomerCard({
       {/* 5 · Evidence and communication history */}
       <section aria-label={C.sectionHistory} className="flex flex-col gap-1.5">
         <SectionTitle>{C.sectionHistory}</SectionTitle>
-        <div className="text-label text-kit-slate-11">
+        <div className="text-meta text-kit-slate-11">
           {[phone ?? C.noPhone, email ?? C.noEmail].join(" · ")}
           {address ? <div className="break-words text-kit-slate-12">{address}</div> : null}
         </div>
@@ -244,11 +244,11 @@ export default function CustomerCard({
           <ol className="flex flex-col gap-2" data-testid="party-customer-history">
             {model.history.slice(0, 8).map((h, i) => (
               <li key={`${h.atIso}-${i}`}>
-                <div className="text-[12px] leading-4 text-kit-slate-12">{CUSTOMER_RESULT_WORD[h.result]}</div>
-                <div className="text-[12px] leading-4 text-kit-slate-11">
+                <div className="text-body font-medium text-kit-slate-12">{CUSTOMER_RESULT_WORD[h.result]}</div>
+                <div className="text-meta text-kit-slate-11">
                   {[whenText(h.atIso), CHANNEL_WORD[h.channel] ?? h.channel, h.by].filter(Boolean).join(" · ")}
                 </div>
-                {h.evidencePath ? <div className="text-[12px] leading-4 text-kit-slate-11">WhatsApp reply · 1 photo</div> : null}
+                {h.evidencePath ? <div className="text-meta text-kit-slate-11">WhatsApp reply · 1 photo</div> : null}
               </li>
             ))}
           </ol>
@@ -260,7 +260,7 @@ export default function CustomerCard({
 
 function DoorLink({ to, children }: { to: string; children: string }) {
   return (
-    <Link className="inline-flex min-h-10 items-center gap-1 self-start text-label text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to={to}>
+    <Link className="inline-flex min-h-10 items-center gap-1 self-start text-meta text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to={to}>
       {children}
       <Icon name="open" size={14} />
     </Link>

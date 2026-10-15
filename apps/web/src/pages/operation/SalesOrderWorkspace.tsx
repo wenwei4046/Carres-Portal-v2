@@ -142,6 +142,7 @@ import SalesOrderReadFailure from "./SalesOrderReadFailure";
 import { RouteLoadingFrame, type RouteRetryOwner } from "./SalesOrderRoute";
 import { salesOrderRouteInputOf, type RouteOrderDetail } from "./sales-order-route-input";
 import MIcon from "@/components/carres/MIcon";
+import COrderLines, { type COrderLine } from "@/components/carres/COrderLines";
 import { atSalePaymentWord, viewSlip } from "@/lib/payment-display";
 import { useShellTasks } from "./components/ShellTasks";
 import { AgreementForm } from "./customer-agreement";
@@ -2709,161 +2710,141 @@ function SalesOrderWorkspaceBody() {
   /* THE LOCKED STATE (owner ruling 2026-09-26): View and a historical version
      are ONE locked presentation; the amendment alone draws controls. */
   const amending = !formLocked;
-  const ITEM_COLS = "grid grid-cols-[24px_minmax(0,1fr)_56px_110px_110px] gap-3";
   const paymentWord = atSalePaymentWord(order?.payment_method, order?.installment_months ?? null);
   const slip = order?.payment_slip_url ?? null;
+  /* Item text, one rule (01 §5): line 1 the model, line 2 the spec and the
+     code; a size the variant already says is not printed twice. */
+  const specOf = (...parts: Array<string | null | undefined>) =>
+    [...new Set(parts.flatMap((p) => (p ?? "").split(" · ")).map((p) => p.trim()).filter(Boolean))].join(" · ");
+  const goodsLines: COrderLine[] = draft.lines.filter((l) => l.sku.trim()).map((l, i) => {
+    const known = catalogModel.bySku.get(l.sku);
+    const model = known ? catalogModel.byModel.get(known.modelId) : undefined;
+    const canConfig = !l.removed && model && (model.skus.length > 1 || model.gaps.length > 0);
+    const open = configOpen.has(l.key);
+    const locked = !amending || l.removed || protectedLine(l);
+    const notes = [
+      !known && catalogQ.data && <span key="nic" className="text-[12px] text-c-warn-fg">{NOT_IN_CATALOG}</span>,
+      l.added && <span key="new" className="text-[12px] font-medium text-c-ok-fg">New line</span>,
+      l.removed && <span key="rm" className="text-[12px] text-c-warn-fg">Cancelled when approved · Restore to keep it</span>,
+      protectedLine(l) && <span key="free" className="text-[12px] text-c-secondary">Free item. It follows the item it came with</span>,
+      amending && !protectedLine(l) && (
+        <span key="doors" className="flex flex-wrap gap-x-4 text-[13px] font-medium">
+          {canConfig && (
+            <button type="button" className="text-c-ink hover:underline" aria-expanded={open} aria-label={`Configure ${nameOfSku(l.sku)}`}
+              onClick={() => setConfigOpen((st) => { const n = new Set(st); if (n.has(l.key)) n.delete(l.key); else n.add(l.key); return n; })}>
+              {open ? "Close configuration" : "Configure"}
+            </button>
+          )}
+          {l.removed ? (
+            <button type="button" className="text-c-ink hover:underline" aria-label={`Restore ${nameOfSku(l.sku)}`}
+              onClick={() => setDraftLine(l.key, { removed: false })}>Restore</button>
+          ) : (
+            <button type="button" className="text-c-warn-fg hover:underline" aria-label={`Remove ${nameOfSku(l.sku)}`}
+              onClick={() => (l.added
+                ? setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))
+                : setDraftLine(l.key, { removed: true }))}>Remove</button>
+          )}
+        </span>
+      ),
+    ].filter(Boolean);
+    return {
+      key: l.key,
+      testId: `edit-line-${i + 1}`,
+      struck: l.removed,
+      model: model?.name || nameOfSku(l.sku),
+      spec: known ? specOf(known.variant, configWords(l.attrs), l.sku) : specOf(configWords(l.attrs)),
+      notes: notes.length ? notes : undefined,
+      qty: locked ? l.qty : (
+        <span className="inline-block w-16">
+          <CInput id={`so-edit-qty-${l.key}`} label={`Qty ${nameOfSku(l.sku)}`} type="number" min={1} value={String(l.qty)} className="text-right"
+            onChange={(e) => setDraftLine(l.key, { qty: Math.max(1, Number(e.target.value) || 1) })} />
+        </span>
+      ),
+      unitPrice: locked ? fmtMoney(l.unit_price) : (
+        <span className="inline-block w-24">
+          <CInput id={`so-edit-price-${l.key}`} label={`Unit price ${nameOfSku(l.sku)}`} type="number" min={0} step="0.01" value={String(l.unit_price)} className="text-right"
+            onChange={(e) => setDraftLine(l.key, { unit_price: Math.max(0, Number(e.target.value) || 0) })} />
+        </span>
+      ),
+      amount: fmtMoney(l.qty * l.unit_price),
+      below: amending && open && canConfig ? (
+        <div className="grid grid-cols-1 gap-2 bg-c-ground px-2 py-2 sm:grid-cols-3">
+          {model!.skus.length > 1 && (
+            <CSelect id={`so-edit-size-${l.key}`} label="Size" value={l.sku}
+              onChange={(sku) => {
+                const hit = model!.skus.find((x) => x.sku === sku);
+                if (!hit) return;
+                setDraftLine(l.key, { sku, unit_price: hit.price + surchargeOf(l.attrs) });
+              }}
+              options={model!.skus.map((x) => ({ value: x.sku, label: x.variant || x.sku }))} />
+          )}
+          {model!.gaps.length > 0 && (
+            <CSelect id={`so-edit-gap-${l.key}`} label="Mattress gap"
+              value={String((l.attrs as { gap?: string } | undefined)?.gap ?? "KIV")}
+              onChange={(gap) => setDraftLine(l.key, { attrs: { ...(l.attrs ?? {}), gap } })}
+              options={[{ value: "KIV", label: "Confirm later" }, ...model!.gaps.map((g) => ({ value: g, label: g }))]} />
+          )}
+        </div>
+      ) : undefined,
+    };
+  });
+  const serviceLines: COrderLine[] = draft.addons.map((a) => {
+    const owned = SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addon_key);
+    const pos = serviceSizeDraft(a, catalogQ.data?.addons.find((x) => x.key === a.addon_key)?.sizeOptions);
+    const sizes = disposalUnitSizes(pos);
+    const options = addonSizeOptions(pos);
+    const notes = [
+      a.added && <span key="new" className="text-[12px] font-medium text-c-ok-fg">New line</span>,
+      amending && !owned && (
+        <span key="doors" className="flex gap-4 text-[13px] font-medium">
+          <button type="button" className={a.removed ? "text-c-ink hover:underline" : "text-c-warn-fg hover:underline"}
+            aria-label={`${a.removed ? "Restore" : "Remove"} ${nameOfAddon(a.addon_key)}`}
+            onClick={() => a.removed ? setDraftAddon(a.key, { removed: false }) : a.added
+              ? setDraft((d) => ({ ...d, addons: d.addons.filter((x) => x.key !== a.key) }))
+              : setDraftAddon(a.key, { removed: true })}>{a.removed ? "Restore" : "Remove"}</button>
+        </span>
+      ),
+    ].filter(Boolean);
+    return {
+      key: a.key,
+      testId: `edit-service-${a.addon_key}`,
+      data: { "data-pos-field": "orderAddons" },
+      struck: a.removed,
+      model: nameOfAddon(a.addon_key),
+      spec: specOf(typeof a.attrs?.["size"] === "string" ? String(a.attrs["size"]) : null, serviceCodeWord(a.addon_key, addonSkuByKey.get(a.addon_key))),
+      notes: notes.length ? notes : undefined,
+      qty: amending && !owned && !a.removed ? (
+        <span className="inline-block w-16">
+          <CInput id={`so-edit-service-qty-${a.key}`} label={`Qty ${nameOfAddon(a.addon_key)}`} type="number" min={1} step={1} value={String(a.qty)} className="text-right"
+            onChange={(e) => setDraftAddon(a.key, resizeService(a, Number(e.target.value), pos.sizeOptions))} />
+        </span>
+      ) : a.qty,
+      unitPrice: fmtMoney(a.unit_price),
+      amount: fmtMoney(a.qty * a.unit_price),
+      below: amending && !owned && !a.removed && options.length > 0 ? (
+        <div className="grid grid-cols-1 gap-2 bg-c-ground px-2 py-2 sm:grid-cols-3">
+          {sizes.map((size, i) => (
+            <CSelect key={i} id={`so-service-size-${a.key}-${i}`} label={a.qty > 1 ? `Size ${i + 1}` : "Size"} placeholder={a.qty > 1 ? `Size ${i + 1}` : "Size"}
+              value={size} onChange={(value) => setDraftAddon(a.key, sizeServiceUnit(a, i, value))}
+              options={[...new Set([...options, ...(size ? [size] : [])])].map((value) => ({ value, label: value }))} />
+          ))}
+        </div>
+      ) : undefined,
+    };
+  });
+  const owes = money.known && money.outstanding > 0;
   const itemsCard = (
     <Card label="Items and payment" testId="so-card-items">
       <CardTitle note={amending ? undefined : undefined}>Items</CardTitle>
-      <div className="overflow-x-auto" data-testid="edit-items">
-        <div role="table" aria-label="Items" className="min-w-[520px] text-[13px] tabular-nums" data-testid="edit-goods">
-          <div role="row" className={`${ITEM_COLS} border-b border-t border-b-c-head-line border-t-c-row-line py-[7px] text-[12px] text-c-muted`}>
-            <span>#</span><span>Item</span><span className="text-right">Qty</span><span className="text-right">Unit price</span><span className="text-right">Amount</span>
-          </div>
-          {draft.lines.filter((l) => l.sku.trim()).map((l, i) => {
-            const known = catalogModel.bySku.get(l.sku);
-            const model = known ? catalogModel.byModel.get(known.modelId) : undefined;
-            const canConfig = !l.removed && model && (model.skus.length > 1 || model.gaps.length > 0);
-            const strike = l.removed ? "line-through text-c-muted" : "";
-            const open = configOpen.has(l.key);
-            const locked = !amending || l.removed || protectedLine(l);
-            return (
-              <div key={l.key} data-testid={`edit-line-${i + 1}`}>
-                <div role="row" className={`${ITEM_COLS} items-baseline border-b border-c-row-line py-2`}>
-                  <span className="text-c-muted">{i + 1}</span>
-                  <span className="flex min-w-0 flex-col gap-0.5">
-                    <span className={`break-words ${strike}`}>
-                      <span className="font-medium text-c-ink">{nameOfSku(l.sku)}</span>{" "}
-                      <span className="text-c-muted">· {l.sku}</span>
-                    </span>
-                    {configWords(l.attrs) && <span className={`text-[12px] text-c-secondary ${strike}`}>{configWords(l.attrs)}</span>}
-                    {!known && catalogQ.data && <span className="text-[12px] text-c-warn-fg">{NOT_IN_CATALOG}</span>}
-                    {l.added && <span className="text-[12px] font-medium text-c-ok-fg">New line</span>}
-                    {l.removed && <span className="text-[12px] text-c-warn-fg">Cancelled when approved · Restore to keep it</span>}
-                    {protectedLine(l) && <span className="text-[12px] text-c-secondary">Free item. It follows the item it came with</span>}
-                    {amending && !protectedLine(l) && (
-                      <span className="flex flex-wrap gap-x-4 text-[13px] font-medium">
-                        {canConfig && (
-                          <button type="button" className="text-c-ink hover:underline" aria-expanded={open} aria-label={`Configure ${nameOfSku(l.sku)}`}
-                            onClick={() => setConfigOpen((st) => { const n = new Set(st); if (n.has(l.key)) n.delete(l.key); else n.add(l.key); return n; })}>
-                            {open ? "Close configuration" : "Configure"}
-                          </button>
-                        )}
-                        {l.removed ? (
-                          <button type="button" className="text-c-ink hover:underline" aria-label={`Restore ${nameOfSku(l.sku)}`}
-                            onClick={() => setDraftLine(l.key, { removed: false })}>Restore</button>
-                        ) : (
-                          <button type="button" className="text-c-warn-fg hover:underline" aria-label={`Remove ${nameOfSku(l.sku)}`}
-                            onClick={() => (l.added
-                              ? setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))
-                              : setDraftLine(l.key, { removed: true }))}>Remove</button>
-                        )}
-                      </span>
-                    )}
-                  </span>
-                  <span className={`text-right text-c-ink ${strike}`}>
-                    {locked ? l.qty : (
-                      <CInput id={`so-edit-qty-${l.key}`} label={`Qty ${nameOfSku(l.sku)}`} type="number" min={1} value={String(l.qty)} className="text-right"
-                        onChange={(e) => setDraftLine(l.key, { qty: Math.max(1, Number(e.target.value) || 1) })} />
-                    )}
-                  </span>
-                  <span className={`text-right text-c-secondary ${strike}`}>
-                    {locked ? fmtMoney(l.unit_price) : (
-                      <CInput id={`so-edit-price-${l.key}`} label={`Unit price ${nameOfSku(l.sku)}`} type="number" min={0} step="0.01" value={String(l.unit_price)} className="text-right"
-                        onChange={(e) => setDraftLine(l.key, { unit_price: Math.max(0, Number(e.target.value) || 0) })} />
-                    )}
-                  </span>
-                  <span className={`text-right text-c-ink ${strike}`}>{fmtMoney(l.qty * l.unit_price)}</span>
-                </div>
-                {amending && open && canConfig && (
-                  <div className="grid grid-cols-1 gap-2 border-b border-c-row-line bg-c-ground px-2 py-2 sm:grid-cols-3">
-                    {model!.skus.length > 1 && (
-                      <CSelect id={`so-edit-size-${l.key}`} label="Size" value={l.sku}
-                        onChange={(sku) => {
-                          const hit = model!.skus.find((x) => x.sku === sku);
-                          if (!hit) return;
-                          setDraftLine(l.key, { sku, unit_price: hit.price + surchargeOf(l.attrs) });
-                        }}
-                        options={model!.skus.map((x) => ({ value: x.sku, label: x.variant || x.sku }))} />
-                    )}
-                    {model!.gaps.length > 0 && (
-                      <CSelect id={`so-edit-gap-${l.key}`} label="Mattress gap"
-                        value={String((l.attrs as { gap?: string } | undefined)?.gap ?? "KIV")}
-                        onChange={(gap) => setDraftLine(l.key, { attrs: { ...(l.attrs ?? {}), gap } })}
-                        options={[{ value: "KIV", label: "Confirm later" }, ...model!.gaps.map((g) => ({ value: g, label: g }))]} />
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          {draft.addons.map((a, j) => {
-            const strike = a.removed ? "line-through text-c-muted" : "";
-            const owned = SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addon_key);
-            const pos = serviceSizeDraft(a, catalogQ.data?.addons.find((x) => x.key === a.addon_key)?.sizeOptions);
-            const sizes = disposalUnitSizes(pos);
-            const options = addonSizeOptions(pos);
-            const n = draft.lines.filter((l) => l.sku.trim()).length + j + 1;
-            return (
-              <div key={a.key} data-testid={`edit-service-${a.addon_key}`} data-pos-field="orderAddons">
-                <div role="row" className={`${ITEM_COLS} items-baseline border-b border-c-row-line py-2`}>
-                  <span className="text-c-muted">{n}</span>
-                  <span className="flex min-w-0 flex-col gap-0.5">
-                    <span className={`break-words ${strike}`}>
-                      <span className="font-medium text-c-ink">{nameOfAddon(a.addon_key)}</span>{" "}
-                      <span className="text-c-muted">· {serviceCodeWord(a.addon_key, addonSkuByKey.get(a.addon_key))}</span>
-                    </span>
-                    {typeof a.attrs?.["size"] === "string" && <span className={`text-[12px] text-c-secondary ${strike}`}>{String(a.attrs["size"])}</span>}
-                    {a.added && <span className="text-[12px] font-medium text-c-ok-fg">New line</span>}
-                    {amending && !owned && (
-                      <span className="flex gap-4 text-[13px] font-medium">
-                        <button type="button" className={a.removed ? "text-c-ink hover:underline" : "text-c-warn-fg hover:underline"}
-                          aria-label={`${a.removed ? "Restore" : "Remove"} ${nameOfAddon(a.addon_key)}`}
-                          onClick={() => a.removed ? setDraftAddon(a.key, { removed: false }) : a.added
-                            ? setDraft((d) => ({ ...d, addons: d.addons.filter((x) => x.key !== a.key) }))
-                            : setDraftAddon(a.key, { removed: true })}>{a.removed ? "Restore" : "Remove"}</button>
-                      </span>
-                    )}
-                  </span>
-                  <span className={`text-right text-c-ink ${strike}`}>
-                    {amending && !owned && !a.removed ? (
-                      <CInput id={`so-edit-service-qty-${a.key}`} label={`Qty ${nameOfAddon(a.addon_key)}`} type="number" min={1} step={1} value={String(a.qty)} className="text-right"
-                        onChange={(e) => setDraftAddon(a.key, resizeService(a, Number(e.target.value), pos.sizeOptions))} />
-                    ) : a.qty}
-                  </span>
-                  <span className={`text-right text-c-secondary ${strike}`}>{fmtMoney(a.unit_price)}</span>
-                  <span className={`text-right text-c-ink ${strike}`}>{fmtMoney(a.qty * a.unit_price)}</span>
-                </div>
-                {amending && !owned && !a.removed && options.length > 0 && (
-                  <div className="grid grid-cols-1 gap-2 border-b border-c-row-line bg-c-ground px-2 py-2 sm:grid-cols-3">
-                    {sizes.map((size, i) => (
-                      <CSelect key={i} id={`so-service-size-${a.key}-${i}`} label={a.qty > 1 ? `Size ${i + 1}` : "Size"} placeholder={a.qty > 1 ? `Size ${i + 1}` : "Size"}
-                        value={size} onChange={(value) => setDraftAddon(a.key, sizeServiceUnit(a, i, value))}
-                        options={[...new Set([...options, ...(size ? [size] : [])])].map((value) => ({ value, label: value }))} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          <div role="row" className={`${ITEM_COLS} border-b border-c-footer-line py-[7px]`}>
-            <span /><span className="font-medium text-c-secondary">Total</span>
-            <span className="text-right text-c-ink">{qtyTotal}</span><span />
-            <span className="text-right font-medium text-c-ink" data-testid="money-total-payable">
-              {amending ? fmtMoney(editTotal) : money.known && money.total != null ? fmtMoney(money.total) : "No price yet"}
-            </span>
-          </div>
-          <div role="row" className={`${ITEM_COLS} border-b border-c-footer-line py-[7px]`}>
-            <span /><span className="text-c-secondary">Received</span><span /><span />
-            <span className="text-right text-c-ink" data-testid="money-paid">{fmtMoney(money.paid)}</span>
-          </div>
-          <div role="row" className={`${ITEM_COLS} border-b border-c-footer-line py-[7px] ${money.known && money.outstanding > 0 ? "bg-c-warn-bg" : ""}`}>
-            <span /><span className="font-medium text-c-secondary">Balance due</span><span /><span />
-            <span className={`text-right font-medium ${money.known && money.outstanding > 0 ? "text-c-warn-fg" : "text-c-ink"}`} data-testid="money-outstanding">
-              {!money.known ? "No price yet" : fmtMoney(Math.max(0, money.outstanding))}
-            </span>
-          </div>
-        </div>
+      <div className="min-w-0" data-testid="edit-items">
+        <COrderLines label="Items" data-testid="edit-goods" lines={[...goodsLines, ...serviceLines]}
+          totals={[
+            { key: "total", label: "Total", strong: true, qty: qtyTotal,
+              amount: <span data-testid="money-total-payable">{amending ? fmtMoney(editTotal) : money.known && money.total != null ? fmtMoney(money.total) : "No price yet"}</span> },
+            { key: "received", label: "Received", amount: <span data-testid="money-paid">{fmtMoney(money.paid)}</span> },
+            { key: "balance", label: "Balance due", strong: true, warn: owes,
+              amount: <span data-testid="money-outstanding">{!money.known ? "No price yet" : fmtMoney(Math.max(0, money.outstanding))}</span> },
+          ]} />
       </div>
       {amending && (
         <div className="grid grid-cols-1 gap-2 pt-3 sm:grid-cols-3">

@@ -128,7 +128,7 @@ export default function ListPageShell({
   const headerPad = inShell ? "max-[767px]:px-3 max-[767px]:pt-3" : "px-3 pt-3";
   /* The page's name lives in the shell header. A frame's own header is a
    *  quiet row on the ground: card-title type, no band, no border. */
-  const titleType = "text-[15px] font-semibold leading-[22px] text-c-ink";
+  const titleType = "text-strong text-c-ink";
   return (
     <div
       className={`h-full flex flex-col ${className}`}
@@ -154,7 +154,7 @@ export default function ListPageShell({
       {hasHeader && !workspace && (
         <div className={`shrink-0 ${headerPad}`}>
           <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0 flex items-center gap-1.5 text-[12px] leading-4 text-c-secondary">
+            <div className="min-w-0 flex items-center gap-1.5 text-meta text-c-secondary">
               {breadcrumb}
             </div>
             {actions && <div className="shrink-0 flex items-center gap-1">{actions}</div>}
@@ -162,7 +162,7 @@ export default function ListPageShell({
           <div className="flex items-baseline gap-2.5 min-w-0">
             <div className={`min-w-0 truncate ${titleType}`}>{title}</div>
             {meta && (
-              <div className="shrink-0 flex items-center gap-1 text-[12px] leading-4 text-c-secondary">
+              <div className="shrink-0 flex items-center gap-1 text-meta text-c-secondary">
                 {meta}
               </div>
             )}
@@ -251,7 +251,7 @@ export default function ListPageShell({
                   key={i}
                   type="button"
                   onClick={c.onClear}
-                  className="inline-flex items-center gap-1 rounded-lg border border-c-input-border bg-c-search-bg px-2.5 py-1 text-[12px] font-semibold leading-4 text-c-body hover:bg-c-hover"
+                  className="inline-flex items-center gap-1 rounded-lg border border-c-input-border bg-c-search-bg px-2.5 py-1 text-meta font-medium text-c-body hover:bg-c-hover"
                 >
                   {c.label}
                   <MIcon name="close" size={16} className="text-c-muted" />
@@ -264,7 +264,7 @@ export default function ListPageShell({
           {footer && (
             <footer
               /* The v4 status footer: 44 · 13 secondary · closes the card above. */
-              className="shrink-0 flex items-center justify-between gap-3 px-3.5 h-11 rounded-b-lg border border-t-0 border-c-card-border bg-c-card text-[13px] text-c-secondary"
+              className="shrink-0 flex items-center justify-between gap-3 px-3.5 h-11 rounded-b-lg border border-t-0 border-c-card-border bg-c-card text-body text-c-secondary"
               data-testid="listshell-footer"
             >
               {footer}

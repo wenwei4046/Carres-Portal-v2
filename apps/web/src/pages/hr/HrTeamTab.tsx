@@ -158,7 +158,7 @@ function TeamRow({
         <StaffCodeCell kind="hq_user" id={account.id} code={account.staffCode} />
       </div>
       <div className="flex-1 min-w-0">
-        <span className="text-body font-semibold text-base-900 truncate">
+        <span className="text-body font-medium text-base-900 truncate">
           {account.name}
         </span>
         <span className="ml-2 text-meta text-base-500 truncate">{account.email}</span>
@@ -231,7 +231,7 @@ function ShowroomStaffRow({ staff }: { staff: TeamShowroomStaff }) {
         <StaffCodeCell kind="showroom_staff" id={staff.id} code={staff.staffCode} />
       </div>
       <div className="flex-1 min-w-0">
-        <span className="text-body font-semibold text-base-900 truncate">{staff.name}</span>
+        <span className="text-body font-medium text-base-900 truncate">{staff.name}</span>
         {staff.outletName && (
           <span className="ml-2 text-meta text-base-500 truncate">{staff.outletName}</span>
         )}
@@ -336,7 +336,7 @@ function AddUserModal({
       >
         <div className="px-6 pt-5 pb-4 border-b border-base-100">
           <div className="kicker text-label">HR · Team</div>
-          <h2 className="font-display text-title mt-1 tracking-[-0.02em] font-semibold">
+          <h2 className="font-display text-strong mt-1 tracking-[-0.02em]">
             Add user
           </h2>
           <div className="text-meta text-base-600 mt-1 leading-relaxed">
@@ -345,7 +345,7 @@ function AddUserModal({
           </div>
         </div>
         <div className="p-6 grid grid-cols-2 gap-3">
-          <label className="col-span-2 text-meta font-semibold text-base-700">
+          <label className="col-span-2 text-meta text-base-700">
             Role
             <select
               value={role}
@@ -359,16 +359,16 @@ function AddUserModal({
               ))}
             </select>
           </label>
-          <label className="text-meta font-semibold text-base-700">
+          <label className="text-meta text-base-700">
             Name
             <input value={name} onChange={(e) => setName(e.target.value)} className={`${fieldCls} mt-1 font-normal`} />
           </label>
-          <label className="text-meta font-semibold text-base-700">
+          <label className="text-meta text-base-700">
             Email
             <input value={email} onChange={(e) => setEmail(e.target.value)} className={`${fieldCls} mt-1 font-normal`} />
           </label>
           {external ? (
-            <label className="col-span-2 text-meta font-semibold text-base-700">
+            <label className="col-span-2 text-meta text-base-700">
               Company name
               <input
                 value={companyName}
@@ -380,7 +380,7 @@ function AddUserModal({
             /* R6 — PICK a warehouse, never type one. A free-text name here
                would mint nothing and bind nothing; the login has to point at
                the same row the POs are bound to or it sees an empty list. */
-            <label className="col-span-2 text-meta font-semibold text-base-700">
+            <label className="col-span-2 text-meta text-base-700">
               Warehouse
               <select
                 value={warehouseId}
@@ -395,13 +395,13 @@ function AddUserModal({
                   </option>
                 ))}
               </select>
-              <span className="block text-label font-normal text-base-600 mt-1">
+              <span className="block text-meta text-base-600 mt-1">
                 This login sees only what is coming to that warehouse.
               </span>
             </label>
           ) : (
             <>
-              <label className="text-meta font-semibold text-base-700">
+              <label className="text-meta text-base-700">
                 Position
                 <select
                   value={positionId}
@@ -422,7 +422,7 @@ function AddUserModal({
                   ))}
                 </select>
               </label>
-              <label className="text-meta font-semibold text-base-700">
+              <label className="text-meta text-base-700">
                 Reports to
                 <select
                   value={reportsTo}
@@ -438,7 +438,7 @@ function AddUserModal({
                   ))}
                 </select>
               </label>
-              <label className="col-span-2 text-meta font-semibold text-base-700">
+              <label className="col-span-2 text-meta text-base-700">
                 Title (optional)
                 <input
                   value={title}
@@ -448,7 +448,7 @@ function AddUserModal({
               </label>
             </>
           )}
-          <label className="text-meta font-semibold text-base-700">
+          <label className="text-meta text-base-700">
             Temp password
             <input
               type="password"
@@ -457,7 +457,7 @@ function AddUserModal({
               className={`${fieldCls} mt-1 font-normal`}
             />
           </label>
-          <label className="text-meta font-semibold text-base-700">
+          <label className="text-meta text-base-700">
             Confirm password
             <input
               type="password"
@@ -527,7 +527,7 @@ function AddShowroomStaffModal({
       >
         <div className="px-6 pt-5 pb-4 border-b border-base-100">
           <div className="kicker text-label">HR · Team</div>
-          <h2 className="font-display text-title mt-1 tracking-[-0.02em] font-semibold">
+          <h2 className="font-display text-strong mt-1 tracking-[-0.02em]">
             Add showroom staff
           </h2>
           <div className="text-meta text-base-600 mt-1 leading-relaxed">
@@ -537,7 +537,7 @@ function AddShowroomStaffModal({
           </div>
         </div>
         <div className="p-6 flex flex-col gap-3">
-          <label className="text-meta font-semibold text-base-700">
+          <label className="text-meta text-base-700">
             Showroom
             <select
               value={dealerId}
@@ -551,11 +551,11 @@ function AddShowroomStaffModal({
               ))}
             </select>
           </label>
-          <label className="text-meta font-semibold text-base-700">
+          <label className="text-meta text-base-700">
             Name
             <input value={name} onChange={(e) => setName(e.target.value)} className={`${fieldCls} mt-1 font-normal`} />
           </label>
-          <label className="text-meta font-semibold text-base-700">
+          <label className="text-meta text-base-700">
             Position
             <select
               value={tier}
@@ -596,12 +596,12 @@ function ChartPersonCard({
   return (
     <div className="bg-white border border-base-200 rounded px-3 py-1.5 min-w-0">
       <div className="flex items-baseline gap-2 min-w-0">
-        <span className="text-body font-semibold text-base-900 truncate">{name}</span>
+        <span className="text-body font-medium text-base-900 truncate">{name}</span>
         {code && (
-          <span className="font-mono text-label tabular-nums text-base-400 shrink-0">{code}</span>
+          <span className="font-mono text-meta tabular-nums text-base-500 shrink-0">{code}</span>
         )}
       </div>
-      {detail && <div className="text-label text-base-500 truncate">{detail}</div>}
+      {detail && <div className="text-meta text-base-500 truncate">{detail}</div>}
     </div>
   );
 }
@@ -672,10 +672,10 @@ function DepartmentChartCard({
   const column = (title: string, count: number, body: ReactNode) => (
     <div key={title} className="rounded border border-base-200 bg-base-50 min-w-0">
       <div className="flex items-baseline justify-between px-3 py-2 border-b border-base-200">
-        <span className="text-meta font-semibold text-base-900 uppercase tracking-wide truncate">
+        <span className="text-label text-base-900 uppercase tracking-[0.06em] truncate">
           {title}
         </span>
-        <span className="text-label text-base-500 tabular-nums shrink-0">{count}</span>
+        <span className="text-meta text-base-500 tabular-nums shrink-0">{count}</span>
       </div>
       <div className="p-2 flex flex-col gap-1.5">{body}</div>
     </div>
@@ -693,7 +693,7 @@ function DepartmentChartCard({
           {/* Management team — sits ON TOP of every department. */}
           {cLevel.length > 0 && (
             <div className="pb-4 mb-4 border-b border-dashed border-base-200">
-              <div className="text-label uppercase tracking-[0.05em] text-base-500 text-center mb-2">Management team</div>
+              <div className="text-label uppercase tracking-[0.06em] text-base-500 text-center mb-2">Management team</div>
               <div className="flex flex-wrap justify-center gap-2">
                 {cLevel.map((a) => (
                   <ChartPersonCard
@@ -716,7 +716,7 @@ function DepartmentChartCard({
                 d.name,
                 members.length,
                 members.length === 0 ? (
-                  <div className="text-label text-base-400 px-1 py-2 text-center">No one yet</div>
+                  <div className="text-meta text-base-500 px-1 py-2 text-center">No one yet</div>
                 ) : (
                   members.map((a) => (
                     <ChartPersonCard
@@ -735,7 +735,7 @@ function DepartmentChartCard({
                 staffByStore.reduce((n, [, rows]) => n + rows.length, 0),
                 staffByStore.map(([store, rows]) => (
                   <div key={store} className="flex flex-col gap-1.5">
-                    <div className="text-label uppercase tracking-[0.05em] text-base-500 px-1">{store}</div>
+                    <div className="text-label uppercase tracking-[0.06em] text-base-500 px-1">{store}</div>
                     {rows.map((s) => (
                       <ChartPersonCard
                         key={s.id}
@@ -844,7 +844,7 @@ function DepartmentsCard({ departments }: { departments: OrgDepartment[] }) {
               Add department
             </Btn>
           </div>
-          <div className="text-label text-base-400 px-1 pb-1">
+          <div className="text-meta text-base-500 px-1 pb-1">
             A position joins a department in the Positions card below; the chart
             follows automatically. C-level seats stay department-less. They top
             the chart.
@@ -919,14 +919,14 @@ function DutiesCard({
             <table className="w-full border-collapse">
               <thead>
                 <tr>
-                  <th className="text-label uppercase tracking-[0.05em] text-base-500 text-left font-medium px-1 pb-1.5">
+                  <th className="text-meta font-medium text-base-500 text-left px-1 pb-1.5">
                     Position
                   </th>
                   {duties.map((d) => (
                     <th
                       key={d.key}
                       title={`${d.name}: ${d.description}`}
-                      className="text-label uppercase tracking-[0.05em] text-base-500 font-medium px-1 pb-1.5 w-[92px] text-center"
+                      className="text-meta font-medium text-base-500 px-1 pb-1.5 w-[92px] text-center"
                     >
                       {DUTY_SHORT[d.key] ?? d.name}
                     </th>
@@ -1025,7 +1025,7 @@ function PositionsCard({
             if (rows.length === 0) return null;
             return (
               <div key={band}>
-                <div className="text-label uppercase tracking-[0.05em] text-base-500 px-1 mb-1">{POSITION_BAND_LABEL[band]}</div>
+                <div className="text-label uppercase tracking-[0.06em] text-base-500 px-1 mb-1">{POSITION_BAND_LABEL[band]}</div>
                 <div className="flex flex-col">
                   {rows.map((p) => (
                     <div
@@ -1221,7 +1221,7 @@ export default function HrTeamTab() {
               if (!rows || rows.length === 0) return null;
               return (
                 <div key={band}>
-                  <div className="text-label uppercase tracking-[0.05em] text-base-500 px-2 pt-1">
+                  <div className="text-label uppercase tracking-[0.06em] text-base-500 px-2 pt-1">
                     {band === "unassigned" ? "No position yet" : POSITION_BAND_LABEL[band]}
                   </div>
                   {rows.map((a) => (
@@ -1266,13 +1266,13 @@ export default function HrTeamTab() {
             )}
             {staffByStore.map(([store, rows]) => (
               <div key={store}>
-                <div className="text-label uppercase tracking-[0.05em] text-base-500 px-2 pt-1">{store}</div>
+                <div className="text-label uppercase tracking-[0.06em] text-base-500 px-2 pt-1">{store}</div>
                 {rows.map((s) => (
                   <ShowroomStaffRow key={s.id} staff={s} />
                 ))}
               </div>
             ))}
-            <div className="text-label text-base-400 px-2 pb-1">
+            <div className="text-meta text-base-500 px-2 pb-1">
               Dealer-side staff are not Carres staff. They are managed by each
               dealer and never appear here.
             </div>
@@ -1296,7 +1296,7 @@ export default function HrTeamTab() {
                 className="flex items-center gap-3 h-9 px-2 rounded hover:bg-hovertint min-w-0"
               >
                 <div className="flex-1 min-w-0">
-                  <span className="text-body font-semibold text-base-900 truncate">
+                  <span className="text-body font-medium text-base-900 truncate">
                     {a.name}
                   </span>
                   <span className="ml-2 text-meta text-base-500 truncate">{a.email}</span>
@@ -1344,7 +1344,7 @@ export default function HrTeamTab() {
                 <span className="tabular-nums text-base-500 shrink-0 w-[86px]">
                   {h.changedAt.slice(0, 10)}
                 </span>
-                <span className="font-semibold text-base-900 truncate">{h.subjectName}</span>
+                <span className="font-medium text-base-900 truncate">{h.subjectName}</span>
                 <span className="text-base-600 truncate">
                   {h.prevPosition ?? "No position"} → {h.newPosition ?? "No position"}
                 </span>

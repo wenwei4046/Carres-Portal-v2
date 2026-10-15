@@ -109,7 +109,7 @@ function CompDialog({ edit, onClose }: { edit: EditState; onClose: () => void })
       >
         <div className="px-6 pt-5 pb-4 border-b border-base-100">
           <div className="kicker text-label">HR · People cost</div>
-          <h2 className="font-display text-title mt-1 tracking-[-0.02em] font-semibold">
+          <h2 className="font-display text-strong mt-1 tracking-[-0.02em]">
             {edit.compId ? "Edit salary" : "Record salary"}
           </h2>
           <div className="text-meta text-base-600 mt-1 leading-relaxed">
@@ -119,7 +119,7 @@ function CompDialog({ edit, onClose }: { edit: EditState; onClose: () => void })
           </div>
         </div>
         <div className="p-6 grid grid-cols-2 gap-3">
-          <label className="text-meta font-semibold text-base-700">
+          <label className="text-meta text-base-700">
             Base monthly (RM)
             <input
               autoFocus
@@ -129,7 +129,7 @@ function CompDialog({ edit, onClose }: { edit: EditState; onClose: () => void })
               className={`${fieldCls} mt-1 font-normal t-num`}
             />
           </label>
-          <label className="text-meta font-semibold text-base-700">
+          <label className="text-meta text-base-700">
             Fixed allowance (RM)
             <input
               inputMode="decimal"
@@ -138,7 +138,7 @@ function CompDialog({ edit, onClose }: { edit: EditState; onClose: () => void })
               className={`${fieldCls} mt-1 font-normal t-num`}
             />
           </label>
-          <label className="text-meta font-semibold text-base-700">
+          <label className="text-meta text-base-700">
             Employer burden (%)
             <input
               inputMode="decimal"
@@ -147,7 +147,7 @@ function CompDialog({ edit, onClose }: { edit: EditState; onClose: () => void })
               className={`${fieldCls} mt-1 font-normal t-num`}
             />
           </label>
-          <label className="text-meta font-semibold text-base-700">
+          <label className="text-meta text-base-700">
             Applies from
             <input
               type="date"
@@ -157,8 +157,8 @@ function CompDialog({ edit, onClose }: { edit: EditState; onClose: () => void })
             />
           </label>
           <div className="col-span-2 rounded-lg bg-base-50 border border-base-200 px-3 py-2">
-            <div className="text-label uppercase tracking-[0.05em] text-base-500">Loaded monthly cost</div>
-            <div className="t-num text-strong font-semibold" data-testid="comp-loaded-preview">
+            <div className="text-label uppercase tracking-[0.06em] text-base-500">Loaded monthly cost</div>
+            <div className="t-num text-strong" data-testid="comp-loaded-preview">
               {preview === null ? "" : rm(preview)}
             </div>
             <div className="text-meta text-base-500">
@@ -311,7 +311,7 @@ export default function HrPeopleCostTab({
                 {["Group", "People", "Loaded cost", "Revenue", "Cost of revenue"].map((h, i) => (
                   <th
                     key={h}
-                    className={`text-label uppercase tracking-[0.05em] text-base-500 font-medium px-2.5 py-2 border-b border-base-200 whitespace-nowrap ${
+                    className={`text-meta font-medium text-base-500 px-2.5 py-2 border-b border-base-200 whitespace-nowrap ${
                       i === 0 ? "text-left" : "text-right"
                     }`}
                   >
@@ -337,7 +337,7 @@ export default function HrPeopleCostTab({
                   </td>
                   <td className="px-2.5 h-11 text-body text-right">
                     {g.costPctOfRevenue !== null ? (
-                      <span className="t-num font-semibold">{g.costPctOfRevenue}%</span>
+                      <span className="t-num">{g.costPctOfRevenue}%</span>
                     ) : g.absence ? (
                       <span className="text-base-400">{REVENUE_ABSENCE_LABEL[g.absence]}</span>
                     ) : (
@@ -351,12 +351,12 @@ export default function HrPeopleCostTab({
         </div>
         <div className="px-3 py-2 flex flex-col gap-1.5">
           <p className="text-meta text-base-500">
-            <b>Head-office cost is never divided across stores.</b> Splitting it over a
+            <b className="font-medium">Head-office cost is never divided across stores.</b> Splitting it over a
             showroom would invent a figure and then judge the store against it. Overhead
             is reported as overhead.
           </p>
           <p className="text-meta text-base-500 border-t border-base-200 pt-1.5">
-            People with no department land in <b>Management</b>. The Chairman and COO are
+            People with no department land in <b className="font-medium">Management</b>. The Chairman and COO are
             department-less by design (they top the org chart). Give anyone else a
             position on the Team tab and they move into their own row.
           </p>
@@ -375,15 +375,15 @@ export default function HrPeopleCostTab({
           <div className="p-3 flex flex-col gap-2.5">
             <div className="flex gap-7 flex-wrap">
               <div>
-                <div className="text-label uppercase tracking-[0.05em] text-base-500">Staff cost</div>
+                <div className="text-label uppercase tracking-[0.06em] text-base-500">Staff cost</div>
                 <div className="t-num text-title font-semibold">{rm(s.fixedCost)}</div>
               </div>
               <div>
-                <div className="text-label uppercase tracking-[0.05em] text-base-500">Revenue on file</div>
+                <div className="text-label uppercase tracking-[0.06em] text-base-500">Revenue on file</div>
                 <div className="t-num text-title font-semibold">{rm(s.revenue)}</div>
               </div>
               <div>
-                <div className="text-label uppercase tracking-[0.05em] text-base-500">Staff cost as % of revenue</div>
+                <div className="text-label uppercase tracking-[0.06em] text-base-500">Staff cost as % of revenue</div>
                 <div
                   className={`t-num text-title font-semibold ${
                     s.costPctOfRevenue === null ? "text-base-400" : ""
@@ -400,14 +400,14 @@ export default function HrPeopleCostTab({
                 <div>
                   {cost.coverage.partial ? (
                     <>
-                      <b>
+                      <b className="font-medium">
                         Sales on file cover {cost.coverage.firstOrderDate} to{" "}
                         {cost.coverage.lastOrderDate}, {cost.coverage.daysWithOrders} of{" "}
                         {cost.coverage.daysInMonth} days.
                       </b>{" "}
                     </>
                   ) : (
-                    <b>This month is still running. </b>
+                    <b className="font-medium">This month is still running. </b>
                   )}
                   A full month of salary against part of a month of sales would read as a
                   wildly wrong ratio, so the percentage stays hidden until the month is
@@ -441,7 +441,7 @@ export default function HrPeopleCostTab({
                   (h, i) => (
                     <th
                       key={h || `sp-${i}`}
-                      className={`text-label uppercase tracking-[0.05em] text-base-500 font-medium px-2.5 py-2 border-b border-base-200 whitespace-nowrap ${
+                      className={`text-meta font-medium text-base-500 px-2.5 py-2 border-b border-base-200 whitespace-nowrap ${
                         i >= 2 && i <= 5 ? "text-right" : "text-left"
                       }`}
                     >
@@ -457,7 +457,7 @@ export default function HrPeopleCostTab({
                   <td className="px-2.5 h-11 text-body">
                     {r.name}
                     {r.staffCode && (
-                      <span className="text-meta text-base-400 t-num"> {r.staffCode}</span>
+                      <span className="text-meta text-base-500 t-num"> {r.staffCode}</span>
                     )}
                   </td>
                   <td className="px-2.5 h-11 text-body text-base-500">
@@ -481,7 +481,7 @@ export default function HrPeopleCostTab({
                       <td className="px-2.5 h-11 text-body text-right t-num">
                         {r.employerBurdenPct}%
                       </td>
-                      <td className="px-2.5 h-11 text-body text-right t-num font-semibold">
+                      <td className="px-2.5 h-11 text-body text-right t-num">
                         {rm(r.loaded ?? 0)}
                       </td>
                       <td className="px-2.5 h-11 text-body t-num">{r.effectiveFrom}</td>
@@ -513,12 +513,12 @@ export default function HrPeopleCostTab({
         </div>
         <div className="px-3 py-2 flex flex-col gap-1.5">
           <p className="text-meta text-base-500">
-            A salary is <b>never edited in place</b>. A raise is a new row from the date it
+            A salary is <b className="font-medium">never edited in place</b>. A raise is a new row from the date it
             starts, so last month's cost stays what it actually was. Same rule as
             commission rates and targets.
           </p>
           <p className="text-meta text-base-500 border-t border-base-200 pt-1.5">
-            <b>Carres never computes EPF, SOCSO, EIS or PCB.</b> Burden is one percentage a
+            <b className="font-medium">Carres never computes EPF, SOCSO, EIS or PCB.</b> Burden is one percentage a
             human types as an estimate so the cost figure is not misleadingly low. No
             payslip, no bank file, no e-filing. That stays with the payroll provider.
           </p>

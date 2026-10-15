@@ -73,7 +73,7 @@ export default function SupplierSKU() {
   return (
     <div className="p-9 max-w-[1400px] mx-auto">
       <header className="mb-7">
-        <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">
+        <div className="text-label uppercase tracking-[0.06em] text-muted-foreground">
           Catalog
         </div>
         <h1 className="font-display text-page mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
@@ -144,7 +144,7 @@ export default function SupplierSKU() {
         ) : (
           Object.entries(byCat).map(([cat, items]) => (
             <div key={cat}>
-              <div className="px-5 py-2.5 border-b border-border text-label font-semibold uppercase tracking-[0.18em] text-primary flex items-center gap-2.5 bg-card">
+              <div className="px-5 py-2.5 border-b border-border text-label uppercase tracking-[0.06em] text-primary flex items-center gap-2.5 bg-card">
                 <span>{cat}</span>
                 <span className="text-muted-foreground font-medium tracking-normal normal-case">
                   · {items.length} SKU{items.length === 1 ? "" : "s"}
@@ -161,11 +161,11 @@ export default function SupplierSKU() {
                       {r.sku}
                     </div>
                     <div className="min-w-0">
-                      <div className="text-body font-semibold truncate">
+                      <div className="text-body font-medium truncate">
                         {r.model?.name ?? ""}
                       </div>
                       {r.model?.blurb && (
-                        <div className="text-label text-muted-foreground mt-0.5 truncate">
+                        <div className="text-meta text-muted-foreground mt-0.5 truncate">
                           {r.model.blurb}
                         </div>
                       )}
@@ -175,7 +175,7 @@ export default function SupplierSKU() {
                     </div>
                     <div className="text-right">
                       {d > 0 ? (
-                        <span className="font-mono text-meta font-semibold px-2.5 py-0.5 rounded bg-primary/10 text-primary">
+                        <span className="font-mono text-meta font-medium px-2.5 py-0.5 rounded bg-primary/10 text-primary">
                           {d}
                         </span>
                       ) : (
@@ -184,7 +184,7 @@ export default function SupplierSKU() {
                         </span>
                       )}
                     </div>
-                    <div className="font-mono text-right text-meta font-semibold">
+                    <div className="font-mono text-right text-body tabular-nums">
                       {r.price.toLocaleString()}
                     </div>
                   </div>
@@ -216,7 +216,7 @@ function Kpi({
         {value}
       </div>
       {hint && (
-        <div className="text-label text-muted-foreground mt-1.5">{hint}</div>
+        <div className="text-meta text-muted-foreground mt-1.5">{hint}</div>
       )}
     </div>
   );
@@ -235,7 +235,7 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
-      className={`px-3.5 py-1 rounded text-label font-semibold uppercase tracking-[0.1em] ${
+      className={`px-3.5 py-1 rounded text-label uppercase tracking-[0.06em] ${
         active
           ? "bg-foreground text-background"
           : "text-muted-foreground hover:bg-secondary/50"
@@ -255,7 +255,7 @@ function HeaderCell({
 }) {
   return (
     <div
-      className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground"
+      className="text-meta font-medium text-muted-foreground"
       style={{ textAlign: align ?? "left" }}
     >
       {children}

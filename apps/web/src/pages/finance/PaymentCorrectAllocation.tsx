@@ -73,17 +73,17 @@ export default function PaymentCorrectAllocation({ payment, onClose }: {
       <h2 className="text-strong mb-2">Correct allocation</h2>
       <div className="space-y-2 text-body">
         <p>{payment.receipt_no ?? "Receipt number missing"} · {rm(payment.amount)} received.</p>
-        <p className="font-semibold">This moves the money. It does not change how much was received.</p>
+        <p className="font-medium">This moves the money. It does not change how much was received.</p>
 
         {lines.map((line, i) => <div key={i} className="flex gap-2">
           <label className="flex-1">
-            <span className="text-label">Sales Order</span>
+            <span className="text-meta text-kit-slate-11">Sales Order</span>
             <input value={line.orderId} onChange={(e) => setLine(i, { orderId: e.target.value })}
               aria-label={`Sales Order ${i + 1}`}
               className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" />
           </label>
           <label className="w-40">
-            <span className="text-label">Amount</span>
+            <span className="text-meta text-kit-slate-11">Amount</span>
             <input type="number" step="0.01" value={line.amount}
               onChange={(e) => setLine(i, { amount: e.target.value })}
               aria-label={`Amount ${i + 1}`}
@@ -104,7 +104,7 @@ export default function PaymentCorrectAllocation({ payment, onClose }: {
         </p>
 
         <label className="block">
-          <span className="text-label">Why is this being corrected</span>
+          <span className="text-meta text-kit-slate-11">Why is this being corrected</span>
           <input value={reason} onChange={(e) => setReason(e.target.value)}
             aria-label="Why is this being corrected"
             className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" />
