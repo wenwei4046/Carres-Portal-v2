@@ -128,6 +128,14 @@ what moved, what an owner ruling replaced, and the kept `SalesOrderCompactView`)
    restriction; do not silently reintroduce TBD for dated or new orders.
    Do not bypass the page with a direct production write or report this TEST answer as real
    customer communication. Owner authorisation is satisfied, runtime proof is not.
+   Controller-directed read-only reconciliation (15 Oct): the live row has no delivery date,
+   `delivery_date_tbd=false`, unfinished `place` status, and predates the 15 Aug entry gate. It
+   meets `work.ts`'s current `askDeliveryDate` predicate and Orders MASTER's legacy eligibility;
+   do not remove it as stale solely because a response writer is absent. The live revision writer
+   retains `promise_moves_by_amendment`; the UI requires a real date for non-contact edits.
+   No TBD checkbox, bypass, date clearing, writer change or task-semantic change is authorised.
+   Controller proposal: prove the existing real-date/amendment contract on an isolated fixture;
+   supporting a legacy no-date response writer would need an explicit scoped policy ruling.
 3. **Batch D · SO Batch brief.** A confirmed: preserve the existing deadline rule, no code change.
    B and C still await owner rulings via the controller (§5); batch any approved changes into one release.
 4. **Page adoption down the side menu** after Design's fix list per page; **Settings per module** at
