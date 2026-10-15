@@ -176,10 +176,10 @@ export default function WorkOrderRoute({
   return (
     <WorkSection className="shrink-0 px-3 py-1.5 min-[768px]:px-4" data-testid="work-route" aria-label={R.heading}>
       {header ? <div className="-mx-3 mb-2 border-b border-kit-slate-4 px-3 pb-2.5 pt-1.5 min-[768px]:-mx-4 min-[768px]:px-4">{header}</div> : null}
-      {title === null ? null : <div className="flex h-[14px] items-center justify-between">
+      {title === null ? null : <div className="flex min-h-[22px] items-center justify-between">
         <SectionTitle>{title ?? R.heading}</SectionTitle>
         {route.header ? (
-          <span className={`text-[11px] font-semibold leading-[14px] ${STATUS_TEXT[route.header.tone]}`} data-testid="work-route-header">
+          <span className={`text-meta font-medium ${STATUS_TEXT[route.header.tone]}`} data-testid="work-route-header">
             {route.header.text}
           </span>
         ) : null}
@@ -205,7 +205,7 @@ export default function WorkOrderRoute({
         </ol>
       </div>
       {factsQ.isError ? (
-        <div className="flex flex-wrap items-center gap-2 text-[12px] leading-4 text-kit-amber-11" data-testid="work-route-supplier-failed" role="status">
+        <div className="flex flex-wrap items-center gap-2 text-meta text-kit-amber-11" data-testid="work-route-supplier-failed" role="status">
           <span>Some information could not be refreshed.</span>
           <Button size="touch" onClick={() => void factsQ.refetch()}>Try again</Button>
         </div>
@@ -213,7 +213,7 @@ export default function WorkOrderRoute({
       {exceptions.length > 0 ? (
         <ul className="mb-0.5 flex flex-col" data-testid="work-route-exceptions">
           {exceptions.map((e) => (
-            <li key={e.text} className={`flex items-center gap-1 text-[12px] leading-4 ${STATUS_TEXT[e.tone]}`}>
+            <li key={e.text} className={`flex items-center gap-1 text-meta ${STATUS_TEXT[e.tone]}`}>
               <Icon name="late" size={14} />
               <span>{e.text}</span>
             </li>
@@ -222,7 +222,7 @@ export default function WorkOrderRoute({
       ) : null}
       {detail ? (
         <div id={`route-detail-${detail.key}`} className="mb-1 mt-1 flex flex-col gap-1 rounded-control bg-kit-slate-2 p-2.5" data-testid={`work-route-detail-${detail.key}`}>
-          <div className="text-[12px] font-semibold leading-4 text-kit-slate-12">
+          <div className="text-body font-medium text-kit-slate-12">
             {detail.label} · {detail.status}
           </div>
           <RouteDetail point={detail} orderId={orderId} supplier={supplier} customerLine={customer.model?.status.text ?? null} logisticsLine={lm.partnerName ? [lm.partnerName, lm.model?.rows[1].fact].filter(Boolean).join(" · ") : "Logistics not assigned"} card={lm.card} onOpenParty={onOpenParty} />
@@ -255,7 +255,7 @@ function PointButton({
       className={`relative z-[1] flex min-w-[56px] flex-col items-center rounded-control px-0.5 text-center hover:bg-kit-slate-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-kit-blue-9 ${open ? "bg-kit-slate-2" : ""}`}
       data-testid={`work-route-point-${point.key}`}
     >
-      <span className={`h-4 whitespace-nowrap text-[11px] leading-4 tabular-nums ${point.final ? "font-semibold text-kit-slate-12" : "text-kit-slate-11"}`}>
+      <span className={`h-4 whitespace-nowrap text-meta tabular-nums ${point.final ? "font-medium text-kit-slate-12" : "text-kit-slate-11"}`}>
         {point.dateText ?? " "}
       </span>
       <span className="flex h-3 items-center justify-center" aria-hidden="true">
@@ -264,8 +264,8 @@ function PointButton({
         >
         </span>
       </span>
-      <span className="h-4 whitespace-nowrap text-[12px] font-semibold leading-4 text-kit-slate-12">{point.label}</span>
-      <span className={`h-4 whitespace-nowrap text-[11px] leading-4 ${STATUS_TEXT[point.tone]}`}>{point.status}</span>
+      <span className="h-4 whitespace-nowrap text-meta font-medium text-kit-slate-12">{point.label}</span>
+      <span className={`h-4 whitespace-nowrap text-meta ${STATUS_TEXT[point.tone]}`}>{point.status}</span>
     </button>
   );
 }
@@ -288,7 +288,7 @@ function RouteDetail({
   onOpenParty: (party: "logistics" | "customer" | "supplier") => void;
 }) {
   const link = (label: string, to: string) => (
-    <Link className="inline-flex min-h-10 items-center gap-1 self-start text-label text-kit-blue-11 hover:underline" to={to}>
+    <Link className="inline-flex min-h-10 items-center gap-1 self-start text-meta text-kit-blue-11 hover:underline" to={to}>
       {label}
       <Icon name="open" size={14} />
     </Link>
@@ -297,7 +297,7 @@ function RouteDetail({
     <Button size="touch" onClick={() => onOpenParty(party)}>{label}</Button>
   );
   const row = (left: string, right: string, key?: string) => (
-    <div key={key ?? left} className="flex flex-wrap items-baseline justify-between gap-x-3 text-[12px] leading-4">
+    <div key={key ?? left} className="flex flex-wrap items-baseline justify-between gap-x-3 text-meta">
       <span className="text-kit-slate-12">{left}</span>
       <span className="text-kit-slate-11">{right}</span>
     </div>

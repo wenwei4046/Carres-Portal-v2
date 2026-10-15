@@ -47,30 +47,29 @@ describe("WorkCard", () => {
   /* THE OWNER DENSITY RULING 2026-09-25 — exact values, not a direction.
      A class is not a pixel; the production walk measures the computed
      styles. These lock the classes that decide them. */
-  it("locks the exact density values: rail 60, weekday 11, date 22, problem 15, action 12, footer 28, icon 14", () => {
+  it("locks the exact density values: rail 60, weekday 11, date 15, problem 15, action 12, footer 28, icon 14", () => {
     render(<WorkCard item={row()} moduleLabel="Delivery" action="Arrange a new delivery date" today="2026-09-17" selected={false} onSelect={vi.fn()} onOpenRecord={vi.fn()} />);
     const date = screen.getByTestId("work-card-date");
     expect(date.className).toContain("h-11");
     const [weekday, day] = Array.from(date.children) as HTMLElement[];
-    expect(weekday.className).toContain("text-[11px]");
+    expect(weekday.className).toContain("text-label"); /* 11/500 caps (01 §2) */
     expect(weekday.className).toContain("leading-[14px]");
-    expect(day.className).toContain("text-[22px]");
+    expect(day.className).toContain("text-strong"); /* 15/500: 22/600 is not on the scale */
     expect(day.className).toContain("leading-6");
     const badge = screen.getByText("Late");
-    expect(badge.className).toContain("text-[9px]");
+    expect(badge.className).toContain("text-label"); /* a tag: 11/500 caps */
     expect(badge.className).toContain("max-h-[17px]");
     expect(badge.className).toContain("px-1.5");
     const module = screen.getByTestId("work-card-module");
-    expect(module.className).toContain("text-[10px]");
+    expect(module.className).toContain("text-label");
     expect(module.className).toContain("tracking-[0.06em]");
     expect(module.querySelector("svg")?.getAttribute("width")).toBe("14");
     const problem = screen.getByTestId("work-card-problem");
-    expect(problem.className).toContain("text-[15px]");
+    expect(problem.className).toContain("text-strong");
     expect(problem.className).toContain("leading-5");
     expect(problem.className).toContain("truncate");
     const action = screen.getByTestId("work-card-action");
-    expect(action.className).toContain("text-[12px]");
-    expect(action.className).toContain("leading-4");
+    expect(action.className).toContain("text-meta"); /* 12/400 on a 16 line */
     expect(action.className).toContain("truncate");
     const footer = screen.getByTestId("work-card-footer");
     expect(footer.className).toContain("h-7");

@@ -147,7 +147,7 @@ export default function SupplierCard({
           ) : null}
           {model.stock ? (
             <section aria-label="From stock" className="flex flex-col gap-1 border-b border-kit-slate-4 pb-3 last:border-b-0 last:pb-0" data-testid="party-supplier-stock">
-              <span className="text-[13px] font-semibold leading-[18px] text-kit-slate-12">
+              <span className="text-body font-medium text-kit-slate-12">
                 {[S.fromStock(model.stock.ready, model.stock.total), model.stock.site].filter(Boolean).join(" · ")}
               </span>
             </section>
@@ -170,7 +170,7 @@ export default function SupplierCard({
 
 function OpenPurchasing() {
   return (
-    <Link className="inline-flex min-h-10 items-center gap-1 self-start text-label text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to="/operation/procurement">
+    <Link className="inline-flex min-h-10 items-center gap-1 self-start text-meta text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to="/operation/procurement">
       {S.openPurchasing}
       <Icon name="open" size={14} />
     </Link>
@@ -190,10 +190,10 @@ function SupplierRowView({ row, reference, group, primary }: { row: SupplierRow;
   return (
     <section aria-label={`${row.supplier ?? row.poNo} · ${row.poNo}`} className="flex flex-col gap-1 border-b border-kit-slate-4 pb-3 last:border-b-0 last:pb-0" data-testid={`party-supplier-row-${row.poNo}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <span className="text-[13px] font-semibold leading-[18px] text-kit-slate-12">
+        <span className="text-body font-medium text-kit-slate-12">
           {row.supplier ?? S.notRecorded} · <span className="tabular-nums">{row.poNo}</span>
         </span>
-        <span className="text-[12px] leading-4 text-kit-slate-11 tabular-nums">{S.complete(row.checksDone)}</span>
+        <span className="text-meta text-kit-slate-11 tabular-nums">{S.complete(row.checksDone)}</span>
       </div>
       <ToneLine tone={row.tone} testId={`party-supplier-state-${row.poNo}`}>{row.stateText}</ToneLine>
       <div className="mt-1 flex flex-col">
@@ -237,22 +237,22 @@ function SupplierRowView({ row, reference, group, primary }: { row: SupplierRow;
               Copy message
             </Button>
             {group ? (
-              <a className="inline-flex min-h-10 items-center gap-1 text-label text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" href={group} target="_blank" rel="noreferrer">
+              <a className="inline-flex min-h-10 items-center gap-1 text-meta text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" href={group} target="_blank" rel="noreferrer">
                 <Icon name="message" size={14} />
                 Open WhatsApp group
               </a>
             ) : (
-              <span className="text-label text-kit-slate-11">WhatsApp group not set</span>
+              <span className="text-meta text-kit-slate-11">WhatsApp group not set</span>
             )}
           </>
         ) : null}
         {row.issued && !row.grnIso ? (
-          <Link className="inline-flex min-h-10 items-center gap-1 text-label text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to={poHref(row.poNo)} data-testid={`party-supplier-delay-${row.poNo}`}>
+          <Link className="inline-flex min-h-10 items-center gap-1 text-meta text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to={poHref(row.poNo)} data-testid={`party-supplier-delay-${row.poNo}`}>
             {S.recordDelay}
             <Icon name="open" size={14} />
           </Link>
         ) : null}
-        <Link className="inline-flex min-h-10 items-center gap-1 text-label text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to={poHref(row.poNo)}>
+        <Link className="inline-flex min-h-10 items-center gap-1 text-meta text-kit-slate-11 underline underline-offset-2 hover:text-kit-slate-12" to={poHref(row.poNo)}>
           {S.openPo(row.poNo)}
           <Icon name="open" size={14} />
         </Link>

@@ -75,27 +75,27 @@ export default function GlobalActivity() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search order, customer, or staff…"
-          className="w-full text-meta bg-transparent outline-none placeholder-base-400"
+          className="w-full text-body bg-transparent outline-none placeholder-base-400"
         />
       </div>
 
       <div className="grid grid-cols-3 gap-1.5 mb-2">
-        <select aria-label="Type" value={cat} onChange={(event) => setCat(event.target.value as OrderEventCategory | "all")} className="min-w-0 rounded-md border border-base-200 bg-white px-2 py-1.5 text-label text-base-700">
+        <select aria-label="Type" value={cat} onChange={(event) => setCat(event.target.value as OrderEventCategory | "all")} className="min-w-0 rounded-md border border-base-200 bg-white px-2 py-1.5 text-body text-base-700">
           <option value="all">Type</option>
           {CATEGORY_ORDER.map((category) => <option key={category} value={category}>{category.replaceAll("_", " ")}</option>)}
         </select>
-        <select aria-label="Person" value={staff} onChange={(event) => setStaff(event.target.value)} className="min-w-0 rounded-md border border-base-200 bg-white px-2 py-1.5 text-label text-base-700">
+        <select aria-label="Person" value={staff} onChange={(event) => setStaff(event.target.value)} className="min-w-0 rounded-md border border-base-200 bg-white px-2 py-1.5 text-body text-base-700">
           <option value="all">Person</option>
           {staffNames.map((name) => <option key={name} value={name}>{name}</option>)}
         </select>
-        <select aria-label="Module" defaultValue="all" className="min-w-0 rounded-md border border-base-200 bg-white px-2 py-1.5 text-label text-base-700">
+        <select aria-label="Module" defaultValue="all" className="min-w-0 rounded-md border border-base-200 bg-white px-2 py-1.5 text-body text-base-700">
           <option value="all">Module</option>
           <option value="sales-orders">Sales Orders</option>
         </select>
       </div>
 
       {isLoading ? (
-        <div className="text-meta text-base-400 py-2">Loading…</div>
+        <div className="text-meta text-base-500 py-2">Loading…</div>
       ) : filtered.length === 0 ? (
         <div className="text-meta text-base-500 py-4 text-center">Nothing matches.</div>
       ) : (
@@ -129,7 +129,7 @@ function DayGroup({
 }) {
   return (
     <>
-      <div className="text-label uppercase tracking-[0.05em] text-base-400 pt-2 pb-0.5">
+      <div className="text-label uppercase tracking-[0.06em] text-base-500 pt-2 pb-0.5">
         {label}
       </div>
       {items.map((d) => (
@@ -155,13 +155,13 @@ function FeedRow({ d, onOpen }: { d: Decorated; onOpen: (orderId: string | null)
         <IconChip category={category} size={26} />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-meta text-base-800 leading-snug truncate">
+        <div className="text-body text-base-800 leading-snug truncate">
           <span className={category === "exception" ? "font-medium text-red-700" : "font-medium"}>
             {title}
           </span>
           {body ? <span className="text-base-600">: {body}</span> : null}
         </div>
-        <div className="text-label text-base-500 truncate">
+        <div className="text-meta text-base-500 truncate">
           {/* An event with no order is a portal-wide event, and saying so in
               words beats a dash the reader has to guess at (owner ruling
               2026-08-15 — no "" pretending to be a value). */}

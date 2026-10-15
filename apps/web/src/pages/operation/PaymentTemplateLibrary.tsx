@@ -161,34 +161,34 @@ export function TemplateLibrary({ config }: { config: TemplateLibraryConfig }) {
     const canReview = editor.name.trim() !== "" && editor.body.trim() !== "" && problems.length === 0;
     return <div className="grid gap-3 md:grid-cols-2" data-testid="template-editor">
       <div>
-        <h3 className="text-body font-semibold mb-2">
+        <h3 className="text-strong mb-2">
           {editor.templateKey ? "Edit template" : "New template"} · {config.purposeWord[editor.purpose]}
         </h3>
         {!reviewing ? <div className="space-y-2">
           <Input id="template-name" label="Template name" value={editor.name}
             onChange={(e) => setEditor({ ...editor, name: e.target.value })} />
           <label className="block">
-            <span className="text-label">Wording</span>
+            <span className="text-meta text-kit-slate-11">Wording</span>
             <textarea value={editor.body} rows={10} aria-label="Wording"
               onChange={(e) => setEditor({ ...editor, body: e.target.value })}
               className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" />
           </label>
-          <p className="text-label font-normal">
+          <p className="text-meta text-kit-slate-11">
             Protected fields fill themselves: {config.knownFields.map((f) => `{${f}}`).join(" · ")}
           </p>
-          {problems.map((p) => <p key={p} className="text-label font-normal text-danger">{p}</p>)}
+          {problems.map((p) => <p key={p} className="text-meta text-danger">{p}</p>)}
           <div className="flex gap-2">
             <Button variant="primary" disabled={!canReview}
               onClick={() => setReviewing(true)}>Review changes</Button>
             <Button variant="neutral" onClick={() => { setEditor(null); setReviewing(false); }}>Cancel</Button>
           </div>
         </div> : <div className="space-y-2 text-body" data-testid="template-review">
-          <p className="font-semibold">Review changes</p>
+          <p className="font-medium">Review changes</p>
           {editor.before && editor.before.body !== editor.body && <details>
-            <summary className="cursor-pointer text-label">Wording before this change</summary>
-            <pre className="whitespace-pre-wrap font-sans text-label font-normal">{editor.before.body}</pre>
+            <summary className="cursor-pointer text-meta">Wording before this change</summary>
+            <pre className="whitespace-pre-wrap font-sans text-meta">{editor.before.body}</pre>
           </details>}
-          <p className="text-label font-normal">Saving keeps every earlier version in history.</p>
+          <p className="text-meta text-kit-slate-11">Saving keeps every earlier version in history.</p>
           <div className="flex gap-2">
             <Button variant="primary" loading={save.isPending}
               onClick={() => save.mutate({
@@ -200,7 +200,7 @@ export function TemplateLibrary({ config }: { config: TemplateLibraryConfig }) {
         </div>}
       </div>
       <div data-testid="template-preview">
-        <h3 className="text-body font-semibold mb-2">What {config.recipientWord} receives</h3>
+        <h3 className="text-strong mb-2">What {config.recipientWord} receives</h3>
         <pre className="whitespace-pre-wrap rounded-card border border-base-200 bg-white p-3 font-sans text-body">
           {renderPaymentTemplate(editor.body, config.sampleFacts)}
         </pre>
@@ -213,40 +213,40 @@ export function TemplateLibrary({ config }: { config: TemplateLibraryConfig }) {
       const list = heads.filter((t) => t.purpose === purpose);
       return <div key={purpose}>
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-body font-semibold">{config.purposeWord[purpose]}</h3>
+          <h3 className="text-strong">{config.purposeWord[purpose]}</h3>
           <Button variant="neutral" size="sm" onClick={() => {
             setEditor({ templateKey: null, purpose, name: "", body: "", before: null });
             setReviewing(false);
           }}>New template</Button>
         </div>
-        {list.length === 0 && <p className="text-label font-normal">
+        {list.length === 0 && <p className="text-meta text-kit-slate-11">
           No template yet. The approved wording must come from its owner.
         </p>}
         {list.map((t) => <div key={t.template_key} className="mt-1 text-body">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold">{t.name}</span>
-            <span className="text-label font-normal">V{t.version}</span>
-            {t.is_default && <span className="text-label">Default</span>}
-            {!t.active && <span className="text-label">Inactive</span>}
+            <span className="text-meta text-kit-slate-11">V{t.version}</span>
+            {t.is_default && <span className="text-meta font-medium">Default</span>}
+            {!t.active && <span className="text-meta font-medium">Inactive</span>}
             <span className="ml-auto flex flex-wrap gap-2">
-              <button className="text-meta font-semibold text-kit-blue-11" onClick={() => {
+              <button className="text-body font-medium text-kit-blue-11" onClick={() => {
                 setEditor({ templateKey: t.template_key, purpose: t.purpose,
                   name: t.name, body: t.body, before: t });
                 setReviewing(false);
               }}>Edit</button>
-              <button className="text-meta font-semibold text-kit-blue-11" onClick={() => {
+              <button className="text-body font-medium text-kit-blue-11" onClick={() => {
                 setEditor({ templateKey: null, purpose: t.purpose,
                   name: `${t.name} (copy)`, body: t.body, before: null });
                 setReviewing(false);
               }}>Duplicate</button>
               {!t.is_default && t.active &&
-                <button className="text-meta font-semibold text-kit-blue-11"
+                <button className="text-body font-medium text-kit-blue-11"
                   onClick={() => setDefault.mutate(t.template_key)}>Set as default</button>}
-              <button className="text-meta font-semibold text-kit-blue-11"
+              <button className="text-body font-medium text-kit-blue-11"
                 onClick={() => setActive.mutate({ templateKey: t.template_key, active: !t.active })}>
                 {t.active ? "Make inactive" : "Make active"}
               </button>
-              <button className="text-meta font-semibold text-kit-blue-11"
+              <button className="text-body font-medium text-kit-blue-11"
                 onClick={() => setHistoryKey(historyKey === t.template_key ? null : t.template_key)}>
                 View history
               </button>
@@ -254,10 +254,10 @@ export function TemplateLibrary({ config }: { config: TemplateLibraryConfig }) {
           </div>
           {historyKey === t.template_key && <div className="mt-1 space-y-1" data-testid="template-history">
             {versionsOf(t.template_key).map((v) => <details key={v.id}>
-              <summary className="cursor-pointer text-label">
+              <summary className="cursor-pointer text-meta">
                 V{v.version} · {fmtDate(v.created_at, { time: true })}{v.is_head ? " · current" : ""}
               </summary>
-              <pre className="whitespace-pre-wrap font-sans text-label font-normal">{v.body}</pre>
+              <pre className="whitespace-pre-wrap font-sans text-meta">{v.body}</pre>
             </details>)}
           </div>}
         </div>)}
