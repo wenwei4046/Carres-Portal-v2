@@ -1,27 +1,8 @@
-/**
- * Settings → Personal → Appearance — each person picks their own (owner v4
- * instruction, 01 §9; Settings pattern: plain grouped rows, one header
- * `Save changes`, UI MASTER §4).
- *
- *   Appearance                                              [Save changes]
- *   Choose how your portal looks. This changes only your profile.
- *   ┌──────────────────────────────────────────────────────────────────┐
- *   │ Theme            BRAND · Recommended    ● Carres                  │
- *   │                  COOL · Calm and crisp  ● Cool Slate ● Blue …     │
- *   │                  WARM · Soft and homely ● Warm Honey ● Olive …    │
- *   ├──────────────────────────────────────────────────────────────────┤
- *   │ Focus outline    [Soft grey] [Theme colour] [Strong]               │
- *   └──────────────────────────────────────────────────────────────────┘
- *   Theme changes the page background and selection. Status colours stay the same.
- *
- * The picker starts from the person's saved profile and follows it while
- * nothing is changed. Only a saved choice reaches the screen; a failed save
- * keeps the choice here so `Save changes` retries it.
- */
+/** Personal theme picker. 01 §9 removed the old Focus chooser; focus follows
+ * the shared keyboard rule. Only a successful profile save applies a theme. */
 import { useEffect, useState } from "react";
 import Button from "@/components/kit/Button";
 import {
-  FOCUS_CHOICES,
   THEMES,
   THEME_GROUPS,
   readAppearance,
@@ -39,7 +20,7 @@ export default function AppearanceSettings() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "saved" | "failed"; text: string } | null>(null);
   const current = draft ?? saved;
-  const changed = current.theme !== saved.theme || current.focus !== saved.focus;
+  const changed = current.theme !== saved.theme;
 
   // A different person signed in: their profile, no leftover draft or message.
   useEffect(() => {
@@ -114,38 +95,9 @@ export default function AppearanceSettings() {
             ))}
           </div>
         </div>
-        <div className="grid grid-cols-[220px_minmax(0,1fr)] gap-4 px-4 py-3.5">
-          <span className="text-[13px] font-medium text-c-ink">Focus outline</span>
-          <div className="flex flex-wrap gap-2.5" role="radiogroup" aria-label="Focus outline">
-            {FOCUS_CHOICES.map((f) => {
-              const on = current.focus === f.key;
-              return (
-                <button
-                  key={f.key}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  disabled={busy}
-                  data-testid={`focus-${f.key}`}
-                  /* The sample IS the token rule: this card carries the choice's
-                     own data-focus, so its outline is that choice's --c-focus. */
-                  data-focus={f.key}
-                  onClick={() => pick({ ...current, focus: f.key })}
-                  /* The outline is the sample; the chosen card is the select wash. */
-                  className={`flex min-w-[150px] flex-col gap-0.5 rounded-lg border px-3 py-2 text-left disabled:opacity-60 ${
-                    on ? "border-c-select-fg bg-c-select-bg" : "border-c-footer-line bg-white"
-                  }`}
-                  style={{ outline: "var(--c-focus)", outlineOffset: -2 }}
-                >
-                  <span className="text-[12px] font-semibold text-c-ink">{f.name}</span>
-                  <span className="text-[12px] text-c-secondary">{f.note}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+
       </div>
-      <p className="text-[12px] text-c-secondary">Theme changes the page background and selection. Status colours stay the same.</p>
+      <p className="text-[12px] text-c-secondary">Theme changes only the selection colour.</p>
       {message && (
         <p
           role={message.kind === "failed" ? "alert" : "status"}

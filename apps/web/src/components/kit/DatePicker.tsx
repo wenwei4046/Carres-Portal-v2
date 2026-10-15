@@ -66,7 +66,7 @@ export const CALENDAR_CLASSNAMES = {
   day: "p-0 text-center",
   day_button:
     "h-8 w-8 rounded-lg text-body text-c-ink hover:bg-c-hover " +
-    "focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px]",
+    "focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px]",
   today: "font-semibold text-c-select-fg",
   selected:
     "[&>button]:bg-c-select-bg [&>button]:font-semibold [&>button]:text-c-select-fg [&>button]:hover:bg-c-select-bg",

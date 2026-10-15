@@ -12,14 +12,14 @@
  */
 
 /** Everything a control shares: surface, hairline, type, focus (v4 owner
- *  instruction 9 Oct 2026, 01 §3). The focus is the person's own Appearance
+ *  instruction 9 Oct 2026, 01 §3). Focus uses the fixed shared keyboard
  *  outline, `var(--c-focus)`. The RADIUS and padding are the shape's (see
  *  `controlClass`). Pages that compose their own control read this too, so it
  *  carries no height and no padding. */
 export const CONTROL_BASE =
   "w-full bg-c-card text-body text-c-ink border " +
   "placeholder:text-c-muted " +
-  "focus:[outline:var(--c-focus)] focus:[outline-offset:-2px] " +
+  "focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:0] " +
   "disabled:bg-c-search-bg disabled:text-c-muted disabled:cursor-not-allowed";
 
 /** Resting hairline vs the refused field. 01 §1: form errors are AMBER; the

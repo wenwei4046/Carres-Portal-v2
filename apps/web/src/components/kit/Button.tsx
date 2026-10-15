@@ -98,7 +98,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
       className={
         `inline-flex items-center justify-center whitespace-nowrap ${shape === "pill" ? "rounded-full" : "rounded-lg"} text-body font-medium ` +
         "transition-[filter,background-color] " +
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 focus-visible:ring-offset-1 " +
+        "focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] " +
         "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100 " +
         `${VARIANT[variant]} ${iconOnly ? "h-10 w-10 p-0 min-[768px]:h-8 min-[768px]:w-8" : SIZE[size]}`
       }
