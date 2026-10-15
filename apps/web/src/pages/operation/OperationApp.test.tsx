@@ -131,13 +131,10 @@ vi.mock("./ArrivalSourceWorkspace", () => ({
 // ⭐ SALES ORDER PRODUCTION CUTOVER (2026-08-10) — the two Orders doors. Both
 // self-fetch, so both are stubbed; this suite tests WHICH ROUTE MOUNTS WHICH,
 // which is the whole of the cutover in code.
-// `/operation/orders` renders the Outright list since 2026-10-08; the old
-// `SalesOrdersRegister` stays in the repo, unrouted, and must not mount.
+// `/operation/orders` renders the Outright list since 2026-10-08 (the old
+// register was deleted on 15 Oct 2026, its capabilities moved onto Outright).
 vi.mock("./so-outright/SalesOrdersOutright", () => ({
   default: () => <div data-testid="register-stub">register</div>,
-}));
-vi.mock("./SalesOrdersRegister", () => ({
-  default: () => <div data-testid="old-register-stub">old register</div>,
 }));
 vi.mock("./OperationOrdersControl", () => ({
   default: ({ onImport }: { onImport?: () => void }) => (
@@ -233,9 +230,8 @@ describe("OperationApp — procurement descendant routing", () => {
 describe("OperationApp — the Sales Order cutover's two doors", () => {
   it("/operation/orders mounts the NEW register and never the old table", () => {
     renderApp("/operation/orders");
-    // The Outright list (2026-10-08) — the unrouted SalesOrdersRegister never mounts.
+    // The Outright list (2026-10-08).
     expect(screen.getByTestId("register-stub")).toBeInTheDocument();
-    expect(screen.queryByTestId("old-register-stub")).not.toBeInTheDocument();
     expect(screen.queryByTestId("old-orders-stub")).not.toBeInTheDocument();
     expect(screen.getByTestId("sales-orders-work-surface")).toHaveClass("overflow-hidden");
     expect(screen.getByTestId("sales-orders-work-surface")).not.toHaveClass("overflow-auto");

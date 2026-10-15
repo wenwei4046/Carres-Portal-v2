@@ -16,7 +16,10 @@ import { useEffect, useState, type ReactNode } from "react";
 import MIcon from "@/components/carres/MIcon";
 import CPill, { type CPillTone } from "@/components/carres/CPill";
 import CPopover, { CMenu, CMenuGroup, CMenuItem } from "@/components/carres/CPopover";
-import CTable, { CTableCell, CTableFooter, CTableItems, type CCell, type CTableColumn, type CTableTotals } from "@/components/carres/CTable";
+import { CListCell, trackFloor, type CCell, type CListColumn } from "@/components/carres/CCell";
+import { CListFooter, type CListTotals } from "@/components/carres/CListFooter";
+import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
+import ItemRows from "@/components/register/ItemRows";
 import CSidePanel from "@/components/carres/CSidePanel";
 import { CChip, CIconButton, CShowPanelButton, CViewButton } from "@/components/carres/CToolbar";
 import { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
@@ -58,8 +61,8 @@ function Section({ id, title, note, children }: { id: string; title: string; not
   );
 }
 
-/* ── the Carres Table, with the Sales Order view's columns and TEST rows ── */
-const COLUMNS: CTableColumn[] = [
+/* ── the one listing engine in the v12 look, with the Sales Order view's columns and TEST rows ── */
+const COLUMNS: CListColumn[] = [
   { key: "proceed", label: "Proceed date", width: "120px" },
   { key: "order", label: "SO no.", width: "minmax(150px,1fr)" },
   { key: "items", label: "Items", width: "120px" },
@@ -103,65 +106,93 @@ const ROWS: Row[] = [
     },
   },
 ];
-const LONG_QTY: CTableTotals = {
+const LONG_QTY: CListTotals = {
   lead: "Qty:",
   parts: ["Mattress 23", "Pillow 10", "Bedframe 14", "Mattress protector 4", "Sofa 22 sets", "Others 1"],
   short: ["MS 23", "Pillow 10", "BF 14", "M.P 4", "SOF 22 sets", "Others 1"],
 };
 
+const GRID_COLUMNS: DataGridColumn<Row>[] = COLUMNS.map((c) => ({
+  key: c.key,
+  label: c.head ? c.head[0] : c.label,
+  ...(c.head ? { headerSub: c.head[1] } : {}),
+  exportLabel: c.label,
+  width: trackFloor(c.width),
+  minWidth: trackFloor(c.width),
+  sortable: true,
+  accessor: (r: Row) => (
+    <span className="flex min-w-0 flex-col items-start leading-[1.3]">
+      <CListCell cell={r.cells[c.key]!} />
+    </span>
+  ),
+  filterValue: (r: Row) => r.cells[c.key]!.t,
+  searchValue: (r: Row) => r.cells[c.key]!.t,
+  exportValue: (r: Row) => r.cells[c.key]!.t,
+}));
+const ITEMS = [
+  { key: "a", name: "TEST · Mattress model A", detail: "Queen · TEST-MS-A", qty: "1 pc" },
+  { key: "b", name: "TEST · Pillow model B", detail: "Standard · TEST-PL-B", qty: "2 pcs" },
+];
+
 function TableExample({ narrow }: { narrow: boolean }) {
   const [picked, setPicked] = useState<Set<string>>(new Set(["t2"]));
-  const [opened, setOpened] = useState<Set<string>>(new Set(narrow ? [] : ["t1"]));
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(20);
-  const toggle = (r: Row) =>
-    setPicked((s) => {
-      const n = new Set(s);
-      if (n.has(r.id)) n.delete(r.id);
-      else n.add(r.id);
-      return n;
-    });
   return (
-    <div className="flex min-w-0" style={{ width: narrow ? 560 : "100%", height: 300 }}>
-      <CTable
-        label={narrow ? "TEST list, narrow" : "TEST list"}
-        columns={COLUMNS}
+    <section className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)]" style={{ width: narrow ? 560 : "100%", height: 300 }} data-carres-table="list" aria-label={narrow ? "TEST list, narrow" : "TEST list"}>
+      <DataGrid<Row>
         rows={ROWS}
+        columns={GRID_COLUMNS}
+        storageKey={`carres.ui.table.${narrow ? "narrow" : "wide"}.v1`}
         rowKey={(r) => r.id}
-        identifier={1}
-        selection={{
-          isSelected: (r) => picked.has(r.id),
-          toggle,
-          allSelected: ROWS.every((r) => picked.has(r.id)),
-          toggleAll: () => setPicked((s) => (ROWS.every((r) => s.has(r.id)) ? new Set() : new Set(ROWS.map((r) => r.id)))),
-          rowLabel: (r) => `Select ${r.cells.order!.t}`,
-        }}
-        expand={{
-          isOpen: (r) => opened.has(r.id),
-          toggle: (r) =>
-            setOpened((s) => {
+        rowHeight={54}
+        appearance="reference"
+        palette="slate"
+        hideToolbar
+        fitContent
+        searchPresentation="none"
+        allowColumnGrouping={false}
+        stickyIdentity={{ columnKey: "order" }}
+        selectable={{
+          selectedKeys: picked,
+          onToggle: (key) =>
+            setPicked((s) => {
               const n = new Set(s);
-              if (n.has(r.id)) n.delete(r.id);
-              else n.add(r.id);
+              if (n.has(key)) n.delete(key);
+              else n.add(key);
               return n;
             }),
-          label: (r) => (opened.has(r.id) ? "Hide items" : "Show items"),
-          render: (r, grid) => (
-            <CTableItems
-              label={r.cells.order!.t}
-              grid={grid}
-              items={[
-                { key: "a", name: "TEST · Mattress model A", detail: "Queen · TEST-MS-A", qty: "1 pc" },
-                { key: "b", name: "TEST · Pillow model B", detail: "Standard · TEST-PL-B", qty: "2 pcs" },
-              ]}
-              empty="No items on this order"
-            />
+          onToggleAll: (keys, all) => setPicked(all ? new Set(keys) : new Set()),
+          rowLabel: (r: Row) => `Select ${r.cells.order!.t}`,
+        }}
+        expandable={{
+          flush: true,
+          frame: true,
+          defaultExpandedKeys: narrow ? [] : ["t1"],
+          label: (_r, isOpen) => (isOpen ? "Hide items" : "Show items"),
+          renderExpansion: (r) => (
+            <ItemRows label={r.cells.order!.t}>
+              <div role="row" className="grid h-8 grid-cols-[minmax(0,1fr)_120px] items-center bg-c-band px-[5px] text-meta font-medium text-c-secondary">
+                <span role="columnheader">Item</span>
+                <span role="columnheader">Qty</span>
+              </div>
+              {ITEMS.map((it) => (
+                <div key={it.key} role="row" className="grid min-h-[44px] grid-cols-[minmax(0,1fr)_120px] items-center border-t border-c-row-line bg-c-card px-[5px] py-1">
+                  <span role="cell" className="flex min-w-0 flex-col leading-[1.3]">
+                    <span className="text-body text-c-ink">{it.name}</span>
+                    <span className="text-meta text-c-secondary">{it.detail}</span>
+                  </span>
+                  <span role="cell" className="text-body tabular-nums text-c-ink">{it.qty}</span>
+                </div>
+              ))}
+            </ItemRows>
           ),
         }}
-        renderCell={(r, c) => <CTableCell cell={r.cells[c.key]!} />}
-        footer={<CTableFooter count="3 orders" totals={LONG_QTY} pageSize={size} onPageSize={setSize} page={page} pages={2} onPage={setPage} />}
+        statusSummary={() => (
+          <CListFooter count="3 orders" totals={LONG_QTY} pageSize={size} onPageSize={setSize} page={page} pages={2} onPage={setPage} />
+        )}
       />
-    </div>
+    </section>
   );
 }
 
@@ -442,7 +473,7 @@ export default function UiShowcase() {
             <div key={name} className="flex flex-col gap-1.5 rounded-lg bg-c-card p-3 ring-1 ring-inset ring-c-card-border">
               <span className="text-[12px] text-c-secondary">{name}</span>
               <span className={`flex min-w-0 flex-col leading-[1.3] text-[13px] ${cell.align === "end" ? "items-end" : "items-start"}`}>
-                <CTableCell cell={cell} />
+                <CListCell cell={cell} />
               </span>
             </div>
           ))}

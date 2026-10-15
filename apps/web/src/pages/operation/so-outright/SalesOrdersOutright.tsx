@@ -1,7 +1,11 @@
 /**
  * Sales Orders → Outright — the list (owner-confirmed handoff, Jess 2026-10-08).
  * Current kit: docs/01-design-tokens.md §5 and docs/03-page-patterns.md §2 (v12,
- * 11 Oct 2026); this page is not migrated to it yet.
+ * 11 Oct 2026). The list is the one listing engine (`register/DataGrid`, UI
+ * MASTER §6.2): sort, header filters, Columns, Group by, ticks, the row menu
+ * `View · Print · Cancel SO`, keyboard and the opened row's frame are the
+ * engine's; this page keeps its own v12 toolbar row, selection bar, Summary
+ * and footer words.
  *
  *   [Summary 240] [ Open Delivered All · Sales Order view  chips ····· ▥ ⋮ Tasks 5 ]
  *                 [ ┌ table card: sticky head · 54px rows · footer 44 ───────────┐ ]
@@ -11,12 +15,20 @@
  * writes. A row click opens the order; Ctrl/⌘-click opens it in a new tab.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { REGISTER_DELIVERY_CONDITIONS, registerDeliveryConditionOf } from "@carres/shared";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { goodsCategoryWordOf } from "@carres/shared";
 import MIcon from "@/components/carres/MIcon";
 import CPopover, { CMenuGroup, CMenuItem } from "@/components/carres/CPopover";
-import CTable, { CTableCell, CTableFooter, CTableHead, CTableItems, type CTableGrid } from "@/components/carres/CTable";
+import { CListCell, trackFloor } from "@/components/carres/CCell";
+import { CListFooter } from "@/components/carres/CListFooter";
+import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
+import ItemRows from "@/components/register/ItemRows";
+import PoNumberLinks from "@/components/register/PoNumberLinks";
+import { poNumberLinks, poNumberLinksText, poObjectPath } from "@/components/register/po-number-links";
+import { documentRowMenu } from "@/components/register/row-menu";
+import CancelSalesOrderDialog from "../CancelSalesOrderDialog";
 import CSidePanel from "@/components/carres/CSidePanel";
 import { CChip, CIconButton, CShowPanelButton, CViewButton } from "@/components/carres/CToolbar";
 import { useAuth } from "@/lib/auth";
@@ -24,7 +36,7 @@ import { appTodayIso } from "@/lib/fmt-date";
 import { useSalesOrderRegisterFacts, useSalesOrderRegisterOrders } from "@/lib/queries";
 import { buildRegisterRow, type RegisterRow } from "../sales-order-columns";
 import { isRental, lineName } from "../sales-order-facts";
-import { paymentStatusOf, skuKey, useCatalogNames } from "../SalesOrdersRegister";
+import { PAYMENT_STATUSES, STOCK_STATUSES, paymentStatusOf, skuKey, stockStatusOf, useCatalogNames } from "../sales-order-register-readings";
 import { inRequestedNarrowing, requestedNarrowingOf, requestedNarrowingWord } from "../requested-narrowing";
 import SalesOrderReadFailure from "../SalesOrderReadFailure";
 import { printSalesOrdersOrSay } from "../record-print";
@@ -102,6 +114,29 @@ function writeStore(key: string, value: string) {
   }
 }
 
+/** What a column sorts by: dates and money by their values, the rest by the
+ *  cell's words. A missing value goes last either way. */
+function sortValueOf(key: string, r: RegisterRow, ctx: CellContext): string | number | null {
+  switch (key) {
+    case "proceed":
+      return r.proceeded ?? null;
+    case "order":
+      return r.so;
+    case "reqDate":
+      return r.customerDelivery ?? null;
+    case "items":
+      return pcsOf(r);
+    case "value":
+      return r.total.kind === "amount" ? r.total.value : null;
+    case "paid":
+      return r.paid.kind === "amount" ? r.paid.value : null;
+    case "balance":
+      return r.balance.kind === "settled" ? 0 : r.balance.kind === "amount" ? r.balance.value : null;
+    default:
+      return COLUMNS[key]?.cell(r, ctx).t ?? null;
+  }
+}
+
 export default function SalesOrdersOutright() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -158,10 +193,12 @@ export default function SalesOrdersOutright() {
   const tab: Tab = (["open", "delivered", "all"] as const).find((t) => t === params.get("tab")) ?? saved?.tab ?? "open";
   const layoutKey: LayoutKey = LAYOUTS.find((l) => l.key === params.get("cols"))?.key ?? saved?.cols ?? "so";
   const layout = LAYOUTS.find((l) => l.key === layoutKey)!;
+  /* Header filters ride the URL (`f.{column}`, repeated for each value), so a
+     chip, a link and the engine's filter menu read one answer. */
   const filters = useMemo(() => {
-    const out: Record<string, string> = {};
+    const out: Record<string, string[]> = {};
     params.forEach((value, key) => {
-      if (key.startsWith("f.") && COLUMNS[key.slice(2)]) out[key.slice(2)] = value;
+      if (key.startsWith("f.") && COLUMNS[key.slice(2)]) (out[key.slice(2)] ??= []).push(value);
     });
     return out;
   }, [params]);
@@ -204,21 +241,33 @@ export default function SalesOrdersOutright() {
         (r) =>
           inTab(r) &&
           (!requested || inRequestedNarrowing(r.customerDelivery, requested, isDelivered(r))) &&
-          Object.entries(filters).every(([k, v]) => COLUMNS[k]!.cell(r, ctx).t === v),
+          Object.entries(filters).every(([k, v]) => v.includes(COLUMNS[k]!.cell(r, ctx).t)),
       ),
     [all, inTab, requested, filters, ctx],
   );
 
-  /* ── paging · selection ── */
+  /* ── sort (the engine's header) · Group by (⋮) · paging ── */
+  const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" } | null>(null);
+  const sorted = useMemo(() => {
+    if (!sort || !COLUMNS[sort.key]) return list;
+    const col = COLUMNS[sort.key]!;
+    const valueOf = (r: RegisterRow) => sortValueOf(col.key, r, ctx);
+    const dir = sort.dir === "asc" ? 1 : -1;
+    return [...list].sort((a, b) => {
+      const x = valueOf(a), y = valueOf(b);
+      if (x == null || y == null) return x === y ? 0 : x == null ? 1 : -1;
+      return (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))) * dir;
+    });
+  }, [list, sort, ctx]);
+  const group = (["delivery", "stock", "payment"] as const).find((g) => g === params.get("group")) ?? null;
   const [pageSize, setPageSize] = useState<number>(20);
   const [page, setPage] = useState(1);
-  const pages = Math.max(1, Math.ceil(list.length / pageSize));
-  useEffect(() => setPage(1), [tab, layoutKey, filters, pageSize, seededSearch, requestedParam]);
-  const shown = list.slice((Math.min(page, pages) - 1) * pageSize, Math.min(page, pages) * pageSize);
+  const pages = group ? 1 : Math.max(1, Math.ceil(sorted.length / pageSize));
+  useEffect(() => setPage(1), [tab, layoutKey, filters, pageSize, seededSearch, requestedParam, sort, group]);
+  /* A grouped list shows every order under its group; paging cuts a group. */
+  const shown = group ? sorted : sorted.slice((Math.min(page, pages) - 1) * pageSize, Math.min(page, pages) * pageSize);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [opened, setOpened] = useState<Set<string>>(new Set());
   const selectedRows = list.filter((r) => selected.has(r.id));
-  const allShownSelected = shown.length > 0 && shown.every((r) => selected.has(r.id));
   const toggle = (id: string) =>
     setSelected((s) => {
       const n = new Set(s);
@@ -226,11 +275,11 @@ export default function SalesOrdersOutright() {
       else n.add(id);
       return n;
     });
-  const toggleAll = () =>
+  const toggleAll = (keys: string[], all: boolean) =>
     setSelected((s) => {
       const n = new Set(s);
-      if (allShownSelected) shown.forEach((r) => n.delete(r.id));
-      else shown.forEach((r) => n.add(r.id));
+      if (all) keys.forEach((k) => n.delete(k));
+      else keys.forEach((k) => n.add(k));
       return n;
     });
 
@@ -261,11 +310,11 @@ export default function SalesOrdersOutright() {
 
   /* ── opening an order ── */
   const returnTo = `/operation/orders${params.toString() ? `?${params.toString()}` : ""}`;
-  const open = (r: RegisterRow, e: MouseEvent) => {
+  const open = (r: RegisterRow, e?: MouseEvent) => {
     const picked = window.getSelection?.()?.toString() ?? "";
     if (picked.length > 1) return;
     const path = `/operation/orders/so/${r.id}`;
-    if (e.metaKey || e.ctrlKey) {
+    if (e?.metaKey || e?.ctrlKey) {
       window.open(path, "_blank", "noopener");
       return;
     }
@@ -324,9 +373,8 @@ export default function SalesOrdersOutright() {
   const chips = [
     ...(seededSearch ? [{ key: "search", label: `Search: ${seededSearch}`, clear: () => setParam("search", null) }] : []),
     ...(requested ? [{ key: "requested", label: `Customer’s original requested delivery: ${requestedNarrowingWord(requested)}`, clear: () => setParam("requested", null) }] : []),
-    ...Object.entries(filters).map(([k, v]) => ({ key: k, label: `${COLUMNS[k]!.label}: ${v}`, clear: () => setParam(`f.${k}`, null) })),
+    ...Object.entries(filters).map(([k, v]) => ({ key: k, label: `${COLUMNS[k]!.label}: ${v.join(", ")}`, clear: () => setParam(`f.${k}`, null) })),
   ];
-  const columns = layout.columns.map((k) => COLUMNS[k]!);
   const clearFilters = () =>
     setParams((p) => {
       const n = new URLSearchParams(p);
@@ -362,8 +410,6 @@ export default function SalesOrdersOutright() {
     need.current = [];
     setCompact(0);
   }, [chips.length, layoutKey]);
-  /* SO No stays fixed on the left while the list scrolls (with ▸ and ☐). */
-  const identifier = Math.max(0, layout.columns.indexOf("order"));
 
   /* Footer: `72 orders · Qty: Mattress 72 · Pillow 91 …` in the fixed order; the
      short forms (`MS 72 · BF 14 · M.P 4 · SOF 22 sets`) when two lines are not enough. */
@@ -382,6 +428,130 @@ export default function SalesOrdersOutright() {
     };
     return { lead: "Qty:", parts: shown.map((k) => part(k, k)), short: shown.map((k) => part(k, CATEGORY_CODE[k] ?? k)) };
   }, [list]);
+  /* ── the one listing engine ── */
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; so: number } | null>(null);
+  const [columnsDoor, setColumnsDoor] = useState<{ nonce: number; top: number; right: number } | undefined>(undefined);
+  const moreRef = useRef<HTMLButtonElement>(null);
+  const openColumnsChooser = () => {
+    const r = moreRef.current?.getBoundingClientRect();
+    setColumnsDoor((was) => ({ nonce: (was?.nonce ?? 0) + 1, top: (r?.bottom ?? 120) + 4, right: window.innerWidth - (r?.right ?? window.innerWidth - 16) }));
+  };
+  /* The item rows sit on the list's own measured columns (as SO Batch does). */
+  const gridBox = useRef<HTMLElement>(null);
+  const [drawn, setDrawn] = useState<number[]>([]);
+  useEffect(() => {
+    const el = gridBox.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => {
+      const widths = [...el.querySelectorAll("thead th")].map((th) => Math.round(th.getBoundingClientRect().width * 10) / 10);
+      setDrawn((was) => (was.join() === widths.join() ? was : widths));
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    const table = el.querySelector("table");
+    if (table) observer.observe(table);
+    measure();
+    return () => observer.disconnect();
+  });
+  const documentLinksOf = useCallback(
+    (key: string, r: RegisterRow): { numbers: { poId: string; display: string }[]; open: (id: string) => void } | null => {
+      if (key === "po" && r.poNumbers.length > 0) {
+        return { numbers: poNumberLinks(r.poNumbers.map((poId) => ({ poId }))), open: (poId) => navigate(poObjectPath(poId)) };
+      }
+      if (key === "doNo") {
+        const numbers = r.deliveryOrders.filter((d) => d.do_number).map((d) => ({ poId: d.do_number!, display: d.do_number! }));
+        return numbers.length ? { numbers, open: (no) => navigate(`/operation/delivery-orders/${encodeURIComponent(no)}`) } : null;
+      }
+      if (key === "rcpt" && r.receipts) {
+        const numbers = r.receipts.filter((x) => x.receipt_no).map((x) => ({ poId: x.id, display: x.receipt_no! }));
+        return numbers.length ? { numbers, open: (id) => navigate(`/finance/payments?payment=${encodeURIComponent(id)}`) } : null;
+      }
+      return null;
+    },
+    [navigate],
+  );
+  const gridColumns = useMemo<DataGridColumn<RegisterRow>[]>(
+    () =>
+      layout.columns.map((k) => {
+        const c = COLUMNS[k]!;
+        /* The track is the words' room; the engine's cell keeps 5 each side
+           inside it (10 between columns), so the column is the track plus 10. */
+        const floor = trackFloor(c.width) + 10;
+        const textOf = (r: RegisterRow) => c.cell(r, ctx).t;
+        return {
+          key: c.key,
+          /* A two-line header keeps its second line grey 12/400 (owner 14 Oct 2026). */
+          label: c.head ? c.head[0] : c.label,
+          ...(c.head ? { headerSub: c.head[1] } : {}),
+          exportLabel: c.label,
+          width: floor,
+          minWidth: floor,
+          ...(c.align === "end" ? { align: "right" as const } : {}),
+          accessor: (r: RegisterRow) => {
+            /* A document number opens its own record (UI MASTER §6.0 rule 2):
+               every PO (owner ruling 2026-10-06), Delivery Order and Receipt. */
+            const links = documentLinksOf(k, r);
+            if (links) return <PoNumberLinks wrap numbers={links.numbers} onOpen={links.open} />;
+            return (
+              <span className={`flex min-w-0 flex-col leading-[1.3] ${c.align === "end" ? "items-end" : "items-start"}`}>
+                <CListCell cell={c.cell(r, ctx)} />
+              </span>
+            );
+          },
+          sortable: true,
+          filterable: Boolean(c.filterable),
+          filterValue: textOf,
+          searchValue: textOf,
+          exportValue: (r: RegisterRow) => {
+            if (k === "po") return poNumberLinksText(poNumberLinks(r.poNumbers.map((poId) => ({ poId }))));
+            const x = c.cell(r, ctx);
+            return x.sub ? `${x.t} · ${x.sub}` : x.t;
+          },
+        };
+      }),
+    [layout, ctx, documentLinksOf],
+  );
+  /* The filter menus list the values of the orders in this tab. */
+  const filterValues = useMemo(() => {
+    const out: Record<string, string[]> = {};
+    for (const k of layout.columns) {
+      const c = COLUMNS[k]!;
+      if (!c.filterable) continue;
+      out[k] = [...new Set(all.filter(inTab).map((r) => c.cell(r, ctx).t))].sort((a, b) => a.localeCompare(b));
+    }
+    return out;
+  }, [layout, all, inTab, ctx]);
+  const onColumnQuery = useCallback(
+    (q: { filters: Record<string, string[]>; sort: { key: string; dir: "asc" | "desc" } | null }) => {
+      setSort((was) => (was?.key === q.sort?.key && was?.dir === q.sort?.dir ? was : q.sort));
+      setParams((p) => {
+        const next = new URLSearchParams(p);
+        const before = next.toString();
+        [...next.keys()].filter((key) => key.startsWith("f.")).forEach((key) => next.delete(key));
+        for (const [key, values] of Object.entries(q.filters)) for (const v of values) next.append(`f.${key}`, v);
+        return next.toString() === before ? p : next;
+      }, { replace: true });
+    },
+    [setParams],
+  );
+  const fixedGroups =
+    group === "delivery"
+      ? {
+          groups: [...REGISTER_DELIVERY_CONDITIONS, { key: "not_applicable", label: "Not applicable" }],
+          groupOf: (r: RegisterRow) => registerDeliveryConditionOf(r.o.order_lines ?? [], r.o.allocated_units ?? []) ?? "not_applicable",
+        }
+      : group === "stock"
+        ? { groups: STOCK_STATUSES.map((c) => ({ key: c.key, label: c.label })), groupOf: (r: RegisterRow) => stockStatusOf(r) }
+        : group === "payment"
+          ? { groups: PAYMENT_STATUSES.map((c) => ({ key: c.key, label: c.label })), groupOf: paymentStatusOf }
+          : undefined;
+  const GROUPS = [
+    { key: null, label: "Group by: None" },
+    { key: "delivery", label: "Group by: Delivery Status" },
+    { key: "stock", label: "Group by: Stock Status" },
+    { key: "payment", label: "Group by: Payment Status" },
+  ] as const;
+
   const selPcs = selectedRows.reduce((s, r) => s + pcsOf(r), 0);
   const selTotal = selectedRows.reduce((s, r) => s + (r.total.kind === "amount" ? r.total.value : 0), 0);
 
@@ -480,12 +650,16 @@ export default function SalesOrdersOutright() {
                 width={250}
                 open={moreOpen}
                 onOpenChange={setMoreOpen}
-                trigger={<CIconButton icon="more_vert" label="More actions" pressed={moreOpen} />}
+                trigger={<CIconButton ref={moreRef} icon="more_vert" label="More actions" pressed={moreOpen} />}
               >
                 <CMenuGroup first>EXPORT · orders shown now</CMenuGroup>
                 <CMenuItem icon="table_view" note=".xlsx" onSelect={() => { setMoreOpen(false); void downloadExcel(list); }}>Download Excel</CMenuItem>
                 <CMenuItem icon="picture_as_pdf" onSelect={() => { setMoreOpen(false); void downloadPdf(list); }}>Download PDF</CMenuItem>
                 <CMenuGroup>VIEW</CMenuGroup>
+                <CMenuItem icon="view_column" onSelect={() => { setMoreOpen(false); openColumnsChooser(); }}>Columns</CMenuItem>
+                {GROUPS.map((g) => (
+                  <CMenuItem key={g.label} checked={group === g.key} onSelect={() => { setMoreOpen(false); setParam("group", g.key); }}>{g.label}</CMenuItem>
+                ))}
                 <CMenuItem icon="bookmark_add" onSelect={() => { setMoreOpen(false); writeStore(VIEW_KEY(userId), JSON.stringify({ tab, cols: layoutKey })); toast.success(`Saved as your view: ${TABS.find((t) => t.key === tab)!.label} · ${layout.label}`); }}>Save as my view…</CMenuItem>
                 <CMenuGroup>DATA</CMenuGroup>
                 <CMenuItem icon="sync" note={dataUpdatedAt ? `Last ${time12(dataUpdatedAt)}` : undefined} onSelect={() => { setMoreOpen(false); void refetch(); }}>Sync from Sales Portal now</CMenuItem>
@@ -495,128 +669,94 @@ export default function SalesOrdersOutright() {
           </div>
         )}
 
-        <CTable
-          label="Sales orders"
-          columns={columns}
-          rows={shown}
-          rowKey={(r) => r.id}
-          rowTestId={(r) => `outright-row-${r.so}`}
-          rowTitle="Open order · Ctrl/⌘-click opens a new tab"
-          onRowClick={open}
-          identifier={identifier}
-          selection={{
-            isSelected: (r) => selected.has(r.id),
-            toggle: (r) => toggle(r.id),
-            allSelected: allShownSelected,
-            toggleAll,
-            rowLabel: (r) => `Select SO-${r.so}`,
-          }}
-          renderHeader={(c) => <HeaderCell col={c.key} rows={all.filter(inTab)} ctx={ctx} value={filters[c.key]} onPick={(v) => setParam(`f.${c.key}`, v)} />}
-          expand={{
-            isOpen: (r) => opened.has(r.id),
-            toggle: (r) =>
-              setOpened((s) => {
-                const n = new Set(s);
-                if (n.has(r.id)) n.delete(r.id);
-                else n.add(r.id);
-                return n;
-              }),
-            label: (r) => (opened.has(r.id) ? "Hide items" : "Show items"),
-            render: (r, grid) => <OrderItems row={r} catalogNames={catalogNames} grid={grid} ctx={ctx} />,
-          }}
-          renderCell={(r, c) => <CTableCell cell={COLUMNS[c.key]!.cell(r, ctx)} />}
-          failure={isError ? <SalesOrderReadFailure error={error} surface="sales-orders-register" onRetry={() => void refetch()} /> : undefined}
-          placeholder={
-            isLoading ? (
-              <div className="px-6 py-6 text-center text-[13px] text-c-secondary" role="status">Loading orders</div>
-            ) : shown.length === 0 ? (
-              <div className="px-6 py-6 text-center text-[13px] text-c-secondary">
-                No orders match.{" "}
-                <button type="button" className="font-semibold text-c-body" onClick={() => setParams(new URLSearchParams({ tab: "all" }), { replace: true })}>
-                  Clear filters
-                </button>
-              </div>
-            ) : undefined
-          }
-          footer={
-            <CTableFooter
-              testId="outright-footer"
-              count={isLoading ? "Loading orders" : `${list.length} ${list.length === 1 ? "order" : "orders"}`}
-              {...(isLoading || totals.parts.length === 0 ? {} : { totals })}
-              pageSize={pageSize}
-              onPageSize={setPageSize}
-              page={Math.min(page, pages)}
-              pages={pages}
-              onPage={setPage}
-            />
-          }
-        />
+        <section ref={gridBox} aria-label="Sales orders" className="grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)]" data-carres-table="list">
+          <DataGrid<RegisterRow>
+            rows={shown}
+            columns={gridColumns}
+            storageKey={`carres.outright.grid.${layoutKey}.v1`}
+            rowKey={(r) => r.id}
+            rowTestId={(r) => `outright-row-${r.so}`}
+            rowHeight={54}
+            appearance="reference"
+            palette="slate"
+            hideToolbar
+            openColumns={columnsDoor}
+            searchPresentation="none"
+            fitContent
+            allowColumnGrouping={false}
+            groupBanner={false}
+            {...(fixedGroups ? { fixedGroups } : {})}
+            stickyIdentity={{ columnKey: "order" }}
+            serverColumns={{ values: filterValues, selected: filters, onChange: onColumnQuery }}
+            onRowClick={(r, e) => open(r, e)}
+            contextMenu={(r) =>
+              documentRowMenu({
+                view: () => open(r),
+                print: () => void printSalesOrdersOrSay([r]),
+                more: [{ label: "Cancel SO", danger: true, onClick: () => setCancelTarget({ id: r.id, so: r.so }) }],
+              })
+            }
+            selectable={{
+              selectedKeys: selected,
+              onToggle: toggle,
+              onToggleAll: toggleAll,
+              rowLabel: (r: RegisterRow) => `Select SO-${r.so}`,
+            }}
+            expandable={{
+              flush: true,
+              frame: true,
+              label: (_r, isOpen) => (isOpen ? "Hide items" : "Show items"),
+              renderExpansion: (r) => <OrderItems row={r} catalogNames={catalogNames} ctx={ctx} drawn={drawn} />,
+            }}
+            isLoading={isLoading}
+            errorState={isError ? <SalesOrderReadFailure error={error} surface="sales-orders-register" onRetry={() => void refetch()} /> : undefined}
+            emptyMessage="No orders match."
+            noMatchMessage="No orders match."
+            statusSummary={() => (
+              <CListFooter
+                testId="outright-footer"
+                count={isLoading ? "Loading orders" : `${list.length} ${list.length === 1 ? "order" : "orders"}`}
+                {...(isLoading || totals.parts.length === 0 ? {} : { totals })}
+                pageSize={pageSize}
+                onPageSize={setPageSize}
+                page={Math.min(page, pages)}
+                pages={pages}
+                onPage={setPage}
+              />
+            )}
+          />
+        </section>
+        {cancelTarget && (
+          <CancelSalesOrderDialog
+            orderId={cancelTarget.id}
+            so={cancelTarget.so}
+            open
+            onOpenChange={(isOpen) => { if (!isOpen) setCancelTarget(null); }}
+            onCancelled={() => void refetch()}
+          />
+        )}
       </main>
     </div>
-  );
-}
-
-/* ── the header words; a filterable column opens its values (CTable draws the box) ── */
-function HeaderCell({
-  col,
-  rows,
-  ctx,
-  value,
-  onPick,
-}: {
-  col: string;
-  rows: RegisterRow[];
-  ctx: CellContext;
-  value: string | undefined;
-  onPick: (v: string | null) => void;
-}) {
-  const c = COLUMNS[col]!;
-  const [open, setOpen] = useState(false);
-  if (!c.filterable) return <CTableHead column={c} />;
-  const counts = new Map<string, number>();
-  for (const r of rows) {
-    const t = c.cell(r, ctx).t;
-    counts.set(t, (counts.get(t) ?? 0) + 1);
-  }
-  return (
-    <CPopover
-      label={c.label}
-      role="menu"
-      align="start"
-      open={open}
-      onOpenChange={setOpen}
-      trigger={
-        <button type="button" className={`flex items-center gap-1 text-left font-medium ${value ? "text-c-body" : "text-c-secondary"}`}>
-          <CTableHead column={c} />
-          <MIcon name={value ? "filter_alt" : "arrow_drop_down"} size={16} className={value ? "text-c-body" : "text-c-muted"} />
-        </button>
-      }
-    >
-      <div className="min-w-[170px]">
-        {[...counts.entries()].map(([v, n]) => (
-          <CMenuItem key={v} note={n} checked={value === v ? true : undefined} onSelect={() => { onPick(value === v ? null : v); setOpen(false); }}>
-            {v}
-          </CMenuItem>
-        ))}
-      </div>
-    </CPopover>
   );
 }
 
 /** `1 pc` · `2 pcs`; a sofa in sets, `1 set` · `2 sets` (COPY quantities). */
 const qtyWords = (n: number, sofa: boolean) => (sofa ? `${n} ${n === 1 ? "set" : "sets"}` : `${n} ${n === 1 ? "pc" : "pcs"}`);
 
-/* ── what ▸ opens: the order's items, as the kit's item rows ── */
+/* ── what ▸ opens: the order's items, on the list's own measured columns ──
+   `Item` (the model, then its grey spec line) spans the first three columns,
+   `Qty` sits under the fourth and `Supplier` under the fifth and sixth (v12);
+   the ▸ and ☐ spaces stay empty. */
 function OrderItems({
   row,
   catalogNames,
-  grid,
   ctx,
+  drawn,
 }: {
   row: RegisterRow;
   catalogNames: Map<string, { name: string; variant: string }>;
-  grid: CTableGrid;
   ctx: CellContext;
+  drawn: readonly number[];
 }) {
   const items = (row.o.order_lines ?? [])
     .filter((l) => Number(l.qty) > 0)
@@ -630,7 +770,46 @@ function OrderItems({
         supplier: supplierCell(row, ctx, l.id),
       };
     });
-  return <CTableItems label={`SO-${row.so}`} grid={grid} items={items} empty="No items on this order" testId={`outright-items-${row.so}`} />;
+  const columns = drawn.length >= 4 ? drawn.map((w) => `${w}px`).join(" ") : "32px 30px minmax(0,1fr) 120px 120px 120px";
+  const stepBack = (drawn[0] ?? 32) + (drawn[1] ?? 30);
+  const item = { gridColumn: "3 / span 3" };
+  const qty = { gridColumn: "6 / span 1" };
+  const supplier = { gridColumn: "7 / span 2" };
+  const suppliers = items.some((it) => it.supplier);
+  const keep = { left: stepBack + 5 };
+  return (
+    <ItemRows label={`SO-${row.so}`} stepBack={stepBack} testId={`outright-items-${row.so}`}>
+      <div role="row" className="grid h-8 items-center bg-c-band text-meta font-medium text-c-secondary" style={{ gridTemplateColumns: columns }}>
+        <span aria-hidden="true" />
+        <span aria-hidden="true" />
+        <span role="columnheader" className="flex min-w-0 items-center self-stretch px-[5px]" style={item}>
+          <span className="sticky z-[1] bg-c-band" style={keep}>Item</span>
+        </span>
+        <span role="columnheader" className="px-[5px]" style={qty}>Qty</span>
+        {suppliers ? <span role="columnheader" className="px-[5px]" style={supplier}>Supplier</span> : null}
+      </div>
+      {items.length === 0 ? <div role="row" className="border-t border-c-row-line px-3.5 py-3 text-body text-c-secondary">No items on this order</div> : null}
+      {items.map((it) => (
+        <div key={it.key} role="row" className="grid min-h-[44px] items-center border-t border-c-row-line bg-c-card py-1" style={{ gridTemplateColumns: columns }}>
+          <span aria-hidden="true" />
+          <span aria-hidden="true" />
+          <span role="cell" className="flex min-w-0 items-center self-stretch px-[5px]" style={item}>
+            {/* The item's words stay in view when the list scrolls sideways. */}
+            <span className="sticky z-[1] flex min-w-0 flex-col bg-c-card leading-[1.3]" style={keep}>
+              <span className="break-words text-body text-c-ink">{it.name}</span>
+              {it.detail ? <span className="break-words text-meta text-c-secondary">{it.detail}</span> : null}
+            </span>
+          </span>
+          <span role="cell" className="whitespace-nowrap px-[5px] text-body tabular-nums text-c-ink" style={qty}>{it.qty}</span>
+          {suppliers ? (
+            <span role="cell" className="flex min-w-0 flex-col px-[5px] text-body" style={supplier}>
+              {it.supplier ? <CListCell cell={it.supplier} /> : null}
+            </span>
+          ) : null}
+        </div>
+      ))}
+    </ItemRows>
+  );
 }
 
 /* ── the Summary panel — v8 `sum` in the kit side panel frame ── */
