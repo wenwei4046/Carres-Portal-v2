@@ -19,7 +19,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import OperationApp from "@/pages/operation/OperationApp";
-import { testInternalTask, testTaskPoDocument, testTaskPo, testTaskSuppliers, testTasksFeed } from "./tasks-feed-fixture";
+import { testTaskSalesOrderDocument, testInternalTask, testTaskPoDocument, testTaskPo, testTaskSuppliers, testTasksFeed } from "./tasks-feed-fixture";
 import "@/index.css";
 
 const STATE = new URLSearchParams(window.location.search).get("state") ?? "full";
@@ -107,6 +107,10 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
      No task completion or business writer is simulated by this read-only walk. */
   const path = new URL(url, window.location.href).pathname;
   const requestedOrder = /^\/api\/(?:operation\/)?orders\/([^/]+)/.exec(path)?.[1];
+  if (requestedOrder && path.endsWith("/sales-order-data")) {
+    const document = testTaskSalesOrderDocument(requestedOrder);
+    if (document) return json(document);
+  }
   if (requestedOrder && requestedOrder !== ID && requestedOrder !== "customer-type") {
     return json({ error: "TEST fixture: this Sales Order is not seeded" }, 404);
   }

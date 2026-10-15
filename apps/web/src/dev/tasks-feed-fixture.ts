@@ -10,7 +10,7 @@
  */
 import { addWorkingDays, internalTaskOccurrenceId, internalTaskResultReference, myHolidaySet, projectInternalTaskWork, type InternalTask, type OperationWorkCompleted, type OperationWorkItem, type OperationWorkModule, type OperationWorkResponse } from "@carres/shared";
 import { appTodayIso } from "@/lib/fmt-date";
-import type { PoTemplateData } from "@/lib/pdf/types";
+import type { PoTemplateData, SalesOrderTemplateData } from "@/lib/pdf/types";
 
 const holidays = myHolidaySet();
 function workingDay(from: string, n: number): string {
@@ -235,5 +235,25 @@ export function testTaskPoDocument(poId: string): PoTemplateData | null {
       qty: line.qty, unit: "pc", identity_mode: "quantity", unit_codes: null,
     })),
     terms: "TEST document only",
+  };
+}
+
+/** Only Sales Orders explicitly linked by the declared TEST POs. */
+export function testTaskSalesOrderDocument(orderId: string): SalesOrderTemplateData | null {
+  const so = orderId === "00000000-0000-4000-8000-000000009101" ? 9101
+    : orderId === "00000000-0000-4000-8000-000000009102" ? 9102 : null;
+  if (!so) return null;
+  const lines = [
+    { sku: "TEST-MAT-Q", description: "TEST Mattress · Queen", qty: so === 9101 ? 4 : 2, unit_price: 100, category: "mattress", attrs: { size: "Queen" } },
+    { sku: "TEST-BF-K", description: "TEST Bedframe · King", qty: so === 9101 ? 1 : 2, unit_price: 200, category: "bedframe", attrs: { size: "King" } },
+  ].map((line) => ({ ...line, line_total: line.qty * line.unit_price }));
+  const total = lines.reduce((sum, line) => sum + line.line_total, 0);
+  return {
+    order_id: orderId, order_code: `SO-${so}`, so_number: `SO-${so}`, issue_date: workingDay(appTodayIso(), -8),
+    status_label: "Open", channel: "dealer", currency: "MYR", signed: false,
+    customer: { name: `TEST Customer ${so}`, address: "TEST address, Klang", phone: "0100000000" },
+    dealer: { name: "TEST Dealer", address: null, contact: null, outlet_name: null, outlet_address: null, salesperson_name: null, salesperson_phone: null },
+    delivery: { date: workingDay(appTodayIso(), 4), floor: null, has_lift: null },
+    lines, addons: [], subtotal: total, total, paid: 0, balance_due: total,
   };
 }
