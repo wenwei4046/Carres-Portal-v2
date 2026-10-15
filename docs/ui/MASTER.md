@@ -6,6 +6,14 @@
 > *"delete all old confused part and use the current we confirmed"* — every new chat reads this file
 > and follows the current shared UI/UX without Jess re-teaching it.
 
+## Start here · the one Master UI Kit
+
+- **Rules:** this MASTER → 01 values → 02 component directory → 03 page composition; COPY and module MASTERs keep business ownership.
+- **Practical reference:** the approved Sales Order Outright v12 direction, improved in existing shared components; no fresh redesign or second kit.
+- **Local catalogue:** `/ui`, implemented by `apps/web/src/pages/dev/UiShowcase.tsx`. The coordinated developer serves it at `http://127.0.0.1:5415/ui`; an address is a local session entry, not permanent hosting or proof of acceptance.
+- **Next page:** configure the existing shared parts, fix only the relevant defect, remove its replaced old presentation, continue. A kit-document cleanup is complete without an application deploy; full-Portal adoption is a separate deliverable.
+- **Pending decisions:** use §7.2/§7.4 and the existing handoff. A proposal cannot silently override approved values; one pending choice does not reopen the entire kit.
+
 ## Owner handover · 15 Oct 2026 · one Carres-owned kit
 
 **APPROVED direction (Jess, `Audit UI kit workflow`):** Carres owns and maintains this existing
@@ -140,7 +148,7 @@ not built; built is not verified; one page verified is not every page adopted.
 
 # §0 · Current kit index — read this first
 
-**Implementation inventory:** Built/deployed entries below describe the existing components before visual migration. Their existence is not proof that the current target has been adopted. Appearance always comes from current 01.
+**Current reuse inventory:** entries mix current shared implementations and remaining adapters. Use the named source, 02's runtime directory and each row's scoped status. Appearance comes from 01; source existence is not whole-page adoption. Historical names below never override a later retirement.
 
 **One row per thing on screen; one current source per row.** If something is not in this table it is
 not a current pattern: do not copy it from a neighbouring page. Live examples are on `/ui`.
@@ -151,11 +159,11 @@ not a current pattern: do not copy it from a neighbouring page. Live examples ar
 | Page frame | `ListPageShell` today; kit `PageShell` is the target | `components/ListPageShell.tsx` · `components/kit/PageShell.tsx` | Moving a page onto `PageShell` re-lays it out: owner preview first |
 | Page header + global utilities | `ShellHeader` (shell-drawn; `ModuleHeader` names the page into it) · search pill · `TeamButton` · bell | `pages/operation/components/` | §4 · template 2026-10-08 · built on branch |
 | Portal navigation | `PortalSidebar` + `portal-nav` (six groups, one shared menu) | `pages/portal/` | §4.2 · template 2026-10-08 · built on branch |
-| Left mission rail | `FilterRail` family + `useFilterRailOpen` + the Sales Orders `.so-template-rail` composition | `pages/operation/components/workspace-rail.tsx` · `SalesOrdersRegister.tsx` | §6.1 · rail recipe built; mission rule APPROVED TARGET 2026-10-05; complete composition not yet extracted to the kit (KIT GAP) |
+| Contextual summary / legacy mission rail | Current source-summary composition; existing FilterRail adapters only for retained module contracts | 02 shared adoption map · `pages/operation/components/workspace-rail.tsx` | Current appearance in 01 §4; source semantics in §6.1 and owning module. `SalesOrdersRegister.tsx` is retired (§7.7), never a live reference or extraction target. |
 | Register / listing | `register/DataGrid` — the one listing engine; every list in the Portal passes `appearance="reference"`, Sales Order Outright included since 15 Oct 2026 (`carres/CTable` deleted) | `components/register/DataGrid.tsx` | §6.0 · §6.2 · built. The engine draws the v12 table for every list (header band, 10 between columns with 14 at the edges, ▸ before ☐, 24 round chevron; a two-line header inside the 40 header) and keeps Export and Columns in its one ⋮ Page tools menu. A page that draws its own v12 toolbar row passes `hideToolbar` and opens Columns from its own ⋮ (`openColumns`); `fitContent` widens a column to its longest value (01 §5); `expandable.frame` draws the opened row's one frame (used by Outright; §7.2) |
 | Goods expansion | `GoodsMiniTable` + connector | `pages/operation/components/GoodsMiniTable.tsx` · `ConnectedSections.tsx` | §6.9 · built |
 | Simple and document tables | `DataTable` · `DocumentTable` · `TotalsSummary` · `TableScroller` | `components/kit/*` · `components/TableScroller.tsx` | §3 · built |
-| **Compact module card** (the right Working Panel: identity header, Info and module tabs, module summary, editors, Items, Communication, Timeline) | **`CompactModuleCard`** in kit `Drawer variant="compact-card"` — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` (its `/ui` example left with the earlier kit on 14 Oct 2026; it returns when its page's turn comes) | §4.3 · shared component built · Sales Orders adoption PRODUCTION VERIFIED 2026-10-05 (PR #1893/#1896/#1897, `2ce91e2d`) · embedded presentation DEPLOYED (PR #1926, `dc631e1a`, production SHA verified 2026-10-05; owner review owed) · other modules per §4.3.4 table |
+| **Compact module card** (the right Working Panel: identity header, Info and module tabs, module summary, editors, Items, Communication, Timeline) | **`CompactModuleCard`** in kit `Drawer variant="compact-card"` — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` (its current reuse example is imported by `pages/dev/UiShowcase.tsx`; visual adoption still needs page-scoped proof) | §4.3 · shared component built · Sales Orders adoption PRODUCTION VERIFIED 2026-10-05 (PR #1893/#1896/#1897, `2ce91e2d`) · embedded presentation DEPLOYED (PR #1926, `dc631e1a`, production SHA verified 2026-10-05; owner review owed) · other modules per §4.3.4 table |
 | Object header + tabs | `SalesOrderTabs` recipe | `pages/operation/SalesOrderTabs.tsx` | §4.1 · accepted; page-owned — no generic ObjectHeader/ObjectPage kit API (KIT GAP) |
 | Object facts | `Block` — the one card · `Panel` · `StatusPill` · `EmptyState` · `Loading` | `components/kit/*` | Existing component built; current visual migration owed |
 | Forms | `Input` · `Textarea` · `Select` · `SearchInput` · `Checkbox` · `DatePicker` · `FieldFrame` | `components/kit/*`, `field-recipe.ts` | Existing component built; current visual migration owed |
@@ -446,9 +454,7 @@ simplifies execution; it removes no permission, approval or separation of duties
 | Historical / document failure | correct version and actor; business success is separate from a failed PDF capture |
 | Long content / many records | the full identity is reachable; quantities and actions stay findable; contained scroll |
 
-**Feedback:** ordinary results use the governed `Toast` in one fixed bottom-right tray, stacking
-upward, never in document flow; success/information auto-dismisses after five seconds with a slim
-remaining-time line and a close door (owner confirmation 2026-10-02). A persistent business blocker
+**Feedback:** use the current 01 §3 Toast: fixed bottom centre, ordinary results 2.2–2.6 seconds; task closure 12 seconds with optional Next and Close, never timed Undo (owner 12 Oct evening). This replaces the older 2 Oct bottom-right/five-second composition. Never put ordinary toasts in document flow. A persistent business blocker
 stays an in-page message by the affected surface; field validation stays inline. The listing's three
 message kinds are in §6.5. A `Save` is disabled until something changed, and a blocked save names the
 gap (`Save changes — say why this date is different`). Editors: one open at a time; a failed save

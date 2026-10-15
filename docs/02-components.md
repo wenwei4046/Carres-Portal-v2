@@ -25,6 +25,26 @@
 | Task view | TaskView, TaskToast | The ONE shape of an opened task (owner's round 3 brief, 13 Oct 2026; 03 §8): the task at 13 / 500; its module icon, page and record with the owner's initials at the right, the record being the door to its page; one row per fact in one grid (icon 16, label as wide as the longest and at most 104, then the value), amber only on the fact that has gone by, and a fact may open its own detail under its row; then the segmented tabs. The first tab is the owning module's work and stays mounted; another tab is drawn when it is first opened. The view reads nothing, writes nothing and closes nothing. `TaskToast` is the dark toast after a task closes (01 §3): bottom centre, 12 seconds, `Next: {party} ›` when another task waits, ✕, never `Undo` |
 | Settings | Shared page/row/form components | Plain row groups; edit mode, access, current value, treatment and history |
 
+## Runtime reuse directory · 15 Oct 2026
+
+| Need | Existing shared entry | Rule |
+|---|---|---|
+| List, selection, sort, filter, expansion | `register/DataGrid`, `register/ItemRows` | One listing engine; no CTable or copied HTML table |
+| Model/specification cells and list totals | `carres/CCell`, `carres/CListFooter` | Module supplies facts; shared renderer supplies presentation |
+| Detail order lines | `carres/COrderLines` | Different job from a register; preserve order-line arithmetic |
+| View, panel and icon tools | `carres/CToolbar`: CViewButton, CShowPanelButton, CIconButton, CChip | Reuse the exported control; do not rebuild its wrapper/skin per page |
+| Menus and small floating panels | `carres/CPopover`: CMenu, CMenuItem, CMenuGroup | Retired DropdownMenu/kit Popover are not alternatives |
+| Status rendering | `carres/CPill`, `kit/StatusPill` | Existing overlap, not two approved palettes; retain current consumers until unified with semantic/API parity |
+| Forms, dialogs, documents, task view | Existing `kit/` families in the register above | Preserve behaviour and source ownership during visual adoption |
+| Glyphs | `carres/MIcon`, semantic `kit/Icon` adapter | One approved glyph family; preserve semantic names, accessible labels and consumer APIs |
+| Live catalogue | `pages/dev/UiShowcase.tsx` at `/ui` | Imports actual runtime components with TEST examples; it is not a separate implementation |
+
+**Retirement state:** CTable, DropdownMenu, kit Popover, unused Card, GridToolbar,
+ChecklistRow and QuietRouteRow are already retired in the mainline source. Do not recreate them.
+Btn, Field and PageHeader are legacy contracts blocked from new adoption; remaining consumers
+move with their page. CPill/StatusPill and generic Block/specialised side-panel surfaces require
+capability review rather than deletion by name. Keep the remaining work in the existing handoff.
+
 ## Reuse rules
 
 - Keep existing record-opening contracts from the owning module; the downloaded SO full-page door does not change every register into an SO page.
@@ -70,7 +90,7 @@ The shared Button exposes its existing variant as `data-variant`; the current pr
 
 ## Shared pieces of the current kit — where each lives
 
-The 11 Oct specimen names three shared pieces and a component list. Each has one home. A piece marked KIT GAP has no shared component in `components/kit` on 11 Oct; it is admitted once with its `/ui` example, never drawn inside a page.
+The current adoption map is a reuse contract, not a second kit. Source-checked on 15 Oct 2026 against `pages/dev/UiShowcase.tsx` and the existing component files. A KIT GAP is not permission to invent a page-local component; extend the owning family once and expose it on `/ui`.
 
 | Specimen piece | Home | State |
 |---|---|---|
@@ -84,7 +104,7 @@ The 11 Oct specimen names three shared pieces and a component list. Each has one
 | Tabs · SegmentedControl | Tabs | Segmented look (01 §3) |
 | Toast | Toast | Bottom centre (01 §3) |
 | Selection bar | DataGrid `selectable` (the engine draws it) | Replaces the toolbar in place |
-| Chip: choice chip and theme chip | none | KIT GAP |
+| Choice chip | `carres/CToolbar.CChip` | Existing shared choice chip; reuse current API. Theme-choice adoption remains governed by 01 §9, not inferred from the existence of CChip. |
 | Link: record number | PoNumberLinks and module link cells | KIT GAP: one shared record link |
 | Avatar | none | KIT GAP (UI MASTER §7.3) |
 | Item-row control | none | KIT GAP |
@@ -96,7 +116,7 @@ Behaviour the specimen fixes for every module:
 - A record number in a card or task is the link that opens it; there is no separate Open button.
 - Menus, dialogs and toasts are never clipped by a parent.
 - Print and Download print only the document page, never the whole application.
-- No value is cut with an ellipsis; text wraps inside its own cell or column.
+- Parent list cells, expanded goods and detail order lines follow their distinct 01 §5 contracts. Only the approved customer-name second line may use ellipsis, with full hover/record access; never apply a generic wrap rule that changes every table.
 
 Existing source names are entry points, not proof the latest visual target is built. A missing
 API is recorded as KIT GAP; later implementation extends the same family with a `/ui` example.

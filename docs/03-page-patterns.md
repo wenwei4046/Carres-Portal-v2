@@ -2,6 +2,18 @@
 
 **Current shared target · owner instruction 12 Oct 2026 · supplied 12 Oct.** Use the supplied Sales Order design, checked against Purchasing on the same template, as the visual reference, through the existing shared kit. All visual values live in 01; component contracts live in 02. Business record structure, permissions and exact words come from module MASTERs and COPY-STANDARD. No second layout guide.
 
+## Apply the existing kit · execution order
+
+1. Identify the page's job and owning module; read only its relevant facts, actions, words and approved differences.
+2. Compose its shell, list/detail and task areas with 02's runtime reuse directory and 01's values. Preserve the current approved Claude Design direction.
+3. Configure existing components; never copy specimen CSS, mock storage, permission checks or business completion.
+4. When a shared part needs a fix, change that family once and its actual `/ui` example. A genuine missing capability joins the existing kit, not a module-local skin.
+5. Replace the affected consumers and remove superseded presentation only after capability parity; keep unique functions and unresolved decisions.
+6. For documentation-only reconciliation, review links and the diff. For a UI change, verify the changed scope and reuse unchanged passed evidence; run required release gates at the functional release boundary. Do not wait for whole-Portal perfection to finish an approved page.
+
+The sole entry is UI MASTER; these compositions, 01 and 02 are its supporting contracts.
+The existing delivery handoff tracks migration and production evidence; this file does not duplicate that queue.
+
 ## 1 · Shell
 
 Menu → top bar (module and page, search, team, notifications) → one 36 toolbar row → Summary on the left, list or detail in the middle, Tasks on the right. Summary and Tasks are collapsible contextual regions, not mandatory columns on every screen. Selection uses the person's theme; default Blue. The page never scrolls; panels and the table body scroll inside. A detail opens in the middle in place of the list: Summary and the toolbar hide, Tasks stays, Back returns to the same scroll position. There is no list plus detail three-panel view; the one exception is the Workspace page, where an opened task stands beside its pick list (§8). Panels open by window width: at 1600 or wider Summary and Tasks; from 1280 to 1599 Tasks only; under 1280 neither. Tasks also opens itself for the Log form, an open task and every detail. Opening or closing a panel never changes a column width. Keep content reachable with navigation expanded or collapsed. Narrow layouts collapse secondary panels; they never compress essential facts until unreadable.
