@@ -15,6 +15,7 @@ import KitSelect from "@/components/kit/Select";
 import KitButton from "@/components/kit/Button";
 import KitDatePicker from "@/components/kit/DatePicker";
 import { controlClass } from "@/components/kit/field-recipe";
+import { DialogContainerProvider } from "@/components/kit/dialog-container";
 import { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 
@@ -285,7 +286,7 @@ export function Drawer({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !e.defaultPrevented) onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -294,7 +295,8 @@ export function Drawer({
   return (
     <>
       <div className="fixed inset-0 z-[70]" style={{ background: "var(--backdrop)" }} onClick={onClose} aria-hidden="true" />
-      <aside
+      <DialogContainerProvider>{(setContainer) => (
+      <aside ref={setContainer}
         role="dialog"
         aria-label={typeof title === "string" ? title : undefined}
         data-testid={testId}
@@ -310,6 +312,7 @@ export function Drawer({
             its own width, or the paper is re-cut forever. */}
         <div className="min-h-0 flex-1 overflow-y-scroll px-4 py-3.5 [scrollbar-gutter:stable]">{children}</div>
       </aside>
+      )}</DialogContainerProvider>
     </>
   );
 }
@@ -335,7 +338,7 @@ export function Dialog({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !e.defaultPrevented) onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -343,7 +346,8 @@ export function Dialog({
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center p-4" style={{ background: "var(--backdrop)" }}>
-      <div
+      <DialogContainerProvider>{(setContainer) => (
+      <div ref={setContainer}
         role="dialog"
         aria-modal="true"
         aria-label={typeof title === "string" ? title : undefined}
@@ -358,6 +362,7 @@ export function Dialog({
         <div className="min-h-0 flex-1 overflow-auto px-4 py-3.5">{children}</div>
         {footer && <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-c-section-line px-4 py-3">{footer}</div>}
       </div>
+      )}</DialogContainerProvider>
     </div>
   );
 }
@@ -389,7 +394,7 @@ export function PopMenu({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !e.defaultPrevented) onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

@@ -45,6 +45,7 @@
 // tables are the order's own line block: fixed rows, no sort, no selection.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./purchase-orders/purchase-order-detail.css";
+import { DialogContainerProvider } from "@/components/kit/dialog-container";
 import "./sales-order-detail-theme.css";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -2920,18 +2921,20 @@ function SalesOrderWorkspaceBody() {
             <MIcon name="expand_more" size={18} className="text-c-muted" />
           </CBtn>
           {whyOpen && (
-            <div role="dialog" aria-label="Why" className="absolute right-0 top-10 z-[80] flex w-[min(380px,80vw)] flex-col gap-2 rounded-lg border border-c-btn-border bg-c-card p-3" style={{ boxShadow: "var(--shadow-menu)" }}>
+            <DialogContainerProvider>{(setContainer) => (
+            <div ref={setContainer} role="dialog" aria-label="Why" className="absolute right-0 top-10 z-[80] flex w-[min(380px,80vw)] flex-col gap-2 rounded-lg border border-c-btn-border bg-c-card p-3" style={{ boxShadow: "var(--shadow-menu)" }}>
               <label htmlFor="so-change-reason" className="flex flex-col gap-1 text-[12px] text-c-secondary">
                 Reason for change
                 <textarea id="so-change-reason" rows={2} value={changeReason} onChange={(e) => setChangeReason(e.target.value)}
                   className="rounded-lg border border-c-input-border bg-c-card px-2.5 py-1.5 text-[13px] font-normal text-c-ink outline-none focus:border-c-select-fg" />
               </label>
-              <label htmlFor="so-change-asked" className="flex flex-col gap-1 text-[12px] text-c-secondary">
+              <div className="flex flex-col gap-1 text-[12px] text-c-secondary">
                 Requested date (from customer)
                 <CDate id="so-change-asked" label="Requested date (from customer)" value={changeAskedOn} onChange={setChangeAskedOn} />
-              </label>
+              </div>
               <CBtn kind="main" className="!h-[30px] self-end !text-[12px]" onClick={() => setWhyOpen(false)}>Done</CBtn>
             </div>
+            )}</DialogContainerProvider>
           )}
         </span>
         {commercial && (
