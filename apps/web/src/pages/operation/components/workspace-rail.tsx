@@ -329,13 +329,14 @@ export function FilterRailGroup({
           <Icon name={icon} />
         </span>
         {/* A title never breaks inside a word (it may still wrap at a space); the
-            chosen value beside it gives way and truncates instead. */}
-        <span className="min-w-min flex-1 break-normal text-[13px] font-semibold leading-[18px] text-c-ink">
+            chosen value beside it wraps in its own space and is never cut
+            (01 §2: no value ends in an ellipsis; 13 / 500 for a selected value). */}
+        <span className="min-w-min flex-1 break-normal text-[13px] font-medium leading-[18px] text-c-ink">
           {title}
         </span>
         {!open && shown != null && (
           <span
-            className="min-w-0 max-w-[45%] truncate text-[13px] font-semibold leading-[18px] text-c-select-fg"
+            className="min-w-0 max-w-[55%] break-words text-right text-[13px] font-medium leading-[18px] text-c-select-fg"
             title={shown}
             data-testid="rail-group-chosen"
           >

@@ -54,7 +54,7 @@ export function TwoLines({
       </span>
       {line2 ? (
         <span
-          className={`block truncate text-label ${LINE2_TEXT[line2Tone]}`}
+          className={`block truncate text-meta ${LINE2_TEXT[line2Tone]}`}
           title={cellTitle ?? line2}
           data-testid={line2TestId}
         >

@@ -260,7 +260,7 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack, ba
                       <p className="text-body text-base-900">{issue.officialEnglish}</p>
                       {issue.currentAction ? (
                         <p className="text-meta text-base-700">
-                          <span className="font-semibold text-base-900">{issue.currentAction.action}</span>
+                          <span className="font-medium text-base-900">{issue.currentAction.action}</span>
                           {" · "}{OWNER_RULE_WORD[issue.currentAction.ownerRule] ?? issue.currentAction.ownerRule}
                           {" · by "}{fmtDate(issue.currentAction.dueOn)}
                         </p>
@@ -280,7 +280,7 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack, ba
             <Block title="History">
               <div className="flex flex-col gap-4">
                 <section>
-                  <h3 className="text-label text-kit-slate-11">Site visits</h3>
+                  <h3 className="text-label uppercase tracking-[0.06em] text-kit-slate-11">Site visits</h3>
                   {physical.isLoading ? (
                     <p className="mt-1 text-meta text-base-500">Loading physical receipts and departures…</p>
                   ) : physical.isError ? (
@@ -296,7 +296,7 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack, ba
                         <ul className="mt-1 divide-y divide-kit-slate-5">
                           {movement.visits.map(({ receipt, departure }) => (
                             <li key={receipt.id} className="space-y-1 py-2 text-meta">
-                              <p className="font-semibold text-base-900">{receipt.siteName ?? "Site not recorded"}</p>
+                              <p className="font-medium text-base-900">{receipt.siteName ?? "Site not recorded"}</p>
                               <p>Received {fmtDate(receipt.at)} · <button type="button" className="text-kit-blue-11 hover:underline" onClick={() => navigate(receipt.href)}>{receipt.reference}</button></p>
                               <p>{departure ? <>Departed {fmtDate(departure.at, { time: true })} · <button type="button" className="text-kit-blue-11 hover:underline" onClick={() => navigate(departure.href)}>{departure.reference}</button></> : "Departure not paired with this receipt"}</p>
                             </li>
@@ -305,7 +305,7 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack, ba
                       )}
                       {movement.unpairedDepartures.length > 0 && (
                         <div className="mt-2 space-y-1 text-meta">
-                          <p className="font-semibold text-base-900">Departures without a matching Site receipt</p>
+                          <p className="font-medium text-base-900">Departures without a matching Site receipt</p>
                           <p className="text-base-500">These records do not establish a same-Site visit. The current Site cannot supply a missing historical Site.</p>
                           {movement.unpairedDepartures.map((departure) => (
                             <p key={departure.id}>{fmtDate(departure.at, { time: true })} · <button type="button" className="text-kit-blue-11 hover:underline" onClick={() => navigate(departure.href)}>{departure.reference}</button> · {departure.siteName ?? "Site not recorded"}</p>
@@ -317,7 +317,7 @@ export default function WarehouseUnitDetail({ unitCode: selectedCode, onBack, ba
                 </section>
 
                 <section>
-                  <h3 className="text-label text-kit-slate-11">Changes</h3>
+                  <h3 className="text-label uppercase tracking-[0.06em] text-kit-slate-11">Changes</h3>
                   {data.events.length === 0 ? (
                     <p className="mt-1 text-meta text-base-500">No changes recorded.</p>
                   ) : (
@@ -500,7 +500,7 @@ function CountAgainDialog({ unit, open, onOpenChange, onDone }: {
     >
       {failure ? <p role="alert" className="mb-3 rounded-control border border-kit-red-9 bg-kit-red-3 px-3 py-2 text-body text-kit-red-11">{failure}</p> : null}
       <p className="text-body text-base-800">
-        {site} gets the work again: <span className="font-semibold">Look for {unit.unitCode} at {site} and scan it again</span>, due the next working day.
+        {site} gets the work again: <span className="font-medium">Look for {unit.unitCode} at {site} and scan it again</span>, due the next working day.
         Finding it closes the work; not finding it becomes a difference for GRN Duty to check.
       </p>
     </Modal>
@@ -510,7 +510,7 @@ function CountAgainDialog({ unit, open, onOpenChange, onDone }: {
 function Fact({ label, children, span }: { label: string; children: React.ReactNode; span?: boolean }) {
   return (
     <div className={`flex flex-col gap-1 ${span ? "sm:col-span-3" : ""}`}>
-      <span className="text-label text-kit-slate-11">{label}</span>
+      <span className="text-meta text-kit-slate-11">{label}</span>
       <div className="flex min-h-8 min-w-0 items-center break-words py-1 text-body text-base-900" data-kit="plain-fact">
         <span className="min-w-0">{children}</span>
       </div>

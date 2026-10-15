@@ -205,7 +205,10 @@ export default function WarehouseOutboundWork() {
         key: "date",
         label: "Scheduled handover",
         headerLines: ["Scheduled", "handover"] as const,
-        width: REGISTER_FIELD_WIDTH.date,
+        /* A date WITH its time line (`Driver pickup 14:30`) takes the
+           date-and-time width, like `Loaded at`, so the 12px second line is
+           never cut (01 §2). */
+        width: REGISTER_FIELD_WIDTH.goodsReceivedDate,
         sortable: true,
         filterType: "date",
         chooserGroup: "Dates",
@@ -214,12 +217,12 @@ export default function WarehouseOutboundWork() {
         exportValue: (c) =>
           `${c.eventDate}${c.expectedCollectionWindow ? ` · Driver pickup ${c.expectedCollectionWindow}` : " · Time not provided"}`,
         /* The approved second line (COPY: `Driver pickup {time}` or exactly
-           `Time not provided`) — 11px slate-11 under the 13px date, inside
+           `Time not provided`) — 12px slate-11 under the 13px date, inside
            the one 40px row. */
         accessor: (c) => (
           <span className="block leading-[18px]" data-testid={`wo-date-${c.doNumber}`}>
             <span className="block">{fmtDate(c.eventDate)}</span>
-            <span className="block text-label font-normal leading-[14px] text-kit-slate-11">
+            <span className="block text-meta text-kit-slate-11">
               {c.expectedCollectionWindow
                 ? `Driver pickup ${c.expectedCollectionWindow}`
                 : "Time not provided"}
@@ -321,7 +324,7 @@ export default function WarehouseOutboundWork() {
         accessor: (c) => {
           if (c.products.length === 0) return <span data-testid={`wo-item-${c.doNumber}`}>Products not recorded</span>;
           /* Several goods print `{n} items` and keep the expansion; one good
-             prints its name with the SKU on the approved 11px second line. */
+             prints its name with the SKU on the approved 12px second line. */
           if (c.products.length > 1)
             return <span data-testid={`wo-item-${c.doNumber}`}>{c.products.length} items</span>;
           const x = c.products[0]!;
@@ -329,7 +332,7 @@ export default function WarehouseOutboundWork() {
             <span className="block leading-[18px]" data-testid={`wo-item-${c.doNumber}`}>
               <span className="block">{x.name ?? x.sku ?? "Product not recorded"}</span>
               {x.name && x.sku ? (
-                <span className="block text-label font-normal leading-[14px] text-kit-slate-11">{x.sku}</span>
+                <span className="block text-meta text-kit-slate-11">{x.sku}</span>
               ) : null}
             </span>
           );
@@ -763,8 +766,8 @@ export default function WarehouseOutboundWork() {
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <div className="text-label font-semibold text-kit-slate-11">{label}</div>
-      <div className="truncate text-base-800">{value}</div>
+      <div className="text-meta text-kit-slate-11">{label}</div>
+      <div className="break-words text-base-800">{value}</div>
     </div>
   );
 }
@@ -834,7 +837,7 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
       .find(Boolean) ?? null;
   return (
     <div className="border-t border-kit-slate-5 px-3 py-2" data-testid={`wo-units-${card.doNumber}`}>
-      <div className="mb-1 text-label font-semibold uppercase tracking-wide text-base-600">
+      <div className="mb-1 text-label uppercase tracking-[0.06em] text-base-600">
         Goods scheduled for pickup
       </div>
       {/* The two evidence records, never merged (§8): the Warehouse's own
@@ -946,7 +949,7 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
       </div>}
       {prepError && <div className="mb-2"><FieldError>{prepError}</FieldError></div>}
       {readyUnits.length > 0 && (
-        <p className="mb-2 text-label text-base-500" data-testid="wo-receiver-consequence">
+        <p className="mb-2 text-meta text-base-500" data-testid="wo-receiver-consequence">
           Recording the load moves the accepted Units to {card.logisticsPartner}. Name the person
           who actually receives them and attach proof.
         </p>
@@ -954,7 +957,7 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
       {notCollected.length > 0 && (
         <div className="mb-2 space-y-0.5" data-testid="wo-not-collected">
           {notCollected.map((line) => (
-            <p key={line} className="text-label text-base-600">
+            <p key={line} className="text-meta text-base-600">
               {line}
             </p>
           ))}
@@ -962,7 +965,7 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
       )}
       <div className="overflow-x-auto"><table className="w-full border-collapse text-body">
         <thead>
-          <tr className="text-left text-label font-semibold text-kit-slate-11">
+          <tr className="text-left text-meta font-medium text-kit-slate-11">
             <th className="py-1 pr-3 font-medium">Unit ID</th>
             <th className="py-1 pr-3 font-medium">Product</th>
             <th className="py-1 pr-3 font-medium">Scanned / Checked / Packed</th>
@@ -1068,7 +1071,7 @@ function RecordLoadedModal({
           />
         </div>
         <div>
-          <div className="mb-1 text-label uppercase tracking-wide text-base-500">
+          <div className="mb-1 text-label uppercase tracking-[0.06em] text-base-500">
             Units in this load
           </div>
           {readyUnits.map((u) => (
@@ -1085,15 +1088,15 @@ function RecordLoadedModal({
                 data-testid={`wo-pick-${u.unitId}`}
               />
               <span className="font-mono">{u.unitId}</span>
-              <span className="truncate text-base-500">{u.productName ?? u.sku ?? ""}</span>
+              <span className="min-w-0 break-words text-base-500">{u.productName ?? u.sku ?? ""}</span>
             </label>
           ))}
-          <p className="mt-1 text-label text-base-500">
+          <p className="mt-1 text-meta text-base-500">
             Units left out keep their current holder and stay under {fmtDate(card.eventDate)}.
           </p>
         </div>
         <label className="block">
-          <span className="text-label uppercase tracking-wide text-base-500">
+          <span className="text-label uppercase tracking-[0.06em] text-base-500">
             Loaded to ({card.logisticsPartner})
           </span>
           <input
@@ -1105,7 +1108,7 @@ function RecordLoadedModal({
           />
         </label>
         <label className="block">
-          <span className="text-label uppercase tracking-wide text-base-500">
+          <span className="text-label uppercase tracking-[0.06em] text-base-500">
             Vehicle (when known)
           </span>
           <input
@@ -1116,7 +1119,7 @@ function RecordLoadedModal({
           />
         </label>
         <div>
-          <span className="text-label uppercase tracking-wide text-base-500">
+          <span className="text-label uppercase tracking-[0.06em] text-base-500">
             Proof: photos and videos of the loaded goods
           </span>
           <div className="mt-0.5" data-testid="wo-proof">

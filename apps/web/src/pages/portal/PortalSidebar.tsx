@@ -363,7 +363,7 @@ export default function PortalSidebar({ drawer = false }: {
   const PAGE_REST = "font-normal text-c-body hover:bg-c-hover";
   const PAGE_ON = "bg-c-select-pill font-semibold text-c-select-fg";
   const SECTION_LABEL = "text-[11px] font-semibold uppercase leading-[14px] tracking-[0.06em] text-c-secondary";
-  const GROUP_LABEL = "text-[10px] font-semibold uppercase leading-[13px] tracking-[0.08em] text-c-secondary";
+  const GROUP_LABEL = "text-[11px] font-medium uppercase leading-[14px] tracking-[0.06em] text-c-secondary";
   /** A long name wraps to a second line; it is never cut. */
   const WRAP = "min-w-0 flex-1 break-words [text-wrap:pretty]";
 
