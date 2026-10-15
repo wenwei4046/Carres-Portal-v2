@@ -144,7 +144,7 @@ export default function WarehouseScheduleCard({ card }: { card: ScheduleCard }) 
           </div>
           {refs.secondary && (
             <div
-              className="break-words [overflow-wrap:anywhere] text-label leading-4 text-kit-slate-11"
+              className="break-words [overflow-wrap:anywhere] text-meta text-kit-slate-11"
               data-testid="ws-card-ref-secondary"
             >
               <ReferenceText reference={refs.secondary} />
@@ -158,7 +158,7 @@ export default function WarehouseScheduleCard({ card }: { card: ScheduleCard }) 
         {special && (
           <div className="mt-1">
             <span
-              className="inline-block rounded-full bg-white/70 px-1.5 py-0.5 text-label text-kit-slate-11"
+              className="inline-block rounded-full bg-white/70 px-1.5 py-0.5 text-meta font-medium text-kit-slate-11"
               data-testid="ws-card-special"
             >
               {special}
@@ -289,14 +289,14 @@ function ProductRow({
       <span className="flex h-6 w-6 shrink-0 items-center justify-center text-kit-slate-11">
         <Icon name={visual.glyph} size={18} title={visual.word ?? undefined} />
       </span>
-      {/* A wrapped model name gets its lines apart; the 12px size stays. */}
+      {/* The one item rule (01 §5): model 13 / 400 ink, the SKU under it 12 / 400 grey. */}
       <span
-        className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] text-meta leading-[17px] text-kit-slate-12"
+        className="min-w-0 flex-1 break-words [overflow-wrap:anywhere] text-body text-kit-slate-12"
         data-testid="ws-line-model"
       >
         {line.modelLabel ?? "Model not recorded"}
         {line.sku && line.sku !== line.modelLabel && (
-          <span className="block text-label text-kit-slate-11">{line.sku}</span>
+          <span className="block text-meta text-kit-slate-11">{line.sku}</span>
         )}
       </span>
       <ProgressFigure progress={progress} />
@@ -325,7 +325,7 @@ function ProgressFigure({ progress }: { progress: LineProgress }) {
         : "text-kit-slate-11";
   return (
     <span
-      className={`flex shrink-0 items-center gap-1 ${ink}`}
+      className={`flex shrink-0 items-center gap-1 text-meta ${ink}`}
       data-testid="ws-line-progress"
       data-state={progress.state}
     >
