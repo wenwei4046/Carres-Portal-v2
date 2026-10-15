@@ -853,9 +853,11 @@ export default function WarehouseInbound() {
         >
           {/* ── THE SITE STRIP ─────────────────────────────────────────── */}
           {siteTabs.length > 0 && (
-            /* The kit segmented control (01 §3): one drawing for every set of tabs. */
+            /* The kit segmented control (01 §3): one drawing for every set of tabs.
+               Five Sites need about 740px; on a narrower page the track wraps to a
+               second line rather than cut a Site or run off the screen. */
             <div
-              className={`${SEGMENTED_TRACK} mb-2 max-w-full self-start overflow-x-auto`}
+              className={`${SEGMENTED_TRACK} mb-2 max-w-full flex-wrap self-start`}
               role="tablist"
               aria-label="Receiving Site"
               data-testid="inbound-sites"

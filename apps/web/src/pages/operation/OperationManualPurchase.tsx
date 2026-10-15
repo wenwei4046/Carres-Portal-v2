@@ -1697,10 +1697,11 @@ export default function OperationManualPurchase() {
                   type="button"
                   onClick={() => setMode("create")}
                   data-testid="manual-purchase-new-request"
+                  aria-label={MW.newRequest}
                   className={`${registerStyles.create} relative inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-kit-blue-9 px-3 text-body font-semibold text-white hover:opacity-90`}
                 >
                   <Plus size={14} strokeWidth={2.25} aria-hidden />
-                  <span className={registerStyles.createWords}><span className="sr-only">{MW.newRequest.slice(0, 2)}</span>{MW.newRequest.slice(2)}</span>
+                  <span className={registerStyles.createWords}>{MW.newRequest.slice(2)}</span>
                 </button>
               </>
             }
