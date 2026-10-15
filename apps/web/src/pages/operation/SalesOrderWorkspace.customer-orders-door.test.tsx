@@ -152,3 +152,14 @@ describe("Sales Order page — `{n} orders ›` counts what the Register door op
     expect(screen.queryByTestId("customer-orders-door")).toBeNull();
   });
 });
+
+describe("missing saved delivery access facts", () => {
+  it("shows unknown floor and lift without replacing them by 1 and false", async () => {
+    answer({});
+    mount();
+    await screen.findByTestId("customer-type-chip");
+    await waitFor(() => expect(screen.getByTestId("so-row-floor")).toHaveTextContent("Not recorded"));
+    expect(screen.getByTestId("so-row-lift")).toHaveTextContent("Not recorded");
+    expect(screen.getByTestId("so-row-lift")).not.toHaveTextContent("No lift");
+  });
+});

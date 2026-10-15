@@ -53,6 +53,7 @@ import { paintPdfPages } from "@/lib/pdf/paint";
 import { toast } from "sonner";
 import {
   BUILDING_TYPE_OPTIONS,
+  DELIVERY_FACT_REFUSALS,
   classifySalesOrderChange,
   INSTALMENT_MONTHS,
   isLivePayment,
@@ -220,8 +221,8 @@ interface Draft {
   delivery_date: string | null;
   delivery_date_tbd: boolean;
   proceed_date: string | null;
-  delivery_floor: number;
-  delivery_has_lift: boolean;
+  delivery_floor: number | null;
+  delivery_has_lift: boolean | null;
   delivery_stair_items: number | null;
   /** 0219 — the operator's own configured fields, keyed by config key. */
   custom: Record<string, string>;
@@ -660,8 +661,8 @@ export function snapshotTemplateData(
     },
     delivery: {
       date: h["delivery_date_tbd"] ? "To be confirmed" : (str("delivery_date") ?? ""),
-      floor: Number(h["delivery_floor"] ?? 1),
-      has_lift: Boolean(h["delivery_has_lift"]),
+      floor: h["delivery_floor"] == null ? null : Number(h["delivery_floor"]),
+      has_lift: h["delivery_has_lift"] == null ? null : Boolean(h["delivery_has_lift"]),
     },
     lines,
     addons,
@@ -764,8 +765,8 @@ function draftFromSnapshot(snap: SalesOrderSnapshot): Draft {
     delivery_date: str("delivery_date") || null,
     delivery_date_tbd: Boolean(h["delivery_date_tbd"]),
     proceed_date: str("proceed_date") || null,
-    delivery_floor: Number(h["delivery_floor"] ?? 1),
-    delivery_has_lift: Boolean(h["delivery_has_lift"]),
+    delivery_floor: h["delivery_floor"] == null ? null : Number(h["delivery_floor"]),
+    delivery_has_lift: h["delivery_has_lift"] == null ? null : Boolean(h["delivery_has_lift"]),
     delivery_stair_items:
       h["delivery_stair_items"] == null ? null : Number(h["delivery_stair_items"]),
     custom,
@@ -1235,8 +1236,8 @@ function SalesOrderWorkspaceBody() {
       delivery_date: order.delivery_date,
       delivery_date_tbd: order.delivery_date_tbd,
       proceed_date: order.proceed_date ?? null,
-      delivery_floor: (order as { delivery_floor?: number }).delivery_floor ?? 1,
-      delivery_has_lift: (order as { delivery_has_lift?: boolean }).delivery_has_lift ?? false,
+      delivery_floor: (order as { delivery_floor?: number | null }).delivery_floor ?? null,
+      delivery_has_lift: (order as { delivery_has_lift?: boolean | null }).delivery_has_lift ?? null,
       delivery_stair_items:
         (order as { delivery_stair_items?: number | null }).delivery_stair_items ?? null,
       custom,
@@ -1350,7 +1351,7 @@ function SalesOrderWorkspaceBody() {
    * two surfaces would start disagreeing about money. */
   const stair = useMemo(() => {
     const cfg = catalogQ.data?.floorConfig;
-    if (!cfg) return null;
+    if (!cfg || draft.delivery_floor == null || draft.delivery_has_lift == null) return null;
     const itemsTotal = (detailQ.data?.lines ?? []).reduce((n, l) => n + l.qty, 0);
     /* ⭐ UNSET MEANS NONE — owner ruling 2026-08-27 (YH). It used to mean
        EVERY item (0104's column comment), so an order nobody was asked about
@@ -1575,6 +1576,8 @@ function SalesOrderWorkspaceBody() {
     if (isContactOnlyCorrection(changedFields)) return null;
     /* Edit cannot return an order to no date, so a legacy TBD order picks one before it commits (owner ruling 2026-09-26). */
     if (!draft.delivery_date) return "Delivery date is required. Ask the customer for the date before you save the order.";
+    if (draft.delivery_floor == null) return DELIVERY_FACT_REFUSALS.floor;
+    if (draft.delivery_has_lift == null) return DELIVERY_FACT_REFUSALS.lift;
     /* The delivery date is a PROMISE (orders/MASTER — THE THREE DELIVERY
      * DATES). A date inside the production lead is a promise the factory
      * cannot keep, and the POS has refused it since 2026-05-22 — this door
@@ -1887,8 +1890,8 @@ function SalesOrderWorkspaceBody() {
     if ("customer_birthday" in h) next.customer_birthday = str("customer_birthday") || null;
     if ("customer_address_unknown" in h) next.customer_address_unknown = Boolean(h["customer_address_unknown"]);
     if ("customer_billing_same" in h) next.customer_billing_same = h["customer_billing_same"] !== false;
-    if ("delivery_floor" in h) next.delivery_floor = Number(h["delivery_floor"] ?? 1);
-    if ("delivery_has_lift" in h) next.delivery_has_lift = Boolean(h["delivery_has_lift"]);
+    if ("delivery_floor" in h) next.delivery_floor = h["delivery_floor"] == null ? null : Number(h["delivery_floor"]);
+    if ("delivery_has_lift" in h) next.delivery_has_lift = h["delivery_has_lift"] == null ? null : Boolean(h["delivery_has_lift"]);
     if ("delivery_stair_items" in h) next.delivery_stair_items = h["delivery_stair_items"] == null ? null : Number(h["delivery_stair_items"]);
     if ("proceed_date" in h) next.proceed_date = str("proceed_date") || null;
     if ("customer_emergency" in h) {
@@ -2612,16 +2615,16 @@ function SalesOrderWorkspaceBody() {
             baseline.delivery_date ? fmtDate(baseline.delivery_date) : "",
           )}
         <span data-pos-field="stairCarry" className="contents">
-          {row("floor", "Floor", { value: String(draft.delivery_floor), muted: false }, ["delivery_floor"],
+          {row("floor", "Floor", factOf(draft.delivery_floor == null ? "" : String(draft.delivery_floor)), ["delivery_floor"],
             <CInput id="so-floor" label={`Floor (Max is ${MAX_DELIVERY_FLOOR}rd Floor)`} type="number" min={1} max={MAX_DELIVERY_FLOOR}
-              value={String(draft.delivery_floor)}
-              onChange={(e) => setField("delivery_floor", Math.min(MAX_DELIVERY_FLOOR, Math.max(1, Number(e.target.value) || 1)))} />,
-            String(baseline.delivery_floor))}
-          {row("lift", "Lift", { value: draft.delivery_has_lift ? "Has lift" : "No lift", muted: false }, ["delivery_has_lift"],
-            <CSelect id="so-lift" label="Lift available?" value={draft.delivery_has_lift ? "Has lift" : "No lift"}
+              value={draft.delivery_floor == null ? "" : String(draft.delivery_floor)}
+              onChange={(e) => setField("delivery_floor", e.target.value === "" ? null : Math.min(MAX_DELIVERY_FLOOR, Math.max(1, Number(e.target.value) || 1)))} />,
+            baseline.delivery_floor == null ? "Not recorded" : String(baseline.delivery_floor))}
+          {row("lift", "Lift", factOf(draft.delivery_has_lift == null ? "" : draft.delivery_has_lift ? "Has lift" : "No lift"), ["delivery_has_lift"],
+            <CSelect id="so-lift" label="Lift available?" value={draft.delivery_has_lift == null ? "" : draft.delivery_has_lift ? "Has lift" : "No lift"}
               onChange={(v) => setField("delivery_has_lift", v === "Has lift")}
               options={LIFT_OPTIONS.map((o) => ({ value: o, label: o }))} />,
-            baseline.delivery_has_lift ? "Has lift" : "No lift")}
+            baseline.delivery_has_lift == null ? "Not recorded" : baseline.delivery_has_lift ? "Has lift" : "No lift")}
           {mode === "object" && editing &&
             row("stair-items", "Items needing stair carry",
               factOf(draft.delivery_stair_items == null ? "" : String(draft.delivery_stair_items)), ["delivery_stair_items"],
