@@ -114,7 +114,7 @@ what moved, what an owner ruling replaced, and the kept `SalesOrderCompactView`)
    `Deploy PR #2083 and verify UI` on 15 Oct 2026: record the
    `not yet` test answer on trial order SO-1254 through the Sales Order page and watch its open
    `Ask for the delivery date` task (`orders:c1e95bf2-…:ask_delivery_date`, owner Alvin) leave the
-   feed with a closure receipt. No test database exists here (no Docker or PostgREST); the internal
+   feed with a closure receipt. PostgreSQL and PostgREST are now available locally (15 Oct; no Docker). The internal
    task path is already proven on a local replayed database. No production test write has been
    made. Preflight on `dabffcfc5`: the exact task is open in Team Work, owner Alvin; its door opens
    the full SO page, which has no legacy `not yet` entry. Current `SalesOrderWorkspace.tsx`
@@ -136,6 +136,15 @@ what moved, what an owner ruling replaced, and the kept `SalesOrderCompactView`)
    No TBD checkbox, bypass, date clearing, writer change or task-semantic change is authorised.
    Controller proposal: prove the existing real-date/amendment contract on an isolated fixture;
    supporting a legacy no-date response writer would need an explicit scoped policy ruling.
+   **Local real-date slice PASS (15 Oct, no application change):** synthetic legacy fixture task
+   present → existing `/api/orders/:id/date` HTTP 200 → same source task absent → one actual
+   `completed` ledger row with fixture actor and `orders.delivery_date=2026-12-01`. Actual Hono
+   route/auth, generated local ES256 tokens, Supabase clients, PostgREST 16.4 and PostgreSQL 17.11;
+   no mocked source facts or inserted completion row. This proves only the source API/projector/
+   ledger path, not browser UI, deployed Worker, whole feed or the blocked `not yet` outcome.
+   Replay applied 666/685 migrations, with 19 unrelated failures; no full-replay PASS is claimed.
+   Temporary local HTTP/database services stopped; fixture cluster preserved. The authorised
+   production `not yet` write is **BLOCKED BY CONTRACT CONFLICT**, not awaiting repeat permission.
 3. **Batch D · SO Batch brief.** A confirmed: preserve the existing deadline rule, no code change.
    B and C still await owner rulings via the controller (§5); batch any approved changes into one release.
 4. **Page adoption down the side menu** after Design's fix list per page; **Settings per module** at

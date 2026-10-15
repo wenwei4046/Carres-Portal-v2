@@ -4740,6 +4740,16 @@ keep their own precise keys, and `workItemsForOrder` resolves the person per rul
   falls back. Composed only for the rows nobody asked (`delivery_date` null AND
   `delivery_date_tbd` false — the 3, never the 8; owner ruling 2026-08-15) on an unfinished
   order. The ladder never raises it, so no register cell or drawer headline changed.
+**Measured legacy response-contract gap — 15 Oct 2026; policy unchanged.** The admitted
+`ask_delivery_date` registry still names a governed no-date answer as a completion outcome, while
+the later edit ruling (§ above: no `Delivery date to be confirmed`) requires a real date for a
+legacy delivery/commercial edit. The current SO page has no no-date answer entry; direct revision
+writes retain `promise_moves_by_amendment`. A genuinely eligible legacy row must not be excluded
+solely to hide this missing writer. The specific production no-date proof is blocked by this
+contract conflict. A new legacy response writer or eligibility change remains a scoped proposal,
+not an authorised implementation. A local synthetic real-date API/PostgREST/source-ledger slice
+passed on 15 Oct; it proves neither the no-date outcome nor production/browser completion.
+
 - **The PIC owns the order's Operation journey from beginning to end** — delay decision, logistics
   choice and calls, delivery date/time, today's result, proof, Failed Delivery next step, loan
   return and ordinary collection. Delivery, Payment and Warehouse still own their business facts;
