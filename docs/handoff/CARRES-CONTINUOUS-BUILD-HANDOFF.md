@@ -54,6 +54,11 @@ Records were loaded before measuring; the browser was already signed in as Shash
 entered. SO-1254's previous 37px item row/model-spec-on-one-line findings disappeared: header 40,
 item and total rows 44, model and spec on separate lines; Inter loaded, no page overflow.
 These are the requested measurement checks, not proof of every interaction or every Finance-only page.
+The concurrent #2085 handoff update additionally records Outright, SO Batch and Receiving PASS
+at all three widths, Forecast/Workspace PASS at 1025 and Payment Monitor PASS at 1440; those
+additional checks were not repeated by this chat. It reports a known short-toolbar defect:
+SO Batch `View: By sales order` is cut by 15px at 1025 with Tasks open (433 available, 448 needed),
+tied to the pending presentation decision (§5). Preserve that finding.
 **Batch B2** (`build/kit-batch-b2`, `6c6b99f09`, not a PR yet): Finance
 read failures say `Could not read …`, no `refund_pay` on screen, Payment Monitor ref line grey — ships
 with the next functional release, not on its own.
