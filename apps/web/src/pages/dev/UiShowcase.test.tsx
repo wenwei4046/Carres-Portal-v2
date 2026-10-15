@@ -16,7 +16,7 @@ const render = (ui: ReactElement) =>
 describe("/ui — the one Carres UI kit", () => {
   it("shows the current kit without retired demos or migration notes", () => {
     render(<UiShowcase />);
-    for (const id of ["table", "cells", "order-lines", "pills", "toolbar", "side-panel", "icons", "buttons", "fields", "menus", "tabs-kit", "dialogs", "states", "documents", "task-parts"]) {
+    for (const id of ["colours", "typography", "table", "cells", "order-lines", "pills", "toolbar", "side-panel", "icons", "buttons", "fields", "menus", "tabs-kit", "dialogs", "states", "documents", "task-parts"]) {
       expect(document.getElementById(id), id).toBeInTheDocument();
     }
     expect(screen.queryByRole("heading", { name: "Frozen decisions" })).not.toBeInTheDocument();
@@ -29,6 +29,10 @@ describe("/ui — the one Carres UI kit", () => {
     expect(screen.queryByText(/131 pages/)).not.toBeInTheDocument();
     /* the one listing engine is on the page, not only the Sales Order Outright frame */
     expect(document.getElementById("table")!.querySelector('[data-testid="sales-orders-grid"]')).toBeInTheDocument();
+    const navigation = within(screen.getByRole("navigation", {name:"Kit sections"}));
+    for (const section of document.querySelectorAll("section[id]")) {
+      expect(navigation.getAllByRole("link").some((link) => link.getAttribute("href") === `#${section.id}`), section.id).toBe(true);
+    }
   });
 
   it("the ⋮ menu is the one CPopover menu: it opens, runs a command and closes", () => {

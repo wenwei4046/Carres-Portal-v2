@@ -75,6 +75,16 @@ export const CALENDAR_CLASSNAMES = {
   hidden: "invisible",
 };
 
+/* The field pop-up has room for seven44px targets on a390px screen. The
+   inline Monitor rail consumes the exported skin with its own governed
+   geometry; do not silently widen that216px adapter by changing its nav. */
+const FIELD_CALENDAR_CLASSNAMES = {
+  ...CALENDAR_CLASSNAMES,
+  button_previous: `${CALENDAR_CLASSNAMES.button_previous} max-[767px]:h-11 max-[767px]:w-11`,
+  button_next: `${CALENDAR_CLASSNAMES.button_next} max-[767px]:h-11 max-[767px]:w-11`,
+  day_button: `${CALENDAR_CLASSNAMES.day_button} max-[767px]:h-11 max-[767px]:w-11`,
+};
+
 export default function DatePicker({
   id,
   label,
@@ -129,6 +139,7 @@ export default function DatePicker({
         }
       >
         <DayPicker
+          autoFocus
           mode="single"
           selected={selected}
           defaultMonth={selected}
@@ -139,7 +150,7 @@ export default function DatePicker({
           }}
           showOutsideDays
           weekStartsOn={1}
-          classNames={CALENDAR_CLASSNAMES}
+          classNames={FIELD_CALENDAR_CLASSNAMES}
         />
       </CPopover>
     </FieldFrame>

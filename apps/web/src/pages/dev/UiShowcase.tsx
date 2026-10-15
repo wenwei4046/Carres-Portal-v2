@@ -483,6 +483,35 @@ export default function UiShowcase() {
         </p>
       </header>
 
+      <nav aria-label="Kit sections" className="grid grid-cols-3 gap-x-4 gap-y-1 sm:grid-cols-6 lg:grid-cols-9">
+        {[["colours", "Colours"], ["typography", "Typography"], ["table", "Tables"], ["cells", "Table cells"], ["order-lines", "Order lines"], ["pills", "Pills"], ["toolbar", "Toolbar"], ["side-panel", "Side panel"], ["icons", "Icons"], ["complete-pages", "Complete pages"], ["buttons", "Buttons"], ["fields", "Fields"], ["menus", "Menus"], ["tabs-kit", "Tabs"], ["dialogs", "Dialogs"], ["states", "States"], ["documents", "Documents"], ["task-parts", "Tasks"]].map(([id, label]) => (
+          <a key={id} href={`#${id}`} className="inline-flex min-h-11 items-center text-body text-c-secondary underline decoration-c-chip-border underline-offset-2">{label}</a>
+        ))}
+      </nav>
+
+      <Section id="colours" title="Colours" note="Samples read the running app’s shared tokens. Approved values live in 01; these samples alone do not prove that every page follows them. Status pairs are shown below in Pills.">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {[["Page ground", "--c-ground"], ["Surface", "--c-card"], ["Table header", "--c-band"], ["Primary text", "--c-ink"], ["Body text", "--c-body"], ["Secondary text", "--c-secondary"], ["Border", "--c-card-border"], ["Table row line", "--c-row-line"], ["Selection", "--c-select-bg"], ["Selection text", "--c-select-fg"], ["Button hover", "--c-btn-hover"], ["Main action", "--c-main"]].map(([label, token]) => (
+            <div key={token} className="flex min-w-0 flex-col gap-2 rounded-lg border border-c-card-border bg-c-card p-3">
+              <span aria-hidden="true" className="h-11 rounded-lg border border-c-card-border" style={{ background: `var(${token})` }} data-token={token} />
+              <span className="text-meta text-c-ink">{label}</span>
+              <span className="break-words text-meta text-c-secondary">{token}</span>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section id="typography" title="Typography" note="Inter. The page heading above shows the 20/600 title once. Samples below use the running shared classes; 01 owns the permitted roles. Table numbers use tabular figures.">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[["15 / 500 · Card title", "text-strong", "Customer"], ["14 / 400 · Breadcrumb", "text-control", "Sales Orders"], ["13 / 400 · Body", "text-body", "TEST · Order details"], ["13 / 500 · Selected or field value", "text-body font-medium", "TEST · Selected value"], ["13 / 600 · Identifier or main action", "text-body font-semibold", "SO-TEST-01"], ["12 / 400 · Label or second line", "text-meta", "TEST · Customer A"], ["12 / 500 · Header or pill", "text-meta font-medium", "Proceed date"], ["11 / 500 · Caps label", "text-label uppercase tracking-[0.06em]", "Summary"], ["11 / 700 · Count badge", "text-label font-bold", "12"]].map(([label, className, sample]) => (
+            <div key={label} className="flex min-w-0 flex-col gap-2 rounded-lg border border-c-card-border bg-c-card p-3">
+              <span className="text-meta text-c-secondary">{label}</span>
+              <span className={`${className} text-c-ink`} data-type-sample={label}>{sample}</span>
+            </div>
+          ))}
+        </div>
+      </Section>
+
       <Section id="table" title="Shared table · DataGrid" note="Sticky grey 40 header · 54 rows, every cell on one line · ▸ and tick 24 · gap 10 · a column is as wide as its longest value · ▸, tick and the identifier stay while the list scrolls in its own box · ▸ opens the items on the row's own columns · the footer takes two lines at most, short forms when the full words need a third, and never widens the list.">
         <TableExample narrow={false} />
         <TableExample narrow />
