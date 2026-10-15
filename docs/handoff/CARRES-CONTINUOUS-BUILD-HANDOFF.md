@@ -40,26 +40,34 @@ Never report progress as a percentage; list the exact remaining obligations (§4
 
 ## 2 · Completion table (one table; re-measure before quoting)
 
-Production runs `dabffcfc5` (ERP, POS and API, 15 Oct 2026 14:02 MYT). **Batch B is PR #2083
+Production runs `7f4f7dd34` (ERP, POS and API manifests read 15 Oct 2026 after deploy run
+`38695863784` succeeded). **Batch B is merged PR #2083
 (`build/kit-batch-b`, head `b664e6512`)**: local gates all green (lint, typecheck, 478 test files /
-7,013 tests, kit check 74/74), 42 retaken pictures committed, CI was running at 15:10 MYT. Next: when
-CI is green on the head, squash-merge with `--match-head-commit <head SHA read by gh>`, wait for the
-deploy (`/__carres_deploy.json` on erp/pos and `api…/health` must show the merge SHA), then the
-production carres-check at 1025 · 1164 · 1440 on the Sales Order page, Purchase Orders, Inbound,
-Manual Purchase, Delivery Orders and one Finance list (the browser pane must be signed in by the
-owner — never type a password). **Batch B2** (`build/kit-batch-b2`, `6c6b99f09`, not a PR yet): Finance
+7,013 tests, kit check 74/74), 42 retaken pictures committed. CI `verify` passed on exact head
+`b664e65127cfc96179d37435df23d7f6c6f4ab31` at 14:59:47 MYT. Squash-merged with
+`--match-head-commit` at 15:00:09 MYT as `7f4f7dd340858e64afe04be16375b3754e629632`.
+ERP/POS `/__carres_deploy.json` and API `/health` all reported the full merge SHA.
+Authenticated production `carres-check.js` from that exact SHA: **18/18 PASS**, at
+1025 · 1164 · 1440 on Sales Order SO-1254, Purchase Orders, Inbound, the existing Manual Purchase
+listing, Delivery Orders and Finance Payment Records (`/finance/payments`, permitted for Operation).
+Records were loaded before measuring; the browser was already signed in as Shasha, no password
+entered. SO-1254's previous 37px item row/model-spec-on-one-line findings disappeared: header 40,
+item and total rows 44, model and spec on separate lines; Inter loaded, no page overflow.
+These are the requested measurement checks, not proof of every interaction or every Finance-only page.
+**Batch B2** (`build/kit-batch-b2`, `6c6b99f09`, not a PR yet): Finance
 read failures say `Could not read …`, no `refund_pay` on screen, Payment Monitor ref line grey — ships
 with the next functional release, not on its own.
 
 | Area | Deployed (PR · SHA) | Runtime-verified | Unfinished |
 |---|---|---|---|
-| One listing engine | v12 look #2071 `a6c6eabc9` · one ⋮ Page tools #2074 `241209c68` · whole table lines #2077 `ddd0edf0d` · Outright on the engine, CTable deleted #2079 `2a28f84d9` · engine group rows/chips 12/500 #2080 `cfa0ae0dc` | Production 15 Oct: table lines whole on Outright (last row too, no rounded rows), SO Batch last row, Forecast band; every list header 40 | Opened-row frame on lists other than Outright (owner, UI MASTER §7.2); Finance lists not readable with the available login |
-| Shared parts | one menu #2070 · one pop-up #2072 · one pill drawing #2073 · one segmented control #2078 `4903bead6` · pill weight 500 only and Inbound site switch #2080 `cfa0ae0dc` | /ui computed equal; menus and pop-ups by keyboard in production | Summary panel only on Outright; procurement tab strip and PO object view tabs still draw underline tabs; avatar initials have no 01 §2 pair |
-| Type to 01 §2 (by role) | Delivery, Warehouse, Stock + rail, caps labels, pills, side menu group word #2078 `4903bead6` · SO detail, Order Route, Delivery brief, reorder card, Purchasing, Receiving #2080 `cfa0ae0dc` | Production carres-check at 1025 · 1164 · 1440 on `4903bead6`: Delivery Orders, Delivery Monitor, Outbound, Inventory, SO Batch, Outright PASS; Inbound 2 findings (fixed in #2080). On `cfa0ae0dc`: Purchase Orders and Receiving PASS at 1025 · 1164 · 1440; Inbound PASS at 1440 and its Site switch ran off at 1025/1164 (wraps in #2081); Manual Purchase only the screen-reader `+` (#2081); SO page leftovers are field rows 33 vs 36, item rows 37 vs 44, model · spec on one line, its own items table (01 §5 order-line table owed) and initials 10/700 (#2081) | Legacy old-orders files (OrderDetailDrawer, DeliveryChain, LoanPanel, most of DeliveryOrderPage); Finance (144 sites), Principal (106), Supplier portal (85), HR (59); `sales-order-route.ts` text budget assumes 11px |
+| Batch B release | #2083 `7f4f7dd34`; exact-head CI and deploy succeeded | Six requested production pages × 1025 / 1164 / 1440: 18/18 carres-check PASS | Owner acceptance; other module journeys and denied Finance-only lists are not covered by this measurement pass |
+| One listing engine | v12 look #2071 `a6c6eabc9` · one ⋮ Page tools #2074 `241209c68` · whole table lines #2077 `ddd0edf0d` · Outright on the engine, CTable deleted #2079 `2a28f84d9` · engine group rows/chips 12/500 #2080 `cfa0ae0dc` | Production 15 Oct: table lines whole on Outright (last row too, no rounded rows), SO Batch last row, Forecast band; every list header 40 | Opened-row frame on lists other than Outright (owner, UI MASTER §7.2); Finance-only lists not readable with the available login; permitted Payment Records measured on #2083 |
+| Shared parts | one menu #2070 · one pop-up #2072 · one pill drawing #2073 · one segmented control #2078 `4903bead6` · pill weight 500 only and Inbound site switch #2080 `cfa0ae0dc` | /ui computed equal; menus and pop-ups by keyboard in production | Summary panel only on Outright; Batch B deployed procurement/PO object segmented tabs and initials 11/700, full object-tab interaction walk still owed |
+| Type to 01 §2 (by role) | Delivery, Warehouse, Stock + rail, caps labels, pills, side menu group word #2078 `4903bead6` · SO detail, Order Route, Delivery brief, reorder card, Purchasing, Receiving #2080 `cfa0ae0dc` | Production carres-check at 1025 · 1164 · 1440 on `4903bead6`: Delivery Orders, Delivery Monitor, Outbound, Inventory, SO Batch, Outright PASS; Inbound 2 findings (fixed in #2080). On `cfa0ae0dc`: Purchase Orders and Receiving PASS at 1025 · 1164 · 1440; Inbound PASS at 1440 and its Site switch ran off at 1025/1164 (wraps in #2081); Manual Purchase only the screen-reader `+` (#2081); SO page leftovers are field rows 33 vs 36, item rows 37 vs 44, model · spec on one line, its own items table (01 §5 order-line table owed) and initials 10/700 (#2081) | Batch B deployed remaining Operation, Finance, Principal, Supplier and HR type sites; six-page runtime measurement is in the Batch B row, other portal journeys still owed. Legacy old-orders is excluded; `sales-order-route.ts` text budget assumes 11px |
 | Sales Order (Outright) | page 1 #2066 · Monthly demand door #2075 · engine + approved capabilities #2079 `2a28f84d9` | Production 15 Oct on `2a28f84d9`: carres-check PASS at 1025 · 1164 · 1440, rows closed and open; header 40, rows 54, footer `31 orders · Qty: …`; Group by Payment Status (Unpaid 1 · Partially paid 26 · Paid in full 4); sort SO no. both ways; Stock view PO numbers are links; row menu View · Print · Cancel SO (not clicked); tick `Select SO-1371`; chevron `Show items`; opened-row frame 1px `#CBD0D6`, corners 8, items Item · Qty · Supplier; SO no. stays in view at the right end | Owner walk; short-toolbar decision; SO quick card has no entry point (§5) |
 | SO Batch Purchase | v12 look via the engine · one ⋮ · PO No comma fix · header 40 | Production PASS at 1025 · 1164 · 1440 (15 Oct) | Design brief A/B/C owner rulings (§5); D rejected; E reported (§6) |
 | Workspace | Round 3 + `+ Task` (#2044–#2055) | Production read-only 15 Oct: feed 206 items, UI 193 (13 future on-day deliveries), each destination opens the exact record, reload keeps the same ids and module counts | Signed-in owner walk |
-| Tasks | One feed `/api/operation/work?include=workspace`; no page writes tasks locally | Local replayed database 15 Oct (fixture users, nothing in production): internal task add → same id on retry → in the open feed (real `projectInternalTaskWork`: id `workspace:{task}:internal_task`, destination `/operation?tab=work&task=…`) → mark done on the same record (events added, done) → gone from the open feed; the Work ledger refuses completion except by the owning module's fact and needs a contact with a contact kind | Module task completion end to end: needs the Worker + PostgREST on a test database (no Docker here) or an owner-authorised TEST write in production |
+| Tasks | One feed `/api/operation/work?include=workspace`; no page writes tasks locally | Local replayed database 15 Oct (fixture users, nothing in production): internal task add → same id on retry → in the open feed (real `projectInternalTaskWork`: id `workspace:{task}:internal_task`, destination `/operation?tab=work&task=…`) → mark done on the same record (events added, done) → gone from the open feed; the Work ledger refuses completion except by the owning module's fact and needs a contact with a contact kind | Module task completion end to end: owner authorised the one SO-1254 TEST write; current source UI has no no-date answer entry (§4.2), so no write or closure is claimed |
 
 Engine decision (evidence 15 Oct 2026): `register/DataGrid` is the one listing engine; every list,
 Sales Order Outright included since #2079, passes `appearance="reference"`. `carres/CTable`, the
@@ -88,7 +96,7 @@ what moved, what an owner ruling replaced, and the kept `SalesOrderCompactView`)
 
 ## 4 · Remaining obligations, as delivery batches (controller 15 Oct: batch, no CI cycle per small fix)
 
-1. **Batch B · kit adoption finished on every reachable page (one release).** Three parts built in
+1. **Batch B · DELIVERED #2083 `7f4f7dd34`; requested six-page measurement pass complete.** Three parts built in
    parallel, merged into one branch, one CI, one deploy, one production check at 1025 · 1164 · 1440:
    (a) `build/kit-ops-finish` — remaining Operation pages by role (Delivery Order page, Delivery
    report/settings, Payment settings/templates, Movements, Calendar rail, timelines, Work right
@@ -97,11 +105,24 @@ what moved, what an owner ruling replaced, and the kept `SalesOrderCompactView`)
    (rows 44, model then spec) and field rows 36; (c) `build/kit-portals-type` — Finance, Principal,
    Supplier portal, HR and shared components by role. Excluded on purpose: the legacy old-orders page
    (not in the side menu; retires at go-live).
-2. **Batch C · Tasks end-to-end proof (functionality).** Still blocked on one owner yes: record the
-   customer's `not yet` answer on trial order SO-1254 through the Sales Order page and watch its open
+2. **Batch C · Tasks end-to-end proof (functionality).** Jess authorised this ONE TEST write in
+   `Deploy PR #2083 and verify UI` on 15 Oct 2026: record the
+   `not yet` test answer on trial order SO-1254 through the Sales Order page and watch its open
    `Ask for the delivery date` task (`orders:c1e95bf2-…:ask_delivery_date`, owner Alvin) leave the
    feed with a closure receipt. No test database exists here (no Docker or PostgREST); the internal
-   task path is already proven on a local replayed database.
+   task path is already proven on a local replayed database. No production test write has been
+   made. Preflight on `dabffcfc5`: the exact task is open in Team Work, owner Alvin; its door opens
+   the full SO page, which has no legacy `not yet` entry. Current `SalesOrderWorkspace.tsx`
+   only picks a real date and clears `delivery_date_tbd`; `ConfirmDateModal` was removed in
+   #1325 as unrendered. `POST /api/orders/:id/date` still exists (a real-date writer), as does the
+   Operation revision writer's `ask_delivery_date` completion middleware. Rechecked on deployed
+   `7f4f7dd34`: Request amendment → Edit Customer new delivery date offers only a real-date picker,
+   no no-date answer. No field changed; cancelled with zero changes. **REAL GAP:** Orders MASTER
+   retains legacy no-date work, while its 2026-09-26 edit ruling prohibits a TBD checkbox and says
+   a date changes only into another date. Reconcile a source-owned legacy answer door with that
+   restriction; do not silently reintroduce TBD for dated or new orders.
+   Do not bypass the page with a direct production write or report this TEST answer as real
+   customer communication. Owner authorisation is satisfied, runtime proof is not.
 3. **Batch D · SO Batch brief A/B/C.** Blocked on owner rulings (§5); then one release: group-row
    deadline, group status, Today card arithmetic.
 4. **Page adoption down the side menu** after Design's fix list per page; **Settings per module** at
@@ -153,8 +174,9 @@ Do not start Manual Purchase Request business work (Design review resumed 15 Oct
 
 - No order row is proven genuine business data (CLAUDE.md §6): `AutoCount Archive` imports,
   `rental`, test names (SO-1340, 1339, 1333, 1328), SKU `MEMORY-FOAM-PILLOW-asd`.
-- Access gap: the signed-in production login (Logistics · Carres HQ, Operations) cannot open Finance
-  lists; Finance pages are checked on fixtures and tests only. Not bypassed.
+- Access gap: the signed-in production login (Logistics · Carres HQ, Operations) cannot open Finance-only
+  lists. Shasha can open Payment Records (`/finance/payments`): 12 payments loaded and the three
+  widths passed on #2083. Other Finance-only pages remain fixtures/tests only. Not bypassed.
 - UNVERIFIED: PO review permissions; SO amendment writes; long product names on SO item rows;
   Design interactions not exercised. Never manufacture records, impersonate Jess, approve or issue
   a PO to test.
