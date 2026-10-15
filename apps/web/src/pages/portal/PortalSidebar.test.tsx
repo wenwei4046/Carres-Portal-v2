@@ -1274,12 +1274,12 @@ describe("PortalSidebar — the Purchasing drawers", () => {
     }
   });
 
-  it("the word is a LABEL rank — 10px semibold uppercase, never a destination", () => {
+  it("the word is a LABEL rank — 11 / 500 caps, never a destination", () => {
     renderAt("/operation?tab=purchase");
     const row = group_("purchasing-buy");
-    // 01 §4 group label: 10px / 600 / .08em caps, aligned with the page text.
-    expect(row.className).toContain("text-[10px]");
-    expect(row.className).toContain("font-semibold");
+    // 01 §2 caps label: 11 / 500 / .06em caps (never below 11), aligned with the page text.
+    expect(row.className).toContain("text-[11px]");
+    expect(row.className).toContain("font-medium");
     expect(row.className).toContain("uppercase");
     expect(row.getAttribute("href")).toBeNull();
   });

@@ -271,10 +271,10 @@
    * .label (line 37). Use .kicker for hero / section overlines (terracotta);
    * .label for form fields and KV labels (base-500). */
   .kicker {
-    @apply text-[11px] font-semibold uppercase tracking-[0.22em] text-primary;
+    @apply text-[11px] font-medium uppercase tracking-[0.06em] text-primary;
   }
   .label {
-    @apply text-[11px] font-semibold uppercase tracking-[0.1em] text-base-700;
+    @apply text-[11px] font-medium uppercase tracking-[0.06em] text-base-700;
   }
 
   /* Proto card surface — white fill + thin warm-grey hairline + 6px radius
@@ -323,7 +323,7 @@
    * (a 14px Lucide glyph sits inside the pill; `inline-flex gap` makes room).
    * Blue `.pill-sent` (scheduled) is a documented 4th STATUS tone — the only
    * blue that isn't selection. */
-  .pill           { @apply inline-flex items-center gap-[5px] text-[11.5px] font-semibold px-2.5 py-0.5 rounded-full border border-transparent; }
+  .pill           { @apply inline-flex items-center gap-[5px] text-[12px] font-medium px-2.5 py-0.5 rounded-full border border-transparent; }
   .pill svg       { width: 14px; height: 14px; }
   .pill-draft     { background:#F3E8FF; color:#6B21A8; }
   .pill-sent      { background:#D3E4FB; border-color:#A9C8F2; color:#1E40AF; } /* scheduled — blue (LEGACY: v4 blue = selection; realign per page) */
