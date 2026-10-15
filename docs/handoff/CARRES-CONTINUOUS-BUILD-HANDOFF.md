@@ -126,6 +126,8 @@ Current audit checkout moved externally from `kit-production-proof/Carres-Portal
 
 Control and file-recovery slice validation: common controls80 tests PASS; TaskFiles3 tests PASS; web application typecheck (`tsconfig.app.json`, session71824) exit0; design-standard no new violations, lint exit0 with8164 legacy warn-only findings. This does not prove complete Portal adoption or release readiness.
 
+Catalogue handover: `/ui` now shows an explicit Dimensions and usage section alongside existing colour, type, component and complete-page examples. It presents approved 01 targets for shell/panels/cards/tables/controls/fields/menus/focus/disabled and ownership, not measured implementation or a new rule. No test run or business-page expansion accompanies this display-only handover.
+
 **Owner clarification · 15 Oct:** the ONE Master Kit authority is established by UI MASTER +01/02/03 and its `/ui` catalogue. Pages must follow it now; unfinished page adoption, source-state checks or production verification do not put that standard back up for approval. No further TEST fixture expansion is required to hand over the established standard. The detailed matrix below/above remains the implementation evidence; do not collapse it into a misleading all-green claim.
 
 **Separate delivery outcomes:** kit documentation acceptance complete — NO (remaining kit gaps/decisions in the matrix; ONE authority already established);

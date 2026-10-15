@@ -484,12 +484,12 @@ export default function UiShowcase() {
       <header className="flex flex-col gap-1">
         <h1 className="text-page">Carres UI kit</h1>
         <p className="text-[13px] text-c-secondary">
-          One Carres kit, based on the approved Sales Order Outright design. These are actual shared components with TEST examples. Rules: docs/ui/MASTER.md.
+          One shared standard for every Carres page: colours, typography, dimensions, components and page compositions. Use these shared components; do not create a page-specific kit. Examples use TEST data. Rules: docs/ui/MASTER.md.
         </p>
       </header>
 
       <nav aria-label="Kit sections" className="grid grid-cols-3 gap-x-4 gap-y-1 sm:grid-cols-6 lg:grid-cols-9">
-        {[["colours", "Colours"], ["typography", "Typography"], ["table", "Tables"], ["cells", "Table cells"], ["order-lines", "Order lines"], ["pills", "Pills"], ["toolbar", "Toolbar"], ["side-panel", "Side panel"], ["icons", "Icons"], ["complete-pages", "Complete pages"], ["buttons", "Buttons"], ["fields", "Fields"], ["menus", "Menus"], ["tabs-kit", "Tabs"], ["dialogs", "Dialogs"], ["states", "States"], ["documents", "Documents"], ["task-parts", "Tasks"]].map(([id, label]) => (
+        {[["colours", "Colours"], ["typography", "Typography"], ["measurements", "Dimensions"], ["table", "Tables"], ["cells", "Table cells"], ["order-lines", "Order lines"], ["pills", "Pills"], ["toolbar", "Toolbar"], ["side-panel", "Side panel"], ["icons", "Icons"], ["complete-pages", "Complete pages"], ["buttons", "Buttons"], ["fields", "Fields"], ["menus", "Menus"], ["tabs-kit", "Tabs"], ["dialogs", "Dialogs"], ["states", "States"], ["documents", "Documents"], ["task-parts", "Tasks"]].map(([id, label]) => (
           <a key={id} href={`#${id}`} className="inline-flex min-h-11 items-center text-body text-c-secondary underline decoration-c-chip-border underline-offset-2">{label}</a>
         ))}
       </nav>
@@ -512,6 +512,30 @@ export default function UiShowcase() {
             <div key={label} className="flex min-w-0 flex-col gap-2 rounded-lg border border-c-card-border bg-c-card p-3">
               <span className="text-meta text-c-secondary">{label}</span>
               <span className={`${className} text-c-ink`} data-type-sample={label}>{sample}</span>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section id="measurements" title="Dimensions and usage" note="Approved targets from 01 §§2–5, in CSS pixels. These rules apply to every module; a module changes its content, not the shared design. Targets are distinct from whether every existing page has migrated.">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            ["Shell", "Navigation 220 open / 64 closed. Top bar 56. Toolbar 36, one line."],
+            ["Context panels", "Summary 264. Tasks 320; an open task may use spare width from viewport 1280."],
+            ["Cards", "Radius 8. Padding 14 × 16. Gap 12. White surface, 1px border, no shadow."],
+            ["Tables", "Header 40. Parent row 54. Item row minimum 44. Column width follows content; scrolling stays inside the table."],
+            ["Buttons", "Word 34; toolbar 32; panel 30; small 28. Main action 13/600, one per area. Other actions 13/500."],
+            ["Icons and targets", "Material Symbols Rounded. Icon-only glyph 20; word-button/menu glyph 18; chip glyph 16. Desktop target at least 32; mobile/partner 44."],
+            ["Fields", "Input 32. Search 34. Radius 8. Dates use a calendar. Read-only facts are text, not disabled fields."],
+            ["Menus", "Width 250. Padding 6. Radius 8. Item 32. Label 11/500 caps; item 13/400, selected 13/500."],
+            ["Selection and states", "Blue marks selection. Green means done. Amber means action needed. Missing, failed and no access remain separate states."],
+            ["Keyboard focus", "2px #3965FA, offset 2. Fields have no gap. Focus appears for keyboard navigation."],
+            ["Disabled", "Opacity 45%. No hover or click. Loading actions prevent a second submission."],
+            ["Ownership", "Shared components own appearance. COPY owns words. The module owns facts, permissions, actions and saved results."],
+          ].map(([label, value]) => (
+            <div key={label} className="flex min-w-0 flex-col gap-2 rounded-lg border border-c-card-border bg-c-card p-3">
+              <h3 className="text-body font-medium">{label}</h3>
+              <p className="text-meta text-c-secondary">{value}</p>
             </div>
           ))}
         </div>
