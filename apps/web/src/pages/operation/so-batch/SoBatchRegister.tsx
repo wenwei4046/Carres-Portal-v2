@@ -841,7 +841,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
      modules; this page holds its own facts only, so the others say
      `Coming soon` and cannot be chosen until their facts are read here. */
   const viewMenu = () => (
-    <CPopover label="SO Batch Purchase view" role="menu" width={236} open={viewOpen} onOpenChange={setViewOpen}
+    <CPopover label="SO Batch Purchase view" role="menu" open={viewOpen} onOpenChange={setViewOpen}
       trigger={
         <CViewButton data-testid="so-batch-view" icon={SO_BATCH_VIEWS[presentation].icon}
           name={SO_BATCH_VIEWS[presentation].label} open={viewOpen} />
