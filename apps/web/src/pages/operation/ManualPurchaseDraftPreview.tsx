@@ -62,7 +62,7 @@ export default function ManualPurchaseDraftPreview({
   return (
     <div className="mp-preview" data-testid="mp-create-preview">
       <div className="mp-preview-head">
-        <span className="text-label uppercase tracking-[0.08em] text-kit-slate-11">
+        <span className="text-label uppercase tracking-[0.06em] text-kit-slate-11">
           {MW.page}
         </span>
         <span className="mp-preview-draft" data-testid="mp-preview-draft">

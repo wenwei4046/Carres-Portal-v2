@@ -125,7 +125,7 @@ export function ReadyStockCell({
       <span className="min-w-0 flex-1">
         <span className="block tabular-nums">{counts.available}</span>
         {counts.reserved ? (
-          <span className="block text-label tabular-nums text-kit-slate-11">
+          <span className="block text-meta tabular-nums text-kit-slate-11">
             {counts.reserved}
           </span>
         ) : null}
@@ -286,19 +286,19 @@ export function ManualPurchaseStockFrame({
       data-testid={`mp-stock-frame-${line.demandId}`}
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-kit-slate-6 bg-kit-slate-2 px-2 py-1.5">
-        <span className="text-body font-semibold text-kit-slate-12">{MW.colReadyStock}</span>
-        <span className="text-label text-kit-slate-11">{line.item}</span>
+        <span className="text-body font-medium text-kit-slate-12">{MW.colReadyStock}</span>
+        <span className="text-meta text-kit-slate-11">{line.item}</span>
         {/* ⛔ THE ASK IS PRINTED AND IS NEVER REWRITTEN. Requested, saved and
             still-to-buy stand side by side so the arithmetic is readable
             rather than inferred from a number that quietly shrank. */}
-        <span className="text-label tabular-nums text-kit-slate-11">
+        <span className="text-meta tabular-nums text-kit-slate-11">
           {`Requested ${line.requestedQty} · ${line.reservedQty} reserved · ${line.remainingQty} to buy`}
         </span>
       </div>
 
       {blockWord ? (
         <p
-          className="border-b border-kit-slate-6 px-2 py-1.5 text-label text-kit-slate-11"
+          className="border-b border-kit-slate-6 px-2 py-1.5 text-meta text-kit-slate-11"
           data-testid={`mp-stock-block-${line.demandId}`}
         >
           {blockWord}
@@ -307,10 +307,10 @@ export function ManualPurchaseStockFrame({
 
       {refusal ? (
         <p
-          className="border-b border-kit-slate-6 bg-kit-amber-3 px-2 py-1.5 text-label"
+          className="border-b border-kit-slate-6 bg-kit-amber-3 px-2 py-1.5 text-meta"
           data-testid={`mp-stock-refusal-${line.demandId}`}
         >
-          <span className="block font-medium">{refusal.wrong}</span>
+          <span className="block text-body font-medium">{refusal.wrong}</span>
           <span className="block">{refusal.todo}</span>
           {/* Stated ONCE, for every refusal alike: the door is atomic. */}
           <span className="block">Nothing was saved.</span>
@@ -318,7 +318,7 @@ export function ManualPurchaseStockFrame({
       ) : null}
 
       {rows.length === 0 ? (
-        <p className="px-2 py-2 text-label text-kit-slate-11">{MW.stockNoneMatches}</p>
+        <p className="px-2 py-2 text-meta text-kit-slate-11">{MW.stockNoneMatches}</p>
       ) : (
         <ReadyStockTable
           layout="picker"
@@ -352,16 +352,16 @@ export function ManualPurchaseStockFrame({
 
       {canChoose && rows.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2 border-t border-kit-slate-6 px-2 py-1.5">
-          <span className="text-label text-kit-slate-11" data-testid={`mp-stock-count-${line.demandId}`}>
+          <span className="text-body font-semibold text-kit-slate-12" data-testid={`mp-stock-count-${line.demandId}`}>
             {`${chosenCount} selected`}
           </span>
           {/* ⚠️ `Not saved` IS THE WHOLE POINT OF THE DRAFT STATE. A tick that
               looks committed and is not is the defect this word exists to
               prevent, and the same fact blocks Issue PO upstairs. */}
           {changed ? (
-            <span className="text-label font-medium text-kit-amber-11">{MW.stockNotSaved}</span>
+            <span className="text-meta font-medium text-kit-amber-11">{MW.stockNotSaved}</span>
           ) : saved0k ? (
-            <span className="text-label text-kit-slate-11">{MW.stockSaved}</span>
+            <span className="text-meta text-kit-slate-11">{MW.stockSaved}</span>
           ) : null}
           {/* ⚠️ THE CONTROLS SIT BESIDE THE COUNTS, NOT AT THE FAR RIGHT.
               Found on the rendered walk (2026-09-18): the frame is as wide as

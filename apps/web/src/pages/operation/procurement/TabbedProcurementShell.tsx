@@ -113,8 +113,8 @@ export default function TabbedProcurementShell() {
                   "relative px-4 py-3 text-body font-body transition-colors whitespace-nowrap",
                   "border-b-2 -mb-px",
                   isActive
-                    ? "border-accent text-base-900 font-semibold"
-                    : "border-transparent text-base-600 font-medium hover:text-base-900",
+                    ? "border-accent text-base-900 font-medium"
+                    : "border-transparent text-base-600 font-normal hover:text-base-900",
                 ].join(" ")
               }
             >

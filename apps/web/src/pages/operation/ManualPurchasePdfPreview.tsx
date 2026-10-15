@@ -66,7 +66,7 @@ export default function ManualPurchasePdfPreview({ drafts }: { drafts: readonly 
         return (
           <section key={d.key} className="flex min-h-[640px] flex-1 flex-col gap-1" data-testid={`mp-draft-po-${i}`}>
             {drafts.length > 1 ? (
-              <p className="shrink-0 text-meta font-semibold text-kit-slate-12">
+              <p className="shrink-0 text-body font-medium text-kit-slate-12">
                 {poIndexLabel(i + 1, drafts.length)} · {d.supplierName}
               </p>
             ) : null}

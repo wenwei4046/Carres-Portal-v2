@@ -121,7 +121,7 @@ export default function DestinationAllocationEditor({
             type="button"
             /* A grey text button, the height of the select beside it (01 §3
                buttons; owner 13 Oct 2026): never loose blue text. */
-            className="inline-flex h-7 shrink-0 items-center rounded-control px-2 text-meta font-medium text-c-tab hover:bg-c-hover focus-visible:[outline:var(--c-focus)]"
+            className="inline-flex h-7 shrink-0 items-center rounded-control px-2 text-body font-medium text-c-tab hover:bg-c-hover focus-visible:[outline:var(--c-focus)]"
             data-testid={`so-batch-split-${row.id}`}
             onClick={(e) => {
               e.stopPropagation();
@@ -173,7 +173,7 @@ export default function DestinationAllocationEditor({
           ) : null}
           <button
             type="button"
-            className="mt-0.5 inline-flex h-6 items-center justify-center rounded-control bg-kit-blue-9 px-2 text-meta font-medium text-white disabled:bg-kit-slate-6"
+            className="mt-0.5 inline-flex h-6 items-center justify-center rounded-control bg-kit-blue-9 px-2 text-body font-medium text-white disabled:bg-kit-slate-6"
             data-testid={`so-batch-split-apply-${row.id}`}
             disabled={!check.ok}
             onClick={apply}

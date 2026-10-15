@@ -422,7 +422,7 @@ function OwnerBadge({
       data-owner-duty="PO Duty"
       title={`${label} · PO Duty`}
     >
-      <span className="inline-flex size-6 items-center justify-center rounded-full bg-kit-blue-3 text-[10px] font-semibold text-kit-blue-11">
+      <span className="inline-flex size-6 items-center justify-center rounded-full bg-kit-blue-3 text-label font-bold text-kit-blue-11">
         {initials}
       </span>
       <span className="sr-only">{label} · PO Duty</span>
@@ -741,7 +741,7 @@ export default function PurchaseOrdersPage() {
   const openReceipt = (receiptId: string) =>
     navigate(`/operation?tab=receiving&session=${encodeURIComponent(receiptId)}`);
   const link = "text-left font-medium text-kit-blue-11 underline-offset-2 hover:underline";
-  const supporting = "text-[11px] leading-4 text-kit-slate-11";
+  const supporting = "text-meta text-kit-slate-11";
 
   /**
    * ⭐ THE ELEVEN COLUMNS, EXACTLY (Purchasing MASTER §9.3, Jess 2026-09-18):
@@ -1314,11 +1314,11 @@ export default function PurchaseOrdersPage() {
                     <Button size="touch" variant="ghost" onClick={() => openObject(row)}>View</Button>
                   </div>}>
                     <dl className="grid min-w-0 grid-cols-2 gap-3 text-body">
-                      <div><dt className="text-label text-kit-slate-11">Supplier</dt><dd>{row.supplierName}</dd></div>
-                      <div><dt className="text-label text-kit-slate-11">PO Doc Date</dt><dd>{row.poDate ? fmtDate(row.poDate) : "Not recorded"}</dd></div>
-                      <div><dt className="text-label text-kit-slate-11">Supplier Deliver To</dt><dd>{row.deliverTo}</dd></div>
-                      <div><dt className="text-label text-kit-slate-11">PO Version</dt><dd>{versionLine(row)}</dd></div>
-                      <div className="col-span-2"><dt className="text-label text-kit-slate-11">Items</dt><dd className="break-words">{itemsSummary(row.items)}</dd></div>
+                      <div><dt className="text-meta text-kit-slate-11">Supplier</dt><dd>{row.supplierName}</dd></div>
+                      <div><dt className="text-meta text-kit-slate-11">PO Doc Date</dt><dd>{row.poDate ? fmtDate(row.poDate) : "Not recorded"}</dd></div>
+                      <div><dt className="text-meta text-kit-slate-11">Supplier Deliver To</dt><dd>{row.deliverTo}</dd></div>
+                      <div><dt className="text-meta text-kit-slate-11">PO Version</dt><dd>{versionLine(row)}</dd></div>
+                      <div className="col-span-2"><dt className="text-meta text-kit-slate-11">Items</dt><dd className="break-words">{itemsSummary(row.items)}</dd></div>
                     </dl>
                   </Block>
                 </div>)}
@@ -1430,9 +1430,9 @@ function ReceiptsDialog({
         <table className="w-full text-left text-body" aria-label={`Receipts on ${row.id}`}>
           <thead className="border-b border-kit-slate-5 bg-kit-slate-3">
             <tr>
-              <th scope="col" className="px-2 py-1.5 text-label font-semibold text-kit-slate-11">Goods Received Date</th>
-              <th scope="col" className="px-2 py-1.5 text-label font-semibold text-kit-slate-11">GRN No</th>
-              <th scope="col" className="px-2 py-1.5 text-label font-semibold text-kit-slate-11">Received Qty</th>
+              <th scope="col" className="px-2 py-1.5 text-meta font-medium text-kit-slate-11">Goods Received Date</th>
+              <th scope="col" className="px-2 py-1.5 text-meta font-medium text-kit-slate-11">GRN No</th>
+              <th scope="col" className="px-2 py-1.5 text-meta font-medium text-kit-slate-11">Received Qty</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-kit-slate-5">
@@ -1443,7 +1443,7 @@ function ReceiptsDialog({
                     <span className="tabular-nums">
                       {receipt.receivedOn ? fmtDate(receipt.receivedOn) : <Absence />}
                     </span>
-                    <span className="text-[11px] leading-4 text-kit-slate-11">Time not recorded</span>
+                    <span className="text-meta text-kit-slate-11">Time not recorded</span>
                   </span>
                 </td>
                 <td className="px-2 py-1.5 align-top">
@@ -1714,7 +1714,7 @@ function PurchaseOrderObject({
                 telling them to escalate a HEALTHY refusal, which teaches a team
                 to distrust the page's error strip. */}
             {cancelled ? null : (
-              <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-control border border-kit-slate-5 px-3 text-meta" onClick={() => {
+              <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-control border border-kit-slate-5 px-3 text-body font-medium" onClick={() => {
                 setPdfProblem(null);
                 setPdfAction(null);
                 void downloadOfficialPdf(po.id).catch((e: unknown) => {
@@ -1746,7 +1746,7 @@ function PurchaseOrderObject({
               <CMenu
                 label="Edit purchase order"
                 trigger={
-                  <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-control border border-kit-slate-5 px-3 text-meta font-medium" data-testid="po-object-edit">
+                  <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-control border border-kit-slate-5 px-3 text-body font-medium" data-testid="po-object-edit">
                     Edit <ChevronDown size={14} />
                   </button>
                 }
@@ -1771,7 +1771,7 @@ function PurchaseOrderObject({
             <button
               key={item}
               type="button"
-              className={`h-8 border-b-2 px-3 text-meta font-medium ${view === item ? "border-kit-blue-9 text-kit-blue-11" : "border-transparent text-kit-slate-11 hover:text-kit-slate-12"}`}
+              className={`h-8 border-b-2 px-3 text-body ${view === item ? "font-medium border-kit-blue-9 text-kit-blue-11" : "border-transparent text-kit-slate-11 hover:text-kit-slate-12"}`}
               onClick={() => { setView(item); setMode("read"); }}
             >
               {item}
@@ -1799,7 +1799,7 @@ function PurchaseOrderObject({
             <section className="min-w-0 border border-kit-slate-5 bg-white p-4">
               <div className="mb-3 flex items-center justify-between border-b border-kit-slate-5 pb-3">
                 <div>
-                  <h2 className="text-body font-semibold">{mode === "issue" ? "Issue purchase order" : mode === "deliverTo" ? "Change Deliver To" : "Revise purchase order"}</h2>
+                  <h2 className="text-strong">{mode === "issue" ? "Issue purchase order" : mode === "deliverTo" ? "Change Deliver To" : "Revise purchase order"}</h2>
                   <p className="text-meta text-kit-slate-11">Check the official document beside these fields before you finish.</p>
                 </div>
                 <button type="button" aria-label="Close document work" onClick={() => setMode("read")}><X size={16} /></button>
@@ -1906,7 +1906,7 @@ function PurchaseOrderObject({
                 action: (
                   <button
                     type="button"
-                    className="inline-flex h-7 items-center gap-1.5 rounded-control border border-kit-slate-5 px-2 text-meta"
+                    className="inline-flex h-7 items-center gap-1.5 rounded-control border border-kit-slate-5 px-2 text-body font-medium"
                     data-testid={`po-sent-version-pdf-${sentVersion}`}
                     onClick={() => void downloadKeptPdf(po.id, sentVersion).catch((e: unknown) => {
                       const body = (e as { body?: { message?: string } }).body;
@@ -1983,7 +1983,7 @@ function CurrentAction({ row, owner, onIssue }: { row: RegisterRow; owner: { use
             <div className="text-meta text-kit-slate-11">{action}</div>
           </div>
           {onIssue ? (
-            <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white" onClick={onIssue} data-testid="po-object-primary">
+            <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-control bg-kit-blue-9 px-3 text-body font-semibold text-white" onClick={onIssue} data-testid="po-object-primary">
               <FileCheck2 size={14} /> Issue current PDF
             </button>
           ) : null}
@@ -2212,11 +2212,11 @@ function ConnectionRow({ primary, secondary }: { primary: string; secondary: str
 }
 
 function RecordList({ title, empty, rows, problem, action, onRetry }: { title: string; empty: string; rows: Array<{ id: string; title: string; meta: string; detail?: string; action?: React.ReactNode }>; problem?: string | null; action?: string; onRetry?: () => void }) {
-  return <div className="mx-auto w-full max-w-[980px]"><Block title={title}><div className="divide-y divide-kit-slate-4">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : rows.length ? rows.map((row) => <article key={row.id} className="py-3"><div className="text-body font-semibold text-kit-slate-12">{row.title}</div><div className="mt-0.5 text-meta text-kit-slate-11">{row.meta}</div>{row.detail ? <div className="mt-1 text-body text-kit-slate-11">{row.detail}</div> : null}{row.action ? <div className="mt-1">{row.action}</div> : null}</article>) : <Absence>{empty}</Absence>}</div></Block></div>;
+  return <div className="mx-auto w-full max-w-[980px]"><Block title={title}><div className="divide-y divide-kit-slate-4">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : rows.length ? rows.map((row) => <article key={row.id} className="py-3"><div className="text-body font-medium text-kit-slate-12">{row.title}</div><div className="mt-0.5 text-meta text-kit-slate-11">{row.meta}</div>{row.detail ? <div className="mt-1 text-body text-kit-slate-11">{row.detail}</div> : null}{row.action ? <div className="mt-1">{row.action}</div> : null}</article>) : <Absence>{empty}</Absence>}</div></Block></div>;
 }
 
 function ReadProblem({ problem, action, onRetry }: { problem: string; action: string; onRetry?: () => void }) {
-  return <div className="bg-kit-red-3 px-3 py-2"><div className="text-meta font-semibold text-kit-red-11">{problem}</div><div className="text-meta text-kit-slate-11">{action}</div>{onRetry ? <button type="button" className="mt-2 h-7 rounded-control border border-kit-red-9 bg-white px-2 text-meta font-medium text-kit-red-11" onClick={onRetry}>Try again</button> : null}</div>;
+  return <div className="bg-kit-red-3 px-3 py-2"><div className="text-body font-medium text-kit-red-11">{problem}</div><div className="text-meta text-kit-slate-11">{action}</div>{onRetry ? <button type="button" className="mt-2 h-7 rounded-control border border-kit-red-9 bg-white px-2 text-body font-medium text-kit-red-11" onClick={onRetry}>Try again</button> : null}</div>;
 }
 
 function OrderRoute({ row, receiving, claims, receivingLoading, claimsLoading, receivingError, claimsError, onRetryReceiving, onRetryClaims }: {
@@ -2241,11 +2241,11 @@ function OrderRoute({ row, receiving, claims, receivingLoading, claimsLoading, r
  *  summarised: the Source node names every SO and MPR behind this PO, each
  *  one a door (MASTER §9.3, "individually reachable"). */
 function RouteNode({ title, main, detail, children }: { title: string; main: string; detail: string; children?: ReactNode }) {
-  return <div className="border-l-2 border-kit-blue-9 bg-kit-slate-3 p-3"><div className="text-label text-kit-slate-11">{title}</div><div className="mt-1 text-body font-semibold text-kit-slate-12">{main}</div>{detail ? <div className="mt-1 text-meta text-kit-slate-11">{detail}</div> : null}{children ? <div className="mt-1 space-y-0.5">{children}</div> : null}</div>;
+  return <div className="border-l-2 border-kit-blue-9 bg-kit-slate-3 p-3"><div className="text-meta text-kit-slate-11">{title}</div><div className="mt-1 text-body font-medium text-kit-slate-12">{main}</div>{detail ? <div className="mt-1 text-meta text-kit-slate-11">{detail}</div> : null}{children ? <div className="mt-1 space-y-0.5">{children}</div> : null}</div>;
 }
 
 function RouteProblem({ title, problem, action, onRetry }: { title: string; problem: string; action: string; onRetry: () => void }) {
-  return <div className="border-l-2 border-kit-red-9 bg-kit-red-3 p-3"><div className="text-label text-kit-slate-11">{title}</div><ReadProblem problem={problem} action={action} onRetry={onRetry} /></div>;
+  return <div className="border-l-2 border-kit-red-9 bg-kit-red-3 p-3"><div className="text-meta text-kit-slate-11">{title}</div><ReadProblem problem={problem} action={action} onRetry={onRetry} /></div>;
 }
 
 function OfficialPreview({ poId }: { poId: string }) {
@@ -2324,6 +2324,6 @@ function RevisionForm({
     const pickerDestinations = activeDestinations.some((destination) => destination.id === currentDestinationId) || !currentDestination
       ? activeDestinations
       : [currentDestination, ...activeDestinations];
-    return <div key={line.id} className="grid grid-cols-1 gap-2 border-b border-kit-slate-4 pb-3 sm:grid-cols-[minmax(0,1fr)_88px_minmax(150px,0.8fr)]"><div><div className="text-body font-semibold">{line.model_name ?? line.sku}</div><div className="text-meta text-kit-slate-11">{line.sku} · {line.received_qty} received</div></div><label className="text-meta text-kit-slate-11">Qty<input aria-label={`Qty for ${line.sku}`} type="number" min={Math.max(1, line.received_qty)} value={value} className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 px-2 text-right" onChange={(event) => setDraft((current) => ({ ...current, [line.id]: event.target.value }))} /></label><label className="text-meta text-kit-slate-11">Deliver To<select aria-label={`Deliver To for ${line.sku}`} value={destinationDraft[line.id] ?? currentDestinationId} className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2" onChange={(event) => setDestinationDraft((current) => ({ ...current, [line.id]: event.target.value }))}>{currentDestinationId ? null : <option value="" disabled>Not recorded</option>}{pickerDestinations.map((destination) => { const closed = !activeDestinations.some((active) => active.id === destination.id); return <option key={destination.id} value={destination.id} disabled={closed}>{destination.name}{closed ? " (closed)" : ""}</option>; })}</select></label></div>;
-  })}</div><label className="mt-4 block text-meta text-kit-slate-11">Why<input className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 px-2" value={reason} onChange={(event) => setReason(event.target.value)} /></label>{gap ? <div className="mt-3"><div className="text-meta text-kit-red-11">{gap}</div><div className="text-meta text-kit-slate-11">{action}</div></div> : null}{error ? <div className="mt-3"><div className="text-meta text-kit-red-11">The revision could not be saved</div><div className="text-meta text-kit-slate-11">{error}</div></div> : null}<div className="mt-4 flex justify-end gap-2"><button type="button" className="h-8 rounded-control border border-kit-slate-5 px-3 text-meta" onClick={onCancel}>Cancel</button><button type="button" disabled={!!gap || save.isPending} className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white disabled:bg-kit-slate-6" onClick={() => { if (gap) return; setError(null); save.mutate({ reason: reason.trim(), lines: changes }, { onSuccess: onSaved, onError: (cause) => setError(cause instanceof Error ? cause.message : String(cause)) }); }}>{save.isPending ? "Saving…" : `Save PO V${(po.version ?? 1) + 1}`}</button></div></div>;
+    return <div key={line.id} className="grid grid-cols-1 gap-2 border-b border-kit-slate-4 pb-3 sm:grid-cols-[minmax(0,1fr)_88px_minmax(150px,0.8fr)]"><div><div className="text-body">{line.model_name ?? line.sku}</div><div className="text-meta text-kit-slate-11">{line.sku} · {line.received_qty} received</div></div><label className="text-meta text-kit-slate-11">Qty<input aria-label={`Qty for ${line.sku}`} type="number" min={Math.max(1, line.received_qty)} value={value} className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 px-2 text-right" onChange={(event) => setDraft((current) => ({ ...current, [line.id]: event.target.value }))} /></label><label className="text-meta text-kit-slate-11">Deliver To<select aria-label={`Deliver To for ${line.sku}`} value={destinationDraft[line.id] ?? currentDestinationId} className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 bg-white px-2" onChange={(event) => setDestinationDraft((current) => ({ ...current, [line.id]: event.target.value }))}>{currentDestinationId ? null : <option value="" disabled>Not recorded</option>}{pickerDestinations.map((destination) => { const closed = !activeDestinations.some((active) => active.id === destination.id); return <option key={destination.id} value={destination.id} disabled={closed}>{destination.name}{closed ? " (closed)" : ""}</option>; })}</select></label></div>;
+  })}</div><label className="mt-4 block text-meta text-kit-slate-11">Why<input className="mt-1 h-8 w-full rounded-control border border-kit-slate-5 px-2" value={reason} onChange={(event) => setReason(event.target.value)} /></label>{gap ? <div className="mt-3"><div className="text-meta text-kit-red-11">{gap}</div><div className="text-meta text-kit-slate-11">{action}</div></div> : null}{error ? <div className="mt-3"><div className="text-meta text-kit-red-11">The revision could not be saved</div><div className="text-meta text-kit-slate-11">{error}</div></div> : null}<div className="mt-4 flex justify-end gap-2"><button type="button" className="h-8 rounded-control border border-kit-slate-5 px-3 text-body font-medium" onClick={onCancel}>Cancel</button><button type="button" disabled={!!gap || save.isPending} className="h-8 rounded-control bg-kit-blue-9 px-3 text-body font-semibold text-white disabled:bg-kit-slate-6" onClick={() => { if (gap) return; setError(null); save.mutate({ reason: reason.trim(), lines: changes }, { onSuccess: onSaved, onError: (cause) => setError(cause instanceof Error ? cause.message : String(cause)) }); }}>{save.isPending ? "Saving…" : `Save PO V${(po.version ?? 1) + 1}`}</button></div></div>;
 }
