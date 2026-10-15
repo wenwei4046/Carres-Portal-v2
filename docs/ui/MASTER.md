@@ -23,7 +23,7 @@
 
 ## Start here · the one Master UI Kit
 
-- **New chat: execute, do not guess.** Read 01 §7's filled measurement checklist and this MASTER §2.2's UX contract before touching UI. For the parts being built, name the approved value, trigger, existing component and `/ui` example. Mark CONFORMS / DEVIATION / NOT APPLICABLE in the existing handoff; a missing value is UNRESOLVED, never an implementation value promoted to law. Do not create another guide or tracker.
+- **New chat: execute, do not guess.** Read this MASTER's [filled measurement checklist](#kit-measurements) and this MASTER §2.2's UX contract before touching UI. For the parts being built, name the approved value, trigger, existing component and `/ui` example. Mark CONFORMS / DEVIATION / NOT APPLICABLE in the existing handoff; a missing value is UNRESOLVED, never an implementation value promoted to law. Do not create another guide or tracker.
 - **Rules:** this MASTER: values → components → page compositions; COPY and module MASTERs keep business ownership.
 - **Practical reference:** the approved Sales Order Outright v12 direction, improved in existing shared components; no fresh redesign or second kit.
 - **Local catalogue:** `/ui`, implemented by `apps/web/src/pages/dev/UiShowcase.tsx`. The coordinated developer serves it at `http://127.0.0.1:5415/ui`; an address is a local session entry, not permanent hosting or proof of acceptance.
@@ -73,7 +73,7 @@ retirement and authenticated verification remain separate deliverables.
 
 ---
 
-**One home per thing — this MASTER links, it never copies:**
+**One rule document — internal parts and external business authorities:**
 
 | Thing | Its one home |
 |---|---|
@@ -636,7 +636,7 @@ Never copy reference HTML or CSS into a page; never draw a lookalike panel.
   editors, DO conditions, Items, Communication, Timeline, the SO document preview, the dark Header
   colour, the original requested-date day count, the adapters and the reference differences) live
   **once** in [`MODULE-CARD-TEMPLATE.md`](../ui-reference/MODULE-CARD-TEMPLATE.md). Its numbers live in
-  [01 §7.6](../01-design-tokens.md#76-compact-module-card--compactmodulecard); its words in
+  [01 §7.6](#kit-values); its words in
   COPY-STANDARD "Compact module card words" (`CARD_WORDS`). It is not on `/ui` until its page's turn (one kit, 14 Oct 2026).
 - **Sales fact word — UI Master approved 2026-10-06 (owner ruling: two dates, two names).** The
   card's planned-date fact (`orders.proceed_date`) and its `{n}d` tooltip say **`Planned production
@@ -1639,7 +1639,7 @@ For every used row, record **CONFORMS / DEVIATION / NOT APPLICABLE** in the exis
 | Toast | Bottom centre; #1F2937/white; text13 | Ordinary2.2–2.6s; task close12s; no timed Undo | kit/Toast.tsx |
 | Avatar | Round; header24 | Fixed colour per person; accessible name/tooltip | Shared generic Avatar remains KIT GAP in02 |
 | Ordinary dialog geometry | ENGINEERING DEFAULT, retained from existing implementation: standard512, wide600, viewer880; max-height85vh; body padding16; header/footer14×16; footer gap8 | Existing Modal width union; not new owner approval; task-review and compact-card preserve their distinct full-surface/padding contracts | kit/Modal.tsx; kit/DialogFrame.tsx; tailwind.config.ts |
-| Surface geometry still unresolved | Owner acceptance of ordinary dialog variants; full cross-family z-layer contract | Existing implementation is available above; do not describe it as approved merely because it exists | Owning component contract, reviewed through this same kit |
+| Surface geometry still unresolved | Ordinary dialog variants retained as the common engineering baseline; full cross-family z-layer contract remains to be enumerated | Existing implementation is available above; do not describe it as approved merely because it exists | Owning component contract, reviewed through this same kit |
 
 ### 7.4 Goods tables
 
@@ -1666,7 +1666,7 @@ For every used row, record **CONFORMS / DEVIATION / NOT APPLICABLE** in the exis
 | Summary strip | Equal columns; label12; label/value gap6; value13/500 | Long value wraps within own column | Existing module summary composition |
 | Read-only | Plain facts; Not recorded #6B7280 | No fabricated zero/false or disabled input | Existing shared fact renderer |
 | Narrow | No page side-scroll; touch44; contained table scroll; cards stack without losing facts | Trigger must name viewport OR available canvas explicitly | Shared host + owning component |
-| Role line heights | ENGINEERING DEFAULT, retained from existing implementation: page20/28; card15/22; breadcrumb14/20; body13/18; label12/16; caps11/14 | From tailwind.config.ts fontSize; size/weight approved in §2, these full line-height assignments still require acceptance | Shared text-page/strong/control/body/meta/label roles |
+| Role line heights | ENGINEERING DEFAULT, retained from existing implementation: page20/28; card15/22; breadcrumb14/20; body13/18; label12/16; caps11/14 | Retained common engineering baseline under the owner15Oct delegation; approved size/weight roles stay unchanged; later visual correction updates this same role | Shared text-page/strong/control/body/meta/label roles |
 | Field padding and multiline | ENGINEERING DEFAULT, retained from existing implementation: single-line horizontal10; search12; textarea horizontal10/vertical6, default3 rows, resize-y; mobile min-height44 | Textarea uses rows, not a caller height. Not a new approved fixed-height value | kit/field-recipe.ts; kit/Textarea.tsx |
 | Remaining unspecified dimensions | UNRESOLVED: component min/max and exact breakpoints not stated above | No fallback to guessed numbers; name the current component behaviour as MEASURED when relevant | Owning shared component contract |
 
@@ -1804,8 +1804,8 @@ This table records the boundary between specimen proposals and adopted module be
 | Component family | Existing home / adapter | Current contract |
 |---|---|---|
 | Page shell and header | PageShell, GlobalTopBar, ModuleHeader | Conditional navigation/summary/tasks regions; current shell tokens |
-| Navigation | PortalSidebar and portal-nav | Selected item is a white pill with theme text at 500; authorised module tree; scroll without shrinking rows |
-| Register | components/register/DataGrid | Current two-line minimum row; shared sort/filter/resize/select/group/expand capabilities |
+| Navigation | PortalSidebar and portal-nav | Current module/page600 in theme colour on selected pill; resting module500/page400; authorised tree; long names wrap; scroll without shrinking rows |
+| Register | components/register/DataGrid | Header40, parent/group54; cell lines do not wrap; identifier/customer subtitle follows the explicit second-line exception; shared sort/filter/resize/select/group/expand capabilities |
 | Bounded / goods tables | DataTable, DocumentTable, GoodsMiniTable | Shared tokens; preserve source-specific quantities and connected records |
 | Object header / tabs | Existing module object adapters and Tabs | Identity, status, owner, authorised actions, module-specific views |
 | Card / sections | Block, SectionHeader, CompactModuleCard | Light bordered surface, plain facts, headings; no alternate module palette |
