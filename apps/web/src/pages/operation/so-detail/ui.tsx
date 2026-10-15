@@ -271,7 +271,7 @@ export function Avatar({ person, size = 24, ring = true }: { person: Person; siz
     <span
       title={tip}
       aria-label={tip}
-      className={`grid shrink-0 place-items-center rounded-full text-[10px] font-bold ${ring ? "border-2 border-white" : ""}`}
+      className={`grid shrink-0 place-items-center rounded-full text-[11px] font-bold leading-none ${ring ? "border-2 border-white" : ""}`}
       style={{ width: size, height: size, background: colors.bg, color: colors.fg }}
     >
       {personInitials(person.name, person.email ?? "")}

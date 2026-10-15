@@ -570,8 +570,10 @@ describe("the register — one request per row (card §7)", () => {
   it("`+ Manual Purchase Request` is the page's create door — COPY-STANDARD's own word", async () => {
     await loaded();
     const btn = screen.getByTestId("manual-purchase-new-request");
-    expect(btn).toHaveTextContent("+ Manual Purchase Request");
-    expect(btn).toHaveTextContent(MW.newRequest);
+    /* The + is the drawn icon; the COPY word is the button's name. */
+    expect(btn).toHaveAccessibleName("+ Manual Purchase Request");
+    expect(btn).toHaveAccessibleName(MW.newRequest);
+    expect(btn).toHaveTextContent("Manual Purchase Request");
   });
 
   it("Purpose is NOT a parent column (Card 04); a retired word survives on the object", async () => {
