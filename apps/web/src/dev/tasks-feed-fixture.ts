@@ -10,7 +10,7 @@
  */
 import { addWorkingDays, internalTaskOccurrenceId, internalTaskResultReference, myHolidaySet, projectInternalTaskWork, type InternalTask, type OperationWorkCompleted, type OperationWorkItem, type OperationWorkModule, type OperationWorkResponse } from "@carres/shared";
 import { appTodayIso } from "@/lib/fmt-date";
-import type { operationOrderListRow } from "@/lib/queries";
+import type { operationOrderDetailResponse, operationOrderListRow } from "@/lib/queries";
 import type { SupplierPoFact, LogisticsCardFacts } from "@carres/shared";
 import type { PoTemplateData, SalesOrderTemplateData } from "@/lib/pdf/types";
 
@@ -294,4 +294,22 @@ export function testTaskSupplierFacts(orderId: string): { purchaseOrders: Suppli
 export function testTaskLogisticsFacts(orderId: string): LogisticsCardFacts | null {
   if (!testTaskSalesOrderDocument(orderId)) return null;
   return { partner: null, routes: [], link: null, lastRevokedAt: null, detailsReceivedAt: null, answer: null, history: [] };
+}
+
+/** Opening a linked order never falls through to the root SO1319 fixture. */
+export function testTaskOrderDetail(orderId: string): operationOrderDetailResponse | null {
+  const row = testTaskOrderRows().find((order) => order.id === orderId);
+  const doc = testTaskSalesOrderDocument(orderId);
+  if (!row || !doc) return null;
+  return {
+    order: {
+      ...row, customer_phone: doc.customer.phone, customer_address: doc.customer.address,
+      customer_address_unknown: false, customer_billing_same: true,
+      source_ref: null, source_system: "native", delivery_date_tbd: false,
+      do_note: null, delivery_stops: null, invoice_no: null, invoiced_at: null,
+      paid: doc.paid, outlets: null,
+    },
+    lines: doc.lines.map((line, index) => ({ ...line, id: `${orderId}-line-${index + 1}`, label: line.description, source_po: null })),
+    addons: [], total: doc.total, warehouse: null, stockBalances: [], freeUnits: [], pos: [], history: [], threads: [],
+  };
 }

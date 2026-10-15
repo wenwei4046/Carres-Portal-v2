@@ -19,7 +19,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import OperationApp from "@/pages/operation/OperationApp";
-import { testTaskOrderRows, testTaskSupplierFacts, testTaskLogisticsFacts, testTaskSalesOrderDocument, testInternalTask, testTaskPoDocument, testTaskPo, testTaskSuppliers, testTasksFeed } from "./tasks-feed-fixture";
+import { testTaskOrderDetail, testTaskOrderRows, testTaskSupplierFacts, testTaskLogisticsFacts, testTaskSalesOrderDocument, testInternalTask, testTaskPoDocument, testTaskPo, testTaskSuppliers, testTasksFeed } from "./tasks-feed-fixture";
 import "@/index.css";
 
 const STATE = new URLSearchParams(window.location.search).get("state") ?? "full";
@@ -124,6 +124,12 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   }
   if (path === "/api/operation/orders" && !new URL(url, window.location.href).searchParams.has("count")) {
     return json({ orders: testTaskOrderRows(), nextCursor: null });
+  }
+  if (requestedOrder && testTaskSalesOrderDocument(requestedOrder)) {
+    const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+    if (method !== "GET") return json({ error: "TEST fixture: linked Sales Orders are read-only" }, 405);
+    if (/^\/api\/operation\/orders\/[^/]+$/.test(path)) return json(testTaskOrderDetail(requestedOrder));
+    if (path.endsWith("/payments")) return json({ payments: [] });
   }
   if (requestedOrder && testTaskSalesOrderDocument(requestedOrder) && path.endsWith("/loan-offers")) return json({ offers: [] });
   if (requestedOrder && path.endsWith("/sales-order-data")) {

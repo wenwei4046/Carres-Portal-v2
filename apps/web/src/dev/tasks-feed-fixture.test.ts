@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { testTaskOrderRows, testTaskSupplierFacts, testTaskLogisticsFacts, testTaskSalesOrderDocument, testTaskPo, testTaskPoDocument, testTaskSuppliers } from "./tasks-feed-fixture";
+import { testTaskOrderDetail, testTaskOrderRows, testTaskSupplierFacts, testTaskLogisticsFacts, testTaskSalesOrderDocument, testTaskPo, testTaskPoDocument, testTaskSuppliers } from "./tasks-feed-fixture";
 
 describe("known TEST Purchase Order document reads", () => {
   it.each(["PO-261001-9001", "PO-260925-9002", "PO-261006-9003", "PO-261008-9008"])("keeps %s identity, version, supplier and ordered quantities", (id) => {
@@ -60,5 +60,23 @@ describe("owning Route source fixtures", () => {
   it("keeps unavailable orders unavailable across each owning source", () => {
     expect(testTaskSupplierFacts("unseeded")).toBeNull();
     expect(testTaskLogisticsFacts("unseeded")).toBeNull();
+  });
+});
+
+describe("linked task order detail", () => {
+  it("opens the same owning order and contractual totals as its PDF", () => {
+    for (const row of testTaskOrderRows()) {
+      const detail = testTaskOrderDetail(row.id)!;
+      const doc = testTaskSalesOrderDocument(row.id)!;
+      expect(detail.order.id).toBe(doc.order_id);
+      expect(detail.order.so).toBe(row.so);
+      expect(detail.order.customer_name).toBe(doc.customer.name);
+      expect(detail.lines.map(({ sku, qty, unit_price }) => ({ sku, qty, unit_price }))).toEqual(doc.lines.map(({ sku, qty, unit_price }) => ({ sku, qty, unit_price })));
+      expect(detail.total).toBe(doc.total);
+      expect(detail.order.paid).toBe(doc.paid);
+    }
+  });
+  it("keeps unknown detail unavailable", () => {
+    expect(testTaskOrderDetail("unknown")).toBeNull();
   });
 });
