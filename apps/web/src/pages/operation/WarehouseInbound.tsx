@@ -30,6 +30,7 @@ import {
   FilterRailRow,
 } from "./components/workspace-rail";
 import { useWarehouseInbound } from "./useWarehouseInbound";
+import { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
 
 /**
  * WAREHOUSE — INBOUND (approved receiving workspace, 2026-09-15).
@@ -852,8 +853,9 @@ export default function WarehouseInbound() {
         >
           {/* ── THE SITE STRIP ─────────────────────────────────────────── */}
           {siteTabs.length > 0 && (
+            /* The kit segmented control (01 §3): one drawing for every set of tabs. */
             <div
-              className="mb-2 flex flex-wrap items-center gap-1 border-b border-kit-slate-5"
+              className={`${SEGMENTED_TRACK} mb-2 max-w-full self-start overflow-x-auto`}
               role="tablist"
               aria-label="Receiving Site"
               data-testid="inbound-sites"
@@ -868,16 +870,11 @@ export default function WarehouseInbound() {
                     aria-selected={active}
                     data-testid={`inbound-site-${tab.id}`}
                     onClick={() => setFilter("site", tab.id)}
-                    className={[
-                      "-mb-px border-b-2 px-3 py-1.5 text-body",
-                      active
-                        ? "border-kit-blue-11 text-kit-blue-11"
-                        : "border-transparent text-base-600 hover:bg-hovertint",
-                    ].join(" ")}
+                    className={`${SEGMENT} ${active ? SEGMENT_ON : SEGMENT_OFF}`}
                   >
                     {tab.label}
                     {tab.count !== undefined && (
-                      <span className="ml-1.5 tabular-nums text-meta text-base-500">
+                      <span className="ml-1.5 tabular-nums text-meta text-c-secondary">
                         {tab.count}
                       </span>
                     )}
