@@ -327,7 +327,7 @@ export default function OpsStockListView(props: Props) {
     <div className={props.embedded ? "" : "p-8 max-w-7xl mx-auto"}>
       {!props.embedded && (
         <div className="mb-6">
-          <p className="text-meta uppercase tracking-wider text-base-500 mb-1">
+          <p className="text-label uppercase tracking-[0.06em] text-base-500 mb-1">
             {props.kicker}
           </p>
           <h1 className="text-page text-base-900">{props.title}</h1>
@@ -338,7 +338,7 @@ export default function OpsStockListView(props: Props) {
       {props.actions.includes("add") ? (
         <section className="rounded border border-base-200 bg-white p-4 mb-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-body font-semibold text-base-900">
+            <h2 className="text-strong text-base-900">
               Add stock (receive new units)
             </h2>
             <button
@@ -452,7 +452,7 @@ export default function OpsStockListView(props: Props) {
 
       {props.actions.includes("reserve") ? (
         <section className="rounded border border-base-200 bg-white p-4 mb-4">
-          <h2 className="text-body font-semibold text-base-900 mb-2">
+          <h2 className="text-strong text-base-900 mb-2">
             Reserve oldest free unit
           </h2>
           <div className="flex flex-wrap gap-2 items-end">
@@ -564,10 +564,10 @@ export default function OpsStockListView(props: Props) {
         <>
           {grouped ? (
             <div className="flex items-center justify-between mb-2">
-              <span className="text-label text-base-500">
+              <span className="text-meta text-base-500">
                 {groups?.length ?? 0} models · {rows.length} units
               </span>
-              <div className="flex gap-3 text-label">
+              <div className="flex gap-3 text-body font-medium">
                 <button
                   type="button"
                   className="text-primary hover:underline"
@@ -589,18 +589,18 @@ export default function OpsStockListView(props: Props) {
           ) : null}
           <div className="rounded border border-base-200 bg-white overflow-x-auto">
             <table className="w-full text-body">
-              <thead className="bg-base-700 border-b-2 border-primary text-label uppercase tracking-[0.02em] text-white">
+              <thead className="bg-base-700 border-b-2 border-primary text-meta text-white">
                 <tr>
-                  <th className="text-left px-3 py-2 font-semibold">Unit ID</th>
-                  <th className="text-left px-3 py-2 font-semibold">SKU</th>
-                  <th className="text-left px-3 py-2 font-semibold">Condition</th>
-                  <th className="text-left px-3 py-2 font-semibold">Status</th>
-                  <th className="text-left px-3 py-2 font-semibold">Reserved for</th>
-                  <th className="text-left px-3 py-2 font-semibold">History</th>
-                  <th className="text-left px-3 py-2 font-semibold">PO No.</th>
-                  <th className="text-left px-3 py-2 font-semibold">Source Ref</th>
-                  <th className="text-left px-3 py-2 font-semibold">Date in</th>
-                  <th className="text-right px-3 py-2 font-semibold">Actions</th>
+                  <th className="text-left px-3 py-2 font-medium">Unit ID</th>
+                  <th className="text-left px-3 py-2 font-medium">SKU</th>
+                  <th className="text-left px-3 py-2 font-medium">Condition</th>
+                  <th className="text-left px-3 py-2 font-medium">Status</th>
+                  <th className="text-left px-3 py-2 font-medium">Reserved for</th>
+                  <th className="text-left px-3 py-2 font-medium">History</th>
+                  <th className="text-left px-3 py-2 font-medium">PO No.</th>
+                  <th className="text-left px-3 py-2 font-medium">Source Ref</th>
+                  <th className="text-left px-3 py-2 font-medium">Date in</th>
+                  <th className="text-right px-3 py-2 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -631,10 +631,10 @@ export default function OpsStockListView(props: Props) {
                                 <span className="text-base-400 w-3 inline-block">
                                   {isOpen ? "▾" : "▸"}
                                 </span>
-                                <span className="font-mono text-meta font-semibold text-base-900">
+                                <span className="font-mono text-body font-semibold text-base-900">
                                   {sku}
                                 </span>
-                                <span className="text-label text-base-500">
+                                <span className="text-meta text-base-500">
                                   {rs.length} units ·{" "}
                                   <span className="text-success-700">
                                     {ready} ready
@@ -733,14 +733,14 @@ function RowItem({
           have none and print "": their row still needs a database key, but a
           key is not an identity and never appears here (0453). Grandfathered
           `id-…` codes print exactly as stored — they are on real labels. */}
-      <td className="px-3 py-2 font-mono text-label text-base-900 whitespace-nowrap">
+      <td className="px-3 py-2 font-mono font-semibold text-base-900 whitespace-nowrap">
         {unitIdOf(row) ?? null}
       </td>
       <td className="px-3 py-2 font-mono text-base-700">
         {row.sku}
         {row.qty && row.qty > 1 ? (
           <span
-            className="ml-1.5 rounded bg-base-100 px-1.5 py-0.5 text-label font-semibold text-base-600"
+            className="ml-1.5 rounded bg-base-100 px-1.5 py-0.5 text-meta font-medium text-base-600"
             title="Bulk line. This record represents this many units"
           >
             ×{row.qty}
@@ -768,7 +768,7 @@ function RowItem({
             `written_off`. A held unit is amber, not red: nothing is broken
             about the system, the goods are simply not available. */}
         <span
-          className={`pill ${
+          className={`pill text-meta font-medium ${
             row.status === "free"
               ? "pill-confirmed"
               : row.status === "reserved"

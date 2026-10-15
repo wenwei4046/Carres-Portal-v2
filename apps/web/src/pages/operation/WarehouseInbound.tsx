@@ -94,7 +94,7 @@ function Blank() {
   return <span aria-hidden="true" />;
 }
 
-/** The `Item` cell — ONE line of 13px with the approved 11px second line.
+/** The `Item` cell — ONE line of 13px with the approved 12px second line.
  *  An arrangement past its date with no receipt prints
  *  `Expected {date} · not received` as its first line (owner 2026-09-25) and
  *  an unreadable receipt prints the governed status word, so the operator
@@ -121,13 +121,13 @@ function InboundItemCell({ row: r, today }: { row: InboundArrival; today: string
       {first ? (
         <>
           <span className="block" data-testid={`inbound-item-first-${r.id}`}>{first}</span>
-          <span className="block text-label font-normal leading-[14px] text-kit-slate-11">{goods}</span>
+          <span className="block text-meta text-kit-slate-11">{goods}</span>
         </>
       ) : (
         <>
           <span className="block">{goods}</span>
           {r.products.length === 1 && r.products[0]!.name && r.products[0]!.sku ? (
-            <span className="block text-label font-normal leading-[14px] text-kit-slate-11">{r.products[0]!.sku}</span>
+            <span className="block text-meta text-kit-slate-11">{r.products[0]!.sku}</span>
           ) : null}
         </>
       )}
@@ -1043,7 +1043,7 @@ function InboundExpansion({ row: r }: { row: InboundArrival }) {
       )}
       {r.products.length > 0 && (
         <div>
-          <div className="mb-1 text-label font-semibold uppercase tracking-wide text-base-600">
+          <div className="mb-1 text-label uppercase tracking-[0.06em] text-base-600">
             Products
           </div>
           {r.products.map((p) => (
@@ -1060,7 +1060,7 @@ function InboundExpansion({ row: r }: { row: InboundArrival }) {
       )}
       {r.sessions.length > 0 && (
         <div>
-          <div className="mb-1 text-label font-semibold uppercase tracking-wide text-base-600">
+          <div className="mb-1 text-label uppercase tracking-[0.06em] text-base-600">
             Receipts
           </div>
           {/* Every posted receipt with its own supplier DO number, GRN number
@@ -1081,7 +1081,7 @@ function InboundExpansion({ row: r }: { row: InboundArrival }) {
       )}
       {r.units.length > 0 && (
         <div>
-          <div className="mb-1 text-label font-semibold uppercase tracking-wide text-base-600">
+          <div className="mb-1 text-label uppercase tracking-[0.06em] text-base-600">
             Units
           </div>
           {r.units.map((u) => (

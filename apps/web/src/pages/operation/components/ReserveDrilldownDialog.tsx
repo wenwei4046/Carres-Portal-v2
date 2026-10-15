@@ -69,7 +69,7 @@ export default function ReserveDrilldownDialog({
     <Modal title={`Reserved orders · ${friendlySku}`} onClose={onClose} size="lg">
       <div className="text-meta text-base-600 mb-3.5 font-body">
         Orders currently holding reserved stock at{" "}
-        <strong>{warehouseName}</strong>. Reserve releases automatically on DO
+        <strong className="font-medium">{warehouseName}</strong>. Reserve releases automatically on DO
         upload or order abandon.
       </div>
 
@@ -87,7 +87,7 @@ export default function ReserveDrilldownDialog({
           className="rounded-[4px] bg-destructive/10 border border-destructive/30 p-4 text-body"
           data-testid="reserve-drilldown-error"
         >
-          <div className="text-destructive font-semibold mb-2">
+          <div className="text-destructive font-medium mb-2">
             Couldn&rsquo;t load drill-down
           </div>
           <div className="text-meta text-base-700 mb-3">
@@ -96,7 +96,7 @@ export default function ReserveDrilldownDialog({
           <button
             type="button"
             onClick={() => void drilldown.refetch()}
-            className="btn-secondary text-label py-1.5 px-3"
+            className="btn-secondary text-body font-medium py-1.5 px-3"
           >
             Retry
           </button>
@@ -111,17 +111,17 @@ export default function ReserveDrilldownDialog({
           >
             <div className="flex justify-between items-center gap-4 flex-wrap">
               <div className="font-body text-meta">
-                <strong>{friendlySku}</strong>
+                <strong className="font-medium">{friendlySku}</strong>
                 {skuLabel ? (
-                  <span className="font-mono text-label text-base-500 ml-1.5">
+                  <span className="font-mono text-meta text-base-500 ml-1.5">
                     {sku}
                   </span>
                 ) : null}
                 <span className="text-base-500"> @ {warehouseName}</span>
               </div>
-              <div className="font-mono text-label text-base-600">
-                <strong>{data?.total ?? 0}</strong> reserved across{" "}
-                <strong>{orders.length}</strong> order
+              <div className="font-mono text-meta text-base-600">
+                <strong className="font-medium">{data?.total ?? 0}</strong> reserved across{" "}
+                <strong className="font-medium">{orders.length}</strong> order
                 {orders.length === 1 ? "" : "s"}
               </div>
             </div>
@@ -142,11 +142,11 @@ export default function ReserveDrilldownDialog({
                   gridTemplateColumns: "100px minmax(0,1fr) 150px 90px 90px",
                 }}
               >
-                <div className="label">SO</div>
-                <div className="label">Customer</div>
-                <div className="label">Stage</div>
-                <div className="label text-right">Reserved</div>
-                <div className="label text-right" />
+                <div className="text-meta font-medium text-base-700">SO</div>
+                <div className="text-meta font-medium text-base-700">Customer</div>
+                <div className="text-meta font-medium text-base-700">Stage</div>
+                <div className="text-meta font-medium text-base-700 text-right">Reserved</div>
+                <div className="text-meta font-medium text-base-700 text-right" />
               </div>
               {orders.map((o) => (
                 <div
@@ -157,7 +157,7 @@ export default function ReserveDrilldownDialog({
                     gridTemplateColumns: "100px minmax(0,1fr) 150px 90px 90px",
                   }}
                 >
-                  <div className="font-mono text-meta font-semibold">
+                  <div className="font-mono text-body font-semibold">
                     #SO{o.so}
                   </div>
                   <div className="font-body text-body truncate">
@@ -166,14 +166,14 @@ export default function ReserveDrilldownDialog({
                   <div>
                     <StageChip stage={o.operationStage} />
                   </div>
-                  <div className="font-mono text-body text-right font-semibold">
+                  <div className="font-mono text-body text-right font-medium">
                     ×{o.reservedQty}
                   </div>
                   <div className="text-right">
                     <button
                       type="button"
                       onClick={() => void copyDl(o.so)}
-                      className="btn-ghost text-label py-1 px-2"
+                      className="btn-ghost text-body font-medium py-1 px-2"
                       data-testid={`reserve-drilldown-copy-${o.id}`}
                     >
                       Copy SO
