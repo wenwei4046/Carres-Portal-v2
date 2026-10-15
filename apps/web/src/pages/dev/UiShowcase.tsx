@@ -59,6 +59,33 @@ function specificationRows(source: string, start: string, end: string) {
 const MEASUREMENT_ROWS = specificationRows(kitSource, "## 7 ·", "## 8 ·");
 const UX_ROWS = specificationRows(kitSource, "## §2.2 ·", "**Feedback:**");
 
+const COLOUR_TOKENS = [
+  ["Page ground", "--c-ground"],
+  ["Surface", "--c-card"],
+  ["Table header", "--c-band"],
+  ["Primary text", "--c-ink"],
+  ["Body text", "--c-body"],
+  ["Secondary text", "--c-secondary"],
+  ["Border", "--c-card-border"],
+  ["Table row line", "--c-row-line"],
+  ["Selected tab", "--c-select-bg"],
+  ["Selection text", "--c-select-fg"],
+  ["Button hover", "--c-btn-hover"],
+  ["Main action", "--c-main"],
+  ["Selected row", "--c-select-soft"],
+  ["Row hover", "--c-row-hover"],
+  ["Link and focus", "--c-link"],
+  ["Open frame", "--c-open-frame"],
+  ["Done surface", "--c-ok-bg"],
+  ["Done text", "--c-ok-fg"],
+  ["Needs action surface", "--c-warn-bg"],
+  ["Needs action text", "--c-warn-fg"],
+  ["Neutral pill", "--c-info-bg"],
+  ["Hold", "--c-hold-bg"],
+  ["None surface", "--c-none-bg"],
+  ["None text", "--c-none-fg"],
+] as const;
+
 function Section({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
   return (
     <section id={id} className="flex flex-col gap-3">
@@ -488,6 +515,18 @@ function SharedParts() {
 }
 
 export default function UiShowcase() {
+  const [colourValues, setColourValues] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const refresh = () => {
+      const computed = getComputedStyle(document.documentElement);
+      setColourValues(Object.fromEntries(COLOUR_TOKENS.map(([, token]) => [token, computed.getPropertyValue(token).trim()])));
+    };
+    refresh();
+    const observer = new MutationObserver(refresh);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class"] });
+    return () => observer.disconnect();
+  }, []);
+
   const [tab, setTab] = useState("open");
   const [menu, setMenu] = useState(false);
   const [summary, setSummary] = useState(true);
@@ -510,26 +549,13 @@ export default function UiShowcase() {
         ))}
       </nav>
 
-      <Section id="colours" title="Colours" note="Swatches use the shared runtime tokens. Printed values are the approved default Blue palette from the UI/UX MASTER values section; another chosen theme changes selection colours only. Status colours remain fixed. See the actual status components in Pills.">
+      <Section id="colours" title="Colours" note="Swatches and printed values read the same shared runtime tokens, with no page-local palette. The one UI/UX MASTER owns the approved palette; themes change selection colours only. Status colours remain fixed. See the actual status components in Pills.">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {[
-            ["Page ground", "--c-ground", "#F6F7F9"], ["Surface", "--c-card", "#FFFFFF"],
-            ["Table header", "--c-band", "#F8F9FA"], ["Primary text", "--c-ink", "#1F2937"],
-            ["Body text", "--c-body", "#374151"], ["Secondary text", "--c-secondary", "#6B7280"],
-            ["Border", "--c-card-border", "#E5E7EB"], ["Table row line", "--c-row-line", "#F1F2F4"],
-            ["Selected tab", "--c-select-bg", "#FFFFFF"], ["Selection text", "--c-select-fg", "#2F55E0"],
-            ["Button hover", "--c-btn-hover", "#EDEFF2"], ["Main action", "--c-main", "#1B1B39"],
-            ["Selected row", "--c-select-soft", "#EEF4FF"], ["Row hover", "--c-row-hover", "#F2F3F5"],
-            ["Link and focus", "--c-link", "#3965FA"], ["Open frame", "--c-open-frame", "#CBD0D6"],
-            ["Done surface", "--c-ok-bg", "#E7F6EC"], ["Done text", "--c-ok-fg", "#1E7A40"],
-            ["Needs action surface", "--c-warn-bg", "#FBF0D6"], ["Needs action text", "--c-warn-fg", "#7A5A00"],
-            ["Neutral pill", "--c-info-bg", "#E5E7EB"], ["Hold", "--c-hold-bg", "#1F2937"],
-            ["None surface", "--c-none-bg", "#F1F2F4"], ["None text", "--c-none-fg", "#6B7280"],
-          ].map(([label, token, value]) => (
+          {COLOUR_TOKENS.map(([label, token]) => (
             <div key={token} className="flex min-w-0 flex-col gap-2 rounded-lg border border-c-card-border bg-c-card p-3">
               <span aria-hidden="true" className="h-11 rounded-lg border border-c-card-border" style={{ background: `var(${token})` }} data-token={token} />
               <span className="text-meta text-c-ink">{label}</span>
-              <span className="text-meta font-medium">{value}</span>
+              <span className="text-meta font-medium">{colourValues[token] || token}</span>
               <span className="break-words text-meta text-c-secondary">{token}</span>
             </div>
           ))}
