@@ -33,11 +33,12 @@ const CLASSNAMES = {
   nav: "hidden",
   month_grid: "w-full table-fixed border-collapse",
   weekdays: "text-label text-kit-slate-11",
-  weekday: "border-b border-kit-slate-5 py-1.5 text-center font-normal uppercase",
+  /* A caps label (01 §2): 11 / 500, tracking .06em. */
+  weekday: "border-b border-kit-slate-5 py-1.5 text-center uppercase tracking-[0.06em]",
   week: "",
   day: "border border-kit-slate-4 p-0 align-top",
   day_button: "",
-  today: "[&>button>span:first-child]:font-semibold [&>button>span:first-child]:text-kit-blue-11",
+  today: "[&>button>span:first-child]:font-medium [&>button>span:first-child]:text-kit-blue-11",
   outside: "invisible",
   disabled: "",
   hidden: "invisible",
@@ -46,7 +47,7 @@ const CLASSNAMES = {
 function Line({ label, count, warning }: { label: string; count: number; warning?: boolean }) {
   return (
     <span
-      className={`flex w-full items-start justify-between gap-1 text-label leading-4 ${
+      className={`flex w-full items-start justify-between gap-1 text-meta ${
         warning ? "text-kit-amber-11" : "text-kit-slate-11"
       }`}
     >

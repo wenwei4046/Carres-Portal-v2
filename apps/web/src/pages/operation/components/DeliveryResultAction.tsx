@@ -69,7 +69,7 @@ function LegArrivalForm({
         <p className="text-meta text-base-600">
           This records that the goods reached the named warehouse. The customer has not received them. The next leg carries its own result.
         </p>
-        <label className="grid gap-1 text-meta font-medium text-base-700">
+        <label className="grid gap-1 text-meta text-base-700">
           Note
           <textarea
             aria-label="Note"
@@ -196,7 +196,7 @@ function DeliveryAttemptForm({
         ) : null}
         {result === "partial" ? (
           <fieldset className="grid gap-2">
-            <legend className="text-meta font-semibold text-base-900">
+            <legend className="text-body font-medium text-base-900">
               Delivered Units
             </legend>
             {allocationQ.isLoading ? (
@@ -227,7 +227,7 @@ function DeliveryAttemptForm({
           </fieldset>
         ) : null}
 
-        <label className="grid gap-1 text-meta font-medium text-base-700">
+        <label className="grid gap-1 text-meta text-base-700">
           Delivery Result reason
           <select
             aria-label="Delivery Result reason"
@@ -242,7 +242,7 @@ function DeliveryAttemptForm({
           </select>
         </label>
 
-        <label className="grid gap-1 text-meta font-medium text-base-700">
+        <label className="grid gap-1 text-meta text-base-700">
           Goods location
           <select
             aria-label="Goods location"
@@ -259,7 +259,7 @@ function DeliveryAttemptForm({
 
         {whereGoods === "returned_to_warehouse" && remaining.length > 0 ? (
           <fieldset className="grid gap-2">
-            <legend className="text-meta font-semibold text-base-900">
+            <legend className="text-body font-medium text-base-900">
               Returned Unit action
             </legend>
             {remaining.map((unit) => (
@@ -285,7 +285,7 @@ function DeliveryAttemptForm({
           </fieldset>
         ) : null}
 
-        <label className="grid gap-1 text-meta font-medium text-base-700">
+        <label className="grid gap-1 text-meta text-base-700">
           Explanation
           <textarea
             aria-label="Explanation"
@@ -338,7 +338,7 @@ export default function DeliveryResultAction({
       <button
         type="button"
         data-testid="do-result-primary-action"
-        className="btn-primary inline-flex h-7 items-center px-2.5 text-meta"
+        className="btn-primary inline-flex h-7 items-center px-2.5 text-body font-medium"
         onClick={() => setChooserOpen(true)}
       >
         Record Delivery Result

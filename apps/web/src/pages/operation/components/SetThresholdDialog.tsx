@@ -153,7 +153,7 @@ export default function SetThresholdDialog({
       <div className="mb-3.5">
         <label
           htmlFor="set-threshold-low"
-          className="label mb-1.5 block"
+          className="text-meta text-base-700 mb-1.5 block"
         >
           Low threshold
         </label>
@@ -174,7 +174,7 @@ export default function SetThresholdDialog({
       <div className="mb-3.5">
         <label
           htmlFor="set-threshold-high"
-          className="label mb-1.5 block"
+          className="text-meta text-base-700 mb-1.5 block"
         >
           High threshold
         </label>
@@ -196,7 +196,7 @@ export default function SetThresholdDialog({
         <div
           role="alert"
           data-testid="set-threshold-error"
-          className="text-label font-body mb-3.5 px-2.5 py-1.5 rounded-[4px]"
+          className="text-meta font-body mb-3.5 px-2.5 py-1.5 rounded-[4px]"
           style={{
             color: "var(--destructive)",
             background: "var(--error-soft)",

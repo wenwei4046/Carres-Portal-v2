@@ -612,7 +612,7 @@ describe("long values and the narrow viewport", () => {
     const head = screen.getByTestId("ws-head-2026-09-15");
     expect(head.className).toContain("h-16");
     expect(head.className).toContain("gap-2");
-    /* `text-page` IS 24px/32px weight 600 and `text-label` IS 11px/14px —
+    /* `text-page` IS 20px/28px weight 600 and `text-meta` IS 12px/16px —
        governed tokens, so the sizes cannot drift without the config moving. */
     const day = screen.getByTestId("ws-head-day-2026-09-15");
     expect(day.className).toContain("text-page");

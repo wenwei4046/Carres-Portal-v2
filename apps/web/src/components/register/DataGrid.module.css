@@ -1117,7 +1117,7 @@ div:first-child > .columnsMenuGroup {
   border: 1px solid var(--c-input-border);
   border-radius: var(--radius);
   font-size: var(--fs-label);
-  font-weight: 600;
+  font-weight: 500;
   line-height: 16px;
   color: var(--c-body);
 }
@@ -1152,7 +1152,7 @@ div:first-child > .columnsMenuGroup {
   border-radius: var(--radius);
   font-family: var(--font-sans);
   font-size: var(--fs-label);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--c-body);
   cursor: pointer;
 }

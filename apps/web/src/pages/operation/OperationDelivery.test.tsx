@@ -1157,7 +1157,7 @@ describe("COLUMN 4 — the SO number and the customer's reference (owner correct
        `SO-1217 TCF0541` nor any other joined spelling exists on the row. */
     const ref = within(list).getByText("TCF0541");
     expect(ref).not.toBe(door);
-    expect(ref.className).toContain("text-label");
+    expect(ref.className).toContain("text-meta");
     expect(ref.className).toContain("text-kit-slate-11");
     expect(list.textContent).not.toContain("SO-1217 TCF0541");
     expect(within(list).queryByText(/^SO-1217s+TCF0541$/)).toBeNull();
@@ -1178,7 +1178,7 @@ describe("COLUMN 4 — the SO number and the customer's reference (owner correct
     /* The cell is the button's line and nothing else — no placeholder, no
        dash, no blank line holding the row open. */
     const cell = door.closest("span.block.min-w-0")!;
-    expect(cell.querySelectorAll("span.text-label")).toHaveLength(0);
+    expect(cell.querySelectorAll("span.text-meta")).toHaveLength(0);
     expect(cell.textContent).toBe("SO-1217");
   });
 
