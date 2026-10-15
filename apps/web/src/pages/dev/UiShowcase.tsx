@@ -48,7 +48,6 @@ import Tooltip from "@/components/kit/Tooltip";
 import { TONES as STATUS_TONES } from "@/components/kit/tokens";
 import ListOptionsExample from "@/pages/dev/ListOptionsExample";
 import ServerRegisterExample from "@/pages/dev/ServerRegisterExample";
-import CompactCardExample from "@/pages/dev/CompactCardExample";
 
 function Section({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
   return (
@@ -419,10 +418,6 @@ function SharedParts() {
             {STATUS_TONES.map((tone) => <StatusPill key={tone} tone={tone}>{tone}</StatusPill>)}
           </Sample>
         </Panel2>
-      </Section>
-
-      <Section id="compact-card" title="Working Panel: CompactModuleCard (6 pages)" note="One card for every module's record beside its list: identity, the module's tabs, facts with their editors, items, Communication and Timeline (UI MASTER §4.3). TEST sample.">
-        <CompactCardExample />
       </Section>
 
       <Section id="documents" title="Documents: PdfPreview (11) · SavedEvidenceViewer (6)" note="The real rendered document, fit to width, with loading and retry. Saved photos and video stay read only.">
