@@ -620,7 +620,7 @@ export type DataGridProps<T> = {
     fitExpansionToViewport?: boolean;
     /**
      * The opened row and what it holds are one box (01 §5 "Expanded row": a
-     * 1px `#CBD0D6` frame with corners 8), as Sales Order Outright draws it.
+     * 1px `--c-open-frame` frame with corners 8), as Sales Order Outright draws it.
      * Opt-in; omitted, the §6.9 flush expansion stays exactly as it is.
      */
     frame?: boolean;
