@@ -417,15 +417,16 @@ function OwnerBadge({
   const initials = name?.trim() ? personInitials(name, "") : "PO";
   return (
     <span
+      role="img"
+      aria-label={`${label} · PO Duty`}
       className="inline-flex shrink-0 items-center gap-1.5"
       data-owner-id={userId ?? "not-assigned"}
       data-owner-duty="PO Duty"
       title={`${label} · PO Duty`}
     >
-      <span className="inline-flex size-6 items-center justify-center rounded-full bg-kit-blue-3 text-label font-bold text-kit-blue-11">
+      <span aria-hidden="true" className="inline-flex size-6 items-center justify-center rounded-full bg-kit-blue-3 text-[11px] font-bold leading-none text-kit-blue-11">
         {initials}
       </span>
-      <span className="sr-only">{label} · PO Duty</span>
     </span>
   );
 }

@@ -240,7 +240,7 @@
            bg-white text-base-900
            border border-base-300
            px-[18px] py-2.5 rounded-lg
-           text-[13px] font-semibold
+           text-[13px] font-medium
            transition-colors
            hover:border-base-500
            disabled:opacity-40 disabled:cursor-not-allowed;
@@ -249,7 +249,7 @@
     @apply inline-flex items-center justify-center gap-1.5
            bg-transparent text-base-700
            px-3.5 py-2 rounded-lg
-           text-[13px] font-semibold
+           text-[13px] font-medium
            transition-colors
            hover:text-base-900 hover:bg-base-100
            disabled:opacity-40 disabled:cursor-not-allowed;
