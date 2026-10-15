@@ -12,6 +12,8 @@
  * Remaining consumer migration is tracked in the existing delivery handoff.
  */
 import { useEffect, useState, type ReactNode } from "react";
+import measurementSource from "../../../../../docs/01-design-tokens.md?raw";
+import uxSource from "../../../../../docs/ui/MASTER.md?raw";
 import MIcon from "@/components/carres/MIcon";
 import CPill, { type CPillTone } from "@/components/carres/CPill";
 import CPopover, { CMenu, CMenuGroup, CMenuItem } from "@/components/carres/CPopover";
@@ -42,6 +44,21 @@ import TaskView from "@/components/kit/TaskView";
 import Textarea from "@/components/kit/Textarea";
 import Tooltip from "@/components/kit/Tooltip";
 import { TaskWideSurface } from "@/pages/operation/tasks/TaskFrame";
+
+/** Display canonical specification tables, rather than maintaining another set of values. */
+function specificationRows(source: string, start: string, end: string) {
+  const section = source.slice(source.indexOf(start)).split(end)[0] ?? "";
+  let group = "";
+  return section.split("\n").flatMap((line) => {
+    if (line.startsWith("### ")) group = line.slice(4);
+    if (!line.startsWith("|")) return [];
+    const cells = line.split("|").slice(1, -1).map((cell) => cell.trim());
+    if (!cells[0] || cells[0].startsWith("---") || ["Check", "State"].includes(cells[0])) return [];
+    return [{ group, cells }];
+  });
+}
+const MEASUREMENT_ROWS = specificationRows(measurementSource, "## 7 ·", "## 8 ·");
+const UX_ROWS = specificationRows(uxSource, "## §2.2 ·", "**Feedback:**");
 
 function Section({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
   return (
@@ -489,7 +506,7 @@ export default function UiShowcase() {
       </header>
 
       <nav aria-label="Kit sections" className="grid grid-cols-3 gap-x-4 gap-y-1 sm:grid-cols-6 lg:grid-cols-9">
-        {[["colours", "Colours"], ["typography", "Typography"], ["measurements", "Dimensions"], ["table", "Tables"], ["cells", "Table cells"], ["order-lines", "Order lines"], ["pills", "Pills"], ["toolbar", "Toolbar"], ["side-panel", "Side panel"], ["icons", "Icons"], ["complete-pages", "Complete pages"], ["buttons", "Buttons"], ["fields", "Fields"], ["menus", "Menus"], ["tabs-kit", "Tabs"], ["dialogs", "Dialogs"], ["states", "States"], ["documents", "Documents"], ["task-parts", "Tasks"]].map(([id, label]) => (
+        {[["colours", "Colours"], ["typography", "Typography"], ["measurements", "Dimensions"], ["ux-rules", "UX rules"], ["table", "Tables"], ["cells", "Table cells"], ["order-lines", "Order lines"], ["pills", "Pills"], ["toolbar", "Toolbar"], ["side-panel", "Side panel"], ["icons", "Icons"], ["complete-pages", "Complete pages"], ["buttons", "Buttons"], ["fields", "Fields"], ["menus", "Menus"], ["tabs-kit", "Tabs"], ["dialogs", "Dialogs"], ["states", "States"], ["documents", "Documents"], ["task-parts", "Tasks"]].map(([id, label]) => (
           <a key={id} href={`#${id}`} className="inline-flex min-h-11 items-center text-body text-c-secondary underline decoration-c-chip-border underline-offset-2">{label}</a>
         ))}
       </nav>
@@ -531,25 +548,28 @@ export default function UiShowcase() {
         </div>
       </Section>
 
-      <Section id="measurements" title="Dimensions and usage" note="Approved targets from 01 §§2–5, in CSS pixels. These rules apply to every module; a module changes its content, not the shared design. Targets are distinct from whether every existing page has migrated.">
+      <Section id="measurements" title="Dimensions and usage" note="The full checklist below reads directly from 01 §7. Each item gives its approved value, trigger and shared entry. Units: CSS px. UNRESOLVED means no approved value exists; it must not be guessed.">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {MEASUREMENT_ROWS.map(({ group, cells }) => (
+            <div key={`${group}-${cells[0]}`} className="flex min-w-0 flex-col gap-2 rounded-lg border border-c-card-border bg-c-card p-3">
+              <p className="text-meta text-c-secondary">{group}</p>
+              <h3 className="text-body font-medium">{cells[0]}</h3>
+              <dl className="flex flex-col gap-2 text-meta">
+                <div><dt className="text-c-secondary">Approved value / contract</dt><dd>{cells[1]}</dd></div>
+                <div><dt className="text-c-secondary">Trigger / behaviour</dt><dd>{cells[2]}</dd></div>
+                {cells[3] && <div><dt className="text-c-secondary">Shared entry</dt><dd className="break-words">{cells[3]}</dd></div>}
+              </dl>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section id="ux-rules" title="UX rules" note="Required state behaviour from the one UI MASTER §2.2. Components demonstrate appearance; the owning module supplies facts, permission and the actual saved result.">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            ["Shell", "Navigation 220 open / 64 closed. Top bar 56. Toolbar 36, one line."],
-            ["Context panels", "Summary 264. Tasks 320; an open task may use spare width from viewport 1280."],
-            ["Cards", "Radius 8. Padding 14 × 16. Gap 12. White surface, 1px border, no shadow."],
-            ["Tables", "Header 40. Parent row 54. Item row minimum 44. Column width follows content; scrolling stays inside the table."],
-            ["Buttons", "Word 34; toolbar 32; panel 30; small 28. Main action 13/600, one per area. Other actions 13/500."],
-            ["Icons and targets", "Material Symbols Rounded. Icon-only glyph 20; word-button/menu glyph 18; chip glyph 16. Desktop target at least 32; mobile/partner 44."],
-            ["Fields", "Input 32. Search 34. Radius 8. Dates use a calendar. Read-only facts are text, not disabled fields."],
-            ["Menus", "Width 250. Padding 6. Radius 8. Item 32. Label 11/500 caps; item 13/400, selected 13/500."],
-            ["Selection and states", "Blue marks selection. Green means done. Amber means action needed. Missing, failed and no access remain separate states."],
-            ["Keyboard focus", "2px #3965FA, offset 2. Fields have no gap. Focus appears for keyboard navigation."],
-            ["Disabled", "Opacity 45%. No hover or click. Loading actions prevent a second submission."],
-            ["Ownership", "Shared components own appearance. COPY owns words. The module owns facts, permissions, actions and saved results."],
-          ].map(([label, value]) => (
-            <div key={label} className="flex min-w-0 flex-col gap-2 rounded-lg border border-c-card-border bg-c-card p-3">
-              <h3 className="text-body font-medium">{label}</h3>
-              <p className="text-meta text-c-secondary">{value}</p>
+          {UX_ROWS.map(({ cells }) => (
+            <div key={cells[0]} className="flex min-w-0 flex-col gap-2 rounded-lg border border-c-card-border bg-c-card p-3">
+              <h3 className="text-body font-medium">{cells[0]}</h3>
+              <p className="text-meta">{cells[1]}</p>
             </div>
           ))}
         </div>
