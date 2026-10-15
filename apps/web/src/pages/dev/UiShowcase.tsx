@@ -164,8 +164,8 @@ function TableExample({ narrow }: { narrow: boolean }) {
           defaultExpandedKeys: narrow ? [] : ["t1"],
           label: (_r, isOpen) => (isOpen ? "Hide items" : "Show items"),
           renderExpansion: (r) => (
-            <ItemRows label={r.cells.order!.t}>
-              <div role="row" className="grid h-8 grid-cols-[minmax(0,1fr)_120px] items-center bg-c-band px-[5px] text-meta font-medium text-c-secondary">
+            <ItemRows label={r.cells.order!.t} stepBack={0}>
+              <div role="row" className="grid h-10 grid-cols-[minmax(0,1fr)_120px] items-center bg-c-band px-[5px] text-meta font-medium text-c-secondary">
                 <span role="columnheader">Item</span>
                 <span role="columnheader">Qty</span>
               </div>

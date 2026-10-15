@@ -35,13 +35,13 @@ const VARIANT: Record<Variant, string> = {
   ghost: "bg-transparent text-kit-slate-11 border border-transparent hover:bg-kit-slate-3",
 };
 
-/** Default controls are32px desktop/40px touch under the accepted template;24px is
- *  the dense band. Both are heights, not spacing — Q1 does not reach them.
+/** Keep the existing md32 toolbar contract during consumer migration; the
+ *  small role is28 per current01 §3.
  *  `touch` is the Work party-card button (owner density ruling 2026-09-25):
  *  36px from 768px, 40px below, where a finger presses it. */
 const SIZE: Record<Size, string> = {
   md: "h-10 px-3 gap-2 min-[768px]:h-8",
-  sm: "h-6 px-2 gap-1",
+  sm: "h-7 px-2 gap-1",
   touch: "h-10 px-3 gap-1.5 min-[768px]:h-9",
 };
 
@@ -96,10 +96,10 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
       aria-busy={loading || undefined}
       data-kit="button"
       className={
-        `inline-flex items-center justify-center whitespace-nowrap ${shape === "pill" ? "rounded-full" : "rounded-lg"} text-body font-medium ` +
+        `inline-flex items-center justify-center whitespace-nowrap ${shape === "pill" ? "rounded-full" : "rounded-lg"} text-body ${variant === "primary" ? "font-semibold" : "font-medium"} ` +
         "transition-[filter,background-color] " +
         "focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] " +
-        "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100 " +
+        "disabled:opacity-[0.45] disabled:cursor-not-allowed disabled:hover:brightness-100 " +
         `${VARIANT[variant]} ${iconOnly ? "h-10 w-10 p-0 min-[768px]:h-8 min-[768px]:w-8" : SIZE[size]}`
       }
       {...rest}
