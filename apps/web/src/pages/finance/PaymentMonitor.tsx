@@ -725,7 +725,7 @@ function DayCard({ day, active, words, onPick }: {
 /** The reference line under the SO number — cut to fit, the whole value a
  *  click or a keypress away (owner ruling 2026-09-16). */
 function TwoLinesRef({ text }: { text: string }) {
-  return <span className="block text-label text-kit-slate-11"><TwoLines reveal line1={text} /></span>;
+  return <span className="block text-meta text-c-secondary"><TwoLines reveal line1={text} /></span>;
 }
 
 const RISK_RANK: Record<PaymentMonitorRow["timing"]["kind"], number> = {

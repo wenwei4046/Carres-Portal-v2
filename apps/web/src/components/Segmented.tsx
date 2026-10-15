@@ -1,23 +1,22 @@
 /**
- * Segmented — THE one segmented-control recipe (UI-KIT v4 §10, locked
- * 2026-07-16; ported from the POS size-chip rail, neutralised).
- *
- * Grey pill CONTAINER (base-100, radius 999, 2px inset) + the ACTIVE option
- * as a WHITE chip floating on it (content brighter than container — the
- * locked layering rule). Use for view toggles (Grouped/Flat), rows-per-page,
- * quick modes. NOT for status (pills) and NOT for actions (Btn).
+ * Segmented — the kit's segmented control (01 §3, owner 11 Oct 2026) for a
+ * page's view toggles, rows-per-page and quick modes. It draws the same
+ * track and segments as the shell's tabs (`components/kit/Tabs`), so the
+ * Portal has one segmented control. NOT for status (pills) and NOT for
+ * actions (buttons).
  *
  * `value` may be null (Delivery Monitor, 2026-09-07): the control stays on
- * screen while a different projection shows — no chip lit — so the way back
- * is always one click. Every existing caller passes a value and is unchanged.
+ * screen while a different projection shows — no segment lit — so the way
+ * back is always one click.
  */
 import { Link } from "react-router-dom";
+import { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
 
 /* The one recipe, shared by both exports below so the two can never drift. */
-const RAIL = "inline-flex items-center gap-0.5 bg-base-100 rounded-full p-0.5 h-8 shrink-0";
-const CHIP = "h-7 px-3 rounded-full text-meta font-semibold whitespace-nowrap transition-colors";
-const CHIP_ON = "bg-white text-base-900 shadow-sm";
-const CHIP_OFF = "text-base-500 hover:text-base-800";
+const RAIL = `${SEGMENTED_TRACK} shrink-0`;
+const CHIP = `${SEGMENT} transition-colors`;
+const CHIP_ON = SEGMENT_ON;
+const CHIP_OFF = SEGMENT_OFF;
 
 export default function Segmented<T extends string>({
   options,
