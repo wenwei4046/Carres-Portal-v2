@@ -305,6 +305,18 @@ function SharedParts() {
         </p>
       </header>
 
+      <Section id="complete-pages" title="Complete pages" note="Development fixtures using actual page components. These examples do not prove saved records, production permissions or completed business actions.">
+        <nav aria-label="Complete page previews" className="flex flex-col gap-3 text-body">
+          <a className="underline underline-offset-4" href="/so-workspace-shell-preview.html">Sales Order · full shell and detail</a>
+          <a className="underline underline-offset-4" href="/so-workspace-shell-preview.html?state=empty">Sales Order · no payments recorded</a>
+          <a className="underline underline-offset-4" href="/so-workspace-shell-preview.html?state=forbidden">Sales Order · payment access denied</a>
+          <a className="underline underline-offset-4" href="/route-preview.html">Order Route · standalone implementation example</a>
+          <a className="underline underline-offset-4" href="/work-preview.html?shell=1&pw=1&at=%2Foperation%3Ftab%3Dwork">Workspace · My Task and Team Work</a>
+          <a className="underline underline-offset-4" href="/so-batch-shell-preview.html">Tasks · list and open task</a>
+        </nav>
+        <p className="text-meta text-c-secondary">Check complete pages at 1025, 1164 and 1440 wide, with applicable narrow and zoom states. The standalone Route shows existing implementation, not an approved replacement for the current Route composition. Acceptance is recorded in the existing delivery handoff.</p>
+      </Section>
+
       <Section id="buttons" title="Buttons" note="Main, normal and quiet; 32 high on a desktop, 40 where a finger presses. One main button per area. Destructive commands use a clear action name.">
         <Panel2>
           <Sample label="main · normal · quiet">

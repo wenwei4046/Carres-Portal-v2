@@ -91,6 +91,32 @@ Sales Order Outright included since #2079, passes `appearance="reference"`. `car
 unrouted `SalesOrdersRegister.tsx` and `DestinationHeader.tsx` are deleted (UI MASTER §7.7 lists
 what moved, what an owner ruling replaced, and the kept `SalesOrderCompactView`).
 
+### Master Kit acceptance matrix · personal audit 15 Oct 2026
+
+This is the single detailed kit acceptance matrix within the existing handoff, not a new tracker.
+`APPROVED VALUE` comes from the named authority; `MEASURED IMPLEMENTATION` is observed code/runtime,
+never a new ruling. PASS applies only to the stated check. UNVERIFIED is incomplete, not approval.
+Current audit checkout moved externally from `kit-production-proof/Carres-Portal-v2` to
+`/Users/chaichiewlim/carres-worktrees/kit-docs`, HEAD `44c9bf13e`; local server restored at
+`http://127.0.0.1:5415/ui`. The Desktop checkout remains untouched.
+
+| Item | Authority/source | Approved value and trigger | Actual measured value | Deviation/operator impact | Concrete fix | Verification | Status |
+|---|---|---|---|---|---|---|---|
+| 1 Layout/shell | 01 §4; 03 §1; UI §0/§2.2 | APPROVED VALUE: menu 220/64, top bar 56, toolbar 36; Summary 264, Tasks 320; viewport triggers in 01 | MEASURED IMPLEMENTATION: SO fixture at 1025/1164/1440: nav 220, top bar 56, Tasks 320; ground rgb(246,247,249) | FAIL: at 1025 detail, nav remains 220; 01 §4 requires automatic 64 below 1100. Sticky/overlay checks still owed | Fix detail navigation auto-collapse in shared shell lane; preserve list preference and verify Back | Personal computed styles and bounding boxes at all three widths, 15 Oct | FAIL |
+| 2 Colours/states | 01 §1; token CSS; actual components | APPROVED VALUE: ground #F6F7F9, surface white, ink #1F2937; selection/hover/focus/disabled/status per 01 | MEASURED IMPLEMENTATION: runtime gallery present; no complete computed-colour inventory yet | Source tokens alone do not prove every state uses them | Measure computed styles for each applicable state and fix shared component deviations | Source inspected; runtime states still owed | UNVERIFIED |
+| 3 Typography | 01 §2/§5; CListCell/COrderLines | APPROVED VALUE: Inter and role-specific pairs, wrapping rules; identifier 13/600, header 12/500 | MEASURED IMPLEMENTATION: actual cell/line components consumed on `/ui`; full computed ramp unmeasured | Family/line-height/tracking/wrap may differ from approved role | Inspect loaded font and computed text styles across full pages | Source only; no blanket typography PASS | UNVERIFIED |
+| 4 Measurements | 01 §§3–7; DataGrid/ItemRows | APPROVED VALUE: header 40, parent row 54, item minimum 44; measurements include trigger | MEASURED IMPLEMENTATION: SO at 1025/1164/1440: Items header 40, all 7 body/total rows 44; document width equals viewport; `/ui` 1025 content 977 | Expanded item alignment and full dimensional inventory still owed | Measure bounding boxes, min/max, hit targets, rows, dialog and panel geometry | Personal DOM check at all three SO desktop widths; hit targets/dialogs still owed | PARTIAL PASS |
+| 5 Responsive/zoom | 01 §4; UI §2.2; 03 §10 | APPROVED VALUE: 1025/1164/1440 desktop plus applicable narrow/200% and panel/nav triggers | MEASURED IMPLEMENTATION: `/ui` 1025 document width equals viewport; all 15 catalogue sections width/scrollWidth 977 | This does not prove 1164/1440, 390, zoom or complete-page acceptance; desktop specimen supplies no phone design | Walk required widths and available-canvas/panel states; label phone composition gaps unresolved | Personal browser measurement at 1025 only | PARTIAL PASS |
+| 6 Components/catalogue | 02 runtime directory; UI §0/§7.7 | APPROVED VALUE: one shared implementation per purpose; retain unique consumer capabilities | MEASURED IMPLEMENTATION: actual DataGrid, COrderLines, controls and TaskView; moved checkout lost the uncommitted complete-page links | Reviewers cannot reach shell/detail/Workspace/Tasks from kit | Restore six existing fixture links; clearly label development and standalone Route limits | UiShowcase 7/7 existing tests pass after link restoration; browser SO link opens real shell | FIXED LOCALLY; consumer audit UNVERIFIED |
+| 7 Interactions/states | UI §2.2; 02 contracts | APPROVED VALUE: keyboard/focus return, draft retention, safe cancel/save; distinct loading/empty/denied/failure/conflict | MEASURED IMPLEMENTATION: SO fixture Tasks shows `Tasks could not be refreshed`; no successful task loaded there | Failure is visible, but this fixture cannot prove task list/open-task success | Use task-capable fixture for success; retain explicit failure evidence, verify keyboard and save draft independently | Personal browser SO full page at 1025; no writes | UNVERIFIED |
+| 8 Complete pages | 03 §§2/3/5/8; Orders/Workspace MASTERs | APPROVED VALUE: SO list/detail, Route, Workspace list/open task; Steps/Route/History/Files where source supports them | MEASURED IMPLEMENTATION: after asynchronous seeding settles, SO detail has 2 priced units + 1 gift, two services; total qty 3, RM 4,130; customer facts loaded | Initial DOM briefly showed unseeded defaults; stable view is correct. Route/Timeline, Workspace and open-task coverage still owed | Wait for named source facts before measurement; walk Route/Timeline and task sections; standalone Route remains implementation evidence | Personal stable browser DOM plus fixture and SalesOrderWorkspace source; no business writes | PARTIAL PASS |
+| 9 Ownership | ERP Architecture laws A–D; owning module MASTER; COPY | APPROVED VALUE: module-owned facts/writers/results; Workspace projects actions, never fabricates completion | MEASURED IMPLEMENTATION: gallery uses TEST-only samples; fixture intercepts writes in memory | Fixture success cannot prove permission or persisted business completion | Trace source readers/writers and permission gates; use authorised isolated environment for writes | No production writes performed by audit | UNVERIFIED |
+
+**Separate delivery outcomes:** kit documentation complete — NO (full matrix unresolved);
+local component/full-page coverage complete — NO; Portal migration complete — NO;
+this audit change deployed — NO; authenticated production verified — NO.
+Existing Batch B release evidence above keeps its original limited scope and is not re-labelled by this audit.
+
 ## 3 · Checks and how to rerun them
 
 - Web: `cd apps/web && npx tsc -p tsconfig.app.json --noEmit`; tests with
