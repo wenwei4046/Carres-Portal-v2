@@ -54,7 +54,7 @@ function specificationRows(source: string, start: string, end: string) {
     if (!line.startsWith("|")) return [];
     const cells = line.split("|").slice(1, -1).map((cell) => cell.trim());
     if (!cells[0] || cells[0].startsWith("---") || ["Check", "State"].includes(cells[0])) return [];
-    return [{ group, cells }];
+    return [{ group, cells: cells.length === 3 ? [cells[0]!, cells[1]!, "Preserve the owning module contract", cells[2]!] : cells }];
   });
 }
 const MEASUREMENT_ROWS = specificationRows(measurementSource, "## 7 ·", "## 8 ·");

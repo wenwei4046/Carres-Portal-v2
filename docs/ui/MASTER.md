@@ -455,6 +455,20 @@ simplifies execution; it removes no permission, approval or separation of duties
 | Historical / document failure | correct version and actor; business success is separate from a failed PDF capture |
 | Long content / many records | the full identity is reachable; quantities and actions stay findable; contained scroll |
 
+**Interaction checklist — the same contract, applied through the existing components:**
+
+| State | Required visible behaviour |
+|---|---|
+| Record navigation | Open the exact record; Back restores list scope, sort, page and scroll. Row click, checkbox, expand and in-row controls remain separate operations (DataGrid and owning route). |
+| Viewing / editing | Plain facts until Edit; missing facts stay Not recorded. Starting Edit must not invent values (existing field/property-row adapter). |
+| Unchanged / submitting | Save unavailable when unchanged; submitting prevents a second request. Existing owning writer decides success, not a local click (Button and module mutation). |
+| Cancel / discard | Cancel preserves the saved record; changed input requires the existing discard decision before loss. Restore the baseline on discard; no write (owning editor and shared dialog). |
+| Tab / refresh | Keep a valid draft across tab changes; source refetch must not overwrite an open edit (Tabs and owning draft state). |
+| Overlay close | Use DialogFrame focus isolation and focus return. The owning variant decides whether outside/Escape may close; review forms that prohibit dismissal retain Save/Cancel. |
+| Keyboard / names | Every action reachable by keyboard; grid one Tab stop; icon-only action has accessible name and tooltip; colour alone never explains a state. |
+| Task result | Show the owning module's actual effect, outstanding work and responsible next party. No generic Done; no document preview or toast treated as completion (TaskView and owning module). |
+| Document read | Show the exact saved version; loading/error/retry stay inside PdfPreview or SavedEvidenceViewer. A failed PDF read does not reverse a successful business action. |
+
 **Feedback:** use the current 01 §3 Toast: fixed bottom centre, ordinary results 2.2–2.6 seconds; task closure 12 seconds with optional Next and Close, never timed Undo (owner 12 Oct evening). This replaces the older 2 Oct bottom-right/five-second composition. Never put ordinary toasts in document flow. A persistent business blocker
 stays an in-page message by the affected surface; field validation stays inline. The listing's three
 message kinds are in §6.5. A `Save` is disabled until something changed, and a blocked save names the
