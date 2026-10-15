@@ -92,7 +92,7 @@ function Num({ value, strong = false, tone = "ink", testId }: { value: number; s
   const colour = tone === "none" ? "text-c-secondary" : tone === "forecast" ? "text-c-tab" : "text-c-ink";
   return (
     <span className="flex flex-col items-end" data-testid={testId}>
-      <span className={`text-body tabular-nums ${strong ? "font-semibold" : ""} ${colour}`}>{value}</span>
+      <span className={`text-body tabular-nums ${strong ? "font-medium" : ""} ${colour}`}>{value}</span>
       <span className="text-meta" aria-hidden>&nbsp;</span>
     </span>
   );
@@ -261,7 +261,7 @@ export default function ForecastPurchasePage() {
         {s.onPo > 0 ? <span className="break-words text-meta text-c-secondary" data-testid={`forecast-size-onpo-${s.sku}`}>{W.onPoLine(s.onPo)}</span> : null}
       </span>
       {[0, 1, 2].map((i) => (
-        <span key={i} role="cell" className={`${cell} ${i === 2 ? "bg-c-column-band font-semibold" : ""} ${s.sold[i]! > 0 ? "text-c-ink" : "text-c-secondary"}`}>{s.sold[i]}</span>
+        <span key={i} role="cell" className={`${cell} ${i === 2 ? "bg-c-column-band font-medium" : ""} ${s.sold[i]! > 0 ? "text-c-ink" : "text-c-secondary"}`}>{s.sold[i]}</span>
       ))}
       <span role="cell" className={`${cell} text-c-ink`}>{s.have}</span>
       {[0, 1, 2].map((i) => {
@@ -269,7 +269,7 @@ export default function ForecastPurchasePage() {
         const tone = weekTone(n, i);
         return (
           <span key={i} role="cell" data-testid={`forecast-size-week-${i}-${s.sku}`}
-            className={`${cell} ${i === 0 && n > 0 ? "font-semibold" : ""} ${tone === "ink" ? "text-c-ink" : tone === "forecast" ? "text-c-tab" : "text-c-secondary"}`}>{n}</span>
+            className={`${cell} ${i === 0 && n > 0 ? "font-medium" : ""} ${tone === "ink" ? "text-c-ink" : tone === "forecast" ? "text-c-tab" : "text-c-secondary"}`}>{n}</span>
         );
       })}
     </div>

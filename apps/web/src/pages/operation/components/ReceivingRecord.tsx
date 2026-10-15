@@ -136,7 +136,7 @@ export default function ReceivingRecord({
         </p>
         <button
           type="button"
-          className="rounded-control border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-hovertint"
+          className="rounded-control border border-base-200 bg-white px-3 py-1.5 text-body font-medium text-base-700 hover:bg-hovertint"
           onClick={() => void q.refetch()}
         >
           Try again
@@ -229,7 +229,7 @@ export default function ReceivingRecord({
         {r.status !== "posted" && <span
           data-testid="receiving-record-state"
           className={[
-            "shrink-0 rounded-full px-2.5 py-0.5 text-label font-medium",
+            "shrink-0 rounded-full px-2.5 py-0.5 text-meta font-medium",
             r.status === "voided"
               ? "bg-kit-slate-3 text-kit-slate-11"
               : "bg-kit-amber-3 text-kit-amber-11",
@@ -537,14 +537,14 @@ export default function ReceivingRecord({
           {/* ── History — the three-rank record grammar, append-only ──── */}
           <Section title="History">
             {events.length === 0 ? (
-              <div className="text-label text-kit-slate-9">
+              <div className="text-meta text-kit-slate-11">
                 No receiving activity yet.
               </div>
             ) : (
               <ul className="flex flex-col gap-2" data-testid="record-history">
                 {events.map((e) => (
                   <li key={e.id}>
-                    <div className="text-body font-semibold text-kit-slate-12">
+                    <div className="text-body font-medium text-kit-slate-12">
                       {receivingEventLabel(e.event)}
                     </div>
                     <div className="text-meta text-kit-slate-11">
@@ -552,11 +552,11 @@ export default function ReceivingRecord({
                       {fmtDate(e.event_at.slice(0, 10))}
                     </div>
                     {e.payload?.reason ? (
-                      <div className="text-label font-normal text-kit-slate-11">
+                      <div className="text-meta text-kit-slate-11">
                         {e.payload.reason}
                       </div>
                     ) : e.payload?.grn_no ? (
-                      <div className="text-label font-normal text-kit-slate-11">
+                      <div className="text-meta text-kit-slate-11">
                         {documentDisplayNumber(e.payload.grn_no)}
                         {e.payload.units_counted != null
                           ? ` · ${e.payload.units_counted} unit(s)`
@@ -565,9 +565,9 @@ export default function ReceivingRecord({
                     ) : null}
                     {e.event === "amended" && e.payload?.before ? (
                       /* Only the AFFECTED facts compare side by side. */
-                      <div className="mt-1 grid max-w-md grid-cols-2 gap-2 rounded-card border border-kit-slate-5 p-2 text-label">
+                      <div className="mt-1 grid max-w-md grid-cols-2 gap-2 rounded-card border border-kit-slate-5 p-2 text-meta">
                         <div>
-                          <div className="uppercase tracking-wide text-kit-slate-9">
+                          <div className="text-label uppercase tracking-[0.06em] text-kit-slate-11">
                             Original
                           </div>
                           {Object.entries(e.payload.before).map(([k, v]) => (
@@ -577,7 +577,7 @@ export default function ReceivingRecord({
                           ))}
                         </div>
                         <div>
-                          <div className="uppercase tracking-wide text-kit-slate-9">
+                          <div className="text-label uppercase tracking-[0.06em] text-kit-slate-11">
                             Correction
                           </div>
                           {Object.entries(
@@ -629,7 +629,7 @@ export default function ReceivingRecord({
             type="button"
             data-testid="grn-print"
             onClick={() => void openDocument("print")}
-            className="inline-flex h-7 items-center gap-1.5 rounded-control border border-kit-slate-5 bg-white px-2.5 text-meta font-medium text-kit-slate-12 hover:bg-kit-slate-3"
+            className="inline-flex h-7 items-center gap-1.5 rounded-control border border-kit-slate-5 bg-white px-2.5 text-body font-medium text-kit-slate-12 hover:bg-kit-slate-3"
             title="A reprint carries the same number"
           >
             <Printer size={14} /> Print
@@ -638,7 +638,7 @@ export default function ReceivingRecord({
             type="button"
             data-testid="grn-download"
             onClick={() => void openDocument("download")}
-            className="inline-flex h-7 items-center gap-1.5 rounded-control border border-kit-slate-5 bg-white px-2.5 text-meta font-medium text-kit-slate-12 hover:bg-kit-slate-3"
+            className="inline-flex h-7 items-center gap-1.5 rounded-control border border-kit-slate-5 bg-white px-2.5 text-body font-medium text-kit-slate-12 hover:bg-kit-slate-3"
           >
             <Download size={14} /> Download PDF
           </button>
@@ -752,7 +752,7 @@ function SubmittedReview({
       </p>
       {dutyAllowed && warehouses.length > 0 ? (
         <div className="mt-2 flex items-center gap-2 text-body leading-6">
-          <span className="w-32 shrink-0 text-label text-kit-slate-9">
+          <span className="w-32 shrink-0 text-meta text-kit-slate-11">
             Goods arrived at
           </span>
           <select
@@ -771,7 +771,7 @@ function SubmittedReview({
         </div>
       ) : null}
       {!dutyAllowed ? (
-        <p className="mt-1 text-label text-kit-slate-9" data-testid="review-duty-refusal">
+        <p className="mt-1 text-meta text-kit-slate-11" data-testid="review-duty-refusal">
           Only Operation staff may save a receiving.
         </p>
       ) : returning ? (
@@ -789,7 +789,7 @@ function SubmittedReview({
             <button
               type="button"
               onClick={() => setReturning(false)}
-              className="text-label text-kit-slate-9 hover:text-kit-slate-12"
+              className="text-body font-medium text-kit-slate-11 hover:text-kit-slate-12"
             >
               Cancel
             </button>
@@ -833,7 +833,7 @@ function SubmittedReview({
         </div>
       )}
       {err && (
-        <p className="mt-1 text-label text-kit-red-11" data-testid="review-error">
+        <p className="mt-1 text-meta text-kit-red-11" data-testid="review-error">
           {err}
         </p>
       )}
@@ -953,7 +953,7 @@ function AmendPanel({
 
   return (
     <Section title="Amend Receiving">
-      <p className="text-label text-kit-slate-9">
+      <p className="text-meta text-kit-slate-11">
         The original record is preserved; the correction and its reason join
         History, and the preview beside this form shows the corrected GRN with
         its amendment marked. The number never changes. The GRN number, the
@@ -963,7 +963,7 @@ function AmendPanel({
         claims, not here.
       </p>
       <div className="receiving-details-row mt-2 flex items-center gap-2 text-body leading-6">
-        <span className="w-32 shrink-0 text-label text-kit-slate-9">
+        <span className="w-32 shrink-0 text-meta text-kit-slate-11">
           Correction reason
         </span>
         <input
@@ -977,7 +977,7 @@ function AmendPanel({
       </div>
       {/* Original → Corrected, per fact. */}
       <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
-        <span className="w-32 shrink-0 text-label text-kit-slate-9">
+        <span className="w-32 shrink-0 text-meta text-kit-slate-11">
           Goods Received Date
         </span>
         <span className="tabular-nums text-kit-slate-9">
@@ -999,7 +999,7 @@ function AmendPanel({
         />
       </div>
       <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
-        <span className="w-32 shrink-0 text-label text-kit-slate-9">
+        <span className="w-32 shrink-0 text-meta text-kit-slate-11">
           Goods arrived at
         </span>
         <select
@@ -1026,7 +1026,7 @@ function AmendPanel({
         </select>
       </div>
       <div className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
-        <span className="w-32 shrink-0 text-label text-kit-slate-9">
+        <span className="w-32 shrink-0 text-meta text-kit-slate-11">
           Supplier DO No
         </span>
         <span className="font-mono text-kit-slate-9">{receipt.do_number}</span>
@@ -1044,7 +1044,7 @@ function AmendPanel({
           paper on record (the old file survives in History); arrival
           evidence only ever GROWS. */}
       <div className="mt-2">
-        <span className="text-label text-kit-slate-9">
+        <span className="text-meta text-kit-slate-11">
           Corrected signed DO (optional)
         </span>
         <DOFileUploadField
@@ -1053,14 +1053,14 @@ function AmendPanel({
           onUploaded={(filePath) => set({ doFilePath: filePath })}
         />
         {draft.doFilePath ? (
-          <p className="text-label text-kit-slate-11" data-testid="amend-do-file-ready">
+          <p className="text-meta text-kit-slate-11" data-testid="amend-do-file-ready">
             Corrected DO ready. It replaces the paper on record when the
             amendment is saved.
           </p>
         ) : null}
       </div>
       <div className="mt-2">
-        <span className="text-label text-kit-slate-9">
+        <span className="text-meta text-kit-slate-11">
           Additional arrival evidence (optional)
         </span>
         <ArrivalEvidenceUploadField
@@ -1074,7 +1074,7 @@ function AmendPanel({
       {namedUnits.map((u) => (
         /* 0601 · the person names each Unit, both ways. Original → Corrected. */
         <div key={u.stock_item_id} className="receiving-details-row mt-1 flex flex-wrap items-center gap-2 text-body leading-6">
-          <span className="w-32 shrink-0 break-words font-mono text-label text-kit-slate-9">
+          <span className="w-32 shrink-0 break-words font-mono text-meta text-kit-slate-11">
             {u.unit_code}
           </span>
           <span className="w-24 text-kit-slate-9">
@@ -1100,7 +1100,7 @@ function AmendPanel({
           </select>
           {locked[u.unit_code] ? (
             <span
-              className="basis-full text-label text-kit-red-11"
+              className="basis-full text-meta text-kit-red-11"
               data-testid={`amend-unit-locked-${u.stock_item_id}`}
             >
               {u.unit_code} cannot change. {locked[u.unit_code]}
@@ -1110,7 +1110,7 @@ function AmendPanel({
       ))}
       {quantityLines.map((l) => (
         <div key={l.id} className="receiving-details-row mt-1 flex items-center gap-2 text-body leading-6">
-          <span className="w-32 shrink-0 break-words font-mono text-label text-kit-slate-9">
+          <span className="w-32 shrink-0 break-words font-mono text-meta text-kit-slate-11">
             {l.sku}
           </span>
           {/* Original → Corrected. */}
@@ -1137,7 +1137,7 @@ function AmendPanel({
         </div>
       ))}
       {err && (
-        <p className="mt-1 text-label text-kit-red-11" data-testid="amend-error">
+        <p className="mt-1 text-meta text-kit-red-11" data-testid="amend-error">
           {err}
         </p>
       )}
@@ -1146,7 +1146,7 @@ function AmendPanel({
           type="button"
           onClick={onClose}
           data-testid="amend-cancel"
-          className="text-label text-kit-slate-9 hover:text-kit-slate-12"
+          className="text-body font-medium text-kit-slate-11 hover:text-kit-slate-12"
         >
           Cancel
         </button>
@@ -1237,7 +1237,7 @@ function VoidPanel({
         exact blocker.
       </p>
       <div className="receiving-details-row mt-2 flex items-center gap-2 text-body leading-6">
-        <span className="w-32 shrink-0 text-label text-kit-slate-9">
+        <span className="w-32 shrink-0 text-meta text-kit-slate-11">
           Void reason
         </span>
         <input
@@ -1250,7 +1250,7 @@ function VoidPanel({
         />
       </div>
       {err && (
-        <p className="mt-1 text-label text-kit-red-11" data-testid="void-error">
+        <p className="mt-1 text-meta text-kit-red-11" data-testid="void-error">
           {err}
         </p>
       )}
@@ -1258,7 +1258,7 @@ function VoidPanel({
         <button
           type="button"
           onClick={onClose}
-          className="text-label text-kit-slate-9 hover:text-kit-slate-12"
+          className="text-body font-medium text-kit-slate-11 hover:text-kit-slate-12"
         >
           Cancel
         </button>

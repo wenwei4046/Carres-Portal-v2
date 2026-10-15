@@ -182,8 +182,8 @@ function BranchCard({ branch, nodes, owners, route }: { branch: Branch; nodes: R
     >
       <div className="flex items-center gap-2">
         <MIcon name={BRANCH[branch].icon} size={18} className="text-c-secondary" />
-        <span className="flex-1 text-[14px] font-semibold text-c-ink">{BRANCH[branch].name}</span>
-        <CPill tone={pill.tone} strong>{pill.word}</CPill>
+        <span className="flex-1 text-[15px] font-medium text-c-ink">{BRANCH[branch].name}</span>
+        <CPill tone={pill.tone}>{pill.word}</CPill>
       </div>
       {current?.action && (
         <div className="flex items-center gap-2 pb-0.5">
@@ -206,7 +206,7 @@ function BranchCard({ branch, nodes, owners, route }: { branch: Branch; nodes: R
       </div>
       {items.length > 0 && (
         <div className="flex flex-col gap-0.5 border-t border-c-section-line pt-1.5">
-          <span className="pb-0.5 text-[11px] font-semibold tracking-[.08em] text-c-muted">ITEMS</span>
+          <span className="pb-0.5 text-[11px] font-medium tracking-[.06em] text-c-secondary">ITEMS</span>
           {items.map(({ plate, nodes: own }) => {
             const m = worstOf(own);
             const bad = m === "blocked" || m === "unreadable";
@@ -229,7 +229,7 @@ function BranchCard({ branch, nodes, owners, route }: { branch: Branch; nodes: R
         </div>
       )}
       <div className="flex flex-1 flex-col gap-px border-t border-c-section-line pt-1.5">
-        <span className="pb-0.5 text-[11px] font-semibold tracking-[.08em] text-c-muted">STEPS</span>
+        <span className="pb-0.5 text-[11px] font-medium tracking-[.06em] text-c-secondary">STEPS</span>
         {steps.map((n) => (
           <div
             key={n.id}
@@ -322,7 +322,7 @@ export default function SoOrderRoute({
           small facts in a row (label 12 grey over value 13/500). */}
       <Card label="Order status" testId="route-status-card" className="gap-2">
         <div className="flex items-center gap-2">
-          <span className="flex-1 text-[15px] font-semibold text-c-ink">Delivery date</span>
+          <span className="flex-1 text-[15px] font-medium text-c-ink">Delivery date</span>
           <ViewSwitch
             label="View"
             value={view}
@@ -405,7 +405,7 @@ export default function SoOrderRoute({
           <div className="flex flex-col gap-1 rounded-lg bg-c-warn-bg px-3 py-2 text-[12px] text-c-warn-fg" data-testid="route-notices">
             {route.proposedChange && (
               <span>
-                <b className="font-semibold">{spell(route.proposedChange.fact)}</b>
+                <b className="font-medium">{spell(route.proposedChange.fact)}</b>
                 {route.proposedChange.changes.length > 0 && ` · ${route.proposedChange.changes.map(spell).join(" · ")}`}
                 {route.proposedChange.more > 0 && ` and ${route.proposedChange.more} more`}
                 {route.proposedChange.rule && `. ${route.proposedChange.rule}`}
@@ -414,7 +414,7 @@ export default function SoOrderRoute({
             {route.linkedProblems.map((p) => (
               <span key={p.id}>
                 {p.title}{" "}
-                <Link to={p.door.href} className="font-semibold text-c-ink hover:underline">
+                <Link to={p.door.href} className="font-medium text-c-ink hover:underline">
                   {p.door.label}
                 </Link>
               </span>
@@ -434,7 +434,7 @@ export default function SoOrderRoute({
         <Card label="Details" testId="route-details">
           <div className="overflow-x-auto">
             <div className="min-w-[680px] text-[13px]" role="table" aria-label="Order Route details">
-              <div role="row" className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_110px_minmax(0,1fr)] gap-3 border-b border-c-head-line py-2 text-[12px] text-c-muted">
+              <div role="row" className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_110px_minmax(0,1fr)] gap-3 border-b border-c-head-line py-2 text-[12px] font-medium text-c-secondary">
                 <span>Step</span><span>Who</span><span>Planned</span><span>Actual</span><span>Status</span><span>Document</span>
               </div>
               {steps.map((n) => {

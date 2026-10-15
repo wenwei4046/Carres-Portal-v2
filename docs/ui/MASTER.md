@@ -818,9 +818,10 @@ Staff & Duties edits assignments.
 
 History and Revisions answer in five seconds: **what happened · who did it · when · the important
 result.** Up to three lines in fixed order (omit an inapplicable third; never an empty line):
-1 what happened — `text-body` 13 semibold; 2 who and when — `text-meta` 12 regular (real staff name +
-role + `fmtDate()` date/time); 3 the important result — `text-label` 11 `font-normal`. Never
-concatenate actor, role, action and raw fields into one dotted sentence.
+1 what happened — 13 / 500; 2 who and when — `text-meta` 12 / 400 (real staff name + role +
+`fmtDate()` date/time); 3 the important result — `text-meta` 12 / 400 (sizes follow 01 §2, v12
+11 Oct 2026: 11 is only for caps labels, tags and badges). Never concatenate actor, role, action
+and raw fields into one dotted sentence.
 
 **Staff identity law (Jess 2026-08-27):** `Who did it?` is a PERSON, never a permission. Every staff
 member has an individual account; every write stores the individual `user_id`, resolved to the real

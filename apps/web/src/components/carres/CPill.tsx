@@ -25,19 +25,16 @@ const TONE: Record<CPillTone, string> = {
   select: SELECT_PILL_CLASS,
 };
 
+/** Every pill is 12 / 500 (01 §2), the object header's status pill included. */
 export default function CPill({
   tone = "info",
   children,
-  strong = false,
 }: {
   tone?: CPillTone;
   children: ReactNode;
-  /** 600 instead of 500 — the object header's status pill. */
-  strong?: boolean;
 }) {
-  const shape = strong ? PILL_SHAPE.replace("font-medium", "font-semibold") : PILL_SHAPE;
   return (
-    <span className={`${shape} ${TONE[tone]}`} data-tone={tone}>
+    <span className={`${PILL_SHAPE} ${TONE[tone]}`} data-tone={tone}>
       {children}
     </span>
   );

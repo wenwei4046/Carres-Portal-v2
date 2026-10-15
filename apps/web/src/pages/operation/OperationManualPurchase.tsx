@@ -687,7 +687,7 @@ function Absent({ children, title }: { children: string; title?: string }) {
 function RequesterAvatar({ name, userId }: { name: string | null; userId: string | null }) {
   if (!name || !userId) {
     return (
-      <span className="block text-label text-kit-slate-11" data-testid="mp-row-owner-missing">
+      <span className="block text-meta text-kit-slate-11" data-testid="mp-row-owner-missing">
         {MW.staffIdentityNotRecorded}
       </span>
     );
@@ -696,7 +696,7 @@ function RequesterAvatar({ name, userId }: { name: string | null; userId: string
   const label = `${name} · ${MW.nextActorRequester}`;
   return (
     <span
-      className="inline-grid size-6 shrink-0 place-items-center rounded-full border border-kit-slate-6 text-label font-semibold leading-none"
+      className="inline-grid size-6 shrink-0 place-items-center rounded-full border border-kit-slate-6 text-label font-bold leading-none"
       style={{ background: colour.bg, color: colour.fg }}
       aria-label={label}
       title={label}
@@ -1098,17 +1098,18 @@ export default function OperationManualPurchase() {
         key: "mpr_no",
         label: MW.colMprNo,
         headerLines: ["MPR", "No"],
-        /* `MPR-20260918-4103` is 137px at the register's 13px mono; 152 holds
-           it beside the sort mark and the filter control. */
-        width: 152,
-        minWidth: 108,
+        /* The identifier width (01 §5: minimum 180). Measured 15 Oct 2026:
+           `MPR-20260829-7712` at 13px mono ended in an ellipsis in 152 at
+           1025, 1164 and 1440; 180 holds it whole at 13 / 600. */
+        width: 180,
+        minWidth: 180,
         sortable: true,
         chooserGroup: "Request",
         accessor: (r) =>
           r.mprNo ? (
             <button
               type="button"
-              className="block max-w-full text-left font-mono font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+              className="block max-w-full text-left font-mono font-semibold text-kit-blue-11 underline-offset-2 hover:underline"
               data-testid={`mp-open-${r.id}`}
               onClick={(event) => {
                 event.stopPropagation();
@@ -1153,7 +1154,7 @@ export default function OperationManualPurchase() {
               <StatusPill tone={APPROVAL_TONE[r.approval.kind]}>{r.approval.label}</StatusPill>
               {deadReason(r) ? (
                 <span
-                  className="block text-label font-normal text-kit-amber-11"
+                  className="block text-meta text-kit-amber-11"
                   data-testid="mp-row-dead-reason"
                   title={r.remainderKnown ? undefined : MW.remainderNotCheckedWhy}
                 >
@@ -1696,7 +1697,7 @@ export default function OperationManualPurchase() {
                   type="button"
                   onClick={() => setMode("create")}
                   data-testid="manual-purchase-new-request"
-                  className={`${registerStyles.create} relative inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-kit-blue-9 px-3 text-meta font-semibold text-white hover:opacity-90`}
+                  className={`${registerStyles.create} relative inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-kit-blue-9 px-3 text-body font-semibold text-white hover:opacity-90`}
                 >
                   <Plus size={14} strokeWidth={2.25} aria-hidden />
                   <span className={registerStyles.createWords}><span className="sr-only">{MW.newRequest.slice(0, 2)}</span>{MW.newRequest.slice(2)}</span>
@@ -1891,7 +1892,7 @@ export default function OperationManualPurchase() {
               issueError ? (
                 <span className="flex min-w-0 flex-col" data-testid="mp-issue-selected-error">
                   <span className="font-medium">{issueError.wrong}</span>
-                  <span className="text-label">{issueError.todo}</span>
+                  <span className="text-meta">{issueError.todo}</span>
                 </span>
               ) : undefined
             }
@@ -1976,7 +1977,7 @@ function PoDutyChip({ data }: { data: ManualPurchaseRegisterPayload }) {
       data-testid="mp-po-duty"
       aria-label={label}
       title={label}
-      className="inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full border border-kit-slate-6 px-2 text-label font-semibold leading-none"
+      className="inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full border border-kit-slate-6 px-2 text-label font-bold leading-none"
       style={{ background: colour.bg, color: colour.fg }}
     >
       {personInitials(person.name, person.name)}
@@ -3155,7 +3156,7 @@ function CreateRequestWorkspace({
                         </span>
                         <Link
                           to="/operation?tab=purchasing-settings"
-                          className="text-label text-kit-blue-11 underline-offset-2 hover:underline"
+                          className="text-meta text-kit-blue-11 underline-offset-2 hover:underline"
                         >
                           {g.todo}
                         </Link>
@@ -3248,7 +3249,7 @@ function AlreadyHave({
        lowercase lines. The arithmetic is still PRINTED, never left to the
        reader. */
     <div className="flex flex-col gap-2" data-testid={`mp-already-have-${index}`}>
-      <span className="text-meta font-semibold text-kit-slate-12">{MW.alreadyHave}</span>
+      <span className="text-strong text-kit-slate-12">{MW.alreadyHave}</span>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <SharedFact idPrefix={`mp-have-${index}`} framed label={MW.colFreeStock} value={<span className="tabular-nums">{free}</span>} />
         <SharedFact
@@ -3273,7 +3274,7 @@ function AlreadyHave({
           framed
           label={MW.colStillNeeded}
           testId={`mp-still-needed-${index}`}
-          value={<span className="tabular-nums font-semibold">{still}</span>}
+          value={<span className="tabular-nums font-medium">{still}</span>}
           hint={still === 0 && qty > 0 ? MW.mayNotBeNeeded : undefined}
         />
       </div>
@@ -3430,7 +3431,7 @@ function ObjectTable({
               <th
                 key={c.key}
                 scope="col"
-                className="px-2 py-1.5 text-label font-semibold uppercase text-base-500"
+                className="px-2 py-1.5 text-meta font-medium text-base-500"
               >
                 {c.label}
               </th>
@@ -3553,7 +3554,7 @@ function DeliverToFact({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="ml-2 text-label text-kit-blue-11 underline-offset-2 hover:underline"
+            className="ml-2 text-body font-medium text-kit-blue-11 underline-offset-2 hover:underline"
             data-testid="mp-detail-deliver-to-change"
           >
             {MW.change}
@@ -3627,14 +3628,14 @@ function AlreadyHaveRow({
       <td className="px-2 py-2 tabular-nums">
         {already}
         {onPo.data?.firstPo ? (
-          <span className="pl-1 text-label text-base-600">
+          <span className="pl-1 text-meta text-base-600">
             · {onPo.data.firstPo.id}
             {onPo.data.firstPo.eta ? ` · ${fmtDate(onPo.data.firstPo.eta)}` : ""}
           </span>
         ) : null}
       </td>
       <td
-        className="px-2 py-2 font-semibold tabular-nums"
+        className="px-2 py-2 font-medium tabular-nums"
         data-testid={`mp-object-still-${index}`}
       >
         {stillNeededOf(requestedQty, free, already)}
@@ -3707,10 +3708,10 @@ function ApprovalLineRow({
 function LeadGapLine({ facts }: { facts: { wrong: string; todo: string } }) {
   return (
     <span className="flex min-w-0 flex-col">
-      <span className="text-label font-medium text-kit-red-11">{facts.wrong}</span>
+      <span className="text-body font-medium text-kit-red-11">{facts.wrong}</span>
       <Link
         to="/operation?tab=purchasing-settings"
-        className="text-label text-kit-blue-11 underline-offset-2 hover:underline"
+        className="text-meta text-kit-blue-11 underline-offset-2 hover:underline"
       >
         {facts.todo}
       </Link>
@@ -3732,7 +3733,7 @@ function TwoLines({
   return (
     <span className="flex min-w-0 flex-col" data-testid={testId}>
       <span className="text-body font-medium text-kit-red-11">{wrong}</span>
-      <span className="text-label text-base-600">{todo}</span>
+      <span className="text-meta text-base-600">{todo}</span>
     </span>
   );
 }
@@ -4270,12 +4271,12 @@ function ManualPurchaseObject({
                   <td className="px-2 py-2">
                     {l.item_label ?? l.sku}
                     {configWords(l.attrs) ? (
-                      <span className="block text-label text-kit-slate-11" data-testid={`mp-object-item-config-${i}`}>
+                      <span className="block text-meta text-kit-slate-11" data-testid={`mp-object-item-config-${i}`}>
                         {configWords(l.attrs)}
                       </span>
                     ) : null}
                     {l.cancelled_at ? (
-                      <span className="block text-label text-kit-slate-11">
+                      <span className="block text-meta text-kit-slate-11">
                         {MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead}
                         {l.cancel_reason ? `: ${l.cancel_reason}` : ""}
                       </span>
@@ -4309,7 +4310,7 @@ function ManualPurchaseObject({
                         <span>{MW.noSupplierYet}</span>
                         <Link
                           to="/operation?tab=catalog"
-                          className="text-label text-kit-blue-11 underline-offset-2 hover:underline"
+                          className="text-meta text-kit-blue-11 underline-offset-2 hover:underline"
                         >
                           Ask Catalog to set the supplier of {l.sku}.
                         </Link>
@@ -4481,7 +4482,7 @@ function ManualPurchaseObject({
                  refusal reason, or the reason it came back. */
               <div className="flex flex-col gap-2" data-testid="mp-approval-record">
                 <div className="flex min-w-0 flex-col gap-0.5">
-                  <span className="text-body font-semibold text-base-900">
+                  <span className="text-body font-medium text-base-900">
                     {approval.label}
                   </span>
                   {decidedEvent ? (
@@ -4491,7 +4492,7 @@ function ManualPurchaseObject({
                   ) : null}
                   {approval.kind === "refused" && request.refuse_reason ? (
                     <span
-                      className="text-label text-base-600"
+                      className="text-meta text-base-600"
                       data-testid="mp-detail-refuse-reason"
                     >
                       {request.refuse_reason}
@@ -4499,7 +4500,7 @@ function ManualPurchaseObject({
                   ) : null}
                   {approval.kind === "sent_back" && request.sent_back_reason ? (
                     <span
-                      className="text-label text-base-600"
+                      className="text-meta text-base-600"
                       data-testid="mp-detail-sent-back-reason"
                     >
                       {request.sent_back_reason}
@@ -4623,7 +4624,7 @@ function ManualPurchaseObject({
                 {historyGroups.map((group) => (
                   <section key={group.heading}>
                     <h3
-                      className="mb-1.5 text-label font-semibold text-base-500"
+                      className="mb-1.5 text-meta text-base-500"
                       data-testid={`mp-history-group-${group.heading}`}
                     >
                       {group.heading}

@@ -276,7 +276,7 @@
   color: var(--c-body);
   font-family: var(--font-sans);
   font-size: var(--fs-small);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
 }
@@ -359,7 +359,7 @@
   background: transparent;
   font-family: var(--font-button);
   font-size: var(--fs-label);
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: normal;
   text-transform: none;
   color: var(--c-secondary);
@@ -442,8 +442,8 @@
   border-top: 1px solid var(--c-section-line);
   font-family: var(--font-button);
   font-size: var(--fs-small);
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--c-muted);
 }
@@ -546,7 +546,7 @@ div:first-child > .columnsMenuGroup {
   border: 1px solid var(--c-input-border);
   border-radius: var(--radius);
   font-size: var(--fs-label);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--c-body);
 }
 .groupChipRemove {
@@ -891,7 +891,7 @@ div:first-child > .columnsMenuGroup {
   font-family: var(--font-button);
   font-size: var(--fs-label);
   line-height: 16px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: normal;
   color: var(--c-body);
 }
@@ -923,7 +923,7 @@ div:first-child > .columnsMenuGroup {
   font-family: var(--font-sans);
   font-size: var(--fs-label);
   line-height: 16px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: normal;
   color: var(--c-body);
 }
@@ -1101,7 +1101,7 @@ div:first-child > .columnsMenuGroup {
   color: var(--c-secondary);
 }
 .conditionBarLabel {
-  font-weight: 600;
+  font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
 }
