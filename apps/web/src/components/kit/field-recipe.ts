@@ -20,7 +20,7 @@ export const CONTROL_BASE =
   "w-full bg-c-card text-body text-c-ink border " +
   "placeholder:text-c-muted " +
   "focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:0] " +
-  "disabled:bg-c-search-bg disabled:text-c-muted disabled:cursor-not-allowed";
+  "disabled:bg-c-search-bg disabled:text-c-muted disabled:cursor-not-allowed disabled:opacity-[.45]";
 
 /** Resting hairline vs the refused field. 01 §1: form errors are AMBER; the
  *  red Problem pair is reserved for an evidenced problem. */

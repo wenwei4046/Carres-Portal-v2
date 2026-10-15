@@ -169,7 +169,7 @@ export function CIconBtn({
       aria-label={label}
       title={label}
       {...rest}
-      className={`grid shrink-0 place-items-center rounded-full text-c-body enabled:hover:bg-[var(--c-icon-hover)] enabled:active:bg-[var(--c-icon-press)] focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] ${size === 34 ? "h-[34px] w-[34px]" : "h-9 w-9"} ${className}`}
+      className={`grid shrink-0 place-items-center rounded-full text-c-body enabled:hover:bg-[var(--c-icon-hover)] enabled:active:bg-[var(--c-icon-press)] focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] disabled:opacity-[.45] ${size === 34 ? "h-[34px] w-[34px]" : "h-9 w-9"} ${className}`}
     >
       <MIcon name={icon} size={20} />
     </button>
