@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { testTaskSalesOrderDocument, testTaskPo, testTaskPoDocument, testTaskSuppliers } from "./tasks-feed-fixture";
+import { testTaskOrderRows, testTaskSupplierFacts, testTaskLogisticsFacts, testTaskSalesOrderDocument, testTaskPo, testTaskPoDocument, testTaskSuppliers } from "./tasks-feed-fixture";
 
 describe("known TEST Purchase Order document reads", () => {
   it.each(["PO-261001-9001", "PO-260925-9002", "PO-261006-9003", "PO-261008-9008"])("keeps %s identity, version, supplier and ordered quantities", (id) => {
@@ -39,5 +39,26 @@ describe("linked TEST Sales Order documents", () => {
   it("does not substitute root or other unseeded orders", () => {
     expect(testTaskSalesOrderDocument("11111111-1111-1111-1111-111111111111")).toBeNull();
     expect(testTaskSalesOrderDocument("00000000-0000-4000-8000-000000009103")).toBeNull();
+  });
+});
+
+describe("owning Route source fixtures", () => {
+  it("shares order identity, goods and money with its document", () => {
+    for (const order of testTaskOrderRows()) {
+      const doc = testTaskSalesOrderDocument(order.id)!;
+      expect(order.so).toBe(Number(doc.so_number.slice(3)));
+      expect(order.customer_name).toBe(doc.customer.name);
+      expect(order.delivery_date).toBe(doc.delivery.date);
+      expect(order.order_lines).toEqual(doc.lines.map((line) => ({ ...line, label: line.description })));
+      expect(order.paid).toBe(doc.paid);
+      expect(order.allocated_units).toEqual([]);
+      const facts = testTaskSupplierFacts(order.id)!;
+      expect(facts.purchaseOrders[0]).toMatchObject({ poNo: "PO-261001-9001", orderedQty: 9, receivedQty: 2, grnIso: null });
+      expect(testTaskLogisticsFacts(order.id)).toMatchObject({ partner: null, routes: [], link: null });
+    }
+  });
+  it("keeps unavailable orders unavailable across each owning source", () => {
+    expect(testTaskSupplierFacts("unseeded")).toBeNull();
+    expect(testTaskLogisticsFacts("unseeded")).toBeNull();
   });
 });

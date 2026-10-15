@@ -19,7 +19,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import OperationApp from "@/pages/operation/OperationApp";
-import { testTaskSalesOrderDocument, testInternalTask, testTaskPoDocument, testTaskPo, testTaskSuppliers, testTasksFeed } from "./tasks-feed-fixture";
+import { testTaskOrderRows, testTaskSupplierFacts, testTaskLogisticsFacts, testTaskSalesOrderDocument, testInternalTask, testTaskPoDocument, testTaskPo, testTaskSuppliers, testTasksFeed } from "./tasks-feed-fixture";
 import "@/index.css";
 
 const STATE = new URLSearchParams(window.location.search).get("state") ?? "full";
@@ -107,6 +107,25 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
      No task completion or business writer is simulated by this read-only walk. */
   const path = new URL(url, window.location.href).pathname;
   const requestedOrder = /^\/api\/(?:operation\/)?orders\/([^/]+)/.exec(path)?.[1];
+  /* Settings are deliberately unavailable in this TEST walk. The existing
+     reader's documented default policy applies; never borrow local API data. */
+  if (["/api/operation/purchasing/settings", "/api/operation/delivery-settings/calendar", "/api/operation/delivery-settings/leads", "/api/finance/payment-settings/collection-timing"].includes(path)) {
+    return json({ error: "TEST fixture: settings read not seeded; shared fallback policy applies" }, 404);
+  }
+  const supplierOrder = /^\/api\/operation\/pos\/for-order\/([^/]+)$/.exec(path)?.[1];
+  if (supplierOrder) {
+    const facts = testTaskSupplierFacts(supplierOrder);
+    return json(facts ?? { error: "TEST fixture: supplier source not seeded" }, facts ? 200 : 404);
+  }
+  const logisticsOrder = /^\/api\/operation\/delivery-arrangements\/([^/]+)\/logistics-card$/.exec(path)?.[1];
+  if (logisticsOrder) {
+    const facts = testTaskLogisticsFacts(logisticsOrder);
+    return json(facts ?? { error: "TEST fixture: logistics source not seeded" }, facts ? 200 : 404);
+  }
+  if (path === "/api/operation/orders" && !new URL(url, window.location.href).searchParams.has("count")) {
+    return json({ orders: testTaskOrderRows(), nextCursor: null });
+  }
+  if (requestedOrder && testTaskSalesOrderDocument(requestedOrder) && path.endsWith("/loan-offers")) return json({ offers: [] });
   if (requestedOrder && path.endsWith("/sales-order-data")) {
     const document = testTaskSalesOrderDocument(requestedOrder);
     if (document) return json(document);
@@ -134,6 +153,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       return json(result.pos.length ? result : { error: "TEST fixture: this Purchase Order is not seeded" }, result.pos.length ? 200 : 404);
     }
   }
+  if (path === "/api/operation/partners") return json({ partners: [] });
   if (path === "/api/operation/suppliers") return json(testTaskSuppliers());
   /* Current Order Route reads the owning sources separately. Empty arrays here
      mean no TEST record exists, not a failed source or a completed obligation. */

@@ -10,6 +10,8 @@
  */
 import { addWorkingDays, internalTaskOccurrenceId, internalTaskResultReference, myHolidaySet, projectInternalTaskWork, type InternalTask, type OperationWorkCompleted, type OperationWorkItem, type OperationWorkModule, type OperationWorkResponse } from "@carres/shared";
 import { appTodayIso } from "@/lib/fmt-date";
+import type { operationOrderListRow } from "@/lib/queries";
+import type { SupplierPoFact, LogisticsCardFacts } from "@carres/shared";
 import type { PoTemplateData, SalesOrderTemplateData } from "@/lib/pdf/types";
 
 const holidays = myHolidaySet();
@@ -256,4 +258,40 @@ export function testTaskSalesOrderDocument(orderId: string): SalesOrderTemplateD
     delivery: { date: workingDay(appTodayIso(), 4), floor: null, has_lift: null },
     lines, addons: [], subtotal: total, total, paid: 0, balance_due: total,
   };
+}
+
+/** The same explicit document facts in the Operation list reader's contract. */
+export function testTaskOrderRows(): operationOrderListRow[] {
+  return ["00000000-0000-4000-8000-000000009101", "00000000-0000-4000-8000-000000009102"].map((id) => {
+    const doc = testTaskSalesOrderDocument(id)!;
+    return {
+      id, so: Number(doc.so_number.slice(3)), status: "proceed_order", operation_stage: "in_production",
+      warehouse_id: "w1", customer_name: doc.customer.name, customer_phone: doc.customer.phone,
+      customer_address: doc.customer.address, placed_at: `${doc.issue_date}T02:00:00Z`, proceeded_at: `${doc.issue_date}T03:00:00Z`,
+      delivery_date: doc.delivery.date, delivery_partner_id: null, delivery_partners: null,
+      request_for_delivery_at: null, partner_accepted_at: null, partner_rejected_at: null, partner_rejected_reason: null,
+      do_number: null, dispatched_at: null, delivered_at: null, outlet_id: null, dealer_id: "test-dealer", dealers: { name: doc.dealer.name },
+      paid: doc.paid, order_supplier_threads: [], order_annotations: [], order_addons: [], order_lines: doc.lines.map((line) => ({ ...line, label: line.description })),
+      po_skus: doc.lines.map((line) => line.sku), allocated_units: [],
+    };
+  });
+}
+
+/** Purchasing's known PO9001 facts, not a claimed Warehouse acceptance. */
+export function testTaskSupplierFacts(orderId: string): { purchaseOrders: SupplierPoFact[] } | null {
+  if (!testTaskSalesOrderDocument(orderId)) return null;
+  const po = testTaskPo("PO-261001-9001").pos[0]!;
+  return { purchaseOrders: [{
+    poNo: po.id, supplier: TEST_SUPPLIERS[0]!.name, issued: true, originalIso: po.official_delivery_date,
+    effectiveIso: po.eta_date, etaIso: po.eta_date, status: po.status, reply: null, supplierDo: null,
+    deliverTo: "Carres Klang", grnIso: null,
+    orderedQty: po.purchase_order_lines.reduce((sum, line) => sum + line.qty, 0),
+    receivedQty: po.purchase_order_lines.reduce((sum, line) => sum + line.received_qty, 0),
+    lines: po.purchase_order_lines.map(({ sku, qty }) => ({ sku, qty })),
+  }] };
+}
+
+export function testTaskLogisticsFacts(orderId: string): LogisticsCardFacts | null {
+  if (!testTaskSalesOrderDocument(orderId)) return null;
+  return { partner: null, routes: [], link: null, lastRevokedAt: null, detailsReceivedAt: null, answer: null, history: [] };
 }
