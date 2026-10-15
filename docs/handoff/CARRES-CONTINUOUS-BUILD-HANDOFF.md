@@ -40,16 +40,14 @@ Never report progress as a percentage; list the exact remaining obligations (§4
 
 ## 2 · Completion table (one table; re-measure before quoting)
 
-Production runs `dabffcfc5` (ERP, POS and API, 15 Oct 2026 14:02 MYT). **Batch B is PR #2083
-(`build/kit-batch-b`, head `b664e6512`)**: local gates all green (lint, typecheck, 478 test files /
-7,013 tests, kit check 74/74), 42 retaken pictures committed, CI was running at 15:10 MYT. Next: when
-CI is green on the head, squash-merge with `--match-head-commit <head SHA read by gh>`, wait for the
-deploy (`/__carres_deploy.json` on erp/pos and `api…/health` must show the merge SHA), then the
-production carres-check at 1025 · 1164 · 1440 on the Sales Order page, Purchase Orders, Inbound,
-Manual Purchase, Delivery Orders and one Finance list (the browser pane must be signed in by the
-owner — never type a password). **Batch B2** (`build/kit-batch-b2`, `6c6b99f09`, not a PR yet): Finance
-read failures say `Could not read …`, no `refund_pay` on screen, Payment Monitor ref line grey — ships
-with the next functional release, not on its own.
+Production runs `7f4f7dd34` (ERP, POS and API, 15 Oct 2026 15:17 MYT) = **Batch B #2083, LIVE and
+verified**: signed-in carres-check PASS at 1025 · 1164 · 1440 on the Sales Order page (was 25
+findings), Purchase Orders, Inbound, Manual Purchase, Delivery Orders, Outright, SO Batch and
+Receiving; Forecast and Workspace PASS at 1025; Payment Monitor PASS at 1440. **Batch B2**
+(`build/kit-batch-b2`, `6c6b99f09`, no PR yet): Finance read failures say `Could not read …`, no
+`refund_pay` on screen, Payment Monitor ref line grey — ships with the next functional release.
+Known toolbar defect tied to the pending short-toolbar decision (§5): SO Batch `View: By sales order`
+is cut by 15px at 1025 with the Tasks panel open (row 433 wide, needs 448).
 
 | Area | Deployed (PR · SHA) | Runtime-verified | Unfinished |
 |---|---|---|---|
