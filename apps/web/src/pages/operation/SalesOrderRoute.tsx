@@ -444,7 +444,7 @@ function Node({
         }}
       >
         <div
-          className="flex items-center gap-1 truncate text-label font-semibold text-c-ink"
+          className="flex items-center gap-1 truncate text-meta font-medium text-c-ink"
           style={{ height: TITLE_H, lineHeight: `${TITLE_H}px` }}
         >
           {goodsExpanded ? <ChevronDown size={12} aria-hidden="true" /> : <ChevronRight size={12} aria-hidden="true" />}
@@ -457,7 +457,7 @@ function Node({
         {node.lines.map((line, i) => (
           <div
             key={`${node.id}-line-${i}`}
-            className="truncate text-label text-c-secondary"
+            className="truncate text-meta text-c-secondary"
             style={{ height: LINE_H, lineHeight: `${LINE_H}px` }}
           >
             {spellDates(line)}
@@ -489,7 +489,7 @@ function Node({
         }}
       >
         <div
-          className="text-label font-semibold text-c-ink"
+          className="text-meta font-medium text-c-ink"
           style={{ height: TITLE_H, lineHeight: `${TITLE_H}px` }}
         >
           {node.title}{" "}
@@ -497,7 +497,7 @@ function Node({
         {node.lines.map((line, i) => (
           <div
             key={`${node.id}-line-${i}`}
-            className="whitespace-nowrap text-label text-c-secondary"
+            className="whitespace-nowrap text-meta text-c-secondary"
             style={{ height: LINE_H, lineHeight: `${LINE_H}px` }}
           >
             {line}{" "}
@@ -579,12 +579,12 @@ function Node({
             (measured 2026-09-28: `DELIVERY PHO…`). The word gives up its
             letter spacing first. */}
         <span
-          className={`whitespace-nowrap text-label font-semibold uppercase text-c-secondary ${node.current ? "" : "tracking-wide"}`}
+          className={`whitespace-nowrap text-label uppercase text-c-secondary ${node.current ? "" : "tracking-[0.06em]"}`}
         >
           {node.title}
         </span>
         {node.current && (
-          <span className="ml-auto shrink-0 text-label font-semibold uppercase text-c-ink">
+          <span className="ml-auto shrink-0 text-label uppercase tracking-[0.06em] text-c-ink">
             Current
           </span>
         )}
@@ -678,7 +678,7 @@ function Node({
           <button
             type="button"
             onClick={go}
-            className="truncate text-label font-medium text-c-ink underline-offset-2 hover:underline focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px]"
+            className="truncate text-meta font-medium text-c-ink underline-offset-2 hover:underline focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px]"
           >
             {node.door.label}
           </button>
@@ -690,7 +690,7 @@ function Node({
           <Link
             to={node.door.href}
             tabIndex={-1}
-            className="truncate text-label font-medium text-c-ink underline-offset-2 hover:underline"
+            className="truncate text-meta font-medium text-c-ink underline-offset-2 hover:underline"
           >
             {node.door.label}
           </Link>
@@ -882,7 +882,7 @@ export default function SalesOrderRoute({
             </Link>
           )}
           {route.proposedChange.changes.map((row, i) => (
-            <span key={i} className="basis-full font-semibold">{spellDates(row)}</span>
+            <span key={i} className="basis-full font-medium">{spellDates(row)}</span>
           ))}
           {route.proposedChange.more > 0 && (
             <span className="basis-full">and {route.proposedChange.more} more</span>
@@ -898,7 +898,7 @@ export default function SalesOrderRoute({
           className="rounded-lg border border-c-card-border bg-c-warn-bg px-4 py-3"
           data-testid="linked-problems"
         >
-          <h2 className="text-label font-semibold uppercase tracking-wide text-c-warn-fg">
+          <h2 className="text-label uppercase tracking-[0.06em] text-c-warn-fg">
             Linked problems
           </h2>
           <ul className="mt-1 flex flex-col gap-1">
@@ -907,7 +907,7 @@ export default function SalesOrderRoute({
                 <span>{problem.title}</span>
                 <Link
                   to={problem.door.href}
-                  className="text-label font-medium text-c-ink underline-offset-2 hover:underline"
+                  className="text-meta font-medium text-c-ink underline-offset-2 hover:underline"
                 >
                   {problem.door.label}
                 </Link>
@@ -997,7 +997,7 @@ export default function SalesOrderRoute({
             <div
               key={band.id}
               data-testid={`route-band-${band.id}`}
-              className="absolute truncate border-b border-c-card-border text-label font-semibold uppercase tracking-wide text-c-secondary"
+              className="absolute truncate border-b border-c-card-border text-label uppercase tracking-[0.06em] text-c-secondary"
               style={{
                 left: band.x,
                 top: band.y,

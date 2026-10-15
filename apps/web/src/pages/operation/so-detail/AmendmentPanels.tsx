@@ -32,10 +32,10 @@ export function DiffList({ rows, label }: { rows: DiffRow[]; label: string }) {
           role="row"
           className="grid grid-cols-[minmax(0,.6fr)_minmax(0,1fr)_16px_minmax(0,1fr)] items-baseline gap-2 border-t border-c-section-line py-1.5"
         >
-          <span role="cell" className="text-c-secondary">{r.what}</span>
+          <span role="cell" className="text-[12px] text-c-secondary">{r.what}</span>
           <span role="cell" className="break-words text-c-muted line-through">{r.before || "Not recorded"}</span>
           <span aria-hidden="true" className="text-c-muted">→</span>
-          <span role="cell" className="break-words font-semibold text-c-ink">{r.after || "Not recorded"}</span>
+          <span role="cell" className="break-words font-medium text-c-ink">{r.after || "Not recorded"}</span>
         </div>
       ))}
     </div>
@@ -78,16 +78,16 @@ export function ChangeReview(props: {
       {props.commercial && <Consequences items={props.consequences} />}
       <div className="mt-2 flex flex-col">
         <div className="grid grid-cols-[150px_minmax(0,1fr)] gap-4 border-t border-c-section-line py-[7px] text-[13px]">
-          <span className="text-c-secondary">Reason for change</span>
+          <span className="text-[12px] text-c-secondary">Reason for change</span>
           <span className="break-words font-medium text-c-ink">{props.reason || "Not recorded"}</span>
         </div>
         <div className="grid grid-cols-[150px_minmax(0,1fr)] gap-4 border-t border-c-section-line py-[7px] text-[13px]">
-          <span className="text-c-secondary">Requested date (from customer)</span>
+          <span className="text-[12px] text-c-secondary">Requested date (from customer)</span>
           <span className={`font-medium ${props.askedOn ? "text-c-ink" : "text-c-muted"}`}>{props.askedOn ? fmtDate(props.askedOn) : "Not recorded"}</span>
         </div>
         {props.commercial && (
           <div className="grid grid-cols-[150px_minmax(0,1fr)] gap-4 border-t border-c-section-line py-[7px] text-[13px]">
-            <span className="text-c-secondary">Customer agreement</span>
+            <span className="text-[12px] text-c-secondary">Customer agreement</span>
             <span className={`break-words font-medium ${props.agreement ? "text-c-ink" : "text-c-muted"}`}>
               {props.agreement
                 ? props.agreement.reference
@@ -127,12 +127,12 @@ export function WaitingAmendment(props: {
     >
       <div className="flex flex-wrap items-center gap-3">
         <span className="flex min-w-[220px] flex-1 flex-col leading-[1.35]">
-          <span className="text-[12px] font-semibold text-c-warn-fg">
+          <span className="text-[13px] font-medium text-c-warn-fg">
             {a.stale ? "Amendment out of date. Propose again" : "Amendment · waiting for approval"}
           </span>
           {props.rows[0] && (
             <span className="text-[13px] text-c-body">
-              {props.rows[0].what}: {props.rows[0].before || "Not recorded"} → <b className="font-semibold">{props.rows[0].after || "Not recorded"}</b>
+              {props.rows[0].what}: {props.rows[0].before || "Not recorded"} → <b className="font-medium">{props.rows[0].after || "Not recorded"}</b>
               {props.rows.length > 1 ? ` and ${props.rows.length - 1} more` : ""}
             </span>
           )}
@@ -141,16 +141,16 @@ export function WaitingAmendment(props: {
           </span>
         </span>
         <span className="flex flex-wrap gap-1.5">
-          <CBtn kind="normal" className="!h-[30px] !text-[12px] !font-semibold" onClick={() => setOpen((v) => !v)} aria-expanded={open} data-testid="amendment-details">
+          <CBtn kind="normal" className="!h-[30px]" onClick={() => setOpen((v) => !v)} aria-expanded={open} data-testid="amendment-details">
             {open ? "Hide details" : "Details"}
           </CBtn>
           {!a.stale && (
-            <CBtn kind="normal" className="!h-[30px] !text-[12px] !font-semibold" onClick={props.onWithdraw} data-testid="amendment-withdraw">
+            <CBtn kind="normal" className="!h-[30px]" onClick={props.onWithdraw} data-testid="amendment-withdraw">
               Withdraw
             </CBtn>
           )}
           {a.stale && (
-            <CBtn kind="main" className="!h-[30px] !text-[12px]" onClick={props.onProposeAgain} data-testid="propose-again">
+            <CBtn kind="main" className="!h-[30px]" onClick={props.onProposeAgain} data-testid="propose-again">
               Propose this version again
             </CBtn>
           )}

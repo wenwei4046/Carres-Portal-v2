@@ -85,7 +85,7 @@ const CONNECT_AT_PANEL = "22px";
 function Fact({ label, value, problem = false }: { label: string; value: ReactNode; problem?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-0.5">
-      <span className="shrink-0 text-label text-kit-slate-11">{label}</span>
+      <span className="shrink-0 text-meta text-kit-slate-11">{label}</span>
       <span className={`min-w-0 text-right text-body ${problem ? "text-kit-amber-11" : "text-kit-slate-12"}`}>
         {value}
       </span>
@@ -156,9 +156,9 @@ function ReplyProofField({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-label text-kit-slate-11">{MONITOR_COPY.whatsappProof}</span>
+      <span className="text-meta text-kit-slate-11">{MONITOR_COPY.whatsappProof}</span>
       <div className="flex items-center gap-2">
-        <label className="inline-flex cursor-pointer items-center rounded-control border border-kit-slate-6 bg-white px-2 py-1 text-label font-medium text-kit-slate-12 hover:bg-kit-slate-3">
+        <label className="inline-flex cursor-pointer items-center rounded-control border border-kit-slate-6 bg-white px-2 py-1 text-body font-medium text-kit-slate-12 hover:bg-kit-slate-3">
           {busy ? "…" : path ? MONITOR_COPY.replaceReply : MONITOR_COPY.uploadReply}
           <input
             id={id}
@@ -174,9 +174,9 @@ function ReplyProofField({
             }}
           />
         </label>
-        {path ? <span className="text-label text-kit-green-11">{MONITOR_COPY.replyAttached}</span> : null}
+        {path ? <span className="text-meta text-kit-green-11">{MONITOR_COPY.replyAttached}</span> : null}
       </div>
-      {error ? <span className="text-label text-kit-red-11">{error}</span> : null}
+      {error ? <span className="text-meta text-kit-red-11">{error}</span> : null}
     </div>
   );
 }
@@ -536,7 +536,7 @@ export function LogisticsDetailsEdit({
           </Button>
           {chosen?.whatsapp_group_url ? (
             <a
-              className="text-label text-blue-700 underline-offset-2 hover:underline"
+              className="text-meta text-blue-700 underline-offset-2 hover:underline"
               href={chosen.whatsapp_group_url}
               target="_blank"
               rel="noreferrer"
@@ -544,10 +544,10 @@ export function LogisticsDetailsEdit({
               {MONITOR_COPY.openGroup}
             </a>
           ) : (
-            <span className="text-label text-kit-slate-9">{MONITOR_COPY.groupNotSet}</span>
+            <span className="text-meta text-kit-slate-11">{MONITOR_COPY.groupNotSet}</span>
           )}
         </div>
-        <span className="text-label text-kit-slate-11">{MONITOR_COPY.sentIsNotConfirmed}</span>
+        <span className="text-meta text-kit-slate-11">{MONITOR_COPY.sentIsNotConfirmed}</span>
         <ReplyProofField
           id={`delivery-brief-logistics-proof-${card.scopeId}`}
           path={proofPath}
@@ -752,7 +752,7 @@ export function ItemsServicesStockPanel({
             <thead className="sr-only border-b border-base-200 bg-base-50 xl:not-sr-only xl:table-header-group">
               <tr className="divide-x divide-base-200">
                 {BRIEF_COLUMNS.map((c) => (
-                  <th key={c.key} scope="col" className="px-2 py-1.5 text-label font-semibold uppercase text-base-500">
+                  <th key={c.key} scope="col" className="px-2 py-1.5 text-meta font-medium text-base-500">
                     {c.label}
                   </th>
                 ))}
@@ -764,14 +764,14 @@ export function ItemsServicesStockPanel({
                   <td className="min-w-0 break-words px-2 py-1.5">{line.item}</td>
                   <td className="px-2 py-1.5 tabular-nums">{line.qty}</td>
                   <td className="col-span-2 min-w-0 break-words px-2 py-1.5">
-                    <span className="block text-label text-kit-slate-11 xl:hidden">{MONITOR_COPY.source}</span>
+                    <span className="block text-meta text-kit-slate-11 xl:hidden">{MONITOR_COPY.source}</span>
                     {!line.units?.length ? (
                       absentWord(DW.notAllocated)
                     ) : (
                       line.units.map((u) => (
                         <span key={u.unit} className="block">
                           <span className="block font-mono">{u.unit}</span>
-                          <span className="block text-label">
+                          <span className="block text-meta">
                             {u.po ? (
                               <button
                                 type="button"
@@ -789,11 +789,11 @@ export function ItemsServicesStockPanel({
                     )}
                   </td>
                   <td className={`col-span-2 min-w-0 break-words px-2 py-1.5 ${STATUS_TONE_TEXT[line.statusTone]}`}>
-                    <span className="block text-label text-kit-slate-11 xl:hidden">{MONITOR_COPY.status}</span>
+                    <span className="block text-meta text-kit-slate-11 xl:hidden">{MONITOR_COPY.status}</span>
                     {line.status ?? absentWord(DW.notRecorded)}
                   </td>
                   <td className="col-span-2 min-w-0 break-words px-2 py-1.5">
-                    <span className="block text-label text-kit-slate-11 xl:hidden">{MONITOR_COPY.location}</span>
+                    <span className="block text-meta text-kit-slate-11 xl:hidden">{MONITOR_COPY.location}</span>
                     {line.location ?? absentWord(DW.notRecorded)}
                   </td>
                 </tr>

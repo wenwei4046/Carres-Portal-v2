@@ -43,12 +43,12 @@ export function Card({
   );
 }
 
-/** Card title — 15/600 ink, with an optional quiet note on the right. */
+/** Card title — 15/500 ink (01 §2), with an optional quiet note on the right. */
 export function CardTitle({ children, note, right }: { children: ReactNode; note?: ReactNode; right?: ReactNode }) {
   return (
     <div className="flex items-center gap-2 pb-1.5">
-      <h2 className="flex-1 text-[15px] font-semibold leading-5 text-c-ink">{children}</h2>
-      {note && <span className="text-[12px] text-c-muted">{note}</span>}
+      <h2 className="flex-1 text-[15px] font-medium leading-5 text-c-ink">{children}</h2>
+      {note && <span className="text-[12px] text-c-secondary">{note}</span>}
       {right}
     </div>
   );
@@ -88,11 +88,11 @@ export function KvRow({
       className="grid min-h-8 grid-cols-[150px_minmax(0,1fr)] items-center gap-4 border-t border-c-section-line py-[7px] text-[13px] leading-[18px]"
       data-testid={testId}
     >
-      <span className="text-c-secondary">{label}</span>
+      <span className="text-[12px] leading-4 text-c-secondary">{label}</span>
       {showEditor ? (
         <span className="flex min-w-0 flex-col gap-0.5">
           {editor}
-          {changed && was != null && <span className="text-[12px] text-c-muted">Was: {was || NOT_RECORDED}</span>}
+          {changed && was != null && <span className="text-[12px] text-c-secondary">Was: {was || NOT_RECORDED}</span>}
         </span>
       ) : (
         <span className="flex min-w-0 items-start gap-1.5">
@@ -321,7 +321,7 @@ export function Drawer({
         style={{ width, right, boxShadow: "var(--shadow-drawer)" }}
       >
         <div className="flex shrink-0 items-center gap-2 border-b border-c-section-line px-4 py-3.5">
-          <h2 className="min-w-0 flex-1 truncate text-[15px] font-semibold text-c-ink">{title}</h2>
+          <h2 className="min-w-0 flex-1 truncate text-[15px] font-medium text-c-ink">{title}</h2>
           {actions}
           <CIconBtn icon="close" label="Close" size={34} onClick={onClose} />
         </div>
@@ -371,7 +371,7 @@ export function Dialog({
         style={{ maxWidth: width, boxShadow: "var(--shadow-drawer)" }}
       >
         <div className="flex shrink-0 items-center gap-2 border-b border-c-section-line px-4 py-3.5">
-          <h2 className="min-w-0 flex-1 text-[15px] font-semibold text-c-ink">{title}</h2>
+          <h2 className="min-w-0 flex-1 text-[15px] font-medium text-c-ink">{title}</h2>
           <CIconBtn icon="close" label="Close" size={34} onClick={onClose} />
         </div>
         <div className="min-h-0 flex-1 overflow-auto px-4 py-3.5">{children}</div>
@@ -427,7 +427,7 @@ export function PopMenu({
       >
         {shown.map((g, gi) => (
           <div key={g.heading} className={gi > 0 ? "border-t border-c-section-line" : ""}>
-            <div className="px-2.5 pb-1 pt-2 text-[11px] font-semibold tracking-[.04em] text-c-muted">{g.heading}</div>
+            <div className="px-2.5 pb-1 pt-2 text-[11px] font-medium uppercase tracking-[.06em] text-c-secondary">{g.heading}</div>
             {g.items.map((it) => (
               <button
                 key={it.label}
@@ -439,11 +439,11 @@ export function PopMenu({
                   onClose();
                   it.onSelect();
                 }}
-                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-left text-[13px] font-medium text-c-ink hover:bg-c-hover focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-left text-[13px] text-c-ink hover:bg-c-hover focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <MIcon name={it.icon} size={18} className="text-c-secondary" />
                 <span className="flex-1">{it.label}</span>
-                {it.hint && <span className="text-[11px] text-c-muted">{it.hint}</span>}
+                {it.hint && <span className="text-[12px] text-c-secondary">{it.hint}</span>}
               </button>
             ))}
           </div>

@@ -68,7 +68,7 @@ export default function SoHeader({
           <MIcon name="arrow_back" size={20} />
         </Link>
         <div className="flex min-w-0 flex-col leading-[1.25]" data-testid="object-header-identity">
-          <span className="text-[20px] font-medium tracking-[-.01em] text-c-ink" data-testid="object-identity">
+          <span className="text-[20px] font-semibold tracking-[-.01em] text-c-ink" data-testid="object-identity">
             {identity}
           </span>
           {customer && (
@@ -79,7 +79,7 @@ export default function SoHeader({
         </div>
         {status && (
           <span data-testid="object-identity-status">
-            <CPill tone={status.tone} strong>
+            <CPill tone={status.tone}>
               {status.word}
             </CPill>
           </span>
@@ -102,7 +102,7 @@ export default function SoHeader({
             onClick={onOpenRevisions}
             title="Revision history"
             data-testid="so-rev"
-            className="flex h-6 items-center gap-1 rounded-lg border border-c-btn-border bg-c-card px-2.5 text-[12px] font-semibold text-c-ink hover:bg-c-hover focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px]"
+            className="flex h-6 items-center gap-1 rounded-lg border border-c-btn-border bg-c-card px-2.5 text-[12px] font-medium text-c-ink hover:bg-c-hover focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px]"
           >
             <MIcon name="history" size={16} />
             {revLabel}
@@ -124,7 +124,7 @@ export default function SoHeader({
           }
         >
           <div className="px-2.5 py-2 text-[13px]" data-testid="so-log-contact-soon">
-            <div className="font-semibold text-c-ink">Log a call or WhatsApp</div>
+            <div className="font-medium text-c-ink">Log a call or WhatsApp</div>
             <div className="text-c-secondary">Coming soon</div>
           </div>
         </CPopover>

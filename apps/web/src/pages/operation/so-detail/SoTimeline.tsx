@@ -171,13 +171,13 @@ export default function SoTimeline({ entries }: { entries: TimelineEntry[] }) {
               <span className="flex min-w-0 flex-col gap-0.5 leading-[1.35]">
                 <span className="break-words text-[13px] font-medium text-c-ink">{e.title}</span>
                 {e.details && <span className="break-words text-[12px] text-c-secondary">{e.details}</span>}
-                <span className="flex flex-wrap items-center gap-2 text-[11px] text-c-muted">
+                <span className="flex flex-wrap items-center gap-2 text-[12px] text-c-secondary">
                   <span>{e.source}</span>
                   {e.door && (
                     <button
                       type="button"
                       onClick={e.door.onOpen}
-                      className="whitespace-nowrap text-[12px] font-semibold text-c-ink hover:underline"
+                      className="whitespace-nowrap text-[12px] font-medium text-c-ink hover:underline"
                     >
                       {e.door.label} →
                     </button>

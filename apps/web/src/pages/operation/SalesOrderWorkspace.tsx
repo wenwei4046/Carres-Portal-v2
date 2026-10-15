@@ -2738,11 +2738,11 @@ function SalesOrderWorkspaceBody() {
                     </span>
                     {configWords(l.attrs) && <span className={`text-[12px] text-c-secondary ${strike}`}>{configWords(l.attrs)}</span>}
                     {!known && catalogQ.data && <span className="text-[12px] text-c-warn-fg">{NOT_IN_CATALOG}</span>}
-                    {l.added && <span className="text-[12px] font-semibold text-c-ok-fg">New line</span>}
+                    {l.added && <span className="text-[12px] font-medium text-c-ok-fg">New line</span>}
                     {l.removed && <span className="text-[12px] text-c-warn-fg">Cancelled when approved · Restore to keep it</span>}
                     {protectedLine(l) && <span className="text-[12px] text-c-secondary">Free item. It follows the item it came with</span>}
                     {amending && !protectedLine(l) && (
-                      <span className="flex flex-wrap gap-x-4 text-[12px] font-semibold">
+                      <span className="flex flex-wrap gap-x-4 text-[13px] font-medium">
                         {canConfig && (
                           <button type="button" className="text-c-ink hover:underline" aria-expanded={open} aria-label={`Configure ${nameOfSku(l.sku)}`}
                             onClick={() => setConfigOpen((st) => { const n = new Set(st); if (n.has(l.key)) n.delete(l.key); else n.add(l.key); return n; })}>
@@ -2814,9 +2814,9 @@ function SalesOrderWorkspaceBody() {
                       <span className="text-c-muted">· {serviceCodeWord(a.addon_key, addonSkuByKey.get(a.addon_key))}</span>
                     </span>
                     {typeof a.attrs?.["size"] === "string" && <span className={`text-[12px] text-c-secondary ${strike}`}>{String(a.attrs["size"])}</span>}
-                    {a.added && <span className="text-[12px] font-semibold text-c-ok-fg">New line</span>}
+                    {a.added && <span className="text-[12px] font-medium text-c-ok-fg">New line</span>}
                     {amending && !owned && (
-                      <span className="flex gap-4 text-[12px] font-semibold">
+                      <span className="flex gap-4 text-[13px] font-medium">
                         <button type="button" className={a.removed ? "text-c-ink hover:underline" : "text-c-warn-fg hover:underline"}
                           aria-label={`${a.removed ? "Restore" : "Remove"} ${nameOfAddon(a.addon_key)}`}
                           onClick={() => a.removed ? setDraftAddon(a.key, { removed: false }) : a.added
@@ -2847,9 +2847,9 @@ function SalesOrderWorkspaceBody() {
             );
           })}
           <div role="row" className={`${ITEM_COLS} border-b border-c-footer-line py-[7px]`}>
-            <span /><span className="font-semibold text-c-secondary">Total</span>
+            <span /><span className="font-medium text-c-secondary">Total</span>
             <span className="text-right text-c-ink">{qtyTotal}</span><span />
-            <span className="text-right font-semibold text-c-ink" data-testid="money-total-payable">
+            <span className="text-right font-medium text-c-ink" data-testid="money-total-payable">
               {amending ? fmtMoney(editTotal) : money.known && money.total != null ? fmtMoney(money.total) : "No price yet"}
             </span>
           </div>
@@ -2858,8 +2858,8 @@ function SalesOrderWorkspaceBody() {
             <span className="text-right text-c-ink" data-testid="money-paid">{fmtMoney(money.paid)}</span>
           </div>
           <div role="row" className={`${ITEM_COLS} border-b border-c-footer-line py-[7px] ${money.known && money.outstanding > 0 ? "bg-c-warn-bg" : ""}`}>
-            <span /><span className="font-semibold text-c-secondary">Balance due</span><span /><span />
-            <span className={`text-right font-semibold ${money.known && money.outstanding > 0 ? "text-c-warn-fg" : "text-c-ink"}`} data-testid="money-outstanding">
+            <span /><span className="font-medium text-c-secondary">Balance due</span><span /><span />
+            <span className={`text-right font-medium ${money.known && money.outstanding > 0 ? "text-c-warn-fg" : "text-c-ink"}`} data-testid="money-outstanding">
               {!money.known ? "No price yet" : fmtMoney(Math.max(0, money.outstanding))}
             </span>
           </div>
@@ -2937,12 +2937,12 @@ function SalesOrderWorkspaceBody() {
           </CBtn>
           {whyOpen && (
             <div role="dialog" aria-label="Why" className="absolute right-0 top-10 z-[80] flex w-[min(380px,80vw)] flex-col gap-2 rounded-lg border border-c-btn-border bg-c-card p-3" style={{ boxShadow: "var(--shadow-menu)" }}>
-              <label htmlFor="so-change-reason" className="flex flex-col gap-1 text-[12px] font-semibold text-c-secondary">
+              <label htmlFor="so-change-reason" className="flex flex-col gap-1 text-[12px] text-c-secondary">
                 Reason for change
                 <textarea id="so-change-reason" rows={2} value={changeReason} onChange={(e) => setChangeReason(e.target.value)}
                   className="rounded-lg border border-c-input-border bg-c-card px-2.5 py-1.5 text-[13px] font-normal text-c-ink outline-none focus:border-c-select-fg" />
               </label>
-              <label htmlFor="so-change-asked" className="flex flex-col gap-1 text-[12px] font-semibold text-c-secondary">
+              <label htmlFor="so-change-asked" className="flex flex-col gap-1 text-[12px] text-c-secondary">
                 Requested date (from customer)
                 <CDate id="so-change-asked" label="Requested date (from customer)" value={changeAskedOn} onChange={setChangeAskedOn} />
               </label>
@@ -2958,7 +2958,7 @@ function SalesOrderWorkspaceBody() {
             </CBtn>
             {proofOpen && (
               <div role="dialog" aria-label="Customer agreement" className="absolute right-0 top-10 z-[80] flex w-[min(420px,85vw)] flex-col gap-2 rounded-lg border border-c-btn-border bg-c-card p-3" style={{ boxShadow: "var(--shadow-menu)" }}>
-                <p className="text-[12px] font-semibold text-c-secondary">Customer agreement</p>
+                <p className="text-[12px] text-c-secondary">Customer agreement</p>
                 <p className="text-[12px] text-c-secondary">You can send the request without it, but management cannot approve until it is recorded.</p>
                 <AgreementForm idPrefix="so-change-agreement" value={changeAgreement} onChange={setChangeAgreement} />
                 <CBtn kind="main" className="!h-[30px] self-end !text-[12px]" onClick={() => setProofOpen(false)}>Done</CBtn>
@@ -2985,7 +2985,7 @@ function SalesOrderWorkspaceBody() {
       {discardAsk && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg bg-c-warn-bg px-2.5 py-2">
           <span className="flex-1 text-[13px] font-medium text-c-warn-fg">Discard {changeCount} {changeCount === 1 ? "change" : "changes"}?</span>
-          <CBtn kind="normal" className="!h-[30px] !text-[12px] !font-semibold" onClick={() => setDiscardAsk(false)}>Keep editing</CBtn>
+          <CBtn kind="normal" className="!h-[30px]" onClick={() => setDiscardAsk(false)}>Keep editing</CBtn>
           <CBtn kind="main" className="!h-[30px] !text-[12px]" onClick={discardEdit} data-testid="amendment-discard">Discard</CBtn>
         </div>
       )}
@@ -2999,7 +2999,7 @@ function SalesOrderWorkspaceBody() {
         <span className="flex-1 text-[13px] font-medium">
           Viewing Rev {viewedRevision.revision}. Read only. This is not the current Sales Order.
         </span>
-        <CBtn kind="normal" className="!h-7 !border-0 !text-[12px] !font-semibold !text-c-warn-fg" onClick={backToCurrent} data-testid="workspace-back-to-current">
+        <CBtn kind="normal" className="!h-7 !border-0 !text-c-warn-fg" onClick={backToCurrent} data-testid="workspace-back-to-current">
           Back to current
         </CBtn>
       </div>
