@@ -97,7 +97,7 @@ export default function StockAlertsTile({ onJumpToWarehouse, onJumpToStock }: Pr
           <div className="text-strong font-display text-base-900">
             Stock alerts
           </div>
-          <div className="text-label text-base-500 mt-0.5">
+          <div className="text-meta text-base-500 mt-0.5">
             {isLoading
               ? "Loading…"
               : isError
@@ -112,7 +112,7 @@ export default function StockAlertsTile({ onJumpToWarehouse, onJumpToStock }: Pr
         <button
           type="button"
           onClick={handleOpen}
-          className="btn-ghost text-label py-1 px-2"
+          className="btn-ghost text-body font-medium py-1 px-2"
           data-testid="stock-alerts-open"
           aria-label="View alerts in warehouse"
         >
@@ -148,10 +148,10 @@ export default function StockAlertsTile({ onJumpToWarehouse, onJumpToStock }: Pr
               className="flex items-baseline gap-2 py-1"
               data-testid="stock-alerts-count"
             >
-              <span className="font-mono text-page font-semibold leading-none text-danger">
+              <span className="font-mono text-strong leading-none text-danger">
                 {count}
               </span>
-              <span className="text-label text-base-500">
+              <span className="text-meta text-base-500">
                 {reorderCount > 0 ? "need ordering" : "below threshold"}
               </span>
             </div>
@@ -163,15 +163,15 @@ export default function StockAlertsTile({ onJumpToWarehouse, onJumpToStock }: Pr
                 style={{ gridTemplateColumns: "1fr auto" }}
               >
                 <div className="min-w-0">
-                  <div className="text-meta text-base-900 truncate">
+                  <div className="text-body text-base-900 truncate">
                     {row.sku}
                   </div>
-                  <div className="text-label text-base-500 truncate">
+                  <div className="text-meta text-base-500 truncate">
                     Reorder stock · {row.onHand} left
                     {row.incoming > 0 ? `, ${row.incoming} coming` : ""}
                   </div>
                 </div>
-                <span className="font-mono text-label font-semibold text-danger whitespace-nowrap">
+                <span className="font-mono text-body font-medium text-danger whitespace-nowrap">
                   {row.reorderPoint} point
                 </span>
               </div>
@@ -184,14 +184,14 @@ export default function StockAlertsTile({ onJumpToWarehouse, onJumpToStock }: Pr
                 style={{ gridTemplateColumns: "1fr auto" }}
               >
                 <div className="min-w-0">
-                  <div className="text-meta text-base-900 truncate">
+                  <div className="text-body text-base-900 truncate">
                     {row.sku}
                   </div>
-                  <div className="text-label text-base-500 truncate">
+                  <div className="text-meta text-base-500 truncate">
                     @ {row.warehouse_id.slice(0, 8)}
                   </div>
                 </div>
-                <span className="font-mono text-label font-semibold text-danger whitespace-nowrap">
+                <span className="font-mono text-body font-medium text-danger whitespace-nowrap">
                   {row.shortage > 0 ? `-${row.shortage}` : row.shortage} unit
                   {Math.abs(row.shortage) === 1 ? "" : "s"}
                 </span>

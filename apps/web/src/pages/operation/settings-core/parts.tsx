@@ -167,7 +167,7 @@ function ChangeLines({ oldValue, newValue, fieldLabel, valueOf }: {
     return (
       <ul className="mt-1 grid gap-0.5">
         {fields.map((f) => (
-          <li key={f} className="text-label text-kit-slate-11">
+          <li key={f} className="text-meta text-kit-slate-11">
             {fieldLabel(f)}: {valueOf(f, o[f])} → {valueOf(f, n[f])}
           </li>
         ))}
@@ -175,7 +175,7 @@ function ChangeLines({ oldValue, newValue, fieldLabel, valueOf }: {
     );
   }
   return (
-    <p className="mt-1 text-label text-kit-slate-11">
+    <p className="mt-1 text-meta text-kit-slate-11">
       {valueOf("", oldValue)} → {valueOf("", newValue)}
     </p>
   );

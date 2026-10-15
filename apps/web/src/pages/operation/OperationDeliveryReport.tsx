@@ -69,7 +69,7 @@ function Head({ children, note }: { children: React.ReactNode; note: string }) {
   return (
     <div className="mb-2">
       <h2 className="text-strong">{children}</h2>
-      <p className="text-label font-normal text-base-500">{note}</p>
+      <p className="text-meta text-base-500">{note}</p>
     </div>
   );
 }
@@ -87,12 +87,12 @@ function Row({ to, children, testId }: { to: string; children: React.ReactNode; 
 }
 
 function Empty({ children }: { children: string }) {
-  return <p className="text-label font-normal text-base-400">{children}</p>;
+  return <p className="text-meta text-c-secondary">{children}</p>;
 }
 
 function Counts({ items }: { items: Array<{ word: string; count: number }> }) {
   if (items.length === 0) return null;
-  return <p className="text-body font-semibold mb-2">{items.map((i) => `${i.count} ${i.word}`).join(" · ")}</p>;
+  return <p className="text-body font-medium mb-2">{items.map((i) => `${i.count} ${i.word}`).join(" · ")}</p>;
 }
 
 const INBOUND_RETURNS = new URLSearchParams({ sourceType: "failed-delivery-return" });
@@ -260,7 +260,7 @@ export default function OperationDeliveryReport() {
           <div className="mx-auto max-w-[1100px] p-6">
             <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div>
-                <div className="text-label uppercase tracking-[0.12em] text-base-500">{DR.eyebrow}</div>
+                <div className="text-label uppercase tracking-[0.06em] text-base-500">{DR.eyebrow}</div>
                 <h1 className="text-xl font-semibold">{DR.page}</h1>
               </div>
               <div className="flex items-end gap-2">
@@ -291,17 +291,17 @@ export default function OperationDeliveryReport() {
                     <Head note={`Source: the latest result that reached the customer, against the Sales Order's Requested Delivery Date. Month: the day the result was recorded. Journey legs before the last are warehouse trips and are excluded.${noRequested > 0 ? ` ${noRequested} with no requested date ${noRequested === 1 ? "is" : "are"} listed but not counted.` : ""}`}>
                       {DR.commitment}
                     </Head>
-                    <p className="text-body font-semibold mb-2">{commitmentLine(commitment)}</p>
+                    <p className="text-body font-medium mb-2">{commitmentLine(commitment)}</p>
                     <div className="space-y-1">
                       {commitment.map((r) => (
                         <Row key={r.row.id} to={doHref(r.row)}>
                           <span className="min-w-0">
                             <span className="block text-body font-semibold">{r.row.doNumber} · {soWord(r.row)}</span>
-                            <span className="block text-label font-normal">
+                            <span className="block text-meta text-c-secondary">
                               Requested {r.row.requestedTbd || !r.row.requestedDelivery ? "not stated" : fmtDate(r.row.requestedDelivery)} · Delivered {fmtDate(r.deliveredOn)}
                             </span>
                           </span>
-                          <span className={`shrink-0 text-body font-semibold ${r.kept === false ? "text-red-600" : r.kept ? "text-green-600" : ""}`}>
+                          <span className={`shrink-0 text-body font-medium ${r.kept === false ? "text-red-600" : r.kept ? "text-green-600" : ""}`}>
                             {r.kept === null ? DR.noRequestedDate : r.kept ? DR.keptRequestedDate : DR.afterRequestedDate}
                           </span>
                         </Row>
@@ -317,15 +317,15 @@ export default function OperationDeliveryReport() {
                     <Head note="Source: each Delivery Order's FIRST recorded visit. Actual delivery events only, never a plan. Month: the day of that first visit. Journey legs before the last are excluded.">
                       {DR.firstDelivery}
                     </Head>
-                    <p className="text-body font-semibold mb-2">{firstDeliveryLine(firstVisits)}</p>
+                    <p className="text-body font-medium mb-2">{firstDeliveryLine(firstVisits)}</p>
                     <div className="space-y-1">
                       {firstVisits.map((r) => (
                         <Row key={r.row.id} to={doHref(r.row)}>
                           <span className="min-w-0">
                             <span className="block text-body font-semibold">{r.row.doNumber} · {soWord(r.row)}</span>
-                            <span className="block text-label font-normal">{fmtDate(r.first.recorded_at)} · {r.row.logisticsPartner ?? DR.noLogisticsNamed}</span>
+                            <span className="block text-meta text-c-secondary">{fmtDate(r.first.recorded_at)} · {r.row.logisticsPartner ?? DR.noLogisticsNamed}</span>
                           </span>
-                          <span className={`shrink-0 text-body font-semibold ${r.first.result === "failed" ? "text-red-600" : r.first.result === "delivered" ? "text-green-600" : "text-orange-600"}`}>
+                          <span className={`shrink-0 text-body font-medium ${r.first.result === "failed" ? "text-red-600" : r.first.result === "delivered" ? "text-green-600" : "text-orange-600"}`}>
                             {firstVisitWord(r.first.result)}
                           </span>
                         </Row>
@@ -347,9 +347,9 @@ export default function OperationDeliveryReport() {
                         <Row key={`${r.row.id}-${r.attempt.recorded_at}`} to={doHref(r.row)}>
                           <span className="min-w-0">
                             <span className="block text-body font-semibold">{r.row.doNumber} · {soWord(r.row)}</span>
-                            <span className="block text-label font-normal">{fmtDate(r.attempt.recorded_at)} · {r.row.logisticsPartner ?? DR.noLogisticsNamed}</span>
+                            <span className="block text-meta text-c-secondary">{fmtDate(r.attempt.recorded_at)} · {r.row.logisticsPartner ?? DR.noLogisticsNamed}</span>
                           </span>
-                          <span className="shrink-0 text-body font-semibold text-red-600">{r.reason}</span>
+                          <span className="shrink-0 text-body font-medium text-red-600">{r.reason}</span>
                         </Row>
                       ))}
                       {failed.length === 0 && <Empty>{DR.emptyFailed}</Empty>}
@@ -368,16 +368,16 @@ export default function OperationDeliveryReport() {
                         <Row key={r.name} to={r.href}>
                           <span className="min-w-0">
                             <span className="block text-body font-semibold">{r.name}</span>
-                            <span className="block text-label font-normal">{partnerLine(r)}</span>
+                            <span className="block text-meta text-c-secondary">{partnerLine(r)}</span>
                           </span>
-                          <span className="shrink-0 text-body font-semibold">{`Delivered ${rateWord(r.delivered, r.trips)}`}</span>
+                          <span className="shrink-0 text-body font-medium">{`Delivered ${rateWord(r.delivered, r.trips)}`}</span>
                         </Row>
                       ))}
                       {partnerRows.length === 0 && <Empty>{DR.emptyPartners}</Empty>}
                       {cannotDeliverRows.map((e) => (
                         <div key={e.id} className="rounded-control border border-base-200 bg-white px-2 py-1.5">
                           <span className="block text-body font-semibold">{DR.cannotDeliver} · {(e.partner_id && partnerNameById.get(e.partner_id)) || DR.noLogisticsNamed}</span>
-                          <span className="block text-label font-normal">{fmtDate(e.recorded_at)} · {cannotDeliverWord(e)}{e.note ? ` · ${e.note}` : ""}</span>
+                          <span className="block text-meta text-c-secondary">{fmtDate(e.recorded_at)} · {cannotDeliverWord(e)}{e.note ? ` · ${e.note}` : ""}</span>
                         </div>
                       ))}
                     </div>
@@ -390,17 +390,17 @@ export default function OperationDeliveryReport() {
                     <Head note={`Source: the handover chain (Ready, Handed over, Received by logistics) against the trip's confirmed delivery day. Month: the day of the handover. Warehouse is measured apart from Logistics.${untimedHandovers > 0 ? ` ${untimedHandovers} with no confirmed delivery day ${untimedHandovers === 1 ? "is" : "are"} listed but not counted.` : ""}`}>
                       {DR.warehouse}
                     </Head>
-                    <p className="text-body font-semibold mb-2">{warehouseLine(warehouse)}</p>
+                    <p className="text-body font-medium mb-2">{warehouseLine(warehouse)}</p>
                     <div className="space-y-1">
                       {warehouse.map((r) => (
                         <Row key={r.row.id} to={doHref(r.row)}>
                           <span className="min-w-0">
                             <span className="block text-body font-semibold">{r.row.doNumber} · {soWord(r.row)}</span>
-                            <span className="block text-label font-normal">
+                            <span className="block text-meta text-c-secondary">
                               Ready {r.readyAt ? fmtDate(r.readyAt) : "not recorded"} · Handed over {r.handedOverAt ? fmtDate(r.handedOverAt) : "not recorded"} · Received by logistics {r.receivedAt ? fmtDate(r.receivedAt) : "not recorded"}
                             </span>
                           </span>
-                          <span className={`shrink-0 text-body font-semibold ${r.byDeliveryDay === false ? "text-red-600" : r.byDeliveryDay ? "text-green-600" : ""}`}>
+                          <span className={`shrink-0 text-body font-medium ${r.byDeliveryDay === false ? "text-red-600" : r.byDeliveryDay ? "text-green-600" : ""}`}>
                             {r.byDeliveryDay === null ? "" : r.byDeliveryDay ? DR.handedOverByDeliveryDay : DR.handedOverAfterDeliveryDay}
                           </span>
                         </Row>
@@ -422,11 +422,11 @@ export default function OperationDeliveryReport() {
                         <Row key={r.row.id} to={doHref(r.row)}>
                           <span className="min-w-0">
                             <span className="block text-body font-semibold">{r.row.doNumber} · {soWord(r.row)}</span>
-                            <span className="block text-label font-normal">
+                            <span className="block text-meta text-c-secondary">
                               Delivered {fmtDate(r.reachedOn)}{r.missing.length > 0 ? ` · ${r.missing.join(" · ")}` : ""}{r.row.proofReview.reason ? ` · ${r.row.proofReview.reason}` : ""}
                             </span>
                           </span>
-                          <span className={`shrink-0 text-body font-semibold ${r.word === "Proof Accepted" ? "text-green-600" : r.word === "Proof Rejected" ? "text-red-600" : "text-orange-600"}`}>
+                          <span className={`shrink-0 text-body font-medium ${r.word === "Proof Accepted" ? "text-green-600" : r.word === "Proof Rejected" ? "text-red-600" : "text-orange-600"}`}>
                             {r.word}
                           </span>
                         </Row>
@@ -442,15 +442,15 @@ export default function OperationDeliveryReport() {
                     <Head note="Source: Delivery's own arrangements with a confirmed day, whatever happened later. Month: the confirmed day. Booked means a day AND a time were agreed.">
                       {DR.schedule}
                     </Head>
-                    <p className="text-body font-semibold mb-2">{scheduleLine(schedule)}</p>
+                    <p className="text-body font-medium mb-2">{scheduleLine(schedule)}</p>
                     <div className="space-y-1">
                       {schedule.map((d) => (
                         <Row key={d.day} to={d.href}>
                           <span className="min-w-0">
                             <span className="block text-body font-semibold">{fmtDate(d.day)}</span>
-                            <span className="block text-label font-normal">{d.byPartner.map((p) => `${p.name} ${p.count}`).join(" · ")}</span>
+                            <span className="block text-meta text-c-secondary">{d.byPartner.map((p) => `${p.name} ${p.count}`).join(" · ")}</span>
                           </span>
-                          <span className="shrink-0 text-body font-semibold tabular-nums">{d.total} deliver{d.total === 1 ? "y" : "ies"} · {d.booked} booked</span>
+                          <span className="shrink-0 text-body font-medium tabular-nums">{d.total} deliver{d.total === 1 ? "y" : "ies"} · {d.booked} booked</span>
                         </Row>
                       ))}
                       {schedule.length === 0 && <Empty>{DR.emptySchedule}</Empty>}
@@ -464,20 +464,20 @@ export default function OperationDeliveryReport() {
                     <Head note={`Source: every contact record with the customer or the partner, by Operation or recorded on a partner's behalf. Month: the day of the contact. Today's fact: ${overdueContacts} ${DR.contactsOverdueToday.toLowerCase()} on Monitor.`}>
                       {DR.contacts}
                     </Head>
-                    <p className="text-body font-semibold mb-2">{contactLine(contactRows)}</p>
+                    <p className="text-body font-medium mb-2">{contactLine(contactRows)}</p>
                     <Counts items={contactResultGroups(contactRows).map((g) => ({ word: g.result, count: g.count }))} />
                     <div className="space-y-1">
                       {overdueContacts > 0 && (
                         <Row to="/operation?tab=delivery&view=no_confirmed_date&late=1" testId="report-contacts-overdue">
                           <span className="block text-body font-semibold">{DR.contactsOverdueToday}</span>
-                          <span className="shrink-0 text-body font-semibold text-red-600 tabular-nums">{overdueContacts}</span>
+                          <span className="shrink-0 text-body font-medium text-red-600 tabular-nums">{overdueContacts}</span>
                         </Row>
                       )}
                       {contactRows.map((r) => (
                         <Row key={r.contact.id} to={r.href}>
                           <span className="min-w-0">
                             <span className="block text-body font-semibold">{r.scopeWord}</span>
-                            <span className="block text-label font-normal">
+                            <span className="block text-meta text-c-secondary">
                               {fmtDate(r.contact.contacted_at)} · {r.purpose} · {r.result}{r.onBehalfOf ? ` · ${DR.recordedOnBehalfOf} ${r.onBehalfOf}` : ""}
                             </span>
                           </span>
@@ -499,9 +499,9 @@ export default function OperationDeliveryReport() {
                         <Row key={`${r.row.id}-${r.attempt.recorded_at}`} to={r.href}>
                           <span className="min-w-0">
                             <span className="block text-body font-semibold">{r.row.doNumber} · {soWord(r.row)}</span>
-                            <span className="block text-label font-normal">{fmtDate(r.attempt.recorded_at)} · {r.whereGoods}</span>
+                            <span className="block text-meta text-c-secondary">{fmtDate(r.attempt.recorded_at)} · {r.whereGoods}</span>
                           </span>
-                          <span className={`shrink-0 text-body font-semibold ${r.inbound.startsWith(DR.receivedAtInbound) ? "text-green-600" : "text-orange-600"}`}>{r.inbound}</span>
+                          <span className={`shrink-0 text-body font-medium ${r.inbound.startsWith(DR.receivedAtInbound) ? "text-green-600" : "text-orange-600"}`}>{r.inbound}</span>
                         </Row>
                       ))}
                       {returns.length === 0 && <Empty>{DR.emptyReturns}</Empty>}
@@ -521,9 +521,9 @@ export default function OperationDeliveryReport() {
                         <Row key={r.card.scopeId} to={r.href}>
                           <span className="min-w-0">
                             <span className="block text-body font-semibold">{r.card.doNumber ? `${r.card.doNumber} · ` : ""}SO-{r.card.scope.so} · {r.card.customerName}</span>
-                            <span className="block text-label font-normal">{r.kind} since {fmtDate(r.sinceIso)} · {r.card.logisticsPartnerName ?? DR.noLogisticsNamed}</span>
+                            <span className="block text-meta text-c-secondary">{r.kind} since {fmtDate(r.sinceIso)} · {r.card.logisticsPartnerName ?? DR.noLogisticsNamed}</span>
                           </span>
-                          <span className={`shrink-0 text-body font-semibold tabular-nums ${r.days > 7 ? "text-red-600" : "text-orange-600"}`}>{r.days} day{r.days === 1 ? "" : "s"}</span>
+                          <span className={`shrink-0 text-body font-medium tabular-nums ${r.days > 7 ? "text-red-600" : "text-orange-600"}`}>{r.days} day{r.days === 1 ? "" : "s"}</span>
                         </Row>
                       ))}
                       {ageing.length === 0 && <Empty>{DR.emptyAgeing}</Empty>}

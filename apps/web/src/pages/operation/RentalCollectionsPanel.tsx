@@ -106,7 +106,7 @@ export default function RentalCollectionsPanel({
       >
         <header className="sticky top-0 bg-card border-b border-border px-6 py-4 flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="font-mono text-strong font-semibold text-foreground">
+            <div className="font-mono text-strong text-foreground">
               {data?.agreement.agreementNo ?? "Collections"}
             </div>
             {data && (
@@ -161,7 +161,7 @@ export default function RentalCollectionsPanel({
               <Figure label="Contract value" value={rm(data.totals.contractValue)} />
               <Figure label="Collected" value={rm(data.totals.collected)} />
               {/* The number a credit decision is actually about. */}
-              <Figure label="Still to come" value={rm(data.totals.outstanding)} strong />
+              <Figure label="Still to come" value={rm(data.totals.outstanding)} />
             </div>
 
             <div className="px-6 py-3 border-b border-border text-meta text-muted-foreground">
@@ -169,7 +169,7 @@ export default function RentalCollectionsPanel({
               {data.totals.lateCount > 0 ? (
                 <>
                   {" · "}
-                  <span className="text-danger font-semibold">
+                  <span className="text-danger font-medium">
                     {data.totals.lateCount} past due
                   </span>
                   {/* Say plainly that nobody is chasing yet, rather than let a
@@ -186,7 +186,7 @@ export default function RentalCollectionsPanel({
               {(data.totals.declinedCount ?? 0) > 0 ? (
                 <>
                   {" · "}
-                  <span className="text-danger font-semibold" data-testid="declined-count">
+                  <span className="text-danger font-medium" data-testid="declined-count">
                     {data.totals.declinedCount} card declined
                   </span>
                 </>
@@ -194,7 +194,7 @@ export default function RentalCollectionsPanel({
               {(data.totals.unattachedDeclines ?? 0) > 0 ? (
                 <>
                   {" · "}
-                  <span className="text-danger font-semibold">
+                  <span className="text-danger font-medium">
                     {data.totals.unattachedDeclines} declined with no month to match
                   </span>
                 </>
@@ -229,12 +229,12 @@ export default function RentalCollectionsPanel({
                           clock says so far, and stays grey until someone acts. */}
                       {b.lateInterest != null && b.lateInterest > 0 ? (
                         <div
-                          className="text-label text-danger font-medium mt-0.5"
+                          className="text-meta text-danger mt-0.5"
                           data-testid={`interest-charged-${b.seq}`}
                         >
                           + {rm(b.lateInterest)} interest
                           {b.interestChargedAt ? (
-                            <span className="text-base-400 font-normal">
+                            <span className="text-base-500">
                               {" "}
                               charged {b.interestChargedAt.slice(0, 10)}
                             </span>
@@ -242,7 +242,7 @@ export default function RentalCollectionsPanel({
                         </div>
                       ) : (b.accruedInterest ?? 0) > 0 ? (
                         <div
-                          className="text-label text-base-500 mt-0.5"
+                          className="text-meta text-base-500 mt-0.5"
                           data-testid={`interest-accrued-${b.seq}`}
                         >
                           + {rm(b.accruedInterest ?? 0)} not charged yet
@@ -251,7 +251,7 @@ export default function RentalCollectionsPanel({
                     </td>
                     <td className="px-3 py-2">
                       {b.status === "paid" ? (
-                        <span className="text-emerald-700 font-semibold whitespace-nowrap">Paid</span>
+                        <span className="text-emerald-700 font-medium whitespace-nowrap">Paid</span>
                       ) : b.lastDecline ? (
                         /* 0295 — "Card declined" outranks "Past due" because it
                            is the more specific fact AND the one with an action
@@ -259,32 +259,32 @@ export default function RentalCollectionsPanel({
                            was refused. The reason underneath is what decides
                            whether finance asks for a new card or a top-up. */
                         <span data-testid={`declined-${b.seq}`}>
-                          <span className="text-danger font-semibold whitespace-nowrap">
+                          <span className="text-danger font-medium whitespace-nowrap">
                             Card declined
                           </span>
-                          <div className="text-label text-base-500 mt-0.5">
+                          <div className="text-meta text-base-500 mt-0.5">
                             {b.lastDecline.at.slice(0, 10)}
                             {(b.declineCount ?? 0) > 1 ? ` · ${b.declineCount} tries` : ""}
                           </div>
                           {b.lastDecline.reason ? (
-                            <div className="text-label text-base-600 mt-0.5 max-w-[200px] whitespace-normal">
+                            <div className="text-meta text-base-500 mt-0.5 max-w-[200px] whitespace-normal">
                               {b.lastDecline.reason}
                             </div>
                           ) : null}
                         </span>
                       ) : b.late ? (
-                        <span className="text-danger font-semibold whitespace-nowrap">Past due</span>
+                        <span className="text-danger font-medium whitespace-nowrap">Past due</span>
                       ) : (
                         <span className="text-base-500">Due</span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-meta text-base-600">
+                    <td className="px-3 py-2 text-body text-base-600">
                       {b.method ?? ""}
                       {b.reference ? (
-                        <div className="font-mono text-label text-base-400">{b.reference}</div>
+                        <div className="font-mono text-meta text-base-500">{b.reference}</div>
                       ) : null}
                     </td>
-                    <td className="px-3 py-2 text-meta text-base-600 whitespace-nowrap">
+                    <td className="px-3 py-2 text-body text-base-600 whitespace-nowrap">
                       {b.supplierShare == null ? (
                         ""
                       ) : (
@@ -301,7 +301,7 @@ export default function RentalCollectionsPanel({
                           onClick={() => doRecord(b.seq)}
                           disabled={record.isPending}
                           data-testid={`record-${b.seq}`}
-                          className="text-meta font-medium text-primary underline underline-offset-2 disabled:opacity-50"
+                          className="text-body font-medium text-primary underline underline-offset-2 disabled:opacity-50"
                         >
                           {recordingSeq === b.seq ? "Recording…" : "Record transfer"}
                         </button>
@@ -316,7 +316,7 @@ export default function RentalCollectionsPanel({
                             onClick={() => doCharge(b.seq)}
                             disabled={charge.isPending}
                             data-testid={`charge-interest-${b.seq}`}
-                            className="text-meta font-medium text-danger underline underline-offset-2 disabled:opacity-50"
+                            className="text-body font-medium text-danger underline underline-offset-2 disabled:opacity-50"
                           >
                             {chargingSeq === b.seq
                               ? "Charging…"
@@ -396,7 +396,7 @@ function SettleDialog({ agreementId, onClose }: { agreementId: string; onClose: 
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 py-4 border-b border-border">
-          <div className="text-strong font-semibold">Settle this rental early</div>
+          <div className="text-strong">Settle this rental early</div>
           <div className="text-meta text-muted-foreground mt-0.5">
             Closes every remaining month in one payment.
           </div>
@@ -416,14 +416,14 @@ function SettleDialog({ agreementId, onClose }: { agreementId: string; onClose: 
                 {quote.interestCharged > 0 && (
                   <Line label="Late interest charged" value={rm(quote.interestCharged)} />
                 )}
-                <div className="border-t border-base-200 mt-2 pt-2 flex justify-between font-semibold">
+                <div className="border-t border-base-200 mt-2 pt-2 flex justify-between font-medium">
                   <span>Customer pays</span>
                   <span className="t-num" data-testid="settle-total">{rm(quote.total)}</span>
                 </div>
               </div>
 
               <label className="block">
-                <span className="text-meta font-medium text-base-700">
+                <span className="text-meta text-base-500">
                   Signed settlement document
                 </span>
                 <input
@@ -431,15 +431,15 @@ function SettleDialog({ agreementId, onClose }: { agreementId: string; onClose: 
                   accept="application/pdf,image/png,image/jpeg"
                   data-testid="settle-doc"
                   onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                  className="mt-1 block w-full text-meta"
+                  className="mt-1 block w-full text-body"
                 />
-                <span className="text-label text-muted-foreground">
+                <span className="text-meta text-muted-foreground">
                   The customer signs it first. PDF or a photo.
                 </span>
               </label>
 
               <label className="block">
-                <span className="text-meta font-medium text-base-700">
+                <span className="text-meta text-base-500">
                   Payment reference <span className="text-muted-foreground">(optional)</span>
                 </span>
                 <input
@@ -455,7 +455,7 @@ function SettleDialog({ agreementId, onClose }: { agreementId: string; onClose: 
         </div>
 
         <div className="px-5 py-3 border-t border-border flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="btn-secondary text-body">
+          <button type="button" onClick={onClose} className="btn-secondary text-body font-medium">
             Cancel
           </button>
           <button
@@ -465,7 +465,7 @@ function SettleDialog({ agreementId, onClose }: { agreementId: string; onClose: 
                this just stops the operator finding out the hard way. */
             disabled={!quote || !file || busy}
             data-testid="settle-confirm"
-            className="btn-primary text-body disabled:opacity-50"
+            className="btn-primary text-body font-semibold disabled:opacity-50"
           >
             {busy ? "Settling…" : quote ? `Settle ${rm(quote.total)}` : "Settle"}
           </button>
@@ -484,12 +484,12 @@ function Line({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Figure({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+function Figure({ label, value }: { label: string; value: string }) {
   return (
     <div className="bg-card px-5 py-4">
-      <div className="text-label uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-label uppercase tracking-[0.06em] text-muted-foreground">{label}</div>
       <div
-        className={`t-num mt-1 ${strong ? "text-title font-semibold text-foreground" : "text-strong text-foreground"}`}
+        className="t-num mt-1 text-strong text-foreground"
       >
         {value}
       </div>
@@ -499,7 +499,7 @@ function Figure({ label, value, strong }: { label: string; value: string; strong
 
 function Th({ children }: { children?: React.ReactNode }) {
   return (
-    <th className="px-3 py-2 text-left text-label font-semibold uppercase tracking-wide">
+    <th className="px-3 py-2 text-left text-meta font-medium">
       {children}
     </th>
   );

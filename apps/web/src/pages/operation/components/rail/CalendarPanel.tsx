@@ -244,7 +244,7 @@ export default function CalendarPanel({ onOpenRecord }: { onOpenRecord?: () => v
                   ? undefined
                   : `${fmtDateShort(r.fromIso)} to ${fmtDateShort(r.toIso)}`
               }
-              className={`flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-label font-semibold transition-colors ${
+              className={`flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-meta font-medium transition-colors ${
                 active
                   ? "bg-base-900 text-white"
                   : "bg-white text-base-500 border border-base-200 hover:bg-hovertint"
@@ -271,12 +271,12 @@ export default function CalendarPanel({ onOpenRecord }: { onOpenRecord?: () => v
           one picked day). Content adapts to the active tab. */}
       <div className="mt-3 pt-3 border-t border-base-200 flex-1 overflow-auto space-y-4">
         {shownDays.length === 0 && (
-          <div className="text-meta text-base-400 text-center py-4">
+          <div className="text-meta text-base-500 text-center py-4">
             Pick a day, or Today / Tomorrow / This week.
           </div>
         )}
         {shownDays.length > 1 && !hasAnything && !loading && !failed && (
-          <div className="text-meta text-base-400 text-center py-4">
+          <div className="text-meta text-base-500 text-center py-4">
             Nothing on the books for these days.
           </div>
         )}
@@ -292,12 +292,12 @@ export default function CalendarPanel({ onOpenRecord }: { onOpenRecord?: () => v
               {/* The heading is the DAY, spelled the one ruled way. It used to
                   read `TODAY · 15 AUG 26`, and the relative half was the only
                   part an operator read — on the wrong morning it was a lie. */}
-              <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-2">
+              <div className="text-label uppercase tracking-[0.06em] text-base-500 mb-2">
                 {fmtDate(day)}
               </div>
 
               {dayIsEmpty(day) && shownDays.length === 1 && !loading && !failed && (
-                <div className="text-meta text-base-400 text-center py-3">No dated events this day.</div>
+                <div className="text-meta text-base-500 text-center py-3">No dated events this day.</div>
               )}
               {(["expected_arrival", "actual_arrival"] as const).map((kind) => {
                 const rows = dayReceive.filter((row) => row.kind === kind);
@@ -315,7 +315,7 @@ export default function CalendarPanel({ onOpenRecord }: { onOpenRecord?: () => v
               })}
               {dayDeliveries.length > 0 && (
                 <div className="space-y-1.5">
-                  <div className="text-label uppercase tracking-[0.05em] text-info">Delivery · {dayDeliveries.length} scheduled {dayDeliveries.length === 1 ? "delivery" : "deliveries"}</div>
+                  <div className="text-label uppercase tracking-[0.06em] text-info">Delivery · {dayDeliveries.length} scheduled {dayDeliveries.length === 1 ? "delivery" : "deliveries"}</div>
                   {dayDeliveries.map((d) => <DeliveryRow key={d.orderId} d={d} onOpenRecord={onOpenRecord} href={calendarHref(`/operation?tab=delivery&view=day&date=${day}`, day)} />)}
                   {loads.map((l) => (
                     <CarrierLoadRow key={l.partnerId ?? "none"} load={l} />
@@ -344,15 +344,15 @@ function DeliveryRow({ d, href, onOpenRecord }: { d: DayDelivery; href: string; 
       <span className="w-1 rounded-full shrink-0 bg-success" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <span className="font-mono text-meta font-semibold text-base-900">SO-{d.so}</span>
-          <span className="text-label font-semibold shrink-0 text-success">
+          <span className="font-mono text-body font-semibold text-base-900">SO-{d.so}</span>
+          <span className="text-meta font-medium shrink-0 text-success">
             {d.slot ? shortSlot(d.slot) : "Scheduled"}
           </span>
         </div>
         <div className={`text-meta text-base-700 truncate ${cjkClassName(d.customer)}`}>
           {d.customer || ""}
         </div>
-        <div className="text-label text-base-500 truncate">
+        <div className="text-meta text-base-500 truncate">
           {carrier}
           {loc.label ? ` · ${loc.label}` : ""}
         </div>
@@ -375,8 +375,8 @@ function CarrierLoadRow({ load }: { load: CarrierDayLoad }) {
   return (
     <div className="px-2 pt-1">
       <div
-        className={`flex items-center justify-between gap-2 text-label ${
-          alert ? "text-warning font-semibold" : "text-base-500"
+        className={`flex items-center justify-between gap-2 text-meta ${
+          alert ? "text-warning font-medium" : "text-base-500"
         }`}
       >
         <span className="truncate">{load.partnerName}</span>
@@ -386,7 +386,7 @@ function CarrierLoadRow({ load }: { load: CarrierDayLoad }) {
             : `${load.confirmed + load.provisional}`}
         </span>
       </div>
-      {note && <div className="text-label text-warning mt-0.5">{note}</div>}
+      {note && <div className="text-meta text-warning mt-0.5">{note}</div>}
     </div>
   );
 }
@@ -404,15 +404,15 @@ function DaySection({
 }) {
   return (
     <div className="mb-3">
-      <div className={`text-label uppercase tracking-[0.05em] mb-1.5 ${tone}`}>{title}</div>
+      <div className={`text-label uppercase tracking-[0.06em] mb-1.5 ${tone}`}>{title}</div>
       <div className="space-y-1.5">
           {items.map((it) => (
             <Link key={it.key} to={it.href} onClick={onOpenRecord} className="flex gap-2 rounded bg-base-50 hover:bg-base-100 px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9">
               <div className="min-w-0 flex-1">
-                <div className="font-mono text-meta font-semibold text-base-900 break-words">
+                <div className="font-mono text-body font-semibold text-base-900 break-words">
                   {it.main}
                 </div>
-                <div className="text-label text-base-500">{it.sub}</div>
+                <div className="text-meta text-base-500">{it.sub}</div>
               </div>
             </Link>
           ))}

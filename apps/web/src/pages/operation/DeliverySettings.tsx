@@ -237,8 +237,8 @@ function ChangesList({ changes, partnerId }: { changes: DeliverySettingChangeRow
                 {c.actor_name ?? ""} · {fmtDate(c.changed_at, { time: true })}
               </span>
               <details className="mt-0.5">
-                <summary className="cursor-pointer text-label text-kit-slate-11">Old and new value</summary>
-                <pre className="whitespace-pre-wrap font-sans text-label text-kit-slate-11">
+                <summary className="cursor-pointer text-meta text-kit-slate-11">Old and new value</summary>
+                <pre className="whitespace-pre-wrap font-sans text-meta text-kit-slate-11">
                   {JSON.stringify(c.old_value ?? null)}
                   {"\n→ "}
                   {JSON.stringify(c.new_value ?? null)}
@@ -313,12 +313,12 @@ function PartnersPage({ data }: { data: DeliverySettingsResponse }) {
                 >
                   <span className="min-w-0">
                     <span className="block text-body font-medium text-kit-slate-12">{p.name}</span>
-                    <span className="block text-label text-kit-slate-11">
+                    <span className="block text-meta text-kit-slate-11">
                       {DS.customerPhone} · {orNotConfigured(p.customer_phone)}
                       {p.kv_default ? ` · ${DS.kvDefault}` : ""}
                     </span>
                   </span>
-                  <span className={`text-label ${p.active === false ? "text-kit-slate-9" : "text-kit-green-11"}`}>
+                  <span className={`text-meta font-medium ${p.active === false ? "text-kit-slate-11" : "text-kit-green-11"}`}>
                     {p.active === false ? DS.inactive : DS.active}
                   </span>
                 </Link>
@@ -607,7 +607,7 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
     >
       <div className="mx-auto grid w-full max-w-4xl gap-5 overflow-auto p-5" data-testid="delivery-settings-partner">
         <div>
-          <Link className="text-label text-kit-blue-11" to="/operation/settings/delivery/partners">
+          <Link className="text-body font-medium text-kit-blue-11" to="/operation/settings/delivery/partners">
             ← {DS.partners}
           </Link>
           <div className="text-body text-kit-slate-11">
@@ -626,8 +626,8 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
               key={s.slug}
               to={`/operation/settings/delivery/partners/${encodeURIComponent(partner.id)}/${s.slug}`}
               className={({ isActive }) =>
-                `rounded-control px-2 py-1 text-label ${isActive || (s.slug === "details" && section === "details")
-                  ? "bg-kit-blue-3 font-semibold text-kit-slate-12"
+                `rounded-control px-2 py-1 text-body ${isActive || (s.slug === "details" && section === "details")
+                  ? "bg-kit-blue-3 font-medium text-kit-slate-12"
                   : "text-kit-slate-11 hover:bg-kit-slate-3"}`
               }
               end
@@ -692,7 +692,7 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
               {canEdit ? (
                 <YesNo id="dp-kv" value={draft.coverage.kvDefault} onChange={(v) => set("coverage", { ...draft.coverage, kvDefault: v })} />
               ) : draft.coverage.kvDefault ? DS.yes : DS.no}
-              <span className="block text-label text-kit-slate-11">{KV_STATES.join(" · ")}</span>
+              <span className="block text-meta text-kit-slate-11">{KV_STATES.join(" · ")}</span>
             </Row>
           </SectionCard>
         )}
@@ -736,7 +736,7 @@ function PartnerObject({ data, partnerId, section }: { data: DeliverySettingsRes
                         set("schedule", { ...draft.schedule, regions });
                       }} />
                     ) : <span className="font-medium">{r.name}</span>}
-                    <span className="text-label text-kit-slate-11">{DS.deliveryDays}</span>
+                    <span className="text-meta text-kit-slate-11">{DS.deliveryDays}</span>
                     <WeekdayPicker value={r.deliveryDays} days={[1, 2, 3, 4, 5, 6]} disabled={!canEdit} onChange={(v) => {
                       const regions = [...draft.schedule.regions];
                       regions[i] = { ...r, deliveryDays: v };

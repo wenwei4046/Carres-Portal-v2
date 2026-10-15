@@ -376,7 +376,7 @@ export default function WarehouseOutboundWork() {
           ) : (
             <button
               type="button"
-              className="inline-flex h-7 items-center rounded-control border border-kit-slate-5 bg-white px-2 text-meta text-kit-blue-11 hover:bg-hovertint"
+              className="inline-flex h-7 items-center rounded-control border border-kit-slate-5 bg-white px-2 text-body font-medium text-kit-blue-11 hover:bg-hovertint"
               data-testid={`wo-open-loading-${c.doNumber}`}
               onClick={() => setFilter("loading", workKey(c))}
             >
@@ -685,7 +685,7 @@ export default function WarehouseOutboundWork() {
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    className="inline-flex h-7 items-center gap-1 rounded border border-kit-slate-5 bg-white px-2 text-meta text-base-600 hover:bg-hovertint md:hidden"
+                    className="inline-flex h-7 items-center gap-1 rounded border border-kit-slate-5 bg-white px-2 text-body font-medium text-base-600 hover:bg-hovertint md:hidden"
                     onClick={() => setShowFilters((v) => !v)}
                     data-testid="wo-toggle-filters"
                   >
@@ -694,7 +694,7 @@ export default function WarehouseOutboundWork() {
                   {railHidden && (
                     <button
                       type="button"
-                      className="hidden h-7 items-center gap-1 rounded border border-kit-slate-5 bg-white px-2 text-meta text-base-600 hover:bg-hovertint md:inline-flex"
+                      className="hidden h-7 items-center gap-1 rounded border border-kit-slate-5 bg-white px-2 text-body font-medium text-base-600 hover:bg-hovertint md:inline-flex"
                       onClick={() => setRailHidden(false)}
                       data-testid="wo-show-filters"
                     >
@@ -714,7 +714,7 @@ export default function WarehouseOutboundWork() {
                       back.delete("q");
                       return back.toString();
                     })()}`}
-                    className="text-meta text-base-600 underline-offset-2 hover:underline"
+                    className="text-body font-medium text-base-600 underline-offset-2 hover:underline"
                     data-testid="wo-back-monitor"
                   >
                     ← Pickup Schedule
@@ -767,7 +767,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
       <div className="text-meta text-kit-slate-11">{label}</div>
-      <div className="break-words text-base-800">{value}</div>
+      <div className="break-words font-medium text-base-800">{value}</div>
     </div>
   );
 }
@@ -895,7 +895,7 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
         </label>
         <button
           type="button"
-          className="btn-primary h-7 px-2.5 text-meta"
+          className="btn-primary h-7 px-2.5 text-body font-medium"
           onClick={scanUnit}
           disabled={prep.isPending || !scanValue.trim()}
           data-testid="wo-scan-btn"
@@ -905,7 +905,7 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
         {scannedNotChecked.length > 0 && (
           <button
             type="button"
-            className="btn-primary h-7 px-2.5 text-meta"
+            className="btn-primary h-7 px-2.5 text-body font-medium"
             onClick={() =>
               recordPrep(
                 "checked",
@@ -922,7 +922,7 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
         {checkedNotPacked.length > 0 && (
           <button
             type="button"
-            className="btn-primary h-7 px-2.5 text-meta"
+            className="btn-primary h-7 px-2.5 text-body font-medium"
             onClick={() =>
               recordPrep(
                 "packed",
@@ -939,7 +939,7 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
         {readyUnits.length > 0 && (
           <button
             type="button"
-            className="btn-hero h-7 px-3 text-meta"
+            className="btn-hero h-7 px-3 text-body font-semibold"
             onClick={() => setLoadOpen(true)}
             data-testid="wo-record-loaded"
           >

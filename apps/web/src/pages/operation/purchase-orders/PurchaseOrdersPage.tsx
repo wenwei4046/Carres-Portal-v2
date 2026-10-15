@@ -54,7 +54,7 @@ import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
    PO document is read against the SO every day; two card grammars on two
    sister pages read as two apps (YH, 2026-09-04). */
 import Block from "@/components/kit/Block";
-import Tabs from "@/components/kit/Tabs";
+import Tabs, { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
 import StatusPill from "@/components/kit/StatusPill";
 import Checkbox from "@/components/kit/Checkbox";
 import Button from "@/components/kit/Button";
@@ -1766,12 +1766,14 @@ function PurchaseOrderObject({
             />
           </div>
         ) : null}
-        <nav className="mt-3 flex gap-1 overflow-x-auto whitespace-nowrap" aria-label="Purchase order views">
+        {/* The kit segmented control (01 §3); the track wraps on a narrow page
+            instead of scrolling a view out of sight. */}
+        <nav className={`${SEGMENTED_TRACK} mt-3 max-w-full flex-wrap`} aria-label="Purchase order views">
           {views.map((item) => (
             <button
               key={item}
               type="button"
-              className={`h-8 border-b-2 px-3 text-body ${view === item ? "font-medium border-kit-blue-9 text-kit-blue-11" : "border-transparent text-kit-slate-11 hover:text-kit-slate-12"}`}
+              className={`${SEGMENT} ${view === item ? SEGMENT_ON : SEGMENT_OFF}`}
               onClick={() => { setView(item); setMode("read"); }}
             >
               {item}

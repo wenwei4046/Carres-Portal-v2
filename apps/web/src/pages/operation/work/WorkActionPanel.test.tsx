@@ -64,9 +64,10 @@ describe("WorkActionPanel", () => {
     expect(header.className).not.toMatch(/min-h-/);
     const title = screen.getByTestId("work-detail-title");
     expect(title).toHaveTextContent("Review the delivery proof");
-    expect(title.className).toContain("text-[15px]");
+    /* Panel title 15/500 (01 §2), kept on its 20 line. */
+    expect(title.className).toContain("text-strong");
     expect(title.className).toContain("leading-5");
-    expect(title.className).toContain("font-semibold");
+    expect(title.className).not.toContain("font-semibold");
     expect(screen.getByTestId("work-detail-action")).toHaveTextContent("due Thu, 17 Sep");
     expect(screen.getByTestId("work-detail-fact")).toHaveTextContent("Delivery proof needs review");
     expect(screen.getByTestId("work-detail-open-row")).toContainElement(screen.getByRole("button", { name: "Open DO-140926-0007" }));
