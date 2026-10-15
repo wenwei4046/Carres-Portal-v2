@@ -77,16 +77,16 @@ export function ChangeReview(props: {
       <DiffList rows={props.rows} label="Before and after" />
       {props.commercial && <Consequences items={props.consequences} />}
       <div className="mt-2 flex flex-col">
-        <div className="grid grid-cols-[150px_minmax(0,1fr)] gap-4 border-t border-c-section-line py-[7px] text-[13px]">
+        <div className="grid min-h-9 grid-cols-[150px_minmax(0,1fr)] items-center gap-4 border-t border-c-section-line py-[7px] text-[13px]">
           <span className="text-[12px] text-c-secondary">Reason for change</span>
           <span className="break-words font-medium text-c-ink">{props.reason || "Not recorded"}</span>
         </div>
-        <div className="grid grid-cols-[150px_minmax(0,1fr)] gap-4 border-t border-c-section-line py-[7px] text-[13px]">
+        <div className="grid min-h-9 grid-cols-[150px_minmax(0,1fr)] items-center gap-4 border-t border-c-section-line py-[7px] text-[13px]">
           <span className="text-[12px] text-c-secondary">Requested date (from customer)</span>
           <span className={`font-medium ${props.askedOn ? "text-c-ink" : "text-c-muted"}`}>{props.askedOn ? fmtDate(props.askedOn) : "Not recorded"}</span>
         </div>
         {props.commercial && (
-          <div className="grid grid-cols-[150px_minmax(0,1fr)] gap-4 border-t border-c-section-line py-[7px] text-[13px]">
+          <div className="grid min-h-9 grid-cols-[150px_minmax(0,1fr)] items-center gap-4 border-t border-c-section-line py-[7px] text-[13px]">
             <span className="text-[12px] text-c-secondary">Customer agreement</span>
             <span className={`break-words font-medium ${props.agreement ? "text-c-ink" : "text-c-muted"}`}>
               {props.agreement

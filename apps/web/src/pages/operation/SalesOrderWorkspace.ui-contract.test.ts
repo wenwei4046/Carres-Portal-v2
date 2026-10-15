@@ -246,7 +246,8 @@ describe("Sales Order object template contract", () => {
        here fails this test rather than quietly existing on one surface. */
     for (const field of POS_FORM_BUILTINS) {
       expect(
-        workspace.includes(`data-pos-field="${field.key}"`),
+        /* A JSX attribute, or a line's data on the shared order-line table (COrderLines). */
+        workspace.includes(`data-pos-field="${field.key}"`) || workspace.includes(`"data-pos-field": "${field.key}"`),
         `POS builtin \`${field.key}\` (${field.label}) has no control on the object page`,
       ).toBe(true);
     }
@@ -762,7 +763,7 @@ describe("Sales Order page — kit sizes, one gap, one table grammar", () => {
     expect(serviceCode).toContain("catalogServiceSku && catalogServiceSku.trim() ? catalogServiceSku.trim() : savedKey");
     /* Nothing is upper-cased or rewritten. */
     expect(serviceCode).not.toContain("toUpperCase");
-    expect(workspace).toContain("{serviceCodeWord(a.addon_key, addonSkuByKey.get(a.addon_key))}");
+    expect(workspace).toContain("serviceCodeWord(a.addon_key, addonSkuByKey.get(a.addon_key))");
     expect(workspace).toContain("(key) => serviceCodeWord(key, addonSkuByKey.get(key))");
     /* The paper prints what the payload sends; the API applies the same rule. */
     expect(pdfTemplate).toContain('(a.sku ?? "ADD-ON").split("-")');

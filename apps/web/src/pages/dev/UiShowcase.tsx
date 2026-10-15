@@ -20,6 +20,7 @@ import { CListCell, trackFloor, type CCell, type CListColumn } from "@/component
 import { CListFooter, type CListTotals } from "@/components/carres/CListFooter";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ItemRows from "@/components/register/ItemRows";
+import COrderLines, { type COrderLine } from "@/components/carres/COrderLines";
 import CSidePanel from "@/components/carres/CSidePanel";
 import { CChip, CIconButton, CShowPanelButton, CViewButton } from "@/components/carres/CToolbar";
 import { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
@@ -193,6 +194,32 @@ function TableExample({ narrow }: { narrow: boolean }) {
         )}
       />
     </section>
+  );
+}
+
+/* ── the order-line table in a card (01 §5.1), with TEST lines: a long name, a free item, a service ── */
+const ORDER_LINES: COrderLine[] = [
+  { key: "a", model: "TEST · Mattress model A", spec: "Queen · TEST-MS-A", qty: 2, unitPrice: "RM 1,890.00", amount: "RM 3,780.00" },
+  { key: "b", model: "TEST · a product name long enough to need sixty characters XL", spec: "Super single · Mattress gap: Confirm later · TEST-MS-LONG-CODE", qty: 1, unitPrice: "RM 12,345.50", amount: "RM 12,345.50" },
+  { key: "c", model: "TEST · Pillow model B", spec: "Standard · TEST-PL-B", qty: 1, unitPrice: "RM 0.00", amount: "RM 0.00",
+    notes: <span className="text-[12px] text-c-secondary">Free item. It follows the item it came with</span> },
+  { key: "d", model: "TEST · Delivery fee", spec: "TEST-DELIVERY", qty: 1, unitPrice: "RM 250.00", amount: "RM 250.00" },
+];
+
+function OrderLinesExample({ narrow }: { narrow: boolean }) {
+  return (
+    <div className="flex min-w-0 flex-col rounded-lg border border-c-card-border bg-c-card px-4 py-3.5" style={{ width: narrow ? 420 : "100%" }}>
+      <h3 className="pb-1.5 text-strong text-c-ink">Items</h3>
+      <COrderLines
+        label={narrow ? "TEST items, narrow" : "TEST items"}
+        lines={ORDER_LINES}
+        totals={[
+          { key: "total", label: "Total", strong: true, qty: 5, amount: "RM 16,375.50" },
+          { key: "received", label: "Received", amount: "RM 2,999.50" },
+          { key: "balance", label: "Balance due", strong: true, warn: true, amount: "RM 13,376.00" },
+        ]}
+      />
+    </div>
   );
 }
 
@@ -478,6 +505,11 @@ export default function UiShowcase() {
             </div>
           ))}
         </div>
+      </Section>
+
+      <Section id="order-lines" title="Order-line table in a card: COrderLines" note="A record's goods and services (the Sales Order's Items). Grey 40 header · rows 44, the item on two lines, model then spec, neither wraps · # 20 · item · Qty 32 · Unit price 80 · Amount 80, gap 10; a number column widens to its longest value · an exception note wraps under the item and only that row grows · totals close the table · on a narrow card the table scrolls sideways inside the card, never the page.">
+        <OrderLinesExample narrow={false} />
+        <OrderLinesExample narrow />
       </Section>
 
       <Section id="pills" title="Pills" note="12/500, the full word, never cut.">
