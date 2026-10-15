@@ -234,6 +234,7 @@ For every used row, record **CONFORMS / DEVIATION / NOT APPLICABLE** in the exis
 | Check | Approved value | Trigger / behaviour | Shared entry under components/ |
 |---|---|---|---|
 | Word button | Height34; toolbar32; panel30; small28; radius8 | Ordinary13/500; main13/600; one main action per area | kit/Button.tsx |
+| Button horizontal padding |14 ordinary;12 toolbar, from canonical token --btn-pad /--btn-pad-toolbar | Context selects the shared role, never caller CSS | kit/Button.tsx and shared token adapter |
 | Icon-only | Round; no resting fill/border; glyph20 | Toolbar32; ordinary34; small28–32 | kit/Button.tsx; carres/CToolbar.tsx adapter |
 | Hit area | Desktop minimum32; mobile/partner minimum44 | Glyph size is not hit area | Existing owning control |
 | Icons | Material Symbols Rounded outline weight300 | Menu/word18; icon-only20; chip16 | kit/Icon.tsx; carres/MIcon.tsx |
@@ -260,7 +261,8 @@ For every used row, record **CONFORMS / DEVIATION / NOT APPLICABLE** in the exis
 | Dialog | Shadow0 12px 40px rgba(22,24,29,.22) | Shared focus trap/return and scroll isolation | kit/Modal.tsx; kit/DialogFrame.tsx |
 | Toast | Bottom centre; #1F2937/white; text13 | Ordinary2.2–2.6s; task close12s; no timed Undo | kit/Toast.tsx |
 | Avatar | Round; header24 | Fixed colour per person; accessible name/tooltip | Shared generic Avatar remains KIT GAP in02 |
-| Unspecified surface geometry | UNRESOLVED: ordinary dialog size variants, padding/max-height, complete z-layer ladder | Preserve existing unique capability; do not invent a global value | Owning component contract must be completed |
+| Ordinary dialog geometry | MEASURED IMPLEMENTATION: standard512, wide600, viewer880; max-height85vh; body padding16; header/footer14×16; footer gap8 | Existing Modal width union; not new owner approval; task-review and compact-card preserve their distinct full-surface/padding contracts | kit/Modal.tsx; kit/DialogFrame.tsx; tailwind.config.ts |
+| Surface geometry still unresolved | Owner acceptance of ordinary dialog variants; full cross-family z-layer contract | Existing implementation is available above; do not describe it as approved merely because it exists | Owning component contract, reviewed through this same kit |
 
 ### 7.4 Goods tables
 
@@ -287,7 +289,9 @@ For every used row, record **CONFORMS / DEVIATION / NOT APPLICABLE** in the exis
 | Summary strip | Equal columns; label12; label/value gap6; value13/500 | Long value wraps within own column | Existing module summary composition |
 | Read-only | Plain facts; Not recorded #6B7280 | No fabricated zero/false or disabled input | Existing shared fact renderer |
 | Narrow | No page side-scroll; touch44; contained table scroll; cards stack without losing facts | Trigger must name viewport OR available canvas explicitly | Shared host + owning component |
-| Unresolved typography/spacing | Complete per-role line-height set, all field horizontal padding/textarea minimum, unspecified min/max and component breakpoints | Current implementation is MEASURED, not approved law | Complete this contract in place; no new kit |
+| Role line heights | MEASURED IMPLEMENTATION: page20/28; card15/22; breadcrumb14/20; body13/18; label12/16; caps11/14 | From tailwind.config.ts fontSize; size/weight approved in §2, these full line-height assignments still require acceptance | Shared text-page/strong/control/body/meta/label roles |
+| Field padding and multiline | MEASURED IMPLEMENTATION: single-line horizontal10; search12; textarea horizontal10/vertical6, default3 rows, resize-y; mobile min-height44 | Textarea uses rows, not a caller height. Not a new approved fixed-height value | kit/field-recipe.ts; kit/Textarea.tsx |
+| Remaining unspecified dimensions | UNRESOLVED: component min/max and exact breakpoints not stated above | No fallback to guessed numbers; name the current component behaviour as MEASURED when relevant | Owning shared component contract |
 
 ### 7.6 Compact module card — CompactModuleCard
 
