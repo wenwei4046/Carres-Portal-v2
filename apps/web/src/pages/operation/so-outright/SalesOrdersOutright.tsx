@@ -14,7 +14,7 @@
  * catalogue names, the server's stock / payment / case facts). Nothing here
  * writes. A row click opens the order; Ctrl/⌘-click opens it in a new tab.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { REGISTER_DELIVERY_CONDITIONS, registerDeliveryConditionOf } from "@carres/shared";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -57,6 +57,16 @@ import {
 import { readStateOf, usePayBy } from "./pay-by";
 
 type Tab = "open" | "delivered" | "all";
+type ListSort = { key: string; dir: "asc" | "desc" } | null;
+type ListContext = { user: string; query: string; sort: ListSort; pageSize: number; page: number; selected: Set<string> };
+/* Tab-lifetime presentation state only, scoped to the signed-in person. The
+   URL still owns criteria; the shared grid owns expansion, focus and scroll. */
+const listContexts = new Map<string, ListContext>();
+function listContextFor(user: string, query: string): ListContext {
+  const previous = listContexts.get(user);
+  return previous ? { ...previous, query, page: previous.query === query ? previous.page : 1 }
+    : { user, query, sort: null, pageSize: 20, page: 1, selected: new Set() };
+}
 const TABS: { key: Tab; label: string }[] = [
   { key: "open", label: "Open" },
   { key: "delivered", label: "Delivered" },
@@ -247,7 +257,23 @@ export default function SalesOrdersOutright() {
   );
 
   /* ── sort (the engine's header) · Group by (⋮) · paging ── */
-  const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" } | null>(null);
+  const group = (["delivery", "stock", "payment"] as const).find((g) => g === params.get("group")) ?? null;
+  const query = JSON.stringify([tab, layoutKey, Object.entries(filters).sort(([a], [b]) => a.localeCompare(b)).map(([key, values]) => [key, [...values].sort()]), seededSearch, requestedParam, group]);
+  const [listContext, setListContext] = useState(() => listContextFor(userId, query));
+  /* A genuinely changed scope starts on page1. A remount after Back does not.
+     Compare values, not new filter/sort object identities or mount effects. */
+  if (listContext.user !== userId) setListContext(listContextFor(userId, query));
+  else if (listContext.query !== query) setListContext({ ...listContext, query, page: 1 });
+  useLayoutEffect(() => { listContexts.set(listContext.user, listContext); }, [listContext]);
+  const { sort, pageSize, page, selected } = listContext;
+  const setSort = useCallback((next: ListSort) => setListContext((was) =>
+    was.sort?.key === next?.key && was.sort?.dir === next?.dir ? was : { ...was, sort: next, page: 1 }), []);
+  const setPageSize = useCallback((next: number) => setListContext((was) =>
+    was.pageSize === next ? was : { ...was, pageSize: next, page: 1 }), []);
+  const setPage = useCallback((next: number) => setListContext((was) =>
+    was.page === next ? was : { ...was, page: next }), []);
+  const setSelected = useCallback((update: Set<string> | ((selected: Set<string>) => Set<string>)) =>
+    setListContext((was) => ({ ...was, selected: typeof update === "function" ? update(was.selected) : update })), []);
   const sorted = useMemo(() => {
     if (!sort || !COLUMNS[sort.key]) return list;
     const col = COLUMNS[sort.key]!;
@@ -259,14 +285,9 @@ export default function SalesOrdersOutright() {
       return (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))) * dir;
     });
   }, [list, sort, ctx]);
-  const group = (["delivery", "stock", "payment"] as const).find((g) => g === params.get("group")) ?? null;
-  const [pageSize, setPageSize] = useState<number>(20);
-  const [page, setPage] = useState(1);
   const pages = group ? 1 : Math.max(1, Math.ceil(sorted.length / pageSize));
-  useEffect(() => setPage(1), [tab, layoutKey, filters, pageSize, seededSearch, requestedParam, sort, group]);
   /* A grouped list shows every order under its group; paging cuts a group. */
   const shown = group ? sorted : sorted.slice((Math.min(page, pages) - 1) * pageSize, Math.min(page, pages) * pageSize);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const selectedRows = list.filter((r) => selected.has(r.id));
   const toggle = (id: string) =>
     setSelected((s) => {
@@ -523,7 +544,7 @@ export default function SalesOrdersOutright() {
   }, [layout, all, inTab, ctx]);
   const onColumnQuery = useCallback(
     (q: { filters: Record<string, string[]>; sort: { key: string; dir: "asc" | "desc" } | null }) => {
-      setSort((was) => (was?.key === q.sort?.key && was?.dir === q.sort?.dir ? was : q.sort));
+      setSort(q.sort);
       setParams((p) => {
         const next = new URLSearchParams(p);
         const before = next.toString();
@@ -532,7 +553,7 @@ export default function SalesOrdersOutright() {
         return next.toString() === before ? p : next;
       }, { replace: true });
     },
-    [setParams],
+    [setParams, setSort],
   );
   const fixedGroups =
     group === "delivery"
@@ -569,6 +590,7 @@ export default function SalesOrdersOutright() {
           onNext={() => setMonth((m) => (m < thisMonth ? shiftMonth(m, 1) : m))}
           onHide={() => setSummaryOpen(false)}
           loading={isLoading}
+          failure={isError ? <SalesOrderReadFailure error={error} surface="sales-orders-register" onRetry={() => void refetch()} /> : undefined}
         />
       )}
       <main className="grid min-h-0 min-w-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-2.5">
@@ -674,6 +696,8 @@ export default function SalesOrdersOutright() {
             rows={shown}
             columns={gridColumns}
             storageKey={`carres.outright.grid.${layoutKey}.v1`}
+            sessionKey={`carres.outright.${userId}`}
+            presentationKey={JSON.stringify([query, pageSize, page, sort])}
             rowKey={(r) => r.id}
             rowTestId={(r) => `outright-row-${r.so}`}
             rowHeight={54}
@@ -823,6 +847,7 @@ function SummaryPanel({
   onNext,
   onHide,
   loading,
+  failure,
 }: {
   rows: RegisterRow[];
   facts: Record<string, { cases?: string | null }> | null;
@@ -834,7 +859,9 @@ function SummaryPanel({
   onNext: () => void;
   onHide: () => void;
   loading: boolean;
+  failure?: ReactNode;
 }) {
+  if (failure) return <CSidePanel label="Summary" title="Summary" onHide={onHide} testId="outright-summary">{failure}</CSidePanel>;
   const inMonth = rows.filter((r) => r.proceeded && monthKey(r.proceeded) === month);
   const prev = shiftMonth(month, -1);
   const inPrev = rows.filter((r) => r.proceeded && monthKey(r.proceeded) === prev);

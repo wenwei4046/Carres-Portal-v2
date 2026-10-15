@@ -54,6 +54,8 @@ These describe the measured implementation, not new approved values. The accepta
 
 Direct absolute-import inventory (15 Oct source scan, excludes test/spec, `src/dev` and `pages/dev`, does not count relative imports or re-exports): Button131 files; CPopover17; Icon29; DataGrid54; ItemRows4; TaskView2; StatusPill19; CPill3. These are source consumers, not accepted pages. ItemRows callers are Outright, SO Batch by order/by supplier and Forecast; TaskView callers are TaskFrame and its task-view adapter. Preserve their different capabilities before retirement.
 
+Outright return-context consumer wiring: its caller retains account-scoped, tab-lifetime page/pageSize/sort/selection; URL criteria remain authoritative. It now passes existing DataGrid sessionKey and a query/page/size/sort presentationKey for expansion, active row and scroll. A changed criterion or row count starts page1; direct Back to the same criterion restores the same page. This is local fixture/integration proof, not authenticated production acceptance. Its Summary now uses SalesOrderReadFailure on failed/refused order reads, never zero facts.
+
 **Retirement state:** CTable, DropdownMenu, kit Popover, unused Card, GridToolbar,
 ChecklistRow and QuietRouteRow are already retired in the mainline source. Do not recreate them.
 Btn, Field and PageHeader are legacy contracts blocked from new adoption; remaining consumers
