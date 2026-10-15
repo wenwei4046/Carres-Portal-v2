@@ -70,7 +70,7 @@ with the next functional release, not on its own.
 | Shared parts | one menu #2070 · one pop-up #2072 · one pill drawing #2073 · one segmented control #2078 `4903bead6` · pill weight 500 only and Inbound site switch #2080 `cfa0ae0dc` | /ui computed equal; menus and pop-ups by keyboard in production | Summary panel only on Outright; Batch B deployed procurement/PO object segmented tabs and initials 11/700, full object-tab interaction walk still owed |
 | Type to 01 §2 (by role) | Delivery, Warehouse, Stock + rail, caps labels, pills, side menu group word #2078 `4903bead6` · SO detail, Order Route, Delivery brief, reorder card, Purchasing, Receiving #2080 `cfa0ae0dc` | Production carres-check at 1025 · 1164 · 1440 on `4903bead6`: Delivery Orders, Delivery Monitor, Outbound, Inventory, SO Batch, Outright PASS; Inbound 2 findings (fixed in #2080). On `cfa0ae0dc`: Purchase Orders and Receiving PASS at 1025 · 1164 · 1440; Inbound PASS at 1440 and its Site switch ran off at 1025/1164 (wraps in #2081); Manual Purchase only the screen-reader `+` (#2081); SO page leftovers are field rows 33 vs 36, item rows 37 vs 44, model · spec on one line, its own items table (01 §5 order-line table owed) and initials 10/700 (#2081) | Batch B deployed remaining Operation, Finance, Principal, Supplier and HR type sites; six-page runtime measurement is in the Batch B row, other portal journeys still owed. Legacy old-orders is excluded; `sales-order-route.ts` text budget assumes 11px |
 | Sales Order (Outright) | page 1 #2066 · Monthly demand door #2075 · engine + approved capabilities #2079 `2a28f84d9` | Production 15 Oct on `2a28f84d9`: carres-check PASS at 1025 · 1164 · 1440, rows closed and open; header 40, rows 54, footer `31 orders · Qty: …`; Group by Payment Status (Unpaid 1 · Partially paid 26 · Paid in full 4); sort SO no. both ways; Stock view PO numbers are links; row menu View · Print · Cancel SO (not clicked); tick `Select SO-1371`; chevron `Show items`; opened-row frame 1px `#CBD0D6`, corners 8, items Item · Qty · Supplier; SO no. stays in view at the right end | Owner walk; short-toolbar decision; SO quick card has no entry point (§5) |
-| SO Batch Purchase | v12 look via the engine · one ⋮ · PO No comma fix · header 40 | Production PASS at 1025 · 1164 · 1440 (15 Oct) | Design brief A/B/C owner rulings (§5); D rejected; E reported (§6) |
+| SO Batch Purchase | v12 look via the engine · one ⋮ · PO No comma fix · header 40 | Production PASS at 1025 · 1164 · 1440 (15 Oct) | A confirmed: existing deadline rule retained; B/C owner rulings pending (§5); D rejected; E reported (§6) |
 | Workspace | Round 3 + `+ Task` (#2044–#2055) | Production read-only 15 Oct: feed 206 items, UI 193 (13 future on-day deliveries), each destination opens the exact record, reload keeps the same ids and module counts | Signed-in owner walk |
 | Tasks | One feed `/api/operation/work?include=workspace`; no page writes tasks locally | Local replayed database 15 Oct (fixture users, nothing in production): internal task add → same id on retry → in the open feed (real `projectInternalTaskWork`: id `workspace:{task}:internal_task`, destination `/operation?tab=work&task=…`) → mark done on the same record (events added, done) → gone from the open feed; the Work ledger refuses completion except by the owning module's fact and needs a contact with a contact kind | Module task completion end to end: owner authorised the one SO-1254 TEST write; current source UI has no no-date answer entry (§4.2), so no write or closure is claimed |
 
@@ -128,12 +128,12 @@ what moved, what an owner ruling replaced, and the kept `SalesOrderCompactView`)
    restriction; do not silently reintroduce TBD for dated or new orders.
    Do not bypass the page with a direct production write or report this TEST answer as real
    customer communication. Owner authorisation is satisfied, runtime proof is not.
-3. **Batch D · SO Batch brief A/B/C.** Blocked on owner rulings (§5); then one release: group-row
-   deadline, group status, Today card arithmetic.
+3. **Batch D · SO Batch brief.** A confirmed: preserve the existing deadline rule, no code change.
+   B and C still await owner rulings via the controller (§5); batch any approved changes into one release.
 4. **Page adoption down the side menu** after Design's fix list per page; **Settings per module** at
    completion (owner 2026-10-05).
 
-## 5 · Pending owner/design decisions (bring only these, one at a time)
+## 5 · Owner/design decisions (controller confirms with Jess, then replies to Code; one at a time)
 
 - Short toolbar: one line (built, recommended) vs two rows (`preview/two-row-toolbar`).
 - Opened row: v12 frame vs §6.9 connector (UI MASTER §7.2; the engine can draw the frame,
@@ -147,11 +147,11 @@ what moved, what an owner ruling replaced, and the kept `SalesOrderCompactView`)
 
 ### SO Batch design brief 14 Oct (Round 4 `Code briefs/2 SO Batch Purchase.md`) — owner rulings needed
 
-**A · `Order PO deadline` on a group row**
-- Existing rule (Purchasing MASTER §9.1, column table): "The earliest Order By date among the lines still to buy; under it the weekday and `{n} days left` · `Today` · `{n} days late` (amber once the date has passed)."
-- Proposed: the nearest Order By date that is not yet late; a second amber line `n SOs late` when any line is late; the oldest late date only when every line is late.
-- Consequence: the row stops leading with the oldest late order (production: Nice Future shows `6 Jul · 100 days late`); late lines move to a count. `n SOs late` is not a COPY word (COPY has `{n} days late`, `Late to order`).
-- Recommendation: adopt the next-action date (SAP Fiori "date = next action"), with the second line in existing words: `{n} late to order` (amber). Falsifier: Jess wants the oldest-late date kept as the row's chase signal.
+**A · `Order PO deadline` on a group row — CONFIRMED 15 Oct 2026, no code change**
+- Jess confirmed through `Create Claude design checklist`: keep the earliest Order By among
+  outstanding lines, including an already overdue unpurchased line. Each line keeps its own deadline.
+- Reject replacing it with the nearest non-late date. A future date must not hide buying already late.
+- Trial-data age is not a reason to change the rule. Purchasing MASTER §9.1 remains the authority.
 
 **B · `Status` on a group row**
 - Existing rule (§9.1): "`Cut-off passed` (amber) with what is still to buy, when a line's PO window has gone by; otherwise `To buy`."
