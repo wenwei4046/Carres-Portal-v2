@@ -34,7 +34,7 @@
 | Detail order lines | `carres/COrderLines` | Different job from a register; preserve order-line arithmetic |
 | View, panel and icon tools | `carres/CToolbar`: CViewButton, CShowPanelButton, CIconButton, CChip | Reuse the exported control; do not rebuild its wrapper/skin per page |
 | Menus and small floating panels | `carres/CPopover`: CMenu, CMenuItem, CMenuGroup | Retired DropdownMenu/kit Popover are not alternatives |
-| Status rendering | `carres/CPill`, `kit/StatusPill` | Existing overlap, not two approved palettes; retain current consumers until unified with semantic/API parity |
+| Status rendering | `carres/CPill`, `kit/StatusPill` | Two caller-tone adapters already share PILL_SHAPE and kit/tokens; one visual implementation. `/ui` shows the current CPill gallery once. |
 | Forms, dialogs, documents, task view | Existing `kit/` families in the register above | Preserve behaviour and source ownership during visual adoption |
 | Glyphs | `carres/MIcon`, semantic `kit/Icon` adapter | One approved glyph family; preserve semantic names, accessible labels and consumer APIs |
 | Live catalogue | `pages/dev/UiShowcase.tsx` at `/ui` | Imports actual runtime components with TEST examples; it is not a separate implementation |
@@ -42,7 +42,7 @@
 **Retirement state:** CTable, DropdownMenu, kit Popover, unused Card, GridToolbar,
 ChecklistRow and QuietRouteRow are already retired in the mainline source. Do not recreate them.
 Btn, Field and PageHeader are legacy contracts blocked from new adoption; remaining consumers
-move with their page. CPill/StatusPill and generic Block/specialised side-panel surfaces require
+move with their page. CPill/StatusPill are adapters over one pill drawing; generic Block/specialised side-panel surfaces require
 capability review rather than deletion by name. Keep the remaining work in the existing handoff.
 
 ## Reuse rules
@@ -156,3 +156,14 @@ The imported HTML/support.js demonstrates interactions only and is never the run
 
 These contracts preserve useful supported behaviour, not retired colours, font sizes or geometry.
 Current source APIs must be checked before calling any family fully adopted.
+
+## Current catalogue boundary · owner cleanup 15 Oct 2026
+
+`/ui` presents the current design once per purpose: DataGrid and its cells/footer/expansion,
+COrderLines, one pill gallery, toolbar, Summary, icons, fields, menus, tabs, dialogs, feedback,
+documents/evidence and TaskView/StepList. The old dark-header compact-card preview, older extra
+register demos, duplicate StatusPill gallery, RouteStop/Block task composition, placeholder task
+words, dated import counts and obsolete CTable migration note are removed from the catalogue.
+This retires demonstrations, not the business APIs still used by module pages. Internal sample
+actions are explicitly TEST-only and do not save records. Remaining module migrations belong
+in the existing delivery handoff, never as competing styles at the bottom of `/ui`.

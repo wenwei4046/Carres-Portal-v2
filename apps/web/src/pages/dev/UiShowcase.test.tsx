@@ -14,16 +14,21 @@ const render = (ui: ReactElement) =>
   rtlRender(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })}>{ui}</QueryClientProvider>);
 
 describe("/ui — the one Carres UI kit", () => {
-  it("shows the v12 kit parts, then every shared part the pages import, and none of the retired kit's notes", () => {
+  it("shows the current kit without retired demos or migration notes", () => {
     render(<UiShowcase />);
-    for (const id of ["table", "cells", "order-lines", "pills", "toolbar", "side-panel", "icons", "list-engine", "buttons", "fields", "menus", "tabs-kit", "dialogs", "states", "status-pill", "documents", "task-parts", "not-yet"]) {
+    for (const id of ["table", "cells", "order-lines", "pills", "toolbar", "side-panel", "icons", "buttons", "fields", "menus", "tabs-kit", "dialogs", "states", "documents", "task-parts"]) {
       expect(document.getElementById(id), id).toBeInTheDocument();
     }
     expect(screen.queryByRole("heading", { name: "Frozen decisions" })).not.toBeInTheDocument();
     expect(document.getElementById("compact-card")).not.toBeInTheDocument();
     expect(screen.queryByText("SO-1368")).not.toBeInTheDocument();
+    for (const id of ["list-engine", "status-pill", "not-yet"]) {
+      expect(document.getElementById(id), id).not.toBeInTheDocument();
+    }
+    expect(screen.queryByText(/draw one table twice/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/131 pages/)).not.toBeInTheDocument();
     /* the one listing engine is on the page, not only the Sales Order Outright frame */
-    expect(document.getElementById("list-engine")!.querySelector('[data-testid="sales-orders-grid"]')).toBeInTheDocument();
+    expect(document.getElementById("table")!.querySelector('[data-testid="sales-orders-grid"]')).toBeInTheDocument();
   });
 
   it("the ⋮ menu is the one CPopover menu: it opens, runs a command and closes", () => {
@@ -32,6 +37,7 @@ describe("/ui — the one Carres UI kit", () => {
     fireEvent.click(within(menus).getByRole("button", { name: "Row actions" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Print" }));
     expect(screen.queryByRole("menuitem", { name: "Print" })).not.toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "TEST action result" })).toHaveTextContent("TEST · Print selected");
   });
 
   it("the Carres Table is the marked table, with the preserved date's two-line header and the identifier fixed", () => {
