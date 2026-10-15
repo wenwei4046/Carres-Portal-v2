@@ -40,7 +40,16 @@ Never report progress as a percentage; list the exact remaining obligations (§4
 
 ## 2 · Completion table (one table; re-measure before quoting)
 
-Production runs `dabffcfc5` (ERP, POS and API, 15 Oct 2026 14:02 MYT; #2081 Inbound Site switch wraps, Manual Purchase create door named by aria-label, SO page initials 11/700 — all three in the live bundle; the signed-in look after this deploy is owed: the browser pane lost its sign-in).
+Production runs `dabffcfc5` (ERP, POS and API, 15 Oct 2026 14:02 MYT). **Batch B is PR #2083
+(`build/kit-batch-b`, head `b664e6512`)**: local gates all green (lint, typecheck, 478 test files /
+7,013 tests, kit check 74/74), 42 retaken pictures committed, CI was running at 15:10 MYT. Next: when
+CI is green on the head, squash-merge with `--match-head-commit <head SHA read by gh>`, wait for the
+deploy (`/__carres_deploy.json` on erp/pos and `api…/health` must show the merge SHA), then the
+production carres-check at 1025 · 1164 · 1440 on the Sales Order page, Purchase Orders, Inbound,
+Manual Purchase, Delivery Orders and one Finance list (the browser pane must be signed in by the
+owner — never type a password). **Batch B2** (`build/kit-batch-b2`, `6c6b99f09`, not a PR yet): Finance
+read failures say `Could not read …`, no `refund_pay` on screen, Payment Monitor ref line grey — ships
+with the next functional release, not on its own.
 
 | Area | Deployed (PR · SHA) | Runtime-verified | Unfinished |
 |---|---|---|---|
@@ -88,7 +97,7 @@ what moved, what an owner ruling replaced, and the kept `SalesOrderCompactView`)
    (rows 44, model then spec) and field rows 36; (c) `build/kit-portals-type` — Finance, Principal,
    Supplier portal, HR and shared components by role. Excluded on purpose: the legacy old-orders page
    (not in the side menu; retires at go-live).
-2. **Batch C · Tasks end-to-end proof (functionality).** Blocked on one owner yes: record the
+2. **Batch C · Tasks end-to-end proof (functionality).** Still blocked on one owner yes: record the
    customer's `not yet` answer on trial order SO-1254 through the Sales Order page and watch its open
    `Ask for the delivery date` task (`orders:c1e95bf2-…:ask_delivery_date`, owner Alvin) leave the
    feed with a closure receipt. No test database exists here (no Docker or PostgREST); the internal
