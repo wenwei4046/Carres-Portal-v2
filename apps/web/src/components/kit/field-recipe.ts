@@ -64,9 +64,12 @@ export function controlClass(
   leadingIcon = false,
 ): string {
   const border = error ? CONTROL_BORDER.error : CONTROL_BORDER.rest;
+  /* 01 §1 mobile hit target. CONTROL_BASE also skins read-only facts, so
+     height belongs to this interactive-control recipe, not the shared ink. */
+  const base = `${CONTROL_BASE} max-[767px]:min-h-11`;
   if (shape === "toolbar") {
     return [
-      CONTROL_BASE.replace("text-body ", ""),
+      base.replace("text-body ", ""),
       CONTROL_RADIUS,
       border,
       leadingIcon ? CONTROL_TOOLBAR.replace("px-3", LEADING.toolbar) : CONTROL_TOOLBAR,
@@ -74,14 +77,14 @@ export function controlClass(
   }
   if (shape === "pill") {
     return [
-      CONTROL_BASE.replace("bg-c-card ", "bg-c-search-bg "),
+      base.replace("bg-c-card ", "bg-c-search-bg "),
       "rounded-full",
       error ? CONTROL_BORDER.error : "border-transparent",
       leadingIcon ? CONTROL_SEARCH_PILL.replace("[padding-inline:12px]", LEADING.pill) : CONTROL_SEARCH_PILL,
     ].join(" ");
   }
   return [
-    CONTROL_BASE,
+    base,
     CONTROL_RADIUS,
     border,
     shape === "multi"
