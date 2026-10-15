@@ -297,7 +297,6 @@ export default function SoBatchBySupplier({
          so the button is not over Status and its menu never covers that
          column (owner 13 Oct 2026). */
       toolbarAfterTools={toolbarAfterTools ?? (fit.tight ? undefined : <span aria-hidden className="block" style={{ width: W5.status + 8 }} />)}
-      wrapToolbar
       /* The top bar already searches everything; here search is one icon, so
          the tabs and the view button stay on one line (01 §4). */
       searchPresentation="icon"

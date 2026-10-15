@@ -68,6 +68,7 @@ import { BY_SUPPLIER, orderedSupplierGroups, supplierGroups, todayNumbers, type 
 import SoBatchTodayCard from "./SoBatchTodayCard";
 import CPopover, { CMenuGroup, CMenuItem } from "@/components/carres/CPopover";
 import MIcon from "@/components/carres/MIcon";
+import { CIconButton, CViewButton } from "@/components/carres/CToolbar";
 import { avatarColor, personInitials } from "@/lib/staff-avatar";
 import {
   FilterRail,
@@ -75,7 +76,6 @@ import {
   FilterRailRow,
   FilterRailSelect,
   FILTER_RAIL_KIT_LIST_BELOW_PX, useFilterRailOpen,
-  ShowFiltersButton,
 } from "../components/workspace-rail";
 import PurchasingTabs from "../PurchasingTabs";
 import styles from "./SoBatchRegister.module.css";
@@ -840,14 +840,11 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
      `GROUP BY` chooses how the lines are grouped. `SHOW COLUMNS FOR` names the
      modules; this page holds its own facts only, so the others say
      `Coming soon` and cannot be chosen until their facts are read here. */
-  const viewMenu = (compact: boolean) => (
+  const viewMenu = () => (
     <CPopover label="SO Batch Purchase view" role="menu" width={236} open={viewOpen} onOpenChange={setViewOpen}
       trigger={
-        <Button data-testid="so-batch-view" aria-label={`View: ${SO_BATCH_VIEWS[presentation].label}`} title={compact ? SO_BATCH_VIEWS[presentation].label : undefined}>
-          <MIcon name={SO_BATCH_VIEWS[presentation].icon} size={18} className="text-c-secondary" />
-          {compact ? null : SO_BATCH_VIEWS[presentation].label}
-          <MIcon name="expand_more" size={18} className="text-c-secondary" />
-        </Button>
+        <CViewButton data-testid="so-batch-view" icon={SO_BATCH_VIEWS[presentation].icon}
+          name={SO_BATCH_VIEWS[presentation].label} open={viewOpen} />
       }>
       <CMenuGroup first>{BY_SUPPLIER.groupBy}</CMenuGroup>
       {(Object.keys(SO_BATCH_VIEWS) as SoBatchView[]).map((key) => (
@@ -862,11 +859,11 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
         : <CMenuItem key={set.label} icon={set.icon} disabled note={BY_SUPPLIER.comingSoon} onSelect={() => {}}>{set.label}</CMenuItem>)}
     </CPopover>
   );
-  const viewSwitch = viewMenu(false);
+  const viewSwitch = viewMenu();
   /* While lines are ticked the selection bar takes the toolbar's place. The
      ticks are the same in every grouping, so the view can still be changed
-     there: one small button, so the bar keeps to one line. */
-  const viewSwitchCompact = viewMenu(true);
+     there through the same named shared view button. */
+  const viewSwitchCompact = viewMenu();
   /* BY SUPPLIER (owner 12 Oct 2026): the demand of the orders this list is
      showing, one row per supplier and category. It reads the same ticks, so
      `Issue PO` takes them from either view. */
@@ -1185,7 +1182,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 selectionSummary={summary.text}
                 selectionPrimary={<>{issueActions}{viewSwitchCompact}</>}
                 warning={stockWarning}
-                toolbarEnd={<div className={`${styles.toolbarTools} flex min-w-0 flex-wrap items-center gap-2`}>
+                toolbarEnd={<div className="order-3 ml-auto flex shrink-0 items-center gap-2">
                   {viewSwitch}
                 </div>}
                 lineExtras={(leaf) => {
@@ -1214,7 +1211,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                   };
                 }}
                 toolbarStart={<>
-                  {!filterRailOpen ? <ShowFiltersButton onShow={() => setFilterRailVisible(true)} testId="so-batch-show-filters" /> : null}
+                  {!filterRailOpen ? <CIconButton icon="left_panel_open" label="Show filters" onClick={() => setFilterRailVisible(true)} data-testid="so-batch-show-filters" /> : null}
                   {showTabs}
                 </>}
                 onOpenOrder={setQuickOrderId}
@@ -1239,11 +1236,11 @@ export default function SoBatchRegister({ data, isLoading, onIssue, onOpenPurcha
                 onToggleOrder={setOrderSelected}
                 selectionSummary={summary.text}
                 selectionPrimary={<>{issueActions}{viewSwitchCompact}</>}
-                toolbarEnd={<div className={`${styles.toolbarTools} flex min-w-0 flex-wrap items-center gap-2`}>
+                toolbarEnd={<div className="order-3 ml-auto flex shrink-0 items-center gap-2">
                   {viewSwitch}
                 </div>}
                 toolbarStart={<>
-                  {!filterRailOpen ? <ShowFiltersButton onShow={() => setFilterRailVisible(true)} testId="so-batch-show-filters" /> : null}
+                  {!filterRailOpen ? <CIconButton icon="left_panel_open" label="Show filters" onClick={() => setFilterRailVisible(true)} data-testid="so-batch-show-filters" /> : null}
                   {showTabs}
                 </>}
                 /* `Purchase Orders` (supplier preparation for the Sales Orders in

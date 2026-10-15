@@ -61,7 +61,19 @@ SO Batch `View: By sales order` is cut by 15px at 1025 with Tasks open (433 avai
 tied to the pending presentation decision (§5). Preserve that finding.
 **Batch B2** (`build/kit-batch-b2`, `6c6b99f09`, not a PR yet): Finance
 read failures say `Could not read …`, no `refund_pay` on screen, Payment Monitor ref line grey — ships
-with the next functional release, not on its own.
+with the next functional release, not on its own. Reviewed and integrated into
+`codex/so-batch-toolbar-fit` as `fc3ae1251`; not deployed.
+
+**Current local functional lane (15 Oct):** Audit cleanup `05b1ae058`/`e05ef20cc` and
+canonical-doc reconciliation `a39ad6a80` are integrated. SO Batch now reuses `CViewButton`/
+`CIconButton`; superseded local wrapping CSS and `wrapToolbar` are removed. Shared reference
+toolbar icons use 32px, with approved 4px narrow gaps. Web typecheck/lint PASS; 243 targeted
+SO Batch/Finance tests PASS; 14 browser checks at 1164/1440 PASS, including Tasks-open1164
+and selection-bar stock actions. This is local scope, not deployed proof. The new focused1025
+full-menu+Tasks geometry regression still fails:433px cannot hold the full named controls.
+Existing user-click menu collapse gives589px and fits; automatic compact navigation is only a
+controller-reviewed proposal pending Jess. Do not claim1025 complete, hide actions or adopt
+two rows silently. Local screenshots stay untracked; no customer screenshots enter Git.
 
 | Area | Deployed (PR · SHA) | Runtime-verified | Unfinished |
 |---|---|---|---|
@@ -70,7 +82,7 @@ with the next functional release, not on its own.
 | Shared parts | one menu #2070 · one pop-up #2072 · one pill drawing #2073 · one segmented control #2078 `4903bead6` · pill weight 500 only and Inbound site switch #2080 `cfa0ae0dc` | /ui computed equal; menus and pop-ups by keyboard in production | Summary panel only on Outright; Batch B deployed procurement/PO object segmented tabs and initials 11/700, full object-tab interaction walk still owed |
 | Type to 01 §2 (by role) | Delivery, Warehouse, Stock + rail, caps labels, pills, side menu group word #2078 `4903bead6` · SO detail, Order Route, Delivery brief, reorder card, Purchasing, Receiving #2080 `cfa0ae0dc` | Production carres-check at 1025 · 1164 · 1440 on `4903bead6`: Delivery Orders, Delivery Monitor, Outbound, Inventory, SO Batch, Outright PASS; Inbound 2 findings (fixed in #2080). On `cfa0ae0dc`: Purchase Orders and Receiving PASS at 1025 · 1164 · 1440; Inbound PASS at 1440 and its Site switch ran off at 1025/1164 (wraps in #2081); Manual Purchase only the screen-reader `+` (#2081); SO page leftovers are field rows 33 vs 36, item rows 37 vs 44, model · spec on one line, its own items table (01 §5 order-line table owed) and initials 10/700 (#2081) | Batch B deployed remaining Operation, Finance, Principal, Supplier and HR type sites; six-page runtime measurement is in the Batch B row, other portal journeys still owed. Legacy old-orders is excluded; `sales-order-route.ts` text budget assumes 11px |
 | Sales Order (Outright) | page 1 #2066 · Monthly demand door #2075 · engine + approved capabilities #2079 `2a28f84d9` | Production 15 Oct on `2a28f84d9`: carres-check PASS at 1025 · 1164 · 1440, rows closed and open; header 40, rows 54, footer `31 orders · Qty: …`; Group by Payment Status (Unpaid 1 · Partially paid 26 · Paid in full 4); sort SO no. both ways; Stock view PO numbers are links; row menu View · Print · Cancel SO (not clicked); tick `Select SO-1371`; chevron `Show items`; opened-row frame 1px `#CBD0D6`, corners 8, items Item · Qty · Supplier; SO no. stays in view at the right end | Owner walk; short-toolbar decision; SO quick card has no entry point (§5) |
-| SO Batch Purchase | v12 look via the engine · one ⋮ · PO No comma fix · header 40 | Production PASS at 1025 · 1164 · 1440 (15 Oct) | A confirmed: existing deadline rule retained; B/C owner rulings pending (§5); D rejected; E reported (§6) |
+| SO Batch Purchase | v12 look via the engine · one ⋮ · PO No comma fix · header 40 | Production PASS at 1025 · 1164 · 1440 (15 Oct) | A confirmed: existing deadline rule retained; B preserves existing authority; C proposal review (§5); D rejected; E reported (§6) |
 | Workspace | Round 3 + `+ Task` (#2044–#2055) | Production read-only 15 Oct: feed 206 items, UI 193 (13 future on-day deliveries), each destination opens the exact record, reload keeps the same ids and module counts | Signed-in owner walk |
 | Tasks | One feed `/api/operation/work?include=workspace`; no page writes tasks locally | Local replayed database 15 Oct (fixture users, nothing in production): internal task add → same id on retry → in the open feed (real `projectInternalTaskWork`: id `workspace:{task}:internal_task`, destination `/operation?tab=work&task=…`) → mark done on the same record (events added, done) → gone from the open feed; the Work ledger refuses completion except by the owning module's fact and needs a contact with a contact kind | Module task completion end to end: owner authorised the one SO-1254 TEST write; current source UI has no no-date answer entry (§4.2), so no write or closure is claimed |
 
@@ -146,7 +158,7 @@ what moved, what an owner ruling replaced, and the kept `SalesOrderCompactView`)
    Temporary local HTTP/database services stopped; fixture cluster preserved. The authorised
    production `not yet` write is **BLOCKED BY CONTRACT CONFLICT**, not awaiting repeat permission.
 3. **Batch D · SO Batch brief.** A confirmed: preserve the existing deadline rule, no code change.
-   B and C still await owner rulings via the controller (§5); batch any approved changes into one release.
+   B preserves existing authority; C remains a proposal (§5). Only unavoidable conflicts go through the controller; batch approved changes into one release.
 4. **Page adoption down the side menu** after Design's fix list per page; **Settings per module** at
    completion (owner 2026-10-05).
 
@@ -170,13 +182,15 @@ what moved, what an owner ruling replaced, and the kept `SalesOrderCompactView`)
 - Reject replacing it with the nearest non-late date. A future date must not hide buying already late.
 - Trial-data age is not a reason to change the rule. Purchasing MASTER §9.1 remains the authority.
 
-**B · `Status` on a group row**
+**B · `Status` on a group row — existing authority preserved 15 Oct 2026**
+- Controller disposition: no policy change authorised; preserve the existing any-passed-line rule and do not add `Order now`. This is not a new owner approval or a delivery gate.
 - Existing rule (§9.1): "`Cut-off passed` (amber) with what is still to buy, when a line's PO window has gone by; otherwise `To buy`."
 - Proposed: `Cut-off passed` only when every open line is past its cut-off; otherwise `Order now` when anything is due today or late.
 - Consequence: a group with one passed line and nine on time reads `Order now` instead of `Cut-off passed`; `Order now` is not a COPY word (COPY status words: `To buy` · `Cut-off passed` · `Late to order` · `Partly ordered` · `Ordered` · `From ready stock`).
 - Recommendation: keep `Cut-off passed` when any line's window has passed (it is the fact the buyer must act on today), and use the existing `Late to order` when the Order By date has passed; reject `Order now`. Falsifier: Jess rules the group status must describe the majority of its lines.
 
-**C · Today card numbers**
+**C · Today card numbers — existing authority preserved 15 Oct 2026**
+- Controller disposition: preserve distinct PO-window and Order By definitions. Park the optional additive-number/headline proposal; no business change or new owner vote is required to continue.
 - Existing rule (§9.1 rail): `To order now` = still to buy after its PO window has gone by; `Past the order-by date` = lines whose Order By date has passed. Two different clocks (window cut-off vs Order By date), so 46 and 47 pcs are both correct and need not add up.
 - Proposed: `To order now` = `Past the order-by date` + due today, and the numbers must add up on screen.
 - Consequence: `To order now` changes meaning from the PO-window clock to the Order By clock.
