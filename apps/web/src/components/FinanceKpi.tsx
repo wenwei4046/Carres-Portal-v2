@@ -48,7 +48,7 @@ export function FinanceKpi({
   return (
     <div className={`bg-card rounded-md border ${accent ? "border-primary" : "border-border"} px-5 py-[18px]`}
       data-testid={testId}>
-      <div className={`text-label uppercase tracking-[0.06em] font-semibold ${accent ? "text-primary" : "text-muted-foreground"}`}>
+      <div className={`text-label uppercase tracking-[0.06em] ${accent ? "text-primary" : "text-muted-foreground"}`}>
         {label}
       </div>
       {value === null ? (
@@ -62,7 +62,7 @@ export function FinanceKpi({
           >
             {value}
           </div>
-          {hint && <div className="text-label text-muted-foreground mt-1.5">{hint}</div>}
+          {hint && <div className="text-meta text-muted-foreground mt-1.5">{hint}</div>}
         </>
       )}
       {door && <div className="mt-3">{door}</div>}

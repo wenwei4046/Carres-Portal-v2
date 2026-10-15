@@ -282,9 +282,9 @@ export default function ChartOfAccounts() {
               {r.account.name}
             </span>
             {/* PROPOSAL - PENDING APPROVAL (docs/COPY-STANDARD.md, Finance (Chew), 0656). */}
-            {r.account.is_header ? <span className="text-label text-kit-slate-11">Heading</span> : null}
-            {!r.account.is_active ? <span className="text-label text-kit-slate-11">Retired</span>
-              : notActive.has(r.account.code) ? <span className="text-label text-kit-slate-11">Not active</span> : null}
+            {r.account.is_header ? <span className="text-meta text-kit-slate-11">Heading</span> : null}
+            {!r.account.is_active ? <span className="text-meta text-kit-slate-11">Retired</span>
+              : notActive.has(r.account.code) ? <span className="text-meta text-kit-slate-11">Not active</span> : null}
           </span>
         ),
         searchValue: (r) => r.account.name,

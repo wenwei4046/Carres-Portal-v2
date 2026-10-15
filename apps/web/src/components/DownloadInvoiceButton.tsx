@@ -80,7 +80,7 @@ export default function DownloadInvoiceButton({
         type="button"
         onClick={onClick}
         disabled={busy}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left text-meta hover:bg-base-50 disabled:opacity-40 text-base-900"
+        className="w-full flex items-center gap-2 px-3 py-2 text-left text-body hover:bg-base-50 disabled:opacity-40 text-base-900"
         data-testid={`download-invoice-${so}`}
       >
         <span className="text-base-500 shrink-0">
@@ -94,14 +94,14 @@ export default function DownloadInvoiceButton({
   const baseCls =
     variant === "primary"
       ? "bg-primary text-primary-foreground font-semibold"
-      : "border border-border text-foreground bg-card hover:border-primary";
+      : "border border-border text-foreground bg-card font-medium hover:border-primary";
 
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={busy}
-      className={`px-3.5 py-2 rounded-md text-meta disabled:opacity-50 transition-colors ${baseCls} ${className ?? ""}`}
+      className={`px-3.5 py-2 rounded-md text-body disabled:opacity-50 transition-colors ${baseCls} ${className ?? ""}`}
       data-testid={`download-invoice-${so}`}
     >
       {busy ? "Opening…" : "Print Invoice"}

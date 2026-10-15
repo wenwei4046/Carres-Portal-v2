@@ -99,12 +99,12 @@ export default function ARDrawer({
     <Drawer open={open} onOpenChange={onOpenChange} title={`${soWord} · ${balance.customer}`}>
       <div className="flex flex-col gap-4 text-body" data-testid="ar-drawer">
         <div>
-          <div className="text-label">Outstanding</div>
+          <div className="text-meta text-kit-slate-11">Outstanding</div>
           <div className="text-title font-semibold tabular-nums" data-testid="ar-drawer-outstanding">
             {rm(balance.outstanding)}
           </div>
           {balance.storageOwing > 0 && (
-            <div className="text-label font-normal">includes storage {rm(balance.storageOwing)}</div>
+            <div className="text-meta">includes storage {rm(balance.storageOwing)}</div>
           )}
         </div>
 
@@ -137,13 +137,13 @@ export default function ARDrawer({
               <div className="flex flex-col gap-2 rounded-control border border-kit-slate-5 p-3">
                 <h3 className="text-strong">Record payment received</h3>
                 <label className="block">
-                  <span className="text-label">Amount (RM)</span>
+                  <span className="text-meta text-kit-slate-11">Amount (RM)</span>
                   <input aria-label="Amount" value={recAmt} inputMode="decimal"
                     onChange={(e) => setRecAmt(e.target.value)} className={fieldCls} />
-                  {amount.error && <span className="text-label font-normal">{amount.error}</span>}
+                  {amount.error && <span className="text-meta">{amount.error}</span>}
                 </label>
                 <label className="block">
-                  <span className="text-label">Method</span>
+                  <span className="text-meta text-kit-slate-11">Method</span>
                   <select aria-label="Method" value={first}
                     onChange={(e) => setRecMethod(e.target.value)} className={fieldCls}>
                     {steps.first.map((m) => (
@@ -153,7 +153,7 @@ export default function ARDrawer({
                 </label>
                 {first === MERCHANT_STEP && (
                   <label className="block">
-                    <span className="text-label">Card machine</span>
+                    <span className="text-meta text-kit-slate-11">Card machine</span>
                     <select aria-label="Card machine" value={machine}
                       onChange={(e) => setMachine(e.target.value)} className={fieldCls}>
                       <option value="">Card machine</option>
@@ -164,7 +164,7 @@ export default function ARDrawer({
                   </label>
                 )}
                 <label className="block">
-                  <span className="text-label">{refWord ?? "Reference"}</span>
+                  <span className="text-meta text-kit-slate-11">{refWord ?? "Reference"}</span>
                   <input aria-label="Reference" value={recRef}
                     placeholder={refWord ?? "Bank ref / FPX ref (optional)"}
                     onChange={(e) => setRecRef(e.target.value)} className={fieldCls} />
@@ -184,7 +184,7 @@ export default function ARDrawer({
         <div>
           <h3 className="text-strong mb-1">Payment history</h3>
           {payments.length === 0 ? (
-            <p className="text-label font-normal">No receipts recorded yet.</p>
+            <p className="text-meta">No receipts recorded yet.</p>
           ) : (
             <ul className="flex flex-col" data-testid="ar-drawer-history">
               {payments.map((p) => (
@@ -193,7 +193,7 @@ export default function ARDrawer({
                     <span className="block font-semibold">
                       {p.receipt_no ?? "Receipt number missing"}{p.voided_at ? " · VOIDED" : ""}
                     </span>
-                    <span className="block text-label font-normal">
+                    <span className="block text-meta">
                       {fmtDate(p.paid_on)} · {p.method ? methodLabel(p.method) : "Method not recorded"}
                       {p.reference ? ` · ${p.reference}` : ""}
                     </span>

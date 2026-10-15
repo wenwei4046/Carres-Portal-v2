@@ -14,8 +14,8 @@
 type Tone = "hero" | "row";
 
 const DIGITS: Record<Tone, string> = {
-  hero: "text-strong font-semibold leading-none",
-  row: "text-body font-semibold",
+  hero: "text-strong leading-none",
+  row: "text-body font-medium",
 };
 
 const MARK: Record<Tone, string> = {
@@ -41,7 +41,7 @@ export default function Money({
   return (
     <span className={`inline-flex items-baseline gap-1 whitespace-nowrap ${className}`}>
       <span
-        className={`font-semibold uppercase tracking-[0.06em] text-[#A8A8A8] ${MARK[tone]}`}
+        className={`uppercase tracking-[0.06em] text-[#A8A8A8] ${MARK[tone]}`}
         aria-hidden="true"
       >
         RM

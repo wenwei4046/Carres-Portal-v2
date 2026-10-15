@@ -168,7 +168,7 @@ function OwnerChip({ owner }: { owner: OperationWorkItem["owner"] }) {
        the link's own name is the two governed lines in the sheet's one-line
        spelling, and it opens Settings → Staff & Duties. */
     const named = joinLines(NOBODY_ASSIGNED_TO_ORDER, MANAGER_ASSIGNS_IN_STAFF_DUTIES);
-    return <Link to={MANAGER_ASSIGNS_IN_STAFF_DUTIES_HREF} className="shrink-0 font-semibold text-kit-red-11 underline underline-offset-2"
+    return <Link to={MANAGER_ASSIGNS_IN_STAFF_DUTIES_HREF} className="shrink-0 text-kit-red-11 underline underline-offset-2"
       aria-label={named} title={named}
       onClick={(event) => event.stopPropagation()}
       data-testid="monitor-owner-unassigned">{NOT_ASSIGNED}</Link>;
@@ -177,7 +177,7 @@ function OwnerChip({ owner }: { owner: OperationWorkItem["owner"] }) {
   const label = personLabel(person.name, "");
   const title = `Assigned to ${label}`;
   return <span
-    className="inline-grid h-5 w-5 shrink-0 place-items-center rounded-full text-label font-semibold"
+    className="inline-grid h-5 w-5 shrink-0 place-items-center rounded-full text-label font-bold"
     style={{ background: colors.bg, color: colors.fg }}
     title={title}
     role="img"
@@ -479,8 +479,8 @@ export default function PaymentMonitor() {
       accessor: (r) => {
         const action = timingActionText(r);
         return <span className="block min-w-0" data-testid={`monitor-timing-${r.so ?? r.orderId}`}>
-          <span className={`block truncate font-semibold ${r.timing.late ? "text-kit-red-11" : "text-kit-slate-12"}`} title={r.timing.fact}>{r.timing.fact}</span>
-          {action && <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-label font-normal text-kit-slate-11">
+          <span className={`block truncate ${r.timing.late ? "text-kit-red-11" : "text-kit-slate-12"}`} title={r.timing.fact}>{r.timing.fact}</span>
+          {action && <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-meta text-kit-slate-11">
             {r.work && <OwnerChip owner={r.work.owner} />}
             <span className="truncate" title={action}>{action}</span>
           </span>}
@@ -554,7 +554,7 @@ export default function PaymentMonitor() {
               data-testid="payment-monitor-previous-week" onClick={() => moveWeek(-1)}>
               <ChevronLeft size={15} aria-hidden />
             </button>
-            <span className="min-w-0 flex-1 break-words text-center text-body font-semibold text-kit-slate-12"
+            <span className="min-w-0 flex-1 break-words text-center text-body font-medium text-kit-slate-12"
               data-testid="payment-monitor-week-label" aria-label={weekLabel}>
               {/* Each date stays whole: the break falls between the two days,
                   never inside `Fri, 18 Sep`. */}
@@ -624,13 +624,13 @@ export default function PaymentMonitor() {
             : !isPhone
               ? <aside className="flex w-11 shrink-0 flex-col items-center gap-2 border-r border-kit-slate-5 bg-white py-2">
                   {showFiltersButton}
-                  <span className="text-label text-kit-slate-11 [writing-mode:vertical-rl]">Show filters</span>
+                  <span className="text-meta text-kit-slate-11 [writing-mode:vertical-rl]">Show filters</span>
                 </aside>
               : null}
           <div className="flex min-w-0 min-h-0 flex-1 flex-col">
             {!railVisible && <div data-testid="payment-monitor-day-collapsed"
               className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-kit-slate-5 bg-white px-3 py-1.5">
-              {pickedHeading && <span className="text-body font-semibold text-kit-slate-12">{pickedHeading}</span>}
+              {pickedHeading && <span className="text-body font-medium text-kit-slate-12">{pickedHeading}</span>}
               {pickedWords.map((line) => <span key={line} className="text-body text-kit-slate-12">{line}</span>)}
             </div>}
             {/* The governed Register shell; the Finance frame above it is a fixed
@@ -710,8 +710,8 @@ function DayCard({ day, active, words, onPick }: {
     ].join(" ")}>
     {active && <span aria-hidden className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9" />}
     <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-      <span className="font-semibold text-kit-slate-12">{fmtDate(day.iso)}</span>
-      {day.isToday && <span className="rounded-full border border-kit-blue-9 px-1.5 text-label font-semibold text-kit-blue-11"
+      <span className="font-medium text-kit-slate-12">{fmtDate(day.iso)}</span>
+      {day.isToday && <span className="rounded-full border border-kit-blue-9 px-1.5 text-meta font-medium text-kit-blue-11"
         data-testid="payment-monitor-today">Today</span>}
     </span>
     {day.holiday !== null && <span className="break-words text-meta text-kit-slate-11">

@@ -66,7 +66,7 @@ export default function ArrivalEvidenceUploadField({
         testId={testId ? `${testId}-field` : undefined}
       />
       {notReady && (
-        <p className="text-label text-base-500 mt-1 font-body">
+        <p className="text-meta text-base-500 mt-1 font-body">
           Enter the supplier DO number first. The files are named after it.
         </p>
       )}

@@ -33,7 +33,7 @@ function KpiCard({ label, value, accent, onClick }: KpiCardProps) {
         onClick={onClick}
         className={`${cls} cursor-pointer hover:border-primary/50 transition-colors`}
       >
-        <div className="text-label uppercase tracking-wider text-base-500 font-semibold">
+        <div className="text-label uppercase tracking-[0.06em] text-base-500">
           {label}
         </div>
         <div className="font-display text-page font-semibold tracking-tight text-base-900">
@@ -44,7 +44,7 @@ function KpiCard({ label, value, accent, onClick }: KpiCardProps) {
   }
   return (
     <div className={cls}>
-      <div className="text-label uppercase tracking-wider text-base-500 font-semibold">
+      <div className="text-label uppercase tracking-[0.06em] text-base-500">
         {label}
       </div>
       <div className="font-display text-page font-semibold tracking-tight text-base-900">

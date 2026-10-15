@@ -167,7 +167,7 @@ function OrderWindow({ row, month, onClose }: { row: OrderRow; month: string; on
         <p>Half paid on: {row.halfReachedOn ? fmtDate(row.halfReachedOn) : "Not yet"}</p>
         <p>Paid by the end of {monthWord}: {rm(row.keptToMonthEnd)}</p>
         <p>Commission by the end of {monthWord}: {rm(row.earnedToMonthEnd)}</p>
-        <p className="font-semibold">Commission this month: {rm(row.earned)}</p>
+        <p className="font-medium">Commission this month: {rm(row.earned)}</p>
         <p>Still to earn: {rm(row.stillToEarn)}</p>
         {o.cancelledOn && <p>Cancelled on: {fmtDate(o.cancelledOn)}</p>}
         {taken && <p>Commission taken back on: {fmtDate(o.takeBackOn!)}</p>}

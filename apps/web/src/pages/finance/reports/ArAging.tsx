@@ -173,7 +173,7 @@ export default function ArAging() {
           expandable={{ renderExpansion: (r) => <Invoices row={r} columns={columns} /> }}
           toolbarStart={<div className="flex flex-wrap items-end gap-2">
             <div className="w-40">
-              <span className="block text-label text-kit-slate-11">As of</span>
+              <span className="block text-meta text-kit-slate-11">As of</span>
               <DateField value={asAt} onChange={(iso) => set("asAt", iso && iso !== today ? iso : null)} aria-label="As of" />
             </div>
             <div className="w-40"><Select id="ar-aging-by" label="Age by" value={basis}

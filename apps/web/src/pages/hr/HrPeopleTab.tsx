@@ -79,26 +79,26 @@ function PersonRow({
       className={`${COLS} h-11 w-full border-t border-base-200 px-3.5 text-left hover:bg-hovertint`}
     >
       <span className="flex min-w-0 items-center gap-2.5">
-        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-base-100 text-label font-semibold text-base-600">
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-base-100 text-label font-bold text-base-600">
           {personInitials(p.name, "")}
         </span>
         <span className="min-w-0">
           <span className="block truncate text-body font-semibold leading-tight text-base-900">
             {p.name}
           </span>
-          <span className="text-label uppercase tracking-[0.05em] block truncate normal-case leading-tight text-base-400">
+          <span className="text-meta block truncate leading-tight text-base-500">
             {p.workEmail ?? "No email · signs in with a PIN"}
           </span>
         </span>
       </span>
 
-      <span className="font-mono text-meta font-semibold text-base-600">
+      <span className="font-mono text-body text-base-600">
         {p.staffCode ?? ""}
       </span>
 
       <span className="min-w-0">
         <span className="block truncate text-meta text-base-900">{seat ?? "Not set"}</span>
-        {sub && <span className="text-label uppercase tracking-[0.05em] block truncate normal-case text-base-400">{sub}</span>}
+        {sub && <span className="text-meta block truncate text-base-500">{sub}</span>}
       </span>
 
       <span>
@@ -121,7 +121,7 @@ function PersonRow({
 function GroupBand({ title, count }: { title: string; count: number }) {
   return (
     <div className="flex h-[30px] items-center gap-2 border-t border-base-200 bg-base-50 px-3.5">
-      <span className="text-label uppercase tracking-[0.05em] text-base-400">{title}</span>
+      <span className="text-label uppercase tracking-[0.06em] text-base-500">{title}</span>
       <span className="text-meta text-base-300">{count}</span>
     </div>
   );
@@ -190,7 +190,7 @@ export default function HrPeopleTab() {
             <TriangleAlert size={16} />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-body font-semibold">
+            <div className="text-body font-medium">
               {needsExit.length === 1
                 ? `${needsExit[0]!.name} lost access with no exit recorded`
                 : `${needsExit.length} people lost access with no exit recorded`}
@@ -213,22 +213,22 @@ export default function HrPeopleTab() {
       <SectionCard>
         <div className="flex items-center gap-2 px-3.5 py-3">
           <span className="text-body text-base-500">
-            <b className="text-base-900">{people.length}</b> people ·{" "}
-            <b className="text-base-900">{complete}</b> profiles complete
+            <b className="text-base-900 font-medium">{people.length}</b> people ·{" "}
+            <b className="text-base-900 font-medium">{complete}</b> profiles complete
           </span>
           <span className="flex-1" />
-          <span className="text-meta text-base-400">
+          <span className="text-meta text-base-500">
             A person appears here the moment they get a CR code in Team
           </span>
         </div>
 
         <div className={`${COLS} h-[34px] border-t border-base-200 bg-base-50 px-3.5`}>
-          <span className="text-label uppercase tracking-[0.05em] text-base-400">Person</span>
-          <span className="text-label uppercase tracking-[0.05em] text-base-400">CR</span>
-          <span className="text-label uppercase tracking-[0.05em] text-base-400">Position</span>
-          <span className="text-label uppercase tracking-[0.05em] text-base-400">Employment</span>
-          <span className="text-label uppercase tracking-[0.05em] text-base-400">Access</span>
-          <span className="text-label uppercase tracking-[0.05em] text-base-400">Profile</span>
+          <span className="text-meta font-medium text-base-500">Person</span>
+          <span className="text-meta font-medium text-base-500">CR</span>
+          <span className="text-meta font-medium text-base-500">Position</span>
+          <span className="text-meta font-medium text-base-500">Employment</span>
+          <span className="text-meta font-medium text-base-500">Access</span>
+          <span className="text-meta font-medium text-base-500">Profile</span>
           <span />
         </div>
 
@@ -248,7 +248,7 @@ export default function HrPeopleTab() {
 
         <div className="flex items-center gap-2 border-t border-base-200 bg-base-50 px-3.5 py-2.5">
           <Info size={14} className="shrink-0 text-base-400" />
-          <span className="text-meta text-base-400">
+          <span className="text-meta text-base-500">
             Showing all {people.length}. Store logins, supplier and partner accounts are not
             people. They have no CR code, so they never appear here.
           </span>

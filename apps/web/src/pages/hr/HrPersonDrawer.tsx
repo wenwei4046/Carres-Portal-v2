@@ -74,8 +74,8 @@ function Panel({
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center gap-2 px-[18px] py-3 text-left hover:bg-hovertint"
       >
-        <span className="text-strong flex-1 font-semibold">{title}</span>
-        {tag && <span className="text-meta text-base-400">{tag}</span>}
+        <span className="text-strong flex-1">{title}</span>
+        {tag && <span className="text-meta text-base-500">{tag}</span>}
         <ChevronDown
           size={16}
           className={`text-base-400 transition-transform ${open ? "" : "-rotate-90"}`}
@@ -102,7 +102,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
  *  said in one chip so HR knows where to go to change it. */
 function TeamChip() {
   return (
-    <span className="text-label uppercase tracking-[0.05em] inline-flex items-center gap-1 rounded bg-base-100 px-1.5 py-0.5 font-semibold text-base-500">
+    <span className="text-label uppercase tracking-[0.06em] inline-flex items-center gap-1 rounded bg-base-100 px-1.5 py-0.5 text-base-500">
       <Lock size={11} />
       Team
     </span>
@@ -126,7 +126,7 @@ function EditableText({
     return (
       <button
         type="button"
-        className="inline-flex items-center gap-1 text-meta font-semibold text-primary hover:underline"
+        className="inline-flex items-center gap-1 text-body font-medium text-primary hover:underline"
         onClick={() => setEditing(true)}
       >
         <Plus size={12} />
@@ -189,7 +189,7 @@ function MaskedField({
       <button
         type="button"
         disabled={reveal.isPending}
-        className="inline-flex items-center gap-1 rounded border border-base-300 px-2 py-[3px] text-label font-semibold text-base-600 hover:bg-hovertint disabled:opacity-50"
+        className="inline-flex items-center gap-1 rounded border border-base-300 px-2 py-[3px] text-body font-medium text-base-600 hover:bg-hovertint disabled:opacity-50"
         onClick={() =>
           reveal.mutate(
             { field },
@@ -233,7 +233,7 @@ function DisableLoginDialog({
             <ShieldOff size={19} />
           </div>
           <div>
-            <h3 className="text-strong mb-1 font-semibold">
+            <h3 className="text-strong mb-1">
               {disabling
                 ? `Disable ${person.name}'s login?`
                 : `Give ${person.name} their login back?`}
@@ -337,7 +337,7 @@ function ExitBlock({
               key={r}
               type="button"
               onClick={() => setReason(r)}
-              className={`rounded-md px-3 py-1.5 text-meta font-semibold ${
+              className={`rounded-md px-3 py-1.5 text-meta font-medium ${
                 reason === r ? "bg-card text-base-900 shadow-sm" : "text-base-600"
               }`}
             >
@@ -372,13 +372,13 @@ function ExitBlock({
         >
           {done ? "Update exit" : "Save exit"}
         </Btn>
-        <span className="text-meta text-base-400">
+        <span className="text-meta text-base-500">
           Recording an exit does not cut access. That is the separate step above.
         </span>
       </div>
 
       <div className="mt-4 border-t border-base-100 pt-3">
-        <div className="text-label uppercase tracking-[0.05em] mb-2 text-base-400">Access revocation</div>
+        <div className="text-label uppercase tracking-[0.06em] mb-2 text-base-500">Access revocation</div>
         <ul className="flex flex-col gap-2">
           <li className="text-body flex gap-2">
             <span className={person.access === "disabled" ? "text-success" : "text-base-300"}>
@@ -487,15 +487,15 @@ export default function HrPersonDrawer({
         {/* header */}
         <div className="border-b border-base-200 px-[18px] py-4">
           <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-base-100 text-body font-semibold text-base-700">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-base-100 text-label font-bold text-base-700">
               {personInitials(person.name, "")}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-strong truncate font-semibold">{person.name}</div>
+              <div className="text-strong truncate">{person.name}</div>
               {subtitle && <div className="text-meta truncate text-base-500">{subtitle}</div>}
             </div>
             {person.staffCode && (
-              <span className="font-mono text-meta font-semibold text-base-500">
+              <span className="font-mono text-meta text-base-500">
                 {person.staffCode}
               </span>
             )}
@@ -516,7 +516,7 @@ export default function HrPersonDrawer({
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-base-200 bg-base-50 px-3 py-2.5">
             <Lock size={14} className="mt-0.5 shrink-0 text-base-400" />
             <p className="text-meta leading-relaxed text-base-500">
-              Name, seat, manager and login live in <b>Team</b>. This page reads them.
+              Name, seat, manager and login live in <b className="font-medium">Team</b>. This page reads them.
               Change them once there and every screen agrees.
             </p>
           </div>
@@ -524,7 +524,7 @@ export default function HrPersonDrawer({
           {/* access control — the door Loo approved */}
           {person.kind === "hq" && (
             <div className="mt-2 flex items-center gap-2">
-              <span className="text-meta text-base-400">Portal access</span>
+              <span className="text-meta text-base-500">Portal access</span>
               <span
                 className={
                   person.access === "disabled" ? "pill pill-overdue" : "pill pill-confirmed"
@@ -551,7 +551,7 @@ export default function HrPersonDrawer({
               <div className="mx-[18px] mt-3.5 flex gap-2.5 rounded-lg border border-danger/30 bg-danger-soft px-3.5 py-3">
                 <TriangleAlert size={16} className="mt-0.5 shrink-0 text-danger" />
                 <p className="text-meta leading-relaxed text-danger">
-                  <b>Their login is cut, but the register never learned why.</b> Write the
+                  <b className="font-medium">Their login is cut, but the register never learned why.</b> Write the
                   exit down so the people list, the commission run and the handover
                   checklist all say the same thing.
                 </p>
@@ -566,8 +566,8 @@ export default function HrPersonDrawer({
                 ["Type", detail.employmentType?.replace("_", " ") ?? ""],
               ].map(([k, v]) => (
                 <div key={k} className="bg-card px-3.5 py-2.5">
-                  <div className="text-label uppercase tracking-[0.05em] mb-1 text-base-400">{k}</div>
-                  <div className="text-body font-semibold capitalize">{v}</div>
+                  <div className="text-label uppercase tracking-[0.06em] mb-1 text-base-500">{k}</div>
+                  <div className="text-body font-medium capitalize">{v}</div>
                 </div>
               ))}
             </div>
@@ -585,7 +585,7 @@ export default function HrPersonDrawer({
                 </Row>
 
                 <div className="my-3 flex items-center gap-2">
-                  <span className="text-label uppercase tracking-[0.05em] whitespace-nowrap text-base-400">HR only</span>
+                  <span className="text-label uppercase tracking-[0.06em] whitespace-nowrap text-base-500">HR only</span>
                   <span className="h-px flex-1 bg-base-200" />
                 </div>
 
@@ -749,7 +749,7 @@ export default function HrPersonDrawer({
                       ))}
                     </div>
                     {workDays.length === 0 && (
-                      <p className="text-meta text-base-400">Not recorded. Office working days apply.</p>
+                      <p className="text-meta text-base-500">Not recorded. Office working days apply.</p>
                     )}
                   </div>
                 </Row>
@@ -818,7 +818,7 @@ export default function HrPersonDrawer({
             </div>
 
             <div className="flex items-center gap-2 border-t border-base-200 bg-base-50 px-[18px] py-3">
-              <span className="text-meta text-base-400">
+              <span className="text-meta text-base-500">
                 {dirty ? "Unsaved changes" : "All changes saved"}
               </span>
               <span className="flex-1" />

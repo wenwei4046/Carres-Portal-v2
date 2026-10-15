@@ -21,7 +21,7 @@ export default function ApprovalStatusPill({ status }: Props) {
   const s = STATUS[status] ?? STATUS.pending;
   return (
     <span
-      className={`px-3 py-1 rounded-full text-label font-semibold uppercase tracking-wider whitespace-nowrap ${s.cls}`}
+      className={`px-3 py-1 rounded-full text-label uppercase tracking-[0.06em] whitespace-nowrap ${s.cls}`}
     >
       {s.label}
     </span>

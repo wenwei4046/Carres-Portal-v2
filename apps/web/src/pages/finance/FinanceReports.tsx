@@ -89,7 +89,7 @@ function ProfitAndLossTrend({ goLive, today, dept }: { goLive: string; today: st
   const peak = Math.max(0, ...points.map((p) => Math.max(p.income, p.expense)));
   const height = (n: number) => `${peak > 0 ? (Math.max(n, 0) / peak) * 100 : 0}%`;
   return <div className="flex flex-col gap-3.5" data-testid="pl-trend">
-    <div className="flex flex-wrap items-center justify-end gap-3.5 text-label text-kit-slate-11">
+    <div className="flex flex-wrap items-center justify-end gap-3.5 text-meta text-kit-slate-11">
       <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-kit-green-11" />Income</span>
       <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-kit-slate-11" />Expense</span>
     </div>
@@ -101,8 +101,8 @@ function ProfitAndLossTrend({ goLive, today, dept }: { goLive: string; today: st
               <span className="w-3 rounded-sm bg-kit-green-11" style={{ height: height(p.income) }} />
               <span className="w-3 rounded-sm bg-kit-slate-11" style={{ height: height(p.expense) }} />
             </span>
-            <span className="text-label text-kit-slate-11">{fmtMonth(p.ym)}</span>
-            <span className="text-label tabular-nums">{rm(p.net)}</span>
+            <span className="text-meta text-kit-slate-11">{fmtMonth(p.ym)}</span>
+            <span className="text-meta tabular-nums">{rm(p.net)}</span>
             <span className="sr-only">Income {rm(p.income)} · Expense {rm(p.expense)}</span>
           </li>
         ))}
@@ -216,7 +216,7 @@ const NotStarted = () => <div role="alert" className="text-body">
  *  figures come from. It names Stock value without a link: this page keeps
  *  no doors to the other reports, which are rows on the rail. */
 function StockLine({ statement, dept }: { statement: Statement; dept: string }) {
-  return <p className="text-label text-kit-slate-11" data-testid={`${STATEMENT_ID[statement]}-stock-note`}>
+  return <p className="text-meta text-kit-slate-11" data-testid={`${STATEMENT_ID[statement]}-stock-note`}>
     {stockNote(statement, dept !== "")}
   </p>;
 }

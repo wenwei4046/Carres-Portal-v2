@@ -258,7 +258,7 @@ function PerModelConfig({
             <Btn size="sm" disabled={setModelRate.isPending} onClick={savePerUnit}>
               Save rate
             </Btn>
-            <span className="text-label text-base-500">
+            <span className="text-meta text-base-500">
               Leave empty + Save to remove.
             </span>
           </>
@@ -268,7 +268,7 @@ function PerModelConfig({
       {/* tier ladder for the picked model */}
       {modelId && (
         <div className="border border-base-200 rounded-lg p-3 space-y-2">
-          <div className="text-label font-semibold uppercase tracking-[0.06em] text-base-500">
+          <div className="text-label uppercase tracking-[0.06em] text-base-500">
             Volume tier ladder for this model
           </div>
           {tierDrafts.length === 0 && (
@@ -348,7 +348,7 @@ function PerModelConfig({
 
       {/* overall milestones */}
       <div className="border border-base-200 rounded-lg p-3 space-y-2">
-        <div className="text-label font-semibold uppercase tracking-[0.06em] text-base-500">
+        <div className="text-label uppercase tracking-[0.06em] text-base-500">
           Overall milestones
         </div>
         {milestoneDrafts.length === 0 && (
@@ -646,7 +646,7 @@ export default function HrSetupTab({
                 key={store.dealerId}
                 className="h-11 flex items-center justify-between gap-3 border-b border-base-100 last:border-b-0"
               >
-                <div className="text-body font-semibold text-base-900 truncate">
+                <div className="text-body font-medium text-base-900 truncate">
                   {store.name}
                 </div>
                 <Segmented
@@ -704,13 +704,13 @@ export default function HrSetupTab({
                   className="h-11 flex items-center gap-3 border-b border-base-100 last:border-b-0"
                 >
                   <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                    <span className="text-body font-semibold text-base-900 truncate">
+                    <span className="text-body font-medium text-base-900 truncate">
                       {s.name}
                     </span>
                     <span className="pill pill-neutral shrink-0">
                       {STAFF_TIER_LABEL[s.staffRole] ?? s.staffRole}
                     </span>
-                    <span className="text-label text-base-500 truncate">
+                    <span className="text-meta text-base-500 truncate">
                       {[s.storeName, s.outletName].filter(Boolean).join(" · ")}
                     </span>
                   </div>
@@ -782,7 +782,7 @@ export default function HrSetupTab({
           <div className="px-2 py-1">
             {/* 0251 — the ONE global BD calculation method */}
             <div className="h-11 flex items-center justify-between gap-3 border-b border-base-100">
-              <div className="text-body font-semibold text-base-900">
+              <div className="text-body font-medium text-base-900">
                 Calculation method
               </div>
               <Segmented
@@ -822,10 +822,10 @@ export default function HrSetupTab({
                   className="h-11 flex items-center gap-3 border-b border-base-100 last:border-b-0"
                 >
                   <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                    <span className="text-body font-semibold text-base-900 truncate">
+                    <span className="text-body font-medium text-base-900 truncate">
                       {u.name}
                     </span>
-                    <span className="text-label text-base-500 truncate">
+                    <span className="text-meta text-base-500 truncate">
                       {u.email}
                     </span>
                   </div>
@@ -879,7 +879,7 @@ export default function HrSetupTab({
               Executives' dealer sales.
             </div>
 
-            <div className="pt-3 pb-1 text-label font-semibold uppercase tracking-[0.06em] text-base-500">
+            <div className="pt-3 pb-1 text-label uppercase tracking-[0.06em] text-base-500">
               Dealer portfolio
             </div>
             {dealers.length === 0 && (
@@ -896,7 +896,7 @@ export default function HrSetupTab({
                   className="h-11 flex items-center gap-3 border-b border-base-100 last:border-b-0"
                 >
                   <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                    <span className="text-body font-semibold text-base-900 truncate">
+                    <span className="text-body font-medium text-base-900 truncate">
                       {d.name}
                     </span>
                     {d.status && d.status !== "active" && (
@@ -946,7 +946,7 @@ export default function HrSetupTab({
             {/* 0251 — the BD program's own per-model numbers (item KPI method) */}
             {bdMethod === "per_model" && (
               <>
-                <div className="pt-3 pb-1 text-label font-semibold uppercase tracking-[0.06em] text-base-500">
+                <div className="pt-3 pb-1 text-label uppercase tracking-[0.06em] text-base-500">
                   BD per-model rates & bonuses
                 </div>
                 <div className="py-2">

@@ -44,7 +44,7 @@ export default function PrincipalPartners() {
       </div>
 
       <section>
-        <h2 className="text-strong font-semibold mb-2.5">
+        <h2 className="text-strong mb-2.5">
           Create new LP account
         </h2>
         <CreateLpAccountForm
@@ -55,7 +55,7 @@ export default function PrincipalPartners() {
       </section>
 
       <section>
-        <h2 className="text-strong font-semibold mb-2.5">All LPs</h2>
+        <h2 className="text-strong mb-2.5">All LPs</h2>
         {isLoading ? (
           <p className="text-body text-base-600">Loading…</p>
         ) : !lps || lps.length === 0 ? (
@@ -68,7 +68,7 @@ export default function PrincipalPartners() {
               <li key={lp.id} className="py-3 px-3.5 flex items-baseline gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-3">
-                    <strong className="text-body text-base-900">
+                    <strong className="text-body text-base-900 font-medium">
                       {lp.name}
                     </strong>
                     {lp.contact && (
@@ -78,13 +78,13 @@ export default function PrincipalPartners() {
                     )}
                   </div>
                   {lp.address && (
-                    <div className="text-label text-base-500 mt-0.5">
+                    <div className="text-meta text-base-500 mt-0.5">
                       {lp.address}
                     </div>
                   )}
                 </div>
                 {lp.zones && (
-                  <span className="text-label uppercase tracking-wider text-base-400">
+                  <span className="text-label uppercase tracking-[0.06em] text-base-500">
                     {lp.zones}
                   </span>
                 )}

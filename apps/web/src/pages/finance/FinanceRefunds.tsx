@@ -86,7 +86,7 @@ export default function FinanceRefunds() {
     <div className="p-9 max-w-[1400px] mx-auto">
       <header className="flex items-end justify-between gap-4 flex-wrap mb-7">
         <div>
-          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="text-label uppercase tracking-[0.06em] text-muted-foreground">
             Finance · Documents
           </div>
           <h1 className="font-display text-page mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
@@ -118,7 +118,7 @@ export default function FinanceRefunds() {
 
       <div className="bg-card rounded-md border border-border overflow-auto">
         <div
-          className="grid items-center px-4 py-2.5 bg-muted/40 border-b border-border text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground"
+          className="grid items-center px-4 py-2.5 bg-muted/40 border-b border-border text-meta font-medium text-muted-foreground"
           style={{ gridTemplateColumns: "120px 90px 1.4fr 1.6fr 110px 110px 100px", minWidth: 920 }}
         >
           <span>Note ID</span>
@@ -141,9 +141,9 @@ export default function FinanceRefunds() {
         )}
       </div>
 
-      <div className="mt-3.5 px-4 py-3 bg-muted/30 rounded-md text-label text-muted-foreground">
-        <b>Credit note</b> reduces what a customer owes (applied to balance on next order).{" "}
-        <b>Refund</b> moves cash back to customer's bank.
+      <div className="mt-3.5 px-4 py-3 bg-muted/30 rounded-md text-meta text-muted-foreground">
+        <b className="font-medium">Credit note</b> reduces what a customer owes (applied to balance on next order).{" "}
+        <b className="font-medium">Refund</b> moves cash back to customer's bank.
       </div>
 
       {refundsQ.error && (
@@ -178,24 +178,24 @@ function RefundRow({ r }: { r: RefundDisplayRow }) {
 
   return (
     <div
-      className="grid items-center px-4 py-3 border-b border-border text-meta"
+      className="grid items-center px-4 py-3 border-b border-border text-body"
       style={{ gridTemplateColumns: "120px 90px 1.4fr 1.6fr 110px 110px 100px", minWidth: 920 }}
     >
       <span className="font-mono font-semibold">{r.noteId}</span>
-      <span className="text-label uppercase tracking-wider text-muted-foreground">
+      <span className="text-label uppercase tracking-[0.06em] text-muted-foreground">
         {r.kind === "credit" ? "Credit" : "Refund"}
       </span>
-      <span className="text-muted-foreground text-label truncate" title={r.reason ?? ""}>
+      <span className="text-muted-foreground text-body truncate" title={r.reason ?? ""}>
         {r.reason ?? ""}
       </span>
-      <span className="text-label text-muted-foreground truncate">{detail}</span>
-      <span className="font-mono text-right font-semibold text-primary">{rm(r.amount)}</span>
+      <span className="text-body text-muted-foreground truncate">{detail}</span>
+      <span className="font-mono text-right tabular-nums text-primary">{rm(r.amount)}</span>
       <span>
-        <span className={`px-2 py-0.5 rounded text-label font-semibold ${tone}`}>
+        <span className={`px-2 py-0.5 rounded text-meta font-medium ${tone}`}>
           {r.uiStatusLabel}
         </span>
       </span>
-      <span className="text-right text-label text-muted-foreground">{date}</span>
+      <span className="text-right text-body text-muted-foreground">{date}</span>
     </div>
   );
 }
