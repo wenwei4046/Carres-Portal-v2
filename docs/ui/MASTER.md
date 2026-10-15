@@ -6,6 +6,51 @@
 > *"delete all old confused part and use the current we confirmed"* — every new chat reads this file
 > and follows the current shared UI/UX without Jess re-teaching it.
 
+## Owner handover · 15 Oct 2026 · one Carres-owned kit
+
+**APPROVED direction (Jess, `Audit UI kit workflow`):** Carres owns and maintains this existing
+kit. Claude Design supplies visual proposals; it does not define business rules, permissions,
+record ownership or completion. Retain the approved resolved values in 01 and decisions below;
+this handover approves no new palette, component, workflow or presentation proposal.
+
+**One entry:** this file. 01 owns values, 02 owns component contracts and the adoption map,
+03 owns page compositions, COPY owns words, and each module MASTER owns its business differences.
+These are sections of one system, not competing kits. The runtime families `components/kit`,
+`components/carres` and `components/register/DataGrid` are complementary homes identified in 02;
+folder count alone is not evidence of duplicate kits. `/ui` must show the actual consumed components.
+Design exports and old screenshots are evidence only; their filename or arrival never silently
+changes approved law. A later explicit owner ruling supersedes only its stated scope.
+
+**Authority reconciliation:** baseline read at `origin/main` `3ee517b20` (15 Oct 2026). The Desktop
+`desktop-main` checkout contains uncommitted 9 Oct v4/v8 documents and Appearance/theme code that
+conflict with this baseline. They are preserved work, not a new approved standard. Do not deploy,
+overwrite or migrate from them blindly. Reconcile unique work against current authority before
+adopting it; preserve recoverability before removing superseded content. Git is the history;
+never create another kit MASTER or versioned guide. This note does not claim those drafts removed.
+
+| Active chat | Responsibility | Boundary |
+|---|---|---|
+| Audit UI kit workflow | Kit authority reconciliation and one consolidated adoption/retirement inventory | Coordinate shared-file ownership before edits; no competing application migration |
+| Create Claude design checklist | Explain unresolved business/presentation decisions to Jess and record actual rulings | No separate kit or duplicate implementation; do not re-ask settled decisions |
+| Deploy PR #2083 and verify UI | Existing implementation, functional delivery and release proof | Continue independent authorised work; retain one shared implementation per purpose |
+
+**Bounded execution:** use the existing completion table in
+[`../handoff/CARRES-CONTINUOUS-BUILD-HANDOFF.md`](../handoff/CARRES-CONTINUOUS-BUILD-HANDOFF.md),
+not another tracker. Each change names its defect, shared implementation, affected consumers and
+done evidence. Reuse passed evidence for unchanged code; repeat checks only for a relevant change,
+failure or unresolved material concern. Documentation-only reconciliation needs link/diff review,
+not another application build or deployment. Required release gates remain in force for code.
+Do not let one blocked business decision stop independent approved work.
+
+**Retirement:** confirm replacement capability and its affected consumers, migrate them, verify the
+changed scope, then remove the superseded UI implementation and conflicting active references in
+the same change. Preserve unique functions, business evidence, pending decisions and recoverable
+work. Record remaining consumers in the existing completion table. Never call the whole Portal
+aligned because one page or `/ui` passes. This document establishes one authority; implementation,
+retirement and authenticated verification remain separate deliverables.
+
+---
+
 **One home per thing — this MASTER links, it never copies:**
 
 | Thing | Its one home |
