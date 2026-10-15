@@ -307,9 +307,12 @@ function SharedParts() {
 
       <Section id="complete-pages" title="Complete pages" note="Development fixtures using actual page components. These examples do not prove saved records, production permissions or completed business actions.">
         <nav aria-label="Complete page previews" className="flex flex-col gap-3 text-body">
+          <a className="underline underline-offset-4" href="/sales-orders-shell-preview.html">Sales Order · list and record opening</a>
           <a className="underline underline-offset-4" href="/so-workspace-shell-preview.html">Sales Order · full shell and detail</a>
           <a className="underline underline-offset-4" href="/so-workspace-shell-preview.html?state=empty">Sales Order · no payments recorded</a>
           <a className="underline underline-offset-4" href="/so-workspace-shell-preview.html?state=forbidden">Sales Order · payment access denied</a>
+          <a className="underline underline-offset-4" href="/so-workspace-shell-preview.html?state=route-failed">Sales Order · Route read failure</a>
+          <a className="underline underline-offset-4" href="/so-workspace-shell-preview.html?state=tasks-failed">Sales Order · Tasks read failure</a>
           <a className="underline underline-offset-4" href="/route-preview.html">Order Route · standalone implementation example</a>
           <a className="underline underline-offset-4" href="/work-preview.html?shell=1&pw=1&at=%2Foperation%3Ftab%3Dwork">Workspace · My Task and Team Work</a>
           <a className="underline underline-offset-4" href="/so-batch-shell-preview.html">Tasks · list and open task</a>
@@ -501,6 +504,7 @@ export default function UiShowcase() {
       </Section>
 
       <Section id="toolbar" title="List toolbar" note="One 36px line, every button 32 high: show a hidden panel · the views · filter chips · view (its name always shown) and ⋮ · Tasks. Too short a line keeps the show-panel button's icon only.">
+        <div className="max-w-full overflow-x-auto">
         <div className="flex h-9 min-w-0 flex-nowrap items-center gap-2 rounded-lg bg-c-ground">
           {!summary && <CShowPanelButton label="Summary" onShow={() => setSummary(true)} />}
           <div role="tablist" aria-label="Views" className={SEGMENTED_TRACK}>
@@ -526,6 +530,7 @@ export default function UiShowcase() {
             </CPopover>
           </span>
           <TasksPill />
+        </div>
         </div>
       </Section>
 
