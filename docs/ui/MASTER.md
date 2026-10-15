@@ -1639,7 +1639,8 @@ For every used row, record **CONFORMS / DEVIATION / NOT APPLICABLE** in the exis
 | Toast | Bottom centre; #1F2937/white; text13 | Ordinary2.2–2.6s; task close12s; no timed Undo | kit/Toast.tsx |
 | Avatar | Round; header24 | Fixed colour per person; accessible name/tooltip | Shared generic Avatar remains KIT GAP in02 |
 | Ordinary dialog geometry | ENGINEERING DEFAULT, retained from existing implementation: standard512, wide600, viewer880; max-height85vh; body padding16; header/footer14×16; footer gap8 | Existing Modal width union; not new owner approval; task-review and compact-card preserve their distinct full-surface/padding contracts | kit/Modal.tsx; kit/DialogFrame.tsx; tailwind.config.ts |
-| Surface geometry still unresolved | Ordinary dialog variants retained as the common engineering baseline; full cross-family z-layer contract remains to be enumerated | Existing implementation is available above; do not describe it as approved merely because it exists | Owning component contract, reviewed through this same kit |
+| Overlay layer | ENGINEERING DEFAULT: table header/footer10; toolbar/bulk20; popover/menu/tooltip30; modal/drawer40; toast50 | One closed shared ladder. A picker inside a dialog portals into that dialog context, not a larger invented global z-index | kit/overlay-layer.ts; kit/dialog-container.tsx |
+| Floating menu limits | ENGINEERING DEFAULT: max-height min(70vh,480px); max-width actual Radix available width | Body scrolls; remains within available viewport; menu default250 retained | carres/CPopover.tsx |
 
 ### 7.4 Goods tables
 
@@ -1668,7 +1669,7 @@ For every used row, record **CONFORMS / DEVIATION / NOT APPLICABLE** in the exis
 | Narrow | No page side-scroll; touch44; contained table scroll; cards stack without losing facts | Trigger must name viewport OR available canvas explicitly | Shared host + owning component |
 | Role line heights | ENGINEERING DEFAULT, retained from existing implementation: page20/28; card15/22; breadcrumb14/20; body13/18; label12/16; caps11/14 | Retained common engineering baseline under the owner15Oct delegation; approved size/weight roles stay unchanged; later visual correction updates this same role | Shared text-page/strong/control/body/meta/label roles |
 | Field padding and multiline | ENGINEERING DEFAULT, retained from existing implementation: single-line horizontal10; search12; textarea horizontal10/vertical6, default3 rows, resize-y; mobile min-height44 | Textarea uses rows, not a caller height. Not a new approved fixed-height value | kit/field-recipe.ts; kit/Textarea.tsx |
-| Remaining unspecified dimensions | UNRESOLVED: component min/max and exact breakpoints not stated above | No fallback to guessed numbers; name the current component behaviour as MEASURED when relevant | Owning shared component contract |
+| Field narrow/min-max policy | ENGINEERING DEFAULT: interactive minimum44 below768; width100% of host; single32/search34 desktop; textarea uses rows; floating menus use available-width cap | Breakpoint is viewport768 for interactive hit area, not table column layout. Existing approved module/container triggers remain distinct | kit/field-recipe.ts; floating-surface.ts; owning host |
 
 ### 7.6 Compact module card — CompactModuleCard
 
