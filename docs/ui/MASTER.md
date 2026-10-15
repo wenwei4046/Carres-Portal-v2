@@ -1263,12 +1263,14 @@ tick and chevron in the page's words (`selectable.rowLabel`, `expandable.label`)
 stays inside the 40 header on every list (01 §5). `kit-outright.spec.ts` measures the engine's real
 table; `carres-align.js` still reads the toolbar and the dates.
 
-**Type outside 01 §2 (measured 15 Oct 2026).** `text-label` (11 / 14 / 500) is used 1,294 times and
-`text-[11px]` 71 times; 01 §2 allows 11 only for caps labels, tags and badges (labels and second
-lines are 12 / 400). `carres-check.js` reports 11/400, 11/600 and 12/600 text on Delivery Orders,
-Delivery Monitor, Warehouse Outbound and Stock. Retuning the token in one go would move every
-page at once; it goes page by page with each page's kit check, or as one measured change with the
-whole kit suite and baselines retaken.
+**Type outside 01 §2 (measured 15 Oct 2026).** Pages move by role, never by a blind 11px swap: a
+label or second line is 12 / 400, a caps label 11 / 500 .06em, a table header or pill 12 / 500, 600 only
+on identifiers, the record number and main buttons. Done: Delivery, Warehouse, Stock, the left rail,
+caps labels, pills and the side menu (#2078, production carres-check PASS at 1025 · 1164 · 1440 on
+Delivery Orders, Delivery Monitor, Outbound, Inventory, SO Batch and Outright); SO detail, Order Route,
+Delivery brief, Purchasing and Receiving (#2080, production PASS on Purchase Orders and Receiving at the three widths). Left: the legacy old-orders files, Finance (144
+sites), Principal (106), Supplier portal (85) and HR (59); `sales-order-route.ts` sizes its wrapped
+lines for 11px text.
 
 **Old Sales Order register retired (15 Oct 2026).** `SalesOrdersRegister.tsx` (unrouted since 8 Oct)
 and `DestinationHeader.tsx` were deleted after every approved capability was on Outright or replaced

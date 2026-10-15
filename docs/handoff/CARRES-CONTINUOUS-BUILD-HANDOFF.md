@@ -9,7 +9,7 @@ Paste everything below the line into a fresh session. It is self-contained.
 
 ---
 
-CARRES PORTAL v2 — CONTINUOUS BUILD · checkpoint 2026-10-15 night (UI kit lane)
+CARRES PORTAL v2 — CONTINUOUS BUILD · checkpoint 2026-10-15 day (UI kit lane)
 
 ## 0 · Owner scope carried forward (Jess, 14 Oct 2026 — do not ask her to reconfirm)
 
@@ -20,117 +20,144 @@ CARRES PORTAL v2 — CONTINUOUS BUILD · checkpoint 2026-10-15 night (UI kit lan
    outside a release.
 4. Keep every later module on the same kit, Workspace/Tasks and the Settings it needs.
 
+Controller round 2 (15 Oct, with Jess's "table line" screenshots): park the opened-row frame
+question (UI MASTER §6.9 governs the connector) and continue; type by governed role, never a blind
+11px swap; Tasks need runtime proof, writes only in an authorised test environment; SO Batch brief
+conflicts as rule → change → consequence → recommendation; migrate approved legacy SO capabilities
+without asking Jess to discard them; record access gaps instead of bypassing permissions.
+
 Never report progress as a percentage; list the exact remaining obligations (§4).
 
 ## 1 · Where the work is
 
 - Repo `wenwei4046/Carres-Portal-v2` is PUBLIC: never commit customer data, real-looking names or
   the design package's `sales-real.js`.
-- Worktrees of this lane (all merged, safe to remove): `~/carres-worktrees/{so-outright-kit,
-  one-kit-ui, engine-v12, kit-retire, one-pill, page-tools, requested-door, kit-docs}`.
-  The Desktop checkout is `desktop-main` with someone else's uncommitted files: do not touch them.
+- Worktrees: `~/carres-worktrees/*` (merged ones are safe to remove). The Desktop checkout is
+  `desktop-main` with someone else's uncommitted files: do not touch them.
 - Branch `preview/two-row-toolbar` (= `b7c7c3a01`) keeps the unapproved two-row toolbar candidate.
 - Production: `erp.carresofficial.com`, `pos.carresofficial.com`, `api.carresofficial.com/health`;
   read `/__carres_deploy.json` before quoting a SHA. A merge to `main` deploys all three.
 
-## 2 · Done (each with its proof)
+## 2 · Completion table (one table; re-measure before quoting)
 
-| PR | What | State |
-|---|---|---|
-| #2066 `41bc9a6d3` | Sales Order Outright page 1 on the v12 kit (one-line toolbar; the two-row candidate moved to its branch) | DEPLOYED. Production read 15 Oct: `carres-check.js` PASS at 1025 (panels off · Summary · Tasks), 1164 (same three), 1440 (both open); page side scroll 0; toolbar overflow 0; footer `31 orders · Qty: Mattress 23 · …`; Supplier SO-1371 B1201S-K Nice Future · SO-1363 TRION-Q Ohana, CODY-SK Ohana, pillow `Not recorded` · SO-1362 JAGER-SS Ohana · SO-1340 H1401F-K Nice Future (TEST/trial orders) |
-| #2070 `ece6de740` | One menu: kit `DropdownMenu` retired into `CMenu` (CPopover menu, items as data; Enter/Space/↓ open on the first enabled command); `/ui` shows every shared part pages import, with page counts | DEPLOYED. Production read: SO Batch ⋮ Page tools opens on Enter with focus on the first enabled command, Escape closes and returns focus; `/ui` 18 sections, DataGrid present |
-| #2071 `a6c6eabc9` | The list engine draws the v12 table for every list: header band `#F8F9FA`, 10 between columns with 14 at the edges, ▸ before ☐, 24 round chevron; four page-local padding patches removed; 30 baseline pictures retaken on Linux | DEPLOYED. Production read 15 Oct: SO Batch By supplier 1025 and All 1164 (rows closed and one open, 25 item rows), By sales order All 1025 (▸ ☐ order, `expand_more` when open, 6 item rows), Forecast 1164 (item tick 0.2 px under the row tick), Purchase Orders 1440 (62 rows), Workspace Team 1440: `carres-check.js` PASS, header `rgb(248,249,250)`, no page side scroll. Finance lists not read on production (this login has no Finance access); their look and padding are unchanged by code |
-| #2072 `bd54355c1` | One pop-up (kit `Popover` merged into `CPopover`, which gained the dialog container); `Card`, `GridToolbar`, `ChecklistRow`, `QuietRouteRow` deleted (no page drew them) | DEPLOYED. Production read: Purchase Orders column filter menu and the top bar team pop-up open (`data-kit="popover"`) and close with Escape |
-| #2073 `4da1ddb61` | One pill drawing: `CPill` reads `StatusPill`'s shape and colour pairs | DEPLOYED. Computed identical on `/ui` for every tone (3 10 padding, 12/16, 500, same colours and box sizes) |
-| #2074 `241209c68` | Every Register list keeps Export and Columns in its one ⋮ Page tools menu (46 lists drew the rejected separate buttons); `PO No` lists keep each comma with its number | DEPLOYED (in `2bf3343ed`). Production read: Delivery Orders shows one ⋮ (`Export` · `Columns`) and no separate buttons; SO Batch By sales order All, 13 two-PO cells, the first reads `PO-260903-4316-V1,` / `PO-260903-7907-V1` (no line starts with `,`) |
-| #2075 `2bf3343ed` | Monthly demand's month door (`/operation/orders?tab=all&requested=…`) narrows Sales Order Outright again, with a chip that clears it; one shared `requested-narrowing.ts` (was a live defect since Outright took `/operation/orders`) | DEPLOYED. Production read: `?tab=all&requested=2026-10` shows the chip `Customer’s original requested delivery: Oct 2026`, 6 orders, every preserved request in October |
+Production runs `dabffcfc5` (ERP, POS and API, 15 Oct 2026 14:02 MYT; #2081 Inbound Site switch wraps, Manual Purchase create door named by aria-label, SO page initials 11/700 — all three in the live bundle; the signed-in look after this deploy is owed: the browser pane lost its sign-in).
 
-Engine decision (evidence 15 Oct 2026): `register/DataGrid` is the one listing engine — 56 page
-importers and every one passes `appearance="reference"`; its stylesheet named Sales Order Outright as
-the finished v12 reference. `CTable` (Outright only) is the one exception; UI MASTER §7.7 lists what the
-engine must take before Outright moves onto it.
+| Area | Deployed (PR · SHA) | Runtime-verified | Unfinished |
+|---|---|---|---|
+| One listing engine | v12 look #2071 `a6c6eabc9` · one ⋮ Page tools #2074 `241209c68` · whole table lines #2077 `ddd0edf0d` · Outright on the engine, CTable deleted #2079 `2a28f84d9` · engine group rows/chips 12/500 #2080 `cfa0ae0dc` | Production 15 Oct: table lines whole on Outright (last row too, no rounded rows), SO Batch last row, Forecast band; every list header 40 | Opened-row frame on lists other than Outright (owner, UI MASTER §7.2); Finance lists not readable with the available login |
+| Shared parts | one menu #2070 · one pop-up #2072 · one pill drawing #2073 · one segmented control #2078 `4903bead6` · pill weight 500 only and Inbound site switch #2080 `cfa0ae0dc` | /ui computed equal; menus and pop-ups by keyboard in production | Summary panel only on Outright; procurement tab strip and PO object view tabs still draw underline tabs; avatar initials have no 01 §2 pair |
+| Type to 01 §2 (by role) | Delivery, Warehouse, Stock + rail, caps labels, pills, side menu group word #2078 `4903bead6` · SO detail, Order Route, Delivery brief, reorder card, Purchasing, Receiving #2080 `cfa0ae0dc` | Production carres-check at 1025 · 1164 · 1440 on `4903bead6`: Delivery Orders, Delivery Monitor, Outbound, Inventory, SO Batch, Outright PASS; Inbound 2 findings (fixed in #2080). On `cfa0ae0dc`: Purchase Orders and Receiving PASS at 1025 · 1164 · 1440; Inbound PASS at 1440 and its Site switch ran off at 1025/1164 (wraps in #2081); Manual Purchase only the screen-reader `+` (#2081); SO page leftovers are field rows 33 vs 36, item rows 37 vs 44, model · spec on one line, its own items table (01 §5 order-line table owed) and initials 10/700 (#2081) | Legacy old-orders files (OrderDetailDrawer, DeliveryChain, LoanPanel, most of DeliveryOrderPage); Finance (144 sites), Principal (106), Supplier portal (85), HR (59); `sales-order-route.ts` text budget assumes 11px |
+| Sales Order (Outright) | page 1 #2066 · Monthly demand door #2075 · engine + approved capabilities #2079 `2a28f84d9` | Production 15 Oct on `2a28f84d9`: carres-check PASS at 1025 · 1164 · 1440, rows closed and open; header 40, rows 54, footer `31 orders · Qty: …`; Group by Payment Status (Unpaid 1 · Partially paid 26 · Paid in full 4); sort SO no. both ways; Stock view PO numbers are links; row menu View · Print · Cancel SO (not clicked); tick `Select SO-1371`; chevron `Show items`; opened-row frame 1px `#CBD0D6`, corners 8, items Item · Qty · Supplier; SO no. stays in view at the right end | Owner walk; short-toolbar decision; SO quick card has no entry point (§5) |
+| SO Batch Purchase | v12 look via the engine · one ⋮ · PO No comma fix · header 40 | Production PASS at 1025 · 1164 · 1440 (15 Oct) | Design brief A/B/C owner rulings (§5); D rejected; E reported (§6) |
+| Workspace | Round 3 + `+ Task` (#2044–#2055) | Production read-only 15 Oct: feed 206 items, UI 193 (13 future on-day deliveries), each destination opens the exact record, reload keeps the same ids and module counts | Signed-in owner walk |
+| Tasks | One feed `/api/operation/work?include=workspace`; no page writes tasks locally | Local replayed database 15 Oct (fixture users, nothing in production): internal task add → same id on retry → in the open feed (real `projectInternalTaskWork`: id `workspace:{task}:internal_task`, destination `/operation?tab=work&task=…`) → mark done on the same record (events added, done) → gone from the open feed; the Work ledger refuses completion except by the owning module's fact and needs a contact with a contact kind | Module task completion end to end: needs the Worker + PostgREST on a test database (no Docker here) or an owner-authorised TEST write in production |
 
-Workspace and Tasks (code read 15 Oct): every Tasks surface reads the one server feed
-(`useOperationWork`, one query key, `/api/operation/work?include=workspace`); no page writes task
-data locally, so opening another page cannot overwrite tasks. Round 3 (#2044–#2053) and `+ Task`
-(#2055) are live and were checked signed in on 13–14 Oct.
+Engine decision (evidence 15 Oct 2026): `register/DataGrid` is the one listing engine; every list,
+Sales Order Outright included since #2079, passes `appearance="reference"`. `carres/CTable`, the
+unrouted `SalesOrdersRegister.tsx` and `DestinationHeader.tsx` are deleted (UI MASTER §7.7 lists
+what moved, what an owner ruling replaced, and the kept `SalesOrderCompactView`).
 
 ## 3 · Checks and how to rerun them
 
 - Web: `cd apps/web && npx tsc -p tsconfig.app.json --noEmit`; tests with
   `npx vitest run <dirs> --poolOptions.threads.minThreads=1 --poolOptions.threads.maxThreads=4`
-  (plain `--maxWorkers=4` errors out and runs nothing). Full parallel runs time out under load.
-- Kit: `KIT_PORT=<free> npx playwright test --config playwright.kit.config.ts --grep-invert baseline`.
-  Baselines are Linux pictures: add the PR label `update-baselines`, download the artifact
-  (`gh run download <id>`), commit the intended pictures only.
-- **CI renders two anti-aliasing variants** on rounded edges at fractional x (proved on 6 runs incl.
-  `1d58ff552`); the 0.2 % gate absorbs them. A small spread difference on an untouched page is not a
-  code change and is not committed (15 Oct: sales-order 1164 Tasks-on, 584 px, 0.06 %).
-- Production read: browser pane signed in on `erp.carresofficial.com`; `resize_window` per width,
-  set `carres.outright.summary` / `shell-tasks-open`, reload, fetch `carres-check.js` from raw GitHub
-  at the deployed SHA and `eval`. Remove the two keys after.
+  (plain `--maxWorkers=4` errors out and runs nothing). `pnpm lint` before pushing (row-height and
+  hex guards).
+- Kit: `KIT_BASE_URL=http://localhost:<port> npx playwright test --config playwright.kit.config.ts
+  --grep-invert baseline` against `pnpm --filter @carres/web exec vite --port <port>`. Do not edit
+  code while it runs (a reload fails a case). Baselines are Linux pictures: add the PR label
+  `update-baselines` (remove and re-add it to retake after a push), download the artifact
+  (`gh run download <id>`), commit only pictures with real pixel changes.
+- **CI renders two anti-aliasing variants** on rounded edges at fractional x; the 0.2 % gate absorbs
+  them. A byte change with no pixel over 16 is not committed.
+- Two open PRs that both retake pictures: merge one, merge `main` into the other (no force push),
+  retake, commit.
+- Production read: browser pane, own background tab, `resize_window` per width; `carres-check.js`
+  from raw GitHub at the deployed SHA. Reset the viewport after.
+- Local database for writes: `LC_ALL=C node scripts/dry-run-migrations.mjs --keep` (fixture users
+  `…f001`–`…f004`; impersonate with `set_config('request.jwt.claim.sub', …)`).
 
-## 4 · Remaining obligations, in order (next executable step is 4.1)
+## 4 · Remaining obligations, as delivery batches (controller 15 Oct: batch, no CI cycle per small fix)
 
-Production runs `2bf3343ed` (ERP, POS and API, 15 Oct 2026 03:05 MYT). Nothing of this lane is
-open in a PR.
-
-1. **Bring §5's decisions to the owner, one at a time** (recommendation first), starting with the
-   opened-row frame, because §4.2 waits for it.
-2. **Outright onto the engine, then delete `CTable`** (UI MASTER §7.7): pager footer, widen-to-content
-   columns, URL-driven header value filters, page toolbar in the engine's slots; opened-row frame after
-   §7.2 is decided. Acceptance: 12 sales-order baselines unchanged, `kit-outright.spec.ts` green.
-3. **Type to 01 §2** (UI MASTER §7.7): `text-label` 11/500 used 1,294 times where labels are 12/400;
-   page by page with each page's kit check.
-4. **Old `SalesOrdersRegister.tsx`** is unreachable. Capability check done 15 Oct (UI MASTER §7.7):
-   Outright lacks grouping, per-column sort, the Columns chooser, the role money default, the
-   Monthly demand view, the URL filters (`dealer` `state` `city` `delivery` `category` `stock`
-   `payment`), Cards, the quick card, the row menu `View · Print · Cancel SO`, clickable PO/DO/
-   Receipt/Invoice numbers and money footer totals. Each is either moved into Outright through
-   Design's fix list or dropped by the owner; only then move `skuKey`, `useCatalogNames`,
-   `paymentStatusOf` out and delete the old page and its two test files.
-5. **Page adoption down the side menu** after Design's fix list per page (UI MASTER "How design and
-   Code work"). Production sweep 15 Oct at 1164 (`carres-check.js` at `a6c6eabc9`): PASS on Sales
-   Order Outright, SO Batch, Forecast, Purchase Orders, Receiving, Workspace; FAIL on Delivery
-   Orders (11/400 text), Delivery Monitor (11/600 month heads; its own tabs, not the shared segmented
-   control), Warehouse Inbound (`Awaiting receipt` cut), Warehouse Outbound (11/400 text, a status
-   cut), Stock (11/600 and 12/600 text). The type debt is portal-wide (UI MASTER §7.7).
-6. **Settings per module** at completion (owner 2026-10-05).
+1. **Batch B · kit adoption finished on every reachable page (one release).** Three parts built in
+   parallel, merged into one branch, one CI, one deploy, one production check at 1025 · 1164 · 1440:
+   (a) `build/kit-ops-finish` — remaining Operation pages by role (Delivery Order page, Delivery
+   report/settings, Payment settings/templates, Movements, Calendar rail, timelines, Work right
+   panel cards) + procurement and PO object view tabs onto the kit segmented control + GoodsMiniTable
+   headers; (b) `build/so-page-items` — the Sales Order page's Items card on the 01 §5 order-line table
+   (rows 44, model then spec) and field rows 36; (c) `build/kit-portals-type` — Finance, Principal,
+   Supplier portal, HR and shared components by role. Excluded on purpose: the legacy old-orders page
+   (not in the side menu; retires at go-live).
+2. **Batch C · Tasks end-to-end proof (functionality).** Blocked on one owner yes: record the
+   customer's `not yet` answer on trial order SO-1254 through the Sales Order page and watch its open
+   `Ask for the delivery date` task (`orders:c1e95bf2-…:ask_delivery_date`, owner Alvin) leave the
+   feed with a closure receipt. No test database exists here (no Docker or PostgREST); the internal
+   task path is already proven on a local replayed database.
+3. **Batch D · SO Batch brief A/B/C.** Blocked on owner rulings (§5); then one release: group-row
+   deadline, group status, Today card arithmetic.
+4. **Page adoption down the side menu** after Design's fix list per page; **Settings per module** at
+   completion (owner 2026-10-05).
 
 ## 5 · Pending owner/design decisions (bring only these, one at a time)
 
 - Short toolbar: one line (built, recommended) vs two rows (`preview/two-row-toolbar`).
-- Opened row: v12 frame vs §6.9 connector (UI MASTER §7.2; recommendation: v12 frame).
+- Opened row: v12 frame vs §6.9 connector (UI MASTER §7.2; the engine can draw the frame,
+  Outright uses it; recommendation: v12 frame on every list).
 - List header case portal-wide (UI MASTER §7.2; recommendation: sentence case, as v12).
-- SO Batch design brief 14 Oct (`Sales Order (16).zip`, `Code briefs/2 SO Batch Purchase.md`):
-  A (group row shows the next date, not the earliest) and B (`Cut-off passed` only when every line
-  passed) change Purchasing MASTER §9.1 `Order PO deadline` / `Status` definitions → owner ruling;
-  C (`To order now` = past order-by + due today) changes the Today card's arithmetic → owner ruling;
-  D (`Create PO` task per supplier) uses a rejected word; the PO window Work card already exists and
-  goes to the PO Duty holder (monthly rotation, an Operations person — not Jess's own Tasks list);
-  E is a report only.
+- SO quick card (`SalesOrderCompactView`) has no entry point since row click opens the full SO:
+  give it a door or retire it (Sales Order lane).
 - Tasks title row: 01 §4 names `Log call`, which is not a COPY word; the Portal shows `+ Task`.
 - Earlier lane, still open (2026-09-14 Payment checkpoint): the sentence `Nobody holds Delivery
   Duty.`; a permanent home for the assignment pool; the pooled test account `operation-test@x.com`.
 
+### SO Batch design brief 14 Oct (Round 4 `Code briefs/2 SO Batch Purchase.md`) — owner rulings needed
+
+**A · `Order PO deadline` on a group row**
+- Existing rule (Purchasing MASTER §9.1, column table): "The earliest Order By date among the lines still to buy; under it the weekday and `{n} days left` · `Today` · `{n} days late` (amber once the date has passed)."
+- Proposed: the nearest Order By date that is not yet late; a second amber line `n SOs late` when any line is late; the oldest late date only when every line is late.
+- Consequence: the row stops leading with the oldest late order (production: Nice Future shows `6 Jul · 100 days late`); late lines move to a count. `n SOs late` is not a COPY word (COPY has `{n} days late`, `Late to order`).
+- Recommendation: adopt the next-action date (SAP Fiori "date = next action"), with the second line in existing words: `{n} late to order` (amber). Falsifier: Jess wants the oldest-late date kept as the row's chase signal.
+
+**B · `Status` on a group row**
+- Existing rule (§9.1): "`Cut-off passed` (amber) with what is still to buy, when a line's PO window has gone by; otherwise `To buy`."
+- Proposed: `Cut-off passed` only when every open line is past its cut-off; otherwise `Order now` when anything is due today or late.
+- Consequence: a group with one passed line and nine on time reads `Order now` instead of `Cut-off passed`; `Order now` is not a COPY word (COPY status words: `To buy` · `Cut-off passed` · `Late to order` · `Partly ordered` · `Ordered` · `From ready stock`).
+- Recommendation: keep `Cut-off passed` when any line's window has passed (it is the fact the buyer must act on today), and use the existing `Late to order` when the Order By date has passed; reject `Order now`. Falsifier: Jess rules the group status must describe the majority of its lines.
+
+**C · Today card numbers**
+- Existing rule (§9.1 rail): `To order now` = still to buy after its PO window has gone by; `Past the order-by date` = lines whose Order By date has passed. Two different clocks (window cut-off vs Order By date), so 46 and 47 pcs are both correct and need not add up.
+- Proposed: `To order now` = `Past the order-by date` + due today, and the numbers must add up on screen.
+- Consequence: `To order now` changes meaning from the PO-window clock to the Order By clock.
+- Recommendation: keep both definitions (they are different facts) and make the card follow 01 §4 "one headline tile with its breakdown rows under it": headline `To order now`, breakdown rows that sum to it (`Window passed` + `Due today`), with `Past the order-by date` as its own row outside the sum. Falsifier: Jess rules there is only one clock for "now".
+
+**D · `Create PO` task per supplier** — rejected word (COPY: the page asks `Review PO`/`Issue PO`); the PO window Work card already exists and goes to the PO Duty holder. No change.
+
+**E · July SOs with no PO** — report only; needs read of the live rows, no change.
+
+**E · data check, read-only (production read 15 Oct 2026, nothing changed).** The brief's named orders are not missing POs: SO-1203 is on PO-20260903-6426 and -7907, SO-1205 on -4316, -4585, -7907 and -9389, SO-1208 on -8059 (all `open`, made 3 Sep). Orders proceeded in July with goods lines on no PO: SO-1204, 1206, 1207, 1210, 1212, 1213, 1216, 1254, 1283, 1284, 1287 (1206 and 1216 `proceed_order`; the other nine still `place`). All were created 21–31 Jul 2026 in the portal trial; their delivery dates (4–31 Aug) have passed and none has a Delivery Order. Under CLAUDE.md §6 every row is TEST data and none carries over at go-live, so no SO is closed and no PO raised; the July `days late` on SO Batch is trial data, not a missed purchase.
+
+
 Do NOT ask Jess again about `· passed` or any decision already recorded in COPY or a MASTER.
 Do not start Manual Purchase Request business work (Design review resumed 15 Oct, Q1–Q4 open).
 
-## 6 · Data truth and unverified items
+## 6 · Data truth, access gaps and unverified items
 
 - No order row is proven genuine business data (CLAUDE.md §6): `AutoCount Archive` imports,
   `rental`, test names (SO-1340, 1339, 1333, 1328), SKU `MEMORY-FOAM-PILLOW-asd`.
-- SO-1340: 14 open, unsent, version-1 POs source one qty-1 line (read-only finding).
+- Access gap: the signed-in production login (Logistics · Carres HQ, Operations) cannot open Finance
+  lists; Finance pages are checked on fixtures and tests only. Not bypassed.
 - UNVERIFIED: PO review permissions; SO amendment writes; long product names on SO item rows;
   Design interactions not exercised. Never manufacture records, impersonate Jess, approve or issue
   a PO to test.
 
 ## 7 · Shared kit sources (one kit)
 
-`components/carres/` (CTable until §4.2, CToolbar, CPopover + CMenu, CSidePanel, CPill, MIcon) ·
-`components/kit/` (Button, fields, Modal, Drawer, Tabs, states, documents, CompactModuleCard, task
-parts) · `components/register/DataGrid` (the one listing engine) · `/ui` · 01 / 02 / 03 · UI MASTER
-§0 and §6.0 · checks `docs/ui-reference/sales-order-design/carres-check.js` and `carres-align.js`.
+`components/carres/` (CCell + CListFooter for list cells and footers, CToolbar, CPopover + CMenu,
+CSidePanel, CPill, MIcon) · `components/kit/` (Button, fields, Modal, Drawer, Tabs and the one
+segmented control, states, documents, CompactModuleCard, task parts) · `components/Segmented`
+(draws the kit segmented control) · `components/register/DataGrid` (the one listing engine) ·
+`/ui` · 01 / 02 / 03 · UI MASTER §0 and §6.0 · checks
+`docs/ui-reference/sales-order-design/carres-check.js` and `carres-align.js`.
 
 ## 8 · Restart message
 
