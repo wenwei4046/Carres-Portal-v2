@@ -216,7 +216,7 @@ export default function ProcurementTabContent({
     return (
       <div className="px-9 py-7" data-testid={`procurement-tab-error-${slug}`}>
         <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 text-body">
-          <div className="text-destructive font-semibold mb-2">
+          <div className="text-destructive font-medium mb-2">
             Couldn&rsquo;t load purchase orders
           </div>
           <div className="text-meta text-base-700 mb-3">
@@ -225,7 +225,7 @@ export default function ProcurementTabContent({
           <button
             type="button"
             onClick={() => void tabQ.refetch()}
-            className="btn-secondary text-label py-1.5 px-3"
+            className="btn-secondary text-body font-medium py-1.5 px-3"
           >
             Retry
           </button>
@@ -303,7 +303,7 @@ export default function ProcurementTabContent({
               }}
             >
               <div
-                className="font-mono text-meta font-semibold pt-0.5"
+                className="font-mono text-body font-semibold pt-0.5"
                 title={po.id}
               >
                 {po.id.slice(0, 8)}
@@ -337,7 +337,7 @@ export default function ProcurementTabContent({
                         {skuName}
                       </span>
                       <span
-                        className="font-mono text-label whitespace-nowrap"
+                        className="font-mono text-meta whitespace-nowrap"
                         style={{
                           color: fully ? "var(--success)" : "var(--base-600)",
                         }}
@@ -348,16 +348,16 @@ export default function ProcurementTabContent({
                   );
                 })}
                 {lines.length > 1 && (
-                  <div className="font-mono text-label text-base-500 mt-1">
+                  <div className="font-mono text-meta text-base-500 mt-1">
                     Σ {got}/{total} units
                   </div>
                 )}
                 {po.eta_date && (
                   <div className="mt-1.5 flex items-baseline gap-1.5">
-                    <span className="font-ui text-label uppercase tracking-[0.12em] text-base-500 font-semibold">
+                    <span className="font-ui text-label uppercase tracking-[0.06em] text-base-500">
                       PO ETA
                     </span>
-                    <span className="font-mono text-meta text-base-900 font-semibold">
+                    <span className="font-mono text-meta text-base-900 font-medium">
                       {po.eta_date}
                     </span>
                   </div>
@@ -365,7 +365,7 @@ export default function ProcurementTabContent({
               </div>
               <div className="min-w-0">
                 {orders.length === 0 ? (
-                  <div className="text-label text-base-500 italic font-body">
+                  <div className="text-meta text-base-500 italic font-body">
                     Stockpile · no source order
                   </div>
                 ) : (
@@ -374,7 +374,7 @@ export default function ProcurementTabContent({
                       <OrdersRow key={o.so} order={o} />
                     ))}
                     {orders.length > 1 && (
-                      <div className="font-mono text-label text-base-500 mt-1">
+                      <div className="font-mono text-meta text-base-500 mt-1">
                         Σ {orders.length} orders
                       </div>
                     )}
@@ -498,7 +498,7 @@ function ActionCell({
   if (st === "received") return null;
   if (st === "cancelled") {
     return (
-      <span className="font-mono text-label text-base-500">cancelled</span>
+      <span className="font-mono text-meta text-base-500">cancelled</span>
     );
   }
   if (ss === "reassign_needed") {
@@ -506,7 +506,7 @@ function ActionCell({
     return (
       <button
         type="button"
-        className="btn-primary text-label py-1 px-2.5"
+        className="btn-primary text-body font-medium py-1 px-2.5"
         onClick={(e) => {
           e.stopPropagation();
           onReassign();
@@ -521,7 +521,7 @@ function ActionCell({
   const directReceive = (
     <button
       type="button"
-      className="text-label text-base-500 underline hover:text-base-800 transition-colors"
+      className="text-meta text-base-500 underline hover:text-base-800 transition-colors"
       onClick={(e) => {
         e.stopPropagation();
         onReceive();
@@ -540,7 +540,7 @@ function ActionCell({
       <div className="flex flex-col items-end gap-1">
         <button
           type="button"
-          className="btn-primary text-label py-1 px-2.5"
+          className="btn-primary text-body font-medium py-1 px-2.5"
           onClick={(e) => {
             e.stopPropagation();
             onLpInboundConfirm();
@@ -558,7 +558,7 @@ function ActionCell({
       <div className="flex flex-col items-end gap-1">
         <button
           type="button"
-          className="btn-primary text-label py-1 px-2.5"
+          className="btn-primary text-body font-medium py-1 px-2.5"
           onClick={(e) => {
             e.stopPropagation();
             onAssignPickup();
@@ -586,7 +586,7 @@ function ActionCell({
   ) {
     return (
       <div className="flex flex-col items-end gap-1">
-        <span className="font-mono text-label text-base-500">
+        <span className="font-mono text-meta text-base-500">
           {ss === "pickup_assigned"
             ? "awaiting accept"
             : ss === "pickup_accepted"
@@ -609,7 +609,7 @@ function ActionCell({
   return (
     <button
       type="button"
-      className="btn-secondary text-label py-1 px-2.5"
+      className="btn-secondary text-body font-medium py-1 px-2.5"
       style={{ borderColor: "var(--success)", color: "var(--success)" }}
       onClick={(e) => {
         e.stopPropagation();
@@ -655,7 +655,7 @@ function OrdersRow({
     : "TBD";
   return (
     <div className="text-meta leading-[1.5] flex gap-1.5 items-baseline font-body">
-      <span className="font-mono text-label text-base-700 flex-shrink-0">
+      <span className="font-mono text-meta text-base-700 flex-shrink-0">
         #{order.so}
       </span>
       <span
@@ -669,10 +669,10 @@ function OrdersRow({
           micro-label so the operator can scan customer deadlines at a glance
           without confusing it with the PO ETA. The urgency dot to the right
           encodes the same info in color. */}
-      <span className="font-ui text-label uppercase tracking-[0.12em] text-base-500 font-semibold whitespace-nowrap">
+      <span className="font-ui text-label uppercase tracking-[0.06em] text-base-500 whitespace-nowrap">
         DUE
       </span>
-      <span className="font-mono text-meta text-base-900 font-semibold whitespace-nowrap">
+      <span className="font-mono text-meta text-base-900 font-medium whitespace-nowrap">
         {dateLabel}
       </span>
       <span
@@ -707,7 +707,7 @@ function FilterChip({
       className={[
         "px-3 py-1.5 rounded-[4px] text-meta transition-colors border",
         active
-          ? "bg-base-900 text-white border-base-900 font-semibold"
+          ? "bg-base-900 text-white border-base-900 font-medium"
           : "bg-white text-base-700 border-base-200 font-medium hover:border-base-400",
       ].join(" ")}
     >

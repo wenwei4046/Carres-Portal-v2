@@ -430,7 +430,7 @@ export default function SoBatchIssueWorkspace({
               <button
                 type="button"
                 data-testid="so-batch-issue-prev"
-                className="h-7 rounded-control border border-kit-slate-6 px-2 text-meta disabled:opacity-40"
+                className="h-7 rounded-control border border-kit-slate-6 px-2 text-body font-medium disabled:opacity-40"
                 disabled={idx === 0}
                 onClick={() => { setBundlePreview(null); setAt((i) => Math.max(0, i - 1)); }}
               >
@@ -439,7 +439,7 @@ export default function SoBatchIssueWorkspace({
               <button
                 type="button"
                 data-testid="so-batch-issue-next"
-                className="h-7 rounded-control border border-kit-slate-6 px-2 text-meta disabled:opacity-40"
+                className="h-7 rounded-control border border-kit-slate-6 px-2 text-body font-medium disabled:opacity-40"
                 disabled={idx >= total - 1}
                 onClick={() => { setBundlePreview(null); setAt((i) => Math.min(total - 1, i + 1)); }}
               >
@@ -463,7 +463,7 @@ export default function SoBatchIssueWorkspace({
           {mode === "review" && current ? (
             <>
               <h2
-                className="text-body font-semibold"
+                className="text-strong"
                 data-testid="so-batch-issue-title"
               >
                 {current.supplierName ?? "Supplier"} → {destinationName(current.destinationId)}
@@ -506,7 +506,7 @@ export default function SoBatchIssueWorkspace({
               <div className="overflow-x-auto">
               <table className="w-full text-body">
                 <thead>
-                  <tr className="border-b border-kit-slate-5 text-label uppercase text-kit-slate-11">
+                  <tr className="border-b border-kit-slate-5 text-meta text-kit-slate-11 [&>th]:font-medium">
                     <th className="py-1 text-left">Item</th>
                     <th className="w-24 py-1 text-left">Source</th>
                     <th className="w-14 py-1 pr-3 text-right">Qty</th>

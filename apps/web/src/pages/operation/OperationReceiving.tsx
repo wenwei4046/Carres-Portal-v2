@@ -297,7 +297,7 @@ export default function OperationReceiving() {
             : receivingDisplayNo(r),
         accessor: (r) => (
           <span className="flex flex-col">
-            <span className="font-mono text-meta text-base-900">
+            <span className="font-mono text-body font-semibold text-base-900">
               {receivingDisplayNo(r)}
             </span>
             {r.status === "voided" && (
@@ -305,7 +305,7 @@ export default function OperationReceiving() {
                  number, and only when it is cancelled (owner ruling
                  2026-09-17). */
               <span
-                className="text-label text-kit-red-11"
+                className="text-meta text-kit-red-11"
                 data-testid={`grn-cancelled-${r.id}`}
               >
                 Cancelled
@@ -331,7 +331,7 @@ export default function OperationReceiving() {
         accessor: (r) => (
           <span className="flex flex-col">
             {(r.source_refs ?? []).map((ref) => (
-              <span key={ref} className="font-mono text-meta text-base-900">
+              <span key={ref} className="font-mono text-body text-base-900">
                 {documentDisplayNumber(ref)}
               </span>
             ))}
@@ -349,7 +349,7 @@ export default function OperationReceiving() {
         searchValue: (r) => `${r.po_id ?? ""} ${documentDisplayNumber(r.po_id ?? "")}`,
         exportValue: (r) => documentDisplayNumber(r.po_id ?? ""),
         accessor: (r) => (
-          <span className="font-mono text-meta text-base-900">{documentDisplayNumber(r.po_id ?? "")}</span>
+          <span className="font-mono text-body text-base-900">{documentDisplayNumber(r.po_id ?? "")}</span>
         ),
       },
       {
@@ -483,7 +483,7 @@ export default function OperationReceiving() {
         searchValue: (r) => r.do_number ?? "",
         exportValue: (r) => r.do_number ?? "",
         accessor: (r) => (
-          <span className="font-mono text-meta text-base-900">
+          <span className="font-mono text-body text-base-900">
             {r.do_number}
           </span>
         ),
@@ -906,7 +906,7 @@ export default function OperationReceiving() {
               </p>
               <button
                 type="button"
-                className="rounded-control border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-hovertint"
+                className="rounded-control border border-base-200 bg-white px-3 py-1.5 text-body font-medium text-base-700 hover:bg-hovertint"
                 onClick={() => void registerQ.refetch()}
               >
                 Try again
@@ -1028,7 +1028,7 @@ export default function OperationReceiving() {
                       onClick={() =>
                         setOffset(Math.max(0, offset - page.limit))
                       }
-                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 hover:bg-kit-slate-3 disabled:text-kit-slate-11 disabled:bg-kit-slate-2 disabled:hover:bg-kit-slate-2"
+                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-body font-medium text-kit-slate-11 hover:bg-kit-slate-3 disabled:text-kit-slate-11 disabled:bg-kit-slate-2 disabled:hover:bg-kit-slate-2"
                     >
                       Previous
                     </button>
@@ -1037,7 +1037,7 @@ export default function OperationReceiving() {
                       data-testid="grn-page-next"
                       disabled={to >= page.total}
                       onClick={() => setOffset(offset + page.limit)}
-                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 hover:bg-kit-slate-3 disabled:text-kit-slate-11 disabled:bg-kit-slate-2 disabled:hover:bg-kit-slate-2"
+                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-body font-medium text-kit-slate-11 hover:bg-kit-slate-3 disabled:text-kit-slate-11 disabled:bg-kit-slate-2 disabled:hover:bg-kit-slate-2"
                     >
                       Next
                     </button>
@@ -1132,7 +1132,7 @@ function FindPoView({
                 data-testid={`receiving-find-${p.id}`}
                 className="flex items-center gap-3 py-2.5 text-left hover:bg-kit-slate-3"
               >
-                <span className="w-44 shrink-0 font-mono text-meta text-base-900">
+                <span className="w-44 shrink-0 font-mono text-body text-base-900">
                   {p.id}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-body text-base-900">
