@@ -1,33 +1,16 @@
 /**
- * KIT TOKENS — the machine-readable half of `docs/01-design-tokens.md` (which
- * replaced the retired `docs/UI-KIT.md` §2–§5).
- *
- * Card D0.5a. Every Foundation Component in `components/kit/` reads its type,
- * radius, tone and icon size FROM HERE, and `/ui` renders the same records — so
- * the showcase structurally cannot show a value the components do not use.
- *
- * **Why a TypeScript record and not a CSS class ramp.** The six type tokens are
- * declared in `tailwind.config.ts` as named `fontSize` entries (`text-page` …
- * `text-label`), which carries size + weight + line-height in ONE class and
- * makes a seventh size impossible to write without editing the config. The
- * law's own names (`t-page`, `t-body`, …) could NOT be used as CSS class names:
- * `.t-body` already exists in `index.css` as the retired v17 ramp's 14px/400,
- * used by 5 live files. Redefining it would have re-sized pages this card is
- * forbidden to touch. The mapping token → class is recorded in UI-KIT §2.1.
- *
- * **Q1 · Q3 · Q4 are FROZEN (Jess, 2026-07-28) — the PENDING REGISTER is empty.**
- * Spacing is Candidate A's eight steps, `font-bold` (700) is dead and 600 is the
- * heavy weight, and the icon stroke is Lucide's own 2. D0.5a built its ten boxes
- * from the six steps common to both spacing candidates, so the freeze cost zero
- * component changes — which is why the answer could arrive after the components.
+ * Shared runtime aliases for the ONE kit. Current values and permitted roles
+ * are governed by docs/01-design-tokens.md; Tailwind owns rendered type classes.
+ * Keep consumer APIs during migration. The records below describe those aliases,
+ * not a second list of approved typography or a replacement for 01.
  */
 import type { OrderActionTone } from "@carres/shared";
 
 /* ─────────────────────────────────────────────────────────────────────────
- * §2.1 Typography — six tokens, no seventh.
+ * Typography aliases — preserve names used by current consumers.
  * ──────────────────────────────────────────────────────────────────────── */
 
-/** The six type tokens. A seventh does not exist and does not compile. */
+/** Current class aliases; 01 §2 governs their permitted use. */
 export type TypeToken = "page" | "title" | "strong" | "body" | "meta" | "label" | "control";
 
 export interface TypeTokenSpec {
@@ -40,22 +23,18 @@ export interface TypeTokenSpec {
   use: string;
 }
 
-/**
- * §2.2 — the three weights that survive Q3. 700 was deleted into 600 (Jess,
- * 2026-07-28): the two were doing the same job at every size on `/ui`.
- * A kit file that writes `font-bold` fails `kit-source.test.ts`.
- */
-export const TYPE_WEIGHTS: readonly number[] = [400, 500, 600];
+/** 01 §2 permits 700 only for 11px count badges, never general body text. */
+export const TYPE_WEIGHTS: readonly number[] = [400, 500, 600, 700];
 
-/** UI-KIT §2.1, in the order the law states it. */
+/** Current 01 §2 aliases; values match the runtime Tailwind ramp. */
 export const TYPE_TOKENS: readonly TypeTokenSpec[] = [
-  { token: "page", className: "text-page", px: 24, weight: 600, lineHeight: 32, use: "page title — max one per page" },
-  { token: "title", className: "text-title", px: 20, weight: 600, lineHeight: 28, use: "section title · KPI hero number" },
-  { token: "strong", className: "text-strong", px: 15, weight: 600, lineHeight: 22, use: "card title · field-group heading" },
+  { token: "page", className: "text-page", px: 20, weight: 600, lineHeight: 28, use: "page title — max one per page" },
+  { token: "title", className: "text-title", px: 20, weight: 600, lineHeight: 28, use: "record number — shares the one page-title role" },
+  { token: "strong", className: "text-strong", px: 15, weight: 500, lineHeight: 22, use: "card title · field-group heading" },
   { token: "body", className: "text-body", px: 13, weight: 400, lineHeight: 18, use: "default — table rows, prose, buttons" },
   { token: "meta", className: "text-meta", px: 12, weight: 400, lineHeight: 16, use: "secondary info, captions, timestamps" },
-  { token: "label", className: "text-label", px: 11, weight: 500, lineHeight: 14, use: "field labels, micro-labels, pill text" },
-  { token: "control", className: "text-control", px: 14, weight: 400, lineHeight: 20, use: "workspace toolbar controls (Work, 2026-09-25)" },
+  { token: "label", className: "text-label", px: 11, weight: 500, lineHeight: 14, use: "caps labels and tags; counts may use 700 per 01 §2" },
+  { token: "control", className: "text-control", px: 14, weight: 400, lineHeight: 20, use: "legacy control alias; new controls use 01 §2 button roles" },
 ] as const;
 
 /* ─────────────────────────────────────────────────────────────────────────

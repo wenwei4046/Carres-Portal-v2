@@ -110,7 +110,7 @@ export default function CPopover({
             outside.current = false;
           }}
           className={`${Z_FLOATING} max-h-[min(70vh,480px)] overflow-auto rounded-lg bg-c-card p-1.5 text-c-ink [box-shadow:var(--shadow-menu)] focus:outline-none`}
-          style={width ? { width } : undefined}
+          style={{ ...(width || menu ? { width: width ?? 250 } : {}), maxWidth: "var(--radix-popover-content-available-width)" }}
         >
           {children}
         </RadixPopover.Content>
@@ -166,8 +166,8 @@ export function CMenuItem({
 export function CMenuGroup({ children, first = false }: { children: ReactNode; first?: boolean }) {
   return (
     <div
-      className={`px-2.5 pb-1 pt-2 text-[11px] font-semibold tracking-[0.04em] text-c-muted ${
-        first ? "" : "border-t border-c-section-line"
+      className={`px-2.5 pb-1 pt-2 text-[11px] font-medium uppercase tracking-[0.06em] text-c-secondary ${
+        first ? "" : "border-t border-c-row-line"
       }`}
     >
       {children}
