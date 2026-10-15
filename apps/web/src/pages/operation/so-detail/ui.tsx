@@ -9,8 +9,11 @@
  *   Drawer    right · top/bottom 12 · w400 · shadow-drawer · backdrop
  *   Menu      white · radius 8 · shadow-menu · pad 6 · item pad 7 10 · 13/500
  */
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import MIcon from "@/components/carres/MIcon";
+import KitSelect from "@/components/kit/Select";
+import KitDatePicker from "@/components/kit/DatePicker";
+import { controlClass } from "@/components/kit/field-recipe";
 import { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 
@@ -179,9 +182,8 @@ export function CIconBtn({
   );
 }
 
-/* ── Inputs (edit rows: h30) ────────────────────────────────────────────── */
-const FIELD =
-  "h-[30px] w-full min-w-0 rounded-lg border border-c-input-border bg-c-card px-2.5 text-[13px] text-c-ink outline-none focus:[outline:var(--c-focus)] focus:[outline-offset:-2px] disabled:bg-c-info-bg disabled:text-c-muted";
+/* Existing SO caller APIs adapt to the one Kit; no independent field skin. */
+const FIELD = controlClass(false, "single");
 
 export function CInput({
   label,
@@ -208,26 +210,16 @@ export function CSelect({
   disabled?: boolean;
   id?: string;
 }) {
+  const generatedId = useId();
   return (
-    <select
-      id={id}
-      aria-label={label}
-      value={value}
-      disabled={disabled}
-      onChange={(e) => onChange(e.target.value)}
-      className={FIELD}
-    >
-      {!value && <option value="">{placeholder}</option>}
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <div className="[&>div>label]:sr-only">
+      <KitSelect id={id ?? generatedId} label={label} value={value} disabled={disabled}
+        onValueChange={onChange} placeholder={placeholder} options={options} />
+    </div>
   );
 }
 
-/** A date field with the browser's calendar; the value is ISO `YYYY-MM-DD`. */
+/** Existing ISO API, backed by the shared calendar and its keyboard/focus contract. */
 export function CDate({
   label,
   value,
@@ -241,16 +233,11 @@ export function CDate({
   min?: string;
   id?: string;
 }) {
+  const generatedId = useId();
   return (
-    <input
-      id={id}
-      type="date"
-      aria-label={label}
-      value={value ?? ""}
-      min={min}
-      onChange={(e) => onChange(e.target.value || null)}
-      className={FIELD}
-    />
+    <div className="[&>div>label]:sr-only">
+      <KitDatePicker id={id ?? generatedId} label={label} value={value} minDate={min} onChange={onChange} />
+    </div>
   );
 }
 
