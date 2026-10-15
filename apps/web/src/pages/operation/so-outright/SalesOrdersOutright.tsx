@@ -751,6 +751,7 @@ export default function SalesOrdersOutright() {
             emptyMessage={emptyMessage}
             noMatchMessage={clearableEmpty ? emptyMessage : undefined}
             onClearConditions={clearFilters}
+            clearConditionsInToolbar={selected.size === 0 && compact >= 3 && chips.length > 1}
             statusSummary={() => (
               <CListFooter
                 testId="outright-footer"
