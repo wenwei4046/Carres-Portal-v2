@@ -10,6 +10,7 @@
  */
 import { addWorkingDays, internalTaskOccurrenceId, internalTaskResultReference, myHolidaySet, projectInternalTaskWork, type InternalTask, type OperationWorkCompleted, type OperationWorkItem, type OperationWorkModule, type OperationWorkResponse } from "@carres/shared";
 import { appTodayIso } from "@/lib/fmt-date";
+import type { PoTemplateData } from "@/lib/pdf/types";
 
 const holidays = myHolidaySet();
 function workingDay(from: string, n: number): string {
@@ -187,6 +188,7 @@ export function testTaskSuppliers() {
 export function testTaskPo(poId: string) {
   const today = appTodayIso();
   const seed = SEEDS.find((candidate) => candidate.label === poId);
+  if (!seed || seed.module !== "purchasing") return { pos: [], destinations: [], referencedDestinations: [] };
   const supplier = seed?.recipient === "TEST Supplier B" ? TEST_SUPPLIERS[1]! : TEST_SUPPLIERS[0]!;
   const sentOn = workingDay(today, -6);
   return {
@@ -211,5 +213,27 @@ export function testTaskPo(poId: string) {
     }],
     destinations: [{ id: "w1", name: "Carres Klang" }],
     referencedDestinations: [],
+  };
+}
+
+/** Owning PO document read: reuse the same known TEST version and goods facts. */
+export function testTaskPoDocument(poId: string): PoTemplateData | null {
+  const source = testTaskPo(poId);
+  const po = source.pos[0];
+  if (!po) return null;
+  const supplier = TEST_SUPPLIERS.find((candidate) => candidate.id === po.supplier_id)!;
+  return {
+    po_id: po.id, po_number: po.id, version: po.version,
+    issue_date: po.sends[0]!.sent_at.slice(0, 10),
+    supplier: { name: supplier.name, address: null, contact: null },
+    destination: { name: source.destinations[0]!.name, address: "TEST destination" },
+    delivery_instructions: null, eta_date: po.eta_date,
+    so_refs: po.sources.map((item) => Number(item.reference.slice(3))),
+    issued_by: "TEST · Staff A",
+    lines: po.purchase_order_lines.map((line) => ({
+      sku: line.sku, description: `${line.model_name} ${line.size}`,
+      qty: line.qty, unit: "pc", identity_mode: "quantity", unit_codes: null,
+    })),
+    terms: "TEST document only",
   };
 }

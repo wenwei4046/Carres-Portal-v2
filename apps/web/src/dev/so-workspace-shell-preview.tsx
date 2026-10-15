@@ -19,7 +19,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import OperationApp from "@/pages/operation/OperationApp";
-import { testInternalTask, testTaskPo, testTaskSuppliers, testTasksFeed } from "./tasks-feed-fixture";
+import { testInternalTask, testTaskPoDocument, testTaskPo, testTaskSuppliers, testTasksFeed } from "./tasks-feed-fixture";
 import "@/index.css";
 
 const STATE = new URLSearchParams(window.location.search).get("state") ?? "full";
@@ -118,9 +118,17 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const task = testInternalTask(internalId, PERSON);
     return json(task ?? {}, task ? 200 : 404);
   }
+  const poDocumentId = /^\/api\/operation\/pos\/([^/]+)\/print-data$/.exec(path)?.[1];
+  if (poDocumentId) {
+    const document = testTaskPoDocument(decodeURIComponent(poDocumentId));
+    return json(document ?? { error: "TEST fixture: this Purchase Order is not seeded" }, document ? 200 : 404);
+  }
   if (path === "/api/operation/pos") {
     const po = new URL(url, window.location.href).searchParams.get("poId");
-    if (po) return json(testTaskPo(po));
+    if (po) {
+      const result = testTaskPo(po);
+      return json(result.pos.length ? result : { error: "TEST fixture: this Purchase Order is not seeded" }, result.pos.length ? 200 : 404);
+    }
   }
   if (path === "/api/operation/suppliers") return json(testTaskSuppliers());
   /* Current Order Route reads the owning sources separately. Empty arrays here
