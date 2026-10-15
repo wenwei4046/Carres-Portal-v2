@@ -120,10 +120,10 @@ export function factOf(v: string | null | undefined, absent = NOT_RECORDED): { v
 /* ── Buttons ────────────────────────────────────────────────────────────── */
 type BtnKind = "main" | "header" | "normal" | "quiet";
 const BTN: Record<BtnKind, string> = {
-  main: "h-[34px] px-3.5 font-semibold bg-c-ink text-white hover:opacity-90",
-  header: "h-[34px] px-3.5 font-medium bg-c-card text-c-ink border border-c-btn-border hover:bg-c-hover",
-  normal: "h-8 px-3 font-medium bg-c-card text-c-ink border border-c-btn-border hover:bg-c-hover",
-  quiet: "h-8 px-2.5 font-medium bg-transparent text-c-secondary hover:bg-c-hover",
+  main: "h-[34px] px-3.5 font-semibold bg-c-main text-white enabled:hover:opacity-90",
+  header: "h-[34px] px-3.5 font-medium bg-c-card text-c-ink border border-c-btn-border enabled:hover:bg-c-btn-hover",
+  normal: "h-8 px-3 font-medium bg-c-card text-c-ink border border-c-btn-border enabled:hover:bg-c-btn-hover",
+  quiet: "h-8 px-2.5 font-medium bg-transparent text-c-secondary enabled:hover:bg-c-btn-hover",
 };
 
 export function CBtn({
@@ -142,7 +142,7 @@ export function CBtn({
     <button
       type="button"
       {...rest}
-      className={`inline-flex shrink-0 items-center justify-center gap-1.5 focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] whitespace-nowrap rounded-lg text-[13px] leading-none disabled:cursor-not-allowed disabled:opacity-50 ${BTN[kind]} ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center gap-1.5 focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] whitespace-nowrap rounded-lg text-[13px] leading-none disabled:cursor-not-allowed disabled:opacity-[.45] ${BTN[kind]} ${className}`}
     >
       {icon && <MIcon name={icon} size={18} />}
       {children}
@@ -169,7 +169,7 @@ export function CIconBtn({
       aria-label={label}
       title={label}
       {...rest}
-      className={`grid shrink-0 place-items-center rounded-full text-c-body hover:bg-c-hover focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] ${size === 34 ? "h-[34px] w-[34px]" : "h-9 w-9"} ${className}`}
+      className={`grid shrink-0 place-items-center rounded-full text-c-body enabled:hover:bg-[var(--c-icon-hover)] enabled:active:bg-[var(--c-icon-press)] focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] ${size === 34 ? "h-[34px] w-[34px]" : "h-9 w-9"} ${className}`}
     >
       <MIcon name={icon} size={20} />
     </button>
@@ -420,7 +420,7 @@ export function PopMenu({
                   onClose();
                   it.onSelect();
                 }}
-                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-left text-[13px] text-c-ink hover:bg-c-hover focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-left text-[13px] text-c-ink enabled:hover:bg-c-hover focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] disabled:cursor-not-allowed disabled:opacity-[.45]"
               >
                 <MIcon name={it.icon} size={18} className="text-c-secondary" />
                 <span className="flex-1">{it.label}</span>
@@ -458,7 +458,7 @@ export function PillTabs<K extends string>({
             aria-selected={on}
             onClick={() => onChange(t.key)}
             data-testid={`so-tab-${t.key}`}
-            className={`${SEGMENT} focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] ${on ? SEGMENT_ON : SEGMENT_OFF}`}
+            className={`${SEGMENT} focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] ${on ? SEGMENT_ON : SEGMENT_OFF}`}
           >
             {t.label}
           </button>
@@ -492,7 +492,7 @@ export function ViewSwitch<K extends string>({
             aria-selected={on}
             onClick={() => onChange(v.key)}
             data-testid={`route-view-${v.key}`}
-            className={`${SEGMENT} focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px] ${on ? SEGMENT_ON : SEGMENT_OFF}`}
+            className={`${SEGMENT} focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] ${on ? SEGMENT_ON : SEGMENT_OFF}`}
           >
             {v.label}
           </button>
