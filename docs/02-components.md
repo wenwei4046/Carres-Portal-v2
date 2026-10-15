@@ -39,6 +39,18 @@
 | Glyphs | `carres/MIcon`, semantic `kit/Icon` adapter | One approved glyph family; preserve semantic names, accessible labels and consumer APIs |
 | Live catalogue | `pages/dev/UiShowcase.tsx` at `/ui` | Imports actual runtime components with TEST examples; it is not a separate implementation |
 
+### Source-checked control contracts
+
+These describe the measured implementation, not new approved values. The acceptance gaps remain in the existing handoff matrix.
+
+| Entry | Preserved caller API and behaviour | Measured adoption boundary |
+|---|---|---|
+| `kit/Button` | `variant=primary/neutral/ghost`, `size=md/sm/touch`, `iconOnly`, `shape`, semantic `icon`, `loading`; forwards its ref and native button props. Busy disables input. No caller `className`/`style` skin. | Desktop md32/sm28/touch36; below768 all44. Icon-only32 desktop/44 narrow, actual glyph20; word glyph18. Main600, disabled45%; neutral hover #EDEFF2; icon hover .10/pressed or open .16. md consumer roles still require migration review against default34/panel30 law. |
+| `carres/CPopover` | Controlled/uncontrolled open; trigger, label, align, explicit width, menu/panel roles. CMenu consumes command data and returns focus; disabled commands do not invoke actions. CMenuItem retains checked/strong/note adapters. | Default menu250 with available-viewport cap; explicit picker widths retained. Item32 desktop/44 narrow, ordinary13/400, selected/strong500, disabled45%. |
+| `tasks/TaskFiles` | Owning module supplies lazy `TaskFile.load`; View and Download use that reader. Viewer retry calls the same reader, retains failure on a second rejection, and ignores stale responses after close/file change. | `work-preview` seeds only its exact order's existing Sales Order data reader. `file=failed`/`file=retry` exercise source failure. Fixture rendering is not production permission or document acceptance. |
+
+Direct absolute-import inventory (15 Oct source scan, excludes test/spec, `src/dev` and `pages/dev`, does not count relative imports or re-exports): Button131 files; CPopover17; Icon29; DataGrid54; ItemRows4; TaskView2; StatusPill19; CPill3. These are source consumers, not accepted pages. ItemRows callers are Outright, SO Batch by order/by supplier and Forecast; TaskView callers are TaskFrame and its task-view adapter. Preserve their different capabilities before retirement.
+
 **Retirement state:** CTable, DropdownMenu, kit Popover, unused Card, GridToolbar,
 ChecklistRow and QuietRouteRow are already retired in the mainline source. Do not recreate them.
 Btn, Field and PageHeader are legacy contracts blocked from new adoption; remaining consumers

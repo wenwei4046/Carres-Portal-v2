@@ -150,9 +150,9 @@ export function CMenuItem({
       disabled={disabled}
       onClick={disabled ? undefined : onSelect}
       data-testid={testId}
-      className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-left text-[13px] text-c-ink ${
-        disabled ? "cursor-default opacity-45" : "hover:bg-c-search-bg"
-      } ${strong ? "font-semibold" : "font-medium"}`}
+      className={`flex w-full items-center gap-2.5 min-h-11 min-[768px]:min-h-8 rounded-lg px-2.5 py-[7px] text-left text-[13px] leading-[18px] text-c-ink ${
+        disabled ? "cursor-default opacity-[0.45]" : "hover:bg-c-search-bg"
+      } ${checked || strong ? "font-medium" : "font-normal"}`}
     >
       {icon && <MIcon name={icon} size={18} className="text-c-secondary" />}
       <span className="min-w-0 flex-1">{children}</span>

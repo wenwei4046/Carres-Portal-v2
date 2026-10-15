@@ -24,6 +24,7 @@ import { appTodayIso } from "@/lib/fmt-date";
 import WorkspaceTasks from "@/pages/operation/tasks/WorkspaceTasks";
 import PreviewFrame from "./preview-frame";
 import "@/index.css";
+import type { SalesOrderTemplateData } from "@/lib/pdf/types";
 
 const ME = "00000000-0000-4000-8000-0000000000aa";
 /* The machine's own today, in Malaysia; `wd(n)` is n Office working days
@@ -413,8 +414,33 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 const realFetch = globalThis.fetch.bind(globalThis);
+let fileReadAttempts = 0;
 globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  /* Task Files uses the owning document reader, with the SAME TEST order facts
+     as the Route. Unknown orders keep the unseeded404 below. `file=retry`
+     fails the first read only, so retry can be walked without a business write. */
+  if (new URL(url, window.location.href).pathname === `/api/orders/${ORDER}/sales-order-data`) {
+    const state = new URLSearchParams(window.location.search).get("file");
+    if (state === "failed" || (state === "retry" && fileReadAttempts++ === 0)) return json({ message: "TEST document read failed" }, 503);
+    const order = ORDERS.orders[0]!;
+    const total = order.order_lines.reduce((sum, line) => sum + line.qty * line.unit_price, 0);
+    const document: SalesOrderTemplateData = {
+      order_id: order.id, order_code: `SO-${order.so}`, so_number: `SO-${order.so}`, issue_date: order.placed_at,
+      status_label: "Open", channel: "dealer", currency: "MYR", signed: false,
+      customer: { name: order.customer_name, address: order.customer_address, phone: order.customer_phone, email: order.customer_email },
+      dealer: { name: order.dealers.name, address: null, contact: null, outlet_name: null, outlet_address: null, salesperson_name: null, salesperson_phone: null },
+      delivery: { date: order.delivery_date, floor: order.delivery_floor, has_lift: order.delivery_has_lift },
+      lines: order.order_lines.map((line) => {
+        const sku = CATALOG.skus.find((candidate) => candidate.sku === line.sku);
+        const model = CATALOG.models.find((candidate) => candidate.id === sku?.modelId);
+        return { ...line, description: [model?.name, sku?.variant].filter(Boolean).join(" · ") || line.sku,
+          line_total: line.qty * line.unit_price, attrs: null, category: model?.category };
+      }),
+      addons: [], subtotal: total, total, paid: order.paid, balance_due: total - order.paid,
+    };
+    return json(document);
+  }
   if (/\/api\/operation\/work(\?|$)/.test(url)) {
     return new Response(JSON.stringify(FEED), { status: 200, headers: { "Content-Type": "application/json" } });
   }

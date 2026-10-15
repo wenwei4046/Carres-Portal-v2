@@ -320,7 +320,7 @@ function SharedParts() {
         <p className="text-meta text-c-secondary">Check complete pages at 1025, 1164 and 1440 wide, with applicable narrow and zoom states. The standalone Route shows existing implementation, not an approved replacement for the current Route composition. Acceptance is recorded in the existing delivery handoff.</p>
       </Section>
 
-      <Section id="buttons" title="Buttons" note="Main, normal and quiet; 32 high on a desktop, 40 where a finger presses. One main button per area. Destructive commands use a clear action name.">
+      <Section id="buttons" title="Buttons" note="Main, normal and quiet; 32 high in the desktop toolbar role, at least 44 on a narrow screen. One main button per area. Destructive commands use a clear action name.">
         <Panel2>
           <Sample label="main · normal · quiet">
             <Button variant="primary">Issue PO</Button>
@@ -364,7 +364,7 @@ function SharedParts() {
               items={[
                 { key: "print", label: "Print", icon: "print", onSelect: () => setSampleAction("TEST · Print selected") },
                 { key: "copy", label: "Copy reference", icon: "copy", onSelect: () => setSampleAction("TEST · Copy reference selected") },
-                { key: "cancel", label: "Cancel order", separatorBefore: true, onSelect: () => setSampleAction("TEST · Cancel selected; no record changed") },
+                { key: "cancel", label: "Cancel order", separatorBefore: true, disabled: true, onSelect: () => setSampleAction("TEST · Cancel selected; no record changed") },
               ]}
             />
             <CPopover label="Filters" trigger={<Button icon="filter">Filter</Button>}>

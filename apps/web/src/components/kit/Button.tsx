@@ -1,25 +1,6 @@
-/**
- * Button — UI-KIT §6 Box Dictionary, card D0.5a.
- *
- * THREE variants, and the ladder is a colour law, not a taste:
- *   primary  — charcoal filled (owner-confirmed template 2026-10-08). One
- *              per area, so a block gets exactly one of these.
- *   neutral  — white surface + the grey input edge. Every other action.
- *   ghost    — no box at all. Tertiary (cancel, + add …).
- *
- * There is NO danger variant. §3.3 gives red one job — "late · act now" — and
- * §3.4 bans colour as decoration; a red button paints intent onto a control
- * instead of onto the state that earned it. A destructive action is a neutral
- * button whose WORD says what it does (COPY-STANDARD owns the word).
- *
- * **No `className`, no `style`, and that is the enforcement.** UI-KIT §0.1 says
- * a chat may not invent component styles; the way to make that true is to give
- * it nowhere to put one. Layout around the button is the caller's wrapper.
- *
- * HOVER follows §3.5 exactly: a colour-filled surface keeps its own colour and
- * darkens (`brightness-95`); an uncoloured one takes the single faint blue tint
- * — never grey, which is the RULE I ratchet in `check-design-standard.mjs`.
- */
+/** Shared Button. Appearance follows current 01 §3; callers retain action,
+ * permission, busy state and accessible names. Icon-only controls use the same
+ * semantic Icon adapter and forward their ref for menu/dialog focus return. */
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import Icon, { type IconName } from "./Icon";
 import Loading from "./Loading";
@@ -30,25 +11,25 @@ type Size = "md" | "sm" | "touch";
 /* The main button is the `--c-main` token (01 §1, owner 11 Oct 2026): one per
  * area, white text. A normal button is white with the grey input edge. */
 const VARIANT: Record<Variant, string> = {
-  primary: "bg-c-main text-white border border-c-main hover:brightness-125",
-  neutral: "bg-white text-c-ink border border-c-input-border hover:bg-c-info-bg",
-  ghost: "bg-transparent text-kit-slate-11 border border-transparent hover:bg-kit-slate-3",
+  primary: "bg-c-main text-white border border-c-main enabled:hover:brightness-125",
+  neutral: "bg-white text-c-ink border border-c-btn-border enabled:hover:bg-c-btn-hover",
+  ghost: "bg-transparent text-kit-slate-11 border border-transparent enabled:hover:bg-c-btn-hover",
 };
 
 /** Keep the existing md32 toolbar contract during consumer migration; the
  *  small role is28 per current01 §3.
  *  `touch` is the Work party-card button (owner density ruling 2026-09-25):
- *  36px from 768px, 40px below, where a finger presses it. */
+ *  36px from 768px, 44px below, where a finger presses it. */
 const SIZE: Record<Size, string> = {
-  md: "h-10 px-3 gap-2 min-[768px]:h-8",
-  sm: "h-7 px-2 gap-1",
-  touch: "h-10 px-3 gap-1.5 min-[768px]:h-9",
+  md: "h-11 px-3 gap-2 min-[768px]:h-8",
+  sm: "h-11 px-2 gap-1 min-[768px]:h-7",
+  touch: "h-11 px-3 gap-1.5 min-[768px]:h-9",
 };
 
-const ICON_SIZE: Record<Size, 14 | 16> = { md: 16, sm: 14, touch: 14 };
+/* Icon legacy prop16 renders18; prop18 renders20. Preserve the adapter API. */
 
 export type ButtonProps = {
-  /** Page-tools trigger: 32px desktop, 40px touch, with an accessible name. */
+  /** Page-tools trigger: 32px desktop, 44px touch, with an accessible name. */
   iconOnly?: boolean;
   variant?: Variant;
   size?: Size;
@@ -96,19 +77,19 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
       aria-busy={loading || undefined}
       data-kit="button"
       className={
-        `inline-flex items-center justify-center whitespace-nowrap ${shape === "pill" ? "rounded-full" : "rounded-lg"} text-body ${variant === "primary" ? "font-semibold" : "font-medium"} ` +
+        `inline-flex items-center justify-center whitespace-nowrap ${iconOnly || shape === "pill" ? "rounded-full" : "rounded-lg"} text-body ${variant === "primary" ? "font-semibold" : "font-medium"} ` +
         "transition-[filter,background-color] " +
         "focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:2px] " +
-        "disabled:opacity-[0.45] disabled:cursor-not-allowed disabled:hover:brightness-100 " +
-        `${VARIANT[variant]} ${iconOnly ? "h-10 w-10 p-0 min-[768px]:h-8 min-[768px]:w-8" : SIZE[size]}`
+        "disabled:opacity-[0.45] disabled:cursor-not-allowed " +
+        `${iconOnly ? "border-0 bg-transparent text-c-body enabled:hover:bg-[var(--c-icon-hover)] enabled:active:bg-[var(--c-icon-press)] data-[state=open]:bg-[var(--c-icon-press)] data-[state=open]:enabled:hover:bg-[var(--c-icon-press)] h-11 w-11 p-0 min-[768px]:h-8 min-[768px]:w-8" : `${VARIANT[variant]} ${SIZE[size]}`}`
       }
       {...rest}
       title={rest.title ?? (iconOnly ? rest["aria-label"] : undefined)}
     >
       {loading ? (
-        <Loading size={ICON_SIZE[size]} />
+        <Loading size={16} />
       ) : (
-        icon && <Icon name={icon} size={ICON_SIZE[size]} />
+        icon && <Icon name={icon} size={iconOnly ? 18 : 16} />
       )}
       {children}
     </button>
