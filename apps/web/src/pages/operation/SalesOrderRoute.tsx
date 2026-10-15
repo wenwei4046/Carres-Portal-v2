@@ -383,7 +383,7 @@ function OwnerChip({ person }: { person: RoutePerson }) {
   const label = personLabel(person.name, person.email);
   return (
     <span
-      className="inline-grid h-5 w-5 shrink-0 place-items-center rounded-full text-label font-semibold"
+      className="inline-grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-bold leading-none"
       style={{ background: colors.bg, color: colors.fg }}
       title={label}
       aria-hidden="true"
