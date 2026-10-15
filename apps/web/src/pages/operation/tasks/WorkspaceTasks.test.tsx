@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import type { OperationWorkCompleted } from "@carres/shared";
@@ -24,8 +25,10 @@ vi.mock("./use-po-window-facts", () => ({ usePoWindowFacts: () => new Map() }));
 /* The module's own panel is its own test; here it only proves WHICH task the
    page opens and that it is handed the shared desk's host. */
 vi.mock("./work-panels", () => ({
-  panelFor: (item: WorkRow, host: { result: (text: string) => void }) => (
-    <div data-testid="panel">panel {item.id}<button type="button" onClick={() => host.result("Saved by the module")}>save</button></div>
+  panelFor: (item: WorkRow, host: { result: (text: string) => void; openReview: (render: (close: () => void) => ReactNode) => void }) => (
+    <div data-testid="panel">panel {item.id}<button type="button" onClick={() => host.result("Saved by the module")}>save</button>
+      <button type="button" onClick={() => host.openReview((close) => <><input aria-label="TEST review draft" /><button onClick={close}>Cancel review</button></>)}>Review task</button>
+    </div>
   ),
 }));
 vi.mock("../work/WorkCommunication", () => ({ default: ({ orderId, supplierName, party }: { orderId: string | null; supplierName: string | null; party: string }) =>
@@ -137,6 +140,27 @@ describe("Workspace: the table", () => {
 });
 
 describe("Workspace: one task beside its list", () => {
+  it("the shared desk isolates a full-surface review and returns through the owning form without closing its task", async () => {
+    const view = mount("/operation?tab=work&task=call");
+    const opener = screen.getByRole("button", {name:"Review task"});
+    opener.focus(); fireEvent.click(opener);
+    const dialog = await screen.findByRole("dialog", {name:"Call TEST customer D · SO-9106"});
+    const draft = screen.getByRole("textbox", {name:"TEST review draft"});
+    await waitFor(()=>expect(draft).toHaveFocus());
+    fireEvent.change(draft, {target:{value:"TEST unsaved"}});
+    fireEvent.keyDown(draft, {key:"Escape"});
+    expect(dialog).toBeVisible(); expect(draft).toHaveValue("TEST unsaved");
+    fireEvent.click(screen.getByRole("button", {name:"Cancel review"}));
+    await waitFor(()=>expect(opener).toHaveFocus());
+    expect(screen.getByTestId("panel")).toHaveTextContent("panel call");
+    expect(screen.getByTestId("where")).toHaveTextContent("task=call");
+    expect(notify).not.toHaveBeenCalled();
+    fireEvent.click(opener);
+    expect(await screen.findByRole("dialog")).toBeVisible();
+    view.unmount();
+    await waitFor(()=>expect(document.body).not.toHaveAttribute("data-scroll-locked"));
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
   it("a row opens the task through the shared desk, puts it in the address, and ✕ returns to the table", () => {
     mount();
     fireEvent.click(screen.getByTestId("workspace-row-now"));

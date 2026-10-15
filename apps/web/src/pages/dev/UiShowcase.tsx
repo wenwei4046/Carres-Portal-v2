@@ -41,6 +41,7 @@ import Tabs from "@/components/kit/Tabs";
 import TaskView from "@/components/kit/TaskView";
 import Textarea from "@/components/kit/Textarea";
 import Tooltip from "@/components/kit/Tooltip";
+import { TaskWideSurface } from "@/pages/operation/tasks/TaskFrame";
 
 function Section({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
   return (
@@ -296,6 +297,7 @@ function SharedParts() {
   const [sampleAction, setSampleAction] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   return (
     <>
       <header className="flex flex-col gap-1 border-t border-c-section-line pt-8">
@@ -385,11 +387,12 @@ function SharedParts() {
         </Panel2>
       </Section>
 
-      <Section id="dialogs" title="Dialogs and drawers" note="Use a dialog for a focused form and a drawer for supporting context. These examples do not define a module’s record-opening behaviour. Escape returns focus to the trigger.">
+      <Section id="dialogs" title="Dialogs and drawers" note="Use a dialog for a focused form and a drawer for supporting context. Ordinary dialogs close on Escape. A task-wide review keeps its owning Save and Cancel as the only exits. Closing returns focus to the trigger.">
         <Panel2>
           <Sample label="open them">
             <Button variant="primary" onClick={() => setModalOpen(true)}>Open a modal</Button>
             <Button onClick={() => setDrawerOpen(true)}>Open a drawer</Button>
+            <Button onClick={() => setReviewOpen(true)}>Open task review</Button>
           </Sample>
         </Panel2>
         <Modal
@@ -405,6 +408,14 @@ function SharedParts() {
             <p className="text-body text-c-secondary">TEST · Supporting document context</p>
           </div>
         </Drawer>
+        <Modal open={reviewOpen} onOpenChange={setReviewOpen} title="TEST · Task review" variant="task-review">
+          <TaskWideSurface title="TEST · Task review" about="SO-TEST-01">
+            <div className="flex flex-col gap-4">
+              <Input id="ui-k-review-note" label="Note (optional)" />
+              <div className="flex gap-2"><Button variant="primary" onClick={() => setReviewOpen(false)}>Save</Button><Button onClick={() => setReviewOpen(false)}>Cancel</Button></div>
+            </div>
+          </TaskWideSurface>
+        </Modal>
       </Section>
 
       <Section id="states" title="Feedback states" note="Empty, failed and no access are three different sentences, never one.">
