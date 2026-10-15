@@ -59,7 +59,9 @@ export type CTableColumn = {
 const TICK = 24;
 const GAP = 10;
 /* Row insets: a 6px margin and 14px padding on each side (v12 table rows). */
-const INSET = 6 + 14;
+const MARGIN = 6;
+const PAD = 14;
+const INSET = MARGIN + PAD;
 
 /** The px floor of a track: `120px` → 120, `minmax(150px,1fr)` → 150. */
 export const trackFloor = (width: string) => Number(/(\d+)px/.exec(width)?.[1]) || 0;
@@ -147,11 +149,19 @@ export type CTableExpand<R> = {
 };
 
 /* A frozen cell repeats its row's own background, and its shadow covers the
-   gap beside it, so the scrolled columns pass underneath without showing. */
+   gap beside it, so the scrolled columns pass underneath without showing.
+   The first frozen cell covers the row's own 14 of padding in the row's colour;
+   the 6 of margin outside the row is covered (in the list's white, or the
+   header's band) only once the list has scrolled sideways, so at rest it never
+   paints past the row: no grey sliver beside a hovered row, and an opened row's
+   frame keeps its left line (owner 15 Oct 2026, "table line got problem"). */
 const FROZEN = "sticky z-[1] bg-[var(--row-bg)]";
+const OUTER_COVER = `calc(-${INSET}px * var(--ct-scrolled, 0)) 0 0 var(--ct-gutter-bg, var(--c-card))`;
 const frozen = (left: number, coverLeft: boolean): CSSProperties => ({
   left,
-  boxShadow: coverLeft ? `-${INSET}px 0 0 var(--row-bg), ${GAP}px 0 0 var(--row-bg)` : `${GAP}px 0 0 var(--row-bg)`,
+  boxShadow: coverLeft
+    ? `-${PAD}px 0 0 var(--row-bg), ${OUTER_COVER}, ${GAP}px 0 0 var(--row-bg)`
+    : `${GAP}px 0 0 var(--row-bg)`,
 });
 
 export default function CTable<R>({
@@ -240,12 +250,17 @@ export default function CTable<R>({
     >
       {/* The list's own scroll box takes keyboard focus, so arrow keys reach every
           column, including Qty and Supplier in an opened row (WCAG 2.1.1). */}
-      <div className="min-h-0 min-w-0 overflow-auto [scrollbar-width:thin] focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px]" data-list-scroll tabIndex={0}>
+      <div
+        className="min-h-0 min-w-0 overflow-auto [scrollbar-width:thin] focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px]"
+        data-list-scroll
+        tabIndex={0}
+        onScroll={(e) => e.currentTarget.style.setProperty("--ct-scrolled", e.currentTarget.scrollLeft > 0 ? "1" : "0")}
+      >
         {failure ?? (
           <div ref={tableRef} role="table" aria-label={label} style={{ minWidth: tableMinWidth(widened, ticks, arrows) }}>
             <div
               role="row"
-              className="sticky top-0 z-10 grid h-10 items-center gap-2.5 border-b border-c-head-line bg-[var(--row-bg)] px-5 text-[12px] font-medium text-c-muted [--row-bg:var(--c-band)]"
+              className="sticky top-0 z-10 grid h-10 items-center gap-2.5 border-b border-c-head-line bg-[var(--row-bg)] px-5 text-[12px] font-medium text-c-muted [--ct-gutter-bg:var(--c-band)] [--row-bg:var(--c-band)]"
               style={{ gridTemplateColumns: gcols }}
             >
               {arrows && <span className={`${FROZEN} z-[2] self-stretch`} style={frozen(INSET, true)} role="columnheader" />}
@@ -284,7 +299,7 @@ export default function CTable<R>({
                   data-testid={rowTestId?.(r)}
                   aria-expanded={expand ? opened : undefined}
                   className={`grid min-h-[54px] items-center gap-2.5 bg-[var(--row-bg)] px-3.5 py-1.5 text-[13px] -outline-offset-2 hover:[outline:var(--c-focus)] ${
-                    opened ? "rounded-t-[7px]" : "mx-1.5 rounded-[10px] border-b border-c-row-line"
+                    opened ? "rounded-t-[7px]" : "mx-1.5 border-b border-c-row-line"
                   } ${onRowClick ? "cursor-pointer" : ""} ${on ? "[--row-bg:var(--c-select-bg)]" : "[--row-bg:var(--c-card)] hover:[--row-bg:var(--c-search-bg)]"}`}
                   style={{ gridTemplateColumns: gcols }}
                 >
@@ -374,7 +389,7 @@ export function CTableItems({
       key={i}
       aria-hidden="true"
       className="sticky z-[1] self-stretch bg-[var(--row-bg)]"
-      style={{ left, boxShadow: i === 0 ? `-${INSET}px 0 0 var(--row-bg), ${GAP}px 0 0 var(--row-bg)` : `${GAP}px 0 0 var(--row-bg)` }}
+      style={{ left, boxShadow: i === 0 ? `-${PAD}px 0 0 var(--row-bg), ${OUTER_COVER}, ${GAP}px 0 0 var(--row-bg)` : `${GAP}px 0 0 var(--row-bg)` }}
     />
   ));
   const item = { gridColumn: `${grid.lead + 1} / span 3` };
