@@ -411,7 +411,7 @@ export default function PortalSidebar({ drawer = false }: {
           >
             <span className="flex min-w-0 flex-1 flex-col gap-px">
               <span className="break-words [text-wrap:pretty]">{child.label}</span>
-              <span className="text-[11px] leading-[14px] text-c-secondary">Coming soon</span>
+              <span className="text-[11px] font-medium leading-[14px] text-c-secondary">Coming soon</span>
             </span>
           </span>
         ) : (
@@ -486,7 +486,7 @@ export default function PortalSidebar({ drawer = false }: {
         <span className={WRAP}>{item.label}</span>
         {item.badge && <NavBadge count={badgeCount[item.badge] ?? 0} label={item.label} />}
         {item.pendingPill && pendingCount > 0 && (
-          <span className="min-w-[16px] rounded-full bg-c-ink px-[7px] py-px text-center text-[11px] font-semibold tabular-nums text-white">
+          <span className="min-w-[16px] rounded-full bg-c-ink px-[7px] py-px text-center text-[11px] font-bold tabular-nums text-white">
             {pendingCount}
           </span>
         )}
@@ -691,7 +691,7 @@ export default function PortalSidebar({ drawer = false }: {
           aria-label={`${displayName} · Profile · Sign out`}
           className={`flex items-center gap-2.5 rounded-lg px-1.5 py-2 hover:bg-c-hover ${collapsed ? "justify-center" : ""}`}
         >
-          <span className="relative grid h-8 w-8 shrink-0 place-items-center rounded-full bg-c-info-bg text-[12px] font-semibold text-c-ink">
+          <span className="relative grid h-8 w-8 shrink-0 place-items-center rounded-full bg-c-info-bg text-[11px] font-bold text-c-ink">
             {initials}
             <span className="absolute -bottom-px -right-px h-2.5 w-2.5 rounded-full border-2 border-white bg-c-online" aria-hidden />
           </span>

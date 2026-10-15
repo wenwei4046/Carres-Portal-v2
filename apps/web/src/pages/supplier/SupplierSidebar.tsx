@@ -54,12 +54,12 @@ export default function SupplierSidebar() {
         title="Profile · Sign out"
         className="px-[18px] pt-3 pb-1 border-t border-border flex items-center gap-2.5 hover:bg-accent/40 transition-colors"
       >
-        <div className="w-[30px] h-[30px] rounded bg-primary text-primary-foreground grid place-items-center text-label font-semibold flex-shrink-0">
+        <div className="w-[30px] h-[30px] rounded bg-primary text-primary-foreground grid place-items-center text-label font-bold flex-shrink-0">
           {initials || "SP"}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-meta font-semibold truncate">{email || "Supplier"}</div>
-          <div className="text-label uppercase tracking-[0.1em] text-muted-foreground mt-px">
+          <div className="text-body font-medium truncate">{email || "Supplier"}</div>
+          <div className="text-label uppercase tracking-[0.06em] text-muted-foreground mt-px">
             Supplier · Production
           </div>
         </div>
@@ -79,10 +79,10 @@ function NavItem({
     <NavLink
       to={item.to}
       className={({ isActive }) =>
-        `relative flex items-center gap-2.5 px-3 py-2 rounded-md text-meta font-semibold ${
+        `relative flex items-center gap-2.5 px-3 py-2 rounded-md text-body ${
           isActive
-            ? "text-foreground bg-secondary"
-            : "text-muted-foreground hover:bg-accent/50"
+            ? "font-semibold text-foreground bg-secondary"
+            : "font-medium text-muted-foreground hover:bg-accent/50"
         }`
       }
     >
@@ -96,7 +96,7 @@ function NavItem({
           </span>
           <span className="flex-1">{item.label}</span>
           {badge > 0 && (
-            <span className="font-mono text-label font-semibold px-1.5 py-px rounded-full bg-primary text-primary-foreground">
+            <span className="font-mono text-label font-bold px-1.5 py-px rounded-full bg-primary text-primary-foreground">
               {badge}
             </span>
           )}

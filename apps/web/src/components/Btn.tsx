@@ -29,17 +29,17 @@ type Size = "md" | "sm";
  * radius, a CLEAR 1.5px ink-22% border and INK text — never pale. Flame
  * pill = the hero; white pill = everything else. */
 const VARIANT: Record<Variant, string> = {
-  hero: "bg-primary text-white border-[1.5px] border-primary hover:bg-signature-700",
+  hero: "bg-primary text-white font-semibold border-[1.5px] border-primary hover:bg-signature-700",
   // Jess 2026-07-17: secondary = GREY BASE (borderless, "3rd column"), not a
   // white outline box — outline boxes read as inputs in dense tables.
-  box: "bg-base-100 text-base-900 border-[1.5px] border-transparent hover:bg-base-200",
+  box: "bg-base-100 text-base-900 font-medium border-[1.5px] border-transparent hover:bg-base-200",
   ghost:
-    "bg-transparent text-base-700 border-[1.5px] border-transparent hover:text-base-900 hover:bg-base-50",
+    "bg-transparent text-base-700 font-medium border-[1.5px] border-transparent hover:text-base-900 hover:bg-base-50",
 };
 
 const SIZE: Record<Size, string> = {
   md: "h-8 px-4 text-body gap-1.5 [&_svg]:w-4 [&_svg]:h-4",
-  sm: "h-6 px-2.5 text-label gap-1 [&_svg]:w-3.5 [&_svg]:h-3.5",
+  sm: "h-6 px-2.5 text-body gap-1 [&_svg]:w-3.5 [&_svg]:h-3.5",
 };
 
 /** iconOnly circles share the md/sm heights; the glyph centres, no label. */
@@ -68,7 +68,7 @@ export default function Btn({
   return (
     <button
       type={type}
-      className={`inline-flex items-center justify-center font-semibold whitespace-nowrap rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${VARIANT[variant]} ${
+      className={`inline-flex items-center justify-center whitespace-nowrap rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${VARIANT[variant]} ${
         iconOnly ? SIZE_CIRCLE[size] : SIZE[size]
       } ${className}`}
       {...rest}

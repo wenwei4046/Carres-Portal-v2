@@ -66,11 +66,11 @@ export default function InviteDealerModal({ onClose }: Props) {
       />
       <div className="relative w-[440px] p-6 bg-white border border-base-200 rounded-md">
         <div className="kicker">Network</div>
-        <div className="font-display text-title mt-1 mb-1.5 font-semibold">
+        <div className="font-display text-strong mt-1 mb-1.5">
           Invite a new dealer
         </div>
         <div className="text-meta text-base-600 mb-[18px]">
-          They&apos;ll appear with status <strong>Pending</strong> until approved.
+          They&apos;ll appear with status <strong className="font-medium">Pending</strong> until approved.
         </div>
         <div className="grid gap-3 mb-[18px]">
           <Field
@@ -123,7 +123,7 @@ function Field({
 }) {
   return (
     <div>
-      <div className="text-label uppercase tracking-wider text-base-500 font-semibold mb-1">
+      <div className="text-label uppercase tracking-[0.06em] text-base-500 mb-1">
         {label}
       </div>
       <input

@@ -77,15 +77,15 @@ export default function PODrawerThreadList({ poId }: { poId: string }) {
                     icon so it pops on the thread row. */}
                 <div className="text-body text-foreground mt-1 flex items-center gap-1.5">
                   <span aria-hidden="true">📅</span>
-                  <span className="text-label uppercase tracking-[0.08em] text-muted-foreground">
+                  <span className="text-label uppercase tracking-[0.06em] text-muted-foreground">
                     Customer ETA
                   </span>
-                  <span className="font-mono font-semibold">
+                  <span className="font-mono font-medium">
                     {t.customer_delivery_date ?? ""}
                   </span>
                 </div>
                 {(t.sku_lines ?? []).length > 0 && (
-                  <div className="text-label text-muted-foreground mt-1">
+                  <div className="text-meta text-muted-foreground mt-1">
                     {(t.sku_lines ?? [])
                       .map((l) => `${l.sku} × ${l.qty}`)
                       .join(" · ")}
@@ -103,20 +103,20 @@ export default function PODrawerThreadList({ poId }: { poId: string }) {
 function StatePill({ picked, ready }: { picked: boolean; ready: boolean }) {
   if (picked) {
     return (
-      <span className="text-label uppercase tracking-[0.06em] font-semibold text-success">
+      <span className="text-label uppercase tracking-[0.06em] text-success">
         🚚 Picked
       </span>
     );
   }
   if (ready) {
     return (
-      <span className="text-label uppercase tracking-[0.06em] font-semibold text-primary">
+      <span className="text-label uppercase tracking-[0.06em] text-primary">
         ✅ Ready
       </span>
     );
   }
   return (
-    <span className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground">
+    <span className="text-label uppercase tracking-[0.06em] text-muted-foreground">
       🛠 Producing
     </span>
   );

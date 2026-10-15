@@ -33,7 +33,7 @@ export function StatTile({
 }) {
   return (
     <div className="flex-1 min-w-[160px] rounded-lg border border-base-200 bg-card px-4 py-3">
-      <div className="text-label uppercase tracking-[0.05em] text-base-500">{label}</div>
+      <div className="text-label uppercase tracking-[0.06em] text-base-500">{label}</div>
       <div
         className={`t-num text-page leading-8 font-semibold ${
           muted ? "text-base-400" : "text-base-900"

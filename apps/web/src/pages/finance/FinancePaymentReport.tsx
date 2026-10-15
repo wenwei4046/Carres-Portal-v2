@@ -97,7 +97,7 @@ export function customerBalanceRows(rows: readonly InvoiceRegisterRow[]): Array<
 function Head({ children, note }: { children: React.ReactNode; note?: string }) {
   return <div className="mb-2">
     <h2 className="text-strong">{children}</h2>
-    {note && <p className="text-label font-normal text-base-500">{note}</p>}
+    {note && <p className="text-meta text-base-500">{note}</p>}
   </div>;
 }
 
@@ -240,16 +240,16 @@ export default function FinancePaymentReport() {
       <SectionCard><div className="p-3" data-testid="report-money-received">
         <Head note="Voided payments are not money received and are excluded here; they stay under Payment corrections.">
           Money received</Head>
-        <p className="text-body font-semibold mb-2">{moneyReceivedLine(received)}</p>
+        <p className="text-body font-medium mb-2">{moneyReceivedLine(received)}</p>
         <div className="space-y-1">
           {received.map((p) => <Row key={p.id} to={`/finance/payments?payment=${p.id}`}>
             <span className="min-w-0">
               <span className="block text-body font-semibold">{p.receipt_no ?? "Receipt number missing"}</span>
-              <span className="block text-label font-normal">
+              <span className="block text-meta">
                 {p.orders ? `SO-${p.orders.so}` : "SO not available"} · {p.orders?.customer_name ?? "Customer not available"} · {fmtDate(p.paid_on)} · {METHODS[p.method ?? ""] ?? p.method ?? "Method not recorded"}
               </span>
             </span>
-            <span className="text-body font-semibold tabular-nums shrink-0">{rm(Number(p.amount))}</span>
+            <span className="text-body tabular-nums shrink-0">{rm(Number(p.amount))}</span>
           </Row>)}
           {received.length === 0 && <p className="text-meta text-kit-slate-11">No money received this month.</p>}
         </div>
@@ -262,10 +262,10 @@ export default function FinancePaymentReport() {
           {owing.map((b) => <Row key={b.orderId} to={`/finance/invoices?invoice=${b.doorId}`}>
             <span className="min-w-0">
               <span className="block text-body font-semibold">{b.so !== null ? `SO-${b.so}` : "SO not available"} · {b.customer}</span>
-              {b.storageOwing > 0 && <span className="block text-label font-normal">
+              {b.storageOwing > 0 && <span className="block text-meta">
                 includes storage {rm(b.storageOwing)}</span>}
             </span>
-            <span className="text-body font-semibold tabular-nums shrink-0">{rm(b.outstanding)} still needed</span>
+            <span className="text-body tabular-nums shrink-0">{rm(b.outstanding)} still needed</span>
           </Row>)}
           {/* With orders excluded for having no value, the section cannot say
               nobody owes — only that nothing it can read does. */}
@@ -283,11 +283,11 @@ export default function FinancePaymentReport() {
               <span className="block text-body font-semibold">
                 {r.invoice_no ?? "Number not issued"}{r.status === "voided" ? " · VOIDED" : ""}
               </span>
-              <span className="block text-label font-normal">
+              <span className="block text-meta">
                 {KIND_WORD[r.kind]} · {r.orders ? `SO-${r.orders.so}` : "SO not available"} · {r.orders?.customer_name ?? "Customer not available"}{r.issued_at ? ` · ${fmtDate(r.issued_at)}` : ""}
               </span>
             </span>
-            <span className="text-body font-semibold tabular-nums shrink-0">{rm(Number(r.amount) + Number(r.tax_amount))}</span>
+            <span className="text-body tabular-nums shrink-0">{rm(Number(r.amount) + Number(r.tax_amount))}</span>
           </Row>)}
           {storageInvoices.length === 0 && <p className="text-meta text-kit-slate-11">No storage has been charged.</p>}
         </div>
@@ -301,7 +301,7 @@ export default function FinancePaymentReport() {
             className="rounded-control border border-base-200 bg-white px-2 py-1.5">
             <span className="block text-body font-semibold">
               {soWordOf(c.order_id)} · {GROUP_WORD[c.product_group]}</span>
-            <span className="block text-label font-normal">
+            <span className="block text-meta">
               Free until {c.approved_free_until} · {c.approval_reason ?? "Reason not available"} · approved by {c.approved_by_user?.name ?? "Name not available"}</span>
           </div>)}
           {waivers.length === 0 && <p className="text-meta text-kit-slate-11">
@@ -316,11 +316,11 @@ export default function FinancePaymentReport() {
           {corrections.map((p) => <Row key={p.id} to={`/finance/payments?payment=${p.id}`}>
             <span className="min-w-0">
               <span className="block text-body font-semibold">{p.receipt_no ?? "Receipt number missing"} · VOIDED</span>
-              <span className="block text-label font-normal">
+              <span className="block text-meta">
                 {p.orders ? `SO-${p.orders.so}` : "SO not available"} · {p.voided_at ? fmtDate(p.voided_at) : "Date not available"} · {p.void_reason ?? "Reason not available"}
               </span>
             </span>
-            <span className="text-body font-semibold tabular-nums shrink-0">{rm(Number(p.amount))}</span>
+            <span className="text-body tabular-nums shrink-0">{rm(Number(p.amount))}</span>
           </Row>)}
           {corrections.length === 0 && <p className="text-meta text-kit-slate-11">No payment was corrected this month.</p>}
         </div>
@@ -332,7 +332,7 @@ export default function FinancePaymentReport() {
         <div className="space-y-1">
           {needsReview.map((b) => <Row key={b.orderId} to={`/finance/invoices?invoice=${b.doorId}`}>
             <span className="block text-body font-semibold min-w-0">{b.so !== null ? `SO-${b.so}` : "SO not available"} · {b.customer}</span>
-            <span className="text-body font-semibold tabular-nums shrink-0">{rm(b.overpaid)} needs review</span>
+            <span className="text-body tabular-nums shrink-0">{rm(b.overpaid)} needs review</span>
           </Row>)}
           {needsReview.length === 0 && <p className="text-meta text-kit-slate-11">No money needs review.</p>}
         </div>

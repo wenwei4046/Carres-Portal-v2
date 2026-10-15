@@ -23,11 +23,11 @@ export default function NavBadge({ count, label }: Props) {
     <span
       data-testid={`nav-badge-${label.toLowerCase().replace(/\s+/g, "-")}`}
       aria-label={`${label}, ${count} pending`}
-      className="ml-auto inline-flex items-center justify-center font-semibold"
+      className="ml-auto inline-flex items-center justify-center font-bold"
       style={{
         background: "var(--brand-signature, #D64F20)",
         color: "white",
-        fontSize: "9.5px",
+        fontSize: "11px",
         minWidth: 18,
         height: 16,
         padding: "0 5px",

@@ -162,8 +162,8 @@ export default function PrincipalDealers({
           ).map((f) => {
             const isActive = statusFilter === f;
             const cls = isActive
-              ? "px-2.5 py-1 text-label rounded-sm capitalize bg-white font-semibold text-base-900 cursor-pointer border-0"
-              : "px-2.5 py-1 text-label rounded-sm capitalize text-base-600 font-medium cursor-pointer bg-transparent border-0";
+              ? "px-2.5 py-1 text-body rounded-sm capitalize bg-white font-medium text-base-900 cursor-pointer border-0"
+              : "px-2.5 py-1 text-body rounded-sm capitalize text-base-600 cursor-pointer bg-transparent border-0";
             return (
               <button
                 key={f}
@@ -240,7 +240,7 @@ function Th({
 }) {
   return (
     <th
-      className={`px-4 py-2.5 text-label font-semibold uppercase tracking-wider text-base-500 ${
+      className={`px-4 py-2.5 text-meta font-medium text-base-500 ${
         right ? "text-right" : "text-left"
       }`}
     >

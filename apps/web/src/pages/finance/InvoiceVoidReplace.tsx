@@ -47,7 +47,7 @@ export default function InvoiceVoidReplace({ invoiceId, invoiceNo }: {
   return <div className="mt-2 space-y-2" data-testid="invoice-void-replace">
     <Textarea id="void-replace-reason" label="Why is this invoice wrong?" rows={2} maxLength={500}
       value={reason} onChange={(e) => setReason(e.target.value)} />
-    <p className="text-label font-normal">
+    <p className="text-meta">
       {invoiceNo} is voided and keeps its paper. A replacement draft with the same lines is
       created; issue it from the order with Generate invoice. It gets a new number.
     </p>
