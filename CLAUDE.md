@@ -39,6 +39,8 @@ number, the party and the date already worked out, and one obvious button.
 
 ---
 
+**Owner15Oct2026 · one physical UI/UX MASTER:** `docs/ui/MASTER.md` alone contains the values/measurements, component contracts, UX and page compositions. Former 01/02/03 rule bodies have moved into its named parts; old paths redirect only. Any later reference in this constitution to01/02/03 means those parts of the same MASTER. Never recreate their old independent rule bodies. Preserve conforming parts; fix specific deviations through the shared component. Owner delegated common engineering defaults to be set once, then visually corrected in this same MASTER. Business law and explicit approved design remain binding.
+
 **Mandatory UI cold-start:** before any listing/UI proposal or build, read `docs/ui/MASTER.md`
 **§0 Current kit index first** (one current source per thing on screen; anything not listed is not a
 pattern to copy), then §0.1–§0.3 (page anatomy, shared module page flow, every-new-chat procedure),

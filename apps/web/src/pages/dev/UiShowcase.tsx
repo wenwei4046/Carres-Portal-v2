@@ -12,8 +12,7 @@
  * Remaining consumer migration is tracked in the existing delivery handoff.
  */
 import { useEffect, useState, type ReactNode } from "react";
-import measurementSource from "../../../../../docs/01-design-tokens.md?raw";
-import uxSource from "../../../../../docs/ui/MASTER.md?raw";
+import kitSource from "../../../../../docs/ui/MASTER.md?raw";
 import MIcon from "@/components/carres/MIcon";
 import CPill, { type CPillTone } from "@/components/carres/CPill";
 import CPopover, { CMenu, CMenuGroup, CMenuItem } from "@/components/carres/CPopover";
@@ -57,8 +56,8 @@ function specificationRows(source: string, start: string, end: string) {
     return [{ group, cells: cells.length === 3 ? [cells[0]!, cells[1]!, "Preserve the owning module contract", cells[2]!] : cells }];
   });
 }
-const MEASUREMENT_ROWS = specificationRows(measurementSource, "## 7 ·", "## 8 ·");
-const UX_ROWS = specificationRows(uxSource, "## §2.2 ·", "**Feedback:**");
+const MEASUREMENT_ROWS = specificationRows(kitSource, "## 7 ·", "## 8 ·");
+const UX_ROWS = specificationRows(kitSource, "## §2.2 ·", "**Feedback:**");
 
 function Section({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
   return (
@@ -511,7 +510,7 @@ export default function UiShowcase() {
         ))}
       </nav>
 
-      <Section id="colours" title="Colours" note="Swatches use the shared runtime tokens. Printed values are the approved default Blue palette from 01 §1; another chosen theme changes selection colours only. Status colours remain fixed. See the actual status components in Pills.">
+      <Section id="colours" title="Colours" note="Swatches use the shared runtime tokens. Printed values are the approved default Blue palette from the UI/UX MASTER values section; another chosen theme changes selection colours only. Status colours remain fixed. See the actual status components in Pills.">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {[
             ["Page ground", "--c-ground", "#F6F7F9"], ["Surface", "--c-card", "#FFFFFF"],
@@ -537,7 +536,7 @@ export default function UiShowcase() {
         </div>
       </Section>
 
-      <Section id="typography" title="Typography" note="Inter. The page heading above shows the 20/600 title once. Samples below use the running shared classes; 01 owns the permitted roles. Table numbers use tabular figures.">
+      <Section id="typography" title="Typography" note="Inter. The page heading above shows the 20/600 title once. Samples below use the running shared classes; the UI/UX MASTER owns the permitted roles. Table numbers use tabular figures.">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[["15 / 500 · Card title", "text-strong", "Customer"], ["14 / 400 · Breadcrumb", "text-control", "Sales Orders"], ["13 / 400 · Body", "text-body", "TEST · Order details"], ["13 / 500 · Selected or field value", "text-body font-medium", "TEST · Selected value"], ["13 / 600 · Identifier or main action", "text-body font-semibold", "SO-TEST-01"], ["12 / 400 · Label or second line", "text-meta", "TEST · Customer A"], ["12 / 500 · Header or pill", "text-meta font-medium", "Proceed date"], ["11 / 500 · Caps label", "text-label uppercase tracking-[0.06em]", "Summary"], ["11 / 700 · Count badge", "text-label font-bold", "12"]].map(([label, className, sample]) => (
             <div key={label} className="flex min-w-0 flex-col gap-2 rounded-lg border border-c-card-border bg-c-card p-3">
@@ -548,7 +547,7 @@ export default function UiShowcase() {
         </div>
       </Section>
 
-      <Section id="measurements" title="Dimensions and usage" note="The full checklist below reads directly from 01 §7. Each item gives its approved value, trigger and shared entry. Units: CSS px. UNRESOLVED means no approved value exists; it must not be guessed.">
+      <Section id="measurements" title="Dimensions and usage" note="The full checklist below reads directly from the one UI/UX MASTER. Each item gives its approved value, trigger and shared entry. Units: CSS px. UNRESOLVED means no approved value exists; it must not be guessed.">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {MEASUREMENT_ROWS.map(({ group, cells }) => (
             <div key={`${group}-${cells[0]}`} className="flex min-w-0 flex-col gap-2 rounded-lg border border-c-card-border bg-c-card p-3">
