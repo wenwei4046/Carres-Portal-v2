@@ -343,7 +343,8 @@ export type DataGridProps<T> = {
   /** Commander 2026-05-28 — single-click anywhere on a row fires this (in
       addition to the highlight). Cells that stopPropagation (checkboxes,
       inline inputs) won't trigger it. Used by PO-from-SO to toggle a pick. */
-  onRowClick?: (row: T) => void;
+  /** The click event rides along (a Ctrl/⌘-click may open a new tab). */
+  onRowClick?: (row: T, event?: MouseEvent) => void;
   /** Commander 2026-05-29 — optional per-row inline style. Used by PO-from-SO
       to grey out rows whose supplier conflicts with the locked one. Returns
       undefined for the default look. */
@@ -366,6 +367,9 @@ export type DataGridProps<T> = {
   serverColumns?: {
     values: Record<string, string[]>;
     onChange: (query: RegisterColumnQuery) => void;
+    /** The page's own chosen values (from its URL): the filter menus show them
+     *  ticked and follow when the page clears one (a chip). */
+    selected?: Record<string, string[]>;
   };
   /** Restores a destination URL search when returning from an owned object. */
   initialSearch?: string;
@@ -414,11 +418,18 @@ export type DataGridProps<T> = {
   /** Opt-in responsive Register Search (owner ruling R4 2026-09-16): a
       readable box when the toolbar has room, an icon that opens when narrow,
       and an active query plus its clear control always visible. */
-  searchPresentation?: "icon" | "responsive";
+  searchPresentation?: "icon" | "responsive" | "none";
   /** Keep frequent controls labelled while the container has room. */
   labelledToolbar?: boolean;
   /** Let a page's date/context controls wrap without clipping; retains icon controls. */
   wrapToolbar?: boolean;
+  /**
+   * NOTHING IS CUT (01 §5, opt-in): a column is as wide as its longest value
+   * (header included), never narrower than its declared `width`; a list wider
+   * than its box scrolls sideways in its own box. A width the person dragged
+   * (`layout.widths`) still wins. `wrap` columns keep wrapping instead.
+   */
+  fitContent?: boolean;
   toolbar?: ReactNode;
   /** Reference-toolbar slots. Start renders before Search; End renders after
       Filters / Export / Columns. The legacy `toolbar` slot is unchanged. */
@@ -462,6 +473,13 @@ export type DataGridProps<T> = {
   focusSearchNonce?: number;
   /** bump to collapse every expanded drill-down row ("Collapse all") */
   collapseAllNonce?: number;
+  /**
+   * A page that draws its OWN toolbar row (Sales Order Outright's v12 toolbar
+   * and selection bar) hides the engine's; it then opens the engine's Columns
+   * chooser from its own ⋮ by bumping `openColumns` with where to show it.
+   */
+  hideToolbar?: boolean;
+  openColumns?: { nonce: number; top: number; right: number };
   /**
    * ⭐ STICKY IDENTITY — owner ruling 2026-08-15 (Chai). OPTIONAL, default OFF.
    *
@@ -600,10 +618,19 @@ export type DataGridProps<T> = {
     alignToColumn?: string;
     /** Keep the child within the visible width, retaining the data-column indent. */
     fitExpansionToViewport?: boolean;
+    /**
+     * The opened row and what it holds are one box (01 §5 "Expanded row": a
+     * 1px `--c-open-frame` frame with corners 8), as Sales Order Outright draws it.
+     * Opt-in; omitted, the §6.9 flush expansion stays exactly as it is.
+     */
+    frame?: boolean;
     /** Optional: derive a stable row id for expansion state. Defaults to rowKey. */
     rowExpansionKey?: (row: T) => string;
     /** Per-row test id for the disclosure chevron. */
     testId?: (row: T) => string;
+    /** The chevron's words when the page's dictionary names them (`Show items`
+     *  / `Hide items`); omitted, `Expand row` / `Collapse row`. */
+    label?: (row: T, open: boolean) => string;
     /**
      * ⭐ ENGINE extension (Warehouse unified card, 2026-09-07): the named
      * DATA column is the one expansion entry — its cell renders the chevron
@@ -656,6 +683,8 @@ export type DataGridProps<T> = {
     isIndeterminate?: (row: never) => boolean;
     /** Per-row test id for the checkbox. */
     testId?: (row: never) => string;
+    /** The tick's accessible name, e.g. `Select SO-1234`. Omitted = `Select row`. */
+    rowLabel?: (row: never) => string;
   };
   /** Per-row test id for the whole `<tr>`. */
   rowTestId?: (row: T) => string;
@@ -853,6 +882,7 @@ function DataGridInner<T>({
   searchPresentation = "icon",
   labelledToolbar = false,
   wrapToolbar = false,
+  fitContent = false,
   toolbar,
   toolbarStart,
   toolbarEnd,
@@ -864,6 +894,8 @@ function DataGridInner<T>({
   statusSummary,
   outputActions,
   focusSearchNonce,
+  hideToolbar = false,
+  openColumns,
   collapseAllNonce,
   stickyIdentity = false,
   leadingColumns,
@@ -928,6 +960,15 @@ function DataGridInner<T>({
       ? { ...DEFAULT_LAYOUT, groupBy: [...(initialGroupBy ?? [])], sort: sortDefault ? { ...sortDefault } : null }
       : saved;
   });
+  /* NOTHING IS CUT (`fitContent`, 01 §5): each column's longest value, header
+     included, as measured after the last paint; a column is never narrower
+     than its declared width, and a width the person dragged still wins. */
+  const [fitWidths, setFitWidths] = useState<Record<string, number>>({});
+  const widthOf = (col: { key: string; width?: number; wrap?: boolean }): number => {
+    const own = layout.widths[col.key] ?? col.width ?? 140;
+    if (!fitContent || col.wrap || layout.widths[col.key] != null) return Number(own);
+    return Math.max(Number(own), fitWidths[col.key] ?? 0);
+  };
   /* The keys a pristine layout hides. Keyed by value so a page that rebuilds
      its column array every render does not churn every layout writer. */
   const defaultHiddenSignature = JSON.stringify(columns.filter((c) => c.defaultHidden).map((c) => c.key));
@@ -994,7 +1035,15 @@ function DataGridInner<T>({
   /* Per-column value filter (Commander 2026-05-29 — "没有 drop-down 菜单让我
      去做选择"). filters[colKey] = the set of allowed values; absent / empty =
      no filter on that column. filterMenu anchors the open dropdown. */
-  const [filters, setFilters] = useState<Record<string, string[]>>(remembered?.filters ?? {});
+  const [filters, setFilters] = useState<Record<string, string[]>>(serverColumns?.selected ?? remembered?.filters ?? {});
+  /* A page that owns its filter values (its URL) is followed: a chip cleared
+     on the page clears the menu's tick too. */
+  const selectedFromPage = serverColumns?.selected;
+  const selectedSignature = selectedFromPage ? JSON.stringify(selectedFromPage) : null;
+  useEffect(() => {
+    if (selectedSignature == null) return;
+    setFilters((was) => (JSON.stringify(was) === selectedSignature ? was : (JSON.parse(selectedSignature) as Record<string, string[]>)));
+  }, [selectedSignature]);
   // Date-preset filters for `filterType: 'date'` columns (colKey → preset).
   const [dateFilters, setDateFilters] = useState<Record<string, DatePreset>>(remembered?.dateFilters ?? {});
   // Number range filters (`filterType: 'number'`): colKey → {min?, max?}.
@@ -1019,6 +1068,15 @@ function DataGridInner<T>({
   const searchRef = useRef<HTMLInputElement>(null);
   const searchIconRef = useRef<HTMLButtonElement>(null);
 
+  /* The page's own ⋮ opens the Columns chooser (`openColumns`). */
+  const openColumnsNonce = openColumns?.nonce;
+  useEffect(() => {
+    if (openColumnsNonce == null || !openColumns) return;
+    setColumnsMenuPos({ top: openColumns.top, right: openColumns.right });
+    setColumnsMenuOpen(true);
+    requestAnimationFrame(() => requestAnimationFrame(() => columnsMenuRef.current?.querySelector<HTMLElement>("button, input")?.focus()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openColumnsNonce]);
   // Refocus search when parent bumps focusSearchNonce ("Find" button).
   useEffect(() => {
     if (focusSearchNonce != null) searchRef.current?.focus();
@@ -1392,7 +1450,7 @@ function DataGridInner<T>({
       if (col.key.startsWith("__")) {
         // The control gutter always pins, at cumulative offsets.
         m.set(col.key, left);
-        left += Number(layout.widths[col.key] ?? col.width ?? 140);
+        left += widthOf(col);
         continue;
       }
       if (named == null) {
@@ -1403,7 +1461,7 @@ function DataGridInner<T>({
       }
       if (named.includes(col.key)) {
         m.set(col.key, left);
-        left += Number(layout.widths[col.key] ?? col.width ?? 140);
+        left += widthOf(col);
         pinned += 1;
         // Every named column found: the block is complete.
         if (pinned === named.length) break;
@@ -1418,7 +1476,7 @@ function DataGridInner<T>({
     }
     return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stickyIdentity, leadingColumns, pinnedLeadingKeys, prefixKey, narrowCanvas, visibleColumns, layout.widths]);
+  }, [stickyIdentity, leadingColumns, pinnedLeadingKeys, prefixKey, narrowCanvas, visibleColumns, layout.widths, fitWidths]);
   /** The last pinned column carries the edge that says where the block ends. */
   const pinnedEdgeKey = useMemo(() => {
     const keys = [...pinnedLefts.keys()];
@@ -1749,8 +1807,9 @@ function DataGridInner<T>({
   /** Every group table is exactly as wide as the columns, so the groups line
    *  up with each other and with the horizontal scrollbar under them. */
   const groupedTableWidth = useMemo(
-    () => visibleColumns.reduce((sum, col) => sum + Number(layout.widths[col.key] ?? col.width ?? 140), 0),
-    [visibleColumns, layout.widths],
+    () => visibleColumns.reduce((sum, col) => sum + widthOf(col), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [visibleColumns, layout.widths, fitWidths],
   );
 
   /** One section per governed group: its heading, then the rows under it. */
@@ -2181,6 +2240,62 @@ function DataGridInner<T>({
      cases the normal full map renders, byte-identical to before. So at today's
      list sizes this is a no-op; it only kicks in past VIRTUAL_THRESHOLD rows. */
   const scrollRef = useRef<HTMLDivElement>(null);
+  /* THE OPENED ROW'S FRAME (`expandable.frame`): one box drawn over the opened
+     row and its expansion, measured after each paint; it moves with the list
+     and takes no clicks. */
+  const [frames, setFrames] = useState<ReadonlyArray<{ key: string; top: number; height: number; width: number }>>([]);
+  useLayoutEffect(() => {
+    if (!expandable?.frame) return;
+    const root = scrollRef.current;
+    if (!root) return;
+    const box = root.getBoundingClientRect();
+    const next = [...root.querySelectorAll<HTMLElement>("[data-expansion-of]")].flatMap((child) => {
+      const parent = child.previousElementSibling as HTMLElement | null;
+      if (!parent) return [];
+      const a = parent.getBoundingClientRect();
+      const b = child.getBoundingClientRect();
+      return [{ key: child.dataset.expansionOf!, top: Math.round(a.top - box.top + root.scrollTop), height: Math.round(b.bottom - a.top), width: Math.round(Math.max(a.width, b.width)) }];
+    });
+    setFrames((was) => (JSON.stringify(was) === JSON.stringify(next) ? was : next));
+  });
+  /* Measure every fitted column after each paint (`fitContent`): the widest
+     line of each of its cells, plus the cell's own padding. A line is a child
+     of the cell, or of the cell's one column of lines (`flex-col`), sized to
+     its words, so a column also narrows again when its long value leaves.
+     Setting the widths repaints once; equal measurements stop there. */
+  const [, setFontsReady] = useState(0);
+  useEffect(() => {
+    if (!fitContent) return;
+    void document.fonts?.ready.then(() => setFontsReady((n) => n + 1));
+  }, [fitContent]);
+  useLayoutEffect(() => {
+    if (!fitContent) return;
+    const root = scrollRef.current;
+    if (!root) return;
+    const lineWidth = (el: HTMLElement): number => {
+      const style = getComputedStyle(el);
+      if (style.position === "absolute") return 0;
+      if (style.display.endsWith("flex") && style.flexDirection === "column" && el.children.length > 0) {
+        return Math.max(0, ...Array.from(el.children).map((c) => lineWidth(c as HTMLElement)));
+      }
+      return el.getBoundingClientRect().width;
+    };
+    const next: Record<string, number> = {};
+    root.querySelectorAll<HTMLElement>("[data-col]").forEach((cell) => {
+      const key = cell.dataset.col!;
+      const style = getComputedStyle(cell);
+      /* A missing reading (no layout, e.g. a test page) counts as 0, so the
+         measurement settles instead of re-rendering on `NaN`. */
+      const pad = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+      let need = 0;
+      for (const child of Array.from(cell.children)) need = Math.max(need, lineWidth(child as HTMLElement) || 0);
+      next[key] = Math.max(next[key] ?? 0, Math.ceil(need + pad));
+    });
+    setFitWidths((was) => {
+      const keys = Object.keys(next);
+      return keys.length === Object.keys(was).length && keys.every((k) => was[k] === next[k]) ? was : next;
+    });
+  });
   const sessionSnapshot = useRef({ search, filters, dateFilters, numberFilters, dateRangeFilters,
     expanded: [...expandedRows], active: activeRowKey, scroll: rememberedScroll.current });
   sessionSnapshot.current = { search, filters, dateFilters, numberFilters, dateRangeFilters,
@@ -2349,7 +2464,7 @@ function DataGridInner<T>({
    */
   const headerCells = (inGroup: boolean, selectionRows: readonly T[] = sortedRows) =>
       visibleColumns.map((col) => {
-        const w = layout.widths[col.key] ?? col.width ?? 140;
+        const w = widthOf(col);
         const fills = col.key === fillKey;
         const style: CSSProperties = {
           width: fills ? undefined : w,
@@ -2385,6 +2500,7 @@ function DataGridInner<T>({
         }
         return (
           <th
+            data-col={fitContent && !col.wrap ? col.key : undefined}
             key={col.key}
             scope="col"
             className={`${styles.th} ${inGroup ? styles.thInGroup : ""} ${col.headerLines || col.headerSub ? styles.thTwoLine : ""} ${col.align === "right" ? styles.thAlignRight : ""} ${col.band ? styles.thBand : ""} ${
@@ -2595,9 +2711,9 @@ function DataGridInner<T>({
              Without `onRowClick`, 2990's rule holds: 点行 = multi-select. L2
              drill-down opens ONLY via the left ▸ chevron (its own handler below,
              with stopPropagation). Row-click never expands. */
-          onClick={() => {
+          onClick={(e) => {
             setSelectedKey(key);
-            if (onRowClick) onRowClick(row);
+            if (onRowClick) onRowClick(row, e);
             else if (selectable && (selectable.isSelectable?.(row as never) ?? true)) {
               selectable.onToggle(key);
             }
@@ -2685,7 +2801,7 @@ function DataGridInner<T>({
           }}
         >
           {visibleColumns.map((col) => {
-            const w = layout.widths[col.key] ?? col.width ?? 140;
+            const w = widthOf(col);
             if (col.key === "__select__" && selectable) {
               const canSelect = selectable.isSelectable?.(row as never) ?? true;
               const refusal = canSelect ? null : (selectable.unselectableReason?.(row as never) ?? null);
@@ -2698,7 +2814,7 @@ function DataGridInner<T>({
                 >
                   <input
                     type="checkbox"
-                    aria-label="Select row"
+                    aria-label={selectable.rowLabel?.(row as never) ?? "Select row"}
                     aria-describedby={refusalId}
                     data-testid={selectable.testId?.(row as never)}
                     checked={selectable.selectedKeys.has(key)}
@@ -2745,7 +2861,7 @@ function DataGridInner<T>({
                   ) : null}
                   <button
                     type="button"
-                    aria-label={isExpanded ? "Collapse row" : "Expand row"}
+                    aria-label={expandable.label?.(row, isExpanded) ?? (isExpanded ? "Collapse row" : "Expand row")}
                     data-testid={expandable.testId?.(row)}
                     /* The disclosure has to ANNOUNCE its state, not only its
                        label: a screen reader lands on the chevron and must be
@@ -2849,6 +2965,7 @@ function DataGridInner<T>({
             return (
               <td
                 key={col.key}
+                data-col={fitContent && !col.wrap ? col.key : undefined}
                 className={`${styles.td} ${col.align === "right" ? styles.tdAlignRight : ""}${wrapClass}${pinClass(col.key)}`}
                 style={{ ...cellWidth(col.key, w), ...pinStyle(col.key) }}
               >
@@ -2860,6 +2977,7 @@ function DataGridInner<T>({
         {isExpanded && expandable && (
           <tr
             className={`${styles.tr} ${styles.trExpansion}`}
+            data-expansion-of={expandable.frame ? expandKey : undefined}
             style={{
               background: "var(--grid-expansion, var(--c-ground))",
               ...(expansionJoinable ? { ["--expansion-join-y" as string]: `${EXPANSION_JOIN_Y}px` } : {}),
@@ -2994,7 +3112,8 @@ function DataGridInner<T>({
           ? [{ key: "search", label: `Search: ${search.trim()}`, onClear: () => setSearch("") }]
           : [];
         const chips = [...searchChips, ...(activeConditions ?? []), ...columnChips];
-        if (chips.length === 0 && !reserveConditionRow) return null;
+        /* `hideToolbar`: the page draws its own chips in its own row. */
+        if (hideToolbar || (chips.length === 0 && !reserveConditionRow)) return null;
         return (
           <div className={`${styles.conditionBar}${reserveConditionRow ? ` ${styles.conditionBarReserved}` : ""}`} data-testid="active-conditions" aria-hidden={chips.length === 0 || undefined}>
 
@@ -3041,7 +3160,14 @@ function DataGridInner<T>({
           mandate), then the caller's actions, then Export + Columns pinned
           right (LAWS 3 + 4). */}
       {!(selectable && selectedOrIndeterminateVisibleRows.length > 0) ? (
-      <div className={styles.toolbar} data-testid={isReference ? "work-toolbar" : undefined}>
+      <div
+        className={styles.toolbar}
+        data-testid={isReference ? "work-toolbar" : undefined}
+        /* `hideToolbar`: the page draws its own row; this one keeps only the
+           Columns chooser it opens (`openColumns`), which shows on its own. */
+        style={hideToolbar ? { height: 0, minHeight: 0, overflow: "hidden", visibility: "hidden", marginBottom: "calc(-1 * var(--table-gap))" } : undefined}
+        aria-hidden={hideToolbar || undefined}
+      >
         {isReference && toolbarStart}
         {isReference && !presentationTools && <div className={styles.toolbarSpacer} />}
         {!embedded && searchPresentation === "responsive" ? (
@@ -3109,7 +3235,7 @@ function DataGridInner<T>({
               )}
             </div>
           </>
-        ) : !embedded && (
+        ) : !embedded && searchPresentation !== "none" && (
           isReference && !labelledToolbar && !searchOpen && !search ? (
             <button
               type="button"
@@ -3275,15 +3401,14 @@ function DataGridInner<T>({
           </button>}
           {columnsMenuOpen && (
             <>
-              <div className={styles.columnsMenuBackdrop} onClick={() => setColumnsMenuOpen(false)} />
+              <div className={styles.columnsMenuBackdrop} style={hideToolbar ? { visibility: "visible" } : undefined} onClick={() => setColumnsMenuOpen(false)} />
               <div
                 ref={columnsMenuRef}
                 className={`${styles.columnsMenu}${personalLayouts ? ` ${styles.columnsMenuWithLayouts}` : ""}`}
-                style={
-                  columnsMenuPos
-                    ? { position: "fixed", top: columnsMenuPos.top, right: columnsMenuPos.right }
-                    : undefined
-                }
+                style={{
+                  ...(columnsMenuPos ? { position: "fixed" as const, top: columnsMenuPos.top, right: columnsMenuPos.right } : {}),
+                  ...(hideToolbar ? { visibility: "visible" as const } : {}),
+                }}
                 onClick={(e) => e.stopPropagation()}
               >
                 <header className={styles.columnsMenuHeader}>
@@ -3445,7 +3570,7 @@ function DataGridInner<T>({
         {isReference && toolbarAfterTools ? <div className={styles.afterTools} data-testid="toolbar-after-tools">{toolbarAfterTools}</div> : null}
       </div>
       ) : (
-        <div className={`${styles.toolbar} ${styles.selectionBar}`} data-testid="selection-bar">
+        <div className={`${styles.toolbar} ${styles.selectionBar}`} data-testid="selection-bar" style={hideToolbar ? { display: "none" } : undefined}>
           <span className={styles.selectionCount}>
             {/* The page names its own unit when it has one: `3 delivery scopes
                 selected` beats `3 selected`, which is true and says nothing
@@ -3561,7 +3686,19 @@ function DataGridInner<T>({
            first column fixed, and nothing is cut. `carres-check.js` reads this
            mark; `e2e-kit` still measures that the list FITS wherever it must. */
         data-list-scroll={isReference ? "" : undefined}
+        style={expandable?.frame ? { position: "relative" } : undefined}
       >
+        {expandable?.frame
+          ? frames.map((f) => (
+              <div
+                key={f.key}
+                aria-hidden="true"
+                className={styles.openFrame}
+                data-testid="grid-open-frame"
+                style={{ top: f.top, height: f.height, width: f.width - 10 }}
+              />
+            ))
+          : null}
         {renderResults && !isLoading && errorState == null && sortedRows.length > 0
           ? groupLocalHeaders
             ? groupSections.map(section => (
@@ -3605,7 +3742,7 @@ function DataGridInner<T>({
               >
                 <colgroup>
                   {visibleColumns.map((col) => (
-                    <col key={col.key} style={col.key === fillKey ? undefined : { width: layout.widths[col.key] ?? col.width ?? 140 }} />
+                    <col key={col.key} style={col.key === fillKey ? undefined : { width: widthOf(col) }} />
                   ))}
                 </colgroup>
                 <thead className={styles.thead}>
@@ -3691,7 +3828,7 @@ function DataGridInner<T>({
               <tfoot className={styles.tfoot} data-testid="footer-totals">
                 <tr>
                   {visibleColumns.map((col) => {
-                    const w = layout.widths[col.key] ?? col.width ?? 140;
+                    const w = widthOf(col);
                     return (
                       <td
                         key={col.key}
@@ -3991,7 +4128,7 @@ function DataGridInner<T>({
                         onClick={() => selectAllFilterValues(filterMenu.colKey, visibleFilterValues)}
                         style={{
                           fontSize: "var(--fs-label)",
-                          fontWeight: 600,
+                          fontWeight: 500,
                           padding: "var(--chip-pad)",
                           borderRadius: "var(--radius)",
                           cursor: "pointer",
@@ -4007,7 +4144,7 @@ function DataGridInner<T>({
                         onClick={() => invertFilterValues(filterMenu.colKey, visibleFilterValues)}
                         style={{
                           fontSize: "var(--fs-label)",
-                          fontWeight: 600,
+                          fontWeight: 500,
                           padding: "var(--chip-pad)",
                           borderRadius: "var(--radius)",
                           cursor: "pointer",

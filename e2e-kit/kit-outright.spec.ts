@@ -14,12 +14,14 @@ import { expect, test, type Page } from "@playwright/test";
  *   rows     every list row 54: each cell on one line, none past its column
  *   frozen   scrolled to its right end, the list still shows SO no.
  *   check    `carres-check.js`, as the repository ships it, answers PASS
- *   align    `carres-align.js` gives v12's fingerprint (fix list 14 Oct): toolbar
- *            32, tabs 32, the view button with its name, ⋮ 32, header 40 grey
- *            12/500, rows 54/54, sticky header, pager, no year. The one permitted
- *            difference is a business word: the preserved date keeps its two-line
- *            header `Customer’s original` / `requested delivery` (owner 14 Oct),
- *            where v12 says `ETA`
+ *   align    v12's fingerprint (fix list 14 Oct): toolbar 32, tabs 32, the view
+ *            button with its name, ⋮ 32, header 40 grey 12/500, rows 54/54, sticky
+ *            header, pager, no year. `carres-align.js` reads the toolbar and the
+ *            dates; the list is the one listing engine (a real <table>), which the
+ *            align script cannot read, so the same table facts are measured here.
+ *            The one permitted difference is a business word: the preserved date
+ *            keeps its two-line header `Customer’s original` / `requested
+ *            delivery` (owner 14 Oct), where v12 says `ETA`
  *
  * This list may scroll sideways in its own box when its columns do not fit
  * (Layout Standard 14 Oct: "the whole table scrolls sideways and the identifier
@@ -39,6 +41,30 @@ const V12 = {
   dates: "no year",
 };
 const carresAlign = (page: Page) => page.evaluate((source) => (0, eval)(source) as Record<string, unknown>, CARRES_ALIGN);
+/* The table half of the fingerprint, read from the engine's <table> the way
+   carres-align.js reads it: header row height and band, the header word's
+   size/weight, the words, two body rows, the sticky header, the pager. */
+const tableFingerprint = (page: Page) =>
+  page.evaluate((table) => {
+    const card = document.querySelector(table) as HTMLElement;
+    const head = card.querySelector("thead tr") as HTMLElement;
+    const th = [...head.querySelectorAll("th")].find((c) => c.textContent?.trim()) as HTMLElement;
+    const word = (th.querySelector("span") ?? th) as HTMLElement;
+    const H = (e: Element) => Math.round(e.getBoundingClientRect().height);
+    const rows = [...card.querySelectorAll("tbody tr")].filter((r) => !r.hasAttribute("data-expansion-of") && r.getAttribute("aria-hidden") !== "true");
+    return {
+      headH: H(head),
+      headBg: getComputedStyle(th).backgroundColor,
+      headFont: `${getComputedStyle(word).fontSize}/${getComputedStyle(word).fontWeight}`,
+      /* Each header's words as the align script joins them: a two-line
+         header's lines meet with no space (`Customer’s originalrequested delivery`). */
+      headWords: [...head.querySelectorAll("th")].map((c) => (c as HTMLElement).innerText.replace(/\s*\n\s*/g, "").trim()).filter(Boolean).join(" · "),
+      rowH: rows.slice(0, 2).map(H).join("/"),
+      sticky: getComputedStyle(head.closest("thead") as HTMLElement).position,
+      footer: /Rows 20/.test(card.innerText) ? "pager" : "no pager",
+    };
+  }, TABLE);
+const fingerprint = async (page: Page) => ({ ...(await carresAlign(page)), table: await tableFingerprint(page) });
 const PASS = ["PASS — all measured items match the Standard"];
 const carresCheck = (page: Page) =>
   page.evaluate((source) => { try { return (0, eval)(source) as string[]; } catch (error) { return [`CHECK ERROR ${(error as Error).message}`]; } }, CARRES_CHECK);
@@ -66,10 +92,10 @@ async function measure(page: Page) {
     const toolbar = document.querySelector('[data-testid="outright-toolbar"]') as HTMLElement | null;
     const edge = card.getBoundingClientRect();
     box.scrollLeft = box.scrollWidth;
-    const soNo = [...card.querySelectorAll('[role="columnheader"]')].find((h) => h.textContent?.trim() === "SO no.") as HTMLElement;
+    const soNo = [...card.querySelectorAll("thead th")].find((h) => h.textContent?.trim() === "SO no.") as HTMLElement;
     const soAt = soNo.getBoundingClientRect();
-    const rows = [...card.querySelectorAll('[role="row"]')].filter((r) => !r.closest('[data-carres-table="item-rows"]')).slice(1);
-    const cells = [...card.querySelectorAll('[role="row"] [role="cell"]')].filter((c) => !c.closest('[data-carres-table="item-rows"]'));
+    const rows = [...card.querySelectorAll("tbody tr")].filter((r) => !r.hasAttribute("data-expansion-of") && r.getAttribute("aria-hidden") !== "true");
+    const cells = rows.flatMap((r) => [...r.querySelectorAll(":scope > td")]);
     const past = cells.filter((c) => [...c.children].some((s) => s.getBoundingClientRect().right > c.getBoundingClientRect().right + 1)).length;
     const buttons = toolbar ? [...toolbar.querySelectorAll("button")].filter((b) => (b as HTMLElement).offsetParent).map((b) => Math.round(b.getBoundingClientRect().height)) : [];
     const out = {
@@ -109,9 +135,9 @@ for (const width of WIDTHS) {
           expect(m.cellsPastColumn, `${state}: no cell runs past its column`).toBe(0);
           expect(m.soNoInView, `${state}: SO no. stays in view at the list's right end`).toBe(true);
           expect(await carresCheck(page), `${state}: carres-check.js`).toEqual(PASS);
-          /* With a row open its item sub-header (32) is the align's second row, as in v12: rows 54/54 is measured closed. */
+          /* With a row open its items sit between the rows: rows 54/54 is measured closed. */
           const { rowH: _rowH, ...openTable } = V12.table;
-          expect(await carresAlign(page), `${state}: carres-align.js matches v12`).toMatchObject(state === "rows closed" ? V12 : { ...V12, table: openTable });
+          expect(await fingerprint(page), `${state}: the list matches v12's fingerprint`).toMatchObject(state === "rows closed" ? V12 : { ...V12, table: openTable });
         }
       });
     }
@@ -122,7 +148,7 @@ test("Sales Order Outright headers read the v12 words and the preserved date's t
   await page.setViewportSize({ width: 1164, height: 900 });
   await page.goto(PAGE, { waitUntil: "networkidle" });
   await page.locator('[data-testid^="outright-row-"]').first().waitFor();
-  const heads = await page.locator(`${TABLE} [role="row"]`).first().locator('[role="columnheader"]').allInnerTexts();
+  const heads = await page.locator(`${TABLE} thead tr`).first().locator("th").allInnerTexts();
   expect(heads.map((h) => h.replace(/\n/g, " / ")).filter(Boolean)).toEqual([
     "Proceed date", "SO no.", "Items", "Sales location", "Delivery location", "Customer’s original / requested delivery",
   ]);
@@ -143,8 +169,12 @@ test("Sales Order Outright toolbar never cuts or hides a control with filters on
   await page.getByRole("button", { name: /^View:/ }).click();
   await page.getByRole("menu").getByText("Overview", { exact: true }).click();
   for (const col of ["Payment", "Problems"]) {
-    await page.locator('[role="columnheader"] button', { hasText: col }).click();
-    await page.getByRole("menu").locator('[role^="menuitem"], button').first().click();
+    /* The engine's header filter: hover the header, its funnel, one value. */
+    const th = page.locator(`${TABLE} thead th`, { hasText: col }).first();
+    await th.hover();
+    await th.getByRole("button", { name: `Filter ${col}` }).click();
+    await page.getByTestId("column-filter-menu").locator('input[type="checkbox"]').first().check();
+    await page.keyboard.press("Escape");
   }
   await page.waitForTimeout(500);
   const m = await page.evaluate(() => {
@@ -242,6 +272,6 @@ test("Sales Order Outright opens from Monthly demand narrowed by the customer's 
   await rows().first().waitFor();
   expect(await carresCheck(page)).toEqual(PASS);
   await page.getByRole("button", { name: /Customer’s original requested delivery: After Jan 1900/ }).click();
-  await expect(page.getByRole("button", { name: /Customer’s original requested delivery/ })).toHaveCount(0);
+  await expect(page.getByTestId("outright-toolbar").getByRole("button", { name: /Customer’s original requested delivery/ })).toHaveCount(0);
   await expect(footer).toHaveText(everyOrder);
 });

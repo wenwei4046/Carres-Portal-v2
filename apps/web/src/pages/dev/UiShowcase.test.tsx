@@ -38,7 +38,7 @@ describe("/ui — the one Carres UI kit", () => {
     expect(tables).toHaveLength(2);
     const table = within(tables[0] as HTMLElement);
     /* the preserved request keeps its two lines, never ETA (owner 14 Oct 2026) */
-    expect(table.getByRole("columnheader", { name: "Customer’s original requested delivery" })).toHaveTextContent("Customer’s originalrequested delivery");
+    expect(table.getByRole("columnheader", { name: "Customer’s original requested delivery" })).toHaveTextContent("Customer’s original requested delivery");
     /* ▸ · ☐ · Proceed date · SO no. · … */
     const firstHeader = table.getAllByRole("columnheader")[2]!;
     expect(firstHeader).toHaveTextContent("Proceed date");

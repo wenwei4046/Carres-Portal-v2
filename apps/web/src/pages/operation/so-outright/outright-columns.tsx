@@ -18,7 +18,7 @@ import type { PaymentMonitorRow } from "@carres/shared/payment-monitor";
 import type { RegisterRow } from "../sales-order-columns";
 import { salesLocationOf } from "../sales-order-columns";
 import type { CPillTone } from "@/components/carres/CPill";
-import type { CCell, CTableColumn } from "@/components/carres/CTable";
+import type { CCell, CListColumn } from "@/components/carres/CCell";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 
 export type CellTone = CPillTone | "none";
@@ -195,7 +195,7 @@ const HANDOVER_WORD: Record<NonNullable<OutrightOrderFacts["loading"]["kind"]>, 
 };
 
 /** A Carres Table column, with how it reads its cell. Width = the v12 track. */
-export type Column = CTableColumn & {
+export type Column = CListColumn & {
   cell: (r: RegisterRow, ctx: CellContext) => Cell;
   /** v8 marks these filterable: the header opens a value menu. */
   filterable?: boolean;

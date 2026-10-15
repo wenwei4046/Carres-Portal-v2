@@ -107,7 +107,7 @@ not a current pattern: do not copy it from a neighbouring page. Live examples ar
 | Page header + global utilities | `ShellHeader` (shell-drawn; `ModuleHeader` names the page into it) · search pill · `TeamButton` · bell | `pages/operation/components/` | §4 · template 2026-10-08 · built on branch |
 | Portal navigation | `PortalSidebar` + `portal-nav` (six groups, one shared menu) | `pages/portal/` | §4.2 · template 2026-10-08 · built on branch |
 | Left mission rail | `FilterRail` family + `useFilterRailOpen` + the Sales Orders `.so-template-rail` composition | `pages/operation/components/workspace-rail.tsx` · `SalesOrdersRegister.tsx` | §6.1 · rail recipe built; mission rule APPROVED TARGET 2026-10-05; complete composition not yet extracted to the kit (KIT GAP) |
-| Register / listing | `register/DataGrid` — the one listing engine; every list in the Portal passes `appearance="reference"` (56 pages, measured 15 Oct 2026) | `components/register/DataGrid.tsx` | §6.0 · §6.2 · built. **One exception owed:** Sales Order Outright draws its list with `carres/CTable` (PR #2066), a second table for one page. Its v12 look is the engine's target: on 15 Oct 2026 the engine took the header band `--c-band`, 10 between columns with 14 at the edges, ▸ before ☐ and the 24 round chevron (01 §5) for every list (DEPLOYED, #2071 `a6c6eabc9`, production read PASS), and every list keeps Export and Columns in its one ⋮ Page tools menu (DEPLOYED, #2074); still owed are the opened row's one frame and the move of Sales Order Outright onto the engine with its 12 baseline pictures unchanged, after which `CTable` is deleted (§7.7) |
+| Register / listing | `register/DataGrid` — the one listing engine; every list in the Portal passes `appearance="reference"`, Sales Order Outright included since 15 Oct 2026 (`carres/CTable` deleted) | `components/register/DataGrid.tsx` | §6.0 · §6.2 · built. The engine draws the v12 table for every list (header band, 10 between columns with 14 at the edges, ▸ before ☐, 24 round chevron; a two-line header inside the 40 header) and keeps Export and Columns in its one ⋮ Page tools menu. A page that draws its own v12 toolbar row passes `hideToolbar` and opens Columns from its own ⋮ (`openColumns`); `fitContent` widens a column to its longest value (01 §5); `expandable.frame` draws the opened row's one frame (used by Outright; §7.2) |
 | Goods expansion | `GoodsMiniTable` + connector | `pages/operation/components/GoodsMiniTable.tsx` · `ConnectedSections.tsx` | §6.9 · built |
 | Simple and document tables | `DataTable` · `DocumentTable` · `TotalsSummary` · `TableScroller` | `components/kit/*` · `components/TableScroller.tsx` | §3 · built |
 | **Compact module card** (the right Working Panel: identity header, Info and module tabs, module summary, editors, Items, Communication, Timeline) | **`CompactModuleCard`** in kit `Drawer variant="compact-card"` — pass the header facts once and each module's own facts, editors and items | `components/kit/CompactModuleCard.tsx` · contract `docs/ui-reference/MODULE-CARD-TEMPLATE.md` (its `/ui` example left with the earlier kit on 14 Oct 2026; it returns when its page's turn comes) | §4.3 · shared component built · Sales Orders adoption PRODUCTION VERIFIED 2026-10-05 (PR #1893/#1896/#1897, `2ce91e2d`) · embedded presentation DEPLOYED (PR #1926, `dc631e1a`, production SHA verified 2026-10-05; owner review owed) · other modules per §4.3.4 table |
@@ -1189,7 +1189,7 @@ into the section it belongs to, and this list loses it.
 | Shared Select long option at 390px | measured right edge 420.72px beyond the viewport (research file §9) | Kit fix |
 | WarehouseIncoming modal close | focus lands on the page, not the Count trigger (research file §9) | Adopt `DialogFrame` focus return |
 | Picker inside a dialog renders UNDER it | a real P1 defect, approved, not built | Kit fix |
-| **Opened row: v12 frame vs §6.9 connector** | 01 §5 (v12, owner 14 Oct 2026) draws an opened row and its items as one box (1px `#CBD0D6` frame, corners 8, 8 above and below); §6.8–§6.9 (owner 2026-09-18/21, Purchasing reference) hang the expansion flush under its row with a 1px connector from the caret. Sales Order Outright draws the frame (CTable); every DataGrid list draws the connector or flush item rows | Owner/Design: confirm the v12 frame replaces the §6.9 connector on every list; then the engine draws it once. Recommendation: the v12 frame (the latest explicit look; one frame is simpler to read than a connector), keeping §6.9's flush item columns |
+| **Opened row: v12 frame vs §6.9 connector** | 01 §5 (v12, owner 14 Oct 2026) draws an opened row and its items as one box (1px `#CBD0D6` frame, corners 8, 8 above and below); §6.8–§6.9 (owner 2026-09-18/21, Purchasing reference) hang the expansion flush under its row with a 1px connector from the caret. Since 15 Oct 2026 the engine can draw the frame (`expandable.frame`): Sales Order Outright keeps it, every other list keeps the connector or flush item rows | Owner/Design: confirm the v12 frame replaces the §6.9 connector on every list; then each list turns `frame` on. Recommendation: the v12 frame (the latest explicit look; one frame is simpler to read than a connector), keeping §6.9's flush item columns |
 | **List header case** | COPY approves sentence-case headings for the Sales Order view (`Proceed date` · `SO no.`, 14 Oct 2026) and SO Batch/Forecast already read sentence case; other lists still read Title Case (`Proceed Date`, `PO Delivery Date`). Design's Round 4 log (K1, 15 Oct 2026) asks for one rule for every list | Owner decision, once, for all modules. Recommendation: sentence case everywhere (the v12 look, already live on the three newest pages); COPY changes each heading in one pass |
 | **Customer lookup placement** | The caller-lookup capability (name/phone/order number across all a customer's orders and recorded history) is approved 2026-09-24/26; its rail door was removed 2026-10-05. Tasks → `Sales Order` tab shows only the linked SO's customer | Owner decision on where the cross-order lookup lives (PROPOSAL in §5) |
 
@@ -1254,14 +1254,14 @@ composition (replaced by `CompactModuleCard`).
 
 ## §7.7 · Measured debt
 
-**One table twice (measured 15 Oct 2026).** Every Portal list is `register/DataGrid` except Sales
-Order Outright, which draws `carres/CTable` (PR #2066). Moving it onto the engine needs these
-capabilities in DataGrid first; CTable already has each one, so this is 🟡 COPY REQUIRED, not an
-engine gap: a pager footer (`Rows 20 ▾ · 1 / 2`) whose count and totals take two lines at most; a
-column that widens to its longest value instead of ending in `…` (01 §5); the opened row's one frame
-(§7.2, pending); header value filters with counts driven by the page's URL (`f.{column}`); the page's
-own toolbar row in the engine's toolbar slots, keeping the one-line give-way steps. Acceptance: the 12
-Sales Order baseline pictures unchanged and `kit-outright.spec.ts` green; then `CTable` is deleted.
+**One table (15 Oct 2026).** Sales Order Outright moved onto `register/DataGrid` and `carres/CTable`
+was deleted. The engine took what CTable had (🟡 COPY REQUIRED, no engine gap): the page's own pager
+footer through `statusSummary` (`CListFooter`), a column as wide as its longest value (`fitContent`),
+the opened row's frame (`expandable.frame`), header value filters held in the page's address
+(`serverColumns.selected`), the page's own toolbar row (`hideToolbar` + `openColumns`), and the row
+tick and chevron in the page's words (`selectable.rowLabel`, `expandable.label`). A two-line header now
+stays inside the 40 header on every list (01 §5). `kit-outright.spec.ts` measures the engine's real
+table; `carres-align.js` still reads the toolbar and the dates.
 
 **Type outside 01 §2 (measured 15 Oct 2026).** `text-label` (11 / 14 / 500) is used 1,294 times and
 `text-[11px]` 71 times; 01 §2 allows 11 only for caps labels, tags and badges (labels and second
@@ -1270,16 +1270,16 @@ Delivery Monitor, Warehouse Outbound and Stock. Retuning the token in one go wou
 page at once; it goes page by page with each page's kit check, or as one measured change with the
 whole kit suite and baselines retaken.
 
-**Unreachable page (measured 15 Oct 2026).** `pages/operation/SalesOrdersRegister.tsx` is no longer
-routed (`/operation/orders` and `/operation/orders/:stage` render Sales Order Outright); Outright still
-imports `skuKey`, `useCatalogNames` and `paymentStatusOf` from it. Outright does not have: grouping
-(`?group=`), per-column sort, the grouped Columns chooser, the role money default, the Monthly demand
-view (`?view=monthly`, still on Purchase Orders), the URL filters `dealer` · `state` · `city` ·
-`delivery` · `category` · `stock` · `payment`, Cards, the row quick card, the row menu `View · Print ·
-Cancel SO`, clickable PO / DO / Receipt / Invoice numbers, money totals in the footer. The one inbound
-door that broke (`?requested=` from Monthly demand) is restored in Outright (PR #2075). Each other
-capability is moved into Outright through Design's fix list or recorded as dropped by the owner before
-the old page is deleted.
+**Old Sales Order register retired (15 Oct 2026).** `SalesOrdersRegister.tsx` (unrouted since 8 Oct)
+and `DestinationHeader.tsx` were deleted after every approved capability was on Outright or replaced
+by a later owner ruling. Moved onto Outright: per-column sort, `Columns`, `Group by` (Delivery, Stock,
+Payment Status), the row menu `View · Print · Cancel SO`, clickable PO, Delivery Order and Receipt
+numbers, header value filters in the address. Replaced by owner rulings: the row quick card and Cards
+(row click opens the full Sales Order, owner 9 Oct 2026), the rail's money summary and money footer
+totals (Summary panel and the quantities footer, v12 11 Oct and fix list 14 Oct), the role money
+default (the views and `Save as my view`, handoff 8 Oct). Monthly demand lives on Purchase Orders and
+opens Outright narrowed (PR #2075). The SO quick card part (`SalesOrderCompactView`) is kept but has no
+entry point; whether another page opens it is a product decision for the Sales Order lane.
 
 **Colour** (measured 2026-07-29): 6,385 colour sites; after the ruler shipped 5,545 of 6,129 measured
 (90.5%), rules O 4,661 · P 594 · Q 111. **Typography:** the `t-*` ramp is retired; sizes carry weight
