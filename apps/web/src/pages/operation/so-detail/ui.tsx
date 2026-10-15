@@ -12,6 +12,7 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import MIcon from "@/components/carres/MIcon";
 import KitSelect from "@/components/kit/Select";
+import KitButton from "@/components/kit/Button";
 import KitDatePicker from "@/components/kit/DatePicker";
 import { controlClass } from "@/components/kit/field-recipe";
 import { SEGMENT, SEGMENT_OFF, SEGMENT_ON, SEGMENTED_TRACK } from "@/components/kit/Tabs";
@@ -101,15 +102,8 @@ export function KvRow({
         <span className="flex min-w-0 items-start gap-1.5">
           <span className={`min-w-0 flex-1 break-words font-medium ${muted ? "text-c-muted" : "text-c-ink"}`}>{value}</span>
           {editing && editor && (
-            <button
-              type="button"
-              onClick={onOpen}
-              aria-label={`Edit ${label}`}
-              title="Edit"
-              className="-mt-1 grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-c-secondary hover:bg-c-hover hover:text-c-ink focus-visible:[outline:var(--c-focus)] focus-visible:[outline-offset:-2px]"
-            >
-              <MIcon name="edit" size={16} />
-            </button>
+            <KitButton variant="ghost" iconOnly icon="edit" onClick={onOpen}
+              aria-label={`Edit ${label}`} title="Edit" />
           )}
         </span>
       )}
